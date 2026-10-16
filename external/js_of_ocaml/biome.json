@@ -1,0 +1,66 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.8/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/benchmarks/sources/js",
+      "!**/compiler/tests-full",
+      "!**/compiler/tests-js-parser",
+      "!**/examples/**/*.json",
+      "!**/runtime/js/zstd.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "useArrowFunction": "off",
+        "noImportantStyles": "off",
+        "noCommaOperator": "off",
+        "noUselessEscapeInRegex": "error"
+      },
+      "correctness": {
+        "noInnerDeclarations": "off",
+        "noInvalidUseBeforeDeclaration": "off",
+        "noSwitchDeclarations": "off",
+        "noUnusedVariables": "off",
+        "noUnusedFunctionParameters": "off",
+        "useParseIntRadix": "off"
+      },
+      "nursery": {},
+      "style": {
+        "noParameterAssign": "off",
+        "noUselessElse": "off",
+        "useExponentiationOperator": "off",
+        "useSingleVarDeclarator": "off",
+        "noSubstr": "error",
+        "useTemplate": "off",
+        "noDescendingSpecificity": "off"
+      },
+      "suspicious": {
+        "noAssignInExpressions": "off",
+        "noUselessEscapeInString": "off",
+        "noVar": "off",
+        "noRedeclare": "off",
+        "noEmptyBlock": "off"
+      }
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "vcs": {
+    "clientKind": "git",
+    "enabled": true,
+    "useIgnoreFile": true
+  }
+}

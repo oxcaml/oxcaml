@@ -30,7 +30,7 @@ val transl_apply: scopes:scopes
                   -> ?inlined:inlined_attribute
                   -> ?specialised:specialise_attribute
                   -> ?position:region_close
-                  -> ?mode:locality_mode
+                  -> ?mode:return_mode
                   -> ?yielding:yielding_kind
                   -> result_layout:Lambda.layout
                   -> lambda
@@ -56,7 +56,7 @@ type error =
   | Unboxed_vector_or_mask_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
-  | Block_index_gap_overflow_possible
+  | Mixed_record_atomic_loc of Longident.t
 
 exception Error of Location.t * error
 

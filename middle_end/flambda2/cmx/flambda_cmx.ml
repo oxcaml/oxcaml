@@ -35,16 +35,16 @@ let load_cmx_file_contents loader comp_unit =
   in
   match Imported_unit_map.find cmx_file loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
-  | exception Not_found -> (
-    match loader.get_module_info accessible_comp_unit with
-    | None ->
-      (* To make things easier to think about, we never retry after a .cmx load
-         fails. *)
-      loader.imported_units
-        <- Imported_unit_map.add cmx_file None loader.imported_units;
-      None
-    | Some cmx ->
-      Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+        match loader.get_module_info accessible_comp_unit with
+        | None ->
+          (* To make things easier to think about, we never retry after a .cmx
+             load fails. *)
+          loader.imported_units
+            <- Imported_unit_map.add cmx_file None loader.imported_units;
+          None
+        | Some cmx ->
           let typing_env, all_code =
             Flambda_cmx_format.import_typing_env_and_code cmx
           in
@@ -54,7 +54,7 @@ let load_cmx_file_contents loader comp_unit =
           loader.imported_units
             <- Imported_unit_map.add cmx_file (Some typing_env)
                  loader.imported_units;
-          Some typing_env))
+          Some typing_env)
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
@@ -206,17 +206,18 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let slots_used_in_typing_env =
     TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
+  let is_local = Current_unit.is_current in
   let exported_offsets =
     exported_offsets
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             free_slots_of_all_code)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode free_slots_of_all_code)
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             slots_used_in_typing_env)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode
             slots_used_in_typing_env)
   in

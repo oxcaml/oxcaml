@@ -16,24 +16,29 @@
 
 open Simplify_import
 
-type 'a after_rebuild = Rebuilt_expr.t -> Upwards_acc.t -> 'a
+type after_rebuild =
+  Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t
 
-type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
+type 'a rebuild =
+  'a ->
+  Upwards_acc.t ->
+  after_rebuild:after_rebuild ->
+  Rebuilt_expr.t * Upwards_acc.t
 
-type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
+type 'a down_to_up =
+  Downwards_acc.t -> 'a -> Simplified_expr.t * Downwards_acc.t
 
 type 'a expr_simplifier =
   Downwards_acc.t ->
   'a ->
-  down_to_up:
-    (Rebuilt_expr.t * Upwards_acc.t, Rebuilt_expr.t * Upwards_acc.t) down_to_up ->
-  Rebuilt_expr.t * Upwards_acc.t
+  down_to_up:Simplified_expr.t down_to_up ->
+  Simplified_expr.t * Downwards_acc.t
 
 type simplify_toplevel =
   Downwards_acc.t ->
   Expr.t ->
   return_continuation:Continuation.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
   exn_continuation:Continuation.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
@@ -41,7 +46,7 @@ type simplify_function_body =
   Downwards_acc.t ->
   Expr.t ->
   return_continuation:Continuation.t ->
-  return_arity:[`Unarized] Flambda_arity.t ->
+  return_arity:[`Complex] Flambda_arity.t ->
   exn_continuation:Continuation.t ->
   loopify_state:Loopify_state.t ->
   params:Bound_parameters.t ->
@@ -97,7 +102,7 @@ let project_tuple ~machine_width ~dbg ~size ~field tuple =
 
 let split_direct_over_application apply ~callee's_code_id
     ~callee's_code_metadata =
-  let apply_alloc_mode = Apply.alloc_mode apply in
+  let apply_alloc_mode = Apply.return_mode apply in
   let callee's_params_arity =
     Code_metadata.params_arity callee's_code_metadata
   in
@@ -135,22 +140,23 @@ let split_direct_over_application apply ~callee's_code_id
        value is still live (and with the caller expecting such value to have
        been allocated in their region). *)
     match result_mode with
-    | Alloc_heap ->
+    | Not_alloc_stack ->
       ( None,
-        Alloc_mode.For_applications.heap
+        Alloc_mode.For_applications.not_alloc_stack
           ~alloc_region:
             (match apply_alloc_mode with
-            | Heap { alloc_region } | Local { alloc_region; _ } -> alloc_region)
-      )
-    | Alloc_local -> (
+            | Not_alloc_stack { alloc_region }
+            | Maybe_alloc_stack { alloc_region; _ } ->
+              alloc_region) )
+    | Maybe_alloc_stack -> (
       match apply_alloc_mode with
-      | Heap { alloc_region } ->
+      | Not_alloc_stack { alloc_region } ->
         let region = Variable.create "over_app_region" K.region in
         let ghost_region = Variable.create "over_app_ghost_region" K.region in
         ( Some (region, ghost_region, Continuation.create ()),
-          Alloc_mode.For_applications.local ~alloc_region ~region ~ghost_region
-        )
-      | Local _ -> None, apply_alloc_mode)
+          Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+            ~ghost_region )
+      | Maybe_alloc_stack _ -> None, apply_alloc_mode)
   in
   let perform_over_application =
     let continuation =
@@ -170,7 +176,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:remaining_args ~args_arity:remaining_arity
       ~return_arity:(Apply.return_arity apply)
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
-      ~alloc_mode:outer_apply_alloc_mode (Apply.dbg apply)
+      ~return_mode:outer_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -198,7 +204,7 @@ let split_direct_over_application apply ~callee's_code_id
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components (Apply.return_arity apply))
+          (Flambda_arity.unarize (Apply.return_arity apply))
       in
       let call_return_continuation, call_return_continuation_free_names =
         match Apply.continuation apply with
@@ -270,7 +276,7 @@ let split_direct_over_application apply ~callee's_code_id
                Bound_parameter.create
                  (Variable.create "over_app_result" (KS.kind kind))
                  kind Flambda_debug_uid.none)
-             (Flambda_arity.unarized_components full_apply_result_arity))
+             (Flambda_arity.unarize full_apply_result_arity))
       in
       Continuation_handler.create params
         ~handler:(Expr.create_invalid (Over_application_never_returns apply))
@@ -293,7 +299,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:first_args ~args_arity:callee's_params_arity
       ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
-      ~alloc_mode:inner_apply_alloc_mode (Apply.dbg apply)
+      ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)

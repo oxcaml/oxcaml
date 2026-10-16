@@ -112,9 +112,9 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
       dacc, symbol
     | None ->
       let symbol =
-        Symbol.create
+        Symbol.manufacture
           (Current_unit.get_cu_exn ())
-          (Linkage_name.of_string (Variable.unique_name bound_to))
+          (Variable.canonical_name bound_to)
       in
       if not (K.equal (T.kind ty) K.value)
       then
@@ -130,7 +130,8 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
       in
       let dacc =
         let denv = DA.denv dacc in
-        LC.create_block_like symbol static_const denv ~symbol_projections ty
+        LC.create_block_like symbol static_const (DE.typing_env denv)
+          ~symbol_projections ty
         |> LCS.singleton
         |> DA.add_to_lifted_constant_accumulator dacc ~also_add_to_env:()
       in

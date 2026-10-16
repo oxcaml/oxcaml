@@ -94,8 +94,15 @@ and variant_subkind consts non_consts : Fexpr.subkind =
   in
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings
-    |> List.map (fun (tag, (_shape, sk)) ->
-        Tag.Scannable.to_int tag, List.map kind_with_subkind sk)
+    |> List.map (fun (tag, shape_and_fields) ->
+        ( Tag.Scannable.to_int tag,
+          match
+            (shape_and_fields
+              : Flambda_kind.With_subkind.Non_null_value_subkind
+                .constructor_shape)
+          with
+          | Undetermined -> None
+          | Determined (_shape, sk) -> Some (List.map kind_with_subkind sk) ))
   in
   Variant { consts; non_consts }
 
@@ -199,14 +206,14 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.region Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap { alloc_region } ->
+  | Not_alloc_stack { alloc_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
-    Heap { alloc_region }
-  | Local { alloc_region; region; ghost_region } ->
+    Not_alloc_stack { alloc_region }
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
     let region = Env.find_region_exn env region in
     let ghost_region = Env.find_region_exn env ghost_region in
-    Local { alloc_region; region; ghost_region }
+    Maybe_alloc_stack { alloc_region; region; ghost_region }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -333,7 +340,7 @@ let rec expr env e =
   | Apply app -> apply_expr env app
   | Apply_cont app_cont -> apply_cont_expr env app_cont
   | Switch switch -> switch_expr env switch
-  | Invalid { message } -> invalid_expr env ~message
+  | Invalid _ -> Fexpr.Invalid
 
 and let_expr env le =
   Flambda.Let_expr.pattern_match le ~f:(fun bound ~body : Fexpr.expr ->
@@ -434,7 +441,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         Option.map (Env.find_code_id_exn env) (Code.newer_version_of code)
       in
       let param_arity = Some (complex_arity (Code.params_arity code)) in
-      let ret_arity = Code.result_arity code |> arity_opt in
+      let ret_arity =
+        Code.result_arity code |> Flambda_arity.unarize_t |> arity_opt
+      in
       let recursive = recursive_flag (Code.recursive code) in
       let inline =
         if Flambda2_terms.Inline_attribute.is_default (Code.inline code)
@@ -479,10 +488,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let closure_var, env = Env.bind_var env my_closure in
             let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
               match my_alloc_mode with
-              | Heap { alloc_region } ->
+              | Not_alloc_stack { alloc_region } ->
                 let alloc_region, env = Env.bind_var env alloc_region in
-                Heap { alloc_region }, env
-              | Local
+                Not_alloc_stack { alloc_region }, env
+              | Maybe_alloc_stack
                   { alloc_region = my_alloc_region;
                     region = my_region;
                     ghost_region = my_ghost_region
@@ -490,7 +499,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 let alloc_region, env = Env.bind_var env my_alloc_region in
                 let region, env = Env.bind_var env my_region in
                 let ghost_region, env = Env.bind_var env my_ghost_region in
-                Local { alloc_region; region; ghost_region }, env
+                Maybe_alloc_stack { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in
@@ -507,10 +516,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let code_size =
         Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
       in
-      let result_mode : Fexpr.alloc_mode_for_assignments =
+      let result_mode : Fexpr.alloc_mode_for_return =
         match Code.result_mode code with
-        | Alloc_heap -> Heap
-        | Alloc_local -> Local
+        | Not_alloc_stack -> Not_alloc_stack
+        | Maybe_alloc_stack -> Maybe_alloc_stack
       in
       Code
         { id = code_id;
@@ -641,7 +650,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =
-    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+    alloc_mode_for_applications env (Apply_expr.return_mode app)
   in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with
@@ -658,7 +667,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
   in
   let param_arity = Apply_expr.args_arity app in
-  let return_arity = Apply_expr.return_arity app in
+  let return_arity = Apply_expr.return_arity app |> Flambda_arity.unarize_t in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
     | Function { function_call = Indirect_known_arity _ } ->
@@ -692,6 +701,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       match Apply_expr.inlined app with
       | Default_inlined -> Some Default_inlined
       | Hint_inlined -> Some Hint_inlined
+      | Forward_inlined -> Some Forward_inlined
       | Always_inlined _ -> Some Always_inlined
       | Unroll (n, _) -> Some (Unroll n)
       | Never_inlined -> Some Never_inlined
@@ -734,7 +744,8 @@ and switch_expr env switch : Fexpr.expr =
   let scrutinee = simple env (Switch_expr.scrutinee switch) in
   let cases =
     List.map
-      (fun (imm, app_cont) ->
+      (fun (imm, arm) ->
+        let app_cont = Switch_arm.action arm in
         let tag =
           (* TODO: machine_width should be passed through properly here *)
           let machine_width = Target_system.Machine_width.Sixty_four in
@@ -747,8 +758,6 @@ and switch_expr env switch : Fexpr.expr =
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }
-
-and invalid_expr _env ~message : Fexpr.expr = Invalid { message }
 
 (* Iter on all sets of closures of a given program. *)
 module Iter = struct
@@ -866,13 +875,6 @@ let conv flambda_unit =
   let env =
     Env.bind_toplevel_alloc_region env
       (Flambda_unit.toplevel_my_alloc_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_region env (Flambda_unit.toplevel_my_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_ghost_region env
-      (Flambda_unit.toplevel_my_ghost_region flambda_unit)
   in
   (* Bind all code ids in toplevel let bindings at the start, since they don't
      necessarily occur in dependency order *)

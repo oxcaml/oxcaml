@@ -35,25 +35,25 @@ external get
 
 external set
   : ('a : value_or_null).
-  'a t @ local -> 'a -> unit
+  ('a t [@local_opt]) -> 'a -> unit
   @@ portable
   = "%atomic_set"
 
 external exchange
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a
   @@ portable
   = "%atomic_exchange"
 
 external compare_and_set
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a -> bool
+  ('a t [@local_opt]) -> 'a -> 'a -> bool
   @@ portable
   = "%atomic_cas"
 
 external compare_exchange
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a -> 'a
   @@ portable
   = "%atomic_compare_exchange"
 
@@ -113,13 +113,14 @@ module Loc = struct
   external get : ('a : value_or_null).
     'a t @ local -> 'a @@ portable = "%atomic_load_loc"
   external set : ('a : value_or_null).
-    'a t @ local -> 'a -> unit @@ portable = "%atomic_set_loc"
+    ('a t [@local_opt]) -> 'a -> unit @@ portable = "%atomic_set_loc"
   external exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a @@ portable = "%atomic_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a @@ portable = "%atomic_exchange_loc"
   external compare_and_set : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> bool @@ portable = "%atomic_cas_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> bool @@ portable = "%atomic_cas_loc"
   external compare_exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> 'a @@ portable = "%atomic_compare_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> 'a @@ portable
+    = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
     : int t @ local -> int -> int @@ portable

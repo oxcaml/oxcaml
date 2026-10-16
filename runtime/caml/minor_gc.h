@@ -94,6 +94,8 @@ CAMLextern void caml_minor_collection (void);
 
 #ifdef CAML_INTERNALS
 #include <stdbool.h>
+#include "domain_state.h"
+#include "mlvalues.h"
 
 extern void caml_set_minor_heap_size (asize_t); /* size in bytes */
 extern void caml_empty_minor_heap_no_major_slice_from_stw

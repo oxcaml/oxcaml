@@ -40,15 +40,15 @@ let fst (type a : value) (t : a t#) = t.#fst
 val fst : 'a t# -> 'a = <fun>
 |}]
 
-let fst (t : int64# t#) = t.#fst
+let fst (t : int64_u t#) = t.#fst
 [%%expect{|
-val fst : int64# t# -> int64# = <fun>
+val fst : int64_u t# -> int64_u = <fun>
 |}]
 
-let fst (t : int64# t#) =
+let fst (t : int64_u t#) =
   match t with #{ fst; _ } -> fst
 [%%expect{|
-val fst : int64# t# -> int64# = <fun>
+val fst : int64_u t# -> int64_u = <fun>
 |}]
 
 let fst (type a : bits64) (t : a t#) = t.#fst
@@ -92,14 +92,14 @@ let make (type a : value) fst snd : a t# = #{ fst; snd }
 val make : 'a -> 'a -> 'a t# = <fun>
 |}]
 
-let make (fst : int64#) snd = #{ fst; snd }
+let make (fst : int64_u) snd = #{ fst; snd }
 [%%expect{|
-val make : int64# -> int64# -> int64# t# = <fun>
+val make : int64_u -> int64_u -> int64_u t# = <fun>
 |}]
 
-let make (fst : int64#) (snd : int64#) = #{ fst; snd }
+let make (fst : int64_u) (snd : int64_u) = #{ fst; snd }
 [%%expect{|
-val make : int64# -> int64# -> int64# t# = <fun>
+val make : int64_u -> int64_u -> int64_u t# = <fun>
 |}]
 
 let make (type a : bits64) (fst : a) (snd : a) = #{ fst; snd }
@@ -107,14 +107,14 @@ let make (type a : bits64) (fst : a) (snd : a) = #{ fst; snd }
 val make : ('a : bits64). 'a -> 'a -> 'a t# = <fun>
 |}]
 
-external box_int64 : int64# -> int64 = "%box_int64"
+external box_int64 : int64_u -> int64 = "%box_int64"
 [%%expect {|
-external box_int64 : int64# -> int64 = "%box_int64"
+external box_int64 : int64_u -> int64 = "%box_int64"
 |}]
 
 let[@inline never] make_test_value () = #{ fst = #1L; snd = #2L }
 [%%expect {|
-val make_test_value : unit -> int64# t# = <fun>
+val make_test_value : unit -> int64_u t# = <fun>
 |}]
 
 let test_direct =
@@ -125,10 +125,10 @@ let test_direct =
 val test_direct : int64 = 2L
 |}]
 
-let[@inline never] make_unboxed_pair_value () : #(int64# * int64#) t# =
+let[@inline never] make_unboxed_pair_value () : #(int64_u * int64_u) t# =
   #{ fst = #(#1L, #2L); snd = #(#3L, #4L) }
 [%%expect {|
-val make_unboxed_pair_value : unit -> #(int64# * int64#) t# = <fun>
+val make_unboxed_pair_value : unit -> #(int64_u * int64_u) t# = <fun>
 |}]
 
 let test_unboxed_pair_direct =
@@ -137,10 +137,10 @@ let test_unboxed_pair_direct =
 val test_unboxed_pair_direct : int64 = 4L
 |}]
 
-let[@inline never] make_nested_value () : int64# t# t# =
+let[@inline never] make_nested_value () : int64_u t# t# =
   #{ fst = #{ fst = #1L; snd = #2L }; snd = #{ fst = #3L; snd = #4L } }
 [%%expect {|
-val make_nested_value : unit -> int64# t# t# = <fun>
+val make_nested_value : unit -> int64_u t# t# = <fun>
 |}]
 
 let test_nested_direct =

@@ -15,6 +15,11 @@
 
 type rewrite_context
 
+(** Erase the subkind of something that may contain a poison value. The
+    nullability and immediacy is kept, since poison values are immediates and
+    thus never null. *)
+val erase_subkind : Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t
+
 (** [rewrite_kind_with_subkind context var kind_with_subkind] For
     [kind_with_subkind] the kind associated to variable [var], removes the
     subkinds on the parts that are not used. *)

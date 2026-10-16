@@ -37,13 +37,11 @@ type machtype_component =
 
 type machtype = machtype_component array
 
-(* [alloc_mode] should be isomorphic to [Cmm.Alloc_mode.t],
-   but due to a cyclic dependency we can not use definitions from [Cmm] here. *)
-type alloc_mode =
-  | Alloc_heap
-  | Alloc_local
+type return_mode =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
 
-type apply_fn := machtype list * machtype * alloc_mode
+type apply_fn := machtype list * machtype * return_mode
 
 (* Curry/apply/send functions *)
 type generic_fns =
@@ -57,9 +55,6 @@ type unit_infos =
                                   (* All compilation units in the
                                      .cmx file (i.e. [ui_unit] and
                                      any produced via [Asmpackager]) *)
-    ui_arg_descr: Lambda.arg_descr option;
-                                  (* If this is an argument unit, the
-                                     parameter it implements *)
     ui_imports_cmi: Import_info.t list;
                                   (* Interfaces imported *)
     ui_imports_cmx: Import_info.t list;
@@ -77,13 +72,16 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
+    ui_static_data: Slambdaeval.CU_data.raw;
+                                  (* Compile-time (comptime) value of the unit's
+                                     main module block, as produced by
+                                     [Slambda.eval]. *)
     ui_file_sections: File_sections.t;
   }
 
 type unit_infos_raw =
   { uir_unit: Compilation_unit.t;
     uir_defines: Compilation_unit.t list;
-    uir_arg_descr: Lambda.arg_descr option;
     uir_imports_cmi: Import_info.t array;
     uir_imports_cmx: Import_info.t array;
     uir_quoted_cmi: Compilation_unit.Name.t array;
@@ -98,6 +96,7 @@ type unit_infos_raw =
                                       relative to byte immediately after
                                       this record *)
     uir_external_symbols: string array;
+    uir_static_data: Slambdaeval.CU_data.raw;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

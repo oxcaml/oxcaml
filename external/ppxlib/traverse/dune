@@ -1,0 +1,10 @@
+(library
+ (name ppxlib_traverse)
+ (public_name ppxlib.traverse)
+ (kind ppx_deriver)
+ (flags
+  (:standard -safe-string))
+ (libraries ppxlib ppxlib_ast.ast ppxlib_ast.astlib ppxlib_jane
+  ppxlib_ast.traverse_builtins ppxlib_ast.stdppx stdlib-shims)
+ (preprocess
+  (pps ppxlib_metaquot)))

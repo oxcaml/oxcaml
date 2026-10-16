@@ -22,15 +22,10 @@
 #include "caml/camlatomic.h"
 #include "caml/alloc.h"
 #include "caml/fail.h"
-#include "caml/gc.h"
-#include "caml/interp.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
-#include "caml/minor_gc.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/platform.h"
-#include "caml/prims.h"
 #include "caml/signals.h"
 
 static int obj_tag (value arg)
@@ -430,9 +425,9 @@ CAMLprim value caml_alloc_dummy_float (value size)
   return caml_alloc (wosize, 0);
 }
 
-/* [size] is a [value] representing the number of fields.
-   [scannable_size] is a [value] representing the length of the prefix of
-   fields that contains pointer values.
+/* [size] is a [value] representing the total size of the block in words (not
+   necessarily the number of fields). [scannable_size] is a [value] representing
+   the length of the prefix of fields that contains pointer values.
 */
 CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
 {

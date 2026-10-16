@@ -23,6 +23,7 @@ let runtime =
     ; backtrace
     ; bigarray
     ; bigstring
+    ; block_index
     ; compare
     ; fail
     ; format
@@ -45,14 +46,15 @@ let runtime =
     ; mlBytes
     ; nat
     ; obj
-    ; ocamlj
     ; parsing
+    ; promise
     ; stdlib
     ; sys
     ; str
     ; unix
     ; weak
     ; domain
+    ; dynamic
     ; prng
     ; sync
     ; effect_

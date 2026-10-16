@@ -19,4 +19,15 @@
     offsets inside [Closure_tag] blocks, where the relevant captured value will
     be stored at runtime, by the [Slot_offsets] module. *)
 
-include Slot.S
+include Slot.S with type payload := Flambda_kind.t * is_always_immediate:bool
+
+val create :
+  Compilation_unit.t ->
+  name:string ->
+  is_always_immediate:bool ->
+  Flambda_kind.t ->
+  t
+
+val kind : t -> Flambda_kind.t
+
+val is_always_immediate : t -> bool

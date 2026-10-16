@@ -32,27 +32,13 @@ type primitive_mismatch =
   | Argument_repr of int
   | Layout_poly_attr
 
-type layout_poly_coercion =
-  | Extra_lhs of { extra: int }
-  (** [first] has [extra] more layout parameters than [second]. *)
-  | Extra_rhs of { extra: int }
-  (** [second] has [extra] more layout parameters than [first]. *)
-  | Instantiate_lhs_to_rhs of { index_lhs: int; index_rhs: int }
-  (** The sort poly var at position [index_lhs] in [first] is instantiated with
-      the sort poly var at position [index_rhs] in [second] (not position
-      [index_lhs] as expected). *)
-  | Instantiate_lhs of { index_lhs: int; arg: Jkind_types.Sort.t option }
-  (** The sort poly var at position [index_lhs] in [first] is instantiated with
-      [arg], which is not any sort poly var of [second]. *)
-
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
   | Not_a_primitive
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
-  | Mode of Mode.Value.error
-  | Layout_poly_coercion of layout_poly_coercion
+  | Mode of Mode.With_regionality.error
 
 exception Dont_match of value_mismatch
 
@@ -100,6 +86,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Mode.Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -144,7 +132,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =
@@ -156,8 +144,8 @@ type mmodes =
   | All
   (** Check module inclusion [M1 : MT1 @ m <= MT2 @ m] for all [m]. *)
   | Specific:
-      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.Value.t ->
+      Mode.((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      Mode.(('l * allowed) With_regionality.t) ->
       mmodes
   (** Check module inclusion [M1 : MT1 @ m1 <= MT2 @ m2].
 
@@ -190,11 +178,11 @@ val child_modes_with_modalities:
 (** Claim the current item is included by the RHS and its mode checked. *)
 val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
   item:Mode.Hint.lock_item ->
-  ?typ:type_expr -> mmodes -> (unit, Mode.Value.error) Result.t
+  ?typ:type_expr -> mmodes -> (unit, Mode.With_regionality.error) Result.t
 
 val value_descriptions:
   loc:Location.t -> Env.t -> string ->
-  mmodes:mmodes ->
+  mmodes:mmodes -> self_check:bool ->
   value_description -> value_description -> module_coercion
 
 val type_declarations:
@@ -248,7 +236,11 @@ val report_modality_sub_error :
 
 val report_mode_sub_error :
   pp:Mode.Hint.pinpoint ->
-  string -> string -> Format_doc.formatter -> Mode.Value.error -> unit
+  string ->
+  string ->
+  Format_doc.formatter ->
+  Mode.With_regionality.error ->
+  unit
 
 val report_extension_constructor_mismatch :
   string -> string -> string ->

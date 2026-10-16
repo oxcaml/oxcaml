@@ -379,10 +379,10 @@ static void set_instruction(code_t pc, opcode_t opcode)
 
 static void restore_instruction(code_t pc)
 {
-  CAMLunused_start int found; CAMLunused_end
   uintnat saved;
-  found = caml_skiplist_find(&event_points_table, (uintnat) pc, &saved);
-  CAMLassert(found);
+  if (!caml_skiplist_find(&event_points_table, (uintnat) pc, &saved))
+    caml_fatal_error("restore_instruction: "
+                     "no saved instruction for %p", (void *) pc);
   *pc = saved;
   caml_skiplist_remove(&event_points_table, (uintnat) pc);
 }
@@ -396,10 +396,10 @@ static code_t pc_from_pos(int frag, intnat pos)
 
 opcode_t caml_debugger_saved_instruction(code_t pc)
 {
-  CAMLunused_start int found; CAMLunused_end
   uintnat saved;
-  found = caml_skiplist_find(&event_points_table, (uintnat) pc, &saved);
-  CAMLassert(found);
+  if (!caml_skiplist_find(&event_points_table, (uintnat) pc, &saved))
+    caml_fatal_error("caml_debugger_saved_instruction: "
+                     "no saved instruction for %p", (void *) pc);
   return saved;
 }
 

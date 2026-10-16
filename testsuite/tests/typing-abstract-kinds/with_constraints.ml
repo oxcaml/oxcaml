@@ -628,24 +628,24 @@ Error: Signature mismatch:
 |}]
 
 module M2 : S with module K := K' = struct
-  type t = int64#
+  type t = int64_u
 end
 [%%expect {|
 Lines 1-3, characters 36-3:
 1 | ....................................struct
-2 |   type t = int64#
+2 |   type t = int64_u
 3 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type t = int64# end
+         sig type t = int64_u end
        is not included in
          sig type t end
        Type declarations do not match:
-         type t = int64#
+         type t = int64_u
        is not included in
          type t
        The layout of the first is bits64
-         because it is the unboxed version of the primitive type int64.
+         because it is the primitive type int64_u.
        But the layout of the first must be a value layout
          because of the definition of t at line 5, characters 2-14.
 |}]
@@ -671,7 +671,7 @@ module type S' =
             and type M1.t1 = #(int * float#)
             and type t2 = #(string * float#)
      and kind_ M2.k1 := bits64
-            and type t3 = int64#
+            and type t3 = int64_u
 [%%expect {|
 module type S =
   sig
@@ -691,7 +691,7 @@ module type S' =
     type t2 = #(string * float#)
     module M2 : sig type t1 : bits64 end
     kind_ k3 = bits64
-    type t3 = int64#
+    type t3 = int64_u
   end
 |}]
 

@@ -48,7 +48,7 @@ let code loopify(never) size(64) newer_version_of(escape_string_0)
                   | 1 -> k2 (for_next_naked, int_add)))
 in
 let $camlMutable_vars1__escape_string_1 =
-  closure escape_string_0_1 @escape_string &toplevel.alloc_region
+  closure escape_string_0_1 @escape_string &toplevel
 in
 let $camlMutable_vars1 = Block 0 ($camlMutable_vars1__escape_string_1) in
 cont done ($camlMutable_vars1)

@@ -23,7 +23,11 @@ let is_control_flow = function
 let is_hard_barrier = function
   | Directive d -> (
     match d with
-    | New_label _ | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ -> true
+    | New_label (Label label, _) ->
+      not (Asm_targets.Asm_label.is_dwarf_only_label label)
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ ->
+      true
     | Align _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
     | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
     | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
@@ -140,6 +144,13 @@ let writes_to_reg64 target = function
   | SIMD _ ->
     (* Conservative: assume any SIMD instruction may write to target. *)
     true
+
+let arg_unchanged_by arg instr =
+  match arg with
+  | Imm _ | Sym _ -> true
+  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+    not (writes_to_reg64 (underlying_reg64 arg |> Option.get) instr)
+  | Regmask _ | Regf _ | Mem _ | Mem64_RIP _ -> false
 
 let reads_from_reg64 target = function
   | MOV (src, dst)

@@ -17,8 +17,6 @@
 
 #include "caml/alloc.h"
 #include "caml/custom.h"
-#include "caml/finalise.h"
-#include "caml/gc.h"
 #include "caml/gc_ctrl.h"
 #include "caml/gc_stats.h"
 #include "caml/major_gc.h"
@@ -34,7 +32,6 @@
 #endif
 #include "caml/domain.h"
 #include "caml/fiber.h"
-#include "caml/globroots.h"
 #include "caml/signals.h"
 #include "caml/startup.h"
 #include "caml/fail.h"
@@ -49,8 +46,6 @@ uintnat caml_fiber_wsz;
 /* TODO: turn these into atomics to avoid data races */
 extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */
 extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */
-extern uintnat caml_compaction_algorithm; /* see shared_heap.c */
-extern uintnat caml_compact_unmap;        /* see shared_heap.c */
 extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */
 extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
@@ -86,22 +81,28 @@ CAMLprim value caml_gc_quick_stat(value v)
   Store_field (res, 2, caml_copy_double ((double)s.alloc_stats.major_words));
   Store_field (res, 3, Val_long (mincoll));
   Store_field (res, 4, Val_long (majcoll));
-  Store_field (res, 5, Val_long (
-    s.global_stats.chunk_words + s.heap_stats.large_words));
+  Store_field (res, 5, Val_long (s.global_stats.chunk_words
+                                 + s.heap_stats.large_words
+                                 + s.heap_stats.extent_words));
   Store_field (res, 6, Val_long (s.global_stats.chunks));
-  Store_field (res, 7, Val_long (
-    s.heap_stats.pool_live_words + s.heap_stats.large_words));
-  Store_field (res, 8, Val_long (
-    s.heap_stats.pool_live_blocks + s.heap_stats.large_blocks));
-  Store_field (res, 9, Val_long (
-    s.global_stats.chunk_words - s.heap_stats.pool_live_words
-    - s.heap_stats.pool_frag_words));
+  Store_field (res, 7, Val_long (s.heap_stats.pool_live_words
+                                 + s.heap_stats.large_words
+                                 + s.heap_stats.extent_live_words));
+  Store_field (res, 8, Val_long (s.heap_stats.pool_live_blocks
+                                 + s.heap_stats.large_blocks
+                                 + s.heap_stats.extent_blocks));
+  Store_field (res, 9, Val_long (s.global_stats.chunk_words
+                                 - s.heap_stats.pool_live_words
+                                 - s.heap_stats.pool_frag_words
+                                 + s.heap_stats.extent_words
+                                 - s.heap_stats.extent_live_words));
   Store_field (res, 10, Val_long (0)); /* free_blocks */
   Store_field (res, 11, Val_long (0)); /* largest_free */
   Store_field (res, 12, Val_long (s.heap_stats.pool_frag_words));
   Store_field (res, 13, Val_long (compactions));
-  Store_field (res, 14, Val_long (
-    s.heap_stats.pool_max_words + s.heap_stats.large_max_words));
+  Store_field (res, 14, Val_long (s.heap_stats.pool_max_words
+                                  + s.heap_stats.large_max_words
+                                  + s.heap_stats.extent_max_words));
   Store_field (res, 15, Val_long (0)); /* stack_size */
   Store_field (res, 16, Val_long (s.alloc_stats.forced_major_collections));
   CAMLreturn (res);
@@ -291,7 +292,7 @@ static caml_result gc_major_res(int compaction_mode)
   CAML_GC_MESSAGE(MAJOR, "Major GC cycle requested\n");
   caml_empty_minor_heaps_once();
   caml_finish_major_cycle(compaction_mode);
-  caml_reset_major_pacing();
+  caml_reset_major_pacing(false);
   caml_result result = caml_process_pending_actions_res();
   CAML_EV_END(EV_EXPLICIT_GC_MAJOR);
   return result;
@@ -315,7 +316,7 @@ static caml_result gc_full_major_res(void)
      currently-unreachable object to be collected. */
   for (i = 0; i < 3; i++) {
     caml_finish_major_cycle(i == 2 ? Compaction_auto : Compaction_none);
-    caml_reset_major_pacing();
+    caml_reset_major_pacing(i == 2);
     res = caml_process_pending_actions_res();
     if (caml_result_is_exception(res)) break;
   }
@@ -352,7 +353,7 @@ CAMLprim value caml_gc_compaction(value v)
      why this needs three iterations. */
   for (i = 0; i < 3; i++) {
     caml_finish_major_cycle(i == 2 ? Compaction_forced : Compaction_none);
-    caml_reset_major_pacing();
+    caml_reset_major_pacing(i == 2);
     res = caml_process_pending_actions_res();
     if (caml_result_is_exception(res))
       break;
@@ -404,7 +405,8 @@ void caml_init_gc (void)
   atomic_store_relaxed(&caml_major_heap_increment,
                        caml_params->init_major_heap_increment);
 
-  caml_gc_phase = Phase_sweep_and_mark_main;
+  caml_init_major_pacing ();
+  caml_gc_phase = Phase_sweep_main;
   #ifdef NATIVE_CODE
   caml_init_frame_descriptors();
   #endif
@@ -447,11 +449,12 @@ struct gc_tweak {
   uintnat initial_value;
 };
 
+extern uintnat caml_small_heap_limit; /* see major_gc.c */
+
 static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
+  { "small_heap_limit", &caml_small_heap_limit, 0 },
   { "prelinking_in_use", &caml_prelinking_in_use, 0 },
-  { "compaction", &caml_compaction_algorithm, 0 },
-  { "compact_unmap", &caml_compact_unmap, 0 },
   { "pool_min_chunk_size", &caml_pool_min_chunk_bsz, 0 },
   { "main_stack_size", &caml_init_main_stack_wsz, 0 },
   { "thread_stack_size", &caml_init_thread_stack_wsz, 0 },

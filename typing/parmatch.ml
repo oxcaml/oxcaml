@@ -65,7 +65,7 @@ let extra_pat =
     (Tpat_var { id = Ident.create_local "+"; name = mknoloc "+";
       uid = Uid.internal_not_actually_unique;
       sort = Jkind.Sort.(of_const Const.for_boxed_variant);
-      mode = Mode.Value.disallow_right Mode.Value.max })
+      mode = Mode.With_regionality.disallow_right Mode.With_regionality.max })
     Ctype.none Env.empty
 
 
@@ -194,21 +194,20 @@ let all_coherent column =
       end
     | Unboxed_unit, Unboxed_unit -> true
     | Unboxed_bool _, Unboxed_bool _ -> true
-    | Tuple l1, Tuple l2 ->
-      List.equal (Option.equal String.equal) l1 l2
+    | Tuple l1, Tuple l2
     | Unboxed_tuple l1, Unboxed_tuple l2 ->
       List.equal
         (fun (lbl1, _) (lbl2, _) -> Option.equal String.equal lbl1 lbl2) l1 l2
-    | Record ((lbl1 :: _), _, _), Record ((lbl2 :: _), _, _) ->
+    | Record ((lbl1 :: _), _), Record ((lbl2 :: _), _) ->
       Array.length lbl1.lbl_all = Array.length lbl2.lbl_all
-    | Record_unboxed_product (lbl1 :: _, _, _),
-      Record_unboxed_product (lbl2 :: _, _, _) ->
+    | Record_unboxed_product (lbl1 :: _, _),
+      Record_unboxed_product (lbl2 :: _, _) ->
       Array.length lbl1.lbl_all = Array.length lbl2.lbl_all
     | Array (am1, _, _), Array (am2, _, _) -> am1 = am2
     | Any, _
     | _, Any
-    | Record ([], _, _), Record ([], _, _)
-    | Record_unboxed_product ([], _, _), Record_unboxed_product ([], _, _)
+    | Record ([], _), Record ([], _)
+    | Record_unboxed_product ([], _), Record_unboxed_product ([], _)
     | Variant _, Variant _
     | Lazy, Lazy -> true
     | ( Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
@@ -378,19 +377,34 @@ module Compat
       const_compare c1 c2 = 0
   | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
   | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
-  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
-      tuple_compat labeled_ps labeled_qs
+  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs
   | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
-      unboxed_tuple_compat labeled_ps labeled_qs
+      tuple_compat labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> compat p q
-  | Tpat_record (l1,_,_,_),Tpat_record (l2,_,_,_) ->
+  | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
+      compats ps qs
+  | ( Tpat_record_unboxed_product (l1, _, _),
+      Tpat_record_unboxed_product (l2, _, _) ) ->
+      let ps, qs = records_args l1 l2 in
       compats ps qs
   | Tpat_array (am1, _, ps), Tpat_array (am2, _, qs) ->
       am1 = am2 &&
       List.length ps = List.length qs &&
       compats ps qs
-  | _,_  -> false
+  | Tpat_fun_layout _, _
+  | Tpat_constant _, _
+  | Tpat_unboxed_unit, _
+  | Tpat_unboxed_bool _, _
+  | Tpat_tuple _, _
+  | Tpat_unboxed_tuple _, _
+  | Tpat_construct (_, _, _, _, _), _
+  | Tpat_variant (_, _, _), _
+  | Tpat_record (_, _, _), _
+  | Tpat_record_unboxed_product (_, _, _), _
+  | Tpat_array (_, _, _), _
+  | Tpat_lazy _, _ ->
+      false
 
   and ocompat op oq = match op,oq with
   | None,None -> true
@@ -404,18 +418,10 @@ module Compat
 
   and tuple_compat labeled_ps labeled_qs = match labeled_ps,labeled_qs with
   | [], [] -> true
-  | (p_label, p)::labeled_ps, (q_label, q)::labeled_qs ->
+  | (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
       Option.equal String.equal p_label q_label
       && compat p q && tuple_compat labeled_ps labeled_qs
   | _,_    -> false
-
-  and unboxed_tuple_compat labeled_ps labeled_qs =
-    match labeled_ps,labeled_qs with
-    | [], [] -> true
-    | (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
-        Option.equal String.equal p_label q_label
-        && compat p q && unboxed_tuple_compat labeled_ps labeled_qs
-    | _,_    -> false
 
 end
 
@@ -466,8 +472,7 @@ let simple_match d h =
   | Record_unboxed_product _, Record_unboxed_product _ -> true
   | Unboxed_unit, Unboxed_unit -> true
   | Unboxed_bool b1, Unboxed_bool b2 -> Bool.equal b1 b2
-  | Tuple lbls1, Tuple lbls2 ->
-    List.equal (Option.equal String.equal) lbls1 lbls2
+  | Tuple lbls1, Tuple lbls2
   | Unboxed_tuple lbls1, Unboxed_tuple lbls2 ->
     List.equal (fun (l1, _) (l2, _) -> Option.equal String.equal l1 l2)
       lbls1 lbls2
@@ -484,7 +489,7 @@ let record_arg ph =
   let open Patterns.Head in
   match ph.pat_desc with
   | Any -> []
-  | Record (args, _, _) -> args
+  | Record (args, _) -> args
   | _ -> fatal_error "Parmatch.as_record"
 
 (* extract unboxed record fields as a whole *)
@@ -492,7 +497,7 @@ let record_unboxed_product_arg ph =
   let open Patterns.Head in
   match ph.pat_desc with
   | Any -> []
-  | Record_unboxed_product (args, _, _) -> args
+  | Record_unboxed_product (args, _) -> args
   | _ -> fatal_error "Parmatch.as_record_unboxed_product"
 
 
@@ -517,17 +522,17 @@ let simple_match_args discr head args =
   | Unboxed_tuple _
   | Array _
   | Lazy -> args
-  | Record (lbls, _, _) ->
+  | Record (lbls, _) ->
     extract_fields (record_arg discr) (List.combine lbls args)
-  | Record_unboxed_product (lbls, _, _) ->
+  | Record_unboxed_product (lbls, _) ->
     extract_fields (record_unboxed_product_arg discr) (List.combine lbls args)
   | Any ->
       begin match discr.pat_desc with
       | Construct (cstr, _, _) -> Patterns.omegas cstr.cstr_arity
       | Variant { has_arg = true }
       | Lazy -> [Patterns.omega]
-      | Record (lbls, _, _) -> omega_list lbls
-      | Record_unboxed_product (lbls, _, _) -> omega_list lbls
+      | Record (lbls, _) -> omega_list lbls
+      | Record_unboxed_product (lbls, _) -> omega_list lbls
       | Array (_, _, len) -> Patterns.omegas len
       | Tuple lbls -> omega_list lbls
       | Unboxed_tuple lbls -> omega_list lbls
@@ -581,7 +586,7 @@ let discr_pat q pss =
       match head.pat_desc with
       | Any -> refine_pat acc rows
       | Tuple _ | Unboxed_tuple _ | Lazy -> head
-      | Record (lbls, sorts, repr) ->
+      | Record (lbls, repr) ->
         (* N.B. we could make this case "simpler" by refining the record case
            using [all_record_args].
            In which case we wouldn't need to fold over the first column for
@@ -589,12 +594,12 @@ let discr_pat q pss =
            However it makes the witness we generate for the exhaustivity warning
            less pretty. *)
         let fields = append_unique lbls (record_arg acc) in
-        let d = { head with pat_desc = Record (fields, sorts, repr) } in
+        let d = { head with pat_desc = Record (fields, repr) } in
         refine_pat d rows
-      | Record_unboxed_product (lbls, sorts, repr) ->
+      | Record_unboxed_product (lbls, repr) ->
         let fields = append_unique lbls (record_unboxed_product_arg acc) in
         let d =
-          { head with pat_desc = Record_unboxed_product (fields, sorts, repr) }
+          { head with pat_desc = Record_unboxed_product (fields, repr) }
         in
         refine_pat d rows
       | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Variant _
@@ -622,10 +627,14 @@ let rec read_args xs r = match xs,r with
     fatal_error "Parmatch.read_args"
 
 let set_args q r = match q with
-| {pat_desc = Tpat_tuple lbls_omegas} ->
-    let lbls, omegas = List.split lbls_omegas in
-    let args, rest = read_args omegas r in
-    make_pat (Tpat_tuple (List.combine lbls args)) q.pat_type q.pat_env :: rest
+| {pat_desc = Tpat_tuple omegas} ->
+    let args,rest =
+      read_args (List.map (fun (_, pat, _) -> pat) omegas) r
+    in
+    make_pat
+      (Tpat_tuple
+        (List.map2 (fun (lbl, _, sort) arg -> lbl, arg, sort) omegas args))
+      q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_unboxed_tuple omegas} ->
     let args,rest =
       read_args (List.map (fun (_, pat, _) -> pat) omegas) r
@@ -634,17 +643,17 @@ let set_args q r = match q with
       (Tpat_unboxed_tuple
         (List.map2 (fun (lbl, _, sort) arg -> lbl, arg, sort) omegas args))
       q.pat_type q.pat_env :: rest
-| {pat_desc = Tpat_record (omegas,sorts,repr,closed)} ->
+| {pat_desc = Tpat_record (omegas,repr,closed)} ->
     let args,rest = read_args omegas r in
     let args =
       List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
-    make_pat (Tpat_record (args, sorts, repr, closed))
+    make_pat (Tpat_record (args, repr, closed))
       q.pat_type q.pat_env :: rest
-| {pat_desc = Tpat_record_unboxed_product (omegas,sorts,repr,closed)} ->
+| {pat_desc = Tpat_record_unboxed_product (omegas,repr,closed)} ->
     let args,rest = read_args omegas r in
     let args =
       List.map2 (fun (lid, lbl, _) arg -> (lid, lbl, arg)) omegas args in
-    make_pat (Tpat_record_unboxed_product (args, sorts, repr, closed))
+    make_pat (Tpat_record_unboxed_product (args, repr, closed))
       q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_construct (lid, c, repr, omegas, _)} ->
     let args,rest = read_args omegas r in
@@ -962,8 +971,6 @@ end
 (* These sorts and reprs should never be used (so we make them unlikely to be
    accidentally correct) *)
 
-let fake_sort_const : Jkind.Sort.Const.t = Base Bits16
-
 let fake_cstr_repr : constructor_representation =
   Constructor_mixed [| Float32 |]
 
@@ -972,6 +979,7 @@ let fake_record_repr : record_representation =
 
 let fake_unboxed_record_repr : record_unboxed_product_representation =
   Record_unboxed_product
+
 
 (* build a pattern from a constructor description *)
 let pat_of_constr ex_pat cstr =
@@ -1017,33 +1025,27 @@ let pats_of_type env ty =
               mknoloc (Longident.Lident ld.lbl_name), ld, omega)
               labels
           in
-          let fake_sorts =
-            List.map (fun _ -> Jkind.Sort.of_const fake_sort_const) labels
-            |> Array.of_list
-            |> fun sorts -> Variable sorts
-          in
-          [make_pat (Tpat_record (fields, fake_sorts, fake_record_repr,
-                                  Closed)) ty env]
+          [make_pat (Tpat_record (fields, fake_record_repr, Closed)) ty env]
       | Type_record_unboxed_product (labels, _,_) ->
           let fields =
             List.map (fun ld ->
               mknoloc (Longident.Lident ld.lbl_name), ld, omega)
               labels
           in
-          let fake_sorts =
-            List.map (fun _ -> Jkind.Sort.of_const fake_sort_const) labels
-            |> Array.of_list
-            |> fun sorts -> Variable sorts
-          in
           [make_pat (Tpat_record_unboxed_product
-                       (fields, fake_sorts, fake_unboxed_record_repr,
-                        Closed)) ty env]
+                       (fields, fake_unboxed_record_repr, Closed)) ty env]
       | Type_variant _ | Type_abstract _ | Type_open -> [omega]
       end
   | Has_no_typedecl ->
       begin match get_desc (Ctype.expand_head env ty) with
         Ttuple tl ->
-          [make_pat (Tpat_tuple (List.map (fun (lbl, _) -> lbl, omega) tl))
+          let make_sort_var () =
+            Jkind.Sort.new_var ~level:(Ctype.get_current_level ())
+            |> Jkind.Sort.of_var
+          in
+          [make_pat
+            (Tpat_tuple
+              (List.map (fun (lbl, _) -> lbl, omega, make_sort_var ()) tl))
             ty env]
       | _ -> [omega]
       end
@@ -1082,7 +1084,7 @@ let build_other_constrs env p =
   let open Patterns.Head in
   match p.pat_desc with
   | Construct ({ cstr_tag = Extension _ }, _, _) -> extra_pat
-  | Construct ({ cstr_tag = Ordinary _} as c, _, _) ->
+  | Construct ({ cstr_tag = Ordinary _ | Null } as c, _, _) ->
       let constr = { p with pat_desc = c } in
       let get_constr q =
         match q.pat_desc with
@@ -1135,7 +1137,9 @@ let build_other ext env =
                        name = {txt="*extension*"; loc = d.pat_loc};
                        uid = Uid.internal_not_actually_unique;
                        sort = Jkind.Sort.(of_const Const.for_constructor);
-                       mode = Mode.Value.disallow_right Mode.Value.max })
+                       mode =
+                         Mode.With_regionality.disallow_right
+                           Mode.With_regionality.max })
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with
@@ -1321,11 +1325,11 @@ let rec has_instance p = match p.pat_desc with
       has_instances (List.map snd ps)
   | Tpat_array (_, _, ps) ->
       has_instances ps
-  | Tpat_tuple labeled_ps -> has_instances (List.map snd labeled_ps)
+  | Tpat_tuple labeled_ps
   | Tpat_unboxed_tuple labeled_ps ->
       has_instances (List.map (fun (_, p, _) -> p) labeled_ps)
-  | Tpat_record (lps,_,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
-  | Tpat_record_unboxed_product (lps,_,_,_) ->
+  | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
+  | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_lazy p
     -> has_instance p
@@ -1970,12 +1974,11 @@ let rec le_pat p q =
   | Tpat_variant(l1,None,_r1), Tpat_variant(l2,None,_) ->
       l1 = l2
   | Tpat_variant(_,_,_), Tpat_variant(_,_,_) -> false
-  | Tpat_tuple(labeled_ps), Tpat_tuple(labeled_qs) ->
-      le_tuple_pats labeled_ps labeled_qs
+  | Tpat_tuple(labeled_ps), Tpat_tuple(labeled_qs)
   | Tpat_unboxed_tuple(labeled_ps), Tpat_unboxed_tuple(labeled_qs) ->
-      le_unboxed_tuple_pats labeled_ps labeled_qs
+      le_tuple_pats labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> le_pat p q
-  | Tpat_record (l1,_,_,_), Tpat_record (l2,_,_,_) ->
+  | Tpat_record (l1,_,_), Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
       le_pats ps qs
   | Tpat_array(am1, _, ps), Tpat_array(am2, _, qs) ->
@@ -1990,16 +1993,9 @@ and le_pats ps qs =
 
 and le_tuple_pats labeled_ps labeled_qs =
   match labeled_ps, labeled_qs with
-    (p_label, p)::labeled_ps, (q_label, q)::labeled_qs ->
-      Option.equal String.equal p_label q_label
-      && le_pat p q && le_tuple_pats labeled_ps labeled_qs
-  | _, _ -> true
-
-and le_unboxed_tuple_pats labeled_ps labeled_qs =
-  match labeled_ps, labeled_qs with
     (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
       Option.equal String.equal p_label q_label
-      && le_pat p q && le_unboxed_tuple_pats labeled_ps labeled_qs
+      && le_pat p q && le_tuple_pats labeled_ps labeled_qs
   | _, _ -> true
 
 let get_mins le ps =
@@ -2032,7 +2028,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     let rs = tuple_lubs ps qs in
     make_pat (Tpat_tuple rs) p.pat_type p.pat_env
 | Tpat_unboxed_tuple ps, Tpat_unboxed_tuple qs ->
-    let rs = unboxed_tuple_lubs ps qs in
+    let rs = tuple_lubs ps qs in
     make_pat (Tpat_unboxed_tuple rs) p.pat_type p.pat_env
 | Tpat_lazy p, Tpat_lazy q ->
     let r = lub p q in
@@ -2050,10 +2046,10 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
               p.pat_type p.pat_env
 | Tpat_variant (l1,None,_row), Tpat_variant(l2,None,_)
               when l1 = l2 -> p
-| Tpat_record (l1,sorts,repr,closed),Tpat_record (l2,_,_,_) ->
+| Tpat_record (l1,repr,closed),Tpat_record (l2,_,_) ->
     let rs = record_lubs l1 l2 in
-    (* CR-someday lmaurer: Take lubs of sorts and reprs? *)
-    make_pat (Tpat_record (rs, sorts, repr, closed))
+    (* CR-someday lmaurer: Take lubs of reprs? *)
+    make_pat (Tpat_record (rs, repr, closed))
       p.pat_type p.pat_env
 | Tpat_array (am1, arg_sort, ps), Tpat_array (am2, _, qs)
       when am1 = am2 && List.length ps = List.length qs ->
@@ -2088,16 +2084,9 @@ and record_lubs l1 l2 =
 
 and tuple_lubs ps qs = match ps,qs with
 | [], [] -> []
-| (p_label, p)::ps, (q_label, q)::qs
-      when Option.equal String.equal p_label q_label ->
-    (p_label, lub p q) :: tuple_lubs ps qs
-| _,_ -> raise Empty
-
-and unboxed_tuple_lubs ps qs = match ps,qs with
-| [], [] -> []
 | (p_label, p, sort)::ps, (q_label, q, _)::qs
       when Option.equal String.equal p_label q_label ->
-    (p_label, lub p q, sort) :: unboxed_tuple_lubs ps qs
+    (p_label, lub p q, sort) :: tuple_lubs ps qs
 | _,_ -> raise Empty
 
 and arg_lubs ps qs = match ps,qs with
@@ -2250,19 +2239,18 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
 | Tpat_any|Tpat_var _|Tpat_constant _|Tpat_unboxed_unit|Tpat_unboxed_bool _
 | Tpat_fun_layout _
 | Tpat_variant (_,None,_) -> r
-| Tpat_tuple ps ->
-    List.fold_left (fun r (_, p) -> collect_paths_from_pat r p) r ps
+| Tpat_tuple ps
 | Tpat_unboxed_tuple ps ->
     List.fold_left (fun r (_, p, _) -> collect_paths_from_pat r p) r ps
 | Tpat_array (_, _, ps) ->
     List.fold_left collect_paths_from_pat r ps
 | Tpat_construct (_, {cstr_tag=Extension _}, _, ps, _)->
     List.fold_left collect_paths_from_pat r (List.map snd ps)
-| Tpat_record (lps,_,_,_) ->
+| Tpat_record (lps,_,_) ->
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
-| Tpat_record_unboxed_product (lps,_,_,_) ->
+| Tpat_record_unboxed_product (lps,_,_) ->
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
@@ -2405,8 +2393,7 @@ let inactive ~partial pat =
             | Const_untagged_int _ | Const_unboxed_nativeint _
             -> true
           end
-        | Tpat_tuple ps ->
-            List.for_all (fun (_,p) -> loop p) ps
+        | Tpat_tuple ps
         | Tpat_unboxed_tuple ps ->
             List.for_all (fun (_,p,_) -> loop p) ps
         | Tpat_construct (_, _, _, ps, _) ->
@@ -2415,11 +2402,11 @@ let inactive ~partial pat =
             List.for_all (fun p -> loop p) ps
         | Tpat_alias { pattern = p; _ } | Tpat_variant (_, Some p, _) ->
             loop p
-        | Tpat_record (ldps,_,_,_) ->
+        | Tpat_record (ldps,_,_) ->
             List.for_all
               (fun (_, lbl, p) -> lbl.lbl_mut = Immutable && loop p)
               ldps
-        | Tpat_record_unboxed_product (ldps,_,_,_) ->
+        | Tpat_record_unboxed_product (ldps,_,_) ->
             List.for_all
               (fun (_, lbl, p) ->
                  match lbl.lbl_mut with

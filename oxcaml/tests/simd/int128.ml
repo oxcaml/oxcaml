@@ -8,7 +8,7 @@ let maxi () = #0x7fff_ffff_ffff_ffffL
 let mini () = #0x8000_0000_0000_0000L
 
 (* (low,high) + (low,high) -> (low,high) *)
-external add_int128 : x0:int64# -> x1:int64# -> y0:int64# -> y1:int64# -> #(int64# * int64#) = "" "caml_int128_add"
+external add_int128 : x0:int64_u -> x1:int64_u -> y0:int64_u -> y1:int64_u -> #(int64_u * int64_u) = "" "caml_int128_add"
 [@@noalloc] [@@builtin]
 
 let () =
@@ -42,7 +42,7 @@ let () = (* -(1<<127) - 1 *)
   eq z1 (maxi ())
 
 (* (low,high) - (low,high) -> (low,high) *)
-external sub_int128 : x0:int64# -> x1:int64# -> y0:int64# -> y1:int64# -> #(int64# * int64#) = "" "caml_int128_sub"
+external sub_int128 : x0:int64_u -> x1:int64_u -> y0:int64_u -> y1:int64_u -> #(int64_u * int64_u) = "" "caml_int128_sub"
 [@@noalloc] [@@builtin]
 
 let () =
@@ -76,7 +76,7 @@ let () = (* -(1<<127) - 1 *)
   eq z1 (maxi ())
 
 (* low * low -> (low,high) *)
-external mul_int64 : int64# -> int64# -> #(int64# * int64#) = "" "caml_int64_mul128"
+external mul_int64 : int64_u -> int64_u -> #(int64_u * int64_u) = "" "caml_int64_mul128"
 [@@noalloc] [@@builtin]
 
 let () =
@@ -100,7 +100,7 @@ let () = (* (1<<63-1) * -2 *)
   eq z1 (-#1L)
 
 (* low * low -> (low,high) *)
-external unsigned_mul_int64 : int64# -> int64# -> #(int64# * int64#) = "" "caml_unsigned_int64_mul128"
+external unsigned_mul_int64 : int64_u -> int64_u -> #(int64_u * int64_u) = "" "caml_unsigned_int64_mul128"
 [@@noalloc] [@@builtin]
 
 let () =

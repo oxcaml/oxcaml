@@ -688,18 +688,24 @@ and expression =
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
+  | Cname_for_debugger of Backend_var.With_provenance.t * expression
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
   | Cifthenelse of
       expression
       * Debuginfo.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
   | Cswitch of
-      expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
+      expression
+      * int array
+      * (expression * Debuginfo.t * Branch_annotations.t) array
+      * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
   | Cinvalid of
@@ -774,10 +780,12 @@ let ctrywith (body, lbl, id, extra_args, handler, dbg) =
 let reset () = Label.reset ()
 
 let iter_shallow_tail f = function
-  | Clet (_, _, body) | Cphantom_let (_, _, body) ->
+  | Clet (_, _, body) | Cphantom_let (_, _, body) | Cname_for_debugger (_, body)
+    ->
     f body;
     true
-  | Cifthenelse (_cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse
+      (_cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
     f ifso;
     f ifnot;
     true
@@ -785,7 +793,7 @@ let iter_shallow_tail f = function
     f e2;
     true
   | Cswitch (_e, _tbl, el, _dbg') ->
-    Array.iter (fun (e, _dbg) -> f e) el;
+    Array.iter (fun (e, _dbg, _annots) -> f e) el;
     true
   | Ccatch (_flag, handlers, body) ->
     List.iter (fun { body = h; _ } -> f h) handlers;
@@ -815,11 +823,15 @@ let iter_shallow_tail f = function
 let map_shallow_tail f = function
   | Clet (id, exp, body) -> Clet (id, exp, f body)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, f body)
-  | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
-    Cifthenelse (cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
+  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, f body)
+  | Cifthenelse (cond, ifso_dbg, ifso_p, ifso, ifnot_dbg, ifnot_p, ifnot, dbg)
+    ->
+    Cifthenelse
+      (cond, ifso_dbg, ifso_p, f ifso, ifnot_dbg, ifnot_p, f ifnot, dbg)
   | Csequence (e1, e2) -> Csequence (e1, f e2)
   | Cswitch (e, tbl, el, dbg') ->
-    Cswitch (e, tbl, Array.map (fun (e, dbg) -> f e, dbg) el, dbg')
+    Cswitch
+      (e, tbl, Array.map (fun (e, dbg, annots) -> f e, dbg, annots) el, dbg')
   | Ccatch (flag, handlers, body) ->
     let map_h { label; params; body = handler; dbg; is_cold } =
       { label; params; body = f handler; dbg; is_cold }
@@ -855,8 +867,9 @@ let map_tail f =
     | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
       | Cphantom_let (_, _, _)
+      | Cname_for_debugger _
       | Csequence (_, _)
-      | Cifthenelse (_, _, _, _, _, _)
+      | Cifthenelse (_, _, _, _, _, _, _, _)
       | Cswitch (_, _, _, _)
       | Ccatch (_, _, _) ) as cmm ->
       map_shallow_tail loop cmm
@@ -868,16 +881,20 @@ let iter_shallow f = function
     f e1;
     f e2
   | Cphantom_let (_id, _de, e) -> f e
+  | Cname_for_debugger (_var, e) -> f e
   | Ctuple el -> List.iter f el
   | Cop (_op, el, _dbg) -> List.iter f el
   | Csequence (e1, e2) ->
     f e1;
     f e2
-  | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
+  | Cifthenelse
+      (cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
     f cond;
     f ifso;
     f ifnot
-  | Cswitch (_e, _ia, ea, _dbg) -> Array.iter (fun (e, _) -> f e) ea
+  | Cswitch (e, _ia, ea, _dbg) ->
+    f e;
+    Array.iter (fun (e, _, _) -> f e) ea
   | Ccatch (_f, hl, body) ->
     let iter_h { body = handler; _ } = f handler in
     List.iter iter_h hl;
@@ -888,26 +905,21 @@ let iter_shallow f = function
   | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
     ()
 
-let map_shallow f = function
-  | Clet (id, e1, e2) -> Clet (id, f e1, f e2)
-  | Cphantom_let (id, de, e) -> Cphantom_let (id, de, f e)
-  | Ctuple el -> Ctuple (List.map f el)
-  | Cop (op, el, dbg) -> Cop (op, List.map f el, dbg)
-  | Csequence (e1, e2) -> Csequence (f e1, f e2)
-  | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
-    Cifthenelse (f cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
-  | Cswitch (e, ia, ea, dbg) ->
-    Cswitch (e, ia, Array.map (fun (e, dbg) -> f e, dbg) ea, dbg)
-  | Ccatch (flag, hl, body) ->
-    let map_h { label; params; body = handler; dbg; is_cold } =
-      { label; params; body = f handler; dbg; is_cold }
-    in
-    Ccatch (flag, List.map map_h hl, f body)
-  | Cexit (n, el, traps) -> Cexit (n, List.map f el, traps)
-  | ( Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-    | Cconst_symbol _ | Cvar _ | Cinvalid _ ) as c ->
-    c
+let contains_debug_only_constructs expr =
+  let exception Found in
+  let rec check expr =
+    match expr with
+    | Cphantom_let _ | Cname_for_debugger _ -> raise Found
+    | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
+    | Ccatch _ | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
+    | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+    | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
+      iter_shallow check expr
+  in
+  try
+    check expr;
+    false
+  with Found -> true
 
 let rank_machtype_component : machtype_component -> int = function
   | Val -> 0

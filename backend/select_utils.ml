@@ -57,7 +57,10 @@ type environment =
         (** Which registers must be populated when jumping to the given handler.
         *)
     trap_stack : Operation.trap_stack;
-    tailrec_label : Label.t
+    tailrec_label : Label.t;
+    phantom_lets : V.Set.t;
+    all_phantom_lets :
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -102,6 +105,9 @@ let env_find_static_exception id env =
     Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
+
+let phantom_vars_from_env env =
+  if !Clflags.restrict_to_upstream_dwarf then None else Some env.phantom_lets
 
 let rec combine_traps trap_stack = function
   | [] -> trap_stack
@@ -159,8 +165,41 @@ let env_create ~tailrec_label =
   { vars = V.Map.empty;
     static_exceptions = Static_label.Map.empty;
     trap_stack = Uncaught;
-    tailrec_label
+    tailrec_label;
+    phantom_lets = V.Set.empty;
+    all_phantom_lets = ref V.Map.empty
   }
+
+let env_add_phantom_let var defining_expr env =
+  if !Clflags.restrict_to_upstream_dwarf
+  then env
+  else
+    (* Information about phantom lets is split at this stage:
+
+       1. The phantom variables in scope are recorded in the environment and
+       subsequently passed through CFG to Linear instructions via the
+       phantom_available_before field.
+
+       2. The defining expressions are accumulated (see [all_phantom_lets]) and
+       eventually stored in the CFG's fun_phantom_lets field. *)
+    (* A [None] defining expression means the variable has been optimised out;
+       it is still recorded (as [Cphantom_optimised_out]) so that it remains
+       consistent with [phantom_available_before] and other phantom lets may
+       refer to it. *)
+    let cfg_defining_expr : Cfg.phantom_defining_expr =
+      match (defining_expr : Cmm.phantom_defining_expr option) with
+      | None -> Cfg.phantom_optimised_out
+      | Some defining_expr -> Cfg.phantom_defining_expr_of_cmm defining_expr
+    in
+    let provenance = VP.provenance var in
+    let var = VP.var var in
+    if V.Map.mem var !(env.all_phantom_lets)
+    then Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print var;
+    env.all_phantom_lets
+      := V.Map.add var (provenance, cfg_defining_expr) !(env.all_phantom_lets);
+    { env with phantom_lets = V.Set.add var env.phantom_lets }
+
+let phantom_lets_for_fundecl env = !(env.all_phantom_lets)
 
 let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
   function
@@ -273,7 +312,7 @@ let size_component : machtype_component -> int = function
   | Float -> Arch.size_float
   | Float32 ->
     (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
-       Note that packed float32# arrays are handled via a separate path. *)
+       Note that packed float32_u arrays are handled via a separate path. *)
     Arch.size_float
   | Vec128 -> Arch.size_vec128
   | Valx2 ->
@@ -296,36 +335,39 @@ let size_machtype mty =
   done;
   !size
 
-let size_expr env exp =
+let size_expr_with ~size_of_var exp =
   let rec size localenv = function
     | Cconst_int _ | Cconst_natint _ -> Arch.size_int
     | Cconst_symbol _ -> Arch.size_addr
     | Cconst_float _ -> Arch.size_float
     | Cconst_float32 _ ->
       (* CR layouts v5.1: reconsider when float32 fields are efficiently packed.
-         Note that packed float32# arrays are handled via a separate path. *)
+         Note that packed float32_u arrays are handled via a separate path. *)
       Arch.size_float
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
     | Cconst_mask _ -> Arch.size_int
     | Cvar id -> (
-      try V.Map.find id localenv
-      with Not_found -> (
-        try
-          let regs = env_find id env in
-          size_machtype (Array.map (fun r -> r.Reg.typ) regs)
-        with Not_found ->
-          Misc.fatal_error
-            ("Selection.size_expr: unbound var " ^ V.unique_name id)))
+      try V.Map.find id localenv with Not_found -> size_of_var id)
     | Ctuple el -> List.fold_right (fun e sz -> size localenv e + sz) el 0
     | Cop (op, _, _) -> size_machtype (oper_result_type op)
     | Clet (id, arg, body) ->
       size (V.Map.add (VP.var id) (size localenv arg) localenv) body
+    | Cphantom_let (_id, _defining_expr, body) -> size localenv body
+    | Cname_for_debugger (_var, body) -> size localenv body
     | Csequence (_e1, e2) -> size localenv e2
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
   size V.Map.empty exp
+
+let size_expr env exp =
+  size_expr_with exp ~size_of_var:(fun id ->
+      try
+        let regs = env_find id env in
+        size_machtype (Array.map (fun r -> r.Reg.typ) regs)
+      with Not_found ->
+        Misc.fatal_error ("Selection.size_expr: unbound var " ^ V.unique_name id))
 
 (* Name of function being compiled *)
 let current_function_name = ref ""
@@ -418,6 +460,95 @@ let select_effects (e : Cmm.effects) : Effect.t =
 
 let select_coeffects (e : Cmm.coeffects) : Coeffect.t =
   match e with No_coeffects -> None | Has_coeffects -> Arbitrary
+
+(* [emit_parts] and [emit_parts_list] force right-to-left evaluation order as
+   required by the Flambda [Un_anf] pass (and to be consistent with the bytecode
+   compiler). *)
+
+let may_defer_evaluation ec ~effects_after =
+  let module EC = Effect_and_coeffect in
+  match EC.effect_ ec with
+  | Arbitrary | Raise ->
+    (* Preserve the ordering of effectful expressions by evaluating them early
+       (in the correct order) and assigning their results to temporaries. We can
+       avoid this in just one case: if we know that every [exp'] in the original
+       expression list (cf. [emit_parts_list]) to be evaluated after [exp]
+       cannot possibly affect the result of [exp] or depend on the result of
+       [exp], then [exp] may be deferred. (Checking purity here is not enough:
+       we need to check copurity too to avoid e.g. moving mutable reads earlier
+       than the raising of an exception.) *)
+    EC.pure_and_copure effects_after
+  | None -> (
+    match EC.coeffect ec with
+    | None ->
+      (* Pure expressions may be moved. *)
+      true
+    | Read_mutable -> (
+      (* Read-mutable expressions may only be deferred if evaluation of every
+         [exp'] (for [exp'] as in the comment above) has no effects "worse" (in
+         the sense of the ordering in [t]) than raising an exception. *)
+      match EC.effect_ effects_after with
+      | None | Raise -> true
+      | Arbitrary -> false)
+    | Arbitrary -> (
+      (* Arbitrary expressions may only be deferred if evaluation of every
+         [exp'] (for [exp'] as in the comment above) has no effects. *)
+      match EC.effect_ effects_after with
+      | None -> true
+      | Arbitrary | Raise -> false))
+
+let emit_parts ~effects_of ~is_simple_expr ~emit ~bind_result env ~effects_after
+    exp : _ Or_never_returns.t =
+  let open Or_never_returns.Syntax in
+  (* Even though some expressions may look like they can be deferred from the
+     (co)effect analysis, it may be forbidden to move them. *)
+  if may_defer_evaluation (effects_of exp) ~effects_after && is_simple_expr exp
+  then Ok (exp, env)
+  else
+    let* r = emit env exp in
+    if Array.length r = 0
+    then Or_never_returns.Ok (Cmm.Ctuple [], env)
+    else
+      (* The normal case: introduce a fresh temp to hold the result. *)
+      let id = V.create_local "bind" in
+      Ok (Cmm.Cvar id, bind_result env id r)
+
+let emit_parts_list ~effects_of ~is_simple_expr ~emit ~bind_result env exp_list
+    : _ Or_never_returns.t =
+  let module EC = Effect_and_coeffect in
+  let open Or_never_returns.Syntax in
+  let exp_list_right_to_left, _effect =
+    (* Annotate each expression with the (co)effects that happen after it when
+       the original expression list is evaluated from right to left. The
+       resulting expression list has the rightmost expression first. *)
+    List.fold_left
+      (fun (exp_list, effects_after) exp ->
+        (exp, effects_after) :: exp_list, EC.join (effects_of exp) effects_after)
+      ([], EC.none) exp_list
+  in
+  List.fold_left
+    (fun acc (exp, effects_after) ->
+      let* result, env = acc in
+      let* exp_result, env =
+        emit_parts ~effects_of ~is_simple_expr ~emit ~bind_result env
+          ~effects_after exp
+      in
+      Or_never_returns.Ok (exp_result :: result, env))
+    (Or_never_returns.Ok ([], env))
+    exp_list_right_to_left
+
+let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
+  function
+  | Float -> Double
+  | Float32 -> Single { reg = Float32 }
+  (* SIMD memory operations are unaligned by default. Aligned bigarray
+     operations are handled separately via cmm. *)
+  | Vec128 -> Onetwentyeight_unaligned
+  | Vec256 -> Twofiftysix_unaligned
+  | Vec512 -> Fivetwelve_unaligned
+  | Mask -> Word_mask
+  | Val | Addr | Int -> Word_val
+  | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :
     Cmm.float_width ->
@@ -633,27 +764,37 @@ let make_const_symbol x = Operation.Const_symbol x
 
 let make_opaque () = Operation.Opaque
 
-let insert_debug (_env : environment) sub_cfg basic dbg arg res =
-  Sub_cfg.add_instruction sub_cfg basic arg res dbg
+let insert_debug (env : environment) sub_cfg basic dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-let insert_op_debug_returning_id (_env : environment) sub_cfg op dbg arg res =
-  let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
+let insert_op_debug_returning_id (env : environment) sub_cfg op dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  let instr =
+    Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
+  in
   Sub_cfg.add_instruction' sub_cfg instr;
   instr.id
 
-let insert (_env : environment) sub_cfg basic arg res =
+let insert (env : environment) sub_cfg basic arg res =
   (* CR mshinwell: fix debuginfo *)
+  let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.add_instruction sub_cfg basic arg res Debuginfo.none
+    ~phantom_available_before
 
-let insert' (_env : environment) sub_cfg term arg res =
+let insert' (env : environment) sub_cfg term arg res =
   (* CR mshinwell: fix debuginfo *)
+  let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.set_terminator sub_cfg term arg res Debuginfo.none
+    ~phantom_available_before
 
-let insert_debug' (_env : environment) sub_cfg basic dbg arg res =
-  Sub_cfg.set_terminator sub_cfg basic arg res dbg
+let insert_debug' (env : environment) sub_cfg basic dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.set_terminator sub_cfg basic arg res dbg ~phantom_available_before
 
-let insert_op_debug' (_env : environment) sub_cfg op dbg rs rd =
-  Sub_cfg.set_terminator sub_cfg op rs rd dbg;
+let insert_op_debug' (env : environment) sub_cfg op dbg rs rd =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.set_terminator sub_cfg op rs rd dbg ~phantom_available_before;
   rd
 
 let insert_move env sub_cfg src dst =
@@ -675,12 +816,13 @@ let insert_move_args env sub_cfg arg loc stacksize =
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
 
+let result_needs_mask_of_int64 (src : Reg.t) (dst : Reg.t) =
+  (* The C ABI passes masks in GPRs. *)
+  equal_machtype_component dst.typ Mask && equal_machtype_component src.typ Int
+
 let insert_move_result env sub_cfg (src : Reg.t) (dst : Reg.t) =
-  if
-    equal_machtype_component dst.typ Mask
-    && equal_machtype_component src.typ Int
+  if result_needs_mask_of_int64 src dst
   then
-    (* The C ABI passes masks in GPRs. *)
     insert env sub_cfg (Op (Reinterpret_cast Mask_of_int64)) [| src |] [| dst |]
   else insert_move env sub_cfg src dst
 
@@ -694,16 +836,22 @@ let insert_move_results env sub_cfg loc res stacksize =
 let maybe_emit_naming_op env sub_cfg ~bound_name regs =
   match bound_name with
   | None -> ()
-  | Some bound_name ->
+  | Some bound_name -> (
     let provenance = Backend_var.With_provenance.provenance bound_name in
-    if Option.is_some provenance
-    then
+    match provenance with
+    | None -> ()
+    | Some provenance_inner ->
+      let which_parameter =
+        match Backend_var.Provenance.is_parameter provenance_inner with
+        | Local -> None
+        | Parameter { index } -> Some index
+      in
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
         Operation.Name_for_debugger
-          { ident = bound_name; provenance; which_parameter = None; regs }
+          { ident = bound_name; provenance; which_parameter; regs }
       in
-      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
+      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||])
 
 let join env (opt_r1 : _ Or_never_returns.t) sub_cfg1
     (opt_r2 : _ Or_never_returns.t) sub_cfg2 ~bound_name : _ Or_never_returns.t

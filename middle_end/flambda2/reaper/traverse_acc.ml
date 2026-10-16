@@ -25,12 +25,11 @@ type continuation_info =
 module Env = Traverse_env
 
 type code_dep =
-  { arity : [`Complex] Flambda_arity.t;
+  { code_metadata : Code_metadata.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
     exn : Variable.t; (* Dummy variable representing exn return value *)
-    is_tupled : bool;
     known_arity_call_witness : Code_id_or_name.t;
     unknown_arity_call_witnesses :
       Code_id_or_name.t list (* One element for each (complex) parameter *)
@@ -39,7 +38,7 @@ type code_dep =
 type apply_dep =
   { function_containing_apply_expr : Code_id.t option;
     apply_code_id : Code_id.t;
-    apply_closure : Simple.t option;
+    apply_closure : Code_id_or_name.t option;
     apply_call_witness : Code_id_or_name.t
   }
 
@@ -49,11 +48,74 @@ type closure_dep =
     only_full_applications : bool
   }
 
+type delayed_deps =
+  { apply_deps : apply_dep list;
+    set_of_closures_deps : closure_dep list;
+    imported_symbols : Symbol.Set.t
+  }
+
+module Applications = struct
+  type bounds =
+    { known : int option;
+      unknown : int list option
+    }
+
+  type t = bounds Code_id_or_name.Map.t
+
+  let empty = Code_id_or_name.Map.empty
+
+  let union_option f a b =
+    match a, b with None, x | x, None -> x | Some a, Some b -> Some (f a b)
+
+  let rec max_widths a b =
+    match a, b with
+    | [], widths | widths, [] -> widths
+    | a :: rest_a, b :: rest_b -> max a b :: max_widths rest_a rest_b
+
+  let union_bounds a b =
+    { known = union_option max a.known b.known;
+      unknown = union_option max_widths a.unknown b.unknown
+    }
+
+  let add_apply t apply =
+    match Apply_expr.call_kind apply, Apply_expr.callee apply with
+    | Function { function_call }, Some callee ->
+      Simple.pattern_match callee
+        ~const:(fun _ -> t)
+        ~name:(fun name ~coercion:_ ->
+          let bounds =
+            match function_call with
+            | Direct _ | Indirect_known_arity _ ->
+              { known = Some (List.length (Apply_expr.args apply));
+                unknown = None
+              }
+            | Indirect_unknown_arity ->
+              let groups =
+                Flambda_arity.group_by_parameter
+                  (Apply_expr.args_arity apply)
+                  (Apply_expr.args apply)
+              in
+              { known = None; unknown = Some (List.map List.length groups) }
+          in
+          Code_id_or_name.Map.update
+            (Code_id_or_name.name name)
+            (fun previous ->
+              Some
+                (match previous with
+                | None -> bounds
+                | Some previous -> union_bounds previous bounds))
+            t)
+    | Function _, None | (C_call _ | Method _ | Effect _), _ -> t
+
+  let union a b =
+    Code_id_or_name.Map.union (fun _ a b -> Some (union_bounds a b)) a b
+end
+
 type t =
   { mutable code_deps : code_dep Code_id.Map.t;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
-    mutable apply_deps : apply_dep list;
-    mutable set_of_closures_deps : closure_dep list;
+    mutable delayed_deps : delayed_deps;
+    mutable applications : Applications.t;
     deps : Graph.graph;
     mutable fixed_arity_conts : Continuation.Set.t;
     mutable continuation_info : continuation_info Continuation.Map.t;
@@ -64,11 +126,20 @@ type t =
 
 let code_deps t = t.code_deps
 
+let applications t = t.applications
+
+let record_apply_for_rebuild t apply =
+  t.applications <- Applications.add_apply t.applications apply
+
 let create () =
   { code_deps = Code_id.Map.empty;
     code = Code_id.Map.empty;
-    apply_deps = [];
-    set_of_closures_deps = [];
+    delayed_deps =
+      { apply_deps = [];
+        set_of_closures_deps = [];
+        imported_symbols = Symbol.Set.empty
+      };
+    applications = Applications.empty;
     deps = Graph.create ();
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
@@ -86,7 +157,12 @@ let simple_to_node t ~all_constants simple =
     ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
       if not (Current_unit.is_current (Symbol.compilation_unit s))
-      then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
+      then
+        t.delayed_deps
+          <- { t.delayed_deps with
+               imported_symbols =
+                 Symbol.Set.add s t.delayed_deps.imported_symbols
+             };
       Code_id_or_name.symbol s)
 
 let add_code_dep t code_id dep =
@@ -122,9 +198,6 @@ let add_argument_dep t ~from relation ~base =
 let add_parameter_dep t ~base relation ~to_ =
   Graph.add_parameter_dep t.deps ~base relation ~to_
 
-let add_propagate_dep t ~if_used ~to_ ~from =
-  Graph.add_propagate_dep t.deps ~if_used ~to_ ~from
-
 let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
   Graph.add_alias_if_any_source_dep t.deps ~if_any_source ~to_ ~from
 
@@ -150,16 +223,17 @@ let add_cond_any_source t ~(denv : Env.t) v =
   match Env.current_code_id denv with
   | None -> add_any_source t v
   | Some code_id ->
-    add_propagate_dep t
+    Graph.add_any_source_if_used t.deps
       ~if_used:(Code_id_or_name.code_id code_id)
-      ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
-      ~to_:v
+      v
 
 let cond_alias t ~(denv : Env.t) ~from ~to_ =
   match Env.current_code_id denv with
   | None -> add_alias t ~from ~to_
   | Some code_id ->
-    add_propagate_dep t ~if_used:(Code_id_or_name.code_id code_id) ~from ~to_
+    Graph.add_propagate_dep t.deps
+      ~if_used:(Code_id_or_name.code_id code_id)
+      ~from ~to_
 
 let fixed_arity_continuation t k =
   t.fixed_arity_conts <- Continuation.Set.add k t.fixed_arity_conts
@@ -172,16 +246,30 @@ let continuation_info t k ~params ~arity ~is_exn_handler =
 
 let get_continuation_info t = t.continuation_info
 
-let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
+let add_apply t ~function_containing_apply_expr ~apply_code_id ~apply_closure
+    ~apply_call_witness =
+  t.delayed_deps
+    <- { t.delayed_deps with
+         apply_deps =
+           { function_containing_apply_expr;
+             apply_code_id;
+             apply_closure;
+             apply_call_witness
+           }
+           :: t.delayed_deps.apply_deps
+       }
 
 let add_set_of_closures_dep t let_bound_name_of_the_closure ~closure_code_id
     ~only_full_applications ~defined_in_code_id =
-  t.set_of_closures_deps
-    <- { let_bound_name_of_the_closure;
-         closure_code_id;
-         only_full_applications
-       }
-       :: t.set_of_closures_deps;
+  t.delayed_deps
+    <- { t.delayed_deps with
+         set_of_closures_deps =
+           { let_bound_name_of_the_closure;
+             closure_code_id;
+             only_full_applications
+           }
+           :: t.delayed_deps.set_of_closures_deps
+       };
   match defined_in_code_id with
   | None -> ()
   | Some defined_in_code_id ->
@@ -308,6 +396,31 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
       add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
         ~base:untuple_var)
     params;
+  (* We can't ever remove the accessors from the tuple, because they are inside
+     the [caml_tuplify*] functions and not in our control. As such, even if no
+     component of the tuple is used, the tuple itself must never be replaced by
+     a poison value, because otherwise [caml_tuplify*] will try to load the
+     fields from the poison value and cause a segfault.
+
+     To force the tuple to remain alive, we read its [Is_int] field, and force
+     the result to be used if the function could be called. Ideally, we would
+     want to force the tuple to stay the same length, reading from a
+     [Block_length] field, but this does not exist yet. However, we also never
+     change the length or representation of blocks, so reading the [Is_int]
+     field is enough to ensure the block remains alive and of the same size,
+     even if all its fields turn to poison.
+
+     If we ever start changing the representation of blocks, or if we change
+     their length in another way, it will become necessary to do something else
+     here to ensure the size of the tuple cannot change. *)
+  let keep_tuple_alive_var =
+    Code_id_or_name.var (Variable.create "keep_tuple_alive_var" K.value)
+  in
+  add_accessor_dep t ~to_:keep_tuple_alive_var Field.is_int ~base:untuple_var;
+  (* Make sure [keep_tuple_alive_var] is used if [code_id] is used. *)
+  add_use_dep t
+    ~to_:(Code_id_or_name.code_id code_id)
+    ~from:keep_tuple_alive_var;
   [witness]
 
 let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
@@ -417,85 +530,113 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
-let record_set_of_closures_deps_one_closure t
-    { let_bound_name_of_the_closure = name;
+let add_alias_for_caller graph ~caller ~from ~to_ =
+  match caller with
+  | None -> Graph.add_alias graph ~from ~to_
+  | Some code_id ->
+    Graph.add_propagate_dep graph
+      ~if_used:(Code_id_or_name.code_id code_id)
+      ~from ~to_
+
+let add_closure_dep graph ~analysis_scope ~code_deps
+    { let_bound_name_of_the_closure;
       closure_code_id = code_id;
       only_full_applications = _
     } =
-  let name = Code_id_or_name.name name in
+  let closure = Code_id_or_name.name let_bound_name_of_the_closure in
   (* CR ncourant: use only_full_applications; not done here to avoid conflicts
      in code that will be rewritten for unbox-fv-closures anyway. *)
-  match find_code_dep t code_id with
+  match Code_id.Map.find_opt code_id code_deps with
   | None ->
-    assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
-    (* The code comes from another compilation unit, so we don't know what
-       happens once it is applied. As such, it must cause the whole block to
-       escape. *)
+    assert (
+      not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit code_id)));
+    (* The code comes from a compilation unit outside the analysis scope, so we
+       don't know what happens once it is applied. As such, it must cause the
+       whole block to escape. *)
     let witness =
       Code_id_or_name.var
-        (Variable.create
+        (Variable.create_in_compilation_unit
+           ~compilation_unit:(Code_id.get_compilation_unit code_id)
            (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
            K.value)
     in
-    add_any_source t witness;
-    add_constructor_dep t ~from:witness Field.known_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
+    Graph.add_any_source graph witness;
+    Graph.add_constructor_dep graph ~from:witness Field.known_arity_call_witness
+      ~base:closure;
+    Graph.add_constructor_dep graph ~from:witness
+      Field.unknown_arity_call_witness ~base:closure;
+    Graph.add_constructor_dep graph ~base:witness Field.code_id_of_call_witness
+      ~from:closure
   | Some code_dep ->
-    add_propagate_dep t
+    Graph.add_propagate_dep graph
       ~to_:(Code_id_or_name.var code_dep.my_closure)
-      ~from:name
+      ~from:closure
       ~if_used:(Code_id_or_name.code_id code_id);
-    add_constructor_dep t ~from:code_dep.known_arity_call_witness
-      Field.known_arity_call_witness ~base:name;
-    add_constructor_dep t
+    Graph.add_constructor_dep graph ~from:code_dep.known_arity_call_witness
+      Field.known_arity_call_witness ~base:closure;
+    Graph.add_constructor_dep graph
       ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-      Field.unknown_arity_call_witness ~base:name
+      Field.unknown_arity_call_witness ~base:closure
 
-let record_set_of_closures_deps t =
-  List.iter (record_set_of_closures_deps_one_closure t) t.set_of_closures_deps
+let add_apply_dep graph ~analysis_scope ~code_deps
+    { function_containing_apply_expr = caller;
+      apply_code_id = code_id;
+      apply_closure = closure;
+      apply_call_witness = call
+    } =
+  match Code_id.Map.find_opt code_id code_deps with
+  | Some code_dep ->
+    add_alias_for_caller graph ~caller ~from:code_dep.known_arity_call_witness
+      ~to_:call;
+    Option.iter
+      (fun closure ->
+        add_alias_for_caller graph ~caller ~from:closure
+          ~to_:(Code_id_or_name.var code_dep.my_closure))
+      closure
+  | None -> (
+    assert (
+      not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit code_id)));
+    (match caller with
+    | None -> Graph.add_any_source graph call
+    | Some caller ->
+      Graph.add_any_source_if_used graph
+        ~if_used:(Code_id_or_name.code_id caller)
+        call);
+    match closure with
+    | None -> ()
+    | Some closure -> (
+      match caller with
+      | None -> Graph.add_any_usage graph closure
+      | Some caller ->
+        Graph.add_use_dep graph
+          ~to_:(Code_id_or_name.code_id caller)
+          ~from:closure))
+
+let resolve_delayed_deps graph ~analysis_scope ~code_deps
+    { apply_deps; set_of_closures_deps; imported_symbols } =
+  List.iter (add_apply_dep graph ~analysis_scope ~code_deps) apply_deps;
+  List.iter
+    (add_closure_dep graph ~analysis_scope ~code_deps)
+    set_of_closures_deps;
+  Symbol.Set.iter
+    (fun symbol ->
+      if
+        not
+          (Analysis_scope.contains_unit analysis_scope
+             (Symbol.compilation_unit symbol))
+      then Graph.add_any_source graph (Code_id_or_name.symbol symbol))
+    imported_symbols
 
 let add_set_of_closures t set_of_closures =
   t.all_sets_of_closures <- set_of_closures :: t.all_sets_of_closures
 
-let deps t ~all_constants =
-  List.iter
-    (fun { function_containing_apply_expr;
-           apply_code_id;
-           apply_closure;
-           apply_call_witness
-         } ->
-      let code_dep =
-        match Code_id.Map.find_opt apply_code_id t.code_deps with
-        | Some code_dep -> code_dep
-        | None ->
-          Misc.fatal_errorf
-            "No code found for %a in apply dep (from %a); external code ids \
-             should not appear here"
-            Code_id.print apply_code_id
-            (Format.pp_print_option Code_id.print)
-            function_containing_apply_expr
-      in
-      add_alias t ~from:code_dep.known_arity_call_witness
-        ~to_:apply_call_witness;
-      match apply_closure with
-      | None -> ()
-      | Some closure -> (
-        match function_containing_apply_expr with
-        | None ->
-          add_alias t
-            ~to_:(Code_id_or_name.var code_dep.my_closure)
-            ~from:(simple_to_node t ~all_constants closure)
-        | Some code_id ->
-          add_propagate_dep t
-            ~to_:(Code_id_or_name.var code_dep.my_closure)
-            ~from:(simple_to_node t ~all_constants closure)
-            ~if_used:(Code_id_or_name.code_id code_id)))
-    t.apply_deps;
-  record_set_of_closures_deps t;
-  t.deps
+let deps t = t.deps
+
+let delayed_deps t = t.delayed_deps
 
 let simple_to_node t ~denv s =
   simple_to_node t ~all_constants:(Env.all_constants denv) s

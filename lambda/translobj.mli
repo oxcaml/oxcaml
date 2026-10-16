@@ -29,4 +29,9 @@ val oo_wrap: Env.t -> bool -> ('a -> lambda) -> 'a -> lambda
 val oo_wrap_gen: Env.t -> bool -> ('a -> lambda * 'b) -> 'a -> lambda * 'b
 val oo_add_class: Ident.t -> Env.t * bool
 
+val layout_of_ident: Ident.t -> Lambda.layout option
+(** The layout of an identifier bound around the term being translated by
+    [oo_wrap] (a class table) or by [transl_label_init] (a shared constant or
+    the method cache). *)
+
 val reset: unit -> unit

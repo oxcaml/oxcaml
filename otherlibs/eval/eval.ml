@@ -78,7 +78,6 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
           { ui_unit = uir.uir_unit;
             ui_defines = uir.uir_defines;
             ui_format = uir.uir_format;
-            ui_arg_descr = uir.uir_arg_descr;
             ui_imports_cmi = uir.uir_imports_cmi |> Array.to_list;
             ui_imports_cmx = uir.uir_imports_cmx |> Array.to_list;
             ui_quoted_cmi = uir.uir_quoted_cmi |> Array.to_list;
@@ -89,6 +88,7 @@ let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
             ui_force_link = uir.uir_force_link;
             ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
             ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
+            ui_static_data = uir.uir_static_data;
             ui_file_sections = sections
           }
         in
@@ -124,7 +124,7 @@ let eval (expr : 'a expr) =
   (* TODO: reset all the things *)
   (* TODO: these flags should maybe be snapshotted and restored *)
   Clflags.no_cwd := true;
-  Clflags.native_code := true;
+  Clflags.set_target Clflags.Target.Native;
   Clflags.dont_write_files := true;
   Clflags.shared := true;
   Clflags.dlcode := false;
@@ -196,22 +196,22 @@ let eval (expr : 'a expr) =
           typed_impl.argument_interface )
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
-  (* TODO: assert program.arg_block_idx is none? *)
   (* We ignore the comptime bit here because eval'd stuff is dynamic, we could
      consider packaging the comptime component up in the result if the quoted
-     mode is static, which would let us do something like:
-     [{
+     mode is static, which would let us do something like: *)
+  (* [{
       val eval : <[ 'a @ static ]> expr -> <[ 'a ]> eval with_static_data
       val inject
         :  (('a. 'a with_static_data -> <[ 'a @ static ]> expr) -> 'b expr)
         -> 'b eval
      }] *)
   let lambda =
-    let { Slambda.slv_comptime = _; slv_runtime = raw_lambda } =
-      Slambda.eval Fun.id tlambda_program.code
+    let _static_data, raw_lambda =
+      Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id
+        tlambda_program.code
     in
     Simplif.simplify_lambda
-      ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+      ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
       raw_lambda
   in

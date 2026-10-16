@@ -17,7 +17,6 @@
 #include "caml/runtime_events.h"
 #include "caml/alloc.h"
 #include "caml/callback.h"
-#include "caml/custom.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
@@ -27,8 +26,6 @@
 
 #include <fcntl.h>
 #include <stdatomic.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -869,16 +866,4 @@ CAMLexport value caml_runtime_events_user_resolve(
   }
 
   CAMLreturn (Val_none);
-}
-
-/* Linker compatibility with unused 4 stdlib externals */
-
-CAMLprim value caml_eventlog_resume(value v)
-{
-  caml_failwith("caml_eventlog_resume: not supported in OCaml 5.");
-}
-
-CAMLprim value caml_eventlog_pause(value v)
-{
-  caml_failwith("caml_eventlog_pause: not supported in OCaml 5.");
 }

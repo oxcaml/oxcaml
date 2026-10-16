@@ -50,8 +50,6 @@ type continuation_sort =
 type region =
   | Named of variable
   | Toplevel_alloc_region
-  | Toplevel_region
-  | Toplevel_ghost_region
 
 type tag_scannable = int
 
@@ -69,7 +67,7 @@ type subkind =
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
+        non_consts : (tag_scannable * kind_with_subkind list option) list
       }
   | Float_block of { num_fields : int }
   | Float_array
@@ -225,12 +223,16 @@ type alloc_mode_for_allocations =
       }
 
 type 'a alloc_mode_for_applications =
-  | Heap of { alloc_region : 'a }
-  | Local of
+  | Not_alloc_stack of { alloc_region : 'a }
+  | Maybe_alloc_stack of
       { alloc_region : 'a;
         region : 'a;
         ghost_region : 'a
       }
+
+type alloc_mode_for_return =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
 
 type alloc_mode_for_assignments =
   | Heap
@@ -281,6 +283,7 @@ type inline_attribute = Inline_attribute.t =
 type inlined_attribute =
   | Always_inlined
   | Hint_inlined
+  | Forward_inlined
   | Never_inlined
   | Unroll of int
   | Default_inlined
@@ -328,7 +331,7 @@ type expr =
       { scrutinee : simple;
         cases : (int * apply_or_inlined_cont) list
       }
-  | Invalid of { message : string }
+  | Invalid
 
 and apply_or_inlined_cont =
   | Inlined_goto of expr
@@ -411,7 +414,7 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_assignments
+    result_mode : alloc_mode_for_return
   }
 
 and code_size = int

@@ -18,6 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
+    syntax_quotations : bool;
     open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
@@ -55,6 +56,7 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
+      ("syntax_quotations", `Bool x.syntax_quotations);
       ( "open_args",
         Json.list
           (fun (arg : Clflags.open_arg) ->
@@ -530,7 +532,6 @@ let ocaml_ignored_flags =
     "-safe-matching";
     "-bin-annot-occurrences";
     (* flambda-backend specific *)
-    "-basic-block-sections";
     "-caml-apply-inline-fast-path";
     "-debug-ocaml";
     "-dgc-timings";
@@ -580,11 +581,13 @@ let ocaml_ignored_flags =
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
     "-directory";
+    "-typing-recovery";
     (* Jane Street specific *)
     "-disable-builtin-check";
     "-disable-poll-insertion";
     "-gdwarf-may-alter-codegen";
     "-gno-dwarf-may-alter-codegen";
+    "-gno-ocamldebug-types";
     "-davail";
     "-dranges";
     "-ddebug-invariants";
@@ -594,6 +597,7 @@ let ocaml_ignored_flags =
     "-no-x86-peephole-optimize";
     "-no-x86-peephole-remove-mov-to-dead-register";
     "-no-x86-peephole-remove-redundant-cmp";
+    "-no-x86-peephole-remove-redundant-extension";
     "-no-x86-peephole-combine-add-rsp";
     "-verbose-types";
     "-no-verbose-types";
@@ -609,6 +613,9 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-faes";
+    "-fno-aes";
+    "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
     "-fno-bmi2";
@@ -622,6 +629,7 @@ let ocaml_ignored_flags =
     "-fno-popcnt";
     "-disable-zero-alloc-checker";
     "-disable-precise-zero-alloc-checker";
+    "-no-x86-peephole-remove-redundant-test";
     "-cfg-stack-checks";
     "-no-cfg-stack-checks";
     "-gdwarf-inlined-frames";
@@ -665,18 +673,37 @@ let ocaml_ignored_flags =
     "-no-llvm-backend";
     "-ddwarf-types";
     "-ocamlcfg";
+    "-cfg-eliminate-dead-code-validate";
+    "-no-cfg-eliminate-dead-code-validate";
+    "-cfg-dominators-validate";
+    "-no-cfg-dominators-validate";
+    "-cfg-liveness-validate";
+    "-no-cfg-liveness-validate";
     "-cfg-prologue-validate";
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-omit-leaf-frame-pointers";
+    "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
+    "-cfg-block-layout";
+    "-no-cfg-block-layout";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";
     "-no-cfg-value-propagation-float";
     "-cfg-value-propagation-flow";
     "-no-cfg-value-propagation-flow";
+    "-cfg-copy-propagation";
+    "-no-cfg-copy-propagation";
+    "-use-ssa";
+    "-no-use-ssa";
+    "-ssa-simplify";
+    "-no-ssa-simplify";
+    "-ssa-validate";
+    "-no-ssa-validate";
+    "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";
@@ -747,9 +774,18 @@ let ocaml_ignored_flags =
     "-dump-inlining-paths";
     "-enable-poll-insertion";
     "-fno-asan";
+    "-favx512vl";
+    "-fno-avx512vl";
+    "-favx512bw";
+    "-fno-avx512bw";
+    "-favx512cd";
+    "-fno-avx512cd";
+    "-favx512dq";
+    "-fno-avx512dq";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
+    "-functorize";
     "-gdwarf-may-alter-codegen-experimental";
     "-gno-dwarf-may-alter-codegen-experimental";
     "-gno-startup";
@@ -768,8 +804,10 @@ let ocaml_ignored_flags =
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
     "-no-frametables-in-rodata";
-    "-flambda2-no-simplify-stubs";
-    "-flambda2-simplify-stubs"
+    "-no-flambda2-simplify-stubs";
+    "-flambda2-simplify-stubs";
+    "-stubs-forward-inlining";
+    "-no-stubs-forward-inlining"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -859,11 +897,12 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-cms-files-per-unit";
     "-name-mangling-scheme";
     "-gdwarf-config-max-cms-files-per-variable";
-    "-gdwarf-config-max-type-to-shape-depth";
+    "-type-to-shape-max-depth";
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";
     "-gdwarf-fidelity";
+    "-gdwarf-version";
     "-llvm-path";
     "-afl-inst-ratio";
     "-config-var";
@@ -970,6 +1009,13 @@ let ocaml_flags =
     ( "-strict-formats",
       Marg.unit (fun ocaml -> { ocaml with strict_formats = true }),
       " Reject invalid formats accepted by legacy implementations" );
+    ( "-syntax-quotations",
+      Marg.unit (fun ocaml -> { ocaml with syntax_quotations = true }),
+      " Lex quotation syntax in files without a #syntax quotations directive" );
+    ( "-no-syntax-quotations",
+      Marg.unit (fun ocaml -> { ocaml with syntax_quotations = false }),
+      " Do not lex quotation syntax in files without a #syntax quotations \
+       directive" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
           { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
@@ -1081,6 +1127,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
+        syntax_quotations = Config.syntax_quotations;
         open_args = [];
         ppx = [];
         pp = None;

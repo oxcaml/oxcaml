@@ -1320,7 +1320,11 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
   match i.desc with
   | Op op -> basic_op t i op
   | Prologue | Epilogue | Reloadretaddr -> () (* LLVM handles these for us *)
-  | Stack_check _ -> fail_msg "unexpected instruction: stack check"
+  | Stack_check { max_frame_size_bytes } ->
+    (* Large frames are probed when stack checks are disabled, so they cannot
+       step over the stack's guard page; llvmize does not emit the probes. *)
+    fail_msg "stack probes for large frame (%d bytes) not supported"
+      max_frame_size_bytes
   | Poptrap { lbl_handler } -> (
     match Label.Tbl.find_opt (get_fun_info t).trap_blocks lbl_handler with
     | None -> fail_msg "unbalanced trap pop"
@@ -1496,9 +1500,12 @@ let prepare_fun_info t (cfg : Cfg.t) =
         fun_dbg;
         fun_contains_calls = _ (* not used at this point *);
         fun_num_stack_slots = _ (* only available after regalloc *);
+        fun_frame_required = _ (* only available after prologue insertion *);
+        fun_prologue_required = _ (* only available after prologue insertion *);
         fun_poll = _ (* not needed after poll insertion *);
         next_instruction_id = _;
         fun_ret_type;
+        fun_phantom_lets = _;
         allowed_to_be_irreducible = _;
         register_locations_are_set = _
       } =
@@ -1994,9 +2001,11 @@ let write_module_metadata t =
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;
-  (* Tell LLVM's frametable printer which frame-descriptor layout this runtime
-     expects. 0 is the classic layout. *)
-  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }|};
+  (* Tell LLVM's frametable printer to emit the short frame-descriptor format
+     expected by this runtime: an escape byte before each descriptor, and no
+     alignment padding. (The printer only emits escaped descriptors, whose wire
+     format is shared with the classic layout.) *)
+  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }|};
   F.pp_line t.ppf {|!llvm.module.flags = !{ !0, !1 }|}
 
 let write_llvmir_to_file t =

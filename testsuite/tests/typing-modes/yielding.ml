@@ -3,6 +3,11 @@
  expect;
 *)
 
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 (* CR dkalinichenko: allow [yielding] at toplevel? *)
 let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"
 [%%expect{|
@@ -208,10 +213,7 @@ val f1 : 'a -> unit = <fun>
 let f2 (x @ local) = exclave_ requires_unyielding x
 
 [%%expect{|
-Line 1, characters 50-51:
-1 | let f2 (x @ local) = exclave_ requires_unyielding x
-                                                      ^
-Error: This value is "yielding" but is expected to be "unyielding".
+val f2 : 'a @ local unyielding -> unit @ local = <fun>
 |}]
 
 let f3 (x @ yielding) = requires_unyielding x

@@ -183,7 +183,7 @@ let check_relative_path ~on_error name s =
 
 let decode_compiler_pass ppf v ~name ~filter =
   let module P = Clflags.Compiler_pass in
-  let passes = P.available_pass_names ~filter ~native:!native_code in
+  let passes = P.available_pass_names ~filter ~native:(target_is_native ()) in
   begin match List.find_opt (String.equal v) passes with
   | None ->
     Printf.ksprintf (print_error ppf)
@@ -260,7 +260,7 @@ let read_one_param ppf position name v =
   let set name options s =  setter ppf (fun b -> b) name options s in
   let clear name options s = setter ppf (fun b -> not b) name options s in
   let save_ir ~filter ~setter =
-    if !native_code then begin
+    if target_is_native () then begin
       match decode_compiler_pass ppf v ~name ~filter with
       | None -> ()
       | Some pass -> setter pass true
@@ -284,6 +284,11 @@ let read_one_param ppf position name v =
   if not handled then
   match name with
   | "g" -> set "g" [ Clflags.debug ] v
+  | "gupstream-dwarf" ->
+      (match v with
+      | "0" -> Clflags.no_restrict_to_upstream_dwarf ()
+      | "1" -> Clflags.set_restrict_to_upstream_dwarf ()
+      | _ -> Printf.ksprintf (print_error ppf) "bad value %s for %s" v name)
   | "bin-annot" -> set "bin-annot" [ Clflags.binary_annotations ] v
   | "bin-annot-cms" -> set "bin-annot-cms" [ Clflags.binary_annotations_cms ] v
   | "afl-instrument" -> set "afl-instrument" [ Clflags.afl_instrument ] v
@@ -305,6 +310,7 @@ let read_one_param ppf position name v =
   | "safe-string" -> compat "safe-string" v (* kept for compatibility *)
   | "strict-sequence" -> set "strict-sequence" [ strict_sequence ] v
   | "strict-formats" -> set "strict-formats" [ strict_formats ] v
+  | "syntax-quotations" -> set "syntax-quotations" [ syntax_quotations ] v
   | "thread" -> set "thread" [ use_threads ] v
   | "unboxed-types" -> set "unboxed-types" [ unboxed_types ] v
   | "unsafe" -> set "unsafe" [ unsafe ] v
@@ -324,6 +330,7 @@ let read_one_param ppf position name v =
   | "nodynlink" -> clear "nodynlink" [ dlcode ] v
   | "short-paths" -> clear "short-paths" [ real_paths ] v
   | "no-alias-deps" -> set "no-alias-deps" [ no_alias_deps ] v
+  | "typing-recovery" -> set "typing-recovery" [ typing_recovery ] v
   | "opaque" -> set "opaque" [ opaque ] v
 
   | "pp" -> preprocessor := Some v
@@ -409,6 +416,9 @@ let read_one_param ppf position name v =
     Int_arg_helper.parse v
       "Bad syntax in OCAMLPARAM for 'inline-max-depth'"
       inline_max_depth
+  | "type-to-shape-max-depth" ->
+    int_option_with_none ppf "type-to-shape-max-depth"
+      type_to_shape_max_depth v
   | "gdwarf-config-shape-reduce-depth" ->
     int_option_with_none ppf "gdwarf-config-shape-reduce-depth"
       gdwarf_config_shape_reduce_depth v
@@ -421,9 +431,6 @@ let read_one_param ppf position name v =
   | "gdwarf-config-max-cms-files-per-variable" ->
     int_option_with_none ppf "gdwarf-config-max-cms-files-per-variable"
       gdwarf_config_max_cms_files_per_variable v
-  | "gdwarf-config-max-type-to-shape-depth" ->
-    int_option_with_none ppf "gdwarf-config-max-type-to-shape-depth"
-      gdwarf_config_max_type_to_shape_depth v
   | "gdwarf-config-max-shape-reduce-steps-per-variable" ->
     int_option_with_none ppf
       "gdwarf-config-max-shape-reduce-steps-per-variable"
@@ -447,7 +454,7 @@ let read_one_param ppf position name v =
       set "remove-unused-arguments" [ remove_unused_arguments ] v
 
   | "inlining-report" ->
-      if !native_code then
+      if target_is_native () then
         set "inlining-report" [ inlining_report ] v
 
   | "flambda-verbose" ->
@@ -519,7 +526,7 @@ let read_one_param ppf position name v =
 
 
   | "cmo" | "cma" ->
-    if not !native_code then
+    if not (target_is_native ()) then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -529,7 +536,7 @@ let read_one_param ppf position name v =
     end
 
   | "cmx" | "cmxa" ->
-    if !native_code then
+    if target_is_native () then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -539,7 +546,7 @@ let read_one_param ppf position name v =
     end
 
   | "pic" ->
-    if !native_code then
+    if target_is_native () then
       set "pic" [ pic_code ] v
 
   | "can-discard" ->
@@ -770,7 +777,10 @@ let process_action
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
-      if Filename.check_suffix name ocaml_mod_ext
+      if !Clflags.functorize then
+        (* Anonymous args are module names, not filepaths. *)
+        objfiles := name :: !objfiles
+      else if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
@@ -780,7 +790,8 @@ let process_action
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
-      else if not !native_code && Filename.check_suffix name Config.ext_dll then
+      else if not (target_is_native ())
+           && Filename.check_suffix name Config.ext_dll then
         dllibs := name :: !dllibs
       else
         match Compiler_pass.of_input_filename name with

@@ -360,7 +360,7 @@ let find_prologue_and_epilogues_shrink_wrapped
        This also covers the case where all paths lead to an exception and/or are
        cold. *)
     (* CR-soon cfalas: this assumes that all descendants of a cold block are
-       also cold.*)
+       also cold, which is no longer true if `-cfg-block-layout` is passed.*)
     let all_need_prologue =
       Label.Set.for_all
         (fun label ->
@@ -484,6 +484,12 @@ let add_prologue (cfg : Cfg.t) prologue_label =
 
 let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  cfg.fun_frame_required
+    <- Proc.frame_required ~fun_contains_calls:cfg.fun_contains_calls
+         ~fun_num_stack_slots:cfg.fun_num_stack_slots;
+  cfg.fun_prologue_required
+    <- Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+         ~fun_num_stack_slots:cfg.fun_num_stack_slots;
   let prologue_blocks, epilogue_blocks = f cfg_with_infos in
   Label.Set.iter (add_prologue cfg) prologue_blocks;
   Label.Set.iter

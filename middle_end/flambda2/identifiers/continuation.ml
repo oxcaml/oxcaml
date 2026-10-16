@@ -62,18 +62,14 @@ module Data = struct
 
   let flags = continuation_flags
 
-  let [@ocamlformat "disable"] print ppf
-      { compilation_unit; name; name_stamp; sort; } =
-    Format.fprintf ppf "@[<hov 1>(\
-        @[<hov 1>(compilation_unit@ %a)@]@ \
-        @[<hov 1>(name@ %s)@]@ \
-        @[<hov 1>(name_stamp@ %d)@]@ \
-        @[<hov 1>(sort@ %a)@]\
-        )@]"
-      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
-      name_stamp
-      Sort.print sort
+  let print ppf { compilation_unit; name; name_stamp; sort } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "compilation_unit" compilation_unit
+          (Format_doc.compat Compilation_unit.print_debug);
+        s "name" name;
+        d "name_stamp" name_stamp;
+        a "sort" sort Sort.print ]
 
   let hash { compilation_unit; name = _; name_stamp; sort = _ } =
     Hashtbl.hash (Compilation_unit.hash compilation_unit, name_stamp)
@@ -101,8 +97,6 @@ module Data = struct
 end
 
 type t = Id.t
-
-type exported = Data.t
 
 module Table = Table_by_int_id.Make (Data)
 
@@ -172,6 +166,16 @@ module Set = Tree.Set
 module Map = Tree.Map
 module Lmap = Lmap.Make (T)
 
-let export t = find_data t
+type importer = Table.serializable
 
-let import data = Table.add !grand_table_of_continuations data
+let export conts =
+  Table.export !grand_table_of_continuations ~iter:(fun f -> Set.iter f conts)
+
+let import importer t =
+  Table.add !grand_table_of_continuations (Table.import importer t)
+
+let import_and_rename importer t =
+  let { Data.name; sort; name_stamp = _; compilation_unit = _ } =
+    Table.import importer t
+  in
+  create ~sort ~name ()

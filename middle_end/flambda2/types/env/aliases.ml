@@ -50,22 +50,6 @@ module Map_to_canonical = struct
           fatal_inconsistent ~func_name:"Aliases.Map_to_canonical.union" elt
             coercion1 coercion2)
       map1 map2
-
-  let ids_for_export t =
-    Name.Map.fold
-      (fun name coercion ids ->
-        Ids_for_export.union ids
-          (Ids_for_export.add_name (Coercion.ids_for_export coercion) name))
-      t Ids_for_export.empty
-
-  let apply_renaming t renaming =
-    Name.Map.fold
-      (fun name coercion t ->
-        Name.Map.add
-          (Renaming.apply_name renaming name)
-          (Coercion.apply_renaming coercion renaming)
-          t)
-      t Name.Map.empty
 end
 
 module Aliases_of_canonical_element : sig
@@ -101,10 +85,6 @@ module Aliases_of_canonical_element : sig
   val inter : t -> t -> t
 
   val compose : t -> then_:Coercion.t -> t
-
-  include Contains_ids.S with type t := t
-
-  val apply_renaming : t -> Renaming.t -> t
 end = struct
   type t =
     { aliases : Map_to_canonical.t Name_mode.Map.t;
@@ -135,7 +115,7 @@ end = struct
           "[Aliases_of_canonical_element.invariant]: [aliases] and [all] are \
            not consistent"
 
-  let [@ocamlformat "disable"] print ppf { aliases; all = _; } =
+  let print ppf { aliases; all = _ } =
     Name_mode.Map.print (Name.Map.print Coercion.print) ppf aliases
 
   let empty = { aliases = Name_mode.Map.empty; all = Name.Map.empty }
@@ -215,27 +195,6 @@ end = struct
     let aliases = Name_mode.Map.map_sharing f aliases in
     let all = f all in
     { aliases; all }
-
-  let ids_for_export { aliases; all } =
-    let aliases =
-      Name_mode.Map.fold
-        (fun _mode map_to_canonical ids ->
-          Ids_for_export.union ids
-            (Map_to_canonical.ids_for_export map_to_canonical))
-        aliases Ids_for_export.empty
-    in
-    let all = Map_to_canonical.ids_for_export all in
-    Ids_for_export.union aliases all
-
-  let apply_renaming { aliases; all } renaming =
-    let aliases =
-      Name_mode.Map.map_sharing
-        (fun map_to_canonical ->
-          Map_to_canonical.apply_renaming map_to_canonical renaming)
-        aliases
-    in
-    let all = Map_to_canonical.apply_renaming all renaming in
-    { aliases; all }
 end
 
 module Alias_set = struct
@@ -290,17 +249,14 @@ module Alias_set = struct
       |> Option.map (fun (name, coercion) ->
           Simple.with_coercion (Simple.name name) coercion)
 
-  let [@ocamlformat "disable"] print ppf { const; names; } =
+  let print ppf { const; names } =
     let none ppf () =
       Format.fprintf ppf "%t()%t" Flambda_colours.elide Flambda_colours.pop
     in
-    Format.fprintf ppf
-      "@[<hov 1>(\
-           @[<hov 1>(const@ %a)@]@ \
-           @[<hov 1>(names@ %a)@]\
-       @]"
-       (Format.pp_print_option Reg_width_const.print ~none) const
-       (Name.Map.print Coercion.print) names
+    let open! Misc.Sexp in
+    print ppf
+      [ a "const" const (Format.pp_print_option Reg_width_const.print ~none);
+        a "names" names (Name.Map.print Coercion.print) ]
 
   let inter { const = const1; names = names1 }
       { const = const2; names = names2 } =
@@ -381,32 +337,25 @@ type t =
  * canonical_elements[elem_j_n] = (canon_j, coercion_j_n)
  *)
 
-let [@ocamlformat "disable"] print ppf
-    { canonical_elements; aliases_of_canonical_names;
-      aliases_of_consts }=
+let print ppf
+    { canonical_elements; aliases_of_canonical_names; aliases_of_consts } =
+  let open! Misc.Sexp in
   let print_element_and_coercion ppf (elt, coercion) =
-    Format.fprintf ppf "@[<hov 1>(\
-                        %a@ \
-                        @[<hov 1>%t(coercion@ %a)%t@]\
-                        )@]"
-      Simple.print elt
-      (if Coercion.is_id coercion
-      then Flambda_colours.elide
-      else Flambda_colours.none)
-      Coercion.print coercion
-      Flambda_colours.pop
+    print ppf
+      [ fmt "%a" Simple.print elt;
+        a "coercion" coercion Coercion.print
+          ~colour:
+            (if Coercion.is_id coercion
+             then Flambda_colours.elide
+             else Flambda_colours.none) ]
   in
-  Format.fprintf ppf
-    "@[<hov 1>(\
-      @[<hov 1>(canonical_elements@ %a)@]@ \
-      @[<hov 1>(aliases_of_canonical_names@ %a)@]@ \
-      @[<hov 1>(aliases_of_consts@ %a)@]\
-      )@]"
-    (Name.Map.print print_element_and_coercion) canonical_elements
-    (Name.Map.print Aliases_of_canonical_element.print)
-    aliases_of_canonical_names
-    (Reg_width_const.Map.print Aliases_of_canonical_element.print)
-    aliases_of_consts
+  print ppf
+    [ a "canonical_elements" canonical_elements
+        (Name.Map.print print_element_and_coercion);
+      a "aliases_of_canonical_names" aliases_of_canonical_names
+        (Name.Map.print Aliases_of_canonical_element.print);
+      a "aliases_of_consts" aliases_of_consts
+        (Reg_width_const.Map.print Aliases_of_canonical_element.print) ]
 
 let name_defined_earlier ~binding_time_resolver ~binding_times_and_modes alias
     ~than =
@@ -996,37 +945,6 @@ let get_aliases t element =
            alias_names_with_coercions_to_canonical));
     Alias_set.create_aliases_of_element ~element ~canonical_element
       ~coercion_from_canonical_to_element ~alias_names_with_coercions_to_element
-
-let apply_renaming
-    { canonical_elements; aliases_of_canonical_names; aliases_of_consts }
-    renaming =
-  let rename_name = Renaming.apply_name renaming in
-  let rename_simple = Renaming.apply_simple renaming in
-  let canonical_elements =
-    Name.Map.fold
-      (fun elt (canonical, coercion) acc ->
-        Name.Map.add (rename_name elt)
-          (rename_simple canonical, Coercion.apply_renaming coercion renaming)
-          acc)
-      canonical_elements Name.Map.empty
-  in
-  let aliases_of_canonical_names =
-    Name.Map.fold
-      (fun canonical aliases acc ->
-        Name.Map.add (rename_name canonical)
-          (Aliases_of_canonical_element.apply_renaming aliases renaming)
-          acc)
-      aliases_of_canonical_names Name.Map.empty
-  in
-  let aliases_of_consts =
-    Reg_width_const.Map.fold
-      (fun const aliases ->
-        Reg_width_const.Map.add
-          (Renaming.apply_const renaming const)
-          (Aliases_of_canonical_element.apply_renaming aliases renaming))
-      aliases_of_consts Reg_width_const.Map.empty
-  in
-  { canonical_elements; aliases_of_canonical_names; aliases_of_consts }
 
 let get_canonical_ignoring_name_mode t name =
   let elt = Simple.name name in

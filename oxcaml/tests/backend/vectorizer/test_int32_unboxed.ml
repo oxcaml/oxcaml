@@ -1,7 +1,7 @@
 [@@@ocaml.warnerror "+a-40-41-42"]
 
 module Int32_u = struct
-  type t = int32#
+  type t = int32_u
 
   external to_int32 : t -> (int32[@local_opt]) = "%box_int32" [@@warning "-187"]
 
@@ -30,7 +30,7 @@ module Int32_u = struct
 
 end
 
-type t1 = { mutable d0 : int32# ; mutable d1: int32#; mutable d2: int32#; mutable d3: int32#  }
+type t1 = { mutable d0 : int32_u ; mutable d1: int32_u; mutable d2: int32_u; mutable d3: int32_u  }
 
 (* Currently, can't vectorize because not adjacent and have an unnecessary sign extension. *)
 let[@inline never] [@local never][@specialize never] add_mutable_record (a : t1) (b: t1) (c : t1) : t1 =

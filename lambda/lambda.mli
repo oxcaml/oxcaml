@@ -33,7 +33,6 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
-  | Runtime5
   | Arch_amd64
   | Arch_arm64
 
@@ -47,18 +46,32 @@ type locality_mode = private
   | Alloc_heap
   | Alloc_local
 
+type return_mode = private
+  | Maybe_alloc_stack
+  | Not_alloc_stack
+
 type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
 val alloc_heap : locality_mode
 
-(* Actually [Alloc_heap] if [Config.stack_allocation] is [false] *)
 val alloc_local : locality_mode
+
+val not_alloc_stack : return_mode
+
+val maybe_alloc_stack : return_mode
 
 val modify_heap : modify_mode
 
 val modify_maybe_stack : modify_mode
+
+val return_mode_to_locality_mode : return_mode -> locality_mode
+(** [return_mode_to_locality_mode] takes a return_mode and returns a
+    locality_mode.
+    WARNING: a return_mode is in general not sufficient to determine whether
+    an allocation can be done on the stack. Use this transformation with
+    caution. *)
 
 type staticity =
   | Static
@@ -165,7 +178,7 @@ type primitive =
       * initialization_or_assignment
     (** The same comment about the index as for [Pmixedfield] applies to
         [Psetmixedfield]. *)
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * (layout list)
@@ -252,6 +265,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                           mode : locality_mode; boxed : bool }
   | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
                         tagged : bool }
   | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
@@ -266,6 +281,8 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                          mode : locality_mode; boxed : bool }
   | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
                       tagged : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -278,6 +295,8 @@ type primitive =
       boxed : bool }
   | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
                         index_kind : array_index_kind; boxed : bool }
+  | Pbytes_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                         boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   (* load_i8/i16 is sign-extended *)
@@ -300,6 +319,8 @@ type primitive =
       mode : locality_mode;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                              mode : locality_mode; boxed : bool }
   | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
                           tagged : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -317,6 +338,8 @@ type primitive =
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                             boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
@@ -383,21 +406,39 @@ type primitive =
         into [shape] -- not a field index. *)
     shape : mixed_block_shape;
   }
-  | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
+    mode : modify_mode;
   }
-  | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_exchange_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_compare_exchange_field of
-    { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_compare_set_field of { immediate_or_pointer : immediate_or_pointer }
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+  | Patomic_compare_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx of { layout : layout }
+  | Patomic_set_idx of { layout : layout; mode : modify_mode }
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -455,6 +496,8 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -616,9 +659,33 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
-and constructor_shape =
-  | Constructor_uniform of value_kind list
+(** Compare to [Types.record_representation]. *)
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+(** Compare to [Types.constructor_representation]. *)
+and constructor_representation =
+  | Constructor_uniform_value
   | Constructor_mixed of mixed_block_shape
+  | Constructor_immediate_all_void
+
+(** Compare to [Types.variant_representation]. *)
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
+and constructor_shape =
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -687,6 +754,10 @@ val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
 
+(** Compares record layouts, ignoring the [value_kind] of [Value] fields. *)
+val equal_record_representation_up_to_value_kinds :
+  record_representation -> record_representation -> bool
+
 val join_value_kind : value_kind -> value_kind -> value_kind
 
 (** Join of two layouts, must be of the same kind. *)
@@ -746,11 +817,14 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
+
+val forward_inlined_attribute : unit -> inlined_attribute
 
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
@@ -784,6 +858,7 @@ type zero_alloc_attribute =
                   This definition may not be applicable to new properties. *)
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
@@ -863,6 +938,8 @@ type shared_code = (int * int) list     (* stack size -> code label *)
 
 type static_label = Static_label.t
 
+type unbox_return_attribute = locality_mode option
+
 type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
@@ -882,7 +959,7 @@ type function_attribute = {
      [fun x y -> e]. This fusion is allowed only when the [may_fuse_arity] field
      on *both* functions involved is [true]. *)
   may_fuse_arity: bool;
-  unbox_return: bool;
+  unbox_return: unbox_return_attribute;
 }
 
 type parameter_attribute = {
@@ -895,8 +972,6 @@ type debug_uid = Shape.Uid.t
     WARNING: Unlike the name sugggests, these identifiers are not always unique.
     Instead, in many cases, we use [debug_uid_none] below, and multiple
     variables at the level of Lambda or below can use the same [debug_uid]. *)
-(* CR sspies: This comment is currently not accurate, since we do not yet
-  emit these ids into dwarf code. *)
 
 val debug_uid_none : debug_uid
 (** [debug_uid_none] should be used for those identifiers that are not
@@ -976,7 +1051,7 @@ type lambda =
   | Lfor of lambda_for
   | Lassign of Ident.t * lambda
   | Lsend of meth_kind * lambda * lambda * lambda list
-             * region_close * locality_mode * scoped_location * layout
+             * region_close * return_mode * scoped_location * layout
              * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
@@ -990,6 +1065,10 @@ type lambda =
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of ltemplate
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -1043,7 +1122,7 @@ and lfunction = private
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc : scoped_location;
     mode : locality_mode;     (* locality of the closure itself *)
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
     yielding: yielding_kind;
@@ -1055,9 +1134,7 @@ and lfunction = private
 
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
-    ktmpl_return: layout;
-    ktmpl_body: lambda;
-    ktmpl_ret_mode: locality_mode;
+    ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1067,8 +1144,13 @@ and lkindinstantiate =
   { kinst_func: lambda;
     kinst_args: layout list;
     kinst_result_layout: layout;
-    kinst_mode: locality_mode;
+    kinst_mode: return_mode;
     kinst_loc: scoped_location;
+  }
+
+and ltemplate =
+  { tmpl_func: lfunction;
+    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1091,7 +1173,7 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
     ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
@@ -1178,15 +1260,6 @@ val main_module_representation :
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;         (* Index of argument block (see
-                                           [arg_descr]). If
-                                           [main_module_block_format] is
-                                           [Mb_struct], this is an index into
-                                           the main module block of the
-                                           compilation unit. For
-                                           [Mb_instantiating_functor], this is
-                                           an index into the module returned by
-                                           the instantiating functor. *)
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
@@ -1204,30 +1277,6 @@ type program =
      Initialize_symbol(module_name, 0,
        [getfield 0; ...; getfield (main_module_block_size mbf - 1)])
 *)
-
-(* Info for a compilation unit that implements a parameter (that is, was
-   compiled with [-as-argument-for]). Note that if the CU is itself
-   parameterised, this information (in particular [arg_block_idx]) describes
-   instances rather than the base CU gs. *)
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-                                        (* The parameter implemented (the [P] in
-                                           [-as-argument-for P]) *)
-    arg_block_idx: int;                 (* The index within the main module
-                                           block of the _argument block_. If
-                                           this compilation unit is used as an
-                                           argument when instantiating,
-                                           [-instantiate] will pass the argument
-                                           block to the instantiating functor
-                                           (see [main_module_block_format]). The
-                                           argument block's signature is exactly
-                                           that of the parameter, which is in
-                                           general a supertype of this
-                                           compilation unit's signature. *)
-    main_repr: module_representation;   (* The representation of the main
-                                           module, which is required to index
-                                           into it *)
-  }
 
 (* Sharing key *)
 val make_key: lambda -> lambda option
@@ -1251,6 +1300,7 @@ val layout_int : layout
 val layout_array : array_kind -> layout
 val layout_block : layout
 val layout_list : layout
+val layout_extensible_variant_constructor : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
@@ -1269,16 +1319,8 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
-(* A layout that is Pgenval because it is the field of a block being considered
-   for the tmc transformation
-*)
-val layout_tmc_field : layout
-(* A layout that is Pgenval because it is an optional argument *)
-val layout_optional_arg : layout
 val layout_value_field : layout
 val layout_predef_value : layout
 val layout_lazy : layout
@@ -1320,7 +1362,7 @@ val lfunction :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lambda
 
 val lfunction' :
@@ -1331,7 +1373,7 @@ val lfunction' :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lfunction
 
 (* Set the yielding mode of a closure (defaults to [May_yield] from the
@@ -1387,6 +1429,9 @@ val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 val pointerness_of_separability
   : Jkind_axis.Separability.t -> immediate_or_pointer
 
+val transl_mixed_product_element :
+  Types.mixed_block_element -> unit mixed_block_element
+
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val block_shape_of_value_kinds : value_kind list option -> block_shape
@@ -1400,10 +1445,16 @@ val is_uniform_block_shape : block_shape -> bool
    non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
-val transl_mixed_product_shape_for_read :
+val mixed_block_shape_has_splices : 'a mixed_block_element array -> bool
+
+val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
-  -> Types.mixed_product_shape
+  -> mixed_block_shape
   -> 'a mixed_block_element array
+
+(* Translate a representable layout, turning generalized sorts into splices.
+   Rejects [Any] and [Univar]. *)
+val transl_layout : Jkind_types.Layout.Const.t -> unit mixed_block_element
 
 val transl_module_representation :
   Types.module_representation -> module_representation
@@ -1411,9 +1462,14 @@ val transl_module_representation :
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
 val subst:
-  (Ident.t -> Subst.Lazy.value_description * Mode.Value.l -> Env.t -> Env.t) ->
+  (Ident.t ->
+   Subst.Lazy.value_description * Mode.With_regionality.l ->
+   Env.t ->
+   Env.t) ->
   ?freshen_bound_variables:bool ->
-  lambda Ident.Map.t -> lambda -> lambda
+  lambda Ident.Map.t ->
+  lambda ->
+  lambda
 (** [subst update_env ?freshen_bound_variables s lt]
     applies a substitution [s] to the lambda-term [lt].
 
@@ -1431,6 +1487,9 @@ val rename : Ident.t Ident.Map.t -> lambda -> lambda
 (** A version of [subst] specialized for the case where we're just renaming
     idents. *)
 
+val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
+(** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
+
 val duplicate_function : lfunction -> lfunction
 (** Duplicate a term, freshening all locally-bound identifiers. *)
 
@@ -1440,6 +1499,17 @@ val map : (lambda -> lambda) -> lambda -> lambda
 
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
   (** Apply the given transformation on the function's body *)
+
+val extract_free_var_env :
+  layout_of_ident:(Ident.t -> layout option) ->
+  lfunction ->
+  lfunction * (lambda * layout) Ident.Map.t
+(** [extract_free_var_env ~layout_of_ident lfun] computes an environment for the
+    provided function by renaming the free variables of [lfun] to fresh idents,
+    and returning the freshened function together with the mapping from new
+    idents to (lambda that evaluates to) the old idents.
+    Free variables for which [layout_of_ident] returns [None] are not
+    freshened. *)
 
 val shallow_map  :
   tail:(lambda -> lambda) ->
@@ -1471,6 +1541,11 @@ val eq_locality_mode : locality_mode -> locality_mode -> bool
 val is_local_mode : locality_mode -> bool
 val is_heap_mode : locality_mode -> bool
 
+val is_maybe_alloc_stack : return_mode -> bool
+val is_not_alloc_stack : return_mode -> bool
+val eq_return_mode : return_mode -> return_mode -> bool
+val locality_return_compat : locality_mode -> return_mode -> bool
+
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.
       [Some Alloc_local] permits both options: that is, primitives that
@@ -1487,6 +1562,11 @@ val primitive_may_allocate : primitive -> locality_mode option
 val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option
   (** Like [primitive_may_allocate], for [external] calls. *)
+
+val return_mode_of_primitive_description :
+  external_call_description -> return_mode option
+  (** Like [locality_mode_of_primitive_description], but computes
+      a [return_mode] *)
 
 (***********************)
 (* For static failures *)
@@ -1521,6 +1601,8 @@ val mod_field:
 val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> 'a mixed_block_element
+
+val layout_of_mixed_block_element : _ mixed_block_element -> layout
 
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)

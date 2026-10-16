@@ -19,9 +19,11 @@ let real_paths          = ref true
 let recursive_types     = ref false
 let strict_sequence     = ref false
 let applicative_functors = ref true
+let typing_recovery     = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
+let syntax_quotations   = ref Config.syntax_quotations
 
 type open_arg =
   | Open of string
@@ -43,7 +45,7 @@ let binary_annotations_cms  = ref false
 let shape_format        = ref Old_merlin
 let store_occurrences   = ref true
 let print_types         = ref false
-let native_code         = ref false
+let[@inline] target_is_native () = false
 let error_size          = ref 500
 let dont_write_files    = ref true
 let keep_locs           = ref true
@@ -57,7 +59,10 @@ let unboxed_types       = ref false
 let profile_columns     = ref []
 let dwarf_pedantic      = ref false
 let gdwarf_config_shape_eval_depth = ref None
-let gdwarf_config_max_type_to_shape_depth = ref None
+let type_to_shape_max_depth = ref None
+(* Merlin never emits DWARF debug info; keep the upstream-only
+   restriction on. *)
+let restrict_to_upstream_dwarf = ref true
 let gdwarf_config_max_evaluation_steps_per_variable = ref None
 let locs = ref true
 let locations = ref true

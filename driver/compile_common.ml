@@ -96,7 +96,7 @@ let typecheck_intf info ast =
   let tsg =
     ast
     |> Typemod.type_interface
-         ~sourcefile:(Unit_info.original_source_file info.target)
+         info.target
          info.module_name info.env
     |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
   in
@@ -120,18 +120,14 @@ let typecheck_intf info ast =
   Warnings.check_fatal ();
   alerts, tsg
 
-let emit_signature info alerts tsg =
+let emit_signature info alerts tsg ~arg_signature =
   let sg =
     let kind : Cmi_format.kind =
       if !Clflags.as_parameter then
         Parameter
-      else begin
-        let cmi_arg_for =
-          !Clflags.as_argument_for
-          |> Option.map Global_module.Parameter_name.of_string
-        in
-        Normal { cmi_impl = info.module_name; cmi_arg_for }
-      end
+      else
+        Normal
+          { cmi_impl = info.module_name; cmi_arg_signature = arg_signature }
     in
     let staticity =
       Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
@@ -146,12 +142,19 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
   Profile.(record_call (annotate_file_name (
     Unit_info.raw_source_file info.target))) @@ fun () ->
   let { ast; info } : _ Parse_result.t = parse_intf info in
-  hook_parse_tree ast;
+  let ast = hook_parse_tree ast in
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
     let alerts, tsg = typecheck_intf info ast in
     hook_typed_tree tsg;
     if not !Clflags.print_types then begin
-      emit_signature info alerts tsg
+      let arg_signature =
+        match !Clflags.as_argument_for with
+        | None -> None
+        | Some param ->
+          let param = Global_module.Parameter_name.of_string param in
+          Some (Typemod.arg_signature tsg.Typedtree.sig_type ~param)
+      in
+      emit_signature info alerts tsg ~arg_signature
     end
   end
 
@@ -189,7 +192,7 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
   let exceptionally = Misc.remove_successful_output_files in
   Misc.try_finally ?always:None ~exceptionally (fun () ->
     let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
-    hook_parse_tree parsed;
+    let parsed = hook_parse_tree parsed in
     if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
       let typed = typecheck_impl info parsed in
       hook_typed_tree typed;

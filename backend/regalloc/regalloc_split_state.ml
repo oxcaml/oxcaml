@@ -536,7 +536,7 @@ end = struct
                           dedent ());
                         true
                       | Some spilled_at ->
-                        if debug && Lazy.force invariants
+                        if debug && Param.get invariants
                         then
                           if
                             not
@@ -718,7 +718,7 @@ let compute_definitions :
           let definitions_at_beginning =
             Label.Set.fold
               (fun successor_label definitions_at_beginning ->
-                (if debug && Lazy.force invariants
+                (if debug && Param.get invariants
                  then
                    let successor_block =
                      Cfg_with_infos.get_block_exn cfg_with_infos successor_label
@@ -854,7 +854,7 @@ let make cfg_with_infos =
     compute_definitions cfg_with_infos ~destructions_at_end
   in
   let destructions_at_end, definitions_at_beginning =
-    if Lazy.force split_around_loops
+    if Param.get split_around_loops
     then
       ExtractSpillsAndReloadsFromLoops.optimize cfg_with_infos
         ~destructions_at_end ~definitions_at_beginning

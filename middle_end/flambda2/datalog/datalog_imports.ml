@@ -25,6 +25,16 @@ type 'a with_names =
 
 include Heterogenous_list
 
+module Or_null_ref = struct
+  type 'a t = { mutable contents : 'a Or_null.t }
+
+  let create () = { contents = Or_null.null }
+
+  let get { contents } = contents
+
+  let set r v = r.contents <- v
+end
+
 module Or_null_sender = struct
   module T0 = struct
     type 'a t = 'a Channel.or_null_sender

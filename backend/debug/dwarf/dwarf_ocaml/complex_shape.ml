@@ -76,14 +76,14 @@ let hash { hash; _ } = hash
 let runtime t =
   let desc = Runtime t in
   let layout =
-    Layout.Base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
+    Layout.base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
   in
   { desc; layout; hash = Hashtbl.hash (hash_runtime, RS.hash t) }
 
 let unboxed_tuple args =
   let desc = Unboxed_product { components = args; kind = Unboxed_tuple } in
   { desc;
-    layout = Layout.Product (List.map to_layout args);
+    layout = Layout.product (List.map to_layout args);
     hash =
       Hashtbl.hash
         ( hash_unboxed_product,
@@ -97,7 +97,7 @@ let record_unboxed args =
     Unboxed_product { components; kind = Unboxed_record field_names }
   in
   { desc;
-    layout = Layout.Product (List.map to_layout components);
+    layout = Layout.product (List.map to_layout components);
     hash =
       Hashtbl.hash
         ( hash_unboxed_product,
@@ -107,7 +107,7 @@ let record_unboxed args =
 
 let void =
   let desc = Void in
-  { desc; layout = Layout.Base Sort.Void; hash = Hashtbl.hash hash_void }
+  { desc; layout = Layout.base Sort.Void; hash = Hashtbl.hash hash_void }
 
 let rec print fmt { desc } =
   match desc with
@@ -181,16 +181,17 @@ let translate_simd_vec_split : S.Predef.simd_vec_split -> RS.simd_vec_split =
   | Float32x16 -> Float32x16
   | Float64x8 -> Float64x8
 
-let translate_unboxed : S.Predef.unboxed -> RS.unboxed = function
-  | Unboxed_float -> Unboxed_float
-  | Unboxed_float32 -> Unboxed_float32
-  | Unboxed_nativeint -> Unboxed_nativeint
-  | Unboxed_int64 -> Unboxed_int64
-  | Unboxed_int32 -> Unboxed_int32
-  | Unboxed_int16 -> Unboxed_int16
-  | Unboxed_int8 -> Unboxed_int8
-  | Unboxed_mask -> Unboxed_mask
-  | Unboxed_simd svs -> Unboxed_simd (translate_simd_vec_split svs)
+let translate_unboxed : S.Predef.unboxed -> RS.unboxed RS.Or_void.t = function
+  | Unboxed_float -> Other Unboxed_float
+  | Unboxed_float32 -> Other Unboxed_float32
+  | Unboxed_nativeint -> Other Unboxed_nativeint
+  | Unboxed_int64 -> Other Unboxed_int64
+  | Unboxed_int32 -> Other Unboxed_int32
+  | Unboxed_int16 -> Other Unboxed_int16
+  | Unboxed_int8 -> Other Unboxed_int8
+  | Unboxed_mask -> Other Unboxed_mask
+  | Unboxed_simd svs -> Other (Unboxed_simd (translate_simd_vec_split svs))
+  | Unboxed_unit -> Void
 
 exception Layout_missing
 
@@ -201,6 +202,18 @@ let err_exn f =
 
 let force_runtime_shape_exn cs =
   match runtime_shape cs with Some s -> s | None -> raise Layout_missing
+
+(* CR box: This function should be deleted once addressability affects boxed
+   representations, as addressability will be preserved in shapes and we'll be
+   able to check actual equality *)
+let rec erase_addressable (ly : Layout.t) : Layout.t =
+  match ly with
+  | Base _ | Univar _ | Genvar _ -> ly
+  | Product lys -> Layout.product (List.map erase_addressable lys)
+  | Addressable ly -> erase_addressable ly
+
+let equal_layouts_erasing_addressable ly1 ly2 =
+  Layout.equal (erase_addressable ly1) (erase_addressable ly2)
 
 (* CR mshinwell: it seems like this should move to the frontend *)
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
@@ -231,6 +244,10 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
+  | Addressable ly ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    Addressable (layout_to_types_layout ly)
 
 let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
     : RS.Runtime_layout.t =
@@ -359,20 +376,23 @@ and flatten_product_layout_exn (cs : t) =
     binders of [Shape.t] to the De Bruijn-indexed binders of [Runtime_shape.t].
     The environment maps each in-scope [Shape.Rec_var_ident.t] to its De Bruijn
     index relative to the current position (maintained by [add_binder]) and the
-    layout at which its binder was entered. *)
-module Rec_binder_env : sig
-  type complex_shape := t
+    layout at which its binder was entered.
 
+    Environments are hash-consed (deduplicated in a [table]) so that they can be
+    used as part of [Shape_cache] keys with O(1) equality and hashing. *)
+module Rec_binder_env : sig
   type t
 
-  val empty : t
+  (** A hash-consing table interning the environments. *)
+  type table
 
-  (** [is_empty] means the shape being converted is closed (it can mention no
-      recursive variables), which makes it eligible for caching. *)
-  val is_empty : t -> bool
+  val create_table : initial_size:int -> table
+
+  val empty : table -> t
 
   (** Enter a [Mu (rv, _)] binder whose layout is [layout]. *)
-  val add_binder : t -> Shape.Rec_var_ident.t -> layout:Layout.t option -> t
+  val add_binder :
+    table -> t -> Shape.Rec_var_ident.t -> layout:Layout.t option -> t
 
   module Lookup : sig
     type t =
@@ -392,18 +412,38 @@ module Rec_binder_env : sig
       binder with the layout [use_layout] expected at the use site. *)
   val lookup :
     t -> Shape.Rec_var_ident.t -> use_layout:Layout.t option -> Lookup.t
+
+  (** O(1) equality and hashing on the hash-consed representation, for use in
+      cache keys. *)
+  val equal : t -> t -> bool
+
+  val hash : t -> int
 end = struct
-  type t = (RS.DeBruijn_index.t * Layout.t option) S.Rec_var_env.t
+  include
+    Hash_consed.Dedup
+      (struct
+        type t = (RS.DeBruijn_index.t * Layout.t option) S.Rec_var_env.t
 
-  let empty = S.Rec_var_env.empty
+        let hash_value (idx, ly_opt) =
+          Hashtbl.hash (RS.DeBruijn_index.hash idx, ly_opt)
 
-  let is_empty = S.Rec_var_env.is_empty
+        let equal_value (i1, l1) (i2, l2) =
+          RS.DeBruijn_index.equal i1 i2 && Option.equal Layout.equal l1 l2
 
-  let add_binder t rv ~layout =
-    t
-    |> S.Rec_var_env.map (fun (idx, ly) ->
-        RS.DeBruijn_index.move_under_binder idx, ly)
-    |> S.Rec_var_env.add rv (RS.DeBruijn_index.zero, layout)
+        let hash = S.Rec_var_env.hash hash_value
+
+        let equal = S.Rec_var_env.equal equal_value
+      end)
+      ()
+
+  let empty table = create table S.Rec_var_env.empty
+
+  let add_binder table t rv ~layout =
+    modify table t (fun map ->
+        S.Rec_var_env.map
+          (fun (idx, ly) -> RS.DeBruijn_index.move_under_binder idx, ly)
+          map
+        |> S.Rec_var_env.add rv (RS.DeBruijn_index.zero, layout))
 
   module Lookup = struct
     type t =
@@ -416,65 +456,100 @@ end = struct
   end
 
   let lookup t rv ~use_layout : Lookup.t =
-    match S.Rec_var_env.find_opt rv t with
+    match S.Rec_var_env.find_opt rv (value t) with
     | None -> Unbound
     | Some (idx, bound_layout) -> (
       match bound_layout, use_layout with
-      | Some bound, Some use when not (Layout.equal bound use) ->
+      | Some bound, Some use
+        when not (equal_layouts_erasing_addressable bound use) ->
         Layout_mismatch { bound; use }
       | (Some _ as layout), _ | None, layout -> Bound (idx, layout))
 end
 
+type complex_shape = t
+
+(* Cache keys here include the full recursive-binder environment, so a shape
+   occurring under several different environments is converted once per
+   environment even if it uses none of the binders. Unlike for the DWARF type
+   DIE cache (see [Dwarf_state.Die_gen_ctx]), this only costs compilation time,
+   not DWARF size: the resulting [Runtime_shape.t]s are structurally equal, so
+   the DIE cache still deduplicates the output. Restricting the keys as the DIE
+   cache does would require computing the free recursive variables of a
+   [Shape.t], which carries no such summary. *)
 module Shape_cache : sig
   type complex_shape := t
 
   type t
 
-  val create : int -> t
+  val create : initial_size:int -> t
+
+  (** The empty recursive-binder environment, interned in this cache's table so
+      that it can be used as part of a cache key. *)
+  val empty_rec_env : t -> Rec_binder_env.t
+
+  (** [add_rec_binder t rec_env rv type_layout] extends [rec_env] with a binding
+      for the recursive variable [rv] at [type_layout]. The result is interned
+      in this cache's table for use as part of a cache key. *)
+  val add_rec_binder :
+    t ->
+    Rec_binder_env.t ->
+    S.Rec_var_ident.t ->
+    Layout.t option ->
+    Rec_binder_env.t
 
   val find_in_cache :
-    t -> Shape.t -> Layout.t -> rec_env:Rec_binder_env.t -> complex_shape option
+    t ->
+    type_shape:Shape.t ->
+    type_layout:Layout.t ->
+    rec_env:Rec_binder_env.t ->
+    complex_shape option
 
   val add_to_cache :
     t ->
-    Shape.t ->
-    Layout.t ->
-    complex_shape ->
+    type_shape:Shape.t ->
+    type_layout:Layout.t ->
     rec_env:Rec_binder_env.t ->
+    outp:complex_shape ->
     unit
 end = struct
   type key =
     { type_shape : Shape.t;
-      type_layout : Layout.t
+      type_layout : Layout.t;
+      rec_env : Rec_binder_env.t
     }
 
-  (* CR sspies: This caching will need performance improvements along with the
-     other caches in the future. *)
   module Cache = Hashtbl.Make (struct
     type t = key
 
-    let equal ({ type_shape = x1; type_layout = y1 } : t)
-        ({ type_shape = x2; type_layout = y2 } : t) =
-      Shape.equal x1 x2 && Layout.equal y1 y2
+    let equal ({ type_shape = x1; type_layout = y1; rec_env = r1 } : t)
+        ({ type_shape = x2; type_layout = y2; rec_env = r2 } : t) =
+      Shape.equal x1 x2 && Layout.equal y1 y2 && Rec_binder_env.equal r1 r2
 
-    let hash { type_shape; type_layout } =
-      Hashtbl.hash (type_shape.hash, type_layout)
+    let hash { type_shape; type_layout; rec_env } =
+      Hashtbl.hash (type_shape.hash, type_layout, Rec_binder_env.hash rec_env)
     (* CR sspies: Add a hash function to Layout.t *)
   end)
 
-  type nonrec t = t Cache.t
+  type t =
+    { cache : complex_shape Cache.t;
+      rec_env_table : Rec_binder_env.table
+    }
 
-  let create initial_size = Cache.create initial_size
+  let create ~initial_size =
+    { cache = Cache.create initial_size;
+      rec_env_table = Rec_binder_env.create_table ~initial_size
+    }
 
-  let find_in_cache cache type_shape type_layout ~rec_env =
-    if Rec_binder_env.is_empty rec_env
-    then Cache.find_opt cache { type_shape; type_layout }
-    else None
+  let empty_rec_env t = Rec_binder_env.empty t.rec_env_table
 
-  let add_to_cache cache type_shape type_layout value ~rec_env =
-    (* [rec_env] being empty means that the shape is closed. *)
-    if Rec_binder_env.is_empty rec_env
-    then Cache.add cache { type_shape; type_layout } value
+  let add_rec_binder t rec_env rv type_layout =
+    Rec_binder_env.add_binder t.rec_env_table rec_env rv ~layout:type_layout
+
+  let find_in_cache t ~type_shape ~type_layout ~rec_env =
+    Cache.find_opt t.cache { type_shape; type_layout; rec_env }
+
+  let add_to_cache t ~type_shape ~type_layout ~rec_env ~outp =
+    Cache.add t.cache { type_shape; type_layout; rec_env } outp
 end
 
 (** Lays out the elements in the shape sequentially while erasing all voids.
@@ -493,8 +568,14 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     match RS.Runtime_layout.of_base_layout b with
     | Other runtime_layout -> runtime (RS.unknown runtime_layout)
     | Void -> void)
+  | Addressable ly -> layout_to_unknown_shape ly
   | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_unknown_shape: Genvar"
+
+let unboxed_record_layout fields =
+  match fields with
+  | [(_, _, _, layout)] -> layout
+  | _ -> Layout.product (List.map (fun (_, _, _, ly) -> ly) fields)
 
 let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     (type_layout : Layout.t option) : t =
@@ -509,13 +590,17 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     else unknown_shape_exn ()
   in
   match type_shape.desc, type_layout with
+  | _, Some (Addressable ly) ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    type_shape_to_complex_shape_exn ~cache ~rec_env type_shape (Some ly)
   | Leaf, _ -> unknown_shape_exn ()
   | Unknown_type, _ -> unknown_shape_exn ()
   | Tuple args, (None | Some (Base Scannable)) -> (
     let args =
       List.map
         (fun sh ->
-          type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Scannable))
+          type_shape_to_complex_shape ~cache ~rec_env sh Layout.scannable)
         (* CR sspies: In the future, we cannot assume that these are always
            values. This means we may need to use
            [type_shape_to_complex_shape_exn] and catch the exception on the
@@ -533,7 +618,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         f "tuple must have value layout, but got: %a" pp_layout type_layout)
   | At_layout (shape, ly), None ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly
-  | At_layout (shape, ly1), Some ly2 when Layout.equal ly1 ly2 ->
+  | At_layout (shape, ly1), Some ly2
+    when equal_layouts_erasing_addressable ly1 ly2 ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly1
   | At_layout (shape, layout), Some type_layout ->
     err_or_unknown_exn (fun f ->
@@ -543,10 +629,9 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           pp_layout type_layout pp_layout layout Shape.print shape)
   | Predef (pre, args), _ -> (
     try
-      let predef_shape =
-        predef_to_complex_shape_exn ~cache ~rec_env pre ~args
-      in
-      runtime (RS.predef predef_shape)
+      match predef_to_complex_shape_exn ~cache ~rec_env pre ~args with
+      | Other predef_shape -> runtime (RS.predef predef_shape)
+      | Void -> void
     with Layout_missing -> (
       let layout = Shape.Predef.to_base_layout pre in
       let runtime_layout = RS.Runtime_layout.of_base_layout layout in
@@ -559,23 +644,25 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
        layout by forcing the runtime shape below. *)
     (* CR sspies: We should guess the layout from the recursive body [sh]
        instead of just using the current layout. *)
-    let rec_env = Rec_binder_env.add_binder rec_env rv ~layout:type_layout in
+    let rec_env = Shape_cache.add_rec_binder cache rec_env rv type_layout in
     type_shape_to_complex_shape_exn ~cache ~rec_env sh type_layout
     |> force_runtime_shape_exn |> RS.mu |> runtime
   | Rec_var rv, use_layout -> (
     match Rec_binder_env.lookup rec_env rv ~use_layout with
-    | Bound (i, Some (Layout.Base base)) -> (
-      match RS.Runtime_layout.of_base_layout base with
-      | Void -> void
-      | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | Bound (_, Some (Layout.Product _ as ly)) ->
-      (* We currently do not support unboxed recursive types; fall back to an
-         unknown shape for the layout. *)
-      layout_to_unknown_shape ly
-    | Bound (_, Some (Univar _)) ->
-      Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
-    | Bound (_, Some (Genvar _)) ->
-      Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar"
+    | Bound (i, Some bound_layout) -> (
+      (* CR box: Addressability should be preserved here once it affects boxed
+         representations *)
+      match erase_addressable bound_layout with
+      | Layout.Base base -> (
+        match RS.Runtime_layout.of_base_layout base with
+        | Void -> void
+        | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
+      | Layout.(Product _ | Addressable _) as ly ->
+        (* We currently do not support unboxed recursive types; fall back to an
+           unknown shape for the layout. *)
+        layout_to_unknown_shape ly
+      | Univar _ -> Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
+      | Genvar _ -> Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar")
     | Bound (_, None) -> raise Layout_missing
     | Layout_mismatch { bound; use } ->
       err_or_unknown_exn (fun f ->
@@ -602,7 +689,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | Unboxed_tuple _, Some (Base b) ->
     err_or_unknown_exn (fun f ->
         f "unboxed tuple must have product layout, but got: %a" pp_layout
-          (Layout.Base b))
+          (Layout.base b))
   | Unboxed_tuple fields, Some (Product _ as type_layout) ->
     err_or_unknown_exn (fun f ->
         f
@@ -613,7 +700,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     try
       let constructors =
         List.map
-          (fun { S.name; kind = _; args; constr_uid = _ } ->
+          (fun { S.name; kind = _; is_constant; args; constr_uid = _ } ->
             (* We first compute complex shapes for the fields. Then we unarize
                using the mixed block helpers defined above. *)
             let is_tuple_constructor =
@@ -644,12 +731,14 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
             if is_tuple_constructor
             then
               (* We clear the field names for tuple constructors. *)
-              RS.constructor_with_tuple_arg ~name
+              RS.constructor_with_tuple_arg ~name ~is_constant
                 ~args:
                   (List.map
                      (RS.map_mixed_block_field_label (fun _ -> ()))
                      constr_args)
-            else RS.constructor_with_record_arg ~name ~args:constr_args)
+            else
+              RS.constructor_with_record_arg ~name ~is_constant
+                ~args:constr_args)
           constructors
       in
       runtime (RS.variant constructors)
@@ -667,7 +756,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                 (fun arg ->
                   ( None,
                     type_shape_to_complex_shape ~cache ~rec_env arg
-                      (Layout.Base Scannable) ))
+                      Layout.scannable ))
                 pv_constr_args
             in
             (* Currently, all arguments here are values, but sooner or later
@@ -677,6 +766,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
               lay_out_into_mixed_block_exn ~source_level_fields
             in
             RS.constructor_with_tuple_arg ~name:pv_constr_name
+              ~is_constant:(List.is_empty constr_args)
               ~args:
                 (List.map
                    (RS.map_mixed_block_field_label (fun _ -> ()))
@@ -698,9 +788,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
              type_shape_to_complex_shape ~cache ~rec_env field_value
                field_layout ))
          fields)
-  | Record { fields; kind = Record_unboxed_product }, Some (Product lys)
-    when List.equal Layout.equal (List.map (fun (_, _, _, ly) -> ly) fields) lys
-    ->
+  | Record { fields; kind = Record_unboxed_product }, Some ly
+    when Layout.equal ly (unboxed_record_layout fields) ->
     record_unboxed
       (List.map
          (fun (field_name, _, field_value, field_layout) ->
@@ -710,12 +799,10 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
          fields)
   | ( Record { fields; kind = Record_unboxed_product },
       Some ((Base _ | Product _) as ly) ) ->
-    let layout_from_shapes =
-      Layout.Product (List.map (fun (_, _, _, ly) -> ly) fields)
-    in
     err_or_unknown_exn (fun f ->
         f "unboxed record expected to be of layout %a, but got: %a" pp_layout
-          layout_from_shapes pp_layout ly)
+          (unboxed_record_layout fields)
+          pp_layout ly)
   | Record { fields; kind = Record_boxed }, (None | Some (Base Scannable))
   | Record { fields; kind = Record_floats }, (None | Some (Base Scannable))
   | Record { fields; kind = Record_mixed _ }, (None | Some (Base Scannable))
@@ -750,7 +837,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           kind = Record_unboxed
         },
       ly2 )
-    when Option.value ~default:true (Option.map (Layout.equal field_layout) ly2)
+    when Option.value ~default:true
+           (Option.map (equal_layouts_erasing_addressable field_layout) ly2)
     -> (
     let shape =
       type_shape_to_complex_shape ~cache ~rec_env field_type field_layout
@@ -793,8 +881,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | ( Variant_unboxed
         { name; variant_uid = _; arg_name; arg_uid = _; arg_shape; arg_layout },
       ly2 )
-    when Option.value ~default:true (Option.map (Layout.equal arg_layout) ly2)
-    -> (
+    when Option.value ~default:true
+           (Option.map (equal_layouts_erasing_addressable arg_layout) ly2) -> (
     let shape =
       type_shape_to_complex_shape ~cache ~rec_env arg_shape arg_layout
     in
@@ -829,7 +917,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     unknown_shape_exn ()
 
 and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
-    RS.predef =
+    RS.predef RS.Or_void.t =
   match predef, args with
   | Array, [elem_shape] -> (
     let elem_shape =
@@ -838,37 +926,40 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
     let children = lay_out_sequentially elem_shape in
     match children with
     | [] -> err_exn (fun f -> f "array cannot contain only void elements")
-    | [child] -> Array (Regular child)
-    | children -> Array (Packed children)
+    | [child] -> Other (Array (Regular child))
+    | children -> Other (Array (Packed children))
     (* case for an unboxed product inside *))
-  | Bytes, [] -> Bytes
-  | Char, [] -> Char
-  | Extension_constructor, [] -> Extension_constructor
-  | Float, [] -> Float
-  | Float32, [] -> Float32
-  | Floatarray, [] -> Floatarray
-  | Int, [] -> Int
-  | Int8, [] -> Int8
-  | Int16, [] -> Int16
-  | Int32, [] -> Int32
-  | Int64, [] -> Int64
+  | Bytes, [] -> Other Bytes
+  | Char, [] -> Other Char
+  | Extension_constructor, [] -> Other Extension_constructor
+  | Float, [] -> Other Float
+  | Float32, [] -> Other Float32
+  | Floatarray, [] -> Other Floatarray
+  | Int, [] -> Other Int
+  | Int8, [] -> Other Int8
+  | Int16, [] -> Other Int16
+  | Int32, [] -> Other Int32
+  | Int64, [] -> Other Int64
   | Lazy_t, [elem_shape] ->
     let elem_shape =
       type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape
-        (Some (Layout.Base Scannable))
+        (Some Layout.scannable)
     in
     let elem_shape =
       match runtime_shape elem_shape with
       | Some s -> s
       | None -> RS.unknown Value
     in
-    Lazy_t elem_shape
-  | Nativeint, [] -> Nativeint
-  | Mask, [] -> Mask
-  | String, [] -> String
-  | Simd vec_split, [] -> Simd (translate_simd_vec_split vec_split)
-  | Exception, [] -> Exception
-  | Unboxed unb, [] -> Unboxed (translate_unboxed unb)
+    Other (Lazy_t elem_shape)
+  | Nativeint, [] -> Other Nativeint
+  | Mask, [] -> Other Mask
+  | String, [] -> Other String
+  | Simd vec_split, [] -> Other (Simd (translate_simd_vec_split vec_split))
+  | Exception, [] -> Other Exception
+  | Unboxed unb, [] -> (
+    match translate_unboxed unb with
+    | Other unb -> Other (Unboxed unb)
+    | Void -> Void)
   | ( ( Bytes | Char | Extension_constructor | Float | Float32 | Floatarray
       | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
       | Exception | Unboxed _ ),
@@ -902,7 +993,7 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
           args)
 
 and type_shape_to_complex_shape ~cache ~rec_env type_shape type_layout : t =
-  match Shape_cache.find_in_cache cache type_shape type_layout ~rec_env with
+  match Shape_cache.find_in_cache cache ~type_layout ~type_shape ~rec_env with
   | Some shape -> shape
   | None ->
     let shape =
@@ -911,10 +1002,10 @@ and type_shape_to_complex_shape ~cache ~rec_env type_shape type_layout : t =
           (Some type_layout)
       with Layout_missing -> layout_to_unknown_shape type_layout
     in
-    Shape_cache.add_to_cache cache type_shape type_layout shape ~rec_env;
+    Shape_cache.add_to_cache cache ~type_shape ~type_layout ~outp:shape ~rec_env;
     shape
 
 let type_shape_to_complex_shape ~cache evaluated_shape type_layout =
   let type_shape = Type_shape.Evaluated_shape.shape evaluated_shape in
-  type_shape_to_complex_shape ~cache ~rec_env:Rec_binder_env.empty type_shape
-    type_layout
+  let rec_env = Shape_cache.empty_rec_env cache in
+  type_shape_to_complex_shape ~cache ~rec_env type_shape type_layout

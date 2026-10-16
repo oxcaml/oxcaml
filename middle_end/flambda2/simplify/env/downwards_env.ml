@@ -20,6 +20,8 @@ module K = Flambda_kind
 module BP = Bound_parameter
 module T = Flambda2_types
 module TE = Flambda2_types.Typing_env
+module LCS = Lifted_constant_state
+module LC = Lifted_constant
 
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
@@ -55,6 +57,8 @@ type t =
     inlined_debuginfo : Inlined_debuginfo.t;
     disable_inlining : Disable_inlining.t;
     disable_partial_application_stub_generation : bool;
+    inlined_attribute_to_forward :
+      (Inlined_attribute.t * forwarded_from:Inlined_debuginfo.t) option;
     inlining_state : Inlining_state.t;
     propagating_float_consts : bool;
     at_unit_toplevel : bool;
@@ -95,81 +99,93 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    has_seen_a_non_liftable_continuation : bool
+    has_seen_a_non_liftable_continuation : bool;
         (* This flag is used to mark as non-liftable any continuation that is
            bound after a non-liftable continuation, since any continuation bound
            after a non-liftable continuation may refer to it.
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
+    is_cold : bool
+        (* This flag is used to mark cold contexts, i.e. the body of cold
+           functions and continuations. *)
   }
 
-let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
-                inlined_debuginfo; disable_inlining;
-                disable_partial_application_stub_generation;
-                inlining_state; propagating_float_consts;
-                at_unit_toplevel; unit_toplevel_exn_continuation;
-                variables_defined_at_toplevel; cse; comparison_results;
-                are_rebuilding_terms; closure_info;
-                unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
-                get_imported_code = _; inlining_history_tracker = _;
-                loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
-                lifted = _; cost_of_lifting_continuations_out_of_current_one;
-                has_seen_a_non_liftable_continuation; join_analysis;
-              } =
-  Format.fprintf ppf "@[<hov 1>(\
-      @[<hov 1>(round@ %d)@]@ \
-      @[<hov 1>(machine_width@ %a)@]@ \
-      @[<hov 1>(typing_env@ %a)@]@ \
-      @[<hov 1>(inlined_debuginfo@ %a)@]@ \
-      @[<hov 1>(disable_inlining@ %a)@]@ \
-      @[<hov 1>(disable_partial_application_stub_generation@ %b)@]@ \
-      @[<hov 1>(inlining_state@ %a)@]@ \
-      @[<hov 1>(propagating_float_consts@ %b)@]@ \
-      @[<hov 1>(at_unit_toplevel@ %b)@]@ \
-      @[<hov 1>(unit_toplevel_return_continuation@ %a)@]@ \
-      @[<hov 1>(unit_toplevel_exn_continuation@ %a)@]@ \
-      @[<hov 1>(unit_toplevel_alloc_region@ %a)@]@ \
-      @[<hov 1>(variables_defined_at_toplevel@ %a)@]@ \
-      @[<hov 1>(cse@ @[<hov 1>%a@])@]@ \
-      @[<hov 1>(comparison_results@ @[<hov 1>%a@])@]@ \
-      @[<hov 1>(are_rebuilding_terms@ %a)@]@ \
-      @[<hov 1>(closure_info@ %a)@]@ \
-      @[<hov 1>(all_code@ %a)@]@ \
-      @[<hov 1>(loopify_state@ %a)@]@ \
-      @[<hov 1>(binding_histories@ %a)@]@ \
-      @[<hov 1>(specialization_cost@ %a)@]@ \
-      @[<hov 1>(join_analysis@ %a)@]@ \
-      @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
-      @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]@ \
-      @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]\
-      )@]"
-    round
-    Target_system.Machine_width.print machine_width
-    TE.print typing_env
-    Inlined_debuginfo.print inlined_debuginfo
-    Disable_inlining.print disable_inlining
-    disable_partial_application_stub_generation
-    Inlining_state.print inlining_state
-    propagating_float_consts
-    at_unit_toplevel
-    Continuation.print unit_toplevel_return_continuation
-    Continuation.print unit_toplevel_exn_continuation
-    Variable.print unit_toplevel_alloc_region
-    Variable.Set.print variables_defined_at_toplevel
-    CSE.print cse
-    (Variable.Map.print Comparison_result.print) comparison_results
-    Are_rebuilding_terms.print are_rebuilding_terms
-    Closure_info.print closure_info
-    (Code_id.Map.print Code.print) all_code
-    Loopify_state.print loopify_state
-    Replay_history.print replay_history
-    Specialization_cost.print specialization_cost
-    (Format.pp_print_option Join_analysis.print
-      ~none:(fun ppf () -> Format.fprintf ppf "()")) join_analysis
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
-    cost_of_lifting_continuations_out_of_current_one
-    has_seen_a_non_liftable_continuation
+let print ppf
+    { round;
+      machine_width;
+      typing_env;
+      inlined_debuginfo;
+      disable_inlining;
+      disable_partial_application_stub_generation;
+      inlined_attribute_to_forward;
+      inlining_state;
+      propagating_float_consts;
+      at_unit_toplevel;
+      unit_toplevel_exn_continuation;
+      variables_defined_at_toplevel;
+      cse;
+      comparison_results;
+      are_rebuilding_terms;
+      closure_info;
+      unit_toplevel_return_continuation;
+      unit_toplevel_alloc_region;
+      all_code;
+      get_imported_code = _;
+      inlining_history_tracker = _;
+      loopify_state;
+      replay_history;
+      specialization_cost;
+      defined_variables_by_scope;
+      lifted = _;
+      cost_of_lifting_continuations_out_of_current_one;
+      has_seen_a_non_liftable_continuation;
+      join_analysis;
+      is_cold
+    } =
+  let open! Misc.Sexp in
+  print ppf
+    [ d "round" round;
+      a "machine_width" machine_width Target_system.Machine_width.print;
+      a "typing_env" typing_env TE.print;
+      a "inlined_debuginfo" inlined_debuginfo Inlined_debuginfo.print;
+      a "disable_inlining" disable_inlining Disable_inlining.print;
+      b "disable_partial_application_stub_generation"
+        disable_partial_application_stub_generation;
+      o "inlined_attribute_to_forward" inlined_attribute_to_forward
+        (fun ppf (attribute, ~forwarded_from) ->
+          Format.fprintf ppf "%a@ %a" Inlined_attribute.print attribute
+            Inlined_debuginfo.print forwarded_from);
+      a "inlining_state" inlining_state Inlining_state.print;
+      b "propagating_float_consts" propagating_float_consts;
+      b "at_unit_toplevel" at_unit_toplevel;
+      a "unit_toplevel_return_continuation" unit_toplevel_return_continuation
+        Continuation.print;
+      a "unit_toplevel_exn_continuation" unit_toplevel_exn_continuation
+        Continuation.print;
+      a "unit_toplevel_alloc_region" unit_toplevel_alloc_region Variable.print;
+      a "variables_defined_at_toplevel" variables_defined_at_toplevel
+        Variable.Set.print;
+      a "cse" cse CSE.print;
+      a "comparison_results" comparison_results
+        (Variable.Map.print Comparison_result.print);
+      a "are_rebuilding_terms" are_rebuilding_terms Are_rebuilding_terms.print;
+      a "closure_info" closure_info Closure_info.print;
+      a "all_code" all_code (Code_id.Map.print Code.print);
+      a "loopify_state" loopify_state Loopify_state.print;
+      a "replay_history" replay_history Replay_history.print;
+      a "specialization_cost" specialization_cost Specialization_cost.print;
+      a "join_analysis" join_analysis
+        (Format.pp_print_option Join_analysis.print ~none:(fun ppf () ->
+             Format.fprintf ppf "()"));
+      a "defined_variables_by_scope" defined_variables_by_scope
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+           Lifted_cont_params.print);
+      d "cost_of_lifting_continuations_out_of_current_one"
+        cost_of_lifting_continuations_out_of_current_one;
+      b "has_seen_a_non_liftable_continuation"
+        has_seen_a_non_liftable_continuation;
+      b "is_cold" is_cold ]
 
 let define_continuations ~can_be_lifted t conts =
   let replay_history =
@@ -224,49 +240,40 @@ let define_extra_variable t var kind =
 let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region =
+    ~toplevel_my_alloc_region =
   let typing_env = TE.create ~machine_width ~resolver in
-  let t =
-    { round;
-      machine_width;
-      typing_env;
-      inlined_debuginfo = Inlined_debuginfo.none;
-      disable_inlining = Do_not_disable_inlining;
-      disable_partial_application_stub_generation = false;
-      inlining_state = Inlining_state.default ~round;
-      propagating_float_consts;
-      at_unit_toplevel = true;
-      unit_toplevel_return_continuation;
-      unit_toplevel_exn_continuation;
-      unit_toplevel_alloc_region = toplevel_my_alloc_region;
-      variables_defined_at_toplevel = Variable.Set.empty;
-      cse = CSE.empty;
-      comparison_results = Variable.Map.empty;
-      are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
-      closure_info = Closure_info.not_in_a_closure;
-      all_code = Code_id.Map.empty;
-      get_imported_code;
-      inlining_history_tracker =
-        Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
-      loopify_state = Loopify_state.do_not_loopify;
-      replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
-      defined_variables_by_scope = [Lifted_cont_params.empty];
-      lifted = Variable.Set.empty;
-      cost_of_lifting_continuations_out_of_current_one = 0;
-      has_seen_a_non_liftable_continuation = false;
-      join_analysis = None
-    }
-  in
-  let my_region_duid = Flambda_debug_uid.none in
-  let my_ghost_region_duid = Flambda_debug_uid.none in
-  define_variable
-    (define_variable t
-       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
-       K.region)
-    (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
-       Name_mode.normal)
-    K.region
+  { round;
+    machine_width;
+    typing_env;
+    inlined_debuginfo = Inlined_debuginfo.none;
+    disable_inlining = Do_not_disable_inlining;
+    disable_partial_application_stub_generation = false;
+    inlined_attribute_to_forward = None;
+    inlining_state = Inlining_state.default ~round;
+    propagating_float_consts;
+    at_unit_toplevel = true;
+    unit_toplevel_return_continuation;
+    unit_toplevel_exn_continuation;
+    unit_toplevel_alloc_region = toplevel_my_alloc_region;
+    variables_defined_at_toplevel = Variable.Set.empty;
+    cse = CSE.empty;
+    comparison_results = Variable.Map.empty;
+    are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
+    closure_info = Closure_info.not_in_a_closure;
+    all_code = Code_id.Map.empty;
+    get_imported_code;
+    inlining_history_tracker =
+      Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
+    loopify_state = Loopify_state.do_not_loopify;
+    replay_history = Replay_history.first_pass;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
+    defined_variables_by_scope = [Lifted_cont_params.empty];
+    lifted = Variable.Set.empty;
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    has_seen_a_non_liftable_continuation = false;
+    join_analysis = None;
+    is_cold = false
+  }
 
 let all_code t = t.all_code
 
@@ -284,6 +291,8 @@ let disable_inlining t = t.disable_inlining
 
 let disable_partial_application_stub_generation t =
   t.disable_partial_application_stub_generation
+
+let inlined_attribute_to_forward t = t.inlined_attribute_to_forward
 
 let propagating_float_consts t = t.propagating_float_consts
 
@@ -335,6 +344,7 @@ let enter_set_of_closures
       inlined_debuginfo = _;
       disable_inlining;
       disable_partial_application_stub_generation;
+      inlined_attribute_to_forward = _;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
@@ -356,7 +366,8 @@ let enter_set_of_closures
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
-      join_analysis = _
+      join_analysis = _;
+      is_cold = _
     } =
   { machine_width;
     round;
@@ -364,6 +375,7 @@ let enter_set_of_closures
     inlined_debuginfo = Inlined_debuginfo.none;
     disable_inlining;
     disable_partial_application_stub_generation;
+    inlined_attribute_to_forward = None;
     inlining_state;
     propagating_float_consts;
     at_unit_toplevel = false;
@@ -385,7 +397,8 @@ let enter_set_of_closures
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    has_seen_a_non_liftable_continuation = false
+    has_seen_a_non_liftable_continuation = false;
+    is_cold = false
   }
 
 let define_symbol t sym kind =
@@ -544,6 +557,23 @@ let check_simple_is_bound t (simple : Simple.t) =
 let mem_code t id =
   Code_id.Map.mem id t.all_code || Exported_code.mem id (t.get_imported_code ())
 
+let find_code_metadata_exn t id =
+  match Code_id.Map.find id t.all_code with
+  | code -> Code.code_metadata code
+  | exception Not_found -> (
+    (* We don't care which unit the metadata is coming from, so if we have
+       already loaded the metadata in imported code, return it. *)
+    match Exported_code.find_exn (t.get_imported_code ()) id with
+    | code_or_metadata -> Code_or_metadata.code_metadata code_or_metadata
+    | exception Not_found ->
+      (* Sometimes the metadata is not properly reexported; try to force loading
+         it. *)
+      let (_ : TE.Serializable.t option) =
+        TE.resolver t.typing_env (Code_id.get_compilation_unit id)
+      in
+      Code_or_metadata.code_metadata
+        (Exported_code.find_exn (t.get_imported_code ()) id))
+
 let find_code_exn t id =
   match Code_id.Map.find_or_null id t.all_code with
   | This code -> Code_or_metadata.create code
@@ -640,8 +670,28 @@ let set_inlining_arguments arguments t =
 let set_inlined_debuginfo t ~from =
   { t with inlined_debuginfo = from.inlined_debuginfo }
 
-let merge_inlined_debuginfo t ~from_apply_expr =
+let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
+    ~inlined_attribute =
+  match (inlined_attribute : Inlined_attribute.t) with
+  | Forward_inlined ->
+    Option.map
+      (fun (inlined, ~forwarded_from) ->
+        ( inlined,
+          ~forwarded_from:(Inlined_debuginfo.merge forwarded_from
+                             ~from_apply_expr) ))
+      t.inlined_attribute_to_forward
+  | ( Always_inlined _ | Hint_inlined | Never_inlined | Unroll _
+    | Default_inlined ) as inlined ->
+    Some (inlined, ~forwarded_from:from_apply_expr)
+
+let merge_inlined_debuginfo_and_forward_inlined_attribute t ~from_apply_expr
+    ~inlined_attribute =
+  let inlined_attribute_to_forward =
+    inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
+      ~inlined_attribute
+  in
   { t with
+    inlined_attribute_to_forward;
     inlined_debuginfo =
       Inlined_debuginfo.merge t.inlined_debuginfo ~from_apply_expr
   }
@@ -683,8 +733,14 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
   in
+  let inlined_attribute_to_forward =
+    inlined_attribute_to_forward_through_inlined_apply t
+      ~from_apply_expr:inlined_debuginfo
+      ~inlined_attribute:(Apply.inlined apply)
+  in
   { t with
     inlined_debuginfo;
+    inlined_attribute_to_forward;
     inlining_state;
     inlining_history_tracker =
       Inlining_history.Tracker.enter_inlined_apply
@@ -744,6 +800,56 @@ let enter_continuation_handler lifted_params t =
     specialization_cost = Specialization_cost.can_specialize ()
   }
 
+let add_lifted_constant_state ?maybe_already_defined denv lifted =
+  let initial_denv = denv in
+  let maybe_already_defined =
+    match maybe_already_defined with None -> false | Some () -> true
+  in
+  let denv =
+    LCS.fold lifted ~init:denv ~f:(fun denv lifted_constant ->
+        let types_of_symbols = LC.types_of_symbols lifted_constant in
+        Symbol.Map.fold
+          (fun sym (_denv, typ) denv ->
+            if maybe_already_defined && mem_symbol denv sym
+            then denv
+            else define_symbol denv sym (T.kind typ))
+          types_of_symbols denv)
+  in
+  let typing_env =
+    let typing_env = typing_env denv in
+    LCS.fold lifted ~init:typing_env ~f:(fun typing_env lifted_constant ->
+        let types_of_symbols = LC.types_of_symbols lifted_constant in
+        Symbol.Map.fold
+          (fun sym (typing_env_at_definition, typ) typing_env ->
+            if maybe_already_defined && mem_symbol initial_denv sym
+            then typing_env
+            else
+              let sym = Name.symbol sym in
+              let env_extension =
+                (* CR mshinwell: Maybe sometimes this could be done at a time
+                   previous to this point. *)
+                (* CR pchambart: Maybe some of these make_suitable calls could
+                   be combined into one *)
+                T.make_suitable_for_environment typing_env_at_definition
+                  (Everything_not_in typing_env)
+                  [sym, typ]
+              in
+              TE.add_env_extension_with_extra_variables typing_env env_extension)
+          types_of_symbols typing_env)
+  in
+  LCS.fold lifted ~init:(with_typing_env denv typing_env)
+    ~f:(fun denv lifted_constant ->
+      let pieces_of_code =
+        LC.defining_exprs lifted_constant
+        |> Rebuilt_static_const.Group.pieces_of_code_including_those_not_rebuilt
+      in
+      Code_id.Map.fold
+        (fun code_id code denv ->
+          if maybe_already_defined && mem_code denv code_id
+          then denv
+          else define_code denv ~code_id ~code)
+        pieces_of_code denv)
+
 let variables_defined_in_current_continuation t =
   match t.defined_variables_by_scope with
   | [] -> Misc.fatal_errorf "Empty stack of defined_variables_by_scope in denv"
@@ -768,6 +874,10 @@ let set_has_seen_a_non_liftable_continuation t =
   if t.has_seen_a_non_liftable_continuation
   then t
   else { t with has_seen_a_non_liftable_continuation = true }
+
+let is_cold t = t.is_cold
+
+let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
 
 let must_inline t = Replay_history.must_inline t.replay_history
 
@@ -801,6 +911,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     disable_inlining = denv.disable_inlining;
     disable_partial_application_stub_generation =
       denv.disable_partial_application_stub_generation;
+    inlined_attribute_to_forward = denv.inlined_attribute_to_forward;
     inlining_state = denv.inlining_state;
     inlining_history_tracker = denv.inlining_history_tracker;
     (* denv_for_join *)
@@ -819,6 +930,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
       denv_for_join.cost_of_lifting_continuations_out_of_current_one;
     has_seen_a_non_liftable_continuation =
       denv_for_join.has_seen_a_non_liftable_continuation;
+    is_cold = denv_for_join.is_cold;
     (* For the following fields, both denvs should have the same value of these
        fields *)
     round = denv.round;

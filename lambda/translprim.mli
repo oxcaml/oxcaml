@@ -38,6 +38,7 @@ val transl_primitive :
   poly_mode:Mode.Locality.l option ->
   poly_sort:Jkind.Sort.t option ->
   yielding:Mode.Yielding.l ->
+  zero_alloc_check:Zero_alloc.check option ->
   Path.t option ->
   Lambda.lambda
 
@@ -70,6 +71,7 @@ type error =
   | Unknown_builtin_primitive of string
   | Wrong_arity_builtin_primitive of string
   | Wrong_layout_for_peek_or_poke of string
+  | Layout_poly_arguments_unsupported of string
   | Invalid_floatarray_glb
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive

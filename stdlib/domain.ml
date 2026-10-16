@@ -24,49 +24,59 @@ open Modes.Portable
 
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
-module Obj_opt : sig @@ portable
-  type t
+module Obj_slot : sig @@ portable
+  type t : value non_float
+
   val some : 'a -> t
-  val is_some : t -> bool
+  val none : unit -> t
+  val is_none : t -> bool
+
+  (** A sentinel marking a slot whose value is borrowed by [TLS.access]. *)
+  val borrowed : unit -> t
+  val is_borrowed : t -> bool
+
   val fresh : unit -> t array
   val grow_array : t array -> int -> int -> t array
-  val compare_and_set : t array -> int -> t -> t -> bool
+  val compare_exchange : t array -> int -> t -> t -> t
 
   (** [unsafe_get obj] may only be called safely
-      if [is_some] is true.
+      if [is_none] and [is_borrowed] are both false.
 
       [unsafe_get (some v)] is equivalent to
       [Obj.obj (Obj.repr v)]. *)
   val unsafe_get : t -> 'a
 end = struct
-  type t = Obj.t
-  let none = Obj.magic_portable (Obj.repr (ref 0))
-  let fresh () = Array.make 7 (Obj.magic_uncontended none)
-  let[@inline] some v =
+  type not_a_float = Immediate | Block of { mutable state : not_a_float }
+  type t = not_a_float
+  let none = Sys.opaque_identity (Block { state = Immediate })
+  let none () = Obj.magic_uncontended none
+  let borrowed = Sys.opaque_identity (Block { state = Immediate })
+  let borrowed () = Obj.magic_uncontended borrowed
+  let fresh () = Array.make 7 (none ())
+  let[@inline] some v : t =
    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
     * [x], which may be a [float] and conclude that the [st] is a float array.
     * We do not want OCaml's float array optimisation kicking in here. *)
-    Obj.repr (Sys.opaque_identity v)
-  let[@inline] is_some obj = (obj != Obj.magic_uncontended none)
-  let[@inline] unsafe_get obj = Obj.obj obj
+    Sys.opaque_identity (Obj.magic v)
+  let[@inline] is_none obj = (obj == none ())
+  let[@inline] is_borrowed obj = (obj == borrowed ())
+  let[@inline] unsafe_get obj = Obj.magic obj
 
   let[@inline never] grow_array st idx size =
     let rec compute_new_size s =
       if idx < s then s else compute_new_size (2 * s + 1)
     in
     let new_size = compute_new_size size in
-    let new_st =
-      Array.make new_size (Obj.magic_uncontended none)
-    in
+    let new_st = Array.make new_size (none ()) in
     Array.blit st 0 new_st 0 size;
     new_st
 
-  external compare_and_set_field
-    : t array -> int -> t -> t -> bool @@ portable = "%atomic_cas_field"
+  external compare_exchange_field : t array -> int -> t -> t -> t @@ portable
+    = "%atomic_compare_exchange_field"
 
-  let[@inline] compare_and_set st idx old new_ =
+  let[@inline] compare_exchange st idx old new_ =
     (* In Flambda 2 there is a strict distinction between arrays and blocks. *)
-    compare_and_set_field (Sys.opaque_identity st) idx old new_
+    compare_exchange_field (Sys.opaque_identity st) idx old new_
 end
 
 module Raw = struct
@@ -106,7 +116,7 @@ type 'a t = {
 
 module DLS0 = struct
 
-  type dls_state = Obj_opt.t array
+  type dls_state = Obj_slot.t array
 
   external get_dls_state : unit -> dls_state @@ portable = "%dls_get"
 
@@ -118,7 +128,7 @@ module DLS0 = struct
     "caml_domain_dls_compare_and_set" [@@noalloc]
 
   let init () =
-    let st = Obj_opt.fresh () in
+    let st = Obj_slot.fresh () in
     set_dls_state st
 
   type 'a key = int * (unit -> 'a) Modes.Portable.t
@@ -149,63 +159,60 @@ module DLS0 = struct
     k
 
   (* If necessary, grow the current domain's local state array such that [idx]
-  * is a valid index in the array. *)
+     is a valid index in the array. *)
   let[@inline] rec maybe_grow idx =
     let st = get_dls_state () in
     let sz = Array.length st in
     if idx < sz then st
     else begin
-      let new_st = Obj_opt.grow_array st idx sz in
-      (* We want a implementation that is safe with respect to
-        single-domain multi-threading: retry if the DLS state has
-        changed under our feet.
-        Note that the number of retries will be very small in
-        contended scenarios, as the array only grows, with
-        exponential resizing. *)
+      let new_st = Obj_slot.grow_array st idx sz in
+      (* We want an implementation that is safe with respect to single-domain
+         multi-threading: retry if the DLS state has changed under our feet.
+
+         Note that the number of retries will be very small in contended
+         scenarios, as the array only grows, with exponential resizing. *)
       if compare_and_set_dls_state st new_st
       then new_st
       else maybe_grow idx
     end
 
-  (* Disable inlining to assure poll points are never inserted between grow
-     and set, which could cause us to drop the update. *)
-  let[@inline never] set (type a) (idx, _init) (x : a) =
-    (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    Array.unsafe_set st idx (Obj_opt.some x)
-
-  let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
-    let v : a = init () in
-    let new_obj = Obj_opt.some v in
-    (* At this point, [st] or [st.(idx)] may have been changed
-      by another thread on the same domain.
-
-      If [st] changed, it was resized into a larger value,
-      we can just reuse the new value.
-
-      If [st.(idx)] changed, we drop the current value to avoid
-      letting other threads observe a 'revert' that forgets
-      previous modifications. *)
+  (* Disable inlining to assure poll points are never inserted between
+     [get_dls_state]/[maybe_grow] and [unsafe_set], which could cause us to drop
+     the update. *)
+  let[@inline never] set (type a) ((idx, _init) : a key) (x : a) =
     let st = get_dls_state () in
-    if Obj_opt.compare_and_set st idx old_obj new_obj
-    then v
+    if idx < Array.length st
+    then Array.unsafe_set st idx (Obj_slot.some x)
     else begin
-      (* if st.(idx) changed, someone must have initialized
-        the key in the meantime. *)
-      let updated_obj = Array.unsafe_get st idx in
-      if Obj_opt.is_some updated_obj
-      then (Obj_opt.unsafe_get updated_obj : a)
-      else assert false
+      let st = maybe_grow idx in
+      Array.unsafe_set st idx (Obj_slot.some x)
     end
 
-  (* Inlining is ok because it's safe to return a stale value. *)
-  let[@inline] get (type a) ((idx, init) : a key) : a =
-    (* Assures [idx] is in range. *)
+  let[@cold] get_or_init (type a) ((idx, { portable = init }) : a key) : a =
+    let x = init () in
+    (* At this point, [st] or [st.(idx)] may have been changed by another thread
+       on the same domain.
+
+       If [st] changed, it was resized into a larger value, we can just reuse
+       the new value.
+
+       If [st.(idx)] changed, we drop the current value to avoid letting other
+       threads observe a 'revert' that forgets previous modifications. *)
     let st = maybe_grow idx in
-    let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_some obj
-    then (Obj_opt.unsafe_get obj : a)
-    else init_idx idx obj init.portable
+    let before =
+      Obj_slot.compare_exchange st idx (Obj_slot.none ()) (Obj_slot.some x)
+    in
+    if Obj_slot.is_none before
+    then x
+    else Obj_slot.unsafe_get before
+
+  (* Inlining is ok because it's safe to return a stale value. *)
+  let[@inline] get (type a) ((idx, _) as key : a key) : a =
+    let st = get_dls_state () in
+    if idx < Array.length st
+       && not (Obj_slot.is_none (Array.unsafe_get st idx))
+    then Obj_slot.unsafe_get (Array.unsafe_get st idx)
+    else get_or_init key
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
@@ -333,7 +340,7 @@ let max_domain_count = Raw.get_max_domain_count ()
 
 module TLS0 = struct
 
-  type tls_state = Obj_opt.t array
+  type tls_state = Obj_slot.t array
 
   external get_tls_state
     : unit -> tls_state @@ portable = "%tls_get"
@@ -369,37 +376,57 @@ module TLS0 = struct
     end;
     k
 
-  (* If necessary, grow the current domain's local state array such that [idx]
-    * is a valid index in the array. *)
-  let[@inline] maybe_grow idx =
+  (* [@poll error] so that interrupts cannot grow the state.
+     [idx] must be in range. *)
+  let[@poll error] store idx obj =
+    Array.unsafe_set (get_tls_state ()) idx obj
+
+  let[@cold] grow_and_set idx x =
+    let old_st = get_tls_state () in
+    let new_st = Obj_slot.grow_array old_st idx (Array.length old_st) in
+    set_tls_state new_st;
+    store idx (Obj_slot.some x)
+
+  (* Unlike with DLS we do not prevent inlining to prevent additional poll
+     points as we assume each thread will have its own TLS and we consider TLS
+     use in signal handlers as unsupported. *)
+  let[@inline] set (type a) ((idx, _) : a key) (x : a) =
+    if idx < Array.length (get_tls_state ())
+    then store idx (Obj_slot.some x)
+    else grow_and_set idx x
+
+  let[@inline never] already_accessing () =
+    failwith "Domain.Safe.TLS: key is already being accessed"
+
+  let[@cold] init (type a) ((idx, { portable = init }) as key : a key) : a =
     let st = get_tls_state () in
-    let size = Array.length st in
-    if idx < size then st
+    if idx < Array.length st && Obj_slot.is_borrowed (Array.unsafe_get st idx)
+    then already_accessing ()
     else begin
-      let new_st = Obj_opt.grow_array st idx size in
-      set_tls_state new_st;
-      new_st
+      let x = init () in
+      set key x;
+      x
     end
 
-  let[@inline] set (type a) (idx, _init) (x : a) =
-    (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    Array.unsafe_set st idx (Obj_opt.some x)
-
-  let[@inline never] init_idx (type a) idx (init : _ -> a) =
-    let v : a = init () in
-    let new_obj = Obj_opt.some v in
+  let[@inline] get (type a) ((idx, _) as key : a key) : a =
     let st = get_tls_state () in
-    Array.unsafe_set st idx new_obj;
-    v
+    if idx < Array.length st
+       && not (Obj_slot.is_none (Array.unsafe_get st idx))
+       && not (Obj_slot.is_borrowed (Array.unsafe_get st idx))
+    then Obj_slot.unsafe_get (Array.unsafe_get st idx)
+    else init key
 
-  let[@inline] get (type a) ((idx, init) : a key) : a =
-    (* Assures [idx] is in range. *)
-    let st = maybe_grow idx in
-    let obj = Array.unsafe_get st idx in
-    if Obj_opt.is_some obj
-    then (Obj_opt.unsafe_get obj : a)
-    else init_idx idx init.portable
+  (* While [f] runs, the slot holds [Obj_slot.borrowed] instead of the value, so
+     [get] (hence [access] and splitting) raises on that key. *)
+  let access ((idx, _) as k) f = exclave_
+    let v = get k in
+    store idx (Obj_slot.borrowed ());
+    match f v with
+    | res -> store idx (Obj_slot.some v); res
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      store idx (Obj_slot.some v);
+      Printexc.raise_with_backtrace exn bt
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
@@ -409,7 +436,7 @@ module TLS0 = struct
     type keys = key_value list
 
     let init () =
-      let st = Obj_opt.fresh () in
+      let st = Obj_slot.fresh () in
       set_tls_state st
 
     let get_initial_keys () : key_value list =
@@ -513,10 +540,6 @@ module Tick = struct
       else This (Inner.min_binding inner' |> fst)
   end
 
-  (* NOTE: st_stubs.c relies on this being an int (and in particular not
-     scanned) *)
-  type t = int
-
   (* One registry per recommended_domain_count.
 
      If more than recommended_domain_count domains are spawned (which in
@@ -558,9 +581,9 @@ module Tick = struct
       | Null -> set_tick_interval_usec 0
       | This interval -> set_tick_interval_usec interval)
 
-  let with_ ~interval_usec f =
+  let with_ ~interval_usec (f @ unyielding) = exclave_
     let t = acquire ~interval_usec in
-    match f (borrow_ t) with
+    match f () with
     | res ->
       release t;
       res
@@ -590,6 +613,9 @@ module Safe = struct
   module TLS = TLS0
 
   let spawn f =
+    (* CR-soon vkarvonen: Optimize [get_initial_keys] followed by
+       [set_initial_keys] combination, e.g. use an unboxed array rather than
+       a list and potentially avoid the allocation if possible. *)
     let tls_keys = TLS.Private.get_initial_keys () in
     spawn (fun () ->
       TLS.Private.init ();
@@ -597,27 +623,6 @@ module Safe = struct
       f ()) [@nontail]
 
   let at_exit = at_exit
-end
-
-module TLS = struct
-  module Private = TLS0.Private
-
-  type 'a key = 'a TLS0.key
-
-  let new_key ?split_from_parent f =
-    let split_from_parent =
-      match split_from_parent with
-      | None -> None
-      | Some split_from_parent ->
-        Some (Obj.magic_portable (fun x ->
-          Obj.magic_portable (fun () -> split_from_parent x)))
-    in
-    TLS0.new_key ?split_from_parent (Obj.magic_portable f)
-  ;;
-
-  let get = TLS0.get
-  let set = TLS0.set
-  let init = TLS0.Private.init
 end
 
 module DLS = struct
@@ -643,6 +648,6 @@ let spawn f = Safe.spawn (Obj.magic_portable f)
 let at_exit f = Safe.at_exit (Obj.magic_portable f)
 
 let () = DLS.init ()
-let () = TLS.init ()
+let () = Safe.TLS.Private.init ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit

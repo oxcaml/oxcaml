@@ -391,37 +391,13 @@ We try several places in the identifier to check the result stability
       {
         "start": {
           "line": 2,
-          "col": 18
-        },
-        "end": {
-          "line": 5,
-          "col": 17
-        },
-        "type": "int option -> int",
-        "tail": "no"
-      },
-      {
-        "start": {
-          "line": 2,
-          "col": 18
-        },
-        "end": {
-          "line": 5,
-          "col": 17
-        },
-        "type": "'a",
-        "tail": "no"
-      },
-      {
-        "start": {
-          "line": 2,
           "col": 6
         },
         "end": {
           "line": 5,
           "col": 17
         },
-        "type": "'a -> 'b",
+        "type": "'a -> int",
         "tail": "no"
       }
     ],
@@ -445,7 +421,7 @@ We try several places in the identifier to check the result stability
           pattern (under.ml[1,0+4]..under.ml[1,0+6])
             Tpat_var \"aa\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (under.ml[1,0+9]..under.ml[1,0+12])
             Texp_constant Const_float 4.2
       ]
@@ -456,12 +432,12 @@ We try several places in the identifier to check the result stability
           pattern (under.ml[2,13+4]..under.ml[2,13+5])
             Tpat_var \"f\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
             Texp_function
-            alloc_mode id(modevar#b[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#c[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             yielding_mode unyielding
-            id(modevar#1d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#1e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            return_mode proj_Locality(modevar#16<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -469,24 +445,67 @@ We try several places in the identifier to check the result stability
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
                   Tpat_var \"x\"
                   sort '_representable_layout_1
-                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode local_to_regional_full(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#12<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
-            Tfunction_body
-              expression (under.ml[2,13+18]..under.ml[5,70+17])
-                attribute \"merlin.incorrect\"
+            Tfunction_cases (under.ml[2,13+18]..under.ml[5,70+17])
+              locality_mode proj_Locality(modevar#18<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
+              value
+              extra (under.ml[2,13+18]..under.ml[5,70+17])
+                Texp_constraint
+                core_type (under.ml[2,13+12]..under.ml[2,13+15])
+                  Ttyp_constr \"int!\"
                   []
-                attribute \"merlin.saved-parts\"
-                  [
-                    structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
-                      Pstr_eval
-                      expression (_none_[0,0+-1]..[0,0+-1]) ghost
-                        Pexp_constant
-                        constant (_none_[0,0+-1]..[0,0+-1]) ghost
-                          PConst_int (1,None)
-                  ]
-                Texp_ident \"*type-error*\"
+              [
+                <case>
+                  pattern (under.ml[3,40+4]..under.ml[3,40+8])
+                    extra (under.ml[3,40+4]..under.ml[3,40+8])
+                      Tpat_inspected_type
+                        Label_disambiguation
+                          Unambiguous
+                    Tpat_construct \"None\"
+                    []
+                    None
+                  expression (under.ml[3,40+12]..under.ml[3,40+13])
+                    attribute \"merlin.loc\"
+                      []
+                    Texp_constant Const_int 3
+                <case>
+                  pattern (under.ml[4,54+4]..under.ml[4,54+10])
+                    extra (under.ml[4,54+4]..under.ml[4,54+10])
+                      Tpat_inspected_type
+                        Label_disambiguation
+                          Unambiguous
+                    Tpat_construct \"Some\"
+                    [
+                      pattern (under.ml[4,54+9]..under.ml[4,54+10])
+                        Tpat_constant Const_int 5
+                    ]
+                    None
+                  expression (under.ml[4,54+14]..under.ml[4,54+15])
+                    attribute \"merlin.loc\"
+                      []
+                    Texp_constant Const_int 4
+                <case>
+                  pattern (under.ml[5,70+4]..under.ml[5,70+12])
+                    extra (under.ml[5,70+4]..under.ml[5,70+12])
+                      Tpat_inspected_type
+                        Label_disambiguation
+                          Unambiguous
+                    Tpat_construct \"Some\"
+                    [
+                      pattern (under.ml[5,70+9]..under.ml[5,70+12])
+                        Tpat_var \"_aa\"
+                        sort value
+                        value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
+                    ]
+                    None
+                  expression (under.ml[5,70+16]..under.ml[5,70+17])
+                    attribute \"merlin.loc\"
+                      []
+                    Texp_constant Const_int 4
+              ]
       ]
   ]
   

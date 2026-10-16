@@ -70,19 +70,6 @@ let ( != ) = `use_phys_equal
 
 include Int_replace_polymorphic_compare
 
-let quiet = ref false
-
-let werror = ref false
-
-let warnings = ref 0
-
-let warn fmt =
-  Format.ksprintf
-    (fun s ->
-      incr warnings;
-      if not !quiet then Format.eprintf "%s%!" s)
-    fmt
-
 let fail = ref true
 
 let failwith_ fmt =
@@ -116,55 +103,34 @@ module List = struct
     | [] -> acc
     | x :: xs -> rev_append_map ~f xs (f x :: acc)
 
-  let slow_map l ~f = rev (rev_map ~f l) [@@if ocaml_version < (4, 14, 0)]
-
-  let max_non_tailcall =
-    match Sys.backend_type with
-    | Sys.Native | Sys.Bytecode -> 1_000
-    | Sys.Other _ -> 50
-
-  let rec count_map ~f l ctr =
-    match l with
-    | [] -> []
-    | [ x1 ] ->
-        let f1 = f x1 in
-        [ f1 ]
-    | [ x1; x2 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        [ f1; f2 ]
-    | [ x1; x2; x3 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        [ f1; f2; f3 ]
-    | [ x1; x2; x3; x4 ] ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        let f4 = f x4 in
-        [ f1; f2; f3; f4 ]
-    | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
-        let f1 = f x1 in
-        let f2 = f x2 in
-        let f3 = f x3 in
-        let f4 = f x4 in
-        let f5 = f x5 in
-        f1
-        :: f2
-        :: f3
-        :: f4
-        :: f5
-        :: (if ctr > max_non_tailcall then slow_map ~f tl else count_map ~f tl (ctr + 1))
-  [@@if ocaml_version < (4, 14, 0)]
-
-  let map l ~f = count_map ~f l 0 [@@if ocaml_version < (4, 14, 0)]
-
   let[@tail_mod_cons] rec map l ~f =
     match l with
     | [] -> []
     | x :: tl -> f x :: (map [@tailcall]) tl ~f
-  [@@if ocaml_version >= (4, 14, 0)]
+
+  (* Like [map], but returns the list itself (physically) when the
+     function returns all the elements unchanged (physically). This
+     makes it possible to preserve sharing when rewriting a large data
+     structure that is mostly left unchanged. *)
+  let map_sharing l ~f =
+    let rec take n l acc =
+      if n = 0
+      then acc
+      else
+        match l with
+        | x :: r -> take (n - 1) r (x :: acc)
+        | [] -> assert false
+    in
+    let rec scan n rem =
+      match rem with
+      | [] -> l
+      | x :: r ->
+          let x' = f x in
+          if phys_equal x' x
+          then scan (n + 1) r
+          else rev_append (take n l []) (x' :: map r ~f)
+    in
+    scan 0 l
 
   let rec take' acc n l =
     if n = 0
@@ -182,37 +148,6 @@ module List = struct
     | [] -> None
     | [ x ] -> Some x
     | _ :: xs -> last xs
-
-  let is_empty = function
-    | [] -> true
-    | _ -> false
-  [@@if ocaml_version < (5, 1, 0)]
-
-  let tail_append l1 l2 = rev_append (rev l1) l2 [@@if ocaml_version < (5, 1, 0)]
-
-  let rec count_append l1 l2 count =
-    match l2 with
-    | [] -> l1
-    | _ -> (
-        match l1 with
-        | [] -> l2
-        | [ x1 ] -> x1 :: l2
-        | [ x1; x2 ] -> x1 :: x2 :: l2
-        | [ x1; x2; x3 ] -> x1 :: x2 :: x3 :: l2
-        | [ x1; x2; x3; x4 ] -> x1 :: x2 :: x3 :: x4 :: l2
-        | x1 :: x2 :: x3 :: x4 :: x5 :: tl ->
-            x1
-            :: x2
-            :: x3
-            :: x4
-            :: x5
-            ::
-            (if count > max_non_tailcall
-             then tail_append tl l2
-             else count_append tl l2 (count + 1)))
-  [@@if ocaml_version < (5, 1, 0)]
-
-  let append l1 l2 = count_append l1 l2 0 [@@if ocaml_version < (5, 1, 0)]
 
   let group l ~f =
     let rec loop (l : 'a list) (this_group : 'a list) (acc : 'a list list) : 'a list list
@@ -260,6 +195,21 @@ end
 
 let ( @ ) = List.append
 
+let warn_overflow name ~to_dec ~to_hex i ~truncated_hex ~truncated_dec =
+  Warning.warn
+    `Integer_overflow
+    "%s 0x%s (%s) truncated to 0x%s (%s); the generated code might be incorrect.@."
+    name
+    (to_hex i)
+    (to_dec i)
+    truncated_hex
+    truncated_dec
+
+let truncated_int64_to_hex ~num_bits i =
+  if num_bits <= 32
+  then Printf.sprintf "%lx" (Int64.to_int32 i)
+  else Printf.sprintf "%Lx" i
+
 module Int32 = struct
   include Int32
 
@@ -275,20 +225,18 @@ module Int32 = struct
 
   external ( >= ) : int32 -> int32 -> bool = "%greaterequal"
 
-  let warn_overflow name ~to_dec ~to_hex i i32 =
-    warn
-      "Warning: integer overflow: %s 0x%s (%s) truncated to 0x%lx (%ld); the generated \
-       code might be incorrect.@."
-      name
-      (to_hex i)
-      (to_dec i)
-      i32
-      i32
-
   let convert_warning_on_overflow name ~to_int32 ~of_int32 ~equal ~to_dec ~to_hex x =
     let i32 = to_int32 x in
     let x' = of_int32 i32 in
-    if not (equal x' x) then warn_overflow name ~to_dec ~to_hex x i32;
+    if not (equal x' x)
+    then
+      warn_overflow
+        name
+        ~to_dec
+        ~to_hex
+        x
+        ~truncated_hex:(Printf.sprintf "%lx" i32)
+        ~truncated_dec:(Int32.to_string i32);
     i32
 
   let of_nativeint_warning_on_overflow n =
@@ -316,6 +264,32 @@ module Int64 = struct
   external ( > ) : int64 -> int64 -> bool = "%greaterthan"
 
   external ( >= ) : int64 -> int64 -> bool = "%greaterequal"
+
+  let convert_warning_on_overflow
+      name ~num_bits ~to_int64 ~of_int64 ~equal ~to_dec ~to_hex x =
+    let i64 = to_int64 x in
+    let x' = of_int64 i64 in
+    if not (equal x' x)
+    then
+      warn_overflow
+        name
+        ~to_dec
+        ~to_hex
+        x
+        ~truncated_hex:(truncated_int64_to_hex ~num_bits i64)
+        ~truncated_dec:(Int64.to_string i64);
+    i64
+
+  let of_nativeint_warning_on_overflow n =
+    convert_warning_on_overflow
+      "native integer"
+      ~num_bits:64
+      ~to_int64:Int64.of_nativeint
+      ~of_int64:Int64.to_nativeint
+      ~equal:Nativeint.equal
+      ~to_dec:(Printf.sprintf "%nd")
+      ~to_hex:(Printf.sprintf "%nx")
+      n
 end
 
 module Option = struct
@@ -325,6 +299,14 @@ module Option = struct
     match x with
     | None -> None
     | Some v -> Some (f v)
+
+  (* See [List.map_sharing] *)
+  let map_sharing ~f x =
+    match x with
+    | None -> x
+    | Some v ->
+        let v' = f v in
+        if phys_equal v' v then x else Some v'
 
   let bind ~f x =
     match x with
@@ -370,13 +352,24 @@ module Float = struct
 end
 
 module Float32 = struct
+  (* IEEE 754 single-precision bit patterns, as in Flambda 2's
+     [Flambda2_floats.Float32]. Conversions are done in C stubs
+     (float32_stubs.c), so no compiler support for float32 is needed. *)
   type t = int32
 
-  let of_float = Int32.bits_of_float
+  let of_bits x = x
 
-  let to_float = Int32.float_of_bits
-  (* external of_float : float -> t = "%float32offloat"
-   * external to_float : t -> float = "%floatoffloat32" *)
+  let to_bits x = x
+
+  external of_float : float -> t
+    = "jsoo_float32_of_float" "jsoo_float32_of_float_unboxed"
+  [@@unboxed] [@@noalloc]
+
+  external to_float : t -> float
+    = "jsoo_float32_to_float" "jsoo_float32_to_float_unboxed"
+  [@@unboxed] [@@noalloc]
+
+  external of_boxed : Obj.t -> t = "jsoo_float32_of_boxed"
 
   (* In javascript/wasm, we define float32 parsing as rounding the 64-bit result.
      This is not equivalent to native code, which parses to 32 bits directly. *)
@@ -520,8 +513,6 @@ module Bytes = BytesLabels
 
 module String = struct
   include StringLabels
-
-  let hash (a : string) = Hashtbl.hash a [@@if ocaml_version < (5, 0, 0)]
 
   module Hashtbl = Hashtbl.Make (struct
     include String
@@ -864,6 +855,63 @@ module Int = struct
   end)
 end
 
+module Set = struct
+  module type S = sig
+    include Set.S
+
+    val compare_cardinal_with : t -> int -> int
+    (** [compare_cardinal_with s n] is equivalent to [compare (cardinal s) n]
+        but runs in O(min(n, cardinal s)) time instead of O(cardinal s). *)
+
+    val to_list_bounded : int -> t -> elt list option
+    (** [to_list_bounded n s] returns [Some l] if [s] has at most [n] elements,
+        where [l] is the sorted list of all elements. Returns [None] if [s] has
+        more than [n] elements. Traverses at most [n+1] elements. *)
+  end
+
+  module Make (Ord : Set.OrderedType) : S with type elt = Ord.t = struct
+    include Set.Make (Ord)
+
+    let equal a b = phys_equal a b || equal a b
+
+    let compare a b = if phys_equal a b then 0 else compare a b
+
+    let union a b = if phys_equal a b then a else union a b
+
+    let inter a b = if phys_equal a b then a else inter a b
+
+    let diff a b = if phys_equal a b then empty else diff a b
+
+    let compare_cardinal_with s n =
+      let r =
+        try
+          fold
+            (fun _ n ->
+              (* [n <= 0] means we've already counted [n] elements, so
+                 [cardinal s > n] and we can stop early. *)
+              if n <= 0 then raise_notrace Exit else n - 1)
+            s
+            n
+        with Exit -> -1
+      in
+      if r < 0 then 1 else Int.compare 0 r
+
+    let to_list_bounded n s =
+      try
+        Some
+          (fold
+             (fun x (n, acc) ->
+               (* [n <= 0] means we've already collected [n] elements,
+                  so [cardinal s > n] and we return [None]. *)
+               if n <= 0 then raise_notrace Exit else n - 1, x :: acc)
+             s
+             (n, [])
+          |> snd
+          |> List.rev)
+      with Exit -> None
+  end
+end
+
 module IntSet = Set.Make (Int)
 module IntMap = Map.Make (Int)
 module StringSet = Set.Make (String)
@@ -893,12 +941,43 @@ module BitSet : sig
   val next_free : t -> int -> int
 
   val next_mem : t -> int -> int
+
+  val clear : t -> unit
 end = struct
   type t = { mutable arr : int array }
+
+  (* Count trailing zeros. [w] must be non-zero. *)
+  let ctz w =
+    let n = ref 0 in
+    let w = ref w in
+    if Sys.int_size > 32 && !w land ((1 lsl 32) - 1) = 0
+    then (
+      n := 32;
+      w := !w lsr 32);
+    if !w land 0xFFFF = 0
+    then (
+      n := !n + 16;
+      w := !w lsr 16);
+    if !w land 0xFF = 0
+    then (
+      n := !n + 8;
+      w := !w lsr 8);
+    if !w land 0xF = 0
+    then (
+      n := !n + 4;
+      w := !w lsr 4);
+    if !w land 0x3 = 0
+    then (
+      n := !n + 2;
+      w := !w lsr 2);
+    if !w land 0x1 = 0 then n := !n + 1;
+    !n
 
   let create () = { arr = Array.make 1 0 }
 
   let create' n = { arr = Array.make ((n / Sys.int_size) + 1) 0 }
+
+  let clear t = Array.fill t.arr 0 (Array.length t.arr) 0
 
   let size t = Array.length t.arr * Sys.int_size
 
@@ -940,29 +1019,95 @@ end = struct
       if b <> 0 && b land mask <> 0 then Array.unsafe_set t.arr idx (b lxor mask)
 
   let next_free t i =
-    let x = ref i in
-    while mem t !x do
-      incr x
-    done;
-    !x
+    let arr = t.arr in
+    let len = Array.length arr in
+    let idx = ref (i / Sys.int_size) in
+    if !idx >= len
+    then i
+    else
+      let off = i mod Sys.int_size in
+      (* [lnot] flips set/unset so that [ctz] finds the first *free* bit *)
+      let word = lnot (Array.unsafe_get arr !idx) lsr off in
+      if word <> 0
+      then
+        (* There's a free bit in this word at or above [off] *)
+        i + ctz word
+      else (
+        (* Search subsequent words *)
+        incr idx;
+        while !idx < len && Array.unsafe_get arr !idx = -1 do
+          incr idx
+        done;
+        if !idx >= len
+        then len * Sys.int_size
+        else
+          (* [lnot] to find first free (zero) bit via [ctz] *)
+          let w = lnot (Array.unsafe_get arr !idx) in
+          (!idx * Sys.int_size) + ctz w)
 
   let next_mem t i =
-    let x = ref i in
-    while not (mem t !x) do
-      incr x
-    done;
-    !x
+    let arr = t.arr in
+    let len = Array.length arr in
+    let idx = ref (i / Sys.int_size) in
+    if !idx >= len
+    then failwith "BitSet.next_mem: no set bit found"
+    else
+      let off = i mod Sys.int_size in
+      (* Mask out bits below [off] *)
+      let word = Array.unsafe_get arr !idx lsr off in
+      if word <> 0
+      then i + ctz word
+      else (
+        incr idx;
+        while !idx < len && Array.unsafe_get arr !idx = 0 do
+          incr idx
+        done;
+        if !idx >= len
+        then failwith "BitSet.next_mem: no set bit found"
+        else
+          let w = Array.unsafe_get arr !idx in
+          (!idx * Sys.int_size) + ctz w)
 
   let copy t = { arr = Array.copy t.arr }
 
   let iter ~f t =
-    for i = 0 to size t do
-      if mem t i then f i
+    let arr = t.arr in
+    for idx = 0 to Array.length arr - 1 do
+      let ref_word = ref (Array.unsafe_get arr idx) in
+      if !ref_word <> 0
+      then
+        let base = idx * Sys.int_size in
+        while !ref_word <> 0 do
+          let bit = ctz !ref_word in
+          f (base + bit);
+          ref_word := !ref_word land (!ref_word - 1)
+        done
     done
 end
 
 module Array = struct
   include ArrayLabels
+
+  (* See [List.map_sharing] *)
+  let map_sharing a ~f =
+    let len = length a in
+    let rec scan i =
+      if i = len
+      then a
+      else
+        let x = a.(i) in
+        let x' = f x in
+        if phys_equal x' x
+        then scan (i + 1)
+        else
+          let a' = copy a in
+          a'.(i) <- x';
+          for j = i + 1 to len - 1 do
+            a'.(j) <- f a.(j)
+          done;
+          a'
+    in
+    scan 0
 
   let fold_right_i a ~f ~init:x =
     let r = ref x in
@@ -1031,119 +1176,10 @@ end
 module In_channel = struct
   let stdlib_input_line = input_line
 
-  (* Read up to [len] bytes into [buf], starting at [ofs]. Return total bytes
-     read. *)
-  let read_upto ic buf ofs len =
-    let rec loop ofs len =
-      if len = 0
-      then ofs
-      else
-        let r = input ic buf ofs len in
-        if r = 0 then ofs else loop (ofs + r) (len - r)
-    in
-    loop ofs len - ofs
-
-  (* Best effort attempt to return a buffer with >= (ofs + n) bytes of storage,
-     and such that it coincides with [buf] at indices < [ofs].
-
-     The returned buffer is equal to [buf] itself if it already has sufficient
-     free space.
-
-     The returned buffer may have *fewer* than [ofs + n] bytes of storage if this
-     number is > [Sys.max_string_length]. However the returned buffer will
-     *always* have > [ofs] bytes of storage. In the limiting case when [ofs = len
-     = Sys.max_string_length] (so that it is not possible to resize the buffer at
-     all), an exception is raised. *)
-
-  let ensure buf ofs n =
-    let len = Bytes.length buf in
-    if len >= ofs + n
-    then buf
-    else
-      let new_len = ref len in
-      while !new_len < ofs + n do
-        new_len := (2 * !new_len) + 1
-      done;
-      let new_len = !new_len in
-      let new_len =
-        if new_len <= Sys.max_string_length
-        then new_len
-        else if ofs < Sys.max_string_length
-        then Sys.max_string_length
-        else
-          failwith
-            "In_channel.input_all: channel content is larger than maximum string length"
-      in
-      let new_buf = Bytes.create new_len in
-      Bytes.blit ~src:buf ~src_pos:0 ~dst:new_buf ~dst_pos:0 ~len:ofs;
-      new_buf
-
-  let input_all ic =
-    let chunk_size = 65536 in
-    (* IO_BUFFER_SIZE *)
-    let initial_size = try in_channel_length ic - pos_in ic with Sys_error _ -> -1 in
-    let initial_size = if initial_size < 0 then chunk_size else initial_size in
-    let initial_size =
-      if initial_size <= Sys.max_string_length
-      then initial_size
-      else Sys.max_string_length
-    in
-    let buf = Bytes.create initial_size in
-    let nread = read_upto ic buf 0 initial_size in
-    if nread < initial_size
-    then (* EOF reached, buffer partially filled *)
-      Bytes.sub_string buf ~pos:0 ~len:nread
-    else
-      (* nread = initial_size, maybe EOF reached *)
-      match input_char ic with
-      | exception End_of_file ->
-          (* EOF reached, buffer is completely filled *)
-          Bytes.unsafe_to_string buf
-      | c ->
-          (* EOF not reached *)
-          let rec loop buf ofs =
-            let buf = ensure buf ofs chunk_size in
-            let rem = Bytes.length buf - ofs in
-            (* [rem] can be < [chunk_size] if buffer size close to
-               [Sys.max_string_length] *)
-            let r = read_upto ic buf ofs rem in
-            if r < rem
-            then (* EOF reached *)
-              Bytes.sub_string buf ~pos:0 ~len:(ofs + r)
-            else (* r = rem *)
-              loop buf (ofs + rem)
-          in
-          let buf = ensure buf nread (chunk_size + 1) in
-          Bytes.set buf nread c;
-          loop buf (nread + 1)
-
-  let input_lines ic =
-    let rec aux acc =
-      match input_line ic with
-      | line -> aux (line :: acc)
-      | exception End_of_file -> acc
-    in
-    List.rev (aux [])
-
-  let input_line_exn = stdlib_input_line
-end
-[@@if ocaml_version < (4, 14, 0)]
-
-module In_channel = struct
-  let stdlib_input_line = input_line
-
   include In_channel
 
-  (* [In_channel.input_lines] only exists in the stdlib since 5.1. *)
-  let[@tail_mod_cons] rec input_lines ic =
-    match stdlib_input_line ic with
-    | line -> line :: input_lines ic
-    | exception End_of_file -> []
-  [@@if ocaml_version < (5, 1, 0)]
-
   let input_line_exn = stdlib_input_line
 end
-[@@if ocaml_version >= (4, 14, 0)]
 
 module Seq = struct
   include Seq
@@ -1196,10 +1232,6 @@ let file_lines_text file =
   close_in ic;
   c
 
-let generated_name = function
-  | "param" | "match" | "switcher" -> true
-  | s -> String.starts_with ~prefix:"cst_" s
-
 module Hashtbl = struct
   include Hashtbl
 
@@ -1211,3 +1243,21 @@ module Hashtbl = struct
       =
     Hashtbl.of_seq
 end
+
+module Lexing = struct
+  include Lexing
+
+  let range_to_string (pos1, pos2) =
+    if phys_equal pos1 dummy_pos || phys_equal pos2 dummy_pos
+    then "At an unknown location:\n"
+    else
+      let file = pos1.pos_fname in
+      let line = pos1.pos_lnum in
+      let char1 = pos1.pos_cnum - pos1.pos_bol in
+      let char2 = pos2.pos_cnum - pos1.pos_bol in
+      (* yes, [pos1.pos_bol] *)
+      Printf.sprintf "File \"%s\", line %d, characters %d-%d:\n" file line char1 char2
+  (* use [char1 + 1] and [char2 + 1] if *not* using Caml mode *)
+end
+
+let with_async_exns = Ocaml_or_oxcaml.with_async_exns

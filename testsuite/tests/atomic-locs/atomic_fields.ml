@@ -181,6 +181,26 @@ Line 2, characters 53-70:
 Error: The record field "f" is not atomic
 |}]
 
+(* Test polymorphic atomic fields *)
+
+type poly_record = { mutable poly_field : 'a. 'a option [@atomic] }
+
+(* Reading the field instantiates it, which is fine. *)
+let test_poly_read (r : poly_record) = (r.poly_field : int option)
+[%%expect{|
+type poly_record = { mutable poly_field : 'a. 'a option [@atomic]; }
+val test_poly_read : poly_record -> int option = <fun>
+|}]
+
+let test_poly_atomic_loc (r : poly_record) = [%atomic.loc r.poly_field]
+[%%expect{|
+Line 1, characters 45-71:
+1 | let test_poly_atomic_loc (r : poly_record) = [%atomic.loc r.poly_field]
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Use of "[%atomic.loc]" with polymorphic record fields
+       (here "poly_field") is forbidden.
+|}]
+
 (* Test Invalid_atomic_loc_payload errors *)
 
 (* Empty payload *)

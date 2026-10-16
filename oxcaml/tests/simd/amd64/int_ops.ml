@@ -30,7 +30,7 @@ module Int64 = struct
     eq' (shrx (-1L) 1L) Int64.max_int;
     eq' (shlx 1L 1L) 2L
 
-  external mulx : int64# -> int64# -> #(int64# * int64#) = "" "caml_bmi2_mulx_int64"
+  external mulx : int64_u -> int64_u -> #(int64_u * int64_u) = "" "caml_bmi2_mulx_int64"
     [@@noalloc] [@@builtin]
 
   let () =
@@ -71,7 +71,7 @@ module Int32 = struct
 
   (* Have to bind the return value as int64; the compiler doesn't know how to
      sign-extend pairs of smaller ints. *)
-  external mulx : int32# -> int32# -> #(int64# * int64#) = "" "caml_bmi2_mulx_int32"
+  external mulx : int32_u -> int32_u -> #(int64_u * int64_u) = "" "caml_bmi2_mulx_int32"
     [@@noalloc] [@@builtin]
 
   let mulx x y =

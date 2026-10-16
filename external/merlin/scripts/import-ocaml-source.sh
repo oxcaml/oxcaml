@@ -64,7 +64,7 @@ function merlin-target () {
     parsing/unit_info.ml*)
       echo "${base/#parsing/typing}";;
 
-    .gitattributes|base-rev.txt) ;;
+    .gitattributes) ;;
 
     # Most cases are simple
     *) echo "$base";;
@@ -98,7 +98,6 @@ fi
 
 
 # Used for patch output
-old_base_rev="$(cat upstream/ocaml_flambda/base-rev.txt)"
 current_head="$(git symbolic-ref --short HEAD)"
 
 # Get the new oxcaml sources and copy every file without the merlin-exclude
@@ -111,7 +110,6 @@ else
 fi
 new_files=()
 cd upstream/ocaml_flambda
-echo $rev > base-rev.txt
 dirs=(*/)
 dirs=("${dirs[@]%/}")
 if [[ "$subdirectory" = "." ]]; then
@@ -161,7 +159,7 @@ cd ../..
 # Annotations for diff3 regions; "@" would be more natural than ":" but confuses
 # smerge-mode's highlighting
 old_marker="Merlin:$current_head"
-parent_marker="Compiler:$old_base_rev"
+parent_marker="Compiler:last-imported"
 new_marker="Compiler:$commitish"
 
 # Then patch src/ocaml using the changes you just imported. Newly-imported
@@ -177,16 +175,38 @@ for file in $(git diff --no-ext-diff --name-only); do
   tgt=src/ocaml/$tgt
 
   if [ -e "$file" ]; then
-    # ignore patch output if it worked
-    if ! patch --merge=diff3 $tgt <(git diff --no-ext-diff -- $file) > $tgt.out; then
-      sed -i \
-          -e 's!^<<<<<<<$!& '"$old_marker"'!'    \
-          -e 's!^|||||||$!& '"$parent_marker"'!' \
-          -e 's!^>>>>>>>$!& '"$new_marker"'!'    \
-          $tgt
-      cat $tgt.out
+    # Three-way merge of Merlin's copy with the old and new upstream copies.
+    git show "HEAD:${subtree_prefix}${file}" > "$tgt.base"
+    # If any of the inputs already contain git conflict markers, we use a
+    # marker size greater than 7 to be able to distinguish import-script
+    # conflict markers from pre-existing conflict markers. Otherwise, we use the
+    # default size of 7 since some tooling expects size 7 markers.
+    if grep -qE '^<<<<<<<' "$tgt" "$tgt.base" "$file"; then
+      marker_size=14
+    else
+      marker_size=7
     fi
-    rm -f $tgt.orig $tgt.out
+    if ! git merge-file --diff3 --marker-size="$marker_size" \
+           -L "$old_marker" -L "$parent_marker" -L "$new_marker" \
+           "$tgt" "$tgt.base" "$file"
+    then
+      echo "Merge conflicts in $tgt"
+      combine_status=0
+      scripts/combine-merge-conflicts.py "$tgt" || combine_status="$?"
+      case "$combine_status" in
+        0) ;;
+        21)
+          echo "Warning: malformed merge conflicts in $tgt;" \
+               "leaving them uncombined."
+          ;;
+        *)
+          echo "Error: combining merge conflicts failed on $tgt with status" \
+               "$combine_status" >&2
+          exit "$combine_status"
+          ;;
+      esac
+    fi
+    rm -f "$tgt.base"
   else
     # The file was deleted from the compiler, so delete Merlin's copy too. If
     # Merlin had local changes relative to the previously imported copy, record
@@ -228,4 +248,4 @@ git add .
 # Also add any .rej files that were created by patch, even though they're
 # ignored.
 git add "*.rej" --force &> /dev/null || true
-git commit -m "Automated commit: Import compiler changes from $old_base_rev to $rev"
+git commit -m "Automated commit: Import compiler changes from $rev"

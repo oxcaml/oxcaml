@@ -72,13 +72,13 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   in
   let denv =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region = my_alloc_region } ->
+    | Not_alloc_stack { alloc_region = my_alloc_region } ->
       let my_alloc_region_duid = Flambda_debug_uid.none in
       let my_alloc_region =
         Bound_var.create my_alloc_region my_alloc_region_duid Name_mode.normal
       in
       DE.add_variable denv my_alloc_region (T.unknown K.region)
-    | Local
+    | Maybe_alloc_stack
         { alloc_region = my_alloc_region;
           region = my_region;
           ghost_region = my_ghost_region
@@ -105,7 +105,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =
-    LCS.add_to_denv ~maybe_already_defined:() denv
+    DE.add_lifted_constant_state ~maybe_already_defined:() denv
       (DA.get_lifted_constants outer_dacc)
     |> DE.enter_closure code_id ~return_continuation ~exn_continuation
          ~my_closure
@@ -113,6 +113,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
            (Alloc_mode.For_applications.alloc_region my_alloc_mode)
     |> DE.set_loopify_state loopify_state
     |> DE.increment_continuation_scope
+  in
+  let denv =
+    if Code_metadata.cold code_metadata then DE.mark_as_cold denv else denv
   in
   let dacc = DA.with_denv dacc denv in
   let code_ids_to_remember = DA.code_ids_to_remember outer_dacc in
@@ -175,6 +178,7 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
 type simplify_function_body_result =
   { params : Bound_parameters.t;
     params_and_body : Rebuilt_expr.Function_params_and_body.t;
+    body_is_cold : bool;
     dacc_at_function_entry : DA.t;
     dacc_after_body : DA.t;
     free_names_of_code : NO.t;
@@ -210,10 +214,10 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_ghost_region_duid = Flambda_debug_uid.none in
   let region_params =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region } ->
+    | Not_alloc_stack { alloc_region } ->
       [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
           my_alloc_region_duid ]
-    | Local { alloc_region; region; ghost_region } ->
+    | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
       [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
           my_alloc_region_duid;
         Bound_parameter.create region Flambda_kind.With_subkind.region
@@ -243,6 +247,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         return_continuation
     in
     let free_names_of_body = UA.name_occurrences uacc in
+    let body_is_cold = RE.is_cold body in
     let params_and_body =
       RE.Function_params_and_body.create ~free_names_of_body
         ~return_continuation ~exn_continuation params ~body ~my_closure
@@ -284,6 +289,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         body;
     { params;
       params_and_body;
+      body_is_cold;
       dacc_at_function_entry;
       dacc_after_body;
       free_names_of_code;
@@ -407,11 +413,12 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarize result_arity)
     |> Bound_parameters.create
   in
   let { params;
         params_and_body;
+        body_is_cold;
         dacc_at_function_entry;
         dacc_after_body;
         free_names_of_code;
@@ -449,7 +456,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         ~is_a_functor:(Code.is_a_functor code) ~recursive
     in
     Inlining_report.record_decision_at_function_definition ~absolute_history
-      ~code_metadata:(Code.code_metadata code) ~pass:After_simplify
+      ~code_metadata:
+        (Code_metadata.with_cost_metrics cost_metrics (Code.code_metadata code))
+      ~pass:After_simplify
       ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc_after_body)
       decision;
     decision
@@ -498,6 +507,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
        of the code to compute the debuginfo of the set of closures
        allocation. *)
     let dbg = DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code) in
+    let cold = Code.cold code || body_is_cold in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -510,7 +520,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~poll_attribute:(Code.poll_attribute code)
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
-      ~cold:(Code.cold code) ~is_a_functor ~is_opaque ~recursive ~cost_metrics
+      ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
       ~inlining_arguments ~dbg ~is_tupled:(Code.is_tupled code)
       ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
       ~loopify
@@ -688,14 +698,22 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   in
   let dacc =
     DA.map_denv dacc ~f:(fun denv ->
+        (* The types of each closure can refer to the other closures. The typing
+           env expects equations to refer only to names already defined, so we
+           first define all names then add all equations. *)
+        let denv_with_defined_symbols =
+          List.fold_left
+            (fun denv (bound_name, _closure_type) ->
+              (* In the lifting case the symbols could be defined already. *)
+              DE.define_name_if_undefined denv bound_name K.value)
+            denv closure_types_by_bound_name
+        in
         List.fold_left
           (fun denv (bound_name, closure_type) ->
-            (* In the lifting case the symbols could be defined already. *)
-            let denv = DE.define_name_if_undefined denv bound_name K.value in
             DE.add_equation_on_name denv
               (Bound_name.name bound_name)
               closure_type)
-          denv closure_types_by_bound_name)
+          denv_with_defined_symbols closure_types_by_bound_name)
   in
   let set_of_closures =
     Function_declarations.create all_function_decls_in_set
@@ -710,11 +728,8 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let closure_symbols =
     Function_slot.Lmap.mapi
       (fun function_slot _func_decl ->
-        let name =
-          function_slot |> Function_slot.rename |> Function_slot.to_string
-          |> Linkage_name.of_string
-        in
-        Symbol.create (Current_unit.get_cu_exn ()) name)
+        let name = Function_slot.canonical_name function_slot in
+        Symbol.manufacture (Current_unit.get_cu_exn ()) name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =
@@ -787,7 +802,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
     |> Code_or_metadata.code_metadata
   in
   let set_of_closures_lifted_constant =
-    LC.create_set_of_closures denv ~closure_symbols_with_types
+    LC.create_set_of_closures (DE.typing_env denv) ~closure_symbols_with_types
       ~symbol_projections
       (Rebuilt_static_const.create_set_of_closures
          (DE.are_rebuilding_terms denv)
@@ -902,8 +917,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
       in
       Cost_metrics.
         { cost_metrics = Code_metadata.cost_metrics code_metadata;
-          params_arity =
-            Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+          function_slot_size = Code_metadata.function_slot_size code_metadata
         }
     in
     let machine_width = DE.machine_width (DA.denv dacc) in
@@ -917,7 +931,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
            ~f:(Specialization_cost.add_set_of_closures set_of_closures))
   in
   Simplify_named_result.create dacc
-    (Expr_builder.Keep_binding
+    (Keep_binding
        { let_bound = bound_vars;
          simplified_defining_expr = defining_expr;
          original_defining_expr =

@@ -139,9 +139,7 @@ let result_continuation ppf rcont =
 let region ppf (r : region) =
   match r with
   | Named v -> variable ppf v
-  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel.alloc_region"
-  | Toplevel_region -> Format.pp_print_string ppf "toplevel.region"
-  | Toplevel_ghost_region -> Format.pp_print_string ppf "toplevel.ghost_region"
+  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel"
 
 let cfprintf directive ppf fmt =
   directive ppf;
@@ -246,9 +244,11 @@ and variant_subkind ppf consts non_consts =
       | _ :: _, _ :: _ -> Format.fprintf ppf "@ | "
     in
     let pp_pair ppf (tag, sk) =
-      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag
-        (pp_star_list kind_with_subkind)
-        sk
+      let pp_fields ppf = function
+        | None -> Format.pp_print_string ppf "any"
+        | Some fields -> pp_star_list kind_with_subkind ppf fields
+      in
+      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag pp_fields sk
     in
     pp_pipe_list pp_pair ppf non_consts;
     Format.fprintf ppf "@ ]@]"
@@ -391,8 +391,9 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
 let alloc_mode_for_applications pp ppf (alloc : _ alloc_mode_for_applications)
     ~space =
   match alloc with
-  | Heap { alloc_region } -> pp_spaced ~space ppf "&%a" pp alloc_region
-  | Local { alloc_region; region; ghost_region } ->
+  | Not_alloc_stack { alloc_region } ->
+    pp_spaced ~space ppf "&%a" pp alloc_region
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     pp_spaced ~space ppf "&%a &%a &%a" pp alloc_region pp region pp ghost_region
 
 let boxed_variable ppf var ~kind =
@@ -633,6 +634,7 @@ let inlined_attribute ~space ppf (i : Fexpr.inlined_attribute) =
     match i with
     | Always_inlined -> Some "inlined(always)"
     | Hint_inlined -> Some "inlined(hint)"
+    | Forward_inlined -> Some "inlined(forward)"
     | Never_inlined -> Some "inlined(never)"
     | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
     | Default_inlined -> None
@@ -685,10 +687,9 @@ let parens ~if_scope_is scope ppf f =
   | (Outer | Where_body | Continuation_body), _ -> f scope ppf
 
 let rec expr scope ppf = function
-  | Invalid { message } ->
-    Format.fprintf ppf "@[%tinvalid%t \"%s\"@]" Flambda_colours.invalid_keyword
+  | Invalid ->
+    Format.fprintf ppf "%tinvalid%t" Flambda_colours.invalid_keyword
       Flambda_colours.pop
-      (message |> String.escaped)
   | Apply_cont ac ->
     Format.fprintf ppf "@[%tcont%t %a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop apply_cont ac
@@ -879,7 +880,9 @@ and code_binding ppf
     exn_cont
     (pp_option ~space:Before (pp_like ": %a" arity))
     ret_arity
-    (match result_mode with Heap -> "" | Local -> " local")
+    (match result_mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> " stack")
     (expr Outer) body
 
 let flambda_unit ppf ({ body } : flambda_unit) =

@@ -17,7 +17,6 @@ open! Flambda.Import
 open! Rev_expr
 module Acc = Traverse_acc
 module Env = Traverse_env
-module Dot = Dot_printer
 module K = Flambda_kind
 module KS = Flambda_kind.With_subkind
 
@@ -37,13 +36,14 @@ let apply_cont_deps denv acc apply_cont =
     params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
+  let result_arity = Code.result_arity code in
   let return =
     List.mapi
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components (Code.result_arity code))
+      (Flambda_arity.unarize result_arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -72,12 +72,11 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
       ~params ~returns:return ~exn
   in
   let code_dep =
-    { Traverse_acc.arity;
+    { Traverse_acc.code_metadata = Code.code_metadata code;
       return;
       my_closure;
       exn;
       params;
-      is_tupled;
       known_arity_call_witness;
       unknown_arity_call_witnesses
     }
@@ -106,42 +105,51 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     Function_declarations.funs (Set_of_closures.function_decls set_of_closures)
   in
   let names_and_code_ids =
-    Function_slot.Lmap.mapi
+    Function_slot.Lmap.filter_map
       (fun function_slot name ->
-        let code_id =
-          (Function_slot.Map.find function_slot funs
-            : Function_declarations.code_id_in_function_declaration)
-        in
-        let code_id =
-          match code_id with
-          | Deleted _ -> Or_unknown.Unknown
-          | Code_id { code_id; only_full_applications } ->
-            Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
-              ~only_full_applications
-              ~defined_in_code_id:(Env.current_code_id denv);
-            Or_unknown.Known code_id
-        in
-        name, code_id)
+        if not (Traverse_env.should_keep_function_slot denv function_slot)
+        then None
+        else
+          let code_id =
+            (Function_slot.Map.find function_slot funs
+              : Function_declarations.code_id_in_function_declaration)
+          in
+          let code_id =
+            match code_id with
+            | Deleted _ -> Or_unknown.Unknown
+            | Code_id { code_id; only_full_applications } ->
+              Acc.add_set_of_closures_dep acc name ~closure_code_id:code_id
+                ~only_full_applications
+                ~defined_in_code_id:(Env.current_code_id denv);
+              Or_unknown.Known code_id
+          in
+          Some (name, code_id))
       names_and_function_slots
   in
   Acc.add_set_of_closures acc names_and_code_ids;
   Function_slot.Lmap.iter
-    (fun _function_slot function_slot_name ->
-      Value_slot.Map.iter
-        (fun value_slot simple ->
-          let from = Acc.simple_to_node acc ~denv simple in
-          Acc.add_constructor_dep acc
-            ~base:(Code_id_or_name.name function_slot_name)
-            (Field.value_slot value_slot)
-            ~from)
-        (Set_of_closures.value_slots set_of_closures);
-      Function_slot.Lmap.iter
-        (fun function_slot name ->
-          Acc.add_constructor_dep acc
-            ~base:(Code_id_or_name.name function_slot_name)
-            (Field.function_slot function_slot)
-            ~from:(Code_id_or_name.name name))
-        names_and_function_slots)
+    (fun function_slot function_slot_name ->
+      if Traverse_env.should_keep_function_slot denv function_slot
+      then (
+        Value_slot.Map.iter
+          (fun value_slot simple ->
+            if Traverse_env.should_keep_value_slot denv value_slot
+            then
+              let from = Acc.simple_to_node acc ~denv simple in
+              Acc.add_constructor_dep acc
+                ~base:(Code_id_or_name.name function_slot_name)
+                (Field.value_slot value_slot)
+                ~from)
+          (Set_of_closures.value_slots set_of_closures);
+        Function_slot.Lmap.iter
+          (fun function_slot name ->
+            if Traverse_env.should_keep_function_slot denv function_slot
+            then
+              Acc.add_constructor_dep acc
+                ~base:(Code_id_or_name.name function_slot_name)
+                (Field.function_slot function_slot)
+                ~from:(Code_id_or_name.name name))
+          names_and_function_slots))
     names_and_function_slots
 
 let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
@@ -183,10 +191,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~base:block);
     match mut with
     | Immutable | Immutable_unique -> ()
-    | Mutable ->
-      default_bp (fun to_ ->
-          Acc.add_alias acc ~to_
-            ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))))
+    | Mutable -> default_bp (fun to_ -> Acc.add_any_source acc to_))
   | Unary (Is_int { variant_only = true }, arg) ->
     let name = Acc.simple_to_node acc ~denv arg in
     default_bp (fun to_ ->
@@ -223,22 +228,18 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
       ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
         | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _
         | Int_comp _ | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
-        | Atomic_load_field _ | Poke _ | Read_offset _ ),
+        | Atomic_load _ | Poke _ | Read_offset _ ),
         _,
         _ )
   | Ternary
       ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-        | Atomic_field_int_arith _ | Atomic_set_field _
-        | Atomic_exchange_field _ | Write_offset _ ),
+        | Atomic_int_arith _ | Atomic_set _ | Atomic_exchange _ | Write_offset _
+          ),
         _,
         _,
         _ )
   | Quaternary
-      ( (Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _),
-        _,
-        _,
-        _,
-        _ )
+      ((Atomic_compare_and_set _ | Atomic_compare_exchange _), _, _, _, _)
   | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
@@ -250,10 +251,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
           ~init:()
       | (No_effects | Only_generative_effects _), _, _, _ -> ()
     in
-    default_bp (fun to_ ->
-        Acc.add_use_dep acc
-          ~from:(Code_id_or_name.name (Env.le_monde_exterieur denv))
-          ~to_);
+    default_bp (fun to_ -> Acc.add_any_source acc to_);
     default acc
 
 let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
@@ -380,22 +378,11 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
           Some (Simple.var callee_if_any_source), widget_if_any_source)
         else callee, call_widget
       in
-      if is_external
-      then (
-        Acc.add_cond_any_source acc ~denv call_widget;
-        match callee with
-        | None -> ()
-        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
-      else
-        let apply_dep =
-          { Traverse_acc.function_containing_apply_expr =
-              Env.current_code_id denv;
-            apply_code_id = code_id;
-            apply_closure = callee;
-            apply_call_witness = call_widget
-          }
-        in
-        Acc.add_apply acc apply_dep
+      Acc.add_apply acc
+        ~function_containing_apply_expr:(Env.current_code_id denv)
+        ~apply_code_id:code_id
+        ~apply_closure:(Option.map (Acc.simple_to_node acc ~denv) callee)
+        ~apply_call_witness:call_widget
     in
     match callee with
     | None -> add_apply acc ~only_if_closure_any_source:false
@@ -413,6 +400,9 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
              as we will not be able to recover the code_id from the sources of
              the closure, and the call is indeed very likely to be a call to
              that code_id. *)
+          (* CR ncourant: LTO mode will be slightly less precise when no
+             always preserving direct calls; I don't think this really matters.
+           *)
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
@@ -433,6 +423,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
   | Method _ | C_call _ | Effect _ -> default_acc acc
 
 let traverse_apply denv acc apply : rev_expr =
+  Acc.record_apply_for_rebuild acc apply;
   let return_args =
     match Apply.continuation apply with
     | Never_returns -> []
@@ -507,7 +498,7 @@ let traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
   Target_ocaml_int.Map.iter
-    (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
+    (fun _ arm -> apply_cont_deps denv acc (Switch_arm.action arm))
     (Switch_expr.arms switch);
   { expr; holed_expr = Env.parent denv }
 
@@ -569,8 +560,9 @@ let rec traverse_let denv acc let_expr : rev_expr =
           ~code:(fun rev_group code_id code ->
             let code =
               traverse_code acc code_id code
-                ~le_monde_exterieur:(Env.le_monde_exterieur denv)
                 ~all_constants:(Env.all_constants denv)
+                ~function_slots_to_keep:(Env.function_slots_to_keep denv)
+                ~value_slots_to_keep:(Env.value_slots_to_keep denv)
             in
             Acc.add_code acc code_id code;
             Code :: rev_group)
@@ -697,7 +689,7 @@ and traverse_cont_handler : type a.
       k handler acc)
 
 and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
-    ~le_monde_exterieur ~all_constants : rev_code =
+    ~all_constants ~function_slots_to_keep ~value_slots_to_keep : rev_code =
   let params_and_body = Code.params_and_body code in
   Function_params_and_body.pattern_match params_and_body
     ~f:(fun
@@ -713,11 +705,11 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
       ->
       traverse_function_params_and_body acc code_id code ~return_continuation
         ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~my_depth
-        ~le_monde_exterieur ~all_constants)
+        ~all_constants ~function_slots_to_keep ~value_slots_to_keep)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
-    ~exn_continuation params ~body ~my_closure ~my_alloc_mode
-    ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
+    ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~all_constants
+    ~function_slots_to_keep ~value_slots_to_keep ~my_depth : rev_code =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
   (* Note: this significantly degrades the analysis on code being checked by the
@@ -749,9 +741,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   Acc.continuation_info acc return_continuation ~is_exn_handler:false
     ~params:return
-    ~arity:
-      (Flambda_arity.unarized_components
-         (Code_metadata.result_arity code_metadata));
+    ~arity:(Flambda_arity.unarize (Code_metadata.result_arity code_metadata));
   Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
@@ -765,7 +755,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   let denv =
     Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-      ~current_code_id:(Some code_id) ~le_monde_exterieur ~all_constants
+      ~current_code_id:(Some code_id) ~all_constants ~function_slots_to_keep
+      ~value_slots_to_keep
   in
   if not is_opaque
   then (
@@ -791,8 +782,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
     any_source my_closure;
     any_source my_depth;
     (match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region } -> any_source alloc_region
-    | Local { alloc_region; region; ghost_region } ->
+    | Not_alloc_stack { alloc_region } -> any_source alloc_region
+    | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
       any_source alloc_region;
       any_source region;
       any_source ghost_region);
@@ -809,7 +800,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       my_depth
     }
   in
-  { params_and_body; code_metadata; free_names_of_params_and_body }
+  { params_and_body; free_names_of_params_and_body }
 
 and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   match Expr.descr expr with
@@ -820,17 +811,42 @@ and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   | Switch switch -> traverse_switch denv acc switch
   | Invalid { message } -> traverse_invalid denv acc ~message
 
-type result =
-  { toplevel_expr : Rev_expr.t;
-    code : Rev_expr.rev_code Code_id.Map.t;
-    ordered_code_ids : Code_id.t array;
-    deps : Global_flow_graph.graph;
-    fixed_arity_continuations : Continuation.Set.t;
-    continuation_info : Acc.continuation_info Continuation.Map.t;
-    code_deps : Traverse_acc.code_dep Code_id.Map.t;
-    all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
-  }
+module With_types = struct
+  type ('f, 'a) t =
+    | With_types : 'a -> ([`With_types], 'a) t
+    | Without_types : ([`Without_types], 'a) t
+
+  let map (type f) f : (f, _) t -> (f, _) t = function
+    | With_types x -> With_types (f x)
+    | Without_types -> Without_types
+end
+
+module Problem = struct
+  type 'f t =
+    { deps : Global_flow_graph.graph;
+      code_deps : Traverse_acc.code_dep Code_id.Map.t;
+      delayed_deps : Traverse_acc.delayed_deps;
+      applications : Acc.Applications.t;
+      free_names : Name_occurrences.t;
+      toplevel_return : Code_id_or_name.t;
+      all_sets_of_closures :
+        ( 'f,
+          (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list )
+        With_types.t;
+      final_typing_env : ('f, typing_env option) With_types.t;
+      module_symbol : ('f, Symbol.t) With_types.t
+    }
+end
+
+module Skeleton = struct
+  type t =
+    { toplevel_expr : Rev_expr.t;
+      code : Rev_expr.rev_code Code_id.Map.t;
+      ordered_code_ids : Code_id.t array;
+      fixed_arity_continuations : Continuation.Set.t;
+      continuation_info : Acc.continuation_info Continuation.Map.t
+    }
+end
 
 let create_symbol_and_add_any_source acc name =
   let cu = Current_unit.get_cu_exn () in
@@ -838,13 +854,9 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~all_constants () =
-  let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
-  in
+let run0 unit acc ~free_names ~all_constants () =
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in
@@ -865,30 +877,51 @@ let run0 unit acc ~all_constants () =
     | Always -> Yes
     | Auto -> Auto
   in
-  traverse
-    (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
-       ~current_code_id:None
-       ~le_monde_exterieur:(Name.symbol le_monde_exterieur)
-       ~all_constants:(Name.symbol all_constants))
-    acc (Flambda_unit.body unit)
+  let function_slots_to_keep =
+    Name_occurrences.function_slots_in_normal_projections free_names
+  in
+  let value_slots_to_keep =
+    Name_occurrences.value_slots_in_normal_projections free_names
+  in
+  ( Code_id_or_name.var dummy_toplevel_return,
+    traverse
+      (Env.create ~parent:Hole ~conts ~should_preserve_direct_calls
+         ~current_code_id:None
+         ~all_constants:(Name.symbol all_constants)
+         ~function_slots_to_keep ~value_slots_to_keep)
+      acc (Flambda_unit.body unit) )
 
-let run (unit : Flambda_unit.t) =
+let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
-  let holed =
-    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
+  let toplevel_return, holed =
+    Profile.record_call ~accumulate:false "down"
+      (run0 unit acc ~free_names ~all_constants)
   in
-  let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
-  let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
-  let continuation_info = Acc.get_continuation_info acc in
-  let code_deps = Acc.code_deps acc in
-  if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
-  { toplevel_expr = holed;
-    code = Acc.get_all_code acc;
-    ordered_code_ids = Acc.sort_code_ids acc;
-    deps;
-    fixed_arity_continuations;
-    continuation_info;
-    code_deps;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc
-  }
+  let problem =
+    { Problem.deps = Acc.deps acc;
+      code_deps = Acc.code_deps acc;
+      delayed_deps = Acc.delayed_deps acc;
+      applications = Acc.applications acc;
+      free_names;
+      toplevel_return;
+      all_sets_of_closures =
+        With_types.map
+          (fun _ -> Acc.get_all_sets_of_closures acc)
+          final_typing_env;
+      final_typing_env;
+      module_symbol =
+        With_types.map
+          (fun _ -> Flambda_unit.module_symbol unit)
+          final_typing_env
+    }
+  in
+  let skeleton =
+    { Skeleton.toplevel_expr = holed;
+      code = Acc.get_all_code acc;
+      ordered_code_ids = Acc.sort_code_ids acc;
+      fixed_arity_continuations = Acc.fixed_arity_continuations acc;
+      continuation_info = Acc.get_continuation_info acc
+    }
+  in
+  problem, skeleton

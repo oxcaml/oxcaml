@@ -315,9 +315,10 @@ let add_env_extension_with_extra_variables t
     (env_extension : Typing_env_extension.With_extra_variables.t)
     ~meet_expanded_head =
   Typing_env_extension.With_extra_variables.fold
-    ~variable:(fun var kind t ->
+    ~variable:(fun var t ->
       map_typing_env t ~f:(fun t ->
-          TE.add_variable_definition t var kind Name_mode.in_types))
+          TE.add_variable_definition t var (Variable.kind var)
+            Name_mode.in_types))
     ~equation:(fun name ty t ->
       try add_equation ~raise_on_bottom:true t name ty ~meet_expanded_head
       with Bottom_equation -> map_typing_env ~f:TE.make_bottom t)
@@ -588,3 +589,5 @@ let use_meet_env_strict ~meet_expanded_head t ~f : _ Or_bottom.t =
     let t = f (create t) in
     let tenv = final_typing_env ~meet_expanded_head t in
     if TE.is_bottom tenv then Bottom else Ok tenv
+
+let make_bottom t = map_typing_env ~f:TE.make_bottom t

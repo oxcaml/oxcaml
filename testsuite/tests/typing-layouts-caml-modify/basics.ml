@@ -3,7 +3,7 @@
  {
    not-macos;
    (* Remove layout_beta here when block indices are out of beta *)
-   flags = "-extension layouts_beta \
+   flags = "-extension layouts_beta -extension layout_poly_alpha \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
    native;
@@ -428,7 +428,7 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -437,13 +437,41 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+(* A layout-polymorphic function calling a layout-polymorphic set primitive. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set r (.x) x in
+  (* both [string] and [int] share the same specialization of [set_x],
+     and so we have to do the conservative thing and emit [caml_modify]
+     in either case. *)
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  (* [float#] has a distinct layout and gets its own specialization where
+     [caml_modify] is skipped. *)
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
 
 (* Second, specialized versions *)
 external unsafe_set_imm : ('a : value) ('b : immediate).
@@ -463,7 +491,7 @@ external unsafe_set_i64 : ('a : value) ('b : bits64).
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -475,7 +503,7 @@ external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
@@ -532,11 +560,45 @@ let () =
   let unsafe_set_imm64_imm64 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
     unsafe_set box idx v
   in
+  (* Only the product's mod bound says its components are GC-ignorable. *)
+  let[@inline never] unsafe_set_external
+      (type a : (value & value) mod external_)
+      box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
   let t = { a = #(1, 2) } in
   let idx = (.a) in
   test ~expect_caml_modifies:0
     (fun () -> unsafe_set_imm64_imm64 t idx #(0, 0);
+               ignore (Sys.opaque_identity t));
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_external t idx #(3, 4);
                ignore (Sys.opaque_identity t))
+
+(* An internal component must not hide another component's externality. *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #('a * string) }
+  end in
+  let[@inline never] unsafe_set_external
+      (type a : value mod external_) (t : a t) v =
+    unsafe_set t (.x) v
+  in
+  let[@inline never] unsafe_set_external64
+      (type a : value mod external64) (t : a t) v =
+    unsafe_set t (.x) v
+  in
+  let t = { x = #(1, "before") } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      unsafe_set_external t #(2, "after");
+      let #(i, s) = (Sys.opaque_identity t).x in
+      assert (i = 2 && s = "after"));
+  test ~expect_caml_modifies:1
+    (fun () ->
+      unsafe_set_external64 t #(3, "after64");
+      let #(i, s) = (Sys.opaque_identity t).x in
+      assert (i = 3 && s = "after64"))
 
 let () =
   let open struct
@@ -584,7 +646,7 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -593,13 +655,38 @@ let () =
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_ptr #(t, idx) #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+(* A layout-polymorphic function calling a layout-polymorphic ptr set
+   primitive. As above, [string] and [int] share a specialization of [set_x]
+   that must call [caml_modify], while [float#] gets its own. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set_ptr #(r, (.x)) x in
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
 
 (* Second, specialized versions *)
 external unsafe_set_ptr_imm :
@@ -624,7 +711,7 @@ external unsafe_set_ptr_i64 :
 
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let idx = (.y) in
@@ -638,7 +725,7 @@ external unsafe_set_ptr_prod :
 
 let () =
   let open struct
-    type t = { x : string; mutable y : #(int64# * string * bool)}
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
   end in
   let t = { x = "x"; y = #(#0L, "a", true) } in
   let idx = (.y) in
@@ -733,3 +820,13 @@ let () =
   let t = { x = #("s", U 1) } in
   test ~expect_caml_modifies:1
     (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))
+
+(* Projecting an immediate component out of a mixed tuple and storing it *)
+let () =
+  let open struct
+    type holder = { mutable i : int }
+  end in
+  let[@inline never] set h (t : int * float#) = let (i, _) = t in h.i <- i in
+  let h = { i = 0 } in
+  test ~expect_caml_modifies:0
+    (fun () -> set h (1, #2.0); ignore (Sys.opaque_identity h))

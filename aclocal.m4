@@ -233,6 +233,36 @@ camlPervasives__loop_1128:
         AC_MSG_RESULT([no])])])
   ])])
 
+dnl Probe whether the assembler accepts the DWARF-5 ".file 0" and ".loc 0"
+dnl directives, which define the line table's primary source file entry.
+dnl LLVM-based assemblers (including Apple's) accept them, upgrading the line
+dnl table to DWARF-5 if necessary; the GNU assembler only supports them in
+dnl DWARF-5 mode from binutils 2.34.
+AC_DEFUN([OCAML_AS_HAS_FILE_ZERO_DIRECTIVE], [
+  AC_MSG_CHECKING([whether the assembler supports .file 0 directives])
+  OCAML_CC_SAVE_VARIABLES
+
+  # Modify C-compiler variables to use the assembler
+  CC="$AS"
+  CFLAGS="-o conftest.$ac_objext"
+  CPPFLAGS=""
+  ac_ext="S"
+  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([
+camlConftest__entry:
+        .file   0       "conftest.ml"
+        .loc    0       1
+    ])],
+    [asm_file0_supported=true
+    AC_MSG_RESULT([yes])],
+    [asm_file0_supported=false
+    AC_MSG_RESULT([no])])
+
+  OCAML_CC_RESTORE_VARIABLES
+])
+
 AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   AC_MSG_CHECKING([whether mmap supports MAP_STACK])
   AC_RUN_IFELSE(
@@ -759,3 +789,37 @@ AC_DEFUN([OCAML_OBJCOPY_COMPRESSION_SUPPORT], [
   fi
   rm -f conftest.s
 ])
+
+# It's difficult to use AC_PROG_CXX or AX_CXX_COMPILE_STDCXX conditionally.
+# This macro is only used for ocamltest to call the C++11 compiler if the
+# default C compiler also can build C++.
+AC_DEFUN([OCAML_CXX_COMPILE_STDCXX_11], [
+  AC_MSG_CHECKING([for a C++11 compiler])
+  AC_CACHE_VAL([ocaml_cv_prog_cxx], [
+    AS_CASE(["$ccomp_type"],
+      [cc], [
+        saved_CC="$CC"
+        saved_CFLAGS="$CFLAGS"
+        AS_IF([test x"$CXX" = x],
+          [CC="$CC -xc++"; CFLAGS="$CXXFLAGS"], [CC="$CXX"; CFLAGS="$CXXFLAGS"])
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#if !defined(__cplusplus) || __cplusplus < 201103L
+#error "No C++11 support"
+/* This extra test is added to ignore C++ support when compiling with musl
+   (where the -xc++ flag will get passed through to gcc, but the headers are
+   not available). */
+#elif defined(__has_include) && !__has_include(<atomic>)
+#error "Missing <atomic> header"
+#endif
+#include <iostream>
+          ]])],
+          [ocaml_cv_prog_cxx="$CC"],
+          [ocaml_cv_prog_cxx=""])
+        CC="$saved_CC"
+        CFLAGS="$saved_CFLAGS"],
+      [msvc], [
+        # cl.exe selects between C and C++ based on the file extension
+        ocaml_cv_prog_cxx="$CC"],
+      [ocaml_cv_prog_cxx=""])])
+  AC_MSG_RESULT([${ocaml_cv_prog_cxx:-none found}])
+  ocamltest_CXX="$ocaml_cv_prog_cxx"])

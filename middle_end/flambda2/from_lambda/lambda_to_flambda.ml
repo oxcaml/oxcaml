@@ -359,7 +359,7 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
       CC.close_apply acc ccenv { apply with continuation; region; ghost_region }
     | _ :: _ ->
       let wrapper_cont = Continuation.create () in
-      let return_kinds = Flambda_arity.unarized_components apply.return_arity in
+      let return_kinds = Flambda_arity.unarize apply.return_arity in
       let return_value_components =
         List.mapi
           (fun i _ -> Ident.create_local (Printf.sprintf "return_val%d" i))
@@ -916,11 +916,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         alloc_region = current_alloc_region;
                         args_arity = Flambda_arity.create args_arity;
                         return_arity =
-                          Flambda_arity.unarize_t
-                            (Flambda_arity.create
-                               [ Flambda_arity.Component_for_creation.from_lambda
-                                   layout ~machine_width:(Acc.machine_width acc)
-                               ])
+                          Flambda_arity.create
+                            [ Flambda_arity.Component_for_creation.from_lambda
+                                layout ~machine_width:(Acc.machine_width acc) ]
                       }
                     in
                     wrap_return_continuation acc env ccenv apply))
@@ -1209,7 +1207,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
@@ -1277,10 +1276,9 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               alloc_region = Env.current_alloc_region env;
               args_arity = Flambda_arity.create args_arity;
               return_arity =
-                Flambda_arity.unarize_t
-                  (Flambda_arity.create
-                     [ Flambda_arity.Component_for_creation.from_lambda
-                         ap_return ~machine_width:(Acc.machine_width acc) ])
+                Flambda_arity.create
+                  [ Flambda_arity.Component_for_creation.from_lambda ap_return
+                      ~machine_width:(Acc.machine_width acc) ]
             }
           in
           wrap_return_continuation acc env ccenv apply)
@@ -1399,11 +1397,15 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
       L.lfunction) : Function_decl.t =
   let contains_no_escaping_local_allocs =
-    match ret_mode with Alloc_heap -> true | Alloc_local -> false
+    match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
   let first_complex_local_param =
     List.length params
     - match kind with Curried { nlocal } -> nlocal | Tupled -> 0
+  in
+  let function_slot_size =
+    Function_slot.size_from_arity ~num_complex_params:(List.length params)
+      ~is_tupled:(match kind with Tupled -> true | Curried _ -> false)
   in
   let unboxing_kind (layout : Lambda.layout) :
       Function_decl.unboxing_kind option =
@@ -1413,7 +1415,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(0, Constructor_uniform field_kinds)]
+                non_consts = [(0, Constructor_shape_uniform field_kinds)]
               }
         } ->
       Some
@@ -1427,7 +1429,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(tag, Constructor_uniform field_kinds)]
+                non_consts = [(tag, Constructor_shape_uniform field_kinds)]
               }
         }
       when tag = Obj.double_array_tag ->
@@ -1492,24 +1494,30 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     let is_a_param_unboxed =
       List.exists (fun (p : Lambda.lparam) -> p.attributes.unbox_param) params
     in
-    if attr.stub || ((not attr.unbox_return) && not is_a_param_unboxed)
+    if
+      attr.stub
+      || ((not (Option.is_some attr.unbox_return)) && not is_a_param_unboxed)
     then Normal_calling_convention
     else
       let unboxed_function_slot =
         Function_slot.create
           (Current_unit.get_cu_exn ())
           ~name:(Ident.name fid ^ "_unboxed")
-          ~is_always_immediate:false Flambda_kind.value
+          ~size:
+            (Function_slot.size_from_arity ~num_complex_params:1
+               ~is_tupled:false)
       in
-      let unboxed_return =
-        if attr.unbox_return then unboxing_kind return else None
+      let return_unboxing =
+        match unboxing_kind return, attr.unbox_return with
+        | Some kind, Some mode -> Some (kind, mode)
+        | _, _ -> None
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param
         then unboxing_kind param.layout
         else None
       in
-      let unboxed_params =
+      let params_unboxing =
         List.concat
           (List.map2
              (fun param kinds ->
@@ -1520,15 +1528,35 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                  Misc.fatal_error "Trying to unbox an unboxed product.")
              params unarized_per_param)
       in
+      (* If an unboxable parameter is locally-allocated, but this function is
+         [not_alloc_stack], we need to introduce a wrapper after the return to
+         close the local region introduced for the parameter. We can't allocate
+         the parameter on the heap instead, because the parameter might contain
+         pointers to locally-allocated blocks, for instance if it is a block
+         itself. *)
+      let needs_region_wrapper =
+        Lambda.is_not_alloc_stack ret_mode
+        && List.exists
+             (fun (param : Lambda.lparam) ->
+               param.attributes.unbox_param && Lambda.is_local_mode param.mode)
+             params
+      in
       Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot)
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper
+        }
   in
   let body_cont =
     match calling_convention with
-    | Normal_calling_convention | Unboxed_calling_convention (_, None, _) ->
+    | Normal_calling_convention
+    | Unboxed_calling_convention
+        { return_unboxing = None; needs_region_wrapper = false; _ } ->
       Continuation.create ~sort:Return ()
-    | Unboxed_calling_convention (_, Some _, _) ->
-      Continuation.create ~sort:Normal_or_exn ~name:"boxed_return" ()
+    | Unboxed_calling_convention { needs_region_wrapper = true; _ }
+    | Unboxed_calling_convention { return_unboxing = Some _; _ } ->
+      Continuation.create ~sort:Normal_or_exn ~name:"return_wrapper" ()
   in
   let body_exn_cont = Continuation.create () in
   let free_idents_of_body =
@@ -1561,7 +1589,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
-      ~name:(Ident.name fid) ~is_always_immediate:false Flambda_kind.value
+      ~name:(Ident.name fid) ~size:function_slot_size
   in
   let unboxed_products = ref Ident.Map.empty in
   let params =
@@ -1603,10 +1631,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let unboxed_products = !unboxed_products in
   let removed_params = Ident.Map.keys unboxed_products in
   let return =
-    Flambda_arity.unarize_t
-      (Flambda_arity.create
-         [ Flambda_arity.Component_for_creation.from_lambda return
-             ~machine_width:(Env.machine_width env) ])
+    Flambda_arity.create
+      [ Flambda_arity.Component_for_creation.from_lambda return
+          ~machine_width:(Env.machine_width env) ]
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)
@@ -1715,7 +1742,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+        | Linstantiate _ ->
           Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
@@ -1849,13 +1877,9 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
-    ~compilation_unit ~module_repr ~sections (lam : Lambda.lambda) =
+    ~compilation_unit ~module_repr (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
-  let toplevel_my_region = Ident.create_local "toplevel_my_region" in
-  let toplevel_my_ghost_region =
-    Ident.create_local "toplevel_my_ghost_region"
-  in
   let toplevel_my_alloc_region =
     Ident.create_local "toplevel_my_alloc_region"
   in
@@ -1869,5 +1893,5 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   in
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program
-    ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections
+    ~prog_return_cont:return_continuation ~exn_continuation
+    ~toplevel_my_alloc_region

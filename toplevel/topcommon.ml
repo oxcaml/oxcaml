@@ -102,7 +102,7 @@ end
    Returns [None] if the selected field is not a value, [Some field]
    otherwise. *)
 let mod_field obj (module_repr : Lambda.module_representation) pos =
-  if not !Clflags.native_code then
+  if not (Clflags.target_is_native ()) then
     Some (Obj.field obj pos)
   else
   match module_repr with
@@ -126,7 +126,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
 module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let rec eval_address = function
-    | Env.Aunit cu -> E.eval_compilation_unit cu
+    | Env.Aunit (cu, _) -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
     | Env.Adot(p, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in

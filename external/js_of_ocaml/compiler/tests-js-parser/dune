@@ -1,0 +1,24 @@
+(executable
+ (name run)
+ (libraries js_of_ocaml_compiler unix str))
+
+(rule
+ (alias runtest-parser)
+ (deps
+  (glob_files_rec pass/*.js)
+  simple.js
+  package.json)
+ (action
+  (run ./run.exe pass)))
+
+;; git submodule add https://github.com/tc39/test262.git test262
+;; git checkout 3a9ecbeab03930eb3600198a5dd0e9506ef1807a
+
+(rule
+ (alias runtest-parser)
+ (deps
+  (glob_files_rec test262/test/language/*.js)
+  simple.js
+  package.json)
+ (action
+  (run ./run.exe test262/test/language)))

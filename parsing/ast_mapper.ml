@@ -459,6 +459,7 @@ module M = struct
           (sub.module_expr sub m)
     | Pmod_unpack e -> unpack ~loc ~attrs (sub.expr sub e)
     | Pmod_extension x -> extension ~loc ~attrs (sub.extension sub x)
+    | Pmod_hole -> hole ~loc ~attrs ()
     | Pmod_instance x ->
         (* CR lmaurer: Implement this. Might want to change the [instance] type
            to have Ids with locations in them rather than just raw strings. *)

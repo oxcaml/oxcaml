@@ -75,8 +75,9 @@ val equal_exact : 'a t -> 'a t -> bool
 val is_one_param_of_kind_value : _ t -> bool
 
 (** Convert, in a left-to-right depth-first order, an arity into a flattened
-    list of kinds for all parameters. *)
-val unarize : [`Complex] t -> Flambda_kind.With_subkind.t list
+    list of kinds for all parameters. (For [`Unarized] arities this simply
+    returns the components.) *)
+val unarize : _ t -> Flambda_kind.With_subkind.t list
 
 (** Like [unarize] but works on arities that are known not to contain any
     unboxed products. *)
@@ -88,6 +89,10 @@ val unarize_per_parameter :
 
 (** Like [unarize] but returns a value of type [t]. *)
 val unarize_t : [`Complex] t -> [`Unarized] t
+
+(** Replace the kinds of the unarized components of an arity, given in the same
+    order as [unarize] returns them, preserving the structure of the arity. *)
+val with_unarized_kinds : 'uc t -> Flambda_kind.With_subkind.t list -> 'uc t
 
 (** Given an arity and an identifier, produce a list of identifiers (with
     corresponding kinds) whose length matches [unarize t], with names derived

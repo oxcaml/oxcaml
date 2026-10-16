@@ -5,7 +5,7 @@ module Jkind = Btype.Jkind0
 
 type 'a modes =
   { mode_modes : 'a;
-    mode_desc : Mode.Alloc.atom Location.loc list
+    mode_desc : Mode.With_locality.atom Location.loc list
   }
 
 type modalities =
@@ -15,13 +15,18 @@ type modalities =
 
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified
 *)
-val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
+val transl_mode_annots :
+  Parsetree.modes -> Mode.With_locality.Const.Option.t modes
+
+val apply_mode_implications :
+  Mode.With_locality.Const.Option.t -> Mode.With_locality.Const.Option.t
 
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
+val transl_mode_with_locality :
+  Parsetree.modes -> Mode.With_locality.Const.t modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
@@ -75,10 +80,18 @@ val transl_with_bound_modifiers :
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds :
+  ?warn:bool ->
   Parsetree.modes ->
   Jkind.Mod_bounds.t
   * (Jkind_axis.Nullability.t Location.loc option
     * Jkind_axis.Separability.t Location.loc option)
+
+(** Close mod-bounds under implied modalities, as [transl_mod_bounds] does for
+    user-written annotations (e.g. a [global] bound also bounds [aliased],
+    [forkable] and [unyielding]). Bounds computed axis-by-axis may lack these
+    implications, which [untransl_mod_bounds] relies on to omit implied modes
+    when printing. *)
+val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)

@@ -17,17 +17,14 @@
 
 /* The bytecode interpreter */
 #include <stdio.h>
-#include "caml/alloc.h"
 #include "caml/backtrace.h"
 #include "caml/callback.h"
-#include "caml/codefrag.h"
 #include "caml/debugger.h"
 #include "caml/fail.h"
 #include "caml/fix_code.h"
 #include "caml/instrtrace.h"
 #include "caml/instruct.h"
 #include "caml/interp.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
@@ -36,8 +33,6 @@
 #include "caml/fiber.h"
 #include "caml/dynamic.h"
 #include "caml/domain.h"
-#include "caml/globroots.h"
-#include "caml/startup.h"
 #include "caml/startup_aux.h"
 
 /* Registers for the abstract machine:
@@ -303,9 +298,11 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
 #endif
 
 #ifdef THREADED_CODE
+#define OPCODE_LABEL(name) &&lbl_ ## name,
   static const void * const jumptable[] = {
-#    include "caml/jumptbl.h"
+    CAML_ZINC_OPCODES(OPCODE_LABEL)
   };
+#undef OPCODE_LABEL
 #endif
 
   if (prog == NULL) {           /* Interpreter is initializing */
@@ -625,7 +622,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
         domain_state->current_stack = parent_stack;
         sp = domain_state->current_stack->sp;
         caml_free_stack(old_stack);
-        caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+        caml_fiber_switched();
 
         domain_state->trap_sp_off = Long_val(sp[0]);
         extra_args = Long_val(sp[1]);
@@ -1030,7 +1027,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       }
     raise_notrace:
       if (domain_state->trap_sp_off > 0) {
-        if (Stack_parent(domain_state->current_stack) == NULL) {
+        if (Stack_handle_exception(domain_state->current_stack) == Val_unit) {
           domain_state->external_raise = initial_external_raise;
           domain_state->external_raise_async = initial_external_raise_async;
           domain_state->trap_sp_off = initial_trap_sp_off;
@@ -1040,11 +1037,12 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
         } else {
           struct stack_info* old_stack = domain_state->current_stack;
           struct stack_info* parent_stack = Stack_parent(old_stack);
+          CAMLassert(parent_stack != NULL);
           value hexn = Stack_handle_exception(old_stack);
           old_stack->sp = sp;
           domain_state->current_stack = parent_stack;
           sp = domain_state->current_stack->sp;
-          caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+          caml_fiber_switched();
           caml_free_stack(old_stack);
 
           domain_state->trap_sp_off = Long_val(sp[0]);
@@ -1353,7 +1351,7 @@ do_resume: {
       domain_state->current_stack->sp = sp;
       domain_state->current_stack = stk;
       sp = domain_state->current_stack->sp;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+      caml_fiber_switched();
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       switch (resume_action) {
@@ -1489,7 +1487,7 @@ do_resume: {
       struct stack_info* parent_stack = Stack_parent(old_stack);
 
       check_trap_barrier_for_effect (domain_state);
-      if (parent_stack == NULL) {
+      if (Stack_handle_effect(old_stack) == Val_unit) {
         Setup_for_c_call;
         accu = caml_make_unhandled_effect_exn(accu);
         Restore_after_c_call;
@@ -1506,7 +1504,7 @@ do_resume: {
 
       old_stack->sp = sp;
       domain_state->current_stack = parent_stack;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+      caml_fiber_switched();
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
       Field(cont, 0) = Val_ptr(old_stack);
@@ -1537,7 +1535,7 @@ do_resume: {
       sp[0] = Val_long(domain_state->trap_sp_off);
       sp[1] = Val_long(extra_args);
 
-      if (parent == NULL) {
+      if (Stack_handle_effect(self) == Val_unit) {
         Setup_for_c_call;
         resume_arg = caml_make_unhandled_effect_exn(eff);
         accu = caml_continuation_use(cont);
@@ -1553,7 +1551,7 @@ do_resume: {
       self->sp = sp;
       domain_state->current_stack = parent;
       sp = parent->sp;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+      caml_fiber_switched();
 
       CAMLassert(Stack_parent(cont_tail) == NULL);
       Stack_parent(self) = NULL;

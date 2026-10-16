@@ -448,6 +448,12 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block)
       true)
   else false
 
+(* [block cfg b] simplifies the terminator of [b], and returns [true] when the
+    simplification may have changed the set of successor labels of [b]. In that
+    case it is the caller's responsibility to make predecessor sets consistent
+    again, e.g. via [Cfg.register_predecessors_for_all_blocks].  If it returns
+    [false], successor sets are unchanged, even though the terminator may have
+    been rewritten. *)
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
    branch instructions and save cmp instructions. The main problem is that it

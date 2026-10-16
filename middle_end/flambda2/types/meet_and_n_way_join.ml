@@ -900,23 +900,11 @@ let deduce_get_tag_simple ~machine_width blocks get_tag_var :
   | Unknown, Some var -> Ok (Simple.var var)
   | Unknown, None -> Unknown
 
-let n_way_join_simples env kind simples =
-  let canonical_simples =
-    List.map
-      (fun (id, simple) ->
-        ( id,
-          TE.get_canonical_simple_ignoring_name_mode
-            (Join_env.joined_env env id)
-            simple ))
-      simples
-  in
-  Join_env.n_way_join_simples env kind canonical_simples
-
 let n_way_join_relation_simples env simples_opt =
   match simples_opt with
   | None -> None, env
   | Some simples -> (
-    match n_way_join_simples env K.naked_immediate simples with
+    match Join_env.n_way_join_simples env K.naked_immediate simples with
     | Bottom, env -> None, env
     | Ok simple, env ->
       Simple.pattern_match' simple
@@ -1772,10 +1760,9 @@ and meet_row_like_for_blocks env
     ~left_b:alloc_mode1 ~right_b:alloc_mode2
 
 and meet_row_like_for_closures env
-    ({ known_closures = known1; other_closures = other1 } :
-      TG.Row_like_for_closures.t)
-    ({ known_closures = known2; other_closures = other2 } :
-      TG.Row_like_for_closures.t) : TG.Row_like_for_closures.t meet_result =
+    ({ known_closures = known1 } : TG.Row_like_for_closures.t)
+    ({ known_closures = known2 } : TG.Row_like_for_closures.t) :
+    TG.Row_like_for_closures.t meet_result =
   let meet_shape () () : _ Or_bottom.t = Ok () in
   let merge_map_known merge_case known1 known2 =
     Function_slot.Map.merge
@@ -1791,7 +1778,11 @@ and meet_row_like_for_closures env
   in
   map_result
     ~f:(fun (known_closures, other_closures) ->
-      TG.Row_like_for_closures.create_raw ~known_closures ~other_closures)
+      (match other_closures with
+      | Or_bottom.Bottom -> ()
+      | Or_bottom.Ok _ ->
+        Misc.fatal_error "Unexpected non-bottom other case in meet of row-like");
+      TG.Row_like_for_closures.create_raw ~known_closures)
     (meet_row_like ~meet_expanded_head ~n_way_join_type:n_way_join
        ~meet_maps_to:meet_closures_entry
        ~equal_index:Set_of_closures_contents.equal
@@ -1799,7 +1790,7 @@ and meet_row_like_for_closures env
        ~union_index:Set_of_closures_contents.union ~meet_shape
        ~is_empty_map_known:Function_slot.Map.is_empty
        ~get_singleton_map_known:Function_slot.Map.get_singleton ~merge_map_known
-       env ~known1 ~known2 ~other1 ~other2)
+       env ~known1 ~known2 ~other1:Bottom ~other2:Bottom)
 
 and meet_closures_entry (env : ME.t)
     ({ function_types = function_types1;
@@ -1907,16 +1898,7 @@ and n_way_join env (ts : _ Join_env.join_arg list) : TG.t n_way_join_result =
       kind
   in
   let ts = List.filter (fun (_, ty) -> not (TG.is_obviously_bottom ty)) ts in
-  match
-    List.map
-      (fun (id, ty) ->
-        ( id,
-          TE.get_alias_then_canonical_simple_exn
-            ~min_name_mode:Name_mode.in_types
-            (Join_env.joined_env env id)
-            ty ))
-      ts
-  with
+  match List.map (fun (id, ty) -> id, TG.get_alias_exn ty) ts with
   | canonical_simples -> (
     match Join_env.n_way_join_simples env kind canonical_simples with
     | Bottom, join_env -> Known (MTC.bottom kind), join_env
@@ -2142,7 +2124,9 @@ and n_way_join_head_of_kind_value env
     | is_null_simples -> (
       (* Note: we ideally would use [n_way_join_relation_simples] here, but we
          need to store a [Not_null] constructor if the join is [false]. *)
-      match n_way_join_simples env K.naked_immediate is_null_simples with
+      match
+        Join_env.n_way_join_simples env K.naked_immediate is_null_simples
+      with
       | Bottom, env -> TG.Maybe_null { is_null = None }, env
       | Ok simple, env ->
         let is_null =
@@ -2867,17 +2851,11 @@ and n_way_join_row_like_for_blocks env
 and n_way_join_row_like_for_closures env
     (closures : TG.Row_like_for_closures.t Join_env.join_arg list) :
     TG.Row_like_for_closures.t * _ =
-  let known, other =
-    match closures with
-    | [] -> Misc.fatal_error "Join row_like for no closures."
-    | (id1, { known_closures = known1; other_closures = other1 })
-      :: other_closures ->
-      List.fold_left
-        (fun (known, other)
-             (id2, { TG.known_closures = known2; TG.other_closures = other2 })
-           -> (id2, (known2, other2)) :: known, (id2, other2) :: other)
-        ([id1, (known1, other1)], [id1, other1])
-        other_closures
+  let known =
+    List.rev_map
+      (fun (id, { TG.known_closures }) ->
+        id, (known_closures, Or_bottom.Bottom))
+      closures
   in
   let merge_map_known join_case env knowns =
     generic_merge_map_known ~filter_map:Function_slot.Map.filter_map
@@ -2902,10 +2880,15 @@ and n_way_join_row_like_for_closures env
       ~equal_index:Set_of_closures_contents.equal
       ~inter_index:Set_of_closures_contents.inter
       ~n_way_join_shape:(fun _ -> Or_unknown_or_bottom.Ok ())
-      ~merge_map_known env ~known ~other
+      ~merge_map_known env ~known ~other:[]
   with
   | Known (known_closures, other_closures), env ->
-    TG.Row_like_for_closures.create_raw ~known_closures ~other_closures, env
+    (match other_closures with
+    | Or_bottom.Bottom -> ()
+    | Or_bottom.Ok _ ->
+      Misc.fatal_error
+        "Unexpected non-bottom other case in n-way join of row-like");
+    TG.Row_like_for_closures.create_raw ~known_closures, env
   | Unknown, _ ->
     Misc.fatal_error "Join row_like case for closures returned Unknown"
 
@@ -3053,35 +3036,64 @@ and n_way_join_value_slot_indexed_product env
 and n_way_join_int_indexed_product env shape
     (fields : TG.Product.Int_indexed.t Join_env.join_arg list) :
     TG.Product.Int_indexed.t * Join_env.t =
-  let length =
-    match fields with
-    | [] -> Misc.fatal_error "Join of empty int indexed product."
-    | (_, first_fields) :: other_fields ->
+  match fields with
+  | [] -> Misc.fatal_error "Join of empty int indexed product."
+  | (_, first_fields) :: other_fields ->
+    let length =
       List.fold_left
         (fun length (_, other_fields) -> min length (Array.length other_fields))
         (Array.length first_fields)
         other_fields
-  in
-  let fields, env =
-    let env_ref = ref env in
-    let fields =
-      Array.init length (fun index ->
-          (* CR bclement: if fields are all physically equal and only involve
-             variables defined in the central env, we should reuse the type. *)
-          let fields =
-            List.map (fun (id, fields) -> id, fields.(index)) fields
-          in
-          match n_way_join !env_ref fields with
-          | Unknown, env ->
-            env_ref := env;
-            MTC.unknown_from_shape shape index
-          | Known ty, env ->
-            env_ref := env;
-            ty)
     in
-    fields, !env_ref
-  in
-  TG.Product.Int_indexed.create_from_array fields, env
+    let all_phys_equal =
+      try
+        for index = 0 to length - 1 do
+          let first_field = Array.unsafe_get first_fields index in
+          if
+            List.exists
+              (fun (_, other_fields) ->
+                Array.unsafe_get other_fields index != first_field)
+              other_fields
+          then raise_notrace Exit
+        done;
+        true
+      with Exit -> false
+    in
+    if all_phys_equal
+    then
+      match
+        List.find_map
+          (fun (_, fields) ->
+            if Array.length fields = length then Some fields else None)
+          fields
+      with
+      | None -> assert false
+      | Some fields ->
+        ( TG.Product.Int_indexed.create_from_array fields,
+          Array.fold_left (fun env ty -> Join_env.import_type env ty) env fields
+        )
+    else
+      let fields, env =
+        let env_ref = ref env in
+        let fields =
+          Array.init length (fun index ->
+              (* CR bclement: if fields are all physically equal and only
+                 involve variables defined in the central env, we should reuse
+                 the type. *)
+              let fields =
+                List.map (fun (id, fields) -> id, fields.(index)) fields
+              in
+              match n_way_join !env_ref fields with
+              | Unknown, env ->
+                env_ref := env;
+                MTC.unknown_from_shape shape index
+              | Known ty, env ->
+                env_ref := env;
+                ty)
+        in
+        fields, !env_ref
+      in
+      TG.Product.Int_indexed.create_from_array fields, env
 
 and n_way_join_function_type (env : Join_env.t)
     (func_types : TG.Function_type.t Or_unknown.t Join_env.join_arg list) :

@@ -1,4 +1,4 @@
-let $camlMatch_in_match_seq__first_const = Block 0 () in
+let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
 (let code rec inline(always) loopify(always) size(35)
        aux_1 (acc, s : val) my_closure &my_alloc_region my_depth -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
@@ -34,8 +34,8 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
    let aux = closure aux_1 @aux &my_alloc_region
    with { f = f; next = next }
    in
-   let Pfield = %block_load.[`0`] (`*match*`) in
-   apply direct(aux_1 &my_alloc_region) aux (acc, Pfield) -> k1 * k2
+   let Pmixedfield = %block_load.[`0`] (`*match*`) in
+   apply direct(aux_1 &my_alloc_region) aux (acc, Pmixedfield) -> k1 * k2
  in
  let code size(39)
        `fn[match_in_match_seq.ml:35,14--125]_3` (s : val)
@@ -84,10 +84,10 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
        @`fn[match_in_match_seq.ml:35,14--125]` &my_alloc_region
    with { f_1 = f; next_1 = next }
    in
-   let Pfield = %block_load.[`0`] (`*match*`) in
+   let Pmixedfield = %block_load.[`0`] (`*match*`) in
    let Pmakeblock =
      %block.[`0`].my_alloc_region
-       (Pfield, `fn[match_in_match_seq.ml:35,14--125]`)
+       (Pmixedfield, `fn[match_in_match_seq.ml:35,14--125]`)
    in
    let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock) in
    cont k1 (Pmakeblock_1)
@@ -144,8 +144,8 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
    let aux = closure aux_5 @aux_1 &my_alloc_region
    with { f_2 = f; next_2 = next }
    in
-   let Pfield = %block_load.[`0`] (`*match*`) in
-   let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, aux) in
+   let Pmixedfield = %block_load.[`0`] (`*match*`) in
+   let Pmakeblock = %block.[`0`].my_alloc_region (Pmixedfield, aux) in
    let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock) in
    cont k1 (Pmakeblock_1)
  in
@@ -275,18 +275,14 @@ let $camlMatch_in_match_seq__first_const = Block 0 () in
        apply direct(sum_10 &my_alloc_region)
          (sum : _ -> imm tagged) (apply_result) -> k1 * k2
  in
- (let fold_left = closure fold_left_0 @fold_left &toplevel.alloc_region in
-  let map = closure map_2 @map &toplevel.alloc_region in
-  let filter = closure filter_4 @filter &toplevel.alloc_region in
-  let unfold = closure unfold_6 @unfold &toplevel.alloc_region in
-  let square = closure square_7 @square &toplevel.alloc_region in
-  let ints = closure ints_8 @ints &toplevel.alloc_region
-  with { unfold = unfold }
-  in
-  let sum = closure sum_10 @sum &toplevel.alloc_region
-  with { fold_left = fold_left }
-  in
-  let foo = closure foo_12 @foo &toplevel.alloc_region
+ (let fold_left = closure fold_left_0 @fold_left &toplevel in
+  let map = closure map_2 @map &toplevel in
+  let filter = closure filter_4 @filter &toplevel in
+  let unfold = closure unfold_6 @unfold &toplevel in
+  let square = closure square_7 @square &toplevel in
+  let ints = closure ints_8 @ints &toplevel with { unfold = unfold } in
+  let sum = closure sum_10 @sum &toplevel with { fold_left = fold_left } in
+  let foo = closure foo_12 @foo &toplevel
   with {
     map = map;
     filter = filter;

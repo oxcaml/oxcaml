@@ -21,7 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
-  native_code := true;
+  Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
@@ -68,7 +68,7 @@ let main unix argv ppf ~flambda2 =
        Target_system.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
-    if !Clflags.debug && !Clflags.native_code then
+    if !Clflags.debug && Clflags.target_is_native () then
       Clflags.dwarf_c_toolchain_flag :=
         Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
@@ -103,6 +103,7 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
+                      functorize;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -110,7 +111,7 @@ let main unix argv ppf ~flambda2 =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
+                         -output-obj, -instantiate, -functorize";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -152,6 +153,16 @@ let main unix argv ppf ~flambda2 =
           src, args
       in
       Compiler.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let input_module_names =
+        Compenv.get_objfiles ~with_ocamlparam:false
+        |> Functorizer.validate_inputs
+      in
+      Compiler.functorize input_module_names target;
       Warnings.check_fatal ();
     end
     else if !shared then begin

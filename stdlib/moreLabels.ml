@@ -22,8 +22,12 @@ open! Stdlib
 
 [@@@ocaml.nolabels]
 
-module Hashtbl = Hashtbl
+(* These are 'struct include ... end' so that ocamldep picks up on the
+   fact that they are not module aliases, since the mli re-exports
+   them with a different signature, so they have a cmx dependency *)
 
-module Map = Map
+module Hashtbl = struct include Hashtbl end
 
-module Set = Set
+module Map = struct include Map end
+
+module Set = struct include Set end
