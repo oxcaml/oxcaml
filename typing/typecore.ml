@@ -267,7 +267,8 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
-  | Deref_pattern_not_yet_supported
+  | Deref_pattern_bad_position
+  | Deref_pattern_bad_argument
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -885,6 +886,28 @@ type expected_pat_mode =
 
 let simple_pat_mode mode =
   { mode = With_regionality.disallow_right mode; tuple_modes = None }
+
+(* While type checking patterns, we track some information about the boxed value
+   a deref pattern [deref_ x] would refer to in the current pattern. *)
+type deref_position =
+  { position_mutability : Types.mutability;
+    (* mutability of the position *)
+
+    container_mode : With_regionality.l;
+    (* mode of the boxed value *)
+
+    container_loc : Location.t;
+    (* location of the pattern matching the boxed value *)
+
+    base : deref block_access;
+    (* the access into the boxed value *)
+
+    rev_unboxed : deref unboxed_access list;
+    (* the unboxed accesses from the boxed value to here, in reverse order *)
+  }
+
+let deref_position_push_unboxed_access ua pos =
+  { pos with rev_unboxed = ua :: pos.rev_unboxed }
 
 let tuple_pat_mode mode tuple_modes =
   let mode = With_regionality.disallow_right mode in
@@ -3622,25 +3645,30 @@ let rec type_pat
   : type k . type_pat_state -> k pattern_category ->
       no_existentials: existential_restriction option ->
       pat_mode:expected_pat_mode -> mutable_flag:_ ->
+      pat_addr:deref_position option ->
       penv: Pattern_env.t -> Parsetree.pattern -> type_expr ->
       Jkind.Sort.t -> k general_pattern
-  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
-      expected_ty sort ->
+  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~pat_addr ~penv
+      sp expected_ty sort ->
   Builtin_attributes.warning_scope sp.ppat_attributes
     (fun () ->
        type_pat_aux tps category ~no_existentials
-         ~pat_mode ~mutable_flag ~penv sp expected_ty sort
+         ~pat_mode ~mutable_flag ~pat_addr ~penv sp expected_ty sort
     )
 
+(* [pat_addr] is [Some pos] if a [deref_] pattern is valid at the current
+   pattern's position *)
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
          pat_mode:expected_pat_mode -> mutable_flag:mutable_flag ->
+         pat_addr:deref_position option ->
          penv:Pattern_env.t -> _ -> _ -> _ -> k general_pattern
-  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
-        expected_ty sort ->
+  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~pat_addr ~penv
+        sp expected_ty sort ->
   assert (penv.in_counterexample = false);
-  let type_pat tps category ?(pat_mode=pat_mode) ?(penv=penv) =
-    type_pat tps category ~no_existentials ~pat_mode ~mutable_flag ~penv
+  let type_pat tps category ?(pat_mode=pat_mode) ?(penv=penv) ?pat_addr =
+    type_pat tps category ~no_existentials ~pat_mode ~mutable_flag ~pat_addr
+      ~penv
   in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =
@@ -3677,12 +3705,20 @@ and type_pat_aux
     let expected_tys =
       solve_Ppat_tuple ~pat_mode loc penv args expected_ty
     in
+    let container_mode = pat_mode.mode in
     let pl =
-      List.map2 (fun (lbl, t, pat_mode) (_, p) ->
+      List.mapi (fun i ((lbl, t, pat_mode), (_, p)) ->
+        let pat_addr =
+          { position_mutability = Immutable;
+            container_mode;
+            container_loc = loc;
+            base = Baccess_tuple_element i;
+            rev_unboxed = [] }
+        in
         lbl,
-        type_pat tps Value ~pat_mode p t
+        type_pat tps Value ~pat_mode ~pat_addr p t
           Jkind.Sort.(of_const Const.for_tuple_element))
-        expected_tys args
+        (List.combine expected_tys args)
     in
     rvp {
       pat_desc = Tpat_tuple pl;
@@ -3714,9 +3750,15 @@ and type_pat_aux
       solve_Ppat_unboxed_tuple ~pat_mode loc penv args expected_ty
     in
     let pl =
-      List.map2 (fun (lbl, t, pat_mode, sort) (_, p) ->
-        lbl, type_pat tps Value ~pat_mode p t sort, sort)
-        expected_tys args
+      List.mapi (fun i ((lbl, t, pat_mode, sort), (_, p)) ->
+        let pat_addr =
+          Option.map
+            (deref_position_push_unboxed_access
+               (Uaccess_unboxed_tuple_element i))
+            pat_addr
+        in
+        lbl, type_pat tps Value ~pat_mode ?pat_addr p t sort, sort)
+        (List.combine expected_tys args)
     in
     let ty =
       newty (Tunboxed_tuple (List.map (fun (lbl, p, _) -> lbl, p.pat_type) pl))
@@ -3750,6 +3792,28 @@ and type_pat_aux
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           raise (Error (loc, !!penv, error))
       in
+      let deref_position_through_label ~container_mode (rep : rep) lid
+            (label : rep gen_label_description) pos =
+        match record_form with
+        | Unboxed_product ->
+          Option.map
+            (deref_position_push_unboxed_access
+               (Uaccess_unboxed_field (lid, label, rep)))
+            pos
+        | Legacy ->
+          match rep with
+          | Record_unboxed ->
+            Option.map
+              (deref_position_push_unboxed_access
+                 (Uaccess_unboxed_record_field (lid, label, rep)))
+              pos
+          | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
+          | Record_mixed _ | Record_dummy _ | Record_undetermined
+          | Record_variable _ ->
+            Some { position_mutability = label.lbl_mut; container_mode;
+                   container_loc = loc; base = Baccess_field (lid, label, rep);
+                   rev_unboxed = [] }
+      in
       let type_label_pat rep (label_lid, (label : rep gen_label_description),
                               sarg) =
         let ty_arg =
@@ -3766,9 +3830,15 @@ and type_pat_aux
           apply_left_is_contained_by is_contained_by
             ~modalities:label.lbl_modalities pat_mode.mode
         in
+        let container_mode = pat_mode.mode in
         let pat_mode = simple_pat_mode mode in
         let ty_sort = label_sort record_form label rep ~record_sort in
-        (label_lid, label, type_pat tps Value ~pat_mode sarg ty_arg ty_sort)
+        let pat_addr =
+          deref_position_through_label ~container_mode rep label_lid label
+            pat_addr
+        in
+        (label_lid, label,
+         type_pat tps Value ~pat_mode ?pat_addr sarg ty_arg ty_sort)
       in
       let make_record_pat
             (rep : rep)
@@ -3911,7 +3981,7 @@ and type_pat_aux
             pat_unique_barrier = Unique_barrier.not_computed () }
       end
   | Ppat_alias(sq, name) ->
-      let q = type_pat tps Value sq expected_ty sort in
+      let q = type_pat tps Value ?pat_addr sq expected_ty sort in
       let ty_var, mode = solve_Ppat_alias ~mode:pat_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
@@ -4114,7 +4184,10 @@ and type_pat_aux
                | Some s ->
                  Jkind.Sort.of_const s, None
              in
-             type_pat ~pat_mode tps Value p arg.ca_type sort, jkind_to_check)
+             (* CR address-patterns: in principle, immutable addresses may point
+                into variants *)
+             type_pat ~pat_mode tps Value p arg.ca_type sort,
+             jkind_to_check)
           sargs args
         |> List.split
       in
@@ -4232,6 +4305,7 @@ and type_pat_aux
         with_local_level begin fun () ->
           let type_pat_rec tps penv sp =
             let pat_mode = dynamic_pat_mode pat_mode in
+            (* CR address-patterns: allow deref_ in or patterns *)
             type_pat ~pat_mode tps category sp expected_ty sort ~penv
           in
           let penv1 =
@@ -4313,8 +4387,15 @@ and type_pat_aux
       let mode =
         apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
       in
+      let container_mode = pat_mode.mode in
       let pat_mode = simple_pat_mode mode in
-      let p1 = type_pat ~pat_mode tps Value sp1 ty_arg arg_sort in
+      let pat_addr =
+        { position_mutability = mutability; container_mode;
+          container_loc = loc; base = Baccess_address arg_sort;
+          rev_unboxed = [] }
+      in
+      let p1 = type_pat ~pat_mode ~pat_addr tps Value sp1 ty_arg arg_sort
+      in
       rvp {
         pat_desc = Tpat_addr (mutability, arg_sort, p1);
         pat_loc = loc; pat_extra=[];
@@ -4337,7 +4418,8 @@ and type_pat_aux
           None, None, expected_ty
       in
       let p =
-        type_pat ~pat_mode tps category sp_constrained expected_ty sort
+        type_pat ~pat_mode ?pat_addr tps category sp_constrained expected_ty
+          sort
       in
       let pat_type = match ty with Some ty -> ty | None -> p.pat_type in
       let extra =
@@ -4355,7 +4437,7 @@ and type_pat_aux
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
-      let p = type_pat tps category ~penv p expected_ty sort in
+      let p = type_pat tps category ~penv ?pat_addr p expected_ty sort in
       let new_env = !!penv in
       begin match Env.remove_last_open path new_env with
       | None -> assert false
@@ -4380,13 +4462,52 @@ and type_pat_aux
       }
   | Ppat_effect _ ->
       raise (Error (loc, !!penv, Effect_pattern_below_toplevel))
-  | Ppat_deref _ ->
-      raise (Error (loc, !!penv, Deref_pattern_not_yet_supported))
+  | Ppat_deref sp1 ->
+      (* CR address-patterns: [deref_] should be allowed while deepening an
+         [addr_] at [write] and [immutable], too. Currently, this is only
+         acceptable if the ['a addr] is at least read. Similarly, [deref_] on
+         a mutable field should be allowed in records at [write], [immutable]
+         or [contended]. *)
+      (* CR address-patterns: print a more informative error if the inner
+         pattern is too complex once we have [as deref_ x] *)
+      (* CR address-patterns: support for [as deref_ x] to avoid the limitations of these
+         restrictions. *)
+      (match sp1.ppat_desc with
+       | Ppat_any | Ppat_var _ -> ()
+       | _ ->
+         raise (Error (sp1.ppat_loc, !!penv, Deref_pattern_bad_argument)));
+      let { position_mutability; container_mode; container_loc; base;
+            rev_unboxed } =
+        match pat_addr with
+        | Some pos -> pos
+        | None -> raise (Error (loc, !!penv, Deref_pattern_bad_position))
+      in
+      let unboxed = List.rev rev_unboxed in
+      check_block_reference_path ~loc ~env:!!penv Deref_pattern
+        ~mutability:position_mutability base unboxed;
+      let ty_addr, addr_sort =
+        solve_Ppat_deref !!penv position_mutability expected_ty
+      in
+      let is_contained_by : Mode.Hint.is_contained_by =
+        { containing = Derived_address; container = (container_loc, Pattern) }
+      in
+      let mode = apply_left_is_contained_by is_contained_by container_mode in
+      let p1 =
+        type_pat ~pat_mode:(simple_pat_mode mode) tps Value sp1 ty_addr
+          addr_sort
+      in
+      rvp {
+        pat_desc = Tpat_deref (position_mutability, base, unboxed, p1);
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
 let type_pat tps category ?no_existentials ~mutable_flag penv =
-  type_pat tps category ~no_existentials ~mutable_flag ~penv
+  type_pat tps category ~no_existentials ~mutable_flag ~pat_addr:None ~penv
 
 let type_pattern
     category ~lev ~pat_mode env spat expected_ty ?cont sort allow_modules
@@ -4835,6 +4956,7 @@ let rec check_counter_example_pat
           let args = List.map2 (fun (s, _) a -> s, a) targs args in
           mkp k(Tpat_construct(cstr_lid, constr, repr, args, existential_ctyp)))
   | Tpat_variant(tag, targ, _) ->
+      (* CR address-patterns: allow deref_ in variants whenever that's sound *)
       let constant = (targ = None) in
       let arg_type, row, pat_type =
         solve_Ppat_variant loc penv tag constant expected_ty in
@@ -13890,10 +14012,16 @@ let report_error ~loc env =
   | Effect_pattern_below_toplevel ->
       Location.errorf ~loc
         "@[Effect patterns must be at the top level of a match case.@]"
-  | Deref_pattern_not_yet_supported ->
+  | Deref_pattern_bad_position ->
       Location.errorf ~loc
-        "@[Dereference patterns %a are not supported yet.@]"
-        Style.inline_code "deref_"
+        "@[Dereference patterns must match a value stored in a record,@ \
+         a tuple or at an address.@]"
+  | Deref_pattern_bad_argument ->
+      Location.errorf ~loc
+        "@[Dereference patterns must bind a variable or a wildcard,@ \
+         as in %a or %a.@]"
+        Style.inline_code "deref_ x"
+        Style.inline_code "deref_ _"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"

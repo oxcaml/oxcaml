@@ -91,6 +91,8 @@ type containing =
   | Record of string * modality
   | Array of modality
   | Address of modality
+  | Derived_address
+      (** An address into the container, as bound by a dereference pattern *)
   | Constructor of string * modality
   | Structure of structure_item * modality
 (* Some structure items (such as classes) don't have modalities. We gloss over

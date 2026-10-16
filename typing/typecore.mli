@@ -351,7 +351,8 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
-  | Deref_pattern_not_yet_supported
+  | Deref_pattern_bad_position
+  | Deref_pattern_bad_argument
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
