@@ -473,6 +473,20 @@ Error: The module is "dynamic" because generative functors are always dynamic.
        However, the module highlighted is expected to be "static".
 |}]
 
+(* ...and so are their applications. *)
+module M = struct
+  module F () = struct let x = 1 end
+  module Y = F ()
+  let _ @ static = Y.x
+end
+[%%expect{|
+module M :
+  sig
+    module F : functor () -> sig val x : int end @ static
+    module Y : sig val x : int end
+  end
+|}]
+
 (* A functor type declares its return's staticity independently of the
    functor's own: a dynamic functor returning a static result... *)
 module F : functor (X : sig end) -> sig end @ static =
