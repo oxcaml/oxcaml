@@ -719,8 +719,8 @@ let bad = (.p_mut)
 Line 1, characters 12-17:
 1 | let bad = (.p_mut)
                 ^^^^^
-Error: Mutable block indices to polymorphic record fields
-       (here "p_mut") are forbidden.
+Error: Block indices do not support polymorphic record fields (here "p_mut")
+       in mutable positions.
 |}]
 
 type poly_unboxed = #{ p_u : 'a. 'a option }
@@ -735,8 +735,8 @@ let bad_unboxed = (.h.#p_u)
 Line 1, characters 23-26:
 1 | let bad_unboxed = (.h.#p_u)
                            ^^^
-Error: Mutable block indices to polymorphic record fields
-       (here "p_u") are forbidden.
+Error: Block indices do not support polymorphic record fields (here "p_u")
+       in mutable positions.
 |}]
 
 (**************)
@@ -773,48 +773,54 @@ let bad () = (.global)
 Line 1, characters 13-22:
 1 | let bad () = (.global)
                  ^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is aliased.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is aliased.
 |}]
 let bad () = (.aliased)
 [%%expect{|
 Line 1, characters 13-23:
 1 | let bad () = (.aliased)
                  ^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is aliased.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is aliased.
 |}]
 let bad () = (.many)
 [%%expect{|
 Line 1, characters 13-20:
 1 | let bad () = (.many)
                  ^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is many.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is many.
 |}]
 let bad () = (.unyielding)
 [%%expect{|
 Line 1, characters 13-26:
 1 | let bad () = (.unyielding)
                  ^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is unyielding.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is unyielding.
 |}]
 let bad () = (.portable)
 [%%expect{|
 Line 1, characters 13-24:
 1 | let bad () = (.portable)
                  ^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is portable.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is portable.
 |}]
 let bad () = (.contended)
 [%%expect{|
 Line 1, characters 13-25:
 1 | let bad () = (.contended)
                  ^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is contended.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is contended.
 |}]
 
 (* Mutable indices with each disallowed modality *)
@@ -823,8 +829,10 @@ let bad () = (.mut_not_global)
 Line 1, characters 13-30:
 1 | let bad () = (.mut_not_global)
                  ^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be global, but this is not.
+Error: Block indices do not yet support non-default modalities.
+       In particular,
+       mutable elements must have the default modalities of mutable fields,
+       but this is local.
 |}]
 
 let bad () = (.mut_not_many)
@@ -832,8 +840,10 @@ let bad () = (.mut_not_many)
 Line 1, characters 13-28:
 1 | let bad () = (.mut_not_many)
                  ^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be many, but this is not.
+Error: Block indices do not yet support non-default modalities.
+       In particular,
+       mutable elements must have the default modalities of mutable fields,
+       but this is once.
 |}]
 
 let bad () = (.mut_not_unyielding)
@@ -841,8 +851,10 @@ let bad () = (.mut_not_unyielding)
 Line 1, characters 13-34:
 1 | let bad () = (.mut_not_unyielding)
                  ^^^^^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must be unyielding, but this is not.
+Error: Block indices do not yet support non-default modalities.
+       In particular,
+       mutable elements must have the default modalities of mutable fields,
+       but this is yielding.
 |}]
 
 let bad () = (.mut.#contended)
@@ -850,8 +862,10 @@ let bad () = (.mut.#contended)
 Line 1, characters 13-30:
 1 | let bad () = (.mut.#contended)
                  ^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must have the identity modality, but this is contended.
+Error: Block indices do not yet support non-default modalities.
+       In particular,
+       mutable elements must have the default modalities of mutable fields,
+       but this is contended.
 |}]
 
 let bad () = (.mut.#portable)
@@ -859,8 +873,10 @@ let bad () = (.mut.#portable)
 Line 1, characters 13-29:
 1 | let bad () = (.mut.#portable)
                  ^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must have the identity modality, but this is portable.
+Error: Block indices do not yet support non-default modalities.
+       In particular,
+       mutable elements must have the default modalities of mutable fields,
+       but this is portable.
 |}]
 
 (* After arrays *)
@@ -870,8 +886,10 @@ let bad () =
 Line 2, characters 2-58:
 2 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#portable)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       mutable elements must have the identity modality, but this is portable.
+Error: Block indices do not yet support non-default modalities.
+       In particular,
+       mutable elements must have the default modalities of mutable fields,
+       but this is portable.
 |}]
 let bad () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#mut_not_many)
@@ -888,8 +906,9 @@ let bad () =
 Line 2, characters 2-57:
 2 |   (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#global)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is aliased.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is aliased.
 |}]
 let bad () =
   (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#item.#global.#item)
@@ -897,8 +916,9 @@ let bad () =
 Line 2, characters 2-69:
 2 |   (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#item.#global.#item)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Block indices do not yet support non-default modalities. In particular,
-       immutable elements must have the identity modality, but this is aliased.
+Error: Block indices do not yet support non-default modalities.
+       In particular, immutable elements must have the identity modality,
+       but this is aliased.
 |}]
 
 (* A few positive examples to show that it's the composition of modalities we
@@ -1055,14 +1075,52 @@ Error: This expression has type "('a iarray, 'a) idx_imm"
 (*******************)
 (* Private records *)
 
-type t = private { i : int }
-let bad () = (.i)
+type t = private { i : int; mutable j : int }
+let ok () = (.i)
 [%%expect{|
-type t = private { i : int; }
-Line 2, characters 15-16:
-2 | let bad () = (.i)
+type t = private { i : int; mutable j : int; }
+val ok : unit -> (t, int) idx_imm = <fun>
+|}]
+
+let bad () = (.j)
+[%%expect{|
+Line 1, characters 15-16:
+1 | let bad () = (.j)
                    ^
-Error: Block indices do not support private records.
+Error: Block indices do not support private types in mutable positions.
+|}]
+
+(* Private unboxed records further down the path *)
+module Private_u : sig
+  type t = private #{ a : int; b : int }
+end = struct
+  type t = #{ a : int; b : int }
+end
+type has_private_u = { mutable pu : Private_u.t }
+let bad () = (.pu.#Private_u.a)
+[%%expect{|
+module Private_u : sig type t = private #{ a : int; b : int; } end
+type has_private_u = { mutable pu : Private_u.t; }
+Line 7, characters 19-30:
+7 | let bad () = (.pu.#Private_u.a)
+                       ^^^^^^^^^^^
+Error: Block indices do not support private types in mutable positions.
+|}]
+
+type has_private_u_imm = { ipu : Private_u.t }
+let ok () = (.ipu.#Private_u.a)
+[%%expect{|
+type has_private_u_imm = { ipu : Private_u.t; }
+val ok : unit -> (has_private_u_imm, int) idx_imm = <fun>
+|}]
+
+let bad () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
+[%%expect{|
+Line 2, characters 49-60:
+2 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
+                                                     ^^^^^^^^^^^
+Error: Block indices do not support private types in mutable positions.
 |}]
 
 (****************)
