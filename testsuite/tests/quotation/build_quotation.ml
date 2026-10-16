@@ -380,6 +380,11 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 ]>
 |}];;
 
+<[ fun (deref_ a, _) -> a ]>;;
+[%%expect {|
+- : <[$('a) * $('b) -> $('a) addr_imm]> expr = <[fun (deref_ (a), _) -> a]>
+|}];;
+
 <[ fun f x d -> match f x with | res -> res | exception e -> d ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b) -> $('b)]> expr =
