@@ -345,19 +345,23 @@ let mutable_implied_modalities ~include_comonadic mut =
 
 let block_reference_expected_modalities mutability =
   (* There are two design constraints on what modalities we allow a block
-     reference (such as a block index) to point to. Because these are coupled,
-     this function checks that they are equal.
+     reference (a block index or the address bound by a dereference pattern)
+     to point to. Because these are coupled, this function checks that they
+     are equal.
       1. The default modalities (id for non-mutable fields, global many aliased
          forkable unyielding for mutable fields) should work.
       2. It should also be safe wrt to type signatures given to block index
-         primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_stable]). *)
+         and address primitives (see [idx_imm.mli], [idx_mut.mli], [addr.mli]
+         and [addr_imm.mli] in [Stdlib_stable]). *)
   let mut = Types.is_mutable mutability in
   let expected1 = mutable_implied_modalities mut ~include_comonadic:true in
   let expected2 =
     if mut
     then
-      (* If this list is updated, the external bindings in the [Idx_imm] and
-         [Idx_mut] modules in [Stdlib_stable] may also have to be updated. *)
+      (* If this list is updated, the external bindings in the [Idx_imm],
+         [Idx_mut], [Addr] and [Addr_imm] modules in [Stdlib_stable] may also
+         have to be updated. *)
+      (* CR address-patterns: This should be related to [address_modalities] *)
       modality_of_atoms
         [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
           Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);

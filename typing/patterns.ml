@@ -181,9 +181,7 @@ module General = struct
   let rec strip_vars (p : pattern) : Half_simple.pattern =
     match p.pat_desc with
     | `Alias (p, _, _, _, _, _, _) -> strip_vars (view p)
-    | `Deref _ ->
-      Misc.fatal_error "Patterns.General.strip_vars: dereference pattern"
-    | `Var _ | `Fun_layout _ -> { p with pat_desc = `Any }
+    | `Var _ | `Fun_layout _ | `Deref _ -> { p with pat_desc = `Any }
     | #Half_simple.view as view -> { p with pat_desc = view }
 end
 

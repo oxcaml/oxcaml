@@ -1976,7 +1976,7 @@ and every_both pss qs q1 q2 =
 (* le_pat p q  means, forall V,  V matches q implies V matches p *)
 let rec le_pat p q =
   match (p.pat_desc, q.pat_desc) with
-  | (Tpat_var _|Tpat_any),_ -> true
+  | (Tpat_var _|Tpat_any|Tpat_deref _),_ -> true
   | Tpat_alias { pattern = p; _ }, _ -> le_pat p q
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
@@ -2036,8 +2036,8 @@ let get_mins le ps =
 let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_alias { pattern = p; _ },_      -> lub p q
 | _,Tpat_alias { pattern = q; _ }      -> lub p q
-| (Tpat_any|Tpat_var _),_ -> q
-| _,(Tpat_any|Tpat_var _) -> p
+| (Tpat_any|Tpat_var _|Tpat_deref _),_ -> q
+| _,(Tpat_any|Tpat_var _|Tpat_deref _) -> p
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
 | _,Tpat_or (q1,q2,_)     -> orlub q1 q2 p (* Thanks god, lub is commutative *)
 | Tpat_constant c1, Tpat_constant c2 when const_compare c1 c2 = 0 -> p
@@ -2560,8 +2560,11 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps
         (simpl head_bound_variables varsets p2 ps k)
-    | `Deref _ ->
-      fatal_error "Parmatch.simplify_head_amb_pat: dereference pattern"
+    (* A dereference pattern binds the address at the head and leaves the
+       value unconstrained *)
+    | `Deref (_, _, _, { pat_desc = Tpat_var { id; _ }; _ }) ->
+      simpl (Ident.Set.add id head_bound_variables) varsets Patterns.omega ps k
+    | `Deref _ -> simpl head_bound_variables varsets Patterns.omega ps k
     | #Patterns.Simple.view as view ->
       add_column (Patterns.Head.deconstruct { p with pat_desc = view })
         { row = ps; varsets = head_bound_variables :: varsets; } k

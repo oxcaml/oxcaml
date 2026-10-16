@@ -262,17 +262,20 @@ type existential_binding =
 
 type mode_mismatch_kind = Parameter | Return
 
-(** Different ways of pointing into a block *)
+(* Different ways of pointing into a block: Either using a block index or
+    using a [deref_] pattern *)
 type block_reference_kind =
   | Block_index
+  | Deref_pattern
 
-(** Why a block reference can't point through a type *)
+(** Why a block index or dereference pattern can't point through a type *)
 type block_reference_bad_type =
   | Flatten_floats_record  (** [[@@flatten_floats]] *)
   | Float_record
   | Float_array_record  (** [[@@represent_as_float_array]] *)
   | Unboxed_record  (** [[@@unboxed]] *)
   | Inlined_record
+  | Atomic_field
   | Private_declaration
 
 type error =
@@ -348,7 +351,8 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
-  | Deref_pattern_not_yet_supported
+  | Deref_pattern_bad_position
+  | Deref_pattern_bad_argument
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
