@@ -969,8 +969,7 @@ let unique_use_then_addr (a : bytes addr_imm @ unique) =
 Line 3, characters 22-23:
 3 |   use_unique_addr_imm a
                           ^
-Error: This value is used here,
-       but part of it has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 42-43:
 2 |   (match a with addr_imm_ x -> use_unique x);
                                               ^
@@ -981,11 +980,10 @@ let unique_addr_then_use (a : bytes addr_imm @ unique) =
   use_unique_addr_imm a;
   (match a with addr_imm_ x -> use_unique x)
 [%%expect{|
-Line 3, characters 16-27:
+Line 3, characters 42-43:
 3 |   (match a with addr_imm_ x -> use_unique x)
-                    ^^^^^^^^^^^
-Error: This value is read from here,
-       but it has already been used as unique at:
+                                              ^
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 22-23:
 2 |   use_unique_addr_imm a;
                           ^
@@ -999,8 +997,7 @@ let unique_use_and_as_alias (a : bytes addr_imm @ unique) =
 Line 3, characters 59-61:
 3 |   | addr_imm_ x as a' -> use_unique x; use_unique_addr_imm a'
                                                                ^^
-Error: This value is used here,
-       but part of it has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 36-37:
 3 |   | addr_imm_ x as a' -> use_unique x; use_unique_addr_imm a'
                                         ^
@@ -1082,7 +1079,7 @@ Line 3, characters 31-32:
 3 |   | addr_ 1 -> use_unique_addr a
                                    ^
 Error: This value is used here as unique,
-       but part of it has already been used in a constant pattern at:
+       but it has already been used in a constant pattern at:
 Line 3, characters 10-11:
 3 |   | addr_ 1 -> use_unique_addr a
               ^
@@ -1098,7 +1095,7 @@ Line 3, characters 39-40:
 3 |   | addr_imm_ 1 -> use_unique_addr_imm a
                                            ^
 Error: This value is used here as unique,
-       but part of it has already been used in a constant pattern at:
+       but it has already been used in a constant pattern at:
 Line 3, characters 14-15:
 3 |   | addr_imm_ 1 -> use_unique_addr_imm a
                   ^
@@ -1173,7 +1170,7 @@ Line 3, characters 20-21:
 3 |   use_once_addr_imm a
                         ^
 Error: This value is used here,
-       but part of it is defined as once and has already been used at:
+       but it is defined as once and has already been used at:
 Line 2, characters 31-32:
 2 |   (match a with addr_imm_ f -> f ());
                                    ^
