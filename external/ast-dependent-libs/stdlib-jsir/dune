@@ -23,7 +23,7 @@
     "stdlib-modules: ; @echo stdlib_modules: $(STDLIB_MODULE_BASENAMES)"
     stdlib-modules))))
 
-(;rule
+(rule
  (target sources.dune)
  (action
   (with-stdout-to
