@@ -277,19 +277,17 @@ module Jsoo_phase = struct
     | Link -> "-jsoo-opt-link"
 end
 
-let all_jsoo_opts = ref ([] : string list)          (* -jsoo-opt *)
-let all_jsoo_opts_compile = ref ([] : string list)  (* -jsoo-opt-compile *)
-let all_jsoo_opts_archive = ref ([] : string list)  (* -jsoo-opt-archive *)
-let all_jsoo_opts_runtime = ref ([] : string list)  (* -jsoo-opt-runtime *)
-let all_jsoo_opts_link = ref ([] : string list)     (* -jsoo-opt-link *)
-
-let jsoo_opts (phase : Jsoo_phase.t) =
-  match phase with
-  | All -> all_jsoo_opts
-  | Compile -> all_jsoo_opts_compile
-  | Archive -> all_jsoo_opts_archive
-  | Runtime -> all_jsoo_opts_runtime
-  | Link -> all_jsoo_opts_link
+let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
+  let all = ref ([] : string list) in
+  let compile = ref [] and archive = ref [] in
+  let runtime = ref [] and link = ref [] in
+  fun (phase : Jsoo_phase.t) ->
+    match phase with
+    | All -> all
+    | Compile -> compile
+    | Archive -> archive
+    | Runtime -> runtime
+    | Link -> link
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)

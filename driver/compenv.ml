@@ -48,16 +48,20 @@ let extract_output = function
   | None ->
       fatal "Please specify the name of the output file, using option -o"
 
-let is_js_target = Clflags.target_is_jsir
+let warn_once =
+  let seen = Hashtbl.create 7 in
+  fun message ->
+    if not (Hashtbl.mem seen message) then begin
+      Hashtbl.add seen message ();
+      if !Clflags.verbose then prerr_endline ("Warning: " ^ message)
+    end
 
-let fatal_unsupported_for_js what =
-  fatal (Printf.sprintf "%s is not supported when targeting js_of_ocaml" what)
+let warn_jsir_ignore what =
+  warn_once ("ignoring " ^ what ^ " when targeting js_of_ocaml")
 
 let default_output = function
   | Some s -> s
-  | None ->
-      if is_js_target () then Config.default_executable_name ^ ".js"
-      else Config.default_executable_name
+  | None -> Config.default_executable_name
 
 let first_include_dirs = ref []
 let last_include_dirs = ref []
@@ -762,13 +766,15 @@ let readenv ppf position =
   (match position with
    | Before_args -> ()
    | Before_compile _ | Before_link ->
-     if is_js_target () && !all_ccopts <> [] then
-       fatal_unsupported_for_js "-ccopt";
-     if not (is_js_target ()) then
+     if Clflags.target_is_jsir () && !all_ccopts <> [] then begin
+       warn_jsir_ignore "-ccopt";
+       all_ccopts := []
+     end;
+     if not (Clflags.target_is_jsir ()) then
        List.iter (fun phase ->
            if !(Clflags.jsoo_opts phase) <> [] then
-             fatal (Clflags.Jsoo_phase.flag phase
-                    ^ " is only supported when targeting js_of_ocaml"))
+             warn_once ("ignoring " ^ Clflags.Jsoo_phase.flag phase
+                        ^ ", which is only used when targeting js_of_ocaml"))
          Clflags.Jsoo_phase.all);
   all_ppx := !last_ppx @ !first_ppx
 
@@ -815,19 +821,23 @@ let process_action
       if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
   | ProcessCFile name ->
       readenv ppf (Before_compile name);
-      if is_js_target () then
-        fatal_unsupported_for_js ("C source file " ^ name);
-      Location.input_name := name;
-      let obj_name = match !output_name with
-        | None -> c_object_of_filename name
-        | Some n -> n
-      in
-      if Ccomp.compile_file ?output:!output_name name <> 0
-      then raise (Exit_with_status 2);
-      ccobjs := obj_name :: !ccobjs
+      if Clflags.target_is_jsir () then
+        warn_jsir_ignore ("C source file " ^ name)
+      else begin
+        Location.input_name := name;
+        let obj_name = match !output_name with
+          | None -> c_object_of_filename name
+          | Some n -> n
+        in
+        if Ccomp.compile_file ?output:!output_name name <> 0
+        then raise (Exit_with_status 2);
+        ccobjs := obj_name :: !ccobjs
+      end
   | ProcessObjects names ->
-      if is_js_target () then fatal_unsupported_for_js "-cclib";
-      ccobjs := names @ !ccobjs
+      if Clflags.target_is_jsir () then
+        List.iter (fun name -> warn_jsir_ignore ("-cclib " ^ name)) names
+      else
+        ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
@@ -839,18 +849,19 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
-      else if is_js_target () && Filename.check_suffix name ".js" then begin
-        (* JavaScript stubs play the role of C objects: they are stored in
-           [.cmjxa] files and passed to the js_of_ocaml linker. *)
+      else if Clflags.target_is_jsir () && Filename.check_suffix name ".js"
+      then begin
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
-        if is_js_target () then
-          fatal_unsupported_for_js ("object file " ^ name);
-        has_linker_inputs := true;
-        ccobjs := name :: !ccobjs
+        if Clflags.target_is_jsir () then
+          warn_jsir_ignore ("object file " ^ name)
+        else begin
+          has_linker_inputs := true;
+          ccobjs := name :: !ccobjs
+        end
       end
       else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then
