@@ -1,7 +1,11 @@
 (* TEST
  flags = "-g -inline 0";
  ocamlrunparam += ",b=1";
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 let finaliser _ = try raise Exit with _ -> ()

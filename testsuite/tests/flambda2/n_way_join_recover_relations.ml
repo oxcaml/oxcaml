@@ -1,7 +1,11 @@
 (* TEST
    ocamlopt_flags += " -flambda2-join-points -flambda2-join-algorithm=n-way";
    flambda2;
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
  *)
 
 type t =

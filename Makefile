@@ -125,6 +125,8 @@ distclean: clean
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
 
+with_jsir ?= $(if $(JSOO_SEDLEX_SRC),true,false)
+
 include Makefile.common-ox
 
 .PHONY: ci
@@ -407,6 +409,14 @@ jsoo-test: ast-dependent-libs-compiler \
 	PROJECT_ROOT="$(CURDIR)/_build/jsoo-test/default/js_of_ocaml" \
 	WASM_OF_OCAML=true \
 	  $(ast_dependent_libs_dune) $(ws_jsoo_test) @jsoo-test
+
+ifeq ($(with_jsir),true)
+install_for_test: jsoo-install-shipped
+endif
+
+.PHONY: test-without-jsir
+test-without-jsir:
+	$(MAKE) test with_jsir=false
 
 .PHONY: fmt
 fmt: $(dune_config_targets)

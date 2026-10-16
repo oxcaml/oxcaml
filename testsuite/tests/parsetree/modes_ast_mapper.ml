@@ -1,5 +1,10 @@
 (* TEST
  include ocamlcommon;
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 let locs_to_string (locs : 'a Location.loc list) (f : 'a -> string) : string =

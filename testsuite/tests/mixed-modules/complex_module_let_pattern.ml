@@ -1,6 +1,10 @@
 (* TEST
  flambda2;
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 (* This test doesn't actually have much to do with mixed modules. It exercises

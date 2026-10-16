@@ -88,6 +88,30 @@ let native =
       (if Ocamltest_config.native_compiler then opt_actions else [skip])
   }
 
+let jsir =
+  let actions =
+    if not Ocamltest_config.native_compiler then
+      [Actions_helpers.skip_with_reason "native compiler disabled"]
+    else if not Ocaml_files.jsir_available then
+      [Actions_helpers.skip_with_reason Ocaml_actions.no_jsir_reason]
+    else
+      [
+        setup_ocamlopt_jsir_build_env;
+        ocamlopt_jsir;
+        check_ocamlopt_jsir_output;
+        run_js;
+        check_program_output;
+      ]
+  in
+  {
+    test_name = "jsir";
+    test_run_by_default = true;
+    test_description =
+      "Build JavaScript program with ocamlopt -target js_of_ocaml, run it \
+       with node and check its output";
+    test_actions = actions
+  }
+
 let toplevel = {
   test_name = "toplevel";
   test_run_by_default = false;
@@ -213,6 +237,7 @@ let init () =
   [
     bytecode;
     native;
+    jsir;
     toplevel;
     nattoplevel;
     expect;

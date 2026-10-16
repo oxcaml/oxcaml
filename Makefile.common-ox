@@ -344,6 +344,15 @@ install_for_test: install
 	# ocamltest itself
 	mkdir _runtest/ocamltest
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
+ifeq ($(with_jsir),true)
+	cd _runtest/testsuite/lib && \
+	  OXCAML_JS_OF_OCAML=$$(pwd)/../../_install/bin/js_of_ocaml \
+	  ../../ocamlopt.opt -target js_of_ocaml -nostdlib -I ../../stdlib \
+	    -c lib.ml && \
+	  OXCAML_JS_OF_OCAML=$$(pwd)/../../_install/bin/js_of_ocaml \
+	  ../../ocamlopt.opt -target js_of_ocaml -nostdlib -I ../../stdlib \
+	    -linkall -a -o testing.cmjxa testing.ml
+endif
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \
 	  for path in `cd testsuite; ls -1 -d tests/*`; do \

@@ -1,5 +1,10 @@
 (* TEST
  modules = "extent_stubs.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Basic single-domain tests of heap extents: creation, liveness,

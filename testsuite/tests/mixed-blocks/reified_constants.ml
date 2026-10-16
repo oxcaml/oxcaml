@@ -1,6 +1,10 @@
 (* TEST
    flambda2;
-   native;
+   {
+     native;
+   }{
+     jsir;
+   }
 *)
 
 (* Classic mode doesn't perform any lifting after inlining *)
