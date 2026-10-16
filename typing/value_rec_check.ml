@@ -767,7 +767,9 @@ let rec expression : Typedtree.expression -> term_judg =
       in
       (* All unboxed accesses are nonrecursive, but we include the below match
          in case we add new unboxed access types *)
-      let _unboxed_access = function Uaccess_unboxed_field _ -> empty in
+      let _unboxed_access : index unboxed_access -> _ = function
+        | Uaccess_unboxed_field _ -> empty
+      in
       block_access ba
     | Texp_list_comprehension { comp_body; comp_clauses } ->
       join ((expression comp_body << Guard) ::
@@ -1552,6 +1554,7 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_record_unboxed_product _ -> true
     | Tpat_array _ -> true
     | Tpat_addr _ -> true
+    | Tpat_deref _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)
     | Tpat_exception _ -> false

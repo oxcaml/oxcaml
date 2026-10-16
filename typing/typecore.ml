@@ -96,7 +96,7 @@ let record_form_to_wrong_kind_sort
   | Unboxed_product -> Record_unboxed_product
 
 type type_block_access_result =
-  { ba : block_access; base_ty: type_expr; el_ty: type_expr }
+  { ba : index block_access; base_ty: type_expr; el_ty: type_expr }
 
 type contains_gadt =
   | Contains_gadt
@@ -1711,7 +1711,11 @@ let check_atomic_loc ~loc ~env label lid =
   | Error _ -> Error.log_and_raise loc env (Modalities_on_atomic_field lid)
 
 (* Checks that a block path of kind [kind] is valid to create *)
-let check_block_path ~loc ~env kind ~mutability ba uas =
+let check_block_path
+  : type k. loc:Location.t -> env:Env.t -> block_path_kind ->
+      mutability:Types.mutability -> k block_access -> k unboxed_access list ->
+      unit
+  = fun ~loc ~env kind ~mutability ba uas ->
   let error (lid : Longident.t loc) err =
     Error.log_and_raise lid.loc env err
   in
@@ -1726,7 +1730,7 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
     if Types.is_mutable mutability && is_poly_Tpoly label.lbl_arg then
       error lid (Block_path_polymorphic_field (kind, lid.txt))
   in
-  let check_boxed_access = function
+  let check_boxed_access : k block_access -> unit = function
     | Baccess_field (lid, label, _) ->
       let bad_type reason =
         error lid (Block_path_bad_type (kind, reason))
@@ -1753,17 +1757,26 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
       | Private | Public -> ()
       end;
       check_label_access lid label
-    | Baccess_block _ -> ()
+    | Baccess_block _ | Baccess_tuple_element _ | Baccess_address _ -> ()
   in
-  let check_unboxed_access (Uaccess_unboxed_field (lid, label, _)) =
-    check_label_access lid label
+  let check_unboxed_access : k unboxed_access -> unit = function
+    | Uaccess_unboxed_field (lid, label, _) -> check_label_access lid label
+    | Uaccess_unboxed_record_field (lid, label, _) ->
+      check_label_access lid label
+    | Uaccess_unboxed_tuple_element _ -> ()
   in
-  let boxed_modality = function
+  let boxed_modality : k block_access -> Modality.Const.t = function
     | Baccess_field (_, label, _) -> label.lbl_modalities
-    | Baccess_block _ -> expected_modality
+    (* These bases have no modalities of their own to check: tuple elements
+       carry none, and an index or address already points to a position whose
+       modalities were checked when it was built. *)
+    | Baccess_block _ | Baccess_tuple_element _ | Baccess_address _ ->
+      expected_modality
   in
-  let unboxed_modality (Uaccess_unboxed_field (_, label, _)) =
-    label.lbl_modalities
+  let unboxed_modality : k unboxed_access -> Modality.Const.t = function
+    | Uaccess_unboxed_field (_, label, _) -> label.lbl_modalities
+    | Uaccess_unboxed_record_field (_, label, _) -> label.lbl_modalities
+    | Uaccess_unboxed_tuple_element _ -> Modality.Const.id
   in
   check_boxed_access ba;
   List.iter check_unboxed_access uas;
@@ -2377,7 +2390,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_addr _ | Tpat_deref _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -5033,6 +5046,10 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
+  | Tpat_deref _ ->
+      Misc.fatal_error
+        "Typecore.check_counter_example_pat: dereference patterns are not \
+         supported yet"
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -5780,7 +5797,9 @@ let rec is_nonexpansive exp =
       in
       (* All unboxed accesses are nonexpansive, but we include the below match
          in case we add new unboxed access types *)
-      let _unboxed_access = function Uaccess_unboxed_field _ -> true in
+      let _unboxed_access : index unboxed_access -> _ = function
+        | Uaccess_unboxed_field _ -> true
+      in
       block_access ba
   | Texp_ifthenelse(_cond, ifso, ifnot) ->
       is_nonexpansive ifso && is_nonexpansive_opt ifnot
@@ -6734,7 +6753,7 @@ let generalize_structure_type_block_access_result
     generalize_structure_exp idx
 
 let generalize_structure_type_unboxed_access_result
-      (el_ty, Uaccess_unboxed_field _) =
+      (el_ty, (Uaccess_unboxed_field _ : index unboxed_access)) =
   generalize_structure el_ty
 
 let unique_use ~loc ~env mode_l mode_r  =

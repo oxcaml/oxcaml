@@ -571,6 +571,11 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_addr %a\n" fmt_mutable_mode_flag mut;
       line i ppf "%a\n" fmt_sort arg_sort;
       pattern i ppf p;
+  | Tpat_deref (mut, ba, uas, p) ->
+      line i ppf "Tpat_deref %a\n" fmt_mutable_mode_flag mut;
+      block_access i ppf ba;
+      List.iter (unboxed_access i ppf) uas;
+      pattern i ppf p;
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
       pattern i ppf p;
@@ -1460,17 +1465,26 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   line i ppf "%a\n" fmt_longident li;
   pattern (i+1) ppf p;
 
-and block_access i ppf = function
+and block_access : type k. _ -> _ -> k block_access -> _ = fun i ppf -> function
   | Baccess_field (li, _, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
         fmt_access_flag mut;
       expression i ppf index
+  | Baccess_tuple_element n ->
+      line i ppf "Baccess_tuple_element %d\n" n
+  | Baccess_address sort ->
+      line i ppf "Baccess_address %a\n" fmt_sort sort
 
-and unboxed_access i ppf = function
+and unboxed_access : type k. _ -> _ -> k unboxed_access -> _ =
+  fun i ppf -> function
   | Uaccess_unboxed_field (li, _, _) ->
       line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
+  | Uaccess_unboxed_tuple_element n ->
+      line i ppf "Uaccess_unboxed_tuple_element %d\n" n
+  | Uaccess_unboxed_record_field (li, _, _) ->
+      line i ppf "Uaccess_unboxed_record_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =
   line i ppf "comprehension\n";
