@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension omnidirectionality";
  expect;
 *)
 
@@ -15,16 +16,7 @@ val unify : 'a -> 'a -> unit = <fun>
 
 let f (local_ x) = (x, ignore (x + 1))
 [%%expect {|
-Line 1, characters 20-21:
-1 | let f (local_ x) = (x, ignore (x + 1))
-                        ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 1, characters 19-38
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+val f : int @ local -> int * unit = <fun>
 |}]
 
 let f (local_ x) = (x, ignore (x ^ ""))
@@ -43,27 +35,18 @@ Error: This value is "local" to the parent region
 
 let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
 [%%expect{|
-Line 1, characters 28-29:
-1 | let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
-                                ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option -> int option * unit = <fun>
 |}]
 
 let f (x @ nonportable) =
   ((x : _ @ portable), unify3 x (Some None) (Some (Some 1)))
 [%%expect{|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), unify3 x (Some None) (Some (Some 1)))
-        ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option option -> int option option * unit = <fun>
 |}]
 
 let f (x @ nonportable) y = ((x : _ @ portable), unify3 x y 1)
 [%%expect{|
-Line 1, characters 30-31:
-1 | let f (x @ nonportable) y = ((x : _ @ portable), unify3 x y 1)
-                                  ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int -> int -> int * unit = <fun>
 |}]
 
 (* CR-soon omni: this test should change once defaulting is lazier *)
