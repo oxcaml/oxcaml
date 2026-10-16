@@ -52,7 +52,7 @@ module Non_recursive_let_good = struct
     match l with
     | N v -> N (f v)
     | C (a, b) ->
-        let[@tail_mod_cons] map' l = map f l in
+        let[@tail_mod_cons] (map' @ global) l = map f l in
         C (map' a, (map' [@tailcall]) b)
 end
 [%%expect {|
