@@ -1181,6 +1181,7 @@ module Ast = struct
     | PatOr of pattern * pattern
     | PatConstraint of pattern * core_type * modes
     | PatAddr of pattern * bool
+    | PatDeref of pattern
     | PatLazy of pattern
     | PatAnyModule
     | PatUnpack of Var.Module.t
@@ -1524,6 +1525,7 @@ module Ast = struct
       pp fmt "%s@ (%a)"
         (if mutable_ then "addr_" else "addr_imm_")
         (print_pat env) pat
+    | PatDeref pat -> pp fmt "deref_@ (%a)" (print_pat env) pat
     | PatLazy pat -> pp fmt "lazy@ (%a)" (print_pat env) pat
     | PatAnyModule -> pp fmt "module _"
     | PatUnpack v -> pp fmt "(module@ %a)" (Var.Module.print env) v
@@ -2269,6 +2271,10 @@ module Pat = struct
   let addr t mutable_ =
     let+ p = t in
     Ast.PatAddr (p, mutable_)
+
+  let deref t =
+    let+ p = t in
+    Ast.PatDeref p
 
   let lazy_ t =
     let+ p = t in
