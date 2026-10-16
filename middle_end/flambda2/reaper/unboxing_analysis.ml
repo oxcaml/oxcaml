@@ -999,15 +999,11 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
           in
           let original_arity = Code_metadata.params_arity code_metadata in
           let params_arity =
-            Flambda_arity.create
-              (List.map
-                 (fun kinds ->
-                   Flambda_arity.Component_for_creation.(
-                     Unboxed_product
-                       (List.map (fun kind -> Singleton kind) kinds)))
-                 (Flambda_arity.group_by_parameter original_arity
-                    (rewrite_kinds code_dep.params
-                       (Flambda_arity.unarize original_arity))))
+            (* As for the result arity below, the structure of the original
+               arity is preserved. *)
+            Flambda_arity.with_unarized_kinds original_arity
+              (rewrite_kinds code_dep.params
+                 (Flambda_arity.unarize original_arity))
           in
           let result_arity =
             let original_result_arity =

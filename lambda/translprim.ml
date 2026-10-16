@@ -228,13 +228,15 @@ let extern_repr_of_native_repr:
   | Unextended_bits8, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits8
   | Unextended_bits16, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits16
   | Unpacked_product sort, _ ->
-    (* The product sort is unarized into separate C arguments by
-       [unarize_extern_repr] in [closure_conversion.ml]. *)
-    Same_as_ocaml_repr sort
+    (* Kept distinct from [Same_as_ocaml_repr]: the components of the product
+       are unarized into separate C arguments (see [unarize_extern_repr] in
+       [closure_conversion.ml]), rather than following the calling convention
+       of the corresponding C struct as [Same_as_ocaml_repr] products do. *)
+    Unpacked_product sort
 
 let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
-  | Same_as_ocaml_repr s -> s
+  | Same_as_ocaml_repr s | Unpacked_product s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
