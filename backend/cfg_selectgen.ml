@@ -504,9 +504,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ( SU.basic_op (Intop_atomic { op; size; addr }),
           [compare_with; set_to; eloc] ))
     | Cprobe { name; handler_code_sym; enabled_at_init } ->
+      let known_arguments = Cmm.Known_arguments.of_arguments ~parameters args in
       ( Terminator
           (Prim
-             { op = Probe { name; handler_code_sym; enabled_at_init };
+             { op =
+                 Probe
+                   { name; handler_code_sym; enabled_at_init; known_arguments };
                label_after
              }),
         args )

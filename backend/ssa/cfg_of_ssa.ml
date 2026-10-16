@@ -551,9 +551,15 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
            the arguments to fixed registers. *)
         assert (Array.length virt_res = 0);
         Block.Tbl.replace env.call_result_locs continuation [||];
+        (* CR-soon wsturgeon for wsturgeon: propagate known arguments in SSA *)
+        let known_arguments =
+          Cmm.Known_arguments.none (Array.length virt_args)
+        in
         make_instr
           (Cfg.Prim
-             { op = Probe { name; handler_code_sym; enabled_at_init };
+             { op =
+                 Probe
+                   { name; handler_code_sym; enabled_at_init; known_arguments };
                label_after = label_of env continuation
              })
           virt_args [||] dbg)

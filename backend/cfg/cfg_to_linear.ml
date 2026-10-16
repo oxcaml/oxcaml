@@ -240,7 +240,7 @@ let linearize_terminator (func : string)
               stack_ofs;
               stack_align
             }
-        | Probe { name; handler_code_sym; enabled_at_init } ->
+        | Probe { name; handler_code_sym; enabled_at_init; _ } ->
           Lprobe { name; handler_code_sym; enabled_at_init }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None

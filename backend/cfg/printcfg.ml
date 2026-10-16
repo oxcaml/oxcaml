@@ -169,7 +169,7 @@ let terminator_body_with_args ?(print_reg = Printreg.reg) ?(args = [||])
             stack_ofs;
             stack_align
           }
-      | Probe { name; handler_code_sym; enabled_at_init } ->
+      | Probe { name; handler_code_sym; enabled_at_init; _ } ->
         Linear.Lprobe { name; handler_code_sym; enabled_at_init });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
   | Invalid { message; label_after; _ } ->

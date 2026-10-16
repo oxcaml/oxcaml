@@ -858,16 +858,19 @@ let equal_prim_call_operation left right =
   | ( Probe
         { name = left_name;
           handler_code_sym = left_handler;
-          enabled_at_init = left_enabled
+          enabled_at_init = left_enabled;
+          known_arguments = left_args
         },
       Probe
         { name = right_name;
           handler_code_sym = right_handler;
-          enabled_at_init = right_enabled
+          enabled_at_init = right_enabled;
+          known_arguments = right_args
         } ) ->
     String.equal left_name right_name
     && String.equal left_handler right_handler
     && Bool.equal left_enabled right_enabled
+    && Cmm.Known_arguments.equal left_args right_args
   | (External _ | Probe _), _ -> false
 
 let equal_with_label_after equal_op

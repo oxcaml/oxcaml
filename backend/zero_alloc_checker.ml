@@ -2932,13 +2932,22 @@ end = struct
         | Prim { op = External { alloc = true; func_symbol = func; _ }; _ } ->
           let w = create_witnesses t (Extcall { callee = func }) dbg in
           transform_top t ~next ~exn w ("external call to " ^ func) dbg
-        | Prim { op = Probe { name; handler_code_sym; enabled_at_init = _ }; _ }
-          ->
+        | Prim
+            { op =
+                Probe
+                  { name;
+                    handler_code_sym;
+                    enabled_at_init = _;
+                    known_arguments
+                  };
+              _
+            } ->
           let desc =
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
           let k = Witness.Probe { name; handler_code_sym } in
-          transform_call t ~next ~exn handler_code_sym k ~desc dbg ~known_arguments
+          transform_call t ~next ~exn handler_code_sym k ~desc dbg
+            ~known_arguments
         | Call { op = { desc = Indirect None; _ }; _ } ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg

@@ -394,7 +394,7 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     call_returning_to (Indirect candidates) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res
-  | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
+  | Prim { op = Probe { name; handler_code_sym; enabled_at_init; _ }; _ } ->
     call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
   | Call_no_return ext_call ->
     finish_block env c ~dbg
