@@ -202,6 +202,29 @@ Line 1, characters 19-29:
 Error: Dereference patterns must bind a variable, as in "deref_ x".
 |}]
 
+(***************)
+(* Compilation *)
+
+(* Running dereference patterns *)
+let run (deref_ _, _) = ()
+let _ = run (1, 2)
+[%%expect{|
+val run : 'a * 'b -> unit = <fun>
+- : unit = ()
+|}]
+
+(* Default matrices may contain dereference patterns, e.g. from alternatives of
+   or-patterns. Values that don't match those have to be compiled correctly. *)
+let run_default = function
+  | (1, _) | (_, (deref_ _, 1)) -> 1
+  | (2, (_, 2)) -> 2
+  | _ -> 3
+let _ = run_default (2, (0, 2)), run_default (3, (0, 0))
+[%%expect{|
+val run_default : int * ('a * int) -> int = <fun>
+- : int * int = (2, 3)
+|}]
+
 (*************************************************************)
 (* Restrictions on the path to the position, as for indices *)
 
