@@ -1,0 +1,233 @@
+       0  BRANCH 205
+       2  ACC0
+       3  BNEQ 0, 9
+       6  CONST1
+       7  RETURN 1
+       9  ACC0
+      10  OFFSETINT -1
+      12  PUSHOFFSETCLOSURE3
+      13  APPTERM1 2
+      15  ACC0
+      16  BNEQ 0, 22
+      19  CONST0
+      20  RETURN 1
+      22  ACC0
+      23  OFFSETINT -1
+      25  PUSHOFFSETCLOSUREM3
+      26  APPTERM1 2
+      28  ATOM0 (immutable)
+      29  RETURN 1
+      31  RESTART
+      32  GRAB 1
+      34  ACC1
+      35  PUSHACC1
+      36  APPTERM1 3
+      38  ACC0
+      39  OFFSETINT 1
+      41  RETURN 1
+      43  ACC0
+      44  OFFSETINT 1
+      46  RETURN 1
+      48  ACC0
+      49  VECTLENGTH (addr)
+      50  RETURN 1
+      52  ACC0
+      53  VECTLENGTH (addr)
+      54  RETURN 1
+      56  ACC0
+      57  VECTLENGTH (int)
+      58  RETURN 1
+      60  RESTART
+      61  GRAB 1
+      63  ACC1
+      64  PUSHACC1
+      65  MAKEFLOATBLOCK 2 (immutable)
+      67  RETURN 2
+      69  RESTART
+      70  GRAB 1
+      72  ACC1
+      73  PUSHACC1
+      74  NEQ (int equality test)
+      75  RETURN 2
+      77  RESTART
+      78  GRAB 1
+      80  ACC1
+      81  PUSHACC1
+      82  EQ (int equality test)
+      83  RETURN 2
+      85  RESTART
+      86  GRAB 1
+      88  ACC1
+      89  PUSHACC1
+      90  NEQ (int equality test)
+      91  RETURN 2
+      93  ACC0
+      94  GETFIELD0
+      95  PUSHACC0
+      96  GETFIELD1
+      97  PUSHACC1
+      98  GETFIELD0
+      99  MAKEBLOCK2 0 (immutable)
+     101  POP 1
+     103  GETFIELD1
+     104  RETURN 1
+     106  ACC0
+     107  GETFIELD0
+     108  PUSHACC0
+     109  GETFIELD1
+     110  PUSHACC1
+     111  GETFIELD0
+     112  MAKEBLOCK2 0 (immutable)
+     114  POP 1
+     116  GETFIELD0 (immediate)
+     117  RETURN 1
+     119  ACC0
+     120  GETFIELD0 (immediate)
+     121  PUSHACC0
+     122  PUSHACC1
+     123  MAKEBLOCK2 0 (immutable)
+     125  RETURN 2
+     127  ACC0
+     128  GETFIELD0
+     129  RETURN 1
+     131  ACC0
+     132  GETFIELD0 (immediate)
+     133  RETURN 1
+     135  RESTART
+     136  GRAB 1
+     138  ACC1
+     139  PUSHACC1
+     140  EQ
+     141  RETURN 2
+     143  RESTART
+     144  GRAB 1
+     146  ACC1
+     147  PUSHACC1
+     148  EQ (int equality test)
+     149  RETURN 2
+     151  ACC0
+     152  GETFIELD0
+     153  RETURN 1
+     155  ACC0
+     156  GETFIELD1
+     157  PUSHACC1
+     158  GETFIELD0 (immediate)
+     159  MAKEBLOCK2 0 (immutable)
+     161  RETURN 1
+     163  ACC0
+     164  GETFIELD1
+     165  PUSHACC1
+     166  GETFIELD0 (immediate)
+     167  MAKEBLOCK2 0 (immutable)
+     169  RETURN 1
+     171  RESTART
+     172  GRAB 1
+     174  ACC1
+     175  PUSHACC1
+     176  C_CALL2 caml_array_get_addr
+     178  RETURN 2
+     180  RESTART
+     181  GRAB 1
+     183  ACC1
+     184  PUSHACC1
+     185  GETVECTITEM (immediate)
+     186  RETURN 2
+     188  RESTART
+     189  GRAB 1
+     191  ACC1
+     192  PUSHACC1
+     193  C_CALL2 caml_array_get_addr (immediate)
+     195  RETURN 2
+     197  ACC0
+     198  GETFIELD1
+     199  RETURN 1
+     201  ACC0
+     202  GETFIELD0 (immediate)
+     203  RETURN 1
+     205  CONSTINT 61
+     207  C_CALL1 caml_ensure_stack_capacity
+     209  CLOSURE 0, 201 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> value<int>)
+     212  PUSH
+     213  CLOSURE 0, 197 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> *)
+     216  PUSH
+     217  CLOSURE 0, 189 (value<intarray> -> value<int> -> value<int>)
+     220  PUSH
+     221  CLOSURE 0, 181 (value<intarray> -> value<int> -> value<int>)
+     224  PUSH
+     225  CLOSURE 0, 172 (value<addrarray> -> value<int> -> *)
+     228  PUSH
+     229  CLOSURE 0, 163 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> value<(consts ()) (non_consts ([0: value<int>, *]))>)
+     232  PUSH
+     233  CLOSURE 0, 155 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> value<(consts ()) (non_consts ([0: value<int>, *]))>)
+     236  PUSH
+     237  CLOSURE 0, 151 (value<(consts ()) (non_consts ([0: *, value<int>]))> -> *)
+     240  PUSH
+     241  CLOSURE 0, 144 (value<int> -> value<int> -> value<int>)
+     244  PUSH
+     245  CLOSURE 0, 136 (* -> * -> value<int>)
+     248  PUSH
+     249  CLOSURE 0, 131 (value<(consts ()) (non_consts ([0: value<int>, float64]))> -> value<int>)
+     252  PUSH
+     253  CLOSURE 0, 127 (value<(consts ()) (non_consts ([0: *, float64]))> -> *)
+     256  PUSH
+     257  CLOSURE 0, 119 (value<(consts ()) (non_consts ([0: *, float64]))> -> value<(consts ()) (non_consts ([0: value<int>, value<int>]))>)
+     260  PUSH
+     261  CLOSURE 0, 106 (value<(consts ()) (non_consts ([0: product value<int>, *, *]))> -> value<int>)
+     264  PUSH
+     265  CLOSURE 0, 93 (value<(consts ()) (non_consts ([0: product value<int>, *, *]))> -> *)
+     268  PUSH
+     269  CLOSURE 0, 86 (value<int> -> value<int> -> value<int>)
+     272  PUSH
+     273  CLOSURE 0, 78 (value<int> -> value<int> -> value<int>)
+     276  PUSH
+     277  CLOSURE 0, 70 (value<int> -> value<int> -> value<int>)
+     280  PUSH
+     281  CLOSURE 0, 61 (value<float> -> value<float> -> value<(consts ()) (non_consts ([254: value<float>, value<float>]))>)
+     284  PUSH
+     285  CLOSURE 0, 56 (value<intarray> -> value<int>)
+     288  PUSH
+     289  CLOSURE 0, 52 (value<addrarray> -> value<int>)
+     292  PUSH
+     293  CLOSURE 0, 48 (value<addrarray> -> value<int>)
+     296  PUSH
+     297  CLOSURE 0, 43 (value<int> -> value<int> inline)
+     300  PUSH
+     301  CLOSURE 0, 38 (value<int> -> value<int> inline:never)
+     304  PUSH
+     305  CLOSURE 0, 32 (* -> ? -> ? specialise)
+     308  PUSH
+     309  CLOSURE 0, 28 (* -> * functor)
+     312  PUSH
+     313  CLOSUREREC 0, 2, 15 (value<int> -> value<int>) (value<int> -> value<int>)
+     318  ACC0
+     319  PUSHACC2
+     320  PUSHACC4
+     321  PUSHACC6
+     322  PUSHACC 8
+     324  PUSHACC 10
+     326  PUSHACC 12
+     328  PUSHACC 14
+     330  PUSHACC 16
+     332  PUSHACC 18
+     334  PUSHACC 20
+     336  PUSHACC 22
+     338  PUSHACC 24
+     340  PUSHACC 26
+     342  PUSHACC 28
+     344  PUSHACC 30
+     346  PUSHACC 32
+     348  PUSHACC 34
+     350  PUSHACC 36
+     352  PUSHACC 38
+     354  PUSHACC 40
+     356  PUSHACC 42
+     358  PUSHACC 44
+     360  PUSHACC 46
+     362  PUSHACC 48
+     364  PUSHACC 50
+     366  PUSHACC 52
+     368  PUSHACC 54
+     370  MAKEBLOCK 28, 0 (immutable)
+     373  POP 28
+     375  SETGLOBAL compilation unit Hints
+     377  STOP

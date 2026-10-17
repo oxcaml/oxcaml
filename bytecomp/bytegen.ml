@@ -293,13 +293,14 @@ let comp_primitive stack_info p sz args =
   | Setglobal cu -> Ksetglobal cu
   | Getpredef id -> Kgetpredef id
   | Intcomp cmp -> Kintcomp cmp
-  | Getfield n -> Kgetfield n
-  | Getvectitem -> Kgetvectitem
+  | Physcomp cmp -> Kphyscomp cmp
+  | Getfield (n, ptr) -> Kgetfield (n, ptr)
+  | Getvectitem ptr -> Kgetvectitem ptr
   | Setfield n -> Ksetfield n
   | Setvectitem -> Ksetvectitem
   | Getfloatfield n -> Kgetfloatfield n
   | Setfloatfield n -> Ksetfloatfield n
-  | Ccall name -> Kccall (name, List.length args)
+  | Ccall (name, hint) -> Kccall (name, List.length args, hint)
   | Negint -> Knegint
   | Addint -> Kaddint
   | Subint -> Ksubint
@@ -317,11 +318,11 @@ let comp_primitive stack_info p sz args =
   | Getstringchar -> Kgetstringchar
   | Getbyteschar -> Kgetbyteschar
   | Setbyteschar -> Ksetbyteschar
-  | Vectlength -> Kvectlength
-  | Isint -> Kisint
+  | Vectlength kind -> Kvectlength kind
+  | Isint { variant_only } -> Kisint variant_only
   | Boolnot -> Kboolnot
-  | Makefloatblock -> Kmakefloatblock (List.length args)
-  | Makeblock { tag } -> Kmakeblock (List.length args, tag)
+  | Makefloatblock mut -> Kmakefloatblock (List.length args, mut)
+  | Makeblock { tag; mut } -> Kmakeblock (List.length args, tag, mut)
   | Check_signals -> Kcheck_signals
   | Raise kind -> Kraise kind
   | Make_faux_mixedblock { total_len; tag } ->
@@ -370,15 +371,15 @@ let rec translate_float32s_or_nulls stack_info env cst sz cont =
   | Const_base (Const_float32 f | Const_unboxed_float32 f) ->
     let i = float32_of_string f in
     Kconst (Const_base (Const_int32 (Obj.obj i)))
-    :: Kccall ("caml_float32_of_bits_bytecode", 1)
+    :: Kccall ("caml_float32_of_bits_bytecode", 1, None)
     :: cont
   | Const_null ->
     Kconst (Const_base (Const_int 0))
-    :: Kccall ("caml_int_as_pointer", 1)
+    :: Kccall ("caml_int_as_pointer", 1, None)
     :: cont
   | Const_block (tag, fields) as cst when contains_float32s_or_nulls cst ->
     let fields = List.map (fun field -> Const field) fields in
-    let cont = Kmakeblock (List.length fields, tag) :: cont in
+    let cont = Kmakeblock (List.length fields, tag, Mutable) :: cont in
     comp_args stack_info env fields sz cont
   | Const_mixed_block _ ->
     Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
@@ -437,7 +438,7 @@ and comp_expr stack_info env exp sz cont =
         Kpush_retaddr lbl
         :: comp_args stack_info env args' (sz + 3)
              (getmethod :: Kapply nargs :: cont1)
-  | Function { params; body; free_variables } ->
+  | Function { params; body; free_variables; closure_hint } ->
     (* assume kind = Curried *)
     let lbl = new_label () in
     let fv = Ident.Set.elements free_variables in
@@ -447,7 +448,7 @@ and comp_expr stack_info env exp sz cont =
     comp_args stack_info env
       (List.map (fun n -> Var n) fv)
       sz
-      (Kclosure (lbl, List.length fv) :: cont)
+      (Kclosure (lbl, List.length fv, closure_hint) :: cont)
   | Let { id; arg; body } ->
     comp_expr stack_info env arg sz
       (Kpush
@@ -470,10 +471,15 @@ and comp_expr stack_info env exp sz cont =
         lbl :: comp_fun (pos + 1) rem
     in
     let lbls = comp_fun 0 decl in
+    let lbl_hints =
+      List.map2
+        (fun lbl ({ def } : Blambda.rec_binding) -> lbl, def.closure_hint)
+        lbls decl
+    in
     comp_args stack_info env
       (List.map (fun n -> Var n) fv)
       sz
-      (Kclosurerec (lbls, List.length fv)
+      (Kclosurerec (lbl_hints, List.length fv)
       :: comp_expr stack_info
            (add_vars rec_idents (sz + 1) env)
            body (sz + ndecl) (add_pop ndecl cont))
@@ -515,8 +521,9 @@ and comp_expr stack_info env exp sz cont =
         (Kstrictbranchif lbl :: comp_expr stack_info env exp2 sz cont1))
   | Prim (Raise k, args) ->
     comp_args stack_info env args sz (Kraise k :: discard_dead_code cont)
-  | Prim (Makefloatblock, args) ->
-    comp_args stack_info env args sz (Kmakefloatblock (List.length args) :: cont)
+  | Prim (Makefloatblock mut, args) ->
+    comp_args stack_info env args sz
+      (Kmakefloatblock (List.length args, mut) :: cont)
   | Prim (Make_faux_mixedblock { total_len; tag }, args) ->
     (* There is no notion of a mixed block at runtime in bytecode. Further,
        source-level unboxed types are represented as boxed in bytecode, so
@@ -919,7 +926,7 @@ let comp_block env exp sz cont =
   if used_safe > Config.stack_threshold
   then
     Kconst (Const_base (Const_int used_safe))
-    :: Kccall ("caml_ensure_stack_capacity", 1)
+    :: Kccall ("caml_ensure_stack_capacity", 1, None)
     :: code
   else code
 
