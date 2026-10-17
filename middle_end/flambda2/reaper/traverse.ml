@@ -836,6 +836,60 @@ module Problem = struct
       final_typing_env : ('f, typing_env) With_types.t;
       module_symbol : ('f, Symbol.t) With_types.t
     }
+
+  let ids_for_export
+      { deps;
+        code_deps;
+        delayed_deps;
+        applications;
+        free_names;
+        toplevel_return;
+        all_sets_of_closures = Without_types;
+        final_typing_env = Without_types;
+        module_symbol = Without_types
+      } =
+    Ids_for_export.union_list
+      [ Global_flow_graph.ids_for_export deps;
+        Code_id.Map.fold
+          (fun code_id code_dep ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Acc.ids_for_export_code_dep code_dep))
+          code_deps Ids_for_export.empty;
+        Acc.ids_for_export_delayed_deps delayed_deps;
+        Acc.Applications.ids_for_export applications;
+        Name_occurrences.ids_for_export free_names;
+        Ids_for_export.add_code_id_or_name Ids_for_export.empty toplevel_return
+      ]
+
+  let apply_renaming
+      { deps;
+        code_deps;
+        delayed_deps;
+        applications;
+        free_names;
+        toplevel_return;
+        all_sets_of_closures = Without_types;
+        final_typing_env = Without_types;
+        module_symbol = Without_types
+      } renaming =
+    { deps = Global_flow_graph.apply_renaming deps renaming;
+      code_deps =
+        Code_id.Map.fold
+          (fun code_id code_dep map ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Traverse_acc.apply_renaming_code_dep code_dep renaming)
+              map)
+          code_deps Code_id.Map.empty;
+      delayed_deps = Acc.apply_renaming_delayed_deps delayed_deps renaming;
+      applications = Acc.Applications.apply_renaming applications renaming;
+      free_names = Name_occurrences.apply_renaming free_names renaming;
+      toplevel_return = Renaming.apply_code_id_or_name renaming toplevel_return;
+      all_sets_of_closures = Without_types;
+      final_typing_env = Without_types;
+      module_symbol = Without_types
+    }
 end
 
 module Skeleton = struct
@@ -844,7 +898,86 @@ module Skeleton = struct
       code : Rev_expr.rev_code Code_id.Map.t;
       ordered_code_ids : Code_id.t array;
       fixed_arity_continuations : Continuation.Set.t;
-      continuation_info : Acc.continuation_info Continuation.Map.t
+      continuation_info : Acc.continuation_info Continuation.Map.t;
+      metadata : Flambda_unit.Metadata.t
+    }
+
+  let ids_for_export
+      { toplevel_expr;
+        code;
+        ordered_code_ids;
+        fixed_arity_continuations;
+        continuation_info;
+        metadata
+      } =
+    let ids = Rev_expr.ids_for_export toplevel_expr in
+    let ids =
+      Code_id.Map.fold
+        (fun code_id rev_code ids ->
+          Ids_for_export.union
+            (Ids_for_export.add_code_id ids code_id)
+            (Rev_expr.ids_for_export_code rev_code))
+        code ids
+    in
+    let ids = Array.fold_left Ids_for_export.add_code_id ids ordered_code_ids in
+    let ids =
+      Continuation.Set.fold
+        (fun cont ids -> Ids_for_export.add_continuation ids cont)
+        fixed_arity_continuations ids
+    in
+    let ids =
+      Ids_for_export.union ids (Flambda_unit.Metadata.ids_for_export metadata)
+    in
+    Continuation.Map.fold
+      (fun cont info ids ->
+        Ids_for_export.union
+          (Ids_for_export.add_continuation ids cont)
+          (Acc.ids_for_export_continuation_info info))
+      continuation_info ids
+
+  let apply_renaming
+      { toplevel_expr;
+        code;
+        ordered_code_ids;
+        fixed_arity_continuations;
+        continuation_info;
+        metadata
+      } renaming =
+    let toplevel_expr = Rev_expr.apply_renaming toplevel_expr renaming in
+    let code =
+      Code_id.Map.fold
+        (fun code_id rev_code code ->
+          Code_id.Map.add
+            (Renaming.apply_code_id renaming code_id)
+            (Rev_expr.apply_renaming_code rev_code renaming)
+            code)
+        code Code_id.Map.empty
+    in
+    let ordered_code_ids =
+      Array.map (Renaming.apply_code_id renaming) ordered_code_ids
+    in
+    let fixed_arity_continuations =
+      Continuation.Set.fold
+        (fun cont conts ->
+          Continuation.Set.add (Renaming.apply_continuation renaming cont) conts)
+        fixed_arity_continuations Continuation.Set.empty
+    in
+    let continuation_info =
+      Continuation.Map.fold
+        (fun cont info map ->
+          Continuation.Map.add
+            (Renaming.apply_continuation renaming cont)
+            (Acc.apply_renaming_continuation_info info renaming)
+            map)
+        continuation_info Continuation.Map.empty
+    in
+    let metadata = Flambda_unit.Metadata.apply_renaming metadata renaming in
+    { toplevel_expr;
+      code;
+      ordered_code_ids;
+      fixed_arity_continuations;
+      continuation_info;
+      metadata
     }
 end
 
@@ -891,16 +1024,31 @@ let run0 unit acc ~free_names ~all_constants () =
          ~function_slots_to_keep ~value_slots_to_keep)
       acc (Flambda_unit.body unit) )
 
-let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
+let run (type f) (unit : Flambda_unit.t)
+    ~(final_typing_env : (f, _) With_types.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let toplevel_return, holed =
     Profile.record_call ~accumulate:false "down"
       (run0 unit acc ~free_names ~all_constants)
   in
+  (* If we are forgetting types, forget the result types in the code metadata
+     now, to make sure they won't be stored. *)
+  let code_deps =
+    match final_typing_env with
+    | With_types _ -> Acc.code_deps acc
+    | Without_types ->
+      Code_id.Map.map
+        (fun code_dep ->
+          { code_dep with
+            Acc.code_metadata =
+              Code_metadata.with_result_types Unknown code_dep.Acc.code_metadata
+          })
+        (Acc.code_deps acc)
+  in
   let problem =
     { Problem.deps = Acc.deps acc;
-      code_deps = Acc.code_deps acc;
+      code_deps;
       delayed_deps = Acc.delayed_deps acc;
       applications = Acc.applications acc;
       free_names;
@@ -921,7 +1069,8 @@ let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
       code = Acc.get_all_code acc;
       ordered_code_ids = Acc.sort_code_ids acc;
       fixed_arity_continuations = Acc.fixed_arity_continuations acc;
-      continuation_info = Acc.get_continuation_info acc
+      continuation_info = Acc.get_continuation_info acc;
+      metadata = Flambda_unit.metadata unit
     }
   in
   problem, skeleton
