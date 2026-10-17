@@ -81,14 +81,28 @@ end
 (** Exception raised when attempting to consult an outdated store. *)
 exception Outdated_store of Outdated_store.t
 
-(** [write oc ~filename schema value] writes the [value] in the output channel
-    [oc], creating unmarshalling boundaries on every link in [value] specified
-    by the [schema]. File pointers are made relative to the directory of
-    [filename], the final location of the file. *)
+module File_kind : sig
+  type t =
+    | No_standalone
+        (** The file may point at other files on disk. This reduces the size of
+            the file, but the pointed-at files must be available when reading
+            the file. *)
+    | Standalone
+        (** The file cannot point at other files. The file is larger as a
+            result, but it is standalone. *)
+end
+
+(** [write oc ~filename ~file_kind schema value] writes the [value] in the
+    output channel [oc], creating unmarshalling boundaries on every link in
+    [value] specified by the [schema]. File pointers are made relative to the
+    directory of [filename], the final location of the file. [file_kind]
+    determines whether the output may point into the files that [value] was
+    read from. *)
 val write :
   ?flags:Marshal.extern_flags list ->
   out_channel ->
   filename:string ->
+  file_kind:File_kind.t ->
   'a schema ->
   'a ->
   unit
