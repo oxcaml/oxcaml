@@ -1,6 +1,21 @@
 {
   pkgs ? import <nixpkgs> { },
-  src ? ./.,
+  # The checkout minus VCS metadata, editor droppings, and build artifacts: any
+  # _build (dune's, also under external/*) and the top-level _install, _opam,
+  # _runtest, ... directories. Keeps the store copy small and unchanged by builds.
+  src ? pkgs.lib.cleanSourceWith {
+    src = ./.;
+    filter =
+      path: type:
+      pkgs.lib.cleanSourceFilter path type
+      && !(
+        type == "directory"
+        && (
+          baseNameOf path == "_build"
+          || (dirOf path == toString ./. && pkgs.lib.hasPrefix "_" (baseNameOf path))
+        )
+      );
+  },
   # Short commit hash of src, recorded in the js_of_ocaml version.
   gitRev ? null,
   addressSanitizer ? false,
