@@ -371,7 +371,6 @@ module History = struct
     | Optional_arg_default
     | Layout_poly_in_external
     | Tuple_element
-    | Peek_or_poke
     | Array_element
     | Idx_element
     | Field_in_indexed_record
