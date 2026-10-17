@@ -91,6 +91,12 @@ module type S = sig
 
   val shift_right_logical : t -> int -> t
 
+  val leading_zeros : t -> int
+
+  val trailing_zeros : t -> int
+
+  val popcount : t -> int
+
   val max : t -> t -> t
 
   val min : t -> t -> t
