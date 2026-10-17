@@ -244,7 +244,7 @@ type t : value mod everything everything
 Line 1, characters 30-40:
 1 | type t : value mod everything everything
                                   ^^^^^^^^^^
-Error: The externality axis has already been specified.
+Error: The locality axis has already been specified.
 |}]
 
 (* [everything] does not specify staticity, so [static] is allowed (but
