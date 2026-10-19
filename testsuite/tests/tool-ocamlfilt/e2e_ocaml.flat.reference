@@ -1,5 +1,7 @@
 SYMBOL                                                            FLAT1                                            STRUCTURED  AUTO
 camlE2e_ocaml                                                     E2e_ocaml                                        (error)     E2e_ocaml
+camlE2e_ocaml__$3c_N                                              E2e_ocaml.<_N                                    (error)     E2e_ocaml.<_N
+camlE2e_ocaml__$3c_N_M_code                                       E2e_ocaml.<_N_M_code                             (error)     E2e_ocaml.<_N_M_code
 camlE2e_ocaml__$3e$3e$3d_N_M_code                                 E2e_ocaml.>>=_N_M_code                           (error)     E2e_ocaml.>>=_N_M_code
 camlE2e_ocaml__$3e$3e$3d_N                                        E2e_ocaml.>>=_N                                  (error)     E2e_ocaml.>>=_N
 camlE2e_ocaml__$3e$3e$7c_N_M_code                                 E2e_ocaml.>>|_N_M_code                           (error)     E2e_ocaml.>>|_N_M_code
@@ -18,6 +20,7 @@ camlE2e_ocaml__Make_pair_N_M_code                                 E2e_ocaml.Make
 camlE2e_ocaml__Make_pair_N                                        E2e_ocaml.Make_pair_N                            (error)     E2e_ocaml.Make_pair_N
 camlE2e_ocaml__Make_set_N                                         E2e_ocaml.Make_set_N                             (error)     E2e_ocaml.Make_set_N
 camlE2e_ocaml__Make_set_N_M_code                                  E2e_ocaml.Make_set_N_M_code                      (error)     E2e_ocaml.Make_set_N_M_code
+camlE2e_ocaml__Pmakeblock_N                                       E2e_ocaml.Pmakeblock_N                           (error)     E2e_ocaml.Pmakeblock_N
 camlE2e_ocaml__Pmakeblock_N                                       E2e_ocaml.Pmakeblock_N                           (error)     E2e_ocaml.Pmakeblock_N
 camlE2e_ocaml__Pmakeblock_N                                       E2e_ocaml.Pmakeblock_N                           (error)     E2e_ocaml.Pmakeblock_N
 camlE2e_ocaml__Pmakeblock_N                                       E2e_ocaml.Pmakeblock_N                           (error)     E2e_ocaml.Pmakeblock_N
@@ -54,6 +57,8 @@ camlE2e_ocaml__code_end                                           E2e_ocaml.code
 camlE2e_ocaml__combine_N                                          E2e_ocaml.combine_N                              (error)     E2e_ocaml.combine_N
 camlE2e_ocaml__combine_N_M_code                                   E2e_ocaml.combine_N_M_code                       (error)     E2e_ocaml.combine_N_M_code
 camlE2e_ocaml__compare_N                                          E2e_ocaml.compare_N                              (error)     E2e_ocaml.compare_N
+camlE2e_ocaml__compare_N                                          E2e_ocaml.compare_N                              (error)     E2e_ocaml.compare_N
+camlE2e_ocaml__compare_N_M_code                                   E2e_ocaml.compare_N_M_code                       (error)     E2e_ocaml.compare_N_M_code
 camlE2e_ocaml__compare_N_M_code                                   E2e_ocaml.compare_N_M_code                       (error)     E2e_ocaml.compare_N_M_code
 camlE2e_ocaml__data_begin                                         E2e_ocaml.data_begin                             (error)     E2e_ocaml.data_begin
 camlE2e_ocaml__data_end                                           E2e_ocaml.data_end                               (error)     E2e_ocaml.data_end
