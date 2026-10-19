@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Datalog_imports
+
 module Int = struct
   include Numbers.Int
   module Tree = Patricia_tree.Make (Numbers.Int)
@@ -105,6 +107,109 @@ module Id = struct
     match Type.Id.provably_equal r1.id r2.id with
     | Some Equal -> t
     | None -> Misc.fatal_error "Inconsistent type for uid."
+
+  module Map = struct
+    module type S = sig
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type t
+
+      type 'a elt
+
+      type binding = B : ('t, 'k, 'v) id * 't elt -> binding
+
+      val empty : t
+
+      val singleton : ('t, 'k, 'v) id -> 't elt -> t
+
+      val add : ('t, 'k, 'v) id -> 't elt -> t -> t
+
+      val remove : ('t, 'k, 'v) id -> t -> t
+
+      val find : ('t, 'k, 'v) id -> t -> 't elt
+
+      val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
+
+      val iter : (binding -> unit) -> t -> unit
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) =
+    struct
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt = 'a T.t
+
+      type binding = B : ('t, 'k, 'v) id * 't elt -> binding
+
+      type t = binding Int.Map.t
+
+      let empty = Int.Map.empty
+
+      let singleton key elt = Int.Map.singleton (uid key) (B (key, elt))
+
+      let add key elt t = Int.Map.add (uid key) (B (key, elt)) t
+
+      let remove key t = Int.Map.remove (uid key) t
+
+      let find (type t k v) (key : (t, k, v) id) t : t elt =
+        let (B (key', elt)) = Int.Map.find (uid key) t in
+        let Equal = provably_equal_exn key key' in
+        elt
+
+      let fold f t acc = Int.Map.fold (fun _ binding acc -> f binding acc) t acc
+
+      let iter f t = Int.Map.iter (fun _ binding -> f binding) t
+    end
+
+    module Or_null_sender = Make (Or_null_sender)
+    module Or_null_receiver = Make (Or_null_receiver)
+  end
+
+  module Tbl = struct
+    module type S = sig
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt
+
+      type binding = B : ('a, _, _) id * 'a elt -> binding
+
+      type t
+
+      val create : int -> t
+
+      val replace : t -> ('t, 'k, 'v) id -> 't elt -> unit
+
+      val find : t -> ('t, 'k, 'v) id -> 't elt
+
+      val iter : (binding -> unit) -> t -> unit
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) =
+    struct
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt = 'a T.t
+
+      type binding = B : ('a, _, _) t * 'a elt -> binding
+
+      type t = binding Int.Tbl.t
+
+      let create n = Int.Tbl.create n
+
+      let replace t id elt = Int.Tbl.replace t (uid id) (B (id, elt))
+
+      let find (type t k v) t (id : (t, k, v) id) : t elt =
+        let (B (id', elt)) = Int.Tbl.find t (uid id) in
+        let Equal = provably_equal_exn id id' in
+        elt
+
+      let iter f t = Int.Tbl.iter (fun _ binding -> f binding) t
+    end
+  end
 end
 
 let iter id f table =
@@ -179,4 +284,10 @@ module Map = struct
       tables1 tables2
 
   let fold ~f m ~init = Int.Map.fold (fun _ binding acc -> f binding acc) m init
+
+  let send t senders =
+    Int.Map.iter
+      (fun _ (Id.Map.Or_null_sender.B (tid, sender)) ->
+        Channel.send_or_null sender (get_or_null tid t))
+      senders
 end
