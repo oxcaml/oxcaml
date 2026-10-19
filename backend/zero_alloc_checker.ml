@@ -2608,18 +2608,21 @@ end = struct
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
         let effect_ =
           List.fold_left
-            (fun all_effects { Cmm.sym_name = callee; _ } ->
-              let k = wkind callee in
-              let v = find_callee t callee ~desc dbg k in
-              let w = create_witnesses t k dbg in
-              let effect_ =
-                match Metadata.assume_value dbg ~can_raise:true w with
-                | Some v' ->
-                  assert (Value.is_resolved v');
-                  if Value.is_resolved v then Value.meet v v' else v'
-                | None -> v
-              in
-              Value.join effect_ all_effects)
+            (fun all_effects (callee : Cmm.callee) ->
+              match callee with
+              | Symbol { Cmm.sym_name = callee; _ } -> begin
+                let k = wkind callee in
+                let v = find_callee t callee ~desc dbg k in
+                let w = create_witnesses t k dbg in
+                let effect_ =
+                  match Metadata.assume_value dbg ~can_raise:true w with
+                  | Some v' ->
+                    assert (Value.is_resolved v');
+                    if Value.is_resolved v then Value.meet v v' else v'
+                  | None -> v
+                in
+                Value.join effect_ all_effects
+              end)
             Value.bot callees
         in
         transform t ~next ~exn ~effect_ desc dbg

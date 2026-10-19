@@ -219,6 +219,11 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+type callee =
+  | Symbol of symbol
+
+val equal_callee : callee -> callee -> bool
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -428,7 +433,7 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : callee list option
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
       }

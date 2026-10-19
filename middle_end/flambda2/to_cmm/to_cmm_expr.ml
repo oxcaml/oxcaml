@@ -359,8 +359,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         Some
           (List.map
              (fun code_id ->
-               To_cmm_result.symbol_of_code_id res code_id
-                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env))
+               Cmm.Symbol (To_cmm_result.symbol_of_code_id res code_id
+                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env)))
              (Code_id.Set.elements code_id_set))
     in
     if not (C.check_arity (Apply.args_arity apply) args)
