@@ -284,10 +284,14 @@ let[@tail_mod_cons] rec count_down n =
     n :: count_down (n - 1)
   with Exit -> []
 [%%expect {|
-Line 4, characters 9-27:
+Lines 1-5, characters 35-17:
+1 | ...................................n =
+2 |   try
+3 |     if n = 0 then raise Exit;
 4 |     n :: count_down (n - 1)
-             ^^^^^^^^^^^^^^^^^^
-Warning 51 [wrong-tailcall-expectation]: expected tailcall
+5 |   with Exit -> []
+Warning 71 [unused-tmc-attribute]: This function is marked "@tail_mod_cons"
+  but is never applied in TMC position.
 
 val count_down : int -> int list = <fun>
 |}]
