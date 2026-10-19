@@ -3,7 +3,7 @@
    expect.opt;
 *)
 
-(* `List.iter` isn't `zero_alloc`, because `f` could allocate: *)
+(* [List.iter] isn't [zero_alloc], because [f] could allocate: *)
 let[@zero_alloc] iter ~f l = List.iter f l
 [%%expect{|
 Line 1, characters 5-15:
@@ -14,8 +14,8 @@ File "list.ml", line 119, characters 12-15:
 Error: called function may allocate (indirect call through argument #1) (:1,29--42)
 |}]
 
-(* However, `List.iter` doesn't *itself* allocate, so it's
-   *conditionally* `zero_alloc`: *)
+(* However, [List.iter] doesn't *itself* allocate, so it's
+   *conditionally* [zero_alloc]: *)
 let[@zero_alloc conditional] iter ~f l = List.iter f l
 [%%expect{|
 val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
@@ -43,7 +43,7 @@ val iter_odd : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
   <fun>
 |}]
 
-(* Deceptively trivial-looking functions (e.g. if `'a` is a function): *)
+(* Deceptively trivial-looking functions (e.g. if ['a] is a function): *)
 let[@zero_alloc conditional] apply f x = f x
 let[@zero_alloc conditional] id x = x
 [%%expect{|
@@ -51,8 +51,8 @@ val apply : ('a -> 'b) -> 'a -> 'b [@@zero_alloc conditional] = <fun>
 val id : 'a -> 'a [@@zero_alloc conditional] = <fun>
 |}]
 
-(* Optional arguments are passed on the heap and lowered to `_ option`, so they
-   are *not* valid (but would be valid with the `noalloc` mode): *)
+(* Optional arguments are passed on the heap and lowered to [_ option], so they
+   are *not* valid (but would be valid with the [noalloc] mode): *)
 let[@zero_alloc conditional] apply_opt ?f x =
   match f with
   | Some f -> f x
@@ -195,7 +195,7 @@ exception After_allocating
 val allocate_then_raise : unit -> 'a [@@zero_alloc] = <fun>
 |}]
 
-(* Arguments are non-`strict` by default: *)
+(* Arguments are non-[strict] by default: *)
 let[@zero_alloc conditional] catch_nonstrict f = try f () with _ -> ()
 [%%expect{|
 Line 1, characters 5-15:
@@ -208,8 +208,8 @@ Line 1, characters 53-57:
 Error: called function may allocate (indirect call through argument #1)
 |}]
 
-(* Note that asking for `conditional strict` does not assume that *arguments*
-   are `strict`: *)
+(* Note that asking for [conditional strict] does not assume that *arguments*
+   are [strict]: *)
 let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
 [%%expect{|
 Line 1, characters 5-15:
@@ -222,15 +222,15 @@ Line 1, characters 57-61:
 Error: called function may allocate (indirect call through argument #1)
 |}]
 
-(* Try to use inlining (via `apply`) to break soundness: *)
+(* Try to use inlining (via [apply]) to break soundness: *)
 module Inlining = struct
   let[@inline always] [@zero_alloc conditional] apply f x = f x
 
   let[@zero_alloc conditional] inlining_cant_expose_assumptions () =
-    (* Note that `apply` assumes its `f` argument is non-allocating, but
+    (* Note that [apply] assumes its [f] argument is non-allocating, but
       we have to be careful about scoping that, since in this invocation,
-      `f` is `allocate`, and `apply` is `inline always`, so its inlined body is
-      `(allocate [@zero_alloc assume]) ()`, which would be accepted(!). *)
+      [f] is [allocate], and [apply] is [inline always], so its inlined body is
+      [(allocate [@zero_alloc assume]) ()], which would be accepted(!). *)
     apply allocate ()
 end
 [%%expect{|
@@ -269,7 +269,7 @@ let[@zero_alloc] catch_after_allocating () =
 CR wsturgeon: this has to fail
 |}]
 
-(* On a function instead of an argument, `conditional assume` does what it says:
+(* On a function instead of an argument, [conditional assume] does what it says:
    "at call sites, if all arguments won't allocate, this won't allocate." *)
 let[@inline never][@zero_alloc conditional assume] secret () = allocate ()
 let[@zero_alloc] danger () = secret ()

@@ -3701,7 +3701,7 @@ let call_caml_apply ~callees extended_ty extended_args_type mut clos args pos mo
     bind_list "arg" args (fun args ->
         bind "fun" clos (fun clos ->
             Cifthenelse
-              ( Cop (* CR wsturgeon: propagate `callers` to the branch below *)
+              ( Cop (* CR wsturgeon: propagate [callers] to the branch below *)
                   ( Ccmpi Ceq,
                     [ Cop
                         ( Casr,
