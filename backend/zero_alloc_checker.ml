@@ -2245,20 +2245,11 @@ end = struct
   let add t ~caller ~callees = String.Set.iter (add_one t ~caller) callees
 
   let update t ~caller ~callees =
-    (* check that all callees are present *)
     String.Set.iter
       (fun callee ->
         match String.Tbl.find_opt t callee with
-        | None ->
-          Misc.fatal_errorf "Unresolved dependencies: missing callee %s of %s"
-            callee caller
-        | Some callers ->
-          if not (String.Set.mem caller callers)
-          then
-            Misc.fatal_errorf
-              "Unresolved_dependencies: missing caller %s for callee %s in \
-               unresolved "
-              caller callee)
+        | Some callers when String.Set.mem caller callers -> ()
+        | Some _ | None -> add_one t ~caller callee)
       callees;
     (* remove resolved callees of this caller *)
     let remove callee callers =
