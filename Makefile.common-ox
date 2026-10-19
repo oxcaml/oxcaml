@@ -227,6 +227,22 @@ boot_build = _build/default
 # run on an installed tree (led by David Allsopp) is completed.
 .PHONY: runtest-upstream test install_for_test
 install_for_test: install
+ifeq ($(with_jsir),true)
+	@test -x _install/bin/js_of_ocaml || { \
+	  echo "error: with_jsir=true but _install/bin/js_of_ocaml is missing;" \
+	    "make test needs jsoo-install-shipped to install into" \
+	    "$(CURDIR)/_install (OXCAML_INSTALL and AST_DEPENDENT_LIBS_PREFIX)," \
+	    "or use make test-without-jsir" >&2; \
+	  exit 1; }
+	@test -f _install/lib/ocaml/stdlib.cmjxa || { \
+	  echo "error: with_jsir=true but _install/lib/ocaml/stdlib.cmjxa is" \
+	    "missing (the stdlib-jsir package was not installed)" >&2; \
+	  exit 1; }
+	@command -v "$${NODE:-node}" > /dev/null || { \
+	  echo "error: with_jsir=true but $${NODE:-node} is not in PATH;" \
+	    "ocamltest runs JSIR programs with \$$NODE (default: node)" >&2; \
+	  exit 1; }
+endif
 	rm -rf _runtest
 	mkdir _runtest
 	ln -s ../_install _runtest/_install
@@ -346,12 +362,11 @@ install_for_test: install
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 ifeq ($(with_jsir),true)
 	cd _runtest/testsuite/lib && \
-	  OXCAML_JS_OF_OCAML=$$(pwd)/../../_install/bin/js_of_ocaml \
-	  ../../ocamlopt.opt -target js_of_ocaml -nostdlib -I ../../stdlib \
-	    -c lib.ml && \
-	  OXCAML_JS_OF_OCAML=$$(pwd)/../../_install/bin/js_of_ocaml \
-	  ../../ocamlopt.opt -target js_of_ocaml -nostdlib -I ../../stdlib \
-	    -linkall -a -o testing.cmjxa testing.ml
+	  export OXCAML_JS_OF_OCAML=$(CURDIR)/_install/bin/js_of_ocaml && \
+	  ocamlopt_jsir="../../ocamlopt.opt -target js_of_ocaml -nostdlib \
+	    -I ../../stdlib" && \
+	  $$ocamlopt_jsir -c lib.ml && \
+	  $$ocamlopt_jsir -linkall -a -o testing.cmjxa testing.ml
 endif
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \

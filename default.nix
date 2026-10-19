@@ -916,6 +916,7 @@ stdenv.mkDerivation {
 
   env =
     lib.optionalAttrs (withJsoo && gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
+    // lib.optionalAttrs withJsoo { OXCAML_WITH_JSIR = "true"; }
     // lib.optionalAttrs needsPpxlibSources ppxlibSources
     // lib.optionalAttrs withJsoo jsooSources
     // lib.optionalAttrs (withJsoo && withJsooTestSources) jsooTestSources;

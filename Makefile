@@ -125,7 +125,10 @@ distclean: clean
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
 
-with_jsir ?= $(if $(JSOO_SEDLEX_SRC),true,false)
+# Whether make test also runs the testsuite under JSIR (ocamlopt -target
+# js_of_ocaml), which needs js_of_ocaml (see jsoo-build) and node. A nix shell
+# built with withJsoo=true sets OXCAML_WITH_JSIR=true.
+with_jsir ?= $(if $(filter true,$(OXCAML_WITH_JSIR)),true,false)
 
 include Makefile.common-ox
 
