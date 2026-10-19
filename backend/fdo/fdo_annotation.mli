@@ -37,6 +37,8 @@ val empty : t
 
 val is_empty : t -> bool
 
+val singleton : Fdo_counter.t -> t
+
 val of_list : Fdo_counter.t list -> t
 
 val to_list : t -> Fdo_counter.t list

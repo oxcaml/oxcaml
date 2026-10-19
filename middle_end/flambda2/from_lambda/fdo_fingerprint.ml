@@ -799,6 +799,6 @@ let entry_annotation t =
     let counter =
       t.function_ |> FC.Position.create_function_entry |> FC.of_position
     in
-    Fdo_annotation.of_list [counter]
+    Fdo_annotation.singleton counter
   in
   Fdo_annotation.With_body_hash.create ~annotation ~body_hash:(Some t.body_hash)

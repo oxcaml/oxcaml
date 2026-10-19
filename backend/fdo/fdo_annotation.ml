@@ -32,6 +32,8 @@ let empty = []
 
 let is_empty t = List.is_empty t
 
+let singleton counter = [counter]
+
 let of_list counters = Fdo_counter.add_all [] counters
 
 let to_list t = t
