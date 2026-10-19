@@ -215,6 +215,7 @@ and out_sig_item =
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
   | Osig_jkind of out_jkind_decl
+  | Osig_law of out_law_decl
   | Osig_ellipsis
 and out_type_decl =
   { otype_name: string;
@@ -261,6 +262,16 @@ and out_ext_status =
 and out_jkind_decl =
   { ojkind_name: string;
     ojkind_jkind: out_jkind option }
+and out_law_decl =
+  { olaw_name: string;
+    olaw_params: (string * out_type) list;
+    olaw_assumptions: out_spec list;
+    olaw_conclusion: out_spec }
+and out_spec =
+  | Ospec_var of string
+  | Ospec_global of out_ident
+  | Ospec_constant of out_value
+  | Ospec_apply of out_spec * (arg_label * out_spec) list
 
 
 type out_phrase =

@@ -704,6 +704,7 @@ and structure_item_desc =
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
   | Tstr_jkind of jkind_declaration
+  | Tstr_law of law_declaration
 
 and module_binding =
     {
@@ -808,6 +809,7 @@ and signature_item_desc =
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
   | Tsig_jkind of jkind_declaration
+  | Tsig_law of law_declaration
 
 and module_declaration =
     {
@@ -1124,6 +1126,23 @@ and jkind_declaration =
     jkind_loc: Location.t
    }
 
+and law_declaration =
+  { law_id: Ident.t;
+    law_name: string loc;
+    law_law: Types.law_declaration;
+    law_params: law_param list;
+    law_assumptions: spec_expression list;
+    law_conclusion: spec_expression;
+    law_attributes: attribute list;
+    law_loc: Location.t
+   }
+
+and law_param =
+  { lp_id: Ident.t;
+    lp_name: string loc;
+    lp_type: core_type option
+   }
+
 and spec_expression =
   { stexp_desc: spec_expression_desc;
     stexp_loc: Location.t;
@@ -1210,6 +1229,7 @@ type item_declaration =
   | Class of class_declaration
   | Class_type of class_type_declaration
   | Jkind of jkind_declaration
+  | Law of law_declaration
 
 (* Auxiliary functions over the a.s.t. *)
 
@@ -1629,6 +1649,7 @@ let loc_of_decl ~uid =
   | Class cd -> cd.ci_id_name
   | Class_type ctd -> ctd.ci_id_name
   | Jkind jd -> jd.jkind_name
+  | Law ld -> ld.law_name
 
 let min_mode_with_locks = (Mode.With_regionality.(disallow_right legacy), None)
 

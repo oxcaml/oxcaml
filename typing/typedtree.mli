@@ -1105,6 +1105,7 @@ and structure_item_desc =
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
   | Tstr_jkind of jkind_declaration
+  | Tstr_law of law_declaration
 
 and module_binding =
     {
@@ -1239,6 +1240,7 @@ and signature_item_desc =
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
   | Tsig_jkind of jkind_declaration
+  | Tsig_law of law_declaration
 
 and module_declaration =
     {
@@ -1578,6 +1580,23 @@ and jkind_declaration =
     jkind_loc: Location.t
    }
 
+and law_declaration =
+  { law_id: Ident.t;
+    law_name: string loc;
+    law_law: Types.law_declaration;
+    law_params: law_param list;
+    law_assumptions: spec_expression list;
+    law_conclusion: spec_expression;
+    law_attributes: attribute list;
+    law_loc: Location.t
+   }
+
+and law_param =
+  { lp_id: Ident.t;
+    lp_name: string loc;
+    lp_type: core_type option
+   }
+
 (* Spectree expressions are a strict subset of the typedtree expressions,
    constructed via [Translspec.spectree]. Since not all typedtree expressions
    are valid spectree expressions, the AST below aims to be as minimal as
@@ -1697,6 +1716,7 @@ type item_declaration =
   | Class of class_declaration
   | Class_type of class_type_declaration
   | Jkind of jkind_declaration
+  | Law of law_declaration
 (** [item_declaration] groups together items that correspond to the syntactic
     category of "declarations" which include types, values, modules, etc.
     declarations in signatures and their definitions in implementations. *)

@@ -1851,6 +1851,12 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same id env.cltypes).cltda_shape
   | Jkind ->
       (IdTbl.find_same id env.jkinds).jkda_shape
+  | Law ->
+      (* No language construct supports referencing a law (i.e., there is no way
+         to refer to law [foo] of module [Bar]). Thus, we do not need a separate
+         namespace for laws, and we do not add them to environments unlike other
+         signature items in the rest of this file. *)
+      raise Not_found
 
 
 let shape_of_path ~namespace env =
@@ -2274,7 +2280,9 @@ let prefix_idents root prefixing_sub sg =
     | Sig_value(id, _, _) as item :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
-        ((item, p) :: items_and_paths) prefixing_sub rem
+        ((item, p) :: items_and_paths)
+        (Subst.add_value id p prefixing_sub)
+        rem
     | Sig_type(id, td, rs, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
@@ -2318,6 +2326,12 @@ let prefix_idents root prefixing_sub sg =
       prefix_idents root
         ((Sig_jkind(id, jkd, vis), p) :: items_and_paths)
         (Subst.add_jkind id p prefixing_sub)
+        rem
+    | Sig_law(id, ld, vis) :: rem ->
+      let p = Pdot(root, Ident.name id) in
+      prefix_idents root
+        ((Sig_law(id, ld, vis), p) :: items_and_paths)
+        prefixing_sub
         rem
   in
   let sg = Subst.Lazy.force_signature_once sg in
@@ -2569,6 +2583,7 @@ let rec components_of_module_maker
             let shape = Shape.proj cm_shape (Shape.Item.jkind id) in
             let jkda = { jkda_declaration = decl'; jkda_shape = shape } in
             c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
+        | Sig_law _ -> ()
       )
         items_and_paths;
       inner_full_env := !env;
@@ -3257,6 +3272,7 @@ end) = struct
     | Sig_jkind(id, decl, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.jkind id) in
         map, add_jkind ~check:false ?shape id decl env
+    | Sig_law _ -> map, env
 
   let add_signature
       map

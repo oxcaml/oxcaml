@@ -76,6 +76,12 @@ let float_repres f =
         Printf.sprintf "%.18g" f
       in valid_float_lexeme float_val
 
+let print_value_path ppf = function
+  | Oide_ident s -> value_ident ppf s.printed_name
+  | Oide_dot (id, s) ->
+      print_ident ppf id; pp_print_char ppf '.'; value_ident ppf s
+  | Oide_apply _ | Oide_hash _ as id -> print_ident ppf id
+
 let parenthesize_if_neg ppf fmt v isneg =
   if isneg then pp_print_char ppf '(';
   fprintf ppf fmt v;
@@ -977,6 +983,7 @@ and print_out_sig_item ppf =
   | Osig_ellipsis ->
       fprintf ppf "..."
   | Osig_jkind jkd -> print_out_jkind_decl ppf jkd
+  | Osig_law ld -> print_out_law_decl ppf ld
 
 and print_out_type_decl kwd ppf td =
   let print_constraints ppf =
@@ -1157,6 +1164,42 @@ and print_out_jkind_decl ppf jkd =
     | Some jkind -> fprintf ppf " =@ %a" print_out_jkind jkind
   in
   fprintf ppf "@[kind_ %s%a@]" jkd.ojkind_name print_manifest jkd.ojkind_jkind
+
+and print_out_law_decl ppf ld =
+  let print_param ppf (x, ty) =
+    fprintf ppf "@ (%a : %a)" print_lident x !out_type ty
+  in
+  let print_assumption ppf spec =
+    fprintf ppf "%a ===>@ " print_out_spec spec
+  in
+  fprintf ppf "@[<2>law? %a%a :@ %a%a@]" print_lident ld.olaw_name
+    (fun ppf -> List.iter (print_param ppf)) ld.olaw_params
+    (fun ppf -> List.iter (print_assumption ppf)) ld.olaw_assumptions
+    print_out_spec ld.olaw_conclusion
+
+and print_out_spec ppf = function
+  | Ospec_apply (Ospec_global (Oide_ident op), [(Nolabel, a); (Nolabel, b)])
+    when Pprintast.is_infix_operator op.printed_name ->
+      fprintf ppf "@[<2>%a %s@ %a@]" print_simple_out_spec a op.printed_name
+        print_simple_out_spec b
+  | Ospec_apply (funct, args) ->
+      let print_arg ppf (lab, arg) =
+        match lab with
+        | Nolabel -> fprintf ppf "@ %a" print_simple_out_spec arg
+        | Labelled s | Position s ->
+            fprintf ppf "@ ~%s:%a" s print_simple_out_spec arg
+        | Optional s -> fprintf ppf "@ ?%s:%a" s print_simple_out_spec arg
+      in
+      fprintf ppf "@[<2>%a%a@]" print_simple_out_spec funct
+        (fun ppf -> List.iter (print_arg ppf)) args
+  | Ospec_var _ | Ospec_global _ | Ospec_constant _ as spec ->
+      print_simple_out_spec ppf spec
+
+and print_simple_out_spec ppf = function
+  | Ospec_var x -> value_ident ppf x
+  | Ospec_global id -> print_value_path ppf id
+  | Ospec_constant v -> fprintf ppf "(%a)" print_out_value v
+  | Ospec_apply _ as spec -> fprintf ppf "(%a)" print_out_spec spec
 
 let out_constr = ref print_out_constr
 let out_constr_args = ref print_out_constr_args

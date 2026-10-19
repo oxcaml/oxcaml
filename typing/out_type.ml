@@ -148,6 +148,7 @@ let human_unique n id = Printf.sprintf "%s/%d" (Ident.name id) n
     | Class
     | Class_type
     | Jkind
+    | Law
 
 
 module Namespace = struct
@@ -161,9 +162,10 @@ module Namespace = struct
     | Extension_constructor | Value | Constructor | Label -> 5
     | Unboxed_label -> 6
     | Jkind -> 7
+    | Law -> 8
      (* we do not handle those component *)
 
-  let size = 1 + id Jkind
+  let size = 1 + id Law
 
 
   let pp ppf x =
@@ -182,7 +184,7 @@ module Namespace = struct
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | Some Jkind -> to_lookup Env.find_jkind_by_name
     | None
-    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label) ->
+    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label|Law) ->
          fun _ -> raise Not_found
 
   let location namespace id =
@@ -196,7 +198,8 @@ module Namespace = struct
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
         | Some Jkind -> (in_printing_env @@ Env.find_jkind path).jkind_loc
-        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
+        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label
+               |Law)
         | None ->
             Location.none
       ) with Not_found -> None
@@ -3827,6 +3830,35 @@ let tree_of_cltype_declaration id cl rs =
      tree_of_class_type Type_scheme params cl.clty_type,
      tree_of_rec rs)
 
+(* Clauses of laws *)
+let rec tree_of_spec (e : Spec.expression) : out_spec =
+  match e with
+  | Spec.Sexp_var id -> Ospec_var (Ident.name id)
+  | Spec.Sexp_global path -> Ospec_global (tree_of_path None path)
+  | Spec.Sexp_constant (Spec.Const_int n) -> Ospec_constant (Oval_int n)
+  | Spec.Sexp_apply (funct, args) ->
+      let arg (lbl, e, _) = (label_of_spec lbl, tree_of_spec e) in
+      Ospec_apply (tree_of_spec funct, List.map arg args)
+
+and label_of_spec : Spec.arg_label -> Outcometree.arg_label = function
+  | Spec.Nolabel -> Nolabel
+  | Spec.Labelled s -> Labelled s
+  | Spec.Optional s -> Optional s
+
+let tree_of_law_declaration id decl =
+  let base = With_locality.Const.legacy in
+  prepare_for_printing ~base (List.map snd decl.law_params);
+  let olaw_params =
+    List.map
+      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
+      decl.law_params
+  in
+  Osig_law
+    { olaw_name = Ident.name id;
+      olaw_params;
+      olaw_assumptions = List.map tree_of_spec decl.law_assumptions;
+      olaw_conclusion = tree_of_spec decl.law_conclusion }
+
 let tree_of_jkind_declaration id decl =
   let ojkind =
     { ojkind_name = Ident.name id
@@ -3894,6 +3926,7 @@ let dummy =
 let ident_sigitem = function
   | Types.Sig_type(ident,_,_,_) ->  {hide=true;ident}
   | Types.Sig_jkind (ident,_,_)
+  | Types.Sig_law (ident,_,_)
   | Types.Sig_class(ident,_,_,_)
   | Types.Sig_class_type (ident,_,_,_)
   | Types.Sig_module(ident,_, _,_,_)
@@ -4124,6 +4157,8 @@ and tree_of_sigitem ?abbrev = function
       tree_of_cltype_declaration id decl rs
   | Sig_jkind(id, decl, _) ->
       tree_of_jkind_declaration id decl
+  | Sig_law(id, decl, _) ->
+      tree_of_law_declaration id decl
 
 and tree_of_modtype_declaration ?abbrev id decl =
   let mty =

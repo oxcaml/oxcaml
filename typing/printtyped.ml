@@ -1000,6 +1000,61 @@ and jkind_declaration i ppf x =
   line i ppf "pjkind_manifest =\n";
   option (i+1) jkind_annotation ppf x.jkind_annotation
 
+and law_declaration i ppf x =
+  line i ppf "law_declaration %a %a\n" fmt_ident x.law_id
+       fmt_location x.law_loc;
+  attributes i ppf x.law_attributes;
+  let i = i+1 in
+  line i ppf "law_params =\n";
+  list (i+1) law_param ppf x.law_params;
+  line i ppf "law_assumptions =\n";
+  list (i+1) spec_expression ppf x.law_assumptions;
+  line i ppf "law_conclusion =\n";
+  spec_expression (i+1) ppf x.law_conclusion
+
+and law_param i ppf x =
+  line i ppf "%a\n" fmt_ident x.lp_id;
+  option (i+1) core_type ppf x.lp_type
+
+and spec_expression i ppf x =
+  line i ppf "spec_expression %a\n" fmt_location x.stexp_loc;
+  let i = i+1 in
+  begin match x.stexp_extra with
+  | [] -> ()
+  | extra -> line i ppf "extra\n"; List.iter (spec_extra (i+1) ppf) extra
+  end;
+  match x.stexp_desc with
+  | Stexp_var {id; _} -> line i ppf "Stexp_var %a\n" fmt_ident id
+  | Stexp_global {path; _} -> line i ppf "Stexp_global %a\n" fmt_path path
+  | Stexp_primitive {path; _} ->
+      line i ppf "Stexp_primitive %a\n" fmt_path path
+  | Stexp_constant (Spec.Const_int n) ->
+      line i ppf "Stexp_constant Const_int %d\n" n
+  | Stexp_apply {funct; args; _} ->
+      line i ppf "Stexp_apply\n";
+      spec_expression i ppf funct;
+      list i spec_argument ppf args
+
+and spec_argument i ppf (l, e, s) =
+  line i ppf "<arg>\n";
+  spec_arg_label (i+1) ppf l;
+  spec_expression (i+1) ppf e;
+  line (i+1) ppf "%a\n" fmt_sort s
+
+and spec_arg_label i ppf (l : Spec.arg_label) =
+  match l with
+  | Nolabel -> line i ppf "Nolabel\n"
+  | Labelled s -> line i ppf "Labelled \"%s\"\n" s
+  | Optional s -> line i ppf "Optional \"%s\"\n" s
+
+and spec_extra i ppf (extra, loc) =
+  match extra with
+  | Stexp_constraint ct ->
+      line i ppf "Stexp_constraint %a\n" fmt_location loc;
+      core_type (i+1) ppf ct
+  | Stexp_inspected_type _ ->
+      line i ppf "Stexp_inspected_type %a\n" fmt_location loc
+
 and type_extension i ppf x =
   line i ppf "type_extension\n";
   attributes i ppf x.tyext_attributes;
@@ -1287,6 +1342,9 @@ and signature_item i ppf x =
   | Tsig_jkind jd ->
       line i ppf "Tsig_jkind";
       jkind_declaration i ppf jd
+  | Tsig_law ld ->
+      line i ppf "Tsig_law\n";
+      law_declaration i ppf ld
 
 and module_declaration i ppf md =
   line i ppf "%a\n" fmt_modname md.md_id;
@@ -1415,6 +1473,9 @@ and structure_item i ppf x =
   | Tstr_jkind jd ->
       line i ppf "Tstr_jkind";
       jkind_declaration i ppf jd
+  | Tstr_law ld ->
+      line i ppf "Tstr_law\n";
+      law_declaration i ppf ld
 
 and longident_x_with_constraint i ppf (li, _, wc) =
   line i ppf "%a\n" fmt_path li;

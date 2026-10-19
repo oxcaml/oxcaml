@@ -178,6 +178,8 @@ val tree_of_cltype_declaration:
 
 val tree_of_jkind_declaration:
     Ident.t -> jkind_declaration -> out_sig_item
+val tree_of_law_declaration:
+    Ident.t -> law_declaration -> out_sig_item
 
 (** {1 Module types }*)
 

@@ -43,6 +43,7 @@ type mapper =
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
     jkind_declaration:
       mapper -> jkind_declaration -> jkind_declaration;
+    law_declaration: mapper -> law_declaration -> law_declaration;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -64,6 +65,7 @@ type mapper =
     open_description: mapper -> open_description -> open_description;
     signature: mapper -> signature -> signature;
     signature_item: mapper -> signature_item -> signature_item;
+    spec_expression: mapper -> spec_expression -> spec_expression;
     structure: mapper -> structure -> structure;
     structure_item: mapper -> structure_item -> structure_item;
     typ: mapper -> core_type -> core_type;
@@ -214,6 +216,7 @@ let structure_item sub {str_loc; str_desc; str_env} =
     | Tstr_open od -> Tstr_open (sub.open_declaration sub od)
     | Tstr_attribute attr -> Tstr_attribute (sub.attribute sub attr)
     | Tstr_jkind d -> Tstr_jkind (sub.jkind_declaration sub d)
+    | Tstr_law d -> Tstr_law (sub.law_declaration sub d)
   in
   {str_desc; str_env; str_loc}
 
@@ -330,6 +333,54 @@ let[@warning "+9"] jkind_declaration sub
   let jkind_loc = sub.location sub jkind_loc in
   {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
    jkind_loc}
+
+let spec_extra sub = function
+  | Stexp_constraint cty -> Stexp_constraint (sub.typ sub cty)
+  | Stexp_inspected_type _ as e -> e
+
+let spec_expression sub
+      {stexp_desc; stexp_loc; stexp_extra; stexp_type; stexp_env} =
+  let stexp_desc =
+    match stexp_desc with
+    | Stexp_var r -> Stexp_var { r with name_loc = sub.location sub r.name_loc }
+    | Stexp_global r -> Stexp_global { r with lid = map_loc_lid sub r.lid }
+    | Stexp_primitive r ->
+        Stexp_primitive { r with lid = map_loc_lid sub r.lid }
+    | Stexp_constant _ as d -> d
+    | Stexp_apply {funct; args; ret_mode; yielding} ->
+        let funct = sub.spec_expression sub funct in
+        let args =
+          List.map
+            (fun (lbl, e, sort) -> (lbl, sub.spec_expression sub e, sort))
+            args
+        in
+        Stexp_apply {funct; args; ret_mode; yielding}
+  in
+  let stexp_extra =
+    List.map
+      (fun (extra, loc) -> (spec_extra sub extra, sub.location sub loc))
+      stexp_extra
+  in
+  {stexp_desc; stexp_loc = sub.location sub stexp_loc; stexp_extra; stexp_type;
+   stexp_env = sub.env sub stexp_env}
+
+let[@warning "+9"] law_declaration sub
+     {law_id; law_name; law_law; law_params; law_assumptions; law_conclusion;
+      law_attributes; law_loc} =
+  let law_name = map_loc sub law_name in
+  let law_params =
+    List.map
+      (fun {lp_id; lp_name; lp_type} ->
+         {lp_id; lp_name = map_loc sub lp_name;
+          lp_type = Option.map (sub.typ sub) lp_type})
+      law_params
+  in
+  let law_assumptions = List.map (sub.spec_expression sub) law_assumptions in
+  let law_conclusion = sub.spec_expression sub law_conclusion in
+  let law_attributes = sub.attributes sub law_attributes in
+  let law_loc = sub.location sub law_loc in
+  {law_id; law_name; law_law; law_params; law_assumptions; law_conclusion;
+   law_attributes; law_loc}
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d
@@ -824,6 +875,7 @@ let signature_item sub x =
     | Tsig_open od -> Tsig_open (sub.open_description sub od)
     | Tsig_attribute attr -> Tsig_attribute (sub.attribute sub attr)
     | Tsig_jkind jd -> Tsig_jkind (sub.jkind_declaration sub jd)
+    | Tsig_law ld -> Tsig_law (sub.law_declaration sub ld)
   in
   {sig_loc; sig_desc; sig_env}
 
@@ -1212,6 +1264,7 @@ let default =
     extension_constructor;
     jkind_annotation;
     jkind_declaration;
+    law_declaration;
     location;
     modalities;
     modes;
@@ -1230,6 +1283,7 @@ let default =
     open_description;
     signature;
     signature_item;
+    spec_expression;
     structure;
     structure_item;
     typ;
