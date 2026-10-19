@@ -43,6 +43,31 @@ val iter_odd : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
   <fun>
 |}]
 
+(* Deceptively trivial-looking functions (e.g. if `'a` is a function): *)
+let[@zero_alloc conditional] apply f x = f x
+let[@zero_alloc conditional] id x = x
+[%%expect{|
+val apply : ('a -> 'b) -> 'a -> 'b [@@zero_alloc conditional] = <fun>
+val id : 'a -> 'a [@@zero_alloc conditional] = <fun>
+|}]
+
+(* Optional arguments are passed on the heap and lowered to `_ option`, so they
+   are *not* valid (but would be valid with the `noalloc` mode): *)
+let[@zero_alloc conditional] apply_opt ?f x =
+  match f with
+  | Some f -> f x
+  | None -> ()
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] apply_opt ?f x =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP7.apply_opt (camlTOP7__apply_opt_7_15_code).
+Line 3, characters 14-17:
+3 |   | Some f -> f x
+                  ^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
 (* A trivially allocating function, to be used later: *)
 let state = ref (ref 42)
 let[@inline never] allocate () = state := ref 42
@@ -164,14 +189,6 @@ let[@inline never][@zero_alloc conditional assume] secret () = allocate ()
 let[@zero_alloc] danger () = secret ()
 [%%expect{|
 CR wsturgeon: this has to pass
-|}]
-
-(* Deceptively trivial-looking functions (e.g. if `'a` is a function): *)
-let[@zero_alloc conditional] apply f x = f x
-let[@zero_alloc conditional] id x = x
-[%%expect{|
-val apply : ('a -> 'b) -> 'a -> 'b [@@zero_alloc conditional] = <fun>
-val id : 'a -> 'a [@@zero_alloc conditional] = <fun>
 |}]
 
 (* Try to use inlining (via `apply`) to break soundness: *)
