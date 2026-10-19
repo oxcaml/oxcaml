@@ -27,7 +27,6 @@ C sources and objects and `-ccopt`/`-cclib` are ignored (with a warning under `-
 
 Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
 
-
 ## Number representations
 | Flambda kind       | JSIR representation                                                                                                                                                                                                |
 |--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -59,6 +58,13 @@ require offset 4 in native code, but offset 8 in JSIR.
 
 External pointers (block index accesses with a null base) are unsupported as in bytecode.
 The JS runtime primitive `caml_check_idx_base` raises `Failure` when such an access is attempted.
+
+## Effect handlers
+The effects backend of `js_of_ocaml` (`--effects`) must be the same for every unit of a program (including the standard library) and for its runtime,
+as `js_of_ocaml link` fails otherwise.
+The backend can be chosen with `-jsoo-effects {disabled|cps|double-translation}` (`jsoo-effects=` in `OCAMLPARAM`), which the compiler passes to `js_of_ocaml compile` and `js_of_ocaml build-runtime`.
+The default is `double-translation`, which is what the standard library is built with.
+With `-jsoo-effects disabled`, performing an effect or installing a handler fails at runtime with `Failure "Effect handlers are not supported"`.
 
 ## Known limitations
 

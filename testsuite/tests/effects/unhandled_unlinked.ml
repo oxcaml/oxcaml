@@ -1,7 +1,5 @@
 (* TEST
    exit_status = "2";
-   { bytecode; }
-   { native; }
 *)
 
 open Effect

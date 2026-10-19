@@ -1,7 +1,4 @@
-(* TEST
-  { bytecode; }
-  { native; }
-*)
+(* TEST *)
 
 open Stdlib__Effect
 open Stdlib__Effect.Deep

@@ -1,7 +1,5 @@
 (* TEST
    multicore;
-   { bytecode; }
-   { native; }
 *)
 
 open Effect
