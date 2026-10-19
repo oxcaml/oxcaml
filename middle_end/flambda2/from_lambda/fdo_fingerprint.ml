@@ -496,7 +496,7 @@ module Body_hash = struct
       =
     ident name
 
-  let rec term (lam : L.lambda) =
+  let rec lambda (lam : L.lambda) =
     match lam with
     | Lvar id -> H.node ~tag:1 [ident id]
     | Lmutvar id -> H.node ~tag:2 [ident id]
@@ -515,16 +515,16 @@ module Body_hash = struct
           ap_tailcall = _
         } ->
       H.node ~tag:4
-        [ term ap_func;
-          H.of_list (List.map term ap_args);
+        [ lambda ap_func;
+          H.of_list (List.map lambda ap_args);
           inlined_attribute ap_inlined;
           specialise_attribute ap_specialised;
           bool (Option.is_some ap_probe) ]
     | Lfunction fn -> H.node ~tag:5 [lfunction fn]
     | Llet (_let_kind, _layout, id, _debug_uid, arg, body) ->
-      H.node ~tag:6 [ident id; term arg; term body]
+      H.node ~tag:6 [ident id; lambda arg; lambda body]
     | Lmutlet (_layout, id, _debug_uid, arg, body) ->
-      H.node ~tag:7 [ident id; term arg; term body]
+      H.node ~tag:7 [ident id; lambda arg; lambda body]
     | Lletrec (bindings, body) ->
       H.node ~tag:8
         [ H.of_list
@@ -532,9 +532,9 @@ module Body_hash = struct
                (fun ({ id; debug_uid = _; def } : L.rec_binding) ->
                  H.combine (ident id) (lfunction def))
                bindings);
-          term body ]
+          lambda body ]
     | Lprim (prim, args, _loc) ->
-      H.node ~tag:9 [primitive prim; H.of_list (List.map term args)]
+      H.node ~tag:9 [primitive prim; H.of_list (List.map lambda args)]
     | Lswitch
         ( arg,
           { sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction },
@@ -544,40 +544,41 @@ module Body_hash = struct
       let cases cases =
         H.of_list
           (List.map
-             (fun (key, case) -> H.combine (H.of_int key) (term case))
+             (fun (key, case) -> H.combine (H.of_int key) (lambda case))
              cases)
       in
       H.node ~tag:10
-        [ term arg;
+        [ lambda arg;
           H.of_int sw_numconsts;
           cases sw_consts;
           H.of_int sw_numblocks;
           cases sw_blocks;
-          H.of_option (Option.map term sw_failaction) ]
+          H.of_option (Option.map lambda sw_failaction) ]
     | Lstringswitch (arg, cases, default, _loc, _layout) ->
       H.node ~tag:11
-        [ term arg;
+        [ lambda arg;
           H.of_list
             (List.map
-               (fun (key, case) -> H.combine (H.of_string key) (term case))
+               (fun (key, case) -> H.combine (H.of_string key) (lambda case))
                cases);
-          H.of_option (Option.map term default) ]
+          H.of_option (Option.map lambda default) ]
     (* Static handler numbers are fresh for every compilation and left out, so
        which handler a [Lstaticraise] jumps to is not hashed. *)
     | Lstaticraise (_label, args) ->
-      H.node ~tag:12 [H.of_list (List.map term args)]
+      H.node ~tag:12 [H.of_list (List.map lambda args)]
     | Lstaticcatch (body, (_label, params), handler, _pop_region, _layout) ->
       H.node ~tag:13
-        [ term body;
+        [ lambda body;
           H.of_list
             (List.map (fun (id, _debug_uid, _layout) -> ident id) params);
-          term handler ]
+          lambda handler ]
     | Ltrywith (body, id, _debug_uid, handler, _layout) ->
-      H.node ~tag:14 [term body; ident id; term handler]
+      H.node ~tag:14 [lambda body; ident id; lambda handler]
     | Lifthenelse (cond, ifso, ifnot, _layout) ->
-      H.node ~tag:15 [term cond; term ifso; term ifnot]
-    | Lsequence (first, second) -> H.node ~tag:16 [term first; term second]
-    | Lwhile { wh_cond; wh_body } -> H.node ~tag:17 [term wh_cond; term wh_body]
+      H.node ~tag:15 [lambda cond; lambda ifso; lambda ifnot]
+    | Lsequence (first, second) -> H.node ~tag:16 [lambda first; lambda second]
+    | Lwhile { wh_cond; wh_body } ->
+      H.node ~tag:17 [lambda wh_cond; lambda wh_body]
     | Lfor
         { for_id;
           for_from;
@@ -589,11 +590,11 @@ module Body_hash = struct
         } ->
       H.node ~tag:18
         [ ident for_id;
-          term for_from;
-          term for_to;
+          lambda for_from;
+          lambda for_to;
           H.of_int (match for_dir with Upto -> 0 | Downto -> 1);
-          term for_body ]
-    | Lassign (id, e) -> H.node ~tag:19 [ident id; term e]
+          lambda for_body ]
+    | Lassign (id, e) -> H.node ~tag:19 [ident id; lambda e]
     | Lsend
         ( kind,
           met,
@@ -606,14 +607,14 @@ module Body_hash = struct
           _yielding ) ->
       H.node ~tag:20
         [ H.of_int (match kind with Self -> 0 | Public -> 1 | Cached -> 2);
-          term met;
-          term obj;
-          H.of_list (List.map term args) ]
-    | Lifused (id, e) -> H.node ~tag:21 [ident id; term e]
+          lambda met;
+          lambda obj;
+          H.of_list (List.map lambda args) ]
+    | Lifused (id, e) -> H.node ~tag:21 [ident id; lambda e]
     (* Debugger events, regions and exclaves are transparent *)
-    | Levent (e, _event) -> term e
-    | Lregion (e, _layout) -> term e
-    | Lexclave e -> term e
+    | Levent (e, _event) -> lambda e
+    | Lregion (e, _layout) -> lambda e
+    | Lexclave e -> lambda e
     (* Removed by [Slambda.eval] before the translation to Flambda. *)
     | Lsplice (_loc, _slambda) -> L.fatal_error_invalid_constructor lam
     | Lkindtemplate _template -> L.fatal_error_invalid_constructor lam
@@ -634,9 +635,9 @@ module Body_hash = struct
        } :
         L.lfunction) =
     H.node ~tag:1
-      [H.of_list (List.map lparam params); function_attribute attr; term body]
+      [H.of_list (List.map lparam params); function_attribute attr; lambda body]
 
-  let hash_function fn = FC.Body_hash.of_int32 (H.to_int32 (lfunction fn))
+  let hash hasher hashee = FC.Body_hash.of_int32 (H.to_int32 (hasher hashee))
 end
 
 (* CR yusumez: We need to check whether this is a good way to identify
@@ -774,8 +775,18 @@ let of_function (context : Naming_context.t) (fn : L.lfunction) =
     let name = FC.Name.create ~name_str:path ~discriminator in
     FC.Function.create_original name
   in
-  ( { function_; body_hash = Body_hash.hash_function fn },
+  ( { function_; body_hash = Body_hash.(hash lfunction fn) },
     { context with enclosing_path = path } )
+
+let of_toplevel compilation_unit module_initializer =
+  let name =
+    FC.Name.create
+      ~name_str:(Compilation_unit.full_path_as_string compilation_unit)
+      ~discriminator:0
+  in
+  { function_ = FC.Function.create_original name;
+    body_hash = Body_hash.(hash lambda module_initializer)
+  }
 
 let function_ t = t.function_
 

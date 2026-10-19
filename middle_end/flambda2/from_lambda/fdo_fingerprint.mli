@@ -63,6 +63,8 @@ type t
     the functions defined in its body. *)
 val of_function : Naming_context.t -> Lambda.lfunction -> t * Naming_context.t
 
+val of_toplevel : Compilation_unit.t -> Lambda.lambda -> t
+
 (** The FDO function id. *)
 val function_ : t -> Fdo_counter.Function.t
 
