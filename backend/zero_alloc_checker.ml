@@ -291,16 +291,7 @@ module Witnesses = struct
     }
 end
 
-module Tag = struct
-  type t =
-    | N
-    | E
-    | D
-
-  let compare : t -> t -> int = fun t1 t2 -> Stdlib.compare t1 t2
-
-  let print = function N -> "nor" | E -> "exn" | D -> "div"
-end
+module Tag = Zero_alloc_info.Tag
 
 module Var : sig
   type t
@@ -1248,7 +1239,7 @@ end = struct
       Join (Join.var_with_safe var witnesses)
     | (Top w as top), Var { var; witnesses }
     | Var { var; witnesses }, (Top w as top) ->
-      (* If `Top w` is already "as bad as possible" (i.e. permits allocation and
+      (* If [Top w] is already "as bad as possible" (i.e. permits allocation and
          does *not* do so solely through its arguments), then there's nothing
          more to learn, so we might as well save some time and space. *)
       if
@@ -1403,19 +1394,60 @@ end = struct
      (e.g. why/how witnesses are tracked) next to the code. *)
 
   let apply_call ~witnesses ~callee_summary ~known_arguments =
-    match callee_summary with
-    | Top callee_witnesses ->
-      let caller_argument callee_argument =
-        match Cmm.Known_arguments.find known_arguments callee_argument with
-        | Some (Argument caller_argument) -> Some caller_argument
-        | Some (Symbol _) | None -> None
-      in
-      let allocation_sources =
-        Allocation_sources.rename_arguments
-          (Witnesses.allocation_sources callee_witnesses)
-          ~f:caller_argument
-      in
+    let top allocation_sources =
       Top { witnesses with Witnesses.allocation_sources }
+    in
+    (* Handle a known symbol passed as an argument to a function that we know
+       may call it: e.g. [f ignore] if we know that [f]'s allocation summary
+       depends on whether/how its first argument allocates. *)
+    let handle_call_to_symbol sym_name outcomes =
+      (* Handle aliases, e.g. the data block for a closure that points to the
+         code of that closure (though this is re-exported outside the same
+         compilation unit). *)
+      let name =
+        Zero_alloc_info.resolve_alias
+          (Compilenv.current_zero_alloc_info ())
+          sym_name
+      in
+      (* Fold over the parts of the allocation summary that matter for this
+         argument position, using the characteristics of the symbol passed. *)
+      List.fold_left
+        (fun acc tag ->
+          (* Can this symbol allocate on a (normal/exceptional/diverging) path
+             that matters to the callee at this argument position? *)
+          if Call_outcomes.is_subset ~sub:(Tag.outcome tag) ~super:outcomes
+          then
+            (* Soundly under-approximate that we know nothing about any
+               arguments passed to this symbol in the body of this function. *)
+            (* CR-someday wsturgeon for wsturgeon: store arity and/or known
+               arguments for each call so we have a real [~known_arguments] *)
+            let known_arguments = Cmm.Known_arguments.none 0 in
+            (* Mint a variable that depends on the symbol called. *)
+            let var = Var.create ~name ~tag ~known_arguments in
+            (* Join that dependency with other applicable outcomes (e.g.
+               normal/exceptional/diverging paths), if any. *)
+            join acc (unresolved witnesses var)
+          else acc)
+        Safe Tag.all
+    in
+    let handle_call_to_argument argument outcomes =
+      match Cmm.Known_arguments.find known_arguments argument with
+      | Some (Argument parameter) ->
+        top (Allocation_sources.argument ~lowered_index:parameter ~outcomes)
+      | Some (Symbol { sym_name; _ }) ->
+        handle_call_to_symbol sym_name outcomes
+      | None -> top Allocation_sources.unknown
+    in
+    match callee_summary with
+    | Top callee_witnesses -> (
+      match Witnesses.allocation_sources callee_witnesses with
+      | Allocation_other_than_calling_arguments ->
+        top Allocation_sources.unknown
+      | No_allocation_other_than_calling_arguments arguments_called ->
+        Numbers.Int.Map.fold
+          (fun argument outcomes result ->
+            join result (handle_call_to_argument argument outcomes))
+          arguments_called Safe)
     | Bot | Safe -> callee_summary
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf "Zero_alloc_checker.apply_call: unresolved value %a"
@@ -1457,20 +1489,19 @@ end = struct
         "Meet of unresolved is not implemented and shouldn't be needed."
 
   let apply t ~env =
-    let get env var ~witnesses =
+    let contains_any env vars =
+      Vars.exists (fun var _w -> Option.is_some (env var)) vars
+    in
+    let rec get env var ~witnesses =
       match env var with
       | None -> unresolved witnesses var
       | Some callee_summary ->
         let known_arguments = Var.known_arguments var in
-        apply_call ~witnesses ~callee_summary ~known_arguments
-    in
-    let contains_any env vars =
-      Vars.exists (fun var _w -> Option.is_some (env var)) vars
-    in
+        aux (apply_call ~witnesses ~callee_summary ~known_arguments)
     (* CR-someday gyorsh: This is a naive implementation that reallocates the
        entire [t] whenever there is a change. Can be optimized to update the
        underlying sets and maps instead of using [fold]. *)
-    let rec aux t =
+    and aux t =
       match t with
       | Bot | Safe | Top _ -> t
       | Var { var; witnesses } -> get env var ~witnesses
@@ -1783,7 +1814,7 @@ module Metadata : sig
     Value.t option
 
   (* Redundantly ignore assumptions in which we haven't lost any information, so
-     we can check the soundness of the `zero_alloc` system itself. *)
+     we can check the soundness of the [zero_alloc] system itself. *)
   val assume_value_unless_inferred :
     Debuginfo.t -> (Call_outcomes.t -> Witnesses.t) -> Value.t option
 end = struct
@@ -2556,7 +2587,7 @@ end = struct
 
     val add : Func_info.t -> Value.t -> t -> t
 
-    val get_value_exn : string -> t -> Value.t
+    val find_value : string -> t -> Value.t option
 
     val iter : t -> f:(Func_info.t -> Value.t -> unit) -> unit
 
@@ -2584,9 +2615,8 @@ end = struct
 
     let singleton (func_info : Func_info.t) approx = add func_info approx empty
 
-    let get_value_exn name t =
-      let d = String.Map.find name t in
-      d.approx
+    let find_value name t =
+      Option.map (fun d -> d.approx) (String.Map.find_opt name t)
 
     let map t ~f =
       String.Map.map
@@ -2614,7 +2644,14 @@ end = struct
   let fixpoint ppf init_env =
     (* CR gyorsh: this is a really dumb iteration strategy. *)
     let lookup env var =
-      let v = Env.get_value_exn (Var.name var) env in
+      let v =
+        match Env.find_value (Var.name var) env with
+        | Some v -> v
+        | None -> (
+          match Compilenv_utils.get_value_opt (Var.name var) with
+          | Some v -> v
+          | None -> Value.top Witnesses.unknown)
+      in
       Some (Value.get_component v (Var.tag var))
     in
     let rec loop env =

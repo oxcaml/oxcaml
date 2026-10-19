@@ -755,6 +755,7 @@ module Known_arguments = struct
           Backend_var.same (Backend_var.With_provenance.var parameter) var)
         parameters
       |> Option.map (fun index -> Argument index)
+    | Cconst_symbol (symbol, _dbg) -> Some (Symbol symbol)
     | _ -> None
 
   let of_arguments ~parameters arguments =

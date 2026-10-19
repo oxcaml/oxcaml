@@ -13,6 +13,40 @@ module Call_outcomes = struct
   let diverging = 4
 
   let all = 7
+
+  let is_subset ~sub ~super = sub land super = sub
+end
+
+module Tag = struct
+  type t =
+    | N
+    | E
+    | D
+
+  let compare : t -> t -> int = fun t1 t2 -> Stdlib.compare t1 t2
+
+  let print = function N -> "nor" | E -> "exn" | D -> "div"
+
+  let all = [N; E; D]
+
+  let outcome = function
+    | N -> Call_outcomes.normal_return
+    | E -> Call_outcomes.exceptional_return
+    | D -> Call_outcomes.diverging
+
+  let position = function N -> 0 | E -> 1 | D -> 2
+end
+
+module Call_outcomes_by_component = struct
+  type t = int
+
+  let empty = 0
+
+  let add t name outcomes =
+    t lor (outcomes lsl (3 * Tag.position name))
+
+  let get t name =
+    (t lsr (3 * Tag.position name)) land Call_outcomes.all
 end
 
 module Allocation_sources = struct
@@ -56,20 +90,6 @@ module Allocation_sources = struct
         (Numbers.Int.Map.union (fun _ lhs rhs -> Some (lhs lor rhs)) a1 a2)
 
   let lessequal t1 t2 = compare (join t1 t2) t2 = 0
-
-  let rename_arguments t ~f =
-    match t with
-    | Allocation_other_than_calling_arguments ->
-      Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments arguments_called ->
-      Numbers.Int.Map.fold
-        (fun callee_argument outcomes renamed ->
-          match f callee_argument with
-          | None -> Allocation_other_than_calling_arguments
-          | Some caller_argument ->
-            join renamed (argument ~lowered_index:caller_argument ~outcomes))
-        arguments_called
-        (No_allocation_other_than_calling_arguments Numbers.Int.Map.empty)
 
   let meet t1 t2 = match t1, t2 with
     | ( Allocation_other_than_calling_arguments,
@@ -141,25 +161,33 @@ type components =
 
 type value =
   { components : int;
-    arguments_that_may_allocate : (int * int) list
+    arguments_that_may_allocate : (int * Call_outcomes_by_component.t) list
   }
 
-type t = { mutable zero_alloc : value String.Map.t }
+type t =
+  { mutable zero_alloc : value String.Map.t;
+    mutable aliases : string String.Map.t
+  }
 
-let create () = { zero_alloc = String.Map.empty }
+let create () = { zero_alloc = String.Map.empty; aliases = String.Map.empty }
 
-let reset t = t.zero_alloc <- String.Map.empty
+let reset t =
+  t.zero_alloc <- String.Map.empty;
+  t.aliases <- String.Map.empty
 
 let merge src ~into:dst =
   let join key _ _ = Misc.fatal_errorf "Unexpected merge %s" key in
-  dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
+  dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc;
+  dst.aliases <- String.Map.union join dst.aliases src.aliases
 
 (* Tag 0: [Top Allocation_other_than_calling_arguments]
  * Tag 1: [Safe]
  * Tag 2: [Bot]
  * Tag 3: [Top (No_allocation_other_than_calling_arguments ...)] *)
-let encode_component index component (components, calls) =
-  let with_tag tag = components lor (tag lsl (2 * index)) in
+let encode_component name component (components, calls) =
+  let with_tag tag =
+    components lor (tag lsl (2 * Tag.position name))
+  in
   match component with
   | Top Allocation_other_than_calling_arguments -> with_tag 0, calls
   | Safe -> with_tag 1, calls
@@ -171,7 +199,10 @@ let encode_component index component (components, calls) =
           Numbers.Int.Map.update argument
             (fun previous ->
               Some
-                (Option.value previous ~default:0 lor (outcomes lsl (3 * index))))
+                (Call_outcomes_by_component.add
+                   (Option.value previous
+                      ~default:Call_outcomes_by_component.empty)
+                   name outcomes))
             calls)
         arguments_called calls
     in
@@ -179,8 +210,10 @@ let encode_component index component (components, calls) =
 
 let encode { nor; exn; div } =
   let components, calls =
-    (0, Numbers.Int.Map.empty) |> encode_component 0 nor
-    |> encode_component 1 exn |> encode_component 2 div
+    (0, Numbers.Int.Map.empty)
+    |> encode_component N nor
+    |> encode_component E exn
+    |> encode_component D div
   in
   if components = 0
   then None
@@ -190,16 +223,18 @@ let encode { nor; exn; div } =
         arguments_that_may_allocate = Numbers.Int.Map.bindings calls
       }
 
-let decode_component index value =
-  match (value.components lsr (2 * index)) land 3 with
+let decode_component name value =
+  match (value.components lsr (2 * Tag.position name)) land 3 with
   | 0 -> Top Allocation_other_than_calling_arguments
   | 1 -> Safe
   | 2 -> Bot
   | 3 ->
     let arguments_called =
       List.fold_left
-        (fun calls (argument, outcomes) ->
-          let outcomes = (outcomes lsr (3 * index)) land Call_outcomes.all in
+        (fun calls (argument, outcomes_by_component) ->
+          let outcomes =
+            Call_outcomes_by_component.get outcomes_by_component name
+          in
           if outcomes = 0
           then calls
           else Numbers.Int.Map.add argument outcomes calls)
@@ -211,9 +246,9 @@ let decode_component index value =
 let decode value =
   if value.components = 0
   then Misc.fatal_error "Zero_alloc_info unexpected empty encoding";
-  { nor = decode_component 0 value;
-    exn = decode_component 1 value;
-    div = decode_component 2 value
+  { nor = decode_component N value;
+    exn = decode_component E value;
+    div = decode_component D value
   }
 
 let get_value (t : t) s = String.Map.find_opt s t.zero_alloc
@@ -227,6 +262,12 @@ let set_value (t : t) s (v : value) =
   t.zero_alloc <- String.Map.update s (f v) t.zero_alloc
 
 let iter ~f t = String.Map.iter f t.zero_alloc
+
+let add_alias t ~symbol ~code_symbol =
+  t.aliases <- String.Map.add symbol code_symbol t.aliases
+
+let resolve_alias t symbol =
+  Option.value (String.Map.find_opt symbol t.aliases) ~default:symbol
 
 module Raw = struct
   type entries = (string * value) list
@@ -252,11 +293,19 @@ module Raw = struct
 end
 
 let to_raw (t : t) : Raw.t =
-  if String.Map.is_empty t.zero_alloc
+  let exported =
+    String.Map.fold
+      (fun symbol code_symbol exported ->
+        match get_value t code_symbol with
+        | Some value -> String.Map.add symbol value exported
+        | None -> exported)
+      t.aliases t.zero_alloc
+  in
+  if String.Map.is_empty exported
   then None
-  else Some (String.Map.bindings t.zero_alloc)
+  else Some (String.Map.bindings exported)
 
 let of_raw (t : Raw.t) : t =
   match t with
   | None -> create ()
-  | Some t -> { zero_alloc = Raw.entries_to_map t }
+  | Some t -> { zero_alloc = Raw.entries_to_map t; aliases = String.Map.empty }

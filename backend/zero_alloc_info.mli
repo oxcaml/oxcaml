@@ -13,6 +13,33 @@ module Call_outcomes : sig
   val diverging : t
 
   val all : t
+
+  val is_subset : sub:t -> super:t -> bool
+end
+
+module Tag : sig
+  type t =
+    | N
+    | E
+    | D
+
+  val compare : t -> t -> int
+
+  val print : t -> string
+
+  val all : t list
+
+  val outcome : t -> Call_outcomes.t
+end
+
+module Call_outcomes_by_component : sig
+  type t = private int
+
+  val empty : t
+
+  val add : t -> Tag.t -> Call_outcomes.t -> t
+
+  val get : t -> Tag.t -> Call_outcomes.t
 end
 
 module Allocation_sources : sig
@@ -34,8 +61,6 @@ module Allocation_sources : sig
   val join : t -> t -> t
 
   val meet : t -> t -> t
-
-  val rename_arguments : t -> f:(int -> int option) -> t
 
   val print : Format.formatter -> t -> unit
 end
@@ -73,6 +98,10 @@ val get_value : t -> string -> value option
 val set_value : t -> string -> value -> unit
 
 val iter : f:(string -> value -> unit) -> t -> unit
+
+val add_alias : t -> symbol:string -> code_symbol:string -> unit
+
+val resolve_alias : t -> string -> string
 
 module Raw : sig
   type t
