@@ -49,6 +49,8 @@ val equal : t -> t -> bool
 
 val print : Format.formatter -> t -> unit
 
+(** The counters bundled with a function body hash. Used for function entries.
+*)
 module With_body_hash : sig
   type annotation = t
 
@@ -63,7 +65,13 @@ module With_body_hash : sig
 
   val body_hash : t -> Fdo_counter.Function_body_hash.t option
 
+  val with_annotation : t -> annotation -> t
+
+  val with_body_hash : t -> Fdo_counter.Function_body_hash.t -> t
+
   val empty : t
+
+  val is_empty : t -> bool
 
   val print : Format.formatter -> t -> unit
 end
