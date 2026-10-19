@@ -420,12 +420,12 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check { conditional; strict; opt; arity; partial; loc;
+    | Check { conditional = false; strict; opt; arity; partial; loc;
               custom_error_msg = _ }
       when Zero_alloc.applicable_arity ~arity ~partial ~num_args
            && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { conditional;
+        { conditional = false;
           strict;
           never_returns_normally = false;
           never_raises = false;
