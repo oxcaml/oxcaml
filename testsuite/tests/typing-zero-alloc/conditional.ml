@@ -261,13 +261,32 @@ Error: called function may allocate (indirect call through argument #1)
 |}]
 
 (* Asking for [conditional strict] requires that *arguments* are [strict]: *)
-let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
+module Strict_requires_arguments_to_be_strict = struct
+  let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
+  let[@zero_alloc] enforced_at_call_sites () = catch_strict ignore
+end
 [%%expect{|
-(* CR wsturgeon for wsturgeon: this has to pass *)
+module Strict_requires_arguments_to_be_strict :
+  sig
+    val catch_strict : (unit -> unit) -> unit
+      [@@zero_alloc conditional strict]
+    val enforced_at_call_sites : unit -> unit [@@zero_alloc]
+  end
 |}]
-let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+
+module Strict_requires_arguments_to_be_strict = struct
+  let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
+  let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+end
 [%%expect{|
-(* CR wsturgeon for wsturgeon: this has to fail *)
+Line 3, characters 7-17:
+3 |   let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP26.Strict_requires_arguments_to_be_strict.enforced_at_call_sites (camlTOP26__enforced_at_call_sites_32_61_code).
+Line 3, characters 47-79:
+3 |   let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (direct tailcall camlTOP26__catch_strict_31_60_code)
 |}]
 
 (* CR-someday wsturgeon for wsturgeon: support arbitrary-arity callbacks, and

@@ -361,7 +361,8 @@ module V : sig
   (** order of the abstract domain *)
   val lessequal : t -> t -> bool
 
-  val satisfies : conditional:bool -> actual:t -> expected:t -> bool
+  val satisfies :
+    conditional:bool -> strict:bool -> actual:t -> expected:t -> bool
 
   val join : t -> t -> t
 
@@ -376,7 +377,7 @@ module V : sig
     t
 
   val diff_witnesses :
-    conditional:bool -> expected:t -> actual:t -> Witness_set.t
+    conditional:bool -> strict:bool -> expected:t -> actual:t -> Witness_set.t
 
   val get_witnesses : t -> Witness_set.t
 
@@ -1309,7 +1310,7 @@ end = struct
       (* structural equality on the normal form *)
       equal (join t1 t2) t2
 
-  let satisfies ~conditional ~actual ~expected =
+  let satisfies ~conditional ~strict ~actual ~expected =
     match actual, expected with
     | Top actual, Top expected ->
       Witnesses.lessequal ~ignore_diagnostic_witnesses:true actual expected
@@ -1322,11 +1323,13 @@ end = struct
       | Allocation_other_than_calling_arguments -> false
       | No_allocation_other_than_calling_arguments arguments_called ->
         (* ... and check that, for all arguments that might allocate, ... *)
-        Numbers.Int.Map.for_all (fun _ (outcomes : Call_outcomes.t) ->
+        let allowed : Call_outcomes.t =
+          if strict then Call_outcomes.all else Call_outcomes.normal_return
+        in
+        Numbers.Int.Map.for_all (fun _ outcomes ->
           (* ... as long as we assume those arguments do not allocate in
             normal-return paths, then (conditionally) we're fine. *)
-          (outcomes :> int) land (lnot (Call_outcomes.normal_return :> int))
-          = 0)
+          Call_outcomes.is_subset ~sub:outcomes ~super:allowed)
           arguments_called
       end
     | Top _, (Safe | Bot) -> false
@@ -1453,8 +1456,8 @@ end = struct
       Misc.fatal_errorf "Zero_alloc_checker.apply_call: unresolved value %a"
         (print ~witnesses:false) callee_summary
 
-  let diff_witnesses ~conditional ~expected ~actual =
-    if satisfies ~conditional ~actual ~expected
+  let diff_witnesses ~conditional ~strict ~expected ~actual =
+    if satisfies ~conditional ~strict ~actual ~expected
     then Witness_set.empty
     else
       (* If [actual] is Top and [expected] is not Top then return the [actual]
@@ -1563,7 +1566,11 @@ module Value : sig
   val get_witnesses : t -> Witness_set.components
 
   val diff_witnesses :
-    conditional:bool -> expected:t -> actual:t -> Witness_set.components
+    conditional:bool ->
+    strict:bool ->
+    expected:t ->
+    actual:t ->
+    Witness_set.components
 
   val unresolved :
     string ->
@@ -1621,13 +1628,16 @@ end = struct
           ~known_arguments;
     }
 
-  let diff_witnesses ~conditional ~expected ~actual =
+  let diff_witnesses ~conditional ~strict ~expected ~actual =
     { Witness_set.nor =
-        V.diff_witnesses ~conditional ~expected:expected.nor ~actual:actual.nor;
+        V.diff_witnesses ~conditional ~strict ~expected:expected.nor
+          ~actual:actual.nor;
       Witness_set.exn =
-        V.diff_witnesses ~conditional ~expected:expected.exn ~actual:actual.exn;
+        V.diff_witnesses ~conditional ~strict ~expected:expected.exn
+          ~actual:actual.exn;
       Witness_set.div =
-        V.diff_witnesses ~conditional ~expected:expected.div ~actual:actual.div
+        V.diff_witnesses ~conditional ~strict ~expected:expected.div
+          ~actual:actual.div
     }
 
   let get_witnesses t =
@@ -1712,12 +1722,13 @@ end = struct
     Value.of_annotation ~strict ~never_returns_normally ~never_raises
 
   let valid ~expected ~actual =
-    Value.satisfies ~conditional:expected.conditional ~actual
-      ~expected:(expected_value expected)
+    Value.satisfies ~conditional:expected.conditional ~strict:expected.strict
+      ~actual ~expected:(expected_value expected)
 
   let diff_witnesses t v =
     let expected = expected_value t in
-    Value.diff_witnesses ~conditional:t.conditional ~actual:v ~expected
+    Value.diff_witnesses ~conditional:t.conditional ~strict:t.strict ~actual:v
+      ~expected
 
   let is_assume t = t.assume
 

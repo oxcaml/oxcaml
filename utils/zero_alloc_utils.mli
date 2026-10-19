@@ -36,7 +36,8 @@ module type Component = sig
   (** Order of the abstract domain *)
   val lessequal : t -> t -> bool
 
-  val satisfies : conditional:bool -> actual:t -> expected:t -> bool
+  val satisfies :
+    conditional:bool -> strict:bool -> actual:t -> expected:t -> bool
 
   val join : t -> t -> t
 
@@ -77,7 +78,8 @@ module Make_value
 
   val lessequal : t -> t -> bool
 
-  val satisfies : conditional:bool -> actual:t -> expected:t -> bool
+  val satisfies :
+    conditional:bool -> strict:bool -> actual:t -> expected:t -> bool
 
   val join : t -> t -> t
 
