@@ -451,22 +451,6 @@ let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
       | Some outputvar ->
         Environments.add_if_undefined outputvar prog_output_file env
     in
-    let env = match Compiler.target with
-      | Native | Bytecode -> env
-      | Jsir ->
-        (* A program may behave differently when compiled to JavaScript
-           (for instance, integers are 32 bits wide), in which case its
-           expected output goes in <test>.jsir-output.reference. *)
-        let reference =
-          Filename.make_path
-            [Actions_helpers.test_source_directory env;
-             Filename.chop_extension (Actions_helpers.testfile env)
-             ^ ".jsir-output.reference"]
-        in
-        if Sys.file_exists reference
-        then Environments.add Builtin_variables.reference reference env
-        else env
-    in
     (r, env)
   end else (r, env)
 
@@ -608,7 +592,7 @@ let run_js =
       ~name:"run-js"
       ~description:"Run the JavaScript program with node"
       ~does_something:true
-      (Actions_helpers.run_program ~prefix:Ocaml_files.node))
+      (Actions_helpers.run_program_with ~interpreter:Ocaml_files.node))
 
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in

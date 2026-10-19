@@ -403,7 +403,7 @@ let run = make
   ~name:"run"
   ~description:"Run the program"
   ~does_something:true
-  (Actions_helpers.run_program ?prefix:None)
+  Actions_helpers.run_program
 
 let script = make
   ~name:"script"
