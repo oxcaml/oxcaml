@@ -1195,6 +1195,9 @@ and primitive_coercion =
     pc_kindtemplate: kindtemplate_coercion;
     pc_env: Env.t;
     pc_loc : Location.t;
+    pc_name : string;
+    (** The name of the value that the coerced primitive implements, as
+        declared in the signature; it names the wrapper function. *)
   }
 
 and kindtemplate_coercion =
