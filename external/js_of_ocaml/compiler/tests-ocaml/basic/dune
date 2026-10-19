@@ -32,6 +32,7 @@
   patmatch
   pr7533
   pr7657
+  recvalues
   sets
   stringmatch
   switch_opts
