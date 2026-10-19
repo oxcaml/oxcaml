@@ -55,4 +55,5 @@ ${OCAMLFILT} --format structured \
   "_CamlU4MainF9say_helloD0_D5" \
   "_CamlU4MainF9say_helloD0_D5_x" \
   "_CamlU4MainF4mainL0" \
-  "_CamlU3FooF3barP3_F1f"
+  "_CamlU3FooF3barP3_F1f" \
+  "_CamlU4611686018427387903Foo"

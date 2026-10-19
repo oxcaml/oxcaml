@@ -359,13 +359,14 @@ module Parse = struct
     match undecimal str (pos + flag_len) with
     | None -> None
     | Some (payload_len, length_len) ->
+      let payload_pos = pos + flag_len + length_len in
       let full_len = flag_len + length_len + payload_len in
-      if payload_len <= 0 || pos + full_len > String.length str
+      (* The bound is checked by subtraction: [payload_len] can be close to
+         [max_int], and adding to it would overflow. *)
+      if payload_len <= 0 || payload_len > String.length str - payload_pos
       then None
       else
-        let payload =
-          String.sub str (pos + flag_len + length_len) payload_len
-        in
+        let payload = String.sub str payload_pos payload_len in
         if is_escaped
         then Option.map (fun p -> p, full_len) (decode_split_parts payload)
         else Some (payload, full_len)
