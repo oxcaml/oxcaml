@@ -140,10 +140,6 @@ val to_global_name : t -> Global_module.Name.t option
     prefix. *)
 val to_global_name_exn : t -> Global_module.Name.t
 
-(** Like [to_global_name] but succeed even when there is a pack prefix,
-    discarding the prefix in that case. *)
-val to_global_name_without_prefix : t -> Global_module.Name.t
-
 (** Create the compilation unit named by the given [Global_module.t]. Throws a
     fatal error if the global is not a complete instantiation, which is to say,
     if it has any hidden arguments at any depth. *)
