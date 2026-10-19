@@ -1,5 +1,5 @@
 File "primitive_coercion_zero_alloc_all_in_mli.mli", line 5, characters 0-35:
-Error: Annotation check for zero_alloc failed on function Primitive_coercion_zero_alloc_all_in_mli.(partial) (camlPrimitive_coercion_zero_alloc_all_in_mli__fn_0_0).
+Error: Annotation check for zero_alloc failed on function Primitive_coercion_zero_alloc_all_in_mli.add32.(partial) (camlPrimitive_coercion_zero_alloc_all_in_mli__add32_1_1).
 
 File "primitive_coercion_zero_alloc_all_in_mli.ml", line 11, characters 0-55:
 11 | external add32 : int32 -> int32 -> int32 = "%int32_add" (* Should error *)
