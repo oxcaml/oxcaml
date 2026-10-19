@@ -103,7 +103,7 @@ let instantiate
   let arg_pairs : CU.argument list =
     List.map
       (fun (param, (value, _, _)) : CU.argument ->
-         { param = CU.Name.of_parameter_name param; value })
+         { param; value })
       arg_infos
   in
   let arg_map :
