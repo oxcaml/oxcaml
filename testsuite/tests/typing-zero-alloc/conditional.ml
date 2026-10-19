@@ -244,7 +244,14 @@ module Zero_alloc_conditional_assume_requires_non_allocating_arguments = struct
   let[@zero_alloc] rejected_bc_argument_allocates () = secret allocate
 end
 [%%expect{|
-CR wsturgeon: this has to fail
+Line 4, characters 7-17:
+4 |   let[@zero_alloc] rejected_bc_argument_allocates () = secret allocate
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP23.Zero_alloc_conditional_assume_requires_non_allocating_arguments.rejected_bc_argument_allocates (camlTOP23__rejected_bc_argument_allocates_26_50_code).
+Line 4, characters 55-70:
+4 |   let[@zero_alloc] rejected_bc_argument_allocates () = secret allocate
+                                                           ^^^^^^^^^^^^^^^
+Error: called function may allocate (direct tailcall camlTOP23__secret_25_49_code)
 |}]
 
 (* Arguments are non-[strict] by default: *)

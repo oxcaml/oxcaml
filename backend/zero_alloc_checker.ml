@@ -1661,6 +1661,8 @@ module Annotation : sig
 
   val expected_value : t -> Value.t
 
+  val assumed_value : t -> num_params:int -> Value.t
+
   (** [valid t value] returns true if and only if the [value] satisfies the
       annotation, i.e., [value] is less or equal to [expected_value a] when
       ignoring witnesses. *)
@@ -1720,6 +1722,33 @@ end = struct
         custom_error_msg = _
       } =
     Value.of_annotation ~strict ~never_returns_normally ~never_raises
+
+  let assumed_value t ~num_params =
+    let expected = expected_value t in
+    match t.conditional with
+    | false -> expected
+    | true -> begin
+      let outcomes =
+        if t.strict then Call_outcomes.all else Call_outcomes.normal_return
+      in
+      let only_by_calling_arguments =
+        List.init num_params
+          (fun lowered_index ->
+            V.top
+              (Witnesses.of_summary
+                 (Allocation_sources.argument ~lowered_index ~outcomes)))
+        |> List.fold_left V.join V.safe
+      in
+      let conditional component =
+        V.match_with component ~safe:only_by_calling_arguments ~bot:component
+          ~top:(fun _ -> component)
+          ~unresolved:(fun () -> component)
+      in
+      { Value.nor = conditional expected.nor;
+        exn = conditional expected.exn;
+        div = conditional expected.div
+      }
+    end
 
   let valid ~expected ~actual =
     Value.satisfies ~conditional:expected.conditional ~strict:expected.strict
@@ -2772,8 +2801,8 @@ end = struct
         unresolved_deps;
     propagate ~callee:caller unit_info unresolved_deps ppf
 
-  let check_fun fun_name fun_dbg a check_body ~future_funcnames unit_info
-      unresolved_deps ppf =
+  let check_fun fun_name fun_dbg a check_body ~num_params ~future_funcnames
+      unit_info unresolved_deps ppf =
     let check () =
       let t = create ppf fun_name future_funcnames unit_info a in
       let really_check () =
@@ -2799,9 +2828,9 @@ end = struct
       in
       match a with
       | Some a when Annotation.is_assume a ->
-        let expected_value = Annotation.expected_value a in
-        report t expected_value ~msg:"assumed" ~desc:"fundecl" fun_dbg;
-        Unit_info.record unit_info fun_name expected_value fun_dbg None
+        let assumed_value = Annotation.assumed_value a ~num_params in
+        report t assumed_value ~msg:"assumed" ~desc:"fundecl" fun_dbg;
+        Unit_info.record unit_info fun_name assumed_value fun_dbg None
       | None -> really_check ()
       | Some a ->
         let expected_value = Annotation.expected_value a in
@@ -3055,7 +3084,8 @@ end = struct
           ~desc:"fundecl" fd.fun_dbg;
         res
     in
-    check_fun fd.fun_name fd.fun_dbg a check_body ~future_funcnames unit_info
+    check_fun fd.fun_name fd.fun_dbg a check_body
+      ~num_params:(Array.length fd.fun_args) ~future_funcnames unit_info
       unresolved_deps ppf
 end
 
