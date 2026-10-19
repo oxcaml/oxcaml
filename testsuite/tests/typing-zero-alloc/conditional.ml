@@ -76,14 +76,44 @@ val state : int ref ref = {contents = {contents = 42}}
 val allocate : unit -> unit = <fun>
 |}]
 
-let[@zero_alloc] iter_ignore l = iter ~f:ignore l
+module Module_type_forces_zero_alloc_conditional : sig
+  val f : (unit -> unit) -> unit [@@zero_alloc conditional]
+end = struct
+  let f g = g ()
+end
+[%%expect{|
+module Module_type_forces_zero_alloc_conditional :
+  sig val f : (unit -> unit) -> unit [@@zero_alloc conditional] end
+|}]
+
+module Module_type_forces_zero_alloc_conditional : sig
+  val f : (unit -> unit) -> unit [@@zero_alloc conditional]
+end = struct
+  let f g = allocate ()
+end
+[%%expect{|
+Line 4, characters 8-23:
+4 |   let f g = allocate ()
+            ^^^^^^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP11.Module_type_forces_zero_alloc_conditional.f (camlTOP11__f_10_21_code).
+Line 4, characters 12-23:
+4 |   let f g = allocate ()
+                ^^^^^^^^^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
+let[@zero_alloc] iter_ignore l = List.iter ignore l
 [%%expect{|
 val iter_ignore : 'a list -> unit [@@zero_alloc] = <fun>
 |}]
 
-let[@zero_alloc] iter_alloc l = iter ~f:allocate l
+let[@zero_alloc] iter_alloc l = List.iter ~f:allocate l
 [%%expect{|
-CR wsturgeon: this has to fail
+Line 1, characters 45-53:
+1 | let[@zero_alloc] iter_alloc l = List.iter ~f:allocate l
+                                                 ^^^^^^^^
+Error: The function applied to this argument has type 'a list -> unit
+This argument cannot be applied with label "~f"
 |}]
 
 let[@zero_alloc] iter_even_alloc l = iter_even ~f:allocate l
