@@ -31,6 +31,8 @@ open Heterogenous_list
 
 type ('t, 'k, 'v) id
 
+val provably_equal_map : ('t, 'k, 'v) id -> ('s, 'k, 'v) id -> ('t, 's) Type.eq
+
 type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist

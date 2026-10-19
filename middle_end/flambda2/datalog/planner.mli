@@ -31,7 +31,11 @@ open Lang
 
 type 'k column_iterator =
   | Column_iterator :
-      ('t, 'k, 'v) Column.id * 't variable * 'v variable
+      ('t, 'k, 's) Column.id
+      * 't variable
+      * 's variable
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
       -> 'k column_iterator
 
 type stage =
@@ -46,15 +50,17 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
-type head_atom =
+type (_, _) union =
   | Union :
-      ('t, _, _) Table.Id.t
-      * ('t, 'k, 's) Column.hlist
+      ('t, 'k, 's) Column.hlist
       * 'k Term.hlist
       * 's term
       * ('s, _, 'v) Column.hlist
       * 'v Table.result_repr
-      -> head_atom
+      -> ('t, 'v) union
+
+type head_atom =
+  | Output : ('t, _, _) Table.Id.t * ('t, _) union -> head_atom
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
       * 'k Term.hlist
