@@ -65,7 +65,7 @@ let map_result_types = Code0.map_result_types
 let free_names_of_params_and_body = Code0.free_names_of_params_and_body
 
 let can_be_inlined_for_jsir t =
-  (not !Clflags.jsir)
+  (not (Clflags.target_is_jsir ()))
   || not
        (Name_occurrences.contains_function_or_value_slots
           (free_names_of_params_and_body t))

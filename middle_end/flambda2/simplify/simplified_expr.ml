@@ -36,7 +36,8 @@ module LCS = Lifted_constant_state
 type t =
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
-    removed_operations : Removed_operations.t
+    removed_operations : Removed_operations.t;
+    is_cold : bool
   }
 
 and simplified_lets_and_let_conts =
@@ -84,24 +85,12 @@ and simplified_let_cont_handlers =
   }
 
 and simplified_apply =
-  | Simplified_non_ocaml_function_call of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t
-      }
-  | Simplified_function_call_where_callee's_type_unavailable of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t
-      }
-  | Simplified_non_inlined_direct_full_application of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t;
-        result_arity : [`Unarized] Flambda_arity.t;
-        coming_from_indirect : bool;
-        callee's_code_metadata : Code_metadata.t
-      }
+  { apply : Apply.t;
+    use_id : Apply_cont_rewrite_id.t option;
+    exn_cont_use_id : Apply_cont_rewrite_id.t;
+    result_arity : [`Complex] Flambda_arity.t;
+    is_cold : bool
+  }
 
 and simplified_terminator =
   | Simplified_apply of simplified_apply
@@ -118,6 +107,7 @@ and simplified_apply_cont =
 and simplified_switch =
   { arms :
       (Apply_cont_expr.t
+      * annotations:Branch_annotations.t
       * Apply_cont_rewrite_id.t
       * [`Unarized] Flambda_arity.t
       * TE.t)
@@ -134,6 +124,8 @@ let notify_removed ~operation t =
   { t with
     removed_operations = Removed_operations.( + ) operation t.removed_operations
   }
+
+let mark_as_cold t = if t.is_cold then t else { t with is_cold = true }
 
 let simplified_let ~bindings_to_place ~removed_operations
     ~lifted_constants_from_defining_expr ~at_unit_toplevel ~closure_info
@@ -160,34 +152,18 @@ let simplified_let_cont simplified_handlers t =
 let simplified_terminator simplified_terminator =
   { simplified_lets_and_let_conts = Simplified_terminator;
     simplified_terminator;
-    removed_operations = Removed_operations.zero
+    removed_operations = Removed_operations.zero;
+    is_cold = false
   }
 
-let simplified_apply simplified_apply =
-  simplified_terminator (Simplified_apply simplified_apply)
-
-let simplified_non_ocaml_function_call apply ~use_id ~exn_cont_use_id =
-  simplified_apply
-    (Simplified_non_ocaml_function_call { apply; use_id; exn_cont_use_id })
-
-let simplified_function_call_where_callee's_type_unavailable apply ~use_id
-    ~exn_cont_use_id =
-  simplified_apply
-    (Simplified_function_call_where_callee's_type_unavailable
-       { apply; use_id; exn_cont_use_id })
-
-let simplified_non_inlined_direct_full_application apply ~use_id
-    ~exn_cont_use_id ~result_arity ~coming_from_indirect ~callee's_code_metadata
-    =
-  simplified_apply
-    (Simplified_non_inlined_direct_full_application
-       { apply;
-         use_id;
-         exn_cont_use_id;
-         result_arity;
-         coming_from_indirect;
-         callee's_code_metadata
-       })
+let simplified_apply ?result_arity apply ~use_id ~exn_cont_use_id ~is_cold =
+  let result_arity =
+    match result_arity with
+    | None -> Apply_expr.return_arity apply
+    | Some result_arity -> result_arity
+  in
+  simplified_terminator
+    (Simplified_apply { apply; use_id; exn_cont_use_id; result_arity; is_cold })
 
 let simplified_apply_cont apply_cont ~args ~rewrite_id =
   simplified_terminator (Simplified_apply_cont { apply_cont; args; rewrite_id })

@@ -105,7 +105,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
          body of the function in question, not substituting it into an existing
          context. *)
       let machine_width = DE.machine_width (DA.denv dacc) in
-      UE.add_function_return_or_exn_continuation
+      UE.add_function_return_or_exn_continuation ~is_cold:false
         (UE.create (DA.are_rebuilding_terms dacc) ~machine_width)
         (Exn_continuation.exn_handler exn_continuation)
         (Flambda_arity.create_singletons [Flambda_kind.With_subkind.any_value])
@@ -114,8 +114,9 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~rebuild_expr
       match Apply.continuation apply with
       | Never_returns -> uenv
       | Return return_continuation ->
-        UE.add_function_return_or_exn_continuation uenv return_continuation
-          return_arity
+        UE.add_function_return_or_exn_continuation ~is_cold:false uenv
+          return_continuation
+          (Flambda_arity.unarize_t return_arity)
     in
     let uacc = UA.create ~flow_result ~compute_slot_offsets:false uenv dacc in
     rebuild_expr expr uacc ~after_rebuild:(fun expr uacc -> expr, uacc)
@@ -460,9 +461,10 @@ let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
      [@unrolled] and stubs do not consult the decision made at the function
      definition. *)
   let jsir_forbids_inlining =
-    (* [Code.can_be_inlined_for_jsir] also tests [Clflags.jsir]; testing it here
-       first avoids the code lookup when not compiling to JSIR. *)
-    !Clflags.jsir
+    (* [Code.can_be_inlined_for_jsir] also tests [Clflags.target_is_jsir];
+       testing it here first avoids the code lookup when not compiling to
+       JSIR. *)
+    Clflags.target_is_jsir ()
     && (match Apply.inlined apply with
       | Never_inlined | Forward_inlined ->
         (* Let [make_decision0] report the attribute as the reason. *)

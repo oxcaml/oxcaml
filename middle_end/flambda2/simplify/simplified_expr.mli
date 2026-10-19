@@ -31,7 +31,8 @@ open! Flambda.Import
 type t = private
   { simplified_lets_and_let_conts : simplified_lets_and_let_conts;
     simplified_terminator : simplified_terminator;
-    removed_operations : Removed_operations.t
+    removed_operations : Removed_operations.t;
+    is_cold : bool
   }
 
 and simplified_lets_and_let_conts = private
@@ -85,24 +86,12 @@ and simplified_let_cont_handlers =
   }
 
 and simplified_apply = private
-  | Simplified_non_ocaml_function_call of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t
-      }
-  | Simplified_function_call_where_callee's_type_unavailable of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t
-      }
-  | Simplified_non_inlined_direct_full_application of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t;
-        result_arity : [`Unarized] Flambda_arity.t;
-        coming_from_indirect : bool;
-        callee's_code_metadata : Code_metadata.t
-      }
+  { apply : Apply.t;
+    use_id : Apply_cont_rewrite_id.t option;
+    exn_cont_use_id : Apply_cont_rewrite_id.t;
+    result_arity : [`Complex] Flambda_arity.t;
+    is_cold : bool
+  }
 
 and simplified_terminator = private
   | Simplified_apply of simplified_apply
@@ -119,6 +108,7 @@ and simplified_apply_cont = private
 and simplified_switch = private
   { arms :
       (Apply_cont_expr.t
+      * annotations:Branch_annotations.t
       * Apply_cont_rewrite_id.t
       * [`Unarized] Flambda_arity.t
       * Typing_env.t)
@@ -133,6 +123,8 @@ and simplified_switch = private
 
 val notify_removed : operation:Removed_operations.t -> t -> t
 
+val mark_as_cold : t -> t
+
 val simplified_let :
   bindings_to_place:Simplified_named.binding_to_place list ->
   removed_operations:Removed_operations.t ->
@@ -145,25 +137,12 @@ val simplified_let :
 
 val simplified_let_cont : simplified_let_cont_handlers -> t -> t
 
-val simplified_non_ocaml_function_call :
+val simplified_apply :
+  ?result_arity:[`Complex] Flambda_arity.t ->
   Apply.t ->
   use_id:Apply_cont_rewrite_id.t option ->
   exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  t
-
-val simplified_function_call_where_callee's_type_unavailable :
-  Apply.t ->
-  use_id:Apply_cont_rewrite_id.t option ->
-  exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  t
-
-val simplified_non_inlined_direct_full_application :
-  Apply.t ->
-  use_id:Apply_cont_rewrite_id.t option ->
-  exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
-  coming_from_indirect:bool ->
-  callee's_code_metadata:Code_metadata.t ->
+  is_cold:bool ->
   t
 
 val simplified_apply_cont :
@@ -172,6 +151,7 @@ val simplified_apply_cont :
 val simplified_switch :
   arms:
     (Apply_cont_expr.t
+    * annotations:Branch_annotations.t
     * Apply_cont_rewrite_id.t
     * [`Unarized] Flambda_arity.t
     * Typing_env.t)
