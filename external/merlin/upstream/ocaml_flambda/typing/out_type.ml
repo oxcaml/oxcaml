@@ -463,7 +463,8 @@ let instance_name global =
     (* We can avoid calling [ident_name_simple] here because instance names are
        always global (which is bad - but the syntax is currently bad anyway) *)
     let ({ head; args } : Global_module.Name.t) = global in
-    String.concat "" (head :: List.map string_of_arg args)
+    String.concat ""
+      (Compilation_unit.Name.to_string head :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
     Printf.sprintf "(%s)(%s)"
