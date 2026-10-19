@@ -292,6 +292,7 @@ val set_dumped_pass : string -> bool -> unit
 val dump_into_file : bool ref
 val dump_into_csv : bool ref
 val dump_dir : string option ref
+val debug_action_trace : bool ref
 
 val keyword_edition: string option ref
 val parse_keyword_edition: string -> (int*int) option * string list

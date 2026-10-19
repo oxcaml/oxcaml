@@ -840,6 +840,10 @@ let mk_dump_into_file f =
 let mk_dump_into_csv f =
   "-dump-into-csv", Arg.Unit f, " Dump profile information to profile.csv"
 
+let mk_debug_action_trace f =
+  "-debug-action-trace", Arg.Unit f,
+  " Raise errors from writing action traces instead of ignoring them"
+
 let mk_no_ikinds f =
   "-no-ikinds", Arg.Unit f, " Disable ikinds-based kind checker"
 
@@ -1335,6 +1339,7 @@ module type Compiler_options = sig
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit
+  val _debug_action_trace : unit -> unit
 
   val _args: string -> string array
   val _args0: string -> string array
@@ -1682,6 +1687,7 @@ struct
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
+    mk_debug_action_trace F._debug_action_trace;
     mk_dump_dir F._dump_dir;
     mk_debug_ocaml F._debug_ocaml;
 
@@ -1994,6 +2000,7 @@ struct
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
+    mk_debug_action_trace F._debug_action_trace;
     mk_dump_dir F._dump_dir;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
@@ -2297,6 +2304,7 @@ struct
     mk_dprofile_output F._dprofile_output;
     mk_dump_into_file F._dump_into_file;
     mk_dump_into_csv F._dump_into_csv;
+    mk_debug_action_trace F._debug_action_trace;
     mk_dump_dir F._dump_dir;
     mk_debug_ocaml F._debug_ocaml;
 
@@ -2680,6 +2688,7 @@ module Default = struct
     let _dump_into_file = set dump_into_file
     let _dump_into_csv = set dump_into_csv
     let _dump_dir s = dump_dir := Some s
+    let _debug_action_trace = set debug_action_trace
     let _for_pack s = for_package := (Some (String.capitalize_ascii s))
     let _g = set debug
     let _no_g = clear debug
