@@ -7,8 +7,8 @@ Interfaces imported:
 	00000000000000000000000000000000	Monoid
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Runtime parameters:
-	Monoid
 	Monoid_utils
+	Monoid
 Required globals:
 Uses unsafe features: no
 Force link: no
