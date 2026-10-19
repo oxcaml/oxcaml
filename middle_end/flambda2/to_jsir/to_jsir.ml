@@ -369,6 +369,24 @@ and apply_expr ~env ~res e =
     | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
+      let use_continuation ~res cont =
+        let open Jsir in
+        let cont, res = To_jsir_shared.simple ~env ~res cont in
+        let last = Var.fresh () in
+        let res =
+          To_jsir_result.add_instr_exn res
+            (Let (last, Field (cont, 1, Non_float)))
+        in
+        let stack = Var.fresh () in
+        let res =
+          To_jsir_result.add_instr_exn res
+            (Let
+               ( stack,
+                 Prim (Extern ("caml_continuation_use_noexc", None), [Pv cont])
+               ))
+        in
+        stack, last, res
+      in
       let prim_name, args, res =
         let open Jsir in
         match effect_ with
@@ -386,8 +404,7 @@ and apply_expr ~env ~res e =
           let effc, res = To_jsir_shared.simple ~env ~res effc in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
-          let unit = Pc (Int Targetint.zero) in
-          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg; unit], res
+          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg], res
         | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
           let valuec, res = To_jsir_shared.simple ~env ~res valuec in
           let exnc, res = To_jsir_shared.simple ~env ~res exnc in
@@ -395,23 +412,22 @@ and apply_expr ~env ~res e =
           let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
-          let unit = Pc (Int Targetint.zero) in
           ( "%with_stack_preemptible",
-            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg; unit],
+            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg],
             res )
         | Continue { cont; value } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let stack, last, res = use_continuation ~res cont in
           let value, res = To_jsir_shared.simple ~env ~res value in
-          "%continue", [Pv cont; Pv value], res
+          "%continue", [Pv stack; Pv value; Pv last], res
         | Discontinue { cont; exn } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let stack, last, res = use_continuation ~res cont in
           let exn, res = To_jsir_shared.simple ~env ~res exn in
-          "%discontinue", [Pv cont; Pv exn], res
+          "%discontinue", [Pv stack; Pv exn; Pv last], res
         | Discontinue_with_backtrace { cont; exn; bt } ->
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let stack, last, res = use_continuation ~res cont in
           let exn, res = To_jsir_shared.simple ~env ~res exn in
           let bt, res = To_jsir_shared.simple ~env ~res bt in
-          "%discontinue_with_backtrace", [Pv cont; Pv exn; Pv bt], res
+          "%discontinue_with_backtrace", [Pv stack; Pv exn; Pv bt; Pv last], res
       in
       let prim : Jsir.expr = Prim (Extern (prim_name, None), args) in
       let var = Jsir.Var.fresh () in

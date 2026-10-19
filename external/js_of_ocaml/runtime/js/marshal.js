@@ -852,13 +852,16 @@ var caml_output_val = (function () {
   };
 })();
 
-//Provides: caml_output_value_to_string mutable
+// May raise (continuations, abstract values), so not [mutable]: an unused
+// call must not be removed
+//Provides: caml_output_value_to_string
 //Requires: caml_output_val, caml_string_of_uint8_array
 function caml_output_value_to_string(v, flags) {
   return caml_string_of_uint8_array(caml_output_val(v, flags));
 }
 
-//Provides: caml_output_value_to_bytes mutable
+// May raise
+//Provides: caml_output_value_to_bytes
 //Requires: caml_output_val, caml_bytes_of_uint8_array
 function caml_output_value_to_bytes(v, flags) {
   return caml_bytes_of_uint8_array(caml_output_val(v, flags));
