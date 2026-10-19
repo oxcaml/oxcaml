@@ -12,17 +12,28 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Types related to the compilation of value let-recs (non-functional
-     recursive definitions) *)
+(** Types related to the compilation of recursive value bindings *)
 
-(** The kind of recursive bindings, as computed by
-    [Value_rec_check.classify_expression] *)
+(** The kind of a binding in a [let rec] group, as computed by
+    [Value_rec_check.classify_recursive_binding]. *)
 type recursive_binding_kind =
-| Static
-  (** Bindings for which some kind of pre-allocation scheme is possible.
-      The expression is allowed to be recursive, as long as its definition does
-      not inspect recursively defined values.
-      See [Value_rec_compiler] for more details on the compilation scheme. *)
-| Dynamic
-  (** Bindings for which pre-allocation is not possible.
-      The expression is not allowed to refer to any recursive variable. *)
+| Recursive_function
+  (** A syntactic function. It may refer to the other bindings of the group
+      and is compiled as part of a [Lletrec]. *)
+| Not_recursive
+  (** A binding that does not refer to any binding of the group. It is
+      compiled as a regular let-binding, evaluated before the functions. *)
+| Recursive_record of int list
+  (** A record literal, possibly the inline record of a constructor, whose
+      fields at the given positions are mutable and refer to the group. The
+      record is allocated before the functions with placeholders in these
+      fields, which are assigned once the whole group is defined. *)
+| Recursive_lazy
+  (** A [lazy] expression that refers to the group. The lazy block is
+      allocated before the functions with a placeholder instead of its
+      thunk, which is assigned once the whole group is defined. *)
+| Recursive_ref
+  (** An application of the [%makemutable] primitive, such as [ref], whose
+      argument refers to the group. The cell is allocated before the
+      functions with a placeholder, which is replaced by the argument once
+      the whole group is defined. *)

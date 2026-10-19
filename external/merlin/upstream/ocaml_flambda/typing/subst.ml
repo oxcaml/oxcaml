@@ -1428,7 +1428,7 @@ and compose s1 s2 =
       in
       s2.last_compose <- Some (s1,s); s
 
-and from_lazy =
+and from_lazy () =
   let map_signature m sg =
     let items = force_signature_once sg in
     List.map (From_lazy.signature_item m) items
@@ -1448,13 +1448,13 @@ and from_lazy =
   in
   From_lazy.{map_signature; map_type_expr; map_value_description}
 
-and force_value_description vd = From_lazy.value_description from_lazy vd
-and force_module_decl d = From_lazy.module_declaration from_lazy d
-and force_functor_parameter x = From_lazy.functor_parameter from_lazy x
-and force_modtype x = From_lazy.module_type from_lazy x
-and force_modtype_decl x = From_lazy.modtype_declaration from_lazy x
-and force_signature_item x = From_lazy.signature_item from_lazy x
-and force_signature x = From_lazy.signature from_lazy x
+and force_value_description vd = From_lazy.value_description (from_lazy ()) vd
+and force_module_decl d = From_lazy.module_declaration (from_lazy ()) d
+and force_functor_parameter x = From_lazy.functor_parameter (from_lazy ()) x
+and force_modtype x = From_lazy.module_type (from_lazy ()) x
+and force_modtype_decl x = From_lazy.modtype_declaration (from_lazy ()) x
+and force_signature_item x = From_lazy.signature_item (from_lazy ()) x
+and force_signature x = From_lazy.signature (from_lazy ()) x
 
 let subst_lazy_signature_item scoping s comp =
   For_copy.with_scope
