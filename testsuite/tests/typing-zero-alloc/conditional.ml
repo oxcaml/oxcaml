@@ -208,18 +208,14 @@ Line 1, characters 53-57:
 Error: called function may allocate (indirect call through argument #1)
 |}]
 
-(* Note that asking for [conditional strict] does not assume that *arguments*
-   are [strict]: *)
+(* Asking for [conditional strict] requires that *arguments* are [strict]: *)
 let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
 [%%expect{|
-Line 1, characters 5-15:
-1 | let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
-         ^^^^^^^^^^
-Error: Annotation check for zero_alloc conditional strict failed on function TOP21.catch_strict (camlTOP21__catch_strict_19_38_code).
-Line 1, characters 57-61:
-1 | let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
-                                                             ^^^^
-Error: called function may allocate (indirect call through argument #1)
+(* CR wsturgeon for wsturgeon: this has to pass *)
+|}]
+let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+[%%expect{|
+(* CR wsturgeon for wsturgeon: this has to fail *)
 |}]
 
 (* Try to use inlining (via [apply]) to break soundness: *)
@@ -251,45 +247,12 @@ let[@zero_alloc] ignore_ints (ints : int list) =
 val ignore_ints : int list -> unit [@@zero_alloc] = <fun>
 |}]
 
-(* Arguments are assumed non-strict by default, but they can be made strict: *)
-let catch_nonstrict_with_strict_assumption
-    (f [@zero_alloc conditional assume strict]) =
-  try f () with _ -> ()
-[@@zero_alloc conditional]
-[%%expect{|
-CR wsturgeon: this has to pass
-|}]
-let[@zero_alloc] catch_ignore () = catch_nonstrict_with_strict_assumption ignore
-[%%expect{|
-CR wsturgeon: this has to pass
-|}]
-let[@zero_alloc] catch_after_allocating () =
-  catch_nonstrict_with_strict_assumption allocate_then_raise
-[%%expect{|
-CR wsturgeon: this has to fail
-|}]
-
 (* On a function instead of an argument, [conditional assume] does what it says:
    "at call sites, if all arguments won't allocate, this won't allocate." *)
 let[@inline never][@zero_alloc conditional assume] secret () = allocate ()
 let[@zero_alloc] danger () = secret ()
 [%%expect{|
 CR wsturgeon: this has to pass
-|}]
-
-let[@inline never][@zero_alloc conditional strict] forward
-    (f [@zero_alloc conditional assume strict]) x =
-  f x
-let[@zero_alloc conditional strict] rec insane () = forward insane ()
-[%%expect{|
-CR wsturgeon: this has to pass
-|}]
-
-let[@zero_alloc conditional strict] rec roundabout b =
-  if b then allocate () else
-  forward roundabout true
-[%%expect{|
-CR wsturgeon: this has to fail
 |}]
 
 (* CR-someday wsturgeon for wsturgeon: support arbitrary-arity callbacks, and
@@ -408,6 +371,18 @@ CR wsturgeon: this has to fail
 |}]
 let[@zero_alloc] alloc () =
   arguments_are_conditional (fun f -> (allocate (); f ())) ignore
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+let[@zero_alloc conditional strict] rec insane () = apply insane ()
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc conditional strict] rec roundabout b =
+  if b then allocate () else
+  apply roundabout true
 [%%expect{|
 CR wsturgeon: this has to fail
 |}]
