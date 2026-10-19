@@ -783,8 +783,6 @@ let body_hash t = t.body_hash
 
 let leading_tokens = Leading_tokens.leading_tokens
 
-let hash_function = Body_hash.hash_function
-
 let entry_annotation t =
   let annotation =
     let counter =

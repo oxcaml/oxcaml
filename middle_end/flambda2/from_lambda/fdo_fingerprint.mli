@@ -71,7 +71,7 @@ val function_ : t -> Fdo_counter.Function.t
 
 val body_hash : t -> Fdo_counter.Body_hash.t
 
-(** The counters of the function's entry edge. *)
+(** The counters of the function's entry edge + its body hash *)
 val entry_annotation : t -> Fdo_annotation.With_body_hash.t
 
 (** The first [limit] (5 by default) distinct tokens of a function. Only
@@ -79,6 +79,3 @@ val entry_annotation : t -> Fdo_annotation.With_body_hash.t
     translation order. *)
 val leading_tokens :
   ?limit:int -> params:Ident.t list -> Lambda.lambda -> string list
-
-(** The body hash of a function. Exposed for testing. *)
-val hash_function : Lambda.lfunction -> Fdo_counter.Body_hash.t
