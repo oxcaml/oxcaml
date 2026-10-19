@@ -747,8 +747,7 @@ FUNCTION(caml_c_call)
 #if defined(WITH_THREAD_SANITIZER)
     /* Save return value registers. Since the called function could be
        anything, it may have returned its result (if any) in x0:x1 and/or
-       q0:q3 (the latter in the case of homogeneous floating-point/vector
-       aggregate returns). */
+       q0:q3 (q2:q3 for homogeneous aggregate returns). */
         stp     x0, x1, [sp, -16]!
         CFI_ADJUST(16)
         stp     q0, q1, [sp, -32]!

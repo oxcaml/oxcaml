@@ -1069,13 +1069,13 @@ Error: This value is "local" to the parent region but is expected to be "global"
 (*********************)
 (* Test 9: externals *)
 
-(* This test checks the treatment of products in externals.  Products may
-   appear in C stub arguments and returns; in native code they follow the
-   calling conventions of the corresponding (possibly nested) C structs, with
-   product shapes that the C ABIs pass in memory being rejected during native
-   code generation.  The [@unpacked] attribute instead causes the components
-   of a product argument to be passed as separate C arguments; it is not
-   allowed on returns.  Layout poly primitives have no restrictions. *)
+(* This test checks the treatment of products in externals. In particular:
+   - For C stubs
+     - Products and returns are allowed (though not via memory for now)
+     - [@unpacked] not allowed on returns
+   - For layout poly primitives:
+     - No restrictions
+*)
 
 type t_product : value & value
 type t_product_3 : value & value & value

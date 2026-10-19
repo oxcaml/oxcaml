@@ -786,10 +786,6 @@ module Return = struct
     let abi = Abi.for_unboxed_products apply in
     Unit.of_product apply abi ~what:Return_value (Layout.of_arity return_arity)
 
-  (* [Some units] for a product return occupying more than one register. A
-     product occupying a single register is returned exactly as the
-     corresponding scalar would be, so needs no unpacking, but the ABI must
-     still be checked (see [Abi.for_unboxed_products]). *)
   let units_if_needed apply return_arity return_kinds =
     match return_kinds with
     | [] -> None

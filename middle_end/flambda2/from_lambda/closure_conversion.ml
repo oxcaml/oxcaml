@@ -640,33 +640,31 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
     (* Addressability does not affect the non-boxed representation *)
     unarize_const_sort_for_extern_repr sort
 
-let rec unarize_extern_repr ~machine_width alloc_mode
+let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
+  let same_as_ocaml_repr (sort : Jkind.Sort.Const.t) =
+    match sort with
+    | Base Void -> []
+    | Base _ ->
+      let kind =
+        Typeopt.layout_of_non_void_sort sort
+        |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
+             ~machine_width
+        |> K.With_subkind.kind
+      in
+      [{ kind; arg_transformer = None; return_transformer = None }]
+    | Univar _ -> Misc.fatal_error "unarize_extern_repr: unexpected univar"
+    | Genvar _ -> Misc.fatal_error "unarize_extern_repr: unexpected genvar"
+    | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
+    | Addressable sort ->
+      (* Addressability does not affect the non-boxed representation *)
+      unarize_const_sort_for_extern_repr sort
+  in
   match extern_repr with
+  | Same_as_ocaml_repr sort -> same_as_ocaml_repr sort
   | Unpacked_product sort ->
-    (* The unarized representation of an [@unpacked] product is the same as that
-       of an ordinary unboxed product; the two differ only in calling convention
-       (see [arity_components_of_extern_repr] below). *)
-    unarize_extern_repr ~machine_width alloc_mode
-      (Lambda.Same_as_ocaml_repr sort)
-  | Same_as_ocaml_repr (Base Void) -> []
-  | Same_as_ocaml_repr (Base _ as sort) ->
-    let kind =
-      Typeopt.layout_of_non_void_sort sort
-      |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
-           ~machine_width
-      |> K.With_subkind.kind
-    in
-    [{ kind; arg_transformer = None; return_transformer = None }]
-  | Same_as_ocaml_repr (Univar _) ->
-    Misc.fatal_error "unarize_extern_repr: unexpected univar"
-  | Same_as_ocaml_repr (Genvar _) ->
-    Misc.fatal_error "unarize_extern_repr: unexpected genvar"
-  | Same_as_ocaml_repr (Product sorts) ->
-    List.concat_map unarize_const_sort_for_extern_repr sorts
-  | Same_as_ocaml_repr (Addressable sort) ->
-    (* Addressability does not affect the non-boxed representation *)
-    unarize_const_sort_for_extern_repr sort
+    (* Unarized like an ordinary unboxed product; see [Lambda.extern_repr]. *)
+    same_as_ocaml_repr sort
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -761,12 +759,9 @@ let rec arity_component_of_const_sort_for_extern_repr
     Misc.fatal_error
       "arity_component_of_const_sort_for_extern_repr: unexpected genvar"
 
-(* Note that this returns a list: an [@unpacked] product parameter contributes
-   one (singleton) component per unarized element of the product, since such
-   elements are passed as separate C arguments. In contrast an ordinary unboxed
-   product parameter contributes a single unboxed product component, since it
-   follows the calling convention of the corresponding C struct (see
-   [To_cmm_expr.translate_external_call]). *)
+(* An [@unpacked] product contributes one singleton component per unarized
+   element, and an ordinary unboxed product contributes a single product
+   component (see [Lambda.extern_repr]). *)
 let arity_components_of_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) :
     [`Complex] Flambda_arity.Component_for_creation.t list =
@@ -884,11 +879,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       Apply_cont_expr.continuation apply_cont, false
     | _ -> Continuation.create (), true
   in
-  (* Unboxed products must not be unarized in the parameter and return arities:
-     [To_cmm_extcall] uses the structure of any such products (including
-     nesting) to determine the C calling convention, an unboxed product being
-     passed or returned as if it were a value of the corresponding (possibly
-     nested) C struct type. *)
+  (* Unboxed products are not unarized here: [To_cmm_extcall] needs their
+     structure to lay out the corresponding C structs. *)
   let param_arity =
     List.concat_map
       (fun (_mode, repr) ->
@@ -902,8 +894,6 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         (snd prim_native_repr_res)
       |> Flambda_arity.create
     in
-    (* A return of void layout (or of a product layout all of whose components
-       are void) is given a nullary arity, matching [unarized_results] above. *)
     if Flambda_arity.cardinal_unarized arity = 0
     then Flambda_arity.nullary
     else arity

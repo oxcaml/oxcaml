@@ -18,18 +18,9 @@
 *)
 
 (* Test of unboxed product returns from external calls, across the matrix of
-   base kinds. In native code an unboxed product return follows the calling
-   convention of the corresponding C struct; the native stubs in stubs.c
-   really do return C structs by value, so this checks interoperability with
-   the C compiler's implementation of the ABIs.
-
-   Every case in this file is returned entirely in registers on both x86-64
-   (System V) and arm64 (AAPCS64 and the Apple variant). The cases cover, on
-   at least one of those ABIs: multiple components packed into a single
-   register (with padding, with sign extension of small integers, and with
-   float bit patterns moving through integer registers); homogeneous
-   floating-point aggregates; and mixed integer/floating-point structs using
-   one register of each class. *)
+   base kinds. The native stubs in stubs.c return C structs by value, checking
+   interoperability with the C compiler. Every case is returned entirely in
+   registers on both x86-64 and arm64. *)
 
 open Stdlib_stable
 

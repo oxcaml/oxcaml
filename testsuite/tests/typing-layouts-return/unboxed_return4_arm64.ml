@@ -13,19 +13,13 @@
  }
 *)
 
-(* Test of unboxed products of 128-bit vectors returned from external calls.
+(* Test of unboxed products of 128-bit vectors and homogeneous floating-point
+   aggregates in external calls. The native stubs in vec128_stubs.c use C
+   structs of NEON vector types, checking interoperability with the C
+   compiler.
 
-   On arm64 a pair of 128-bit vectors is a homogeneous short-vector
-   aggregate, returned in q0 and q1; the native stubs in vec128_stubs.c
-   return genuine C structs of NEON vector types, so this checks
-   interoperability with the C compiler's implementation of the AAPCS64 (and
-   its Apple variant).
-
-   This test is restricted to arm64: on x86-64 the corresponding C structs
-   are 32 bytes in size and are therefore returned in memory by the System V
-   ABI, which cannot currently be compiled (see to_cmm_extcall.ml). The test
-   is also native-only, since it is specifically about native-code calling
-   conventions. *)
+   Restricted to arm64, since on x86-64 these C structs exceed 16 bytes and so
+   are passed in memory, which is unsupported. *)
 
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
@@ -117,8 +111,7 @@ let () =
   print_f32x4 "f32x4_pair_noalloc.b" b
 
 (* An unboxed product *argument* of two vectors: a homogeneous short-vector
-   aggregate passed in v0 and v1, with the (vector) result in q0. On x86-64
-   the corresponding C struct argument would be passed in memory. *)
+   aggregate passed in v0 and v1, with the (vector) result in q0. *)
 external add_f32x4_pairwise : #(float32x4# * float32x4#) -> float32x4#
   = "" "add_f32x4_pairwise_native"
 
@@ -127,9 +120,8 @@ let () =
   let y = make_f32x4 #10.0 #20.0 #30.0 #40.0 in
   print_f32x4 "add_pairwise" (add_f32x4_pairwise #(x, y))
 
-(* Homogeneous floating-point aggregates of more than two float64s: their C
-   structs exceed 16 bytes, so on x86-64 they would be passed and returned in
-   memory, but on arm64 they use d0-d3. *)
+(* Homogeneous floating-point aggregates of more than two float64s, in
+   d0-d3. *)
 external ret_f64_triple : unit -> #(float# * float# * float#)
   = "" "ret_f64_triple_native"
 

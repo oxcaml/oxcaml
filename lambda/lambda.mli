@@ -502,11 +502,10 @@ type primitive =
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away.
 
-    [Unpacked_product], which arises from the [@unpacked] attribute, differs
-    from [Same_as_ocaml_repr] on a product sort in terms of native-code
-    calling conventions: the components of an [Unpacked_product] are passed
-    as separate C arguments, whereas a [Same_as_ocaml_repr] product follows
-    the calling convention of the corresponding C struct. *)
+    [Unpacked_product] (from [@unpacked]) and a [Same_as_ocaml_repr] product
+    differ only in native-code calling convention: the former's components
+    are passed as separate C arguments, and the latter is passed as the
+    corresponding C struct. *)
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unpacked_product of Jkind.Sort.Const.t

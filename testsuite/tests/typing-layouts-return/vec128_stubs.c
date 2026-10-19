@@ -1,8 +1,5 @@
-/* Stubs for unboxed_return4_arm64.ml. The native versions return C structs
-   of NEON vector types by value, so that the calling convention used by the
-   OCaml compiler for unboxed products of 128-bit vectors is checked against
-   the C compiler's implementation of the AAPCS64: such structs are
-   homogeneous short-vector aggregates, returned in q0 and q1.
+/* Stubs for unboxed_return4_arm64.ml. The native versions take and return C
+   structs of NEON vector types by value.
 
    The test using this file is native-only and arm64-only, so there are no
    bytecode stubs and arm_neon.h is included unconditionally. */

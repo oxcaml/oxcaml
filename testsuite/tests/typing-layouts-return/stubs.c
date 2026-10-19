@@ -96,9 +96,7 @@ value f64_f64_make_bytecode(value unit) {
 }
 
 /* Stubs for unboxed_return3.ml. The native versions return C structs by
-   value, so that the calling convention used by the OCaml compiler for
-   unboxed product returns is checked against the C compiler's implementation
-   of the underlying ABI. */
+   value. */
 
 #include "caml/float32.h"
 

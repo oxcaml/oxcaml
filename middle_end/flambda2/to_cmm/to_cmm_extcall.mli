@@ -12,9 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Translation of external (C) calls to Cmm, including the implementation of
-    the calling conventions for unboxed products (which are passed and returned
-    as if they were values of C struct type).
+(** Translation of external (C) calls to Cmm, including passing and returning
+    unboxed products as C structs.
 
     Unboxed products that the C ABI would pass in memory cannot currently be
     compiled; [translate_external_call] reports a located error for them. *)

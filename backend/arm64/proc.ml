@@ -221,12 +221,6 @@ let loc_external_arguments ty_args =
     [D0; D1; D2; D3; D4; D5; D6; D7]
      outgoing ty_args
 
-(* External calls' results are in x0-x1 (scalars, and composites of at most
-   16 bytes that are not homogeneous floating-point/vector aggregates) and/or
-   d0-d3 (floating-point and vector scalars, and homogeneous floating-point/
-   vector aggregates of at most four members).  [To_cmm_expr] ensures that
-   result components are only assigned to registers here in situations
-   agreeing with the C ABI. *)
 let loc_external_results res =
   let (loc, _) =
     calling_conventions [X0; X1] [D0; D1; D2; D3] not_supported 0 res

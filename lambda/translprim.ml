@@ -228,10 +228,6 @@ let extern_repr_of_native_repr:
   | Unextended_bits8, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits8
   | Unextended_bits16, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits16
   | Unpacked_product sort, _ ->
-    (* Kept distinct from [Same_as_ocaml_repr]: the components of the product
-       are unarized into separate C arguments (see [unarize_extern_repr] in
-       [closure_conversion.ml]), rather than following the calling convention
-       of the corresponding C struct as [Same_as_ocaml_repr] products do. *)
     Unpacked_product sort
 
 let sort_of_native_repr ~poly_sort repr =

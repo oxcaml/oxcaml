@@ -1,8 +1,5 @@
 /* Stubs for unboxed_args.ml. The native versions take and return C structs
-   by value, so that the calling conventions used by the OCaml compiler for
-   unboxed products are checked against the C compiler's implementation of
-   the underlying ABIs. The bytecode versions receive and return products as
-   (possibly nested) tuples.
+   by value; the bytecode versions use (possibly nested) tuples.
 
    Sums weight successive components by powers of two, so that swapped
    components or arguments are detected. */
@@ -128,9 +125,7 @@ value sum_nested_bytecode(value p) {
   CAMLreturn(caml_copy_int64(res));
 }
 
-/* The layouts of [args_nested_padded] and [args_flat_i32_i16_i16] differ
-   (12 bytes versus 8), so these stubs check that the nesting of unboxed
-   products is respected by the OCaml side. */
+/* See [sum_nested_padded] in unboxed_args.ml. */
 _Static_assert(sizeof(args_nested_padded) == 12,
                "nested struct with trailing padding should be 12 bytes");
 _Static_assert(sizeof(args_flat_i32_i16_i16) == 8,
@@ -200,10 +195,7 @@ value sum_i64_void_bytecode(value p) {
   CAMLreturn(caml_copy_int64(Int64_val(Field(p, 0))));
 }
 
-/* A one-member struct passed on the stack (after the integer argument
-   registers have been exhausted), between two int32_t arguments. On Apple
-   arm64 the struct takes an 8-byte stack slot aligned to 8 bytes, unlike a
-   bare int16_t, which takes 2 bytes. */
+/* See [stack_single] in unboxed_args.ml. */
 
 typedef struct { int16_t a; } args_i16;
 

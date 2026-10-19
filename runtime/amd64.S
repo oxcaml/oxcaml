@@ -914,8 +914,7 @@ LBL(caml_c_call):
 #ifdef WITH_THREAD_SANITIZER
     /* Save return value registers. Since the called function could be
        anything, it may have returned its result (if any) in %rax:%rdx
-       and/or %xmm0:%xmm1 (multi-register returns arise from unboxed
-       product returns following the C struct calling convention). */
+       and/or %xmm0:%xmm1 (%rdx and %xmm1 for unboxed product returns). */
         pushq   %rax; CFI_ADJUST(8);
         pushq   %rdx; CFI_ADJUST(8);
         subq    $32, %rsp; CFI_ADJUST(32);

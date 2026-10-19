@@ -183,9 +183,8 @@ let invariant
   (match call_kind with
   | Function _ | Method _ -> ()
   | C_call _ -> (
-    (* Note that the return arity may describe an unboxed product; the
-       admissible shapes of such products are constrained by the C calling
-       conventions (see [To_cmm_extcall]). *)
+    (* The return arity may be an unboxed product of any shape; unsupported
+       ones are rejected in [To_cmm_extcall]. *)
     match callee with
     | Some callee when Simple.is_symbol callee -> ()
     | None | Some _ ->

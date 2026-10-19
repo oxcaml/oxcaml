@@ -17,20 +17,13 @@
  }
 *)
 
-(* Test of unboxed product arguments to external calls (without the
-   [@unpacked] attribute), together with the unboxed product return shapes
-   beyond pairs: products of three and four components and nested products.
+(* Test of unboxed product arguments to external calls (without [@unpacked]),
+   and of product returns beyond pairs. The native stubs in args_stubs.c take
+   and return C structs by value, checking interoperability with the C
+   compiler.
 
-   In native code an unboxed product argument or return value follows the
-   calling convention of the corresponding (possibly nested) C struct; the
-   native stubs in args_stubs.c really do take and return C structs by value,
-   so this checks interoperability with the C compiler's implementation of
-   the ABIs. In bytecode, products are passed and returned as (possibly
-   nested) tuples.
-
-   No case in this file involves a C struct that either x86-64 (System V) or
-   arm64 (AAPCS64 and the Apple variant) passes in memory. Single-component
-   products, which are passed like their member, may spill to the stack. *)
+   No C struct here is passed in memory, except single-component products which
+   may spill to the stack (since they are passed like their member). *)
 
 open Stdlib_stable
 
@@ -132,12 +125,9 @@ let () =
     (box_int64 (sum_nested #(#(i32 7l, i32 (-9l)), #1000L)))
 
 (* A nested product whose C struct layout differs from that of the flattened
-   product. The inner struct { int32_t; int16_t } is 6 bytes rounded up to 8
-   (its alignment), so the trailing int16 is at byte offset 8 and the struct
-   occupies 12 bytes: two integer registers. The flattened struct { int32_t;
-   int16_t; int16_t } would occupy 8 bytes and a single register. This checks
-   that the nesting of unboxed products is preserved in the Flambda 2 arities
-   all the way to the Cmm translation. *)
+   product: the inner struct { int32_t; int16_t } is padded to 8 bytes, so the
+   whole struct occupies 12 bytes (two registers) rather than 8 (one). This
+   checks that nesting is preserved in the arities down to Cmm. *)
 external sum_nested_padded : #(#(int32_u * int16#) * int16#) -> int64_u
   = "sum_nested_padded_bytecode" "sum_nested_padded_native"
 
@@ -183,12 +173,10 @@ let () =
   Printf.eprintf "sum_i64_void: %Ld\n%!"
     (box_int64 (sum_i64_void #(#123L, #())))
 
-(* A product with a single non-void component, passed on the stack: eight
-   int64 arguments use up the integer argument registers on both ABIs, so [x],
-   the product and [y] are all passed in memory. For register assignment a
-   one-member struct behaves like its member, but on Apple arm64 a struct
-   passed on the stack always occupies an 8-byte slot aligned to 8, whereas a
-   bare int16_t occupies 2 bytes; see [To_cmm_extcall]. *)
+(* A product with a single non-void component, passed on the stack after eight
+   int64s have used up the integer argument registers. On Apple arm64 it takes
+   an 8-byte slot, unlike a bare int16_t; see
+   [To_cmm_extcall.Component.exttype_when_alone]. *)
 external stack_single :
   int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u
   -> int64_u -> int32_u -> #(int16# * unit#) -> int32_u -> int64_u
@@ -229,9 +217,7 @@ let () =
   Printf.eprintf "ret_nested: %ld %ld %Ld\n%!" (box_int32 a) (box_int32 b)
     (box_int64 c)
 
-(* A nested product return whose C struct layout differs from that of the
-   flattened product; see [sum_nested_padded] above. The 12-byte struct is
-   returned in two integer registers, the trailing int16 in the second. *)
+(* Return version of [sum_nested_padded] above. *)
 external ret_nested_padded : unit -> #(#(int32_u * int16#) * int16#)
   = "ret_nested_padded_bytecode" "ret_nested_padded_native"
 
