@@ -1906,7 +1906,7 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = Compilation_unit.Name.of_head_of_global_name global in
+    let name = global.Global_module.Name.head in
     if Current_unit.Name.is (Compilation_unit.Name.to_string name)
     then begin
       (* The current compilation unit appears in quotes.
@@ -2215,9 +2215,7 @@ let same_types env1 env2 =
 let used_persistent () =
   Persistent_env.fold !persistent_env
     (fun s _m r ->
-       Compilation_unit.Name.Set.add
-         (s |> Compilation_unit.Name.of_head_of_global_name)
-         r)
+       Compilation_unit.Name.Set.add s.Global_module.Name.head r)
     Compilation_unit.Name.Set.empty
 
 let find_all_comps wrap proj s (p, mda) =
@@ -3763,7 +3761,9 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   | Mod_persistent -> begin
       (* This is only used when processing [Longident.t]s, which never have
          instance arguments *)
-      let name = Global_module.Name.create_no_args s in
+      let name =
+        Global_module.Name.create_no_args (Compilation_unit.Name.of_string s)
+      in
       let path, a =
         lookup_global_name_module_no_locks load ~errors ~use ~loc name env
       in
@@ -4918,7 +4918,8 @@ let bound_module name env =
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
-            (Global_module.Name.create_no_args name)
+            (Global_module.Name.create_no_args
+               (Compilation_unit.Name.of_string name))
         with
         | (_ : module_data) -> true
         | exception Not_found -> false
@@ -5004,7 +5005,10 @@ let fold_modules f lid env acc =
                   rather than just the name. It looks like the only immediate
                   consequence of this is that spellcheck won't suggest
                   instance names (which is good!). *)
-               let modname = Global_module.Name.create_no_args name in
+               let modname =
+                 Global_module.Name.create_no_args
+                   (Compilation_unit.Name.of_string name)
+               in
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
                | Some mda ->
@@ -5079,7 +5083,10 @@ let filter_non_loaded_persistent f env =
          | Mod_persistent ->
              (* CR lmaurer: Again, setting args to [] here is weird but fine
                 for the moment *)
-             let modname = Global_module.Name.create_no_args name in
+             let modname =
+               Global_module.Name.create_no_args
+                 (Compilation_unit.Name.of_string name)
+             in
              match Persistent_env.find_in_cache !persistent_env modname with
              | Some _ -> acc
              | None ->
