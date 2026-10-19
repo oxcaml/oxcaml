@@ -1542,6 +1542,33 @@ type 'a t : value mod global = private 'a
 type ('a : value mod global) t = private 'a
 |}]
 
+(* Refining a parameter from the manifest must not skip checking its uses. *)
+type 'a t : value mod global = 'a
+and u = (int -> int) t
+[%%expect {|
+Line 2, characters 8-22:
+2 | and u = (int -> int) t
+            ^^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The kind of int -> int is value non_float mod aliased immutable
+           because it's a function type.
+         But the kind of int -> int must be a subkind of value mod global
+           because of the definition of t at line 1, characters 0-33.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
+|}]
+
+type 'a t : value mod global = 'a u
+and 'a u = 'a
+[%%expect {|
+type ('a : value mod global) t = 'a u
+and 'a u = 'a
+|}]
+
 type 'a t : word = private 'a
 [%%expect {|
 Line 1, characters 0-29:
@@ -1660,7 +1687,15 @@ let f x =
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 type 'a t = Box of 'a
-val f : int -> unit = <fun>
+Line 11, characters 4-11:
+11 |     (Box x)
+         ^^^^^^^
+Error: This constructor has type "'a t" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a t is immutable_data with 'a
+         because of the definition of t at line 3, characters 0-21.
+       But the kind of 'a t must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 21-57.
 |}, Principal{|
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
@@ -1696,7 +1731,15 @@ let f x =
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 type 'a t = Box of 'a
-val f : int -> unit = <fun>
+Line 11, characters 4-11:
+11 |     (Box x)
+         ^^^^^^^
+Error: This constructor has type "'a t" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a t is immutable_data with 'a
+         because of the definition of t at line 3, characters 0-21.
+       But the kind of 'a t must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 21-57.
 |}, Principal{|
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>

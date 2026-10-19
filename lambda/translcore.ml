@@ -270,7 +270,7 @@ let event_after ~scopes exp lam =
   Translprim.event_after (of_location ~scopes exp.exp_loc) exp lam
 
 let event_function ~scopes exp lam =
-  if !Clflags.debug && not !Clflags.native_code then
+  if !Clflags.debug && not (Clflags.target_is_native ()) then
     let repr = Some (ref 0) in
     let (info, body) = lam repr in
     (info,
@@ -420,14 +420,18 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check { conditional; strict; opt; arity; partial; loc;
+              custom_error_msg = _ }
+      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+           && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { conditional = c.conditional;
-          strict = c.strict;
+        { conditional;
+          strict;
           never_returns_normally = false;
           never_raises = false;
-          arity = c.arity;
-          loc = c.loc }
+          arity;
+          partial;
+          loc }
       in
       Builtin_attributes.assume_zero_alloc ~inferred:true assume
     | Check _ | Default_zero_alloc | Ignore_assert_all | Assume _ ->
@@ -633,7 +637,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             if List.for_all Jkind.Sort.Const.is_scannable sorts then
               (* Ensure that uniform tuple constants are optimized *)
               Some (Const_block(0, constants))
-            else if !Clflags.native_code then
+            else if Clflags.target_is_native () then
               Some (Const_mixed_block(0, shape, constants))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -672,7 +676,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | _ -> assert false
       end else begin
         let shape =
-          Typeopt.transl_constructor_representation e.exp_env e.exp_loc
+          Translrepr.transl_constructor_representation e.exp_env e.exp_loc
             shape
         in
         let ll =
@@ -718,7 +722,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
-                  if !Clflags.native_code then
+                  if Clflags.target_is_native () then
                     Some (Const_mixed_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -828,14 +832,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       end
   | Texp_record {fields; representation; extended_expression; locality_mode} ->
       let representation =
-        Typeopt.transl_record_representation e.exp_env e.exp_loc
+        Translrepr.transl_record_representation e.exp_env e.exp_loc
           representation
       in
       let extended_expression =
         Option.map
           (fun (init_expr, sort, repres, ubr) ->
              let repres =
-               Typeopt.transl_record_representation e.exp_env e.exp_loc
+               Translrepr.transl_record_representation e.exp_env e.exp_loc
                  repres
              in
              (init_expr, sort, repres, ubr))
@@ -858,7 +862,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let record_repres =
-        Typeopt.transl_record_representation e.exp_env e.exp_loc
+        Translrepr.transl_record_representation e.exp_env e.exp_loc
           record_repres
       in
       let repres = match record_repres with
@@ -888,7 +892,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  record_repres; lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->
       let record_repres =
-        Typeopt.transl_record_representation arg.exp_env e.exp_loc
+        Translrepr.transl_record_representation arg.exp_env e.exp_loc
           record_repres
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -1026,11 +1030,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         Jkind.Sort.Const.for_boxed_record
       in
       let record_repres, ~variable_sorts =
-        Typeopt.transl_record_representation_and_sorts arg.exp_env
+        Translrepr.transl_record_representation_and_sorts arg.exp_env
           e.exp_loc record_repres
       in
       let sort_newval =
-        Typeopt.label_sort_for_representation lbl record_repres
+        Translrepr.label_sort_for_representation lbl record_repres
           ~record_sort:sort_arg ~variable_sorts
       in
       let arg_layout = layout_exp sort_arg arg in
@@ -1444,7 +1448,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                !transl_module ~scopes Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
-    if !Clflags.native_code && !Clflags.probes then begin
+    if Clflags.target_is_native () && !Clflags.probes then begin
       let lam = transl_exp ~scopes Lambda.layout_probe_arg exp in
       let map =
         Ident.Set.fold (fun v acc -> Ident.Map.add v (Ident.rename v) acc)
@@ -1592,7 +1596,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
-    if !Clflags.native_code && !Clflags.probes then
+    if Clflags.target_is_native () && !Clflags.probes then
       Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
             [], of_location ~scopes e.exp_loc)
     else
@@ -1996,7 +2000,7 @@ and transl_tupled_function
        rest_cases, partial, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_typed_locality_mode_l arg_mode)
-      && !Clflags.native_code
+      && Clflags.target_is_native ()
       && List.length pl <= (Lambda.max_arity ())
       && all_components_are_values pl ->
       begin try
@@ -2422,15 +2426,18 @@ and transl_function
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
-         then Check { conditional = false; strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { conditional = false; strict = false; loc = e.exp_loc;
+                      custom_error_msg = None; partial = false }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
-         then Check { conditional = false; strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { conditional = false; strict = false; loc = e.exp_loc;
+                      custom_error_msg = None; partial = false }
          else Default_zero_alloc)
-    | Check { conditional; strict; opt; arity = _; loc; custom_error_msg; } ->
+    | Check { conditional; strict; opt; arity = _; partial; loc;
+              custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { conditional; strict; loc; custom_error_msg }
+      then Check { conditional; strict; loc; custom_error_msg; partial }
       else Default_zero_alloc
     | Assume { conditional; strict; never_returns_normally; never_raises; loc; arity = _; } ->
       Assume { conditional; strict; never_returns_normally; never_raises; loc }
@@ -2729,7 +2736,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             (* See Note [Constant all-value mixed records]. *)
             raise Not_constant
         | Record_mixed shape ->
-            if !Clflags.native_code then
+            if Clflags.target_is_native () then
               Lconst(Const_mixed_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -2907,7 +2914,7 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
   | Baccess_field (_id, lbl, repres) ->
-    let repres = Typeopt.transl_record_representation env loc repres in
+    let repres = Translrepr.transl_record_representation env loc repres in
     begin match repres with
     | Record_boxed
     | Record_float | Record_ufloat ->

@@ -7,7 +7,9 @@ module DLL = Doubly_linked_list
 
 let function_is_assumed_to_never_poll func =
   String.begins_with ~prefix:"caml_apply" func
+  || String.begins_with ~prefix:"caml_curry" func
   || String.begins_with ~prefix:"caml_send" func
+  || String.begins_with ~prefix:"caml_tuplify" func
 
 let is_disabled fun_name =
   !Oxcaml_flags.disable_poll_insertion

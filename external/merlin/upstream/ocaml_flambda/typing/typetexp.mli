@@ -155,7 +155,7 @@ val get_type_param_name: Parsetree.core_type -> string option
 exception Already_bound
 
 type value_loc =
-    Poly_variant | Object_field | Optional_arg
+    Poly_variant | Object_field
 
 type sort_loc =
     Fun_arg | Fun_ret
@@ -205,7 +205,12 @@ type error =
   | Lpoly_unsupported
   | Val_poly_and_layout
 
-exception Error of Location.t * Env.t * error
+module Error : sig
+    type exn += private In_context of Location.t * Env.t * error
+
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
 
 (* Support for first-class modules. *)
 val transl_modtype_longident:  (* from Typemod *)

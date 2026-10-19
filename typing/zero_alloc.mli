@@ -3,6 +3,7 @@ type check = Builtin_attributes.zero_alloc_check =
     strict : bool;
     opt : bool;
     arity : int;
+    partial : bool;
     loc : Location.t;
     custom_error_msg : string option
   }
@@ -13,6 +14,7 @@ type assume = Builtin_attributes.zero_alloc_assume =
     never_returns_normally : bool;
     never_raises : bool;
     arity : int;
+    partial : bool;
     loc : Location.t
   }
 
@@ -48,11 +50,7 @@ val create_var : Location.t -> int -> t
 val get : t -> const
 
 (* For types.ml's backtracking mechanism. *)
-type change
-
-val set_change_log : (change -> unit) -> unit
-
-val undo_change : change -> unit
+include With_backtracking.S
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
@@ -63,5 +61,7 @@ val print_error : Format_doc.formatter -> error -> unit
    zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.  If [t1]
    is a variable, it may be set to make the relation hold. *)
 val sub : t -> t -> (unit, error) Result.t
+
+val applicable_arity : arity:int -> partial:bool -> num_args:int -> bool
 
 val debug_printer : Format.formatter -> t -> unit

@@ -464,22 +464,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of
-    { layout : layout }
-  | Patomic_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -1102,7 +1086,7 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
     false
 
 let forward_inlined_attribute () =
-  if !Clflags.native_code && !Clflags.stubs_forward_inlining
+  if Clflags.target_is_native () && !Clflags.stubs_forward_inlining
   then Forward_inlined
   else Default_inlined
 
@@ -1138,6 +1122,7 @@ type zero_alloc_attribute =
                strict: bool;
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { conditional: bool;
                 strict: bool;
@@ -1609,7 +1594,7 @@ let const_scalar (kind : locality_mode Scalar.Integral.t) n =
       const_unboxed_nativeint (Nativeint.of_int n))
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -1681,7 +1666,6 @@ let layout_list =
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
 let layout_value_field = nullable_value Pgenval
-let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_extensible_variant_constructor = non_null_value Pgenval
 let layout_exception = layout_extensible_variant_constructor
@@ -2221,6 +2205,22 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pfield(pos, Pointer, read_semantics)
   | Module_mixed (_, shape_for_read) ->
     Pmixedfield([pos], shape_for_read, read_semantics)
+
+let rec transl_layout (layout : Jkind_types.Layout.Const.t)
+    : unit mixed_block_element =
+  match layout with
+  | Genvar (var, _axes) -> Splice_variable (Slambdaident.of_sort_var var)
+  | Product layouts ->
+      Product (Array.of_list (List.map transl_layout layouts))
+  | Addressable layout -> transl_layout layout
+  | Base (base, axes) ->
+      Types.mixed_block_element_of_base base axes
+      |> transl_mixed_product_element
+  | Box (_, axes) ->
+      Types.mixed_block_element_of_base Scannable axes
+      |> transl_mixed_product_element
+  | Any _ | Univar _ ->
+      fatal_error "Lambda.transl_layout: unrepresentable layout"
 
 let transl_module_representation repr =
   let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
@@ -2822,7 +2822,7 @@ let merge_inline_attributes attr1 attr2 =
     else None
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -3121,17 +3121,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr _
-  | Patomic_set_ptr _
-  | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3150,7 +3139,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pidx_deepen _
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Punbox _ ->
-    if !Clflags.native_code then None
+    if Clflags.target_is_native () then None
     else
       (* We don't provide a locally-allocating version of this primitive
          since it would only apply to bytecode, and code requiring performance
@@ -3332,11 +3321,8 @@ let primitive_can_raise prim =
   | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
-  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
-  | Patomic_lor_ptr | Patomic_lxor_ptr -> false
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx ->
+    false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3637,7 +3623,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
   acc.last_value_after_flat
 
 let primitive_result_layout (p : primitive) =
-  assert (!Clflags.native_code || Clflags.is_flambda2 ());
+  assert (Clflags.target_is_native () || Clflags.is_flambda2 ());
   match p with
   | Pphys_equal (Eq | Noteq) -> layout_int
   | Pscalar op ->
@@ -3847,12 +3833,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_exchange_idx { layout; _ } -> layout
   | Patomic_compare_set_idx _
   | Patomic_fetch_add_idx -> layout_int
-  | Patomic_load_ptr { layout } -> layout
-  | Patomic_set_ptr _ -> layout_unit
-  | Patomic_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3865,11 +3845,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64

@@ -63,7 +63,7 @@ let preempt_on_tick () =
           preempted := true;
           continue k ())
         | _ -> None)
-    ; tickc = (fun () -> Preempt)
+    ; tickc = This (fun () -> Preempt)
     };
   assert !preempted;
   print_endline "OK"
@@ -89,7 +89,7 @@ let preempt_after_two_ticks () =
           preempted := true;
           continue k ())
         | _ -> None)
-    ; tickc = (fun () ->
+    ; tickc = This (fun () ->
         incr ticks_received;
         if !ticks_received = 2
         then Preempt

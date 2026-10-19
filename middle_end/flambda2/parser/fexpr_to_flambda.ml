@@ -473,8 +473,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (* CR mshinwell: Should get machine_width from fexpr context when
                available *)
             let acc, apply = apply_cont env acc apply in
+            let arm = Switch_arm.from_apply_cont apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, apply) )
+              (Target_ocaml_int.of_int machine_width case, arm) )
           | Inlined_goto body ->
             let (acc : Acc.t), build_let, (apply : Apply_cont_expr.t) =
               inlined_goto env acc body
@@ -483,8 +484,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               let acc, let_k = build_let acc body in
               build_let_ks acc let_k
             in
+            let arm = Switch_arm.from_apply_cont apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, apply) ))
+              (Target_ocaml_int.of_int machine_width case, arm) ))
         (acc, fun acc e -> acc, e)
         cases
     in
@@ -954,7 +956,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
-  | Invalid { message } -> acc, Flambda.Expr.create_invalid (Message message)
+  | Invalid -> acc, Flambda.Expr.create_invalid (Message "Invalid from fexpr")
 
 and inlined_goto env acc (handler_body : Fexpr.expr) =
   let acc, handler = expr env acc handler_body in
@@ -1042,7 +1044,7 @@ let bind_all_code_ids_and_function_slots env (unit : Fexpr.flambda_unit) =
           bindings
       in
       go env fs_size_of_code_ids code_ids_of_slots body
-    | Apply _ | Apply_cont _ | Switch _ | Invalid _ ->
+    | Apply _ | Apply_cont _ | Switch _ | Invalid ->
       env, fs_size_of_code_ids, code_ids_of_slots
   in
   let env, fs_size_of_code_ids, code_ids_of_slots =

@@ -1320,9 +1320,14 @@ module StoreExp = Switch.Store (struct
 
   type key = lambda
 
+  let with_annotations t _ = t
+
   let compare_key = Stdlib.compare
 
-  let make_key = Lambda.make_key
+  let make_key t =
+    match Lambda.make_key t with
+    | None -> None
+    | Some e -> Some (e, Branch_annotations.default)
 end)
 
 let make_exit i = Lstaticraise (i, [])
@@ -2120,7 +2125,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typeopt.transl_constructor_representation head.pat_env
+        Translrepr.transl_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2454,7 +2459,7 @@ let inline_lazy_force arg pos loc =
         ap_specialised = Default_specialise;
         ap_probe=None;
       }
-  else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
+  else if Clflags.target_is_native () && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
        caml_obj_tag and the switch on arbitrary tags *)
     (* Lswitch generates compact and efficient native code *)
@@ -2570,7 +2575,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typeopt.transl_record_representation_and_sorts head.pat_env
+    Translrepr.transl_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
@@ -2580,8 +2585,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        Typeopt.label_sort_for_representation lbl lbl_repres ~record_sort:sort
-          ~variable_sorts
+        Translrepr.label_sort_for_representation lbl lbl_repres
+          ~record_sort:sort ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -3036,7 +3041,7 @@ module SArg = struct
   let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
 
   let make_is_nonzero loc arg =
-    if !Clflags.native_code || Clflags.is_flambda2 ()
+    if Clflags.target_is_native () || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
@@ -3078,9 +3083,10 @@ module SArg = struct
         loc, kind ))
 
   let make_catch kind handler =
-    make_catch_delayed kind handler
+    let i,h = make_catch_delayed kind handler in
+    i,Branch_annotations.default,h
 
-  let make_exit i = make_exit i
+  let make_exit i _ = make_exit i
 end
 
 (* Action sharing for Lswitch argument *)
@@ -3662,7 +3668,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code || Clflags.is_flambda2 () then
+  if Clflags.target_is_native () || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else
@@ -5044,14 +5050,6 @@ let for_optional_arg_default
     ~scopes loc pat ~param ~default_arg ~default_arg_sort ~return_layout body
   : lambda
   =
-  begin match default_arg_sort with
-  | Jkind.Sort.Const.Base Scannable -> ()
-  | _ ->
-    (* Currently this is enforced by the typechecker but we intend to
-       lift this restriction soon. *)
-    Misc.fatal_error
-      "Matching.for_optional_arg_default: optional argument must be a value"
-  end;
   (* CR layouts v1.5: It's sad to compute [default_arg_layout] here as we
      immediately go and do it again in [for_let]. We should rework [for_let]
      so it can take a precomputed layout.
@@ -5060,6 +5058,19 @@ let for_optional_arg_default
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
   let sloc = Scoped_location.of_location ~scopes loc in
+  let field_access =
+    (* CR-someday lmaurer: This is just a special case of [make_field_access]
+       inside [get_expr_args_constr], but deduplicating it is nontrivial at the
+       moment. Even better, we could factor out *all* the places that project a
+       field and have to do this dance. Then here we'd bake in the
+       representation, which we could expose in [Predef] as a function of the
+       argument sort. *)
+    match default_arg_layout with
+    | Pvalue _ -> Pfield (0, Pointer, Reads_agree)
+    | _ ->
+      let shape = [| mixed_block_element_of_layout default_arg_layout |] in
+      Pmixedfield ([ 0 ], shape, Reads_agree)
+  in
   let supplied_or_default =
     transl_match_on_option
       default_arg_layout
@@ -5074,11 +5085,7 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
-           (* Assumes that the argument type has layout [value_or_null]; see
-              the [default_arg_sort] check above. *)
-           (Pfield (0, Pointer, Reads_agree),
-            [ Lvar param ],
-            sloc))
+           (field_access, [ Lvar param ], sloc))
   in
   for_let ~scopes ~arg_sort:default_arg_sort ~return_layout
     loc supplied_or_default Immutable pat body

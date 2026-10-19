@@ -331,7 +331,7 @@ type expr =
       { scrutinee : simple;
         cases : (int * apply_or_inlined_cont) list
       }
-  | Invalid of { message : string }
+  | Invalid
 
 and apply_or_inlined_cont =
   | Inlined_goto of expr

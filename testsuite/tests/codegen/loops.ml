@@ -16,7 +16,7 @@
 open Intrinsics
 
 
-(* CR ttebbi: What could have been a nice dense loop got
+(* CR ttebbi: WhatWe could have been a nice dense loop got
    interrupted by the loop exit path. In addition, we should do
    loop rotation to remove the unconditional jump. *)
 let loop_code_layout n =

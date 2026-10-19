@@ -49,7 +49,7 @@ module Scheduler = struct
 
   let spawn work_queue result completed f =
     Work_queue.push work_queue (fun () ->
-      let k = fiber (fun () ->
+      let k = Preemptible.fiber (fun () ->
         let r = f () in
         Atomic.add result (Int.of_float r);
         Atomic.incr completed)
@@ -58,13 +58,14 @@ module Scheduler = struct
         Preemptible.continue_with k ()
           { retc = (fun _result -> ());
             exnc = raise;
-            tickc = (fun () -> Preempt);
+            tickc = This (fun () -> Preempt);
             effc = fun (type a) (e : a t) ->
               match e with
-              | Preemption -> Some (fun (k : (a, _) continuation) ->
-                Atomic.incr num_preemptions;
-                Work_queue.push work_queue (fun () -> run k))
-              | Yield -> Some (fun (k : (a, _) continuation) ->
+              | Preemption ->
+                Some (fun (k : (a, _) Preemptible.continuation) ->
+                  Atomic.incr num_preemptions;
+                  Work_queue.push work_queue (fun () -> run k))
+              | Yield -> Some (fun (k : (a, _) Preemptible.continuation) ->
                 Work_queue.push work_queue (fun () -> run k))
               | _ -> None }
       in

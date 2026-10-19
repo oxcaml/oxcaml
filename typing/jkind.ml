@@ -3181,6 +3181,19 @@ let get_nullability env jk =
 let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
 
+let of_mod_bounds ~history mod_bounds =
+  { jkind =
+      { base = Layout (Any Scannable_axes.max);
+        mod_bounds;
+        with_bounds = No_with_bounds
+      };
+    annotation = None;
+    history;
+    has_warned = false;
+    ran_out_of_fuel_during_normalize = false;
+    quality = Not_best
+  }
+
 let apply_modality_l modality jk =
   let bounds_mask = Mod_bounds.mask_of_modality ~modality in
   let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
@@ -3496,6 +3509,8 @@ module Format_history = struct
       fprintf ppf "it's the type of something stored in a module"
     | Signature_item -> fprintf ppf "it's the type of something in a signature"
     | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
+    | Typing_recovery ->
+      fprintf ppf "it's a fake kind created during error recovery"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -3628,7 +3643,6 @@ module Format_history = struct
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
          or mut_idx)"
-    | Optional_argument -> fprintf ppf "it's the type of an optional argument"
 
   let format_value_creation_reason ppf ~layout_or_kind :
       History.value_creation_reason -> _ = function
@@ -4713,6 +4727,7 @@ module Debug_printers = struct
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
+    | Typing_recovery -> fprintf ppf "Typing_recovery"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4803,7 +4818,6 @@ module Debug_printers = struct
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
     | Idx_base -> fprintf ppf "Idx_base"
-    | Optional_argument -> fprintf ppf "Optional_argument"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
     | Class_let_binding -> fprintf ppf "Class_let_binding"

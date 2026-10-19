@@ -1444,6 +1444,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
                    (Check { conditional = false;
                             strict = false;
                             arity;
+                            partial = false;
                             custom_error_msg = None;
                             loc = Location.none;
                             opt })

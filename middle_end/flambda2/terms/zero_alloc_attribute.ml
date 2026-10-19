@@ -16,7 +16,8 @@ type t = Lambda.zero_alloc_attribute =
       { conditional : bool;
         strict : bool;
         loc : Location.t;
-        custom_error_msg : string option
+        custom_error_msg : string option;
+        partial : bool
       }
   | Assume of
       { conditional : bool;
@@ -35,21 +36,35 @@ let print ppf t =
       (if strict then "_strict" else "")
       (if never_returns_normally then "_never_returns_normally" else "")
       (if never_raises then "_never_raises" else "")
-  | Check { conditional; strict; loc = _; custom_error_msg = _ } ->
-    Format.fprintf ppf "@[assert_zero_alloc%s%s@]"
+  | Check { conditional; strict; loc = _; custom_error_msg = _; partial } ->
+    Format.fprintf ppf "@[assert_zero_alloc%s%s%s@]"
       (if conditional then "_conditional" else "")
       (if strict then "_strict" else "")
+      (if partial then "_partial" else "")
 
 let from_lambda : Lambda.zero_alloc_attribute -> t = Fun.id
 
 let equal x y =
   match x, y with
   | Default_zero_alloc, Default_zero_alloc -> true
-  | ( Check { conditional = c1; strict = s1; loc = loc1; custom_error_msg = msg1 },
-      Check { conditional = c2; strict = s2; loc = loc2; custom_error_msg = msg2 } ) ->
+  | ( Check
+        { conditional = c1;
+          strict = s1;
+          loc = loc1;
+          custom_error_msg = msg1;
+          partial = p1
+        },
+      Check
+        { conditional = c2;
+          strict = s2;
+          loc = loc2;
+          custom_error_msg = msg2;
+          partial = p2
+        } ) ->
     Bool.equal c1 c2 && Bool.equal s1 s2
     && Location.compare loc1 loc2 = 0
     && Option.equal String.equal msg1 msg2
+    && Bool.equal p1 p2
   | ( Assume
         { conditional = c1;
           strict = s1;

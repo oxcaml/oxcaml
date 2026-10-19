@@ -52,6 +52,19 @@ module Term : sig
   type 'a t = 'a term
 
   include Heterogenous_list.S with type 'a t := 'a t
+
+  val print_hlist :
+    pp_sep:(Format.formatter -> unit -> unit) ->
+    Format.formatter ->
+    _ hlist ->
+    unit
+
+  val print_columns :
+    pp_sep:(Format.formatter -> unit -> unit) ->
+    (_, 'a, _) Column.hlist ->
+    Format.formatter ->
+    'a hlist ->
+    unit
 end
 
 type ('k, 'v) relation =
@@ -87,10 +100,12 @@ val callback_with_bindings :
   atom
 
 type rule =
-  { head : atom iarray;
+  { variables : Variable.t_ list;
+    head : atom iarray;
     body : atom iarray
   }
 
 val print_rule : Format.formatter -> rule -> unit
 
-val rule : head:atom list -> body:atom list -> rule
+val rule :
+  variables:Variable.t_ list -> head:atom list -> body:atom list -> rule

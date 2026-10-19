@@ -345,8 +345,7 @@ open! Relations
    run. *)
 let current_analysis_scope = ref Analysis_scope.Current_unit
 
-let is_local field =
-  Field.is_local field ~analysis_scope:!current_analysis_scope
+let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
 
 module Datalog_schedule = struct
   (* Group rules by priority. Rules with (let$) are executed first, then the

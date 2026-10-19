@@ -1011,9 +1011,9 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
        Lambda.external_call_description) as prim_desc) ~args exn_continuation
     dbg ~current_region ~current_ghost_region k =
   let prim_desc =
-    match !Clflags.jsir with
-    | false -> prim_desc
-    | true ->
+    if not (Clflags.target_is_jsir ())
+    then prim_desc
+    else
       (* [close_c_call0] checks [prim_native_name] to see whether we should
          invoke the bytecode name or native name; for JavaScript compilation, we
          should use the bytecode name unless it involves unboxed products, for
@@ -1320,11 +1320,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
-      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
-      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
@@ -1916,7 +1912,7 @@ let close_exact_or_unknown_apply acc env
     in
     if Flambda_features.classic_mode ()
     then
-      if !Clflags.jsir
+      if Clflags.target_is_jsir ()
       then
         let apply =
           Apply.with_inlined_attribute apply
@@ -2016,9 +2012,11 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       let scrutinee = Simple.var comparison_result in
       let acc, action = action acc in
       let machine_width = Acc.machine_width acc in
+      (* CR bclement: use likelihood information from annotations. *)
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
-           ~if_true:action ~if_false:default_action)
+           ~if_true:(Switch_arm.from_apply_cont action)
+           ~if_false:(Switch_arm.from_apply_cont default_action))
     in
     let acc, body =
       Let_with_acc.create acc
@@ -2064,7 +2062,12 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               Target_ocaml_int.Map.fold
                 (fun case action (acc, arms) ->
                   let acc, arm = action acc in
-                  acc, Target_ocaml_int.Map.add case arm arms)
+                  (* CR bclement: use likelihood annotations from lambda to
+                     compute logits *)
+                  ( acc,
+                    Target_ocaml_int.Map.add case
+                      (Switch_arm.from_apply_cont arm)
+                      arms ))
                 arms
                 (acc, Target_ocaml_int.Map.empty)
             in
@@ -2265,7 +2268,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      (Flambda_kind.With_subkind.kind kind)
                  in
                  Bound_parameter.create var kind Flambda_debug_uid.none)
-               (Flambda_arity.unarized_components return))
+               (Flambda_arity.unarize return))
         in
         let handler acc =
           let acc, apply_cont =
@@ -2302,7 +2305,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       let boxed_variable = Variable.create "boxed_result" K.value in
       let boxed_variable_duid = Flambda_debug_uid.none in
       let return =
-        match Flambda_arity.unarized_components return with
+        match Flambda_arity.unarize return with
         | [return] -> return
         | [] | _ :: _ :: _ ->
           Misc.fatal_error
@@ -2554,7 +2557,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
-             (Flambda_arity.unarized_components result_arity_main_code))
+             (Flambda_arity.unarize result_arity_main_code))
       in
       let handler, free_names_of_handler =
         let boxed_return = Variable.create "boxed_return" K.value in
@@ -3742,7 +3745,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components apply.return_arity)
+          (Flambda_arity.unarize apply.return_arity)
       in
       let handler acc =
         let acc, call_return_continuation =
@@ -3820,7 +3823,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         missing_arity : [`Complex] Flambda_arity.t;
         missing_param_modes : Alloc_mode.For_types.t list;
-        result_arity : [`Unarized] Flambda_arity.t
+        result_arity : [`Complex] Flambda_arity.t
       }
   | Over_app of
       { full : IR.simple list;

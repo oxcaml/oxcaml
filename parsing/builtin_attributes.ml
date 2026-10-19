@@ -816,6 +816,7 @@ type zero_alloc_check =
     strict: bool;
     opt: bool;
     arity: int;
+    partial: bool;
     loc: Location.t;
     custom_error_msg : string option;
   }
@@ -826,6 +827,7 @@ type zero_alloc_assume =
     never_returns_normally: bool;
     never_raises: bool;
     arity: int;
+    partial: bool;
     loc: Location.t;
   }
 
@@ -976,6 +978,13 @@ let filter_arity payload =
   in
   find_arity [] payload
 
+let partition_partial payload =
+  let is_partial = function
+    | (Ident, "partial") -> true
+    | _ -> false
+  in
+  List.exists is_partial payload, List.filter (Fun.negate is_partial) payload
+
 (* If "assume_unless_opt" is not found returns None, otherwise
    returns the rest of the payload. Note it may change the order of the payload,
    which is fine because order doesn't matter. *)
@@ -999,7 +1008,8 @@ type zero_alloc_payload_options =
     has_unknown_option : bool;
   }
 
-let parse_zero_alloc_payload ~loc ~arity ~custom_error_message ~warn payload =
+let parse_zero_alloc_payload ~loc ~arity ~partial ~custom_error_message ~warn
+    payload =
   let options =
     List.fold_left
       (fun options -> function
@@ -1029,12 +1039,12 @@ let parse_zero_alloc_payload ~loc ~arity ~custom_error_message ~warn payload =
   | { conditional; strict; opt; assume = false; ignore = false;
       never_returns_normally = false; never_raises = false;
       has_unknown_option = false } ->
-    Check { conditional; strict; opt; arity; loc;
+    Check { conditional; strict; opt; arity; partial; loc;
             custom_error_msg = custom_error_message }
   | { conditional; strict; opt = false; assume = true; ignore = false;
       never_returns_normally; never_raises; has_unknown_option = false } ->
     Assume { conditional; strict; never_returns_normally; never_raises;
-             arity; loc }
+             arity; partial; loc }
   | { conditional = false; strict = false; opt = false; assume = false;
       ignore = true; never_returns_normally = false; never_raises = false;
       has_unknown_option = false } ->
@@ -1049,7 +1059,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
       warn_payload loc txt
         "Expected a supported combination of conditional, strict, opt, assume, \
          assume_unless_opt, never_returns_normally, error, or ignore, \
-         optionally with arity <int_constant> and \
+         optionally with partial, arity <int_constant>, and \
          custom_error_message <string_constant>."
     in
     match get_optional_payload get_ids_and_constants_from_exp payload with
@@ -1083,9 +1093,11 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
                 signatures";
              default_arity, payload)
       in
+      let partial, payload = partition_partial payload in
       let _, payload = List.split payload in
       let parse =
-        parse_zero_alloc_payload ~loc ~arity ~custom_error_message ~warn
+        parse_zero_alloc_payload ~loc ~arity ~partial ~custom_error_message
+          ~warn
       in
       match filter_assume_unless_opt payload with
       | None -> parse payload
@@ -1097,8 +1109,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
            (* Treat [@zero_alloc assume_unless_opt] as [@zero_alloc] in signatures. *)
            parse rest)
         else
-          let no_other_payload = List.compare_length_with rest 0 = 0 in
-          if no_other_payload then (
+          if List.is_empty rest then (
             if is_zero_alloc_check_enabled ~opt:true then
               (if on_application then
                  (* Treat as if there is no attribute.
@@ -1131,7 +1142,9 @@ let get_zero_alloc_attribute ~in_signature ~on_application ~default_arity l =
    | None, (Check _ | Assume _ | Ignore_assert_all) -> assert false
    | Some _, (Ignore_assert_all | Assume _) -> ()
    | Some attr, Check { opt; _ } ->
-     if not in_signature && is_zero_alloc_check_enabled ~opt && !Clflags.native_code then
+     if not in_signature && is_zero_alloc_check_enabled ~opt
+        && Clflags.target_is_native ()
+     then
        (* The warning for unchecked functions will not trigger if the check is
           requested through the [@@@zero_alloc all] top-level annotation rather
           than through the function annotation [@zero_alloc]. *)

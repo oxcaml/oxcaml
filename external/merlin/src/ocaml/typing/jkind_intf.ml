@@ -289,9 +289,7 @@ module type Sort = sig
 
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
-  type change
-
-  val undo_change : change -> unit
+  module Change : With_backtracking.Change.S
 
   (** Create a new sort variable with the given level. *)
   val new_var : level:int -> var
@@ -352,7 +350,6 @@ end
 module History = struct
   (* For sort variables that are topmost on the jkind lattice. *)
   type concrete_creation_reason =
-    | Merlin
     | Match
     | Extension_constructor_declaration of int
     | Extension_label_declaration of Ident.t
@@ -381,6 +378,7 @@ module History = struct
     | Structure_item
     | Signature_item
     | Layout_poly
+    | Typing_recovery
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -437,7 +435,6 @@ module History = struct
     | Array_comprehension_element
     | Array_comprehension_iterator_element
     | Idx_base
-    | Optional_argument
 
   type value_creation_reason =
     | Class_let_binding

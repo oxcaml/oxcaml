@@ -43,7 +43,7 @@
 
 /* Force tick thread to use usleep instead of epoll. Settable with
    OCAMLRUNPARAM */
-extern uintnat caml_tick_use_usleep;   /* -Xtick_use_usleep= */
+extern uintnat caml_tick_use_usleep;   /* Xtick_use_usleep= */
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)

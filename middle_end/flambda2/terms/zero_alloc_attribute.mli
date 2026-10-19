@@ -16,7 +16,8 @@ type t = Lambda.zero_alloc_attribute =
       { conditional : bool;
         strict : bool;
         loc : Location.t;
-        custom_error_msg : string option
+        custom_error_msg : string option;
+        partial : bool
       }
   | Assume of
       { conditional : bool;

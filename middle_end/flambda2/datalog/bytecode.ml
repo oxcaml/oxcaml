@@ -85,7 +85,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         'k Or_null_sender.t * string * 'k Join_iterator.t * string list * label
         -> code
     | Absent :
-        ('t, 'k, 'v) Trie.is_trie
+        ('t, 'k, 'v) Column.hlist
         * 't Or_null_receiver.t
         * string
         * 'k Or_null_receiver.hlist
@@ -122,14 +122,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * string list
         -> code
     | Union :
-        'v Table.result_repr
-        * ('t, 'k, 'v) Column.hlist
+        ('t, 'k, 's) Column.hlist
         * 't output_ref
         * string
         * 'k Or_null_receiver.hlist
         * string list
-        * 'v Or_null_receiver.t
+        * 's Or_null_receiver.t
         * string
+        * ('s, _, 'v) Column.hlist
+        * 'v Table.result_repr
         -> code
 
   let labels = function
@@ -173,7 +174,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         (print_label digits) if_false
     | Call_with_bindings (_, name, _, _, names) ->
       Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
-    | Union (_, _, _, name, _, names, _, value_name) ->
+    | Union (_, _, name, _, names, _, value_name, _, _) ->
       Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
         print_list names value_name
 
@@ -304,9 +305,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         Advance
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let absent is_trie { value = trie; name } { values = args; names } label =
+  let absent columns { value = trie; name } { values = args; names } label =
     emit_with_label label (fun label ->
-        Absent (is_trie, trie, name, args, names, label))
+        Absent (columns, trie, name, args, names, label))
 
   let distinct column key1 key2 label =
     emit_with_label label (fun label ->
@@ -353,8 +354,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     in
     if_template (seek iterator key) body
 
-  let if_not_in is_trie table args body =
-    if_template (absent is_trie table args) body
+  let if_not_in columns table args body =
+    if_template (absent columns table args) body
 
   let if_not_equal column arg1 arg2 body =
     if_template (distinct column arg1 arg2) body
@@ -364,9 +365,19 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
 
-  let union repr is_trie { value = table; name } { values = args; names }
-      { value; name = value_name } =
-    emit (Union (repr, is_trie, table, name, args, names, value, value_name))
+  let union columns { value = table; name } { values = args; names }
+      { value; name = value_name } inner_columns repr =
+    emit
+      (Union
+         ( columns,
+           table,
+           name,
+           args,
+           names,
+           value,
+           value_name,
+           inner_columns,
+           repr ))
 
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
@@ -427,11 +438,23 @@ module Make (Iterator : Leapfrog.Iterator) = struct
           delayed)
     |> create
 
+  let read_or_null = Channel.recv_or_null
+
   let read = Or_null_receiver.recv
 
   let read_hlist = Or_null_receiver.recv_hlist
 
   let write = Or_null_sender.send
+
+  let rec find_or_null_read_hlist : type t k v.
+      (t, k, v) Column.hlist -> k Or_null_receiver.hlist -> t -> v Or_null.t =
+   fun columns args t ->
+    match args, columns with
+    | [], [] -> Or_null.this t
+    | arg :: args, column :: columns -> (
+      match Column.find_or_null column (read arg) t with
+      | Null -> Or_null.null
+      | This s -> find_or_null_read_hlist columns args s)
 
   let rec read_singleton : type t k v.
       (t, k, v) Column.hlist ->
@@ -486,10 +509,13 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         Join_iterator.accept iterator;
         next ()
       | This _ | Null -> goto if_not_in)
-    | Absent (is_trie, table, _name, args, _names, if_mem) -> (
-      match Trie.find_or_null is_trie (read_hlist args) (read table) with
-      | This _ -> goto if_mem
-      | Null -> next ())
+    | Absent (columns, table, _name, args, _names, if_mem) -> (
+      match read_or_null table with
+      | Null -> next ()
+      | This table -> (
+        match find_or_null_read_hlist columns args table with
+        | This _ -> goto if_mem
+        | Null -> next ()))
     | Distinct (column, key1, _name1, key2, _name2, if_equal) ->
       if Column.equal_key column (read key1) (read key2)
       then goto if_equal
@@ -499,12 +525,18 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
       next ()
-    | Union (repr, columns, table, _, args, _, value, _) ->
+    | Union (columns, table, _, args, _, value, _, inner_cols, repr) ->
       let entry = read_singleton columns args value in
       (match table.contents with
       | Null -> table.contents <- Or_null.this entry
       | This contents ->
-        table.contents <- Or_null.this (Table.union columns repr contents entry));
+        let union_value = Table.result_repr_union repr in
+        let contents =
+          Column.union_total_hlist columns
+            (fun s1 s2 -> Column.union_total_hlist inner_cols union_value s1 s2)
+            contents entry
+        in
+        table.contents <- Or_null.this contents);
       next ()
 
   let run t =

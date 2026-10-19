@@ -439,20 +439,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of { layout : layout }
-  | Patomic_set_ptr of { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -873,6 +859,7 @@ type zero_alloc_attribute =
                   This definition may not be applicable to new properties. *)
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { conditional: bool;
                 strict: bool;
@@ -1336,8 +1323,6 @@ val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
-(* A layout that is Pgenval because it is an optional argument *)
-val layout_optional_arg : layout
 val layout_value_field : layout
 val layout_predef_value : layout
 val layout_lazy : layout
@@ -1468,6 +1453,10 @@ val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> mixed_block_shape
   -> 'a mixed_block_element array
+
+(* Translate a representable layout, turning generalized sorts into splices.
+   Rejects [Any] and [Univar]. *)
+val transl_layout : Jkind_types.Layout.Const.t -> unit mixed_block_element
 
 val transl_module_representation :
   Types.module_representation -> module_representation
