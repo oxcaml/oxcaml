@@ -8,7 +8,7 @@
    out of their mappings ("idled") and copied back onto fresh mappings
    when resumed ("woken"): exercise suspension, promotion and resumption
    with garbage-collection pressure in between. Under stack checks, or
-   with -Xno_idle_stacks=1, the same code runs without idling. *)
+   with Xno_idle_stacks=1, the same code runs without idling. *)
 
 open Effect
 open Effect.Deep
