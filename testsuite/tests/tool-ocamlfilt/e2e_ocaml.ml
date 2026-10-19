@@ -355,6 +355,22 @@ let[@inline never] omit_first_qualified x = Partial.labelled ~b:x
 
 let curried = Partial.labelled ~a:(Sys.opaque_identity 1)
 
+(* {1 Primitives re-exported as values}
+
+   When a signature declares as a [val] what the structure defines as an
+   [external], the compiler wraps the primitive in a closure to fill the
+   module field. The wrapper is named after the value it implements
+   ([Prims.<], [Prims.compare]), not after the primitive. *)
+module Prims : sig
+  val ( < ) : int -> int -> bool
+
+  val compare : int -> int -> int
+end = struct
+  external ( < ) : int -> int -> bool = "%lessthan"
+
+  external compare : int -> int -> int = "%compare"
+end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -392,4 +408,6 @@ let _ =
   ignore (omit_first_qualified 3 ~a:4);
   ignore (Partial.neg 5);
   ignore (curried ~b:6);
-  ignore (pick true)
+  ignore (pick true);
+  ignore (Prims.( < ) 1 2);
+  ignore (Prims.compare 1 2)
