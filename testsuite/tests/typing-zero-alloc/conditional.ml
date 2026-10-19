@@ -37,8 +37,10 @@ and[@zero_alloc conditional] iter_odd ~f : 'a list -> unit = function
   | [] -> ()
   | head :: tail -> (let () = f head in iter_even ~f tail)
 [%%expect{|
-val iter_even : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] = <fun>
-val iter_odd : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] = <fun>
+val iter_even : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
+val iter_odd : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
 |}]
 
 (* A trivially allocating function, to be used later: *)
@@ -49,9 +51,9 @@ val state : int ref ref = {contents = {contents = 42}}
 val allocate : unit -> unit = <fun>
 |}]
 
-let[@zero_alloc] iter_no_op l = iter ~f:ignore l
+let[@zero_alloc] iter_ignore l = iter ~f:ignore l
 [%%expect{|
-val iter_no_op : 'a list -> unit [@@zero_alloc] = <fun>
+val iter_ignore : 'a list -> unit [@@zero_alloc] = <fun>
 |}]
 
 let[@zero_alloc] iter_alloc l = iter ~f:allocate l
