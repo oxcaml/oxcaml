@@ -1042,8 +1042,9 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   (* A constant constructor or a constructor all of whose fields are values.
-     This is named 'uniform_value' to distinguish from the 'Constructor_uniform'
-     of [lambda.mli], which can also represent all-flat-float records.
+     This is named 'uniform_value' to distinguish from the
+     'Constructor_shape_uniform' of [lambda.mli], which can also represent
+     all-flat-float records.
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
@@ -1362,6 +1363,9 @@ val equal_constructor_representation_up_to_scannable_axes :
     it is nullary, or its shape is [Constructor_immediate_all_void]. *)
 val cstr_layout_is_constant : cstr_layout -> bool
 
+val mixed_block_element_of_base :
+  Jkind_types.Sort.base -> Jkind_types.Scannable_axes.t -> mixed_block_element
+
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
@@ -1376,6 +1380,20 @@ val bound_value_identifiers_and_sorts :
   signature -> (Ident.t * Jkind_types.Sort.t) list
 
 val signature_item_id : signature_item -> Ident.t
+
+(* Info for a compilation unit that implements a parameter (that is, was
+   compiled with [-as-argument-for]); stored in the unit's [.cmi]. Note that
+   if the CU is itself parameterised, this information describes instances
+   rather than the base CU. *)
+type arg_signature = {
+  arg_param : Global_module.Parameter_name.t;
+    (* The parameter implemented (the [P] in [-as-argument-for P]) *)
+  arg_block_idx : int;
+    (* The index of the _argument block_ within the main module block (for a
+       parameterised unit, within the block returned by its instantiating
+       functor). [-instantiate] passes the argument block to instantiating
+       functors; its signature is exactly that of the parameter. *)
+}
 
 val equal_mixed_block_element_up_to_scannable_axes :
   mixed_block_element -> mixed_block_element -> bool

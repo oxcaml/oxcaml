@@ -150,18 +150,15 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
     DM.add env.code_ids name c;
     c
 
-let fresh_function_slot env { Fexpr.txt = name; loc = _ } =
-  let c =
-    Function_slot.create
-      (Current_unit.get_cu_exn ())
-      ~name ~is_always_immediate:false Flambda_kind.value
-  in
+let fresh_function_slot env { Fexpr.txt = name; loc = _ } ~size =
+  let c = Function_slot.create (Current_unit.get_cu_exn ()) ~name ~size in
   UT.add env.function_slots name c;
   c
 
-let fresh_or_existing_function_slot env ({ Fexpr.txt = name; loc = _ } as id) =
+let fresh_or_existing_function_slot env ({ Fexpr.txt = name; loc = _ } as id)
+    ~size =
   match UT.find_opt env.function_slots name with
-  | None -> fresh_function_slot env id
+  | None -> fresh_function_slot env id ~size
   | Some function_slot -> function_slot
 
 let fresh_value_slot env { Fexpr.txt = name; loc = _ } kind =
@@ -212,6 +209,11 @@ let find_with ~descr ~find map { Fexpr.txt = name; loc } =
   | None ->
     Misc.fatal_errorf "Unbound %s %s: %a" descr name print_scoped_location loc
   | Some a -> a
+
+let find_function_slot env id =
+  find_with ~descr:"function_slot"
+    ~find:(fun map name -> UT.find_opt name map)
+    env.function_slots id
 
 let get_symbol (env : env) sym =
   match sym with

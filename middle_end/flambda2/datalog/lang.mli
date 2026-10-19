@@ -52,12 +52,25 @@ module Term : sig
   type 'a t = 'a term
 
   include Heterogenous_list.S with type 'a t := 'a t
+
+  val print_hlist :
+    pp_sep:(Format.formatter -> unit -> unit) ->
+    Format.formatter ->
+    _ hlist ->
+    unit
+
+  val print_columns :
+    pp_sep:(Format.formatter -> unit -> unit) ->
+    (_, 'a, _) Column.hlist ->
+    Format.formatter ->
+    'a hlist ->
+    unit
 end
 
 type ('k, 'v) relation =
   | Table : (_, 'k, 'v) Table.Id.t -> ('k, 'v) relation
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
-  | Distinct : 'k Value.repr -> ('k -> 'k -> nil, unit) relation
+  | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
@@ -75,7 +88,7 @@ val table : (_, 'k, 'v) Table.Id.t -> 'k Term.hlist -> atom
 
 val unless : (_, 'k, 'v) Table.Id.t -> 'k Term.hlist -> atom
 
-val distinct : 'k Value.repr -> 'k term -> 'k term -> atom
+val distinct : (_, 'k, _) Column.id -> 'k term -> 'k term -> atom
 
 val filter :
   ?name:string -> ('k Constant.hlist -> bool) -> 'k Term.hlist -> atom
@@ -87,10 +100,12 @@ val callback_with_bindings :
   atom
 
 type rule =
-  { head : atom iarray;
+  { variables : Variable.t_ list;
+    head : atom iarray;
     body : atom iarray
   }
 
 val print_rule : Format.formatter -> rule -> unit
 
-val rule : head:atom list -> body:atom list -> rule
+val rule :
+  variables:Variable.t_ list -> head:atom list -> body:atom list -> rule

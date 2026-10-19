@@ -1,0 +1,10 @@
+File "functor_mode_cmi.ml", line 16, characters 51-57:
+16 | module G : module type of Functor_mode_cmi_lib.F = G_impl
+                                                        ^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         functor (X : sig type t end) -> sig type t = X.t list end @ local
+       is not included in
+         functor (X : sig type t end) -> sig type t = X.t list end
+       Got local
+       but expected global.

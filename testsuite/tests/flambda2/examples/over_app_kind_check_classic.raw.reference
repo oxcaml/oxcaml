@@ -7,7 +7,7 @@
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   invalid "(Application_result_kind_mismatch_in_lambda\n (dbg over_app_kind_check_classic.ml:16,2--16))"
+   invalid
  in
  let $camlOver_app_kind_check_classic__s0 = closure test_0 @test &toplevel in
  let $camlOver_app_kind_check_classic__s2 =
@@ -16,6 +16,7 @@
  let $camlOver_app_kind_check_classic__s1 = closure f_1 @f &toplevel in
  cont k ($camlOver_app_kind_check_classic__s2))
   where k define_root_symbol (module_block) =
-    let field_0 = $camlOver_app_kind_check_classic__s0 in
-    let $camlOver_app_kind_check_classic = Block 0 (field_0) in
+    let $camlOver_app_kind_check_classic =
+      Block 0 ($camlOver_app_kind_check_classic__s0)
+    in
     cont done ($camlOver_app_kind_check_classic)

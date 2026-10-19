@@ -729,7 +729,6 @@ module Dwarf_helpers = struct
       let code_layout : Dwarf_state.code_layout =
         if
           !Clflags.function_sections
-          || !Oxcaml_flags.basic_block_sections
           || !Oxcaml_flags.module_entry_functions_section
         then
           (* Use Function_sections mode - ranges will be recorded via
@@ -829,8 +828,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ | Alloc _ )
     | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
-    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
-    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
+    | Lreloadretaddr | Lreturn | Llabel_for_jump_target _ | Llabel_for_dwarf _
+    | Lbranch _ | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Lentertrap
+    | Lraise _ ->
       loop i.next fs max_fs nontail_flag
     | Lstackcheck _ ->
       (* should not be already present *)
@@ -841,32 +841,33 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
 
 let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     ~stack_threshold_size ~trap_size =
-  if Config.no_stack_checks
-  then fundecl
-  else
-    let frame_size =
-      Proc.frame_size ~stack_offset ~num_stack_slots:fundecl.fun_num_stack_slots
-        ~contains_calls:fundecl.fun_contains_calls
-    in
-    let { max_frame_size; contains_nontail_calls } =
-      preproc_stack_check ~fun_body:fundecl.fun_body ~frame_size ~trap_size
-    in
-    let insert_stack_check =
-      contains_nontail_calls || max_frame_size >= stack_threshold_size
-    in
-    if insert_stack_check
+  let frame_size =
+    Proc.frame_size ~stack_offset ~num_stack_slots:fundecl.fun_num_stack_slots
+      ~contains_calls:fundecl.fun_contains_calls
+  in
+  let { max_frame_size; contains_nontail_calls } =
+    preproc_stack_check ~fun_body:fundecl.fun_body ~frame_size ~trap_size
+  in
+  let insert_stack_check =
+    if Config.no_stack_checks
     then
-      let fun_body =
-        (* CR mshinwell: These availability sets aren't taking into account any
-           potential clobbers by the stack check. *)
-        Linear.instr_cons
-          (Lstackcheck { max_frame_size_bytes = max_frame_size })
-          [||] [||] ~available_before:fundecl.fun_body.available_before
-          ~available_across:fundecl.fun_body.available_across fundecl.fun_body
-          ~phantom_available_before:fundecl.fun_body.phantom_available_before
-      in
-      { fundecl with fun_body }
-    else fundecl
+      Domainstate.stack_guard_stride > 0
+      && max_frame_size >= Domainstate.stack_guard_stride
+    else contains_nontail_calls || max_frame_size >= stack_threshold_size
+  in
+  if insert_stack_check
+  then
+    let fun_body =
+      (* CR mshinwell: These availability sets aren't taking into account any
+         potential clobbers by the stack check. *)
+      Linear.instr_cons
+        (Lstackcheck { max_frame_size_bytes = max_frame_size })
+        [||] [||] ~available_before:fundecl.fun_body.available_before
+        ~available_across:fundecl.fun_body.available_across fundecl.fun_body
+        ~phantom_available_before:fundecl.fun_body.phantom_available_before
+    in
+    { fundecl with fun_body }
+  else fundecl
 
 let stapsdt_base_emitted = ref false
 

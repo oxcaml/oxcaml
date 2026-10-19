@@ -241,7 +241,8 @@ and 'k pattern_desc =
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
   | Tpat_unboxed_bool : bool -> value pattern_desc
-  | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
+  | Tpat_tuple : (string option * value general_pattern * Jkind.sort) list ->
+      value pattern_desc
   | Tpat_unboxed_tuple :
       (string option * value general_pattern * Jkind.sort) list ->
       value pattern_desc
@@ -336,7 +337,8 @@ and expression_desc =
   | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
-  | Texp_tuple of (string option * expression) list * locality_mode_r
+  | Texp_tuple of
+      (string option * expression * Jkind.sort) list * locality_mode_r
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
       Longident.t loc * constructor_description * constructor_representation *
@@ -737,6 +739,7 @@ and module_coercion =
   | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
+  | Tcoerce_kindtemplate of kindtemplate_coercion
   | Tcoerce_invalid
 
 and module_type =
@@ -766,8 +769,15 @@ and primitive_coercion =
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
     pc_zero_alloc_check: Zero_alloc.check option;
+    pc_kindtemplate: kindtemplate_coercion;
     pc_env: Env.t;
     pc_loc : Location.t;
+  }
+
+and kindtemplate_coercion =
+  {
+    tc_args: Jkind.Sort.Const.t list;
+    tc_params: Jkind.Sort.var list;
   }
 
 and signature = {
@@ -1202,7 +1212,7 @@ let shallow_iter_pattern_desc
   = fun f -> function
   | Tpat_alias { pattern = p; _ } -> f.f p
   | Tpat_fun_layout _ -> ()
-  | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
+  | Tpat_tuple patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
@@ -1231,7 +1241,8 @@ let shallow_map_pattern_desc
       Tpat_alias { pattern = f.f p1; id; name = s; uid; sort; mode = m;
                    type_expr = ty }
   | Tpat_tuple pats ->
-      Tpat_tuple (List.map (fun (label, pat) -> label, f.f pat) pats)
+      Tpat_tuple
+        (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
@@ -1369,8 +1380,7 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
           List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
-      | Tpat_tuple patl ->
-        List.iter (fun (_, pat) -> loop f pat) patl
+      | Tpat_tuple patl
       | Tpat_unboxed_tuple patl ->
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
@@ -1435,6 +1445,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
                  Zero_alloc.create_const
                    (Check { strict = false;
                             arity;
+                            partial = false;
                             custom_error_msg = None;
                             loc = Location.none;
                             opt })
@@ -1613,34 +1624,6 @@ let label_sort (type rep)
     | Record_dummy _ ->
       Misc.fatal_error "label_sort: unexpected dummy representation"
     end
-
-let finalized_label_sort (label : Data_types.label_description)
-      (repres : Types.record_representation) ~record_sort ~variable_sorts =
-  match repres with
-  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-  | Record_inlined
-      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
-    begin match variable_sorts with
-    | Some sorts -> sorts.(label.lbl_pos)
-    | None ->
-      begin match label.lbl_sort with
-      | Some sort -> sort
-      | None ->
-        Misc.fatal_errorf
-          "no sort for label %s despite finalized representation"
-          label.lbl_name
-      end
-    end
-  | Record_undetermined | Record_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _) ->
-    Misc.fatal_error "finalized_label_sort: representation was not finalized"
-  | Record_inlined (_, Constructor_immediate_all_void, _) ->
-    Misc.fatal_error
-      "finalized_label_sort: unexpected immediate representation"
-  | Record_dummy _ ->
-    Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 
 let unboxed_label_all_sorts label repres =
   Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all

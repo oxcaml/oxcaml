@@ -37,7 +37,7 @@ type transl_value_decl_modal =
   (** A primitive in structure, in which case the modality syntax is treated as
     modes, and the returned value description will have empty modalities. *)
   (* CR zqian: avoid the above hack *)
-  | Sig_value of Mode.With_regionality.l * Mode.Modality.Const.t
+  | Sig_value of Mode.With_regionality.Const.t * Mode.Modality.Const.t
   (** A value description in a signature, in which case we require the mode of
       the structure that the value lives in, as well as the default modalities
       of the signature. *)
@@ -48,7 +48,7 @@ val transl_value_decl:
     Env.t -> modal:transl_value_decl_modal ->
     why:Jkind.History.concrete_creation_reason -> Location.t ->
     Parsetree.value_description ->
-    Typedtree.value_description * Mode.With_regionality.l * Env.t
+    Typedtree.value_description * Mode.With_regionality.Const.t * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
    the [Parsetree.type_declaration] argument should satisfy [is_fixed_type] *)
@@ -117,26 +117,6 @@ val instance_record_representation:
     (Types.label_declaration * Types.type_expr) list ->
     'rep
 
-(* Finalize variable (inlined) record representations, defaulting any unfilled
-   sorts. This should not be called until the end of typechecking. *)
-val finalize_record_representation:
-    Env.t -> Location.t -> Types.record_representation ->
-    Types.record_representation
-
-(* As [finalize_record_representation], also returning the fields' (now
-   defaulted) sorts if the representation was variable. [None] means the
-   representation was already final, so the field sorts are on the
-   declaration ([lbl_sort]). *)
-val finalize_record_representation_and_sorts:
-    Env.t -> Location.t -> Types.record_representation ->
-    Types.record_representation
-    * variable_sorts:Jkind.Sort.Const.t array option
-
-(* As [finalize_record_representation], for [Constructor_variable]. *)
-val finalize_constructor_representation:
-    Env.t -> Location.t -> Types.constructor_representation ->
-    Types.constructor_representation
-
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
 
@@ -145,7 +125,7 @@ val compute_block_shape :
     Env.t -> type_expr list ->
     [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
-type native_repr_kind = Unboxed | Untagged | Unpacked
+type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
@@ -172,6 +152,8 @@ module Mixed_product_kind : sig
     | Cstr_tuple
     | Cstr_record
     | Module
+    | Block
+    | Tuple
 end
 
 val assert_mixed_product_support :
@@ -268,11 +250,15 @@ type error =
   | Constructor_submode_failed of Mode.With_regionality.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
 
-exception Error of Location.t * error
+module Error : sig
+    type exn += private In_context of Location.t * error
+
+  val log_or_raise : Location.t -> error -> unit
+  val log_and_raise : Location.t -> error -> 'a
+end
 
 val report_error: loc:Location.t -> error -> Location.report

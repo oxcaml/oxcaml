@@ -192,7 +192,7 @@ let find_size_of_alloc_prim prim args =
   else None
 
 let compute_mixed_block_size shape =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     let bytes = Mixed_product_bytes.count (Product shape) in
     let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
     let size = Mixed_product_bytes.size_in_words bytes in
@@ -231,8 +231,8 @@ let compute_static_size lam =
           env bindings
       in
       compute_expression_size env body
-    | Lprim (p, args, _) ->
-      size_of_primitive env p args
+    | Lprim (p, args, loc) ->
+      size_of_primitive env loc p args
     | Lswitch (_, sw, _, _) ->
       let fail_case =
         match sw.sw_failaction with
@@ -295,15 +295,27 @@ let compute_static_size lam =
      number of value fields only. In bytecode, void fields are kept, so the
      block size includes all fields. *)
   and all_value_mixed_block_size shape =
-    if !Clflags.native_code then
+    if Clflags.target_is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
     else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
-  and size_of_primitive env p args =
+  and size_of_primitive env loc p args =
+    let check_shape shape =
+      if Lambda.mixed_block_shape_has_splices shape then
+        Location.raise_errorf ~loc:(Debuginfo.Scoped_location.to_location loc)
+          "Recursive definitions of layout-polymorphic blocks are not \
+           currently supported."
+    in
+    begin match p with
+    | Pmakeblock (_, _, Shape shape, _)
+    | Pduprecord
+        ((Record_mixed shape
+         | Record_inlined (_, Constructor_mixed shape, _)), _) ->
+      check_shape shape
+    | _ -> ()
+    end;
     match p with
     | Pignore
     | Psetfield _
@@ -339,11 +351,6 @@ let compute_static_size lam =
     | Patomic_land_idx
     | Patomic_lor_idx
     | Patomic_lxor_idx
-    | Patomic_add_ptr
-    | Patomic_sub_ptr
-    | Patomic_land_ptr
-    | Patomic_lor_ptr
-    | Patomic_lxor_ptr
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -353,7 +360,7 @@ let compute_static_size lam =
     | Pduprecord (repres, size) ->
         begin match repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
             Block (Regular_block size)
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
             (* Extensible variants require an extra machine word
@@ -364,37 +371,27 @@ let compute_static_size lam =
         | Record_inlined
               (Ordinary { runtime_tag; _ },
                Constructor_mixed shape,
-               Variant_boxed _)
-              when Mixed_product_bytes.types_shape_is_all_value shape ->
-            let size = all_value_mixed_block_size_types shape in
+               Variant_boxed)
+              when Mixed_product_bytes.shape_is_all_value shape ->
+            let size = all_value_mixed_block_size shape in
             Block (uniform_block_size ~tag:runtime_tag size)
         | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
+                          (Variant_boxed | Variant_extensible))
         | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
+            if Mixed_product_bytes.shape_is_all_value shape
             then
               Block (Regular_block
-                (all_value_mixed_block_size_types shape))
+                (all_value_mixed_block_size shape))
             else
-              let size =
-                compute_mixed_block_size
-                  (Lambda.transl_mixed_product_shape shape)
+              let size = compute_mixed_block_size shape
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
-        | Record_dummy _ ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected dummy representation"
         | Record_inlined (_, Constructor_immediate_all_void, _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected immediate representation"
-        | Record_undetermined | Record_variable _
-        | Record_inlined (_, (Constructor_undetermined
-                             | Constructor_variable _), _) ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
@@ -510,12 +507,6 @@ let compute_static_size lam =
     | Patomic_compare_exchange_idx _
     | Patomic_compare_set_idx _
     | Patomic_fetch_add_idx
-    | Patomic_load_ptr _
-    | Patomic_set_ptr _
-    | Patomic_exchange_ptr _
-    | Patomic_compare_exchange_ptr _
-    | Patomic_compare_set_ptr _
-    | Patomic_fetch_add_ptr
     | Popaque _
     | Pdls_get
     | Ptls_get
@@ -594,7 +585,9 @@ let compute_static_size lam =
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Preinterpret_boxed_vector_as_tuple _
-    | Preinterpret_tuple_as_boxed_vector _ ->
+    | Preinterpret_tuple_as_boxed_vector _
+    | Pbox _
+    | Punbox _ ->
         dynamic_size lam
   in
   compute_expression_size Ident.Map.empty lam

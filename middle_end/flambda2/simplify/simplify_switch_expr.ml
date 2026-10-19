@@ -79,11 +79,19 @@ let find_all_aliases env arg =
       | None -> find_all_aliases ())
     arg
 
-let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
+let rebuild_arm uacc arm (action, ~annotations, use_id, arity, env_at_use)
     (new_let_conts, arms, (mergeable_arms : mergeable_arms)) =
   let action =
     Simplify_common.clear_demoted_trap_action_and_patch_unused_exn_bucket uacc
       action
+  in
+  let create_arm action =
+    let annotations =
+      if UE.is_cold_continuation (UA.uenv uacc) (Apply_cont.continuation action)
+      then Branch_annotations.with_likelihood annotations Likelihood.cold
+      else annotations
+    in
+    Switch_arm.create ~annotations action
   in
   match EB.rewrite_switch_arm uacc action ~use_id arity with
   | Invalid _ ->
@@ -137,7 +145,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
       (* The destination is unreachable; delete the [Switch] arm. *)
       new_let_conts, arms, mergeable_arms
     | Some action -> (
-      let arms = TI.Map.add arm action arms in
+      let arms = TI.Map.add arm (create_arm action) arms in
       (* Check to see if this arm may be merged with others. *)
       if Option.is_some (Apply_cont.trap_action action)
       then new_let_conts, arms, Not_mergeable
@@ -167,7 +175,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
   | New_wrapper new_let_cont ->
     let new_let_conts = new_let_cont :: new_let_conts in
     let action = Apply_cont.goto new_let_cont.cont in
-    let arms = TI.Map.add arm action arms in
+    let arms = TI.Map.add arm (create_arm action) arms in
     new_let_conts, arms, Not_mergeable
 
 let filter_and_choose_alias required_names alias_set =
@@ -183,14 +191,15 @@ let filter_and_choose_alias required_names alias_set =
     in
     Alias_set.find_best available_alias_set
 
-let find_cse_simple ?(required = true) dacc required_names local_cse prim =
+let find_cse_simple ?(required = true) cse typing_env required_names local_cse
+    prim =
   match P.Eligible_for_cse.create prim with
   | None -> None (* Constant *)
   | Some with_fixed_value -> (
     let[@local] try_local_cse () =
       Common_subexpression_elimination.find local_cse with_fixed_value
     in
-    match DE.find_cse (DA.denv dacc) with_fixed_value with
+    match Common_subexpression_elimination.find cse with_fixed_value with
     | None ->
       if required
       then
@@ -202,7 +211,7 @@ let find_cse_simple ?(required = true) dacc required_names local_cse prim =
     | Some simple -> (
       match
         filter_and_choose_alias required_names
-          (find_all_aliases (DA.typing_env dacc) simple)
+          (find_all_aliases typing_env simple)
       with
       | Some simple -> Some simple
       | None -> try_local_cse ()))
@@ -211,13 +220,26 @@ let fields_to_simples dbg simples =
   List.map (fun simple -> Simple.With_debuginfo.create simple dbg) simples
 
 let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
-    simples =
+    simples ~machine_width =
   let fields_to_or_variables prover simples =
     ListLabels.map simples ~f:(fun simple ->
         Simple.pattern_match simple
           ~name:(fun _ ~coercion:_ ->
             (* Only constants reach this point. *) assert false)
           ~const:(fun cst ->
+            let cst =
+              (* Poison values can't be represented in static const arrays, so
+                 we materialize them as an arbitrary value here.
+
+                 We lose the information that the value is a poison for later
+                 simplifications, which is unfortunate, but the benefit in code
+                 size is likely worth it compared to not using lookup tables for
+                 values that could be poisoned. *)
+              match RWC.is_poison cst with
+              | None -> cst
+              | Some (kind, name) ->
+                RWC.of_int_of_kind machine_width kind (String.hash name)
+            in
             let cst =
               match prover cst with
               | Some v -> v
@@ -284,9 +306,12 @@ let bound_prim name kind prim dbg = Prim (name, kind, prim, dbg)
 let bound_lookup_table name ~element_kind ~array_kind simples dbg =
   Lookup_table { name; array_kind; element_kind; simples; dbg }
 
-let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
+let ( let$ ) expr k uacc ~shareable_constants ~typing_env_before_switch
+    ~cse_before_switch ~local_cse =
+  let machine_width = TE.machine_width typing_env_before_switch in
   let[@local] already_bound simple =
-    k simple uacc ~dacc_before_switch ~local_cse
+    k simple uacc ~shareable_constants ~typing_env_before_switch
+      ~cse_before_switch ~local_cse
   in
   match expr with
   | Simple simple -> already_bound simple
@@ -294,32 +319,30 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
     let array_const =
       create_lookup_table_array_const dbg array_kind
         (UA.are_rebuilding_terms uacc)
-        simples
+        simples ~machine_width
     in
     let[@local] create_lookup_table static_const =
       let symbol = Symbol.manufacture (Current_unit.get_cu_exn ()) name in
-      let dacc_before_switch =
+      let shareable_constants =
         match static_const with
-        | None -> dacc_before_switch
-        | Some static_const ->
+        | Some static_const when Static_const.can_share static_const ->
           (* Note: this only enables sharing of identical arguments for this
-             switch -- the modified [dacc_before_switch] gets thrown away. *)
-          DA.consider_constant_for_sharing dacc_before_switch symbol
-            static_const
+             switch -- the modified [shareable_constants] gets thrown away. *)
+          Static_const.Map.add static_const symbol shareable_constants
+        | _ -> shareable_constants
       in
       let fields = List.map (T.alias_type_of (KS.kind element_kind)) simples in
       let block_type =
         T.immutable_array ~element_kind:(Ok element_kind) ~fields
-          Alloc_mode.For_types.heap
-          ~machine_width:(DE.machine_width (DA.denv dacc_before_switch))
+          Alloc_mode.For_types.heap ~machine_width
       in
       let uacc =
         UA.add_lifted_constant uacc
-          (LC.create_block_like symbol array_const
-             (DA.denv dacc_before_switch)
+          (LC.create_block_like symbol array_const typing_env_before_switch
              block_type ~symbol_projections:Variable.Map.empty)
       in
-      k (Simple.symbol symbol) uacc ~dacc_before_switch ~local_cse
+      k (Simple.symbol symbol) uacc ~shareable_constants
+        ~typing_env_before_switch ~cse_before_switch ~local_cse
     in
     match RSC.to_const array_const with
     | None ->
@@ -327,12 +350,12 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
       create_lookup_table None
     | Some (Deleted_code | Code _) -> Misc.fatal_error "Cannot bind code"
     | Some (Static_const const) -> (
-      match DA.find_shareable_constant dacc_before_switch const with
+      match Static_const.Map.find_opt const shareable_constants with
       | None -> create_lookup_table (Some const)
       | Some symbol -> already_bound (Simple.symbol symbol)))
   | Prim (name, kind, prim, dbg) -> (
     match
-      find_cse_simple ~required:false dacc_before_switch
+      find_cse_simple ~required:false cse_before_switch typing_env_before_switch
         (UA.required_names uacc) local_cse prim
     with
     | Some simple -> already_bound simple
@@ -346,13 +369,16 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
         | Some with_fixed_value ->
           Common_subexpression_elimination.add local_cse with_fixed_value
             ~bound_to:(Simple.var var)
-            (DE.get_continuation_scope (DA.denv dacc_before_switch))
+            (TE.current_scope typing_env_before_switch)
       in
-      let body, uacc = k (Simple.var var) uacc ~dacc_before_switch ~local_cse in
+      let body, uacc =
+        k (Simple.var var) uacc ~shareable_constants ~typing_env_before_switch
+          ~cse_before_switch ~local_cse
+      in
       let duid = Flambda_debug_uid.none in
       let machine_width = UE.machine_width (UA.uenv uacc) in
       let binding =
-        EB.Keep_binding
+        Simplified_named.Keep_binding
           { let_bound = BPt.singleton (BV.create var duid NM.normal);
             simplified_defining_expr =
               Simplified_named.create ~machine_width named;
@@ -361,19 +387,21 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
       in
       EB.make_new_let_bindings uacc ~bindings_outermost_first:[binding] ~body)
 
-let return ~added_code_size ~free_names expr uacc ~dacc_before_switch:_
-    ~local_cse:_ =
+let return ~added_code_size ~free_names expr uacc ~shareable_constants:_
+    ~typing_env_before_switch:_ ~cse_before_switch:_ ~local_cse:_ =
   let uacc = UA.notify_added ~code_size:added_code_size uacc in
   let uacc = UA.add_free_names uacc free_names in
   expr, uacc
 
-let run uacc ~dacc_before_switch k =
+let run uacc ~shareable_constants ~typing_env_before_switch ~cse_before_switch k
+    =
   (* [local_cse] allows sharing between distinct arguments of the same switch.
 
      We can't update the CSE from the [dacc_before_switch] because that can bind
      to existing names that are not in the [required_names] and we can't use
      anymore. *)
-  k uacc ~dacc_before_switch ~local_cse:Common_subexpression_elimination.empty
+  k uacc ~shareable_constants ~typing_env_before_switch ~cse_before_switch
+    ~local_cse:Common_subexpression_elimination.empty
 
 type affine_immediate_kind =
   | Tagged
@@ -728,8 +756,16 @@ let recognize_mergeable_argument ~machine_width ~scrutinee required_names ~dbg
           | Naked_mask -> single_kind Naked_masks Naked_masks)
         | Region | Rec_info -> None))
 
-let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-    ~dacc_before_switch uacc ~after_rebuild =
+let rebuild_switch
+    { SE.arms;
+      condition_dbg;
+      scrutinee;
+      scrutinee_ty;
+      shareable_constants;
+      typing_env_before_switch;
+      cse_before_switch
+    } uacc ~after_rebuild =
+  let machine_width = TE.machine_width typing_env_before_switch in
   let new_let_conts, arms, mergeable_arms =
     TI.Map.fold (rebuild_arm uacc) arms ([], TI.Map.empty, No_arms)
   in
@@ -739,7 +775,6 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
     | No_arms | Not_mergeable -> None
     | Mergeable { cont; args } ->
       let num_args = List.length args in
-      let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
       let mergeable_args =
         List.filter_map
           (recognize_mergeable_argument ~machine_width ~scrutinee
@@ -752,7 +787,6 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       then Some (cont, mergeable_args)
       else None
   in
-  let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
   let body, uacc =
     if num_arms < 1
     then
@@ -793,22 +827,27 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                of continuations in [Name_occurrences] and then try to inline out
                [dest]. This might happen anyway in the backend though so this
                probably isn't that important for now. *)
+            let is_cold = UE.is_cold_continuation (UA.uenv uacc) dest in
             let apply_cont = Apply_cont.create dest ~args ~dbg in
             return
-              (RE.create_apply_cont apply_cont)
+              (RE.create_apply_cont ~is_cold apply_cont)
               ~added_code_size:(Code_size.apply_cont apply_cont)
               ~free_names:(Apply_cont.free_names apply_cont)
           | special_arg :: special_args ->
             rebuild_mergeable_argument ~machine_width ~scrutinee special_arg
               (fun arg -> rebuild_merged_switch special_args (arg :: args_rev))
         in
-        run uacc ~dacc_before_switch (rebuild_merged_switch args [])
+        run uacc ~shareable_constants ~typing_env_before_switch
+          ~cse_before_switch
+          (rebuild_merged_switch args [])
       | None -> normal_case uacc
   in
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
   after_rebuild expr uacc
 
-let simplify_arm arm (action, env_at_use) (arms, dacc) =
+let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
+  let action = Switch_arm.action switch_arm in
+  let annotations = Switch_arm.annotations switch_arm in
   let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
   let args = AC.args action in
   let use_kind =
@@ -816,6 +855,11 @@ let simplify_arm arm (action, env_at_use) (arms, dacc) =
   in
   let { S.simples = args; simple_tys = arg_types } =
     S.simplify_simples (DA.with_denv dacc denv_at_use) args
+  in
+  let denv_at_use =
+    if Switch_arm.is_cold switch_arm
+    then DE.mark_as_cold denv_at_use
+    else denv_at_use
   in
   let dacc, rewrite_id =
     DA.record_continuation_use dacc (AC.continuation action) use_kind
@@ -837,7 +881,9 @@ let simplify_arm arm (action, env_at_use) (arms, dacc) =
            (Apply_cont.continuation action)
            args)
   in
-  let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
+  let arms =
+    TI.Map.add arm (action, ~annotations, rewrite_id, arity, env_at_use) arms
+  in
   arms, dacc
 
 let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
@@ -1008,17 +1054,15 @@ let simplify_switch dacc switch ~down_to_up =
       (Switch.arms switch)
   in
   match TI.Map.get_singleton arms with
-  | Some (_, (apply_cont, env_at_use)) ->
+  | Some (_, (arm, env_at_use)) ->
     (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
-    Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
-      ~down_to_up:(fun dacc ~rebuild ->
-        down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-            let uacc =
-              UA.notify_removed ~operation:Removed_operations.branch uacc
-            in
-            rebuild uacc ~after_rebuild))
+    Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
+      ~down_to_up:(fun dacc simplified_expr ->
+        down_to_up dacc
+          (SE.notify_removed ~operation:Removed_operations.branch
+             simplified_expr))
   | None ->
     let arms, dacc = TI.Map.fold simplify_arm arms (TI.Map.empty, dacc) in
     let dacc =
@@ -1044,7 +1088,9 @@ let simplify_switch dacc switch ~down_to_up =
         dacc
       | _ -> dacc
     in
+    let shareable_constants = DA.shareable_constants dacc_before_switch in
+    let typing_env_before_switch = DA.typing_env dacc_before_switch in
+    let cse_before_switch = DE.cse (DA.denv dacc_before_switch) in
     down_to_up dacc
-      ~rebuild:
-        (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-           ~dacc_before_switch)
+      (SE.simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+         ~shareable_constants ~typing_env_before_switch ~cse_before_switch)

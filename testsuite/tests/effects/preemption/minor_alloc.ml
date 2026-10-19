@@ -24,7 +24,7 @@ let alloc () =
 
 let () =
   Gc.set { (Gc.get ()) with minor_heap_size = 1024 };
-  Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
+  Domain.Tick.with_ ~interval_usec:1_000 (fun () ->
     let bang = Atomic.make false in
     let weird = ref [] in
     let f () =
@@ -46,4 +46,6 @@ let () =
     in
     Preemptible.try_with
       ~on_tick:(fun () -> Preempt)
-      f () { effc })
+      f () { effc };
+    ());
+  ()

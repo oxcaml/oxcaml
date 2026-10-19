@@ -44,7 +44,7 @@
          (field $serialize (ref null $serialize))
          (field $deserialize (ref null $deserialize))
          (field $dup (ref null $dup))))
-   (type $custom (sub (struct (field (ref $custom_operations)))))
+   (type $custom (sub (struct (field $ops (ref $custom_operations)))))
    (type $custom_with_id
       (sub $custom
          (struct
@@ -66,7 +66,7 @@
       (sub final $custom_with_id
          (struct
             (field (ref $custom_operations))
-            (field i64)
+            (field $id i64)
             (field $state (mut i32)))))
 
    (func (export "caml_ml_mutex_new") (param (ref eq)) (result (ref eq))
@@ -75,17 +75,17 @@
 
    (@string $lock_failure "Mutex.lock: mutex already locked. Cannot wait.")
 
-   (func (export "caml_ml_mutex_lock") (param (ref eq)) (result (ref eq))
+   (func (export "caml_ml_mutex_lock") (param $vt (ref eq)) (result (ref eq))
       (local $t (ref $mutex))
-      (local.set $t (ref.cast (ref $mutex) (local.get 0)))
+      (local.set $t (ref.cast (ref $mutex) (local.get $vt)))
       (if (struct.get $mutex $state (local.get $t))
          (then (call $caml_failwith (global.get $lock_failure))))
       (struct.set $mutex $state (local.get $t) (i32.const 1))
       (ref.i31 (i32.const 0)))
 
-   (func (export "caml_ml_mutex_try_lock") (param (ref eq)) (result (ref eq))
+   (func (export "caml_ml_mutex_try_lock") (param $vt (ref eq)) (result (ref eq))
       (local $t (ref $mutex))
-      (local.set $t (ref.cast (ref $mutex) (local.get 0)))
+      (local.set $t (ref.cast (ref $mutex) (local.get $vt)))
       (if (result (ref eq)) (struct.get $mutex $state (local.get $t))
          (then
             (ref.i31 (i32.const 0)))
@@ -93,19 +93,40 @@
             (struct.set $mutex $state (local.get $t) (i32.const 1))
             (ref.i31 (i32.const 1)))))
 
-   (func (export "caml_ml_mutex_unlock") (param (ref eq)) (result (ref eq))
+   (func (export "caml_ml_mutex_unlock") (param $vt (ref eq)) (result (ref eq))
       (struct.set $mutex $state
-         (ref.cast (ref $mutex) (local.get 0)) (i32.const 0))
+         (ref.cast (ref $mutex) (local.get $vt)) (i32.const 0))
       (ref.i31 (i32.const 0)))
+
+   (global $condition_ops (ref $custom_operations)
+      (struct.new $custom_operations
+         (@string "_condition")
+         (ref.func $custom_compare_id)
+         (ref.null $compare)
+         (ref.func $custom_hash_id)
+         (ref.null $fixed_length)
+         (ref.null $serialize)
+         (ref.null $deserialize)
+         (ref.null $dup)))
+
+   (type $condition
+      (sub final $custom_with_id
+         (struct
+            (field (ref $custom_operations))
+            (field i64))))
 
    (func (export "caml_ml_condition_new") (param (ref eq)) (result (ref eq))
-      (ref.i31 (i32.const 0)))
-
-   (@string $condition_failure "Condition.wait: cannot wait")
+      ;; Each condition variable gets a distinct identity, like the JS runtime
+      ;; (which allocates a fresh object). The previous immediate 0 made all
+      ;; condition variables physically equal.
+      (struct.new $condition
+         (global.get $condition_ops) (call $custom_next_id)))
 
    (func (export "caml_ml_condition_wait")
       (param (ref eq)) (param (ref eq)) (result (ref eq))
-      (call $caml_failwith (global.get $condition_failure))
+      ;; A no-op, like the JS runtime: single-threaded, there is nothing to
+      ;; wait for. The two runtimes must agree (the JS one returns 0 rather
+      ;; than raising).
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_ml_condition_signal") (param (ref eq)) (result (ref eq))

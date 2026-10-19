@@ -1,0 +1,8 @@
+mod_directive_on.ml: List
+mod_uses_dollar.ml: String
+File "mod_uses_dollar.ml", line 1, characters 6-7:
+1 | let ( $ ) f x = f x
+          ^
+Error: Syntax error: operator expected.
+mod_uses_dollar.ml:
+mod_uses_dollar.ml: String

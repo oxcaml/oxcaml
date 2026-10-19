@@ -221,7 +221,7 @@ type primitive =
   | Psetufloatfield of int * initialization_or_assignment
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
@@ -464,22 +464,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of
-    { layout : layout }
-  | Patomic_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -517,6 +501,8 @@ type primitive =
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -588,9 +574,30 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
-and constructor_shape =
-  | Constructor_uniform of value_kind list
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+and constructor_representation =
+  | Constructor_uniform_value
   | Constructor_mixed of mixed_block_shape
+  | Constructor_immediate_all_void
+
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
+and constructor_shape =
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -770,9 +777,9 @@ and equal_value_kind x y =
 
 and equal_mixed_block_element :
   type p.
-    (p -> p -> bool) -> p mixed_block_element -> p mixed_block_element
-    -> bool =
-  fun eq_param m1 m2 ->
+    (p -> p -> bool) -> equal_value_kind:(value_kind -> value_kind -> bool)
+    -> p mixed_block_element -> p mixed_block_element -> bool =
+  fun eq_param ~equal_value_kind m1 m2 ->
   match m1, m2 with
   | Value v1, Value v2 -> equal_value_kind v1 v2
   | Float_boxed param1, Float_boxed param2 -> eq_param param1 param2
@@ -789,8 +796,8 @@ and equal_mixed_block_element :
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
-    Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
-      es1 es2
+    Misc.Stdlib.Array.equal
+      (equal_mixed_block_element eq_param ~equal_value_kind) es1 es2
   | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
@@ -798,16 +805,57 @@ and equal_mixed_block_element :
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
-  Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
+  Misc.Stdlib.Array.equal
+    (equal_mixed_block_element Unit.equal ~equal_value_kind) shape1 shape2
 
 and equal_constructor_shape x y =
   match x, y with
-  | Constructor_uniform fields1, Constructor_uniform fields2 ->
+  | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2 ->
       List.length fields1 = List.length fields2
       && List.for_all2 equal_value_kind fields1 fields2
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> false
+  | Constructor_shape_undetermined, Constructor_shape_undetermined -> true
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _
+    | Constructor_shape_undetermined), _ -> false
+
+let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
+  Misc.Stdlib.Array.equal
+    (equal_mixed_block_element Unit.equal ~equal_value_kind:(fun _ _ -> true))
+    shape1 shape2
+
+let equal_constructor_representation_up_to_value_kinds r1 r2 =
+  match r1, r2 with
+  | Constructor_uniform_value, Constructor_uniform_value -> true
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      equal_mixed_block_shape_up_to_value_kinds shape1 shape2
+  | Constructor_immediate_all_void, Constructor_immediate_all_void -> true
+  | (Constructor_uniform_value | Constructor_mixed _
+    | Constructor_immediate_all_void), _ -> false
+
+let equal_variant_representation r1 r2 =
+  match r1, r2 with
+  | Variant_unboxed, Variant_unboxed
+  | Variant_boxed, Variant_boxed
+  | Variant_extensible, Variant_extensible
+  | Variant_with_null, Variant_with_null -> true
+  | (Variant_unboxed | Variant_boxed | Variant_extensible | Variant_with_null),
+    _ -> false
+
+let equal_record_representation_up_to_value_kinds r1 r2 =
+  match r1, r2 with
+  | Record_unboxed, Record_unboxed
+  | Record_boxed, Record_boxed
+  | Record_float, Record_float
+  | Record_ufloat, Record_ufloat -> true
+  | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
+      Types.equal_tag tag1 tag2
+      && equal_constructor_representation_up_to_value_kinds cr1 cr2
+      && equal_variant_representation vr1 vr2
+  | Record_mixed shape1, Record_mixed shape2 ->
+      equal_mixed_block_shape_up_to_value_kinds shape1 shape2
+  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+    | Record_ufloat | Record_mixed _), _ -> false
 
 let join_nullable x y =
   match x, y with
@@ -819,25 +867,26 @@ let rec join_value_kind_non_null x y =
   else
     match x, y with
     | Pvariant { consts = consts1; non_consts = non_consts1 },
-      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
-        match join_non_consts non_consts1 non_consts2 with
-        | Some non_consts ->
-            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
-            Pvariant { consts; non_consts }
-        | None -> Pgenval
-      end
+      Pvariant { consts = consts2; non_consts = non_consts2 } ->
+        let non_consts = join_non_consts non_consts1 non_consts2 in
+        let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+        Pvariant { consts; non_consts }
     | _, _ -> Pgenval
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
-  | Constructor_uniform fields1, Constructor_uniform fields2
+  | Constructor_shape_undetermined, _ | _, Constructor_shape_undetermined ->
+      Constructor_shape_undetermined
+  | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
-      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
-      Option.map
-        (fun shape -> Constructor_mixed shape)
-        (join_mixed_block_shape shape1 shape2)
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+      Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2)
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 -> begin
+      match join_mixed_block_shape shape1 shape2 with
+      | Some shape -> Constructor_shape_mixed shape
+      | None -> Constructor_shape_undetermined
+    end
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ ->
+      Constructor_shape_undetermined
 
 and join_mixed_block_shape shape1 shape2 =
   if Array.length shape1 <> Array.length shape2 then None
@@ -876,17 +925,15 @@ and join_non_consts non_consts1 non_consts2 =
   let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
   let rec merge l1 l2 =
     match l1, l2 with
-    | [], l | l, [] -> Some l
+    | [], l | l, [] -> l
     | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
         if tag1 < tag2 then
-          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+          (tag1, shape1) :: merge rest1 l2
         else if tag2 < tag1 then
-          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+          (tag2, shape2) :: merge l1 rest2
         else
-          match join_constructor_shape shape1 shape2 with
-          | Some shape ->
-              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
-          | None -> None
+          let shape = join_constructor_shape shape1 shape2 in
+          (tag1, shape) :: merge rest1 rest2
   in
   merge (sorted non_consts1) (sorted non_consts2)
 
@@ -1039,7 +1086,7 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
     false
 
 let forward_inlined_attribute () =
-  if !Clflags.native_code && !Clflags.stubs_forward_inlining
+  if Clflags.target_is_native () && !Clflags.stubs_forward_inlining
   then Forward_inlined
   else Default_inlined
 
@@ -1074,6 +1121,7 @@ type zero_alloc_attribute =
   | Check of { strict: bool;
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
@@ -1447,14 +1495,8 @@ let main_module_representation = function
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;
     required_globals : Compilation_unit.Set.t;
     code : lambda }
-
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int;
-    main_repr: module_representation; }
 
 let const_int n = Const_base (Const_int n)
 
@@ -1550,7 +1592,7 @@ let const_scalar (kind : locality_mode Scalar.Integral.t) n =
       const_unboxed_nativeint (Nativeint.of_int n))
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -1618,13 +1660,10 @@ let layout_list =
        { consts = [0];
          non_consts =
            [0,
-            Constructor_uniform
+            Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
-let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
-let layout_tmc_field = nullable_value Pgenval
-let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
 let layout_extensible_variant_constructor = non_null_value Pgenval
 let layout_exception = layout_extensible_variant_constructor
@@ -1670,7 +1709,8 @@ let layout_tupled_vector v =
   in
   Pvalue
     { raw_kind =
-        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+        Pvariant
+          { consts = []; non_consts = [0, Constructor_shape_mixed fields] };
       nullable = Non_nullable
     }
 
@@ -2088,8 +2128,9 @@ let pointerness_of_separability sep =
   if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
-  match elt with
+let rec transl_mixed_product_element (element : Types.mixed_block_element)
+  : unit mixed_block_element
+  = match element with
   | Scannable { separability; _ } ->
     let raw_kind =
       value_kind_of_pointerness (pointerness_of_separability separability)
@@ -2103,34 +2144,37 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
-  | Vec256 ->
-    if split_vectors
-    then Product [|Vec128; Vec128|]
-    else Vec256
+  | Vec256 when split_vectors -> Product [| Vec128; Vec128 |]
+  | Vec256 -> Vec256
   | Vec512 -> Vec512
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
-  | Product shapes ->
-    Product (transl_mixed_product_shape shapes)
+  | Product shape -> Product (transl_mixed_product_shape shape)
   | Void -> Product [||]
   | Addressable elt ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
-    transl_mixed_block_element elt
+    transl_mixed_product_element elt
 
 and transl_mixed_product_shape shape =
-  Array.map transl_mixed_block_element shape
+  Array.map transl_mixed_product_element shape
 
-let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
-    (elt : Types.mixed_block_element) =
+let mixed_block_shape_has_splices shape =
+  let rec has_splices : 'a mixed_block_element -> bool = function
+    | Splice_variable _ -> true
+    | Product shape -> Array.exists has_splices shape
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+    | Untagged_immediate -> false
+  in
+  Array.exists has_splices shape
+
+let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
+    (elt : unit mixed_block_element) =
   match elt with
-  | Scannable { separability; _ } ->
-    let raw_kind =
-      value_kind_of_pointerness (pointerness_of_separability separability)
-    in
-    Value { (get_value_kind i) with raw_kind }
-  | Float_boxed -> Float_boxed (get_mode i)
+  | Value { raw_kind; _ } -> Value { (get_value_kind i) with raw_kind }
+  | Float_boxed () -> Float_boxed (get_mode i)
   | Float64 -> Float64
   | Float32 -> Float32
   | Bits8 -> Bits8
@@ -2148,18 +2192,11 @@ let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
     let get_value_kind _ = generic_value in
-    Product
-      (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-  | Void -> Product [||]
-  | Addressable elt ->
-    (* CR box: Addressability should be preserved here once it affects boxed
-       representations *)
-    transl_mixed_block_element_for_read ~get_value_kind ~get_mode i elt
+    Product (mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Splice_variable id -> Splice_variable id
 
-and transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi
-    (transl_mixed_block_element_for_read ~get_value_kind ~get_mode)
-    shape
+and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (mixed_block_element_for_read ~get_value_kind ~get_mode) shape
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
@@ -2167,32 +2204,41 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_mixed (_, shape_for_read) ->
     Pmixedfield([pos], shape_for_read, read_semantics)
 
+let rec transl_layout (layout : Jkind_types.Layout.Const.t)
+    : unit mixed_block_element =
+  match layout with
+  | Genvar (var, _axes) -> Splice_variable (Slambdaident.of_sort_var var)
+  | Product layouts ->
+      Product (Array.of_list (List.map transl_layout layouts))
+  | Addressable layout -> transl_layout layout
+  | Base (base, axes) ->
+      Types.mixed_block_element_of_base base axes
+      |> transl_mixed_product_element
+  | Box (_, axes) ->
+      Types.mixed_block_element_of_base Scannable axes
+      |> transl_mixed_product_element
+  | Any _ | Univar _ ->
+      fatal_error "Lambda.transl_layout: unrepresentable layout"
+
 let transl_module_representation repr =
-  (* The shape here is potentially an underapproximation, since the scannable
-     axes in [shape] will all be [max]. This should not matter, though, since it
-     is not possible to reassign / directly mutate a [val] in a module. *)
-  let shape =
-    Array.map
-      (fun sort ->
-         sort
-         |> Jkind.Sort.default_for_transl_and_get
-         |> Types.mixed_block_element_of_const_sort)
-      repr
-  in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
-  then Module_value_only { field_count = Array.length shape }
+  let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
+  if Array.for_all Jkind.Sort.Const.is_scannable sorts
+  then Module_value_only { field_count = Array.length sorts }
   else
+    (* The shape here is potentially an underapproximation, since the scannable
+       axes in [shape] will all be [max]. This should not matter, though, since
+       it is not possible to reassign / directly mutate a [val] in a module. *)
+    let shape =
+      Array.map
+        (fun sort ->
+           transl_layout
+             (Jkind.Layout.Const.of_sort_const sort
+                Jkind_types.Scannable_axes.max))
+        sorts
+    in
     Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
+      ( shape,
+        mixed_product_shape_for_read
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
@@ -2778,7 +2824,7 @@ let merge_inline_attributes attr1 attr2 =
     else None
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -2798,6 +2844,8 @@ let find_exact_application kind ~arity args =
           if arity <> List.length const_args
           then None
           else Some (List.map (fun cst -> Lconst cst) const_args)
+      (* CR layouts-mixed-tuplify: this should support [Const_mixed_block] once
+         there is proper support for mixed tupled functions *)
       | _ -> None
       end
 
@@ -3040,6 +3088,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_mask -> None
   | Pbox_mask m -> Some m
   | Punbox_unit -> None
+  | Pbox (_, m) -> Some m
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
@@ -3074,17 +3123,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr _
-  | Patomic_set_ptr _
-  | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3101,8 +3139,9 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
-  | Preinterpret_tagged_int63_as_unboxed_int64 ->
-    if !Clflags.native_code then None
+  | Preinterpret_tagged_int63_as_unboxed_int64
+  | Punbox _ ->
+    if Clflags.target_is_native () then None
     else
       (* We don't provide a locally-allocating version of this primitive
          since it would only apply to bytecode, and code requiring performance
@@ -3284,11 +3323,8 @@ let primitive_can_raise prim =
   | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
-  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
-  | Patomic_lor_ptr | Patomic_lxor_ptr -> false
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx ->
+    false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3304,7 +3340,7 @@ let primitive_can_raise prim =
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
-  | Ppeek _ | Ppoke _ ->
+  | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ ->
     false
 
 let constant_layout: constant -> layout = function
@@ -3357,8 +3393,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
-  | Genvar _ ->
-    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -3507,7 +3542,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
-  | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
+  | Ptop | Pbottom ->
+    Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32
@@ -3589,7 +3625,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
   acc.last_value_after_flat
 
 let primitive_result_layout (p : primitive) =
-  assert (!Clflags.native_code || Clflags.is_flambda2 ());
+  assert (Clflags.target_is_native () || Clflags.is_flambda2 ());
   match p with
   | Pphys_equal (Eq | Noteq) -> layout_int
   | Pscalar op ->
@@ -3799,12 +3835,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_exchange_idx { layout; _ } -> layout
   | Patomic_compare_set_idx _
   | Patomic_fetch_add_idx -> layout_int
-  | Patomic_load_ptr { layout } -> layout
-  | Patomic_set_ptr _ -> layout_unit
-  | Patomic_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3817,11 +3847,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
@@ -3847,6 +3872,14 @@ let primitive_result_layout (p : primitive) =
   | Pset_ptr _ -> layout_unit
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
+  | Pbox (_layout, _) ->
+    (* CR box: Once we box some things as tagged immediates, we should compute
+       a more precise layout here. For instance, a [bits8 box] could get
+       [layout_int]. If we add mutability tracking (depending on when
+       specialization happens), we could compute more precise layouts too,
+       like that of a tuple. *)
+    layout_block
+  | Punbox layout -> layout
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode

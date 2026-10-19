@@ -233,6 +233,7 @@ caml_ba_alloc(int flags, int num_dims, void * data, intnat * dim)
   CAMLassert(0 <= num_dims);
   CAMLassert(num_dims <= CAML_BA_MAX_NUM_DIMS);
   CAMLassert((flags & CAML_BA_KIND_MASK) < CAML_BA_FIRST_UNIMPLEMENTED_KIND);
+  CAMLassert((flags & CAML_BA_STACK) == 0);
   for (int i = 0; i < num_dims; i++) dimcopy[i] = dim[i];
   num_elts = 1;
   for (int i = 0; i < num_dims; i++) {
@@ -594,7 +595,7 @@ CAMLexport uintnat caml_ba_deserialize(void * dst)
   b->num_dims = caml_deserialize_uint_4();
   if (b->num_dims < 0 || b->num_dims > CAML_BA_MAX_NUM_DIMS)
     caml_deserialize_error("input_value: wrong number of bigarray dimensions");
-  b->flags = caml_deserialize_uint_4() | CAML_BA_MANAGED;
+  b->flags = (caml_deserialize_uint_4() & ~CAML_BA_STACK) | CAML_BA_MANAGED;
   b->proxy = NULL;
   for (int i = 0; i < b->num_dims; i++) {
     intnat len = caml_deserialize_uint_2();
@@ -1203,6 +1204,35 @@ CAMLprim value caml_ba_layout(value vb)
   return Val_caml_ba_layout(layout);
 }
 
+/* Whether the bigarray block is allocated on the stack */
+
+CAMLprim value caml_ba_is_stack(value vb)
+{
+  return Val_bool((Caml_ba_array_val(vb)->flags & CAML_BA_STACK) != 0);
+}
+
+/* The caller must ensure that [vb] is stack-allocated. */
+
+CAMLprim value caml_ba_globalize_stack(value vb)
+{
+  CAMLparam1(vb);
+  CAMLlocal1(res);
+  uintnat asize = SIZEOF_BA_ARRAY
+                   + Caml_ba_array_val(vb)->num_dims * sizeof(intnat);
+
+  res = caml_alloc_custom(Custom_ops_val(vb), asize, 0, 1);
+  memcpy(Data_custom_val(res), Data_custom_val(vb), asize);
+  Caml_ba_array_val(res)->flags &= ~CAML_BA_STACK;
+  CAMLreturn(res);
+}
+
+CAMLprim value caml_ba_unsafe_smart_globalize(value vb)
+{
+  if (Caml_ba_array_val(vb)->flags & CAML_BA_STACK)
+    return caml_ba_globalize_stack(vb);
+  return vb;
+}
+
 /* Create / update proxy to indicate that b2 is a sub-array of b1 */
 
 static void caml_ba_update_proxy(struct caml_ba_array * b1,
@@ -1283,7 +1313,7 @@ CAMLprim value caml_ba_slice(value vb, value vind)
     (char *) b->data +
     offset * caml_ba_element_size[b->flags & CAML_BA_KIND_MASK];
   /* Allocate an OCaml bigarray to hold the result */
-  res = caml_ba_alloc(b->flags | CAML_BA_SUBARRAY,
+  res = caml_ba_alloc((b->flags & ~CAML_BA_STACK) | CAML_BA_SUBARRAY,
                       b->num_dims - num_inds, sub_data, sub_dims);
   /* Copy the finalization function from the original array (PR#8568) */
   Custom_ops_val(res) = Custom_ops_val(vb);
@@ -1361,7 +1391,7 @@ CAMLprim value caml_ba_sub(value vb, value vofs, value vlen)
     (char *) b->data +
     ofs * mul * caml_ba_element_size[b->flags & CAML_BA_KIND_MASK];
   /* Allocate an OCaml bigarray to hold the result */
-  res = caml_ba_alloc(b->flags | CAML_BA_SUBARRAY,
+  res = caml_ba_alloc((b->flags & ~CAML_BA_STACK) | CAML_BA_SUBARRAY,
                       b->num_dims, sub_data, b->dim);
   /* Copy the finalization function from the original array (PR#8568) */
   Custom_ops_val(res) = Custom_ops_val(vb);
@@ -1531,7 +1561,8 @@ CAMLprim value caml_ba_reshape(value vb, value vdim)
   if (num_elts != caml_ba_num_elts(b))
     caml_invalid_argument("Bigarray.reshape: size mismatch");
   /* Create bigarray with same data and new dimensions */
-  res = caml_ba_alloc(b->flags | CAML_BA_SUBARRAY, num_dims, b->data, dim);
+  res = caml_ba_alloc((b->flags & ~CAML_BA_STACK) | CAML_BA_SUBARRAY,
+                      num_dims, b->data, dim);
   /* Copy the finalization function from the original array (PR#8568) */
   Custom_ops_val(res) = Custom_ops_val(vb);
   /* Create or update proxy in case of managed bigarray */

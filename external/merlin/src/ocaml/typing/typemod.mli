@@ -51,10 +51,11 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
+  Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
 val transl_signature:
-  ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
+  ?interface_toplevel:bool -> md_mode:Mode.With_regionality.Const.t ->
+  Env.t -> Parsetree.signature -> Typedtree.signature
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
@@ -63,6 +64,13 @@ val transl_signature:
    CR-soon zqian: all persistent modules should always be [Static]. *)
 val staticity_of_modalities:
   Typedtree.modalities -> Mode.Staticity.Const.t
+
+(* [arg_signature sg ~param] describes a unit with signature [sg] compiled
+   with [-as-argument-for param]. *)
+val arg_signature:
+  Types.signature -> param:Global_module.Parameter_name.t ->
+  Types.arg_signature
+
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*
@@ -202,8 +210,8 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
 
-exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+exception Errors of Location.t * Typing_recovery.Error_set.t
 
 val report_error: Env.t -> loc:Location.t -> error -> Location.error
 
@@ -213,6 +221,10 @@ val reset : preserve_persistent_env:bool -> unit
 
 (* merlin *)
 
+module Error : sig
+    type exn += private In_context of Location.t * Env.t * error
+end
+
 val normalize_signature : Types.signature -> unit
 
 val merlin_type_structure:
@@ -220,4 +232,5 @@ val merlin_type_structure:
   Typedtree.structure * Types.signature * (* Signature_names.t * *) Env.t
 
 val merlin_transl_signature:
-  ?interface_toplevel:bool -> Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature
+  ?interface_toplevel:bool -> md_mode:Mode.With_regionality.Const.t ->
+  Env.t -> Types.signature -> Parsetree.signature -> Typedtree.signature

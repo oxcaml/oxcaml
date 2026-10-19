@@ -103,12 +103,25 @@ module Term = struct
         loop ~first:false ppf terms
     in
     loop ~first:true ppf terms
+
+  let print_columns ~pp_sep columns ppf terms =
+    let rec loop : type t k v.
+        first:_ -> (t, k, v) Column.hlist -> _ -> k hlist -> unit =
+     fun ~first columns ppf terms ->
+      match columns, terms with
+      | [], [] -> ()
+      | column :: columns, term :: terms ->
+        if not first then pp_sep ppf ();
+        print_term (Column.print_key column) ppf term;
+        loop ~first:false columns ppf terms
+    in
+    loop ~first:true columns ppf terms
 end
 
 type ('k, 'v) relation =
   | Table : (_, 'k, 'v) Table.Id.t -> ('k, 'v) relation
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
-  | Distinct : 'k Value.repr -> ('k -> 'k -> nil, unit) relation
+  | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
@@ -160,11 +173,12 @@ let callback_with_bindings ~name fn args =
   atom (Callback_with_bindings (fn, name)) args
 
 type rule =
-  { head : atom iarray;
+  { variables : Variable.t_ list;
+    head : atom iarray;
     body : atom iarray
   }
 
-let print_rule ppf { head; body } =
+let print_rule ppf { variables = _; head; body } =
   (* Note: we need to eta-expand `Iarray.iter` because of `local` mode
      restrictions. *)
   Format.fprintf ppf "@[<2>@[%a@]@ :-@ @[<hv>%a.@]@]"
@@ -179,5 +193,5 @@ let print_rule ppf { head; body } =
        print_atom)
     body
 
-let rule ~head ~body =
-  { head = Iarray.of_list head; body = Iarray.of_list body }
+let rule ~variables ~head ~body =
+  { variables; head = Iarray.of_list head; body = Iarray.of_list body }

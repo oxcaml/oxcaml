@@ -586,14 +586,3 @@ Test M.3 : Predef types
   [
     "(lazy _)"
   ]
-
-Test M.4 : that construct will work on holes in an overwrite expression
-
-  $ cat > M4.ml <<EOF
-  > let _ = overwrite_ (1, 2) with (_, 3)
-  > EOF
-
-TODO: fix this
-  $ $MERLIN single construct -position 1:32 \
-  > -filename M4.ml < M4.ml | jq .value
-  "Construct only works on holes."

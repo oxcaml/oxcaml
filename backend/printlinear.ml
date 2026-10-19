@@ -23,10 +23,6 @@ open Linear
 
 let label ppf l = Format.fprintf ppf "L%a" Label.format l
 
-let section_name_to_string ppf = function
-  | None -> ()
-  | Some name -> fprintf ppf " in %s section" name
-
 let call_operation ?(print_reg = Printreg.reg) ppf op arg =
   let regs = Printreg.regs' ~print_reg in
   match op with
@@ -93,8 +89,8 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     call_operation ppf op i.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
   | Lreturn -> fprintf ppf "return %a" regs i.arg
-  | Llabel { label = lbl; section_name } ->
-    fprintf ppf "%a%a:" label lbl section_name_to_string section_name
+  | Llabel_for_jump_target lbl -> fprintf ppf "%a:" label lbl
+  | Llabel_for_dwarf lbl -> fprintf ppf "%a: (DWARF only label)" label lbl
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
   | Lcondbranch (tst, lbl) ->
     fprintf ppf "if %a goto %a" (test tst) i.arg label lbl
@@ -138,5 +134,4 @@ let fundecl ppf f =
     then ""
     else " " ^ Debuginfo.to_string f.fun_dbg
   in
-  fprintf ppf "@[<v 2>%s:%s%a@,%a@]" f.fun_name dbg section_name_to_string
-    f.fun_section_name all_instr f.fun_body
+  fprintf ppf "@[<v 2>%s:%s@,%a@]" f.fun_name dbg all_instr f.fun_body

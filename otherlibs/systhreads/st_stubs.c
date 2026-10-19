@@ -139,7 +139,6 @@ struct caml_thread_struct {
   value descr;              /* The heap-allocated descriptor (root) */
   struct caml_thread_struct * next; /* Doubly-linked list of running threads */
   struct caml_thread_struct * prev;
-  value tls_state;    /* saved TLS value */
   int domain_id;      /* The id of the domain to which this thread belongs */
   struct stack_info* current_stack;      /* saved Caml_state->current_stack */
   struct c_stack_link* c_stack;          /* saved Caml_state->c_stack */
@@ -159,6 +158,7 @@ struct caml_thread_struct {
   void * signal_stack;       /* this thread's signal stack */
   size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
+  bool preemption_scheduled; /* Is a preemption scheduled? */
   dynamic_cache_t dynamic;   /* cached dynamic value bindings */
 
 #ifndef NATIVE_CODE
@@ -276,14 +276,14 @@ static void caml_thread_scan_roots(
   if (active != NULL) {
     do {
       (*action)(fdata, th->descr, &th->descr);
-      (*action)(fdata, th->tls_state, &th->tls_state);
       (*action)(fdata, th->backtrace_last_exn, &th->backtrace_last_exn);
       /* Don't rescan the stack of the current thread, it was done already */
       if (th != active) {
         if (th->current_stack != NULL)
+          /* A descheduled thread has no cached TLS state. */
           caml_do_local_roots(action, fflags, fdata,
                               th->local_roots, th->current_stack, th->gc_regs,
-                              th->dynamic, th->c_stack);
+                              th->dynamic, /*tls_state=*/NULL, th->c_stack);
       }
       th = th->next;
     } while (th != active);
@@ -305,7 +305,6 @@ static void save_runtime_state(void)
   CAMLassert(th != NULL);
   th->current_stack = Caml_state->current_stack;
   th->current_stack->local_sp = Caml_state->local_sp;
-  th->tls_state = Caml_state->tls_state;
   th->c_stack = Caml_state->c_stack;
   th->gc_regs = Caml_state->gc_regs;
   th->gc_regs_buckets = Caml_state->gc_regs_buckets;
@@ -315,6 +314,13 @@ static void save_runtime_state(void)
   th->backtrace_pos = Caml_state->backtrace_pos;
   th->backtrace_buffer = Caml_state->backtrace_buffer;
   th->backtrace_last_exn = Caml_state->backtrace_last_exn;
+  /* We should never be able to get here if the preemption is a block; that
+     means it has been allocated but not yet initialized (and performed). We
+     must have done a GC (or run pending actions) before returning back to
+     OCaml.
+  */
+  CAMLassert(!Is_block(Caml_state->preemption));
+  th->preemption_scheduled = Caml_state->preemption == Val_long(1);
 #ifndef NATIVE_CODE
   th->trap_sp_off = Caml_state->trap_sp_off;
   th->trap_barrier_off = Caml_state->trap_barrier_off;
@@ -344,10 +350,10 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->local_roots = th->local_roots;
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
-  caml_modify_generational_global_root
-    (&Caml_state->tls_state, th->tls_state);
+  caml_tls_update_cache();
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
+  Caml_state->preemption = th->preemption_scheduled ? Val_long(1) : Val_long(0);
 #ifndef NATIVE_CODE
   Caml_state->trap_sp_off = th->trap_sp_off;
   Caml_state->trap_barrier_off = th->trap_barrier_off;
@@ -420,7 +426,6 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
   if (th == NULL) return NULL;
 
   th->descr = Val_unit;
-  th->tls_state = Atom(0); /* Empty array */
   th->next = NULL;
   th->prev = NULL;
 
@@ -438,6 +443,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
   th->dynamic = caml_dynamic_cache_new();
   if (th->dynamic == NULL) goto fail_dynamic;
 
+  th->preemption_scheduled = false;
   th->c_stack = NULL;
   th->local_roots = NULL;
   th->backtrace_pos = 0;
@@ -474,7 +480,6 @@ void caml_thread_free_info(caml_thread_t th)
      c_stack: stack-allocated
      local_roots: stack-allocated
      backtrace_last_exn: heap-allocated
-     tls_state: heap-allocated
      gc_regs:
        must be empty for a terminated thread
        (we assume that the C call stack must be empty at
@@ -653,14 +658,14 @@ static void caml_thread_domain_initialize_hook(void)
   new_thread->descr = caml_thread_new_descriptor(Val_unit);
   new_thread->next = new_thread;
   new_thread->prev = new_thread;
-  /* Initialize [backtrace_last_exn] and [tls_state] as they are accessed
-     by the GC via [caml_thread_scan_roots] */
+  /* Initialize [backtrace_last_exn] as it is accessed by the GC via
+     [caml_thread_scan_roots] */
   new_thread->backtrace_last_exn = Val_unit;
-  new_thread->tls_state = Atom(0); /* empty array */
   new_thread->memprof = caml_memprof_main_thread(Caml_state);
   new_thread->dynamic = Caml_state->dynamic_bindings;
   CAMLassert(new_thread->dynamic);
   new_thread->is_main = 1;
+  new_thread->preemption_scheduled = false;
   new_thread->signal_stack = NULL;
 
   This_thread = new_thread;
@@ -800,6 +805,37 @@ static void thread_init_current(caml_thread_t th)
   th->signal_stack = caml_init_signal_stack(&th->signal_stack_size);
 }
 
+static const value * _Atomic acquire_tick_cache = NULL;
+static const value * _Atomic release_tick_cache = NULL;
+
+static const value * cached_named_value(const value * _Atomic * cache,
+                                        const char * name)
+{
+  const value * v = atomic_load_acquire(cache);
+  if (v == NULL) {
+    v = caml_named_value(name);
+    if (v == NULL) caml_fatal_error("named value %s not found", name);
+    atomic_store_release(cache, v);
+  }
+  return v;
+}
+
+CAMLprim value caml_thread_acquire_tick(value interval_usec)
+{
+  CAMLparam1(interval_usec);
+  const value * acquire_tick =
+    cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
+  CAMLreturn(caml_callback(*acquire_tick, interval_usec));
+}
+
+CAMLprim value caml_thread_release_tick(value tick)
+{
+  CAMLparam1(tick);
+  const value * release_tick =
+    cached_named_value(&release_tick_cache, "Domain.Tick.release");
+  CAMLreturn(caml_callback(*release_tick, tick));
+}
+
 /* Create a thread */
 
 /* the thread lock is not held when entering */
@@ -902,10 +938,8 @@ CAMLexport int caml_c_thread_register(void)
      This must happen after the thread is fully set up, since the tick
      acquire may start the tick thread which sends interrupts to all
      domains. */
-  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
-  if (!acquire_tick) {
-    caml_fatal_error("named value Domain.Tick.acquire not found");
-  }
+  const value * acquire_tick =
+    cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
   value tick =
     caml_callback_exn(*acquire_tick, Val_long(Thread_timeout_usec));
   if (Is_exception_result(tick)) {
@@ -939,10 +973,8 @@ CAMLexport int caml_c_thread_unregister(void)
 
   /* Release the tick */
   if (c_thread_tick != 0) {
-    const value* release_tick = caml_named_value("Domain.Tick.release");
-    if (!release_tick) {
-      caml_fatal_error("Named value Domain.Tick.release not found");
-    }
+    const value * release_tick =
+      cached_named_value(&release_tick_cache, "Domain.Tick.release");
     result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
   }
 

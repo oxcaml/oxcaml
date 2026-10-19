@@ -36,6 +36,8 @@ utils/debug.ml* merlin-exclude
 utils/domainstate.ml*.c merlin-exclude
 utils/doubly_linked_list.ml* merlin-exclude
 utils/file_sections.ml* merlin-exclude
+utils/json.ml merlin-exclude
+utils/json.mli merlin-exclude
 utils/linkage_name.ml* merlin-exclude
 utils/lru.ml* merlin-exclude
 utils/opt_fuel.ml* merlin-exclude
@@ -48,3 +50,5 @@ utils/symbol.ml* merlin-exclude
 utils/target_system.ml* merlin-exclude
 utils/targetint.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
+utils/id_counter.ml merlin-exclude
+utils/id_counter.mli merlin-exclude

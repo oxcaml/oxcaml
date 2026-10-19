@@ -358,7 +358,8 @@ let pat
     | Tpat_var { id; name; uid; sort; mode } ->
       Tpat_var { id; name = map_loc sub name; uid; sort; mode }
     | Tpat_tuple l ->
-        Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
+        Tpat_tuple
+          (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
@@ -582,7 +583,8 @@ let expr sub x =
     | Texp_unboxed_unit -> Texp_unboxed_unit
     | Texp_unboxed_bool b -> Texp_unboxed_bool b
     | Texp_tuple (list, am) ->
-        Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list, am)
+        Texp_tuple
+          (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list, am)
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
@@ -899,6 +901,8 @@ let module_coercion sub = function
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}
+  | Tcoerce_kindtemplate ks ->
+      Tcoerce_kindtemplate ks
   | Tcoerce_invalid -> Tcoerce_invalid
 
 let module_expr sub x =

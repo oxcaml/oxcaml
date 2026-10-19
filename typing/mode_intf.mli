@@ -945,6 +945,8 @@ module type S = sig
 
     val to_const_exn : lr -> Const.t
 
+    val to_of_const_exn : lr -> lr
+
     module List : sig
       (* No new types exposed to avoid too many type names *)
       include Allow_disallow with type (_, _, 'd) sided = 'd t list
@@ -973,9 +975,15 @@ module type S = sig
     val min_with_comonadic :
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
-    (* [min_with_monadic ax elt] returns [min] but with the monadic axis [ax] set to [elt]. *)
+    (** [min_with_monadic ax elt] returns [min] but with the monadic axis [ax]
+        set to [elt]. *)
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
+
+    (** [max_with_monadic ax elt] returns [max] but with the monadic axis [ax]
+        set to [elt]. *)
+    val max_with_monadic :
+      'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'l) t
 
     (** Registers a mode in the scope, to be zapped to legacy when the scope is
         resolved. See [zap_to_legacy] for an explanation of [arg]. *)
@@ -1065,6 +1073,17 @@ module type S = sig
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val in_bounds : Const.t -> (allowed * allowed) t -> bool
+
+      (** Zap a mode toward the floor of [towards]. Axes that are either
+          strictly above or below [towards] end up as close as possible to the
+          semantic lower bound of [towards]. Returns [None] if the mode is
+          generic. *)
+      val zap_towards_floor_of : lr -> towards:lr -> Const.t option
+
+      (** Zap a mode toward the ceil of [towards]. Axes that are either strictly
+          above or below [towards] end up as close as possible to the semantic
+          upper bound of [towards]. Returns [None] if the mode is generic. *)
+      val zap_towards_ceil_of : lr -> towards:lr -> Const.t option
     end
   end
 
@@ -1080,6 +1099,8 @@ module type S = sig
   module Const : sig
     val with_locality_as_regionality :
       With_locality.Const.t -> With_regionality.Const.t
+
+    val value_to_alloc_r2l : With_regionality.Const.t -> With_locality.Const.t
 
     module Axis : sig
       val with_locality_as_regionality :
@@ -1214,6 +1235,10 @@ module type S = sig
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
+
+      (** Apply a modality on a constant *)
+      val apply_const :
+        t -> With_regionality.Const.t -> With_regionality.Const.t
 
       (** [set a t] overwrites an axis of [t] to be [a]. *)
       val set : 'a Axis.t -> 'a -> t -> t

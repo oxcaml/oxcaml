@@ -104,11 +104,21 @@ module type Sort = sig
 
     val all_void : t -> bool
 
+    (** [subst s t] applies the variable substitution [s] to [t], replacing each
+        [Genvar v], where [(v, t')] is in [s], with [t'].
+
+        Raises [Not_found] if no pairing for [v] occurs in [s]. *)
+    val subst : (var * t) list -> t -> t
+
     (** True if the sort contains no univars or genvars.
 
         CR layout-polymorphism: This function should be deleted once we support
         layout-poly any-fields *)
     val is_concrete : t -> bool
+
+    (** True if the sort is [scannable], possibly under [Addressable]. Products
+        (even of scannables), univars, and genvars are not scannable. *)
+    val is_scannable : t -> bool
 
     val is_surely_addressable : t -> bool
 
@@ -158,8 +168,6 @@ module type Sort = sig
     val for_instance_var : t
 
     val for_lazy_body : t
-
-    val for_tuple_element : t
 
     val for_variant_arg : t
 
@@ -275,14 +283,13 @@ module type Sort = sig
       this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
-  (** Return a [Const.t] if the sort has no unset variables, or [None] *)
-  val to_const_opt : t -> Const.t option
+  (** Assert the given sort is constant, failing if the sort contains
+      non-generic variables. *)
+  val assert_const : t -> Const.t
 
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
-  type change
-
-  val undo_change : change -> unit
+  module Change : With_backtracking.Change.S
 
   (** Create a new sort variable with the given level. *)
   val new_var : level:int -> var
@@ -297,10 +304,6 @@ module type Sort = sig
   val is_genvar : var -> bool
 
   val reset_cmi_sort_id : unit -> unit
-
-  (** [subst s t] applies the variable substitution [s] to [t], replacing each
-      [Var v] where [(v, t')] is in [s] with [t']. *)
-  val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
       var in [vars], calls [f] with {!instance} configured to replace each var
@@ -367,7 +370,7 @@ module History = struct
     | Statement
     | Optional_arg_default
     | Layout_poly_in_external
-    | Unboxed_tuple_element
+    | Tuple_element
     | Peek_or_poke
     | Array_element
     | Idx_element
@@ -375,6 +378,7 @@ module History = struct
     | Structure_item
     | Signature_item
     | Layout_poly
+    | Typing_recovery
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -415,7 +419,6 @@ module History = struct
      related to objects here. *)
   type value_or_null_creation_reason =
     | Primitive of Ident.t
-    | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
     | V1_safety_check

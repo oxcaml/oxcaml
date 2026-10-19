@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -53,11 +54,31 @@ let set_b r v = r.b <- v
 [%%expect_asm X86_64{|
 set_b:
   subq  $8, %rsp
-  movq  %rbx, %rsi
   leaq  8(%rax), %rdi
+  movq  %rbx, %rsi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
+  ret
+|}]
+
+(* Int record field updates in a single [addq] *)
+
+type counters = { mutable foo : int; mutable bar : int }
+
+let incr_foo (t : counters) = t.foo <- t.foo + 1
+[%%expect_asm X86_64{|
+incr_foo:
+  addq  $2, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let incr_bar (t : counters) = t.bar <- t.bar + 1
+[%%expect_asm X86_64{|
+incr_bar:
+  addq  $2, 8(%rax)
+  movl  $1, %eax
   ret
 |}]
 
@@ -85,17 +106,17 @@ let header x = get_header x
 [%%expect_asm X86_64{|
 header:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $2303, -8(%rax)
+  leaq  8(%r15), %rbx
+  movq  $2303, -8(%rbx)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
-  movq  %rdi, (%rax)
-  movq  -8(%rbx), %rbx
-  movq  %rbx, 8(%rax)
+  movq  %rdi, (%rbx)
+  movq  -8(%rax), %rax
+  movq  %rax, 8(%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]
@@ -131,14 +152,14 @@ let make_ref x = ref x
 [%%expect_asm X86_64{|
 make_ref:
   subq  $8, %rsp
-  movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    <hidden GC jump pad>
 .L0:
-  leaq  8(%r15), %rax
-  movq  $1024, -8(%rax)
-  movq  %rbx, (%rax)
+  leaq  8(%r15), %rbx
+  movq  $1024, -8(%rbx)
+  movq  %rax, (%rbx)
+  movq  %rbx, %rax
   addq  $8, %rsp
   ret
 |}]

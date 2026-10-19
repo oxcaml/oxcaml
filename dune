@@ -63,6 +63,8 @@
 
 (copy_files# backend/cfg/*.ml{,i})
 
+(copy_files# backend/ssa/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -134,6 +136,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  json
   arrayset
   config
   build_path_prefix_map
@@ -167,6 +170,8 @@
   structured_mangling
   symbol
   lazy_backtrack
+  with_backtracking_intf
+  with_backtracking
   diffing
   diffing_with_keys
   linkdeps
@@ -176,6 +181,8 @@
   doubly_linked_list
   file_sections
   lru
+  id_counter
+  likelihood
   ;; PARSING
   location
   longident
@@ -201,6 +208,8 @@
   parsetree ; mli only file
   ;; DRIVER
   pparse
+  compenv
+  makedepend
   ;; TYPING (these depend only on utils/, so live here to let
   ;; compilation_unit and symbol reference them)
   ident
@@ -296,6 +305,8 @@
   typedecl
   typeopt
   value_rec_check
+  typing_recovery_state
+  typing_recovery
   typecore
   solver_intf
   solver
@@ -316,6 +327,7 @@
   outcometree
   allowance
   ;; lambda/
+  branch_annotations
   debuginfo
   lambda
   static_label
@@ -343,6 +355,7 @@
   translobj
   translprim
   translquote
+  translrepr
   ;; bytecomp/
   debug_event
   meta
@@ -352,9 +365,7 @@
   symtable
   ;; some of COMP
   main_args
-  compenv
   compmisc
-  makedepend
   compile_common
   instantiator
   functorizer
@@ -465,11 +476,22 @@
 (rule
  (targets ocamlopt_flags.sexp)
  (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
+   (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; Write empty files in an unconfigured tree
+(rule
+ (target Makefile.config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
+
+(rule
+ (target Makefile.build_config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
 
 (install
  (files ocamlyacc)
@@ -517,14 +539,6 @@
   (ocamlbytecomp.cma as compiler-libs/ocamlbytecomp.cma)
   (ocamlfrontend.cma as compiler-libs/ocamlfrontend.cma)
   (ocamlcommon.cma as compiler-libs/ocamlcommon.cma))
- (section lib)
- (package ocaml))
-
-(install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -654,6 +668,8 @@
   cfg
   cfg_available_regs
   cfg_colours
+  cfg_compare
+  cfg_copy_propagation
   cfg_edge
   cfg_intf
   cfg_quick_hash
@@ -665,14 +681,19 @@
   cfg_dataflow
   cfg_deadcode
   cfg_liveness
+  cfg_validation_facts
+  cfg_liveness_validate
   cfg_dominators
+  cfg_dominators_validate
   cfg_loop_infos
   cfg_to_linear_desc
   cfg_cse
   cfg_cse_target_intf
+  cfg_reachability_validate
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_z3
   cfg_prologue
   cfg_merge_blocks
   cfg_block_layout
@@ -713,6 +734,14 @@
   ir_config_fingerprint
   linear_format
   cfg_format
+  ;; backend/ssa/
+  ssa
+  ssa_print
+  ssa_reducer
+  ssa_simplify
+  ssa_tail_call
+  ssa_of_cmm
+  cfg_of_ssa
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
@@ -759,6 +788,7 @@
   oxcaml_common
   flambda2_identifiers
   flambda2_cmx
+  flambda2_datalog
   compiler_owee
   gc_timings
   arm64_ast

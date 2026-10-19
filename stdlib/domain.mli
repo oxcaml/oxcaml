@@ -174,61 +174,16 @@ module DLS : sig
         to [k], which cannot be restored later. *)
 end
 
-(** Thread-local storage. Like {!DLS}, but stores a distinct value for each
-    thread. Domains can contain multiple threads, so [TLS] should be preferred
-    in nearly all cases. *)
-module TLS : sig
-
-    type 'a key : value mod portable contended
-    (** Type of a TLS key *)
-
-    val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
-    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.new_key]."]
-    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
-
-    val get : 'a key -> 'a
-    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.get]."]
-    (** Like {!DLS.get}, but reads the value for the current thread. *)
-
-    val set : 'a key -> 'a -> unit
-    [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
-    (** Like {!DLS.set}, but sets the value for the current thread. *)
-
-    (** For use by the threading library. *)
-    module Private : sig @@ portable
-        type keys
-        val init : unit -> unit
-        val get_initial_keys : unit -> keys
-        val set_initial_keys : keys -> unit
-    end
-end
-
 module Tick : sig @@ portable
-  (** A handle to a request that the tick thread tick at a given interval
-
-      In between calling [acquire] and calling [release], the tick thread will
-      tick {i at least as frequently} as the provided [interval_usec]. *)
-  type t : mutable_data mod external_ global non_float
-
-  (** Request that the tick thread tick at least as frequently as
-      [interval_usec] until [release] is called on the returned handle. *)
-  val acquire : interval_usec:int -> t @ unique
-
-  (** Release a handle to a tick request.
-
-     It is unsound to call this on a domain other than the one that called
-     [acquire] (though it is fine to call it on a different thread on the same
-     domain).
-  *)
-  val release : t @ unique -> unit
-
-  (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least as
-      frequently as [interval_usec] *)
+  (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least
+      as frequently as [interval_usec]. The caller must assure we do not switch
+      domains for the duration of [f]. (This is true if the current execution
+      context is not preemptable.) *)
   val with_
     : ('r : value_or_null).
        interval_usec:int
-    -> (t @ local -> 'r) @ local once
-    -> 'r
+    -> (unit -> 'r @ local unique once) @ local once unyielding
+    -> 'r @ local unique once
 
   (** Returns the interval at which the tick thread will tick, or [Null]
       if no domain has any active tick requests. This is the global minimum
@@ -261,25 +216,37 @@ module Safe : sig @@ portable
     (** Like {!DLS.set}, but safe to use in the presence of multiple domains. *)
   end
 
-  (** Like {!TLS}, but uses modes to enforce properties necessary for data-race
-      freedom. *)
+  (** Thread-local storage. Like {!Domain.DLS}, but stores a distinct value for
+      every preemptible fiber. Preemptable fibers are the fundamental unit of
+      preemptive concurrency, so [TLS] should be nearly always preferred. *)
   module TLS : sig
 
-    type 'a key = 'a TLS.key
+    type 'a key : value mod portable contended
     (** Type of a TLS key *)
 
     val new_key
       : ?split_from_parent:('a -> (unit -> 'a) @ portable once) @ portable
       -> (unit -> 'a) @ portable
       -> 'a key
-    (** Like {!TLS.new_key}, but safe to use in the presence of multiple
-        domains. *)
+    (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
 
-    val get : ('a : value mod portable). 'a key -> 'a @ contended
-    (** Like {!TLS.get}, but safe to use in the presence of multiple domains. *)
+    val access
+      : ('b : value_or_null).
+      'a key
+      -> ('a -> 'b @ contended local once portable unique)
+         @ local once portable unyielding
+      -> 'b @ contended local once portable unique
+    (** [access k f] provides uncontended access to the current value of [k]
+        for the duration of [f]. Raises if [f] re-enters [access k] or creates
+        a thread or preemptable fiber. *)
 
-    val set : ('a : value mod contended). 'a key -> 'a @ portable -> unit
-    (** Like {!TLS.set}, but safe to use in the presence of multiple domains. *)
+    (** For use by the threading library and [Effect]. *)
+    module Private : sig @@ portable
+        type keys
+        val init : unit -> unit
+        val get_initial_keys : unit -> keys
+        val set_initial_keys : keys -> unit
+    end
   end
 
   val spawn : (unit -> 'a) @ portable once -> 'a t
