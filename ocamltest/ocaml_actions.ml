@@ -36,10 +36,12 @@ let jsir_action a =
   if Ocamltest_config.native_compiler && Ocaml_files.jsir_available then a
   else (Actions.update a no_jsir)
 
-let get_backend_value_from_env env bytecode_var native_var =
-  Ocaml_backends.make_backend_function
-    (Environments.safe_lookup bytecode_var env)
-    (Environments.safe_lookup native_var env)
+(* Jsir is compiled by ocamlopt (-target js_of_ocaml), so it takes the
+   ocamlopt variables. *)
+let get_backend_value_from_env env ocamlc_var ocamlopt_var backend =
+  match (backend : Ocaml_backends.t) with
+  | Bytecode -> Environments.safe_lookup ocamlc_var env
+  | Native | Jsir -> Environments.safe_lookup ocamlopt_var env
 
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
@@ -95,8 +97,6 @@ let default_ocaml_env = [|
   "OCAML_ERROR_STYLE=contextual"
 |]
 
-(* JSIR mode looks for js_of_ocaml in the configured bindir,
-   which need not be where the testsuite runs from. *)
 let compiler_env backend =
   match (backend : Ocaml_backends.t) with
   | Native | Bytecode -> default_ocaml_env

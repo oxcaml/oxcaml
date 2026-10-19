@@ -31,7 +31,6 @@ let runtime_variant_flags () = match Ocaml_files.runtime_variant() with
   | Ocaml_files.Debug -> " -runtime-variant d"
   | Ocaml_files.Instrumented -> " -runtime-variant i"
 
-(* Selects the backend of ocamlopt; the native one is the default. *)
 let target_flags = function
   | Ocaml_backends.Native | Ocaml_backends.Bytecode -> ""
   | Ocaml_backends.Jsir -> "-target js_of_ocaml"

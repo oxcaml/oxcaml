@@ -28,13 +28,6 @@ let string_of_backend = function
   | Bytecode -> "bytecode"
   | Jsir -> "jsir"
 
-(* Creates a function that returns its first argument for Bytecode           *)
-(* and its second argument for Native code. Jsir is driven by ocamlopt, so   *)
-(* it gets the Native value.                                                 *)
-let make_backend_function bytecode_value native_value = function
-  | Bytecode -> bytecode_value
-  | Native | Jsir -> native_value
-
 let module_extension = function
   | Bytecode -> "cmo"
   | Native -> "cmx"
