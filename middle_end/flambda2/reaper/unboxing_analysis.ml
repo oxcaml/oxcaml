@@ -343,8 +343,8 @@ let unboxing_rules =
       (* Likewise, if a block with a local field escapes, and that field is read
          again from a value with several sources, prevent changing the
          representation. *)
-      (let$ [usage; field; source1; source2; v] =
-         ["usage"; "field"; "source1"; "source2"; "v"]
+      (let$ [usage; field; v; source1; source2] =
+         ["usage"; "field"; "v"; "source1"; "source2"]
        in
        [ rev_accessor ~base:usage field ~to_:v;
          has_usage v;

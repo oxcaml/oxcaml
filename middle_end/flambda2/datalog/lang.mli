@@ -22,7 +22,7 @@ module Variable : sig
 
     module Set : Container_types.Set with type elt = t
 
-    module Map : Container_types.Map with type key = t
+    module Map : Container_types.Map with type key = t and module Set = Set
 
     module Tbl : Hashtbl.S with type key = t
   end
@@ -53,6 +53,8 @@ module Variable : sig
       val remove : 'a variable -> t -> t
 
       val find : 'a variable -> t -> 'a elt
+
+      val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
     end
 
     module Make (T : sig

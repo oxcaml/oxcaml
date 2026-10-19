@@ -88,6 +88,8 @@ module Variable = struct
       val remove : 'a variable -> t -> t
 
       val find : 'a variable -> t -> 'a elt
+
+      val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
     end
 
     module Make (T : sig
@@ -112,6 +114,8 @@ module Variable = struct
         let (B (key', elt)) = Id.Map.find (uid key) t in
         let Equal = must_be_equal key key' in
         elt
+
+      let fold f t acc = Id.Map.fold (fun _ binding acc -> f binding acc) t acc
     end
   end
 end

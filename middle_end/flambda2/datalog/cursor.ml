@@ -305,11 +305,15 @@ module From_plan = struct
           | Callback_with_bindings _ ->
             Misc.fatal_error "Callback with bindings cannot be used in the body")
         @@ build_stages env stages (index + 1) k
+      | Existential_stage existential_stages ->
+        Executor.exists
+          (fun ~accept ->
+            build_stages env existential_stages 0 (fun _env -> accept))
+          (build_stages env stages (index + 1) k)
 
   let create_from_plan_with_parameters ?(callback = ref ignore) ~original_rule
-      parameters
-      ({ tables; input_stages = _; existential_stages = _; output_atoms = _ } as
-       plan) : (_, _) with_parameters =
+      parameters ({ tables; input_stages = _; output_atoms = _ } as plan) :
+      (_, _) with_parameters =
     let env = Env.create () in
     let env, parameters =
       let rec bind_params : type p.
@@ -334,23 +338,20 @@ module From_plan = struct
     in
     let executor =
       build_stages env plan.input_stages 0 (fun env ->
-          Executor.exists
-            (fun ~accept ->
-              build_stages env plan.existential_stages 0 (fun _env -> accept))
-            (Iarray.fold_right
-               (fun head_atom body ->
-                 match head_atom with
-                 | Union (tid, columns, args, value, inner_columns, repr) ->
-                   let table = Env.get_output env tid in
-                   let value = Env.must_be_bound_term env value in
-                   let args = Env.must_be_bound_term_hlist env args in
-                   Executor.list
-                     [ Executor.union columns table args value inner_columns repr;
-                       body ]
-                 | Callback_with_bindings (fn, args) ->
-                   let args = Env.must_be_bound_term_hlist env args in
-                   Executor.list [Executor.call_with_bindings fn args; body])
-               plan.output_atoms Executor.nop))
+          Iarray.fold_right
+            (fun head_atom body ->
+              match head_atom with
+              | Union (tid, columns, args, value, inner_columns, repr) ->
+                let table = Env.get_output env tid in
+                let value = Env.must_be_bound_term env value in
+                let args = Env.must_be_bound_term_hlist env args in
+                Executor.list
+                  [ Executor.union columns table args value inner_columns repr;
+                    body ]
+              | Callback_with_bindings (fn, args) ->
+                let args = Env.must_be_bound_term_hlist env args in
+                Executor.list [Executor.call_with_bindings fn args; body])
+            plan.output_atoms Executor.nop)
       |> Executor.assemble
     in
     let cursor_naive_binders = Env.get_naive_tables env in

@@ -38,6 +38,10 @@ type stage =
   | Join_stage : 'k variable * 'k column_iterator list -> stage
   | Seek_stage : 'k term * 'k column_iterator list -> stage
   | Check_stage : atom -> stage
+  | Existential_stage : stage iarray -> stage
+(* Variables bound by existential stages are not accessible in the output, which
+   allows skipping the full existential stage once we have found any satisfying
+   instance. *)
 
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
@@ -59,10 +63,6 @@ type head_atom =
 type plan =
   { tables : bound_table iarray;
     input_stages : stage iarray;
-    existential_stages : stage iarray;
-    (* Variables bound by existential stages are not accessible in the output,
-       which allows skipping the full existential stage once we have found any
-       satisfying instance. *)
     output_atoms : head_atom iarray
   }
 
