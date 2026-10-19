@@ -53,6 +53,13 @@ val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_jkind: Ident.t -> Path.t -> t -> t
 
+(* Substitute a module path by another path that denotes the same module,
+   such as the target of a module alias. This preserves typing, so - unlike
+   the path substitutions in [Unsafe] - it is safe. Used when saving a
+   signature to normalize mentions of global units through module aliases
+   (see [Env.save_signature]). *)
+val add_same_module_path: Path.t -> Path.t -> 'k subst -> 'k subst
+
 type additional_action_config =
    | Duplicate_variables
    (* [Duplicate_variables] makes it so that any substitution will duplicate

@@ -1,26 +1,23 @@
 (* TEST
-(* This tests the -H flag.
+(* This tests the -H flag and attached cmi paths.
 
    The basic structure is that libc depends on libb, which depends on liba.  We
    want to test a few things:
 
-   - Compiling libc with -I liba allows the compiler to see the type definitions
-     in liba and allows c.ml to reference it directly.
+   - b.cmi records the path of the a.cmi it was compiled against, so compiling
+     libc resolves transitive references to A through that path, whether or not
+     any version of liba is on the include path and regardless of -I/-H order.
 
-   - Compiling libc with -H liba allows the compiler to see the type definitions
-     in liba, but doesn't allow c.ml to reference it directly.
+   - Compiling libc with -I liba allows c.ml to reference A directly.
 
-   - If -H and -I are are passed for two different versions of liba, the -I one
-     takes priority.
+   - Compiling libc with -H liba (or with A reachable only through b.cmi's
+     attached path) does not allow c.ml to reference A directly.
 
-   - If -H is passed twice with two different versions of liba, the first takes
-     priority.
-
-   The liba_alt directory has an alternate versions of liba used for testing the
-   precedence order of the includes.
+   The liba_alt directory has an alternate version of liba used for testing
+   that the attached path prevails for transitive references.
 *)
 
-subdirectories = "liba liba_alt libb libc";
+subdirectories = "liba liba_alt libb libc libd";
 setup-ocamlc.byte-build-env;
 
 flags = "-I liba -nocwd";
@@ -39,26 +36,18 @@ flags = "-nocwd";
 module = "libb/with_sub.ml";
 ocamlc.byte;
 {
-  (* Test hiding A completely. You can't do much with types from it because
-     their layouts are unknown. *)
+  (* Test using values whose types come from A with no liba on the include
+     path at all: a.cmi is found through the path attached in b.cmi. *)
   flags = "-I libb -nocwd";
   module = "libc/c2.ml";
   setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
   ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/missing_cmi_layout.ocamlc.reference";
-  check-ocamlc.byte-output;
 }
 {
-  (* Test hiding A completely, but using it *)
   flags = "-I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
   ocamlc.byte;
-  compiler_reference = "${test_source_directory}/not_included.ocamlc.reference";
-  check-ocamlc.byte-output;
 }
 (* Test transitive use of A's cmi, both with -I and with -H. *)
 {
@@ -82,47 +71,20 @@ ocamlc.byte;
   check-ocamlc.byte-output;
 }
 
-(* The next four tests check that -I takes priority over -H regardless of the
-   order on the command line.
-*)
+(* The next tests check that transitive references to A resolve through the
+   path attached in b.cmi - the one b was compiled against - regardless of
+   which alternate versions of liba appear on the include path, in any -I/-H
+   combination and order. (Direct references still go through the include
+   path: see the c3 and c4 tests.) *)
 {
   split [
   | flags = "-H liba_alt -I liba -I libb -nocwd";
   | flags = "-I liba -H liba_alt -I libb -nocwd";
-  ]
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-{
-  not-target-windows;
-  split [
   | flags = "-H liba -I liba_alt -I libb -nocwd";
   | flags = "-I liba_alt -H liba -I libb -nocwd";
+  | flags = "-H liba_alt -H liba -I libb -nocwd";
+  | flags = "-H liba -H liba_alt -I libb -nocwd";
   ]
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-
-(* The next two tests show that earlier -Hs take priority over later -Hs *)
-{
-  not-target-windows;
-  flags = "-H liba_alt -H liba -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-{
-  flags = "-H liba -H liba_alt -I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
@@ -213,6 +175,89 @@ ocamlc.byte;
   flags = "-I liba -nocwd -open A -open-cmi libb/with_sub.cmi";
   module = "libb/uses_string.ml";
   setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+}
+
+(* Test that [-short-paths] prints members of an [-open-cmi]'d library
+   under their member name rather than the mangled unit name, so that tools
+   re-parsing the output in the same context (such as menhir's --infer
+   pipeline) can resolve them. [libd/d.cmi] is a facade compiled with warning
+   49 disabled, so mentions of [Attr] are saved in mock.cmi as its target
+   [D__Attr] (with the cmi path attached); with the facade hidden, the printer
+   must find the in-scope member name [Attr], including for the manifest type
+   [Attr.lst]. *)
+{
+  flags = "-I libd -nocwd";
+  module = "libd/d__Id.mli";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+
+  module = "libd/d__Attr.ml";
+  ocamlc.byte;
+
+  flags = "-nocwd -no-alias-deps -w -49";
+  module = "libd/d.ml";
+  ocamlc.byte;
+
+  flags = "-nocwd -open-cmi libd/d.cmi -H libd";
+  module = "libc/mock.ml";
+  ocamlc.byte;
+
+  flags = "-i -short-paths -nocwd -open-cmi libd/d.cmi -I libc -H libd";
+  module = "libc/c7.ml";
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/member_name_printing.ocamlc.reference";
+  check-ocamlc.byte-output;
+
+  script = "cp ${compiler_output} inferred.mli";
+  script;
+  flags = "-nocwd -open-cmi libd/d.cmi -H libd";
+  module = "inferred.mli";
+  ocamlc.byte;
+}
+
+(* Types at different depths must use the same identifier for [Attr].
+   Rewriting normalized paths to synthetic persistent identifiers caused
+   [Attr/1.Id.t Attr/2.expr], which Menhir could not re-parse. *)
+{
+  flags = "-I libd -nocwd";
+  module = "libd/d__Id.mli";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+
+  module = "libd/d__Attr.ml";
+  ocamlc.byte;
+
+  flags = "-nocwd -no-alias-deps -w -49";
+  module = "libd/d.ml";
+  ocamlc.byte;
+
+  flags = "-i -short-paths -nocwd -open-cmi libd/d.cmi -H libd";
+  module = "libc/c9.ml";
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/member_name_printing_short_paths.ocamlc.reference";
+  check-ocamlc.byte-output;
+
+  script = "cp ${compiler_output} inferred.mli";
+  script;
+  flags = "-nocwd -open-cmi libd/d.cmi -H libd";
+  module = "inferred.mli";
+  ocamlc.byte;
+}
+
+(* Regression test: mentioning a type of a non-closed unit whose members are
+   large mutually recursive declarations must verify each member once, not
+   once per reference (which is exponential). *)
+{
+  flags = "-I libd -nocwd -no-alias-deps -w -49";
+  module = "libd/rec_types.mli";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+
+  flags = "-I libd -nocwd";
+  module = "libc/c8.mli";
   ocamlc.byte;
 }
 

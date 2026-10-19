@@ -1,0 +1,2 @@
+val g : Attr.t -> Attr.t
+val g_list : Attr.lst -> Attr.lst
