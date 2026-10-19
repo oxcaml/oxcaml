@@ -389,16 +389,6 @@ static struct stack_cache stack_cache_global[NUM_STACK_SIZE_CLASSES];
 static struct stack_cache stack_cache_extra[NUM_STACK_SIZE_CLASSES];
 static caml_plat_mutex stack_cache_global_lock = CAML_PLAT_MUTEX_INITIALIZER;
 
-/* Monotonic counters, reported via CAML_GC_MESSAGE (STACKS category). */
-static atomic_uintnat stacks_demoted = 0;
-static atomic_uintnat stacks_idled = 0;
-static atomic_uintnat stacks_idled_bytes = 0;
-static atomic_uintnat stacks_woken = 0;
-static atomic_uintnat stacks_woken_bytes = 0;
-static atomic_uintnat stack_cache_hits_local = 0;
-static atomic_uintnat stack_cache_hits_global = 0;
-static atomic_uintnat stack_cache_hits_extra = 0;
-
 /* A cached stack's [sp] is dead so we use it to record the major
    cycle at which the stack was demoted, so they can be freed when
    they get old. */
@@ -435,11 +425,56 @@ static void cache_push_with_lock(struct stack_cache* c,
 
 #endif /* STACK_GUARD_PAGES */
 
-/* Stack counters, reported at process exit */
+/* Count and peak of live stacks. Used to drive GC, so not a
+ * per-domain stat. */
 static atomic_uintnat stack_count = 0;
 static atomic_uintnat stack_count_peak = 0;
-static atomic_uintnat stacks_created = 0;
-static atomic_uintnat stacks_freed = 0;
+
+/* Per-domain stack stats, reported at process exit: the owning domain
+   is the only writer, so updates are cheap. */
+struct stack_stats {
+  atomic_uintnat created;
+  atomic_uintnat freed;
+  /* The remaining counters are only used with STACK_GUARD_PAGES. */
+  atomic_uintnat idled;
+  atomic_uintnat idled_bytes;
+  atomic_uintnat woken;
+  atomic_uintnat woken_bytes;
+  atomic_uintnat demoted;
+  atomic_uintnat hits_local;    /* stack-cache hits at each level */
+  atomic_uintnat hits_global;
+  atomic_uintnat hits_extra;
+  uintnat pad[6]; /* Pad to whole cache line */
+};
+static_assert(sizeof(struct stack_stats) % 64 == 0, "");
+static struct stack_stats domain_stack_stats[Max_domains_max];
+
+/* The current domain's statistics counter [field]. */
+#define Stack_stat(field) (&domain_stack_stats[Caml_state->id].field)
+
+/* Totals of the per-domain slots, in a local (so plainly-read)
+   struct; racily stale, which is fine for reporting. */
+static struct stack_stats stack_stats_sum(void)
+{
+  struct stack_stats t = { 0, };
+  for (int i = 0; i < caml_params->max_domains; i++) {
+    struct stack_stats* s = &domain_stack_stats[i];
+#define Add(field) \
+    caml_atomic_counter_add_relaxed(&t.field, atomic_load_relaxed(&s->field))
+    Add(created);
+    Add(freed);
+    Add(idled);
+    Add(idled_bytes);
+    Add(woken);
+    Add(woken_bytes);
+    Add(demoted);
+    Add(hits_local);
+    Add(hits_global);
+    Add(hits_extra);
+#undef Add
+  }
+  return t;
+}
 
 #ifdef STACK_GUARD_PAGES
 /* The guarded-stack population when [minor_gc_request_hysteresis] last
@@ -487,12 +522,12 @@ stack_alloc_uncached(mlsize_t wosize, int cache_bucket, int64_t id)
     caml_plat_lock_blocking(&stack_cache_global_lock);
     stack = cache_pop_with_lock(&stack_cache_global[cache_bucket]);
     if (stack != NULL) {
-      (void)caml_atomic_counter_incr(&stack_cache_hits_global);
+      caml_atomic_counter_incr(Stack_stat(hits_global));
     } else {
       stack = cache_pop_with_lock(&stack_cache_extra[cache_bucket]);
       if (stack != NULL) {
         /* Dipping into the over-bound reserve. */
-        (void)caml_atomic_counter_incr(&stack_cache_hits_extra);
+        caml_atomic_counter_incr(Stack_stat(hits_extra));
         minor_gc_request_hysteresis();
       }
     }
@@ -506,7 +541,7 @@ stack_alloc_uncached(mlsize_t wosize, int cache_bucket, int64_t id)
 #endif
   stack = alloc_for_stack(wosize, id);
   if (stack == NULL) return NULL;
-  (void)caml_atomic_counter_incr(&stacks_created);
+  caml_atomic_counter_incr(Stack_stat(created));
   uintnat count = caml_atomic_counter_incr(&stack_count);
   uintnat peak = atomic_load_relaxed(&stack_count_peak);
   while (count > peak &&
@@ -543,7 +578,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
         if(alloc) {
           cache->len -= 1;
 #ifdef STACK_GUARD_PAGES
-          (void)caml_atomic_counter_incr(&stack_cache_hits_local);
+          caml_atomic_counter_incr(Stack_stat(hits_local));
 #endif
         }
       } else {
@@ -1316,7 +1351,7 @@ struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 
 static void free_stack_memory(struct stack_info* stack)
 {
-  (void)caml_atomic_counter_incr(&stacks_freed);
+  caml_atomic_counter_incr(Stack_stat(freed));
   (void)caml_atomic_counter_decr(&stack_count);
   CAML_EV_COUNTER(EV_C_STACK_FREED, stack->size);
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
@@ -1548,9 +1583,9 @@ static struct stack_info* stack_idle(struct stack_info* stack)
   idle->idled_from = Stack_high(stack);
   memcpy(idle->sp, stack->sp, data_bytes + sizeof(struct stack_handler));
 
-  (void)caml_atomic_counter_incr(&stacks_idled);
-  atomic_fetch_add(&stacks_idled_bytes,
-                   data_bytes + sizeof(struct stack_handler));
+  caml_atomic_counter_incr(Stack_stat(idled));
+  caml_atomic_counter_add_relaxed(Stack_stat(idled_bytes),
+                          data_bytes + sizeof(struct stack_handler));
   CAML_EV_COUNTER(EV_C_STACK_IDLED,
                   data_bytes + sizeof(struct stack_handler));
   return idle;
@@ -1632,9 +1667,9 @@ static struct stack_info* stack_wake(struct stack_info* idle,
   }
 #endif
 
-  (void)caml_atomic_counter_incr(&stacks_woken);
-  atomic_fetch_add(&stacks_woken_bytes,
-                   data_bytes + sizeof(struct stack_handler));
+  caml_atomic_counter_incr(Stack_stat(woken));
+  caml_atomic_counter_add_relaxed(Stack_stat(woken_bytes),
+                          data_bytes + sizeof(struct stack_handler));
   CAML_EV_COUNTER(EV_C_STACK_WOKEN,
                   data_bytes + sizeof(struct stack_handler));
   caml_stat_free(idle);
@@ -1745,7 +1780,7 @@ void caml_stack_cache_flush_local(void)
     demoted += n;
   }
   caml_plat_unlock(&stack_cache_global_lock);
-  atomic_fetch_add(&stacks_demoted, demoted);
+  caml_atomic_counter_add_relaxed(Stack_stat(demoted), demoted);
   if (demoted > 0) {
     CAML_GC_MESSAGE(STACKS,
                     "Demoted %" ARCH_INTNAT_PRINTF_FORMAT "u guarded "
@@ -1824,26 +1859,21 @@ void caml_stack_cache_free_unused(void)
     }
   }
   caml_plat_unlock(&stack_cache_global_lock);
+  struct stack_stats t = stack_stats_sum();
   CAML_GC_MESSAGE(STACKS,
                   "Freed %" ARCH_INTNAT_PRINTF_FORMAT "u cached stack "
                   "mappings (lifetime: %" ARCH_INTNAT_PRINTF_FORMAT
                   "u created, %" ARCH_INTNAT_PRINTF_FORMAT "u idled, %"
                   ARCH_INTNAT_PRINTF_FORMAT "u woken).\n",
-                  freed,
-                  atomic_load_relaxed(&stacks_created),
-                  atomic_load_relaxed(&stacks_idled),
-                  atomic_load_relaxed(&stacks_woken));
+                  freed, t.created, t.idled, t.woken);
   CAML_GC_MESSAGE(STACKS,
                   "Stack cache hits: %" ARCH_INTNAT_PRINTF_FORMAT
                   "u local, %" ARCH_INTNAT_PRINTF_FORMAT "u global, %"
                   ARCH_INTNAT_PRINTF_FORMAT "u extra; KiB copied: %"
                   ARCH_INTNAT_PRINTF_FORMAT "u idling, %"
                   ARCH_INTNAT_PRINTF_FORMAT "u waking.\n",
-                  atomic_load_relaxed(&stack_cache_hits_local),
-                  atomic_load_relaxed(&stack_cache_hits_global),
-                  atomic_load_relaxed(&stack_cache_hits_extra),
-                  atomic_load_relaxed(&stacks_idled_bytes) / 1024,
-                  atomic_load_relaxed(&stacks_woken_bytes) / 1024);
+                  t.hits_local, t.hits_global, t.hits_extra,
+                  t.idled_bytes / 1024, t.woken_bytes / 1024);
 }
 
 #endif /* STACK_GUARD_PAGES */
@@ -1852,11 +1882,11 @@ void caml_stack_cache_free_unused(void)
 void caml_stack_stats_print(void)
 {
 #define F_U "%"ARCH_INTNAT_PRINTF_FORMAT"u"
+  struct stack_stats t = stack_stats_sum();
   CAML_GC_MESSAGE(STATS,
                   "Stacks: "F_U" created, "F_U" freed, "
                   F_U" live, "F_U" peak.\n",
-                  atomic_load_relaxed(&stacks_created),
-                  atomic_load_relaxed(&stacks_freed),
+                  t.created, t.freed,
                   atomic_load_relaxed(&stack_count),
                   atomic_load_relaxed(&stack_count_peak));
 #ifdef STACK_GUARD_PAGES
@@ -1864,16 +1894,11 @@ void caml_stack_stats_print(void)
                   "  "F_U" idled ("F_U" KiB), "
                   F_U" woken ("F_U" KiB), "
                   F_U" demoted.\n",
-                  atomic_load_relaxed(&stacks_idled),
-                  atomic_load_relaxed(&stacks_idled_bytes) / 1024,
-                  atomic_load_relaxed(&stacks_woken),
-                  atomic_load_relaxed(&stacks_woken_bytes) / 1024,
-                  atomic_load_relaxed(&stacks_demoted));
+                  t.idled, t.idled_bytes / 1024,
+                  t.woken, t.woken_bytes / 1024, t.demoted);
   CAML_GC_MESSAGE(STATS,
                   "  Cache hits: "F_U" local, "F_U" global, "F_U" extra\n",
-                  atomic_load_relaxed(&stack_cache_hits_local),
-                  atomic_load_relaxed(&stack_cache_hits_global),
-                  atomic_load_relaxed(&stack_cache_hits_extra));
+                  t.hits_local, t.hits_global, t.hits_extra);
 #endif
 }
 
