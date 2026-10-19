@@ -226,10 +226,21 @@ CR wsturgeon: this has to fail
 
 (* Without inlining, arguments themselves can require conditional logic: *)
 let[@inline never][@zero_alloc conditional] forward2 f x y = f x y
-let[@zero_alloc] higher_order () = forward2 apply ignore ()
-let[@zero_alloc] higher_order () = forward2 apply allocate ()
+let[@zero_alloc] higher_order_ignore () = forward2 apply ignore ()
 [%%expect{|
-val forward2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional] = <fun>
+val forward2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional] =
+   <fun>
+val higher_order_ignore : unit -> unit [@@zero_alloc] = <fun>
+|}]
+let[@zero_alloc] higher_order_allocate () = forward2 apply allocate ()
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+(* Arity matters, and the above are all single-argument functions: *)
+let[@zero_alloc] two_arguments () () = ()
+let[@zero_alloc] higher_order_arity_2 () = forward2 two_arguments () ()
+[%%expect{|
 val higher_order : unit -> unit [@@zero_alloc] = <fun>
 CR wsturgeon: the latter has to fail
 |}]
