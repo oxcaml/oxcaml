@@ -663,9 +663,9 @@ val get_current_unit_name: unit -> string
 
 (* Read, save a signature to/from a file. *)
 val read_signature:
-  Global_module.Name.t -> Unit_info.Artifact.t
+  Compilation_unit.Name.t -> Unit_info.Artifact.t
   -> signature * Mode.Staticity.Const.t
-        (* Arguments: module name, file name, [add_binding] flag.
+        (* Arguments: interface name, file name, [add_binding] flag.
            Results: signature. If [add_binding] is true, creates an entry for
            the module in the environment. *)
 val save_signature:

@@ -227,8 +227,6 @@ module T0 : sig
 
   val to_global_name_exn : t -> Global_module.Name.t
 
-  val to_global_name_without_prefix : t -> Global_module.Name.t
-
   val create_full : Prefix.t -> Name.t -> argument list -> t
 
   val of_global_name : Global_module.Name.t -> t
@@ -377,18 +375,6 @@ end = struct
 
   let to_global_name t =
     try Some (to_global_name_exn t) with Error (Packed_instance _) -> None
-
-  let to_global_name_without_prefix t =
-    if is_plain_name t
-    then
-      let name = Sys.opaque_identity (Obj.obj t : Name.t) in
-      Global_module.Name.create_no_args (Name.to_string name)
-    else
-      let full = Sys.opaque_identity (Obj.obj t : full) in
-      match full with
-      | With_prefix { name; _ } ->
-        Global_module.Name.create_no_args (Name.to_string name)
-      | Global glob -> glob
 
   let of_global_name (name : Global_module.Name.t) =
     match name with
