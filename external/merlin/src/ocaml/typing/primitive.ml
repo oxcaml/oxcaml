@@ -566,7 +566,7 @@ module Repr_check = struct
      builtin or the argument is annotated with [@unsafe_unextended]. This
      applies to the components of [@unpacked] products (separate C arguments)
      but not of ordinary unboxed products (C struct members). See
-     [To_cmm_extcall.Component]. *)
+     [To_cmm_extcall.Component] for more details. *)
   let c_stub_arg_errors ~builtin = function
     | Same_as_ocaml_repr s ->
       if not builtin && sort_is_bits8_or_bits16 s
