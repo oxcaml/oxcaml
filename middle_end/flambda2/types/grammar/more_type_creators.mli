@@ -220,5 +220,5 @@ val unknown_with_subkind :
 val unknown_types_from_arity :
   ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
-  [`Unarized] Flambda_arity.t ->
+  _ Flambda_arity.t ->
   Type_grammar.t list

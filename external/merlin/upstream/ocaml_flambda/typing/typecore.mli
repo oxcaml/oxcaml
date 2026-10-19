@@ -68,7 +68,7 @@ type pattern_variable_kind =
 type pattern_variable =
   {
     pv_id: Ident.t;
-    pv_mode: Mode.Value.l;
+    pv_mode: Mode.With_regionality.l;
     pv_value_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
@@ -126,6 +126,12 @@ type mutable_restriction =
   | In_group
   | In_rec
 
+type layout_poly_restriction =
+  | Class
+
+type layout_poly_inst_restriction =
+  | Binding_op
+
 type module_patterns_restriction =
   | Modules_allowed of { scope: int }
   | Modules_rejected
@@ -157,10 +163,13 @@ val check_partial:
         ?lev:int -> Env.t -> type_expr ->
         Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
 val type_expect:
-        Env.t -> ?mode:Mode.Value.r -> Parsetree.expression -> type_expected ->
-          Typedtree.expression
+        Env.t ->
+        ?mode:Mode.With_regionality.r ->
+        Parsetree.expression ->
+        type_expected ->
+        Typedtree.expression
 val type_exp:
-        Env.t -> ?mode: Mode.Value.r -> Parsetree.expression ->
+        Env.t -> ?mode: Mode.With_regionality.r -> Parsetree.expression ->
           Typedtree.expression
 val type_approx:
         Env.t -> Parsetree.expression -> type_expr -> unit
@@ -224,7 +233,12 @@ type submode_reason =
       (* Check that this constructor is allowed in this context. *)
   | Other (* add more cases here for better hints *)
 
-val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.Value.t -> unit
+val escape :
+  loc:Location.t ->
+  env:Env.t ->
+  reason:submode_reason ->
+  (Mode.allowed * 'r) Mode.With_regionality.t ->
+  unit
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
@@ -284,7 +298,7 @@ type error =
   | Not_an_object of type_expr * type_forcing_context option
   | Non_value_object of Jkind.Violation.t * type_forcing_context option
   | Non_value_let_rec of Jkind.Violation.t * type_expr
-  | Undefined_method of type_expr * string * string list option
+  | Undefined_method of Typedtree.expression * string * string list option
   | Undefined_self_method of string * string list
   | Virtual_class of Longident.t
   | Private_type of type_expr
@@ -331,7 +345,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_loc of Longident.t
   | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -376,10 +389,10 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Mutable_block_index_polymorphic_field of Longident.t
-  | Submode_failed of Mode.Value.error * submode_reason
+  | Submode_failed of Mode.With_regionality.error * submode_reason
   | Curried_application_complete of
-      arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Uncurried_function_escapes_comonadic of Mode.Alloc.Comonadic.error
+      arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]
+  | Uncurried_function_escapes_comonadic of Mode.With_locality.Comonadic.error
   | Uncurried_function_escapes_locality
   | Function_returns_local
   | Tail_call_local_returning
@@ -401,6 +414,7 @@ type error =
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
+  | Optional_arg_default_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Always_heap_allocation of always_heap_allocation
@@ -410,15 +424,18 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Let_poly_not_yet_implemented
+  | Layout_poly_not_yet_supported of layout_poly_restriction
+  | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
-  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Useless_lpoly
 
-and invalid_layout_poly_inst_context =
-  | Binding_op
+module Error : sig
+  type exn += private In_context of Location.t * Env.t * error
 
-exception Error of Location.t * Env.t * error
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
+
 exception Error_forward of Location.error
 
 val report_error: loc:Location.t -> Env.t -> error -> Location.error

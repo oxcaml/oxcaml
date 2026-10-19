@@ -144,7 +144,11 @@ val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
 
 val set_inlined_debuginfo : t -> from:t -> t
 
-val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
+val merge_inlined_debuginfo_and_forward_inlined_attribute :
+  t ->
+  from_apply_expr:Inlined_debuginfo.t ->
+  inlined_attribute:Inlined_attribute.t ->
+  t
 
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
@@ -192,6 +196,14 @@ val disable_inlining : t -> Disable_inlining.t
 
 val disable_partial_application_stub_generation : t -> bool
 
+(** This is the [@inlined] attribute (after forwarding) that was provided on the
+    [apply] to the innermost inlined function we are currently simplifying, and
+    the value that should be used for [@inlined forward] calls within.
+
+    It is [None] if we are not currently inside an inlined body. *)
+val inlined_attribute_to_forward :
+  t -> (Inlined_attribute.t * forwarded_from:Inlined_debuginfo.t) option
+
 val enter_set_of_closures : t -> t
 
 val enter_stub_function : t -> t
@@ -236,6 +248,9 @@ val defined_variables_by_scope : t -> Lifted_cont_params.t list
 
 val enter_continuation_handler : Lifted_cont_params.t -> t -> t
 
+val add_lifted_constant_state :
+  ?maybe_already_defined:unit -> t -> Lifted_constant_state.t -> t
+
 val variables_defined_in_current_continuation : t -> Lifted_cont_params.t
 
 val cost_of_lifting_continuations_out_of_current_one : t -> int
@@ -266,3 +281,7 @@ val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
 val has_seen_a_non_liftable_continuation : t -> bool
 
 val set_has_seen_a_non_liftable_continuation : t -> t
+
+val is_cold : t -> bool
+
+val mark_as_cold : t -> t

@@ -33,7 +33,7 @@ include Location_or_range_list_entry.Make (struct
     | Base_addressx _ -> 0x01
     | Startx_endx _ -> 0x02
     | Startx_length _ -> 0x03
-    | Offset_pair _ -> 0x04
+    | Offset_pair _ | Offset_pair_between_labels _ -> 0x04
     | Base_address _ -> 0x05
     | Start_end _ -> 0x06
     | Start_length _ -> 0x07

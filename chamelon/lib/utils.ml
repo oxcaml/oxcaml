@@ -348,7 +348,7 @@ let to_module_binding { name; implementation; interface } : module_binding =
               mty_loc = annots.sig_sloc;
               mty_attributes = []
             },
-            { mode_modes = Mode.Value.legacy; mode_desc = [] } )
+            { mode_modes = Mode.With_regionality.legacy; mode_desc = [] } )
       in
       { mod_desc =
           Tmod_constraint

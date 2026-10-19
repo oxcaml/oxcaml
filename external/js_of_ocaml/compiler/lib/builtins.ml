@@ -40,10 +40,12 @@ let register ~name ~content ~fragments =
   let name = "+" ^ name in
   let t = { File.name; content; fragments } in
   if String.Hashtbl.mem tbl name
-  then warn "The builtin runtime file %S was registered multiple time" name;
+  then
+    failwith
+      (Printf.sprintf "The builtin runtime file %S was registered multiple times" name);
   String.Hashtbl.add tbl name t;
   t
 
-let find name = try Some (String.Hashtbl.find tbl name) with Not_found -> None
+let find name = String.Hashtbl.find_opt tbl name
 
 let all () = String.Hashtbl.fold (fun _ v acc -> v :: acc) tbl []

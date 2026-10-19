@@ -58,26 +58,24 @@ module Block_kind = struct
     | Mixed (tag, fields) ->
       Tag.Scannable.to_tag tag, Scannable (Mixed_record fields)
 
-  let [@ocamlformat "disable"] print ppf t =
-   match t with
-   | Values (tag, shape) ->
-     Format.fprintf ppf
-       "@[<hov 1>(Values@ \
-         @[<hov 1>(tag %a)@]@ \
-         @[<hov 1>(shape@ @[<hov 1>(%a)@])@])@]"
-       Tag.Scannable.print tag
-       (Format.pp_print_list ~pp_sep:Format.pp_print_space
-      K.With_subkind.print) shape
-   | Naked_floats ->
-     Format.pp_print_string ppf "Naked_floats"
-   | Mixed (tag, shape) ->
-     Format.fprintf ppf
-       "@[<hov 1>(Mixed@ \
-         @[<hov 1>(tag %a)@]@ \
-         @[<hov 1>(shape@ @[<hov 1>(%a)@])@])@]"
-       Tag.Scannable.print tag
-       (Format.pp_print_list ~pp_sep:Format.pp_print_space
-          K.print) (Array.to_list (K.Mixed_block_shape.field_kinds shape))
+  let print ppf t =
+    let open! Misc.Sexp in
+    match t with
+    | Values (tag, shape) ->
+      print ppf
+        [ fmt "Values";
+          a "tag" tag Tag.Scannable.print;
+          a "shape" shape
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               K.With_subkind.print) ]
+    | Naked_floats -> Format.pp_print_string ppf "Naked_floats"
+    | Mixed (tag, shape) ->
+      print ppf
+        [ fmt "Mixed";
+          a "tag" tag Tag.Scannable.print;
+          a "shape"
+            (Array.to_list (K.Mixed_block_shape.field_kinds shape))
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space K.print) ]
 
   let compare t1 t2 =
     match t1, t2 with
@@ -101,7 +99,7 @@ module Init_or_assign = struct
     | Initialization
     | Assignment of Alloc_mode.For_assignments.t
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print ppf t =
     let fprintf = Format.fprintf in
     match t with
     | Initialization -> fprintf ppf "Init"
@@ -266,7 +264,7 @@ module Array_load_kind = struct
     | Naked_vec512s -> Format.pp_print_string ppf "Naked_vec512s"
     | Naked_masks -> Format.pp_print_string ppf "Naked_masks"
 
-  let compare = Stdlib.compare
+  let (compare : t -> t -> int) = Stdlib.compare
 
   let kind_of_loaded_value t =
     match t with
@@ -379,25 +377,18 @@ module Duplicate_block_kind = struct
     | Naked_floats of { length : Target_ocaml_int.t }
     | Mixed
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print ppf t =
+    let open! Misc.Sexp in
     match t with
-    | Values { tag; length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Block_of_values \
-          @[<hov 1>(tag@ %a)@]@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        Tag.Scannable.print tag
-        Target_ocaml_int.print length
-    | Naked_floats { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Block_of_naked_floats@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        Target_ocaml_int.print length
-    | Mixed ->
-      Format.fprintf ppf
-        "@[<hov 1>(Mixed)@]"
+    | Values { tag; length } ->
+      print ppf
+        [ fmt "Block_of_values";
+          a "tag" tag Tag.Scannable.print;
+          a "length" length Target_ocaml_int.print ]
+    | Naked_floats { length } ->
+      print ppf
+        [fmt "Block_of_naked_floats"; a "length" length Target_ocaml_int.print]
+    | Mixed -> print ppf [fmt "Mixed"]
 
   let compare t1 t2 =
     match t1, t2 with
@@ -431,82 +422,28 @@ module Duplicate_array_kind = struct
     | Naked_vec512s of { length : Target_ocaml_int.t option }
     | Naked_masks of { length : Target_ocaml_int.t option }
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print_length ppf kind_name length =
+    let open! Misc.Sexp in
+    print ppf
+      [ fmt kind_name;
+        a "length" length (Misc.Stdlib.Option.print Target_ocaml_int.print) ]
+
+  let print ppf t =
     match t with
     | Immediates -> Format.pp_print_string ppf "Immediates"
     | Values -> Format.pp_print_string ppf "Values"
-    | Naked_floats { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_floats@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_float32s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_float32s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_ints { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_ints@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_int8s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_int8s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_int16s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_int16s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_int32s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_int32s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_int64s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_int64s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_nativeints { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_nativeints@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_vec128s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_vec128s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_vec256s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_vec256s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_vec512s { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_vec512s@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
-    | Naked_masks { length; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_masks@ \
-          @[<hov 1>(length@ %a)@]\
-          )@]"
-        (Misc.Stdlib.Option.print Target_ocaml_int.print) length
+    | Naked_floats { length } -> print_length ppf "Naked_floats" length
+    | Naked_float32s { length } -> print_length ppf "Naked_float32s" length
+    | Naked_ints { length } -> print_length ppf "Naked_ints" length
+    | Naked_int8s { length } -> print_length ppf "Naked_int8s" length
+    | Naked_int16s { length } -> print_length ppf "Naked_int16s" length
+    | Naked_int32s { length } -> print_length ppf "Naked_int32s" length
+    | Naked_int64s { length } -> print_length ppf "Naked_int64s" length
+    | Naked_nativeints { length } -> print_length ppf "Naked_nativeints" length
+    | Naked_vec128s { length } -> print_length ppf "Naked_vec128s" length
+    | Naked_vec256s { length } -> print_length ppf "Naked_vec256s" length
+    | Naked_vec512s { length } -> print_length ppf "Naked_vec512s" length
+    | Naked_masks { length } -> print_length ppf "Naked_masks" length
 
   let compare t1 t2 =
     match t1, t2 with
@@ -558,7 +495,7 @@ module Block_access_field_kind = struct
     | Any_value
     | Immediate
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print ppf t =
     match t with
     | Any_value -> Format.pp_print_string ppf "Any_value"
     | Immediate -> Format.pp_print_string ppf "Immediate"
@@ -584,20 +521,17 @@ module Mixed_block_access_field_kind = struct
     | Value_prefix of Block_access_field_kind.t
     | Flat_suffix of K.Flat_suffix_element.t
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print ppf t =
+    let open! Misc.Sexp in
     match t with
     | Value_prefix field_kind ->
-        Format.fprintf ppf
-          "@[<hov 1>(Value_prefix@ \
-           @[<hov 1>(field_kind@ %a)@]\
-           )@]"
-          Block_access_field_kind.print field_kind
+      print ppf
+        [ fmt "Value_prefix";
+          a "field_kind" field_kind Block_access_field_kind.print ]
     | Flat_suffix flat_element ->
-        Format.fprintf ppf
-          "@[<hov 1>(Flat_suffix \
-           @[<hov 1>(flat_element@ %a)@]\
-           )@]"
-          K.Flat_suffix_element.print flat_element
+      print ppf
+        [ fmt "Flat_suffix";
+          a "flat_element" flat_element K.Flat_suffix_element.print ]
 
   let compare t1 t2 =
     match t1, t2 with
@@ -628,34 +562,25 @@ module Block_access_kind = struct
           shape : Flambda_kind.Mixed_block_shape.t
         }
 
-  let [@ocamlformat "disable"] print ppf t =
+  let print ppf t =
+    let open! Misc.Sexp in
     match t with
-    | Values { tag; size; field_kind; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Values@ \
-          @[<hov 1>(tag@ %a)@]@ \
-          @[<hov 1>(size@ %a)@]@ \
-          @[<hov 1>(field_kind@ %a)@]\
-          )@]"
-        (Or_unknown.print Tag.Scannable.print) tag
-        (Or_unknown.print Target_ocaml_int.print) size
-        Block_access_field_kind.print field_kind
-    | Naked_floats { size; } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Naked_floats@ \
-          @[<hov 1>(size@ %a)@]\
-          )@]"
-        (Or_unknown.print Target_ocaml_int.print) size
+    | Values { tag; size; field_kind } ->
+      print ppf
+        [ fmt "Values";
+          a "tag" tag (Or_unknown.print Tag.Scannable.print);
+          a "size" size (Or_unknown.print Target_ocaml_int.print);
+          a "field_kind" field_kind Block_access_field_kind.print ]
+    | Naked_floats { size } ->
+      print ppf
+        [ fmt "Naked_floats";
+          a "size" size (Or_unknown.print Target_ocaml_int.print) ]
     | Mixed { tag; size; field_kind; shape = _ } ->
-      Format.fprintf ppf
-        "@[<hov 1>(Mixed@ \
-          @[<hov 1>(tag@ %a)@]@ \
-          @[<hov 1>(size@ %a)@]@ \
-          @[<hov 1>(field_kind@ %a)@]\
-          )@]"
-        (Or_unknown.print Tag.Scannable.print) tag
-        (Or_unknown.print Target_ocaml_int.print) size
-        Mixed_block_access_field_kind.print field_kind
+      print ppf
+        [ fmt "Mixed";
+          a "tag" tag (Or_unknown.print Tag.Scannable.print);
+          a "size" size (Or_unknown.print Target_ocaml_int.print);
+          a "field_kind" field_kind Mixed_block_access_field_kind.print ]
 
   let element_kind_for_load t =
     match t with
@@ -1099,7 +1024,10 @@ type nullary_primitive =
       { name : string;
         enabled_at_init : bool option
       }
-  | Enter_inlined_apply of { dbg : Inlined_debuginfo.t }
+  | Enter_inlined_apply of
+      { dbg : Inlined_debuginfo.t;
+        inlined_attribute : Inlined_attribute.t
+      }
   | Dls_get
   | Tls_get
   | Domain_index
@@ -1133,8 +1061,13 @@ let compare_nullary_primitive p1 p2 =
     if c <> 0
     then c
     else Option.compare Bool.compare enabled_at_init1 enabled_at_init2
-  | Enter_inlined_apply { dbg = dbg1 }, Enter_inlined_apply { dbg = dbg2 } ->
-    Inlined_debuginfo.compare dbg1 dbg2
+  | ( Enter_inlined_apply { dbg = dbg1; inlined_attribute = inlined_attribute1 },
+      Enter_inlined_apply { dbg = dbg2; inlined_attribute = inlined_attribute2 }
+    ) ->
+    let c = Inlined_debuginfo.compare dbg1 dbg2 in
+    if c <> 0
+    then c
+    else Inlined_attribute.compare inlined_attribute1 inlined_attribute2
   | Dls_get, Dls_get -> 0
   | Tls_get, Tls_get -> 0
   | Domain_index, Domain_index -> 0
@@ -1162,9 +1095,9 @@ let print_nullary_primitive ppf p =
       (match enabled_at_init with
       | None | Some false -> ""
       | Some true -> " enabled_at_init")
-  | Enter_inlined_apply { dbg } ->
-    Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a)@]"
-      Inlined_debuginfo.print dbg
+  | Enter_inlined_apply { dbg; inlined_attribute } ->
+    Format.fprintf ppf "@[<hov 1>(Enter_inlined_apply@ %a@ %a)@]"
+      Inlined_debuginfo.print dbg Inlined_attribute.print inlined_attribute
   | Dls_get -> Format.pp_print_string ppf "Dls_get"
   | Tls_get -> Format.pp_print_string ppf "Tls_get"
   | Domain_index -> Format.pp_print_string ppf "Domain_index"
@@ -1209,6 +1142,12 @@ let nullary_classify_for_printing p =
   | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
   | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Neither
+
+let free_names_nullary_primitive p =
+  match p with
+  | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+    Name_occurrences.empty
 
 module Reinterpret_64_bit_word = struct
   type t =
@@ -2040,7 +1979,7 @@ let compare_binary_primitive p1 p2 =
   | Poke kind1, Poke kind2 ->
     Flambda_kind.Standard_int_or_float.compare kind1 kind2
   | Read_offset (kind1, mut1), Read_offset (kind2, mut2) ->
-    let c = Array_load_kind.compare kind1 kind2 in
+    let c = Flambda_kind.With_subkind.compare kind1 kind2 in
     if c <> 0 then c else Stdlib.compare mut1 mut2
   | ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
       | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _ | Int_comp _
@@ -2875,10 +2814,7 @@ let equal t1 t2 = compare t1 t2 = 0
 
 let free_names t =
   match t with
-  | Nullary
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
-    Name_occurrences.empty
+  | Nullary prim -> free_names_nullary_primitive prim
   | Unary (prim, x0) ->
     Name_occurrences.union
       (free_names_unary_primitive prim)
@@ -3302,7 +3238,7 @@ module Without_args = struct
     | Quaternary of quaternary_primitive
     | Variadic of variadic_primitive
 
-  let [@ocamlformat "disable"] print ppf (t : t) =
+  let print ppf (t : t) =
     match t with
     | Nullary prim -> print_nullary_primitive ppf prim
     | Unary prim -> print_unary_primitive ppf prim
@@ -3310,6 +3246,28 @@ module Without_args = struct
     | Ternary prim -> print_ternary_primitive ppf prim
     | Quaternary prim -> print_quaternary_primitive ppf prim
     | Variadic prim -> print_variadic_primitive ppf prim
+
+  let equal (t1 : t) (t2 : t) =
+    match t1, t2 with
+    | Nullary prim1, Nullary prim2 -> equal_nullary_primitive prim1 prim2
+    | Unary prim1, Unary prim2 -> equal_unary_primitive prim1 prim2
+    | Binary prim1, Binary prim2 -> equal_binary_primitive prim1 prim2
+    | Ternary prim1, Ternary prim2 -> equal_ternary_primitive prim1 prim2
+    | Quaternary prim1, Quaternary prim2 ->
+      equal_quaternary_primitive prim1 prim2
+    | Variadic prim1, Variadic prim2 -> equal_variadic_primitive prim1 prim2
+    | ( (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _),
+        _ ) ->
+      false
+
+  let free_names (t : t) =
+    match t with
+    | Nullary prim -> free_names_nullary_primitive prim
+    | Unary prim -> free_names_unary_primitive prim
+    | Binary prim -> free_names_binary_primitive prim
+    | Ternary prim -> free_names_ternary_primitive prim
+    | Quaternary prim -> free_names_quaternary_primitive prim
+    | Variadic prim -> free_names_variadic_primitive prim
 
   let effects_and_coeffects (t : t) =
     match t with
@@ -3320,6 +3278,15 @@ module Without_args = struct
     | Quaternary prim -> effects_and_coeffects_of_quaternary_primitive prim
     | Variadic prim -> effects_and_coeffects_of_variadic_primitive prim
 end
+
+let without_args t : Without_args.t =
+  match t with
+  | Nullary prim -> Nullary prim
+  | Unary (prim, _) -> Unary prim
+  | Binary (prim, _, _) -> Binary prim
+  | Ternary (prim, _, _, _) -> Ternary prim
+  | Quaternary (prim, _, _, _, _) -> Quaternary prim
+  | Variadic (prim, _) -> Variadic prim
 
 let is_begin_or_end_region t =
   match t with

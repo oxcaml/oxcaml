@@ -57,26 +57,36 @@ val empty : t
 (** Add a set of closure to the set of constraints. *)
 val add_set_of_closures : t -> is_phantom:bool -> Set_of_closures.t -> t
 
+(** Like [add_set_of_closures] but does not require a real [Set_of_closures.t].
+*)
+val add_set_of_closures_slots :
+  t ->
+  is_phantom:bool ->
+  function_slots:Function_slot.Set.t ->
+  value_slots:Value_slot.Set.t ->
+  t
+
 (** Aggregate sets of closures from two contexts *)
 val add_offsets_from_function : t -> from_function:t -> t
 
 (** Compute offsets for all function and value slots that occur in the current
     compilation unit, taking into account the constraints introduced by the
     potential sharing of slots across multiple sets of closures (see .ml file
-    for more details). *)
+    for more details).
+
+    [is_local_compilation_unit] identifies the compilation units whose slots are
+    laid out by this computation. Pass [Current_unit.is_current], except when
+    doing link time optimization. *)
 val finalize_offsets :
-  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-  used_slots:used_slots ->
   t ->
+  is_local_compilation_unit:(Compilation_unit.t -> bool) ->
+  used_slots:used_slots ->
   result
 
 (** Same as [finalize_offsets], except that the used slots are computed from the
     given free names of the whole compilation unit. *)
 val finalize_offsets_from_free_names :
-  t ->
-  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-  free_names:Name_occurrences.t ->
-  result
+  t -> free_names:Name_occurrences.t -> result
 
 type words = int
 

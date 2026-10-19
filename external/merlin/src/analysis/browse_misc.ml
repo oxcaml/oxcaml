@@ -42,7 +42,7 @@ let print_constructor c =
     in
     let desc =
       Tarrow
-        ( (Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy),
+        ( (Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy),
           dummy_type_scheme (Ttuple labeled_args_without_modalities),
           c.cstr_res,
           commu_ok )

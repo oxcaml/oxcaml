@@ -28,7 +28,7 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; input : [ `Bytecode_file of string | `Cmj of string | `Cmja of string | `Bytecode_stdin | `None ]
+  ; bytecode : [ `File of string | `Stdin | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun :
@@ -37,10 +37,10 @@ type t =
       | `Anonymous
       ]
   ; target_env : Target_env.t
+  ; shape_files : string list
   ; (* toplevel *)
     dynlink : bool
   ; linkall : bool
-  ; toplevel : bool
   ; export_file : string option
   ; no_cmis : bool
   ; (* filesystem *)
@@ -50,6 +50,8 @@ type t =
   ; fs_external : bool
   ; keep_unit_names : bool
   ; effects : Config.effects_backend
+  ; build_config : bool
+  ; apply_build_config : string option
   }
 
 val options : t Cmdliner.Term.t

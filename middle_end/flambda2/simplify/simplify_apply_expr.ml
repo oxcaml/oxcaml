@@ -107,9 +107,9 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   let tuple_size =
     (* The code for the function being applied has exactly as many parameters as
        there are components of the tuple (which is the first element of
-       [Apply.args apply]). The components must be of kind [Value] (in Lambda,
-       [layout_tuple_element]) and therefore cannot be unboxed products
-       themselves. *)
+       [Apply.args apply]). The components must be of kind [Value] due to the
+       check in [transl_tupled_function] and therefore cannot be unboxed
+       products themselves. *)
     Flambda_arity.cardinal_unarized
       (Code_metadata.params_arity callee's_code_metadata)
   in
@@ -181,33 +181,28 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   in
   simplify_expr dacc expr ~down_to_up
 
-let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
-    ~result_arity ~coming_from_indirect ~callee's_code_metadata:_ uacc
-    ~after_rebuild =
-  let uacc =
-    if coming_from_indirect
-    then
-      UA.notify_removed ~operation:Removed_operations.direct_call_of_indirect
-        uacc
-    else uacc
-  in
+let rebuild_apply
+    ({ apply; use_id; exn_cont_use_id; result_arity; is_cold } :
+      SE.simplified_apply) uacc ~after_rebuild =
   let apply =
     Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
       apply
   in
   let erase_callee = false in
   (* CR ncourant: find out how we can erase the callee in simplify mode and
-     still update to newer code pointers after resimplification. *)
+      still update to newer code pointers after resimplification. *)
   (* let erase_callee =
-   *   match Apply.callee apply with
-   *   | None -> false
-   *   | Some callee ->
-   *     Simple.is_symbol callee
-   *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
-   * in *)
+    *   match Apply.callee apply with
+    *   | None -> false
+    *   | Some callee ->
+    *     Simple.is_symbol callee
+    *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
+    * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
   let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id result_arity apply
+    EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold
+      (Flambda_arity.unarize_t result_arity)
+      apply
   in
   after_rebuild expr uacc
 
@@ -217,9 +212,10 @@ type inlining_decision =
 
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
    [callee's_code_metadata] to prevent using the wrong one by mistake *)
-let simplify_direct_full_application ~simplify_expr dacc apply function_type
-    ~params_arity ~result_arity ~(result_types : _ Or_unknown_or_bottom.t)
-    ~down_to_up ~coming_from_indirect ~callee's_code_metadata =
+let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
+    function_type ~params_arity ~result_arity
+    ~(result_types : _ Or_unknown_or_bottom.t) ~down_to_up ~coming_from_indirect
+    ~callee's_code_metadata ~inlined_forwarded_from =
   let inlined =
     match function_type with
     | None ->
@@ -227,8 +223,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       Do_not_inline { erase_attribute = false }
     | Some function_type -> (
       let decision =
-        Call_site_inlining_decision.make_decision dacc ~simplify_expr ~apply
-          ~function_type ~return_arity:result_arity
+        Call_site_inlining_decision.make_decision dacc ~simplify_expr
+          ~rebuild_expr ~apply ~function_type ~return_arity:result_arity
       in
       let unrolling_depth =
         Simplify_rec_info_expr.known_remaining_unrolling_depth dacc
@@ -243,7 +239,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           ~callee:(Code_metadata.absolute_history callee's_code_metadata)
           ~tracker:(DE.inlining_history_tracker (DA.denv dacc))
           ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc)
-          ~apply decision;
+          ~apply ~inlined_forwarded_from decision;
       match Call_site_inlining_decision_type.can_inline decision with
       | Do_not_inline { erase_attribute_if_ignored } ->
         Do_not_inline { erase_attribute = erase_attribute_if_ignored }
@@ -259,19 +255,23 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
   in
   match inlined with
   | Inline (dacc, inlined) ->
-    let down_to_up dacc ~rebuild =
-      let rebuild uacc ~after_rebuild =
-        let uacc =
-          if coming_from_indirect
-          then
-            UA.notify_removed
-              ~operation:Removed_operations.direct_call_of_indirect uacc
-          else uacc
-        in
-        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
-        rebuild uacc ~after_rebuild
+    let is_cold = Code_metadata.cold callee's_code_metadata in
+    let down_to_up dacc simplified_body =
+      let simplified_body =
+        if coming_from_indirect
+        then
+          SE.notify_removed
+            ~operation:Removed_operations.direct_call_of_indirect
+            simplified_body
+        else simplified_body
       in
-      down_to_up dacc ~rebuild
+      let simplified_body =
+        SE.notify_removed ~operation:Removed_operations.call simplified_body
+      in
+      let simplified_body =
+        if is_cold then SE.mark_as_cold simplified_body else simplified_body
+      in
+      down_to_up dacc simplified_body
     in
     simplify_expr dacc inlined ~down_to_up
   | Do_not_inline { erase_attribute } -> (
@@ -295,10 +295,16 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
         | Never_returns, (Unknown | Bottom | Ok _) | Return _, Bottom ->
           dacc, None, Apply.Result_continuation.Never_returns
         | Return apply_return_continuation, Unknown ->
+          let env_at_use = DA.denv dacc in
+          let env_at_use =
+            if Code_metadata.cold callee's_code_metadata
+            then DE.mark_as_cold env_at_use
+            else env_at_use
+          in
           let dacc, use_id =
             DA.record_continuation_use dacc apply_return_continuation
               (Non_inlinable { escaping = true })
-              ~env_at_use:(DA.denv dacc)
+              ~env_at_use
               ~arg_types:
                 (T.unknown_types_from_arity result_arity
                    ~alloc_mode:
@@ -346,9 +352,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                          arg))
                   denv params args
               in
-              let result_arity =
-                Flambda_arity.unarized_components result_arity
-              in
+              let result_arity = Flambda_arity.unarize result_arity in
               let denv =
                 List.fold_left2
                   (fun denv kind result ->
@@ -375,18 +379,30 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                   result_arity results
               in
               let dacc = DA.with_denv dacc denv in
+              let env_at_use = DA.denv dacc in
+              let env_at_use =
+                if Code_metadata.cold callee's_code_metadata
+                then DE.mark_as_cold env_at_use
+                else env_at_use
+              in
               let dacc, use_id =
                 DA.record_continuation_use dacc apply_return_continuation
                   (Non_inlinable { escaping = true })
-                  ~env_at_use:(DA.denv dacc) ~arg_types
+                  ~env_at_use ~arg_types
               in
               dacc, Some use_id, result_continuation)
+      in
+      let env_at_use = DA.denv dacc in
+      let env_at_use =
+        if Code_metadata.cold callee's_code_metadata
+        then DE.mark_as_cold env_at_use
+        else env_at_use
       in
       let dacc, exn_cont_use_id =
         DA.record_continuation_use dacc
           (Exn_continuation.exn_handler (Apply.exn_continuation apply))
           (Non_inlinable { escaping = true })
-          ~env_at_use:(DA.denv dacc)
+          ~env_at_use
           ~arg_types:
             (T.unknown_types_from_arity
                (Exn_continuation.arity (Apply.exn_continuation apply))
@@ -396,11 +412,22 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       let dacc =
         record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
       in
-      down_to_up dacc
-        ~rebuild:
-          (rebuild_non_inlined_direct_full_application apply ~use_id
-             ~exn_cont_use_id ~result_arity ~coming_from_indirect
-             ~callee's_code_metadata))
+      let expr =
+        (* CR-someday bclement: it's not clear that either of the [result_arity]
+           from the callee's code metadata or the [apply]'s [return_arity] is
+           more precise than the other, but it would be better to be consistent
+           and use the same one everywhere. *)
+        SE.simplified_apply apply ~use_id ~exn_cont_use_id ~result_arity
+          ~is_cold:(Code_metadata.cold callee's_code_metadata)
+      in
+      let expr =
+        if coming_from_indirect
+        then
+          SE.notify_removed
+            ~operation:Removed_operations.direct_call_of_indirect expr
+        else expr
+      in
+      down_to_up dacc expr)
 
 (* CR mshinwell: need to work out what to do for local alloc transformations
    when there are zero args. *)
@@ -447,7 +474,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       (Warnings.Inlining_impossible
          Inlining_helpers.(
            inlined_attribute_on_partial_application_msg Unrolled))
-  | Default_inlined | Hint_inlined -> ());
+  | Default_inlined | Hint_inlined | Forward_inlined -> ());
   let num_non_unarized_params = Flambda_arity.num_params param_arity in
   let num_non_unarized_args = Flambda_arity.num_params args_arity in
   assert (num_non_unarized_params > num_non_unarized_args);
@@ -464,9 +491,14 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
   let wrapper_var = Variable.create "partial_app" K.value in
   let wrapper_var_duid = Flambda_debug_uid.none in
   let compilation_unit = Current_unit.get_cu_exn () in
+  (* CR ncourant: it would be good to share that computation with the other
+     places the function_slot_size is computed *)
   let wrapper_function_slot =
     Function_slot.create compilation_unit ~name:"partial_app_closure"
-      ~is_always_immediate:false K.value
+      ~size:
+        (Function_slot.size_from_arity
+           ~num_complex_params:(num_non_unarized_params - num_non_unarized_args)
+           ~is_tupled:false)
   in
   (* The allocation mode of the closure is directly determined by
      [first_complex_local_param]. We check that it is consistent with the
@@ -643,11 +675,12 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             List.map arg applied_unarized_args
             @ Bound_parameters.simples remaining_params
           in
+          let inlined = Inlined_attribute.forward_inlined () in
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
-              dbg ~inlined:Default_inlined
+              dbg ~inlined
               ~inlining_state:(Apply.inlining_state apply)
               ~position:Normal ~probe:None
               ~relative_history:Inlining_history.Relative.empty
@@ -797,19 +830,18 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       in
       expr, dacc
   in
-  let down_to_up dacc ~rebuild =
-    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-        let uacc =
-          if coming_from_indirect
-          then
-            UA.notify_removed
-              ~operation:Removed_operations.direct_call_of_indirect uacc
-          else uacc
-        in
-        (* Increase the counter of calls as the apply has been replaced by an
-           allocation of the partial set of closures. *)
-        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
-        rebuild uacc ~after_rebuild)
+  let down_to_up dacc expr =
+    let expr =
+      if coming_from_indirect
+      then
+        SE.notify_removed ~operation:Removed_operations.direct_call_of_indirect
+          expr
+      else expr
+    in
+    (* Increase the counter of calls as the apply has been replaced by an
+       allocation of the partial set of closures. *)
+    let expr = SE.notify_removed ~operation:Removed_operations.call expr in
+    down_to_up dacc expr
   in
   simplify_expr dacc expr ~down_to_up
 
@@ -820,24 +852,20 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     Simplify_common.split_direct_over_application apply ~callee's_code_id
       ~callee's_code_metadata
   in
-  let down_to_up dacc ~rebuild =
-    let rebuild uacc ~after_rebuild =
-      let uacc =
-        if coming_from_indirect
-        then
-          UA.notify_removed
-            ~operation:Removed_operations.direct_call_of_indirect uacc
-        else uacc
-      in
-      rebuild uacc ~after_rebuild
+  let down_to_up dacc expr =
+    let expr =
+      if coming_from_indirect
+      then
+        SE.notify_removed ~operation:Removed_operations.direct_call_of_indirect
+          expr
+      else expr
     in
-    down_to_up dacc ~rebuild
+    down_to_up dacc expr
   in
   simplify_expr dacc expr ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
-  down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-      EB.rebuild_invalid uacc reason ~after_rebuild)
+  down_to_up dacc (SE.simplified_invalid reason)
 
 let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
     ~(args_arity : [`Complex] Flambda_arity.t) =
@@ -860,22 +888,6 @@ let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
   let params = Flambda_arity.unarize_per_parameter params_arity in
   let args = Flambda_arity.unarize_per_parameter args_arity in
   has_mismatch params args
-
-let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
-    ~exn_cont_use_id uacc ~after_rebuild =
-  let apply =
-    Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
-      apply
-  in
-  let apply =
-    Apply.with_inlined_attribute apply
-      (Inlined_attribute.with_use_info (Apply.inlined apply)
-         Unused_because_function_unknown)
-  in
-  let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
-  in
-  after_rebuild expr uacc
 
 let simplify_function_call_where_callee's_type_unavailable dacc apply
     (call : Call_kind.Function_call.t) ~down_to_up =
@@ -936,27 +948,39 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       else Call_kind.direct_function_call code_id
   in
   let apply = Apply_expr.with_call_kind apply call_kind in
+  let apply =
+    Apply_expr.with_inlined_attribute apply
+      (Inlined_attribute.with_use_info (Apply.inlined apply)
+         Unused_because_function_unknown)
+  in
   let dacc =
     record_free_names_of_apply_as_used ~use_id ~exn_cont_use_id dacc apply
   in
   down_to_up dacc
-    ~rebuild:
-      (rebuild_function_call_where_callee's_type_unavailable apply ~use_id
-         ~exn_cont_use_id)
+    (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 
-let simplify_direct_function_call ~simplify_expr dacc apply
+let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_metadata_from_type
     ~callee's_code_ids_from_call_kind ~callee's_function_slot
     ~coming_from_indirect ~result_arity ~result_types ~recursive
     ~must_be_detupled ~closure_alloc_mode_from_type function_decl ~down_to_up
-    ~call =
-  (match Apply.probe apply, Apply.inlined apply with
-  | None, _ | Some _, Never_inlined -> ()
-  | Some _, (Hint_inlined | Unroll _ | Default_inlined | Always_inlined _) ->
-    Misc.fatal_errorf
-      "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
-       always be marked as [Never_inline]:@ %a"
-      Apply.print apply);
+    ~call ~inlined_forwarded_from =
+  let result_types : _ Or_unknown_or_bottom.t =
+    match Apply.probe apply, Apply.inlined apply with
+    | None, _ -> result_types
+    | Some _, Never_inlined ->
+      (* The handler of a disabled probe is not called, so nothing can be
+         deduced from its result types (in particular, the probe may return even
+         if the handler never does). *)
+      Unknown
+    | ( Some _,
+        ( Hint_inlined | Forward_inlined | Unroll _ | Default_inlined
+        | Always_inlined _ ) ) ->
+      Misc.fatal_errorf
+        "[Apply] terms with a [probe] (i.e. that call a tracing probe) must \
+         always be marked as [Never_inline]:@ %a"
+        Apply.print apply
+  in
   let callee's_code_ids : _ Or_bottom.t =
     match (callee's_code_ids_from_call_kind : _ Or_unknown.t) with
     | Unknown -> Ok (Code_id.Set.singleton callee's_code_id_from_type)
@@ -1052,9 +1076,10 @@ let simplify_direct_function_call ~simplify_expr dacc apply
             replace_apply_by_invalid dacc ~down_to_up
               (Application_result_kind_mismatch (result_arity, apply))
         else
-          simplify_direct_full_application ~simplify_expr dacc apply
-            (Some function_decl) ~params_arity ~result_arity ~result_types
+          simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc
+            apply (Some function_decl) ~params_arity ~result_arity ~result_types
             ~down_to_up ~coming_from_indirect ~callee's_code_metadata
+            ~inlined_forwarded_from
       else if provided_num_args > num_params
       then
         if
@@ -1113,8 +1138,8 @@ let simplify_direct_function_call ~simplify_expr dacc apply
            with %d arguments: %a"
           num_params provided_num_args Apply.print apply
 
-let simplify_function_call ~simplify_expr dacc apply ~callee_ty
-    (call : Call_kind.Function_call.t) ~down_to_up =
+let simplify_function_call ~simplify_expr ~rebuild_expr dacc apply ~callee_ty
+    (call : Call_kind.Function_call.t) ~down_to_up ~inlined_forwarded_from =
   (* Function declarations and params and body might not have the same calling
      convention. Currently the only case when it happens is for tupled
      functions. For such functions, the function_declaration declares a
@@ -1140,9 +1165,12 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
          declaration is tupled. *)
       is_function_decl_tupled
   in
-  let type_unavailable () =
+  let type_unavailable call =
     simplify_function_call_where_callee's_type_unavailable dacc apply call
       ~down_to_up
+  in
+  let not_a_closure () =
+    down_to_up dacc (SE.simplified_invalid (Closure_type_was_invalid apply))
   in
   (* CR-someday mshinwell: Should this be using [meet_shape], like for
      primitives? *)
@@ -1152,13 +1180,15 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
     match call with
     | Direct callee's_code_id -> (
       match DE.find_code_metadata_exn denv callee's_code_id with
-      | exception Not_found -> type_unavailable ()
+      | exception Not_found -> type_unavailable call
       | callee's_code_metadata ->
-        simplify_direct_full_application ~simplify_expr dacc apply None
+        simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
+          None
           ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
           ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
           ~result_types:(Code_metadata.result_types callee's_code_metadata)
-          ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata)
+          ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata
+          ~inlined_forwarded_from)
     | Indirect_known_arity _ | Indirect_unknown_arity ->
       Misc.fatal_errorf
         "No callee provided for non-direct OCaml function call:@ %a" Apply.print
@@ -1183,13 +1213,13 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
       match DE.find_code_metadata_exn denv callee's_code_id_from_type with
-      | exception Not_found -> type_unavailable ()
+      | exception Not_found -> type_unavailable call
       | callee's_code_metadata_from_type ->
         let must_be_detupled =
           call_must_be_detupled
             (Code_metadata.is_tupled callee's_code_metadata_from_type)
         in
-        simplify_direct_function_call ~simplify_expr dacc apply
+        simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
           ~callee's_code_id_from_type ~callee's_code_metadata_from_type
           ~callee's_code_ids_from_call_kind ~callee's_function_slot
           ~coming_from_indirect
@@ -1199,13 +1229,37 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
             (Code_metadata.result_types callee's_code_metadata_from_type)
           ~recursive:(Code_metadata.recursive callee's_code_metadata_from_type)
           ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
-          ~down_to_up ~call)
-    | Need_meet -> type_unavailable ()
-    | Invalid ->
-      let rebuild uacc ~after_rebuild =
-        EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
-      in
-      down_to_up dacc ~rebuild)
+          ~down_to_up ~call ~inlined_forwarded_from)
+    | Need_meet -> (
+      match call with
+      | Direct _ | Indirect_known_arity _ -> type_unavailable call
+      | Indirect_unknown_arity -> (
+        (* If the call is to a known set of potential code IDs that all have the
+           same arity as the actual arguments of the call, promote it to an
+           [Indirect_known_arity] call, skipping [caml_applyN]. *)
+        match T.meet_code_ids (DE.typing_env denv) callee_ty with
+        | Known_result code_ids ->
+          let args_arity = Apply.args_arity apply in
+          if
+            Code_id.Set.for_all
+              (fun code_id ->
+                match DE.find_code_metadata_exn denv code_id with
+                | exception Not_found -> false
+                | code_metadata ->
+                  let params_arity = Code_metadata.params_arity code_metadata in
+                  let is_tupled = Code_metadata.is_tupled code_metadata in
+                  (not is_tupled)
+                  && Flambda_arity.equal_ignoring_subkinds args_arity
+                       params_arity)
+              code_ids
+          then
+            type_unavailable
+              (Call_kind.Function_call.indirect_known_arity
+                 ~code_ids:(Known code_ids))
+          else type_unavailable call
+        | Need_meet -> type_unavailable call
+        | Invalid -> not_a_closure ()))
+    | Invalid -> not_a_closure ())
 
 type ('a, 'b) simplify_apply_shared_result =
   | Ok of 'a
@@ -1251,6 +1305,17 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~from_env:(DE.get_inlining_state (DA.denv dacc))
         ~from_metadata:(Apply.inlining_state apply)
     in
+    let inlined, inlined_forwarded_from =
+      match Apply.inlined apply with
+      | ( Never_inlined | Default_inlined | Unroll _ | Always_inlined _
+        | Hint_inlined ) as inlined ->
+        inlined, None
+      | Forward_inlined as inlined -> (
+        match DE.inlined_attribute_to_forward (DA.denv dacc) with
+        | None -> inlined, None
+        | Some (inlined_from_env, ~forwarded_from) ->
+          inlined_from_env, Some forwarded_from)
+    in
     let apply =
       Apply.create ~callee:simplified_callee
         ~continuation:(Apply.continuation apply)
@@ -1260,25 +1325,14 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
-        ~inlined:(Apply.inlined apply) ~inlining_state
-        ~probe:(Apply.probe apply) ~position:(Apply.position apply)
+        ~inlined ~inlining_state ~probe:(Apply.probe apply)
+        ~position:(Apply.position apply)
         ~relative_history:
           (Inlining_history.Relative.concat
              ~earlier:(DE.relative_history (DA.denv dacc))
              ~later:(Apply.relative_history apply))
     in
-    Ok (dacc, callee_ty, apply, arg_types)
-
-let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
-    ~after_rebuild =
-  let apply =
-    Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
-      apply
-  in
-  let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
-  in
-  after_rebuild expr uacc
+    Ok (dacc, callee_ty, apply, arg_types, inlined_forwarded_from)
 
 let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
   fail_if_probe apply;
@@ -1320,9 +1374,8 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       ~exn_cont_use_id apply
   in
   down_to_up dacc
-    ~rebuild:
-      (rebuild_non_ocaml_function_call apply ~use_id:(Some use_id)
-         ~exn_cont_use_id)
+    (SE.simplified_apply apply ~use_id:(Some use_id) ~exn_cont_use_id
+       ~is_cold:false)
 
 let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     =
@@ -1338,12 +1391,8 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
   in
   match simplified with
   | Specialised (dacc, expr, operation) ->
-    let down_to_up dacc ~rebuild =
-      let rebuild uacc ~after_rebuild =
-        let uacc = UA.notify_removed uacc ~operation in
-        rebuild uacc ~after_rebuild
-      in
-      down_to_up dacc ~rebuild
+    let down_to_up dacc expr =
+      down_to_up dacc (SE.notify_removed ~operation expr)
     in
     simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
@@ -1385,7 +1434,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
       record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
     in
     down_to_up dacc
-      ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
+      (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
   | Invalid ->
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
 
@@ -1453,18 +1502,18 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
   in
   down_to_up dacc
-    ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
+    (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 
-let simplify_apply ~simplify_expr dacc apply ~down_to_up =
+let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
   match simplify_apply_shared dacc apply with
   | Invalid args_arity ->
     replace_apply_by_invalid dacc ~down_to_up
       (Application_argument_kind_mismatch (args_arity, apply))
-  | Ok (dacc, callee_ty, apply, arg_types) -> (
+  | Ok (dacc, callee_ty, apply, arg_types, inlined_forwarded_from) -> (
     match Apply.call_kind apply with
     | Function { function_call } ->
-      simplify_function_call ~simplify_expr dacc apply ~callee_ty function_call
-        ~down_to_up
+      simplify_function_call ~simplify_expr ~rebuild_expr dacc apply ~callee_ty
+        function_call ~down_to_up ~inlined_forwarded_from
     | Method { kind; obj } ->
       let callee_ty =
         match callee_ty with

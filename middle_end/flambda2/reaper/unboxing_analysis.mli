@@ -54,6 +54,8 @@ type param_decision =
   | Delete
   | Unbox of Variable.t Unboxed_fields.t
 
+val arity_of_decisions : param_decision list -> [`Complex] Flambda_arity.t
+
 type my_closure_param_decision =
   | Keep_my_closure
   | Unbox_my_closure of Variable.t Unboxed_fields.t
@@ -78,16 +80,40 @@ type calling_convention_change =
 type code_changes
 
 val get_calling_convention_change :
-  code_changes -> Code_id.t -> calling_convention_change
+  code_changes ->
+  analysis_scope:Analysis_scope.t ->
+  Code_id.t ->
+  calling_convention_change
+
+val is_changing_calling_convention :
+  code_changes -> analysis_scope:Analysis_scope.t -> Code_id.t -> bool
+
+(* Returns [None] for code ids of units that did not participate in the
+   solve. *)
+val find_code_metadata :
+  code_changes ->
+  analysis_scope:Analysis_scope.t ->
+  Code_id.t ->
+  Code_metadata.t option
 
 val pp_result : Format.formatter -> result -> unit
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  result
 
 val compute_code_changes :
   result ->
+  analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
+  rewrite_result_types:
+    (my_closure:Variable.t ->
+    params:(Variable.t * Points_to_analysis.keep_or_delete) list ->
+    results:(Variable.t * Points_to_analysis.keep_or_delete) list ->
+    Result_types.t ->
+    Result_types.t Or_unknown_or_bottom.t) ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   code_changes

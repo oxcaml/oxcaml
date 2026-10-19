@@ -83,6 +83,7 @@ let target_os_type = {@QS@|@target_os_type@|@QS@}
 
 let asm = {@QS@|@AS@|@QS@}
 let asm_cfi_supported = @asm_cfi_supported@
+let asm_file0_supported = @asm_file0_supported@
 let asm_size_type_directives = @asm_size_type_directives@
 let with_frame_pointers = @frame_pointers@
 let with_address_sanitizer = @address_sanitizer@
@@ -105,8 +106,6 @@ let flexdll_dirs = [@flexdll_dir@]
 
 let ar_supports_response_files = @ar_supports_response_files@
 
-let runtime5 = true
-
 let syntax_quotations = "@enable_syntax_quotations@" = "yes"
 
 let reserved_header_bits = @reserved_header_bits@
@@ -122,6 +121,8 @@ let has_popcnt = "@has_popcnt@" = "yes"
 let has_lzcnt = "@has_lzcnt@" = "yes"
 
 let has_pclmul = "@has_pclmul@" = "yes"
+
+let has_aes = "@has_aes@" = "yes"
 
 let has_sse3 = "@has_sse3@" = "yes"
 

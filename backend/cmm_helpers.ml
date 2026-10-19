@@ -157,6 +157,14 @@ let bind name arg fn =
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
 
+let bind_with_annotations name arg fn =
+  match arg with
+  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> fn arg
+  | _ ->
+    let id = V.create_local name in
+    let body, annots = fn (Cvar id) in
+    Clet (VP.create id, arg, body), annots
+
 let bind_list name args fn =
   let rec aux bound_args = function
     | [] -> fn bound_args
@@ -524,6 +532,7 @@ let[@inline] is_constant = function
   | _ -> false
 
 let rec add_const c n dbg =
+  let c = prefer_add c in
   if n = 0
   then c
   else
@@ -543,7 +552,7 @@ let rec add_const c n dbg =
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
           add_const c (n - x) dbg
-        | _ -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+        | c -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
 
 let rec add_const' arg const dbg =
   let open P.Default_variables in
@@ -593,7 +602,7 @@ let rec add_int c1 c2 dbg =
         add_const (add_int c1 c2 dbg) n1 dbg
       | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
         add_const (add_int c1 c2 dbg) n2 dbg
-      | _, _ -> Cop (Caddi, [c1; c2], dbg))
+      | c1, c2 -> Cop (Caddi, [c1; c2], dbg))
 
 let rec add_int' arg1 arg2 dbg =
   let open P.Default_variables in
@@ -614,12 +623,12 @@ let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
 let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
-      | _, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
-      | _, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
+      | c1, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
+      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
         add_const (sub_int c1 c2 dbg) (-n2) dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), _ ->
+      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
         add_const (sub_int c1 c2 dbg) n1 dbg
-      | _, _ -> Cop (Csubi, [c1; c2], dbg))
+      | c1, c2 -> Cop (Csubi, [c1; c2], dbg))
 
 let rec sub_int' arg1 arg2 dbg =
   let open P.Default_variables in
@@ -677,12 +686,27 @@ let rec max_signed_bit_length e =
     if n = 0 then max_signed_bit_length c else arch_bits - n
   | Cop ((Cand | Cor | Cxor), [x; y], _) ->
     Int.max (max_signed_bit_length x) (max_signed_bit_length y)
+  | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
   | _ -> arch_bits
+
+(* The number of significant bits of a value loaded from memory, per
+   [max_signed_bit_length]. *)
+and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
+  match memory_chunk with
+  | Byte_unsigned | Byte_signed -> 8
+  | Sixteen_unsigned | Sixteen_signed -> 16
+  | Thirtytwo_unsigned | Thirtytwo_signed -> 32
+  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+  | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+    arch_bits
 
 let rec max_signed_bit_length' e =
   let open P.Default_variables in
   P.run_default
-    ~default:(fun _ -> arch_bits)
+    ~default:(function
+      | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
+      | _ -> arch_bits)
     (prefer_or e)
     [ (Binop (Comparison, Any c1, Any c2) => fun _env -> 1);
       ( Guarded
@@ -1094,6 +1118,10 @@ let store ~dbg memory_chunk init ~addr ~new_value =
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
+  | Cop (Casr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+    or_const (asr_const e (right - 1) dbg_op) 1n dbg
+  | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+    or_const (lsr_const e (right - 1) dbg_op) 1n dbg
   | c -> incr_int (lsl_const c 1 dbg) dbg
 
 let untag_int i dbg =
@@ -1441,8 +1469,10 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
             Cifthenelse
               ( Cop (Ccmpi Cne, [c2; Cconst_int (-1, dbg)], dbg),
                 dbg,
+                Branch_annotations.default,
                 Cop (operator, [c1; c2], dbg),
                 dbg,
+                Branch_annotations.default,
                 if_divisor_is_negative_one ~dividend:c1 ~dbg,
                 dbg )))
 
@@ -1467,8 +1497,10 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
       Cifthenelse
         ( Cop (Ccmpi Ceq, [c1; Cconst_natint (divisor, dbg)], dbg),
           dbg,
+          Branch_annotations.default,
           Cconst_int (1, dbg),
           dbg,
+          Branch_annotations.default,
           Cconst_int (0, dbg),
           dbg )
     else if is_power_of_2_or_zero divisor
@@ -1539,8 +1571,10 @@ let unsigned_div_int c1 c2 dbg =
     Cifthenelse
       ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
         dbg,
+        Branch_annotations.default,
         Cconst_int (1, dbg),
         dbg,
+        Branch_annotations.default,
         Cconst_int (0, dbg),
         dbg )
   | _, Some divisor ->
@@ -1600,8 +1634,10 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
           Cifthenelse
             ( Cop (Ccmpi Ceq, [c1; min_int], dbg),
               dbg,
+              Branch_annotations.default,
               Cconst_int (0, dbg),
               dbg,
+              Branch_annotations.default,
               c1,
               dbg ))
     else if is_power_of_2_or_zero n
@@ -1648,8 +1684,10 @@ let unsigned_mod_int c1 c2 dbg =
         Cifthenelse
           ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
             dbg,
+            Branch_annotations.default,
             Cconst_int (0, dbg),
             dbg,
+            Branch_annotations.default,
             c1,
             dbg ))
   | _, Some divisor ->
@@ -2181,6 +2219,11 @@ let rec sign_extend ~bits ~dbg e =
     map_tail
       (fun e ->
         match prefer_or e with
+        | (Cconst_int _ | Cconst_natint _) as e ->
+          natint_const_untagged dbg
+            (Nativeint.shift_right
+               (Nativeint.shift_left (const_exn e) unused_bits)
+               unused_bits)
         | Cop (Cand, [x; y], _) when is_constant y ->
           and_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
         | Cop (Cor, [x; y], _) when is_constant y ->
@@ -2394,14 +2437,14 @@ let set_field_unboxed ~dbg memory_chunk block ~index_in_words newval =
 let string_length exp dbg =
   bind "str" exp (fun str ->
       let tmp_var = V.create_local "tmp" in
+      (* A string header never has reserved (mixed-block) bits set, so the size
+         can be read from the unmasked header. *)
+      let size = lsr_const (get_header str dbg) 10 dbg in
       Clet
         ( VP.create tmp_var,
           Cop
             ( Csubi,
-              [ Cop
-                  ( Clsl,
-                    [get_size str dbg; Cconst_int (log2_size_addr, dbg)],
-                    dbg );
+              [ Cop (Clsl, [size; Cconst_int (log2_size_addr, dbg)], dbg);
                 Cconst_int (1, dbg) ],
               dbg ),
           Cop
@@ -3436,7 +3479,7 @@ let make_switch arg cases actions dbg =
       | Constant_rev of Cmm.data_item list
       | Jump_rev of Cmm.exit_label * Cmm.data_item list
   end in
-  let classify (action, _dbg) : Classify.elt =
+  let classify (action, _dbg, _annots) : Classify.elt =
     match action with
     | Cexit (lbl, [arg], []) -> (
       match extract_uconstant arg with
@@ -3496,7 +3539,7 @@ module SArgBlocks = struct
 
   type test = expression
 
-  type act = expression
+  type act = expression * Branch_annotations.t
 
   (* The module [SArgBlocks] must conform to the signature `Switch.S`. Since we
      do not need a layout, we pick unit as the layout. *)
@@ -3520,32 +3563,46 @@ module SArgBlocks = struct
 
   let arg_as_test arg = arg
 
-  let make_if () cond ifso ifnot =
-    Cifthenelse
-      (cond, Debuginfo.none, ifso, Debuginfo.none, ifnot, Debuginfo.none)
+  let make_if () cond (ifso, ifso_a) (ifnot, ifnot_a) =
+    ( Cifthenelse
+        ( cond,
+          Debuginfo.none,
+          ifso_a,
+          ifso,
+          Debuginfo.none,
+          ifnot_a,
+          ifnot,
+          Debuginfo.none ),
+      Branch_annotations.add ifso_a ifnot_a )
 
   let make_switch dbg () arg cases actions =
-    let actions = Array.map (fun expr -> expr, dbg) actions in
-    make_switch arg cases actions dbg
+    let annots =
+      Branch_annotations.sum_list
+        (Array.map (fun (_, annots) -> annots) actions |> Array.to_list)
+    in
+    let actions = Array.map (fun (expr, annots) -> expr, dbg, annots) actions in
+    make_switch arg cases actions dbg, annots
 
-  let bind arg body = bind "switcher" arg body
+  let bind arg body = bind_with_annotations "switcher" arg body
 
-  let make_catch () handler =
+  let make_catch () (handler, annots) =
     match handler with
-    | Cexit (Lbl i, [], []) -> i, fun e -> e
-    | _ -> (
+    | Cexit (Lbl i, [], []) -> i, annots, fun e -> e
+    | _ ->
       let dbg = Debuginfo.none in
       let i = Lambda.next_raise_count () in
       (* Printf.eprintf "SHARE CMM: %i\n" i ; Printcmm.expression
          Format.str_formatter handler ; Printf.eprintf "%s\n"
          (Format.flush_str_formatter ()) ; *)
       ( i,
-        fun body ->
-          match body with
-          | Cexit (j, _, _) -> if j = Lbl i then handler else body
-          | _ -> ccatch (i, [], body, handler, dbg, false) ))
+        annots,
+        fun (body, annots) ->
+          ( (match body with
+            | Cexit (j, _, _) -> if j = Lbl i then handler else body
+            | _ -> ccatch (i, [], body, handler, dbg, false)),
+            annots ) )
 
-  let make_exit i = Cexit (Lbl i, [], [])
+  let make_exit i annots = Cexit (Lbl i, [], []), annots
 end
 
 (* cmm store, as sharing as normally been detected in previous phases, we only
@@ -3555,17 +3612,19 @@ end
    the index in the action array as context allows to share them correctly
    without duplication. *)
 module StoreExpForSwitch = Switch.CtxStore (struct
-  type t = expression
+  type t = expression * Branch_annotations.t
 
   type key = Static_label.t option * int
 
   type context = int
 
-  let make_key index expr =
+  let with_annotations (expr, _) annots = expr, annots
+
+  let make_key index (expr, annots) =
     let continuation =
       match expr with Cexit (Lbl i, [], []) -> Some i | _ -> None
     in
-    Some (continuation, index)
+    Some ((continuation, index), annots)
 
   let compare_key (cont, index) (cont', index') =
     match cont, cont' with
@@ -3595,12 +3654,17 @@ let transl_switch_clambda loc arg index cases =
   done;
   inters := (0, !this_high, !this_act) :: !inters;
   match !inters with
-  | [_] -> cases.(0)
+  | [_] ->
+    let case, _ = cases.(0) in
+    case
   | inters ->
     bind "switcher" arg (fun a ->
-        SwitcherBlocks.zyva loc ()
-          (0, n_index - 1)
-          a (Array.of_list inters) store)
+        let body, _ =
+          SwitcherBlocks.zyva loc ()
+            (0, n_index - 1)
+            a (Array.of_list inters) store
+        in
+        body)
 
 let split_arity_for_apply arity args =
   (* Decides whether a caml_applyN needs to be split. If N <= max_arity, then
@@ -3647,11 +3711,13 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                       Cconst_int (List.length extended_args_type, dbg) ],
                     dbg ),
                 dbg,
+                Branch_annotations.default,
                 Cop
                   ( Capply { result_type = ty; region = pos; callees = None },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
+                Branch_annotations.default,
                 really_call_caml_apply clos args,
                 dbg )))
   else really_call_caml_apply clos args
@@ -3663,8 +3729,10 @@ let maybe_reset_current_region ~dbg ~body_tail ~body_nontail old_region =
   Cifthenelse
     ( Cop (Ccmpi Ceq, [old_region; Cop (Cbeginregion, [], dbg ())], dbg ()),
       dbg (),
+      Branch_annotations.default,
       body_tail,
       dbg (),
+      Branch_annotations.default,
       (let res = V.create_local "result" in
        Clet
          ( VP.create res,
@@ -3795,8 +3863,10 @@ let cache_public_method meths tag cache dbg =
     Cifthenelse
       ( Cop (Ccmpi Cge, [Cvar check_li; Cvar check_hi], dbg),
         dbg,
+        Branch_annotations.default,
         Cexit (Lbl found_cont, [Cvar check_li], []),
         dbg,
+        Branch_annotations.default,
         Cexit (Lbl loop_cont, [Cvar check_li; Cvar check_hi], []),
         dbg )
   in
@@ -3822,12 +3892,14 @@ let cache_public_method meths tag cache dbg =
                       dbg ) ],
                 dbg ),
             dbg,
+            Branch_annotations.default,
             (* tag < a.(mi) : interval is now [ li; mi - 2 ] *)
             Cexit
               ( Lbl check_cont,
                 [Cvar li; Cop (Csubi, [Cvar mi; cconst_int 2], dbg)],
                 [] ),
             dbg,
+            Branch_annotations.default,
             (* tag >= a.(mi) : interval is now [ mi; hi ] *)
             Cexit (Lbl check_cont, [Cvar mi; Cvar hi], []),
             dbg ) )
@@ -3949,12 +4021,14 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
                 Cconst_int (List.length arity, dbg ()) ],
               dbg () ),
           dbg (),
+          Branch_annotations.default,
           Cop
             ( Capply { result_type = result; region = Rc_normal; callees = None },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
           dbg (),
+          Branch_annotations.default,
           code,
           dbg () ) )
 
@@ -4005,9 +4079,11 @@ let send_function (arity, result, mode) =
                     Cifthenelse
                       ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
                         dbg (),
+                        Branch_annotations.default,
                         cache_public_method (Cvar meths) tag cache_ptr_cvar
                           (dbg ()),
                         dbg (),
+                        Branch_annotations.default,
                         cached_pos,
                         dbg () ),
                     Cop
@@ -4059,6 +4135,8 @@ let apply_function (arity, result, mode) =
 let tuplify_function arity return =
   if List.exists (function [| Val |] | [| Int |] -> false | _ -> true) arity
   then
+    (* CR layouts-mixed-tuplify: eventually, we should support mixed tuplified
+       functions *)
     Misc.fatal_error
       "tuplify_function is currently unsupported if arity contains non-values";
   let arity = List.length arity in
@@ -4752,8 +4830,10 @@ let entry_point namelist =
       Cifthenelse
         ( Cop (Ccmpi Ceq, [Cvar id; high], dbg),
           dbg,
+          Branch_annotations.default,
           Cexit (Lbl raise_num, [], []),
           dbg,
+          Branch_annotations.default,
           Ctuple [],
           dbg )
     in
@@ -5045,8 +5125,9 @@ let sequence x y =
   | _, Ctuple [] -> x
   | _, _ -> Csequence (x, y)
 
-let ite ~dbg ~then_dbg ~then_ ~else_dbg ~else_ cond =
-  Cifthenelse (cond, then_dbg, then_, else_dbg, else_, dbg)
+let ite ~dbg ~then_dbg ~then_annots ~then_ ~else_dbg ~else_annots ~else_ cond =
+  Cifthenelse
+    (cond, then_dbg, then_annots, then_, else_dbg, else_annots, else_, dbg)
 
 let trywith ~dbg ~body ~exn_var ~extra_args ~handler_cont ~handler () =
   Ccatch

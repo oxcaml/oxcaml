@@ -4,7 +4,7 @@ let log_section = "stack-or-heap-enclosing"
 let { Logger.log = _ } = Logger.for_section log_section
 
 type stack_or_heap =
-  | Alloc_mode of Typedtree.alloc_mode_r
+  | Alloc_mode of Typedtree.locality_mode_r
   | No_alloc of { reason : string }
   | Unexpected_no_alloc
 
@@ -25,17 +25,17 @@ let from_nodes ~lsp_compat ~pos ~path =
     let ret ?(loc = Mbrowse.node_loc node) mode_result =
       Some (loc, mode_result)
     in
-    let ret_alloc ?loc alloc_mode = ret ?loc (Alloc_mode alloc_mode) in
+    let ret_alloc ?loc locality_mode = ret ?loc (Alloc_mode locality_mode) in
     let ret_no_alloc ?loc reason = ret ?loc (No_alloc { reason }) in
     let ret_maybe_alloc ?loc reason = function
-      | Some alloc_mode -> ret_alloc ?loc alloc_mode
+      | Some locality_mode -> ret_alloc ?loc locality_mode
       | None -> ret_no_alloc ?loc reason
     in
     match (node, parent) with
     | ( Pattern { pat_desc = Tpat_var _; _ },
         Some
           (Value_binding
-             { vb_expr = { exp_desc = Texp_function { alloc_mode; _ }; _ };
+             { vb_expr = { exp_desc = Texp_function { locality_mode; _ }; _ };
                vb_loc;
                _
              }) ) ->
@@ -43,10 +43,10 @@ let from_nodes ~lsp_compat ~pos ~path =
          value binding. However, the LSP hover at this point will describe just the
          pattern, so we don't override the location in the [lsp_compat] regime. *)
       let loc = if lsp_compat then None else Some vb_loc in
-      ret ?loc (Alloc_mode alloc_mode)
+      ret ?loc (Alloc_mode locality_mode)
     | Expression { exp_desc; _ }, _ -> (
       match exp_desc with
-      | Texp_function { alloc_mode; body; _ } -> (
+      | Texp_function { locality_mode; body; _ } -> (
         let body_loc =
           (* A function expression is often in a non-obvious way the nearest enclosing
              allocating expression. To avoid confusion, we only consider a function
@@ -76,8 +76,8 @@ let from_nodes ~lsp_compat ~pos ~path =
         in
         match body_loc with
         | Some loc when cursor_is_inside loc -> None
-        | _ -> ret (Alloc_mode alloc_mode))
-      | Texp_array (_, _, _, alloc_mode) -> ret (Alloc_mode alloc_mode)
+        | _ -> ret (Alloc_mode locality_mode))
+      | Texp_array (_, _, _, locality_mode) -> ret (Alloc_mode locality_mode)
       | Texp_construct
           ({ loc; txt = _lident }, { cstr_repr; _ }, _, args, maybe_alloc_mode)
         -> (
@@ -89,7 +89,7 @@ let from_nodes ~lsp_compat ~pos ~path =
           if lsp_compat && cursor_is_inside loc then Some loc else None
         in
         match maybe_alloc_mode with
-        | Some alloc_mode -> ret ?loc (Alloc_mode alloc_mode)
+        | Some locality_mode -> ret ?loc (Alloc_mode locality_mode)
         | None -> (
           match args with
           | [] -> ret_no_alloc ?loc "constructor without arguments"
@@ -99,10 +99,10 @@ let from_nodes ~lsp_compat ~pos ~path =
               ret_no_alloc ?loc "unboxed constructor"
             | Variant_extensible | Variant_boxed _ ->
               ret ?loc Unexpected_no_alloc)))
-      | Texp_record { representation; alloc_mode = maybe_alloc_mode; _ } -> (
+      | Texp_record { representation; locality_mode = maybe_alloc_mode; _ } -> (
         match (maybe_alloc_mode, representation) with
         | _, Record_inlined _ -> None
-        | Some alloc_mode, _ -> ret_alloc alloc_mode
+        | Some locality_mode, _ -> ret_alloc locality_mode
         | None, Record_unboxed -> ret_no_alloc "unboxed record"
         | ( None,
             ( Record_boxed
@@ -114,12 +114,13 @@ let from_nodes ~lsp_compat ~pos ~path =
             | Record_dummy _ ) ) -> ret Unexpected_no_alloc)
       | Texp_field { boxing; _ } -> (
         match boxing with
-        | Boxing (alloc_mode, _) -> ret_alloc alloc_mode
+        | Boxing (locality_mode, _) -> ret_alloc locality_mode
         | Non_boxing _ -> None)
       | Texp_variant (_, maybe_exp_and_alloc_mode) ->
         maybe_exp_and_alloc_mode
-        |> Option.map ~f:(fun (_, (alloc_mode : Typedtree.alloc_mode_r)) ->
-            alloc_mode)
+        |> Option.map
+             ~f:(fun (_, (locality_mode : Typedtree.locality_mode_r)) ->
+               locality_mode)
         |> ret_maybe_alloc "variant without argument"
       | _ -> None)
     | _ -> None

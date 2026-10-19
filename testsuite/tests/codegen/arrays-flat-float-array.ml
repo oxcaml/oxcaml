@@ -9,6 +9,7 @@
  flat-float-array;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -47,10 +48,9 @@ push:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 
@@ -360,8 +360,8 @@ let int64_length (a : int64_u array) = Array.length a
 int64_length:
   movq  -8(%rax), %rax
   salq  $8, %rax
-  shrq  $18, %rax
-  leaq  1(%rax,%rax), %rax
+  shrq  $17, %rax
+  orq   $1, %rax
   ret
 |}]
 
@@ -431,11 +431,11 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let ref_safe_set (a : string array) (i : int) (v : string) =
@@ -456,10 +456,9 @@ ref_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 (* CR ttebbi: The header is loaded twice: once for the bounds check and once
@@ -496,10 +495,9 @@ poly_safe_get:
 .L2:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L3:
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
@@ -529,10 +527,9 @@ poly_safe_set:
 .L1:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L2:
 |}]
 
 (* CR ttebbi: shrq $18 followed by salq $1 could be shrq $17. *)
@@ -542,18 +539,17 @@ let int64_safe_get (a : int64_u array) (i : int) =
 int64_safe_get:
   movq  -8(%rax), %rdi
   salq  $8, %rdi
-  shrq  $18, %rdi
-  salq  $1, %rdi
+  shrq  $17, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let float_safe_get (a : float# array) (i : int) =
@@ -568,11 +564,11 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let float_safe_get_plain (a : float array) (i : int) =
@@ -587,11 +583,11 @@ float_safe_get_plain:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let int32_safe_get (a : int32_u array) (i : int) =
@@ -611,11 +607,11 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 (* [float# box] gets optimized like [float] *)

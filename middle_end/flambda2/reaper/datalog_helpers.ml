@@ -190,10 +190,9 @@ module Fixit : sig
 
   val ( let@ ) : ('a -> 'b) -> 'a -> 'b
 end = struct
-  let empty columns =
-    Datalog.create_table ~name:"empty" ~default_value:() columns
+  let empty columns = Datalog.create_relation ~name:"empty" columns
 
-  let local name columns = Datalog.create_table ~name ~default_value:() columns
+  let local name columns = Datalog.create_relation ~name columns
 
   module Table = struct
     type ('t, 'k, 'v) t = ('t, 'k, 'v) Datalog.table
@@ -217,7 +216,9 @@ end = struct
       | [], [] -> db
       | from_table :: from_tables, to_table :: to_tables ->
         let db =
-          Datalog.set_table to_table (Datalog.get_table from_table db) db
+          Datalog.set_table_or_null to_table
+            (Datalog.get_table_or_null from_table db)
+            db
         in
         copy from_tables to_tables db
 
@@ -346,7 +347,8 @@ end = struct
     let body = g y in
     Now
       ( Seq (Run schedule, body),
-        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+        fun db ->
+          Datalog.set_table_or_null y (Datalog.get_table_or_null x db) db )
 
   let fix' x f =
     let y = Table.locals x in
@@ -373,7 +375,8 @@ end = struct
     let schedule = Datalog.Schedule.saturate (f y) in
     Now
       ( Map (Run schedule, fun db () -> Datalog.get_table y db),
-        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+        fun db ->
+          Datalog.set_table_or_null y (Datalog.get_table_or_null x db) db )
 
   let ( let@ ) f x = f x
 end

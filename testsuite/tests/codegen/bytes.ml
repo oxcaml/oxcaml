@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -183,8 +184,7 @@ let bytes_safe_get_int32 (buf : bytes) (i : int) =
 [%%expect_asm X86_64{|
 bytes_safe_get_int32:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $18, %rdi
+  shrq  $10, %rdi
   leaq  -1(,%rdi,8), %rdi
   movzbq (%rax,%rdi), %rsi
   subq  %rsi, %rdi
@@ -199,11 +199,11 @@ bytes_safe_get_int32:
   movslq (%rax,%rbx), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let bytes_get_int64_indexed_by_int64
@@ -398,8 +398,7 @@ let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
 str_length:
   movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
+  shrq  $10, %rbx
   leaq  -1(,%rbx,8), %rbx
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx
@@ -411,8 +410,7 @@ let buf_length (b : bytes) = Bytes.length b
 [%%expect_asm X86_64{|
 buf_length:
   movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
+  shrq  $10, %rbx
   leaq  -1(,%rbx,8), %rbx
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx

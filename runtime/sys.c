@@ -19,12 +19,10 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h> /* for _wchdir and _wgetcwd */
@@ -59,9 +57,7 @@
 #include "caml/mlvalues.h"
 #include "caml/osdeps.h"
 #include "caml/signals.h"
-#include "caml/fiber.h"
 #include "caml/sys.h"
-#include "caml/startup.h"
 #include "caml/callback.h"
 #include "caml/startup_aux.h"
 #include "caml/major_gc.h"
@@ -462,7 +458,7 @@ CAMLprim value caml_sys_executable_name(value unit)
   return caml_copy_string_of_os(caml_params->exe_name);
 }
 
-void caml_sys_init(const char_os * exe_name, char_os **argv)
+void caml_sys_init(const char_os * exe_name, char_os const * const * argv)
 {
 #ifdef _WIN32
   /* Initialises the caml_win32_* globals on Windows with the version of
@@ -474,7 +470,7 @@ void caml_sys_init(const char_os * exe_name, char_os **argv)
 #endif
   caml_init_exe_name(exe_name);
   main_argv = caml_alloc_array((void *)caml_copy_string_of_os,
-                               (char const **) argv);
+                               (char const * const *) argv);
   caml_register_generational_global_root(&main_argv);
 }
 
@@ -684,11 +680,6 @@ CAMLprim value caml_sys_const_ostype_cygwin(value unit)
 CAMLprim value caml_sys_const_backend_type(value unit)
 {
   return Val_int(1); /* Bytecode backed */
-}
-
-CAMLprim value caml_sys_const_runtime5(value unit)
-{
-  return Val_true;
 }
 
 CAMLprim value caml_sys_const_arch_amd64(value unit)

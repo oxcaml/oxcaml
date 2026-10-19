@@ -108,7 +108,8 @@ end
 
 (**** Type level management ****)
 
-let generic_level = Mode.Alloc.generic_level
+let generic_level = Mode.With_locality.generic_level
+let subject_level = generic_level - 1
 let lowest_level = Ident.lowest_scope
 
 (**** leveled type pool ****)
@@ -451,7 +452,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -591,23 +592,8 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
-let instance_jkind (t : jkind_lr) : jkind_lr =
-  let rec instance_layout (l : Jkind_types.Sort.t Jkind_types.Layout.t)
-      : Jkind_types.Sort.t Jkind_types.Layout.t =
-    match l with
-    | Any _ -> l
-    | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
-    | Product ts -> Product (List.map instance_layout ts)
-    | Addressable l -> Addressable (instance_layout l)
-  in
-  match t.jkind.base with
-  | Kconstr _ -> t
-  | Layout l ->
-    { t with jkind = { t.jkind with base = Layout (instance_layout l) } }
-
 let rec copy_type_desc ?(keep_names=false) f fm = function
     Tvar { name; jkind } ->
-     let jkind = instance_jkind jkind in
      if keep_names then Tvar { name; jkind } else Tvar { name=None; jkind }
   | Tarrow ((p, m1, m2), ty1, ty2, c)->
     Tarrow ((p, fm m1, fm m2), f ty1, f ty2, copy_commu c)
@@ -649,14 +635,16 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_saving : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_saving :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_restoring : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_restoring :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
@@ -673,19 +661,19 @@ end = struct
 
   let mode_instantiate copy_scope ~current_level m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.instantiate ~copy_scope ~current_level m
+    Mode.With_locality.instantiate ~copy_scope ~current_level m
 
   let mode_copy_generic copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_generic ~copy_scope m
+    Mode.With_locality.copy_generic ~copy_scope m
 
   let mode_copy_for_saving copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_saving ~copy_scope m
+    Mode.With_locality.copy_for_saving ~copy_scope m
 
   let mode_copy_for_restoring copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_restoring ~copy_scope m
+    Mode.With_locality.copy_for_restoring ~copy_scope m
 
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =
@@ -2201,8 +2189,6 @@ module Jkind0 = struct
 
     let get_const t = Jkind_desc.get_const t.jkind
 
-    let instance = instance_jkind
-
     let map_type_expr f t =
       if has_with_bounds t
       then { t with jkind = Jkind_desc.map_type_expr f t.jkind }
@@ -2221,36 +2207,21 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels_with_updates lbls_updated =
-      List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
-        (fun ((lbl : label_declaration), ld_type, _sort) ->
-          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
+        (fun { ld_type; ld_modalities; _ } ->
+          add_with_bounds ~type_expr:ld_type ~modality:ld_modalities)
         lbls jkind
 
-    let for_boxed_record_with_updates lbls =
-      if all_void_labels_with_updates lbls
-      then Builtin.immediate ~why:Empty_record
-      else
-        let base =
-          lbls
-          |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
-          |> List.fold_left combine_mutability Immutable
-          |> jkind_of_mutability ~why:Boxed_record
-          |> mark_best
-        in
-        add_labels_as_with_bounds lbls base
-
     let for_boxed_record lbls =
-      for_boxed_record_with_updates
-        (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
+      let base =
+        lbls
+        |> List.map (fun { ld_mutable; _ } -> ld_mutable)
+        |> List.fold_left combine_mutability Immutable
+        |> jkind_of_mutability ~why:Boxed_record
+        |> mark_best
+      in
+      add_labels_as_with_bounds lbls base
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =

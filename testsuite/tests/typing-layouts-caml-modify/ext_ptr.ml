@@ -3,7 +3,7 @@
  {
    not-macos;
    (* Remove layout_beta here when block indices are out of beta *)
-   flags = "-extension layouts_beta \
+   flags = "-extension layouts_beta -extension layout_poly_alpha \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
    native;
@@ -97,3 +97,33 @@ let () =
                ignore (Sys.opaque_identity t));
   let #{ a; b } = t.y in
   assert (a = "c" && b = "d")
+
+(* A layout-polymorphic function calling layout-polymorphic ext_ptr
+   primitives. Unlike the regular ptr primitives, no specialization needs
+   [caml_modify]. *)
+external unsafe_get_ext_ptr : ('b : any).
+  int64_u -> ('b[@local_opt]) = "%unsafe_get_ext_ptr"
+[@@layout_poly]
+
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ get_x r = unsafe_get_ext_ptr (addr_of_value r) in
+  let[@inline never] poly_ set_x r x = unsafe_set_ext_ptr (addr_of_value r) x in
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x string_record "after";
+      assert (get_x (Sys.opaque_identity string_record) = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x int_record 2;
+      assert (get_x (Sys.opaque_identity int_record) = 2));
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (get_x (Sys.opaque_identity float_record)) = 2.5))

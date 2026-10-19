@@ -156,6 +156,21 @@ module Directive = struct
 
     let print_using_decimals = print_aux ~force_decimal:true
 
+    (* Unlike [print], this does not depend on the assembler in use, so it is
+       suitable for error messages. *)
+    let rec print_debug ppf t =
+      match t with
+      | Signed_int n -> Format.fprintf ppf "%Ld" n
+      | Unsigned_int n -> Format.fprintf ppf "0x%Lx" (Uint64.to_int64 n)
+      | This -> Format.pp_print_string ppf "<this>"
+      | Label lbl -> Format.pp_print_string ppf (Asm_label.encode lbl)
+      | Symbol sym -> Format.pp_print_string ppf (Asm_symbol.encode sym)
+      | Variable name -> Format.fprintf ppf "<variable %s>" name
+      | Add (c1, c2) ->
+        Format.fprintf ppf "(%a + %a)" print_debug c1 print_debug c2
+      | Sub (c1, c2) ->
+        Format.fprintf ppf "(%a - %a)" print_debug c1 print_debug c2
+
     let rec eval ~this ~lookup_label ~lookup_symbol ~lookup_variable t =
       match t with
       | Signed_int n -> Some n
@@ -219,7 +234,9 @@ module Directive = struct
     | Code
     | Machine_width_data
 
-  type label_or_symbol =
+  (* CR mshinwell: use [Asm_label_or_symbol.t] directly everywhere and delete
+     this alias. *)
+  type label_or_symbol = Asm_label_or_symbol.t =
     | Label of Asm_label.t
     | Symbol of Asm_symbol.t
 
@@ -1177,15 +1194,29 @@ let between_labels_32_bit ?comment:_comment ~upper ~lower () =
      force an assembly time constant. *)
   const expr Thirty_two
 
-let between_labels_64_bit ?comment:_ ~upper:_ ~lower:_ () =
-  (* CR poechsel: use the arguments *)
-  Misc.fatal_error "between_labels_64_bit not implemented yet"
+let between_labels_64_bit ?comment:_comment ~upper ~lower () =
+  let expr = const_sub (const_label upper) (const_label lower) in
+  (* See [between_labels_32_bit] above regarding assembly-time constants. *)
+  const expr Sixty_four
 
 let delta_uleb128 ~upper ~lower =
   let delta =
     Directive.Constant.Sub
       (Directive.Constant.Label upper, Directive.Constant.Label lower)
   in
+  emit (Delta_uleb128 { delta })
+
+(* The ULEB128-encoded distance from the [lower] symbol to the [upper] label
+   plus [upper_offset]. As for [delta_uleb128], the value must be a non-negative
+   assembly-time constant; the [lower] symbol must be in the current compilation
+   unit and in the same section as [upper]. *)
+let delta_uleb128_label_minus_symbol ~upper ~upper_offset ~lower =
+  let upper : Directive.Constant.t =
+    if Int64.equal upper_offset 0L
+    then Label upper
+    else Add (Label upper, Signed_int upper_offset)
+  in
+  let delta = Directive.Constant.Sub (upper, Symbol lower) in
   emit (Delta_uleb128 { delta })
 
 let between_labels_32_bit_with_offsets ?comment:_comment ~upper ~upper_offset

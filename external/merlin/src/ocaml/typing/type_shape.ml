@@ -133,6 +133,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
       | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
       | p when Path.same p Predef.path_unboxed_mask -> Some Unboxed_mask
+      | p when Path.same p Predef.path_unboxed_unit -> Some Unboxed_unit
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function

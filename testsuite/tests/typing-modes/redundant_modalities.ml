@@ -1,5 +1,5 @@
 (* TEST
-    flags += "-extension mode_alpha";
+    flags += "-extension mode_alpha -extension layout_poly_alpha";
     expect;
 *)
 

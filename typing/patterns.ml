@@ -56,7 +56,7 @@ module Simple = struct
     | `Constant of constant
     | `Unboxed_unit
     | `Unboxed_bool of bool
-    | `Tuple of (string option * pattern) list
+    | `Tuple of (string option * pattern * Jkind.sort) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
         Longident.t loc * constructor_description * constructor_representation
@@ -89,12 +89,19 @@ end
 module General = struct
   type view = [
     | Half_simple.view
-    | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
+    | `Var of
+        Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
-                   * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
-                   * alloc_mode_r
-    | `Alias of pattern * Ident.t * string loc
-                * Uid.t * Jkind.Sort.t * Mode.Value.l * Types.type_expr
+                   * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
+                   * locality_mode_r
+    | `Alias of
+        pattern
+        * Ident.t
+        * string loc
+        * Uid.t
+        * Jkind.Sort.t
+        * Mode.With_regionality.l
+        * Types.type_expr
   ]
   type pattern = view pattern_data
 
@@ -104,8 +111,8 @@ module General = struct
     | Tpat_var { id; name = str; uid; sort; mode } ->
        `Var (id, str, uid, sort, mode)
     | Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly;
-                        env_alloc_mode } ->
-       `Fun_layout (id, str, uid, sort, mode, lpoly, env_alloc_mode)
+                        env_locality_mode } ->
+       `Fun_layout (id, str, uid, sort, mode, lpoly, env_locality_mode)
     | Tpat_alias { pattern = p; id; name = str; uid; sort; mode;
                    type_expr = ty } ->
        `Alias (p, id, str, uid, sort, mode, ty)
@@ -138,9 +145,9 @@ module General = struct
     | `Any -> Tpat_any
     | `Var (id, str, uid, sort, mode) ->
        Tpat_var { id; name = str; uid; sort; mode }
-    | `Fun_layout (id, str, uid, sort, mode, lpoly, env_alloc_mode) ->
+    | `Fun_layout (id, str, uid, sort, mode, lpoly, env_locality_mode) ->
        Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly;
-                         env_alloc_mode }
+                         env_locality_mode }
     | `Alias (p, id, str, uid, sort, mode, ty) ->
        Tpat_alias { pattern = p; id; name = str; uid; sort; mode;
                     type_expr = ty }
@@ -181,7 +188,7 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -214,7 +221,7 @@ end = struct
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -239,7 +246,9 @@ end = struct
       | `Unboxed_unit -> Unboxed_unit, []
       | `Unboxed_bool b -> Unboxed_bool b, []
       | `Tuple args ->
-          Tuple (List.map fst args), (List.map snd args)
+          let labels_and_sorts = List.map (fun (l, _, s) -> l, s) args in
+          let pats = List.map (fun (_, p, _) -> p) args in
+          Tuple labels_and_sorts, pats
       | `Unboxed_tuple args ->
           let labels_and_sorts = List.map (fun (l, _, s) -> l, s) args in
           let pats = List.map (fun (_, p, _) -> p) args in
@@ -299,7 +308,7 @@ end = struct
       | Unboxed_unit -> Tpat_unboxed_unit
       | Unboxed_bool b -> Tpat_unboxed_bool b
       | Tuple lbls ->
-          Tpat_tuple (List.map (fun lbl -> lbl, omega) lbls)
+          Tpat_tuple (List.map (fun (lbl, sort) -> lbl, omega, sort) lbls)
       | Unboxed_tuple lbls_and_sorts ->
           Tpat_unboxed_tuple
             (List.map (fun (lbl, sort) -> lbl, omega, sort) lbls_and_sorts)

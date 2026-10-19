@@ -43,7 +43,7 @@ module Simple : sig
     | `Constant of constant
     | `Unboxed_unit
     | `Unboxed_bool of bool
-    | `Tuple of (string option * pattern) list
+    | `Tuple of (string option * pattern * Jkind.sort) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
         Longident.t loc * constructor_description * constructor_representation
@@ -74,12 +74,19 @@ end
 module General : sig
   type view = [
     | Half_simple.view
-    | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
+    | `Var of
+        Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
-                   * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
-                   * alloc_mode_r
-    | `Alias of pattern * Ident.t * string loc * Uid.t
-                * Jkind.Sort.t * Mode.Value.l * Types.type_expr
+                   * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
+                   * locality_mode_r
+    | `Alias of
+        pattern
+        * Ident.t
+        * string loc
+        * Uid.t
+        * Jkind.Sort.t
+        * Mode.With_regionality.l
+        * Types.type_expr
   ]
   type pattern = view pattern_data
 
@@ -97,7 +104,7 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation

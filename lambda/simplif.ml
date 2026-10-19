@@ -104,7 +104,8 @@ let rec eliminate_ref id = function
       Lregion(eliminate_ref id e, layout)
   | Lexclave e ->
       Lexclave(eliminate_ref id e)
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as lam ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
 (* Simplification of exits *)
@@ -202,7 +203,8 @@ let simplify_exits lam =
   | Lifused(_v, l) -> count ~try_depth l
   | Lregion (l, _) -> count ~try_depth:(try_depth+1) l
   | Lexclave l -> count ~try_depth:(try_depth-1) l
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as lam ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
   and count_default ~try_depth sw = match sw.sw_failaction with
@@ -391,7 +393,8 @@ let simplify_exits lam =
       simplif ~layout ~try_depth:(try_depth + 1) l,
       result_layout ly)
   | Lexclave l -> Lexclave (simplif ~layout ~try_depth:(try_depth - 1) l)
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ ->
       fatal_error_invalid_constructor l
   in
   simplif ~layout:None ~try_depth:0 lam
@@ -422,12 +425,12 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   (* CR mshinwell: Evaluate the impact of simply removing [Alias] from
      [Lambda], given what Flambda 2 does. *)
   let dwarf_wants_to_prevent_substitutions =
-    !Clflags.native_code
+    Clflags.target_is_native ()
     && !Clflags.debug
     && not restrict_to_upstream_dwarf
     && gdwarf_may_alter_codegen
   in
-  let optimize = !Clflags.native_code || not !Clflags.debug in
+  let optimize = Clflags.target_is_native () || not !Clflags.debug  in
   let optimize_except_alias_bindings =
     (* The debug info degrades when we substitute let x = y in ... bindings. We
        disable their simplification when [dwarf_wants_to_prevent_substitutions].
@@ -553,7 +556,8 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       count bv l1;
       (* Don't move code into an exclave *)
       count Ident.Map.empty l2
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as lam ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
   and count_lfunction fn =
@@ -724,7 +728,8 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       if count_var v > 0 then simplif l else lambda_unit
   | Lregion (l, layout) -> Lregion (simplif l, layout)
   | Lexclave l -> Lexclave (simplif l)
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ as l ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ as l ->
     fatal_error_invalid_constructor l
   in
   simplif lam
@@ -823,7 +828,8 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos is_tail lam
   | Lexclave lam ->
       emit_tail_infos is_tail lam
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ ->
       fatal_error_invalid_constructor lambda
 and list_emit_tail_infos_fun f is_tail =
   List.iter (fun x -> emit_tail_infos is_tail (f x))
@@ -841,6 +847,11 @@ and emit_tail_infos_lfunction _is_tail lfun =
    the overhead associated with boxing an optional argument with a
    'Some' constructor, only to deconstruct it immediately in the
    function's body. *)
+
+(* CR-someday lmaurer: There doesn't currently seem to be any reason to do this
+   outside of the main Simplif pass. Calling it from the middle of flambda2
+   closure conversion is confusing, and flambda2 behaves exactly as if the two
+   returned functions were written separately by the user. *)
 
 let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
       ~body ~attr ~loc ~mode ~ret_mode =
@@ -861,13 +872,16 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
        the pattern-matching compiler for options.
     *)
     | Llet(Strict, k, id, duid,
-           (Lifthenelse(Lprim (Pisint _, [Lvar optparam], _), _, _, _) as def),
+           (Lifthenelse(Lprim (Pisint _, [Lvar optparam], _), _, _, layout)
+            as def),
            rest) when
         String.starts_with (Ident.name optparam) ~prefix:"*opt*" &&
         List.exists (fun p -> Ident.same p.name optparam) params
           && not (List.mem_assoc optparam map)
       ->
-        let wrapper_body, inner = aux ((optparam, id) :: map) add_region rest in
+        let wrapper_body, inner =
+          aux ((optparam, (id, layout)) :: map) add_region rest
+        in
         Llet(Strict, k, id, duid, def, wrapper_body), inner
     | Lregion (rest, ret) ->
         let wrapper_body, inner = aux map true rest in
@@ -886,10 +900,11 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
         let inner_id_duid = Lambda.debug_uid_none in
         let map_param (p : Lambda.lparam) =
           try
+            let name, layout = List.assoc p.name map in
             {
-              name = List.assoc p.name map;
+              name;
               debug_uid = p.debug_uid;
-              layout = Lambda.layout_optional_arg;
+              layout;
               attributes = Lambda.default_param_attribute;
               mode = p.mode
             }
@@ -911,7 +926,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
                which ignores [ap_yielding]. *)
             ap_yielding = May_yield;
             ap_tailcall = Default_tailcall;
-            ap_inlined = Default_inlined;
+            ap_inlined = forward_inlined_attribute ();
             ap_specialised = Default_specialise;
             ap_probe=None;
           }
@@ -1005,7 +1020,7 @@ let simplify_local_functions lam =
   let enabled = function
     (* Stubs are explicitly intended for the middle-end inliner, they should not
        be contified. *)
-    | {stub=true; _ } when !Clflags.native_code
+    | {stub=true; _ } when Clflags.target_is_native ()
       -> false
     | {local = Always_local; _}
     | {local = Default_local;
@@ -1178,7 +1193,8 @@ let simplify_local_functions lam =
 let simplify_lambda lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   let lam =
     lam
-    |> (if !Clflags.native_code || Clflags.is_flambda2() || not !Clflags.debug
+    |> (if Clflags.target_is_native () || Clflags.is_flambda2()
+           || not !Clflags.debug
         then simplify_local_functions else Fun.id
        )
     |> simplify_exits

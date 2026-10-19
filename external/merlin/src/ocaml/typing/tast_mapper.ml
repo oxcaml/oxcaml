@@ -358,7 +358,8 @@ let pat
     | Tpat_var { id; name; uid; sort; mode } ->
       Tpat_var { id; name = map_loc sub name; uid; sort; mode }
     | Tpat_tuple l ->
-        Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
+        Tpat_tuple
+          (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
@@ -387,9 +388,9 @@ let pat
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
-    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_alloc_mode } ->
+    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_locality_mode } ->
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
-                          lpoly; env_alloc_mode }
+                          lpoly; env_locality_mode }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -550,12 +551,12 @@ let expr sub x =
         Texp_let (rec_flag, list, sub.expr sub exp)
     | Texp_letmutable (vb, exp) ->
         Texp_letmutable (sub.value_binding sub vb, sub.expr sub exp)
-    | Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
+    | Texp_function { params; body; locality_mode; ret_mode; ret_sort;
                       yielding; zero_alloc } ->
         let params = List.map (function_param sub) params in
         let body = function_body sub body in
         let ret_mode = sub.modes sub ret_mode in
-        Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
+        Texp_function { params; body; locality_mode; ret_mode; ret_sort;
                         yielding; zero_alloc }
     | Texp_apply (exp, list, pos, am, ym, za) ->
         Texp_apply (
@@ -582,7 +583,8 @@ let expr sub x =
     | Texp_unboxed_unit -> Texp_unboxed_unit
     | Texp_unboxed_bool b -> Texp_unboxed_bool b
     | Texp_tuple (list, am) ->
-        Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list, am)
+        Texp_tuple
+          (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list, am)
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
@@ -593,13 +595,16 @@ let expr sub x =
                         am)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record { fields; representation; extended_expression; alloc_mode } ->
+    | Texp_record
+        { fields; representation; extended_expression; locality_mode } ->
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
-            Option.map (fun (exp, sort, ubr) -> (sub.expr sub exp, sort, ubr))
+            Option.map
+              (fun (exp, sort, repres, ubr) ->
+                 (sub.expr sub exp, sort, repres, ubr))
               extended_expression;
-          alloc_mode
+          locality_mode
         }
     | Texp_record_unboxed_product
           { fields; representation; extended_expression } ->
@@ -630,14 +635,14 @@ let expr sub x =
           record_repres; modality; label;
         }
     | Texp_atomic_loc { record; record_sort; record_repres; lid; label;
-                        alloc_mode; } ->
+                        locality_mode; } ->
         Texp_atomic_loc {
           record = sub.expr sub record;
           lid = map_loc_lid sub lid;
-          record_sort; record_repres; label; alloc_mode;
+          record_sort; record_repres; label; locality_mode;
         }
-    | Texp_array (amut, sort, list, alloc_mode) ->
-        Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
+    | Texp_array (amut, sort, list, locality_mode) ->
+        Texp_array (amut, sort, List.map (sub.expr sub) list, locality_mode)
     | Texp_idx (ba, uas) ->
         Texp_idx
           (map_block_access sub ba, List.map (map_unboxed_access sub) uas)
@@ -896,6 +901,8 @@ let module_coercion sub = function
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}
+  | Tcoerce_kindtemplate ks ->
+      Tcoerce_kindtemplate ks
   | Tcoerce_invalid -> Tcoerce_invalid
 
 let module_expr sub x =

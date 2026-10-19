@@ -86,7 +86,7 @@ type node =
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Mode.Alloc.atom Location.loc
+  | Mode of Mode.With_locality.atom Location.loc
   | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
   | Jkind_declaration of Typedtree.jkind_declaration
@@ -394,7 +394,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_lazy p
   | Tpat_exception p -> of_pattern p
   | Tpat_value p -> of_pattern (p :> value general_pattern)
-  | Tpat_tuple ps -> list_fold (fun (_lbl, p) -> of_pattern p) ps
+  | Tpat_tuple ps -> list_fold (fun (_lbl, p, _sort) -> of_pattern p) ps
   | Tpat_unboxed_tuple ps -> list_fold (fun (_lbl, p, _sort) -> of_pattern p) ps
   | Tpat_construct (_, _, _, ps, t) ->
     list_fold (fun (_, p) -> of_pattern p) ps
@@ -453,7 +453,7 @@ let rec of_expression_desc loc = function
     of_expression e ** list_fold of_case cs ** list_fold of_case effs
   | Texp_try (e, cs, effs) ->
     of_expression e ** list_fold of_case cs ** list_fold of_case effs
-  | Texp_tuple (es, _) -> list_fold (fun (_lbl, e) -> of_expression e) es
+  | Texp_tuple (es, _) -> list_fold (fun (_lbl, e, _sort) -> of_expression e) es
   | Texp_unboxed_tuple es ->
     list_fold (fun (_lbl, e, _sort) -> of_expression e) es
   | Texp_construct (_, _, _, es, _) ->
@@ -465,7 +465,7 @@ let rec of_expression_desc loc = function
   | Texp_setinstvar (_, _, _, e) -> of_expression e
   | Texp_setmutvar (_, _, e) -> of_expression e
   | Texp_record { fields; extended_expression } ->
-    option_fold (fun (e, _, _) -> of_expression e) extended_expression
+    option_fold (fun (e, _, _, _) -> of_expression e) extended_expression
     **
     let fold_field = function
       | _, _, Typedtree.Kept _ -> id_fold
@@ -545,7 +545,7 @@ let rec of_expression_desc loc = function
        the patterns patN when they are tuples themselves. *)
     let rec flatten_patterns ~size acc pat =
       match pat.pat_desc with
-      | Tpat_tuple [ (None, tuple); (None, pat) ] when size > 0 ->
+      | Tpat_tuple [ (None, tuple, _); (None, pat, _) ] when size > 0 ->
         flatten_patterns ~size:(size - 1) (pat :: acc) tuple
       | _ -> List.rev (pat :: acc)
     in
@@ -566,7 +566,7 @@ let rec of_expression_desc loc = function
         record_repres = _;
         lid = _;
         label = _;
-        alloc_mode = _
+        locality_mode = _
       } -> of_expression record
   | Texp_hole _ -> id_fold
   | Texp_quote exp -> of_expression exp
@@ -764,10 +764,10 @@ let of_attribute (attr : attribute) =
   let name = attr.attr_name.txt in
   (* There are a number of attributes that start with "merlin." that either modify Merlin
      behavior (ex: merlin.loc, merlin.hide, merlin.focus) or deal with the type-checker's
-     error recovery (ex: merlin.incorrect). Including these attributes in the browse tree
+     error recovery (ex: ocaml.incorrect). Including these attributes in the browse tree
      causes Merlin to sometimes choose an incorrect node. These attributes are also
      uninteresting - in practice they don't appear in user-written code. *)
-  match String.is_prefixed name ~by:"merlin." with
+  match String.is_prefixed name ~by:"merlin." || name = "ocaml.incorrect" with
   | true -> id_fold
   | false -> app (Attribute attr)
 
@@ -795,7 +795,9 @@ let of_node node =
                 name = { txt = name; loc = vd.val_loc };
                 uid = vd.val_uid;
                 sort;
-                mode = Mode.Value.disallow_right Mode.Value.legacy
+                mode =
+                  Mode.With_regionality.disallow_right
+                    Mode.With_regionality.legacy
               };
           pat_loc = vd.val_loc;
           pat_extra = [];

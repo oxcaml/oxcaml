@@ -13,9 +13,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Type : sig
-  type (_, _) eq = Equal : ('a, 'a) eq
-end
+type _ result_repr
+
+val unit_repr : unit result_repr
+
+val result_repr_print : 'v result_repr -> Format.formatter -> 'v -> unit
+
+val result_repr_union : 'v result_repr -> 'v -> 'v -> 'v
+
+val result_repr_diff_or_null : 'v result_repr -> 'v -> 'v -> 'v Or_null.t
 
 module Id : sig
   type (!'t, !'k, !'v) t
@@ -46,9 +52,9 @@ module Id : sig
 
   val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
 
-  val default_value : ('t, 'k, 'v) t -> 'v
+  val result_repr : ('t, 'k, 'v) t -> 'v result_repr
 
-  val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
+  val default_value : ('t, 'k, 'v) t -> 'v
 
   val has_provenance : ('t, 'k, 'v) t -> bool
 
@@ -58,7 +64,7 @@ module Id : sig
     provenance:bool ->
     name:string ->
     columns:('t, 'k, 'v) Column.hlist ->
-    default_value:'v ->
+    result_repr:'v result_repr ->
     ('t, 'k, 'v) t
 end
 
@@ -71,7 +77,9 @@ module Map : sig
 
   val is_empty : t -> bool
 
-  val get : ('t, 'k, 'v) Id.t -> t -> 't
+  val get_or_null : ('t, 'k, 'v) Id.t -> t -> 't Or_null.t
+
+  val set_or_null : ('t, 'k, 'v) Id.t -> 't Or_null.t -> t -> t
 
   val set : ('t, 'k, 'v) Id.t -> 't -> t -> t
 

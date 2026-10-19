@@ -67,7 +67,7 @@ type subkind =
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
+        non_consts : (tag_scannable * kind_with_subkind list option) list
       }
   | Float_block of { num_fields : int }
   | Float_array
@@ -283,6 +283,7 @@ type inline_attribute = Inline_attribute.t =
 type inlined_attribute =
   | Always_inlined
   | Hint_inlined
+  | Forward_inlined
   | Never_inlined
   | Unroll of int
   | Default_inlined
@@ -330,7 +331,7 @@ type expr =
       { scrutinee : simple;
         cases : (int * apply_or_inlined_cont) list
       }
-  | Invalid of { message : string }
+  | Invalid
 
 and apply_or_inlined_cont =
   | Inlined_goto of expr

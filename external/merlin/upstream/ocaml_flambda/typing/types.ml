@@ -110,7 +110,7 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { mode : Mode.Value.Comonadic.lr
+      { mode : Mode.With_regionality.Comonadic.lr
       ; atomic : atomic
       }
 
@@ -125,9 +125,9 @@ let is_atomic = function
 
 (** Takes [m0] which is the parameter of [let mutable], returns the
     mode of new values in future writes. *)
-let mutable_mode m0 : _ Mode.Value.t =
+let mutable_mode m0 : _ Mode.With_regionality.t =
   { comonadic = m0
-  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  ; monadic = Mode.With_regionality.Monadic.(min |> allow_left |> allow_right)
   }
 
 (* Type expressions for the core language *)
@@ -186,7 +186,7 @@ and arg_label =
   | Position of string
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Mode.With_locality.lr * Mode.With_locality.lr
 
 and package =
     { pack_path : Path.t;
@@ -331,7 +331,7 @@ module Vars = Misc.Stdlib.String.Map
 
 type value_kind =
     Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+  | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
@@ -725,18 +725,18 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
+  | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Value.l
+  and persistent_signature = signature * Mode.With_regionality.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -1001,11 +1001,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
-      (* Equality of tag and variant representation imply equality of
-         constructor representation. *)
-      ignore (cr1 : constructor_representation);
-      ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 &&
+        equal_constructor_representation_up_to_scannable_axes cr1 cr2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true
@@ -1053,6 +1050,24 @@ let cstr_layout_is_constant (layout : cstr_layout) =
     Array.length sorts = 0
   | Cstr_layout_undetermined -> false
 
+let mixed_block_element_of_base (base : Jkind_types.Sort.base) scannable_axes
+    : mixed_block_element =
+  match base with
+  | Scannable -> Scannable scannable_axes
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Float32 -> Float32
+  | Float64 -> Float64
+  | Untagged_immediate -> Untagged_immediate
+  | Vec128 -> Vec128
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Mask -> Mask
+  | Word -> Word
+  | Void -> Void
+
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
@@ -1060,22 +1075,10 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
      we are forced to default to max. It would be good to store the scannable
      axis information, but doing so takes a sizable refactor. See the comment
      on [Sort] in [jkind_intf.ml] *)
-  | Base Scannable -> Scannable Jkind_types.Scannable_axes.max
-  | Base Bits8 -> Bits8
-  | Base Bits16 -> Bits16
-  | Base Bits32 -> Bits32
-  | Base Bits64 -> Bits64
-  | Base Float32 -> Float32
-  | Base Float64 -> Float64
-  | Base Untagged_immediate -> Untagged_immediate
-  | Base Vec128 -> Vec128
-  | Base Vec256 -> Vec256
-  | Base Vec512 -> Vec512
-  | Base Mask -> Mask
-  | Base Word -> Word
+  | Base base ->
+    mixed_block_element_of_base base Jkind_types.Scannable_axes.max
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
-  | Base Void -> Void
   | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
@@ -1145,6 +1148,11 @@ let signature_item_representation sg =
 let bound_value_identifiers_and_sorts sigs =
   List.filter_map signature_item_representation sigs
 
+type arg_signature = {
+  arg_param : Global_module.Parameter_name.t;
+  arg_block_idx : int;
+}
+
 let rec mixed_block_element_to_string = function
   | Scannable _ -> "Scannable"
   | Float_boxed -> "Float_boxed"
@@ -1206,8 +1214,8 @@ type change =
   | Ccommu : [`var] commutable_gen -> change
   | Cuniv : type_expr option ref * type_expr option -> change
   | Cmodes : Mode.changes -> change
-  | Csort : Jkind_types.Sort.change -> change
-  | Czero_alloc : Zero_alloc.change -> change
+  | Csort : Jkind_types.Sort.Change.t -> change
+  | Czero_alloc : Zero_alloc.Change.t -> change
 
 type changes =
     Change of change * changes ref
@@ -1223,8 +1231,8 @@ let log_change ch =
 
 let () =
   Mode.set_append_changes (fun changes -> log_change (Cmodes !changes));
-  Jkind_types.Sort.set_change_log (fun change -> log_change (Csort change));
-  Zero_alloc.set_change_log (fun change -> log_change (Czero_alloc change))
+  Jkind_types.Sort.set_log (fun change -> log_change (Csort change));
+  Zero_alloc.set_log (fun change -> log_change (Czero_alloc change))
 
 (* constructor and accessors for [field_kind] *)
 
@@ -1691,8 +1699,8 @@ let undo_change = function
   | Ccommu (Cvar r)  -> r.commu <- Cunknown
   | Cuniv  (r, v)    -> r := v
   | Cmodes c          -> Mode.undo_changes c
-  | Csort change -> Jkind_types.Sort.undo_change change
-  | Czero_alloc c -> Zero_alloc.undo_change c
+  | Csort change -> Jkind_types.Sort.Change.undo change
+  | Czero_alloc c -> Zero_alloc.Change.undo c
 
 type snapshot = changes ref * int
 let last_snapshot = Local_store.s_ref 0
@@ -1855,8 +1863,14 @@ let undo_compress (changes, _old) =
 
 let class_mode =
   let hint : _ Mode.Hint.const = Legacy Class in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)

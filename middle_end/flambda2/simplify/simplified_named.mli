@@ -54,3 +54,11 @@ val update_cost_metrics : Cost_metrics.t -> t -> t
 type 'a or_rewritten =
   | Simplified of 'a
   | Rewritten of (body:Flambda.Expr.t -> Flambda.Expr.t)
+
+type binding_to_place =
+  | Keep_binding of
+      { let_bound : Bound_pattern.t;
+        simplified_defining_expr : t;
+        original_defining_expr : Named.t option
+      }
+  | Delete_binding of { original_defining_expr : Named.t option }

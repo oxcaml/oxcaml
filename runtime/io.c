@@ -22,7 +22,6 @@
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
-#include <sys/types.h>
 #include <stdbool.h>
 #include "caml/config.h"
 #ifndef _WIN32
@@ -32,7 +31,6 @@
 #include </usr/include/io.h>
 #endif
 #include "caml/alloc.h"
-#include "caml/camlatomic.h"
 #include "caml/custom.h"
 #include "caml/fail.h"
 #include "caml/io.h"

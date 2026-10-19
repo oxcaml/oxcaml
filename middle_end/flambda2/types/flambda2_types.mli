@@ -108,7 +108,7 @@ module Typing_env_extension : sig
 
     val map_types : t -> f:(flambda_type -> flambda_type) -> t
 
-    val existential_vars : t -> Variable.Set.t
+    val existential_vars : t -> Variable.t list
 
     include Contains_ids.S with type t := t
 
@@ -670,7 +670,7 @@ val kind : t -> Flambda_kind.t
 val unknown_types_from_arity :
   ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
-  [`Unarized] Flambda_arity.t ->
+  _ Flambda_arity.t ->
   t list
 
 (** Whether the given type says that a term of that type can never be
@@ -843,6 +843,10 @@ val prove_single_closures_entry :
   * Closures_entry.t
   * Function_type.t)
   proof_of_property
+
+val meet_code_ids : Typing_env.t -> t -> Code_id.Set.t meet_shortcut
+
+val prove_code_ids : Typing_env.t -> t -> Code_id.Set.t proof_of_property
 
 val meet_strings : Typing_env.t -> t -> String_info.Set.t meet_shortcut
 

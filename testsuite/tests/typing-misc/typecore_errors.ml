@@ -463,3 +463,14 @@ Line 1, characters 8-19:
             ^^^^^^^^^^^
 Error: Pattern error
 |}]
+
+(* Too many arguments *)
+
+let f: _ -> int = fun x y -> 0
+[%%expect {|
+Line 1, characters 18-30:
+1 | let f: _ -> int = fun x y -> 0
+                      ^^^^^^^^^^^^
+Error: This function expects too many arguments, it should have type
+       "'a -> int"
+|}]

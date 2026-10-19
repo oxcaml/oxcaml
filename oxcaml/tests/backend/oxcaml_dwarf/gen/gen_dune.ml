@@ -1,4 +1,12 @@
+(* With no arguments, generates the rules for the tests in this directory, which
+   use the default DWARF version. With [--dwarf-5], generates the rules for the
+   dwarf5/ subdirectory: the same tests, compiled with [-gdwarf-version 5],
+   whose filtered LLDB output must be identical to the DWARF-4 expected outputs
+   in this directory. *)
 let () =
+  let dwarf_5 =
+    Array.exists (fun arg -> String.equal arg "--dwarf-5") Sys.argv
+  in
   let enabled_if = {|(enabled_if (= %{context_name} "main"))|} in
   let enabled_if_with_lldb =
     {|(enabled_if
@@ -12,12 +20,18 @@ let () =
    (= %{context_name} "main")
    (= %{env:OXCAML_LLDB=} "")))|}
   in
+  let ocamlopt_flags =
+    if dwarf_5
+    then "(:standard (:include ocamlopt_flags.sexp) -gdwarf-version 5)"
+    else "(:standard (:include ocamlopt_flags.sexp))"
+  in
   let buf = Buffer.create 1000 in
   let subst_common name = function
     | "enabled_if" -> enabled_if
     | "enabled_if_with_lldb" -> enabled_if_with_lldb
     | "enabled_if_without_lldb" -> enabled_if_without_lldb
     | "name" -> name
+    | "ocamlopt_flags" -> ocamlopt_flags
     | _ -> assert false
   in
   let print_executable name =
@@ -28,7 +42,7 @@ let () =
  (modules ${name})
  ${enabled_if}
  (libraries stdlib_stable)
- (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp)))
+ (ocamlopt_flags ${ocamlopt_flags})
  (foreign_archives simd_stubs))
 |}
   in
@@ -79,13 +93,28 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
     (pipe-outputs
      (run %{env:OXCAML_LLDB=} -s ${name}_clean.lldb ./${name}.exe)
      (run sh ./${filter}))))))
-
+|};
+    (* In DWARF-5 mode the expected output is the parent directory's file, so
+       [diff] (the command, not the dune action) is used to avoid any
+       possibility of promotion overwriting the DWARF-4 expected output. *)
+    Buffer.add_substitute buf subst
+      (if dwarf_5
+       then
+         {|
+(rule
+ (alias runtest-dwarf)
+ ${enabled_if_with_lldb}
+ (deps ../${name}.output ${name}.output.corrected)
+ (action (run diff -u ../${name}.output ${name}.output.corrected)))
+|}
+       else
+         {|
 (rule
  (alias runtest-dwarf)
  ${enabled_if_with_lldb}
  (deps ${name}.output ${name}.output.corrected)
  (action (diff ${name}.output ${name}.output.corrected)))
-|};
+|});
     Buffer.output_buffer Out_channel.stdout buf
   in
   (* Function to generate rules for tests driven by a Python script running
@@ -189,7 +218,9 @@ ${lib_compile_runs}))
 |};
     Buffer.output_buffer Out_channel.stdout buf
   in
-  print_missing_lldb_error ();
+  (* In DWARF-5 mode the parent directory's error rule already fails the
+     recursive [runtest-dwarf] alias when no LLDB is configured. *)
+  if not dwarf_5 then print_missing_lldb_error ();
   (* Generate tests - add more tests here as needed *)
   print_dwarf_test "test_basic_dwarf";
   print_dwarf_test "test_unboxed_dwarf";
@@ -205,10 +236,16 @@ ${lib_compile_runs}))
   print_dwarf_test "test_ocaml_and_c_dwarf" ~extra_deps:["frames.py"];
   print_dwarf_test "test_addressable_dwarf";
   print_dwarf_python_test "test_inlined_frames_dwarf";
-  print_cross_unit_dwarf_python_test "test_cross_unit_paths_dwarf"
-    ~lib_dir:"cross_unit_dir"
-    ~lib_modules:
-      [ "cu_lib_inner", "cu_lib_inner";
-        "cu_lib_outer", "cu_lib_outer";
-        "test_cross_unit_paths_dwarf", "cu_prim" ];
+  (* The cross-unit test has no DWARF-5 variant: its hand-rolled compilation
+     steps and [cross_unit_dir] sources are not mirrored into the dwarf5/
+     subdirectory, and it tests file-path recording, which is orthogonal to the
+     DWARF version. *)
+  if not dwarf_5
+  then
+    print_cross_unit_dwarf_python_test "test_cross_unit_paths_dwarf"
+      ~lib_dir:"cross_unit_dir"
+      ~lib_modules:
+        [ "cu_lib_inner", "cu_lib_inner";
+          "cu_lib_outer", "cu_lib_outer";
+          "test_cross_unit_paths_dwarf", "cu_prim" ];
   ()

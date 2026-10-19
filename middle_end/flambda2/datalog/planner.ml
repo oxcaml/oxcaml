@@ -42,14 +42,44 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
-type ('p, 'v) plan =
+type head_atom =
+  | Union :
+      ('t, _, _) Table.Id.t
+      * ('t, 'k, 's) Column.hlist
+      * 'k Term.hlist
+      * 's term
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
+      -> head_atom
+  | Callback_with_bindings :
+      (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
+      * 'k Term.hlist
+      -> head_atom
+
+type plan =
   { tables : bound_table iarray;
-    parameters : 'p Variable.hlist;
     input_stages : stage iarray;
     num_existentials : int;
-    output_atoms : atom iarray;
-    callback : ('v Constant.hlist -> unit) ref
+    output_atoms : head_atom iarray
   }
+
+let print_head_atom ppf head_atom =
+  match head_atom with
+  | Union (tid, columns, args, value, _, _) ->
+    Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Table.Id.print tid
+      (Term.print_columns
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+         columns)
+      args
+      (fun ppf value ->
+        match value with
+        | Literal _ -> ()
+        | Variable var -> Format.fprintf ppf " <= %a" Variable.print var)
+      value
+  | Callback_with_bindings (fn, args) ->
+    Format.fprintf ppf "%s@[<1>(%a)@]" fn.name
+      (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
+      args
 
 let print_stage ppf stage =
   match stage with
@@ -63,8 +93,7 @@ let print_stage ppf stage =
     let print_lit =
       match join_columns with
       | [] -> fun ppf _ -> Format.fprintf ppf "<cst>"
-      | Column_iterator (col, _, _) :: _ ->
-        Value.print_repr (Column.value_repr col)
+      | Column_iterator (col, _, _) :: _ -> Column.print_key col
     in
     Format.fprintf ppf "@[<2>@[if %a not in %a:@]@ continue@]"
       (print_term print_lit) term
@@ -101,15 +130,32 @@ let print_plan ppf { input_stages; output_atoms; num_existentials; _ } =
        restrictions. *)
     Format.pp_print_iter ~pp_sep:Format.pp_print_space
       (fun f arr -> Iarray.iter f arr)
-      print_atom ppf output_atoms;
+      print_head_atom ppf output_atoms;
     if num_existentials > 0
     then Format.fprintf ppf "@ break %d" num_existentials
   in
   print_stages print_output ppf input_stages
 
+(* Represent occurrences of variables in table atoms.
+
+   An occurrence is binding and will participate in the join defining the
+   variable if:
+
+   - It is the first (outermost) occurrence of the variable in the atom, and
+
+   - There is no previous (outer) occurrences of a variable that must be bound
+   earlier ccording to the global variable ordering.
+
+   For instance, the first occurrence of [X] in [P(X, Y, X)] is always binding,
+   but the occurrence of [Y] is only binding if [Y] is after [X] in the global
+   variable ordering. *)
+type 'a arg =
+  | Bind of 'a variable
+  | Check of 'a term
+
 type index_layer =
   | Index_layer :
-      ('t, 'k, 'v) Column.id * 't variable * 'k term * 'v variable
+      ('t, 'k, 'v) Column.id * 't variable * 'k arg * 'v variable
       -> index_layer
 
 type table_layers =
@@ -131,30 +177,47 @@ type atom_layout =
   }
 
 let layout_table_atom : type t k v.
-    (t, k, v) Column.hlist -> t variable -> k Term.hlist -> table_layers =
- fun columns table args ->
+    binding_times:_ ->
+    (t, k, v) Column.hlist ->
+    t variable ->
+    k Term.hlist ->
+    table_layers =
+ fun ~binding_times columns table args ->
   let columns, result =
     let rec loop : type t k.
+        min_binding_time:_ ->
         _ ->
         (t, k, v) Column.hlist ->
         t variable ->
         k Term.hlist ->
         _ * v variable =
-     fun rev_plan columns outer_var args ->
+     fun ~min_binding_time rev_plan columns outer_var args ->
       match columns, args with
       | [], [] -> Iarray.of_list (List.rev rev_plan), outer_var
       | column :: columns, arg :: args ->
         let inner_var =
           Variable.create
             (Format.asprintf "%a[%a]" Variable.print outer_var
-               (print_term (Value.print_repr (Column.value_repr column)))
+               (print_term (Column.print_key column))
                arg)
         in
-        loop
+        (* Only the first (outermost) position of a variable is binding and can
+           participate in a join defining that variable. *)
+        let arg, min_binding_time =
+          match arg with
+          | Variable var -> (
+            match Variable.Id.Map.find (Variable.uid var) binding_times with
+            | var_binding_time when var_binding_time >= min_binding_time ->
+              Bind var, var_binding_time + 1
+            | _ | (exception Not_found) ->
+              Check (Variable var), min_binding_time)
+          | Literal _ -> Check arg, min_binding_time
+        in
+        loop ~min_binding_time
           (Index_layer (column, outer_var, arg, inner_var) :: rev_plan)
           columns inner_var args
     in
-    loop [] columns table args
+    loop ~min_binding_time:0 [] columns table args
   in
   Table_layers { columns; table; result; bound_prefix = 0 }
 
@@ -166,19 +229,26 @@ let rec free_vars_term_hlist : type a. a Term.hlist -> Variable.Id.Set.t =
   | Variable v :: terms ->
     Variable.Id.Set.add (Variable.uid v) (free_vars_term_hlist terms)
 
-let layout_atom bound_tables atom =
+let layout_atom ~binding_times bound_tables atom =
   let (Atom (relation, terms)) = atom in
   let bound_tables, table_layers =
     match relation with
     | Table tid ->
       let var = Variable.create (Table.Id.name tid) in
       let seminaive_tables = Bound_table (tid, var) :: bound_tables in
-      let table_layers = layout_table_atom (Table.Id.columns tid) var terms in
+      let table_layers =
+        layout_table_atom ~binding_times (Table.Id.columns tid) var terms
+      in
       seminaive_tables, Some table_layers
     | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
       bound_tables, None
   in
-  bound_tables, { table_layers; atom; free_vars = free_vars_term_hlist terms }
+  let free_vars =
+    Variable.Id.Set.filter
+      (fun var -> Variable.Id.Map.mem var binding_times)
+      (free_vars_term_hlist terms)
+  in
+  bound_tables, { table_layers; atom; free_vars }
 
 let add_join_stage stages var columns =
   Dynarray.add_last stages (Join_stage (var, columns))
@@ -200,9 +270,15 @@ let add_stages_involving_no_free_vars stages atom_decomposition =
         let index_layer = Iarray.get columns bound_prefix in
         let (Index_layer (col, outer, arg, inner)) = index_layer in
         match arg with
-        | Variable var when Variable.Id.Set.mem (Variable.uid var) free_vars ->
+        | Bind var ->
+          if not (Variable.Id.Set.mem (Variable.uid var) free_vars)
+          then
+            Misc.fatal_errorf
+              "*BUG*: Planner found binding position for variable %a, but it \
+               was already bound."
+              Variable.print var;
           stop_iteration ()
-        | Variable _ | Literal _ ->
+        | Check ((Variable _ | Literal _) as arg) ->
           add_seek_stage stages arg [Column_iterator (col, outer, inner)];
           loop (bound_prefix + 1)
     in
@@ -220,16 +296,26 @@ let advance_prefix_and_extract_iterator_on_variable (type a) table_layers
       Iarray.get columns bound_prefix
     in
     match arg with
-    | Literal _ -> iterators
-    | Variable arg_var -> (
+    | Check _ -> iterators
+    | Bind arg_var -> (
       match Variable.provably_equal var arg_var with
       | None -> iterators
       | Some Equal ->
         layers.bound_prefix <- bound_prefix + 1;
         Column_iterator (column, outer_var, inner_var) :: iterators))
 
-let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
-  let tables, body_layout = Iarray.fold_left_map layout_atom [] body in
+let plan_rule { variables = vars; head; body } =
+  let _, binding_times =
+    List.fold_left
+      (fun (next_binding_time, bindable_vars) (Variable.Any var) ->
+        ( next_binding_time + 1,
+          Variable.Id.Map.add (Variable.uid var) next_binding_time bindable_vars
+        ))
+      (0, Variable.Id.Map.empty) vars
+  in
+  let tables, body_layout =
+    Iarray.fold_left_map (layout_atom ~binding_times) [] body
+  in
   let tables = Iarray.of_list (List.rev tables) in
   let var_to_atoms = Variable.Id.Tbl.create 0 in
   Iarray.iteri
@@ -243,7 +329,8 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
         free_vars)
     body_layout;
   let stages = Dynarray.create () in
-  (* Constant stage: place any stage that does not involve variables. *)
+  (* Initial stage: place any stage that does not involve variables (only
+     constants and parameters). *)
   Iarray.iter
     (fun atom_layout -> add_stages_involving_no_free_vars stages atom_layout)
     body_layout;
@@ -256,17 +343,6 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
         add_stages_involving_no_free_vars stages atom_layout)
       atom_ids
   in
-  (* Parameter stage: place any stage only involving parameters. *)
-  Variable.iter_hlist
-    (fun (Any param) ->
-      match Variable.Id.Tbl.find var_to_atoms (Variable.uid param) with
-      | exception Not_found ->
-        Misc.fatal_errorf "Parameter %a is either unused or bound twice"
-          Variable.print param
-      | atom_ids ->
-        Variable.Id.Tbl.remove var_to_atoms (Variable.uid param);
-        place_stages_involving_var param atom_ids)
-    parameters;
   (* Variable stage: this is where we start introducing join stages in a
      top-down way, following the provided ordering. *)
   List.iter
@@ -331,10 +407,18 @@ let plan_rule ?(callback = ref ignore) parameters vars { head; body } =
     in
     loop 0
   in
-  { tables;
-    parameters;
-    input_stages;
-    output_atoms = head;
-    num_existentials;
-    callback
-  }
+  let head =
+    Iarray.map
+      (fun (Atom (relation, args)) ->
+        match relation with
+        | Unless _ | Distinct _ | Filter _ ->
+          Misc.fatal_error "not supported in the head"
+        | Table tid ->
+          let repr = Table.Id.result_repr tid in
+          let columns = Table.Id.columns tid in
+          Union (tid, columns, args, lit (Table.Id.default_value tid), [], repr)
+        | Callback_with_bindings (fn, name) ->
+          Callback_with_bindings ({ value = fn; name }, args))
+      head
+  in
+  { tables; input_stages; output_atoms = head; num_existentials }

@@ -84,11 +84,8 @@ module type Sort = sig
       | Product of t list
       | Univar of univar
       | Genvar of var
-          (** A layout variable bound by a surrounding [val_lpoly]. It's a
-              "fake" constant that will be instantiated to real layout constant
-              by slambda. The [var] is used only for physical identity; its
-              contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
+          (** Generic sort variable. Instantiated to a concrete layout in during
+              slambda evaluation of templates. *)
       | Addressable of t
           (** Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)] *)
@@ -107,18 +104,21 @@ module type Sort = sig
 
     val all_void : t -> bool
 
-    (** Like [all_void], but a layout variable counts as maybe-void, since it
-        can be instantiated as void.
+    (** [subst s t] applies the variable substitution [s] to [t], replacing each
+        [Genvar v], where [(v, t')] is in [s], with [t'].
 
-        CR layout-polymorphism: This function should be deleted once we support
-        layout-poly any-fields *)
-    val maybe_all_void : t -> bool
+        Raises [Not_found] if no pairing for [v] occurs in [s]. *)
+    val subst : (var * t) list -> t -> t
 
     (** True if the sort contains no univars or genvars.
 
         CR layout-polymorphism: This function should be deleted once we support
         layout-poly any-fields *)
     val is_concrete : t -> bool
+
+    (** True if the sort is [scannable], possibly under [Addressable]. Products
+        (even of scannables), univars, and genvars are not scannable. *)
+    val is_scannable : t -> bool
 
     val is_surely_addressable : t -> bool
 
@@ -168,8 +168,6 @@ module type Sort = sig
     val for_instance_var : t
 
     val for_lazy_body : t
-
-    val for_tuple_element : t
 
     val for_variant_arg : t
 
@@ -257,9 +255,6 @@ module type Sort = sig
 
   val bits64 : t
 
-  (** Create a new sort variable that can be unified. *)
-  val new_var : level:int -> var
-
   val of_base : base -> t
 
   val of_const : Const.t -> t
@@ -288,39 +283,27 @@ module type Sort = sig
       this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
-  (** Return a [Const.t] if the sort has no unset variables, or [None] *)
-  val to_const_opt : t -> Const.t option
-
-  (** Like [default_to_scannable_and_get] but operates directly on a [var]. *)
-  val var_default_to_scannable_and_get : var -> Const.t
+  (** Assert the given sort is constant, failing if the sort contains
+      non-generic variables. *)
+  val assert_const : t -> Const.t
 
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
-  type change
+  module Change : With_backtracking.Change.S
 
-  val undo_change : change -> unit
+  (** Create a new sort variable with the given level. *)
+  val new_var : level:int -> var
 
-  (** Create a fresh polymorphic sort variable (level = [Ident.highest_scope]).
-  *)
+  (** Create a generic sort variable. *)
   val new_genvar : unit -> var
 
-  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
-      intended for saving to a cmi. *)
+  (** Create a generic sort variable for saving to a cmi. *)
   val new_genvar_for_cmi : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar} or
-      {!new_genvar_for_cmi}. *)
+  (** Checks the variable is a generic sort variable. *)
   val is_genvar : var -> bool
 
   val reset_cmi_sort_id : unit -> unit
-
-  (** Get the concrete content of a variable. The returned sort must be
-      representable (including rigid sorts). *)
-  val get_representable_var : var -> t option
-
-  (** [subst s t] applies the variable substitution [s] to [t], replacing each
-      [Var v] where [(v, t')] is in [subst] with [t']. *)
-  val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
       var in [vars], calls [f] with {!instance} configured to replace each var
@@ -350,7 +333,7 @@ module type Sort = sig
   val generalize_with : (unit -> 'a) -> 'a * var list
 
   (** Generalize sort variables when in sort generalization context. Sets the
-      level of sort variables to Ident.highest_scope and accumulates them. This
+      level of sort variables to [generic_level] and accumulates them. This
       should be called from Ctype.generalize. Only has an effect when called
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
@@ -367,7 +350,6 @@ end
 module History = struct
   (* For sort variables that are topmost on the jkind lattice. *)
   type concrete_creation_reason =
-    | Merlin
     | Match
     | Extension_constructor_declaration of int
     | Extension_label_declaration of Ident.t
@@ -388,7 +370,7 @@ module History = struct
     | Statement
     | Optional_arg_default
     | Layout_poly_in_external
-    | Unboxed_tuple_element
+    | Tuple_element
     | Peek_or_poke
     | Array_element
     | Idx_element
@@ -396,6 +378,7 @@ module History = struct
     | Structure_item
     | Signature_item
     | Layout_poly
+    | Typing_recovery
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -436,7 +419,6 @@ module History = struct
      related to objects here. *)
   type value_or_null_creation_reason =
     | Primitive of Ident.t
-    | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
     | V1_safety_check
@@ -493,7 +475,6 @@ module History = struct
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
-    | Empty_record
     | Enumeration
     | Primitive of Ident.t
     | Immediate_polymorphic_variant

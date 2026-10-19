@@ -58,7 +58,7 @@ type prio_queue = (Reg.t * Interval.t) Prio_queue.t
 let priority_heuristics : Reg.t -> Interval.t -> int =
  fun _reg itv ->
   (* CR-someday xclerc for xclerc: consider using affinity *)
-  match Lazy.force Priority_heuristics.value with
+  match Param.get Priority_heuristics.value with
   | Priority_heuristics.Interval_length -> Interval.length itv
   | Priority_heuristics.Random_for_testing -> Priority_heuristics.random ()
 
@@ -275,7 +275,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   if debug then log "#temporaries=%d" initial_temporaries;
   let state = State.make ~stack_slots ~initial_temporaries ~affinity in
   let flat =
-    match Lazy.force Spilling_heuristics.value with
+    match Param.get Spilling_heuristics.value with
     | Flat_uses -> true
     | Hierarchical_uses -> false
     | Random_for_testing -> Spilling_heuristics.random ()

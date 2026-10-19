@@ -5,7 +5,7 @@ module Jkind = Btype.Jkind0
 
 type 'a modes =
   { mode_modes : 'a;
-    mode_desc : Mode.Alloc.atom Location.loc list
+    mode_desc : Mode.With_locality.atom Location.loc list
   }
 
 type modalities =
@@ -15,16 +15,18 @@ type modalities =
 
 (** Interpret mode syntax as mode annotation, where axes can be left unspecified
 *)
-val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
+val transl_mode_annots :
+  Parsetree.modes -> Mode.With_locality.Const.Option.t modes
 
 val apply_mode_implications :
-  Mode.Alloc.Const.Option.t -> Mode.Alloc.Const.Option.t
+  Mode.With_locality.Const.Option.t -> Mode.With_locality.Const.Option.t
 
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
+val transl_mode_with_locality :
+  Parsetree.modes -> Mode.With_locality.Const.t modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and

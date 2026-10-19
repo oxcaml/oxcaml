@@ -161,10 +161,10 @@ type t17b : (value & value) non_pointer
 type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
-Line 4, characters 12-39:
+Line 4, characters 28-39:
 4 | type t17b : (value & value) non_pointer
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+                                ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "value & value".
 
 type t17b : value & value
 |}]
@@ -172,7 +172,7 @@ type t17b : value & value
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global)
 [%%expect{|
-type ('a : value mod everything non_float) t18 = 'a
+type ('a : (value mod everything) non_float) t18 = 'a
 |}]
 
 type t = #(int * float#)
@@ -1834,4 +1834,56 @@ module type S = sig
 end
 [%%expect{|
 module type S = sig val poly_ f : 'a -> 'b end
+|}]
+
+(*************************************************)
+(* Attributes on constrained function parameters *)
+
+let f ((x : int) [@test.attr]) = x
+[%%expect{|
+val f : int -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr]) = x
+[%%expect{|
+val f : l:int -> int = <fun>
+|}]
+
+let f ?l:((x : int option) [@test.attr]) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int option = <fun>
+|}]
+
+let f ?l:((x : int) [@test.attr] = 0) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int = <fun>
+|}]
+
+let f ((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : int @ local -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : l:int @ local -> int = <fun>
+|}]
+
+(********************************)
+(* exclave_ sequence precedence *)
+
+let no_parens () = exclave_ (); ()
+[%%expect{|
+val no_parens : unit -> unit @ local = <fun>
+|}]
+let right_parens () = exclave_ ((); ())
+[%%expect{|
+val right_parens : unit -> unit @ local = <fun>
+|}]
+let left_parens () = (exclave_ ()); ()
+[%%expect{|
+Line 1, characters 21-34:
+1 | let left_parens () = (exclave_ ()); ()
+                         ^^^^^^^^^^^^^
+Error: Exclave expression should only be in tail position of the current region.
 |}]

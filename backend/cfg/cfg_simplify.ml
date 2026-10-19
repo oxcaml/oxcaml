@@ -74,9 +74,13 @@ end = struct
   let run : Cfg_with_layout.t -> Label.Set.t =
    fun cfg_with_layout ->
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
-    let handlers_are_entry_points =
-      not !Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+    (* The SSA pipeline always removes dead trap handlers. When it is enabled,
+       eliminate them here too, so that the [Cfg_selectgen] pipeline produces a
+       comparable CFG (see [Cfg_compare]). *)
+    let eliminate_dead_trap_handlers =
+      !Oxcaml_flags.cfg_eliminate_dead_trap_handlers || !Oxcaml_flags.use_ssa
     in
+    let handlers_are_entry_points = not eliminate_dead_trap_handlers in
     match Dataflow.run cfg ~init:Reachable ~handlers_are_entry_points () with
     | Result.Error _ ->
       Misc.fatal_error
@@ -306,4 +310,9 @@ let run cfg_with_layout =
      second round of dead code elimination. *)
   Eliminate_dead_code.run cfg_with_layout |> acc;
   Cfg_with_layout.remove_blocks cfg_with_layout !dead_labels;
+  if !Oxcaml_flags.cfg_eliminate_dead_code_validate
+  then
+    Profile.record ~accumulate:true "validate_reachability"
+      Cfg_reachability_validate.validate_reachability
+      (Cfg_with_layout.cfg cfg_with_layout);
   cfg_with_layout

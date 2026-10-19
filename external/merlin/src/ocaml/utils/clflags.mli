@@ -27,8 +27,10 @@ val real_paths           : bool ref
 val recursive_types      : bool ref
 val strict_sequence      : bool ref
 val applicative_functors : bool ref
+val typing_recovery      : bool ref
 val nopervasives         : bool ref
 val strict_formats       : bool ref
+val syntax_quotations    : bool ref
 type open_arg =
   | Open of string
   | Open_cmi of string
@@ -52,7 +54,7 @@ val binary_annotations_cms   : bool ref
 val shape_format         : shape_format ref
 val store_occurrences    : bool ref
 val print_types          : bool ref
-val native_code          : bool ref
+val target_is_native     : unit -> bool
 val dont_write_files     : bool ref
 val error_size           : int ref (* max size of module related errors *)
 val keep_locs            : bool ref

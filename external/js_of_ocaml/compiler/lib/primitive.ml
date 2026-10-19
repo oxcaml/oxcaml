@@ -21,7 +21,10 @@ open! Stdlib
 
 let aliases_ = String.Hashtbl.create 17
 
-let rec resolve nm = try resolve (String.Hashtbl.find aliases_ nm) with Not_found -> nm
+let rec resolve nm =
+  match String.Hashtbl.find_opt aliases_ nm with
+  | Some nm' -> resolve nm'
+  | None -> nm
 
 (****)
 
@@ -67,15 +70,16 @@ let kind_args_tbl = String.Hashtbl.create 37
 
 let arities = String.Hashtbl.create 37
 
-let kind nm = try String.Hashtbl.find kinds (resolve nm) with Not_found -> `Mutator
+let kind nm = String.Hashtbl.find_opt kinds (resolve nm) |> Option.value ~default:`Mutator
 
-let kind_args nm =
-  try Some (String.Hashtbl.find kind_args_tbl (resolve nm)) with Not_found -> None
+let kind_args nm = String.Hashtbl.find_opt kind_args_tbl (resolve nm)
 
 let arity nm = String.Hashtbl.find arities (resolve nm)
 
 let has_arity nm a =
-  try String.Hashtbl.find arities (resolve nm) = a with Not_found -> false
+  match String.Hashtbl.find_opt arities (resolve nm) with
+  | Some ar -> ar = a
+  | None -> false
 
 let is_pure nm =
   match nm with
@@ -98,8 +102,9 @@ let register p k kargs arity =
   | exception Not_found -> ()
   | k' when kind_equal k k' -> ()
   | k' ->
-      warn
-        "Warning: overriding the purity of the primitive %s: %s -> %s@."
+      Warning.warn
+        `Overriding_primitive_purity
+        "overriding the purity of the primitive %s: %s -> %s@."
         p
         (string_of_kind k')
         (string_of_kind k));
@@ -130,4 +135,5 @@ let reset () =
   String.Hashtbl.clear kind_args_tbl;
   String.Hashtbl.clear arities;
   String.Hashtbl.clear aliases_;
-  named_values := StringSet.empty
+  named_values := StringSet.empty;
+  externals := StringSet.empty

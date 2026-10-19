@@ -135,14 +135,9 @@ end) : S = struct
                 Module_value_only { field_count = main_module_block_size }
             }
         in
-        let arg_block_idx =
-          (* Packs not supported as argument modules *)
-          None
-        in
         let program =
           { Lambda.code;
             main_module_block_format;
-            arg_block_idx;
             compilation_unit;
             required_globals
           }
@@ -183,9 +178,8 @@ end) : S = struct
         members []
     in
     let ui =
-      (* [arg_descr] is None because we don't allow packs to be arguments.
-         [static_data] is empty as we don't support packs with layout poly. *)
-      Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
+      (* [static_data] is empty as we don't support packs with layout poly. *)
+      Compilenv.build_unit_info ~main_module_block_format
         ~static_data:(Slambdaeval.CU_data.empty ())
     in
     let file_sections =
@@ -212,7 +206,6 @@ end) : S = struct
         ui_defines =
           List.flatten (List.map (fun info -> info.ui_defines) units)
           @ [ui.ui_unit];
-        ui_arg_descr = None;
         ui_imports_cmi =
           Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))

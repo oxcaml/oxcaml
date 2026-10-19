@@ -1184,6 +1184,9 @@ Error: This type "(int, int) t" should be an instance of type
 
 type ('a, 'b) t_test = ('a, 'b) t require_contended
 [%%expect {|
+type ('a : value mod contended, 'b : value mod contended) t_test =
+    ('a, 'b) t require_contended
+|}, Principal{|
 Line 1, characters 23-33:
 1 | type ('a, 'b) t_test = ('a, 'b) t require_contended
                            ^^^^^^^^^^

@@ -1,21 +1,12 @@
 let code foo_0 deleted in
-let code loopify(never) size(25) newer_version_of(foo_0)
+let code loopify(never) size(10) newer_version_of(foo_0)
       foo_0_1 (b : imm tagged, x : imm tagged, y : float boxed)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  (let untagged = %untag_imm (b) in
-   switch untagged
-     | 0 -> k3
-     | 1 -> k4)
-    where k4 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.add (prim, 0x1p+0) in
-      cont k2 (prim_1)
-    where k3 =
-      let prim = %unbox_num.`float` (y) in
-      let prim_1 = %bfloat_arith.add (prim, 0x1p+0) in
-      cont k2 (prim_1)
+  (let prim = %unbox_num.`float` (y) in
+   let prim_1 = %bfloat_arith.add (prim, 0x1p+0) in
+   cont k2 (prim_1))
     where k2 (unboxed_float : float) =
       let unboxed_field_0 = x in
       let prim = %num_conv.[`float`].[`imm`] (unboxed_float) in

@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension layout_poly_alpha";
  expect;
 *)
 
@@ -551,13 +552,9 @@ module M = struct
   module (Y @ static) = F(struct end)(struct end)
 end
 [%%expect{|
-module M :
-  sig
-    module F :
-      functor (A : sig end @ static) ->
-        (functor (B : sig end @ static) -> sig end @ static) @ static
-    module Y : sig end
-  end
+>> Fatal error: Slambda eval doesn't support partial or over application of functors.
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 
@@ -629,4 +626,22 @@ Line 3, characters 21-22:
 3 |     let _ @ static = x in
                          ^
 Error: This value is "dynamic" but is expected to be "static".
+|}]
+
+(* Unpacked first class modules must be dynamic *)
+module type S = sig val y : int end
+let unpack_static (p : (module S)) =
+  let module F (X : S @ static) = struct
+    let z = X.y + 1
+  end in
+  let module M @ static = (val p) in
+  ()
+[%%expect{|
+module type S = sig val y : int end
+Line 6, characters 26-33:
+6 |   let module M @ static = (val p) in
+                              ^^^^^^^
+Error: The module is "dynamic"
+         because unpacked first-class modules are always dynamic.
+       However, the module highlighted is expected to be "static".
 |}]

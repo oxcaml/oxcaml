@@ -183,7 +183,7 @@ let check_relative_path ~on_error name s =
 
 let decode_compiler_pass ppf v ~name ~filter =
   let module P = Clflags.Compiler_pass in
-  let passes = P.available_pass_names ~filter ~native:!native_code in
+  let passes = P.available_pass_names ~filter ~native:(target_is_native ()) in
   begin match List.find_opt (String.equal v) passes with
   | None ->
     Printf.ksprintf (print_error ppf)
@@ -260,7 +260,7 @@ let read_one_param ppf position name v =
   let set name options s =  setter ppf (fun b -> b) name options s in
   let clear name options s = setter ppf (fun b -> not b) name options s in
   let save_ir ~filter ~setter =
-    if !native_code then begin
+    if target_is_native () then begin
       match decode_compiler_pass ppf v ~name ~filter with
       | None -> ()
       | Some pass -> setter pass true
@@ -310,6 +310,7 @@ let read_one_param ppf position name v =
   | "safe-string" -> compat "safe-string" v (* kept for compatibility *)
   | "strict-sequence" -> set "strict-sequence" [ strict_sequence ] v
   | "strict-formats" -> set "strict-formats" [ strict_formats ] v
+  | "syntax-quotations" -> set "syntax-quotations" [ syntax_quotations ] v
   | "thread" -> set "thread" [ use_threads ] v
   | "unboxed-types" -> set "unboxed-types" [ unboxed_types ] v
   | "unsafe" -> set "unsafe" [ unsafe ] v
@@ -329,6 +330,7 @@ let read_one_param ppf position name v =
   | "nodynlink" -> clear "nodynlink" [ dlcode ] v
   | "short-paths" -> clear "short-paths" [ real_paths ] v
   | "no-alias-deps" -> set "no-alias-deps" [ no_alias_deps ] v
+  | "typing-recovery" -> set "typing-recovery" [ typing_recovery ] v
   | "opaque" -> set "opaque" [ opaque ] v
 
   | "pp" -> preprocessor := Some v
@@ -452,7 +454,7 @@ let read_one_param ppf position name v =
       set "remove-unused-arguments" [ remove_unused_arguments ] v
 
   | "inlining-report" ->
-      if !native_code then
+      if target_is_native () then
         set "inlining-report" [ inlining_report ] v
 
   | "flambda-verbose" ->
@@ -524,7 +526,7 @@ let read_one_param ppf position name v =
 
 
   | "cmo" | "cma" ->
-    if not !native_code then
+    if not (target_is_native ()) then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -534,7 +536,7 @@ let read_one_param ppf position name v =
     end
 
   | "cmx" | "cmxa" ->
-    if !native_code then
+    if target_is_native () then
     begin
       match position with
       | Before_link | Before_compile _ ->
@@ -544,7 +546,7 @@ let read_one_param ppf position name v =
     end
 
   | "pic" ->
-    if !native_code then
+    if target_is_native () then
       set "pic" [ pic_code ] v
 
   | "can-discard" ->
@@ -788,7 +790,8 @@ let process_action
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
-      else if not !native_code && Filename.check_suffix name Config.ext_dll then
+      else if not (target_is_native ())
+           && Filename.check_suffix name Config.ext_dll then
         dllibs := name :: !dllibs
       else
         match Compiler_pass.of_input_filename name with
