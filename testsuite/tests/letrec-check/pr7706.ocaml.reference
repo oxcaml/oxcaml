@@ -1,7 +1,14 @@
-Lines 5-6, characters 2-3:
-5 | ..let y = if false then (fun z -> 1) else (fun z -> x 4 + 1) in
-6 |   y..
-Error: This kind of expression is not allowed as right-hand side of let rec
+Line 5, characters 10-60:
+5 |   let y = if false then (fun z -> 1) else (fun z -> x 4 + 1) in
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use x before the let rec has defined it.
+Hint: Each right-hand side of a let rec must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  let rec are also allowed.
 Line 2, characters 17-18:
 2 | let () = ignore (x 42);;
                      ^

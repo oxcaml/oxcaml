@@ -279,10 +279,12 @@ type error =
   | Int16_literal of string
   | Untagged_char_literal of char
   | Illegal_letrec_pat
-  | Illegal_letrec_expr
+  | Illegal_letrec_expr of Ident.t
+  | Illegal_letrec_cycle of Ident.t list
+  | Local_letrec_member of Ident.t
   | Illegal_mutable_pat
   | Mixed_poly_nonpoly_bindings
-  | Illegal_class_expr
+  | Illegal_class_expr of Ident.t
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error
@@ -5865,24 +5867,75 @@ let rec maybe_computation exp =
   | Texp_apply_layout _
     -> true
 
+(* The members of the preambles of a [let rec] group are compiled as part of
+   the group, outside of any region, so they must be heap-allocated like the
+   bindings of the group. *)
+let rec force_preamble_members_global env expr
+    (kind : Value_rec_types.recursive_binding_kind) =
+  match kind with
+  | Not_recursive -> ()
+  | Recursive { preamble; _ } ->
+    let rec preamble_items expr (items : Value_rec_types.preamble_item list) =
+      match items, Value_rec_check.split_preamble expr with
+      | Members kinds :: items, Some body ->
+        begin match expr.exp_desc with
+        | Texp_let (_, vbs, _) ->
+          List.iter2 (force_member_global env) vbs kinds
+        | _ -> ()
+        end;
+        preamble_items body items
+      | Hoisted :: items, Some body -> preamble_items body items
+      | [], _ | _ :: _, None -> ()
+    in
+    preamble_items expr preamble
+
+and force_member_global env vb (kind : Value_rec_types.recursive_binding_kind) =
+  begin match kind, vb.vb_pat.pat_desc with
+  | Recursive _, Tpat_var { id; mode; _ } ->
+    let areality = With_regionality.proj_comonadic Areality mode in
+    begin match
+      Regionality.submode ~pp:(vb.vb_pat.pat_loc, Expression)
+        areality Regionality.global
+    with
+    | Ok () -> ()
+    | Error _ ->
+      Error.log_or_raise vb.vb_pat.pat_loc env (Local_letrec_member id)
+    end
+  | Recursive _, _ | Not_recursive, _ -> ()
+  end;
+  force_preamble_members_global env vb.vb_expr kind
+
 let annotate_recursive_bindings env valbinds =
-  let ids = let_bound_idents valbinds in
-  List.map
-    (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort;
-           vb_attributes; vb_loc} as vb) ->
-      match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
-      | None ->
-           Error.log_or_raise vb_expr.exp_loc env Illegal_letrec_expr;
-           vb
-      | Some vb_rec_kind ->
-          { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
-    valbinds
+  let bindings =
+    List.map
+      (fun vb ->
+         let id =
+           match pat_bound_idents vb.vb_pat with
+           | id :: _ -> id
+           | [] -> Ident.create_local "_"
+         in
+         id, vb.vb_expr)
+      valbinds
+  in
+  match Value_rec_check.classify_recursive_bindings bindings with
+  | Error (Illegal_reference (loc, id)) ->
+      Error.log_or_raise loc env (Illegal_letrec_expr id);
+      valbinds
+  | Error (Illegal_cycle (loc, ids)) ->
+      Error.log_or_raise loc env (Illegal_letrec_cycle ids);
+      valbinds
+  | Ok kinds ->
+      List.iter2
+        (fun vb kind -> force_preamble_members_global env vb.vb_expr kind)
+        valbinds kinds;
+      List.map2 (fun vb vb_rec_kind -> { vb with vb_rec_kind }) valbinds kinds
 
 let check_recursive_class_bindings env ids exprs =
   List.iter
     (fun expr ->
-       if not (Value_rec_check.is_valid_class_expr ids expr) then
-         Error.log_or_raise expr.cl_loc env Illegal_class_expr)
+       match Value_rec_check.check_class_expr ids expr with
+       | Ok () -> ()
+       | Error id -> Error.log_or_raise expr.cl_loc env (Illegal_class_expr id))
     exprs
 
 (* The "rest of the function" extends from the start of the first parameter
@@ -6077,43 +6130,44 @@ and type_tuple_approx (env: Env.t) loc ty_expected l =
     (fun (_, e) (_, ty) -> type_approx env e ty)
     l labeled_tys
 
-and type_approx_function =
-  let rec loop env params c body ty_expected ~in_function ~first =
-    let loc_function, _ = in_function in
-    let loc = loc_rest_of_function ~first ~loc_function params body in
-    (* We can approximate types up to the first newtype parameter, whereupon
-      we give up.
-    *)
-    match params with
-    | { pparam_desc = Pparam_newtype _ } :: _ -> ()
-    | { pparam_desc = Pparam_val (label, _, pat) } :: params ->
-        let label, pat = Typetexp.transl_label_from_pat label pat in
-        let ty_res =
-          type_approx_fun_one_param env loc label (Some pat) ty_expected
-            ~first ~in_function
-        in
-        loop env params c body ty_res ~in_function ~first:false
-    | [] ->
-        (* In the [Pconstraint] case, we override the [ty_expected] that
-           gets passed to the approximating of the rest of the type.
-        *)
-        let ty_expected =
-          type_approx_constraint_opt env c ty_expected ~loc
-        in
-        match body with
-        | Pfunction_body body ->
-            type_approx env body ty_expected
-        | Pfunction_cases ({pc_rhs = e} :: _, _, _) ->
-            let ty_res =
-              type_approx_fun_one_param env loc Nolabel None ty_expected
-                ~in_function ~first
-            in
-            type_approx env e ty_res
-        | Pfunction_cases ([], _, _) -> ()
-  in
-  fun ~loc env params c body ty_expected : unit ->
-    loop env params c body ty_expected
-      ~in_function:(loc, ty_expected) ~first:true
+and type_approx_function ~loc env params c body ty_expected : unit =
+  type_approx_function_params env params c body ty_expected
+    ~in_function:(loc, ty_expected) ~first:true
+
+and type_approx_function_params env params c body ty_expected ~in_function
+      ~first =
+  let loc_function, _ = in_function in
+  let loc = loc_rest_of_function ~first ~loc_function params body in
+  (* We can approximate types up to the first newtype parameter, whereupon
+    we give up.
+  *)
+  match params with
+  | { pparam_desc = Pparam_newtype _ } :: _ -> ()
+  | { pparam_desc = Pparam_val (label, _, pat) } :: params ->
+      let label, pat = Typetexp.transl_label_from_pat label pat in
+      let ty_res =
+        type_approx_fun_one_param env loc label (Some pat) ty_expected
+          ~first ~in_function
+      in
+      type_approx_function_params env params c body ty_res
+        ~in_function ~first:false
+  | [] ->
+      (* In the [Pconstraint] case, we override the [ty_expected] that
+         gets passed to the approximating of the rest of the type.
+      *)
+      let ty_expected =
+        type_approx_constraint_opt env c ty_expected ~loc
+      in
+      match body with
+      | Pfunction_body body ->
+          type_approx env body ty_expected
+      | Pfunction_cases ({pc_rhs = e} :: _, _, _) ->
+          let ty_res =
+            type_approx_fun_one_param env loc Nolabel None ty_expected
+              ~in_function ~first
+          in
+          type_approx env e ty_res
+      | Pfunction_cases ([], _, _) -> ()
 
 (* Check that all univars are safe in a type. Both exp.exp_type and
    ty_expected should already be generalized. *)
@@ -11163,7 +11217,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
                Texp_let (Nonrecursive,
                          [{vb_pat=let_pat; vb_expr=texp; vb_sort=let_pat_sort;
                            vb_attributes=[]; vb_loc=Location.none;
-                           vb_rec_kind = Dynamic;
+                           vb_rec_kind = Not_recursive;
                           }],
                          func let_var) }
       end
@@ -12399,9 +12453,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 pv_lpoly
             ) pvs;
           (* If recursive, all pattern variables must have layout value. This
-             could be relaxed in some cases, like let recs that aren't actually
-             recusive. But, if making that change, delete [Lambda.layout_letrec]
-             and route the appropriate sorts through to its uses. *)
+             could be relaxed for the bindings of the group that are not
+             actually recursive (see [Value_rec_check]). *)
           if is_recursive then begin
             List.iter (fun { pv_id; pv_loc; pv_type; _ } ->
               let value =
@@ -12570,14 +12623,22 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         let e = add_zero_alloc_attribute e pvb.pvb_attributes in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
-         vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
+         vb_loc=pvb.pvb_loc; vb_rec_kind = Not_recursive;
         })
       l spat_sexp_list
   in
   if is_recursive then
     List.iter
-      (fun {vb_pat=pat} -> match pat.pat_desc with
-           Tpat_var _ | Tpat_fun_layout _ -> ()
+      (fun {vb_pat=pat} ->
+         (* [let rec (module M) = ...] would define a cyclic module value. *)
+         let unpack =
+           List.exists
+             (fun (extra, _, _) ->
+                match extra with Tpat_unpack -> true | _ -> false)
+             pat.pat_extra
+         in
+         match pat.pat_desc with
+         | (Tpat_var _ | Tpat_fun_layout _) when not unpack -> ()
          | _ -> Error.log_or_raise pat.pat_loc env Illegal_letrec_pat)
       l;
   List.iter (fun vb ->
@@ -12951,8 +13012,7 @@ and type_n_ary_function
     (* [yielding] records whether *fully applying* this function can perform a
        free effect: the closure may yield if it closes over a yielding value
        (its own mode), or if any argument it is given is yielding (the
-       parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
-       this, since the wrapper is exactly a full application. *)
+       parameter modes). It is recorded on the Lambda function. *)
     let param_yieldings =
       List.map
         (fun (p : type_function_result_param) -> p.param_yielding)
@@ -14249,13 +14309,54 @@ let report_error ~loc env =
         "All bindings in a %a must be either all %a or all non-%a"
         Style.inline_code "let"
         Style.inline_code "poly_" Style.inline_code "poly_"
-  | Illegal_letrec_expr ->
-      Location.errorf ~loc
-        "This kind of expression is not allowed as right-hand side of %a"
+  | Illegal_letrec_expr id ->
+      let hint =
+        Location.msg
+          "@[<v 2>Hint: Each right-hand side of a %a must have the form r:@,\
+          \  @[<v>right-hand side r ::= \
+           b | fun ... -> e | lazy e | let x = r in r@,\
+           block           b ::= \
+           C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v@,\
+           value           v ::= \
+           x | c | b | fun ... -> e | lazy e | [| v; ... |]@]@,\
+           Here x is a variable, c a constant, C a constructor and e any@,\
+           expression. Expressions that do not mention the names defined by \
+           the@,\
+           %a are also allowed.@]"
+          Style.inline_code "let rec"
+          Style.inline_code "let rec"
+      in
+      Location.errorf ~loc ~sub:[ hint ]
+        "This expression may use %a@ before the %a has defined it."
+        Style.inline_code (Ident.name id)
         Style.inline_code "let rec"
-  | Illegal_class_expr ->
+  | Illegal_letrec_cycle ids ->
+      let hint =
+        Location.msg
+          "@[Hint: A cycle must go through a function, a %a value or a \
+           mutable field.@]"
+          Style.inline_code "lazy"
+      in
+      Location.errorf ~loc ~sub:[ hint ]
+        "This %a would create a cycle of immutable values:@ %a."
+        Style.inline_code "let rec"
+        (pp_print_list
+           ~pp_sep:(fun ppf () -> fprintf ppf " ->@ ")
+           (fun ppf id -> Style.inline_code ppf (Ident.name id)))
+        ids
+  | Local_letrec_member id ->
       Location.errorf ~loc
-        "This kind of recursive class expression is not allowed"
+        "This value is local,@ but it must be allocated on the heap:@ \
+         it refers to the names defined by the enclosing %a,@ so %a is \
+         defined together with them."
+        Style.inline_code "let rec"
+        Style.inline_code (Ident.name id)
+  | Illegal_class_expr id ->
+      Location.errorf ~loc
+        "This kind of recursive class expression is not allowed.@ \
+         It refers to the class %a,@ which is defined in the same recursive \
+         group."
+        Style.inline_code (Ident.name id)
   | Letop_type_clash(name, err) ->
       report_unification_error ~loc env err
         (msg "The operator %a has type" Style.inline_code name)

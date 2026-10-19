@@ -1062,12 +1062,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
           let immediate_or_pointer, _ = maybe_pointer newval in
+          let pos = lbl.lbl_pos + 1 in
           if Types.is_atomic lbl.lbl_mut
           then
+            let field_lambda = Lconst (Const_base (Const_int pos)) in
             Patomic_set_field { immediate_or_pointer; mode = modify_mode },
             [arg_lambda; field_lambda; newval_lambda]
           else
-            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
+            Psetfield (pos, immediate_or_pointer, mode),
             [arg_lambda; newval_lambda]
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
@@ -1323,26 +1325,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                             (Lvar cpy) (Lvar id) expr, rem))
              modifs
              (Lvar cpy))
-  | Texp_letmodule(None, loc, Mp_present, modl, body) ->
-      let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
-      let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
-      Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
-                transl_exp ~scopes layout body)
-  | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->
-      let defining_expr =
-        let mod_scopes = enter_module_definition ~scopes id in
-        !transl_module ~scopes:mod_scopes Tcoerce_none None modl
-      in
-      (* CR sspies: Add a debug uid to [Texp_letmodule] for the binder. *)
-      Llet(Strict, Lambda.layout_module, id, Lambda.debug_uid_none,
-          defining_expr, transl_exp ~scopes layout body)
-  | Texp_letmodule(_, _, Mp_absent, _, body) ->
-      transl_exp ~scopes layout body
+  | Texp_letmodule(id, loc, presence, modl, body) ->
+      let wrap = transl_letmodule ~scopes id loc presence modl in
+      wrap (transl_exp ~scopes layout body)
   | Texp_letexception(cd, body) ->
-      Llet(Strict, Lambda.layout_block,
-           cd.ext_id,  Lambda.debug_uid_none,
-           transl_extension_constructor ~scopes e.exp_env None cd,
-           transl_exp ~scopes layout body)
+      let wrap = transl_letexception ~scopes e.exp_env cd in
+      wrap (transl_exp ~scopes layout body)
   | Texp_pack modl ->
       let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
       !transl_module ~scopes:mod_scopes Tcoerce_none None modl
@@ -1378,29 +1366,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       | `Other ->
          (* other cases compile to a lazy block holding a function.  The
             typechecker enforces that e has jkind value.  *)
-         let scopes = enter_lazy ~scopes in
-         let fn = lfunction ~kind:(Curried {nlocal=0})
-                            ~params:[{ name = Ident.create_local "param";
-                                       debug_uid = Lambda.debug_uid_none;
-                                       layout = Lambda.layout_unit;
-                                       attributes = Lambda.default_param_attribute;
-                                       mode = alloc_heap}]
-                            ~return:Lambda.layout_lazy_contents
-                            (* The translation of [e] may be a function, in
-                               which case disallowing arity fusion gives a very
-                               small performance improvement.
-                            *)
-                            ~attr:function_attribute_disallowing_arity_fusion
-                            ~loc:(of_location ~scopes e.exp_loc)
-                            ~mode:alloc_heap
-                            ~ret_mode:not_alloc_stack
-                            ~body:(maybe_region_layout
-                                     Lambda.layout_lazy_contents
-                                     (transl_exp ~scopes
-                                        Lambda.layout_lazy_contents e))
-         in
-          Lprim(Pmakelazyblock Lazy_tag, [fn],
-                of_location ~scopes e.exp_loc)
+         Lprim(Pmakelazyblock Lazy_tag, [transl_lazy_thunk ~scopes e],
+               of_location ~scopes e.exp_loc)
       end
   | Texp_object (cs, meths) ->
       let cty = cs.cstr_type in
@@ -1421,30 +1388,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_unreachable ->
       raise (Error (e.exp_loc, Unreachable_reached))
   | Texp_open (od, e) ->
-      let pure = pure_module od.open_expr in
-      (* this optimization shouldn't be needed because Simplif would
-          actually remove the [Llet] when it's not used.
-          But since [scan_used_globals] runs before Simplif, we need to
-          do it. *)
-      begin match od.open_bound_items with
-      | [] when pure = Alias -> transl_exp ~scopes layout e
-      | _ ->
-          let oid = Ident.create_local "open" in
-          let oid_duid = Lambda.debug_uid_none in
-          let open_repr = transl_module_representation od.open_items_repr in
-          let body, _ =
-            List.fold_left (fun (body, pos) id ->
-              Llet(Alias, layout_of_module_field open_repr pos, id,
-                   Lambda.debug_uid_none,
-                   Lprim(mod_field pos open_repr, [Lvar oid],
-                         of_location ~scopes od.open_loc), body),
-              pos + 1
-            ) (transl_exp ~scopes layout e, 0)
-              (bound_value_identifiers od.open_bound_items)
-          in
-          Llet(pure, Lambda.layout_module, oid, oid_duid,
-               !transl_module ~scopes Tcoerce_none None od.open_expr, body)
-      end
+      let wrap = transl_open ~scopes od in
+      wrap (transl_exp ~scopes layout e)
   | Texp_probe {name; handler=exp; enabled_at_init} ->
     if Clflags.target_is_native () && !Clflags.probes then begin
       let lam = transl_exp ~scopes Lambda.layout_probe_arg exp in
@@ -2504,30 +2449,102 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       in
       transl pat_expr_list
   | Recursive ->
-      let idlist =
-        List.map
-          (fun {vb_pat=pat} -> match pat.pat_desc with
-            | Tpat_var { id; uid; _ } -> id, uid
-            | Tpat_fun_layout { id; uid; lpoly }
-                when List.is_empty (Lpoly.get_exn lpoly) ->
-              id, uid
-            | _ -> Misc.fatal_error "Translcore.transl_let")
-        pat_expr_list in
-      let transl_case
-            {vb_expr=expr; vb_sort; vb_attributes; vb_rec_kind = rkind;
-             vb_loc; vb_pat} (id, id_duid) =
+      (* See [Value_rec_compiler] for the compilation scheme. *)
+      let rec transl_member ~scopes ~in_structure vb
+            (kind : Value_rec_types.recursive_binding_kind)
+          : Value_rec_compiler.item list =
+        let {vb_expr=expr; vb_sort; vb_attributes; vb_loc; vb_pat; _} = vb in
+        let id, debug_uid = recursive_binding_ident vb in
         let vb_sort = Jkind.Sort.default_for_transl_and_get vb_sort in
-        let vb_layout = layout_exp vb_sort expr in
-        let def =
-          transl_bound_exp ~scopes ~in_structure vb_pat vb_layout expr
+        let layout = layout_exp vb_sort expr in
+        let with_region def =
+          if add_regions then maybe_region_layout layout def else def
+        in
+        let transl_def expr =
+          transl_bound_exp ~scopes ~in_structure vb_pat layout expr
             vb_loc vb_attributes
         in
-        let def =
-          if add_regions then maybe_region_layout vb_layout def else def
+        let value expr : Value_rec_compiler.item =
+          Value { id; debug_uid; layout; def = with_region (transl_def expr) }
         in
-        ( id, id_duid, rkind, def ) in
-      let lam_bds = List.map2 transl_case pat_expr_list idlist in
-      fun body -> Value_rec_compiler.compile_letrec lam_bds body
+        match kind with
+        | Not_recursive -> [value expr]
+        | Recursive { preamble; definition } ->
+          let scopes' = recursive_definition_scopes ~scopes ~in_structure id in
+          let preamble, expr = transl_preamble ~scopes:scopes' expr preamble in
+          let definition : Value_rec_compiler.item =
+            match definition, expr.exp_desc with
+            | Value, _ -> value expr
+            | Function, _ ->
+              let wrap, def =
+                Translobj.oo_wrap_split expr.exp_env true transl_def expr
+              in
+              begin match def with
+              | Lfunction def ->
+                Function { wrap; binding = { id; debug_uid; def } }
+              | def ->
+                Misc.fatal_errorf
+                  "Translcore.transl_let: recursive definition of %a is not \
+                   a function:@ %a"
+                  Ident.print id Printlambda.lambda def
+              end
+            | Lazy, Texp_lazy e ->
+              (* The shortcuts of [Texp_lazy] do not apply: the lazy block must
+                 exist before its thunk is defined. *)
+              Lazy { id; debug_uid; thunk = transl_lazy_thunk ~scopes:scopes' e;
+                     loc = of_location ~scopes:scopes' e.exp_loc }
+            | Lazy, _ ->
+              Misc.fatal_errorf
+                "Translcore.transl_let: recursive definition of %a is not \
+                 a lazy expression"
+                Ident.print id
+            | Construction, _ ->
+              let def = transl_exp ~scopes:scopes' layout expr in
+              Block { id; debug_uid; layout; def = with_region def }
+          in
+          preamble @ [definition]
+      (* Translates the items [items] of the preamble of [expr], and returns
+         the rest of [expr]. *)
+      and transl_preamble ~scopes expr items =
+        match items, Value_rec_check.split_preamble expr with
+        | [], _ -> [], expr
+        | (item : Value_rec_types.preamble_item) :: items, Some body ->
+          let item : Value_rec_compiler.item list =
+            match item, expr.exp_desc with
+            | Hoisted, _ ->
+              [Preamble (transl_preamble_item ~scopes ~return_layout expr)]
+            | Members kinds, Texp_let (_, vbs, _) ->
+              List.concat
+                (List.map2 (transl_member ~scopes ~in_structure:false)
+                   vbs kinds)
+            | Members _, _ ->
+              Misc.fatal_error
+                "Translcore.transl_let: preamble members are not a let"
+          in
+          let items, expr = transl_preamble ~scopes body items in
+          item @ items, expr
+        | _ :: _, None ->
+          Misc.fatal_error "Translcore.transl_let: the preamble is too short"
+      in
+      let items =
+        List.concat_map
+          (fun vb -> transl_member ~scopes ~in_structure vb vb.vb_rec_kind)
+          pat_expr_list
+      in
+      (* The preamble items were originally evaluated inside the region of
+         their binding, if any, so their local allocations need a region. *)
+      let needs_region =
+        add_regions && Config.stack_allocation
+        && List.exists
+             (fun (item : Value_rec_compiler.item) ->
+                match item with
+                | Preamble wrap -> may_allocate_in_region (wrap lambda_unit)
+                | Value _ | Function _ | Lazy _ | Block _ -> false)
+             items
+      in
+      fun body ->
+        let lam = Value_rec_compiler.compile_letrec items body in
+        if needs_region then Lregion (lam, return_layout) else lam
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
@@ -2538,6 +2555,107 @@ and transl_letmutable ~scopes ~return_layout
   in
   Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
     pat body
+
+and recursive_binding_ident {vb_pat=pat} =
+  match pat.pat_desc with
+  | Tpat_var { id; uid; _ } -> id, uid
+  | Tpat_fun_layout { id; uid; lpoly }
+      when List.is_empty (Lpoly.get_exn lpoly) ->
+    id, uid
+  | _ -> Misc.fatal_error "Translcore.transl_let"
+
+and recursive_definition_scopes ~scopes ~in_structure id =
+  if in_structure then
+    let assume_zero_alloc = Zero_alloc_utils.Assume_info.none in
+    enter_value_definition ~scopes ~assume_zero_alloc id
+  else scopes
+
+(* An item of the preamble of a recursive binding that does not refer to the
+   group (see [Value_rec_check.split_preamble]), as a context for the rest of
+   the group. *)
+and transl_preamble_item ~scopes ~return_layout e =
+  match e.exp_desc with
+  | Texp_let (rec_flag, vbs, _) ->
+    transl_let ~scopes ~return_layout rec_flag vbs
+  | Texp_sequence (e1, sort, _) ->
+    let sort = Jkind.Sort.default_for_transl_and_get sort in
+    let lam = transl_exp ~scopes (layout_exp sort e1) e1 in
+    fun body -> Lsequence (lam, body)
+  | Texp_open (od, _) -> transl_open ~scopes od
+  | Texp_letmodule (id, loc, presence, modl, _) ->
+    transl_letmodule ~scopes id loc presence modl
+  | Texp_letexception (cd, _) -> transl_letexception ~scopes e.exp_env cd
+  | _ ->
+    Misc.fatal_error "Translcore.transl_preamble_item: not a preamble item"
+
+and transl_open ~scopes od =
+  let pure = pure_module od.open_expr in
+  (* this optimization shouldn't be needed because Simplif would
+      actually remove the [Llet] when it's not used.
+      But since [scan_used_globals] runs before Simplif, we need to
+      do it. *)
+  match od.open_bound_items with
+  | [] when pure = Alias -> fun body -> body
+  | _ ->
+    let oid = Ident.create_local "open" in
+    let oid_duid = Lambda.debug_uid_none in
+    let open_repr = transl_module_representation od.open_items_repr in
+    let open_lam = !transl_module ~scopes Tcoerce_none None od.open_expr in
+    fun body ->
+      let body, _ =
+        List.fold_left (fun (body, pos) id ->
+          Llet(Alias, layout_of_module_field open_repr pos, id,
+               Lambda.debug_uid_none,
+               Lprim(mod_field pos open_repr, [Lvar oid],
+                     of_location ~scopes od.open_loc), body),
+          pos + 1
+        ) (body, 0)
+          (bound_value_identifiers od.open_bound_items)
+      in
+      Llet(pure, Lambda.layout_module, oid, oid_duid, open_lam, body)
+
+and transl_letmodule ~scopes id (loc : _ Location.loc) presence modl =
+  match id, presence with
+  | None, Mp_present ->
+    let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
+    let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
+    fun body ->
+      Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc), body)
+  | Some id, Mp_present ->
+    let defining_expr =
+      let mod_scopes = enter_module_definition ~scopes id in
+      !transl_module ~scopes:mod_scopes Tcoerce_none None modl
+    in
+    (* CR sspies: Add a debug uid to [Texp_letmodule] for the binder. *)
+    fun body ->
+      Llet(Strict, Lambda.layout_module, id, Lambda.debug_uid_none,
+           defining_expr, body)
+  | _, Mp_absent -> fun body -> body
+
+and transl_letexception ~scopes env cd =
+  let def = transl_extension_constructor ~scopes env None cd in
+  fun body ->
+    Llet(Strict, Lambda.layout_block, cd.ext_id, Lambda.debug_uid_none, def,
+         body)
+
+(* The thunk [fun () -> e] of a lazy block. *)
+and transl_lazy_thunk ~scopes e =
+  let scopes = enter_lazy ~scopes in
+  lfunction ~kind:(Curried {nlocal=0})
+    ~params:[{ name = Ident.create_local "param";
+               debug_uid = Lambda.debug_uid_none;
+               layout = Lambda.layout_unit;
+               attributes = Lambda.default_param_attribute;
+               mode = alloc_heap}]
+    ~return:Lambda.layout_lazy_contents
+    (* The translation of [e] may be a function, in which case disallowing
+       arity fusion gives a very small performance improvement. *)
+    ~attr:function_attribute_disallowing_arity_fusion
+    ~loc:(of_location ~scopes e.exp_loc)
+    ~mode:alloc_heap
+    ~ret_mode:not_alloc_stack
+    ~body:(maybe_region_layout Lambda.layout_lazy_contents
+             (transl_exp ~scopes Lambda.layout_lazy_contents e))
 
 and transl_setinstvar ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in

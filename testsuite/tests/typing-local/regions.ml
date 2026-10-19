@@ -173,11 +173,11 @@ let () =
 let () = check_empty "toplevel binding"
 
 
-let rec foo = 1 :: bar
+let rec foo () = 1 :: bar
 and bar =
   let local_ z = ref 1000 in
   let _ = opaque_identity z in
-  1 :: foo
+  [1]
 let () = check_empty "toplevel rec binding"
 
 

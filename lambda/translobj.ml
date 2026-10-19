@@ -170,20 +170,24 @@ let layout_of_ident id =
         Some (Lambda.layout_array Pgenarray)
       | _ -> None
 
-let oo_wrap_gen env req f x =
+let oo_wrap_split env req f x =
   if !wrapping then
-    if !cache_required then f x else
-      Misc.protect_refs [Misc.R (cache_required, true)] (fun () ->
-          f x
-        )
+    let res =
+      if !cache_required then f x else
+        Misc.protect_refs [Misc.R (cache_required, true)] (fun () ->
+            f x
+          )
+    in
+    Fun.id, res
   else
     Misc.protect_refs [Misc.R (wrapping, true); Misc.R (top_env, env)]
       (fun () ->
          cache_required := req;
          classes := [];
          method_ids := Ident.Set.empty;
-         let lambda, other = f x in
-         let lambda =
+         let res = f x in
+         let classes = !classes in
+         let wrap lambda =
            List.fold_left
              (fun lambda id ->
                 let cl =
@@ -196,10 +200,14 @@ let oo_wrap_gen env req f x =
                      (* CR sspies: Can we find a better [debug_uid] here? *)
                      Lprim (Popaque Lambda.layout_class, [cl], Loc_unknown),
                      lambda))
-             lambda !classes
+             lambda classes
          in
-         lambda, other
+         wrap, res
       )
+
+let oo_wrap_gen env req f x =
+  let wrap, (lambda, other) = oo_wrap_split env req f x in
+  wrap lambda, other
 
 let oo_wrap env req f x =
   let lam, () = oo_wrap_gen env req (fun x -> f x, ()) x in

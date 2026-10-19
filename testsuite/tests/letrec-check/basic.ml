@@ -2,9 +2,38 @@
  expect;
 *)
 
-let rec x = (x; ());;
+(* Recursive definitions of functions are accepted, as are bindings that do
+   not refer to the recursive group. *)
+
+let rec even n = n = 0 || odd (n - 1)
+and odd n = n <> 0 && even (n - 1);;
 [%%expect{|
-val x : unit = ()
+val even : int -> bool = <fun>
+val odd : int -> bool = <fun>
+|}];;
+
+let rec fact = function 0 -> 1 | n -> n * fact (n - 1);;
+[%%expect{|
+val fact : int -> int = <fun>
+|}];;
+
+let rec f : type a. a -> a = fun x -> f x;;
+[%%expect{|
+val f : 'a -> 'a = <fun>
+|}];;
+
+let rec f x = g x
+and g = (fun x -> f x : int -> int);;
+[%%expect{|
+val f : int -> int = <fun>
+val g : int -> int = <fun>
+|}];;
+
+let rec f n = if n = 0 then base else f (n - 1)
+and base = 42;;
+[%%expect{|
+val f : int -> int = <fun>
+val base : int = 42
 |}];;
 
 let rec x = "x";;
@@ -12,355 +41,351 @@ let rec x = "x";;
 val x : string = "x"
 |}];;
 
-let rec x = let x = () in x;;
+let rec f () = x
+and x = [1; 2; 3];;
 [%%expect{|
-val x : unit = ()
+val f : unit -> int list = <fun>
+val x : int list = [1; 2; 3]
 |}];;
 
-let rec x = let y = (x; ()) in y;;
+let rec f = let tbl = Hashtbl.create 7 in fun x -> Hashtbl.find tbl x;;
 [%%expect{|
-val x : unit = ()
+val f : '_weak1 -> 'a = <fun>
 |}];;
 
-let rec x = let y = () in x;;
+let rec f = fun x -> x
+and g = let h = f in fun x -> h x;;
 [%%expect{|
-Line 1, characters 12-27:
-1 | let rec x = let y = () in x;;
-                ^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Line 2, characters 16-17:
+2 | and g = let h = f in fun x -> h x;;
+                    ^
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let rec x = [y]
-and y = let x = () in x;;
+(* Non-function bindings may not refer to the recursive group: no cyclic
+   values. *)
+
+let rec x = 1 :: x;;
 [%%expect{|
-val x : unit list = [()]
-val y : unit = ()
+Line 1, characters 17-18:
+1 | let rec x = 1 :: x;;
+                     ^
+Error: This "let rec" would create a cycle of immutable values: "x" -> "x".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
 
-let rec x = [y]
-and y = let rec x = () in x;;
+type tup = T of tup * int
+let rec x = T (x, 0);;
 [%%expect{|
-val x : unit list = [()]
-val y : unit = ()
+type tup = T of tup * int
+Line 2, characters 15-16:
+2 | let rec x = T (x, 0);;
+                   ^
+Error: This "let rec" would create a cycle of immutable values: "x" -> "x".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
 
-let rec x =
-  let a = x in
-  fun () -> a ()
-and y =
-  [x];;
+type 'a stream = Cons of 'a * 'a stream
+let rec s = Cons (1, s);;
 [%%expect{|
-val x : unit -> 'a = <fun>
-val y : (unit -> 'a) list = [<fun>]
+type 'a stream = Cons of 'a * 'a stream
+Line 2, characters 21-22:
+2 | let rec s = Cons (1, s);;
+                         ^
+Error: This "let rec" would create a cycle of immutable values: "s" -> "s".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
 
-let rec x = [|y|] and y = 0;;
+type tree = Node of tree array
+let rec t = Node [| t |];;
 [%%expect{|
-val x : int array = [|0|]
-val y : int = 0
+type tree = Node of tree array
+val t : tree = Node [|<cycle>|]
 |}];;
 
-
-let rec x = (y, y)
-and y = fun () -> ignore x;;
+type t = { f : unit -> t }
+let rec r = { f = (fun () -> r) };;
 [%%expect{|
-val x : (unit -> unit) * (unit -> unit) = (<fun>, <fun>)
-val y : unit -> unit = <fun>
+type t = { f : unit -> t; }
+val r : t = {f = <fun>}
 |}];;
 
-let rec x = Some y
-and y = fun () -> ignore x
-;;
+(* Lazy values are accepted: their bodies are only evaluated when forced. *)
+
+let rec x = lazy (Lazy.force x);;
 [%%expect{|
-val x : (unit -> unit) option = Some <fun>
-val y : unit -> unit = <fun>
+val x : 'a Lazy.t = <lazy>
 |}];;
 
-let rec x = ignore x;;
+let () =
+  match Lazy.force x with
+  | _ -> assert false
+  | exception CamlinternalLazy.Undefined -> ();;
 [%%expect{|
-Line 1, characters 12-20:
-1 | let rec x = ignore x;;
-                ^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
-let rec x = y 0 and y _ = ();;
+let rec squares = lazy (List.map square [1; 2; 3])
+and square n = n * n
+and sum () = List.fold_left ( + ) 0 (Lazy.force squares);;
 [%%expect{|
-Line 1, characters 12-15:
-1 | let rec x = y 0 and y _ = ();;
-                ^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val squares : int list Lazy.t = <lazy>
+val square : int -> int = <fun>
+val sum : unit -> int = <fun>
 |}];;
 
-let rec b = if b then true else false;;
+let () = assert (sum () = 14);;
 [%%expect{|
-Line 1, characters 12-37:
-1 | let rec b = if b then true else false;;
-                ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
 
-let rec x = function
-    Some _ -> ignore (y [])
-  | None -> ignore (y [])
-and y = function
-    [] -> ignore (x None)
-  | _ :: _ -> ignore (x None)
-    ;;
+type cell = { mutable items : int Lazy.t list }
+let rec count = lazy (List.length cell.items)
+and cell = { items = [count; lazy 0] };;
 [%%expect{|
-val x : 'a option -> unit = <fun>
-val y : 'a list -> unit = <fun>
+type cell = { mutable items : int Lazy.t list; }
+val count : int Lazy.t = <lazy>
+val cell : cell = {items = [<lazy>; lazy 0]}
 |}];;
 
-(* used to be accepted, see PR#7696 *)
-let rec x = { x with contents = 3 }  [@ocaml.warning "-23"];;
+let () = assert (Lazy.force count = 2);;
+[%%expect{|
+|}];;
+
+(* Only the lazy values bound by the [let rec] are accepted, not those
+   nested in its right-hand sides. *)
+
+type stream = Cons of int * stream Lazy.t
+let rec s = Cons (1, lazy s);;
+[%%expect{|
+type stream = Cons of int * stream Lazy.t
+val s : stream = Cons (1, <cycle>)
+|}];;
+
+let rec x = (x; ());;
+[%%expect{|
+Line 1, characters 13-14:
+1 | let rec x = (x; ());;
+                 ^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
+|}];;
+
+let rec x = let _ = x in 0;;
+[%%expect{|
+Line 1, characters 20-21:
+1 | let rec x = let _ = x in 0;;
+                        ^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
+|}];;
+
+type cell = C of cell ref
+let rec c = C (ref c);;
+[%%expect{|
+type cell = C of cell ref
+val c : cell = C {contents = <cycle>}
+|}];;
+
+let rec x = let module M = struct let y = x end in M.y;;
+[%%expect{|
+Line 1, characters 27-47:
+1 | let rec x = let module M = struct let y = x end in M.y;;
+                               ^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
+|}];;
+
+module type S = sig val y : int end
+let rec x = (module struct let y = ignore x; 1 end : S);;
+[%%expect{|
+module type S = sig val y : int end
+Line 2, characters 12-55:
+2 | let rec x = (module struct let y = ignore x; 1 end : S);;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
+|}];;
+
+type a = A of b * int
+and b = B of a * int
+let rec x = A (y, 0)
+and y = B (x, 1);;
+[%%expect{|
+type a = A of b * int
+and b = B of a * int
+Line 3, characters 15-16:
+3 | let rec x = A (y, 0)
+                   ^
+Error: This "let rec" would create a cycle of immutable values: "y" -> "x" -> "y".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
+|}];;
+
+let rec x = object method m = x end;;
 [%%expect{|
 Line 1, characters 12-35:
-1 | let rec x = { x with contents = 3 }  [@ocaml.warning "-23"];;
+1 | let rec x = object method m = x end;;
                 ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-(* this is rejected as `c` will be dereferenced during the copy,
-   and is not yet fully defined *)
-let rec c = { c with Complex.re = 1.0 };;
+(* Functions that are not syntactically functions are rejected too. *)
+
+let rec f = let g x = f x in g;;
 [%%expect{|
-Line 1, characters 12-39:
-1 | let rec c = { c with Complex.re = 1.0 };;
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Line 1, characters 29-30:
+1 | let rec f = let g x = f x in g;;
+                                 ^
+Error: This expression may use "g" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let rec x = `A y
-and y = fun () -> ignore x
-;;
+let rec f = let count = ref 0 in fun x -> incr count; f x;;
 [%%expect{|
-val x : [> `A of unit -> unit ] = `A <fun>
-val y : unit -> unit = <fun>
+val f : '_weak2 -> 'a = <fun>
 |}];;
 
-let rec x = { contents = y }
-and y = fun () -> ignore x;;
+let rec f x = x
+and g = f;;
 [%%expect{|
-val x : (unit -> unit) ref = {contents = <fun>}
-val y : unit -> unit = <fun>
+Line 2, characters 8-9:
+2 | and g = f;;
+            ^
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let r = ref (fun () -> ())
-let rec x = fun () -> r := x;;
+let rec f = fun x -> x
+and y = f 0;;
 [%%expect{|
-val r : (unit -> unit) ref = {contents = <fun>}
-val x : unit -> unit = <fun>
+Line 2, characters 8-11:
+2 | and y = f 0;;
+            ^^^
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let rec x = fun () -> y.contents and y = { contents = 3 };;
+let rec f = Fun.id (fun x -> f x);;
 [%%expect{|
-val x : unit -> int = <fun>
-val y : int ref = {contents = 3}
+Line 1, characters 12-33:
+1 | let rec f = Fun.id (fun x -> f x);;
+                ^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let r = ref ()
-let rec x = r := x;;
+let rec f = (fun x -> x) |> fun g -> g;;
 [%%expect{|
-val r : unit ref = {contents = ()}
-Line 2, characters 12-18:
-2 | let rec x = r := x;;
-                ^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val f : '_weak3 -> '_weak3 = <fun>
 |}];;
 
-let rec x =
-  for i = 0 to 1 do
-    let z = y in ignore z
-  done
-and y = x; ();;
+(* Binding operators count as references. *)
+
+let ( let* ) x f = f x
+let rec f = let* x = 1 in fun () -> x + f ();;
 [%%expect{|
-Lines 2-4, characters 2-6:
-2 | ..for i = 0 to 1 do
-3 |     let z = y in ignore z
-4 |   done
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val ( let* ) : 'a -> ('a -> 'b) -> 'b = <fun>
+Line 2, characters 12-44:
+2 | let rec f = let* x = 1 in fun () -> x + f ();;
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let rec x =
-  for i = 0 to y do
-    ()
-  done
-and y = 10;;
+let rec ( let* ) x f = f x
+and y = let* x = 1 in x;;
 [%%expect{|
-Lines 2-4, characters 2-6:
-2 | ..for i = 0 to y do
-3 |     ()
-4 |   done
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Line 2, characters 8-23:
+2 | and y = let* x = 1 in x;;
+            ^^^^^^^^^^^^^^^
+Error: This expression may use "let*" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-let rec x =
-  for i = y to 10 do
-    ()
-  done
-and y = 0;;
+(* Recursive bindings in classes. *)
+
+class c = let rec f x = if x then f false else 0 in object method m = f true end;;
 [%%expect{|
-Lines 2-4, characters 2-6:
-2 | ..for i = y to 10 do
-3 |     ()
-4 |   done
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+class c : object method m : int end
 |}];;
 
-let rec x =
-  while false do
-    let y = x in ignore y
-  done
-and y = x; ();;
+class c = let rec x = 1 :: x in object method m = x end;;
 [%%expect{|
-Lines 2-4, characters 2-6:
-2 | ..while false do
-3 |     let y = x in ignore y
-4 |   done
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Line 1, characters 27-28:
+1 | class c = let rec x = 1 :: x in object method m = x end;;
+                               ^
+Error: This "let rec" would create a cycle of immutable values: "x" -> "x".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
-
-let rec x =
-  while y do
-    ()
-  done
-and y = false;;
-[%%expect{|
-Lines 2-4, characters 2-6:
-2 | ..while y do
-3 |     ()
-4 |   done
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-let rec x =
-  while y do
-    let y = x in ignore y
-  done
-and y = false;;
-[%%expect{|
-Lines 2-4, characters 2-6:
-2 | ..while y do
-3 |     let y = x in ignore y
-4 |   done
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-
-
-let rec x = y.contents and y = { contents = 3 };;
-[%%expect{|
-Line 1, characters 12-22:
-1 | let rec x = y.contents and y = { contents = 3 };;
-                ^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-let rec x = assert y and y = true;;
-[%%expect{|
-Line 1, characters 12-20:
-1 | let rec x = assert y and y = true;;
-                ^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-(* Recursively constructing arrays of known non-float type is permitted *)
-let rec deep_cycle : [`Tuple of [`Shared of 'a] array] as 'a
-  = `Tuple [| `Shared deep_cycle |];;
-[%%expect{|
-val deep_cycle : [ `Tuple of [ `Shared of 'a ] array ] as 'a =
-  `Tuple [|`Shared <cycle>|]
-|}];;
-
-(* Constructing float arrays was disallowed altogether at one point
-   by an overzealous check.  Constructing float arrays in recursive
-   bindings is fine when they don't partake in the recursion. *)
-let rec _x = let _ = [| 1.0 |] in 1. in ();;
-[%%expect{|
-- : unit = ()
-|}];;
-
-(* The builtin Stdlib.ref is currently treated as a constructor.
-   Other functions of the same name should not be so treated. *)
-let _ =
-  let module Stdlib =
-  struct
-    let ref _ = assert false
-  end in
-  let rec x = Stdlib.ref y
-  and y = fun () -> ignore x
-  in (x, y)
-;;
-[%%expect{|
-Line 6, characters 14-26:
-6 |   let rec x = Stdlib.ref y
-                  ^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-(* An example, from Leo White, of let rec bindings that allocate
-   values of unknown size *)
-let foo p x =
-  let rec f =
-    if p then (fun y -> x + g y) else (fun y -> g y)
-  and g =
-    if not p then (fun y -> x - f y) else (fun y -> f y)
-  in
-  (f, g)
-;;
-[%%expect{|
-Line 3, characters 4-52:
-3 |     if p then (fun y -> x + g y) else (fun y -> g y)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-let rec x =
-  match let _ = y in raise Not_found with
-    _ -> "x"
-  | exception Not_found -> "z"
-and y = match x with
-  z -> ("y", z);;
-[%%expect{|
-Lines 2-4, characters 2-30:
-2 | ..match let _ = y in raise Not_found with
-3 |     _ -> "x"
-4 |   | exception Not_found -> "z"
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}];;
-
-
-(* To compute the dependencies of mutually-recursive bindings,
-   transitive dependencies must be taken into account.
-
-   The example below was causing a segfault in 4.08+dev.
-*)
-let rec wrong =
-  (* x depends on y,
-     and y depends on wrong,
-     so it is important to notice that x transitively depends on wrong;
-
-     an earlier version of our letrec analysis would only report that
-     y depends on wrong, which seems safe as y is not used in the
-     body.
-  *)
-  let rec x = ref y
-  and y = ref wrong
-  in ref ("foo" ^ ! ! !x);;
-[%%expect{|
-Lines 10-12, characters 2-25:
-10 | ..let rec x = ref y
-11 |   and y = ref wrong
-12 |   in ref ("foo" ^ ! ! !x)..
-Error: This kind of expression is not allowed as right-hand side of "let rec"
-|}]
-
-(* in this case, x does not depend on y, so everything is fine *)
-let rec okay =
-  let rec x = ref "bar"
-  and _y = ref okay in
-  ref ("foo" ^ ! x);;
-[%%expect{|
-val okay : string ref = {contents = "foobar"}
-|}]

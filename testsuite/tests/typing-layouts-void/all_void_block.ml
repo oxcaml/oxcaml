@@ -188,14 +188,34 @@ type imm = A of unit# [@immediate_all_void_constructor]
 let rec x = A (let _ = ref x in #())
 [%%expect{|
 type imm = A of unit# [@immediate_all_void_constructor]
-val x : imm = A <void>
+Line 2, characters 14-36:
+2 | let rec x = A (let _ = ref x in #())
+                  ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 type blk = A of unit#
 let rec x = A (let _ = ref x in #())
 [%%expect{|
 type blk = A of unit#
-val x : blk = A <void>
+Line 2, characters 14-36:
+2 | let rec x = A (let _ = ref x in #())
+                  ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 (* Mode-crossing *)

@@ -1107,7 +1107,7 @@ let free_methods l =
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =
-  let open Value_rec_types in
+  let open Value_rec_compiler in
   (* First check if it is not only a rebind *)
   let rebind = transl_class_rebind ~scopes cl vflag in
   if rebind <> lambda_unit then rebind, Dynamic else

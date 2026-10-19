@@ -168,12 +168,15 @@ module type S' = sig val f : int -> int end;;
 module type S' = sig val f : int -> int end
 |}];;
 
-(* Even works with recursion, but must be fully explicit *)
+(* Recursion is not allowed: it would define a cyclic module value *)
 let rec (module M : S') =
   (module struct let f n = if n <= 0 then 1 else n * M.f (n-1) end : S')
 in M.f 3;;
 [%%expect{|
-- : int = 6
+Line 1, characters 16-17:
+1 | let rec (module M : S') =
+                    ^
+Error: Only variables are allowed as left-hand side of "let rec"
 |}];;
 
 (* Subtyping *)

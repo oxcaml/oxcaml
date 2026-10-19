@@ -3,8 +3,15 @@ Line 5, characters 58-64:
                                                               ^^^^^^
 Warning 20 [ignored-extra-argument]: this argument will not be used by the function.
 
-Line 5, characters 12-52:
+Line 5, characters 48-52:
 5 | let rec r = let rec x () = r and y () = x () in y () in r "oops";;
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of let rec
+                                                    ^^^^
+Error: This expression may use y before the let rec has defined it.
+Hint: Each right-hand side of a let rec must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  let rec are also allowed.
 

@@ -360,10 +360,12 @@ type error =
   | Int16_literal of string
   | Untagged_char_literal of char
   | Illegal_letrec_pat
-  | Illegal_letrec_expr
+  | Illegal_letrec_expr of Ident.t
+  | Illegal_letrec_cycle of Ident.t list
+  | Local_letrec_member of Ident.t
   | Illegal_mutable_pat
   | Mixed_poly_nonpoly_bindings
-  | Illegal_class_expr
+  | Illegal_class_expr of Ident.t
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
   | Bindings_type_clash of Errortrace.unification_error

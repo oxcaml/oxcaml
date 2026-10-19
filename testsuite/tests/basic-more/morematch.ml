@@ -954,7 +954,7 @@ type  habert_a=
   | A of habert_c
   | B of habert_c
 
-and habert_c= {lvar:int; lassoc: habert_c;lnb:int}
+and habert_c= {lvar:int; mutable lassoc: habert_c;lnb:int}
 
 
 let habert=function

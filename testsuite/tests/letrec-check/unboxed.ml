@@ -9,7 +9,17 @@ type r = R of r list [@@unboxed]
 let rec a = R [a];;
 [%%expect{|
 type r = R of r list [@@unboxed]
-val a : r = R [<cycle>]
+Line 2, characters 12-17:
+2 | let rec a = R [a];;
+                ^^^^^
+Error: This expression may use "a" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 
@@ -20,7 +30,14 @@ type t = { x : int64; } [@@unboxed]
 Line 2, characters 12-19:
 2 | let rec x = {x = y} and y = 3L;;
                 ^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 (* This test was made to error by disallowing singleton recursive unboxed types.
@@ -36,8 +53,8 @@ Error: The definition of "r" is recursive without boxing:
          "r" contains "r"
 |}];;
 
-(* This test is not allowed if 'a' is unboxed, but should be accepted
-   as written *)
+(* This test is not allowed if 'a' is unboxed, and is also rejected
+   as written: the field is not a construction *)
 type a = {a: b}
 and b = X of a | Y
 
@@ -50,7 +67,19 @@ let rec a =
 [%%expect{|
 type a = { a : b; }
 and b = X of a | Y
-val a : a = {a = X <cycle>}
+Lines 6-9, characters 4-9:
+6 | ....(if Sys.opaque_identity true then
+7 |        X a
+8 |      else
+9 |        Y)...
+Error: This expression may use "a" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 type a = {a: b }[@@unboxed]
@@ -71,11 +100,18 @@ Lines 5-9, characters 2-10:
 7 |        X a
 8 |      else
 9 |        Y)}..
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "a" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
-(* This test is not allowed if 'c' is unboxed, but should be accepted
-   as written *)
+(* This test is not allowed if 'c' is unboxed, and is also rejected
+   as written: the field is not a construction *)
 type d = D of e
 and e = V of d | W;;
 [%%expect{|
@@ -90,7 +126,19 @@ let rec d =
      else
        W);;
 [%%expect{|
-val d : d = D (V <cycle>)
+Lines 3-6, characters 4-9:
+3 | ....(if Sys.opaque_identity true then
+4 |        V d
+5 |      else
+6 |        W)..
+Error: This expression may use "d" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 type d = D of e [@@unboxed]
@@ -111,5 +159,12 @@ Lines 5-9, characters 2-9:
 7 |        V d
 8 |      else
 9 |        W)..
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "d" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;

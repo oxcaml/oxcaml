@@ -1544,7 +1544,14 @@ type letrec_record = #{ i : int; }
 Line 2, characters 21-31:
 2 | let e2 = let rec x = #{ i = y } and y = 42 in ()
                          ^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 (* These examples motivate having a check in [type_let], because
