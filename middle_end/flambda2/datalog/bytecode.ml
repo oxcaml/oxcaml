@@ -245,7 +245,22 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   type state =
     { code : late Dynarray.t;
       pending_jump : (label_id * fused_labels:label_id list) option ref;
-          (** Pending [goto] instruction not yet added to the [code] array. *)
+          (** Pending [goto] instruction not yet added to the [code] array.
+
+              The [fused_labels] are placed after the goto, i.e. a
+              [pending_jump] of [l, ~fused_labels:[l1, ..., ln]] represents a
+              trail of:
+
+              goto l; label l1, ..., ln:
+
+              This is used to optimise the case where a [goto] is immediately
+              followed by its label: in this case, we can replace:
+
+              goto l; label l1, ..., ln, l:
+
+              with just:
+
+              label l1, ..., ln, l: *)
       labels : int Dynarray.t;
           (** Map from label ids to their resolved offset. -1 for unresolved
               labels. *)
