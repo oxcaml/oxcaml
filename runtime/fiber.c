@@ -90,11 +90,11 @@ uintnat caml_cache_stacks_per_class = /* Xcache_stacks_per_class */
 
 /* Soft upper bound on the number of guarded stacks in existence (see the
    design comment below); only meaningful with STACK_GUARD_PAGES. */
-uintnat caml_max_guarded_stacks = 1024; /* -Xmax_guarded_stacks */
+uintnat caml_max_guarded_stacks = 1024; /* Xmax_guarded_stacks */
 
 /* Set nonzero to disable stack idling (see the design comment below):
    promoted continuations then keep their guarded stacks. */
-uintnat caml_no_idle_stacks = 0; /* -Xno_idle_stacks */
+uintnat caml_no_idle_stacks = 0; /* Xno_idle_stacks */
 
 uintnat caml_get_init_stack_wsize (int context)
 {
@@ -351,7 +351,7 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
    minor collection. These requests back off geometrically (see
    [minor_gc_request_hysteresis]) so that a large population of live
    stacks does not force a collection per allocation. Idling (and the
-   GC requests that serve it) can be disabled with -Xno_idle_stacks=1:
+   GC requests that serve it) can be disabled with Xno_idle_stacks=1:
    every stack then stays guarded for life. The global and
    extra caches are shared by all
    domains, so they are multiple-consumer: lock-free popping would
