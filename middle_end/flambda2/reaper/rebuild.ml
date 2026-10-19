@@ -1200,7 +1200,7 @@ let rebuild_apply env apply =
             let cont_decisions =
               Continuation.Map.find cont env.cont_params_to_keep
             in
-            Flambda_arity.create_singletons
+            Flambda_arity.with_unarized_kinds (Apply.return_arity apply)
               (List.map2
                  (fun (decision : Unboxing_analysis.param_decision) kind ->
                    match decision with
@@ -1216,7 +1216,7 @@ let rebuild_apply env apply =
                      Types_rewriter.erase_subkind kind
                    | Delete -> Types_rewriter.erase_subkind kind)
                  cont_decisions
-                 (Flambda_arity.unarized_components (Apply.return_arity apply)))
+                 (Flambda_arity.unarize (Apply.return_arity apply)))
         in
         let make_apply =
           Apply.create
@@ -1237,7 +1237,7 @@ let rebuild_apply env apply =
             (fun kind ->
               Unboxing_analysis.Keep
                 (Variable.create "function_return" (KS.kind kind), kind))
-            (Flambda_arity.unarized_components return_arity)
+            (Flambda_arity.unarize return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
           func_decisions)
@@ -1347,8 +1347,7 @@ let rebuild_apply env apply =
         Flambda_arity.create (List.map components_for args)
       in
       let return_arity =
-        Flambda_arity.unarize_t
-          (Unboxing_analysis.arity_of_decisions return_decisions)
+        Unboxing_analysis.arity_of_decisions return_decisions
       in
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =
@@ -2087,7 +2086,14 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
     | Switch switch ->
       let arms =
         Target_ocaml_int.Map.filter_map
-          (fun _ -> rewrite_apply_cont_expr env)
+          (fun _ arm ->
+            match rewrite_apply_cont_expr env (Switch_arm.action arm) with
+            | None -> None
+            | Some action ->
+              Some
+                (Switch_arm.create
+                   ~annotations:(Switch_arm.annotations arm)
+                   action))
           (Switch_expr.arms switch)
       in
       if Target_ocaml_int.Map.is_empty arms
@@ -2349,7 +2355,7 @@ type 'f result =
   { unit : Flambda_unit.t;
     exported_code : Exported_code.t;
     slot_offsets : Slot_offsets.result;
-    final_typing_env : ('f, typing_env option) Traverse.With_types.t
+    final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
 let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton

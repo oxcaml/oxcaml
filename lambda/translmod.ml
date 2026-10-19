@@ -102,7 +102,10 @@ let transl_type_extension ~scopes env rootpath tyext body =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
-    Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape)
+    then
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a coercion *)
@@ -819,7 +822,7 @@ and transl_structure ~scopes loc
       (* This debugging event provides information regarding the structure
          items. It is ignored by the OCaml debugger but is used by
          Js_of_ocaml to preserve variable names. *)
-      (if !Clflags.debug && not !Clflags.native_code then
+      (if !Clflags.debug && not (Clflags.target_is_native ()) then
          Levent(body,
                 {lev_loc = loc;
                  lev_kind = Lev_pseudo;
@@ -1170,15 +1173,29 @@ let add_runtime_parameters lam params =
        function call and actually substitutes. *)
     Always_inline
   in
-  lfunction
-    ~params
-    ~kind:(Curried { nlocal = 0 })
-    ~return:layout_module
-    ~attr:{ default_function_attribute with is_a_functor = true; inline }
-    ~loc:Loc_unknown
-    ~body:lam
-    ~mode:alloc_heap
-    ~ret_mode:not_alloc_stack
+  let attr = { default_function_attribute with is_a_functor = true; inline } in
+  (* A unit can have more runtime parameters than [Lambda.max_arity], so split
+     them into a curried chain of functions. [transl_instance] still passes all
+     the arguments at once, as an over-application. *)
+  let chunks = Misc.Stdlib.List.chunks_of (Lambda.max_arity ()) params in
+  let lam, _return =
+    List.fold_right
+      (fun params (body, return) ->
+        let lam =
+          lfunction
+            ~params
+            ~kind:(Curried { nlocal = 0 })
+            ~return
+            ~attr
+            ~loc:Loc_unknown
+            ~body
+            ~mode:alloc_heap
+            ~ret_mode:not_alloc_stack
+        in
+        lam, layout_functor)
+      chunks (lam, layout_module)
+  in
+  lam
 
 let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
   let path = global_path module_id in
@@ -1276,7 +1293,7 @@ let toplevel_name id =
   with Not_found -> Ident.name id
 
 let toploop_getvalue id =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     (* [toploop_getvalue] and [toploop_setvalue] are only used by bytecode, so
        we can hardcode the module representations passed to [mod_field] as
        [Module_value_only]. *)
@@ -1301,7 +1318,7 @@ let toploop_getvalue id =
   }
 
 let toploop_setvalue id lam =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     (* See comment under [toploop_getvalue] *)
     fatal_error "Translmod.toploop_setvalue: expected bytecode";
   Lapply{
@@ -1837,7 +1854,7 @@ let transl_functorization_make ~params ~modules ~find_impl_by_name
   let required_globals =
     Global_module.Map.fold
       (fun _gm (_id, cu) set -> Compilation_unit.Set.add cu set)
-      module_map Compilation_unit.Set.empty
+      module_map (scan_used_globals body)
   in
   let unit_ident = Ident.create_local "*unit*" in
   let func_params =

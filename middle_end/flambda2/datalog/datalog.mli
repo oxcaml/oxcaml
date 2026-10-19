@@ -85,4 +85,4 @@ val create_callback_with_bindings :
 
 val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) program
 
-val deduce : atom list -> (nil, Schedule.rule) program
+val deduce : atom list -> (nil, Lang.rule) program

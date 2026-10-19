@@ -65,13 +65,13 @@ static CAMLthread_local int64_t fiber_id_local = 0;
 #define MAX_STACK_CACHE_LIMIT  Max_domains_max
 
 /* Parameters settable with OCAMLRUNPARAM */
-uintnat caml_init_main_stack_wsz = 0;   /* -Xmain_stack_size= */
-uintnat caml_init_thread_stack_wsz = 0; /* -Xthread_stack_size= */
-uintnat caml_init_fiber_stack_wsz = 0;  /* -Xfiber_stack_size= */
+uintnat caml_init_main_stack_wsz = 0;   /* Xmain_stack_size= */
+uintnat caml_init_thread_stack_wsz = 0; /* Xthread_stack_size= */
+uintnat caml_init_fiber_stack_wsz = 0;  /* Xfiber_stack_size= */
 
 uintnat caml_nohugepage_stacks = 1;
 
-uintnat caml_cache_stacks_per_class = /* -Xcache_stacks_per_class */
+uintnat caml_cache_stacks_per_class = /* Xcache_stacks_per_class */
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
   1
 #else
@@ -225,6 +225,9 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
   // mmap is always expected to return a page-aligned value.
   CAMLassert((uintnat)stack % page_size == 0);
 
+  /* The compiler probes large frames at [Stack_guard_stride]-byte strides; a
+     guard page at least that big can never be stepped over. */
+  CAMLassert(page_size >= Stack_guard_stride);
   if (mprotect(Protected_stack_page(stack), page_size, PROT_NONE)) {
     caml_mem_unmap(stack, len);
     return NULL;
@@ -291,7 +294,8 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 
 static struct stack_info*
 alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
-                             value hexn, value heff, value htick, int64_t id)
+                             value hexn, value heff, value htick,
+                             bool preemptible, int64_t id)
 {
   struct stack_info* stack;
   struct stack_cache* caches = Caml_state->stack_caches;
@@ -351,6 +355,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_limit = 0;
   stack->dynamic = Val_null;
   stack->is_task = false;
+  /* Preemptible fibers own TLS state; see fiber.h. */
+  stack->tls_state = preemptible ? Atom(0) : Val_null;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -359,15 +365,6 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   CAMLassert(Stack_high(stack) - Stack_base(stack) >= wosize);
   return stack;
 
-}
-
-/* allocate a stack with at least "wosize" usable words of stack */
-struct stack_info*
-caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int64_t id)
-{
-  int cache_bucket = stack_cache_bucket (wosize);
-  return alloc_size_class_stack_noexc(wosize, cache_bucket, hval, hexn, heff,
-                                      /*htick=*/Val_null, id);
 }
 
 static int64_t new_fiber_id(void)
@@ -384,7 +381,7 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
   const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id);
+                                   hexn, heff, /*htick=*/Val_null, false, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -404,7 +401,7 @@ value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
   const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id);
+                                 hval, hexn, heff, htick, true, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -695,6 +692,7 @@ void caml_scan_stack(
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    f(fdata, stack->tls_state, &stack->tls_state);
 
     scan_local_allocations(f, fdata, locals, stack->local_sp);
 
@@ -743,7 +741,7 @@ CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
   const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
-                                   hexn, heff, /*htick=*/Val_null, id);
+                                   hexn, heff, /*htick=*/Val_null, false, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -768,7 +766,7 @@ CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
   const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
-                                 hval, hexn, heff, htick, id);
+                                 hval, hexn, heff, htick, true, id);
 
   if (!stack)
 #if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
@@ -842,6 +840,8 @@ void caml_scan_stack(
       f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
     if (is_scannable(fflags, Stack_handle_tick(stack)))
       f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
+    if (is_scannable(fflags, stack->tls_state))
+      f(fdata, stack->tls_state, &stack->tls_state);
 
     stack = Stack_parent(stack);
   }
@@ -855,6 +855,7 @@ CAMLexport void caml_do_local_roots (
   struct stack_info *current_stack,
   value * v_gc_regs,
   dynamic_cache_t dynamic_bindings,
+  value * tls_state,
   struct c_stack_link* c_stack)
 {
 #ifdef NATIVE_CODE
@@ -862,6 +863,8 @@ CAMLexport void caml_do_local_roots (
 #endif
 
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
+  if (tls_state != NULL) f(fdata, *tls_state, tls_state);
+
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
 #ifdef NATIVE_CODE
     /* c_stack marks the boundary between C stack segments. Distinct C stack
@@ -977,6 +980,7 @@ int caml_try_realloc_stack(asize_t required_space)
                                            Stack_handle_exception(old_stack),
                                            Stack_handle_effect(old_stack),
                                            Stack_handle_tick(old_stack),
+                                           Stack_is_preemptible(old_stack),
                                            old_stack->id);
 
   if (!new_stack) return 0;
@@ -992,14 +996,16 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dynamic = old_stack->dynamic;
   new_stack->is_task = old_stack->is_task;
+  new_stack->tls_state = old_stack->tls_state;
 
-  // Detach locals stack and dynamic bindings from old_stack
+  // Detach locals stack, dynamic bindings, and TLS state from old_stack
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
   old_stack->dynamic = Val_null;
   old_stack->is_task = false;
+  old_stack->tls_state = Val_null;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1069,9 +1075,10 @@ int caml_try_realloc_stack(asize_t required_space)
 struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
   const int64_t id = new_fiber_id();
-  struct stack_info* stk =
-    caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
-  return stk;
+  return alloc_size_class_stack_noexc(init_wsize,
+                                      stack_cache_bucket(init_wsize),
+                                      Val_unit, Val_unit, Val_unit,
+                                      /*htick=*/Val_null, true, id);
 }
 
 static void free_stack_memory(struct stack_info* stack)
@@ -1193,6 +1200,8 @@ void caml_free_stack (struct stack_info* stack)
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
 
+  stack->tls_state = Val_null;
+
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
     memset(Stack_base(stack), 0x42,
@@ -1217,6 +1226,27 @@ void caml_free_stack (struct stack_info* stack)
   } else {
     free_stack_memory(stack);
   }
+}
+
+struct stack_info* caml_tls_find_owner(struct stack_info* stack)
+{
+  while (stack->tls_state == Val_null) {
+    stack = Stack_parent(stack);
+    CAMLassert(stack != NULL);
+  }
+  return stack;
+}
+
+void caml_tls_update_cache(void)
+{
+  Caml_state->tls_state =
+    caml_tls_find_owner(Caml_state->current_stack)->tls_state;
+}
+
+void caml_fiber_switched(void)
+{
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+  caml_tls_update_cache();
 }
 
 void caml_free_gc_regs_buckets(value *gc_regs_buckets)
@@ -1292,6 +1322,12 @@ void caml_continuation_replace(value cont, struct stack_info* stk)
   (void)b; /* squash unused warning */
 }
 
+static void check_preemptable(struct stack_info* stk, value htick)
+{
+  if (htick != Val_null && !Stack_is_preemptible(stk))
+    caml_fatal_error("cannot add a tick handler to a non-preemptible fiber");
+}
+
 CAMLprim value caml_continuation_update_handler_noexc
   (value cont, value hval, value hexn, value heff, value htick)
 {
@@ -1309,6 +1345,7 @@ CAMLprim value caml_continuation_update_handler_noexc
     return cont;
   }
   stk = Ptr_val(Field(cont, 1));
+  check_preemptable(stk, htick);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
   Stack_handle_effect(stk) = heff;
@@ -1337,6 +1374,7 @@ CAMLprim value caml_continuation_update_tick_handler_noexc
     return cont;
   }
   while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
+  check_preemptable(stk, htick);
   Stack_handle_tick(stk) = htick;
   caml_continuation_replace(cont, Ptr_val(stack));
 
@@ -1439,7 +1477,7 @@ caml_result caml_tick_fiber_res(struct stack_info *stack) {
     }
   }
 
-  if (Stack_is_preemptible(stack)) {
+  if (Stack_handle_tick(stack) != Val_null) {
     res = caml_callback_res(Stack_handle_tick(stack), Val_unit);
     if (caml_result_is_exception(res)) {
       return res;

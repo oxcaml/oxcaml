@@ -485,23 +485,21 @@ module Sort = struct
     | Ccontents of t option
     | Clevel of int
 
-  type change = var * sort_change
+  module Change = struct
+    type t = var * sort_change
 
-  let change_log : (change -> unit) ref = ref (fun _ -> ())
+    let undo (v, ch) =
+      match ch with
+      | Ccontents t_op -> v.contents <- t_op
+      | Clevel level -> v.level <- level
+  end
 
-  let set_change_log cl = change_log := cl
-
-  let log_change change = !change_log change
-
-  let undo_change (v, ch) =
-    match ch with
-    | Ccontents t_op -> v.contents <- t_op
-    | Clevel level -> v.level <- level
+  include With_backtracking.Make (Change)
 
   let[@inline] set_var_level (v : var) (level : int) =
     if level < v.level
     then (
-      log_change (v, Clevel v.level);
+      log (v, Clevel v.level);
       v.level <- level)
 
   let rec update_level level = function
@@ -517,7 +515,7 @@ module Sort = struct
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
     then (
-      log_change (v, Ccontents v.contents);
+      log (v, Ccontents v.contents);
       v.contents <- contents)
 
   let[@inline] equate_var (v : var) (t : t) =

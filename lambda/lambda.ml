@@ -1086,7 +1086,7 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
     false
 
 let forward_inlined_attribute () =
-  if !Clflags.native_code && !Clflags.stubs_forward_inlining
+  if Clflags.target_is_native () && !Clflags.stubs_forward_inlining
   then Forward_inlined
   else Default_inlined
 
@@ -1121,6 +1121,7 @@ type zero_alloc_attribute =
   | Check of { strict: bool;
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
@@ -1591,7 +1592,7 @@ let const_scalar (kind : locality_mode Scalar.Integral.t) n =
       const_unboxed_nativeint (Nativeint.of_int n))
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -2203,6 +2204,22 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_mixed (_, shape_for_read) ->
     Pmixedfield([pos], shape_for_read, read_semantics)
 
+let rec transl_layout (layout : Jkind_types.Layout.Const.t)
+    : unit mixed_block_element =
+  match layout with
+  | Genvar (var, _axes) -> Splice_variable (Slambdaident.of_sort_var var)
+  | Product layouts ->
+      Product (Array.of_list (List.map transl_layout layouts))
+  | Addressable layout -> transl_layout layout
+  | Base (base, axes) ->
+      Types.mixed_block_element_of_base base axes
+      |> transl_mixed_product_element
+  | Box (_, axes) ->
+      Types.mixed_block_element_of_base Scannable axes
+      |> transl_mixed_product_element
+  | Any _ | Univar _ ->
+      fatal_error "Lambda.transl_layout: unrepresentable layout"
+
 let transl_module_representation repr =
   let sorts = Array.map Jkind.Sort.default_for_transl_and_get repr in
   if Array.for_all Jkind.Sort.Const.is_scannable sorts
@@ -2212,8 +2229,12 @@ let transl_module_representation repr =
        axes in [shape] will all be [max]. This should not matter, though, since
        it is not possible to reassign / directly mutate a [val] in a module. *)
     let shape =
-      transl_mixed_product_shape
-        (Array.map Types.mixed_block_element_of_const_sort sorts)
+      Array.map
+        (fun sort ->
+           transl_layout
+             (Jkind.Layout.Const.of_sort_const sort
+                Jkind_types.Scannable_axes.max))
+        sorts
     in
     Module_mixed
       ( shape,
@@ -2803,7 +2824,7 @@ let merge_inline_attributes attr1 attr2 =
     else None
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -3120,7 +3141,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pidx_deepen _
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Punbox _ ->
-    if !Clflags.native_code then None
+    if Clflags.target_is_native () then None
     else
       (* We don't provide a locally-allocating version of this primitive
          since it would only apply to bytecode, and code requiring performance
@@ -3604,7 +3625,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
   acc.last_value_after_flat
 
 let primitive_result_layout (p : primitive) =
-  assert (!Clflags.native_code || Clflags.is_flambda2 ());
+  assert (Clflags.target_is_native () || Clflags.is_flambda2 ());
   match p with
   | Pphys_equal (Eq | Noteq) -> layout_int
   | Pscalar op ->

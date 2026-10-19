@@ -43,7 +43,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarize result_arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -498,7 +498,7 @@ let traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
   Target_ocaml_int.Map.iter
-    (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
+    (fun _ arm -> apply_cont_deps denv acc (Switch_arm.action arm))
     (Switch_expr.arms switch);
   { expr; holed_expr = Env.parent denv }
 
@@ -741,9 +741,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   Acc.continuation_info acc return_continuation ~is_exn_handler:false
     ~params:return
-    ~arity:
-      (Flambda_arity.unarized_components
-         (Code_metadata.result_arity code_metadata));
+    ~arity:(Flambda_arity.unarize (Code_metadata.result_arity code_metadata));
   Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;
@@ -835,7 +833,7 @@ module Problem = struct
         ( 'f,
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list )
         With_types.t;
-      final_typing_env : ('f, typing_env option) With_types.t;
+      final_typing_env : ('f, typing_env) With_types.t;
       module_symbol : ('f, Symbol.t) With_types.t
     }
 end

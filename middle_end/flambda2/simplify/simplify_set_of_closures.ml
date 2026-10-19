@@ -114,6 +114,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_loopify_state loopify_state
     |> DE.increment_continuation_scope
   in
+  let denv =
+    if Code_metadata.cold code_metadata then DE.mark_as_cold denv else denv
+  in
   let dacc = DA.with_denv dacc denv in
   let code_ids_to_remember = DA.code_ids_to_remember outer_dacc in
   let code_ids_to_never_delete = DA.code_ids_to_never_delete outer_dacc in
@@ -175,6 +178,7 @@ let extract_accumulators_from_function outer_dacc ~dacc_after_body
 type simplify_function_body_result =
   { params : Bound_parameters.t;
     params_and_body : Rebuilt_expr.Function_params_and_body.t;
+    body_is_cold : bool;
     dacc_at_function_entry : DA.t;
     dacc_after_body : DA.t;
     free_names_of_code : NO.t;
@@ -243,6 +247,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         return_continuation
     in
     let free_names_of_body = UA.name_occurrences uacc in
+    let body_is_cold = RE.is_cold body in
     let params_and_body =
       RE.Function_params_and_body.create ~free_names_of_body
         ~return_continuation ~exn_continuation params ~body ~my_closure
@@ -284,6 +289,7 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         body;
     { params;
       params_and_body;
+      body_is_cold;
       dacc_at_function_entry;
       dacc_after_body;
       free_names_of_code;
@@ -407,11 +413,12 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarize result_arity)
     |> Bound_parameters.create
   in
   let { params;
         params_and_body;
+        body_is_cold;
         dacc_at_function_entry;
         dacc_after_body;
         free_names_of_code;
@@ -500,6 +507,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
        of the code to compute the debuginfo of the set of closures
        allocation. *)
     let dbg = DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code) in
+    let cold = Code.cold code || body_is_cold in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -512,7 +520,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~poll_attribute:(Code.poll_attribute code)
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
-      ~cold:(Code.cold code) ~is_a_functor ~is_opaque ~recursive ~cost_metrics
+      ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
       ~inlining_arguments ~dbg ~is_tupled:(Code.is_tupled code)
       ~is_my_closure_used ~inlining_decision ~absolute_history ~relative_history
       ~loopify
@@ -690,14 +698,22 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   in
   let dacc =
     DA.map_denv dacc ~f:(fun denv ->
+        (* The types of each closure can refer to the other closures. The typing
+           env expects equations to refer only to names already defined, so we
+           first define all names then add all equations. *)
+        let denv_with_defined_symbols =
+          List.fold_left
+            (fun denv (bound_name, _closure_type) ->
+              (* In the lifting case the symbols could be defined already. *)
+              DE.define_name_if_undefined denv bound_name K.value)
+            denv closure_types_by_bound_name
+        in
         List.fold_left
           (fun denv (bound_name, closure_type) ->
-            (* In the lifting case the symbols could be defined already. *)
-            let denv = DE.define_name_if_undefined denv bound_name K.value in
             DE.add_equation_on_name denv
               (Bound_name.name bound_name)
               closure_type)
-          denv closure_types_by_bound_name)
+          denv_with_defined_symbols closure_types_by_bound_name)
   in
   let set_of_closures =
     Function_declarations.create all_function_decls_in_set

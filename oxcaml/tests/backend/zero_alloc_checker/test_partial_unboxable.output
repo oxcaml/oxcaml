@@ -1,0 +1,5 @@
+File "test_partial_unboxable.ml", line 1, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Test_partial_unboxable.f (camlTest_partial_unboxable__f_HIDE_STAMP).
+
+File "test_partial_unboxable.ml", lines 1-2, characters 27-17:
+Error: called function may allocate (indirect tailcall)
