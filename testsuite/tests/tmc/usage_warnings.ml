@@ -275,3 +275,19 @@ module All_annotations_flipped :
     val map_wrong : ('a -> 'b) -> 'a t -> 'b t
   end
 |}]
+
+(* The body of a [try] is not in TMC position: the call would not be a tail
+   call, as the exception handler must be removed after it returns. *)
+let[@tail_mod_cons] rec count_down n =
+  try
+    if n = 0 then raise Exit;
+    n :: count_down (n - 1)
+  with Exit -> []
+[%%expect {|
+Line 4, characters 9-27:
+4 |     n :: count_down (n - 1)
+             ^^^^^^^^^^^^^^^^^^
+Warning 51 [wrong-tailcall-expectation]: expected tailcall
+
+val count_down : int -> int list = <fun>
+|}]
