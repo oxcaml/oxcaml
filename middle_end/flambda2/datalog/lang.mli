@@ -35,6 +35,30 @@ module Variable : sig
 
      Variables with the same [uid] are guaranteed to be equal. *)
   val must_be_equal : 'a t -> 'b t -> ('a, 'b) Type.eq
+
+  module Map : sig
+    module type S = sig
+      type t
+
+      type 'a elt
+
+      type binding = B : 'a variable * 'a elt -> binding
+
+      val empty : t
+
+      val singleton : 'a variable -> 'a elt -> t
+
+      val add : 'a variable -> 'a elt -> t -> t
+
+      val remove : 'a variable -> t -> t
+
+      val find : 'a variable -> t -> 'a elt
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) : S with type 'a elt = 'a T.t
+  end
 end
 
 type 'a term =

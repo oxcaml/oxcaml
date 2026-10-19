@@ -70,6 +70,50 @@ module Variable = struct
     | None ->
       Misc.fatal_errorf "Variables must be equal (%a vs. %a)" print var1 print
         var2
+
+  module Map = struct
+    module type S = sig
+      type t
+
+      type 'a elt
+
+      type binding = B : 'a variable * 'a elt -> binding
+
+      val empty : t
+
+      val singleton : 'a variable -> 'a elt -> t
+
+      val add : 'a variable -> 'a elt -> t -> t
+
+      val remove : 'a variable -> t -> t
+
+      val find : 'a variable -> t -> 'a elt
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) =
+    struct
+      type 'a elt = 'a T.t
+
+      type binding = B : 'a variable * 'a elt -> binding
+
+      type t = binding Id.Map.t
+
+      let empty = Id.Map.empty
+
+      let singleton key elt = Id.Map.singleton (uid key) (B (key, elt))
+
+      let add key elt t = Id.Map.add (uid key) (B (key, elt)) t
+
+      let remove key t = Id.Map.remove (uid key) t
+
+      let find (type a) (key : a variable) t : a elt =
+        let (B (key', elt)) = Id.Map.find (uid key) t in
+        let Equal = must_be_equal key key' in
+        elt
+    end
+  end
 end
 
 type 'a term =
