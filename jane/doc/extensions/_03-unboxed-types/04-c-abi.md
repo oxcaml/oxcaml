@@ -55,13 +55,98 @@ value add_floats_bytecode(value a, value b) {
 }
 ```
 
+## Unboxed products
+
+On native, an unboxed product is passed to and returned from a C stub as the
+C struct whose members are the product's components, in order. A nested
+product is a nested struct, and a component of layout `void` is left out. On
+bytecode, the product is a single boxed block (as unboxed products are boxed in
+bytecode).
+
+```ocaml
+external sum_and_diff :
+  #(int32# * int32#) -> #(int32# * int32#) =
+  "sum_and_diff_bytecode" "sum_and_diff_native"
+```
+```c
+typedef struct { int32_t a; int32_t b; } pair;
+
+pair sum_and_diff_native(pair p) {
+  pair res = { p.a + p.b, p.a - p.b };
+  return res;
+}
+
+value sum_and_diff_bytecode(value p) {
+  CAMLparam1(p);
+  CAMLlocal3(res, sum, diff);
+  int32_t a = Int32_val(Field(p, 0));
+  int32_t b = Int32_val(Field(p, 1));
+  sum = caml_copy_int32(a + b);
+  diff = caml_copy_int32(a - b);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = sum;
+  Field(res, 1) = diff;
+  CAMLreturn(res);
+}
+```
+
+The C calling convention pads nested structs, making nesting in the unboxed
+product type significant. For example, `#(#(int32# * int16#) * int16#)` is the
+12-byte struct
+
+```c
+typedef struct { struct { int32_t a; int16_t b; } inner; int16_t c; } t;
+```
+
+whereas the flat `#(int32# * int16# * int16#)` is an 8-byte struct.
+
+Components of layout `bits8` and `bits16` are allowed inside products. Unlike
+scalar arguments (see [Small numbers](../../miscellaneous-extensions/small-numbers)),
+they do not need `[@unsafe_unextended]`, because C does not assume that struct
+members are extended.
+
+### Supported products {#supported-products}
+
+Native code supports x86-64 (Linux and macOS) and arm64 (Linux and macOS).
+Windows is not supported. Only products that C passes entirely in registers
+are supported:
+
+- products of at most 16 bytes, and
+- on arm64, also products of up to four components that are all `float64`, all
+  `float32`, or all 128-bit vectors (C's "homogeneous aggregates"), such as
+  `#(float# * float# * float# * float#)`.
+
+A product is also passed in memory if too few argument registers are left
+for it, so this is not supported either. For example, on x86-64 the six
+integer argument registers are used up here:
+
+```ocaml
+external f :
+  int64# -> int64# -> int64# -> int64# -> int64# -> int64# ->
+  #(int64# * int64#) -> int64# =
+  "f_bytecode" "f_native"
+```
+
+Declarations that C would pass in memory are rejected when compiling to native
+code:
+
+```
+Error: The unboxed product argument of the external call to f_native cannot be
+       compiled: the corresponding C struct (16 bytes) would be passed in
+       memory, since too few argument registers remain for it. Only unboxed
+       products that C passes entirely in registers are currently supported.
+```
+
+To pass such a product, split it into smaller products, or use
+[`[@unpacked]`](#unpacked).
+
+A product with a single non-void component, such as `#(int * unit#)`, is passed
+like that component, and so may be passed on the stack.
+
 ## Unboxed product arguments: `[@unpacked]` {#unpacked}
 
-C stubs can only take an unboxed product (e.g. `#(int64_u * int)`) as an
-argument with the `[@unpacked]` attribute. This passes each component of the
-product as a separate argument to the native stub, while the bytecode stub
-receives the product as a single boxed block (as unboxed products are boxed in
-bytecode).
+The `[@unpacked]` attribute on a product argument passes each component of the
+product as a separate argument to the native stub, instead of as a struct.
 
 ```ocaml
 external add_i64_int :
@@ -103,14 +188,15 @@ value add_with_void_bytecode(value prod) {
 ```
 
 `[@unpacked]` may only be attached to arguments, and cannot be combined with
-`[@unboxed]` or `[@untagged]`.
+`[@unboxed]` or `[@untagged]`. Since the components become separate arguments,
+components of layout `bits8` or `bits16` follow the rules for scalar
+arguments.
 
-### `[@unpacked]` products are not C aggregates
+### `[@unpacked]` products are not C structs
 
-Unpacked components are treated as separate arguments, whereas C aggregates
-have a distinguished calling convention (e.g. an aggregate that does not fit
-in the remaining argument registers is passed entirely on the stack). Consider
-the following:
+Unpacked components are separate arguments, whereas C structs have their own
+calling convention (e.g. a struct that does not fit in the remaining argument
+registers is passed entirely on the stack). Consider the following:
 
 ```ocaml
 external f :
@@ -119,8 +205,8 @@ external f :
   "f_bytecode" "f_native"
 ```
 
-On x86-64 System V, the five `int`s occupy the first five argument registers,
-the first component of the unpacked product uses the sixth register, and the
+On x86-64, the five `int`s occupy the first five argument registers, the first
+component of the unpacked product uses the sixth register, and the
 second component is passed on the stack. The correct native binding is the
 following:
 ```c
@@ -128,45 +214,6 @@ value f_native(value a, value b, value c, value d, value e,
                value x, value y);
 ```
 
-A C function that combined `x` and `y` into a two-word struct parameter would
-instead expect the whole struct on the stack.
-
-## Unboxed product returns
-
-C stubs may return an unboxed product without any attribute, provided the
-product is a pair whose components are not themselves products. The native
-stub returns a two-field struct by value, and as usual, the bytecode stub
-returns the product as a single boxed block.
-
-The components of the returned pair are subject to the following restrictions:
-- Each must be of layout `bits64`, `word`, `float64`, `value`, or `void`.
-- `float32` and 128-bit vectors are accepted only on arm64.
-- On arm64, both components must also have the same layout, so mixed pairs such
-  as `#(int64_u * float#)` are supported only on x86-64.
-
-```ocaml
-external f64_f64_make : unit -> #(float# * float#) =
-  "f64_f64_make_bytecode" "f64_f64_make"
-```
-```c
-typedef struct {
-  double a;
-  double b;
-} f64_f64_struct;
-
-f64_f64_struct f64_f64_make(void) {
-  f64_f64_struct res = { 123, 456 };
-  return res;
-}
-
-value f64_f64_make_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal3(res, a, b);
-  a = caml_copy_double(123);
-  b = caml_copy_double(456);
-  res = caml_alloc_small(2, 0);
-  Field(res, 0) = a;
-  Field(res, 1) = b;
-  CAMLreturn(res);
-}
-```
+Without `[@unpacked]`, the product would be a two-word struct that does not fit
+in the one remaining register, which is not supported on x86-64 (see
+[above](#supported-products)).
