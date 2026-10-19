@@ -26,44 +26,77 @@ end
 let x = M.x
 [%%expect{|
 module M : S
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 7, characters 8-11:
+7 | let x = M.x
+            ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 let y = M.y
 [%%expect{|
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 8-11:
+1 | let y = M.y
+            ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 let f (module M : S) = M.x
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 23-26:
+1 | let f (module M : S) = M.x
+                           ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 let f (module M : S) = M.y
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 23-26:
+1 | let f (module M : S) = M.y
+                           ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 (* We can project out of the module if we know [t]'s layout. *)
 let f (type a : value) (module M : S with type t = a) = M.x
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S with type t = 'a) -> 'a = <fun>
 |}]
 
 let f (type a : value) (module M : S with type t = a) = M.y
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S with type t = 'a) -> int = <fun>
 |}]
 
 (* The same rules apply for projecting out submodules, exceptions, and classes. *)
@@ -95,52 +128,82 @@ module type S2 =
 
 let f (module M : S2) = (module M.N : Inner)
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 32-35:
+1 | let f (module M : S2) = (module M.N : Inner)
+                                    ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 8, characters 2-11:
+8 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 7, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 let f (type a : value) (module M : S2 with type t = a) = (module M.N : Inner)
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S2 with type t = 'a) -> (module Inner) = <fun>
 |}]
 
 let f (module M : S2) = raise M.Failure
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 30-39:
+1 | let f (module M : S2) = raise M.Failure
+                                  ^^^^^^^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 8, characters 2-11:
+8 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 7, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 let f (type a : value) (module M : S2 with type t = a) = raise M.Failure
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S2 with type t = 'a) -> 'b = <fun>
 |}]
 
 let f (module M : S2) = new M.foo
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 28-33:
+1 | let f (module M : S2) = new M.foo
+                                ^^^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 8, characters 2-11:
+8 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 7, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 let f (type a : value) (module M : S2 with type t = a) = new M.foo
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S2 with type t = 'a) -> unit -> < bar : unit > = <fun>
 |}]
 
 (* Same rules apply to submodules of functor arguments. *)
 module F (M : S2) = struct module A = M.N end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 38-41:
+1 | module F (M : S2) = struct module A = M.N end
+                                          ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 8, characters 2-11:
+8 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 7, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 module type Value_witness = sig
@@ -152,9 +215,16 @@ module type Value_witness = sig type t end
 
 module F (V : Value_witness) (M : S2 with type t = V.t) = struct module A = M.N end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig
+           type t = V.t
+           val x : t
+           module N : Inner
+           exception Failure
+           class foo : unit -> object method bar : unit end
+         end)
+    -> sig module A : sig val y : int val z : int end end
 |}]
 
 (* Paths that only mention types or module types don't project anything at
@@ -177,9 +247,8 @@ end
 [%%expect{|
 module type Inner_with_type = sig type u val z : int end
 module type S3 = sig type t : any val x : t module N : Inner_with_type end
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (M : S3) -> sig type u = M.N.u module type T = Inner_with_type end
 |}]
 
 (* Like unrepresentable modules, functor applications have no runtime address.
@@ -256,9 +325,10 @@ module F (V : Value_witness) (M : S with type t = V.t) = struct
   let poly_ g y = (x, y)
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig val poly_ g : 'a -> M.t * 'a end
 |}]
 
 module F (V : Value_witness) (M : S with type t = V.t) = struct
@@ -266,9 +336,10 @@ module F (V : Value_witness) (M : S with type t = V.t) = struct
   module G (X : sig end @ static) = struct let y = x end
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig module G : functor (X : sig end @ static) -> sig val y : M.t end end
 |}]
 
 (* [open]ing a module expression binds its items like an [include] does *)
@@ -299,9 +370,7 @@ module F (M : S) = struct
   open M
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : S) -> sig end
 |}]
 
 module F (M : S) = struct
@@ -366,9 +435,7 @@ module type U = sig
   val z : t
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module type U = sig module M : S val z : M.t end
 |}]
 
 (* Signature inclusion checks with t at different layouts *)
@@ -616,21 +683,19 @@ module A = P.N
 [%%expect{|
 module type S2 = sig type t : any val x : t module N : Inner end
 module P : S2
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module A = P.N
 |}]
 
 (* Constraining an alias makes the module exist at runtime, which requires
    projecting [N] out of [P]. *)
 module A : Inner = P.N
 [%%expect{|
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: Env.Unrepresentable_type(_, _, _, _)
 
 |}]
 
 module M : sig module A : Inner end = struct module A = P.N end
 [%%expect{|
-Uncaught exception: Misc.Fatal_error
+Uncaught exception: Env.Unrepresentable_type(_, _, _, _)
 
 |}]

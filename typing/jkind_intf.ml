@@ -391,6 +391,7 @@ module History = struct
     | Signature_item
     | Layout_poly
     | Typing_recovery
+    | Module_projection
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)

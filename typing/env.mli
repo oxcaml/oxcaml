@@ -139,6 +139,28 @@ val find_hash_type: Path.t -> t -> type_declaration
 val find_implicit_jkind: string -> t -> jkind_lr option
 (* Find the implicit jkind for a type variable name. *)
 
+(* A value in a signature whose type is not representable. *)
+type unrepresentable_item =
+  { item : Ident.t;
+    item_desc : Subst.Lazy.value_description;
+    item_type : type_expr;
+    violation : Jkind.Violation.t }
+
+(* The sort of a signature item, computing it in [env] if the item's
+   declaration doesn't record one. [None] for items with no runtime
+   representation. *)
+val sort_of_signature_item:
+  why:Jkind_intf.History.concrete_creation_reason -> t ->
+  Subst.Lazy.signature_item ->
+  (Jkind_types.Sort.t option, unrepresentable_item) result
+
+(* The sorts of the runtime items of a signature, as computed by
+   [sort_of_signature_item]. *)
+val sorts_of_signature_items:
+  why:Jkind_intf.History.concrete_creation_reason -> t ->
+  Subst.Lazy.signature_item list ->
+  (module_representation, unrepresentable_item) result
+
 val find_value_address: Path.t -> t -> address
 val find_module_address: Path.t -> t -> address
 val find_class_address: Path.t -> t -> address
@@ -291,6 +313,13 @@ type lookup_error =
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
   | Unbound_in_stage of
       none_in_quotations_context * Longident.t * Location.t * stage * stage
+  | Module_projection_unrepresentable of
+      {
+        unrep_loc : Location.t;
+        unrep_id : Ident.t;
+        unrep_ty : type_expr;
+        violation : Jkind.Violation.t
+      }
 
 
 val lookup_error: Location.t -> t -> lookup_error -> 'a
@@ -349,6 +378,10 @@ val lookup_jkind :
 val lookup_module_path:
   ?use:bool -> loc:Location.t -> load:bool -> Longident.t -> t ->
     Path.t * mode_with_locks
+(* Raises a lookup error if the module at [path] is projected out of a module
+   that is not representable. *)
+val check_module_path_representable:
+  loc:Location.t -> Path.t -> t -> unit
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
@@ -784,6 +817,14 @@ val add_delayed_check_forward: ((unit -> unit) -> unit) ref
 (* Forward declaration to break mutual recursion with Mtype. *)
 val scrape_alias:
     (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
+(* Forward declaration to break mutual recursion with Ctype. *)
+val type_sort :
+  (why:Jkind_intf.History.concrete_creation_reason ->
+  allow_mutation:bool ->
+  t ->
+  type_expr ->
+  (Jkind_types.Sort.t, Jkind.Violation.t) result)
+  ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
