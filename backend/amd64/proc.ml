@@ -744,7 +744,8 @@ let operation_supported = function
   | Creinterpret_cast (Mask_of_int64 | Int64_of_mask) ->
     Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
-  | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
+  | Capply _ | Cextcall _ | Cload _ | Calloc _ | Calloc_uninitialized _
+  | Cstore _
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
