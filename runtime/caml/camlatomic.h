@@ -81,6 +81,13 @@ Caml_inline uintnat caml_atomic_counter_incr(atomic_uintnat* counter)
   return old+1;
 }
 
+/* Add [n] to an atomic uintnat [c]. Only suitable for single-writer
+   atomics. */
+Caml_inline void caml_atomic_counter_add_relaxed(atomic_uintnat* c, uintnat n)
+{
+  atomic_store_relaxed(c, atomic_load_relaxed(c) + n);
+}
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_ATOMIC_H */
