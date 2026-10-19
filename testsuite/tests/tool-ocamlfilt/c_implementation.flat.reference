@@ -1,0 +1,5 @@
+e2e_ocaml.o: the two implementations agree on every symbol
+e2e_oxcaml.o: the two implementations agree on every symbol
+e2e_inline_lib.o: the two implementations agree on every symbol
+e2e_inline_mid.o: the two implementations agree on every symbol
+e2e_inline.o: the two implementations agree on every symbol

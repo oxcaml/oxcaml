@@ -305,6 +305,12 @@ let auto_demangle structured_options str =
     | None -> Flat0.unmangle str
   else None
 
+(* The standalone C implementation of the demangler (see [demangle.c]), bound
+   through [demangle_stubs.c]. It only implements the default behavior of
+   [auto_demangle]: definition site only, no stamps. *)
+external demangle_c : string -> string option
+  = "ocamlfilt_demangle_ocaml_symbol"
+
 (* Main program *)
 type demangle_format =
   | Auto
@@ -312,17 +318,23 @@ type demangle_format =
   | Flat1
   | Structured
 
+type implementation =
+  | Ocaml
+  | C
+
 type options =
   { format : demangle_format;
-    structured : Structured.options
+    structured : Structured.options;
+    implementation : implementation
   }
 
-let demangle { format; structured } str =
-  match format with
-  | Auto -> auto_demangle structured str
-  | Flat0 -> Flat0.unmangle str
-  | Flat1 -> Flat1.unmangle str
-  | Structured -> Structured.unmangle structured str
+let demangle { format; structured; implementation } str =
+  match implementation, format with
+  | C, _ -> demangle_c str
+  | Ocaml, Auto -> auto_demangle structured str
+  | Ocaml, Flat0 -> Flat0.unmangle str
+  | Ocaml, Flat1 -> Flat1.unmangle str
+  | Ocaml, Structured -> Structured.unmangle structured str
 
 type codecops =
   | Encode
@@ -387,6 +399,8 @@ let show_stamps_ref = ref false
 
 let show_specialization_site_ref = ref false
 
+let implementation_ref = ref Ocaml
+
 let symbols_ref = ref []
 
 let codecops_ref = ref []
@@ -414,6 +428,11 @@ let specs =
       " For a function body copied into another compilation unit by inlining, \
        show that unit as [Unit.<specialization_of>.] before the name of the \
        definition site (structured scheme only)" );
+    ( "--c-implementation",
+      Arg.Unit (fun () -> implementation_ref := C),
+      " Demangle with the standalone C implementation (tools/demangle.c) \
+       instead of the OCaml one. It only implements the default behavior: \
+       --format, --stamps and --specialization-site are ignored" );
     ( "--encode",
       Arg.Unit (fun () -> codecops_ref := Encode :: !codecops_ref),
       " Encode input as an identifier, instead of demangling; can be pipelined \
@@ -430,6 +449,7 @@ let () =
       structured =
         { show_stamps = !show_stamps_ref;
           show_specialization_site = !show_specialization_site_ref
-        }
+        };
+      implementation = !implementation_ref
     }
     (List.rev !codecops_ref) !symbols_ref
