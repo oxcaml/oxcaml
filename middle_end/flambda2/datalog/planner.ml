@@ -38,14 +38,18 @@ type 'k column_iterator =
       * 'v Table.result_repr
       -> 'k column_iterator
 
+type check_atom =
+  | Distinct : (_, 'k, _) Column.id * 'k term * 'k term -> check_atom
+  | Unless :
+      ('t, 'k, 'v) Column.hlist * 't variable * 'k Term.hlist
+      -> check_atom
+  | Filter : ('k Constant.hlist -> bool) with_name * 'k Term.hlist -> check_atom
+
 type stage =
   | Join_stage : 'k variable * 'k column_iterator list -> stage
   | Seek_stage : 'k term * 'k column_iterator list -> stage
-  | Check_stage : atom -> stage
+  | Check_stage : check_atom -> stage
   | Existential_stage : stage iarray -> stage
-
-type bound_table =
-  | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
 type (_, _) union =
   | Union :
@@ -57,22 +61,43 @@ type (_, _) union =
       -> ('t, 'v) union
 
 type head_atom =
-  | Output : ('t, _, _) Table.Id.t * ('t, _) union -> head_atom
+  | Output : 't variable * ('t, _) union -> head_atom
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
       * 'k Term.hlist
       -> head_atom
 
-type plan =
-  { tables : bound_table iarray;
+type rule_plan =
+  { rule_id : int;
+    monotone_inputs : Variable.t_ list;
     input_stages : stage iarray;
     output_atoms : head_atom iarray
+  }
+
+module Variable_map = Table.Id.Map.Make (Variable)
+
+module Variable_and_plans_map = Table.Id.Map.Make (struct
+  type 'a t = 'a variable * rule_plan list
+end)
+
+type plan =
+  { rule_plan : rule_plan;
+    inputs : Variable_map.t;
+    outputs : Variable_map.t
+  }
+
+type incremental_plan =
+  { initial_plans : rule_plan list;
+    incremental_plans : Variable_and_plans_map.t;
+    current_inputs : Variable_map.t;
+    previous_inputs : Variable_map.t;
+    outputs : Variable_map.t
   }
 
 let print_head_atom ppf head_atom =
   match head_atom with
   | Output (tid, Union (columns, args, value, _, _)) ->
-    Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Table.Id.print tid
+    Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Variable.print tid
       (Term.print_columns
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
          columns)
@@ -84,6 +109,25 @@ let print_head_atom ppf head_atom =
       value
   | Callback_with_bindings (fn, args) ->
     Format.fprintf ppf "%s@[<1>(%a)@]" fn.name
+      (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
+      args
+
+let print_neg_check_atom ppf check_atom =
+  match check_atom with
+  | Distinct (column, arg1, arg2) ->
+    Format.fprintf ppf "%a = %a"
+      (print_term (Column.print_key column))
+      arg1
+      (print_term (Column.print_key column))
+      arg2
+  | Unless (columns, table, args) ->
+    Format.fprintf ppf "%a@[<1>(%a)@]" Variable.print table
+      (Term.print_columns
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+         columns)
+      args
+  | Filter ({ name; _ }, args) ->
+    Format.fprintf ppf "not %s@[<1>(%a)@]" name
       (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
       args
 
@@ -108,7 +152,7 @@ let rec print_stage ppf stage =
          (fun ppf (Column_iterator (_, tbl, _, _, _)) -> Variable.print ppf tbl))
       join_columns
   | Check_stage atom ->
-    Format.fprintf ppf "@[<2>@[if %a:@]@ continue@]" print_neg_atom atom
+    Format.fprintf ppf "@[<2>@[if %a:@]@ continue@]" print_neg_check_atom atom
   | Existential_stage stages ->
     Format.fprintf ppf
       "@[<v 2>@[<v>if not exists (@;<1 2>@[<v>%a@]@ ):@]@ continue@]"
@@ -137,7 +181,7 @@ and print_stages print ppf stages =
     decr depth
   done
 
-let print_plan ppf { input_stages; output_atoms; _ } =
+let print_rule_plan ppf { input_stages; output_atoms; _ } =
   let print_output ppf () =
     (* Note: we need to eta-expand `Iarray.iter` because of `local` mode
        restrictions. *)
@@ -146,6 +190,8 @@ let print_plan ppf { input_stages; output_atoms; _ } =
       print_head_atom ppf output_atoms
   in
   print_stages print_output ppf input_stages
+
+let print_plan ppf { rule_plan; _ } = print_rule_plan ppf rule_plan
 
 let rec free_vars_term_hlist : type a. a Term.hlist -> Variable.Id.Set.t =
  fun terms ->
@@ -212,7 +258,64 @@ module Join_stages = Variable.Map.Make (struct
   type 'a t = 'a column_iterator list
 end)
 
-let introduce_copies ~binding_times ~join_stages ~body_occurrences head =
+type context =
+  | Seminaive of
+      { current_variables : Variable_map.t;
+        output_variables : Variable_map.t;
+        delta_variables : Variable_map.t ref;
+        previous_variables : Variable_map.t ref;
+        delta_id : int
+      }
+  | Naive of
+      { current_variables : Variable_map.t ref;
+        output_variables : Variable_map.t ref
+      }
+
+let get_or_create ~prefix variables tid =
+  try Variable_map.find tid !variables
+  with Not_found ->
+    let variable = Variable.create (prefix ^ Table.Id.name tid) in
+    variables := Variable_map.add tid variable !variables;
+    variable
+
+let get_or_create_current t tid =
+  match t with
+  | Seminaive { current_variables; _ } ->
+    begin try Variable_map.find tid current_variables
+    with Not_found ->
+      Misc.fatal_errorf
+        "*BUG*: Tried to input table %a during seminaive planning, but it was \
+         not used in the initial plan."
+        Table.Id.print tid
+    end
+  | Naive { current_variables; _ } ->
+    get_or_create ~prefix:"" current_variables tid
+
+let get_or_create_output t tid =
+  match t with
+  | Seminaive { output_variables; _ } ->
+    begin try Variable_map.find tid output_variables
+    with Not_found ->
+      Misc.fatal_errorf
+        "*BUG*: Tried to access output table %a during seminaive planning, but \
+         it was not used in the initial plan."
+        Table.Id.print tid
+    end
+  | Naive { output_variables; _ } ->
+    get_or_create ~prefix:"out_" output_variables tid
+
+let get_or_create_table t atom_id tid =
+  match t with
+  | Seminaive { delta_variables; previous_variables; delta_id; _ } ->
+    if atom_id = delta_id
+    then get_or_create ~prefix:"dif_" delta_variables tid
+    else if atom_id < delta_id
+    then get_or_create ~prefix:"pre_" previous_variables tid
+    else get_or_create_current t tid
+  | Naive _ -> get_or_create_current t tid
+
+let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
+    =
   let head_occurrences = Var_occurrences.create () in
   Iarray.iter
     (fun (Atom (_, args)) -> Var_occurrences.add_terms head_occurrences args)
@@ -338,7 +441,9 @@ let introduce_copies ~binding_times ~join_stages ~body_occurrences head =
               else no_copy ())
           | Variable _ | Literal _ -> no_copy ()))
     in
-    Output (tid, loop (Table.Id.columns tid) args (Table.Id.result_repr tid))
+    Output
+      ( get_or_create_output context tid,
+        loop (Table.Id.columns tid) args (Table.Id.result_repr tid) )
   in
   Iarray.map
     (fun (Atom (relation, args)) ->
@@ -350,16 +455,16 @@ let introduce_copies ~binding_times ~join_stages ~body_occurrences head =
         Callback_with_bindings ({ value = fn; name }, args))
     head
 
-let prepare_rule ~binding_times body head =
+let prepare_rule context ~binding_times body head =
   let join_stages = ref Join_stages.empty in
-  let bound_tables = ref [] in
-  let bind_table tid =
-    let table = Variable.create (Table.Id.name tid) in
-    bound_tables := Bound_table (tid, table) :: !bound_tables;
-    table
-  in
   let body_occurrences = Var_occurrences.create () in
-  let plan_body_table tid args =
+  let monotone_vars = ref Variable.Id.Map.empty in
+  let mark_as_monotone table =
+    monotone_vars
+      := Variable.Id.Map.add (Variable.uid table) (Variable.Any table)
+           !monotone_vars
+  in
+  let plan_body_table tid table args =
     let rec loop : type t k v.
         min_binding_time:_ ->
         _ ->
@@ -419,23 +524,38 @@ let prepare_rule ~binding_times body head =
         in
         loop ~min_binding_time stages columns scalar args repr
     in
-    loop ~min_binding_time:0 [] (Table.Id.columns tid) (bind_table tid) args
+    mark_as_monotone table;
+    loop ~min_binding_time:0 [] (Table.Id.columns tid) table args
       (Table.Id.result_repr tid)
   in
   let stages =
-    List.concat_map
-      (fun (Atom (relation, args) as atom) ->
+    List.mapi
+      (fun atom_id (Atom (relation, args)) ->
         match relation with
-        | Table tid -> plan_body_table tid args
-        | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
+        | Table tid ->
+          let table = get_or_create_table context atom_id tid in
+          plan_body_table tid table args
+        | Unless tid ->
+          let table = get_or_create_current context tid in
+          Var_occurrences.add_var body_occurrences table;
           Var_occurrences.add_terms body_occurrences args;
-          [Check_stage atom])
+          [Check_stage (Unless (Table.Id.columns tid, table, args))]
+        | Distinct repr ->
+          Var_occurrences.add_terms body_occurrences args;
+          let [arg1; arg2] = args in
+          [Check_stage (Distinct (repr, arg1, arg2))]
+        | Filter (fn, name) ->
+          Var_occurrences.add_terms body_occurrences args;
+          [Check_stage (Filter ({ value = fn; name }, args))]
+        | Callback_with_bindings _ ->
+          Misc.fatal_error "Callback with bindings cannot be used in the body")
       (Iarray.to_list body)
+    |> List.concat
   in
   let head =
-    introduce_copies ~binding_times ~join_stages ~body_occurrences head
+    introduce_copies context ~binding_times ~join_stages ~body_occurrences head
   in
-  ( List.rev !bound_tables,
+  ( ~nonempty_inputs:(Variable.Id.Map.data !monotone_vars),
     Join_stages.fold
       (fun (B (var, iterators)) stages -> Join_stage (var, iterators) :: stages)
       !join_stages stages
@@ -452,12 +572,19 @@ let vars_defined_by_stage = function
   | Seek_stage (_arg, iterators) -> vars_defined_by_iterators iterators
   | Check_stage _ | Existential_stage _ -> Variable.Id.Set.empty
 
+let vars_used_by_check_atom = function
+  | Unless (_columns, table, args) ->
+    Variable.Id.Set.add (Variable.uid table) (free_vars_term_hlist args)
+  | Distinct (_column, arg1, arg2) ->
+    Variable.Id.Set.union_list [vars_used_by_term arg1; vars_used_by_term arg2]
+  | Filter (_fn, args) -> free_vars_term_hlist args
+
 let rec vars_used_by_stage = function
   | Join_stage (_var, iterators) -> vars_used_by_iterators iterators
   | Seek_stage (arg, iterators) ->
     Variable.Id.Set.union (vars_used_by_term arg)
       (vars_used_by_iterators iterators)
-  | Check_stage (Atom (_relation, args)) -> free_vars_term_hlist args
+  | Check_stage check_atom -> vars_used_by_check_atom check_atom
   | Existential_stage stages ->
     (* Variables are only bound once, so we don't need to care about order of
        definition and use within the existential stage. *)
@@ -774,7 +901,7 @@ let group_existential_stages ~binding_times ~required_vars stages =
               Dynarray.add_last new_stages (Existential_stage local_stages)))
         nodes)
 
-let plan_rule0 { variables; head; body } =
+let plan_rule0 ~rule_id context { variables; head; body } =
   let _, binding_times =
     List.fold_left
       (fun (next_binding_time, bindable_vars) (Variable.Any var) ->
@@ -783,7 +910,9 @@ let plan_rule0 { variables; head; body } =
         ))
       (0, Variable.Id.Map.empty) variables
   in
-  let tables, stages, head = prepare_rule ~binding_times body head in
+  let ~nonempty_inputs, stages, head =
+    prepare_rule context ~binding_times body head
+  in
   let vars_used_by_head =
     Iarray.fold_left
       (fun vars atom ->
@@ -800,10 +929,20 @@ let plan_rule0 { variables; head; body } =
       stages
     |> plan_stages ~binding_times
   in
-  { tables = Iarray.of_list tables; input_stages; output_atoms = head }
+  { rule_id;
+    monotone_inputs = nonempty_inputs;
+    input_stages;
+    output_atoms = head
+  }
 
 let plan_rule rule =
-  try plan_rule0 rule
+  let current_variables = ref Variable_map.empty in
+  let output_variables = ref Variable_map.empty in
+  try
+    let rule_plan =
+      plan_rule0 ~rule_id:0 (Naive { current_variables; output_variables }) rule
+    in
+    { rule_plan; inputs = !current_variables; outputs = !output_variables }
   with Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf
@@ -814,3 +953,57 @@ let plan_rule rule =
          (fun ppf (Variable.Any var) -> Variable.print ppf var))
       rule.variables;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
+
+let plan_incremental rules =
+  let initial_plans, current_variables, output_variables =
+    let current_variables = ref Variable_map.empty in
+    let output_variables = ref Variable_map.empty in
+    let naive_context = Naive { current_variables; output_variables } in
+    let initial_plans =
+      List.mapi
+        (fun rule_id rule -> plan_rule0 ~rule_id naive_context rule)
+        rules
+    in
+    initial_plans, !current_variables, !output_variables
+  in
+  let incremental_plans, previous_variables =
+    let delta_variables = ref Variable_map.empty in
+    let previous_variables = ref Variable_map.empty in
+    let plans_for_delta_table = Numbers.Int.Tbl.create 0 in
+    List.iteri
+      (fun rule_id rule ->
+        Iarray.iteri
+          (fun atom_id (Atom (relation, _)) ->
+            match relation with
+            | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> ()
+            | Table tid ->
+              let context =
+                Seminaive
+                  { delta_variables;
+                    current_variables;
+                    previous_variables;
+                    output_variables;
+                    delta_id = atom_id
+                  }
+              in
+              Numbers.Int.Tbl.add plans_for_delta_table (Table.Id.uid tid)
+                (plan_rule0 ~rule_id context rule))
+          rule.body)
+      rules;
+    let incremental_plans =
+      Variable_map.fold
+        (fun (B (tid, var)) incremental_plans ->
+          let plans =
+            Numbers.Int.Tbl.find_all plans_for_delta_table (Table.Id.uid tid)
+          in
+          Variable_and_plans_map.add tid (var, plans) incremental_plans)
+        !delta_variables Variable_and_plans_map.empty
+    in
+    incremental_plans, !previous_variables
+  in
+  { initial_plans;
+    incremental_plans;
+    current_inputs = current_variables;
+    previous_inputs = previous_variables;
+    outputs = output_variables
+  }

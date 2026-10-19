@@ -40,38 +40,39 @@ let get_and_clear_output ({ contents } as t) =
   t.contents <- Or_null.null;
   contents
 
-type stats =
+type stats_ref =
   { mutable time : float;
     mutable num_outputs : int;
     mutable num_iterations : int
   }
 
-let total_time { time; _ } = time
+let create_stats () = { time = 0.; num_outputs = 0; num_iterations = 0 }
 
-let average_time { time; num_iterations; _ } = time /. float num_iterations
+type stats =
+  { total_time : float;
+    num_outputs : int;
+    num_iterations : int
+  }
 
-let num_outputs { num_outputs; _ } = num_outputs
+let get_and_clear_stats
+    ({ time; num_outputs; num_iterations } as stats_ref : stats_ref) =
+  stats_ref.time <- 0.;
+  stats_ref.num_iterations <- 0;
+  stats_ref.num_outputs <- 0;
+  { total_time = time; num_outputs; num_iterations }
 
-let num_iterations { num_iterations; _ } = num_iterations
-
-let print_stats ppf stats =
-  if num_iterations stats = 0
+let print_stats ppf { total_time; num_outputs; num_iterations } =
+  if num_iterations = 0
   then Format.fprintf ppf "---"
   else
     Format.fprintf ppf
       "%d iteration(s) (total: %f, mean: %f), producing %d output(s) (average: \
        %f, average time: %f)"
-      stats.num_iterations (total_time stats) (average_time stats)
-      stats.num_outputs
-      (float stats.num_outputs /. float stats.num_iterations)
-      (stats.time /. float stats.num_outputs)
-
-let create_stats () = { time = 0.; num_outputs = 0; num_iterations = 0 }
-
-let reset_stats stats =
-  stats.time <- 0.;
-  stats.num_iterations <- 0;
-  stats.num_outputs <- 0
+      num_iterations total_time
+      (total_time /. float num_iterations)
+      num_outputs
+      (float num_outputs /. float num_iterations)
+      (total_time /. float num_outputs)
 
 type timer = { mutable start_time : float }
 
@@ -172,7 +173,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * ('s, _, 'v) Column.hlist
         * 'v Table.result_repr
         -> code
-    | Metrics : metrics_code * stats -> code
+    | Metrics : metrics_code * stats_ref -> code
 
   let labels = function
     | Exit () | Union _ | Call_with_bindings _ | Metrics _ -> []
