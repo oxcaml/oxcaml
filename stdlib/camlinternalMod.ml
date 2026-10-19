@@ -37,13 +37,17 @@ let rec init_mod_field modu i loc shape =
            fn' x in
        Obj.repr fn
     | Lazy ->
-       let rec l =
+       (* [self] is the placeholder itself, so that forcing it before the
+          module has been initialised can be detected. *)
+       let self = ref (Obj.repr ()) in
+       let l =
          lazy (
-           let l' = Obj.obj (Obj.field modu i) in
-           if l == l' then
+           let l' = Obj.field modu i in
+           if l' == !self then
              raise (Undefined_recursive_module loc)
            else
-             Lazy.force l') in
+             Lazy.force (Obj.obj l')) in
+       self := Obj.repr l;
        Obj.repr l
     | Class ->
        Obj.repr (CamlinternalOO.dummy_class loc)

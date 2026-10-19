@@ -1106,11 +1106,14 @@ let free_methods l =
       fatal_error_invalid_constructor l
   in free l; !fv
 
+type class_kind =
+  | Recursive_class
+  | Non_recursive_class
+
 let transl_class ~scopes ids cl_id pub_meths cl vflag =
-  let open Value_rec_types in
   (* First check if it is not only a rebind *)
   let rebind = transl_class_rebind ~scopes cl vflag in
-  if rebind <> lambda_unit then rebind, Dynamic else
+  if rebind <> lambda_unit then rebind, Non_recursive_class else
 
   (* Prepare for heavy environment handling *)
   let scopes = enter_class_definition ~scopes cl_id in
@@ -1234,7 +1237,9 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                    mkappl (Lvar obj_init, [lambda_unit], layout_function)))
   in
   (* Simplest case: an object defined at toplevel (ids=[]) *)
-  if top && ids = [] then llets layout_table (ltable cla (ldirect obj_init), Dynamic) else
+  if top && ids = [] then
+    llets layout_table (ltable cla (ldirect obj_init), Non_recursive_class)
+  else
 
   let concrete = (vflag = Concrete)
   and lclass mk_lam_and_kind =
@@ -1249,7 +1254,8 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
            ~ret_mode:not_alloc_stack
            ~params:[lparam cla cla_duid layout_table]
            ~body:cl_init,
-         Dynamic (* Placeholder, real kind is computed in [lbody] below *))
+         (* Placeholder, real kind is computed in [lbody] below *)
+         Non_recursive_class)
     in
     let lam, rkind = mk_lam_and_kind (free_variables cl_init) in
     Llet(Strict, layout_function, class_init, class_init_duid, cl_init, lam),
@@ -1259,7 +1265,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
       (* Not recursive: can use make_class directly *)
       mkappl (oo_prim "make_class",[transl_meth_list pub_meths;
                                     Lvar class_init], layout_block),
-      Dynamic
+      Non_recursive_class
     else
       (* Recursive: need to have an actual allocation for let rec compilation
          to work, so hardcode make_class *)
@@ -1273,7 +1279,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
             [mkappl (Lvar env_init, [lambda_unit], layout_obj);
              Lvar class_init; lambda_unit],
             Loc_unknown)))),
-      Static
+      Recursive_class
   and lbody_virt lenvs =
     (* Virtual classes only need to provide the [class_init] and [env]
        fields. [obj_init] is filled with a dummy [lambda_unit] value. *)
@@ -1289,7 +1295,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                           ~body:cl_init;
            lenvs],
          Loc_unknown),
-    Static
+    Recursive_class
   in
   (* Still easy: a class defined at toplevel *)
   if top && concrete then lclass lbody else
@@ -1407,7 +1413,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   lcache (
   make_envs (
   if ids = []
-  then mkappl (lfield cached 0, [lenvs], layout_obj), Dynamic
+  then mkappl (lfield cached 0, [lenvs], layout_obj), Non_recursive_class
   else
     Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
         (if concrete then
@@ -1417,7 +1423,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
         else [lambda_unit; lfield cached 0; lenvs]),
         Loc_unknown
        ),
-    Static)))
+    Recursive_class)))
 
 (* Wrapper for class compilation *)
 (*
@@ -1432,9 +1438,51 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
 let transl_class ~scopes ids id pub_meths cl vf =
   oo_wrap_gen cl.cl_env false (transl_class ~scopes ids id pub_meths cl) vf
 
+(* A class whose definition refers to a class of its recursive group (for
+   instance through [new] or [inherit] in a method body) needs the final
+   address of that class before the group is evaluated. The block of such a
+   class is pre-allocated, and the fields of its definition (a three-field
+   block, see [lbody] above) are copied into the pre-allocated block once the
+   definition has been evaluated. Classes that do not refer to the group are
+   defined first, as plain let-bindings. *)
+let compile_class_bindings bindings body =
+  let recursive, non_recursive =
+    List.partition
+      (fun (_, _, kind, _) ->
+         match kind with
+         | Recursive_class -> true
+         | Non_recursive_class -> false)
+      bindings
+  in
+  let class_block_size = 3 in
+  let define (id, id_duid, _, def) body =
+    Llet (Strict, layout_block, id, id_duid, def, body)
+  in
+  let allocate (id, id_duid, _, _) body =
+    let placeholder =
+      Lprim (Pmakeblock (0, Mutable, All_value, alloc_heap),
+             List.init class_block_size (fun _ -> lambda_unit), Loc_unknown)
+    in
+    Llet (Strict, layout_block, id, id_duid, placeholder, body)
+  in
+  let patch (id, _, _, def) body =
+    let tmp = Ident.create_local (Ident.name id) in
+    let copy_field i body =
+      Lsequence
+        (Lprim (Psetfield (i, Pointer, Assignment modify_heap),
+                [Lvar id; lfield tmp i], Loc_unknown),
+         body)
+    in
+    Llet (Strict, layout_block, tmp, Lambda.debug_uid_none, def,
+          List.fold_right copy_field (List.init class_block_size Fun.id) body)
+  in
+  List.fold_right define non_recursive
+    (List.fold_right allocate recursive
+       (List.fold_right patch recursive body))
+
 let () =
   transl_object := (fun ~scopes id meths cl ->
-    let lam, _rkind = transl_class ~scopes [] id meths cl Concrete in
+    let lam, _kind = transl_class ~scopes [] id meths cl Concrete in
     lam)
 
 (* Error report *)

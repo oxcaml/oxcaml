@@ -186,7 +186,6 @@ val dump_matchcomp : bool ref
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
 val dump_blambda : bool ref
-val dump_letreclambda : bool ref
 val dump_rawclambda : bool ref
 val dump_clambda : bool ref
 val dump_rawflambda : bool ref

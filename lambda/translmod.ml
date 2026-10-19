@@ -953,7 +953,7 @@ and transl_structure ~scopes loc
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          Value_rec_compiler.compile_letrec class_bindings body, repr
+          Translclass.compile_class_bindings class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_sorts =
             bound_value_identifiers_and_sorts incl.incl_type
@@ -1409,7 +1409,7 @@ let transl_toplevel_item ~scopes item =
          be a value named identically *)
       let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
       List.iter set_toplevel_unique_name ids;
-      Value_rec_compiler.compile_letrec class_bindings
+      Translclass.compile_class_bindings class_bindings
         (make_sequence toploop_setvalue_id ids)
   | Tstr_include incl ->
       let ids = bound_value_identifiers incl.incl_type in

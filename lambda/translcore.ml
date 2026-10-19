@@ -212,6 +212,36 @@ let maybe_region get_layout lam =
 let maybe_region_layout layout lam =
   maybe_region (fun () -> layout) lam
 
+(* The assignment of the single field of a block bound by [let rec], which
+   was allocated with a placeholder. *)
+let recursive_patch_field0 ~modify_mode id contents loc =
+  Lprim (Psetfield (0, Pointer, Assignment modify_mode),
+         [Lvar id; contents], loc)
+
+(* A value of the right representation for the field at position [pos] of a
+   record bound by [let rec], which is assigned once the group is defined;
+   see [transl_recursive_record]. Such fields have layout value, because
+   they are built from the names bound by the [let rec]. *)
+let recursive_record_placeholder (repres : Lambda.record_representation) pos =
+  let boxed_float_zero = Lconst (Const_base (Const_float "0.")) in
+  let not_a_value () =
+    Misc.fatal_errorf
+      "Translcore.recursive_record_placeholder: field %d is not a value" pos
+  in
+  match repres with
+  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
+    lambda_unit
+  | Record_float -> boxed_float_zero
+  | Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _) ->
+    begin match shape.(pos) with
+    | Value _ -> lambda_unit
+    | Float_boxed _ -> boxed_float_zero
+    | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+    | Vec512 | Mask | Word | Untagged_immediate | Product _
+    | Splice_variable _ -> not_a_value ()
+    end
+  | Record_unboxed | Record_ufloat
+  | Record_inlined (_, Constructor_immediate_all_void, _) -> not_a_value ()
 
 let is_alloc_heap = function Alloc_heap -> true | Alloc_local -> false
 
@@ -1015,85 +1045,17 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
     end
   | Texp_setfield{ record = arg; record_repres;
                    modality = arg_mode; lid = _id; label = lbl; newval } ->
-      (* CR layouts v2.5: When we allow `any` in record fields and check
-         representability on construction, [sort_of_jkind] will be unsafe here.
-         Probably we should add a sort to `Texp_setfield` in the typed tree,
-         then. *)
       let modify_mode = transl_modify_mode arg_mode in
-      let mode = Assignment modify_mode in
       let sort_arg =
         (* We know the record is boxed because [@@unboxed] records don't have
            mutable fields, and this is double checked by the assert in [access]
            above. *)
         Jkind.Sort.Const.for_boxed_record
       in
-      let record_repres, ~variable_sorts =
-        Translrepr.transl_record_representation_and_sorts arg.exp_env
-          e.exp_loc record_repres
-      in
-      let sort_newval =
-        Translrepr.label_sort_for_representation lbl record_repres
-          ~record_sort:sort_arg ~variable_sorts
-      in
       let arg_layout = layout_exp sort_arg arg in
       let arg_lambda = transl_exp ~scopes arg_layout arg in
-      let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
-      let newval_layout = layout_exp sort_newval newval in
-      let newval_lambda = transl_exp ~scopes newval_layout newval in
-      let prim, args =
-        match record_repres with
-          Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
-          let immediate_or_pointer, _ = maybe_pointer newval in
-          if Types.is_atomic lbl.lbl_mut
-          then
-            Patomic_set_field { immediate_or_pointer; mode = modify_mode },
-            [arg_lambda; field_lambda; newval_lambda]
-          else
-            Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
-            [arg_lambda; newval_lambda]
-        | Record_inlined (_, Constructor_immediate_all_void, _) ->
-          fatal_error "transl_exp0: unexpected immediate representation"
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
-          assert false
-        | Record_float ->
-          Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
-        | Record_ufloat ->
-          Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
-        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let immediate_or_pointer, _ = maybe_pointer newval in
-          if Types.is_atomic lbl.lbl_mut
-          then
-            Patomic_set_field { immediate_or_pointer; mode = modify_mode },
-            [arg_lambda; field_lambda; newval_lambda]
-          else
-            Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
-            [arg_lambda; newval_lambda]
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
-            (* CR layouts v5.9: support this *)
-            fatal_error
-              "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed)
-          (* CR layouts v5: once all-void records are allowed, handle
-             constructors with all-void inline records, which are stored as
-             immediates *)
-        | Record_mixed shape ->
-          let field_shape =
-            Typeopt.refine_mixed_block_element newval.exp_env newval.exp_loc
-              newval.exp_type shape.(lbl.lbl_pos)
-          in
-          (* Update the shape with details for the modified field. *)
-          shape.(lbl.lbl_pos) <- field_shape;
-          if Types.is_atomic lbl.lbl_mut then
-            (Patomic_set_mixed_field
-               { index = lbl.lbl_pos; shape; mode = modify_mode },
-            [arg_lambda; newval_lambda])
-          else
-            (Psetmixedfield([lbl.lbl_pos], shape, mode),
-            [arg_lambda; newval_lambda])
-        | Record_inlined (_, _, Variant_with_null) -> assert false
-      in
-      Lprim(prim, args, of_location ~scopes e.exp_loc)
+      transl_setfield ~scopes e.exp_loc arg.exp_env record_repres modify_mode
+        arg_lambda lbl newval
   | Texp_array (amut, element_sort, expr_list, locality_mode) ->
       let mode = transl_typed_locality_mode_r locality_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
@@ -1378,29 +1340,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       | `Other ->
          (* other cases compile to a lazy block holding a function.  The
             typechecker enforces that e has jkind value.  *)
-         let scopes = enter_lazy ~scopes in
-         let fn = lfunction ~kind:(Curried {nlocal=0})
-                            ~params:[{ name = Ident.create_local "param";
-                                       debug_uid = Lambda.debug_uid_none;
-                                       layout = Lambda.layout_unit;
-                                       attributes = Lambda.default_param_attribute;
-                                       mode = alloc_heap}]
-                            ~return:Lambda.layout_lazy_contents
-                            (* The translation of [e] may be a function, in
-                               which case disallowing arity fusion gives a very
-                               small performance improvement.
-                            *)
-                            ~attr:function_attribute_disallowing_arity_fusion
-                            ~loc:(of_location ~scopes e.exp_loc)
-                            ~mode:alloc_heap
-                            ~ret_mode:not_alloc_stack
-                            ~body:(maybe_region_layout
-                                     Lambda.layout_lazy_contents
-                                     (transl_exp ~scopes
-                                        Lambda.layout_lazy_contents e))
-         in
-          Lprim(Pmakelazyblock Lazy_tag, [fn],
-                of_location ~scopes e.exp_loc)
+         Lprim(Pmakelazyblock Lazy_tag, [transl_lazy_thunk ~scopes e],
+               of_location ~scopes e.exp_loc)
       end
   | Texp_object (cs, meths) ->
       let cty = cs.cstr_type in
@@ -2518,16 +2459,97 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
              vb_loc; vb_pat} (id, id_duid) =
         let vb_sort = Jkind.Sort.default_for_transl_and_get vb_sort in
         let vb_layout = layout_exp vb_sort expr in
-        let def =
-          transl_bound_exp ~scopes ~in_structure vb_pat vb_layout expr
-            vb_loc vb_attributes
-        in
-        let def =
+        let with_region def =
           if add_regions then maybe_region_layout vb_layout def else def
         in
-        ( id, id_duid, rkind, def ) in
-      let lam_bds = List.map2 transl_case pat_expr_list idlist in
-      fun body -> Value_rec_compiler.compile_letrec lam_bds body
+        let transl_def () =
+          with_region
+            (transl_bound_exp ~scopes ~in_structure vb_pat vb_layout expr
+               vb_loc vb_attributes)
+        in
+        match (rkind : Value_rec_types.recursive_binding_kind) with
+        | Recursive_function ->
+          (* The class tables of the immediate objects of the function are
+             bound before the group rather than around the function. *)
+          let wrap, def =
+            Translobj.oo_wrap_split expr.exp_env true transl_def ()
+          in
+          begin match def with
+          | Lfunction def ->
+            Either.Left (wrap, { id; debug_uid = id_duid; def })
+          | def ->
+            Misc.fatal_errorf
+              "Translcore.transl_let: recursive definition of %a is not a \
+               function:@ %a"
+              Ident.print id Printlambda.lambda def
+          end
+        | Not_recursive ->
+          Either.Right (id, id_duid, vb_layout, transl_def (), [])
+        | Recursive_record patched ->
+          let def, patches =
+            transl_recursive_record ~scopes ~in_structure id expr patched
+          in
+          Either.Right (id, id_duid, vb_layout, with_region def, patches)
+        | Recursive_lazy ->
+          let def, patch =
+            transl_recursive_lazy ~scopes ~in_structure id expr
+          in
+          Either.Right (id, id_duid, vb_layout, def, [patch])
+        | Recursive_ref ->
+          let def, patch =
+            transl_recursive_ref ~scopes ~in_structure id vb_layout expr
+          in
+          Either.Right (id, id_duid, vb_layout, def, [patch])
+      in
+      (* [Value_rec_check] guarantees that the non-function bindings do not
+         read through the group. They are evaluated first, in order, with
+         placeholders in the fields of records and the lazy blocks that refer
+         to the group; then
+         the mutually recursive functions are defined; finally these fields
+         are assigned. *)
+      let functions, others =
+        List.partition_map Fun.id (List.map2 transl_case pat_expr_list idlist)
+      in
+      fun body ->
+        let body =
+          List.fold_right
+            (fun (_, _, _, _, patches) body ->
+               List.fold_right
+                 (fun patch body -> Lsequence (patch, body))
+                 patches body)
+            others body
+        in
+        let body =
+          match functions with
+          | [] -> body
+          | _ :: _ ->
+            List.fold_left (fun body (wrap, _) -> wrap body)
+              (Lletrec (List.map snd functions, body))
+              functions
+        in
+        List.fold_right
+          (fun (id, id_duid, layout, def, _) body ->
+             Llet (Strict, layout, id, id_duid, def, body))
+          others body
+
+(* The thunk [fun () -> e] of a lazy block. *)
+and transl_lazy_thunk ~scopes e =
+  let scopes = enter_lazy ~scopes in
+  lfunction ~kind:(Curried {nlocal=0})
+    ~params:[{ name = Ident.create_local "param";
+               debug_uid = Lambda.debug_uid_none;
+               layout = Lambda.layout_unit;
+               attributes = Lambda.default_param_attribute;
+               mode = alloc_heap}]
+    ~return:Lambda.layout_lazy_contents
+    (* The translation of [e] may be a function, in which case disallowing
+       arity fusion gives a very small performance improvement. *)
+    ~attr:function_attribute_disallowing_arity_fusion
+    ~loc:(of_location ~scopes e.exp_loc)
+    ~mode:alloc_heap
+    ~ret_mode:not_alloc_stack
+    ~body:(maybe_region_layout Lambda.layout_lazy_contents
+             (transl_exp ~scopes Lambda.layout_lazy_contents e))
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
@@ -2544,8 +2566,182 @@ and transl_setinstvar ~scopes loc self var expr =
   Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
     [self; var; transl_exp ~scopes Lambda.layout_instance_var expr], loc)
 
+(* [r.lbl <- newval], where [arg_lambda] is the translation of the record
+   [r] and [record_repres] its representation. Shared between
+   [Texp_setfield] and the recursive records of [transl_let]. *)
+and transl_setfield ~scopes loc env record_repres modify_mode arg_lambda lbl
+      newval =
+  (* CR layouts v2.5: When we allow `any` in record fields and check
+     representability on construction, [sort_of_jkind] will be unsafe here.
+     Probably we should add a sort to `Texp_setfield` in the typed tree,
+     then. *)
+  let mode = Assignment modify_mode in
+  let sort_arg = Jkind.Sort.Const.for_boxed_record in
+  let record_repres, ~variable_sorts =
+    Translrepr.transl_record_representation_and_sorts env loc record_repres
+  in
+  let sort_newval =
+    Translrepr.label_sort_for_representation lbl record_repres
+      ~record_sort:sort_arg ~variable_sorts
+  in
+  let field_lambda = Lconst (Const_base (Const_int lbl.lbl_pos)) in
+  let newval_layout = layout_exp sort_newval newval in
+  let newval_lambda = transl_exp ~scopes newval_layout newval in
+  let prim, args =
+    match record_repres with
+      Record_boxed
+    | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
+      let immediate_or_pointer, _ = maybe_pointer newval in
+      if Types.is_atomic lbl.lbl_mut
+      then
+        Patomic_set_field { immediate_or_pointer; mode = modify_mode },
+        [arg_lambda; field_lambda; newval_lambda]
+      else
+        Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
+        [arg_lambda; newval_lambda]
+    | Record_inlined (_, Constructor_immediate_all_void, _) ->
+      fatal_error "transl_exp0: unexpected immediate representation"
+    | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
+      assert false
+    | Record_float ->
+      Psetfloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+    | Record_ufloat ->
+      Psetufloatfield (lbl.lbl_pos, mode), [arg_lambda; newval_lambda]
+    | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+      let immediate_or_pointer, _ = maybe_pointer newval in
+      let pos = lbl.lbl_pos + 1 in
+      if Types.is_atomic lbl.lbl_mut
+      then
+        let field_lambda = Lconst (Const_base (Const_int pos)) in
+        Patomic_set_field { immediate_or_pointer; mode = modify_mode },
+        [arg_lambda; field_lambda; newval_lambda]
+      else
+        Psetfield (pos, immediate_or_pointer, mode),
+        [arg_lambda; newval_lambda]
+    | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+        (* CR layouts v5.9: support this *)
+        fatal_error
+          "Mixed inlined records not supported for extensible variants"
+    | Record_inlined (_, Constructor_mixed shape, Variant_boxed)
+      (* CR layouts v5: once all-void records are allowed, handle
+         constructors with all-void inline records, which are stored as
+         immediates *)
+    | Record_mixed shape ->
+      let field_shape =
+        Typeopt.refine_mixed_block_element newval.exp_env newval.exp_loc
+          newval.exp_type shape.(lbl.lbl_pos)
+      in
+      (* Update the shape with details for the modified field. *)
+      shape.(lbl.lbl_pos) <- field_shape;
+      if Types.is_atomic lbl.lbl_mut then
+        (Patomic_set_mixed_field
+           { index = lbl.lbl_pos; shape; mode = modify_mode },
+        [arg_lambda; newval_lambda])
+      else
+        (Psetmixedfield([lbl.lbl_pos], shape, mode),
+        [arg_lambda; newval_lambda])
+    | Record_inlined (_, _, Variant_with_null) -> assert false
+  in
+  Lprim(prim, args, of_location ~scopes loc)
+
+(* A record bound by [let rec] whose mutable fields at positions [patched]
+   refer to the group (see [Value_rec_check]). Returns the allocation of the
+   record, with placeholders in these fields, and the assignments that fill
+   them in once the whole group is defined. *)
+and transl_recursive_record ~scopes ~in_structure id expr patched =
+  let record =
+    match expr.exp_desc with
+    | Texp_construct (_, cstr, _, [ (_, record) ], _)
+      when Option.is_some cstr.cstr_inlined -> record
+    | _ -> expr
+  in
+  match record.exp_desc with
+  | Texp_record
+      { fields; representation; extended_expression = None; locality_mode } ->
+    let loc = record.exp_loc and env = record.exp_env in
+    let scopes = recursive_definition_scopes ~scopes ~in_structure id in
+    let repres =
+      Translrepr.transl_record_representation env loc representation
+    in
+    let mode = Option.map transl_typed_locality_mode_r locality_mode in
+    let is_patched i = List.mem i patched in
+    let placeholder i =
+      if is_patched i then Some (recursive_record_placeholder repres i)
+      else None
+    in
+    let alloc =
+      transl_record ~scopes loc env mode ~placeholder fields repres None
+    in
+    let modify_mode =
+      match mode with
+      | Some mode when is_heap_mode mode -> modify_heap
+      | Some _ -> modify_maybe_stack
+      | None ->
+        Misc.fatal_errorf
+          "Translcore.transl_recursive_record: %a is an unboxed record"
+          Ident.print id
+    in
+    let patch i (lbl, _, definition) =
+      match definition with
+      | Overridden (_, newval) when is_patched i ->
+        Some
+          (transl_setfield ~scopes loc env representation modify_mode
+             (Lvar id) lbl newval)
+      | Overridden _ | Kept _ -> None
+    in
+    alloc, List.filter_map Fun.id (Array.to_list (Array.mapi patch fields))
+  | _ ->
+    Misc.fatal_errorf
+      "Translcore.transl_recursive_record: %a is not a record literal"
+      Ident.print id
+
+(* The scopes of a recursive definition that is not translated through
+   [transl_bound_exp]. *)
+and recursive_definition_scopes ~scopes ~in_structure id =
+  if in_structure then
+    let assume_zero_alloc = Zero_alloc_utils.Assume_info.none in
+    enter_value_definition ~scopes ~assume_zero_alloc id
+  else scopes
+
+(* A reference cell bound by [let rec] whose contents refer to the group
+   (see [Value_rec_check]). Returns the allocation of the cell, with a
+   placeholder instead of its contents, and the assignment of the contents
+   once the whole group is defined. *)
+and transl_recursive_ref ~scopes ~in_structure id layout expr =
+  let scopes = recursive_definition_scopes ~scopes ~in_structure id in
+  match transl_exp ~scopes layout expr with
+  | Lprim (Pmakeblock (0, Mutable, shape, mode), [contents], loc) ->
+    let modify_mode =
+      if is_heap_mode mode then modify_heap else modify_maybe_stack
+    in
+    Lprim (Pmakeblock (0, Mutable, shape, mode), [lambda_unit], loc),
+    recursive_patch_field0 ~modify_mode id contents loc
+  | def ->
+    Misc.fatal_errorf
+      "Translcore.transl_recursive_ref: %a is not a reference cell:@ %a"
+      Ident.print id Printlambda.lambda def
+
+(* A [lazy] expression bound by [let rec] that refers to the group (see
+   [Value_rec_check]). Returns the allocation of the lazy block, with a
+   placeholder instead of its thunk, and the assignment of the thunk once the
+   whole group is defined. The shortcuts of [Texp_lazy] do not apply, since
+   the block must exist before its contents can be computed. *)
+and transl_recursive_lazy ~scopes ~in_structure id expr =
+  match expr.exp_desc with
+  | Texp_lazy e ->
+    let scopes = recursive_definition_scopes ~scopes ~in_structure id in
+    let loc = of_location ~scopes e.exp_loc in
+    Lprim (Pmakelazyblock Lazy_tag, [lambda_unit], loc),
+    recursive_patch_field0 ~modify_mode:modify_heap id
+      (transl_lazy_thunk ~scopes e) loc
+  | _ ->
+    Misc.fatal_errorf
+      "Translcore.transl_recursive_lazy: %a is not a lazy expression"
+      Ident.print id
+
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
-and transl_record ~scopes loc env mode fields repres opt_init_expr =
+and transl_record ~scopes loc env mode ?(placeholder = fun _ -> None) fields
+      repres opt_init_expr =
   (* Determine if there are "enough" fields (only relevant if this is a
      functional-style record update *)
   let size = Array.length fields in
@@ -2707,7 +2903,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                field_layout
            | Overridden (_lid, expr) ->
                let field_layout = layout_exp lbl_sort expr in
-               transl_exp ~scopes field_layout expr, field_layout)
+               let lam =
+                 match placeholder i with
+                 | Some lam -> lam
+                 | None -> transl_exp ~scopes field_layout expr
+               in
+               lam, field_layout)
         fields
     in
     let ll, shape = List.split (Array.to_list lv) in

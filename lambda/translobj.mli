@@ -27,6 +27,10 @@ val method_ids: Ident.Set.t ref (* reset when starting a new wrapper *)
 
 val oo_wrap: Env.t -> bool -> ('a -> lambda) -> 'a -> lambda
 val oo_wrap_gen: Env.t -> bool -> ('a -> lambda * 'b) -> 'a -> lambda * 'b
+val oo_wrap_split: Env.t -> bool -> ('a -> 'b) -> 'a -> (lambda -> lambda) * 'b
+(** Like [oo_wrap_gen], but returns the function that binds the class tables
+    around a term instead of applying it. These bindings are closed. *)
+
 val oo_add_class: Ident.t -> Env.t * bool
 
 val layout_of_ident: Ident.t -> Lambda.layout option

@@ -17,15 +17,19 @@
  (action
   (with-stdout-to %{targets}
    ;; Partial applications of the form Obj.magic f x in menhirLib cause
-   ;; an issue with locals, so rewrite these to Obj.magic (f x)
+   ;; an issue with locals, so rewrite these to Obj.magic (f x).
+   ;; The engine builds its empty stack as a cyclic record with [let rec],
+   ;; which requires the [next] field to be mutable (see also the .mli rule
+   ;; below).
    (bash "cat $(menhir --suggest-menhirLib)/menhirLib.ml |
-          sed 's/\\b\\(in\\|then\\|with\\|else\\)\\b/@@@\\1/g; s/Obj.magic \\([a-z0-9_]\\+\\( [a-z0-9_]\\+\\)\\+\\)/Obj.magic (\\1)/g;  s/@@@//g'"))))
+          sed 's/\\b\\(in\\|then\\|with\\|else\\)\\b/@@@\\1/g; s/Obj.magic \\([a-z0-9_]\\+\\( [a-z0-9_]\\+\\)\\+\\)/Obj.magic (\\1)/g;  s/@@@//g; s/^\\(  \\)\\(next: (.state, .semantic_value) stack;\\)/\\1mutable \\2/'"))))
 
 (rule
  (targets camlinternalMenhirLib.mli)
  (action
   (with-stdout-to %{targets}
-   (bash "cat $(menhir --suggest-menhirLib)/menhirLib.mli"))))
+   (bash "cat $(menhir --suggest-menhirLib)/menhirLib.mli |
+          sed 's/^\\(  \\)\\(next: (.state, .semantic_value) stack;\\)/\\1mutable \\2/'"))))
 
 (ocamllex
  (modules lexer)

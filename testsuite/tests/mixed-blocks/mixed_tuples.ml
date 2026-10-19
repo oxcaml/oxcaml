@@ -411,39 +411,6 @@ let letop_mixed =
 val letop_mixed : int * string * bool = (4, "hi", true)
 |}]
 
-(* works with recursive construction of recursive data *)
-
-type rec_record = { r : (rec_record * float#) ; i : int }
-
-let _ =
-  let rec recursive_rec = { r = (recursive_rec, #2.0) ; i = 42 } in
-  (* no layout poly first, so we need to make our own *)
-  let fst (x, _) = x in
-  assert (recursive_rec == fst recursive_rec.r)
-[%%expect{|
-type rec_record = { r : rec_record * float#; i : int; }
-- : unit = ()
-|}]
-
-let _ =
-  let rec recursive_tup = ({ r = recursive_tup ; i = 42 }, #2.0) in
-  let fst (x, _) = x in
-  assert (recursive_tup == (fst recursive_tup).r)
-[%%expect{|
-- : unit = ()
-|}]
-
-type rec_constr = C of (#(rec_constr option * float#) * int)
-let _ =
-  let rec recursive = C ( #(Some recursive, #4.0), 2 ) in
-  (* no layout poly first, so we need to make our own *)
-  let get = function C (#(opt, _), _) -> Option.get opt in
-  assert (recursive == get recursive)
-[%%expect{|
-type rec_constr = C of (#(rec_constr option * float#) * int)
-- : unit = ()
-|}]
-
 (* Tuple elements must be representable *)
 let f (type a : any) (g : unit -> a) = (g (), 1)
 [%%expect{|

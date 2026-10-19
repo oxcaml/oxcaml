@@ -462,10 +462,13 @@ let poly_ cycle payload =
   let rec node = { payload; next = node } in
   node
 [%%expect{|
-Line 2, characters 17-41:
+Line 2, characters 35-39:
 2 |   let rec node = { payload; next = node } in
-                     ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Recursive definitions of layout-polymorphic blocks are not currently supported.
+                                       ^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec".
+       It refers to "node", but the names bound by a "let rec" may only be used
+       by the functions and lazy values it binds or, through constructors,
+       in the mutable fields of the records and references it binds.
 |}]
 
 type ('a : any) pair = #('a * 'a)

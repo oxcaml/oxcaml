@@ -188,14 +188,26 @@ type imm = A of unit# [@immediate_all_void_constructor]
 let rec x = A (let _ = ref x in #())
 [%%expect{|
 type imm = A of unit# [@immediate_all_void_constructor]
-val x : imm = A <void>
+Line 2, characters 12-36:
+2 | let rec x = A (let _ = ref x in #())
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec".
+       It refers to "x", but the names bound by a "let rec" may only be used
+       by the functions and lazy values it binds or, through constructors,
+       in the mutable fields of the records and references it binds.
 |}]
 
 type blk = A of unit#
 let rec x = A (let _ = ref x in #())
 [%%expect{|
 type blk = A of unit#
-val x : blk = A <void>
+Line 2, characters 12-36:
+2 | let rec x = A (let _ = ref x in #())
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec".
+       It refers to "x", but the names bound by a "let rec" may only be used
+       by the functions and lazy values it binds or, through constructors,
+       in the mutable fields of the records and references it binds.
 |}]
 
 (* Mode-crossing *)

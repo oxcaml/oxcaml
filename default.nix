@@ -416,6 +416,10 @@ let
       substituteInPlace sdk/cmly_api.ml \
         --replace-fail '[@@@ocaml.deprecated "Please use [get_reductions]"]' \
           '[@@ocaml.deprecated "Please use [get_reductions]"]'
+      # The empty stack is a cyclic let rec, which OxCaml only accepts
+      # through mutable fields (see also parsing/dune).
+      substituteInPlace lib/EngineTypes.ml \
+        --replace-fail '  next: (' '  mutable next: ('
     '';
   };
 

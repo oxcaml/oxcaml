@@ -298,26 +298,9 @@ let rec compare : type (a : value_or_null) . a elem -> a -> a -> int =
               if x <> 0 then x else
                 compare e6 a16 a26
 
-let rec print : type (a : value_or_null) . a elem -> a -> unit =
-  let open struct
-    type packed = P : ('a : value_or_null) . 'a elem * 'a -> packed
+type packed = P : ('a : value_or_null) . 'a elem * 'a -> packed
 
-    let print_comma_sep l =
-      Printf.printf "(";
-      let rec go l =
-        match l with
-        | [] -> assert false
-        | [P (e,a)] ->
-          print e a;
-          Printf.printf ")"
-        | (P (e,a)) :: l ->
-          print e a;
-          Printf.printf ", ";
-          go l
-      in
-      go l
-  end
-  in
+let rec print : type (a : value_or_null) . a elem -> a -> unit =
   fun elem a ->
     match elem with
     | Number {ops} ->
@@ -357,6 +340,21 @@ let rec print : type (a : value_or_null) . a elem -> a -> unit =
       print_comma_sep
         [P (e1, a1); P (e2, a2); P (e3, a3); P (e4, a4); P (e5, a5);
          P (e6, a6)]
+
+and print_comma_sep l =
+  Printf.printf "(";
+  let rec go l =
+    match l with
+    | [] -> assert false
+    | [P (e,a)] ->
+      print e a;
+      Printf.printf ")"
+    | (P (e,a)) :: l ->
+      print e a;
+      Printf.printf ", ";
+      go l
+  in
+  go l
 
 let make_element_ops (type a) (elem : a elem)
   : (module Element_intf with type t = a) =

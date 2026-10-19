@@ -1109,9 +1109,8 @@ and rec_binding = {
   id : Ident.t;
   debug_uid : debug_uid;
   def : lfunction;
-  (* Generic recursive bindings have been removed from Lambda in 5.2.
-     [Value_rec_compiler.compile_letrec] deals with transforming generic
-     definitions into basic Lambda code. *)
+  (* Only syntactic functions can be bound recursively; see
+     [Value_rec_check] and [Translcore.transl_let]. *)
 }
 
 and lfunction = private
@@ -1327,8 +1326,6 @@ val layout_lazy : layout
 val layout_lazy_contents : layout
 (* A layout that is Pgenval because we are missing layout polymorphism *)
 val layout_any_value : layout
-(* A layout that is Pgenval because it is bound by a letrec *)
-val layout_letrec : layout
 val layout_instance_var : layout
 val layout_method : layout
 val layout_initializer : layout

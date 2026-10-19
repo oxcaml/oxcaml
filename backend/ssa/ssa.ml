@@ -213,22 +213,21 @@ type 'g graph =
     [pending_terminator]. Doing it like this keeps the publicly visible
     [finished Terminator.t] type clean, as it cannot contain
     [pending_terminator]. *)
-let rec pending_terminator : under_construction terminator =
-  Continue { continuation = Goto dummy_block; args = [||] }
-
-and dummy_block : under_construction block =
+let rec dummy_block : under_construction block =
   { block_id = Block_id.dummy;
     params = [||];
     predecessors = [];
     body = [||];
     pending_body = [];
-    terminator = pending_terminator;
+    terminator = Continue { continuation = Goto dummy_block; args = [||] };
     terminator_dbg = Debuginfo.none;
     handler_dbg = Debuginfo.none;
     cold = false;
     dominator_info = { depth = -1; dominator = dummy_block };
     block_end_trap_stack = []
   }
+
+let pending_terminator : under_construction terminator = dummy_block.terminator
 
 let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool)
     ~(handler_dbg : Debuginfo.t) : under_construction block =

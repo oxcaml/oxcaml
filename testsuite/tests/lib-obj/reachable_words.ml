@@ -24,7 +24,8 @@ let f () =
   expect_size 5 (B (a, a)); (* sharing *)
   expect_size 7 (B (a, A (x + 1)));
 
-  let rec b = B (a, b) in (* cycle *)
+  let b = B (a, a) in
+  Obj.set_field (Obj.repr b) 1 (Obj.repr b); (* cycle *)
   expect_size 5 b;
 
   print_endline "OK"

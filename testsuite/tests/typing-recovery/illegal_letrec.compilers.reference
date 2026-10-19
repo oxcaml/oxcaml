@@ -11,15 +11,24 @@ File "illegal_letrec.ml", line 17, characters 10-18:
 File "illegal_letrec.ml", line 20, characters 12-16:
 20 | let rec x = f ~x
                  ^^^^
-  This kind of expression is not allowed as right-hand side of let rec
+  This kind of expression is not allowed as right-hand side of let rec.
+  It refers to x, but the names bound by a let rec may only be used
+  by the functions and lazy values it binds or, through constructors,
+  in the mutable fields of the records and references it binds.
 File "illegal_letrec.ml", line 21, characters 12-21:
 21 | let rec x = f ~x ~z:0
                  ^^^^^^^^^
-  This kind of expression is not allowed as right-hand side of let rec
+  This kind of expression is not allowed as right-hand side of let rec.
+  It refers to x, but the names bound by a let rec may only be used
+  by the functions and lazy values it binds or, through constructors,
+  in the mutable fields of the records and references it binds.
 File "illegal_letrec.ml", line 25, characters 2-37:
 25 |   g ~given:(f ~omitted_g:() ~given:0)
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  This kind of expression is not allowed as right-hand side of let rec
+  This kind of expression is not allowed as right-hand side of let rec.
+  It refers to f, but the names bound by a let rec may only be used
+  by the functions and lazy values it binds or, through constructors,
+  in the mutable fields of the records and references it binds.
 File "illegal_letrec.ml", line 29, characters 17-19:
 29 | let t : string = 10
                       ^^

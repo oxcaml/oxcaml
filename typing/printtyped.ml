@@ -1507,8 +1507,14 @@ and case
 and value_binding rec_flag i ppf x =
   begin match rec_flag, x.vb_rec_kind with
   | Nonrecursive, _ -> line i ppf "<def>\n"
-  | Recursive, Static -> line i ppf "<def_rec>\n"
-  | Recursive, Dynamic -> line i ppf "<def_rec_dynamic>\n"
+  | Recursive, Recursive_function -> line i ppf "<def_rec>\n"
+  | Recursive, Not_recursive -> line i ppf "<def_rec_nonrec>\n"
+  | Recursive, Recursive_record patched ->
+    line i ppf "<def_rec_record %a>\n"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
+      patched
+  | Recursive, Recursive_lazy -> line i ppf "<def_rec_lazy>\n"
+  | Recursive, Recursive_ref -> line i ppf "<def_rec_ref>\n"
   end;
   attributes (i+1) ppf x.vb_attributes;
   pattern (i+1) ppf x.vb_pat;

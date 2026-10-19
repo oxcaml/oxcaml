@@ -1,0 +1,13 @@
+a allocated
+n evaluated
+b allocated
+a.data = 0, b.data = 1, n = 42, length = 2
+depth of child = 1
+x1.v = 1, x2.v = 2
+fr = (1, 2), mx = (3, 4)
+len evaluated
+f called
+r.len = 3, r.s = abc
+renamed
+local = 0
+atomic = 1

@@ -8,6 +8,6 @@
 
 let x = (fun () -> (fun _ -> Lazy.force (lazy "")) ()) ()
 
-let rec foo = lazy (fun x : int -> x)
+let foo = lazy (fun x : int -> x)
 
-and t = lazy (Lazy.force foo)
+let t = lazy (Lazy.force foo)

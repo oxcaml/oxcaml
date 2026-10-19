@@ -2340,7 +2340,15 @@ let rec merge (Cons (x1, t1) as l1) (Cons (x2, t2) as l2) =
   else Cons (x2, lazy (merge l1 (force t2)))
 ;;
 
-let rec scale = Cons (1, lazy (merge (mult 2 scale) (mult 3 scale)));;
+let scale =
+  let cell = ref None in
+  let tail =
+    lazy (let scale = Option.get !cell in merge (mult 2 scale) (mult 3 scale))
+  in
+  let scale = Cons (1, tail) in
+  cell := Some scale;
+  scale
+;;
 
 let ashell_4 cmp a =
   let l = Array.length a in

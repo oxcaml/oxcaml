@@ -577,7 +577,7 @@ let mk_value_binding ?(id = Jkind.Sort.scannable) ~vb_pat ~vb_expr
   { vb_pat;
     vb_expr;
     vb_attributes;
-    vb_rec_kind = Dynamic;
+    vb_rec_kind = Not_recursive;
     vb_loc = Location.none;
     vb_sort = id
   }
