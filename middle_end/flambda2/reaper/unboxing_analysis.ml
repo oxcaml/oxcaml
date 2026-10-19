@@ -297,8 +297,8 @@ let calling_convention_changes_rules =
          changing the calling convention, but this would require wrappers for
          over- and partial applications, as well as untupling. As these wrappers
          are complex to write correctly, this is not done yet. *)
-      (let$ [call_witness; codeid; set_of_closures] =
-         ["call_witness"; "codeid"; "set_of_closures"]
+      (let$ [call_witness; set_of_closures; codeid] =
+         ["call_witness"; "set_of_closures"; "codeid"]
        in
        [ rev_constructor ~from:call_witness
            !!Field.unknown_arity_call_witness
@@ -532,8 +532,8 @@ let unboxing_rules =
          the representation of the other allocation can be changed, of it the
          field it is stored in is never read, as in that case a poison value
          will be stored instead. *)
-      (let$ [alias; allocation_id; relation; to_] =
-         ["alias"; "allocation_id"; "relation"; "to_"]
+      (let$ [alias; relation; to_; allocation_id] =
+         ["alias"; "relation"; "to_"; "allocation_id"]
        in
        [ sources alias allocation_id;
          rev_constructor ~from:alias relation ~base:to_;

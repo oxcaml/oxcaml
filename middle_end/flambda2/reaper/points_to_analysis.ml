@@ -395,15 +395,15 @@ module Datalog_schedule = struct
       (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
        [any_source if_any_source; alias_if_any_source ~if_any_source ~to_ ~from]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; from; to_] =
-         ["base"; "base_use"; "relation"; "from"; "to_"]
+      (let$$ [base; base_use; relation; to_; from] =
+         ["base"; "base_use"; "relation"; "to_"; "from"]
        in
        [ constructor ~base relation ~from;
          nontop_usages base base_use;
          rev_accessor ~base:base_use relation ~to_ ]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; from; to_] =
-         ["base"; "base_use"; "relation"; "from"; "to_"]
+      (let$$ [base; base_use; relation; to_; from] =
+         ["base"; "base_use"; "relation"; "to_"; "from"]
        in
        [ when1 is_local relation;
          constructor ~base relation ~from;
@@ -432,11 +432,11 @@ module Datalog_schedule = struct
          sources base base_source;
          constructor ~base:base_source relation ~from ]
        ==> alias ~to_ ~from);
-      (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
+      (let$ [relation; to_; from] = ["relation"; "to_"; "from"] in
        [escaping_field relation from; reading_field relation to_]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_source; relation; from; to_] =
-         ["base"; "base_source"; "relation"; "from"; "to_"]
+      (let$$ [base; base_source; relation; to_; from] =
+         ["base"; "base_source"; "relation"; "to_"; "from"]
        in
        [ rev_argument ~base relation ~from;
          nontop_sources base base_source;

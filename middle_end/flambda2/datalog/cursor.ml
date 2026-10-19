@@ -253,13 +253,13 @@ module From_plan = struct
 
   let column_for_join = function
     | [] -> Misc.fatal_error "Empty join"
-    | Column_iterator (column, _, _) :: _ -> Column column
+    | Column_iterator (column, _, _, _, _) :: _ -> Column column
 
   let rec join_iterators : type k.
       _ -> k column_iterator list -> _ * k Column.Iterator.t list with_names =
    fun env -> function
     | [] -> env, { values = []; names = [] }
-    | Column_iterator (column, outer, inner) :: rest ->
+    | Column_iterator (column, outer, inner, _, _) :: rest ->
       let outer_receiver = Env.must_be_bound env outer in
       let inner_sender, inner_receiver = Channel.create_or_null Or_null.null in
       let iterator =
@@ -341,7 +341,8 @@ module From_plan = struct
           Iarray.fold_right
             (fun head_atom body ->
               match head_atom with
-              | Union (tid, columns, args, value, inner_columns, repr) ->
+              | Output (tid, Union (columns, args, value, inner_columns, repr))
+                ->
                 let table = Env.get_output env tid in
                 let value = Env.must_be_bound_term env value in
                 let args = Env.must_be_bound_term_hlist env args in

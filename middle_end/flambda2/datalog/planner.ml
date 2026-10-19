@@ -31,7 +31,11 @@ open Lang
 
 type 'k column_iterator =
   | Column_iterator :
-      ('t, 'k, 'v) Column.id * 't variable * 'v variable
+      ('t, 'k, 's) Column.id
+      * 't variable
+      * 's variable
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
       -> 'k column_iterator
 
 type stage =
@@ -43,15 +47,17 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
-type head_atom =
+type (_, _) union =
   | Union :
-      ('t, _, _) Table.Id.t
-      * ('t, 'k, 's) Column.hlist
+      ('t, 'k, 's) Column.hlist
       * 'k Term.hlist
       * 's term
       * ('s, _, 'v) Column.hlist
       * 'v Table.result_repr
-      -> head_atom
+      -> ('t, 'v) union
+
+type head_atom =
+  | Output : ('t, _, _) Table.Id.t * ('t, _) union -> head_atom
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
       * 'k Term.hlist
@@ -65,7 +71,7 @@ type plan =
 
 let print_head_atom ppf head_atom =
   match head_atom with
-  | Union (tid, columns, args, value, _, _) ->
+  | Output (tid, Union (columns, args, value, _, _)) ->
     Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Table.Id.print tid
       (Term.print_columns
          ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
@@ -87,19 +93,19 @@ let rec print_stage ppf stage =
     Format.fprintf ppf "for %a in @[%a@]:" Variable.print var
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf " ⨝@ ")
-         (fun ppf (Column_iterator (_, tbl, _)) -> Variable.print ppf tbl))
+         (fun ppf (Column_iterator (_, tbl, _, _, _)) -> Variable.print ppf tbl))
       join_columns
   | Seek_stage (term, join_columns) ->
     let print_lit =
       match join_columns with
       | [] -> fun ppf _ -> Format.fprintf ppf "<cst>"
-      | Column_iterator (col, _, _) :: _ -> Column.print_key col
+      | Column_iterator (col, _, _, _, _) :: _ -> Column.print_key col
     in
     Format.fprintf ppf "@[<2>@[if %a not in %a:@]@ continue@]"
       (print_term print_lit) term
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf " ⨝@ ")
-         (fun ppf (Column_iterator (_, tbl, _)) -> Variable.print ppf tbl))
+         (fun ppf (Column_iterator (_, tbl, _, _, _)) -> Variable.print ppf tbl))
       join_columns
   | Check_stage atom ->
     Format.fprintf ppf "@[<2>@[if %a:@]@ continue@]" print_neg_atom atom
@@ -149,17 +155,210 @@ let rec free_vars_term_hlist : type a. a Term.hlist -> Variable.Id.Set.t =
   | Variable v :: terms ->
     Variable.Id.Set.add (Variable.uid v) (free_vars_term_hlist terms)
 
-let decompose_body ~binding_times body =
-  let module M = Variable.Map.Make (struct
-    type 'a t = 'a column_iterator list
-  end) in
-  let join_stages = ref M.empty in
+module Var_occurrences = struct
+  type t = int Variable.Id.Tbl.t
+
+  let create () = Variable.Id.Tbl.create 0
+
+  let add_var t var =
+    Variable.Id.Tbl.replace t (Variable.uid var)
+      (try 1 + Variable.Id.Tbl.find t (Variable.uid var) with Not_found -> 1)
+
+  let add_term t term =
+    match term with Literal _ -> () | Variable var -> add_var t var
+
+  let rec add_terms : type k. t -> k Term.hlist -> unit =
+   fun t -> function
+    | [] -> ()
+    | term :: terms ->
+      add_term t term;
+      add_terms t terms
+
+  let mem t var_id = Variable.Id.Tbl.mem t var_id
+
+  let mem_var t var = mem t (Variable.uid var)
+
+  let count_var t var =
+    try Variable.Id.Tbl.find t (Variable.uid var) with Not_found -> 0
+
+  let remove_var t var =
+    let count = count_var t var in
+    if count = 1
+    then Variable.Id.Tbl.remove t (Variable.uid var)
+    else Variable.Id.Tbl.replace t (Variable.uid var) (count - 1)
+end
+
+let vars_used_by_iterator
+    (Column_iterator (_column, table, _scalar, _inner_cols, _repr)) =
+  Variable.Id.Set.singleton (Variable.uid table)
+
+let vars_used_by_iterators iterators =
+  List.fold_left
+    (fun vars iterator ->
+      Variable.Id.Set.union vars (vars_used_by_iterator iterator))
+    Variable.Id.Set.empty iterators
+
+let vars_defined_by_iterator
+    (Column_iterator (_column, _table, scalar, _inner, _repr)) =
+  Variable.Id.Set.singleton (Variable.uid scalar)
+
+let vars_defined_by_iterators iterators =
+  List.fold_left
+    (fun vars iterator ->
+      Variable.Id.Set.union vars (vars_defined_by_iterator iterator))
+    Variable.Id.Set.empty iterators
+
+module Join_stages = Variable.Map.Make (struct
+  type 'a t = 'a column_iterator list
+end)
+
+let introduce_copies ~binding_times ~join_stages ~body_occurrences head =
+  let head_occurrences = Var_occurrences.create () in
+  Iarray.iter
+    (fun (Atom (_, args)) -> Var_occurrences.add_terms head_occurrences args)
+    head;
+  (* Detect copies *)
+  let detect_copy (type t k v s h u) (body_scalar : t variable)
+      (body_columns : (t, k, v) Column.hlist) (body_repr : v Table.result_repr)
+      (head_scalar : s term) (head_columns : (s, h, u) Column.hlist)
+      (head_repr : u Table.result_repr) : (t, s) Type.eq option =
+    let detect_copy_from_unit_repr () : (t, s) Type.eq option =
+      match body_columns, head_columns with
+      | _ :: _, _ | _, _ :: _ -> None
+      | [], [] -> (
+        match
+          ( Table.result_repr_is_unit body_repr,
+            Table.result_repr_is_unit head_repr )
+        with
+        | Some Equal, Some Equal -> Some Equal
+        | (None | Some Equal), _ -> None)
+    in
+    match head_scalar with
+    | Literal _ -> detect_copy_from_unit_repr ()
+    | Variable head_scalar -> (
+      match Variable.provably_equal body_scalar head_scalar with
+      | Some Equal -> Some Equal
+      | None -> detect_copy_from_unit_repr ())
+  in
+  let is_copy_stage (type t s k v) (head_column : (t, k, s) Column.id)
+      (var : k variable) (head_scalar : s term)
+      (head_inner : (s, _, v) Column.hlist) (head_repr : v Table.result_repr) :
+      t variable option =
+    match Join_stages.find var !join_stages with
+    | [iterator] -> (
+      let (Column_iterator
+             (body_column, body_table, body_scalar, body_inner, body_repr)) =
+        iterator
+      in
+      match
+        detect_copy body_scalar body_inner body_repr head_scalar head_inner
+          head_repr
+      with
+      | None -> None
+      | Some Equal ->
+        let Equal = Column.provably_equal_map head_column body_column in
+        Some body_table)
+    | _ | (exception Not_found) -> None
+  in
+  let vars_in_reverse_binding_time_order =
+    Variable.Id.Map.fold
+      (fun var_id binding_time acc -> (binding_time, var_id) :: acc)
+      binding_times []
+    |> List.sort (fun (binding_time1, _) (binding_time2, _) ->
+        Int.compare binding_time2 binding_time1)
+    |> ref
+  in
+  let hint_vars_order = ref [] in
+  let remove_var_if_no_body_uses var =
+    (not (Var_occurrences.mem_var body_occurrences var))
+    &&
+    match Join_stages.find var !join_stages with
+    | iterators
+      when Variable.Id.Set.for_all
+             (fun var_id -> not (Var_occurrences.mem body_occurrences var_id))
+             (vars_defined_by_iterators iterators) ->
+      (match !vars_in_reverse_binding_time_order with
+      | (_, var_id) :: rest when Variable.Id.equal (Variable.uid var) var_id ->
+        vars_in_reverse_binding_time_order := rest;
+        hint_vars_order := Variable.Any var :: !hint_vars_order
+      | _ ->
+        (* This would work just fine, but would change the explicit
+           order-provided iteration order. The copy optimization is important
+           enough for performance (and easy enough to fix) that we want to yell
+           at users if they don't write a compatible order. *)
+        Misc.fatal_errorf
+          "Variable %a is eligible for copy optimization, but is not \
+           innermost. It must be moved to the end of the iteration list.@ \
+           Hint: Variable order should end with ..., %a."
+          Variable.print var
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+             (fun ppf (Variable.Any var) -> Variable.print ppf var))
+          (Variable.Any var :: !hint_vars_order));
+      join_stages := Join_stages.remove var !join_stages;
+      List.iter
+        (fun (Column_iterator (_, table_var, _, _, _)) ->
+          Var_occurrences.remove_var body_occurrences table_var)
+        iterators;
+      true
+    | _ | (exception Not_found) -> false
+  in
+  let plan_head_table tid args =
+    let rec loop : type t k v.
+        (t, k, v) Column.hlist ->
+        k Term.hlist ->
+        v Table.result_repr ->
+        (t, v) union =
+     fun columns args repr ->
+      match columns, args with
+      | [], [] ->
+        Union
+          ( columns,
+            args,
+            Literal (Table.result_repr_default_value repr),
+            [],
+            repr )
+      | column :: columns, arg :: args -> (
+        let[@local] no_copy outer args scalar inner repr =
+          Union (column :: outer, arg :: args, scalar, inner, repr)
+        in
+        match loop columns args repr with
+        | Union ((_ :: _ as outer), (_ :: _ as args), scalar, inner, repr) ->
+          no_copy outer args scalar inner repr
+        | Union ([], [], scalar, inner, repr) -> (
+          let[@local] no_copy () = no_copy [] [] scalar inner repr in
+          match arg with
+          | Variable var when Var_occurrences.count_var head_occurrences var = 1
+            -> (
+            match is_copy_stage column var scalar inner repr with
+            | None -> no_copy ()
+            | Some body_table ->
+              if remove_var_if_no_body_uses var
+              then Union ([], [], Variable body_table, column :: inner, repr)
+              else no_copy ())
+          | Variable _ | Literal _ -> no_copy ()))
+    in
+    Output (tid, loop (Table.Id.columns tid) args (Table.Id.result_repr tid))
+  in
+  Iarray.map
+    (fun (Atom (relation, args)) ->
+      match relation with
+      | Unless _ | Distinct _ | Filter _ ->
+        Misc.fatal_error "not supported in the head"
+      | Table tid -> plan_head_table tid args
+      | Callback_with_bindings (fn, name) ->
+        Callback_with_bindings ({ value = fn; name }, args))
+    head
+
+let prepare_rule ~binding_times body head =
+  let join_stages = ref Join_stages.empty in
   let bound_tables = ref [] in
   let bind_table tid =
     let table = Variable.create (Table.Id.name tid) in
     bound_tables := Bound_table (tid, table) :: !bound_tables;
     table
   in
+  let body_occurrences = Var_occurrences.create () in
   let plan_body_table tid args =
     let rec loop : type t k v.
         min_binding_time:_ ->
@@ -167,11 +366,13 @@ let decompose_body ~binding_times body =
         (t, k, v) Column.hlist ->
         t variable ->
         k Term.hlist ->
+        v Table.result_repr ->
         _ =
-     fun ~min_binding_time stages columns table args ->
+     fun ~min_binding_time stages columns table args repr ->
       match columns, args with
       | [], [] -> List.rev stages
       | column :: columns, arg :: args ->
+        Var_occurrences.add_var body_occurrences table;
         let scalar =
           Variable.create
             (Format.asprintf "%a[%a]" Variable.print table
@@ -192,7 +393,9 @@ let decompose_body ~binding_times body =
            [X] in the global variable ordering. *)
         let stages, min_binding_time =
           let add_seek_stage () =
-            ( Seek_stage (arg, [Column_iterator (column, table, scalar)])
+            Var_occurrences.add_term body_occurrences arg;
+            ( Seek_stage
+                (arg, [Column_iterator (column, table, scalar, columns, repr)])
               :: stages,
               min_binding_time )
           in
@@ -200,21 +403,24 @@ let decompose_body ~binding_times body =
           | Variable var -> (
             match Variable.Id.Map.find (Variable.uid var) binding_times with
             | var_binding_time when var_binding_time >= min_binding_time ->
+              (* Note: a join stage is the binding stage for the key variable,
+                 so the [arg] must not be added to [body_occurrences]. *)
               let existing_iterators =
-                try M.find var !join_stages with Not_found -> []
+                try Join_stages.find var !join_stages with Not_found -> []
               in
               join_stages
-                := M.add var
-                     (Column_iterator (column, table, scalar)
+                := Join_stages.add var
+                     (Column_iterator (column, table, scalar, columns, repr)
                      :: existing_iterators)
                      !join_stages;
               stages, var_binding_time + 1
             | _ | (exception Not_found) -> add_seek_stage ())
           | Literal _ -> add_seek_stage ()
         in
-        loop ~min_binding_time stages columns scalar args
+        loop ~min_binding_time stages columns scalar args repr
     in
     loop ~min_binding_time:0 [] (Table.Id.columns tid) (bind_table tid) args
+      (Table.Id.result_repr tid)
   in
   let stages =
     List.concat_map
@@ -222,32 +428,19 @@ let decompose_body ~binding_times body =
         match relation with
         | Table tid -> plan_body_table tid args
         | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
+          Var_occurrences.add_terms body_occurrences args;
           [Check_stage atom])
       (Iarray.to_list body)
   in
-  ( M.fold
+  let head =
+    introduce_copies ~binding_times ~join_stages ~body_occurrences head
+  in
+  ( List.rev !bound_tables,
+    Join_stages.fold
       (fun (B (var, iterators)) stages -> Join_stage (var, iterators) :: stages)
       !join_stages stages
     |> Iarray.of_list,
-    List.rev !bound_tables )
-
-let vars_used_by_iterator (Column_iterator (_column, table, _scalar)) =
-  Variable.Id.Set.singleton (Variable.uid table)
-
-let vars_used_by_iterators iterators =
-  List.fold_left
-    (fun vars iterator ->
-      Variable.Id.Set.union vars (vars_used_by_iterator iterator))
-    Variable.Id.Set.empty iterators
-
-let vars_defined_by_iterator (Column_iterator (_column, _table, scalar)) =
-  Variable.Id.Set.singleton (Variable.uid scalar)
-
-let vars_defined_by_iterators iterators =
-  List.fold_left
-    (fun vars iterator ->
-      Variable.Id.Set.union vars (vars_defined_by_iterator iterator))
-    Variable.Id.Set.empty iterators
+    head )
 
 let vars_used_by_term = function
   | Literal _ -> Variable.Id.Set.empty
@@ -590,11 +783,16 @@ let plan_rule0 { variables; head; body } =
         ))
       (0, Variable.Id.Map.empty) variables
   in
-  let stages, tables = decompose_body ~binding_times body in
+  let tables, stages, head = prepare_rule ~binding_times body head in
   let vars_used_by_head =
     Iarray.fold_left
-      (fun vars (Atom (_relation, args)) ->
-        Variable.Id.Set.union vars (free_vars_term_hlist args))
+      (fun vars atom ->
+        match atom with
+        | Output (_, Union (_, args, scalar, _, _)) ->
+          Variable.Id.Set.union_list
+            [vars; vars_used_by_term scalar; free_vars_term_hlist args]
+        | Callback_with_bindings (_, args) ->
+          Variable.Id.Set.union vars (free_vars_term_hlist args))
       Variable.Id.Set.empty head
   in
   let input_stages =
@@ -602,21 +800,7 @@ let plan_rule0 { variables; head; body } =
       stages
     |> plan_stages ~binding_times
   in
-  let output_atoms =
-    Iarray.map
-      (fun (Atom (relation, args)) ->
-        match relation with
-        | Unless _ | Distinct _ | Filter _ ->
-          Misc.fatal_error "not supported in the head"
-        | Table tid ->
-          let repr = Table.Id.result_repr tid in
-          let columns = Table.Id.columns tid in
-          Union (tid, columns, args, lit (Table.Id.default_value tid), [], repr)
-        | Callback_with_bindings (fn, name) ->
-          Callback_with_bindings ({ value = fn; name }, args))
-      head
-  in
-  { tables = Iarray.of_list tables; input_stages; output_atoms }
+  { tables = Iarray.of_list tables; input_stages; output_atoms = head }
 
 let plan_rule rule =
   try plan_rule0 rule

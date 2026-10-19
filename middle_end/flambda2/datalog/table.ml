@@ -38,6 +38,10 @@ let result_repr_diff_or_null (type t) (repr : t result_repr) :
     t -> t -> t Or_null.t =
   match repr with Unit_repr -> fun () () -> Or_null.null
 
+let result_repr_is_unit (type v) (Unit_repr : v result_repr) :
+    (v, unit) Type.eq option =
+  Some Equal
+
 let rec concat : type t k v. (t, k, v) Column.hlist -> earlier:t -> later:t -> t
     =
  fun columns ~earlier ~later ->
