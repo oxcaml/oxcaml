@@ -29,8 +29,10 @@ let make_trace_dir =
     | Some dir as some -> (
       match Sys.mkdir dir 0o777 with
       | () -> some
-      | exception Sys_error _ when Sys.is_directory dir -> some
-      | exception _ -> None))
+      | exception Sys_error _ when Sys.file_exists dir && Sys.is_directory dir
+        ->
+        some
+      | exception _ when not !Clflags.debug_action_trace -> None))
 
 module Writer : sig
   val write_event : Json.t -> unit
