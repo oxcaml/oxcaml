@@ -544,6 +544,7 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
+  | Pvoid
   | Punboxed_product of layout list
   | Pbottom
   | Psplicevar of Slambdaident.t
@@ -567,6 +568,7 @@ and 'a mixed_block_element =
   | Mask
   | Word
   | Untagged_immediate
+  | Void
   | Product of 'a mixed_block_element array
   | Splice_variable of Slambdaident.t
 
@@ -795,14 +797,15 @@ and equal_mixed_block_element :
   | Vec512, Vec512
   | Mask, Mask
   | Word, Word
-  | Untagged_immediate, Untagged_immediate -> true
+  | Untagged_immediate, Untagged_immediate
+  | Void, Void -> true
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal
       (equal_mixed_block_element eq_param ~equal_value_kind) es1 es2
   | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
-     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Product _
+     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+     | Mask | Word | Untagged_immediate | Void | Product _
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
@@ -913,12 +916,13 @@ and join_mixed_block_element (m1 : unit mixed_block_element)
   | Vec512, Vec512
   | Mask, Mask
   | Word, Word
-  | Untagged_immediate, Untagged_immediate -> Some m1
+  | Untagged_immediate, Untagged_immediate
+  | Void, Void -> Some m1
   | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
       Some m1
   | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
       | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-      | Untagged_immediate | Product _ | Splice_variable _ ),
+      | Untagged_immediate | Void | Product _ | Splice_variable _ ),
       _ ) ->
       None
 
@@ -952,6 +956,7 @@ let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
    duplicated for now. We should fix the module dependency structure *)
 let rec is_value_or_void_element : _ mixed_block_element -> bool = function
   | Value _ -> true
+  | Void -> true
   | Product elts -> Array.for_all is_value_or_void_element elts
   | Splice_variable var -> fatal_error_unevaluated_splice_var var
   | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
@@ -983,6 +988,7 @@ let rec join_layout x y =
   | Pbottom, l | l, Pbottom -> l
   | Ptop, _ | _, Ptop -> Ptop
   | Pvalue kind1, Pvalue kind2 -> Pvalue (join_value_kind kind1 kind2)
+  | Pvoid, Pvoid -> Pvoid
   | Punboxed_product layouts1, Punboxed_product layouts2
     when List.length layouts1 = List.length layouts2 ->
       Punboxed_product (List.map2 join_layout layouts1 layouts2)
@@ -997,7 +1003,7 @@ let rec join_layout x y =
       x
   | Punboxed_mask, Punboxed_mask -> x
   | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
-  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ | Pvoid
       | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
       _ ) ->
       Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
@@ -1087,7 +1093,7 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
     false
 
 let forward_inlined_attribute () =
-  if !Clflags.native_code && !Clflags.stubs_forward_inlining
+  if Clflags.target_is_native () && !Clflags.stubs_forward_inlining
   then Forward_inlined
   else Default_inlined
 
@@ -1122,6 +1128,7 @@ type zero_alloc_attribute =
   | Check of { strict: bool;
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
@@ -1592,7 +1599,7 @@ let const_scalar (kind : locality_mode Scalar.Integral.t) n =
       const_unboxed_nativeint (Nativeint.of_int n))
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -1649,7 +1656,7 @@ let split_vectors =
 
 let layout_unit = non_null_value Pintval
 let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})
-let layout_unboxed_unit = Punboxed_product []
+let layout_unboxed_unit = Pvoid
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
 let layout_array kind = non_null_value (Parrayval kind)
@@ -2150,8 +2157,8 @@ let rec transl_mixed_product_element (element : Types.mixed_block_element)
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
+  | Void -> Void
   | Product shape -> Product (transl_mixed_product_shape shape)
-  | Void -> Product [||]
   | Addressable elt ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
@@ -2166,7 +2173,7 @@ let mixed_block_shape_has_splices shape =
     | Product shape -> Array.exists has_splices shape
     | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Untagged_immediate -> false
+    | Untagged_immediate | Void -> false
   in
   Array.exists has_splices shape
 
@@ -2190,6 +2197,7 @@ let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
+  | Void -> Void
   | Product shapes ->
     let get_value_kind _ = generic_value in
     Product (mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
@@ -2229,8 +2237,12 @@ let transl_module_representation repr =
        axes in [shape] will all be [max]. This should not matter, though, since
        it is not possible to reassign / directly mutate a [val] in a module. *)
     let shape =
-      transl_mixed_product_shape
-        (Array.map Types.mixed_block_element_of_const_sort sorts)
+      Array.map
+        (fun sort ->
+           transl_layout
+             (Jkind.Layout.Const.of_sort_const sort
+                Jkind_types.Scannable_axes.max))
+        sorts
     in
     Module_mixed
       ( shape,
@@ -2820,7 +2832,7 @@ let merge_inline_attributes attr1 attr2 =
     else None
 
 let max_arity () =
-  if !Clflags.native_code then 126 else max_int
+  if Clflags.target_is_native () then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
@@ -2919,11 +2931,9 @@ let project_from_mixed_block_shape
                for (nested) shape of %d elements"
               field (Array.length shape);
           project_from_mixed_block_element_by_path shape.(field) path
-        | Value _
-        | Float_boxed _
-        | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
-        | Splice_variable _ ->
+        | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+        | Bits64 | Word | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
+        | Void | Splice_variable _ ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -2934,7 +2944,7 @@ let mixed_block_projection_may_allocate shape ~path =
     match element with
     | Float_boxed mode -> Some mode
     | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-    | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask -> None
+    | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask | Void -> None
     | Product shape ->
       Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
@@ -3137,7 +3147,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pidx_deepen _
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Punbox _ ->
-    if !Clflags.native_code then None
+    if Clflags.target_is_native () then None
     else
       (* We don't provide a locally-allocating version of this primitive
          since it would only apply to bytecode, and code requiring performance
@@ -3381,7 +3391,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Base Mask -> layout_unboxed_mask
-  | Base Void -> layout_unboxed_product []
+  | Base Void -> layout_unboxed_unit
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Addressable sort ->
@@ -3439,6 +3449,7 @@ let strip_locality_mode shape =
     | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
+    | Void -> Void
     | Splice_variable id -> Splice_variable id
   in
   Array.map strip_elt shape
@@ -3519,6 +3530,7 @@ let rec layout_of_mixed_block_element element =
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Mask -> layout_unboxed_mask
+  | Void -> layout_unboxed_unit
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))
@@ -3557,6 +3569,7 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_mask -> Mask
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
+  | Pvoid -> Void
   | Psplicevar id -> Splice_variable id
 
 let pointerness_of_scannable_with_externality ext =
@@ -3590,11 +3603,13 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Mask -> layout_unboxed_mask
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
+  | Void -> Pvoid
   | Splice_variable id -> Psplicevar id
 
 let rec mixed_block_element_leaves (el : _ mixed_block_element)
   : _ mixed_block_element list =
   match el with
+  | Void -> []
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
@@ -3608,7 +3623,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
     List.fold_left
       (fun acc el ->
         match el with
-        | Product _ -> assert false
+        | Void | Product _ -> assert false
         | Splice_variable _ ->
           (* CR layout poly: Treat variables as potentially both, that causes
              this function to be maximally pessimistic. *)
@@ -3623,7 +3638,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
   acc.last_value_after_flat
 
 let primitive_result_layout (p : primitive) =
-  assert (!Clflags.native_code || Clflags.is_flambda2 ());
+  assert (Clflags.target_is_native () || Clflags.is_flambda2 ());
   match p with
   | Pphys_equal (Eq | Noteq) -> layout_int
   | Pscalar op ->

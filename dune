@@ -136,6 +136,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  json
   arrayset
   config
   build_path_prefix_map
@@ -169,6 +170,8 @@
   structured_mangling
   symbol
   lazy_backtrack
+  with_backtracking_intf
+  with_backtracking
   diffing
   diffing_with_keys
   linkdeps

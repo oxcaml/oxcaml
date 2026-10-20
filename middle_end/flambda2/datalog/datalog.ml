@@ -55,7 +55,7 @@ let create_callback_with_bindings func ~name args =
 
 type (_, _) terminator =
   | Yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) terminator
-  | Deduce : atom list -> (Heterogenous_list.nil, Schedule.rule) terminator
+  | Deduce : atom list -> (Heterogenous_list.nil, Lang.rule) terminator
 
 type levels = Levels : 'a Variable.hlist -> levels
 
@@ -128,8 +128,8 @@ let compile_terminator : type p a.
         args
     in
     let variables = Lang.Variable.hlist_to_list variables in
-    Cursor.With_parameters.create_from_rule ~callback parameters variables
-      (Lang.rule ~head:(yield :: head) ~body)
+    Cursor.With_parameters.create_from_rule ~callback parameters
+      (Lang.rule ~variables ~head:(yield :: head) ~body)
   | Deduce deductions ->
     let [] = parameters in
     let head =
@@ -139,9 +139,8 @@ let compile_terminator : type p a.
            deductions)
         head
     in
-    Schedule.create_rule
-      (Lang.Variable.hlist_to_list variables)
-      (Lang.rule ~head ~body)
+    let variables = Lang.Variable.hlist_to_list variables in
+    Lang.rule ~variables ~head ~body
 
 let compile_program parameters
     { conditions; filters; callbacks; terminator; levels } =

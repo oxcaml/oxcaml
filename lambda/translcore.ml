@@ -270,7 +270,7 @@ let event_after ~scopes exp lam =
   Translprim.event_after (of_location ~scopes exp.exp_loc) exp lam
 
 let event_function ~scopes exp lam =
-  if !Clflags.debug && not !Clflags.native_code then
+  if !Clflags.debug && not (Clflags.target_is_native ()) then
     let repr = Some (ref 0) in
     let (info, body) = lam repr in
     (info,
@@ -420,13 +420,16 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check { strict; opt; arity; partial; loc; custom_error_msg = _ }
+      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+           && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { strict;
           never_returns_normally = false;
           never_raises = false;
-          arity = c.arity;
-          loc = c.loc }
+          arity;
+          partial;
+          loc }
       in
       Builtin_attributes.assume_zero_alloc ~inferred:true assume
     | Check _ | Default_zero_alloc | Ignore_assert_all | Assume _ ->
@@ -632,7 +635,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             if List.for_all Jkind.Sort.Const.is_scannable sorts then
               (* Ensure that uniform tuple constants are optimized *)
               Some (Const_block(0, constants))
-            else if !Clflags.native_code then
+            else if Clflags.target_is_native () then
               Some (Const_mixed_block(0, shape, constants))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -717,7 +720,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
-                  if !Clflags.native_code then
+                  if Clflags.target_is_native () then
                     Some (Const_mixed_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -1443,7 +1446,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                !transl_module ~scopes Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
-    if !Clflags.native_code && !Clflags.probes then begin
+    if Clflags.target_is_native () && !Clflags.probes then begin
       let lam = transl_exp ~scopes Lambda.layout_probe_arg exp in
       let map =
         Ident.Set.fold (fun v acc -> Ident.Map.add v (Ident.rename v) acc)
@@ -1591,7 +1594,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
-    if !Clflags.native_code && !Clflags.probes then
+    if Clflags.target_is_native () && !Clflags.probes then
       Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
             [], of_location ~scopes e.exp_loc)
     else
@@ -1995,7 +1998,7 @@ and transl_tupled_function
        rest_cases, partial, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_typed_locality_mode_l arg_mode)
-      && !Clflags.native_code
+      && Clflags.target_is_native ()
       && List.length pl <= (Lambda.max_arity ())
       && all_components_are_values pl ->
       begin try
@@ -2421,15 +2424,17 @@ and transl_function
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc)
-    | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
+    | Check { strict; opt; arity = _; partial; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { strict; loc; custom_error_msg }
+      then Check { strict; loc; custom_error_msg; partial }
       else Default_zero_alloc
     | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
       Assume { strict; never_returns_normally; never_raises; loc }
@@ -2728,7 +2733,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             (* See Note [Constant all-value mixed records]. *)
             raise Not_constant
         | Record_mixed shape ->
-            if !Clflags.native_code then
+            if Clflags.target_is_native () then
               Lconst(Const_mixed_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should

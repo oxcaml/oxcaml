@@ -33,7 +33,7 @@ type 'f solution =
     slot_offsets : Slot_offsets.result;
     types_rewrite_context :
       ('f, Types_rewriter.rewrite_context) Traverse.With_types.t;
-    final_typing_env : ('f, typing_env option) Traverse.With_types.t
+    final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
 let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
@@ -138,8 +138,7 @@ let solve (type f) (problem : f Traverse.Problem.t)
       ~rewrite_result_types:(fun ~my_closure ~params ~results types ->
         match types_rewrite_context, final_typing_env with
         | Without_types, Without_types -> Or_unknown_or_bottom.Unknown
-        | With_types _, With_types None -> Or_unknown_or_bottom.Unknown
-        | With_types types_rewrite_context, With_types (Some old_typing_env) ->
+        | With_types types_rewrite_context, With_types old_typing_env ->
           Or_unknown_or_bottom.Ok
             (Types_rewriter.rewrite_result_types types_rewrite_context
                ~old_typing_env ~my_closure ~params ~results types))
@@ -155,8 +154,7 @@ let solve (type f) (problem : f Traverse.Problem.t)
         With_types final_typing_env,
         With_types unit_symbol ) ->
       With_types
-        (Option.map
-           (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol)
+        (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol
            final_typing_env)
   in
   { analysis_scope;

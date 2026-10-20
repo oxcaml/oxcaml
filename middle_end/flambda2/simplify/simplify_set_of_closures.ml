@@ -698,14 +698,22 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   in
   let dacc =
     DA.map_denv dacc ~f:(fun denv ->
+        (* The types of each closure can refer to the other closures. The typing
+           env expects equations to refer only to names already defined, so we
+           first define all names then add all equations. *)
+        let denv_with_defined_symbols =
+          List.fold_left
+            (fun denv (bound_name, _closure_type) ->
+              (* In the lifting case the symbols could be defined already. *)
+              DE.define_name_if_undefined denv bound_name K.value)
+            denv closure_types_by_bound_name
+        in
         List.fold_left
           (fun denv (bound_name, closure_type) ->
-            (* In the lifting case the symbols could be defined already. *)
-            let denv = DE.define_name_if_undefined denv bound_name K.value in
             DE.add_equation_on_name denv
               (Bound_name.name bound_name)
               closure_type)
-          denv closure_types_by_bound_name)
+          denv_with_defined_symbols closure_types_by_bound_name)
   in
   let set_of_closures =
     Function_declarations.create all_function_decls_in_set

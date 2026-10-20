@@ -1687,7 +1687,15 @@ let f x =
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 type 'a t = Box of 'a
-val f : int -> unit = <fun>
+Line 11, characters 4-11:
+11 |     (Box x)
+         ^^^^^^^
+Error: This constructor has type "'a t" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a t is immutable_data with 'a
+         because of the definition of t at line 3, characters 0-21.
+       But the kind of 'a t must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 21-57.
 |}, Principal{|
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
@@ -1723,7 +1731,15 @@ let f x =
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 type 'a t = Box of 'a
-val f : int -> unit = <fun>
+Line 11, characters 4-11:
+11 |     (Box x)
+         ^^^^^^^
+Error: This constructor has type "'a t" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a t is immutable_data with 'a
+         because of the definition of t at line 3, characters 0-21.
+       But the kind of 'a t must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 21-57.
 |}, Principal{|
 val id : 'a -> 'a = <fun>
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>

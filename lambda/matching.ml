@@ -2139,14 +2139,14 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let sem = add_barrier_to_read ubr Reads_agree in
   let make_void_access binding_kind sort =
     (* Accesses to the void arguments of a constant constructor must create a
-       void (represented in lambda as an empty unboxed product) or product of
-       voids rather than access a block.
+       void or product of voids rather than access a block.
 
        This is necessary for bytecode, where [Pmixedfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
        boxed in bytecode). *)
     let rec lambda_void_of_el el =
       match el with
+      | Void -> Lprim (Punbox_unit, [lambda_unit], loc), layout_unboxed_unit
       | Product shape ->
         let ll, layouts =
           Array.map lambda_void_of_el shape |> Array.to_list |> List.split
@@ -2459,7 +2459,7 @@ let inline_lazy_force arg pos loc =
         ap_specialised = Default_specialise;
         ap_probe=None;
       }
-  else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
+  else if Clflags.target_is_native () && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
        caml_obj_tag and the switch on arbitrary tags *)
     (* Lswitch generates compact and efficient native code *)
@@ -3041,7 +3041,7 @@ module SArg = struct
   let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
 
   let make_is_nonzero loc arg =
-    if !Clflags.native_code || Clflags.is_flambda2 ()
+    if Clflags.target_is_native () || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
@@ -3668,7 +3668,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code || Clflags.is_flambda2 () then
+  if Clflags.target_is_native () || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else

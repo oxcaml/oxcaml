@@ -78,6 +78,8 @@
   local_store
   config
   build_path_prefix_map
+  with_backtracking_intf
+  with_backtracking
   misc
   format_doc
   target_system
@@ -230,6 +232,10 @@
 (copy_files ../../utils/config.ml)
 
 (copy_files ../../utils/build_path_prefix_map.ml)
+
+(copy_files ../../utils/with_backtracking_intf.ml)
+
+(copy_files ../../utils/with_backtracking.ml)
 
 (copy_files ../../utils/misc.ml)
 
@@ -439,6 +445,8 @@
 (copy_files ../../utils/config.mli)
 
 (copy_files ../../utils/build_path_prefix_map.mli)
+
+(copy_files ../../utils/with_backtracking.mli)
 
 (copy_files ../../utils/misc.mli)
 
@@ -729,6 +737,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Build_path_prefix_map.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Config.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Format_doc.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking_intf.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Misc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Target_system.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Arg_helper.cmo
@@ -870,6 +880,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Build_path_prefix_map.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Config.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Format_doc.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking_intf.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Misc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Target_system.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Arg_helper.cmx
