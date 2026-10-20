@@ -157,8 +157,8 @@ let wrap_inlined_body_for_exn_extra_args acc ~extra_args ~apply_exn_continuation
     ~is_cold:false
 
 let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
-    ~(result_arity : [`Complex | `Unknown] Flambda_arity.t) ~make_inlined_body
-    ~invalid ~apply_cont_create ~let_cont_create =
+    ~(result_arity : [`Complex | `Unknown] Flambda_arity.t) ~is_tail_call
+    ~make_inlined_body ~invalid ~apply_cont_create ~let_cont_create =
   let with_exn_extra_args acc ~apply_return_continuation =
     match Exn_continuation.extra_args apply_exn_continuation with
     | [] ->
@@ -172,9 +172,19 @@ let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
         ~result_arity:(Flambda_arity.receiving_arity result_arity)
         ~make_inlined_body ~apply_cont_create ~let_cont_create
   in
-  match Flambda_arity.known result_arity with
-  | Some _ -> with_exn_extra_args acc ~apply_return_continuation
-  | None ->
+  match
+    Flambda_arity.known result_arity, (apply_return_continuation : RC.t)
+  with
+  | Some _, _ -> with_exn_extra_args acc ~apply_return_continuation
+  | None, Return _
+    when is_tail_call
+         && List.is_empty (Exn_continuation.extra_args apply_exn_continuation)
+    ->
+    (* The calls in the body stay tail calls: they return to the caller's return
+       continuation, at another arity, which makes them never return (see
+       [Simplify_apply_expr] and [To_cmm_expr]). *)
+    with_exn_extra_args acc ~apply_return_continuation
+  | None, (Return _ | Never_returns) ->
     let never_returns = Continuation.create () in
     let_cont_create acc never_returns ~handler_params:Bound_parameters.empty
       ~handler:invalid

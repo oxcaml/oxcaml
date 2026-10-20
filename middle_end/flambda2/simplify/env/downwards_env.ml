@@ -646,12 +646,12 @@ let set_rebuild_terms t =
 
 let are_rebuilding_terms t = t.are_rebuilding_terms
 
-let enter_closure code_id ~return_continuation ~exn_continuation ~my_closure
-    ~my_alloc_region t =
+let enter_closure code_id ~return_continuation ~exn_continuation ~result_arity
+    ~my_closure ~my_alloc_region t =
   { t with
     closure_info =
       Closure_info.in_a_closure code_id ~return_continuation ~exn_continuation
-        ~my_closure ~my_alloc_region
+        ~result_arity ~my_closure ~my_alloc_region
   }
 
 let closure_info t = t.closure_info

@@ -20,6 +20,7 @@ type t = private
       { code_id : Code_id.t;
         return_continuation : Continuation.t;
         exn_continuation : Continuation.t;
+        result_arity : [`Complex | `Unknown] Flambda_arity.t;
         my_closure : Variable.t;
         my_alloc_region : Variable.t
       }
@@ -34,6 +35,7 @@ val in_a_closure :
   Code_id.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
+  result_arity:[`Complex | `Unknown] Flambda_arity.t ->
   my_closure:Variable.t ->
   my_alloc_region:Variable.t ->
   t
@@ -43,3 +45,7 @@ type in_or_out_of_closure =
   | Not_in_a_closure
 
 val in_or_out_of_closure : t -> in_or_out_of_closure
+
+(** Whether the application returns to the current function's return
+    continuation and raises to its exception continuation. *)
+val is_tail_call : t -> Flambda.Apply.t -> bool
