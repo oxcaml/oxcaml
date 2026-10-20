@@ -251,7 +251,7 @@ let fold_binary_primitive machine_width (prim : P.binary_primitive) arg1 arg2 =
               (Reg_width_const.naked_immediate
                  (Target_ocaml_int.bool machine_width result))))
   | _ ->
-    Flambda2_simplify.Simplify_binary_primitive.fold_binary_int_primitive
+    Flambda2_simplify_shared.Binary_primitive_ops.fold_binary_int_primitive
       ~machine_width prim arg1 arg2
 
 let fold_primitive_with_const_args machine_width (prim : P.t) : Simple.t option
