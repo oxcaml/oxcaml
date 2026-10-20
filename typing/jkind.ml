@@ -3504,7 +3504,7 @@ module Format_history = struct
     match arity with 1 -> "" | _ -> to_ordinal position ^ " "
 
   let format_concrete_creation_reason ppf :
-      History.concrete_creation_reason -> unit = function
+    History.concrete_creation_reason -> unit = function
     | Match -> fprintf ppf "a value of this type is matched against a pattern"
     | Extension_constructor_declaration _ ->
       fprintf ppf "it's the type of an argument to an extension constructor"
@@ -3568,6 +3568,8 @@ module Format_history = struct
       fprintf ppf "it's a fake kind created during error recovery"
     | Module_projection ->
       fprintf ppf "it's the type of an item in a module being projected from"
+    | Module_coercion ->
+      fprintf ppf "it's the type of an item in a module being coerced"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4788,6 +4790,7 @@ module Debug_printers = struct
     | Layout_poly -> fprintf ppf "Layout_poly"
     | Typing_recovery -> fprintf ppf "Typing_recovery"
     | Module_projection -> fprintf ppf "Module_projection"
+    | Module_coercion -> fprintf ppf "Module_coercion"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

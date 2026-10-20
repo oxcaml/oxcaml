@@ -126,6 +126,7 @@ module Error = struct
     | Module_type_declaration of
         (modtype_declaration, module_type_declaration_symptom) diff
     | Module_type of module_type_diff
+    | Unrepresentable_item of type_expr * Jkind.Violation.t
 
   and module_type_declaration_symptom =
     | Illegal_permutation of Typedtree.module_coercion
@@ -478,6 +479,31 @@ let is_identity_coercion pos_cc_list =
   | (n, c) :: rem ->
       n = pos && c = Tcoerce_none && loop (pos + 1) rem in
   loop 0 pos_cc_list
+
+let build_output_repr ~env input_repr pos_cc_list =
+  List.map
+    (fun (pos, cc) ->
+       if pos >= 0 then input_repr.(pos)
+       else
+         match cc with
+         | Tcoerce_alias _ -> Jkind.Sort.(of_const Const.for_module)
+         | Tcoerce_primitive pc ->
+           (match
+              Ctype.type_sort ~why:Signature_item ~allow_mutation:false env
+                pc.pc_type
+            with
+            | Ok sort -> sort
+            | Error _ ->
+              Misc.fatal_error
+                "build_output_repr: expected representable primitive")
+         (* [Tcoerce_invalid] is never actually translated; see the
+            comment at its definition in [typedtree.mli]. *)
+         | Tcoerce_invalid -> Jkind.Sort.(of_const Const.void)
+         | Tcoerce_none | Tcoerce_structure _ | Tcoerce_functor _
+         | Tcoerce_kindtemplate _ ->
+           Misc.fatal_error "build_output_repr: unexpected coercion")
+    pos_cc_list
+  |> Array.of_list
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -957,17 +983,29 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           then mod_shape
           else Shape.str ?uid:mod_shape.Shape.uid d.shape_map
         in
-        let coercion =
-          (* see PR#5098 *)
-          if runtime_len1 = runtime_len2 && is_identity_coercion cc then
-            Tcoerce_none
-          else
-            let input_repr = Subst.Lazy.expect_fixed_representation sig1 in
-            let output_repr = Subst.Lazy.expect_fixed_representation sig2 in
-            Tcoerce_structure
-              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
-        in
-        Ok (coercion, shape)
+        (* see PR#5098 *)
+        if runtime_len1 = runtime_len2 && is_identity_coercion cc then
+          Ok (Tcoerce_none, shape)
+        else begin
+          match
+            Env.sorts_of_signature_items ~why:Module_coercion new_env sig1
+          with
+          | Error { item; item_type; violation; item_desc = _ } ->
+              Error {
+                Error.env=new_env;
+                subst;
+                missings = [];
+                incompatibles =
+                  [item, Error.Unrepresentable_item (item_type, violation)];
+              }
+          | Ok input_repr ->
+              let output_repr =
+                build_output_repr ~env:new_env input_repr cc
+              in
+              Ok (Tcoerce_structure
+                    { input_repr; output_repr; pos_cc_list = cc; id_pos_list },
+                  shape)
+        end
     | missings, incompatibles, _runtime_coercions, _leftovers ->
         Error {
           Error.env=new_env;

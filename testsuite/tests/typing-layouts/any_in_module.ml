@@ -465,9 +465,7 @@ module Sig_extra : S = struct
   let z = 3 (* This gets dropped *)
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module Sig_extra : S
 |}]
 
 module Sig_reorder : S = struct
@@ -476,9 +474,7 @@ module Sig_reorder : S = struct
   let x = 1
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module Sig_reorder : S
 |}]
 
 (* Signature inclusion *)
@@ -501,18 +497,28 @@ module F (M : S) = struct
   type v = G(M).u
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 3, characters 11-15:
+3 |   type v = G(M).u
+               ^^^^
+Error: Modules do not match: sig type t = M.t val x : t val y : int end
+     is not included in U
+     Signatures containing unrepresentable items are not
+     included in other signatures.
+     "x" is not representable.
+     The layout of t is any
+       because of the definition of t at line 2, characters 2-14.
+     But the layout of t must be representable
+       because it's the type of an item in a module being coerced.
 |}]
 
 module F (V : Value_witness) (M : S with type t = V.t) = struct
   type v = G(M).u
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig type v = G(M).u end
 |}]
 
 (* Coercing out of a module requires knowing the input's representation. *)
@@ -520,9 +526,21 @@ module Sig_from_unrepresentable (M : S) = struct
   module N : sig val y : int end = M
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 35-36:
+2 |   module N : sig val y : int end = M
+                                       ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = M.t val x : t val y : int end
+       is not included in
+         sig val y : int end
+       Signatures containing unrepresentable items are not
+       included in other signatures.
+       "x" is not representable.
+       The layout of t is any
+         because of the definition of t at line 2, characters 2-14.
+       But the layout of t must be representable
+         because it's the type of an item in a module being coerced.
 |}]
 
 (* The same, in a submodule. *)
@@ -530,9 +548,27 @@ module Sig_from_unrepresentable_nested (M : S) = struct
   module O : sig module N : sig val y : int end end = struct module N = M end
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 54-77:
+2 |   module O : sig module N : sig val y : int end end = struct module N = M end
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig module N : sig type t = M.t val x : t val y : int end end
+       is not included in
+         sig module N : sig val y : int end end
+       In module "N":
+       Modules do not match:
+         sig type t = M.t val x : t val y : int end
+       is not included in
+         sig val y : int end
+       In module "N":
+       Signatures containing unrepresentable items are not
+       included in other signatures.
+       "x" is not representable.
+       The layout of t is any
+         because of the definition of t at line 2, characters 2-14.
+       But the layout of t must be representable
+         because it's the type of an item in a module being coerced.
 |}]
 
 (* We can obtain sorts for things that don't have a runtime representation in
@@ -542,9 +578,7 @@ module Sig_primitive : sig type t : any val f : t end = struct
   external f : int -> int = "%identity"
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module Sig_primitive : sig type t : any val f : t end
 |}]
 
 (* The constant and identity functors can take unrepresentable modules. *)
@@ -582,16 +616,26 @@ end
 let f (module M : S) = (module M : S2)
 [%%expect{|
 module type S2 = sig type t : any val x : t end
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 7, characters 31-32:
+7 | let f (module M : S) = (module M : S2)
+                                   ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = M.t val x : t val y : int end
+       is not included in
+         S2
+       Signatures containing unrepresentable items are not
+       included in other signatures.
+       "x" is not representable.
+       The layout of t is any
+         because of the definition of t at line 2, characters 2-14.
+       But the layout of t must be representable
+         because it's the type of an item in a module being coerced.
 |}]
 
 let f (type a : value) (module M : S with type t = a) = (module M : S2)
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S with type t = 'a) -> (module S2) = <fun>
 |}]
 
 (* Test [include functor]. *)
