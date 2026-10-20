@@ -444,6 +444,16 @@ module Coerced_inst = Coerced.Make (struct
   let x = 3
 end)
 
+(* {1 A primitive used as a value}
+
+   Passing a primitive such as [Fun.id] as a value eta-expands it into a
+   closure, named after the primitive: [First_class.use_id.%identity]. *)
+module First_class = struct
+  let[@inline never] keep (f : int -> int) = Sys.opaque_identity f
+
+  let[@inline never] use_id () = keep Fun.id
+end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -488,4 +498,5 @@ let _ =
   ignore (Prims.( < ) 1 2);
   ignore (Prims.compare 1 2);
   ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1));
-  ignore (Coerced_inst.get ())
+  ignore (Coerced_inst.get ());
+  ignore (First_class.use_id () 5)
