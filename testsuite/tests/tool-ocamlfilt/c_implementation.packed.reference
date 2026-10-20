@@ -1,1 +1,1 @@
-e2e_oxcaml.o: the two implementations agree on every symbol
+c_implementation_input.o: the two implementations agree on every symbol
