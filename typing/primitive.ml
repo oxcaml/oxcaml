@@ -579,13 +579,16 @@ module Repr_check = struct
     | Unextended_bits8 | Unextended_bits16
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
-
-  let c_stub_return_errors = function
-    | Same_as_ocaml_repr _
+ let c_stub_return_errors = function
+    | Same_as_ocaml_repr (Base _ | Product _ | Addressable _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
     | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
+    | Same_as_ocaml_repr (Univar _) ->
+      Misc.fatal_error "c_stub_return_errors: univar"
+    | Same_as_ocaml_repr (Genvar _) ->
+      Misc.fatal_error "c_stub_return_errors: genvar"
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
