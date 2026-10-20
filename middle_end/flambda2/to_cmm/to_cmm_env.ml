@@ -1313,3 +1313,5 @@ let flush_delayed_lets ~mode env res =
     }
   in
   flush, env, !res
+
+let argument_index_by_name t v = Variable.Map.find_opt v t.arguments

@@ -398,3 +398,5 @@ val get_cmm_continuation : t -> Continuation.t -> Lambda.static_label
 (** print function *)
 val print_param_type :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a param_type -> unit
+
+val argument_index_by_name : t -> Variable.t -> int option
