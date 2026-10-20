@@ -1,4 +1,3 @@
-# 2 "camlinternalComprehension.ml"
 open! Stdlib
 
 type 'a rev_list =

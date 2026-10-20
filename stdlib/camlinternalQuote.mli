@@ -1,4 +1,3 @@
-# 2 "camlinternalQuote.mli"
 (******************************************************************************
  *                                  OxCaml                                    *
  *                      Andrej Ivaskovic, Jane Street                         *
