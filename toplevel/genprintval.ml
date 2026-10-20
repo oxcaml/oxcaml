@@ -377,10 +377,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       List.map snd (Array.to_list label_params_and_types)
 
     let outval_mixed_rep shape =
-      Outval_record_mixed
-        (Mixed_block_shape.of_mixed_block_elements
-           (Lambda.transl_mixed_product_shape shape)
-           ~print_locality:(fun ppf () -> Format.fprintf ppf "()"))
+      let shape = Lambda.transl_mixed_product_shape shape in
+      match Lambda.singleton_product_shape_for_bytecode shape with
+      | Some _ when not (Clflags.target_is_native ()) ->
+          Outval_record_unboxed
+      | _ ->
+          Outval_record_mixed
+            (Mixed_block_shape.of_mixed_block_elements shape
+               ~print_locality:(fun ppf () -> Format.fprintf ppf "()"))
 
     let outval_rep_of_field_types env field_types =
       match Typedecl.compute_block_shape env (field_types ()) with
@@ -869,12 +873,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
             with
             | Void -> Oval_stuff "<void>"
-            | Unboxed_product
-              when (not (Clflags.target_is_native ()))
-                   && Mixed_block_shape.num_fields shape = 1 ->
-                (* Bytecode stores the fields of a singleton product directly
-                   in the block. *)
-                nested obj
             | Unboxed_product | Singleton _
               when not (Clflags.target_is_native ()) ->
                 (* Only native code reorders a mixed block's fields; bytecode
