@@ -105,6 +105,7 @@ val create :
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
+  params:Bound_parameters.t ->
   t
 
 (** Given an existing environment providing the "global" information (such as
@@ -115,6 +116,7 @@ val enter_function_body :
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
+  params:Bound_parameters.t ->
   t
 
 (** {2 Debuginfo} *)

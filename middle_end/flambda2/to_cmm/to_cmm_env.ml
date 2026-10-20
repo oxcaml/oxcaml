@@ -188,9 +188,12 @@ type t =
     (* Stages of let-bindings, most recent at the head. *)
     validity_stages : validity_stage list;
     (* Stages of let-bindings, most recent at the head. *)
-    symbol_inits : Symbol_inits.t
-        (* Symbol initialization expressions, indexed by the variable used as
-           value for the symbol field initialization. *)
+    symbol_inits : Symbol_inits.t;
+    (* Symbol initialization expressions, indexed by the variable used as
+       value for the symbol field initialization. *)
+    arguments : int Variable.Map.t
+    (* Named parameters and aliases thereof, mapped to their index in the list
+       of arguments to this function. *)
   }
 
 type translation_result =
@@ -281,7 +284,7 @@ let print ppf t =
 (* Creation *)
 
 let create offsets functions_info ~trans_prim ~return_continuation
-    ~return_continuation_arity ~exn_continuation =
+    ~return_continuation_arity ~exn_continuation ~params =
   let conts =
     Continuation.Map.singleton return_continuation
       (Return { param_types = return_continuation_arity })
@@ -299,13 +302,17 @@ let create offsets functions_info ~trans_prim ~return_continuation
     vars = Variable.Map.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
-    symbol_inits = Backend_var.Map.empty
+    symbol_inits = Backend_var.Map.empty;
+    arguments =
+      Bound_parameters.vars params
+      |> List.mapi (fun argument_index var -> var, argument_index)
+      |> Variable.Map.of_list
   }
 
 let enter_function_body env ~return_continuation ~return_continuation_arity
-    ~exn_continuation =
+    ~exn_continuation ~params =
   create env.offsets env.functions_info ~trans_prim:env.trans_prim
-    ~return_continuation ~return_continuation_arity ~exn_continuation
+    ~return_continuation ~return_continuation_arity ~exn_continuation ~params
 
 (* Debuginfo *)
 
