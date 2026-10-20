@@ -732,6 +732,7 @@ val transl_switch_clambda :
       any way for the frontend to generate any arguments other than the cache
       and cache position) *)
 val send :
+  never_returns:bool ->
   Lambda.meth_kind ->
   expression ->
   expression ->
@@ -1082,6 +1083,7 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
+  never_returns:bool ->
   machtype ->
   Lambda.region_close ->
   symbol ->
@@ -1091,6 +1093,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
+  never_returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->
@@ -1103,6 +1106,7 @@ val indirect_call :
     application (since this enables a few optimisations). *)
 val indirect_full_call :
   dbg:Debuginfo.t ->
+  never_returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
