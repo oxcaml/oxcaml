@@ -283,6 +283,13 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     aux args args_arity
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
+  let arguments_possibly_being_called =
+    let bind f = function | None -> None | Some x -> f x in
+    callee_simple
+    |> bind Simple.must_be_var
+    |> bind (fun (var, _) -> Env.argument_index_by_name env var)
+    |> Option.map (fun argument_index -> [Cmm.Argument { argument_index }])
+  in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -337,7 +344,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     ( C.indirect_call ~dbg return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
-        callee args_ty (split_args ()),
+        callee args_ty (split_args ()) ~callees:arguments_possibly_being_called,
       free_vars,
       env,
       res,
@@ -354,12 +361,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     let callees =
       match callees with
-      | Unknown ->
-        let bind f = function | None -> None | Some x -> f x in
-        callee_simple
-        |> bind Simple.must_be_var
-        |> bind (fun (var, _) -> Env.argument_index_by_name env var)
-        |> Option.map (fun argument_index -> [Cmm.Argument { argument_index }])
+      | Unknown -> arguments_possibly_being_called
       | Known code_id_set ->
         Some
           (List.map
