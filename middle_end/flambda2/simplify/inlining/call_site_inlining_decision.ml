@@ -461,9 +461,6 @@ let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
      [@unrolled] and stubs do not consult the decision made at the function
      definition. *)
   let jsir_forbids_inlining =
-    (* [Code.can_be_inlined_for_jsir] also tests [Clflags.target_is_jsir];
-       testing it here first avoids the code lookup when not compiling to
-       JSIR. *)
     Clflags.target_is_jsir ()
     && (match Apply.inlined apply with
       | Never_inlined | Forward_inlined ->

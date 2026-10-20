@@ -407,7 +407,8 @@ module Inlining = struct
              wrappers created by [make_unboxed_function_wrapper] inherit the
              main function's decision while projecting from their own closure,
              so they can reach this point with code present. *)
-          if not (Code.can_be_inlined_for_jsir code)
+          if
+            Clflags.target_is_jsir () && not (Code.can_be_inlined_for_jsir code)
           then
             ( Call_site_inlining_decision_type.Jsir_inlining_disabled,
               Not_inlinable { disabled_for_jsir = true } )
