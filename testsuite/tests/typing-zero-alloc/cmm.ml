@@ -49,3 +49,13 @@ camlTOP4__shadow_8_16_code:
 
 val shadow : 'a -> 'b -> unit = <fun>
 |}]
+
+(* "Tupled" functions (functions with a single tuple argument) are lowered to
+   multi-argument functions: *)
+let tupled (x, f) = f x
+[%%expect{|
+camlTOP5__tupled_10_18_code:
+- Some [Argument { argument_index = 1 }]
+
+val tupled : 'a * ('a -> 'b) -> 'b = <fun>
+|}]
