@@ -1,4 +1,4 @@
-/* Stubs for unboxed_return4_arm64.ml. The native versions take and return C
+/* Stubs for unboxed_arm64.ml. The native versions take and return C
    structs of NEON vector types by value.
 
    The test using this file is native-only and arm64-only, so there are no

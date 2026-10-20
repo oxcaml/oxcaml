@@ -13,10 +13,6 @@ sum_three_pairs: 321
 mixed_args: 230
 sum_i64_void: 123
 stack_single: 1000536
-ret_i32i32_i64: -11 22 -3333
-ret_f32_quad: 0.5000 -1.5000 2.2500 -4.0000
-ret_nested: -77 88 9999
-ret_nested_padded: -77777 1234 -5678
 swap_mixed: -2.5000 5
 sum_i16_quad: 20003
 sum_i8_i8_i16_i32: 7920000
@@ -26,11 +22,14 @@ sum_string_i64: 105
 sum_three_pairs_then_int: 6721
 stack_single_f32: 66.0000
 sum_i64_pair_noalloc: 17
-ret_i16_quad: -1 2 -3000 4000
-ret_i8_i8_i16_i32: -100 50 -20000 1000000
-ret_f32_triple: 1.5000 -0.2500 4.0000
-ret_string_i64: hello 42
 seven_ints_f64_pair: 770.0000
 stack_single_value: 786
 all_void_arg: 4242
-all_void_return: ok
+void_between_args: 8421
+void_inside_f32: 1.0000
+void_nested: 139700
+void_stack_single_nested: 6536
+void_regs_int: 321
+void_regs_float: 1793.0000
+void_record: 97
+void_swap: 0.7500 12

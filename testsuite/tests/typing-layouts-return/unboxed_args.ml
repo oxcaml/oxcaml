@@ -17,10 +17,9 @@
  }
 *)
 
-(* Test of unboxed product arguments to external calls (without [@unpacked]),
-   and of product returns beyond pairs. The native stubs in args_stubs.c take
-   and return C structs by value, checking interoperability with the C
-   compiler.
+(* Test of unboxed product arguments to external calls (without [@unpacked]).
+   The native stubs in args_stubs.c take C structs by value, checking
+   interoperability with the C compiler.
 
    No C struct here is passed in memory, except single-component products which
    may spill to the stack (since they are passed like their member). *)
@@ -35,16 +34,12 @@ external unbox_int32 : (int32[@local_opt]) -> int32_u = "%unbox_int32"
 external unbox_float32 : (float32[@local_opt]) -> float32_u = "%unbox_float32"
 external float_of_float32 : float32 -> float = "%floatoffloat32"
 external untag_int16 : int16 -> int16# = "%untag_int16"
-external tag_int16 : int16# -> int16 = "%tag_int16"
 external untag_int8 : int8 -> int8# = "%untag_int8"
-external tag_int8 : int8# -> int8 = "%tag_int8"
 
 let i32 x = unbox_int32 x
 let f32 x = unbox_float32 (Float32.of_float x)
 let i16 x = untag_int16 (Int16.of_int x)
-let i16' x = Int16.to_int (tag_int16 x)
 let i8 x = untag_int8 (Int8.of_int x)
-let i8' x = Int8.to_int (tag_int8 x)
 let f32' x = float_of_float32 (box_float32 x)
 
 (* Two int64s: two integer registers on both ABIs. *)
@@ -188,44 +183,6 @@ let () =
        (stack_single #1L #2L #3L #4L #5L #6L #7L #8L (i32 100l)
           #(i16 (-5), #()) (i32 1000l)))
 
-(* A three-component return of 16 bytes: the two int32s come back packed in
-   the first result register, the int64 in the second. *)
-external ret_i32i32_i64 : unit -> #(int32_u * int32_u * int64_u)
-  = "ret_i32i32_i64_bytecode" "ret_i32i32_i64_native"
-
-let () =
-  let #(a, b, c) = ret_i32i32_i64 () in
-  Printf.eprintf "ret_i32i32_i64: %ld %ld %Ld\n%!" (box_int32 a) (box_int32 b)
-    (box_int64 c)
-
-(* A four-component return: on x86-64, two SSE registers each holding two
-   packed float32s; on arm64, a homogeneous aggregate returned in s0-s3. *)
-external ret_f32_quad : unit -> #(float32_u * float32_u * float32_u * float32_u)
-  = "ret_f32_quad_bytecode" "ret_f32_quad_native"
-
-let () =
-  let #(a, b, c, d) = ret_f32_quad () in
-  Printf.eprintf "ret_f32_quad: %.4f %.4f %.4f %.4f\n%!" (f32' a) (f32' b)
-    (f32' c) (f32' d)
-
-(* A nested product return. *)
-external ret_nested : unit -> #(#(int32_u * int32_u) * int64_u)
-  = "ret_nested_bytecode" "ret_nested_native"
-
-let () =
-  let #(#(a, b), c) = ret_nested () in
-  Printf.eprintf "ret_nested: %ld %ld %Ld\n%!" (box_int32 a) (box_int32 b)
-    (box_int64 c)
-
-(* Return version of [sum_nested_padded] above. *)
-external ret_nested_padded : unit -> #(#(int32_u * int16#) * int16#)
-  = "ret_nested_padded_bytecode" "ret_nested_padded_native"
-
-let () =
-  let #(#(a, b), c) = ret_nested_padded () in
-  Printf.eprintf "ret_nested_padded: %ld %d %d\n%!" (box_int32 a) (i16' b)
-    (i16' c)
-
 (* A packed product argument together with a packed product return. *)
 external swap_mixed : #(int32_u * float32_u) -> #(float32_u * int32_u)
   = "swap_mixed_bytecode" "swap_mixed_native"
@@ -314,45 +271,6 @@ let () =
   Printf.eprintf "sum_i64_pair_noalloc: %Ld\n%!"
     (box_int64 (sum_i64_pair_noalloc #(#5L, #6L)))
 
-(* Returns with more than two components per register. *)
-external ret_i16_quad : unit -> #(int16# * int16# * int16# * int16#)
-  = "ret_i16_quad_bytecode" "ret_i16_quad_native"
-
-let () =
-  let #(a, b, c, d) = ret_i16_quad () in
-  Printf.eprintf "ret_i16_quad: %d %d %d %d\n%!" (i16' a) (i16' b) (i16' c)
-    (i16' d)
-
-external ret_i8_i8_i16_i32 : unit -> #(int8# * int8# * int16# * int32_u)
-  = "ret_i8_i8_i16_i32_bytecode" "ret_i8_i8_i16_i32_native"
-
-let () =
-  let #(a, b, c, d) = ret_i8_i8_i16_i32 () in
-  Printf.eprintf "ret_i8_i8_i16_i32: %d %d %d %ld\n%!" (i8' a) (i8' b) (i16' c)
-    (box_int32 d)
-
-(* See [sum_f32_triple]. *)
-external ret_f32_triple : unit -> #(float32_u * float32_u * float32_u)
-  = "ret_f32_triple_bytecode" "ret_f32_triple_native"
-
-let () =
-  let #(a, b, c) = ret_f32_triple () in
-  Printf.eprintf "ret_f32_triple: %.4f %.4f %.4f\n%!" (f32' a) (f32' b) (f32' c)
-
-(* A freshly allocated heap pointer returned in a product: it must be treated
-   as a GC root, so it is promoted and the minor heap is then overwritten
-   before it is used. *)
-external ret_string_i64 : int -> #(string * int64_u)
-  = "ret_string_i64_bytecode" "ret_string_i64_native"
-
-let () =
-  let #(s, n) = ret_string_i64 21 in
-  Gc.minor ();
-  for _ = 1 to 1_000_000 do
-    ignore (Sys.opaque_identity (String.make 5 'x'))
-  done;
-  Printf.eprintf "ret_string_i64: %s %Ld\n%!" s (box_int64 n)
-
 (* Seven ints use up the six x86-64 integer argument registers (the seventh
    goes on the stack); the pair of floats still goes in registers. *)
 external seven_ints_f64_pair :
@@ -374,16 +292,96 @@ let () =
     (box_int64
        (stack_single_value #1L #2L #3L #4L #5L #6L #7L #8L #(5, #()) 7))
 
-(* Products all of whose components are void: no C arguments or results. *)
+(* A product all of whose components are void: no C arguments. *)
 external all_void_arg : #(unit# * unit#) -> int64_u
   = "all_void_arg_bytecode" "all_void_arg_native"
 
 let () =
   Printf.eprintf "all_void_arg: %Ld\n%!" (box_int64 (all_void_arg #(#(), #())))
 
-external all_void_return : unit -> #(unit# * unit#)
-  = "all_void_return_bytecode" "all_void_return_native"
+(* Void scalar arguments between other arguments correspond to no C
+   arguments. *)
+external void_between_args :
+  int64_u -> unit# -> #(int32_u * int32_u) -> unit# -> int64_u -> int64_u
+  = "void_between_args_bytecode" "void_between_args_native"
 
 let () =
-  let #(#(), #()) = all_void_return () in
-  Printf.eprintf "all_void_return: ok\n%!"
+  Printf.eprintf "void_between_args: %Ld\n%!"
+    (box_int64 (void_between_args #1L #() #(i32 10l, i32 100l) #() #1000L))
+
+(* Void components between other components contribute no struct members or
+   padding. *)
+external void_inside_f32 :
+  #(unit# * float32_u * unit# * float32_u * unit#) -> float#
+  = "void_inside_f32_bytecode" "void_inside_f32_native"
+
+let () =
+  Printf.eprintf "void_inside_f32: %.4f\n%!"
+    (box_float (void_inside_f32 #(#(), f32 1.5, #(), f32 (-0.25), #())))
+
+(* Nested products containing void, including an all-void one, which has
+   neither size nor alignment. *)
+external void_nested :
+  #(#(unit# * int16#) * #(unit# * unit#) * #(int32_u * unit#)) -> int64_u
+  = "void_nested_bytecode" "void_nested_native"
+
+let () =
+  Printf.eprintf "void_nested: %Ld\n%!"
+    (box_int64
+       (void_nested #(#(#(), i16 (-300)), #(#(), #()), #(i32 70000l, #()))))
+
+(* Like [stack_single], with the single non-void component nested among
+   voids. *)
+external void_stack_single_nested :
+  int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u
+  -> int64_u -> #(unit# * #(unit# * int16#) * unit#) -> int32_u -> int64_u
+  = "void_stack_single_nested_bytecode" "void_stack_single_nested_native"
+
+let () =
+  Printf.eprintf "void_stack_single_nested: %Ld\n%!"
+    (box_int64
+       (void_stack_single_nested #1L #2L #3L #4L #5L #6L #7L #8L
+          #(#(), #(#(), i16 (-5)), #()) (i32 7l)))
+
+(* Void arguments take no registers: these use exactly all six x86-64 integer
+   argument registers and all eight floating-point argument registers
+   respectively, so would be rejected if they did. *)
+external void_regs_int :
+  int64_u -> int64_u -> int64_u -> int64_u -> unit# -> #(unit# * unit#)
+  -> #(int64_u * int64_u) -> int64_u
+  = "void_regs_int_bytecode" "void_regs_int_native"
+
+let () =
+  Printf.eprintf "void_regs_int: %Ld\n%!"
+    (box_int64 (void_regs_int #1L #2L #3L #4L #() #(#(), #()) #(#5L, #6L)))
+
+external void_regs_float :
+  float# -> float# -> float# -> float# -> float# -> float# -> #(unit# * unit#)
+  -> unit# -> #(float# * float#) -> float#
+  = "void_regs_float_bytecode" "void_regs_float_native"
+
+let () =
+  Printf.eprintf "void_regs_float: %.4f\n%!"
+    (box_float
+       (void_regs_float #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #(#(), #()) #()
+          #(#7.0, #8.0)))
+
+(* An unboxed record with a void field. *)
+type i32_void_i64 = #{ x : int32_u; v : unit#; y : int64_u }
+
+external void_record : i32_void_i64 -> int64_u
+  = "void_record_bytecode" "void_record_native"
+
+let () =
+  Printf.eprintf "void_record: %Ld\n%!"
+    (box_int64 (void_record #{ x = i32 (-3l); v = #(); y = #50L }))
+
+(* Voids in both arguments and returns. *)
+external void_swap :
+  unit# -> #(int32_u * unit# * float32_u) -> unit#
+  -> #(unit# * float32_u * int32_u)
+  = "void_swap_bytecode" "void_swap_native"
+
+let () =
+  let #(#(), a, b) = void_swap #() #(i32 12l, #(), f32 0.75) #() in
+  Printf.eprintf "void_swap: %.4f %ld\n%!" (f32' a) (box_int32 b)

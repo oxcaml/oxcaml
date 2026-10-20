@@ -1,6 +1,6 @@
 (* TEST
  modules = "vec128_stubs.c";
- reference = "${test_source_directory}/unboxed_return4_arm64.reference";
+ reference = "${test_source_directory}/unboxed_arm64.reference";
  flambda2;
  arch_arm64;
  {

@@ -1,5 +1,5 @@
-/* Stubs for unboxed_args.ml. The native versions take and return C structs
-   by value; the bytecode versions use (possibly nested) tuples.
+/* Stubs for unboxed_args.ml. The native versions take C structs by value;
+   the bytecode versions use (possibly nested) tuples.
 
    Sums weight successive components by powers of two, so that swapped
    components or arguments are detected. */
@@ -22,7 +22,6 @@ typedef struct { args_i32_i32 p; int64_t c; } args_nested;
 typedef struct { int32_t a; int16_t b; } args_i32_i16;
 typedef struct { args_i32_i16 p; int16_t c; } args_nested_padded;
 typedef struct { int32_t a; int16_t b; int16_t c; } args_flat_i32_i16_i16;
-typedef struct { int32_t a; int32_t b; int64_t c; } args_i32_i32_i64;
 typedef struct { int32_t a; float b; } args_i32_f32;
 typedef struct { float a; int32_t b; } args_f32_i32_ret;
 
@@ -217,82 +216,6 @@ value stack_single_bytecode(value *argv, int argn) {
   CAMLreturn(caml_copy_int64(sum));
 }
 
-args_i32_i32_i64 ret_i32i32_i64_native(value unit) {
-  args_i32_i32_i64 res = { -11, 22, -3333 };
-  return res;
-}
-
-value ret_i32i32_i64_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal4(res, a, b, c);
-  a = caml_copy_int32(-11);
-  b = caml_copy_int32(22);
-  c = caml_copy_int64(-3333);
-  res = caml_alloc_small(3, 0);
-  Field(res, 0) = a;
-  Field(res, 1) = b;
-  Field(res, 2) = c;
-  CAMLreturn(res);
-}
-
-args_f32x4 ret_f32_quad_native(value unit) {
-  args_f32x4 res = { 0.5f, -1.5f, 2.25f, -4.0f };
-  return res;
-}
-
-value ret_f32_quad_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal5(res, a, b, c, d);
-  a = caml_copy_float32(0.5f);
-  b = caml_copy_float32(-1.5f);
-  c = caml_copy_float32(2.25f);
-  d = caml_copy_float32(-4.0f);
-  res = caml_alloc_small(4, 0);
-  Field(res, 0) = a;
-  Field(res, 1) = b;
-  Field(res, 2) = c;
-  Field(res, 3) = d;
-  CAMLreturn(res);
-}
-
-args_nested ret_nested_native(value unit) {
-  args_nested res = { { -77, 88 }, 9999 };
-  return res;
-}
-
-value ret_nested_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal4(res, inner, a, b);
-  a = caml_copy_int32(-77);
-  b = caml_copy_int32(88);
-  inner = caml_alloc_small(2, 0);
-  Field(inner, 0) = a;
-  Field(inner, 1) = b;
-  a = caml_copy_int64(9999);
-  res = caml_alloc_small(2, 0);
-  Field(res, 0) = inner;
-  Field(res, 1) = a;
-  CAMLreturn(res);
-}
-
-args_nested_padded ret_nested_padded_native(value unit) {
-  args_nested_padded res = { { -77777, 1234 }, -5678 };
-  return res;
-}
-
-value ret_nested_padded_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal3(res, inner, a);
-  a = caml_copy_int32(-77777);
-  inner = caml_alloc_small(2, 0);
-  Field(inner, 0) = a;
-  Field(inner, 1) = Val_int16(1234);
-  res = caml_alloc_small(2, 0);
-  Field(res, 0) = inner;
-  Field(res, 1) = Val_int16(-5678);
-  CAMLreturn(res);
-}
-
 args_f32_i32_ret swap_mixed_native(args_i32_f32 p) {
   args_f32_i32_ret res = { p.b, p.a };
   return res;
@@ -346,37 +269,6 @@ value sum_i8_i8_i16_i32_bytecode(value p) {
   CAMLreturn(caml_copy_int64(res));
 }
 
-args_i16x4 ret_i16_quad_native(value unit) {
-  args_i16x4 res = { -1, 2, -3000, 4000 };
-  return res;
-}
-
-value ret_i16_quad_bytecode(value unit) {
-  value res = caml_alloc_small(4, 0);
-  Field(res, 0) = Val_int16(-1);
-  Field(res, 1) = Val_int16(2);
-  Field(res, 2) = Val_int16(-3000);
-  Field(res, 3) = Val_int16(4000);
-  return res;
-}
-
-args_i8_i8_i16_i32 ret_i8_i8_i16_i32_native(value unit) {
-  args_i8_i8_i16_i32 res = { -100, 50, -20000, 1000000 };
-  return res;
-}
-
-value ret_i8_i8_i16_i32_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal2(res, d);
-  d = caml_copy_int32(1000000);
-  res = caml_alloc_small(4, 0);
-  Field(res, 0) = Val_int8(-100);
-  Field(res, 1) = Val_int8(50);
-  Field(res, 2) = Val_int16(-20000);
-  Field(res, 3) = d;
-  CAMLreturn(res);
-}
-
 /* Floating-point components in less common positions. */
 
 typedef struct { float a; int64_t b; } args_f32_i64;
@@ -405,24 +297,6 @@ value sum_f32_triple_bytecode(value p) {
   CAMLreturn(caml_copy_double(res));
 }
 
-args_f32x3 ret_f32_triple_native(value unit) {
-  args_f32x3 res = { 1.5f, -0.25f, 4.0f };
-  return res;
-}
-
-value ret_f32_triple_bytecode(value unit) {
-  CAMLparam1(unit);
-  CAMLlocal4(res, a, b, c);
-  a = caml_copy_float32(1.5f);
-  b = caml_copy_float32(-0.25f);
-  c = caml_copy_float32(4.0f);
-  res = caml_alloc_small(3, 0);
-  Field(res, 0) = a;
-  Field(res, 1) = b;
-  Field(res, 2) = c;
-  CAMLreturn(res);
-}
-
 /* Heap pointers as components. */
 
 typedef struct { value s; int64_t n; } args_string_i64;
@@ -436,24 +310,6 @@ value sum_string_i64_bytecode(value p) {
   int64_t res = (int64_t) caml_string_length(Field(p, 0))
     + Int64_val(Field(p, 1));
   CAMLreturn(caml_copy_int64(res));
-}
-
-args_string_i64 ret_string_i64_native(value n) {
-  args_string_i64 res;
-  res.s = caml_copy_string("hello");
-  res.n = 2 * Long_val(n);
-  return res;
-}
-
-value ret_string_i64_bytecode(value n) {
-  CAMLparam1(n);
-  CAMLlocal3(res, s, m);
-  s = caml_copy_string("hello");
-  m = caml_copy_int64(2 * Long_val(n));
-  res = caml_alloc_small(2, 0);
-  Field(res, 0) = s;
-  Field(res, 1) = m;
-  CAMLreturn(res);
 }
 
 /* Stack arguments. */
@@ -540,8 +396,8 @@ value stack_single_f32_bytecode(value *argv, int argn) {
   CAMLreturn(caml_copy_double(sum));
 }
 
-/* Products all of whose components are void correspond to no C arguments or
-   results at all. */
+/* A product all of whose components are void corresponds to no C
+   arguments at all. */
 
 int64_t all_void_arg_native(void) {
   return 4242;
@@ -552,13 +408,127 @@ value all_void_arg_bytecode(value p) {
   CAMLreturn(caml_copy_int64(4242));
 }
 
-void all_void_return_native(value unit) {
-  return;
+/* Void arguments and components. Void corresponds to nothing in the native
+   stubs; in bytecode it is [Val_unit], and void components remain tuple
+   fields. */
+
+int64_t void_between_args_native(int64_t x, args_i32_i32 p, int64_t y) {
+  return x + 2 * (int64_t) p.a + 4 * (int64_t) p.b + 8 * y;
 }
 
-value all_void_return_bytecode(value unit) {
-  value res = caml_alloc_small(2, 0);
-  Field(res, 0) = Val_unit;
-  Field(res, 1) = Val_unit;
+value void_between_args_bytecode(value x, value u1, value p, value u2,
+                                 value y) {
+  CAMLparam5(x, u1, p, u2, y);
+  int64_t res = Int64_val(x) + 2 * (int64_t) Int32_val(Field(p, 0))
+    + 4 * (int64_t) Int32_val(Field(p, 1)) + 8 * Int64_val(y);
+  CAMLreturn(caml_copy_int64(res));
+}
+
+typedef struct { float a; float b; } args_f32_f32;
+
+double void_inside_f32_native(args_f32_f32 p) {
+  return (double) p.a + 2 * (double) p.b;
+}
+
+value void_inside_f32_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Float32_val(Field(p, 1))
+    + 2 * (double) Float32_val(Field(p, 3));
+  CAMLreturn(caml_copy_double(res));
+}
+
+/* The all-void middle product has no counterpart. */
+typedef struct { int32_t b; } args_i32;
+typedef struct { args_i16 p; args_i32 r; } args_void_nested;
+
+_Static_assert(sizeof(args_void_nested) == 8,
+               "void_nested struct should be 8 bytes");
+
+int64_t void_nested_native(args_void_nested p) {
+  return (int64_t) p.p.a + 2 * (int64_t) p.r.b;
+}
+
+value void_nested_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) Int16_val(Field(Field(p, 0), 1))
+    + 2 * (int64_t) Int32_val(Field(Field(p, 2), 0));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+int64_t void_stack_single_nested_native(int64_t a0, int64_t a1, int64_t a2,
+                                        int64_t a3, int64_t a4, int64_t a5,
+                                        int64_t a6, int64_t a7, args_i16 s,
+                                        int32_t y) {
+  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + 100 * (int64_t) s.a
+    + 1000 * (int64_t) y;
+}
+
+value void_stack_single_nested_bytecode(value *argv, int argn) {
+  CAMLparam0();
+  int64_t sum = 0;
+  int i;
+  for (i = 0; i < 8; i++) sum += Int64_val(argv[i]);
+  sum += 100 * (int64_t) Int16_val(Field(Field(argv[8], 1), 1));
+  sum += 1000 * (int64_t) Int32_val(argv[9]);
+  CAMLreturn(caml_copy_int64(sum));
+}
+
+int64_t void_regs_int_native(int64_t a, int64_t b, int64_t c, int64_t d,
+                             args_i64_i64 p) {
+  return a + 2 * b + 4 * c + 8 * d + 16 * p.a + 32 * p.b;
+}
+
+value void_regs_int_bytecode(value *argv, int argn) {
+  CAMLparam0();
+  value p = argv[6];
+  int64_t res = Int64_val(argv[0]) + 2 * Int64_val(argv[1])
+    + 4 * Int64_val(argv[2]) + 8 * Int64_val(argv[3])
+    + 16 * Int64_val(Field(p, 0)) + 32 * Int64_val(Field(p, 1));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+double void_regs_float_native(double a0, double a1, double a2, double a3,
+                              double a4, double a5, args_f64_f64 p) {
+  return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * a4 + 32 * a5 + 64 * p.a
+    + 128 * p.b;
+}
+
+value void_regs_float_bytecode(value *argv, int argn) {
+  CAMLparam0();
+  double res = 0;
+  double weight = 1;
+  int i;
+  for (i = 0; i < 6; i++, weight *= 2) res += weight * Double_val(argv[i]);
+  res += 64 * Double_val(Field(argv[8], 0));
+  res += 128 * Double_val(Field(argv[8], 1));
+  CAMLreturn(caml_copy_double(res));
+}
+
+typedef struct { int32_t x; int64_t y; } args_i32_i64;
+
+int64_t void_record_native(args_i32_i64 p) {
+  return (int64_t) p.x + 2 * p.y;
+}
+
+value void_record_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) Int32_val(Field(p, 0)) + 2 * Int64_val(Field(p, 2));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+args_f32_i32_ret void_swap_native(args_i32_f32 p) {
+  args_f32_i32_ret res = { p.b, p.a };
   return res;
+}
+
+value void_swap_bytecode(value u1, value p, value u2) {
+  CAMLparam3(u1, p, u2);
+  CAMLlocal3(res, a, b);
+  a = caml_copy_float32(Float32_val(Field(p, 2)));
+  b = caml_copy_int32(Int32_val(Field(p, 0)));
+  res = caml_alloc_small(3, 0);
+  Field(res, 0) = Val_unit;
+  Field(res, 1) = a;
+  Field(res, 2) = b;
+  CAMLreturn(res);
 }
