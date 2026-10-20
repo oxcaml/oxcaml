@@ -372,11 +372,38 @@ let rec iter_exn_names f pat =
       iter_exn_names f p
   | _ -> ()
 
-let transl_ident loc env ty path desc kind =
+let transl_ident ?(in_new_scope = false) loc env ty path desc kind =
   match desc.val_kind, kind with
-  | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+  | Val_prim p, Id_prim (poly_mode, poly_sort, yielding)
+    when in_new_scope || p.prim_arity = 0 ->
+      (* Either the primitive is the right-hand side of a binding, [let f =
+         prim], and the closure that eta-expands it is the value being defined
+         and is named after it, or it has no arguments (e.g. [__FUNCTION__],
+         which reads the current scopes) and there is no closure to name. *)
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
         ~zero_alloc_check:None (Some path)
+  | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+      (* A primitive used as a value elsewhere (e.g. passed as an argument) is
+         eta-expanded into a closure named after the primitive, e.g.
+         [%identity], through a scope and a let-binding that the middle end
+         names it after. *)
+      let id = Ident.create_local p.prim_name in
+      let loc =
+        map_scopes
+          (fun scopes ->
+            enter_value_definition ~scopes
+              ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none id)
+          loc
+      in
+      begin match
+        Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort
+          ~yielding ~zero_alloc_check:None (Some path)
+      with
+      | Lfunction _ as wrapper ->
+          Llet (Strict, Lambda.layout_function, id, Lambda.debug_uid_none,
+                wrapper, Lvar id)
+      | lam -> lam
+      end
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
@@ -508,7 +535,7 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
 and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
-      transl_ident (of_location ~scopes e.exp_loc)
+      transl_ident ~in_new_scope (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind
   | Texp_apply_layout (func, args) ->
       Lkindinstantiate {
