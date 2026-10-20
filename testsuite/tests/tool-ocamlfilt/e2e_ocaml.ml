@@ -346,6 +346,8 @@ let pick flag : (module V) =
 module Partial = struct
   let[@inline never] labelled ~a ~b = a - b
 
+  let[@inline never] sum3 ~a ~b ~c = a + b + c
+
   let[@inline never] omit_first x = labelled ~b:x
 
   let neg = ( ~- )
@@ -354,6 +356,13 @@ end
 let[@inline never] omit_first_qualified x = Partial.labelled ~b:x
 
 let curried = Partial.labelled ~a:(Sys.opaque_identity 1)
+
+(* Partially applying a partial application applies the original callee
+   to more arguments: the wrapper is [partial{Partial.sum3}], not
+   [partial{first.partial{Partial.sum3}}]. *)
+let first = Partial.sum3 ~a:(Sys.opaque_identity 1)
+
+let second = first ~b:(Sys.opaque_identity 2)
 
 (* {1 Primitives re-exported as values}
 
@@ -408,6 +417,7 @@ let _ =
   ignore (omit_first_qualified 3 ~a:4);
   ignore (Partial.neg 5);
   ignore (curried ~b:6);
+  ignore (second ~c:7);
   ignore (pick true);
   ignore (Prims.( < ) 1 2);
   ignore (Prims.compare 1 2)
