@@ -469,6 +469,7 @@ AC_SUBST([ar_supports_response_files])
 AC_SUBST([target_bindir])
 AC_SUBST([cc_extra_warnings])
 AC_SUBST([cxx_extra_warnings])
+AC_SUBST([ox_ldflags])
 
 ## Generated files
 
@@ -3068,6 +3069,9 @@ AC_ARG_WITH([objcopy],
     [Path to objcopy executable (otherwise PATH is searched for 'llvm-objcopy' or
     'objcopy')])],
   [objcopy=$with_objcopy])
+
+ox_ldflags=""
+AX_CHECK_LINK_FLAG([-fuse-ld=lld], [ox_ldflags="-cclib -fuse-ld=lld"], [], [])
 
 ## Frame pointers
 
