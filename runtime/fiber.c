@@ -496,6 +496,23 @@ static int visit(scanning_action f, void* fdata,
   }
 }
 
+#ifdef DEBUG
+/* Fill the free space of [arena] below [sp] (a non-positive byte
+   offset from the top of the arena) with Debug_free_local.  Fill at
+   most MAX_LOCAL_DEBUG_FILL_WORDS words, so that scanning a large,
+   mostly-empty arena stays cheap. */
+#define MAX_LOCAL_DEBUG_FILL_WORDS ((intnat)1 << 17)
+static void fill_arena_free_space(struct caml_local_arena arena, intnat sp)
+{
+  header_t* end = (header_t*)(arena.base + arena.length + sp);
+  header_t* start = (header_t*)arena.base;
+  if (end - start > MAX_LOCAL_DEBUG_FILL_WORDS)
+    start = end - MAX_LOCAL_DEBUG_FILL_WORDS;
+  for (header_t *hp = start; hp < end; hp++)
+    *hp = Debug_free_local;
+}
+#endif
+
 static void scan_local_allocations(scanning_action f, void* fdata,
                                    caml_local_arenas* loc, uintnat local_sp)
 {
@@ -511,13 +528,7 @@ static void scan_local_allocations(scanning_action f, void* fdata,
   arena_ix = loc->count - 1;
   arena = loc->arenas[arena_ix];
 #ifdef DEBUG
-  { header_t* hp;
-    for (hp = (header_t*)arena.base;
-         hp < (header_t*)(arena.base + arena.length + sp);
-         hp++) {
-      *hp = Debug_free_local;
-    }
-  }
+  fill_arena_free_space(arena, sp);
 #endif
 
   while (sp < 0) {
@@ -528,11 +539,7 @@ static void scan_local_allocations(scanning_action f, void* fdata,
       CAMLassert(arena_ix > 0);
       arena = loc->arenas[--arena_ix];
 #ifdef DEBUG
-      for (hp = (header_t*)arena.base;
-           hp < (header_t*)(arena.base + arena.length + sp);
-           hp++) {
-        *hp = Debug_free_local;
-      }
+      fill_arena_free_space(arena, sp);
 #endif
       continue;
     }
