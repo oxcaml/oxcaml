@@ -1,8 +1,5 @@
 {
   pkgs ? import <nixpkgs> { },
-  # The checkout minus VCS metadata, editor droppings, and build artifacts: any
-  # _build (dune's, also under external/*) and the top-level _install, _opam,
-  # _runtest, ... directories. Keeps the store copy small and unchanged by builds.
   src ? pkgs.lib.cleanSourceWith {
     src = ./.;
     filter =
