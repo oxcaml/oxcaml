@@ -626,25 +626,10 @@ module Repr_check = struct
       prim
 
   let check_c_stub ~builtin prim =
-    (* C externals may take and return unboxed products ([@unpacked] is not
-       allowed on returns). Product shapes that the C ABIs pass in memory are
-       rejected during Cmm generation (see [To_cmm_extcall] in flambda2).
-
-       CR mshinwell: it would be better to reject such shapes here: the
-       Cmm-level error fires as soon as an offending external is declared in a
-       natively-compiled module (its module block field needs an eta-expanded
-       wrapper), even if the declaration is usable in bytecode. However:
-
-       - The ABI classification logic lives in [To_cmm_extcall], which
-         [typing/] cannot reference, and a hook installed by the middle end
-         would be unpleasant. It could instead be extracted into a small
-         library in [utils/] (cf. [Target_system]), parameterized over an
-         abstract component (register class and size) so that it depends on
-         neither [Jkind] nor [Flambda_kind].
-
-       - The check is target- and backend-dependent (bytecode and JSIR accept
-         every shape, and Merlin would have to), so the elaboration of
-         [external] declarations would become backend-dependent. *)
+    (* CR mshinwell: it would be better to reject non-compilable shapes here
+       rather than in the backend. However, it is unclear how to do this since
+       the check is target- and backend-dependent, so the elaboration of
+       [external] declarations would become backend-dependent.  *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
       (List.init arity (fun _ -> c_stub_arg_errors ~builtin))

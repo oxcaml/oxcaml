@@ -1,23 +1,51 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*                       Mark Shinwell, Jane Street Europe                *)
-(*                                                                        *)
-(*   Copyright 2025 Jane Street Group LLC                                 *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
-(**************************************************************************)
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                                Jane Street                                 *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
 
 [@@@ocaml.warning "+a-30-40-41-42"]
 
-open! Flambda.Import
+module Apply = Flambda.Apply
 module Ece = Effects_and_coeffects
 module K = Flambda_kind
 module Nonempty_list = Misc.Nonempty_list
+
+module List = struct
+  include List
+  include Misc.Stdlib.List
+
+  let group_by same_group xs =
+    fold_right
+      (fun x (acc : 'a Nonempty_list.t list) ->
+        match acc with
+        | (first :: rest) :: pieces when same_group first x ->
+          (x :: first :: rest : _ Nonempty_list.t) :: pieces
+        | [] | (_ :: _) :: _ -> ([x] : _ Nonempty_list.t) :: acc)
+      xs []
+end
 
 module C = struct
   include Cmm_helpers
@@ -28,8 +56,7 @@ end
 (* An unboxed product passed to or returned from an external call follows the
    calling convention of the C struct whose members are the product's
    components, in order, with nested products as nested structs. ([@unpacked]
-   products never reach here: closure conversion unarizes them into separate
-   scalar arguments.)
+   products are unarized by closure conversion and never reach here.)
 
    The backend assigns one register or stack slot to each element of a
    [Cextcall]'s argument and result descriptions and has no notion of
@@ -52,31 +79,45 @@ end
 
 (* CR mshinwell: lift the memory-passing restrictions as described above. Until
    then it would be better to reject the unsupported shapes at type-checking
-   time; see the CR in [Primitive.Repr_check.check_c_stub].
-
-   Since nesting affects C struct layout (alignment and size-rounding of nested
-   structs), products are laid out following the structure recorded in the
-   [`Complex] arities of the [Apply] expression. *)
+   time; see the CR in [Primitive.Repr_check.check_c_stub]. *)
 
 (* Errors for declarations that are well-typed but cannot currently be compiled,
    reported at the location of the [Apply]. *)
 module Error = struct
-  type what =
-    | Argument
-    | Return_value
+  module What = struct
+    type t =
+      | Argument
+      | Return_value
 
-  type memory_reason =
-    | Larger_than_16_bytes
-    | Larger_than_16_bytes_and_not_homogeneous
-    | Too_few_registers_remaining
+    let print ppf t =
+      Format_doc.pp_print_string ppf
+        (match t with Argument -> "argument" | Return_value -> "return value")
+  end
+
+  module Memory_reason = struct
+    type t =
+      | Larger_than_16_bytes
+      | Larger_than_16_bytes_and_not_homogeneous
+      | Too_few_registers_remaining
+
+    let print ppf t =
+      Format_doc.pp_print_string ppf
+        (match t with
+        | Larger_than_16_bytes -> "it is larger than 16 bytes"
+        | Larger_than_16_bytes_and_not_homogeneous ->
+          "it is larger than 16 bytes and not a homogeneous floating-point or \
+           vector aggregate of at most four members"
+        | Too_few_registers_remaining ->
+          "too few argument registers remain for it")
+  end
 
   type t =
     | Unsupported_on_windows
     | Unsupported_architecture
     | Passed_in_memory of
-        { what : what;
+        { what : What.t;
           size : int;
-          reason : memory_reason
+          reason : Memory_reason.t
         }
 
   exception Error of t * Apply.t
@@ -90,22 +131,6 @@ module Error = struct
       | Some (sym, _) -> Symbol.linkage_name_as_string sym
       | None -> "<unknown>")
     | None -> "<unknown>"
-
-  let print_what ppf what =
-    Format_doc.pp_print_string ppf
-      (match what with
-      | Argument -> "argument"
-      | Return_value -> "return value")
-
-  let print_memory_reason ppf reason =
-    Format_doc.pp_print_string ppf
-      (match reason with
-      | Larger_than_16_bytes -> "it is larger than 16 bytes"
-      | Larger_than_16_bytes_and_not_homogeneous ->
-        "it is larger than 16 bytes and not a homogeneous floating-point or \
-         vector aggregate of at most four members"
-      | Too_few_registers_remaining ->
-        "too few argument registers remain for it")
 
   let report ppf (t, apply) =
     match t with
@@ -125,7 +150,7 @@ module Error = struct
          compiled:@ the corresponding C struct (%d bytes) would be passed in \
          memory, since %a.@ Only unboxed products that C passes entirely in \
          registers are currently supported.@]"
-        print_what what (callee_name apply) size print_memory_reason reason
+        What.print what (callee_name apply) size Memory_reason.print reason
 
   let () =
     Location.register_error_of_exn (function
@@ -234,7 +259,7 @@ module Component = struct
 
   (* The bit pattern of a component, as an untagged integer in the low [8 *
      size] bits of a word (the bits above being unspecified). *)
-  let bits ~dbg t cmm =
+  let bits ~dbg t cmm : Cmm.expression =
     match K.With_subkind.kind t.kind with
     | Naked_number
         ( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
@@ -242,7 +267,7 @@ module Component = struct
       cmm
     | Naked_number Naked_float -> C.float_as_int64 ~dbg cmm
     | Naked_number Naked_float32 ->
-      Cmm.Cop (Cmm.Creinterpret_cast Cmm.Int32_of_float32, [cmm], dbg)
+      Cop (Creinterpret_cast Int32_of_float32, [cmm], dbg)
     | Value ->
       (* Values are word-sized, hence never share a unit, and are passed
          directly. *)
@@ -298,71 +323,76 @@ module Component = struct
      member on every supported ABI. *)
   let exttype_when_alone t : Cmm.exttype =
     match t.reg_class with
-    | Int_regs -> if t.size < 8 then Cmm.XInt64 else exttype t
+    | Int_regs -> if t.size < 8 then XInt64 else exttype t
     | Float_regs -> exttype t
 end
 
-(* The layout of the C struct corresponding to an unboxed product. *)
+(* The layout of the C struct corresponding to an unboxed product. Nested
+   products are laid out as nested structs, following the structure of the
+   [`Complex] arities of the [Apply]. *)
 module Layout = struct
-  (* A struct being laid out: its members so far (leaf components in reverse
-     order, with offsets from the start of the struct), its size before
-     rounding, and its alignment. *)
-  type state =
-    { rev_acc : Component.t list;
-      size : int;
-      align : int
-    }
-
   type t =
     { components : Component.t list;
       size : int
     }
 
-  let init_state = { rev_acc = []; size = 0; align = 1 }
+  (* A struct being laid out as a fold over the arity. *)
+  module State = struct
+    type t =
+      { rev_components : Component.t list;
+            (* Leaf components so far (in reverse order, with offsets from the
+               start of the struct) *)
+        size : int; (* Size before rounding *)
+        align : int
+      }
 
-  let singleton (state : state) kind =
-    let reg_class, size = Component.reg_class_and_size kind in
-    let offset = Misc.align state.size size in
-    let component : Component.t = { kind; reg_class; size; offset } in
-    { rev_acc = component :: state.rev_acc;
-      size = offset + size;
-      align = max state.align size
-    }
+    let init = { rev_components = []; size = 0; align = 1 }
 
-  (* Add [inner], a laid-out member, after the members in [outer], treating it
-     as a nested struct: it is aligned to the largest alignment of its members
-     and its size is rounded up to that alignment. (A scalar member is a
-     one-member struct, whose layout is the same as the scalar's.) *)
-  let unboxed_product ~(outer : state) ~(inner : state) =
-    let offset = Misc.align outer.size inner.align in
-    let rev_acc =
-      List.map
-        (fun (component : Component.t) ->
-          { component with offset = component.offset + offset })
-        inner.rev_acc
-      @ outer.rev_acc
-    in
-    { rev_acc;
-      size = offset + Misc.align inner.size inner.align;
-      align = max outer.align inner.align
-    }
+    let singleton (t : t) kind =
+      let reg_class, size = Component.reg_class_and_size kind in
+      let offset = Misc.align t.size size in
+      let component : Component.t = { kind; reg_class; size; offset } in
+      { rev_components = component :: t.rev_components;
+        size = offset + size;
+        align = max t.align size
+      }
 
-  let of_state { rev_acc; size; align } =
-    { components = List.rev rev_acc; size = Misc.align size align }
+    (* Add [inner], a laid-out member, after the members in [outer], treating it
+       as a nested struct: it is aligned to the largest alignment of its members
+       and its size is rounded up to that alignment. (A scalar member is a
+       one-member struct, whose layout is the same as the scalar's.) *)
+    let unboxed_product ~(outer : t) ~(inner : t) =
+      let offset = Misc.align outer.size inner.align in
+      let rev_components =
+        List.map
+          (fun (component : Component.t) ->
+            { component with offset = component.offset + offset })
+          inner.rev_components
+        @ outer.rev_components
+      in
+      { rev_components;
+        size = offset + Misc.align inner.size inner.align;
+        align = max outer.align inner.align
+      }
+  end
+
+  let of_state ({ rev_components; size; align } : State.t) =
+    { components = List.rev rev_components; size = Misc.align size align }
 
   (* The flattened components of the struct corresponding to a product, with
      offsets from the start of the outermost struct, and that struct's total
      size. Void components correspond to no C struct members and contribute
      nothing. *)
   let of_arity arity =
-    Flambda_arity.fold ~init:init_state ~singleton ~unboxed_product
-      ~component:unboxed_product arity
+    Flambda_arity.fold ~init:State.init ~singleton:State.singleton
+      ~unboxed_product:State.unboxed_product ~component:State.unboxed_product
+      arity
     |> of_state
 
   (* Like [of_arity], but laying out each parameter as a struct of its own. *)
   let of_param_arities arity =
-    Flambda_arity.fold_per_parameter ~init:init_state ~singleton
-      ~unboxed_product arity
+    Flambda_arity.fold_per_parameter ~init:State.init ~singleton:State.singleton
+      ~unboxed_product:State.unboxed_product arity
     |> List.map of_state
 end
 
@@ -373,7 +403,7 @@ let sign_extend_small_int_result ~builtin_sign_extends kind ~dbg cmm =
   if builtin_sign_extends
   then cmm
   else
-    match Flambda_kind.With_subkind.kind kind with
+    match K.With_subkind.kind kind with
     | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
     | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
     | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
@@ -401,6 +431,8 @@ module Unit = struct
       components : Component.t Nonempty_list.t
     }
 
+  let num_components t = List.length (Nonempty_list.to_list t.components)
+
   let reg_counts units =
     List.map (fun { reg_class; components = _ } -> reg_class) units
     |> Reg_count.of_classes
@@ -423,11 +455,13 @@ module Unit = struct
         (fun (component : Component.t) -> component.size = first.size)
         rest
 
-  (* Group laid-out components into the 8-byte pieces of the struct they
-     inhabit, rebasing their offsets to the piece. Since every component is
-     naturally aligned, no component of size at most 8 straddles a piece
-     boundary; a vector would, but a vector plus any other component exceeds 16
-     bytes and has already been rejected. *)
+  (* Group laid-out components, which are sorted by increasing offset, into the
+     8-byte pieces of the struct they inhabit, rebasing their offsets to the
+     piece.
+
+     Since every component is naturally aligned, no component of size at most 8
+     straddles a piece boundary. A vector would, but a vector plus any other
+     component exceeds 16 bytes and has already been rejected. *)
   let group_into_pieces (components : Component.t list) =
     List.iter
       (fun (component : Component.t) ->
@@ -438,25 +472,11 @@ module Unit = struct
              %a) does not fit in a piece"
             component.size K.With_subkind.print component.kind)
       components;
-    let rec group (components : Component.t list) =
-      match components with
-      | [] -> []
-      | first :: others ->
-        let piece = first.offset / 8 in
-        let in_piece, rest =
-          (* The components are sorted by increasing offset, so this partition
-             splits off a prefix. *)
-          List.partition
-            (fun (component : Component.t) -> component.offset / 8 = piece)
-            others
-        in
-        let rebase (component : Component.t) =
-          { component with offset = component.offset - (8 * piece) }
-        in
-        (rebase first :: List.map rebase in_piece : _ Nonempty_list.t)
-        :: group rest
-    in
-    group components
+    let piece (component : Component.t) = component.offset / 8 in
+    List.group_by (fun c1 c2 -> piece c1 = piece c2) components
+    |> List.map
+         (Nonempty_list.map (fun (component : Component.t) ->
+              { component with offset = component.offset mod 8 }))
 
   (* The units of a laid-out product. Raises [Error] if the ABI would pass the
      product in memory. *)
@@ -533,7 +553,7 @@ module Unit = struct
       in
       if component.offset = 0
       then bits
-      else C.lsl_int bits (Cmm.Cconst_int (8 * component.offset, dbg)) dbg
+      else C.lsl_int bits (Cconst_int (8 * component.offset, dbg)) dbg
     in
     let (first :: rest) = components_with_args in
     List.fold_left
@@ -639,17 +659,18 @@ module Arity_component_head = struct
     |> List.map (function
       | Some kind -> Singleton kind
       | None -> Unboxed_product)
+
+  let is_unboxed_product t =
+    match t with Unboxed_product -> true | Singleton _ -> false
 end
 
 (* Translation of the arguments of an external call. *)
 module Args = struct
-  type param_head = Arity_component_head.t
-
   (* [Some exttypes] when no parameter is an unboxed product, in which case no
      laying-out is needed and the arguments pass through unchanged. *)
   let exttypes_if_all_scalar params =
     params
-    |> Misc.Stdlib.List.map_option (fun (param : param_head) ->
+    |> List.map_option (fun (param : Arity_component_head.t) ->
         match param with Singleton kind -> Some kind | Unboxed_product -> None)
     |> Option.map
          (List.map (fun kind -> C.exttype_of_kind (K.With_subkind.kind kind)))
@@ -658,7 +679,8 @@ module Args = struct
      all, so require no particular ABI support. *)
   let involves_unboxed_products params laid_out_params =
     List.exists2
-      (fun (param : param_head) ({ components; size = _ } : Layout.t) ->
+      (fun (param : Arity_component_head.t)
+           ({ components; size = _ } : Layout.t) ->
         match param, components with
         | Unboxed_product, _ :: _ -> true
         | (Unboxed_product | Singleton _), _ -> false)
@@ -669,7 +691,7 @@ module Args = struct
      a struct containing a single scalar member from the member itself. (Such
      products may therefore be passed on the stack, unlike larger ones.) The
      stack slot may however differ; see [Component.exttype_when_alone]. *)
-  let translate_single_component ~free_regs (param : param_head)
+  let translate_single_component ~free_regs (param : Arity_component_head.t)
       (component : Component.t) arg =
     let free_regs =
       Reg_count.take_one_if_available free_regs component.reg_class
@@ -679,7 +701,7 @@ module Args = struct
       | Singleton _ -> Component.exttype component
       | Unboxed_product -> Component.exttype_when_alone component
     in
-    free_regs, (arg, exttype)
+    free_regs, [arg, exttype]
 
   (* Raises [Error] if the product would be demoted to memory for lack of
      registers. Returns the remaining free registers and one argument per unit,
@@ -697,31 +719,61 @@ module Args = struct
              reason = Too_few_registers_remaining
            })
         apply;
-    let rec build (units : Unit.t list) param_args rev_acc =
-      match units with
-      | [] -> (
-        match param_args with
-        | [] -> List.rev rev_acc
-        | _ :: _ ->
-          Misc.fatal_errorf
-            "To_cmm_extcall.Args.translate_product: arguments left over after \
-             the last unit:@ %a"
-            Apply.print apply)
-      | unit :: units ->
-        let unit_args, param_args =
-          Misc.Stdlib.List.split_at
-            (List.length (Nonempty_list.to_list unit.components))
-            param_args
-        in
-        build units param_args (Unit.pack ~dbg unit unit_args :: rev_acc)
+    let leftover_args, args_with_types =
+      List.fold_left_map
+        (fun param_args (unit : Unit.t) ->
+          let unit_args, param_args =
+            List.split_at (Unit.num_components unit) param_args
+          in
+          param_args, Unit.pack ~dbg unit unit_args)
+        param_args units
     in
-    Reg_count.subtract free_regs unit_regs, build units param_args []
+    if not (List.is_empty leftover_args)
+    then
+      Misc.fatal_errorf
+        "To_cmm_extcall.Args.translate_product: arguments left over after the \
+         last unit:@ %a"
+        Apply.print apply;
+    Reg_count.subtract free_regs unit_regs, args_with_types
+
+  (* Returns the remaining free registers and the Cmm arguments, with their
+     [exttype]s, for one parameter. *)
+  let translate_param apply ~dbg abi ~free_regs param (layout : Layout.t)
+      param_args =
+    match layout.components, param_args with
+    | [], [] ->
+      (* Void arguments take no registers. *)
+      free_regs, []
+    | [component], [arg] ->
+      translate_single_component ~free_regs param component arg
+    | _ :: _ :: _, param_args ->
+      translate_product apply ~dbg abi ~free_regs layout param_args
+    | [], _ :: _ | [_], ([] | _ :: _ :: _) ->
+      Misc.fatal_errorf
+        "To_cmm_extcall.Args.translate_param: arguments do not match the \
+         arity:@ %a"
+        Apply.print apply
+
+  (* Free registers are tracked across the argument list so that products the
+     ABI would demote to memory can be rejected. *)
+  let translate_with_unboxed_products apply ~dbg arity param_heads
+      laid_out_params args =
+    let abi = Abi.for_unboxed_products apply in
+    (* [args] has one argument per laid-out component: both are the non-void
+       leaves, in order. *)
+    let args_per_param = Flambda_arity.group_by_parameter arity args in
+    let (_leftover_regs : Reg_count.t), args_with_types =
+      List.fold_left_map2
+        (fun free_regs (param, layout) param_args ->
+          translate_param apply ~dbg abi ~free_regs param layout param_args)
+        (Abi.num_arg_regs abi)
+        (List.combine param_heads laid_out_params)
+        args_per_param
+    in
+    List.split (List.concat args_with_types)
 
   (* Returns the Cmm arguments and the [exttype]s describing what is actually
-     passed. [params] has one component per parameter and [args] is the flat
-     list of unarized Cmm arguments. Free registers are tracked across the
-     argument list so that products the ABI would demote to memory can be
-     rejected. *)
+     passed. [args] is the flat list of unarized Cmm arguments. *)
   let translate apply ~dbg args =
     let arity = Apply.args_arity apply in
     let param_heads = Arity_component_head.of_arity arity in
@@ -729,78 +781,72 @@ module Args = struct
     | Some exttypes -> args, exttypes
     | None ->
       let laid_out_params = Layout.of_param_arities arity in
-      if not (involves_unboxed_products param_heads laid_out_params)
+      if involves_unboxed_products param_heads laid_out_params
       then
+        translate_with_unboxed_products apply ~dbg arity param_heads
+          laid_out_params args
+      else
         ( args,
           List.concat_map
             (fun ({ components; size = _ } : Layout.t) ->
               List.map Component.exttype components)
             laid_out_params )
-      else
-        let abi = Abi.for_unboxed_products apply in
-        (* [args] has one argument per laid-out component: both are the non-void
-           leaves, in order. *)
-        let args_per_param = Flambda_arity.group_by_parameter arity args in
-        let (_ : Reg_count.t), rev_args_with_types =
-          List.fold_left2
-            (fun (free_regs, rev_acc) (param, (layout : Layout.t)) param_args ->
-              match layout.components, param_args with
-              | [], [] ->
-                (* Void arguments take no registers. *)
-                free_regs, rev_acc
-              | [component], [arg] ->
-                let free_regs, arg_with_type =
-                  translate_single_component ~free_regs param component arg
-                in
-                free_regs, arg_with_type :: rev_acc
-              | _ :: _ :: _, param_args ->
-                let free_regs, args_with_types =
-                  translate_product apply ~dbg abi ~free_regs layout param_args
-                in
-                free_regs, List.rev_append args_with_types rev_acc
-              | [], _ :: _ | [_], ([] | _ :: _ :: _) ->
-                Misc.fatal_errorf
-                  "To_cmm_extcall.Args.translate: arguments do not match the \
-                   arity:@ %a"
-                  Apply.print apply)
-            (Abi.num_arg_regs abi, [])
-            (List.combine param_heads laid_out_params)
-            args_per_param
-        in
-        List.split (List.rev rev_args_with_types)
 end
 
 (* Translation of the return value of an external call. *)
 module Return = struct
+  type t =
+    | No_value (* a void return in C *)
+    | Scalar of K.With_subkind.t
+      (* including products with a single non-void component *)
+    | Units of Unit.t list
+
   (* The units of a product return value with at least two unarized components.
      No register availability check is needed: anything [Unit.of_product]
      accepts fits the result registers assigned by [Proc.loc_external_results]
      (at most two integer units, matching rax/rdx and x0/x1; at most four arm64
      homogeneous aggregate members, matching d0-d3; at most two SSE units on
      x86-64, matching xmm0/xmm1). *)
-  let units apply return_arity =
+  let units apply return_arity return_kinds =
     let abi = Abi.for_unboxed_products apply in
-    Unit.of_product apply abi ~what:Return_value (Layout.of_arity return_arity)
+    let units =
+      Unit.of_product apply abi ~what:Return_value
+        (Layout.of_arity return_arity)
+    in
+    let num_components =
+      List.fold_left (fun n unit -> n + Unit.num_components unit) 0 units
+    in
+    if List.compare_length_with return_kinds num_components <> 0
+    then
+      Misc.fatal_errorf
+        "To_cmm_extcall.Return.units: unit components do not match the return \
+         arity:@ %a"
+        Apply.print apply;
+    units
 
-  let units_if_needed apply return_arity return_kinds =
-    match return_kinds with
-    | [] -> None
-    | [_] ->
-      let return_is_product =
-        List.exists
-          (fun (component : Arity_component_head.t) ->
-            match component with
-            | Unboxed_product -> true
-            | Singleton _ -> false)
+  let create apply return_arity =
+    (* Void has been erased in return arities by this point, unlike in parameter
+       arities (see the phantom type parameters on the arity fields in
+       [Apply_expr.t]). *)
+    match Flambda_arity.unarize return_arity with
+    | [] -> No_value
+    | [kind] ->
+      if
+        List.exists Arity_component_head.is_unboxed_product
           (Arity_component_head.of_arity return_arity)
-      in
-      if return_is_product then ignore (Abi.for_unboxed_products apply : Abi.t);
-      None
-    | _ :: _ :: _ -> Some (units apply return_arity)
+      then ignore (Abi.for_unboxed_products apply : Abi.t);
+      Scalar kind
+    | _ :: _ :: _ as return_kinds ->
+      Units (units apply return_arity return_kinds)
+
+  let machtype t ~return_ty =
+    match t with
+    | No_value | Scalar _ -> C.Extended_machtype.to_machtype return_ty
+    | Units units -> Array.concat (List.map Unit.machtype units)
 
   (* Rebuild the unarized return values from the received units. *)
-  let unpack apply ~dbg ~builtin_sign_extends (units : Unit.t list) ~unit_tys
-      return_values return_kinds =
+  let unpack_units ~dbg ~builtin_sign_extends units return_values =
+    let unit_tys = Array.of_list (List.map Unit.machtype units) in
     let unit_value =
       match units with
       | [_] ->
@@ -810,27 +856,22 @@ module Return = struct
         fun index ->
           C.tuple_field return_values ~component_tys:unit_tys index dbg
     in
-    let components_in_order =
-      List.concat
-        (List.mapi
-           (fun index (unit : Unit.t) ->
-             List.map
-               (fun component -> index, unit, component)
-               (Nonempty_list.to_list unit.components))
-           units)
-    in
-    if List.compare_lengths components_in_order return_kinds <> 0
-    then
-      Misc.fatal_errorf
-        "To_cmm_extcall.Return.unpack: unit components do not match the return \
-         arity:@ %a"
-        Apply.print apply;
-    C.make_tuple
-      (List.map
-         (fun (index, unit, component) ->
-           Unit.unpack_component ~dbg ~builtin_sign_extends unit
-             (unit_value index) component)
-         components_in_order)
+    List.mapi
+      (fun index (unit : Unit.t) ->
+        List.map
+          (fun component ->
+            Unit.unpack_component ~dbg ~builtin_sign_extends unit
+              (unit_value index) component)
+          (Nonempty_list.to_list unit.components))
+      units
+    |> List.concat |> C.make_tuple
+
+  let unpack ~dbg ~builtin_sign_extends t return_values =
+    match t with
+    | No_value -> return_values
+    | Scalar kind ->
+      sign_extend_small_int_result ~builtin_sign_extends kind ~dbg return_values
+    | Units units -> unpack_units ~dbg ~builtin_sign_extends units return_values
 end
 
 let callee_symbol_name res apply callee_simple =
@@ -852,47 +893,19 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   C.fail_if_apply_with_probe apply;
   let callee = callee_symbol_name res apply callee_simple in
   let returns = Apply.returns apply in
-  (* Void has been erased in return arities by this point, unlike in parameter
-     arities (see the phantom type parameters on the arity fields in
-     [Apply_expr.t]). *)
-  let return_kinds = Flambda_arity.unarize return_arity in
-  let return_units = Return.units_if_needed apply return_arity return_kinds in
-  let return_ty, unit_tys =
-    match return_units with
-    | None ->
-      (* [unit_tys] is only used when [return_units] is [Some]. *)
-      C.Extended_machtype.to_machtype return_ty, [||]
-    | Some units ->
-      let unit_tys = List.map Unit.machtype units in
-      Array.concat unit_tys, Array.of_list unit_tys
-  in
+  let return = Return.create apply return_arity in
   let args, ty_args = Args.translate apply ~dbg args in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
   let { extcall; builtin_sign_extends } : Cmm_builtins.t =
     C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
-      ~returns ~ty_args callee return_ty args
-  in
-  let wrap return_values =
-    match return_kinds, return_units with
-    | [], None ->
-      (* Extcalls of arity 0 are allowed. These correspond to void returns in
-         C. *)
-      return_values
-    | [kind], None ->
-      sign_extend_small_int_result ~builtin_sign_extends kind ~dbg return_values
-    | _ :: _ :: _, Some units ->
-      Return.unpack apply ~dbg ~builtin_sign_extends units ~unit_tys
-        return_values return_kinds
-    | [], Some _ | [_], Some _ | _ :: _ :: _, None ->
-      Misc.fatal_errorf
-        "To_cmm_extcall.translate_external_call: return units do not match the \
-         return arity:@ %a"
-        Apply.print apply
+      ~returns ~ty_args callee
+      (Return.machtype return ~return_ty)
+      args
   in
   let extcall_ident = Ident.create_local "extcall" in
   let extcall_var = Backend_var.With_provenance.create extcall_ident in
-  let cmm =
-    C.letin extcall_var ~defining_expr:extcall ~body:(wrap (Cvar extcall_ident))
+  let body =
+    Return.unpack ~dbg ~builtin_sign_extends return (Cvar extcall_ident)
   in
-  cmm, free_vars, env, res, Ece.all
+  C.letin extcall_var ~defining_expr:extcall ~body, free_vars, env, res, Ece.all
