@@ -354,7 +354,12 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     let callees =
       match callees with
-      | Unknown -> None
+      | Unknown ->
+        let bind f = function | None -> None | Some x -> f x in
+        callee_simple
+        |> bind Simple.must_be_var
+        |> bind (fun (var, _) -> Env.argument_index_by_name env var)
+        |> Option.map (fun argument_index -> [Cmm.Argument { argument_index }])
       | Known code_id_set ->
         Some
           (List.map
