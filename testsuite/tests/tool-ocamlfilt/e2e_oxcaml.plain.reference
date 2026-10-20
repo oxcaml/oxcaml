@@ -17,12 +17,13 @@ _CamlU10E2e_oxcamlF7twice_uDN_DN_                    (error)                    
 _CamlU10E2e_oxcamlF8triangleDN_DN_                   (error)                        E2e_oxcaml.triangle                       E2e_oxcaml.triangle
 _CamlU10E2e_oxcamlF9use_localDN_DN_                  (error)                        E2e_oxcaml.use_local                      E2e_oxcaml.use_local
 _CamlU10E2e_oxcamlL0_DN_DN_                          (error)                        E2e_oxcaml.fn_{0}                         E2e_oxcaml.fn_{0}
-_CamlU10E2e_oxcamlM10Make_adderF10Make_adderDN_DN_   (error)                        E2e_oxcaml.Make_adder.Make_adder          E2e_oxcaml.Make_adder.Make_adder
+_CamlU10E2e_oxcamlM10Make_adderDN_DN_                (error)                        E2e_oxcaml.Make_adder                     E2e_oxcaml.Make_adder
 _CamlU10E2e_oxcamlM10Make_adderF11scale_localDN_DN_  (error)                        E2e_oxcaml.Make_adder.scale_local         E2e_oxcaml.Make_adder.scale_local
 _CamlU10E2e_oxcamlM10Make_adderF11scale_localDN_DN_  (error)                        E2e_oxcaml.Make_adder.scale_local         E2e_oxcaml.Make_adder.scale_local
 _CamlU10E2e_oxcamlM10Make_adderF3addDN_DN_           (error)                        E2e_oxcaml.Make_adder.add                 E2e_oxcaml.Make_adder.add
 _CamlU10E2e_oxcamlM10Make_adderF3addDN_DN_           (error)                        E2e_oxcaml.Make_adder.add                 E2e_oxcaml.Make_adder.add
-_CamlU10E2e_oxcamlM4BumpF4BumpDN_DN_                 (error)                        E2e_oxcaml.Bump.Bump                      E2e_oxcaml.Bump.Bump
+_CamlU10E2e_oxcamlM4BumpDN_DN_                       (error)                        E2e_oxcaml.Bump                           E2e_oxcaml.Bump
+_CamlU10E2e_oxcamlM8PipelineDN_DN_                   (error)                        E2e_oxcaml.Pipeline                       E2e_oxcaml.Pipeline
 _CamlU10E2e_oxcamlM8PipelineF12single_localDN_DN_    (error)                        E2e_oxcaml.Pipeline.single_local          E2e_oxcaml.Pipeline.single_local
 _CamlU10E2e_oxcamlM8PipelineF12single_localDN_DN_    (error)                        E2e_oxcaml.Pipeline.single_local          E2e_oxcaml.Pipeline.single_local
 _CamlU10E2e_oxcamlM8PipelineF6nestedDN_DN_           (error)                        E2e_oxcaml.Pipeline.nested                E2e_oxcaml.Pipeline.nested
@@ -31,7 +32,6 @@ _CamlU10E2e_oxcamlM8PipelineF6nestedL0_DN_DN_        (error)                    
 _CamlU10E2e_oxcamlM8PipelineF6nestedL0_DN_DN_        (error)                        E2e_oxcaml.Pipeline.nested.fn_{0}         E2e_oxcaml.Pipeline.nested.fn_{0}
 _CamlU10E2e_oxcamlM8PipelineF6nestedL0_L0_DN_DN_     (error)                        E2e_oxcaml.Pipeline.nested.fn_{0}.fn_{0}  E2e_oxcaml.Pipeline.nested.fn_{0}.fn_{0}
 _CamlU10E2e_oxcamlM8PipelineF6nestedL0_L0_DN_DN_     (error)                        E2e_oxcaml.Pipeline.nested.fn_{0}.fn_{0}  E2e_oxcaml.Pipeline.nested.fn_{0}.fn_{0}
-_CamlU10E2e_oxcamlM8PipelineF8PipelineDN_DN_         (error)                        E2e_oxcaml.Pipeline.Pipeline              E2e_oxcaml.Pipeline.Pipeline
 camlE2e_oxcaml                                       E2e_oxcaml                     (error)                                   E2e_oxcaml
 camlE2e_oxcaml__Bump_N                               E2e_oxcaml.Bump_N              (error)                                   E2e_oxcaml.Bump_N
 camlE2e_oxcaml__Make_adder_N                         E2e_oxcaml.Make_adder_N        (error)                                   E2e_oxcaml.Make_adder_N

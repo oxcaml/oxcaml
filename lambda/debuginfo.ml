@@ -215,6 +215,15 @@ module Scoped_location = struct
     | Empty -> ZA.Assume_info.none
     | Cons { assume_zero_alloc; _ } -> assume_zero_alloc
 
+  (* A function the compiler derives from the function defined by [scopes]:
+     see [Structured_mangling.marker_payload]. The string form, which names
+     functions in DWARF and assembly output, is left as it is, and so is the
+     zero_alloc assumption, which the derived function's body inherits. *)
+  let enter_compiler_generated ~scopes marker =
+    cons scopes Sc_partial_or_eta_wrapper (str scopes) ""
+      ~assume_zero_alloc:(get_assume_zero_alloc ~scopes)
+      (Some (Function (Structured_mangling.marker_payload marker)))
+
   let string_of_scopes ~include_zero_alloc = function
     | Empty -> "<unknown>"
     | Cons {str; assume_zero_alloc; _} ->

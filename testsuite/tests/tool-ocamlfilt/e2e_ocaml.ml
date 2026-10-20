@@ -413,6 +413,37 @@ module Captured = struct
     find_exn
 end
 
+(* {1 A functor coerced by its signature}
+
+   When a signature hides items of a functor's body, the compiler wraps
+   the functor in a closure that applies the coercion to its result. The
+   wrapper is named after the functor with the [coerce] marker,
+   [Coerced.Make.{coerce}], and the functor's own body is [Coerced.Make];
+   the latter is how every functor body is named. *)
+module Coerced : sig
+  module type S = sig
+    val x : int
+  end
+
+  module Make (X : S) : sig
+    val get : unit -> int
+  end
+end = struct
+  module type S = sig
+    val x : int
+  end
+
+  module Make (X : S) = struct
+    let[@inline never] helper () = X.x * 2
+
+    let[@inline never] get () = helper () + 1
+  end
+end
+
+module Coerced_inst = Coerced.Make (struct
+  let x = 3
+end)
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -456,4 +487,5 @@ let _ =
   ignore (pick true);
   ignore (Prims.( < ) 1 2);
   ignore (Prims.compare 1 2);
-  ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1))
+  ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1));
+  ignore (Coerced_inst.get ())
