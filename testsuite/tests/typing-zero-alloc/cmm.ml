@@ -34,3 +34,18 @@ camlTOP2__apply_6_11_code:
 
 val apply : ('a -> 'b) -> 'a -> 'b = <fun>
 |}]
+
+let alias f x = let g = f in g x
+[%%expect{|
+camlTOP3__alias_7_13_code:
+- Some [Argument { argument_index = 0 }]
+
+val alias : ('a -> 'b) -> 'a -> 'b = <fun>
+|}]
+
+let shadow f x = let f = ignore in f x
+[%%expect{|
+camlTOP4__shadow_8_16_code:
+
+val shadow : 'a -> 'b -> unit = <fun>
+|}]
