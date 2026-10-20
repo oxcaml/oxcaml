@@ -221,6 +221,11 @@ val equal_symbol : symbol -> symbol -> bool
 
 type callee =
   | Symbol of symbol
+  | Argument of
+      { argument_index : int;
+        (** The index of this argument, in the list of the *surrounding*
+           function's arguments. *)
+      }
 
 val equal_callee : callee -> callee -> bool
 
