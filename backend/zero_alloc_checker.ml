@@ -2617,7 +2617,8 @@ end = struct
                 match callee with
                 | Symbol { sym_name; _ } -> find_callee t sym_name ~desc dbg k
                 | Argument { argument_index = _ } ->
-                  Misc.fatal_error "(* CR wsturgeon for wsturgeon: implement *)"
+                  (* CR-soon wsturgeon for wsturgeon: this is a separate PR *)
+                  Value.top w
               in
               let effect_ =
                 match Metadata.assume_value dbg ~can_raise:true w with
