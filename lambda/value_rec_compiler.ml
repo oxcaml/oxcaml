@@ -191,12 +191,10 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
-(* In bytecode, a block whose only field is an unboxed product stores the
-   fields of that product directly. *)
-let bytecode_block_size (shape : _ mixed_block_element array) =
-  match shape with
-  | [| Product elements |] -> Array.length elements
-  | _ -> Array.length shape
+let bytecode_block_size shape =
+  match singleton_product_shape_for_bytecode shape with
+  | Some elements -> Array.length elements
+  | None -> Array.length shape
 
 let compute_mixed_block_size shape =
   if Clflags.target_is_native () then

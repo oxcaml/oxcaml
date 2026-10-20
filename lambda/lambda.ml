@@ -975,6 +975,12 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
 
+let singleton_product_shape_for_bytecode
+    (shape : 'a mixed_block_element array) =
+  match shape with
+  | [| Product elements |] -> Some elements
+  | _ -> None
+
 let equal_layout x y =
   match x, y with
   | Pvalue x, Pvalue y -> equal_value_kind x y

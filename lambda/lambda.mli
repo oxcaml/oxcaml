@@ -1448,6 +1448,17 @@ val is_uniform_block_shape : block_shape -> bool
    non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
+(** In bytecode, a block whose only field is an unboxed product, like
+    [{ p : #(int * int) }], stores the fields of that product directly, just
+    like [{ x : int; y : int }]. This maintains the invariant that values of
+    the same layout (here, [(value & value) box]) be represented the same.
+
+    [singleton_product_shape_for_bytecode shape] returns [Some elements] if
+    [shape] is such a block, where [elements] is the shape of its flattened
+    fields, and [None] otherwise. *)
+val singleton_product_shape_for_bytecode :
+  'a mixed_block_element array -> 'a mixed_block_element array option
+
 val mixed_block_shape_has_splices : 'a mixed_block_element array -> bool
 
 val mixed_product_shape_for_read :
