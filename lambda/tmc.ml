@@ -1139,13 +1139,21 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
          (* Prepending arguments does not affect nlocal *)
          k
     in
+    (* The destination-passing version is a compiler-generated variant of
+       the function: the [dps] marker names it in mangled symbols. *)
+    let loc =
+      Debuginfo.Scoped_location.map_scopes
+        (fun scopes ->
+          Debuginfo.Scoped_location.enter_compiler_generated ~scopes "dps")
+        lfun.loc
+    in
     Lambda.duplicate_function @@ lfunction'
       ~kind
       ~params
       ~return:lfun.return
       ~body:(Choice.dps ~tail:true ~dst:dst fun_choice)
       ~attr:lfun.attr
-      ~loc:lfun.loc
+      ~loc
       ~mode:lfun.mode
       ~ret_mode:lfun.ret_mode
   in

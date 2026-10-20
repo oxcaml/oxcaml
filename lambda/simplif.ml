@@ -948,10 +948,19 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
         in
         let body = Lambda.rename subst body in
         let body = if add_region then Lregion (body, return) else body in
+        (* The body is a compiler-generated variant of the function: the
+           [inner] marker names it in mangled symbols. *)
+        let inner_loc =
+          Debuginfo.Scoped_location.map_scopes
+            (fun scopes ->
+              Debuginfo.Scoped_location.enter_compiler_generated ~scopes
+                "inner")
+            loc
+        in
         let inner_fun =
           lfunction' ~kind:(Curried {nlocal=0})
             ~params:new_ids
-            ~return ~body ~attr ~loc ~mode ~ret_mode
+            ~return ~body ~attr ~loc:inner_loc ~mode ~ret_mode
         in
         (wrapper_body, { id = inner_id;
                          debug_uid = inner_id_duid;

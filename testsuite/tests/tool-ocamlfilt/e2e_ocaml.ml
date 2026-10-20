@@ -454,6 +454,27 @@ module First_class = struct
   let[@inline never] use_id () = keep Fun.id
 end
 
+(* {1 Compiler-generated variants of a function}
+
+   A function with optional arguments is split into a wrapper filling in
+   the defaults, which keeps the name, and a body marked [{inner}]:
+   [Generated.escape.{inner}]. A [[@tail_mod_cons]] function gets a
+   destination-passing version marked [{dps}]:
+   [Generated.map.map_loop.{dps}]. *)
+module Generated = struct
+  let[@inline never] escape ?(quote = '"') ?(sep = ',') s =
+    if String.contains s sep
+    then String.make 1 quote ^ s ^ String.make 1 quote
+    else s
+
+  let[@inline never] map l ~f =
+    let[@tail_mod_cons] rec map_loop = function
+      | [] -> []
+      | x :: l -> f x :: map_loop l
+    in
+    map_loop l
+end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -499,4 +520,6 @@ let _ =
   ignore (Prims.compare 1 2);
   ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1));
   ignore (Coerced_inst.get ());
-  ignore (First_class.use_id () 5)
+  ignore (First_class.use_id () 5);
+  ignore (Generated.escape "a,b");
+  ignore (Generated.map [ 1; 2 ] ~f:(fun x -> x + 1))
