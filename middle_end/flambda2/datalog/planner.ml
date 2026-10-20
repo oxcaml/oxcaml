@@ -487,6 +487,11 @@ let group_existential_stages ~binding_times ~required_vars stages =
       let node1, cls1 = find node1 and node2, cls2 = find node2 in
       if node1 != node2
       then (
+        (* CR-someday bclement and ncourant: Note that this can have poor
+           complexity, but this should be fine because we expect to have only
+           few elements here and even being quadratic is fine. Switch to
+           union-by-rank if extracting this code outside of its current
+           context. *)
         node2.parent <- Node node1;
         node1.parent <- Root (node2.stage_id :: List.rev_append cls1 cls2))
   end in
