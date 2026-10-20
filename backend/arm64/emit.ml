@@ -2137,10 +2137,13 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
     in
     ()
   | Far_stackcheck { max_frame_size_bytes } ->
-    let _sc_label, _sc_return =
-      assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
-    in
-    ()
+    if Config.no_stack_checks
+    then emit_stack_probes ~max_frame_size_bytes
+    else
+      let _sc_label, _sc_return =
+        assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
+      in
+      ()
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
   | Branch lbl -> emit_branch lbl
 
