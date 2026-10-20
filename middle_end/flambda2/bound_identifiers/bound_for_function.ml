@@ -43,31 +43,33 @@ let[@ocamlformat "disable"] print ppf
 let create ~return_continuation ~exn_continuation ~params ~my_closure
     ~my_alloc_mode ~my_depth =
   Bound_parameters.check_no_duplicates params;
-  if Flambda_features.check_invariants ()
-  then (
-    (match Continuation.sort return_continuation with
-    | Return -> ()
-    | Normal_or_exn | Define_root_symbol | Toplevel_return ->
-      Misc.fatal_errorf
-        "Return continuation %a has wrong sort (must be [Return])"
-        Continuation.print return_continuation);
-    let params_set = Bound_parameters.var_set params in
-    let my_set, expected_size =
-      let regions, num_regions =
-        match (my_alloc_mode : Alloc_mode.For_applications.t) with
-        | Not_alloc_stack { alloc_region } -> [alloc_region], 1
-        | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
-          [alloc_region; region; ghost_region], 3
-      in
-      Variable.Set.of_list (my_closure :: my_depth :: regions), 2 + num_regions
-    in
-    if
-      Variable.Set.cardinal my_set <> expected_size
-      || not (Variable.Set.is_empty (Variable.Set.inter my_set params_set))
-    then
-      Misc.fatal_errorf
-        "[my_closure], [my_region], [my_ghost_region] and [my_depth] must be \
-         disjoint from themselves and the other parameters");
+  (if Flambda_features.check_light_invariants ()
+   then
+     match Continuation.sort return_continuation with
+     | Return -> ()
+     | Normal_or_exn | Define_root_symbol | Toplevel_return ->
+       Misc.fatal_errorf
+         "Return continuation %a has wrong sort (must be [Return])"
+         Continuation.print return_continuation);
+  (if Flambda_features.check_invariants ()
+   then
+     let params_set = Bound_parameters.var_set params in
+     let my_set, expected_size =
+       let regions, num_regions =
+         match (my_alloc_mode : Alloc_mode.For_applications.t) with
+         | Not_alloc_stack { alloc_region } -> [alloc_region], 1
+         | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
+           [alloc_region; region; ghost_region], 3
+       in
+       Variable.Set.of_list (my_closure :: my_depth :: regions), 2 + num_regions
+     in
+     if
+       Variable.Set.cardinal my_set <> expected_size
+       || not (Variable.Set.is_empty (Variable.Set.inter my_set params_set))
+     then
+       Misc.fatal_errorf
+         "[my_closure], [my_region], [my_ghost_region] and [my_depth] must be \
+          disjoint from themselves and the other parameters");
   { return_continuation;
     exn_continuation;
     params;
