@@ -1014,7 +1014,7 @@ and law_declaration i ppf x =
 
 and law_param i ppf x =
   line i ppf "%a\n" fmt_ident x.lp_id;
-  option (i+1) core_type ppf x.lp_type
+  core_type (i+1) ppf x.lp_type
 
 and spec_expression i ppf x =
   line i ppf "spec_expression %a\n" fmt_location x.stexp_loc;

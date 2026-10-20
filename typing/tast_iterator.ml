@@ -303,7 +303,7 @@ let[@warning "+9"] law_declaration sub
   iter_loc sub law_name;
   List.iter
     (fun {lp_id = _; lp_name; lp_type} ->
-       iter_loc sub lp_name; Option.iter (sub.typ sub) lp_type)
+       iter_loc sub lp_name; sub.typ sub lp_type)
     law_params;
   List.iter (sub.spec_expression sub) law_assumptions;
   sub.spec_expression sub law_conclusion

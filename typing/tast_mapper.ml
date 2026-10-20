@@ -372,7 +372,7 @@ let[@warning "+9"] law_declaration sub
     List.map
       (fun {lp_id; lp_name; lp_type} ->
          {lp_id; lp_name = map_loc sub lp_name;
-          lp_type = Option.map (sub.typ sub) lp_type})
+          lp_type = sub.typ sub lp_type})
       law_params
   in
   let law_assumptions = List.map (sub.spec_expression sub) law_assumptions in

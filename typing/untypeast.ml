@@ -351,7 +351,7 @@ let law_declaration sub (decl : T.law_declaration) =
     plaw_params =
       List.map
         (fun (p : T.law_param) ->
-           (map_loc sub p.lp_name, Option.map (sub.typ sub) p.lp_type))
+           (map_loc sub p.lp_name, Some (sub.typ sub p.lp_type)))
         decl.law_params;
     plaw_assumptions =
       List.map

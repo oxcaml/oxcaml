@@ -70,6 +70,7 @@ let view_fixity_of_exp = function
   | _ -> `Normal
 
 let is_infix  = function `Infix _ -> true | _  -> false
+let is_infix_operator s = is_infix (fixity_of_string s)
 let is_mixfix = function `Mixfix _ -> true | _ -> false
 let is_kwdop = function `Letop _ | `Andop _ -> true | _ -> false
 

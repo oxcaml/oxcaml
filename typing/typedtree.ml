@@ -1140,7 +1140,7 @@ and law_declaration =
 and law_param =
   { lp_id: Ident.t;
     lp_name: string loc;
-    lp_type: core_type option
+    lp_type: core_type
    }
 
 and spec_expression =

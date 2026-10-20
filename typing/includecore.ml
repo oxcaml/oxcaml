@@ -504,6 +504,13 @@ type jkind_mismatch =
   | Manifest_missing
   | Manifest_mismatch
 
+type law_mismatch =
+  | Law_arity of int * int
+  | Law_parameter_types of string option * Errortrace.equality_error
+  | Law_clauses
+  | Law_module_path of { path : Path.t; name : string }
+  | Law_applied_path of Path.t
+
 module Printtyp = Printtyp.Doc
 
 let report_modality_sub_error first second ppf e =
@@ -923,6 +930,48 @@ let report_type_mismatch first second decl env ppf err =
       (fun ppf (first, second, mismatch) ->
          report_unsafe_mode_crossing_mismatch first second ppf mismatch)
       (first, second, mismatch)
+
+let report_law_mismatch env ppf err =
+  let pr fmt = Fmt.fprintf ppf fmt in
+  let msg = Fmt.Doc.msg in
+  let path = Style.as_inline_code Printtyp.path in
+  pr "@ ";
+  match err with
+  | Law_arity (n1, n2) ->
+      pr "The first law has %d parameter%s, but the second has %d." n1
+        (if n1 = 1 then "" else "s") n2
+  | Law_parameter_types (None, err) ->
+      Errortrace_report.equality ppf Type_scheme env err
+        (msg "The parameter types")
+        (msg "are not equal to the parameter types")
+  | Law_parameter_types (Some x, err) ->
+      Errortrace_report.equality ppf Type_scheme env err
+        (Fmt.doc_printf "The parameter %a has type" Style.inline_code x)
+        (msg "but it is expected to have type")
+  | Law_clauses ->
+      pr "The clauses of the two laws differ."
+  | Law_module_path { path = p; name } ->
+      pr "@[<hov>The@ first@ law@ refers@ to@ %a,@ but@ the@ second@ law@ \
+          refers@ to@ %a.@ The@ two@ are@ not@ known@ to@ be@ the@ same@ \
+          value.@]@ @[<2>Hint:@ consider@ referring@ to@ %a@ in@ the@ \
+          second@ one.@]"
+        path p Style.inline_code name path p
+  | Law_applied_path p ->
+      let rec application : Path.t -> _ = function
+        | Papply (functor_, arg) -> Some (functor_, arg)
+        | Pdot (p, _) | Pextra_ty (p, _) -> application p
+        | Pident _ -> None
+      in
+      pr "@[<hov>The@ law@ refers@ to@ %a.@ Each@ functor@ application@ \
+          results@ in@ a@ new@ module,@ so@ " path p;
+      begin match application p with
+      | Some (functor_, arg) ->
+          pr "each@ application@ of@ %a@ to@ %a@ is@ a@ new@ module@ with@ \
+              its@ own@ %a.@]"
+            path functor_ path arg Style.inline_code (Path.last p)
+      | None ->
+          pr "the@ law@ is@ not@ about@ an@ individual@ module.@]"
+      end
 
 let report_jkind_mismatch first second ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
@@ -1905,6 +1954,165 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
       match ext1.ext_private, ext2.ext_private with
       | Private, Public -> Some Constructor_privacy
       | _, _ -> None
+
+(* Inclusion between laws *)
+
+let law_paths (decl : Types.law_declaration) =
+  List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
+
+(* [law_applied_path] rejects a law that refers to a value through a
+   functor application, for example [F(A).x]. Each application of [F] to
+   [A] creates a new module with new values. Thus, the path [F(A).x] does
+   not identify one value. The type checker rejects a clause that is
+   written with such a path. Here, the path is the result of a
+   substitution, for example of [module M := F (A)] in a signature whose
+   law refers to [M.x]. *)
+let law_applied_path decl_impl decl_intf =
+  List.find_map
+    (fun ((ns : Spec.namespace), path) ->
+       match ns with
+       | Value when Path.contains_apply path -> Some (Law_applied_path path)
+       | Value -> None)
+    (law_paths decl_impl @ law_paths decl_intf)
+
+(* The checks below pair the parameters of the two laws by position.
+   Thus, the two laws must have the same number of parameters. *)
+let law_arity (decl_impl : Types.law_declaration)
+      (decl_intf : Types.law_declaration) =
+  let n_impl = List.length decl_impl.law_params
+  and n_intf = List.length decl_intf.law_params in
+  if n_impl = n_intf then None else Some (Law_arity (n_impl, n_intf))
+
+(* The parameter types of the two laws must be equal up to a renaming of
+   type variables. The function compares the types as lists, so that one
+   renaming applies to all parameters: [(x : 'a) (y : 'a)] is different
+   from [(x : 'a) (y : 'b)]. If the lists differ, the function compares
+   the parameters one by one to find the parameter to report. *)
+let law_parameter_types env (decl_impl : Types.law_declaration)
+      (decl_intf : Types.law_declaration) =
+  let equal = Ctype.equal env true in
+  let types (decl : Types.law_declaration) = List.map snd decl.law_params in
+  match equal (types decl_impl) (types decl_intf) with
+  | () -> None
+  | exception Ctype.Equality err_all ->
+    let culprit =
+      List.find_map
+        (fun ((x, ty_impl), (_, ty_intf)) ->
+           match equal [ty_impl] [ty_intf] with
+           | () -> None
+           | exception Ctype.Equality err -> Some (Some (Ident.name x), err))
+        (List.combine decl_impl.law_params decl_intf.law_params)
+    in
+    let x, err = Option.value culprit ~default:(None, err_all) in
+    Some (Law_parameter_types (x, err))
+
+(* [law_module_path] improves the error message when [law_clauses] fails.
+   It detects one common cause of a mismatch. Consider
+
+   {[
+     module M = struct
+       let f x = x
+       module N = struct law? l (x : int) : f x = x end
+     end
+     module type S = sig
+       val f : int -> int
+       module N : sig law? l (x : int) : f x = x end
+     end
+     module M' : S = M
+   ]}
+
+   This example fails type checking. The type of the module expression [M] is
+   the strengthened signature
+   [sig val f : 'a -> 'a module N = M.N end]. To compare the two [N],
+   module inclusion expands the alias [M.N]. The expansion replaces the
+   idents of the components of [M] by paths through [M] (see
+   [Env.prefix_idents]). Thus, the law of [M.N] is [M.f x = x]. The law
+   of [N] in [S] is [f x = x], where [f] is the ident of [val f] in [S].
+   Module inclusion maps this ident to the ident of [val f] in [M]. It
+   does not map the ident to the path [M.f]. Thus, [law_clauses] rejects
+   the two laws. In contrast, the following is accepted
+
+   {[
+     module type S' = sig
+       val f : int -> int
+       module N : sig law? l (x : int) : M.f x = x end
+     end
+     module M' : S' = M
+   ]}
+
+   because the law of [N] in [S'] refers to [f] through the path [M.f],
+   which is the path in the law of [M.N].
+
+   In situations such as the above, [law_module_path] returns
+   [Law_module_path { path; name }] for the first path [path] of the
+   implementation that ends in a name [name] to which the interface
+   refers by an ident. The names can agree by coincidence. Thus, the function
+   must run only after [law_clauses] has failed. *)
+let law_module_path (decl_impl : Types.law_declaration)
+      (decl_intf : Types.law_declaration) =
+  let names =
+    List.filter_map
+      (fun ((ns : Spec.namespace), (path : Path.t)) ->
+         match ns, path with
+         | Value, Pident id -> Some (ns, Ident.name id)
+         | Value, (Pdot _ | Papply _ | Pextra_ty _) -> None)
+      (law_paths decl_intf)
+  in
+  List.find_map
+    (fun (ns, (path : Path.t)) ->
+       match path with
+       | Pdot (_, name) when List.mem (ns, name) names ->
+           Some (Law_module_path { path; name })
+       | Pdot _ | Pident _ | Papply _ | Pextra_ty _ -> None)
+    (law_paths decl_impl)
+
+(* The clauses of the two laws must be the same expressions up to two
+   things. First, the names of the parameters: [vars] pairs them by
+   position. Second, module aliases in the paths of values: [Alias.f] is
+   [Outer.f] when [module Alias = Outer]. All other paths must be
+   identical. This is how [Ctype.equal] compares the paths of types. *)
+(* CR sspies: Strengthening a signature with a path [M] gives its type [t]
+   the manifest [M.t], but records nothing about its value [f]. Thus, the
+   comparison cannot relate the ident [f] to the path [M.f] (see
+   [law_module_path]). A follow-up PR should record that [f] is [M.f] in the
+   same way and compares the clauses up to these equations. *)
+let law_clauses env (decl_impl : Types.law_declaration)
+      (decl_intf : Types.law_declaration) =
+  let same_path (ns : Spec.namespace) p1 p2 =
+    let normalize =
+      match ns with
+      | Value -> Env.normalize_value_path None env
+    in
+    Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
+  in
+  let vars =
+    List.map2 (fun (x_impl, _) (x_intf, _) -> (x_impl, x_intf))
+      decl_impl.law_params decl_intf.law_params
+  in
+  let equal = Spec.alpha_equal ~same_path ~vars in
+  let assumptions_impl = decl_impl.law_assumptions
+  and assumptions_intf = decl_intf.law_assumptions in
+  if List.compare_lengths assumptions_impl assumptions_intf = 0
+     && List.for_all2 equal assumptions_impl assumptions_intf
+     && equal decl_impl.law_conclusion decl_intf.law_conclusion
+  then None
+  else
+    Some (Option.value (law_module_path decl_impl decl_intf)
+            ~default:Law_clauses)
+
+let law_declarations ~loc env name (decl_impl : Types.law_declaration)
+      (decl_intf : Types.law_declaration) =
+  Builtin_attributes.check_alerts_inclusion
+    ~def:decl_impl.law_loc
+    ~use:decl_intf.law_loc
+    loc
+    decl_impl.law_attributes decl_intf.law_attributes
+    name;
+  let[@inline always] if_none f = function None -> f () | Some x -> Some x in
+  law_applied_path decl_impl decl_intf
+  |> if_none (fun () -> law_arity decl_impl decl_intf)
+  |> if_none (fun () -> law_parameter_types env decl_impl decl_intf)
+  |> if_none (fun () -> law_clauses env decl_impl decl_intf)
 
 (* Inclusion between jkind declarations *)
 let jkind_declarations ~loc env name
