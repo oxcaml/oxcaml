@@ -520,12 +520,22 @@ let rec build_object_init_0
       let envs = if top then None else Some env in
       let ((_,inh_init), obj_init) =
         build_object_init ~scopes cl_table obj params (envs,[]) copy_env cl in
+      (* The closures creating objects are compiler-generated: the [obj_init]
+         marker names them under the class. *)
+      let loc =
+        of_location
+          ~scopes:(Debuginfo.Scoped_location.enter_compiler_generated ~scopes
+                     "obj_init")
+          cl.cl_loc
+      in
       let obj_init =
         if ids = []
         then obj_init
-        else lfunction layout_obj [lparam self self_duid layout_obj] obj_init
+        else
+          lfunction ~loc layout_obj [lparam self self_duid layout_obj] obj_init
       in
-      (inh_init, lfunction (if ids = [] then layout_obj else layout_function)
+      (inh_init,
+       lfunction ~loc (if ids = [] then layout_obj else layout_function)
          [lparam env env_duid layout_block] (subst_env env inh_init obj_init))
 
 
@@ -1158,8 +1168,10 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
           (* Doesn't seem to improve size for bytecode *)
           (* if not (Clflags.target_is_native ()) then raise Not_found; *)
           if not arr || !Clflags.debug then raise Not_found;
-          builtin_meths [self.name] env env2 (lfunction return args body')
+          builtin_meths [self.name] env env2 (lfunction ~loc return args body')
         with Not_found ->
+          (* [loc] carries the class and method scopes the method was
+             translated under; keep it so that the method is named. *)
           [lfunction ~kind ~ret_mode ~loc return (self :: args)
              (if not (Ident.Set.mem env (free_variables body')) then body' else
               Llet(Alias, layout_block, env, env_duid,
@@ -1235,13 +1247,21 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
   if top && ids = [] then llets layout_table (ltable cla (ldirect obj_init), Dynamic) else
 
   let concrete = (vflag = Concrete)
-  and lclass mk_lam_and_kind =
+  (* The closure initializing the class is compiler-generated: the
+     [class_init] marker names it under the class. *)
+  and class_init_loc =
+    of_location
+      ~scopes:(Debuginfo.Scoped_location.enter_compiler_generated ~scopes
+                 "class_init")
+      cl.cl_loc
+  in
+  let lclass mk_lam_and_kind =
     let cl_init, _ =
       llets layout_function
         (Lambda.lfunction
            ~kind:(Curried {nlocal=0})
            ~attr:default_function_attribute
-           ~loc:Loc_unknown
+           ~loc:class_init_loc
            ~return:layout_function
            ~mode:alloc_heap
            ~ret_mode:not_alloc_stack
@@ -1279,7 +1299,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
           [lambda_unit; Lambda.lfunction
                           ~kind:(Curried {nlocal=0})
                           ~attr:default_function_attribute
-                          ~loc:Loc_unknown
+                          ~loc:class_init_loc
                           ~return:layout_function
                           ~mode:alloc_heap
                           ~ret_mode:not_alloc_stack
