@@ -15,11 +15,6 @@ let rule ~ppf ~target ~exts ~src ~deps ~action =
     src (String.concat " " deps)
     action
 
-let copy_ml_files ~ppf files =
-  Printf.fprintf ppf
-    "(copy_files# %s)\n"
-    files
-
 let copy_files ~ppf files =
   Printf.fprintf ppf
     "(copy_files %s)\n" files
@@ -95,7 +90,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
     then flags ^ " -pp \"awk -f %{dep:../expand_module_aliases.awk}\""
     else flags
   in
-  if ext <> `Cmo then copy_ml_files ~ppf (sprintf "../%s" src);
+  if ext <> `Cmo then copy_files ~ppf (sprintf "../%s" src);
   match ext with
   | `Cmi ->
      let action =
