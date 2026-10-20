@@ -189,11 +189,11 @@ type t =
     validity_stages : validity_stage list;
     (* Stages of let-bindings, most recent at the head. *)
     symbol_inits : Symbol_inits.t;
-    (* Symbol initialization expressions, indexed by the variable used as
-       value for the symbol field initialization. *)
+    (* Symbol initialization expressions, indexed by the variable used as value
+       for the symbol field initialization. *)
     arguments : int Variable.Map.t
-    (* Named parameters and aliases thereof, mapped to their index in the list
-       of arguments to this function. *)
+        (* Named parameters and aliases thereof, mapped to their index in the
+           list of arguments to this function. *)
   }
 
 type translation_result =

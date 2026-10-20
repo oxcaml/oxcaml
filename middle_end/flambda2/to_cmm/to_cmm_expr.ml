@@ -284,9 +284,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   let arguments_possibly_being_called =
-    let bind f = function | None -> None | Some x -> f x in
-    callee_simple
-    |> bind Simple.must_be_var
+    let bind f = function None -> None | Some x -> f x in
+    callee_simple |> bind Simple.must_be_var
     |> bind (fun (var, _) -> Env.argument_index_by_name env var)
     |> Option.map (fun argument_index -> [Cmm.Argument { argument_index }])
   in
@@ -366,8 +365,10 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         Some
           (List.map
              (fun code_id ->
-               Cmm.Symbol (To_cmm_result.symbol_of_code_id res code_id
-                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env)))
+               Cmm.Symbol
+                 (To_cmm_result.symbol_of_code_id res code_id
+                    ~currently_in_inlined_body:
+                      (Env.currently_in_inlined_body env)))
              (Code_id.Set.elements code_id_set))
     in
     if not (C.check_arity (Apply.args_arity apply) args)

@@ -324,10 +324,11 @@ type callee =
   | Symbol of symbol
   | Argument of { argument_index : int }
 
-let equal_callee c1 c2 = match c1, c2 with
+let equal_callee c1 c2 =
+  match c1, c2 with
   | Symbol s1, Symbol s2 -> equal_symbol s1 s2
-  | ( Argument { argument_index = a1 },
-      Argument { argument_index = a2 } ) -> a1 = a2
+  | Argument { argument_index = a1 }, Argument { argument_index = a2 } ->
+    a1 = a2
   | Symbol _, Argument _ | Argument _, Symbol _ -> false
 
 type phantom_defining_expr =

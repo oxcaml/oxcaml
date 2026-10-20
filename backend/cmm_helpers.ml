@@ -2648,7 +2648,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     ( Capply
         { result_type = Extended_machtype.to_machtype result;
           region = apos;
-          callees = Some [Symbol sym];
+          callees = Some [Symbol sym]
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol (sym, dbg) :: obj :: tag :: cache :: pos :: args,
@@ -5694,8 +5694,10 @@ let perform ~dbg eff =
   let sym = Cmm.global_symbol "caml_perform" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_nontail;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_nontail;
+          callees = Some [Symbol sym]
+        },
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
 
@@ -5703,8 +5705,10 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_normal;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [Symbol sym]
+        },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
@@ -5727,8 +5731,10 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_normal;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [Symbol sym]
+        },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
@@ -5756,8 +5762,10 @@ let continue ~dbg ~cont ~value =
   let sym = Cmm.global_symbol "caml_continue" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_normal;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [Symbol sym]
+        },
       [Cconst_symbol (sym, dbg); cont; value],
       dbg )
 
@@ -5765,8 +5773,10 @@ let discontinue ~dbg ~cont ~exn =
   let sym = Cmm.global_symbol "caml_discontinue" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_normal;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [Symbol sym]
+        },
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
 
@@ -5774,8 +5784,10 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
   let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_normal;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [Symbol sym]
+        },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
@@ -5785,8 +5797,10 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
   let sym = Cmm.global_symbol "caml_reperform" in
   Cop
     ( Capply
-        { result_type = typ_val; region = Rc_normal;
-          callees = Some [Symbol sym] },
+        { result_type = typ_val;
+          region = Rc_normal;
+          callees = Some [Symbol sym]
+        },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
       dbg )
 
