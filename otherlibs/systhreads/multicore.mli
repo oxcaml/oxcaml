@@ -19,7 +19,13 @@
     running in parallel. *)
 
 (** [max_domains ()] is the maximum number of domains. Domains are indexed from
-    [0] to [max_domains () - 1]. *)
+    [0] to [max_domains () - 1].
+
+    This defaults to [Domain.recommended_domain_count ()]. For testing only
+    (e.g. simulating parallelism on a single-CPU host) it can be overridden
+    with OCAMLRUNPARAM=Xoverride_max_domains_test_only_not_for_prod=N,
+    clamped to [Domain.max_domain_count]. The override does not affect
+    [Domain.recommended_domain_count]. *)
 val max_domains : unit -> int
 
 (** [current_domain ()] is the index of the domain that the current thread is
