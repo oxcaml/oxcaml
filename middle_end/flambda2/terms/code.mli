@@ -63,8 +63,8 @@ val free_names_of_params_and_body : t -> Name_occurrences.t
     closures is created and read wherever the slot is projected. A body that
     mentions slots, either by projecting from a closure (its own or any other)
     or by defining a set of closures, therefore cannot be moved into another
-    function by inlining. This returns [true] when not compiling to JSIR, or
-    when the body contains no such slots. It should be checked at every call
-    site inlining decision, since e.g. [[@inlined]] attributes and stubs bypass
-    the decision made at the function definition. *)
+    function by inlining. This returns [true] when the body contains no such
+    slots. It should be checked at every call site inlining decision, since e.g.
+    [[@inlined]] attributes and stubs bypass the decision made at the function
+    definition. *)
 val can_be_inlined_for_jsir : t -> bool
