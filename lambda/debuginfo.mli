@@ -78,6 +78,11 @@ module Scoped_location : sig
      scopes' string form is left unchanged. *)
   val add_partial_application_item :
     scopes:scopes -> Compilation_unit.t Structured_mangling.path -> scopes
+  (* A function the compiler derives from the function defined by [scopes],
+     e.g. the body of a function with optional arguments; the marker (e.g.
+     ["inner"]) names it in mangled symbols, see
+     [Structured_mangling.marker_payload]. *)
+  val enter_compiler_generated : scopes:scopes -> string -> scopes
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
   val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t

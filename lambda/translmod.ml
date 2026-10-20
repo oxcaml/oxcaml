@@ -126,7 +126,7 @@ let rec apply_coercion loc strict restr arg =
         in
         let lam =
           coerced_block loc ~strict:Alias ~field_loc:(fun _ -> loc)
-            output_repr pos_cc_list get_field
+            ~field_name:(fun _ -> None) output_repr pos_cc_list get_field
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
   | Tcoerce_functor(cc_arg, cc_res, yielding) ->
@@ -167,15 +167,38 @@ let rec apply_coercion loc strict restr arg =
   | Tcoerce_invalid -> Misc.fatal_error "Translmod: invalid coercion"
 
 (* Builds the block of a structure coerced by [pos_cc_list]. The wrapper
-   function of a primitive coerced to a value is let-bound to a variable named
-   after the value, so that the middle end names the function after it (an
-   [Llet]-bound [Lfunction] takes its binder's name in [Lambda_to_flambda]). *)
-and coerced_block loc ~strict ~field_loc output_repr pos_cc_list get_field =
+   function of a primitive coerced to a value, and that of a functor coerced
+   to its signature when the field's name is known, are let-bound to a variable
+   named after the value, so that the middle end names the function after it
+   (an [Llet]-bound [Lfunction] takes its binder's name in
+   [Lambda_to_flambda]). A functor's wrapper is also given a scope naming the
+   functor and a [coerce] marker, telling it from the functor's own body. *)
+and coerced_block loc ~strict ~field_loc ~field_name output_repr pos_cc_list
+    get_field =
   let field (pos, cc) =
-    let lam = apply_coercion (field_loc cc) strict cc (get_field pos) in
-    match cc, lam with
-    | Tcoerce_primitive { pc_name; _ }, Lfunction _ ->
-      let id = Ident.create_local pc_name in
+    let loc = field_loc cc in
+    let name, loc =
+      match cc with
+      | Tcoerce_primitive { pc_name; _ } -> Some pc_name, loc
+      | Tcoerce_functor _ -> (
+        match field_name pos with
+        | None -> None, loc
+        | Some name ->
+          let scopes_of scopes =
+            let scopes =
+              enter_value_definition ~scopes
+                ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
+                (Ident.create_local name)
+            in
+            Debuginfo.Scoped_location.enter_compiler_generated ~scopes "coerce"
+          in
+          Some name, Debuginfo.Scoped_location.map_scopes scopes_of loc)
+      | _ -> None, loc
+    in
+    let lam = apply_coercion loc strict cc (get_field pos) in
+    match name, lam with
+    | Some name, Lfunction _ ->
+      let id = Ident.create_local name in
       Llet(Strict, Lambda.layout_function, id, Lambda.debug_uid_none, lam,
            Lvar id)
     | _, _ -> lam
@@ -825,8 +848,11 @@ and transl_structure ~scopes loc
                 | Tcoerce_primitive p -> of_location ~scopes p.pc_loc
                 | _ -> loc
               in
-              coerced_block loc ~strict:Strict ~field_loc output_repr
-                pos_cc_list get_field
+              let field_name pos =
+                if pos < 0 then None else Some (Ident.name (fst v.(pos)))
+              in
+              coerced_block loc ~strict:Strict ~field_loc ~field_name
+                output_repr pos_cc_list get_field
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list

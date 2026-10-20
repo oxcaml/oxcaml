@@ -244,6 +244,11 @@ let rec mangle_path_item ~definition_unit buf path_item =
 and mangle_path ~definition_unit buf path =
   List.iter (mangle_path_item ~definition_unit buf) path
 
+let marker_payload marker = "{" ^ marker ^ "}"
+
+let is_marker_payload payload =
+  String.length payload > 0 && Char.equal payload.[0] '{'
+
 let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
   (* Compare the current compilation unit with the one recorded in the [path] to
      avoid repetition in the mangled name when they are identical, and to add an
