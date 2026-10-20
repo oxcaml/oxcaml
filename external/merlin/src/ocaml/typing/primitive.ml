@@ -579,13 +579,16 @@ module Repr_check = struct
     | Unextended_bits8 | Unextended_bits16
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
-
-  let c_stub_return_errors = function
-    | Same_as_ocaml_repr _
+ let c_stub_return_errors = function
+    | Same_as_ocaml_repr (Base _ | Product _ | Addressable _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
     | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
+    | Same_as_ocaml_repr (Univar _) ->
+      Misc.fatal_error "c_stub_return_errors: univar"
+    | Same_as_ocaml_repr (Genvar _) ->
+      Misc.fatal_error "c_stub_return_errors: genvar"
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
@@ -626,25 +629,10 @@ module Repr_check = struct
       prim
 
   let check_c_stub ~builtin prim =
-    (* C externals may take and return unboxed products ([@unpacked] is not
-       allowed on returns). Product shapes that the C ABIs pass in memory are
-       rejected during Cmm generation (see [To_cmm_extcall] in flambda2).
-
-       CR mshinwell: it would be better to reject such shapes here: the
-       Cmm-level error fires as soon as an offending external is declared in a
-       natively-compiled module (its module block field needs an eta-expanded
-       wrapper), even if the declaration is usable in bytecode. However:
-
-       - The ABI classification logic lives in [To_cmm_extcall], which
-         [typing/] cannot reference, and a hook installed by the middle end
-         would be unpleasant. It could instead be extracted into a small
-         library in [utils/] (cf. [Target_system]), parameterized over an
-         abstract component (register class and size) so that it depends on
-         neither [Jkind] nor [Flambda_kind].
-
-       - The check is target- and backend-dependent (bytecode and JSIR accept
-         every shape, and Merlin would have to), so the elaboration of
-         [external] declarations would become backend-dependent. *)
+    (* CR mshinwell: it would be better to reject non-compilable shapes here
+       rather than in the backend. However, it is unclear how to do this since
+       the check is target- and backend-dependent, so the elaboration of
+       [external] declarations would become backend-dependent.  *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
       (List.init arity (fun _ -> c_stub_arg_errors ~builtin))
