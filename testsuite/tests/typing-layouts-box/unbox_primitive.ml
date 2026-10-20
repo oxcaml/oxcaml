@@ -329,7 +329,7 @@ type two = { t1 : #(int * int64_u); t2 : #(int64_u * int); }
 (* Void components contribute no fields to the box and no data to the unboxed
    result. *)
 
-   type one_void = { v : unit# }
+type one_void = { v : unit# }
 type all_void = { x : unit#; kept : unit# }
 type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit# }
 
