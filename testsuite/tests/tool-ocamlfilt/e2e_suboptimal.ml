@@ -21,13 +21,12 @@
    STRUCTURED column of [e2e_suboptimal.reference] for the demangled
    names. *)
 
-(* {1 Functor instances are indistinguishable; the body name doubles}
+(* {1 Functor instances are indistinguishable}
 
    The two applications below produce two separate compiled copies of
    [run], but both mangle identically to [Make.run]: the application
    site ([Int_inst] / [Str_inst]) never appears in the name, so the
-   copies cannot be told apart. The functor's own body symbol also
-   doubles its name, mangling to [Make.Make]. *)
+   copies cannot be told apart. (The functor's own body is [Make].) *)
 module type ORD = sig
   type t
 
