@@ -15,15 +15,7 @@
 #ifndef CAML_ADDRMAP_H
 #define CAML_ADDRMAP_H
 
-<<<<<<< HEAD
-#include "config.h"
-#include "misc.h"
-#include "mlvalues.h"
-||||||| upstream
-#include "mlvalues.h"
-=======
 #ifdef CAML_INTERNALS
->>>>>>> ocaml/ocaml#14370
 
 #include "mlvalues.h"
 
