@@ -1298,6 +1298,7 @@ val split_vectors : bool
 val layout_unit : layout
 val layout_bool : layout
 val layout_unboxed_unit : layout
+val layout_void : layout
 val layout_int : layout
 val layout_array : array_kind -> layout
 val layout_block : layout
