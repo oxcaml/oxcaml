@@ -48,12 +48,11 @@ end
    one entity, nor pass by reference, nor leave registers unused when a whole
    aggregate does not fit; and memory returns need a stack temporary around the
    [Cextcall] plus a hidden address parameter (x8 on arm64, which the backend
-   does not model).
+   does not model). *)
 
-   CR mshinwell: lift the memory-passing restrictions as described above.
-
-   CR mshinwell: until then it would be better to reject the unsupported shapes
-   at type-checking time; see the CR in [Primitive.Repr_check.check_c_stub].
+(* CR mshinwell: lift the memory-passing restrictions as described above. Until
+   then it would be better to reject the unsupported shapes at type-checking
+   time; see the CR in [Primitive.Repr_check.check_c_stub].
 
    Since nesting affects C struct layout (alignment and size-rounding of nested
    structs), products are laid out following the structure recorded in the
@@ -549,8 +548,7 @@ module Unit = struct
     match t.reg_class, components_with_args with
     | Float_regs, [(component, arg)] -> arg, Component.exttype component
     | Float_regs, _ :: _ :: _ ->
-      ( C.int64_as_float ~dbg (pack_int_bits ~dbg components_with_args),
-        Cmm.XFloat )
+      C.int64_as_float ~dbg (pack_int_bits ~dbg components_with_args), XFloat
     | Int_regs, [((component : Component.t), arg)] when component.offset = 0
       -> (
       match component.reg_class with
@@ -558,14 +556,14 @@ module Unit = struct
       | Float_regs -> (
         let bits = Component.bits ~dbg component arg in
         match component.size with
-        | 8 -> bits, Cmm.XInt64
-        | 4 -> bits, Cmm.XInt32
+        | 8 -> bits, XInt64
+        | 4 -> bits, XInt32
         | _ ->
           Misc.fatal_errorf
             "To_cmm_extcall.Unit.pack: floating-point component of size %d in \
              an integer unit"
             component.size))
-    | Int_regs, _ -> pack_int_bits ~dbg components_with_args, Cmm.XInt64
+    | Int_regs, _ -> pack_int_bits ~dbg components_with_args, XInt64
 
   (* The machtype in which the value of a unit of a return value is received. *)
   let machtype { reg_class; components } =
@@ -583,11 +581,11 @@ module Unit = struct
      Components that arrive in a register of the correct class without any
      packing get the usual sign extension of small integer results. *)
   let unpack_component ~dbg ~builtin_sign_extends (t : t) unit_value
-      (component : Component.t) =
+      (component : Component.t) : Cmm.expression =
     let shifted value =
       if component.offset = 0
       then value
-      else C.asr_int value (Cmm.Cconst_int (8 * component.offset, dbg)) dbg
+      else C.asr_int value (Cconst_int (8 * component.offset, dbg)) dbg
     in
     let single = match t.components with [_] -> true | _ :: _ :: _ -> false in
     match t.reg_class, component.reg_class with
@@ -602,16 +600,14 @@ module Unit = struct
            floating-point unit"
           component.size
       else
-        Cmm.Cop
-          ( Cmm.Creinterpret_cast Cmm.Float32_of_int32,
+        Cop
+          ( Creinterpret_cast Float32_of_int32,
             [shifted (C.float_as_int64 ~dbg unit_value)],
             dbg )
     | Int_regs, Float_regs -> (
       match component.size with
       | 8 -> C.int64_as_float ~dbg unit_value
-      | 4 ->
-        Cmm.Cop
-          (Cmm.Creinterpret_cast Cmm.Float32_of_int32, [shifted unit_value], dbg)
+      | 4 -> Cop (Creinterpret_cast Float32_of_int32, [shifted unit_value], dbg)
       | _ ->
         Misc.fatal_errorf
           "To_cmm_extcall.Unit.unpack_component: floating-point component of \
@@ -880,9 +876,8 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   let wrap return_values =
     match return_kinds, return_units with
     | [], None ->
-      (* CR mshinwell: this statement would seem to be wrong if we permit void
-         returns from extcalls *)
-      (* Extcalls of arity 0 are allowed (these never return). *)
+      (* Extcalls of arity 0 are allowed. These correspond to void returns in
+         C. *)
       return_values
     | [kind], None ->
       sign_extend_small_int_result ~builtin_sign_extends kind ~dbg return_values
