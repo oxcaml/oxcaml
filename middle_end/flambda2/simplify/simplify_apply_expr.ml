@@ -753,7 +753,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           Code_id.create ~name ~slot_stamp:None
             ~debug:
               (Debuginfo.add_partial_application_item
-                 ~callee:(Code_id.mangling_path callee's_code_id)
+                 ~callee:(Code_id.partial_application_callee callee's_code_id)
                  dbg)
             (Current_unit.get_cu_exn ())
         in

@@ -964,6 +964,22 @@ module Code_id = struct
     let { Code_id_data.name; debug_info; _ } = find_data t in
     mangling_path_of ~name ~debug:debug_info
 
+  (* Partially applying the wrapper of a partial application applies the
+     original callee to more arguments, so the wrapper's own [P] item is looked
+     through: the new wrapper is [partial{f}] rather than
+     [partial{g.partial{f}}]. A wrapper of an unknown callee ([partial{?}])
+     keeps its full path, which is the only information there is. *)
+  let partial_application_callee t =
+    let path = mangling_path t in
+    match Misc.last path with
+    | Some (Partial (_ :: _ as callee)) -> callee
+    | Some
+        ( Partial []
+        | Compilation_unit _ | Inline_marker | Module _ | Anonymous_module _
+        | Class _ | Function _ | Anonymous_function _ | Lazy _ | Stamp _ )
+    | None ->
+      path
+
   let rename t =
     let { Code_id_data.name; slot_stamp; debug_info; _ } = find_data t in
     create ~name ~slot_stamp ~debug:debug_info (Current_unit.get_cu_exn ())

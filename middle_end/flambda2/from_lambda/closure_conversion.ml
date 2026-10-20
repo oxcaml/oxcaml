@@ -3644,7 +3644,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
       Debuginfo.Scoped_location.map_scopes
         (fun scopes ->
           Debuginfo.Scoped_location.add_partial_application_item ~scopes
-            (Code_id.mangling_path callee_code_id))
+            (Code_id.partial_application_callee callee_code_id))
         apply.loc
     in
     let function_declarations =
