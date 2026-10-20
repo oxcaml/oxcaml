@@ -82,6 +82,7 @@ module With_parameters : sig
 
   val create_from_rule :
     ?callback:('v Constant.hlist -> unit) ref ->
+    ?stats:Bytecode.stats ->
     'p Lang.Variable.hlist ->
     Lang.rule ->
     ('p, 'v) t

@@ -34,6 +34,22 @@ val create_output : unit -> 'a output_ref
 
 val get_and_clear_output : 'a output_ref -> 'a Or_null.t
 
+type stats
+
+val print_stats : Format.formatter -> stats -> unit
+
+val create_stats : unit -> stats
+
+val reset_stats : stats -> unit
+
+val num_outputs : stats -> int
+
+val num_iterations : stats -> int
+
+val total_time : stats -> float
+
+val average_time : stats -> float
+
 type bindings_ref
 
 type bindings
@@ -119,6 +135,10 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     ('s, _, 'v) Column.hlist ->
     'v Table.result_repr ->
     assembler
+
+  val with_timer : stats:stats -> assembler -> assembler
+
+  val increase_count : stats:stats -> assembler
 
   val ( ++ ) : assembler -> assembler -> assembler
 

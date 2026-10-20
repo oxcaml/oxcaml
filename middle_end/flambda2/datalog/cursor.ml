@@ -311,8 +311,9 @@ module From_plan = struct
             build_stages env existential_stages 0 (fun _env -> accept))
           (build_stages env stages (index + 1) k)
 
-  let create_from_plan_with_parameters ?(callback = ref ignore) ~original_rule
-      parameters ({ tables; input_stages = _; output_atoms = _ } as plan) :
+  let create_from_plan_with_parameters ?(callback = ref ignore) ?stats
+      ~original_rule parameters
+      ({ tables; input_stages = _; output_atoms = _ } as plan) :
       (_, _) with_parameters =
     let env = Env.create () in
     let env, parameters =
@@ -336,7 +337,7 @@ module From_plan = struct
           Env.bind_var env var receiver, binders)
         (env, []) tables
     in
-    let executor =
+    let assembler =
       build_stages env plan.input_stages 0 (fun env ->
           Iarray.fold_right
             (fun head_atom body ->
@@ -352,9 +353,17 @@ module From_plan = struct
               | Callback_with_bindings (fn, args) ->
                 let args = Env.must_be_bound_term_hlist env args in
                 Executor.list [Executor.call_with_bindings fn args; body])
-            plan.output_atoms Executor.nop)
-      |> Executor.assemble
+            plan.output_atoms
+            (match stats with
+            | None -> Executor.nop
+            | Some stats -> Executor.increase_count ~stats))
     in
+    let assembler =
+      match stats with
+      | None -> assembler
+      | Some stats -> Executor.with_timer ~stats assembler
+    in
+    let executor = Executor.assemble assembler in
     let cursor_naive_binders = Env.get_naive_tables env in
     let cursor_outputs = Env.get_output_tables env in
     { parameters;
@@ -376,10 +385,10 @@ module With_parameters = struct
 
   let without_parameters { parameters = []; cursor } = cursor
 
-  let create_from_rule ?callback params rule =
+  let create_from_rule ?callback ?stats params rule =
     let plan = Planner.plan_rule rule in
-    From_plan.create_from_plan_with_parameters ?callback ~original_rule:rule
-      params plan
+    From_plan.create_from_plan_with_parameters ?callback ?stats
+      ~original_rule:rule params plan
 
   let naive_fold { parameters; cursor } ps db f acc =
     Or_null_sender.send_hlist parameters ps;
