@@ -444,6 +444,28 @@ module Coerced_inst = Coerced.Make (struct
   let x = 3
 end)
 
+(* The same, one module deeper: the coercion of [Nested] applies a nested
+   coercion to [Inner], whose functor is named [Nested.Inner.Make.{coerce}]. *)
+module Nested : sig
+  module Inner : sig
+    module Make (X : Coerced.S) : sig
+      val get : unit -> int
+    end
+  end
+end = struct
+  module Inner = struct
+    module Make (X : Coerced.S) = struct
+      let[@inline never] helper () = X.x * 3
+
+      let[@inline never] get () = helper () + 1
+    end
+  end
+end
+
+module Nested_inst = Nested.Inner.Make (struct
+  let x = 4
+end)
+
 (* {1 A primitive used as a value}
 
    Passing a primitive such as [Fun.id] as a value eta-expands it into a
@@ -520,6 +542,7 @@ let _ =
   ignore (Prims.compare 1 2);
   ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1));
   ignore (Coerced_inst.get ());
+  ignore (Nested_inst.get ());
   ignore (First_class.use_id () 5);
   ignore (Generated.escape "a,b");
   ignore (Generated.map [ 1; 2 ] ~f:(fun x -> x + 1))
