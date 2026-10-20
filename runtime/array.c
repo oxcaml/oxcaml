@@ -1279,6 +1279,8 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   mlsize_t suffix_depth = Wosize_val(idx_suffix);
 
   mlsize_t wosize = prefix_depth + suffix_depth;
+  // both paths may be empty (singleton products and unboxed records)
+  if (wosize == 0) return Atom(0);
   tag_t tag = 0;
   value block;
   mlsize_t i = 0;

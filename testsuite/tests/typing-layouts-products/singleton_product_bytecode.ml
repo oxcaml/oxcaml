@@ -236,6 +236,23 @@ val idx_whole_product :
   ((1, 2), (3, 4), (40, 40), (5, 6), {p = #{a = 5; b = 6}})
 |}]
 
+(* Regression test: deepening an index with an empty runtime path by adding
+   nothing to the path, creating another empty index. Runtime must not allocate
+   an empty block (observed by compacting). *)
+
+let deepen_empty_by_empty =
+  let r = { wp = mk_wp 1 2 } in
+  let i : (rwp, pair wrap) idx_mut =
+    (.idx_mut(Sys.opaque_identity (whole ())).#w)
+  in
+  Gc.compact ();
+  Idx_mut.set r i (mk_wp 3 4).#w.#w;
+  let p = (Idx_mut.get r i).#w in
+  (p.#a, p.#b), read_wp r
+[%%expect{|
+val deepen_empty_by_empty : (int * int) * (int * int) = ((3, 4), (3, 4))
+|}]
+
 (* Constructors *)
 
 type v =
