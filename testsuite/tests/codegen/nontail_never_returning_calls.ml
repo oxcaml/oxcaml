@@ -73,29 +73,22 @@ Calls.in_try:
   call  camlTOP1__fail_0_6_code@PLT
 .L1:
 .L2:
-  popq  48(%r14)
-  addq  $8, %rsp
-  addq  $8, %rsp
-  ret
-.L3:
   movq  (%rsp), %rbx
   movq  %rbx, 64(%r14)
   movq  caml_exn_Not_found@GOTPCREL(%rip), %rbx
   cmpq  %rbx, %rax
-  jne   .L4
+  jne   .L3
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L4:
+.L3:
   call  caml_reraise_exn@PLT
-.L5:
+.L4:
 
 Calls.nontail:
   subq  $8, %rsp
   call  camlTOP1__fail_0_6_code@PLT
 .L0:
-  addq  $8, %rsp
-  ret
 
 Calls.product_in_try:
   subq  $8, %rsp
@@ -109,27 +102,20 @@ Calls.product_in_try:
   call  camlTOP1__fail_product_1_7_code@PLT
 .L1:
 .L2:
-  popq  48(%r14)
-  addq  $8, %rsp
-  addq  $8, %rsp
-  ret
-.L3:
   movq  (%rsp), %rbx
   movq  %rbx, 64(%r14)
   movq  caml_exn_Not_found@GOTPCREL(%rip), %rbx
   cmpq  %rbx, %rax
-  jne   .L4
+  jne   .L3
   movl  $1, %eax
   addq  $8, %rsp
   ret
-.L4:
+.L3:
   call  caml_reraise_exn@PLT
-.L5:
+.L4:
 
 Calls.product_nontail:
   subq  $8, %rsp
   call  camlTOP1__fail_product_1_7_code@PLT
 .L0:
-  addq  $8, %rsp
-  ret
 |}]

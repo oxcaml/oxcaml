@@ -33,14 +33,12 @@ is_enter:
   movl  $1, %eax
   call  camlNontail_never_returning_calls_helper__raise_e_0_3_code@PLT
 .L0:
-  jmp   .L2
 .L1:
   movq  (%rax), %rax
   movq  <hidden PC-relative offset>(%rip), %rbx
   movq  %rbx, %rdi
   movq  %rax, %rsi
   call  caml_string_equal@PLT
-.L2:
   movq  %rax, %rbx
   addq  $8, %rsp
   ret
@@ -56,9 +54,6 @@ get_float:
   movl  $1, %eax
   call  camlNontail_never_returning_calls_helper__raise_e_0_3_code@PLT
 .L0:
-  movq  %rax, %rbx
-  addq  $8, %rsp
-  ret
 .L1:
   movq  (%rax), %rax
   vmovsd (%rax), %xmm0
