@@ -669,7 +669,7 @@ let cannot_change_calling_convention ~analysis_scope uses v =
            (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
-let perform_analysis0 db ~stats ~analysis_scope =
+let perform_analysis0 ?stats db ~analysis_scope =
   current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
@@ -698,7 +698,7 @@ let perform_analysis0 db ~stats ~analysis_scope =
             db
         in
         List.fold_left
-          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          (fun db rule -> Datalog.Schedule.run ?stats rule db)
           db unboxing_rules)
   in
   let name_of_node =
@@ -866,21 +866,21 @@ let perform_analysis0 db ~stats ~analysis_scope =
   in
   { db; unboxed_fields = unboxed; changed_representation }
 
-let perform_analysis db ~stats ~analysis_scope =
+let perform_analysis ?stats db ~analysis_scope =
   let db =
     if Flambda_features.reaper_change_calling_conventions ()
     then
       Profile.record_call ~accumulate:true "compute_calling_convention_changes"
         (fun () ->
           List.fold_left
-            (fun db rule -> Datalog.Schedule.run ~stats rule db)
+            (fun db rule -> Datalog.Schedule.run ?stats rule db)
             db calling_convention_changes_rules)
     else db
   in
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats ~analysis_scope
+  then perform_analysis0 db ?stats ~analysis_scope
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;

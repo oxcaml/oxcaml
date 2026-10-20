@@ -40,6 +40,46 @@ let get_and_clear_output ({ contents } as t) =
   t.contents <- Or_null.null;
   contents
 
+type stats =
+  { mutable time : float;
+    mutable num_outputs : int;
+    mutable num_iterations : int
+  }
+
+let total_time { time; _ } = time
+
+let average_time { time; num_iterations; _ } = time /. float num_iterations
+
+let num_outputs { num_outputs; _ } = num_outputs
+
+let num_iterations { num_iterations; _ } = num_iterations
+
+let print_stats ppf stats =
+  if num_iterations stats = 0
+  then Format.fprintf ppf "---"
+  else
+    Format.fprintf ppf
+      "%d iteration(s) (total: %f, mean: %f), producing %d output(s) (average: \
+       %f, average time: %f)"
+      stats.num_iterations (total_time stats) (average_time stats)
+      stats.num_outputs
+      (float stats.num_outputs /. float stats.num_iterations)
+      (stats.time /. float stats.num_outputs)
+
+let create_stats () = { time = 0.; num_outputs = 0; num_iterations = 0 }
+
+let reset_stats stats =
+  stats.time <- 0.;
+  stats.num_iterations <- 0;
+  stats.num_outputs <- 0
+
+type timer = { mutable start_time : float }
+
+type metrics_code =
+  | Timer_start of timer
+  | Timer_stop of timer
+  | Increase_outputs_count
+
 type bindings_ref =
   | Bindings_ref_innermost_first :
       ('k columns * 'k Or_null_receiver.hlist with_names)
@@ -132,9 +172,10 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * ('s, _, 'v) Column.hlist
         * 'v Table.result_repr
         -> code
+    | Metrics : metrics_code * stats -> code
 
   let labels = function
-    | Exit () | Union _ | Call_with_bindings _ -> []
+    | Exit () | Union _ | Call_with_bindings _ | Metrics _ -> []
     | Goto lab
     | Init (_, _, _, _, lab)
     | Advance (_, _, _, _, lab)
@@ -177,6 +218,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Union (_, _, name, _, names, _, value_name, _, _) ->
       Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
         print_list names value_name
+    | Metrics (Timer_start _timer, _stats) -> Format.fprintf ppf "timer.start"
+    | Metrics (Timer_stop _timer, _stats) -> Format.fprintf ppf "timer.stop"
+    | Metrics (Increase_outputs_count, _stats) -> Format.fprintf ppf "count++"
 
   let print_code_iarray ppf code =
     let length = Iarray.length code in
@@ -435,6 +479,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
            inner_columns,
            repr ))
 
+  let with_timer ~stats body st =
+    let timer = { start_time = 0. } in
+    emit (Metrics (Timer_start timer, stats)) st;
+    body st;
+    emit (Metrics (Timer_stop timer, stats)) st
+
+  let increase_count ~stats st =
+    emit (Metrics (Increase_outputs_count, stats)) st
+
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
      there are no out-of-range labels, and the code ends with an [Exit]
@@ -594,6 +647,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
             contents entry
         in
         table.contents <- Or_null.this contents);
+      next ()
+    | Metrics (Timer_start timer, stats) ->
+      stats.num_iterations <- stats.num_iterations + 1;
+      timer.start_time <- Sys.time ();
+      next ()
+    | Metrics (Timer_stop timer, stats) ->
+      let time = Sys.time () in
+      stats.time <- stats.time +. (time -. timer.start_time);
+      next ()
+    | Metrics (Increase_outputs_count, stats) ->
+      stats.num_outputs <- stats.num_outputs + 1;
       next ()
 
   let run t =
