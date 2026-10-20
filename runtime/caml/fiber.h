@@ -63,7 +63,6 @@ struct stack_info {
    * Stacks may be unpooled if either the stack size is not 2**N multiple of
    * [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
   int cache_bucket;
-  int domain_idx; /* the index of the domain that allocated this fiber */
   size_t size; /* size in bytes of this stack's memory */
   uintnat magic;
   int64_t id;
@@ -83,6 +82,7 @@ struct stack_info {
   /* The current dynamic binding node. Either [Val_null], or a block with three
      fields: dynamic key, bound value, and nullable parent node. */
   value dynamic;
+  int domain_idx; /* domain that made this fiber */
   bool is_task;
 
   /* Whether the fiber was allocated by [caml_alloc_stack_preemptible]. */
@@ -329,15 +329,29 @@ enum tick_outcome {
   TICK_RESULT_CONTINUE = 1
 };
 
-struct stack_cache {
-  _Atomic(struct stack_info*) head;
-  _Atomic(uintnat) len;
+/* A stack in one of the stack caches: the same memory as a [struct
+   stack_info], viewed through a different type while it has no
+   execution state. Mirrors the leading layout of [struct stack_info],
+   repurposing the first two words. The remaining [struct stack_info]
+   fields are dead while cached, and are reinitialized when the stack is
+   reused. */
+struct cached_stack {
+  /* Overlays [sp]: the major-cycle count when this stack was demoted,
+     used to free long-unused stacks (global and extra caches only). */
+  uintnat stamp;
+  /* Overlays [exception_ptr]: the next stack in this cache. */
+  struct cached_stack* next;
+  /* The address at which the handler will be rebuilt on reuse. */
+  struct stack_handler* handler_space;
+  int cache_bucket; /* as in struct stack_info */
+  size_t size;      /* as in struct stack_info */
+  uintnat magic;    /* as in struct stack_info */
 };
 
-/* A stack in a cache is dead storage: its [exception_ptr] field doubles
-   as the intrusive link to the next cached stack. (The runtime builds
-   with -fno-strict-aliasing, so the lvalue pun is fine.) */
-#define Stack_cache_next(stk) (*(struct stack_info**)&(stk)->exception_ptr)
+struct stack_cache {
+  _Atomic(struct cached_stack*) head;
+  _Atomic(uintnat) len;
+};
 
 struct stack_cache* caml_alloc_stack_caches(void);
 void caml_enable_stack_caches(struct stack_cache*);
