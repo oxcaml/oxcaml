@@ -159,8 +159,11 @@ module Scoped_location = struct
       | Cons {item = Sc_class_definition; _} -> dot ~sep:"#" scopes s
       | _ -> dot scopes s
     in
+    (* Translclass binds the method's function as [method_<name>]; the
+       mangling item matches, so the binder's name identifies the function. *)
     cons scopes Sc_method_definition str s
-      ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
+      ~assume_zero_alloc:ZA.Assume_info.none
+      (Some (Function ("method_" ^ s)))
 
   let enter_lazy ~scopes =
     cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none

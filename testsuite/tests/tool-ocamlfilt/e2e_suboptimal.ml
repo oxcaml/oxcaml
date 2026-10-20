@@ -49,26 +49,19 @@ module Str_inst = Make (struct
   let cmp = compare
 end)
 
-(* {1 Classes and objects get poor symbols across the board}
+(* {1 Classes and objects}
 
-   OxCaml emits no DWARF for the OOP fragment of OCaml and the linker
-   names are correspondingly weak. Recording them here documents what
-   future object support (Shape.t object variants, then DWARF
-   [DW_TAG_class_type] / [DW_TAG_subprogram] / [DW_TAG_inheritance])
-   would aim to fix.
-
-   - Method bodies are named after the compiler's [method_<name>]
-     binding but at the top level of the unit ([E2e_suboptimal.method_log])
-     rather than under their class, so methods of different classes
-     with the same name are indistinguishable; class initializers are
-     still an anonymous [fn] under the class ([dog.fn]).
+   OxCaml emits no DWARF for the OOP fragment of OCaml, but the linker
+   names now carry the class: methods are [<class>.method_<name>] and the
+   closures the class compiler generates are marked,
+   [<class>.{class_init}] and [<class>.{obj_init}]. What remains lossy:
    - Instance variables ([val nick], [val count]) and their accessors
      produce no symbol of their own.
    - A [virtual] class yields no constructor symbol, and [inherit]
      leaves no trace in any name.
    - An immediate object ([object ... end] with no class, in
-     [make_logger]) loses even the name of the binding it is attached
-     to. *)
+     [make_logger]) is a class named [object]:
+     [make_logger.object.method_log]. *)
 let scale k = k + 1
 
 class virtual animal = object
