@@ -72,7 +72,7 @@ let loopify_decision_for_call dacc apply =
     | Not_in_a_closure | In_a_set_of_closures_but_not_yet_in_a_specific_closure
       ->
       Loopify_state.do_not_loopify
-    | Closure { return_continuation; exn_continuation; my_closure; _ } -> (
+    | Closure { my_closure; _ } as closure_info -> (
       let tenv = DE.typing_env denv in
       let[@inline always] canon simple =
         Simple.without_coercion (TE.get_canonical_simple_exn tenv simple)
@@ -82,16 +82,7 @@ let loopify_decision_for_call dacc apply =
       | Some callee ->
         if
           Simple.equal (canon (Simple.var my_closure)) (canon callee)
-          && (match Apply.continuation apply with
-            | Never_returns ->
-              (* If we never return, then this call is a tail-call *)
-              true
-            | Return apply_return_continuation ->
-              Continuation.equal apply_return_continuation return_continuation)
-          && Exn_continuation.equal
-               (Apply.exn_continuation apply)
-               (Exn_continuation.create ~exn_handler:exn_continuation
-                  ~extra_args:[])
+          && Closure_info.is_tail_call closure_info apply
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
@@ -1536,7 +1527,29 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
   down_to_up dacc
     (SE.simplified_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
 
+(* Inlining a function that never returns at a tail call makes the calls in its
+   body return to the caller's return continuation, at another arity (see
+   [Inlining_helpers.wrap_inlined_body]). Such calls never return. *)
+let never_returns_at_another_arity dacc apply =
+  match Apply.continuation apply, DE.closure_info (DA.denv dacc) with
+  | Return k, Closure { return_continuation; result_arity; _ }
+    when Continuation.equal k return_continuation -> (
+    match Flambda_arity.known result_arity with
+    | None -> apply
+    | Some result_arity ->
+      if
+        Flambda_arity.equal_ignoring_subkinds result_arity
+          (Apply.return_arity apply)
+      then apply
+      else Apply.with_continuation apply Never_returns)
+  | ( (Return _ | Never_returns),
+      ( Not_in_a_closure
+      | In_a_set_of_closures_but_not_yet_in_a_specific_closure | Closure _ ) )
+    ->
+    apply
+
 let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
+  let apply = never_returns_at_another_arity dacc apply in
   match simplify_apply_shared dacc apply with
   | Invalid args_arity ->
     replace_apply_by_invalid dacc ~down_to_up

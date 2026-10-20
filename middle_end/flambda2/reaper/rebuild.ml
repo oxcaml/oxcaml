@@ -763,6 +763,17 @@ let make_apply_wrapper env
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
       ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
+  | Return return_cont
+    when List.compare_lengths
+           (Continuation.Map.find return_cont env.cont_params_to_keep)
+           return_decisions
+         <> 0 ->
+    (* A call with an empty result arity may return to a continuation with
+       parameters: it then never returns (see
+       [Inlining_helpers.wrap_inlined_body]). *)
+    let apply = make_apply ~continuation:Never_returns in
+    RE.from_expr ~expr:(Expr.create_apply apply)
+      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
   | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
@@ -1122,6 +1133,12 @@ let rebuild_apply env apply =
       let return_arity =
         match Apply.continuation apply with
         | Never_returns -> Apply.return_arity apply
+        | Return _
+          when Flambda_arity.cardinal_unarized (Apply.return_arity apply) = 0
+          ->
+          (* The call returns nothing, or never returns (see
+             [Inlining_helpers.wrap_inlined_body]). *)
+          Apply.return_arity apply
         | Return cont ->
           let cont_decisions =
             Continuation.Map.find cont env.cont_params_to_keep

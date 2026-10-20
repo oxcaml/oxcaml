@@ -47,6 +47,7 @@ val wrap_inlined_body :
   apply_exn_continuation:Exn_continuation.t ->
   apply_return_continuation:Flambda.Apply.Result_continuation.t ->
   result_arity:[`Unarized | `Unknown] Flambda_arity.t ->
+  is_tail_call:bool ->
   make_inlined_body:
     ('acc ->
     apply_exn_continuation:Continuation.t ->

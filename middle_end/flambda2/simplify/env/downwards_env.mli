@@ -216,6 +216,7 @@ val enter_closure :
   Code_id.t ->
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
+  result_arity:[`Unarized | `Unknown] Flambda_arity.t ->
   my_closure:Variable.t ->
   my_alloc_region:Variable.t ->
   t ->

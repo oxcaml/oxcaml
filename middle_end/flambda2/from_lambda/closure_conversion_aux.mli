@@ -313,6 +313,10 @@ module Acc : sig
 
   val top_closure_info : t -> closure_info option
 
+  (** Whether the application returns to the current function's return
+      continuation and raises to its exception continuation. *)
+  val is_tail_call : t -> Apply_expr.t -> bool
+
   val push_closure_info :
     t ->
     return_continuation:Continuation.t ->

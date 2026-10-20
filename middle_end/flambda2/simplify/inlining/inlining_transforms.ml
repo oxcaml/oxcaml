@@ -93,13 +93,13 @@ let let_cont_create () cont ~handler_params ~handler ~body ~is_exn_handler
     ~free_names_of_body:Unknown
 
 let wrap_inlined_body ~apply_exn_continuation ~apply_return_continuation
-    ~result_arity ~make_inlined_body ~invalid =
+    ~result_arity ~is_tail_call ~make_inlined_body ~invalid =
   let apply_cont_create () ~trap_action cont ~args ~dbg =
     Apply_cont.create ~trap_action cont ~args ~dbg |> Expr.create_apply_cont
   in
   Inlining_helpers.wrap_inlined_body () ~apply_exn_continuation
-    ~apply_return_continuation ~result_arity ~make_inlined_body ~invalid
-    ~apply_cont_create ~let_cont_create
+    ~apply_return_continuation ~result_arity ~is_tail_call ~make_inlined_body
+    ~invalid ~apply_cont_create ~let_cont_create
 
 let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   let callee = Apply.callee apply in
@@ -143,6 +143,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
   | Maybe_alloc_stack _, Maybe_alloc_stack
   | Not_alloc_stack _, Not_alloc_stack ->
+    let is_tail_call = Closure_info.is_tail_call (DE.closure_info denv) apply in
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in
@@ -168,8 +169,8 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
         in
         let expr =
           wrap_inlined_body ~apply_exn_continuation ~apply_return_continuation
-            ~result_arity:(Code.result_arity code) ~make_inlined_body
-            ~invalid:(fun () ->
+            ~result_arity:(Code.result_arity code) ~is_tail_call
+            ~make_inlined_body ~invalid:(fun () ->
               Expr.create_invalid (Application_never_returns apply))
         in
         DA.with_denv dacc denv, expr)

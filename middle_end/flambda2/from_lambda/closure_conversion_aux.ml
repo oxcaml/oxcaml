@@ -715,6 +715,17 @@ module Acc = struct
     | [] -> None
     | closure_info :: _ -> Some closure_info
 
+  let is_tail_call t apply =
+    match top_closure_info t with
+    | None -> false
+    | Some { return_continuation; exn_continuation; _ } ->
+      (match Apply_expr.continuation apply with
+        | Never_returns -> true
+        | Return cont -> Continuation.equal cont return_continuation)
+      && Exn_continuation.equal
+           (Apply_expr.exn_continuation apply)
+           exn_continuation
+
   let push_closure_info t ~return_continuation ~exn_continuation ~my_closure
       ~is_purely_tailrec ~code_id =
     { t with
@@ -994,28 +1005,18 @@ module Expr_with_acc = struct
         acc
     in
     let is_tail_call =
-      match Acc.top_closure_info acc with
-      | None -> false
-      | Some { return_continuation; exn_continuation; _ } -> (
-        (match Apply_expr.continuation apply with
-          | Never_returns -> true
-          | Return cont -> Continuation.equal cont return_continuation)
-        && Exn_continuation.equal
-             (Apply_expr.exn_continuation apply)
-             exn_continuation
-        (* If the return and exn continuation match, the call is in tail
-           position, but could still be an under- or over-application. By
-           checking that it is a direct call, we are sure it has the correct
-           arity. *)
-        &&
-        match Apply.call_kind apply with
-        | Function { function_call = Direct _; _ } -> true
-        | Function
-            { function_call = Indirect_unknown_arity | Indirect_known_arity _;
-              _
-            } ->
-          false
-        | Method _ | C_call _ | Effect _ -> false)
+      Acc.is_tail_call acc apply
+      (* If the return and exn continuation match, the call is in tail position,
+         but could still be an under- or over-application. By checking that it
+         is a direct call, we are sure it has the correct arity. *)
+      &&
+      match Apply.call_kind apply with
+      | Function { function_call = Direct _; _ } -> true
+      | Function
+          { function_call = Indirect_unknown_arity | Indirect_known_arity _; _ }
+        ->
+        false
+      | Method _ | C_call _ | Effect _ -> false
     in
     let acc =
       match Apply.callee apply with

@@ -486,7 +486,7 @@ module Inlining = struct
       ~body ~is_exn_handler ~is_cold
 
   let wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
-      ~result_arity ~make_inlined_body ~invalid =
+      ~result_arity ~is_tail_call ~make_inlined_body ~invalid =
     let apply_cont_create acc ~trap_action cont ~args ~dbg =
       let acc, apply_cont =
         Apply_cont_with_acc.create acc ~trap_action cont ~args ~dbg
@@ -494,8 +494,8 @@ module Inlining = struct
       Expr_with_acc.create_apply_cont acc apply_cont
     in
     Inlining_helpers.wrap_inlined_body acc ~apply_exn_continuation
-      ~apply_return_continuation ~result_arity ~make_inlined_body ~invalid
-      ~apply_cont_create ~let_cont_create
+      ~apply_return_continuation ~result_arity ~is_tail_call ~make_inlined_body
+      ~invalid ~apply_cont_create ~let_cont_create
 
   let inline acc ~apply ~apply_depth ~func_desc:code =
     let apply_dbg = Apply.dbg apply in
@@ -541,11 +541,12 @@ module Inlining = struct
             ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
             ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
         in
+        let is_tail_call = Acc.is_tail_call acc apply in
         let acc = Acc.with_free_names Name_occurrences.empty acc in
         let acc = Acc.increment_metrics cost_metrics acc in
         wrap_inlined_body acc ~apply_exn_continuation ~apply_return_continuation
-          ~result_arity:(Code.result_arity code) ~make_inlined_body
-          ~invalid:(fun acc ->
+          ~result_arity:(Code.result_arity code) ~is_tail_call
+          ~make_inlined_body ~invalid:(fun acc ->
             Expr_with_acc.create_invalid acc (Application_never_returns apply)))
 end
 

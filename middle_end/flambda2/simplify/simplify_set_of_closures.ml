@@ -108,6 +108,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     DE.add_lifted_constant_state ~maybe_already_defined:() denv
       (DA.get_lifted_constants outer_dacc)
     |> DE.enter_closure code_id ~return_continuation ~exn_continuation
+         ~result_arity:(Code_metadata.result_arity code_metadata)
          ~my_closure
          ~my_alloc_region:
            (Alloc_mode.For_applications.alloc_region my_alloc_mode)
