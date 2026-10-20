@@ -111,7 +111,8 @@ let rec apply_coercion loc strict restr arg =
   match restr with
     Tcoerce_none ->
       arg
-  | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
+  | Tcoerce_structure
+      { input_repr; output_repr; pos_cc_list; output_names; id_pos_list } ->
       name_lambda strict arg Lambda.layout_module (fun id ->
         let input_repr = transl_module_representation input_repr in
         let output_repr = transl_module_representation output_repr in
@@ -126,7 +127,7 @@ let rec apply_coercion loc strict restr arg =
         in
         let lam =
           coerced_block loc ~strict:Alias ~field_loc:(fun _ -> loc)
-            ~field_name:(fun _ -> None) output_repr pos_cc_list get_field
+            ~output_names output_repr pos_cc_list get_field
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
   | Tcoerce_functor(cc_arg, cc_res, yielding) ->
@@ -166,34 +167,48 @@ let rec apply_coercion loc strict restr arg =
         (fun _ -> apply_coercion loc Alias cc lam)
   | Tcoerce_invalid -> Misc.fatal_error "Translmod: invalid coercion"
 
-(* Builds the block of a structure coerced by [pos_cc_list]. The wrapper
-   function of a primitive coerced to a value, and that of a functor coerced
-   to its signature when the field's name is known, are let-bound to a variable
-   named after the value, so that the middle end names the function after it
-   (an [Llet]-bound [Lfunction] takes its binder's name in
-   [Lambda_to_flambda]). A functor's wrapper is also given a scope naming the
-   functor and a [coerce] marker, telling it from the functor's own body. *)
-and coerced_block loc ~strict ~field_loc ~field_name output_repr pos_cc_list
+(* Builds the block of a structure coerced by [pos_cc_list]. [output_names]
+   names the fields of the block (see [Tcoerce_structure]) when known. The
+   wrapper function of a primitive coerced to a value, and that of a functor
+   coerced to its signature, are let-bound to a variable named after the
+   value, so that the middle end names the function after it (an
+   [Llet]-bound [Lfunction] takes its binder's name in [Lambda_to_flambda]).
+   A functor's wrapper is also given a scope naming the functor and a
+   [coerce] marker, telling it from the functor's own body, and a coerced
+   submodule's fields are named under the submodule's scope. *)
+and coerced_block loc ~strict ~field_loc ~output_names output_repr pos_cc_list
     get_field =
-  let field (pos, cc) =
+  let names =
+    if List.compare_lengths output_names pos_cc_list = 0
+    then List.map Option.some output_names
+    else List.map (fun _ -> None) pos_cc_list
+  in
+  let scoped loc enter =
+    Debuginfo.Scoped_location.map_scopes (fun scopes -> enter scopes) loc
+  in
+  let field (pos, cc) name =
     let loc = field_loc cc in
     let name, loc =
-      match cc with
-      | Tcoerce_primitive { pc_name; _ } -> Some pc_name, loc
-      | Tcoerce_functor _ -> (
-        match field_name pos with
-        | None -> None, loc
-        | Some name ->
-          let scopes_of scopes =
-            let scopes =
-              enter_value_definition ~scopes
-                ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
-                (Ident.create_local name)
-            in
-            Debuginfo.Scoped_location.enter_compiler_generated ~scopes "coerce"
+      match cc, name with
+      | Tcoerce_primitive { pc_name; _ }, _ -> Some pc_name, loc
+      | Tcoerce_functor _, Some name ->
+        let enter scopes =
+          let scopes =
+            enter_value_definition ~scopes
+              ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
+              (Ident.create_local name)
           in
-          Some name, Debuginfo.Scoped_location.map_scopes scopes_of loc)
-      | _ -> None, loc
+          Debuginfo.Scoped_location.enter_compiler_generated ~scopes "coerce"
+        in
+        Some name, scoped loc enter
+      | Tcoerce_structure _, Some name ->
+        let enter scopes =
+          enter_module_definition ~scopes (Ident.create_local name)
+        in
+        None, scoped loc enter
+      | (Tcoerce_none | Tcoerce_functor _ | Tcoerce_structure _
+        | Tcoerce_alias _ | Tcoerce_kindtemplate _ | Tcoerce_invalid), _ ->
+        None, loc
     in
     let lam = apply_coercion loc strict cc (get_field pos) in
     match name, lam with
@@ -204,7 +219,7 @@ and coerced_block loc ~strict ~field_loc ~field_name output_repr pos_cc_list
     | _, _ -> lam
   in
   Lprim(block_of_module_representation ~loc:(to_location loc) output_repr,
-        List.map field pos_cc_list, loc)
+        List.map2 field pos_cc_list names, loc)
 
 and apply_coercion_result loc strict funct params args yielding cc_res =
   match cc_res with
@@ -309,9 +324,10 @@ let rec compose_coercions c1 c2 =
     (Tcoerce_none, c2) -> c2
   | (c1, Tcoerce_none) -> c1
   | ( Tcoerce_structure { input_repr = _; output_repr = or1;
-                          pos_cc_list = pc1; id_pos_list = ids1 },
+                          pos_cc_list = pc1; output_names; id_pos_list = ids1 },
       Tcoerce_structure { input_repr = ir2; output_repr = _;
-                          pos_cc_list = pc2; id_pos_list = ids2 }
+                          pos_cc_list = pc2; output_names = _;
+                          id_pos_list = ids2 }
     ) ->
       let v2 = Array.of_list pc2 in
       let ids1 =
@@ -339,6 +355,7 @@ let rec compose_coercions c1 c2 =
         { input_repr = ir2
         ; output_repr = or1
         ; pos_cc_list
+        ; output_names
         ; id_pos_list = ids1 @ ids2
         }
   | (Tcoerce_functor(arg1, res1, y1), Tcoerce_functor(arg2, res2, y2)) ->
@@ -819,7 +836,8 @@ and transl_structure ~scopes loc
                   List.map (fun id -> Lvar id) ids, loc),
               repr
         | Tcoerce_structure
-          { input_repr = _; output_repr; pos_cc_list; id_pos_list; } ->
+          { input_repr = _; output_repr; pos_cc_list; output_names;
+            id_pos_list; } ->
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
@@ -848,10 +866,7 @@ and transl_structure ~scopes loc
                 | Tcoerce_primitive p -> of_location ~scopes p.pc_loc
                 | _ -> loc
               in
-              let field_name pos =
-                if pos < 0 then None else Some (Ident.name (fst v.(pos)))
-              in
-              coerced_block loc ~strict:Strict ~field_loc ~field_name
+              coerced_block loc ~strict:Strict ~field_loc ~output_names
                 output_repr pos_cc_list get_field
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
