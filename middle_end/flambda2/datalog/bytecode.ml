@@ -231,7 +231,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
      with unresolved labels emitted during the first iteration. The closure
      takes as argument the resolved offsets for the labels.
 
-     Unconditional jumps ([goto]) are explicitly represented in the [late] type
+     Unconditional jumps ([goto]) are explicitly represented in the [state] type
      in order to simplify code when a jump is either followed immediately by its
      label or by an instruction insn without label (which becomes
      unreachable). *)

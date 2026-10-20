@@ -62,6 +62,15 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     ('k Or_null_receiver.t -> assembler) ->
     assembler
 
+  (** [exists cond body] evaluates [cond] and if it runs its [accept] argument,
+      [body] is executed once, then execution continues after the whole [exists]
+      block.
+
+      In pseudo-assembly syntax, this is implemented as:
+
+      {[
+        cond ~accept:[body; goto after]; after: ...
+      ]} *)
   val exists : (accept:assembler -> assembler) -> assembler -> assembler
 
   (** [nop] is a no-op and does nothing. *)
