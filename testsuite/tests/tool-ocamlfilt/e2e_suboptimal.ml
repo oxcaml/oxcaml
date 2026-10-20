@@ -58,11 +58,11 @@ end)
    [DW_TAG_class_type] / [DW_TAG_subprogram] / [DW_TAG_inheritance])
    would aim to fix.
 
-   - Method bodies lose their name: every method below mangles to an
-     anonymous [fn] under its class or object ([E2e_suboptimal.dog.fn],
-     [E2e_suboptimal.make_logger.object.fn]), so the methods of a class
-     are indistinguishable from each other and from anonymous functions
-     in it.
+   - Method bodies sit under their class and method scopes but end in
+     the compiler's [method_<name>] binding, so the method's name is
+     repeated ([E2e_suboptimal.dog.scale.method_scale]); class
+     initializers are still an anonymous [fn] under the class
+     ([dog.fn]).
    - Instance variables ([val nick], [val count]) and their accessors
      produce no symbol of their own.
    - A [virtual] class yields no constructor symbol, and [inherit]

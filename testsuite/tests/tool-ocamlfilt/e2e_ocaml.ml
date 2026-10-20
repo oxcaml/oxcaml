@@ -398,6 +398,21 @@ end = struct
   external compare : int -> int -> int = "%compare"
 end
 
+(* {1 A named function defined under a capturing [let]}
+
+   [let f = let x = ... in let f ... = ... x ... in f] is an idiom for
+   sharing a value between calls while keeping a named symbol. The inner
+   function keeps its name, [Captured.find_exn.find_exn], even though its
+   binding is the whole body of the outer one. *)
+module Captured = struct
+  let find_exn =
+    let not_found = Not_found in
+    let[@inline never] find_exn t ~f =
+      match List.find_opt f t with None -> raise not_found | Some x -> x
+    in
+    find_exn
+end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -440,4 +455,5 @@ let _ =
   ignore (use_app ());
   ignore (pick true);
   ignore (Prims.( < ) 1 2);
-  ignore (Prims.compare 1 2)
+  ignore (Prims.compare 1 2);
+  ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1))
