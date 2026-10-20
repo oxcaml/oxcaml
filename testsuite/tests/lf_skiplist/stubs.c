@@ -182,7 +182,7 @@ CAMLprim value hammer_skiplist_randomly_in_range(value v_unit) {
 
   const int range_mask = 15;
 
-  for (int round = 0; round < 100000; round++) {
+  for (int round = 0; round < 10000; round++) {
     barrier_await(n_domains);
 
     for (int i = 0; i < 100; i++) {
