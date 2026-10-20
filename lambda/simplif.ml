@@ -588,9 +588,15 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
    tail call later on. *)
 
   let mklet str kind v duid e1 e2 =
-    match e2 with
-    | Lvar w when optimize && Ident.same v w -> e1
-    | _ -> Llet (str, kind,v,duid,e1,e2)
+    match e1, e2 with
+    | Lfunction _, Lvar w when optimize && Ident.same v w ->
+        (* [let f = fun ... in f] keeps its binding: the middle end names the
+           function after the variable it is bound to (see the [Llet] of an
+           [Lfunction] in [Lambda_to_flambda]), and an anonymous function
+           would only get a generic name. *)
+        Llet (str, kind, v, duid, e1, e2)
+    | _, Lvar w when optimize && Ident.same v w -> e1
+    | _, _ -> Llet (str, kind, v, duid, e1, e2)
   in
 
   let mkmutlet kind v duid e1 e2 =

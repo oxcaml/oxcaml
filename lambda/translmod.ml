@@ -167,32 +167,21 @@ let rec apply_coercion loc strict restr arg =
   | Tcoerce_invalid -> Misc.fatal_error "Translmod: invalid coercion"
 
 (* Builds the block of a structure coerced by [pos_cc_list]. The wrapper
-   function of a primitive coerced to a value is let-bound around the block,
-   to a variable named after the value, so that the middle end names the
-   function after that variable (see the [Llet] of an [Lfunction] in
-   [Lambda_to_flambda]); bound around the field alone, the binding would be
-   removed by [Simplif]. *)
+   function of a primitive coerced to a value is let-bound to a variable named
+   after the value, so that the middle end names the function after it (an
+   [Llet]-bound [Lfunction] takes its binder's name in [Lambda_to_flambda]). *)
 and coerced_block loc ~strict ~field_loc output_repr pos_cc_list get_field =
-  let bindings, fields =
-    List.fold_right
-      (fun (pos, cc) (bindings, fields) ->
-        let field = apply_coercion (field_loc cc) strict cc (get_field pos) in
-        match cc, field with
-        | Tcoerce_primitive { pc_name; _ }, Lfunction _ ->
-          let id = Ident.create_local pc_name in
-          (id, field) :: bindings, Lvar id :: fields
-        | _, _ -> bindings, field :: fields)
-      pos_cc_list ([], [])
+  let field (pos, cc) =
+    let lam = apply_coercion (field_loc cc) strict cc (get_field pos) in
+    match cc, lam with
+    | Tcoerce_primitive { pc_name; _ }, Lfunction _ ->
+      let id = Ident.create_local pc_name in
+      Llet(Strict, Lambda.layout_function, id, Lambda.debug_uid_none, lam,
+           Lvar id)
+    | _, _ -> lam
   in
-  let block =
-    Lprim(block_of_module_representation ~loc:(to_location loc) output_repr,
-          fields, loc)
-  in
-  List.fold_right
-    (fun (id, wrapper) body ->
-      Llet(Strict, Lambda.layout_function, id, Lambda.debug_uid_none,
-           wrapper, body))
-    bindings block
+  Lprim(block_of_module_representation ~loc:(to_location loc) output_repr,
+        List.map field pos_cc_list, loc)
 
 and apply_coercion_result loc strict funct params args yielding cc_res =
   match cc_res with
