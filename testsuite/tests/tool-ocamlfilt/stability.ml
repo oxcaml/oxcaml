@@ -33,8 +33,10 @@
    [stability_lib_edited], which add a comment and unrelated top-level
    functions. [stability.sh] checks that the demangled names of every other
    function are the same in both compilations, including the closure of
-   [make_adder] that gets copied into this unit by inlining. The reference
-   lists those names. *)
+   [make_adder] that gets copied into this unit by [-O3] inlining. The
+   reference lists the names each unit defines itself; the cross-unit
+   names are checked but not listed, so that the reference holds whether
+   or not that inlining happens (e.g. under [Oclassic]). *)
 
 let adder = Stability_lib.make_adder (Sys.opaque_identity 10)
 
