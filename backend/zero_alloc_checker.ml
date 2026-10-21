@@ -2040,10 +2040,10 @@ end = struct
     | Bot -> V.bot
 
   let encode =
-    Zero_alloc_info.Encoded.Components.encode ~encode_component:encode
+    Zero_alloc_info.Encoded.Components.encode_or_elide ~encode_component:encode
 
   let decode =
-    Zero_alloc_info.Encoded.Components.decode ~decode_component:decode
+    Zero_alloc_info.Encoded.Components.decode_maybe_elided ~decode_component:decode
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in

@@ -22,27 +22,41 @@ module Encoded = struct
   end
 
   module Components = struct
-    (* CR-someday wsturgeon for wsturgeon: nonzero by refinement? *)
     type t = int
 
-    let encode ~(encode_component : 'a -> Component.t)
+    let encode (components : Component.t Zero_alloc_utils.Components.t) =
+      components.nor lor (components.exn lsl 2) lor (components.div lsl 4)
+
+    let all_top =
+      Zero_alloc_utils.Components.create (fun _ignore_tag ->
+          Component.encode (Top ()))
+
+    let all_top_encoding = encode all_top
+
+    let encode_or_elide ~(encode_component : 'a -> Component.t)
         (components : 'a Zero_alloc_utils.Components.t) : t option =
-      let c =
-        encode_component components.nor
-        lor (encode_component components.exn lsl 2)
-        lor (encode_component components.div lsl 4)
+      let encoded =
+        encode
+          (Zero_alloc_utils.Components.map components ~f:(fun _tag ->
+               encode_component))
       in
-      if c = 0 then None else Some c
+      (* Artifact-size optimization: if this summary is all [Top] (the most
+         common case), then leave it out, and let readers infer that a missing
+         summary is all [Top]. *)
+      if encoded = all_top_encoding then None else Some encoded
 
     let decode ~(decode_component : Component.t -> 'a) (i : t) :
         'a Zero_alloc_utils.Components.t =
-      if i land 0b111111 = 0
-      then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding"
-      else
-        { nor = decode_component (i land 3);
-          exn = decode_component ((i lsr 2) land 3);
-          div = decode_component ((i lsr 4) land 3)
-        }
+      { nor = decode_component (i land 3);
+        exn = decode_component ((i lsr 2) land 3);
+        div = decode_component ((i lsr 4) land 3)
+      }
+
+    let decode_maybe_elided ~(decode_component : Component.t -> 'a) i :
+        'a Zero_alloc_utils.Components.t =
+      if i = all_top_encoding
+      then Misc.fatal_error "Zero_alloc_checker unexpected all-Top encoding"
+      else decode ~decode_component i
   end
 end
 

@@ -15,14 +15,12 @@ module Encoded : sig
   module Components : sig
     type t
 
-    val encode :
+    val encode_or_elide :
       encode_component:('a -> Component.t) ->
       'a Zero_alloc_utils.Components.t ->
       t option
-    (* CR-soon wsturgeon: why was this originally written with an [option],
-       since that [option] does *not* mean "encoding/decoding failed"? *)
 
-    val decode :
+    val decode_maybe_elided :
       decode_component:(Component.t -> 'a) ->
       t ->
       'a Zero_alloc_utils.Components.t
