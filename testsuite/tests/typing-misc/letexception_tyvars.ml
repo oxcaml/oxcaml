@@ -23,12 +23,12 @@ val xv_stmt : unit -> int * string = <fun>
 val xv_export : unit -> int = <fun>
 |}]
 
-(* The exception's own declaration still typechecks normally, and the
-   enclosing named variable is still usable after it. *)
+(* A simpler case of the same thing: both ['a]s are the same variable, so
+   annotating [y] makes [x] an [int] too. *)
 
-let f (x : 'a) : 'a =
+let f (x : 'a) (y : int) =
   let exception E of int in
-  try raise (E 1) with E n -> ignore n; (x : 'a)
+  ((y : 'a), x)
 [%%expect{|
-val f : 'a -> 'a = <fun>
+val f : int -> int -> int * int = <fun>
 |}]
