@@ -1325,6 +1325,22 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
     | W16 -> Some (sse_or_avx pmullw vpmullw_X_X_Xm128)
     | W8 -> None
   in
+  let make_binary_operation arg_0 arg_1 res operation =
+    { Vectorize_utils.Vectorized_instruction.operation;
+      arguments = [| arg_0; arg_1 |];
+      results = [| res |]
+    }
+  in
+  let make_const res consts =
+    match create_const_vec consts with
+    | Some [const_instruction] ->
+      assert (
+        Array.length const_instruction.arguments = 0
+        && Array.length const_instruction.results = 1);
+      const_instruction.results.(0) <- res;
+      const_instruction
+    | _ -> assert false
+  in
   let vectorize_intop (intop : Operation.integer_operation) =
     match intop with
     | Iadd -> Option.bind add_op (make_default ~arg_count ~res_count)
@@ -1363,6 +1379,12 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
       sse_or_avx orps vorps_X_X_Xm128 |> make_default ~arg_count ~res_count
     | Ixor ->
       sse_or_avx xorps vxorps_X_X_Xm128 |> make_default ~arg_count ~res_count
+    | Inot ->
+      assert (arg_count = 1 && res_count = 1);
+      Some
+        [ make_const (New_Vec128 0) (List.init length (fun _ -> -1L));
+          make_binary_operation (Argument 0) (New_Vec128 0) (Result 0)
+            (sse_or_avx xorps vxorps_X_X_Xm128) ]
     | Ilsl ->
       let sse, avx =
         match width_type with
@@ -1431,7 +1453,7 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
         (* These instructions seem to not have a simd counterpart yet, could
            also implement as a combination of other instructions if needed in
            the future *))
-    | Idiv _ | Imod _ | Inot | Iclz | Ictz | Ipopcnt -> None
+    | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt -> None
   in
   match List.hd cfg_ops with
   | Move -> Operation.Move |> make_default ~arg_count ~res_count
@@ -1562,22 +1584,6 @@ let vectorize_operation (width_type : Vectorize_utils.Width_in_bits.t)
           arguments = [| arg |];
           results = [| res |]
         }
-      in
-      let make_binary_operation arg_0 arg_1 res operation =
-        { Vectorize_utils.Vectorized_instruction.operation;
-          arguments = [| arg_0; arg_1 |];
-          results = [| res |]
-        }
-      in
-      let make_const res consts =
-        match create_const_vec consts with
-        | Some [const_instruction] ->
-          assert (
-            Array.length const_instruction.arguments = 0
-            && Array.length const_instruction.results = 1);
-          const_instruction.results.(0) <- res;
-          const_instruction
-        | _ -> assert false
       in
       match addressing_mode with
       | Iindexed _ -> (
