@@ -252,6 +252,14 @@ module Scoped_location = struct
     | Cons { prev = Empty; _ } -> Some scopes
     | Cons { prev } -> outermost_scope prev
 
+  let enclosing_module_scopes scopes =
+    let rec loop = function
+      | Empty -> Empty
+      | Cons { item = Sc_module_definition; _ } as scopes -> scopes
+      | Cons { prev; _ } -> loop prev
+    in
+    loop scopes
+
   let compilation_unit scopes =
     match outermost_scope scopes with
     | None -> None

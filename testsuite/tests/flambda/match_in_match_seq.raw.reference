@@ -209,7 +209,7 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
        -> k1 * k2
  in
  let code size(3) stub
-       `%addint_11` (prim : imm tagged, prim_1 : imm tagged)
+       `+_11` (prim : imm tagged, prim_1 : imm tagged)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
@@ -224,9 +224,9 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
    let fold_left = %project_value_slot.[sum].[fold_left] (my_closure) in
-   let `%addint` = closure `%addint_11` @`%addint` &my_alloc_region in
+   let `+` = closure `+_11` @`+` &my_alloc_region in
    apply direct(fold_left_0 &my_alloc_region)
-     (fold_left : _ -> imm tagged) (`%addint`, 0, s) -> k1 * k2
+     (fold_left : _ -> imm tagged) (`+`, 0, s) -> k1 * k2
  in
  let code size(5)
        `fn[match_in_match_seq.ml:60,28--44]_13` (i : imm tagged)
