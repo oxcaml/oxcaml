@@ -27,7 +27,7 @@ Compile the project.
 
 Create some index files. We make an index for each ml file. We also make an
 index called AB, which points to the A and B indexes. Lastly, we aggregate the
-AB and C indexes into a standalon and non-standalone index.
+AB and C indexes into a standalone and non-standalone index.
 
   $ ocaml-index aggregate -o a.idx a.cmt
   $ ocaml-index aggregate -o b.idx b.cmt
