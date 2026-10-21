@@ -2607,6 +2607,9 @@ let rec try_reduce_once env t =
     end
   | _ -> raise Cannot_expand
 
+(** Apply a reduction step on [<[t]> eval].
+    [copy_persistent] relies on this function to always return copies,
+    and to behave well on ill-staged types. *)
 and try_reduce_quote_eval env t =
   let path_must_be_persistent env path =
     if not (Env.path_is_persistent_in_quotations env path) then
@@ -2729,6 +2732,20 @@ let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
   try try_reduce env ty'
   with Cannot_expand -> ty'
+
+(** Fully reduce all [Tquote_eval]s, raising [Cannot_expand] on failure. *)
+let rec try_full_reduce_quote_eval_desc env = function
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
+  | Tvariant row ->
+    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
+    Tvariant (
+      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
+  | t ->
+    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
+and try_full_reduce_quote_eval env t =
+  try_full_reduce_quote_eval_desc env (get_desc t)
+  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
 
 (* [Predef]'s [eval] and [box] are special -- we want to always expand it in
    [reduce_head], so we special-case its abbreviation expansion there. *)
@@ -4479,20 +4496,6 @@ let rec is_aliasable_ty env ty =
   | Tquote ty' -> is_aliasable_ty (incr_stage env) ty'
   | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
-
-(* Fully reduce all [Tquote_eval]s, raising [Cannot_expand] on failure. *)
-let rec try_full_reduce_quote_eval_desc env = function
-  | Tquote_eval t ->
-    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
-  | Tvariant row ->
-    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
-    Tvariant (
-      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
-  | t ->
-    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
-and try_full_reduce_quote_eval env t =
-  try_full_reduce_quote_eval_desc env (get_desc t)
-  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
 
 let copy_persistent env ty =
   try_full_reduce_quote_eval env (new_quote_eval_ty ty)
