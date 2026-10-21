@@ -62,10 +62,19 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     ('k Or_null_receiver.t -> assembler) ->
     assembler
 
-  (** [break n] breaks out of the [n] innermost loops (created with [for_in]).
+  (** [exists cond body] evaluates [cond] and if it runs its [accept] argument,
+      [body] is executed once, then execution continues after the whole [exists]
+      block.
 
-      {b Note}: [break 0] is a no-op. *)
-  val break : int -> assembler
+      In pseudo-assembly syntax, this is implemented as:
+
+      {[
+        cond ~accept:[body; goto after]; after: ...
+      ]} *)
+  val exists : (accept:assembler -> assembler) -> assembler -> assembler
+
+  (** [nop] is a no-op and does nothing. *)
+  val nop : assembler
 
   (** [if_in key iterators body] executes body if [key] is in the intersection
       of the [iterators]. *)
