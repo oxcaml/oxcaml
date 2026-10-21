@@ -29,12 +29,10 @@ granularity.
 The error should disappear from both documents.
   $ errors a.ml
   $ errors b.ml
-  1:15 Unbound module Dep_appearing
 
 Even after editing b.ml.
   $ echo 'let _z = ()' >> b.ml
   $ errors b.ml
-  1:15 Unbound module Dep_appearing
 
 For reference, single mode:
   $ $MERLIN single errors -filename b.ml < b.ml | jq -r '.value[].message'
