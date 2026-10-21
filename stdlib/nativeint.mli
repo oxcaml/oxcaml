@@ -148,6 +148,18 @@ external shift_right_logical :
    regardless of the sign of [x].
    The result is unspecified if [y < 0] or [y >= bitsize]. *)
 
+external rotate_left :
+  (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) = "%nativeint_rotl"
+(** [Nativeint.rotate_left x y] rotates [x] to the left by [y] bits: the
+   bits shifted out at the high end re-enter at the low end.
+   The result is unspecified if [y < 0] or [y >= bitsize]. *)
+
+external rotate_right :
+  (nativeint[@local_opt]) -> int -> (nativeint[@local_opt]) = "%nativeint_rotr"
+(** [Nativeint.rotate_right x y] rotates [x] to the right by [y] bits: the
+   bits shifted out at the low end re-enter at the high end.
+   The result is unspecified if [y < 0] or [y >= bitsize]. *)
+
 
 external of_int : int -> (nativeint[@local_opt]) = "%nativeint_of_int"
 (** Convert the given integer (type [int]) to a native integer

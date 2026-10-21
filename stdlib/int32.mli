@@ -129,6 +129,18 @@ external shift_right_logical : (int32[@local_opt]) -> int -> (int32[@local_opt])
    regardless of the sign of [x].
    The result is unspecified if [y < 0] or [y >= 32]. *)
 
+external rotate_left :
+  (int32[@local_opt]) -> int -> (int32[@local_opt]) = "%int32_rotl"
+(** [Int32.rotate_left x y] rotates [x] to the left by [y] bits: the bits
+   shifted out at the high end re-enter at the low end.
+   The result is unspecified if [y < 0] or [y >= 32]. *)
+
+external rotate_right :
+  (int32[@local_opt]) -> int -> (int32[@local_opt]) = "%int32_rotr"
+(** [Int32.rotate_right x y] rotates [x] to the right by [y] bits: the bits
+   shifted out at the low end re-enter at the high end.
+   The result is unspecified if [y < 0] or [y >= 32]. *)
+
 external of_int : int -> (int32[@local_opt]) = "%int32_of_int"
 (** Convert the given integer (type [int]) to a 32-bit integer
     (type [int32]). On 64-bit platforms, the argument is taken

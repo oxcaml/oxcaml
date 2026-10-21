@@ -521,15 +521,17 @@ end = struct
     | Lsl -> always_some Num.shift_left
     | Lsr -> always_some Num.shift_right_logical
     | Asr -> always_some Num.shift_right
+    | Rol -> always_some Num.rotate_left
+    | Ror -> always_some Num.rotate_right
 
   let op_lhs_unknown ~machine_width (op : P.int_shift_op) ~rhs :
       Num.t binary_arith_outcome_for_one_side_only =
     let module O = Target_ocaml_int in
     let rhs = rhs in
     match op with
-    | Lsl | Lsr | Asr ->
-      (* Shifting either way by [Targetint_32_64.size] or above, or by a
-         negative amount, is undefined.
+    | Lsl | Lsr | Asr | Rol | Ror ->
+      (* Shifting or rotating either way by [Targetint_32_64.size] or above, or
+         by a negative amount, is undefined.
 
          However note that we cannot produce [Invalid] unless the code is type
          unsafe, which it is not here. (Otherwise a GADT match might be reduced
@@ -551,7 +553,7 @@ end = struct
       if Num.equal lhs (Num.zero machine_width)
       then Exactly (Num.zero machine_width)
       else Cannot_simplify
-    | Asr ->
+    | Asr | Rol | Ror ->
       if Num.equal lhs (Num.zero machine_width)
       then Exactly (Num.zero machine_width)
       else if Num.equal lhs (Num.minus_one machine_width)

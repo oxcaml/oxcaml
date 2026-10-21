@@ -1820,6 +1820,8 @@ type int_shift_op =
   | Lsl
   | Lsr
   | Asr
+  | Rol
+  | Ror
 
 let print_int_shift_op ppf o =
   let fprintf = Format.fprintf in
@@ -1827,6 +1829,8 @@ let print_int_shift_op ppf o =
   | Lsl -> fprintf ppf "lsl"
   | Lsr -> fprintf ppf "lsr"
   | Asr -> fprintf ppf "asr"
+  | Rol -> fprintf ppf "rotl"
+  | Ror -> fprintf ppf "rotr"
 
 type binary_float_arith_op =
   | Add

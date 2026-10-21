@@ -38,3 +38,11 @@ val encode_bitfield :
   rn:[`GP of 'a] Reg.t ->
   rd:[`GP of 'b] Reg.t ->
   int32
+
+val encode_extract :
+  sf:int ->
+  rm:[`GP of 'a] Reg.t ->
+  imms:int ->
+  rn:[`GP of 'b] Reg.t ->
+  rd:[`GP of 'c] Reg.t ->
+  int32
