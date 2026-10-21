@@ -151,8 +151,7 @@ module Witnesses : sig
   val cutoff : t -> n:int -> t
 
   val simplify :
-    t Zero_alloc_utils.Components.t ->
-    t Zero_alloc_utils.Components.t
+    t Zero_alloc_utils.Components.t -> t Zero_alloc_utils.Components.t
 end = struct
   include Set.Make (Witness)
 
@@ -194,7 +193,7 @@ end = struct
       exn = diff exn nor;
       div =
         (* don't print diverge witnesses unless they are the only ones. *)
-        if is_empty nor && is_empty exn then div else empty
+        (if is_empty nor && is_empty exn then div else empty)
     }
 end
 
@@ -1360,9 +1359,7 @@ module Value : sig
   val get_witnesses : t -> Witnesses.t Zero_alloc_utils.Components.t
 
   val diff_witnesses :
-    expected:t ->
-    actual:t ->
-    Witnesses.t Zero_alloc_utils.Components.t
+    expected:t -> actual:t -> Witnesses.t Zero_alloc_utils.Components.t
 
   val unresolved : string -> Witnesses.t -> t
 
@@ -1375,8 +1372,8 @@ end = struct
   include T
 
   let unresolved name w =
-    Zero_alloc_utils.Components.create
-      (fun tag -> Var.create name tag |> V.unresolved w)
+    Zero_alloc_utils.Components.create (fun tag ->
+        Var.create name tag |> V.unresolved w)
 
   let is_resolved (t : _ Zero_alloc_utils.Components.t) =
     V.is_resolved t.nor && V.is_resolved t.exn && V.is_resolved t.div
@@ -1397,8 +1394,8 @@ end = struct
     Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.transform effect_)
 
   let replace_witnesses w =
-    Zero_alloc_utils.Components.map
-      ~f:(fun _ignore_tag -> V.replace_witnesses w)
+    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
+        V.replace_witnesses w)
 
   let diff_witnesses ~expected ~actual =
     Zero_alloc_utils.Components.map2
@@ -1406,8 +1403,7 @@ end = struct
       expected actual
 
   let get_witnesses =
-    Zero_alloc_utils.Components.map
-      ~f:(fun _ignore_tag -> V.get_witnesses)
+    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.get_witnesses)
 end
 
 (** Representation of user-provided annotations as abstract values *)
@@ -2077,8 +2073,7 @@ end = struct
 
   let get_value_opt s =
     let info = Compilenv.cached_zero_alloc_info in
-    Zero_alloc_info.get_value info s
-    |> Option.map decode
+    Zero_alloc_info.get_value info s |> Option.map decode
 end
 
 (** The analysis involved some fixed point computations. Termination: [Value.t]
@@ -2836,8 +2831,7 @@ let record_unit_info ppf_dump =
   Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
 type iter_witnesses =
-  (string -> Witnesses.t Zero_alloc_utils.Components.t -> unit) ->
-  unit
+  (string -> Witnesses.t Zero_alloc_utils.Components.t -> unit) -> unit
 
 let iter_witnesses f =
   Unit_info.iter unit_info ~f:(fun func_info ->

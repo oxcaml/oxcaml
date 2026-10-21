@@ -28,8 +28,8 @@ module Components : sig
           (** Property about all paths from this program point that may reach a
               Return with Exception *)
       div : 'component
-          (** Property about all paths from this program point that may
-              diverge. *)
+          (** Property about all paths from this program point that may diverge.
+          *)
     }
 
   val create : (Tag.t -> 'a) -> 'a t

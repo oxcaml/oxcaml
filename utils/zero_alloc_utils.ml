@@ -50,11 +50,7 @@ module Components = struct
       div : 'component
     }
 
-  let create f =
-    { nor = f Tag.N;
-      exn = f Tag.E;
-      div = f Tag.D;
-    }
+  let create f = { nor = f Tag.N; exn = f Tag.E; div = f Tag.D }
 
   let iter ~f { nor; exn; div } =
     f Tag.N nor;
@@ -62,24 +58,18 @@ module Components = struct
     f Tag.D div
 
   let map ~f { nor; exn; div } =
-    { nor = f Tag.N nor;
-      exn = f Tag.E exn;
-      div = f Tag.D div;
-    }
+    { nor = f Tag.N nor; exn = f Tag.E exn; div = f Tag.D div }
 
   let map2 ~f lhs rhs =
     { nor = f Tag.N lhs.nor rhs.nor;
       exn = f Tag.E lhs.exn rhs.nor;
-      div = f Tag.D lhs.div rhs.nor;
+      div = f Tag.D lhs.div rhs.nor
     }
 
   let lessequal f lhs rhs =
-    f lhs.nor rhs.nor
-    && f lhs.exn rhs.exn
-    && f lhs.div rhs.div
+    f lhs.nor rhs.nor && f lhs.exn rhs.exn && f lhs.div rhs.div
 
-  let compare f
-      { nor = n1; exn = e1; div = d1 }
+  let compare f { nor = n1; exn = e1; div = d1 }
       { nor = n2; exn = e2; div = d2 } =
     let c = f n1 n2 in
     if c <> 0

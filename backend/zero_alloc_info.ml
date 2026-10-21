@@ -32,22 +32,19 @@ module Value = struct
   (* CR-someday wsturgeon for wsturgeon: nonzero by refinement? *)
   type t = int
 
-  let encode
-      ~(encode_component : 'a -> Component_value.t)
+  let encode ~(encode_component : 'a -> Component_value.t)
       (components : 'a Zero_alloc_utils.Components.t) : t option =
     let c =
-      (encode_component components.nor)
+      encode_component components.nor
       lor (encode_component components.exn lsl 2)
       lor (encode_component components.div lsl 4)
     in
     if c = 0 then None else Some c
 
-  let decode
-      ~(decode_component : Component_value.t -> 'a)
-      (i : t) : 'a Zero_alloc_utils.Components.t =
+  let decode ~(decode_component : Component_value.t -> 'a) (i : t) :
+      'a Zero_alloc_utils.Components.t =
     if i land 0b111111 = 0
-    then
-      Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding"
+    then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding"
     else
       { nor = decode_component (i land 3);
         exn = decode_component ((i lsr 2) land 3);
