@@ -562,7 +562,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
       let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
           =
-        let return_continuation = Continuation.create () in
+        let return_continuation = Continuation.create ~sort:Return () in
         let remaining_params =
           List.map
             (fun kind ->
