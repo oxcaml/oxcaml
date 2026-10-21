@@ -307,7 +307,7 @@ module With_parameters = struct
     let { Planner.inputs;
           outputs;
           rule_plan =
-            { input_stages; output_atoms; rule_id = _; monotone_inputs = _ }
+            { input_stages; output_atoms; rule_id = _; skip_if_empty = _ }
         } =
       Planner.plan_rule rule
     in
@@ -337,14 +337,12 @@ module With_parameters = struct
 end
 
 module Incremental = struct
-  type monotone_input =
-    | Monotone_input : _ Or_null_receiver.t -> monotone_input
+  type skip_if_empty = Skip_if_empty : _ Or_null_receiver.t -> skip_if_empty
 
   type guarded_executor =
     { executor : Executor.t;
       rule_id : int;
-      monotone_inputs : monotone_input list;
-          (* Only run if all the monotone inputs are non-null. *)
+      skip_if_empty : skip_if_empty list;
       stats : Bytecode.stats_ref option
     }
 
@@ -367,20 +365,20 @@ module Incremental = struct
 
   let create_executors ~with_stats env plans =
     List.map
-      (fun { Planner.input_stages; output_atoms; rule_id; monotone_inputs } ->
-        let monotone_inputs =
+      (fun { Planner.input_stages; output_atoms; rule_id; skip_if_empty } ->
+        let skip_if_empty =
           List.map
             (fun (Lang.Variable.Any monotone_input) ->
               let receiver = Builder.Env.must_be_bound env monotone_input in
-              Monotone_input receiver.value)
-            monotone_inputs
+              Skip_if_empty receiver.value)
+            skip_if_empty
         in
         let stats =
           if with_stats then Some (Bytecode.create_stats ()) else None
         in
         { executor =
             Builder.create_executor ~stats env input_stages output_atoms;
-          monotone_inputs;
+          skip_if_empty;
           rule_id;
           stats
         })
@@ -567,12 +565,12 @@ module Incremental = struct
                 unbind_table (Bind_table (tid, sender)))
             @@ fun () ->
             List.iter
-              (fun { executor; monotone_inputs; rule_id = _; stats = _ } ->
+              (fun { executor; skip_if_empty; rule_id = _; stats = _ } ->
                 if
                   List.for_all
-                    (fun (Monotone_input receiver) ->
+                    (fun (Skip_if_empty receiver) ->
                       Or_null.is_this (Channel.recv_or_null receiver))
-                    monotone_inputs
+                    skip_if_empty
                 then Executor.run executor)
               executors)
         incremental_executors;

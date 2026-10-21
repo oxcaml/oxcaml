@@ -69,7 +69,7 @@ type head_atom =
 
 type rule_plan =
   { rule_id : int;
-    monotone_inputs : Variable.t_ list;
+    skip_if_empty : Variable.t_ list;
     input_stages : stage iarray;
     output_atoms : head_atom iarray
   }
@@ -555,7 +555,7 @@ let prepare_rule context ~binding_times body head =
   let head =
     introduce_copies context ~binding_times ~join_stages ~body_occurrences head
   in
-  ( ~nonempty_inputs:(Variable.Id.Map.data !monotone_vars),
+  ( ~skip_if_empty:(Variable.Id.Map.data !monotone_vars),
     Join_stages.fold
       (fun (B (var, iterators)) stages -> Join_stage (var, iterators) :: stages)
       !join_stages stages
@@ -910,7 +910,7 @@ let plan_rule0 ~rule_id context { variables; head; body } =
         ))
       (0, Variable.Id.Map.empty) variables
   in
-  let ~nonempty_inputs, stages, head =
+  let ~skip_if_empty, stages, head =
     prepare_rule context ~binding_times body head
   in
   let vars_used_by_head =
@@ -929,11 +929,7 @@ let plan_rule0 ~rule_id context { variables; head; body } =
       stages
     |> plan_stages ~binding_times
   in
-  { rule_id;
-    monotone_inputs = nonempty_inputs;
-    input_stages;
-    output_atoms = head
-  }
+  { rule_id; skip_if_empty; input_stages; output_atoms = head }
 
 let plan_rule rule =
   let current_variables = ref Variable_map.empty in

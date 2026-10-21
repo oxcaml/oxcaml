@@ -74,7 +74,7 @@ type rule_plan =
   { rule_id : int;
         (** Index in the list of rules provided to [plan_incremental], or [0]
             for [plan_rule]. *)
-    monotone_inputs : Variable.t_ list;
+    skip_if_empty : Variable.t_ list;
     input_stages : stage iarray;
     output_atoms : head_atom iarray
   }
