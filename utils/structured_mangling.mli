@@ -69,7 +69,10 @@
     created by a partial application: it is followed by the number of items in
     the path of the callee, terminated by [_], then by those items (e.g.
     [P2_M5InnerF3add] for a partial application of [Inner.add]; [P0_] when the
-    callee is unknown).
+    callee is unknown). The callee's compilation unit is omitted when it is the
+    unit the function is defined in, as recorded at the head of the path, so
+    that a copy of the function specialized into another unit by inlining
+    carries the same [P] item as the original.
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz], and the code of the second lambda directly inside

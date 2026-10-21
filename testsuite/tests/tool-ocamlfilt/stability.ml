@@ -3,7 +3,7 @@
  readonly_files = "stability_lib.ml stability_lib_edited.ml \
                    stability_edited.ml";
  setup-ocamlopt.byte-build-env;
- flags = "-name-mangling-scheme structured -O3 -c";
+ flags = "-name-mangling-scheme structured -O3 -flambda2-simplify-stubs -c";
  module = "stability_lib.ml";
  ocamlopt_byte_exit_status = "0";
  ocamlopt.byte;
@@ -33,12 +33,17 @@
    [stability_lib_edited], which add a comment and unrelated top-level
    functions. [stability.sh] checks that the demangled names of every other
    function are the same in both compilations, including the closure of
-   [make_adder] that gets copied into this unit by [-O3] inlining. The
-   reference lists the names each unit defines itself; the cross-unit
-   names are checked but not listed, so that the reference holds whether
-   or not that inlining happens (e.g. under [Oclassic]). *)
+   [make_adder] that gets copied into this unit by [-O3] inlining, and
+   that every such copy demangles to a name the library defines itself
+   ([-flambda2-simplify-stubs] makes the partial-application wrapper of
+   [bind_a] one of them). The reference lists the names each unit defines
+   itself; the cross-unit names are checked but not listed, so that the
+   reference holds whether or not that inlining happens (e.g. under
+   [Oclassic]). *)
 
 let adder = Stability_lib.make_adder (Sys.opaque_identity 10)
+
+let bound = Stability_lib.bind_a (Sys.opaque_identity 4)
 
 let[@inline never] double_even numbers =
   let even = List.filter (fun[@cold] x -> x mod 2 = 0) numbers in
@@ -59,6 +64,7 @@ let[@inline never] use_lib xs =
 
 let () =
   ignore (adder 1);
+  ignore (bound ~b:1);
   ignore (double_even [ 1; 2; 3; 4 ]);
   ignore (omit_first 1 ~a:2);
   ignore (curried ~b:3);

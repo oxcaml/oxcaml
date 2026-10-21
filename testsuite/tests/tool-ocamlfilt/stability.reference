@@ -1,8 +1,11 @@
 # stability_lib
+Stability_lib.bind_a
+Stability_lib.bind_a.partial{subtract}
 Stability_lib.make_adder
 Stability_lib.make_adder.fn_{0}
 Stability_lib.scale_all
 Stability_lib.scale_all.fn_{0}
+Stability_lib.subtract
 Stability_lib.twice
 # stability
 Stability.curried.partial{labelled}
