@@ -480,6 +480,13 @@ module Sort = struct
         v.contents v.level v.id
   end
 
+  (* CR-someday jbachurski: We need a forward declaration of [add_to_pool]
+     because we might need to add a generic variable to a pool if it is lowered
+     in [update_level]. This is just a hack to avoid a dependency cycle, which
+     occurs because sort/layout/jkind inference functions morally belong in
+     [Jkind] (which corresponds to [Ctype]) so that they can use [Btype],
+     and not [Jkind_types] (which corresponds to [Types]) where they are now.
+     It is better to avoid using this reference when possible. *)
   let add_to_pool : (level:int -> t -> unit) ref =
     ref (fun ~level:_ _ -> assert false)
 
@@ -522,7 +529,12 @@ module Sort = struct
     | Product ts -> List.iter (iter_var ~f) ts
     | Addressable t -> iter_var ~f t
 
-  let update_level level = iter_var ~f:(fun v -> set_var_level v level)
+  let update_level level =
+    iter_var ~f:(fun v ->
+        assert (v.contents = None);
+        let generic = v.level = generic_level in
+        set_var_level v level;
+        if generic then !add_to_pool ~level (Var v))
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents

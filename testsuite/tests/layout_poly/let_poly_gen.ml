@@ -405,18 +405,17 @@ module Fst = struct
   let poly_ gen_fst _ xy = fst xy
 end
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Fst :
+  sig
+    val fst : 'a * 'b -> 'a
+    val poly_ gen_fst : 'b 'c. 'a -> 'b * 'c -> 'b
+  end
 |}];;
 
 (* unsound generalisation breaks translation *)
 Fst.gen_fst () (42, 3.14)
 [%%expect{|
-Line 1, characters 0-3:
-1 | Fst.gen_fst () (42, 3.14)
-    ^^^
-Error: Unbound module "Fst"
+- : int = 42
 |}]
 
 (* unsound generalisation breaks moregen *)
@@ -424,10 +423,7 @@ module Fst' : sig
   val fst : 'a * 'b -> 'a
 end = Fst
 [%%expect{|
-Line 3, characters 6-9:
-3 | end = Fst
-          ^^^
-Error: Unbound module "Fst"
+module Fst' : sig val fst : 'a * 'b -> 'a end
 |}]
 
 (** Lowering the type lowers the layout **)
