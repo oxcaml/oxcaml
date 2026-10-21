@@ -523,6 +523,10 @@ module type Solver_mono = sig
       'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
   end
 
+  (* CR zeisbach: a lot of printing interacts with the description of a mode
+     variable and not a mode variable itself. As such, it seems appropriate to
+     document this inferface better, as well as perhaps [desc] below. *)
+
   (** The exposed description of modes *)
   module Desc : sig
     module Var : sig

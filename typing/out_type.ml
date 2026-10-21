@@ -1082,6 +1082,10 @@ let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
     else
       With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
 
+(* CR zeisbach: it's a little suspicious to me that we have implication logic
+   spread through the compiler / seemingly duplicated some times (like in
+   Typemode, too). Maybe there is a way to have a single source of truth here?
+   Like there is for modality implications (IIUC). *)
 let erase_implied_axes (modes : Mode.With_locality.Const.t) :
     Mode.With_locality.Const.Option.t =
   (* [forkable] has implied defaults depending on [areality]: *)
@@ -1288,6 +1292,10 @@ end = struct
       | Monadic :
           (With_locality.Monadic.Const.t,
            With_locality.Monadic.Const.t) table
+          (* CR zeisbach: perhaps this description could be tweaked to make
+             it clear what is specific to [Monadic] and what is the general
+             definition of path (since this comment is referred to by both
+             [Comonadic] and [Closing_over] as well) *)
           (** Tracks all paths from a visible monadic mode
           variable to another. A path is defined as follows:
             let [(v, f)] and [(u, h)] be two visible monadic
@@ -1364,6 +1372,11 @@ end = struct
       | Closing_over -> Closing_over_paths.find key t.closing_over
   end
 
+  (* CR zeisbach: not a super actionable comment, but IMO it's pretty
+     unfortunate that this is the existing style used by this module. so much
+     implicit state is tricky... seems like changing it might substantially
+     diverge from the upstream organization of this code, so i'm not actually
+     suggesting it. *)
   (** Tracks the mapping of monadic and comonadic mode
   descriptions visible in the type *)
   let visible_pairs = ref ([] : visible_pair list)
@@ -1410,14 +1423,31 @@ end = struct
     [tree_of_modal_typexp]. It is needed so we get the
     correct precise bounds of mode descriptions
   *)
+  (* CR zeisbach: this comment is a red flag to me: it seems pretty brittle to
+     rely on these two otherwise unrelated functions matching in their side
+     effects. (Especially since there is only a comment on one of the two paired
+     functions!).
+
+     It would be nice if there were a common helper called by both of these
+     functions, but my instinct is that such a refactor would be pretty tricky.
+     Maybe some small bit of functionality could be pulled out (like the arrow
+     case, perhaps? though that doesn't buy you _too_ much...)
+     I would at least recommend adding a comment to [tree_of_modal_typexp]. *)
   let rec zap_non_generic_modes : const_or_generic -> type_expr -> unit =
     fun acc_mode ty ->
     let px = proxy ty in
     if List.memq px !visited_for_modes then () else begin
       visited_for_modes := px :: !visited_for_modes;
+      (* CR zeisbach: comparing this to [tree_of_modal_typexp], here we do not
+         call [Ctype.reduce_head]. i'm just noting this discrepency, since I
+         think there are stage-related subtelties to mirroring this call *)
       let tty = Transient_expr.repr ty in
       match tty.desc with
       | Tarrow ((_l, marg, mret), ty1, ty2, _) ->
+        (* CR zeisbach: this does not mirror [tree_of_modal_typexp] for optional
+           arguments. This can lead to more verbose printing of curry modes.
+           (META: this is the type of bug that a refactoring could potentially
+           make impossible by construction. again, unsure of the feasibility) *)
         zap_non_generic_modes (const_or_generic_of_mode ~arg:true marg) ty1;
         let acc_mode = curry_acc acc_mode marg in
         equate_curry acc_mode mret ty2
@@ -1469,20 +1499,30 @@ end = struct
         let v = K (src, v) in
         VarTbl.add visible_vars v ()
 
+  let pair_of_mode ({ monadic; comonadic } : With_locality.lr) =
+    let monadic = With_locality.get_monadic_desc monadic in
+    let comonadic = With_locality.get_comonadic_desc comonadic in
+    { monadic; comonadic }
+
   let add_named_modevar : With_locality.lr -> unit =
-    fun ({ monadic; comonadic } as mode) ->
+    fun mode ->
       if With_locality.check_generic mode then begin
-        let monadic_desc = With_locality.get_monadic_desc monadic in
-        let comonadic_desc = With_locality.get_comonadic_desc comonadic in
-        let pair = { monadic = monadic_desc; comonadic = comonadic_desc } in
-        add_visible With_locality.obj_monadic monadic_desc;
-        add_visible With_locality.obj_comonadic comonadic_desc;
+        let ({ monadic; comonadic } as pair) = pair_of_mode mode in
+        add_visible With_locality.obj_monadic monadic;
+        add_visible With_locality.obj_comonadic comonadic;
         if List.exists (eq_pair pair) !visible_pairs then
+          (* CR zeisbach: as discussed, maybe this should be ripped out for
+             now? *)
           aliased_visible_pairs := pair :: !aliased_visible_pairs
         else
           visible_pairs := pair :: !visible_pairs
       end
 
+  (* CR zeisbach: I think that this function deserves a purpose statement at
+     least clarifying what we can expect has been mutably accumulated by the end
+     of the traversal. (perhaps a slightly more descriptive name as well, which
+     we can get away with since it's only called twice.) The description in the
+     mode printing doc seems like a good place to start :-) *)
   let rec add_named_modevars ty =
     let px = proxy ty in
     if not (List.memq px !visited_for_named_modevars) then begin
@@ -1552,6 +1592,9 @@ end = struct
       if visible dst v then [P { dst; var = v; path = C.id }]
       else paths_from_vlowers ~stack dst v
 
+  (* CR zeisbach: (nit) it might be useful to somewhere describe the purpose of
+     the stack in this traversal, either through a comment or through the
+     addition of named intermediates in the body of this function. *)
   and paths_from_vlowers :
       type b. stack:stack
       -> b C.obj -> b Desc.Var.Head.t
@@ -1580,6 +1623,13 @@ end = struct
     fun (K (dst, v)) ->
       paths_from_vlowers ~stack:(VarTbl.create 17) dst v
 
+  (* CR zeisbach: Too much of this comment describes _what_ the function does
+     (which can be deduced from the code, and risks going stale). The discussion
+     of [find_visible_morph_opt] seems to duplicate its own doc comment. It's
+     true that the comment here has less noise than the body, but I claim that
+     either (a) that isn't a problem, or (b) if it is a problem, then the way to
+     fix it is to (somehow) clean up the body of the function. I personally
+     think the body of the function is mostly fine. *)
   (** [find_path_from_description] constructs all morphisms
     from one visible mode variable to another, and records
     them in the [table] of [visible_paths].
@@ -1626,6 +1676,10 @@ end = struct
           ) paths
 
 
+  (* CR zeisbach: when I read this and looked the fact that we are iterating
+     over monadic/comonadic pairs, I was confused. It might be nice to slightly
+     rephrase this comment to make it clear that we aren't using the paired-ness
+     of the (co)monadic halves here and rather just gathering up all paths. *)
   (* The following function is expensive and should be
   called once during preprocessing. It constructs all
   morphisms from a visible monadic/comonadic variable to
@@ -1690,7 +1744,7 @@ end = struct
   parts of the argument, and the monadic part of the return *)
 
   (** A [closing_over_edge] describes a relationship between
-  three visible mode variables: [src], [target] and [curry]*)
+  three visible mode variables: [src], [target] and [curry] *)
   type closing_over_edge =
     { cls_target : closing_over_morph;
         (** A path from [curry] to monadic
@@ -1710,6 +1764,9 @@ end = struct
   | Comonadic of comonadic_edge
       (** a constraint between the comonadic parts
       of two alloc modes *)
+  (* CR zeisbach: (style nit) [Closing_over] ? That seems to match the style for
+     naming constructors elsewhere in the compiler. Might be more noise than
+     it's worth but your call; I'd prefer renaming. *)
   | ClosingOver of closing_over_edge
       (** a constraint between the monadic part
       of one mode and the comonadic part of another *)
@@ -1728,6 +1785,9 @@ end = struct
       | Amodevar (Amorphvar (v, f)) ->
         C.apply dst f v.desc_lower
 
+  (* CR zeisbach: the [target <= src] comments below suggest a relationship
+     between the targets and sources of the returned morphisms that is relied
+     upon but not documented on this function. *)
   let construct_morphs :
       type a. (a, a) Paths.table
         -> (a, (allowed * allowed)) Desc.t
@@ -1793,7 +1853,8 @@ end = struct
 
   (** We only want to print a constraint (and thus
   construct an edge) between [(mon0, com0)] and
-  [(mon1, com1)] if the following is true:
+  [(mon1, com1)] whenever the following conditions
+  are all true:
 
   1) Either [compare mon0 mon1], or
      [compare com0 com1] can't be decided via bounds
@@ -1980,6 +2041,10 @@ end = struct
       List.map (fun edge -> Simple edge) simple @ comonadic
     end
 
+  (* CR zeisbach: it is not immediately obvious to me why we call
+     [construct_closing_over_to] exactly here and not in the from function
+     below. Perhaps a comment here or on [construct_closing_over_to] could
+     be useful? *)
   let construct_edges_to :
       visible_pair -> edge list =
     fun pair1 ->
@@ -1995,6 +2060,10 @@ end = struct
       List.concat_map (fun pair1 -> construct_edges_between pair0 pair1)
         !visible_pairs
 
+  (* CR zeisbach: We might want to use [name_is_already_used] to avoid printing
+     mode names that clash with user-written type variable names? I believe they
+     are in different namespaces, but something like ['m @ [< 'm] -> ...] could
+     be confusing. *)
   let pick_name : int -> string = fun i ->
     match i with
     | 0 -> "'m"
@@ -2004,6 +2073,8 @@ end = struct
     | 4 -> "'q"
     | _ -> Fmt.asprintf "'mm%d" (i - 5)
 
+  (* CR zeisbach: this shadows the [add_named_modevar] used by [reserve], but
+     I think it probably shouldn't. *)
   let add_named_modevar name =
     let mopt =
       List.find_opt
@@ -2163,11 +2234,6 @@ end = struct
     | Some (_, edges) -> edges
     | None -> { lower = []; upper = [] }
 
-  let pair_of_mode ({ monadic; comonadic } : With_locality.lr) =
-    let monadic = With_locality.get_monadic_desc monadic in
-    let comonadic = With_locality.get_comonadic_desc comonadic in
-    { monadic; comonadic }
-
   (* The variable heads of the curry accumulator. *)
   let acc_heads (acc : const_or_generic) : boxedhead list =
     match acc with
@@ -2284,10 +2350,25 @@ end = struct
       Fmt.fprintf ppf "as %s" m
     end
 
+  (* CR zeisbach: nit: callers (and the parameter name) seem to use the
+     convention of calling [With_locality.lr] "modes", not "mode" (which the
+     name of this function uses). *)
   let name_of_mode (modes : With_locality.lr) =
-    let monadic = With_locality.get_monadic_desc modes.monadic in
-    let comonadic = With_locality.get_comonadic_desc modes.comonadic in
-    let pair = { monadic; comonadic } in
+    let pair = pair_of_mode modes in
+    (* CR zeisbach: It could be a good idea to check some invariants that we
+       expect to hold here. For instance, if the [pair] we are trying to print
+       is not in [visible_pairs], then something in [reserve] has gone wrong,
+       and we could fatal error.
+
+       Similarly, we could check whether any of the [heads_of_mode] for these
+       [modes] are in [suppressed_curry_heads], as that would indicate we are
+       printing something that we should not. Such an assertion would have
+       caught some of the bugs that I found.
+
+       Though TBF, I think there aren't a ton of places in the front-end with
+       similar assertions, unless it's particularly important. It could be even
+       nicer to instead try to structure the code to avoid these cases as
+       possibilities, but I don't yet have suggestions for how to do so. *)
     match find_mode_already_printed pair with
     | Some m -> Fmt.asprintf "%s" m
     | None ->
