@@ -2152,7 +2152,16 @@ let quote_attributes e =
           Location.print_loc attr.attr_name.loc s)
     |> Exp_attribute.wrap
   in
-  List.map quoted_attr e.exp_attributes
+  (* The attribute marking an eta-expansion synthesized by the type checker
+     only guides the translation to Lambda; it has no place in the quoted
+     code. *)
+  let attributes =
+    List.filter
+      (fun (attr : Typedtree.attribute) ->
+        not (Builtin_attributes.has_eta_expansion_attribute [attr]))
+      e.exp_attributes
+  in
+  List.map quoted_attr attributes
 
 let translattribute_actions =
   List.map
