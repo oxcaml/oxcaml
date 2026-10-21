@@ -78,6 +78,11 @@ struct
     List.map (fun[@inline never] x -> x * K.factor) xs
 end
 
+(* Used as a value from e2e_inline.ml: the closure that eta-expands it
+   there is named after this declaration, [E2e_inline_lib.bump], as a copy
+   from this unit. *)
+external bump : int -> int = "caml_e2e_inline_bump_stub"
+
 (* Reached only via [E2e_inline_mid.relay], for the transitive
    inlining case in e2e_inline.ml. *)
 let[@inline always] relayed base = fun[@inline never] k -> base + k

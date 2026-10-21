@@ -83,6 +83,10 @@ module Scoped_location : sig
      ["inner"]) names it in mangled symbols, see
      [Structured_mangling.marker_payload]. *)
   val enter_compiler_generated : scopes:scopes -> string -> scopes
+  (* The innermost compilation unit or module (named or anonymous) enclosing
+     [scopes]: [scopes] without its trailing function, class, method, lazy
+     and wrapper items. *)
+  val enclosing_module_scopes : scopes -> scopes
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
   val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t

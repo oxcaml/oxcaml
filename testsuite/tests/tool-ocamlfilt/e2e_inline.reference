@@ -8,6 +8,7 @@ _CamlU10E2e_inlineF11use_functorDN_DN_                                     (erro
 _CamlU10E2e_inlineF11use_iterateDN_DN_                                     (error)                           E2e_inline.use_iterate                                        E2e_inline.use_iterate
 _CamlU10E2e_inlineF11use_iterateL0_DN_DN_                                  (error)                           E2e_inline.use_iterate.fn_{0}                                 E2e_inline.use_iterate.fn_{0}
 _CamlU10E2e_inlineF12local_inlineDN_DN_                                    (error)                           E2e_inline.local_inline                                       E2e_inline.local_inline
+_CamlU10E2e_inlineF12use_lib_primDN_DN_                                    (error)                           E2e_inline.use_lib_prim                                       E2e_inline.use_lib_prim
 _CamlU10E2e_inlineF12use_mk_adderDN_DN_                                    (error)                           E2e_inline.use_mk_adder                                       E2e_inline.use_mk_adder
 _CamlU10E2e_inlineF14inline_squaresDN_DN_                                  (error)                           E2e_inline.inline_squares                                     E2e_inline.inline_squares
 _CamlU10E2e_inlineF14use_transitiveDN_DN_                                  (error)                           E2e_inline.use_transitive                                     E2e_inline.use_transitive
@@ -18,6 +19,7 @@ _CamlU10E2e_inlineF7add_oneP2_U14E2e_inline_libF3addDN_                    (erro
 _CamlU10E2e_inlineF8composedDN_DN_                                         (error)                           E2e_inline.composed                                           E2e_inline.composed
 _CamlU10E2e_inlineF9use_chainDN_DN_                                        (error)                           E2e_inline.use_chain                                          E2e_inline.use_chain
 _CamlU10E2e_inlineF9use_innerDN_DN_                                        (error)                           E2e_inline.use_inner                                          E2e_inline.use_inner
+_CamlU10E2e_inlineIU14E2e_inline_libF4bumpDN_DN_                           (error)                           E2e_inline_lib.bump                                           E2e_inline_lib.bump
 _CamlU10E2e_inlineIU14E2e_inline_libF6chain4L0_DN_DN_                      (error)                           E2e_inline_lib.chain4.fn_{0}                                  E2e_inline_lib.chain4.fn_{0}
 _CamlU10E2e_inlineIU14E2e_inline_libF6chain4L0_DN_DN_                      (error)                           E2e_inline_lib.chain4.fn_{0}                                  E2e_inline_lib.chain4.fn_{0}
 _CamlU10E2e_inlineIU14E2e_inline_libF6chain4L0_L0_DN_DN_                   (error)                           E2e_inline_lib.chain4.fn_{0}.fn_{0}                           E2e_inline_lib.chain4.fn_{0}.fn_{0}
@@ -60,6 +62,7 @@ camlE2e_inline__use_first_class_N                                          E2e_i
 camlE2e_inline__use_functor_N                                              E2e_inline.use_functor_N          (error)                                                       E2e_inline.use_functor_N
 camlE2e_inline__use_inner_N                                                E2e_inline.use_inner_N            (error)                                                       E2e_inline.use_inner_N
 camlE2e_inline__use_iterate_N                                              E2e_inline.use_iterate_N          (error)                                                       E2e_inline.use_iterate_N
+camlE2e_inline__use_lib_prim_N                                             E2e_inline.use_lib_prim_N         (error)                                                       E2e_inline.use_lib_prim_N
 camlE2e_inline__use_mk_adder_N                                             E2e_inline.use_mk_adder_N         (error)                                                       E2e_inline.use_mk_adder_N
 camlE2e_inline__use_thrice_N                                               E2e_inline.use_thrice_N           (error)                                                       E2e_inline.use_thrice_N
 camlE2e_inline__use_transitive_N                                           E2e_inline.use_transitive_N       (error)                                                       E2e_inline.use_transitive_N

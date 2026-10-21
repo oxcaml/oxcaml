@@ -372,6 +372,86 @@ let rec iter_exn_names f pat =
       iter_exn_names f p
   | _ -> ()
 
+(* The mangling path of the callee of a partial application, carried by the
+   [P] item of the wrapper's symbol: the callee's compilation unit and enclosing
+   modules, then the function itself, as in the path of the callee's own
+   symbol. Module aliases and [open]s are expanded so that every way of
+   referring to the callee gives the same name, and the compilation unit is
+   taken from the callee's address so that [-for-pack] prefixes and instance
+   arguments agree with the middle end's naming of the same callee. A callee
+   reached through a functor application cannot be named, and the path of a
+   callee bound in the current unit is relative to the application site. *)
+let partial_application_callee env (path : Path.t) :
+    Compilation_unit.t Structured_mangling.path =
+  match Path.flatten (Env.normalize_value_path None env path) with
+  | `Contains_apply -> []
+  | `Ok (name, []) -> [Structured_mangling.Function (Ident.name name)]
+  | `Ok (head, names) ->
+    let modules, name = Misc.split_last names in
+    let head : _ Structured_mangling.path_item =
+      match Env.find_module_address (Pident head) env with
+      | Env.Aunit (cu, _) -> Compilation_unit cu
+      | Env.Alocal _ | Env.Adot _ | exception Not_found ->
+        Module (Ident.name head)
+    in
+    (head :: List.map (fun m -> Structured_mangling.Module m) modules)
+    @ [Structured_mangling.Function name]
+
+(* The scopes of the value declared at the mangling path [path] (see
+   [partial_application_callee]), used to name a closure that stands for that
+   value: the compilation unit at the head of the path when it has one,
+   otherwise the module enclosing [scopes], then the path's modules and its
+   function. A path that cannot be named ([]) gives the value named [name]
+   under [scopes]. A value declared in a local module inside a function is
+   named without that function. *)
+let scopes_of_value_path ~scopes
+    (path : Compilation_unit.t Structured_mangling.path) name =
+  let value scopes name =
+    enter_value_definition ~scopes
+      ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
+      (Ident.create_local name)
+  in
+  match path with
+  | [] -> value scopes name
+  | _ :: _ ->
+    let base, items =
+      match path with
+      | Structured_mangling.Compilation_unit cu :: items ->
+        enter_compilation_unit ~scopes:empty_scopes cu, items
+      | items -> enclosing_module_scopes scopes, items
+    in
+    List.fold_left
+      (fun scopes (item : _ Structured_mangling.path_item) ->
+        match item with
+        | Module m -> enter_module_definition ~scopes (Ident.create_local m)
+        | Function f -> value scopes f
+        | Compilation_unit _ | Inline_marker | Anonymous_module _ | Class _
+        | Anonymous_function _ | Lazy _ | Partial _ | Stamp _ -> scopes)
+      base items
+
+(* The number of parameters in the declared type of the function [path],
+   which an application of it supplying fewer arguments leaves partially
+   applied. The type is taken from the environment, as the one recorded by
+   the type checker in [Texp_ident] is instantiated at the use site (so that
+   ['a -> 'a] applied to a function would count that function's parameters).
+   Abbreviations are not expanded, so an abbreviated function type counts as
+   having no parameters, and applications of it as complete. *)
+let declared_arity env (path : Path.t) =
+  let rec count ty n =
+    match get_desc ty with
+    | Tarrow (_, _, ret, _) -> count ret (n + 1)
+    | Tpoly (ty, _) -> count ty n
+    | _ -> n
+  in
+  match Env.find_value path env with
+  | desc -> count (Subst.Lazy.force_value_description desc).val_type 0
+  | exception Not_found -> 0
+
+let supplied_arguments (args : (arg_label * apply_arg) list) =
+  List.length
+    (List.filter (fun (_, (arg : apply_arg)) ->
+       match arg with Arg _ -> true | Omitted _ -> false) args)
+
 let transl_ident ?(in_new_scope = false) loc env ty path desc kind =
   match desc.val_kind, kind with
   | Val_prim p, Id_prim (poly_mode, poly_sort, yielding)
@@ -384,15 +464,20 @@ let transl_ident ?(in_new_scope = false) loc env ty path desc kind =
         ~zero_alloc_check:None (Some path)
   | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
       (* A primitive used as a value elsewhere (e.g. passed as an argument) is
-         eta-expanded into a closure named after the primitive, e.g.
-         [%identity], through a scope and a let-binding that the middle end
-         names it after. *)
-      let id = Ident.create_local p.prim_name in
+         eta-expanded into a closure. Every such closure of a given primitive
+         does the same thing, so it is named after the primitive's declaration
+         ([Stdlib.Fun.id], [Fast_strings.to_uppercase]) rather than after the
+         use site, through scopes built from the declaration's path and a
+         let-binding that the middle end names it after. A declaration in
+         another compilation unit yields the path of a copy from that unit,
+         which the demangler shows at its definition site. *)
+      let name = Path.last path in
+      let id = Ident.create_local name in
       let loc =
         map_scopes
           (fun scopes ->
-            enter_value_definition ~scopes
-              ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none id)
+            scopes_of_value_path ~scopes (partial_application_callee env path)
+              name)
           loc
       in
       begin match
@@ -463,54 +548,6 @@ let zero_alloc_of_application
       Zero_alloc_utils.Assume_info.none
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
-
-(* The mangling path of the callee of a partial application, carried by the
-   [P] item of the wrapper's symbol: the callee's compilation unit and enclosing
-   modules, then the function itself, as in the path of the callee's own
-   symbol. Module aliases and [open]s are expanded so that every way of
-   referring to the callee gives the same name, and the compilation unit is
-   taken from the callee's address so that [-for-pack] prefixes and instance
-   arguments agree with the middle end's naming of the same callee. A callee
-   reached through a functor application cannot be named, and the path of a
-   callee bound in the current unit is relative to the application site. *)
-let partial_application_callee env (path : Path.t) :
-    Compilation_unit.t Structured_mangling.path =
-  match Path.flatten (Env.normalize_value_path None env path) with
-  | `Contains_apply -> []
-  | `Ok (name, []) -> [Structured_mangling.Function (Ident.name name)]
-  | `Ok (head, names) ->
-    let modules, name = Misc.split_last names in
-    let head : _ Structured_mangling.path_item =
-      match Env.find_module_address (Pident head) env with
-      | Env.Aunit (cu, _) -> Compilation_unit cu
-      | Env.Alocal _ | Env.Adot _ | exception Not_found ->
-        Module (Ident.name head)
-    in
-    (head :: List.map (fun m -> Structured_mangling.Module m) modules)
-    @ [Structured_mangling.Function name]
-
-(* The number of parameters in the declared type of the function [path],
-   which an application of it supplying fewer arguments leaves partially
-   applied. The type is taken from the environment, as the one recorded by
-   the type checker in [Texp_ident] is instantiated at the use site (so that
-   ['a -> 'a] applied to a function would count that function's parameters).
-   Abbreviations are not expanded, so an abbreviated function type counts as
-   having no parameters, and applications of it as complete. *)
-let declared_arity env (path : Path.t) =
-  let rec count ty n =
-    match get_desc ty with
-    | Tarrow (_, _, ret, _) -> count ret (n + 1)
-    | Tpoly (ty, _) -> count ty n
-    | _ -> n
-  in
-  match Env.find_value path env with
-  | desc -> count (Subst.Lazy.force_value_description desc).val_type 0
-  | exception Not_found -> 0
-
-let supplied_arguments (args : (arg_label * apply_arg) list) =
-  List.length
-    (List.filter (fun (_, (arg : apply_arg)) ->
-       match arg with Arg _ -> true | Omitted _ -> false) args)
 
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
