@@ -1004,7 +1004,11 @@ let duplicate_class_type ty =
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
-    iter_type_expr lower_all (Fun.const ()) ty
+    begin match get_desc ty with
+    | Tvar { jkind } -> Jkind.update_level !current_level jkind
+    | _ -> ()
+    end;
+    iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
   end
 
 (*
@@ -1063,10 +1067,12 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   let current_level = !current_level in
-  if level <> generic_level then begin
-    if is_Tvar ty && level > current_level then
-      set_level ty current_level
-    else if level > current_level then begin
+  if level <> generic_level && level > current_level then
+    match get_desc ty with
+    | Tvar { jkind } ->
+      set_level ty current_level;
+      Jkind.update_level current_level jkind
+    | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -1075,8 +1081,6 @@ let rec generalize_structure ty =
       set_level ty generic_level;
       let mgen m = Mode.With_locality.generalize_structure ~current_level m in
       iter_type_expr generalize_structure mgen ty
-    end
-  end
 
 let generalize_structure ty =
   simple_abbrevs := Mnil;
