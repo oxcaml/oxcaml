@@ -65,6 +65,13 @@ val f : <[string]> expr -> string = <fun>
 
 let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
 [%%expect {|
+Line 1, characters 41-42:
+1 | let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
+                                             ^
+Error: The value "x" has type "<[int]> expr"
+       but an expression was expected of type "<[string]> expr"
+       Type "int" is not compatible with type "string"
+|}, Principal{|
 Line 1, characters 36-42:
 1 | let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
                                         ^^^^^^

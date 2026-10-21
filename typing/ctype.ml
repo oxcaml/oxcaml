@@ -2733,7 +2733,9 @@ let rec try_reduce env ty =
   try try_reduce env ty'
   with Cannot_expand -> ty'
 
-(** Fully reduce all [Tquote_eval]s, raising [Cannot_expand] on failure. *)
+(** Deeply reduce all [Tquote_eval]s appearing in a type.
+    The resulting type does not contain any [Tquote_eval]s and has no sharing.
+    Raises [Cannot_expand] on failure. *)
 let rec try_full_reduce_quote_eval_desc env = function
   | Tquote_eval t ->
     try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
