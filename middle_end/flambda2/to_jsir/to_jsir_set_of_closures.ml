@@ -74,10 +74,8 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         let res =
           if closure_bound_with_code
           then
-            (* [fn_var] was already bound where the code was defined (see
-               [To_jsir_static_const.prepare_code]), and the code does not
-               depend on which closure it is called through, so we can reuse
-               that closure instead of allocating a new one. *)
+            (* [To_jsir_static_const.code] binds the closure for this code, so
+               we reuse it here instead of allocating another closure. *)
             res
           else
             let expr : Jsir.expr = Closure (params, (addr, []), (None, None)) in
