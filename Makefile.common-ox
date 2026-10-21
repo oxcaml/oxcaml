@@ -433,10 +433,23 @@ promote-one-no-rebuild:
 	 fi; \
 	 cd _runtest/testsuite && make promote $(if $(TEST),TEST=$(call locate_test,$(TEST))) $(if $(DIR),DIR=$(call locate_test,$(DIR))))
 
+# Also build the indexes for Merlin's find-all-references (merlin-index) when
+# an ocaml-index is on PATH; it must come from the same Merlin as the editor's
+# ocaml-lsp, as the one in the dev shell does. Restrict dune to our packages so
+# that it runs that ocaml-index rather than external/merlin's, which can't read
+# the boot compiler's cmt files. Both aliases are defined only in the root, and
+# under --only-packages the recursive forms fail on external/merlin's promoted
+# parsers, so build them non-recursively.
+merlin_index_packages = ocaml,oxcaml,oxcaml-dev
+have_ocaml_index = $(shell command -v ocaml-index)
+merlin_index_flags = $(if $(have_ocaml_index),--only-packages $(merlin_index_packages))
+merlin_index_target = $(if $(have_ocaml_index),@@merlin-index)
+
 # This target is like a polling version of upstream "make ocamlopt"
 .PHONY: hacking
 hacking: _build/_bootinstall
-	$(dune) build -w @merlin-support $(boot_targets)
+	$(dune) build -w $(merlin_index_flags) @@merlin-support $(merlin_index_target) \
+	  $(boot_targets)
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run
@@ -446,11 +459,11 @@ hacking: _build/_bootinstall
 
 .PHONY: hacking-emacs-poller
 hacking-emacs-poller: _build/_bootinstall
-	$(dune) build --passive-watch-mode
+	$(dune) build --passive-watch-mode $(merlin_index_flags)
 
 .PHONY: hacking-emacs-builder
 hacking-emacs-builder: _build/_bootinstall
-	$(dune) rpc build -w @merlin-support $(boot_targets)
+	$(dune) rpc build -w @@merlin-support $(merlin_index_target) $(boot_targets)
 	$(dune) diagnostics
 
 .PHONY: debug-printers
