@@ -733,7 +733,9 @@ module Sort = struct
     assert (level >= 0 && level <= generic_level);
     proto_new_var_unsafe ~level
 
-  let new_genvar () = proto_new_var_unsafe ~level:generic_level
+  let new_genvar () =
+    (* Generic variables are not tracked by pools. *)
+    proto_new_var_unsafe ~level:generic_level
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
