@@ -23,6 +23,7 @@ A valid implementation, which is a syntax error as an interface.
 
 The interface should have a syntax error.
   $ errors same.mli
+  1:0 Syntax error
 
 Any change to the text misses the cache.
   $ echo '' >> same.mli
