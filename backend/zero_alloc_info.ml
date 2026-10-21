@@ -3,41 +3,47 @@
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 module String = Misc.Stdlib.String
 
-module Component_value = struct
-  type t = int
+module Encoded = struct
+  module Component = struct
+    type t = int
 
-  let of_int i =
-    if i lsr 2 = 0
-    then i
-    else
-      Misc.fatal_error
-        "[Zero_alloc_info.Component_value.of_int]: value outside range 0-3"
+    let encode : unit Zero_alloc_utils.Component.t -> int = function
+      | Bot -> 0
+      | Safe -> 1
+      | Top () -> 2
 
-  let to_int i = i
-end
+    let decode : int -> unit Zero_alloc_utils.Component.t = function
+      | 0 -> Bot
+      | 1 -> Safe
+      | 2 -> Top ()
+      | _ ->
+        Misc.fatal_error
+          "[Zero_alloc_info.Component_value.of_int]: value outside range 0-3"
+  end
 
-module Value = struct
-  (* CR-someday wsturgeon for wsturgeon: nonzero by refinement? *)
-  type t = int
+  module Components = struct
+    (* CR-someday wsturgeon for wsturgeon: nonzero by refinement? *)
+    type t = int
 
-  let encode ~(encode_component : 'a -> Component_value.t)
-      (components : 'a Zero_alloc_utils.Components.t) : t option =
-    let c =
-      encode_component components.nor
-      lor (encode_component components.exn lsl 2)
-      lor (encode_component components.div lsl 4)
-    in
-    if c = 0 then None else Some c
+    let encode ~(encode_component : 'a -> Component.t)
+        (components : 'a Zero_alloc_utils.Components.t) : t option =
+      let c =
+        encode_component components.nor
+        lor (encode_component components.exn lsl 2)
+        lor (encode_component components.div lsl 4)
+      in
+      if c = 0 then None else Some c
 
-  let decode ~(decode_component : Component_value.t -> 'a) (i : t) :
-      'a Zero_alloc_utils.Components.t =
-    if i land 0b111111 = 0
-    then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding"
-    else
-      { nor = decode_component (i land 3);
-        exn = decode_component ((i lsr 2) land 3);
-        div = decode_component ((i lsr 4) land 3)
-      }
+    let decode ~(decode_component : Component.t -> 'a) (i : t) :
+        'a Zero_alloc_utils.Components.t =
+      if i land 0b111111 = 0
+      then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding"
+      else
+        { nor = decode_component (i land 3);
+          exn = decode_component ((i lsr 2) land 3);
+          div = decode_component ((i lsr 4) land 3)
+        }
+  end
 end
 
 module Allocation_sources = struct
@@ -49,7 +55,7 @@ module Allocation_sources = struct
         }
 end
 
-type t = { mutable zero_alloc : Value.t String.Map.t }
+type t = { mutable zero_alloc : Encoded.Components.t String.Map.t }
 
 let create () = { zero_alloc = String.Map.empty }
 
@@ -61,9 +67,9 @@ let merge src ~into:dst =
   in
   dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
 
-let get_value (t : t) s = String.Map.find_opt s t.zero_alloc
+let get (t : t) s = String.Map.find_opt s t.zero_alloc
 
-let set_value (t : t) s (v : Value.t) =
+let set (t : t) s (v : Encoded.Components.t) =
   let f new_ old =
     if not (Option.is_none old)
     then Misc.fatal_errorf "Value of %s is already set" s;

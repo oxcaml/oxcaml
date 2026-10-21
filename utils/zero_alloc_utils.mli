@@ -1,9 +1,11 @@
 (** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"
     respectively. *)
-type 'top component =
-  | Top of 'top
-  | Safe
-  | Bot
+module Component : sig
+  type 'top t =
+    | Top of 'top
+    | Safe
+    | Bot
+end
 
 module Tag : sig
   type t =
@@ -96,7 +98,7 @@ module type Component = sig
 end
 
 module Make_component (Witnesses : WS) : sig
-  type t = Witnesses.t component
+  type t = Witnesses.t Component.t
 
   include Component with type witnesses := Witnesses.t and type t := t
 end
