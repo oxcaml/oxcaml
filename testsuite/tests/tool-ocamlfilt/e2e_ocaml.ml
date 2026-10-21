@@ -497,6 +497,45 @@ module Generated = struct
     map_loop l
 end
 
+(* {1 Arity chunks and class parameters}
+
+   A native function with more than 126 parameters is split into chunks
+   of at most that many; the inner chunks are marked [{curry}]:
+   [Wide.wide.{curry}]. The closure taking a class's parameters creates
+   its objects and is marked [{obj_init}] like the parameterless case:
+   [reader.{obj_init}]. *)
+module Wide = struct
+  let[@inline never] wide ~a0 ~a1 ~a2 ~a3 ~a4 ~a5 ~a6 ~a7 ~a8 ~a9 ~a10 ~a11
+        ~a12 ~a13 ~a14 ~a15 ~a16 ~a17 ~a18 ~a19 ~a20 ~a21 ~a22 ~a23 ~a24 ~a25
+        ~a26 ~a27 ~a28 ~a29 ~a30 ~a31 ~a32 ~a33 ~a34 ~a35 ~a36 ~a37 ~a38 ~a39
+        ~a40 ~a41 ~a42 ~a43 ~a44 ~a45 ~a46 ~a47 ~a48 ~a49 ~a50 ~a51 ~a52 ~a53
+        ~a54 ~a55 ~a56 ~a57 ~a58 ~a59 ~a60 ~a61 ~a62 ~a63 ~a64 ~a65 ~a66 ~a67
+        ~a68 ~a69 ~a70 ~a71 ~a72 ~a73 ~a74 ~a75 ~a76 ~a77 ~a78 ~a79 ~a80 ~a81
+        ~a82 ~a83 ~a84 ~a85 ~a86 ~a87 ~a88 ~a89 ~a90 ~a91 ~a92 ~a93 ~a94 ~a95
+        ~a96 ~a97 ~a98 ~a99 ~a100 ~a101 ~a102 ~a103 ~a104 ~a105 ~a106 ~a107
+        ~a108 ~a109 ~a110 ~a111 ~a112 ~a113 ~a114 ~a115 ~a116 ~a117 ~a118
+        ~a119 ~a120 ~a121 ~a122 ~a123 ~a124 ~a125 ~a126 ~a127 ~a128 ~a129 =
+      a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 +
+      a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24
+      + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 +
+      a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47
+      + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 +
+      a59 + a60 + a61 + a62 + a63 + a64 + a65 + a66 + a67 + a68 + a69 + a70
+      + a71 + a72 + a73 + a74 + a75 + a76 + a77 + a78 + a79 + a80 + a81 +
+      a82 + a83 + a84 + a85 + a86 + a87 + a88 + a89 + a90 + a91 + a92 + a93
+      + a94 + a95 + a96 + a97 + a98 + a99 + a100 + a101 + a102 + a103 + a104
+      + a105 + a106 + a107 + a108 + a109 + a110 + a111 + a112 + a113 + a114
+      + a115 + a116 + a117 + a118 + a119 + a120 + a121 + a122 + a123 + a124
+      + a125 + a126 + a127 + a128 + a129
+end
+
+class reader filename =
+  object
+    val name = String.uppercase_ascii filename
+
+    method name = name
+  end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -537,6 +576,23 @@ let _ =
   ignore (second ~c:7);
   ignore (render [ "a" ]);
   ignore (use_app ());
+  ignore (Wide.wide ~a0:0 ~a1:1 ~a2:2 ~a3:3 ~a4:4 ~a5:5 ~a6:6 ~a7:7 ~a8:8
+     ~a9:9 ~a10:10 ~a11:11 ~a12:12 ~a13:13 ~a14:14 ~a15:15 ~a16:16 ~a17:17
+     ~a18:18 ~a19:19 ~a20:20 ~a21:21 ~a22:22 ~a23:23 ~a24:24 ~a25:25 ~a26:26
+     ~a27:27 ~a28:28 ~a29:29 ~a30:30 ~a31:31 ~a32:32 ~a33:33 ~a34:34 ~a35:35
+     ~a36:36 ~a37:37 ~a38:38 ~a39:39 ~a40:40 ~a41:41 ~a42:42 ~a43:43 ~a44:44
+     ~a45:45 ~a46:46 ~a47:47 ~a48:48 ~a49:49 ~a50:50 ~a51:51 ~a52:52 ~a53:53
+     ~a54:54 ~a55:55 ~a56:56 ~a57:57 ~a58:58 ~a59:59 ~a60:60 ~a61:61 ~a62:62
+     ~a63:63 ~a64:64 ~a65:65 ~a66:66 ~a67:67 ~a68:68 ~a69:69 ~a70:70 ~a71:71
+     ~a72:72 ~a73:73 ~a74:74 ~a75:75 ~a76:76 ~a77:77 ~a78:78 ~a79:79 ~a80:80
+     ~a81:81 ~a82:82 ~a83:83 ~a84:84 ~a85:85 ~a86:86 ~a87:87 ~a88:88 ~a89:89
+     ~a90:90 ~a91:91 ~a92:92 ~a93:93 ~a94:94 ~a95:95 ~a96:96 ~a97:97 ~a98:98
+     ~a99:99 ~a100:100 ~a101:101 ~a102:102 ~a103:103 ~a104:104 ~a105:105
+     ~a106:106 ~a107:107 ~a108:108 ~a109:109 ~a110:110 ~a111:111 ~a112:112
+     ~a113:113 ~a114:114 ~a115:115 ~a116:116 ~a117:117 ~a118:118 ~a119:119
+     ~a120:120 ~a121:121 ~a122:122 ~a123:123 ~a124:124 ~a125:125 ~a126:126
+     ~a127:127 ~a128:128 ~a129:129);
+  ignore (new reader "r")#name;
   ignore (pick true);
   ignore (Prims.( < ) 1 2);
   ignore (Prims.compare 1 2);

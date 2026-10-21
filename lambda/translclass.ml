@@ -465,6 +465,12 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
              ~return_layout:layout_obj pat.pat_loc None (Lvar param) [pat, rem]
              partial
          in
+         (* The closure taking the class's parameters creates its objects:
+            the [obj_init] marker names it under the class. *)
+         let scopes =
+           Debuginfo.Scoped_location.enter_compiler_generated ~scopes
+             "obj_init"
+         in
          Lambda.lfunction
                    ~kind:(Curried {nlocal=0})
                    ~params:(lparam param param_duid arg_layout::params)
