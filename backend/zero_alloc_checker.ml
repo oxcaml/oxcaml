@@ -150,13 +150,9 @@ module Witnesses : sig
 
   val cutoff : t -> n:int -> t
 
-  type components =
-    { nor : t;
-      exn : t;
-      div : t
-    }
-
-  val simplify : components -> components
+  val simplify :
+    t Zero_alloc_utils.Components.t ->
+    t Zero_alloc_utils.Components.t
 end = struct
   include Set.Make (Witness)
 
@@ -192,41 +188,24 @@ end = struct
 
   let iter t ~f = iter f t
 
-  type components =
-    { nor : t;
-      exn : t;
-      div : t
-    }
-
-  let simplify { nor; exn; div } =
-    { div =
-        (* don't print diverge witnesses unless they are the only ones. *)
-        (if is_empty nor && is_empty exn then div else empty);
-      nor;
+  let simplify { Zero_alloc_utils.Components.nor; exn; div } =
+    { Zero_alloc_utils.Components.nor;
       (* only print the exn witnesses that are not also nor witnesses. *)
-      exn = diff exn nor
+      exn = diff exn nor;
+      div =
+        (* don't print diverge witnesses unless they are the only ones. *)
+        if is_empty nor && is_empty exn then div else empty
     }
-end
-
-module Tag = struct
-  type t =
-    | N
-    | E
-    | D
-
-  let compare : t -> t -> int = fun t1 t2 -> Stdlib.compare t1 t2
-
-  let print = function N -> "nor" | E -> "exn" | D -> "div"
 end
 
 module Var : sig
   type t
 
-  val create : string -> Tag.t -> t
+  val create : string -> Zero_alloc_utils.Tag.t -> t
 
   val name : t -> string
 
-  val tag : t -> Tag.t
+  val tag : t -> Zero_alloc_utils.Tag.t
 
   val print : Format.formatter -> t -> unit
 
@@ -241,12 +220,12 @@ end = struct
   module T = struct
     type t =
       { name : string;
-        tag : Tag.t
+        tag : Zero_alloc_utils.Tag.t
       }
 
     let compare { tag = tag1; name = name1 } { tag = tag2; name = name2 } =
       let c = String.compare name1 name2 in
-      if c = 0 then Tag.compare tag1 tag2 else c
+      if c = 0 then Zero_alloc_utils.Tag.compare tag1 tag2 else c
   end
 
   include T
@@ -262,7 +241,7 @@ end = struct
   let create name tag = { name; tag }
 
   let print ppf { name; tag } =
-    Format.fprintf ppf "%s.%s@ " name (Tag.print tag)
+    Format.fprintf ppf "%s.%s@ " name (Zero_alloc_utils.Tag.print tag)
 end
 
 (** Abstract value for each component of the domain. *)
@@ -1378,67 +1357,57 @@ module Value : sig
 
   val get_unresolved_names : t -> String.Set.t
 
-  val get_witnesses : t -> Witnesses.components
+  val get_witnesses : t -> Witnesses.t Zero_alloc_utils.Components.t
 
-  val diff_witnesses : expected:t -> actual:t -> Witnesses.components
+  val diff_witnesses :
+    expected:t ->
+    actual:t ->
+    Witnesses.t Zero_alloc_utils.Components.t
 
   val unresolved : string -> Witnesses.t -> t
 
   val is_resolved : t -> bool
 
-  val get_component : t -> Tag.t -> V.t
+  val get_component : t -> Zero_alloc_utils.Tag.t -> V.t
 
   val apply : t -> (Var.t -> V.t option) -> t
 end = struct
   include T
 
   let unresolved name w =
-    { nor = Var.create name Tag.N |> V.unresolved w;
-      exn = Var.create name Tag.E |> V.unresolved w;
-      div = Var.create name Tag.D |> V.unresolved w
-    }
+    Zero_alloc_utils.Components.create
+      (fun tag -> Var.create name tag |> V.unresolved w)
 
-  let is_resolved t =
+  let is_resolved (t : _ Zero_alloc_utils.Components.t) =
     V.is_resolved t.nor && V.is_resolved t.exn && V.is_resolved t.div
 
-  let get_unresolved_names t =
+  let get_unresolved_names (t : _ Zero_alloc_utils.Components.t) =
     String.Set.(
       union
         (V.get_unresolved_names t.nor)
         (union (V.get_unresolved_names t.exn) (V.get_unresolved_names t.div)))
 
-  let get_component t (tag : Tag.t) =
+  let get_component (t : t) (tag : Zero_alloc_utils.Tag.t) =
     match tag with N -> t.nor | E -> t.exn | D -> t.div
 
   let apply t env =
-    { nor = V.apply t.nor ~env;
-      exn = V.apply t.exn ~env;
-      div = V.apply t.div ~env
-    }
+    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.apply ~env) t
 
-  let transform effect_ v =
-    { nor = V.transform effect_ v.nor;
-      exn = V.transform effect_ v.exn;
-      div = V.transform effect_ v.div
-    }
+  let transform effect_ =
+    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag -> V.transform effect_)
 
-  let replace_witnesses w t =
-    { nor = V.replace_witnesses w t.nor;
-      exn = V.replace_witnesses w t.exn;
-      div = V.replace_witnesses w t.div
-    }
+  let replace_witnesses w =
+    Zero_alloc_utils.Components.map
+      ~f:(fun _ignore_tag -> V.replace_witnesses w)
 
   let diff_witnesses ~expected ~actual =
-    { Witnesses.nor = V.diff_witnesses ~expected:expected.nor ~actual:actual.nor;
-      Witnesses.exn = V.diff_witnesses ~expected:expected.exn ~actual:actual.exn;
-      Witnesses.div = V.diff_witnesses ~expected:expected.div ~actual:actual.div
-    }
+    Zero_alloc_utils.Components.map2
+      ~f:(fun _ignore_tag expected actual -> V.diff_witnesses ~expected ~actual)
+      expected actual
 
-  let get_witnesses t =
-    { Witnesses.nor = V.get_witnesses t.nor;
-      Witnesses.exn = V.get_witnesses t.exn;
-      Witnesses.div = V.get_witnesses t.div
-    }
+  let get_witnesses =
+    Zero_alloc_utils.Components.map
+      ~f:(fun _ignore_tag -> V.get_witnesses)
 end
 
 (** Representation of user-provided annotations as abstract values *)
@@ -1461,7 +1430,7 @@ module Annotation : sig
 
   val valid : t -> Value.t -> bool
 
-  val diff_witnesses : t -> Value.t -> Witnesses.components
+  val diff_witnesses : t -> Value.t -> Witnesses.t Zero_alloc_utils.Components.t
 
   val is_assume : t -> bool
 
@@ -1644,7 +1613,7 @@ module Report : sig
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.components
+      witnesses : Witnesses.t Zero_alloc_utils.Components.t
     }
 
   exception Fail of t list
@@ -1655,7 +1624,7 @@ end = struct
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.components
+      witnesses : Witnesses.t Zero_alloc_utils.Components.t
     }
 
   exception Fail of t list
@@ -1835,7 +1804,9 @@ end = struct
       Location.error_of_printer ~loc ~sub pp ()
     in
     let print_witnesses ws : Location.error list =
-      let { Witnesses.nor; exn; div } = Witnesses.simplify ws in
+      let { nor; exn; div } : Witnesses.t Zero_alloc_utils.Components.t =
+        Witnesses.simplify ws
+      in
       let f ws component =
         ws |> Witnesses.elements |> List.map (print_witness ~component)
       in
@@ -2079,6 +2050,7 @@ end = struct
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
           (V.print ~witnesses:false) v)
+    |> Zero_alloc_info.Component_value.of_int
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
@@ -2086,24 +2058,16 @@ end = struct
      callee are ignored, and replaced by the name of the callee. *)
   let decoded_witness = Witnesses.empty
 
-  let decode = function
+  let decode v =
+    match Zero_alloc_info.Component_value.to_int v with
     | 0 -> V.top decoded_witness
     | 1 -> V.safe
     | 2 -> V.bot
     | n -> Misc.fatal_errorf "Zero_alloc_checker cannot decode %d" n
 
-  let encode (v : Value.t) : Zero_alloc_info.value option =
-    let c = (encode v.div lsl 4) lor (encode v.exn lsl 2) lor encode v.nor in
-    if c = 0 then None else Some c
+  let encode = Zero_alloc_info.Value.encode ~encode_component:encode
 
-  let decode : Zero_alloc_info.value option -> Value.t option = function
-    | None -> None
-    | Some d ->
-      if d = 0 then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding";
-      let nor = decode (d land 3) in
-      let exn = decode ((d lsr 2) land 3) in
-      let div = decode ((d lsr 4) land 3) in
-      Some { nor; exn; div }
+  let decode = Zero_alloc_info.Value.decode ~decode_component:decode
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in
@@ -2113,7 +2077,8 @@ end = struct
 
   let get_value_opt s =
     let info = Compilenv.cached_zero_alloc_info in
-    decode (Zero_alloc_info.get_value info s)
+    Zero_alloc_info.get_value info s
+    |> Option.map decode
 end
 
 (** The analysis involved some fixed point computations. Termination: [Value.t]
@@ -2360,7 +2325,7 @@ end = struct
         let exn = V.bot in
         (* Assume that the operation does not diverge. *)
         let div = V.bot in
-        { Value.nor; exn; div }
+        ({ nor; exn; div } : _ Zero_alloc_utils.Components.t)
     in
     transform t ~next ~exn ~effect_ desc dbg
 
@@ -2558,11 +2523,11 @@ end = struct
         let res = check_body t in
         report t res ~msg:"finished" ~desc:"fundecl" fun_dbg;
         if (not t.keep_witnesses) && Value.is_resolved res
-        then (
-          let { Witnesses.nor; exn; div } = Value.get_witnesses res in
-          assert (Witnesses.is_empty nor);
-          assert (Witnesses.is_empty exn);
-          assert (Witnesses.is_empty div));
+        then begin
+          Zero_alloc_utils.Components.iter
+            ~f:(fun _tag component -> assert (Witnesses.is_empty component))
+            (Value.get_witnesses res)
+        end;
         Unit_info.record unit_info fun_name res fun_dbg a;
         add_unresolved_dependencies fun_name unit_info unresolved_deps t.ppf;
         report_unit_info ppf unit_info ~msg:"after record"
@@ -2680,10 +2645,10 @@ end = struct
         | Alloc { mode = Local; _ } -> next
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
-          let effect_ =
+          let effect_ : _ Zero_alloc_utils.Components.t =
             match Metadata.assume_value_unless_inferred dbg w with
             | Some effect_ -> effect_
-            | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
+            | None -> { nor = V.top w; exn = V.bot; div = V.bot }
           in
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
@@ -2870,7 +2835,9 @@ let record_unit_info ppf_dump =
   Analysis.record_unit unit_info unresolved_deps ppf_dump;
   Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
-type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
+type iter_witnesses =
+  (string -> Witnesses.t Zero_alloc_utils.Components.t -> unit) ->
+  unit
 
 let iter_witnesses f =
   Unit_info.iter unit_info ~f:(fun func_info ->

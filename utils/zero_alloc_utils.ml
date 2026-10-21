@@ -27,6 +27,68 @@
    Perhaps we should translate "strict" and "never_returns_normally" directly
    into (nor,exn,div) *)
 
+type 'witnesses component =
+  | Top of 'witnesses
+  | Safe
+  | Bot
+
+module Tag = struct
+  type t =
+    | N
+    | E
+    | D
+
+  let compare = Stdlib.compare
+
+  let print = function N -> "nor" | E -> "exn" | D -> "div"
+end
+
+module Components = struct
+  type 'component t =
+    { nor : 'component;
+      exn : 'component;
+      div : 'component
+    }
+
+  let create f =
+    { nor = f Tag.N;
+      exn = f Tag.E;
+      div = f Tag.D;
+    }
+
+  let iter ~f { nor; exn; div } =
+    f Tag.N nor;
+    f Tag.E exn;
+    f Tag.D div
+
+  let map ~f { nor; exn; div } =
+    { nor = f Tag.N nor;
+      exn = f Tag.E exn;
+      div = f Tag.D div;
+    }
+
+  let map2 ~f lhs rhs =
+    { nor = f Tag.N lhs.nor rhs.nor;
+      exn = f Tag.E lhs.exn rhs.nor;
+      div = f Tag.D lhs.div rhs.nor;
+    }
+
+  let lessequal f lhs rhs =
+    f lhs.nor rhs.nor
+    && f lhs.exn rhs.exn
+    && f lhs.div rhs.div
+
+  let compare f
+      { nor = n1; exn = e1; div = d1 }
+      { nor = n2; exn = e2; div = d2 } =
+    let c = f n1 n2 in
+    if c <> 0
+    then c
+    else
+      let c = f e1 e2 in
+      if c <> 0 then c else f d1 d2
+end
+
 module type WS = sig
   type t
 
@@ -67,10 +129,7 @@ end
 
 module Make_component (Witnesses : WS) = struct
   (* keep in sync with "resolved" values in Checkmach. *)
-  type t =
-    | Top of Witnesses.t
-    | Safe
-    | Bot
+  type t = Witnesses.t component
 
   let bot = Bot
 
@@ -129,29 +188,15 @@ module Make_value
     (V : Component with type witnesses := Witnesses.t) =
 struct
   (** Lifts V to triples *)
-  type t =
-    { nor : V.t;
-      exn : V.t;
-      div : V.t
-    }
+  type t = V.t Components.t
 
-  let bot = { nor = V.bot; exn = V.bot; div = V.bot }
+  let bot = Components.create (fun _ignore_tag -> V.bot)
 
-  let lessequal v1 v2 =
-    V.lessequal v1.nor v2.nor && V.lessequal v1.exn v2.exn
-    && V.lessequal v1.div v2.div
+  let lessequal = Components.lessequal V.lessequal
 
-  let join v1 v2 =
-    { nor = V.join v1.nor v2.nor;
-      exn = V.join v1.exn v2.exn;
-      div = V.join v1.div v2.div
-    }
+  let join = Components.map2 ~f:(fun _ignore_tag -> V.join)
 
-  let meet v1 v2 =
-    { nor = V.meet v1.nor v2.nor;
-      exn = V.meet v1.exn v2.exn;
-      div = V.meet v1.div v2.div
-    }
+  let meet = Components.map2 ~f:(fun _ignore_tag -> V.meet)
 
   let normal_return = { bot with nor = V.safe }
 
@@ -159,29 +204,22 @@ struct
 
   let diverges = { bot with div = V.safe }
 
-  let safe = { nor = V.safe; exn = V.safe; div = V.safe }
+  let safe = Components.create (fun _ignore_tag -> V.safe)
 
-  let top w = { nor = V.top w; exn = V.top w; div = V.top w }
+  let top w = Components.create (fun _ignore_tag -> V.top w)
 
-  let relaxed w = { nor = V.safe; exn = V.top w; div = V.top w }
+  let relaxed w : t = { nor = V.safe; exn = V.top w; div = V.top w }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
     let res = if strict then safe else relaxed Witnesses.empty in
     let res = if never_raises then { res with exn = V.bot } else res in
     if never_returns_normally then { res with nor = V.bot } else res
 
-  let print ~witnesses ppf { nor; exn; div } =
+  let print ~witnesses ppf ({ nor; exn; div } : t) =
     let pp = V.print ~witnesses in
     Format.fprintf ppf "{ nor=%a;@ exn=%a;@ div=%a }@," pp nor pp exn pp div
 
-  let compare { nor = n1; exn = e1; div = d1 } { nor = n2; exn = e2; div = d2 }
-      =
-    let c = V.compare n1 n2 in
-    if c <> 0
-    then c
-    else
-      let c = V.compare e1 e2 in
-      if c <> 0 then c else V.compare d1 d2
+  let compare = Components.compare V.compare
 end
 
 module Assume_info = struct

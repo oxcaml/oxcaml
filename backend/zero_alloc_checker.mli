@@ -77,15 +77,9 @@ module Witnesses : sig
   val is_empty : t -> bool
 
   val iter : t -> f:(Witness.t -> unit) -> unit
-
   (** The witnesses are classified into which path they may appear on. If a
       witness appears on both a path to a normal and an excpetional return, it
       will only appear in [nor] component. *)
-  type components =
-    { nor : t;  (** on a path from function entry to a normal return *)
-      exn : t;  (** on a path from function entry to an exceptionall return *)
-      div : t  (** on a path from function entry that may diverge *)
-    }
 end
 
 (** Iterate over all function symbols with their witnesses. This function can be
@@ -94,7 +88,9 @@ end
     only for functions annotated with [@zero_alloc], set
     [Oxcaml_flags.zero_alloc_checker_details_cutoff] to a negative value before
     calls to [fundecl]. Used by compiler_hooks. *)
-type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
+type iter_witnesses =
+  (string -> Witnesses.t Zero_alloc_utils.Components.t -> unit) ->
+  unit
 
 val iter_witnesses : iter_witnesses
 

@@ -3,7 +3,25 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
-type value = int
+module Component_value : sig
+  type t
+  val of_int : int -> t
+  val to_int : t -> int
+end
+
+module Value : sig
+  type t
+
+  val encode :
+    encode_component:('a -> Component_value.t) ->
+    'a Zero_alloc_utils.Components.t ->
+    t option
+
+  val decode :
+    decode_component:(Component_value.t -> 'a) ->
+    t ->
+    'a Zero_alloc_utils.Components.t
+end
 
 type t
 
@@ -16,9 +34,11 @@ val merge : t -> into:t -> unit
 
 (** [get_value t fun_name] returns None if [fun_name] is not associated with any
     value. *)
-val get_value : t -> string -> value option
+val get_value : t -> string -> Value.t option
 
-val set_value : t -> string -> value -> unit
+val set_value : t -> string -> Value.t -> unit
+
+val iter : f:(string -> Value.t -> unit) -> t -> unit
 
 module Raw : sig
   type t

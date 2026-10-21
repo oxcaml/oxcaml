@@ -1,3 +1,50 @@
+(** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"
+    respectively. *)
+type 'witnesses component =
+  | Top of 'witnesses
+  | Safe
+  | Bot
+
+module Tag : sig
+  type t =
+    | N
+    | E
+    | D
+
+  val compare : t -> t -> int
+
+  val print : t -> string
+end
+
+(** Three fields, [nor], [exn], & [div], meaning "control flow that returns
+    normally," "control flow that raises," and "control flow that diverges,"
+    respectively. *)
+module Components : sig
+  type 'component t =
+    { nor : 'component;
+          (** Property about all paths from this program location that may reach
+              a Normal Return *)
+      exn : 'component;
+          (** Property about all paths from this program point that may reach a
+              Return with Exception *)
+      div : 'component
+          (** Property about all paths from this program point that may
+              diverge. *)
+    }
+
+  val create : (Tag.t -> 'a) -> 'a t
+
+  val iter : f:(Tag.t -> 'a -> unit) -> 'a t -> unit
+
+  val map : f:(Tag.t -> 'a -> 'b) -> 'a t -> 'b t
+
+  val map2 : f:(Tag.t -> 'a -> 'a -> 'b) -> 'a t -> 'a t -> 'b t
+
+  val lessequal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+end
+
 (** Abstract domain used in static analysis for checking [@zero_alloc]
     annotations. See [backend/zero_alloc_checker] for details of the analysis.
     See this module's .ml file for details about the translation of
@@ -49,10 +96,7 @@ module type Component = sig
 end
 
 module Make_component (Witnesses : WS) : sig
-  type t =
-    | Top of Witnesses.t
-    | Safe
-    | Bot
+  type t = Witnesses.t component
 
   include Component with type witnesses := Witnesses.t and type t := t
 end
@@ -61,17 +105,7 @@ module Make_value
     (Witnesses : WS)
     (V : Component with type witnesses := Witnesses.t) : sig
   (** Abstract value associated with each program location in a function. *)
-  type t =
-    { nor : V.t;
-          (** Property about all paths from this program location that may reach
-              a Normal Return *)
-      exn : V.t;
-          (** Property about all paths from this program point that may reach a
-              Return with Exception *)
-      div : V.t
-          (** Property about all paths from this program point that may diverge.
-          *)
-    }
+  type t = V.t Components.t
 
   val lessequal : t -> t -> bool
 
