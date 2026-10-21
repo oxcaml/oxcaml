@@ -60,7 +60,7 @@ The non-standalone indexes are smaller:
 Create a function that temporarily removes an index file, which we'll use to
 test the behavior of indexes when some are missing.
 
-  $ with_removed () (
+  $ with_removed () {
   >   file="$1"
   >   shift
   >   [ "$1" = -- ] && shift
@@ -69,7 +69,7 @@ test the behavior of indexes when some are missing.
   >   status="$?"
   >   mv -- "$file.moved" "$file"
   >   exit $status
-  > )
+  > }
 
 The standalone index is the same as before, even when the component indexes are
 missing.
