@@ -372,6 +372,16 @@ let second = first ~b:(Sys.opaque_identity 2)
    closure is the partial application too: [render.partial{Partial.text}]. *)
 let[@inline never] render l = List.map (Partial.text ~wrap:80) l
 
+(* The eta-expansion of a complete application whose result happens to be a
+   function with optional arguments is a partial application of that result,
+   not of the function applied, which is left unknown: [use_app.partial{?}]
+   rather than [use_app.partial{Stdlib.Sys.opaque_identity}]. *)
+let[@inline never] with_opt ?(opt = 0) b = opt + b
+
+let[@inline never] apply_int (g : int -> int) = g 2
+
+let[@inline never] use_app () = apply_int (Sys.opaque_identity with_opt)
+
 (* {1 Primitives re-exported as values}
 
    When a signature declares as a [val] what the structure defines as an
@@ -427,6 +437,7 @@ let _ =
   ignore (curried ~b:6);
   ignore (second ~c:7);
   ignore (render [ "a" ]);
+  ignore (use_app ());
   ignore (pick true);
   ignore (Prims.( < ) 1 2);
   ignore (Prims.compare 1 2)
