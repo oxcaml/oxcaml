@@ -141,7 +141,15 @@ type is_tail_position = [ `No | `Tail_position | `Tail_call ]
 type _ _bool = bool
 
 type occurrences_status =
-  [ `Not_requested | `Out_of_sync of string list | `No_def | `Included ]
+  | Not_requested
+  | Out_of_sync of
+      { source_files : string list;
+            (** ml/mli files that have changes since the index was generated *)
+        indices : string list
+            (** indices that have changed since other indices were generated *)
+      }
+  | No_def
+  | Included
 
 type occurrence = { loc : Location.t; is_stale : bool }
 
