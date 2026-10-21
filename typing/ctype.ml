@@ -6980,13 +6980,13 @@ let moregeneral ~self_check env inst_nongen
         changed.
        *)
       let (subj_inst_sorts, subj_inst) =
-        Jkind_types.Sort.instance_with ~level:!current_level subj_sch_sorts
+        Jkind.Sort.instance_with ~level:!current_level subj_sch_sorts
           (fun () -> instance_aux ~instantiate_modes subj_sch)
       in
       let subj_inst' = duplicate_type subj_inst in
       (* Duplicate generic variables *)
       let (pat_inst_sorts, pat_inst) =
-        Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
+        Jkind.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       try
@@ -6998,8 +6998,7 @@ let moregeneral ~self_check env inst_nongen
       with Moregen_trace trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
-        ignore
-          (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
+        ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
     | _, Ok (subj_inst_sorts, pat_inst_sorts) ->
       (* After [moregen], [pat_inst_sorts] have been set to [subj_inst_sorts],

@@ -292,7 +292,7 @@ module type Sort = sig
   module Change : With_backtracking.Change.S
 
   (** Create a new sort variable with the given level. *)
-  val new_var : level:int -> var
+  val proto_new_var : level:int -> var
 
   (** Create a generic sort variable. *)
   val new_genvar : unit -> var

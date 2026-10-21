@@ -100,6 +100,8 @@ val new_quote_eval_ty: type_expr -> type_expr
 val new_box_ty: type_expr -> type_expr
         (* Box a type expression *)
 
+val new_sort_var: level:int -> Jkind_types.Sort.var
+
 (**** Types ****)
 
 val is_Tvar: type_expr -> bool

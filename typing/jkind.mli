@@ -51,6 +51,8 @@ module Sort : sig
        and type base = Jkind_types.Sort.base
        and type Const.t = Jkind_types.Sort.Const.t
 
+  val new_var : level:int -> var
+
   module Flat : sig
     (** A flat sort is returned from [get]. *)
     type t =

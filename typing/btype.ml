@@ -187,6 +187,14 @@ let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
 let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 
+(**** Some sort creators ****)
+
+let new_sort_var ~level =
+  let open Jkind_types.Sort in
+  let var = proto_new_var ~level in
+  add_to_sort_pool ~level (of_var var);
+  var
+
 (**** Check some types ****)
 
 let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false

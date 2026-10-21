@@ -87,6 +87,10 @@ module Sort : sig
 
   include With_backtracking.S with module Change := Change
 
+  (** Use [Jkind.Sort.instance_with] instead, which passes in [new_var]. *)
+  val instance_with :
+    new_var:(unit -> var) -> var list -> (unit -> 'a) -> var list * 'a
+
   val equate : allow_mutation:bool -> t -> t -> bool
 
   val constrain_addressable : allow_mutation:bool -> t -> bool

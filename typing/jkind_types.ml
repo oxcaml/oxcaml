@@ -706,15 +706,17 @@ module Sort = struct
 
   let reset_cmi_sort_id () = last_var_cmi_id := 0
 
-  let new_var_unsafe ~level =
+  let proto_new_var_unsafe ~level =
     incr last_var_id;
     { contents = None; level; id = !last_var_id }
 
-  let new_var ~level =
+  (** Like [Types.proto_newty3], this function should not be called directly.
+      Instead, use [Btype.new_var] which adds the variable to a level pool. *)
+  let proto_new_var ~level =
     assert (level >= 0 && level <= generic_level);
-    new_var_unsafe ~level
+    proto_new_var_unsafe ~level
 
-  let new_genvar () = new_var_unsafe ~level:generic_level
+  let new_genvar () = proto_new_var_unsafe ~level:generic_level
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
@@ -722,15 +724,14 @@ module Sort = struct
 
   let instance_map : (var * var) list ref = ref []
 
-  let instance_with ~level vars f =
+  let instance_with ~new_var vars f =
     let new_vars =
       List.map
         (fun v ->
           assert (is_genvar v);
           (* ensure the variable is not a CMI serialised variable *)
           assert (v.id > 0);
-          let v' = new_var ~level in
-          v, v')
+          v, new_var ())
         vars
     in
     let old_map = !instance_map in

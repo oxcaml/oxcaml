@@ -229,9 +229,8 @@ module Test = struct
 end;;
 Test.k 42 #17l
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Test : sig val id : 'a -> 'a val poly_ k : 'a. 'a -> 'b -> 'a end
+- : int = 42
 |}];;
 
 (** Irrelevant generalisation **)
