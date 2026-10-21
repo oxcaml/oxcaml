@@ -11174,11 +11174,18 @@ and type_argument_ ?explanation ?recarg ~overwrite env
         in
         let e = {texp with exp_type = ty_res; exp_desc = Texp_exclave e} in
         let cases = [ case eta_pat e ] in
-        let cases_loc = { texp.exp_loc with loc_ghost = true } in
+        (* The function stands for the argument at its location; the
+           attribute lets the translation to Lambda name it as the partial
+           application it is. *)
+        let ghost_loc = { sarg.pexp_loc with loc_ghost = true } in
+        let cases_loc = ghost_loc in
         let param, param_uid =
           name_cases ~pattern_kind:Synthetic_eta_expansion "param" cases
         in
-        { texp with exp_type = ty_fun; exp_desc =
+        { texp with exp_type = ty_fun;
+          exp_loc = ghost_loc;
+          exp_attributes = [Builtin_attributes.eta_expansion_attribute];
+          exp_desc =
           Texp_function
             { params = [];
               body =

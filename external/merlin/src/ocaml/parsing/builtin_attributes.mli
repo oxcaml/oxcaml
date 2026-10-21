@@ -367,6 +367,7 @@ val get_tracing_probe_payload :
   Parsetree.payload -> (tracing_probe, unit) result
 
 val has_atomic: Parsetree.attributes -> bool
+<<<<<<< Merlin:Svetlitski/structured-mangling-partial-applications
 
 (* Merlin specific *)
 
@@ -380,3 +381,14 @@ val merlin_punned_let : string
     parser. (The label node doesn't have a place to insert an attribute, so it can't be
     given one.) *)
 val merlin_punned_record_pattern : string
+||||||| Compiler:last-imported
+=======
+
+(** The attribute the type checker puts on the function it synthesizes when
+    eta-expanding an application that omits optional arguments (see
+    [Typecore]), so that the translation to Lambda can name that function as
+    the partial application it stands for. Not meant to be written in
+    source programs. *)
+val eta_expansion_attribute : Parsetree.attribute
+val has_eta_expansion_attribute : Parsetree.attributes -> bool
+>>>>>>> Compiler:HEAD
