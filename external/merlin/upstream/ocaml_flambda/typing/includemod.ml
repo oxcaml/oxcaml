@@ -471,7 +471,8 @@ let equal_modtype_paths env p1 subst p2 =
        (Env.normalize_modtype_path env
           (Subst.modtype_path subst p2))
 
-let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
+let simplify_structure_coercion input_repr output_repr pos_cc_list
+    output_names id_pos_list =
   let rec is_identity_coercion pos = function
   | [] ->
       true
@@ -479,7 +480,9 @@ let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
       n = pos && c = Tcoerce_none && is_identity_coercion (pos + 1) rem in
   if is_identity_coercion 0 pos_cc_list
   then Tcoerce_none
-  else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+  else
+    Tcoerce_structure
+      { input_repr; output_repr; pos_cc_list; output_names; id_pos_list }
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -967,12 +970,22 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
           List.filter_map Subst.Lazy.sort_of_signature_item sig2
           |> Array.of_list
         in
+        let output_names =
+          List.filter_map
+            (fun item ->
+              if is_runtime_component item
+              then let (id, _, _) = item_ident_name item in Some (Ident.name id)
+              else None)
+            sig2
+        in
         let coercion =
           if runtime_len1 = runtime_len2 then (* see PR#5098 *)
-            simplify_structure_coercion input_repr output_repr cc id_pos_list
+            simplify_structure_coercion input_repr output_repr cc output_names
+              id_pos_list
           else
             Tcoerce_structure
-              { input_repr; output_repr; pos_cc_list = cc; id_pos_list }
+              { input_repr; output_repr; pos_cc_list = cc; output_names;
+                id_pos_list }
         in
         Ok (coercion, shape)
     | missings, incompatibles, _runtime_coercions, _leftovers ->

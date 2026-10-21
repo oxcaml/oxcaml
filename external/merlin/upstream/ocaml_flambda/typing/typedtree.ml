@@ -732,6 +732,10 @@ and module_coercion =
       { input_repr : Types.module_representation
       ; output_repr : Types.module_representation
       ; pos_cc_list : (int * module_coercion) list
+      ; output_names : string list
+      (* The names of the runtime components of the signature coerced to, in
+         the order of [pos_cc_list], or [] when unknown; they name the
+         wrapper functions that the coercions create. *)
       ; id_pos_list : (Ident.t * int * module_coercion) list
       }
   | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
