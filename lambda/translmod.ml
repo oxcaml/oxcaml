@@ -186,10 +186,29 @@ and coerced_block loc ~strict ~field_loc ~output_names output_repr pos_cc_list
   let scoped loc enter =
     Debuginfo.Scoped_location.map_scopes (fun scopes -> enter scopes) loc
   in
+  (* A module alias is coerced like the module it stands for, so the wrapper
+     of an aliased functor is named after the alias. *)
+  let rec strip_alias = function
+    | Tcoerce_alias (_, _, cc) -> strip_alias cc
+    | cc -> cc
+  in
+  (* Binds the wrapper function that [apply_coercion] built for a field to
+     [name]; the coercion of an alias wraps that function in the bindings of
+     the alias's path. *)
+  let rec bind_wrapper name lam =
+    match lam with
+    | Lfunction _ ->
+      let id = Ident.create_local name in
+      Llet(Strict, Lambda.layout_function, id, Lambda.debug_uid_none, lam,
+           Lvar id)
+    | Llet(str, kind, id, duid, e, body) ->
+      Llet(str, kind, id, duid, e, bind_wrapper name body)
+    | lam -> lam
+  in
   let field (pos, cc) name =
     let loc = field_loc cc in
     let name, loc =
-      match cc, name with
+      match strip_alias cc, name with
       | Tcoerce_primitive { pc_name; _ }, _ -> Some pc_name, loc
       | Tcoerce_functor _, Some name ->
         let enter scopes =
@@ -211,12 +230,9 @@ and coerced_block loc ~strict ~field_loc ~output_names output_repr pos_cc_list
         None, loc
     in
     let lam = apply_coercion loc strict cc (get_field pos) in
-    match name, lam with
-    | Some name, Lfunction _ ->
-      let id = Ident.create_local name in
-      Llet(Strict, Lambda.layout_function, id, Lambda.debug_uid_none, lam,
-           Lvar id)
-    | _, _ -> lam
+    match name with
+    | Some name -> bind_wrapper name lam
+    | None -> lam
   in
   Lprim(block_of_module_representation ~loc:(to_location loc) output_repr,
         List.map2 field pos_cc_list names, loc)
