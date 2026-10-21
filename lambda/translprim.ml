@@ -1810,7 +1810,7 @@ let layout_of_ty_for_idx_set env loc ty =
      respectively.
 
      We should consider tracking primitives' sort variables in the typedtree
-     itself, similar to what the comment above [type_representable_layout]
+     itself, similar to what the comment above [get_representable_layout_opt]
      in [Typeopt] suggests. *)
   let jkind = Ctype.type_jkind env ty in
   let layout =
