@@ -5,6 +5,23 @@ module Component : sig
     | Top of 'top
     | Safe
     | Bot
+
+  val map : f:('a -> 'b) -> 'a t -> 'b t
+
+  val print :
+    print_top:(Format.formatter -> 'top -> unit) ->
+    Format.formatter ->
+    'top t ->
+    unit
+
+  val compare : compare_top:('top -> 'top -> int) -> 'top t -> 'top t -> int
+
+  val join : join_top:('top -> 'top -> 'top) -> 'top t -> 'top t -> 'top t
+
+  val meet : meet_top:('top -> 'top -> 'top) -> 'top t -> 'top t -> 'top t
+
+  val lessequal :
+    lessequal_top:('top -> 'top -> bool) -> 'top t -> 'top t -> bool
 end
 
 module Tag : sig
