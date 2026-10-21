@@ -10,7 +10,7 @@
    array kind as a refinement, and falls back to [Pgenval] when the element
    has no representable layout. But anything that needs the element's array
    kind, such as specializing an array primitive, must reject them. See
-   [Typeopt.type_representable_layout]. *)
+   [Typeopt.type_layout_and_make_representable]. *)
 
 (*******************************************************)
 (* Test: externals over [any separable] type variables *)
@@ -21,7 +21,7 @@ external weird_id : ('a : any mod separable). 'a array -> int = "%identity"
 let weird_id' arr = weird_id arr
 [%%expect{|
 external weird_id : ('a : any separable). 'a array -> int = "%identity"
-val weird_id' : ('a : value_maybe_null). 'a array -> int = <fun>
+val weird_id' : ('a : any separable). 'a array -> int = <fun>
 |}]
 
 (* This is not sound whenever 'a is not a value, but this is the kind of
@@ -41,8 +41,7 @@ let product_edge_case x = product_edge_case x
 [%%expect{|
 external product_edge_case : ('a : any separable). #('a * 'a) array -> int
   = "%identity"
-val product_edge_case : ('a : value_maybe_null). #('a * 'a) array -> int =
-  <fun>
+val product_edge_case : ('a : any separable). #('a * 'a) array -> int = <fun>
 |}]
 
 (*******************************************************************)
@@ -59,49 +58,29 @@ type t_any : any separable
 
 let f (a : t array) = a
 [%%expect{|
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+val f : t array -> t array = <fun>
 |}]
 
 let f (a : t iarray) = a
 [%%expect{|
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+val f : t iarray -> t iarray = <fun>
 |}]
 
 let f (a : t_any array) = a
 [%%expect{|
-Line 1, characters 26-27:
-1 | let f (a : t_any array) = a
-                              ^
-Error: A representable layout is required here.
-       The layout of t_any is any separable
-         because of the definition of t_any at line 3, characters 0-26.
-       But the layout of t_any must be representable
-         because it's the type of an array element.
+val f : t_any array -> t_any array = <fun>
 |}]
 
 let f (type a : any separable) (a : a array) = a
 [%%expect{|
-Line 1, characters 47-48:
-1 | let f (type a : any separable) (a : a array) = a
-                                                   ^
-Error: A representable layout is required here.
-       The layout of a is any separable
-         because of the annotation on the abstract type declaration for a.
-       But the layout of a must be representable
-         because it's the type of an array element.
+val f : ('a : any separable). 'a array -> 'a array = <fun>
 |}]
 
 type r = { a : t array }
 let h (x : r) = x.a
 [%%expect{|
 type r = { a : t array; }
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+val h : r -> t array = <fun>
 |}]
 
 module F (X : sig
@@ -114,9 +93,15 @@ end) = struct
   let len () = X.len (X.arr ())
 end
 [%%expect{|
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor
+    (X : sig
+           kind_ k
+           type t : k separable
+           val arr : unit -> t array
+           val len : t array -> int
+         end)
+    -> sig val g : unit -> unit val len : unit -> int end
 |}]
 
 (* The functor body doesn't depend on the element's representation. *)
@@ -128,10 +113,8 @@ module Float = F (struct
 end)
 let n = Float.len ()
 [%%expect{|
-Line 1, characters 15-16:
-1 | module Float = F (struct
-                   ^
-Error: Unbound module "F"
+module Float : sig val g : unit -> unit val len : unit -> int end
+val n : int = 3
 |}]
 
 external[@layout_poly] length : ('a : any separable). 'a array -> int
@@ -146,10 +129,8 @@ let n = Float_u.len ()
 [%%expect{|
 external length : ('a : any separable). 'a array -> int = "%array_length"
   [@@layout_poly]
-Line 3, characters 17-18:
-3 | module Float_u = F (struct
-                     ^
-Error: Unbound module "F"
+module Float_u : sig val g : unit -> unit val len : unit -> int end
+val n : int = 2
 |}]
 
 (************************************************************************)
@@ -226,27 +207,37 @@ external len : t array -> int = "%array_length"
 let g a = len a
 [%%expect{|
 external len : t array -> int = "%array_length"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-external len : t iarray -> int = "%array_length"
-let g a = len a
-[%%expect{|
-external len : t iarray -> int = "%array_length"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-external len : t_any array -> int = "%array_length"
-let g a = len a
-[%%expect{|
-external len : t_any array -> int = "%array_length"
-Line 2, characters 14-15:
+Line 2, characters 10-15:
 2 | let g a = len a
-                  ^
+              ^^^^^
+Error: A representable layout is required here.
+       The kind of t is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t must be representable
+         because it's the type of an array element.
+|}]
+
+external len : t iarray -> int = "%array_length"
+let g a = len a
+[%%expect{|
+external len : t iarray -> int = "%array_length"
+Line 2, characters 10-15:
+2 | let g a = len a
+              ^^^^^
+Error: A representable layout is required here.
+       The kind of t is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t must be representable
+         because it's the type of an array element.
+|}]
+
+external len : t_any array -> int = "%array_length"
+let g a = len a
+[%%expect{|
+external len : t_any array -> int = "%array_length"
+Line 2, characters 10-15:
+2 | let g a = len a
+              ^^^^^
 Error: A representable layout is required here.
        The layout of t_any is any separable
          because of the definition of t_any at line 3, characters 0-26.
@@ -259,36 +250,56 @@ let g a = blit a 0 a 0 0
 [%%expect{|
 external blit : t array -> int -> t array -> int -> int -> unit
   = "%arrayblit"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 10-24:
+2 | let g a = blit a 0 a 0 0
+              ^^^^^^^^^^^^^^
+Error: A representable layout is required here.
+       The kind of t is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t must be representable
+         because it's the type of an array element.
 |}]
 
 external size : t array -> int = "%array_element_size_in_bytes"
 let g a = size a
 [%%expect{|
 external size : t array -> int = "%array_element_size_in_bytes"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 10-16:
+2 | let g a = size a
+              ^^^^^^
+Error: A representable layout is required here.
+       The kind of t is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t must be representable
+         because it's the type of an array element.
 |}]
 
 external make_uninit : int -> t array = "%makearray_dynamic_uninit"
 let g () = make_uninit 3
 [%%expect{|
 external make_uninit : int -> t array = "%makearray_dynamic_uninit"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 11-24:
+2 | let g () = make_uninit 3
+               ^^^^^^^^^^^^^
+Error: A representable layout is required here.
+       The kind of t is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t must be representable
+         because it's the type of an array element.
 |}]
 
 external idx : int -> (t array, t) idx_mut = "%unsafe_array_idx"
 let g () = idx 0
 [%%expect{|
 external idx : int -> (t array, t) idx_mut = "%unsafe_array_idx"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 11-16:
+2 | let g () = idx 0
+               ^^^^^
+Error: A representable layout is required here.
+       The kind of t is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t must be representable
+         because it's the type of an array element.
 |}]
 
 (**********************************************************)
@@ -300,7 +311,12 @@ let g a = len a
 [%%expect{|
 type t_alias = t
 external len : t_alias array -> int = "%array_length"
->> Fatal error: Typeopt.type_representable_layout: unexpected missing layout (1)
-Uncaught exception: Misc.Fatal_error
-
+Line 3, characters 10-15:
+3 | let g a = len a
+              ^^^^^
+Error: A representable layout is required here.
+       The kind of t_alias is k separable
+         because of the definition of t at line 2, characters 0-20.
+       But the kind of t_alias must be representable
+         because it's the type of an array element.
 |}]
