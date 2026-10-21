@@ -26,6 +26,7 @@ law? stdlib (xs : 'a list) (n : int) : List.length xs >= n
 law? kinded (x : ('a : immutable_data)) (y : 'a) : f x = f y
 law? \#type (\#method : int) : \#method = \#method
 law? assumptions (x : int) (y : int) : x > 0 ===> y > 0 ===> x + y > 0
+law? unannotated x y : f x = y
 
 (* Laws in a submodule and in a module type. *)
 

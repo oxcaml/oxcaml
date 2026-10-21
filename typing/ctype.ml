@@ -7029,6 +7029,30 @@ let moregeneral ~self_check env inst_nongen
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 
+(* [moregeneral_list] piggybacks on [moregeneral]: each list is packed into an
+   unboxed tuple, so that [moregeneral] instantiates it as a whole. Lists of
+   length zero and one are packed too, although no such unboxed tuples exist
+   normally. *)
+let moregeneral_list ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_schs subj_schs =
+  if List.compare_lengths pat_schs subj_schs <> 0 then
+    invalid_arg
+      (Printf.sprintf "Ctype.moregeneral_list: unequal lengths: %d vs %d"
+         (List.length pat_schs) (List.length subj_schs));
+  let pack tys =
+    newgenty (Tunboxed_tuple (List.map (fun ty -> (None, ty)) tys))
+  in
+  match
+    moregeneral ~self_check env inst_nongen pat_sch_sorts subj_sch_sorts
+      (pack pat_schs) (pack subj_schs)
+  with
+  | result -> result
+  | exception Moregen { trace = _ :: trace } ->
+      (* The head of the trace is the pair of packed tuples, which was
+         constructed internally. The rest of the trace is the trace of the
+         components, so we drop the head. *)
+      raise (Moregen (moregen_error ~trace))
+
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
     moregeneral ~self_check:false env inst_nongen [] [] pat_sch subj_sch

@@ -506,7 +506,7 @@ type jkind_mismatch =
 
 type law_mismatch =
   | Law_arity of int * int
-  | Law_parameter_types of string option * Errortrace.equality_error
+  | Law_parameter_types of string option * Errortrace.moregen_error
   | Law_clauses
   | Law_module_path of { path : Path.t; name : string }
   | Law_applied_path of Path.t
@@ -941,11 +941,11 @@ let report_law_mismatch env ppf err =
       pr "The first law has %d parameter%s, but the second has %d." n1
         (if n1 = 1 then "" else "s") n2
   | Law_parameter_types (None, err) ->
-      Errortrace_report.equality ppf Type_scheme env err
-        (msg "The parameter types")
-        (msg "are not equal to the parameter types")
+      Errortrace_report.moregen ppf Type_scheme env err
+        (msg "The parameter types do not match: the type")
+        (msg "is not compatible with the type")
   | Law_parameter_types (Some x, err) ->
-      Errortrace_report.equality ppf Type_scheme env err
+      Errortrace_report.moregen ppf Type_scheme env err
         (Fmt.doc_printf "The parameter %a has type" Style.inline_code x)
         (msg "but it is expected to have type")
   | Law_clauses ->
@@ -1983,24 +1983,29 @@ let law_arity (decl_impl : Types.law_declaration)
   and n_intf = List.length decl_intf.law_params in
   if n_impl = n_intf then None else Some (Law_arity (n_impl, n_intf))
 
-(* The parameter types of the two laws must be equal up to a renaming of
-   type variables. The function compares the types as lists, so that one
-   renaming applies to all parameters: [(x : 'a) (y : 'a)] is different
-   from [(x : 'a) (y : 'b)]. If the lists differ, the function compares
-   the parameters one by one to find the parameter to report. *)
-let law_parameter_types env (decl_impl : Types.law_declaration)
+(* The parameter types of the implementation's law must be more general
+   than those of the interface's law, as for the types of values. The
+   function compares the types as lists, so that one instantiation covers
+   all parameters: [(x : 'a) (y : 'a)] is not more general than
+   [(x : int) (y : string)]. If the lists fail, the function compares the
+   parameters one by one to find the parameter to report. *)
+let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
-  let equal = Ctype.equal env true in
+  let moregeneral tys_impl tys_intf =
+    (* Laws are not layout-polymorphic: no sort variables, no coercion. *)
+    ignore
+      (Ctype.moregeneral_list ~self_check env true [] [] tys_impl tys_intf)
+  in
   let types (decl : Types.law_declaration) = List.map snd decl.law_params in
-  match equal (types decl_impl) (types decl_intf) with
+  match moregeneral (types decl_impl) (types decl_intf) with
   | () -> None
-  | exception Ctype.Equality err_all ->
+  | exception Ctype.Moregen err_all ->
     let culprit =
       List.find_map
         (fun ((x, ty_impl), (_, ty_intf)) ->
-           match equal [ty_impl] [ty_intf] with
+           match moregeneral [ty_impl] [ty_intf] with
            | () -> None
-           | exception Ctype.Equality err -> Some (Some (Ident.name x), err))
+           | exception Ctype.Moregen err -> Some (Some (Ident.name x), err))
         (List.combine decl_impl.law_params decl_intf.law_params)
     in
     let x, err = Option.value culprit ~default:(None, err_all) in
@@ -2100,7 +2105,8 @@ let law_clauses env (decl_impl : Types.law_declaration)
     Some (Option.value (law_module_path decl_impl decl_intf)
             ~default:Law_clauses)
 
-let law_declarations ~loc env name (decl_impl : Types.law_declaration)
+let law_declarations ~self_check ~loc env name
+      (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
   Builtin_attributes.check_alerts_inclusion
     ~def:decl_impl.law_loc
@@ -2111,7 +2117,8 @@ let law_declarations ~loc env name (decl_impl : Types.law_declaration)
   let[@inline always] if_none f = function None -> f () | Some x -> Some x in
   law_applied_path decl_impl decl_intf
   |> if_none (fun () -> law_arity decl_impl decl_intf)
-  |> if_none (fun () -> law_parameter_types env decl_impl decl_intf)
+  |> if_none (fun () ->
+       law_parameter_types ~self_check env decl_impl decl_intf)
   |> if_none (fun () -> law_clauses env decl_impl decl_intf)
 
 (* Inclusion between jkind declarations *)

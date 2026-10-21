@@ -311,10 +311,12 @@ module Core_inclusion = struct
 
   (* Inclusion between laws *)
 
-  let law_declarations ~loc env ~direction:_ subst id ~mmodes:_ decl1 decl2 =
+  let law_declarations ~self_check ~loc env ~direction:_ subst id ~mmodes:_
+      decl1 decl2 =
     let decl2 = Subst.law_declaration subst decl2 in
     match
-      Includecore.law_declarations ~loc env (Ident.name id) decl1 decl2
+      Includecore.law_declarations ~self_check ~loc env (Ident.name id)
+        decl1 decl2
     with
     | None -> Ok Tcoerce_none
     | Some err ->
@@ -1291,7 +1293,7 @@ let make_core_inclusion ~self_check = Core_inclusion.{
   class_type_declarations;
   class_declarations;
   jkind_declarations;
-  law_declarations;
+  law_declarations = law_declarations ~self_check;
 }
 
 let core_inclusion = make_core_inclusion ~self_check:false

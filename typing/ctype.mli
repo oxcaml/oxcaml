@@ -417,6 +417,12 @@ val moregeneral: self_check:bool -> Env.t -> bool ->
            Returns, for each pattern sort variable (in order), the sort it was
            constrained to during the check, or [None] if unconstrained. Sorts
            in the result may contain subject sort variables. *)
+val moregeneral_list: self_check:bool -> Env.t -> bool ->
+  Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
+  type_expr list -> type_expr list -> Jkind_types.Sort.Const.t option list
+        (* Same as [moregeneral] for two lists of type schemes of the same
+           length, each instantiated as a whole. Raises [Invalid_argument] if
+           the length of the lists differs. *)
 val deep_occur: type_expr -> type_expr -> bool
         (* Check whether a type occurs structurally within another. *)
 val deep_occur_list: type_expr -> type_expr list -> bool

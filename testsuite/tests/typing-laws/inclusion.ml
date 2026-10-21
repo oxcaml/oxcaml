@@ -88,10 +88,8 @@ Error: Signature mismatch:
        The parameter "x" has type "string" but it is expected to have type "int"
 |}]
 
-(* Unlike the types of values, the parameter types of the structure's law
-   must be equal to those of the signature's. *)
-(* CR-someday sspies: In the future, we should relax this restriction to allow
-   generalization, since we want to generate tests based on the .ml file. *)
+(* As for values, the parameter types of the structure's law may be more
+   general than those of the signature's law, but not less general. *)
 
 module More_general : sig
   law? p (x : int) (f : int -> int) : f x = f x
@@ -99,20 +97,8 @@ end = struct
   law? p (x : 'a) (f : 'a -> 'b) : f x = f x
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   law? p (x : 'a) (f : 'a -> 'b) : f x = f x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig law? p (x : 'a) (f : 'a -> 'b) : (f x) = (f x) end
-       is not included in
-         sig law? p (x : int) (f : int -> int) : (f x) = (f x) end
-       Laws do not match:
-         law? p (x : 'a) (f : 'a -> 'b) : (f x) = (f x)
-       is not included in
-         law? p (x : int) (f : int -> int) : (f x) = (f x)
-       The parameter "x" has type "'a" but it is expected to have type "int"
+module More_general :
+  sig law? p (x : int) (f : int -> int) : (f x) = (f x) end
 |}]
 
 module Less_general : sig
@@ -137,9 +123,8 @@ Error: Signature mismatch:
        The parameter "x" has type "int" but it is expected to have type "'a"
 |}]
 
-(* The parameter types are compared together, with one renaming of the
-   type variables for all of them. Thus, even once we support generalizing,
-   the following example should still fail, since int and string don't unify. *)
+(* The parameter types are instantiated together: the structure's law must
+   be more general for one instance of its type variables. *)
 
 module Shared_variable : sig
   law? p (x : int) (y : string) : 1 = 1
@@ -160,11 +145,12 @@ Error: Signature mismatch:
          law? p (x : 'a) (y : 'a) : (1) = (1)
        is not included in
          law? p (x : int) (y : string) : (1) = (1)
-       The parameter "x" has type "'a" but it is expected to have type "int"
+       The parameter types do not match: the type "int"
+       is not compatible with the type "string"
 |}]
 
 (* The kinds of the parameter types are compared too: a law over any ['a]
-   is not a law over [('a : immutable_data)]. *)
+   is a law over [('a : immutable_data)], but not the reverse. *)
 
 module Kinded : sig
   law? p (x : ('a : immutable_data)) : 1 = 1
@@ -172,26 +158,7 @@ end = struct
   law? p (x : 'a) : 1 = 1
 end
 [%%expect {|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   law? p (x : 'a) : 1 = 1
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig law? p (x : 'a) : (1) = (1) end
-       is not included in
-         sig law? p (x : ('a : immutable_data)) : (1) = (1) end
-       Laws do not match:
-         law? p (x : 'a) : (1) = (1)
-       is not included in
-         law? p (x : ('a : immutable_data)) : (1) = (1)
-       The parameter "x" has type "('a : value_or_null)"
-       but it is expected to have type "('a0 : immutable_data)"
-       because the layouts of their variables are different.
-       The layout of 'a is value_or_null
-         because it's the type of a law parameter.
-       The layout of 'a0 is immutable_data
-         because of the annotation on the type variable 'a.
+module Kinded : sig law? p (x : ('a : immutable_data)) : (1) = (1) end
 |}]
 
 module Kinded_inverse : sig
@@ -214,12 +181,14 @@ Error: Signature mismatch:
        is not included in
          law? p (x : 'a) : (1) = (1)
        The parameter "x" has type "('a : immutable_data)"
-       but it is expected to have type "('a0 : value_or_null)"
-       because the layouts of their variables are different.
-       The layout of 'a is immutable_data
+       but it is expected to have type "('b : value)"
+       The layout of 'a is value
+         because it's a fresh unification variable,
+         chosen to have layout value.
+       But the layout of 'a must be a sublayout of value non_float
          because of the annotation on the type variable 'a.
-       The layout of 'a0 is value_or_null
-         because it's the type of a law parameter.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Two laws of a signature cannot have the same name. *)

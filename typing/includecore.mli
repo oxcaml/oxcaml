@@ -137,7 +137,7 @@ type type_mismatch =
 
 type law_mismatch =
   | Law_arity of int * int
-  | Law_parameter_types of string option * Errortrace.equality_error
+  | Law_parameter_types of string option * Errortrace.moregen_error
   | Law_clauses
   | Law_module_path of { path : Path.t; name : string }
   | Law_applied_path of Path.t
@@ -209,7 +209,7 @@ val jkind_declarations:
   jkind_mismatch option
 
 val law_declarations:
-  loc:Location.t -> Env.t -> string ->
+  self_check:bool -> loc:Location.t -> Env.t -> string ->
   law_declaration -> law_declaration ->
   law_mismatch option
 
