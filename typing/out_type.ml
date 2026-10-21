@@ -1769,10 +1769,9 @@ end = struct
   let construct_comonadic_morphs src_descr target_descr =
     construct_morphs Paths.Comonadic src_descr target_descr
 
-  (* Tests whether the relation between two descriptions can be decided by
-  their bounds. If the following is true for two parts of a mode variable pair,
-  then no constraint needs to be printed *)
-  let descr_compare_dec :
+  (* Tests whether the relation between two descriptions cannot be decided by
+  their bounds. A constraint decided by bounds does not need to be printed *)
+  let order_is_not_decided_by_bounds :
       type a. a C.obj
       -> (a, (allowed * allowed)) Desc.t
       -> (a, (allowed * allowed)) Desc.t
@@ -1782,8 +1781,7 @@ end = struct
       let lower0 = dlower_lr dst a0 in
       let upper1 = dupper_lr dst a1 in
       let lower1 = dlower_lr dst a1 in
-      C.le dst upper0 lower1 ||
-      C.le dst upper1 lower0
+      not (C.le dst upper0 lower1 || C.le dst upper1 lower0)
 
   let descr_is_var : type a. (a, (allowed * allowed)) Desc.t -> bool =
     fun v ->
@@ -1807,18 +1805,17 @@ end = struct
       -> bool =
     fun ({ monadic = mon0; comonadic = com0 } as pair0)
         ({ monadic = mon1; comonadic = com1 } as pair1) ->
-      let compare_dec =
-        not (descr_compare_dec
-               With_locality.obj_monadic mon0 mon1)
-        || not (descr_compare_dec
-                  With_locality.obj_comonadic com0 com1)
+      let order_is_not_decided =
+        order_is_not_decided_by_bounds With_locality.obj_monadic mon0 mon1
+        || order_is_not_decided_by_bounds
+             With_locality.obj_comonadic com0 com1
       in
       let check_signature =
         (descr_is_var mon0 && descr_is_var mon1)
         || (descr_is_var com0 && descr_is_var com1)
       in
       let pairs_ne = not (eq_pair pair0 pair1) in
-      compare_dec && check_signature && pairs_ne
+      order_is_not_decided && check_signature && pairs_ne
 
   let construct_name :
       visible_pair
@@ -1891,8 +1888,8 @@ end = struct
       construct_comonadic_morphs pair1.comonadic pair0.comonadic
     in
     if List.is_empty mon_morphs
-       && not (descr_compare_dec With_locality.obj_comonadic
-                 pair0.comonadic pair1.comonadic)
+       && order_is_not_decided_by_bounds With_locality.obj_comonadic
+            pair0.comonadic pair1.comonadic
        && not (check_closing_over_candidate pair0 pair1)
     then
       List.map (fun com_morph ->
