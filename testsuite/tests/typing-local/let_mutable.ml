@@ -660,7 +660,11 @@ let foo_22 n =
   x.a_22
 [%%expect{|
 type r_22 = { mutable a_22 : int; }
-val foo_22 : int -> int = <fun>
+Line 5, characters 12-31:
+5 |   (try x <- stack_ { a_22 = n }; raise Exit with Exit -> ());
+                ^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 let bar_22 n =
@@ -670,7 +674,11 @@ let bar_22 n =
    | exception Exit -> ());
   x.a_22
 [%%expect{|
-val bar_22 : int -> int = <fun>
+Line 3, characters 14-33:
+3 |   (match x <- stack_ { a_22 = n }; raise Exit with
+                  ^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 (* Heap values, and values from the caller's region, are fine. *)
@@ -698,7 +706,11 @@ let inside_22 n =
   (try let y = stack_ { a_22 = n } in x <- y; raise Exit with Exit -> ());
   x.a_22
 [%%expect{|
-val inside_22 : int -> int = <fun>
+Line 3, characters 43-44:
+3 |   (try let y = stack_ { a_22 = n } in x <- y; raise Exit with Exit -> ());
+                                               ^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global".
 |}]
 
 (* The value of the [try] is allowed to be local, since the body is not closed
