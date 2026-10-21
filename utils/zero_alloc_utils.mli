@@ -1,7 +1,7 @@
 (** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"
     respectively. *)
-type 'witnesses component =
-  | Top of 'witnesses
+type 'top component =
+  | Top of 'top
   | Safe
   | Bot
 
