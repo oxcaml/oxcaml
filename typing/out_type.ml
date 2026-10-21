@@ -1066,9 +1066,7 @@ let equate_with_curry_bounds : With_locality.lr -> Curry_mode.t -> bool =
               monadic = With_locality.Monadic.Const.min }
         in
         With_locality.Const.equal floor expected_floor
-        && With_locality.Monadic.Const.equal
-             (With_locality.Const.split ceil).monadic
-             With_locality.Monadic.Const.max
+        && With_locality.Const.equal ceil With_locality.Const.max
       | Const _, true | Variable _, false -> false
 
 let erase_implied_axes (modes : Mode.With_locality.Const.t) :
