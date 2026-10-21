@@ -221,6 +221,19 @@ module Test : sig val k : 'a -> 'b -> 'a end
 - : int = 42
 |}]
 
+(* [id] is not generalised, but comes from an instantiation *)
+
+module Test = struct
+  let id = M.id
+  let poly_ k x y = id x
+end;;
+Test.k 42 #17l
+[%%expect{|
+>> Fatal error: Jkind_types.instance_var: free genvar
+Uncaught exception: Misc.Fatal_error
+
+|}];;
+
 (** Irrelevant generalisation **)
 
 (* [app_x] and [app_y] cannot generalize over [x] and [y],
