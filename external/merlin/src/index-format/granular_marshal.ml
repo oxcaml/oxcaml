@@ -578,7 +578,7 @@ let write ?(flags = []) fd ~filename ~(file_kind : File_kind.t) root_schema
   | Standalone -> materialize root_schema root_value
   | No_standalone -> ());
   let relativize =
-    relativize ~wrt:Filename.(dirname (concat (Unix.getcwd ()) filename))
+    relativize ~wrt:(Filename.dirname (Misc.canonicalize_filename filename))
   in
   let write_id = File_digest.write_delayed fd in
   let write_root_loc = write_string_delayed ~size:ptr_size fd in
@@ -700,11 +700,7 @@ let write ?(flags = []) fd ~filename ~(file_kind : File_kind.t) root_schema
 
 let read filename fd root_schema =
   let id = File_digest.read fd in
-  let filename =
-    if Filename.is_relative filename then
-      Filename.concat (Unix.getcwd ()) filename
-    else filename
-  in
+  let filename = Misc.canonicalize_filename filename in
   let store = { filename; id; cache = Cache_cache.read filename } in
   let root_loc = int_of_binstring (really_input_string fd 8) in
   let parent_link =
