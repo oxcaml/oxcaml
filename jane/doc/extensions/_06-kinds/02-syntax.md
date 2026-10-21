@@ -45,6 +45,9 @@ It's legal to omit the `mod ...` or `with ...` portion of the kind when you only
 want to specify the layout (as we did in a couple of these examples). The bounds
 of unspecified axes are the maximum on those axes.
 
+Kind declarations may also appear in module signatures and structures; for more
+information, see [their documentation](../declarations).
+
 ## Syntax examples
 
 Here are some example kinds:
@@ -85,8 +88,8 @@ please see the [syntax reference](#syntax-reference).
 
 Kinds are built by starting with a layout and then adding _bounds_ (as described
 in the [overview][]). However, some kinds are so commonplace that we provide
-abbreviations in these cases. We expect to eventually allow users to write their
-own kind abbreviations.
+built-in abbreviations in these cases. Users can also
+[declare their own](../declarations) kind abbreviations.
 
 In all cases but one, the layouts described here are the basic layouts also
 described in our [unboxed types][] documentation. The exception is around
@@ -486,12 +489,18 @@ upper-bounds the separability to `non_pointer`. Now, we can also write them as
 First we define the syntax for kinds:
 
 ```
-kind ::= atomic-kind [ `mod` mod-bounds ] [ with-bounds ]
-     |   `(` kind `)`
+kind ::= modified-kind [ `mod` mod-bounds ] [ with-bounds ]
      |   kind `&` kind
 
-atomic-kind ::= layout
-            |   kind_abbreviation
+modified-kind ::= base-kind { scannable-axis }
+              |   `(` kind `)` { scannable-axis }
+
+base-kind ::= layout
+          |   predef-kind-abbrev
+          |   [ extended-module-path `.` ] kind-name
+
+(* to support kind declarations *)
+kind-name ::= lowercase-ident
 
 layout ::= `any`
        |   `value_or_null`
@@ -506,9 +515,8 @@ layout ::= `any`
        |   `vec128`
        |   `vec256`
        |   `vec512`
-       |   layout scannable_axis
 
-scannable_axis ::= `non_null`
+scannable-axis ::= `non_null`
               |    `maybe_null`
               |    `non_pointer`
               |    `non_pointer64`
@@ -516,17 +524,17 @@ scannable_axis ::= `non_null`
               |    `separable`
               |    `maybe_separable`
 
-kind_abbreviation ::= `value`
-                  |   `immediate`
-                  |   `immediate_or_null`
-                  |   `immediate64`
-                  |   `immediate64_or_null`
-                  |   `immutable_data`
-                  |   `immutable_data_or_null`
-                  |   `sync_data`
-                  |   `sync_data_or_null`
-                  |   `mutable_data`
-                  |   `mutable_data_or_null`
+predef-kind-abbrev ::= `value`
+                   |   `immediate`
+                   |   `immediate_or_null`
+                   |   `immediate64`
+                   |   `immediate64_or_null`
+                   |   `immutable_data`
+                   |   `immutable_data_or_null`
+                   |   `sync_data`
+                   |   `sync_data_or_null`
+                   |   `mutable_data`
+                   |   `mutable_data_or_null`
 
 mod-bounds ::= `everything`
            |   { mod-bound }+
@@ -609,4 +617,17 @@ class-field +::=
       `type` { abstract-type-binder }+ `.` typexpr `=` expr
   | `method!` [ `private` ] method-name `:`
       `type` { abstract-type-binder }+ `.` typexpr `=` expr
+
+(* allow kind declarations *)
+kind-definition ::= `kind_` kind-name [ `=` kind ]  (* new non-terminal *)
+
+specification +::= kind-definition
+
+definition +::= kind-definition
+
+(* the following extend the definitions in Chapter 12.7 to allow
+   substitution of kind declarations; the kind may not contain
+   with-bounds *)
+mod-constraint +::= `kind_` [ module-path `.` ] kind-name `=` kind
+               |    `kind_` [ module-path `.` ] kind-name `:=` kind
 ```
