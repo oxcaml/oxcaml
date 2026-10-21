@@ -47,6 +47,17 @@ module Components : sig
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
 end
 
+type relevant_components_by_argument_index =
+  { relevant_components_by_argument_index :
+      bool Components.t Numbers.Int.Map.t
+  }
+
+module Allocation_sources : sig
+  type 'args_only t =
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of 'args_only
+end
+
 (** Abstract domain used in static analysis for checking [@zero_alloc]
     annotations. See [backend/zero_alloc_checker] for details of the analysis.
     See this module's .ml file for details about the translation of

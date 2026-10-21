@@ -2040,7 +2040,10 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~top:(fun _ -> Zero_alloc_utils.Component.Top ())
+      ~top:Zero_alloc_utils.(fun _witnesses ->
+        Component.Top
+          (* CR wsturgeon for wsturgeon: inspect witnesses to refine this *)
+          Allocation_sources.Allocation_other_than_calling_arguments)
       ~safe:Zero_alloc_utils.Component.Safe ~bot:Zero_alloc_utils.Component.Bot
       ~unresolved:(fun () ->
         Misc.fatal_errorf
@@ -2056,7 +2059,11 @@ end = struct
 
   let decode v =
     match Zero_alloc_info.Encoded.Component.decode v with
-    | Top () -> V.top decoded_witness
+    | Top Allocation_other_than_calling_arguments -> V.top decoded_witness
+    | Top (No_allocation_other_than_calling_arguments ()) ->
+      (* CR wsturgeon for wsturgeon: do we need to distinguish allocation
+         sources here? *)
+      V.conditional decoded_witness
     | Safe -> V.safe
     | Bot -> V.bot
 

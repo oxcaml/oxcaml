@@ -7,9 +7,13 @@ module Encoded : sig
   module Component : sig
     type t
 
-    val encode : unit Zero_alloc_utils.Component.t -> t
+    val encode :
+      'a Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t ->
+      t
 
-    val decode : t -> unit Zero_alloc_utils.Component.t
+    val decode :
+      t ->
+      unit Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
   end
 
   module Components : sig
@@ -27,15 +31,6 @@ module Encoded : sig
       t ->
       'a Zero_alloc_utils.Components.t
   end
-end
-
-module Allocation_sources : sig
-  type t =
-    | Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments of
-        { relevant_components_by_argument_index :
-            bool Zero_alloc_utils.Components.t Numbers.Int.Map.t
-        }
 end
 
 type t

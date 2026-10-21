@@ -81,6 +81,17 @@ module Components = struct
       if c <> 0 then c else f d1 d2
 end
 
+type relevant_components_by_argument_index =
+  { relevant_components_by_argument_index :
+      bool Components.t Numbers.Int.Map.t
+  }
+
+module Allocation_sources = struct
+  type 'args_only t =
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of 'args_only
+end
+
 module type WS = sig
   type t
 

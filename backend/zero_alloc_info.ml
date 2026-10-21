@@ -1,21 +1,26 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare [@@warning "-66"]
+open Zero_alloc_utils
 module String = Misc.Stdlib.String
 
 module Encoded = struct
   module Component = struct
     type t = int
 
-    let encode : unit Zero_alloc_utils.Component.t -> int = function
+    let encode : _ Allocation_sources.t Component.t -> int =
+      function
       | Bot -> 0
       | Safe -> 1
-      | Top () -> 2
+      | Top (No_allocation_other_than_calling_arguments _) -> 2
+      | Top Allocation_other_than_calling_arguments -> 3
 
-    let decode : int -> unit Zero_alloc_utils.Component.t = function
+    let decode : int -> unit Allocation_sources.t Component.t =
+      function
       | 0 -> Bot
       | 1 -> Safe
-      | 2 -> Top ()
+      | 2 -> Top (No_allocation_other_than_calling_arguments ())
+      | 3 -> Top Allocation_other_than_calling_arguments
       | _ ->
         Misc.fatal_error
           "[Zero_alloc_info.Component_value.of_int]: value outside range 0-3"
@@ -26,7 +31,7 @@ module Encoded = struct
     type t = int
 
     let encode ~(encode_component : 'a -> Component.t)
-        (components : 'a Zero_alloc_utils.Components.t) : t option =
+        (components : 'a Components.t) : t option =
       let c =
         encode_component components.nor
         lor (encode_component components.exn lsl 2)
@@ -35,7 +40,7 @@ module Encoded = struct
       if c = 0 then None else Some c
 
     let decode ~(decode_component : Component.t -> 'a) (i : t) :
-        'a Zero_alloc_utils.Components.t =
+        'a Components.t =
       if i land 0b111111 = 0
       then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding"
       else
@@ -44,15 +49,6 @@ module Encoded = struct
           div = decode_component ((i lsr 4) land 3)
         }
   end
-end
-
-module Allocation_sources = struct
-  type t =
-    | Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments of
-        { relevant_components_by_argument_index :
-            bool Zero_alloc_utils.Components.t Numbers.Int.Map.t
-        }
 end
 
 type t = { mutable zero_alloc : Encoded.Components.t String.Map.t }
