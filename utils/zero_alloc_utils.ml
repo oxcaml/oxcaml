@@ -27,10 +27,12 @@
    Perhaps we should translate "strict" and "never_returns_normally" directly
    into (nor,exn,div) *)
 
-type 'top component =
-  | Top of 'top
-  | Safe
-  | Bot
+module Component = struct
+  type 'top t =
+    | Top of 'top
+    | Safe
+    | Bot
+end
 
 module Tag = struct
   type t =
@@ -119,15 +121,15 @@ end
 
 module Make_component (Witnesses : WS) = struct
   (* keep in sync with "resolved" values in Checkmach. *)
-  type t = Witnesses.t component
+  type t = Witnesses.t Component.t
 
-  let bot = Bot
+  let bot = Component.Bot
 
-  let top w = Top w
+  let top w = Component.Top w
 
-  let safe = Safe
+  let safe = Component.Safe
 
-  let join c1 c2 =
+  let join (c1 : _ Component.t) (c2 : _ Component.t) : _ Component.t =
     match c1, c2 with
     | Bot, Bot -> Bot
     | Safe, Safe -> Safe
@@ -135,7 +137,7 @@ module Make_component (Witnesses : WS) = struct
     | Safe, Bot | Bot, Safe -> Safe
     | Top w1, Bot | Top w1, Safe | Bot, Top w1 | Safe, Top w1 -> Top w1
 
-  let meet c1 c2 =
+  let meet (c1 : _ Component.t) (c2 : _ Component.t) : _ Component.t =
     match c1, c2 with
     | Bot, Bot -> Bot
     | Safe, Safe -> Safe
@@ -144,8 +146,8 @@ module Make_component (Witnesses : WS) = struct
     | Top _, Bot | Bot, Top _ -> Bot
     | Top _, Safe | Safe, Top _ -> Safe
 
-  let lessequal v1 v2 =
-    match v1, v2 with
+  let lessequal (c1 : _ Component.t) (c2 : _ Component.t) =
+    match c1, c2 with
     | Bot, Bot -> true
     | Safe, Safe -> true
     | Top w1, Top w2 -> Witnesses.lessequal w1 w2
@@ -155,8 +157,8 @@ module Make_component (Witnesses : WS) = struct
     | Top _, (Bot | Safe) -> false
     | Safe, Bot -> false
 
-  let compare t1 t2 =
-    match t1, t2 with
+  let compare (c1 : _ Component.t) (c2 : _ Component.t) =
+    match c1, c2 with
     | Bot, Bot -> 0
     | Safe, Safe -> 0
     | Top w1, Top w2 -> Witnesses.compare w1 w2
@@ -165,7 +167,7 @@ module Make_component (Witnesses : WS) = struct
     | Safe, Top _ -> -1
     | Top _, Safe -> 1
 
-  let print ~witnesses ppf = function
+  let print ~witnesses ppf : _ Component.t -> _ = function
     | Bot -> Format.fprintf ppf "bot"
     | Top w ->
       Format.fprintf ppf "top";

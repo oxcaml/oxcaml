@@ -2040,13 +2040,13 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~top:(fun _ -> 0)
-      ~safe:1 ~bot:2
+      ~top:(fun _ -> Zero_alloc_utils.Component.Top ())
+      ~safe:Zero_alloc_utils.Component.Safe ~bot:Zero_alloc_utils.Component.Bot
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
           (V.print ~witnesses:false) v)
-    |> Zero_alloc_info.Component_value.of_int
+    |> Zero_alloc_info.Encoded.Component.encode
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
@@ -2055,25 +2055,26 @@ end = struct
   let decoded_witness = Witnesses.empty
 
   let decode v =
-    match Zero_alloc_info.Component_value.to_int v with
-    | 0 -> V.top decoded_witness
-    | 1 -> V.safe
-    | 2 -> V.bot
-    | n -> Misc.fatal_errorf "Zero_alloc_checker cannot decode %d" n
+    match Zero_alloc_info.Encoded.Component.decode v with
+    | Top () -> V.top decoded_witness
+    | Safe -> V.safe
+    | Bot -> V.bot
 
-  let encode = Zero_alloc_info.Value.encode ~encode_component:encode
+  let encode =
+    Zero_alloc_info.Encoded.Components.encode ~encode_component:encode
 
-  let decode = Zero_alloc_info.Value.decode ~decode_component:decode
+  let decode =
+    Zero_alloc_info.Encoded.Components.decode ~decode_component:decode
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in
     match encode v with
     | None -> ()
-    | Some i -> Zero_alloc_info.set_value info s i
+    | Some i -> Zero_alloc_info.set info s i
 
   let get_value_opt s =
     let info = Compilenv.cached_zero_alloc_info in
-    Zero_alloc_info.get_value info s |> Option.map decode
+    Zero_alloc_info.get info s |> Option.map decode
 end
 
 (** The analysis involved some fixed point computations. Termination: [Value.t]
