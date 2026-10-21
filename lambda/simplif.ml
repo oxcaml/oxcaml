@@ -593,7 +593,12 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
         (* [let f = fun ... in f] keeps its binding: the middle end names the
            function after the variable it is bound to (see the [Llet] of an
            [Lfunction] in [Lambda_to_flambda]), and an anonymous function
-           would only get a generic name. *)
+           would only get a generic name. The binding also lets
+           [split_default_wrapper] below, which only recognizes let-bound
+           functions, treat a function with optional arguments defined this
+           way like any other named one: its default-filling wrapper is
+           inlined at known call sites, at the cost of one more call through
+           an unknown closure. *)
         Llet (str, kind, v, duid, e1, e2)
     | _, Lvar w when optimize && Ident.same v w -> e1
     | _, _ -> Llet (str, kind, v, duid, e1, e2)
