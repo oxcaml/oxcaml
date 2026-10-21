@@ -32,6 +32,52 @@ module Component = struct
     | Top of 'top
     | Safe
     | Bot
+
+  let map ~f = function Top top -> Top (f top) | Safe -> Safe | Bot -> Bot
+
+  let print ~print_top ppf = function
+    | Bot -> Format.fprintf ppf "bot"
+    | Safe -> Format.fprintf ppf "safe"
+    | Top top -> print_top ppf top
+
+  let compare ~compare_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> 0
+    | Bot, _ -> -1
+    | _, Bot -> 1
+    | Safe, Safe -> 0
+    | Safe, _ -> -1
+    | _, Safe -> 1
+    | Top t1, Top t2 -> compare_top t1 t2
+
+  let join ~join_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> Bot
+    | Safe, Safe -> Safe
+    | Top t1, Top t2 -> Top (join_top t1 t2)
+    | Safe, Bot | Bot, Safe -> Safe
+    | Top _, Bot | Top _, Safe -> c1
+    | Bot, Top _ | Safe, Top _ -> c2
+
+  let meet ~meet_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> Bot
+    | Safe, Safe -> Safe
+    | Top t1, Top t2 -> Top (meet_top t1 t2)
+    | Safe, Bot | Bot, Safe -> Bot
+    | Top _, Bot | Bot, Top _ -> Bot
+    | Top _, Safe | Safe, Top _ -> Safe
+
+  let lessequal ~lessequal_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> true
+    | Safe, Safe -> true
+    | Top t1, Top t2 -> lessequal_top t1 t2
+    | Bot, Safe -> true
+    | Bot, Top _ -> true
+    | Safe, Top _ -> true
+    | Top _, (Bot | Safe) -> false
+    | Safe, Bot -> false
 end
 
 module Tag = struct
@@ -64,8 +110,8 @@ module Components = struct
 
   let map2 ~f lhs rhs =
     { nor = f Tag.N lhs.nor rhs.nor;
-      exn = f Tag.E lhs.exn rhs.nor;
-      div = f Tag.D lhs.div rhs.nor
+      exn = f Tag.E lhs.exn rhs.exn;
+      div = f Tag.D lhs.div rhs.div
     }
 
   let lessequal f lhs rhs =
@@ -140,50 +186,20 @@ module Make_component (Witnesses : WS) = struct
 
   let safe = Component.Safe
 
-  let join (c1 : _ Component.t) (c2 : _ Component.t) : _ Component.t =
-    match c1, c2 with
-    | Bot, Bot -> Bot
-    | Safe, Safe -> Safe
-    | Top w1, Top w2 -> Top (Witnesses.join w1 w2)
-    | Safe, Bot | Bot, Safe -> Safe
-    | Top w1, Bot | Top w1, Safe | Bot, Top w1 | Safe, Top w1 -> Top w1
+  let join = Component.join ~join_top:Witnesses.join
 
-  let meet (c1 : _ Component.t) (c2 : _ Component.t) : _ Component.t =
-    match c1, c2 with
-    | Bot, Bot -> Bot
-    | Safe, Safe -> Safe
-    | Top w1, Top w2 -> Top (Witnesses.meet w1 w2)
-    | Safe, Bot | Bot, Safe -> Bot
-    | Top _, Bot | Bot, Top _ -> Bot
-    | Top _, Safe | Safe, Top _ -> Safe
+  let meet = Component.meet ~meet_top:Witnesses.meet
 
-  let lessequal (c1 : _ Component.t) (c2 : _ Component.t) =
-    match c1, c2 with
-    | Bot, Bot -> true
-    | Safe, Safe -> true
-    | Top w1, Top w2 -> Witnesses.lessequal w1 w2
-    | Bot, Safe -> true
-    | Bot, Top _ -> true
-    | Safe, Top _ -> true
-    | Top _, (Bot | Safe) -> false
-    | Safe, Bot -> false
+  let lessequal = Component.lessequal ~lessequal_top:Witnesses.lessequal
 
-  let compare (c1 : _ Component.t) (c2 : _ Component.t) =
-    match c1, c2 with
-    | Bot, Bot -> 0
-    | Safe, Safe -> 0
-    | Top w1, Top w2 -> Witnesses.compare w1 w2
-    | Bot, (Safe | Top _) -> -1
-    | (Safe | Top _), Bot -> 1
-    | Safe, Top _ -> -1
-    | Top _, Safe -> 1
+  let compare = Component.compare ~compare_top:Witnesses.compare
 
-  let print ~witnesses ppf : _ Component.t -> _ = function
-    | Bot -> Format.fprintf ppf "bot"
-    | Top w ->
+  let print ~witnesses =
+    let print_top ppf w =
       Format.fprintf ppf "top";
       if witnesses then Format.fprintf ppf " (%a)" Witnesses.print w
-    | Safe -> Format.fprintf ppf "safe"
+    in
+    Component.print ~print_top
 end
 
 module Make_value
