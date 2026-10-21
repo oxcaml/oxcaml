@@ -190,7 +190,7 @@ let get_unit comp_unit =
     Infos_table.find global_infos_table name
   with Not_found ->
     let (infos, crc) =
-      if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
+      if Env.is_opaque_impl comp_unit then (None, None)
       else begin
         let missing_extension =
           if Clflags.target_is_jsir () then "cmjx" else "cmx"

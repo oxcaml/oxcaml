@@ -707,11 +707,13 @@ val is_bound_to_runtime_parameter: Ident.t -> bool
    alphabetical order *)
 val parameters: unit -> Global_module.Parameter_name.t list
 
-(* [is_imported_opaque md] returns true if [md] is an opaque imported module *)
-val is_imported_opaque: Compilation_unit.Name.t -> bool
+(* [is_opaque_impl cu] returns true if the interface implemented by
+   [cu] (as recorded in its cmi) was imported as an opaque module *)
+val is_opaque_impl: Compilation_unit.t -> bool
 
-(* [register_import_as_opaque md] registers [md] as an opaque imported module *)
-val register_import_as_opaque: Compilation_unit.Name.t -> unit
+(* [register_impl_as_opaque cu] registers the interface implemented by [cu] as
+   an opaque imported module *)
+val register_impl_as_opaque: Compilation_unit.t -> unit
 
 (* [is_parameter_unit md] returns true if [md] was compiled with
    -as-parameter *)
