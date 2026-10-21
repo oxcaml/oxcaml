@@ -224,6 +224,10 @@ module Datalog = struct
         | `Filter (Filter (p, args)) -> Datalog.filter p args f)
       f predicates
 
+  let bind name f args body =
+    let v = Lang.Variable.create name in
+    Datalog.if_let v f args (body (Lang.var v))
+
   module Cursor = struct
     type ('p, 'v) with_parameters = ('p, 'v) Cursor.With_parameters.t
     (* ('p, (action, 'v Constant.hlist, nil) Cursor0.instruction) cursor *)

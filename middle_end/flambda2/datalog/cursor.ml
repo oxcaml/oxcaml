@@ -275,6 +275,14 @@ module Builder = struct
         let receiver = Env.must_be_bound_term env term in
         let env = Env.bind_var env var receiver in
         build_stages env stages (index + 1) k
+      | If_let_stage (var, fn, args) ->
+        let var =
+          match var with None -> Variable.create "_" | Some var -> var
+        in
+        Executor.if_let (Variable.name var) fn
+          (Env.must_be_bound_term_hlist env args) (fun receiver ->
+            let env = Env.bind_var env var receiver in
+            build_stages env stages (index + 1) k)
       | Existential_stage existential_stages ->
         Executor.exists
           (fun ~accept ->

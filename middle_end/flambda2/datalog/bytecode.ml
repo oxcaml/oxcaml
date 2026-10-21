@@ -155,6 +155,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * string list
         * label
         -> code
+    | If_let :
+        'v Or_null_sender.t
+        * string
+        * ('k Constant.hlist -> 'v Or_null.t)
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * label
+        -> code
     | Call_with_bindings :
         (bindings_ref -> 'b Constant.hlist -> unit)
         * string
@@ -183,7 +192,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Absent (_, _, _, _, _, lab)
     | Distinct (_, _, _, _, _, lab)
     | Seek (_, _, _, _, lab)
-    | Filter (_, _, _, _, lab) ->
+    | Filter (_, _, _, _, lab)
+    | If_let (_, _, _, _, _, _, lab) ->
       [lab]
 
   let print_list =
@@ -214,6 +224,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Filter (_, name, _, names, if_false) ->
       Format.fprintf ppf "filter@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_false
+    | If_let (_, name, _, fn, _, names, if_null) ->
+      Format.fprintf ppf "call@ %s,@ %s,@ [@[%a]@],@ %a" name fn print_list
+        names (print_label digits) if_null
     | Call_with_bindings (_, name, _, _, names) ->
       Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
     | Union (_, _, name, _, names, _, value_name, _, _) ->
@@ -372,7 +385,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let emit insn st = emit0 (fun _ -> insn) st
 
-  let emit_with_label label f st =
+  let emit_with_label f label st =
     emit0 (fun offsets -> f (get_label offsets label)) st
 
   let goto lab st =
@@ -396,30 +409,30 @@ module Make (Iterator : Leapfrog.Iterator) = struct
               } )
       }
 
-  let init receiver iterator label =
-    emit_with_label label (fun label ->
+  let init receiver iterator =
+    emit_with_label (fun label ->
         Init
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let advance receiver iterator label =
-    emit_with_label label (fun label ->
+  let advance receiver iterator =
+    emit_with_label (fun label ->
         Advance
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let absent columns { value = trie; name } { values = args; names } label =
-    emit_with_label label (fun label ->
+  let absent columns { value = trie; name } { values = args; names } =
+    emit_with_label (fun label ->
         Absent (columns, trie, name, args, names, label))
 
-  let distinct column key1 key2 label =
-    emit_with_label label (fun label ->
+  let distinct column key1 key2 =
+    emit_with_label (fun label ->
         Distinct (column, key1.value, key1.name, key2.value, key2.name, label))
 
-  let seek iterator { value = receiver; name } label =
-    emit_with_label label (fun label ->
+  let seek iterator { value = receiver; name } =
+    emit_with_label (fun label ->
         Seek (iterator.values, iterator.names, receiver, name, label))
 
-  let filter { value = fn; name } { values = args; names } label =
-    emit_with_label label (fun label -> Filter (fn, name, args, names, label))
+  let filter { value = fn; name } { values = args; names } =
+    emit_with_label (fun label -> Filter (fn, name, args, names, label))
 
   let ( ++ ) fn1 fn2 code =
     fn1 code;
@@ -463,6 +476,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     if_template (distinct column arg1 arg2) body
 
   let if_ fn args body = if_template (filter fn args) body
+
+  let if_let name fn args body st =
+    let sender, receiver = Channel.create_or_null Or_null.null in
+    let receiver = { value = receiver; name } in
+    if_template
+      (emit_with_label (fun label ->
+           If_let
+             (sender, name, fn.value, fn.name, args.values, args.names, label)))
+      (body receiver) st
 
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
@@ -634,6 +656,12 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       else next ()
     | Filter (func, _name, args, _names, if_false) ->
       if func (read_hlist args) then next () else goto if_false
+    | If_let (sender, _name, fn, _fn_name, args, _names, if_null) -> (
+      match fn (read_hlist args) with
+      | Null -> goto if_null
+      | This value ->
+        write sender value;
+        next ())
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
       next ()

@@ -50,6 +50,11 @@ type stage =
   | Seek_stage : 'k term * 'k column_iterator list -> stage
   | Check_stage : check_atom -> stage
   | Let_stage : 'k variable * 'k term -> stage
+  | If_let_stage :
+      'v variable option
+      * ('k Constant.hlist -> 'v Or_null.t) with_name
+      * 'k Term.hlist
+      -> stage
   | Existential_stage : stage iarray -> stage
 
 type (_, _) union =
@@ -158,6 +163,14 @@ let rec print_stage ppf stage =
       join_columns
   | Check_stage atom ->
     Format.fprintf ppf "@[<2>@[if %a:@]@ continue@]" print_neg_check_atom atom
+  | If_let_stage (None, fn, args) ->
+    Format.fprintf ppf "@[<2>@[if %s(%a) is null:@]@ continue@]" fn.name
+      (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
+      args
+  | If_let_stage (Some var, fn, args) ->
+    Format.fprintf ppf "@[if let %a = %s(%a) in@]@" Variable.print var fn.name
+      (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
+      args
   | Existential_stage stages ->
     Format.fprintf ppf
       "@[<v 2>@[<v>if not exists (@;<1 2>@[<v>%a@]@ ):@]@ continue@]"
@@ -171,7 +184,9 @@ and print_stages print ppf stages =
     let extra_indent =
       match stage with
       | Join_stage _ -> 2
-      | Seek_stage _ | Check_stage _ | Existential_stage _ | Let_stage _ -> 0
+      | Seek_stage _ | Check_stage _ | Existential_stage _ | Let_stage _
+      | If_let_stage _ ->
+        0
     in
     if extra_indent > 0
     then (
@@ -482,7 +497,7 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
   Iarray.map
     (fun (Atom (relation, args, value)) ->
       match relation with
-      | Unless _ | Distinct _ | Filter _ ->
+      | If_let _ | Unless _ | Distinct _ | Filter _ ->
         Misc.fatal_error "not supported in the head"
       | Table tid -> plan_head_table tid args value
       | Callback_with_bindings (fn, name) ->
@@ -622,6 +637,9 @@ let prepare_rule context ~binding_times body head =
         | Filter (fn, name) ->
           Var_occurrences.add_terms body_occurrences args;
           [Check_stage (Filter ({ value = fn; name }, args))]
+        | If_let fn ->
+          Var_occurrences.add_terms body_occurrences args;
+          [If_let_stage (value, fn, args)]
         | Callback_with_bindings _ ->
           Misc.fatal_error "Callback with bindings cannot be used in the body")
       (Iarray.to_list body)
@@ -646,6 +664,10 @@ let vars_used_by_term = function
 
 let vars_defined_by_stage = function
   | Let_stage (var, _term) -> Variable.Id.Set.singleton (Variable.uid var)
+  | If_let_stage (var, _fn, _args) -> (
+    match var with
+    | None -> Variable.Id.Set.empty
+    | Some var -> Variable.Id.Set.singleton (Variable.uid var))
   | Join_stage (var, iterators) ->
     Variable.Id.Set.add (Variable.uid var) (vars_defined_by_iterators iterators)
   | Seek_stage (_arg, iterators) -> vars_defined_by_iterators iterators
@@ -665,6 +687,7 @@ let rec vars_used_by_stage = function
     Variable.Id.Set.union (vars_used_by_term arg)
       (vars_used_by_iterators iterators)
   | Check_stage check_atom -> vars_used_by_check_atom check_atom
+  | If_let_stage (_var, _fn, args) -> free_vars_term_hlist args
   | Existential_stage stages ->
     (* Variables are only bound once, so we don't need to care about order of
        definition and use within the existential stage. *)
@@ -684,6 +707,7 @@ let rec available_at_binding_time ~binding_times = function
   | Let_stage (var, _) -> (
     try Variable.Id.Map.find (Variable.uid var) binding_times
     with Not_found -> Misc.fatal_error "*BUG*: Let stage without binding time")
+  | If_let_stage (_, _, _) -> -1
   | Join_stage (var, _) -> (
     try Variable.Id.Map.find (Variable.uid var) binding_times
     with Not_found ->
@@ -825,7 +849,8 @@ let assert_consecutive_binding_times ~binding_times stages =
         match stage with
         | Let_stage (var, _) -> Variable.Any var :: vars
         | Join_stage (var, _) -> Variable.Any var :: vars
-        | Check_stage _ | Seek_stage _ -> vars
+        | If_let_stage (Some var, _, _) -> Variable.Any var :: vars
+        | If_let_stage (None, _, _) | Check_stage _ | Seek_stage _ -> vars
         | Existential_stage local_stages ->
           let local_vars = aux ~binding_times local_stages in
           check_vars local_vars;
@@ -968,6 +993,10 @@ let group_existential_stages ~binding_times ~required_vars stages =
             | Root [] -> (
               match Iarray.get stages stage_id with
               | Seek_stage _ as stage -> Dynarray.add_last new_stages stage
+              | If_let_stage (_, fn, args) ->
+                (* An existential consisting of a single [if let] stage cannot
+                   usefully bind the variable, so drop it if there was one. *)
+                Dynarray.add_last new_stages (If_let_stage (None, fn, args))
               | (Check_stage _ | Existential_stage _) as stage ->
                 Dynarray.add_last new_stages stage
               | Let_stage _ ->
@@ -1060,7 +1089,9 @@ let plan_incremental rules =
         Iarray.iteri
           (fun atom_id (Atom (relation, _, _)) ->
             match relation with
-            | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> ()
+            | If_let _ | Unless _ | Distinct _ | Filter _
+            | Callback_with_bindings _ ->
+              ()
             | Table tid ->
               let context =
                 Seminaive

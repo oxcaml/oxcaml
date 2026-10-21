@@ -98,6 +98,7 @@ type ('k, 'v) relation =
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
   | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
+  | If_let : ('k Constant.hlist -> 'v Or_null.t) with_name -> ('k, 'v) relation
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
       -> ('k, unit) relation
@@ -119,6 +120,13 @@ val distinct : (_, 'k, _) Column.id -> 'k term -> 'k term -> atom
 
 val filter :
   ?name:string -> ('k Constant.hlist -> bool) -> 'k Term.hlist -> atom
+
+val if_let :
+  ?name:string ->
+  'v variable ->
+  ('k Constant.hlist -> 'v Or_null.t) ->
+  'k Term.hlist ->
+  atom
 
 val callback_with_bindings :
   name:string ->

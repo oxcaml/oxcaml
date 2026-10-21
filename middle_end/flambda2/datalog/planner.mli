@@ -50,6 +50,11 @@ type stage =
   | Seek_stage : 'k term * 'k column_iterator list -> stage
   | Check_stage : check_atom -> stage
   | Let_stage : 'k variable * 'k term -> stage
+  | If_let_stage :
+      'v variable option
+      * ('k Constant.hlist -> 'v Or_null.t) with_name
+      * 'k Term.hlist
+      -> stage
   | Existential_stage : stage iarray -> stage
 (* Variables bound by existential stages are not accessible in the output, which
    allows skipping the full existential stage once we have found any satisfying

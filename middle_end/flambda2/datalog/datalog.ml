@@ -93,6 +93,8 @@ let unless_eq repr x y body = add_filter (Lang.distinct repr x y) body
 
 let filter fn args body = add_filter (Lang.filter fn args) body
 
+let if_let var fn args body = add_filter (Lang.if_let var fn args) body
+
 let yield args =
   { conditions = [];
     filters = [];

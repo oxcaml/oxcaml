@@ -120,6 +120,13 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     assembler ->
     assembler
 
+  val if_let :
+    string ->
+    ('k Constant.hlist -> 'v Or_null.t) with_name ->
+    'k Or_null_receiver.hlist with_names ->
+    ('v Or_null_receiver.t with_name -> assembler) ->
+    assembler
+
   val call_with_bindings :
     (bindings_ref -> 'b Constant.hlist -> unit) with_name ->
     'b Or_null_receiver.hlist with_names ->

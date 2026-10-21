@@ -103,7 +103,9 @@ let extra_atoms_for_provenance ~stats ~rule_id atom =
     in
     let name = Table.Id.name tid ^ ".provenance" in
     [Lang.callback_with_bindings ~name provenance_fn args]
-  | Table _ | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> []
+  | If_let _ | Table _ | Unless _ | Distinct _ | Filter _
+  | Callback_with_bindings _ ->
+    []
 
 let maybe_add_provenance ~stats ~rule_id rule =
   if not stats.with_provenance

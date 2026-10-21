@@ -553,6 +553,13 @@ module Datalog : sig
 
   val where : hypothesis list -> ('p, 'a) program -> ('p, 'a) program
 
+  val bind :
+    string ->
+    ('k Constant.hlist -> 'v Or_null.t) ->
+    'k Term.hlist ->
+    ('v Term.t -> ('p, 'b) program) ->
+    ('p, 'b) program
+
   (** [yield args] is a query program that outputs the tuple [args]. *)
   val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.with_parameters) program
 

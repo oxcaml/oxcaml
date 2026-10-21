@@ -79,6 +79,13 @@ val filter :
   ('p, 'a) program ->
   ('p, 'a) program
 
+val if_let :
+  'v Lang.variable ->
+  ('k Constant.hlist -> 'v Or_null.t) ->
+  'k Term.hlist ->
+  ('p, 'a) program ->
+  ('p, 'a) program
+
 type callback
 
 val create_callback_with_bindings :

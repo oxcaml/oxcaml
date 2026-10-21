@@ -171,6 +171,7 @@ type ('k, 'v) relation =
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
   | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
+  | If_let : ('k Constant.hlist -> 'v Or_null.t) with_name -> ('k, 'v) relation
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
       -> ('k, unit) relation
@@ -184,6 +185,7 @@ module Relation = struct
     | Unless tid -> Format.fprintf ppf "~%a" Table.Id.print tid
     | Distinct _repr -> Format.pp_print_string ppf "distinct"
     | Filter (_fn, name) -> Format.pp_print_string ppf name
+    | If_let fn -> Format.pp_print_string ppf fn.name
     | Callback_with_bindings (_fn, name) -> Format.pp_print_string ppf name
 
   let print_neg (type k v) ppf (t : (k, v) t) =
@@ -192,6 +194,7 @@ module Relation = struct
     | Unless tid -> Format.fprintf ppf "%a" Table.Id.print tid
     | Distinct _repr -> Format.pp_print_string ppf "equal"
     | Filter (_fn, name) -> Format.fprintf ppf "not %s" name
+    | If_let fn -> Format.fprintf ppf "not %s" fn.name
     | Callback_with_bindings (_fn, name) -> Format.fprintf ppf "not %s" name
 end
 
@@ -223,6 +226,9 @@ let unless tid args = atom (Unless tid) args
 let distinct repr k1 k2 = atom (Distinct repr) [k1; k2]
 
 let filter ?(name = "<filter>") fn args = atom (Filter (fn, name)) args
+
+let if_let ?(name = "<let>") var fn args =
+  Atom (If_let { value = fn; name }, args, Some var)
 
 let callback_with_bindings ~name fn args =
   atom (Callback_with_bindings (fn, name)) args
