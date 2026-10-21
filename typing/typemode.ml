@@ -244,10 +244,10 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let mode_consts annots =
-  List.map (fun { txt = Parsetree.Mode txt; loc } -> { txt; loc }) annots
+let mode_const_of_modes annots =
+  List.map (Location.map (fun (Parsetree.Mode txt) -> txt)) annots
 
-let transl_mode_atoms atoms =
+let transl_mode_const atoms =
   let annots =
     List.map
       (fun { txt; loc } ->
@@ -265,9 +265,7 @@ let transl_mode_atoms atoms =
   let modes = List.fold_left step With_locality.Const.Option.none annots in
   { mode_modes = modes; mode_desc = annots }
 
-let transl_mode_annots annots = transl_mode_atoms (mode_consts annots)
-
-let untransl_const_mode s ~loc : string Location.loc = { txt = s; loc }
+let transl_mode_annots annots = transl_mode_const (mode_const_of_modes annots)
 
 let const_mode_strings (atoms : Parsetree.mode_const) =
   List.map (fun { Location.txt = s; _ } -> s) atoms
@@ -569,6 +567,9 @@ let transl_mode_with_locality annots =
   in
   { mode_modes = modes; mode_desc = annots }
 
+let legacy_modes : With_locality.lr modes =
+  { mode_modes = With_locality.legacy; mode_desc = [] }
+
 let everything_modality =
   List.fold_left
     (fun acc -> function
@@ -677,7 +678,7 @@ let transl_mod_bounds ?(warn = true) annots =
           in
           nonmodal, base, atoms, seen_ev)
       (Nonmodal_bounds.empty, Modality.Const.id, [], false)
-      (mode_consts annots)
+      (mode_const_of_modes annots)
     |> fun (nm, base, atoms, _) ->
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
@@ -744,7 +745,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     List.map
       (fun (Atom (ax, m) : Modality.atom) ->
         let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
-        untransl_const_mode s ~loc:Location.none)
+        Location.mknoloc s)
       least_modalities
   in
   (* These mod-bounds are top ones, which are redundant to print. But we
@@ -767,7 +768,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
               (Modality.Per_axis.print ax)
               (Modality.Const.proj ax modality)
           in
-          Some (untransl_const_mode s ~loc:Location.none))
+          Some (Location.mknoloc s))
       With_regionality.Axis.all
   in
   let nonmodal_annots, top_nonmodal_annots =
@@ -775,7 +776,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     let mk_annot top print value =
       let only_when_verbose = value = top in
       let s = Format_doc.asprintf "%a" print value in
-      untransl_const_mode s ~loc:Location.none, only_when_verbose
+      Location.mknoloc s, only_when_verbose
     in
     [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->

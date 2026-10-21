@@ -28,6 +28,8 @@ val untransl_mode : _ modes -> Parsetree.modes
 val transl_mode_with_locality :
   Parsetree.modes -> Mode.With_locality.Const.t modes
 
+val legacy_modes : Mode.With_locality.lr modes
+
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
     attributes on the field and insert mutable-implied modalities accordingly.

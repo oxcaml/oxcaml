@@ -2521,9 +2521,6 @@ let with_new_param fp =
     (fun (id, _, _, _) -> with_new_idents_types_constr [id])
     fp.fp_newtypes
 
-let legacy_arrow_modes : Mode.With_locality.lr Typemode.modes =
-  { mode_modes = Mode.With_locality.legacy; mode_desc = [] }
-
 let without_param fp =
   let pat_of_param =
     match fp.fp_kind with
@@ -2630,7 +2627,11 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_var (Some name, jkind_annotation)
         | Tarrow ((arg_label, _, _), ty, ty', _) ->
           Ttyp_arrow
-            (arg_label, go ty, legacy_arrow_modes, go ty', legacy_arrow_modes)
+            ( arg_label,
+              go ty,
+              Typemode.legacy_modes,
+              go ty',
+              Typemode.legacy_modes )
         | Tpoly (ty, tyl) -> (
           let cty = go ty in
           match List.filter_map unwrap_univar tyl with
@@ -3414,9 +3415,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
                     | None -> newcorevar env loc),
-                    legacy_arrow_modes,
+                    Typemode.legacy_modes,
                     spine,
-                    legacy_arrow_modes );
+                    Typemode.legacy_modes );
               ctyp_type = newvar ();
               ctyp_env = env;
               ctyp_loc = to_location loc;

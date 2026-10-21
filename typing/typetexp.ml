@@ -925,6 +925,10 @@ let rec extract_params styp =
       (match r.ptyp_desc with
       | Ptyp_arrow _
         when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
+          if mr <> [] then
+            Syntaxerr.ill_formed_ast styp.ptyp_loc
+              "Return modes on a function type whose result is an \
+               uncurried function type.";
           let params, ret, ret_mode = extract_params r in
           (l, arg_mode, a) :: params, ret, ret_mode
       | _ ->
