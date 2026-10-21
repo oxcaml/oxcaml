@@ -3,18 +3,6 @@
 open! Int_replace_polymorphic_compare [@@warning "-66"]
 module String = Misc.Stdlib.String
 
-type t = { mutable zero_alloc : int String.Map.t }
-
-let create () = { zero_alloc = String.Map.empty }
-
-let reset t = t.zero_alloc <- String.Map.empty
-
-let merge src ~into:dst =
-  let join key b1 b2 =
-    Misc.fatal_errorf "Unexpected merge %s %d %d" key b1 b2
-  in
-  dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
-
 module Component_value = struct
   type t = int
 
@@ -60,6 +48,18 @@ module Allocation_sources = struct
             bool Zero_alloc_utils.Components.t Numbers.Int.Map.t
         }
 end
+
+type t = { mutable zero_alloc : Value.t String.Map.t }
+
+let create () = { zero_alloc = String.Map.empty }
+
+let reset t = t.zero_alloc <- String.Map.empty
+
+let merge src ~into:dst =
+  let join key b1 b2 =
+    Misc.fatal_errorf "Unexpected merge %s %d %d" key b1 b2
+  in
+  dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
 
 let get_value (t : t) s = String.Map.find_opt s t.zero_alloc
 

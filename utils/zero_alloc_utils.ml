@@ -27,8 +27,8 @@
    Perhaps we should translate "strict" and "never_returns_normally" directly
    into (nor,exn,div) *)
 
-type 'witnesses component =
-  | Top of 'witnesses
+type 'top component =
+  | Top of 'top
   | Safe
   | Bot
 
