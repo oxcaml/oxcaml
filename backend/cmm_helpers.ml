@@ -5199,6 +5199,15 @@ let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
 let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
+let cmp_int cmp ~dbg x y =
+  match x, y with
+  | Cop (Cnot, [arg], _), ((Cconst_int _ | Cconst_natint _) as const) ->
+    let cmp = Cmm.swap_integer_comparison cmp in
+    binary (Ccmpi cmp) ~dbg arg (not_int const dbg)
+  | ((Cconst_int _ | Cconst_natint _) as const), Cop (Cnot, [arg], _) ->
+    binary (Ccmpi cmp) ~dbg arg (not_int const dbg)
+  | _, _ -> binary (Ccmpi cmp) ~dbg x y
+
 let eq ~dbg x y =
   match x, y with
   | Cconst_int (n, _), Cop (Csubi, [Cconst_int (m, _); c], _)
@@ -5254,28 +5263,25 @@ let eq ~dbg x y =
      *   (check-sat)
      *)
     binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
-  | Cop (Cnot, [arg], _), ((Cconst_int _ | Cconst_natint _) as const)
-  | ((Cconst_int _ | Cconst_natint _) as const), Cop (Cnot, [arg], _) ->
-    binary (Ccmpi Ceq) ~dbg arg (not_int const dbg)
-  | _, _ -> binary (Ccmpi Ceq) ~dbg x y
+  | _, _ -> cmp_int Ceq ~dbg x y
 
-let neq = binary (Ccmpi Cne)
+let neq = cmp_int Cne
 
-let lt = binary (Ccmpi Clt)
+let lt = cmp_int Clt
 
-let le = binary (Ccmpi Cle)
+let le = cmp_int Cle
 
-let gt = binary (Ccmpi Cgt)
+let gt = cmp_int Cgt
 
-let ge = binary (Ccmpi Cge)
+let ge = cmp_int Cge
 
-let ult = binary (Ccmpi Cult)
+let ult = cmp_int Cult
 
-let ule = binary (Ccmpi Cule)
+let ule = cmp_int Cule
 
-let ugt = binary (Ccmpi Cugt)
+let ugt = cmp_int Cugt
 
-let uge = binary (Ccmpi Cuge)
+let uge = cmp_int Cuge
 
 let float_abs = unary (Cabsf Float64)
 
