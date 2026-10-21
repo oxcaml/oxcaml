@@ -113,6 +113,7 @@ let rec eliminate_ref id = function
 type exit = {
   mutable count: int;
   mutable max_depth: int;
+  mutable tail_only: bool;
 }
 
 let simplify_exits lam =
@@ -122,57 +123,47 @@ let simplify_exits lam =
 
   let get_exit i =
     try Hashtbl.find exits i
-    with Not_found -> {count = 0; max_depth = 0}
+    with Not_found -> {count = 0; max_depth = 0; tail_only = true}
 
-  and incr_exit i nb d =
+  and incr_exit i nb d ~tail =
     match Hashtbl.find_opt exits i with
     | Some r ->
         r.count <- r.count + nb;
-        r.max_depth <- Misc.Stdlib.Int.max r.max_depth d
+        r.max_depth <- Misc.Stdlib.Int.max r.max_depth d;
+        r.tail_only <- r.tail_only && tail
     | None ->
-        let r = {count = nb; max_depth = d} in
+        let r = {count = nb; max_depth = d; tail_only = tail} in
         Hashtbl.add exits i r
   in
 
-  let rec count ~try_depth = function
-  | (Lvar _| Lmutvar _ | Lconst _) -> ()
-  | Lapply ap ->
-      count ~try_depth ap.ap_func;
-      List.iter (count ~try_depth) ap.ap_args
-  | Lfunction {body} -> count ~try_depth body
-  | Llet(_, _kind, _v, _duid, l1, l2)
-  | Lmutlet(_kind, _v, _duid, l1, l2) ->
-      count ~try_depth l2; count ~try_depth l1
-  | Lletrec(bindings, body) ->
-      List.iter (fun { def = { body } } -> count ~try_depth body) bindings;
-      count ~try_depth body
-  | Lprim(_p, ll, _) -> List.iter (count ~try_depth) ll
+  let rec count ~try_depth ~tail = function
   | Lswitch(l, sw, _loc, _kind) ->
-      count_default ~try_depth sw ;
-      count ~try_depth l;
-      List.iter (fun (_, l) -> count ~try_depth l) sw.sw_consts;
-      List.iter (fun (_, l) -> count ~try_depth l) sw.sw_blocks
+      count_default ~try_depth sw ~tail;
+      count ~try_depth l ~tail:false;
+      List.iter (fun (_, l) -> count ~try_depth l ~tail) sw.sw_consts;
+      List.iter (fun (_, l) -> count ~try_depth l ~tail) sw.sw_blocks
   | Lstringswitch(l, sw, d, _, _kind) ->
-      count ~try_depth l;
-      List.iter (fun (_, l) -> count ~try_depth l) sw;
+      count ~try_depth l ~tail:false;
+      List.iter (fun (_, l) -> count ~try_depth l ~tail) sw;
       begin match  d with
       | None -> ()
       | Some d -> match sw with
-        | []|[_] -> count ~try_depth d
+        | []|[_] -> count ~try_depth d ~tail
         | _ -> (* default will get replicated *)
-            count ~try_depth d; count ~try_depth d
+            count ~try_depth d ~tail; count ~try_depth d ~tail
       end
   | Lstaticraise (i,ls) ->
-      incr_exit i 1 try_depth;
-      List.iter (count ~try_depth) ls
+      incr_exit i 1 try_depth ~tail;
+      List.iter (count ~try_depth ~tail:false) ls
   | Lstaticcatch (l1,(i,[]),Lstaticraise (j,[]), _, _) ->
       (* i will be replaced by j in l1, so each occurrence of i in l1
          increases j's ref count *)
-      count ~try_depth l1 ;
+      count ~try_depth l1 ~tail:true;
       let ic = get_exit i in
-      incr_exit j ic.count (Misc.Stdlib.Int.max try_depth ic.max_depth)
+      incr_exit j ic.count
+        (Misc.Stdlib.Int.max try_depth ic.max_depth) ~tail:(tail && ic.tail_only)
   | Lstaticcatch(l1, (i,_), l2, r, _) ->
-      count ~try_depth l1;
+      count ~try_depth l1 ~tail:true;
       (* If l1 does not contain (exit i),
          l2 will be removed, so don't count its exits *)
       if (get_exit i).count > 0 then begin
@@ -181,35 +172,26 @@ let simplify_exits lam =
           | Popped_region -> try_depth - 1
           | Same_region -> try_depth
         in
-        count ~try_depth l2
+        count ~try_depth l2 ~tail
       end
   | Ltrywith(l1, _v, _duid, l2, _kind) ->
-      count ~try_depth:(try_depth+1) l1;
-      count ~try_depth l2;
-  | Lifthenelse(l1, l2, l3, _kind) ->
-      count ~try_depth l1;
-      count ~try_depth l2;
-      count ~try_depth l3
-  | Lsequence(l1, l2) -> count ~try_depth l1; count ~try_depth l2
-  | Lwhile lw ->
-      count ~try_depth lw.wh_cond;
-      count ~try_depth:(try_depth+1) lw.wh_body
-  | Lfor lf ->
-      count ~try_depth lf.for_from;
-      count ~try_depth lf.for_to;
-      count ~try_depth:(try_depth+1) lf.for_body
-  | Lassign(_v, l) -> count ~try_depth l
-  | Lsend(_k, m, o, ll, _, _, _, _, _) ->
-      List.iter (count ~try_depth) (m::o::ll)
-  | Levent(l, _) -> count ~try_depth l
-  | Lifused(_v, l) -> count ~try_depth l
-  | Lregion (l, _) -> count ~try_depth:(try_depth+1) l
-  | Lexclave l -> count ~try_depth:(try_depth-1) l
+      count ~try_depth:(try_depth+1) l1 ~tail:false;
+      count ~try_depth l2 ~tail;
+  | Lregion (l, _) -> count ~try_depth:(try_depth+1) l ~tail
+  | Lexclave l -> count ~try_depth:(try_depth-1) l ~tail
+  | (Lvar _| Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ |
+     Llet _ | Lmutlet _ | Lletrec _ | Lprim _ | Lifthenelse _ |
+     Lsequence _ | Lwhile _ | Lfor _ | Lassign _ | Lsend _ |
+     Levent _ | Lifused _ ) as lam ->
+    Lambda.shallow_iter
+      ~tail:(count ~try_depth ~tail)
+      ~non_tail:(count ~try_depth ~tail:false)
+      lam
   | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
   | Linstantiate _ as lam ->
       fatal_error_invalid_constructor lam
 
-  and count_default ~try_depth sw = match sw.sw_failaction with
+  and count_default ~try_depth sw ~tail = match sw.sw_failaction with
   | None -> ()
   | Some al ->
       let nconsts = List.length sw.sw_consts
@@ -217,13 +199,13 @@ let simplify_exits lam =
       if
         nconsts < sw.sw_numconsts && nblocks < sw.sw_numblocks
       then begin (* default action will occur twice in native code *)
-        count ~try_depth al ; count ~try_depth al
+        count ~try_depth al ~tail; count ~try_depth al ~tail
       end else begin (* default action will occur once *)
         assert (nconsts < sw.sw_numconsts || nblocks < sw.sw_numblocks) ;
-        count ~try_depth al
+        count ~try_depth al ~tail
       end
   in
-  count ~try_depth:0 lam;
+  count ~try_depth:0 lam ~tail:true;
 
   (*
      Second pass simplify  ``catch body with (i ...) handler''
@@ -346,12 +328,12 @@ let simplify_exits lam =
         | Popped_region -> try_depth - 1
         | Same_region -> try_depth
       in
-      let {count; max_depth} = get_exit i in
+      let {count; max_depth; tail_only} = get_exit i in
       if count = 0 then
         (* Discard staticcatch: not matching exit *)
         simplif ~layout ~try_depth l1
       else if
-      count = 1 && max_depth <= try_depth then begin
+      count = 1 && max_depth <= try_depth && tail_only then begin
         (* Inline handler if there is a single occurrence and it is not
            nested within an inner try..with *)
         assert(max_depth = try_depth);
