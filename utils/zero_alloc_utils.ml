@@ -127,15 +127,82 @@ module Components = struct
       if c <> 0 then c else f d1 d2
 end
 
-type relevant_components_by_argument_index =
-  { relevant_components_by_argument_index :
-      bool Components.t Numbers.Int.Map.t
-  }
+module Relevant_components_by_argument_index = struct
+  type t = bool Components.t Numbers.Int.Map.t
+
+  let compare = Numbers.Int.Map.compare (Components.compare Bool.compare)
+
+  let join =
+    Numbers.Int.Map.union (fun _ c1 c2 ->
+      Some (Components.map2 ~f:(fun _ r1 r2 -> r1 || r2) c1 c2))
+
+  let meet t1 t2 =
+    Numbers.Int.Map.merge
+      (fun _argument_index c1 c2 ->
+        match c1, c2 with
+        | Some c1, Some c2 ->
+          let c = Components.map2 ~f:(fun _tag r1 r2 -> r1 && r2) c1 c2 in
+          if c.nor || c.exn || c.div then Some c else None
+        | None, _ | _, None -> None)
+      t1 t2
+
+  let lessequal t1 t2 =
+    Numbers.Int.Map.for_all
+      (fun argument_index c1 ->
+        match Numbers.Int.Map.find_opt argument_index t2 with
+        | None -> false
+        | Some c2 -> Components.lessequal (fun r1 r2 -> (not r1) || r2) c1 c2)
+      t1
+end
 
 module Allocation_sources = struct
   type 'args_only t =
     | Allocation_other_than_calling_arguments
     | No_allocation_other_than_calling_arguments of 'args_only
+
+  let compare ~compare_args_only t1 t2 =
+    match t1, t2 with
+    | ( Allocation_other_than_calling_arguments,
+        Allocation_other_than_calling_arguments ) -> 0
+    | ( No_allocation_other_than_calling_arguments _,
+        Allocation_other_than_calling_arguments ) -> -1
+    | ( Allocation_other_than_calling_arguments,
+        No_allocation_other_than_calling_arguments _ ) -> 1
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      compare_args_only a1 a2
+
+  let lessequal ~lessequal_args_only t1 t2 =
+    match t1, t2 with
+    | _, Allocation_other_than_calling_arguments -> true
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      lessequal_args_only a1 a2
+    | ( Allocation_other_than_calling_arguments,
+        No_allocation_other_than_calling_arguments _ ) ->
+      false
+
+  let join ~join_args_only t1 t2 =
+    match t1, t2 with
+    | Allocation_other_than_calling_arguments, _
+    | _, Allocation_other_than_calling_arguments ->
+      Allocation_other_than_calling_arguments
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      No_allocation_other_than_calling_arguments (join_args_only a1 a2)
+
+  let meet ~meet_args_only t1 t2 =
+    match t1, t2 with
+    | Allocation_other_than_calling_arguments, t
+    | t, Allocation_other_than_calling_arguments ->
+      t
+    | ( No_allocation_other_than_calling_arguments a1,
+        No_allocation_other_than_calling_arguments a2 ) ->
+      No_allocation_other_than_calling_arguments (meet_args_only a1 a2)
+
+  let other_than_calling_arguments = function
+    | Allocation_other_than_calling_arguments -> true
+    | No_allocation_other_than_calling_arguments _ -> false
 end
 
 module type WS = sig

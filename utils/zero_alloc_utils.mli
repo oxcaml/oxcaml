@@ -64,15 +64,48 @@ module Components : sig
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
 end
 
-type relevant_components_by_argument_index =
-  { relevant_components_by_argument_index :
-      bool Components.t Numbers.Int.Map.t
-  }
+module Relevant_components_by_argument_index : sig
+  type t = bool Components.t Numbers.Int.Map.t
+
+  val compare : t -> t -> int
+
+  val join : t -> t -> t
+
+  val meet : t -> t -> t
+
+  val lessequal : t -> t -> bool
+end
 
 module Allocation_sources : sig
   type 'args_only t =
     | Allocation_other_than_calling_arguments
     | No_allocation_other_than_calling_arguments of 'args_only
+
+  val compare :
+    compare_args_only:('args_only -> 'args_only -> int) ->
+    'args_only t ->
+    'args_only t ->
+    int
+
+  val lessequal :
+    lessequal_args_only:('args_only -> 'args_only -> bool) ->
+    'args_only t ->
+    'args_only t ->
+    bool
+
+  val join :
+    join_args_only:('args_only -> 'args_only -> 'args_only) ->
+    'args_only t ->
+    'args_only t ->
+    'args_only t
+
+  val meet :
+    meet_args_only:('args_only -> 'args_only -> 'args_only) ->
+    'args_only t ->
+    'args_only t ->
+    'args_only t
+
+  val other_than_calling_arguments : 'args_only t -> bool
 end
 
 (** Abstract domain used in static analysis for checking [@zero_alloc]

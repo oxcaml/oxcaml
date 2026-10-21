@@ -243,6 +243,57 @@ end = struct
     Format.fprintf ppf "%s.%s@ " name (Zero_alloc_utils.Tag.print tag)
 end
 
+module Top = struct
+  type t =
+    { allocation_sources :
+        Zero_alloc_utils.Relevant_components_by_argument_index.t
+          Zero_alloc_utils.Allocation_sources.t;
+      witnesses : Witnesses.t;
+    }
+
+  let compare
+      { allocation_sources = a1; witnesses = w1 }
+      { allocation_sources = a2; witnesses = w2 } =
+    let c =
+      Zero_alloc_utils.Allocation_sources.compare
+        ~compare_args_only:
+          Zero_alloc_utils.Relevant_components_by_argument_index.compare
+        a1 a2
+    in
+    if c <> 0 then c else Witnesses.compare w1 w2
+
+  let lessequal
+      { allocation_sources = a1; witnesses = w1 }
+      { allocation_sources = a2; witnesses = w2 } =
+    Zero_alloc_utils.Allocation_sources.lessequal
+      ~lessequal_args_only:
+        Zero_alloc_utils.Relevant_components_by_argument_index.lessequal
+      a1 a2
+    && Witnesses.lessequal w1 w2
+
+  let join
+      { allocation_sources = a1; witnesses = w1 }
+      { allocation_sources = a2; witnesses = w2 } =
+    { allocation_sources =
+        Zero_alloc_utils.Allocation_sources.join
+          ~join_args_only:Zero_alloc_utils.Relevant_components_by_argument_index.join
+          a1 a2;
+      witnesses = Witnesses.join w1 w2
+    }
+
+  let meet
+      { allocation_sources = a1; witnesses = w1 }
+      { allocation_sources = a2; witnesses = w2 } =
+    { allocation_sources =
+        Zero_alloc_utils.Allocation_sources.meet
+          ~meet_args_only:Zero_alloc_utils.Relevant_components_by_argument_index.meet
+          a1 a2;
+      witnesses = Witnesses.meet w1 w2
+    }
+
+  let cutoff t ~n = { t with witnesses = Witnesses.cutoff t.witnesses ~n }
+end
+
 (** Abstract value for each component of the domain. *)
 module V : sig
   type t
@@ -284,7 +335,7 @@ module V : sig
   val compare : t -> t -> int
 
   val match_with :
-    resolved:(Witnesses.t Zero_alloc_utils.Component.t -> 'a) ->
+    resolved:(Top.t Zero_alloc_utils.Component.t -> 'a) ->
     unresolved:(unit -> 'a) ->
     t ->
     'a
@@ -385,9 +436,9 @@ end = struct
   module Transform : sig
     type t
 
-    val var_with_top : Var.t -> var_witnesses:Witnesses.t -> Witnesses.t -> t
+    val var_with_top : Var.t -> var_witnesses:Witnesses.t -> Top.t -> t
 
-    val add_top : t -> Witnesses.t -> t
+    val add_top : t -> Top.t -> t
 
     val add_var : t -> Var.t -> Witnesses.t -> t
 
@@ -405,7 +456,7 @@ end = struct
 
     val flatten : t -> t -> t
 
-    val get_top : t -> Witnesses.t option
+    val get_top : t -> Top.t option
 
     val get_vars : t -> Vars.t
 
@@ -418,7 +469,7 @@ end = struct
     type t =
       | Args of Vars.t
       | Args_with_top of
-          { w : Witnesses.t;
+          { top : Top.t;
             vars : Vars.t
           }
 
@@ -437,80 +488,83 @@ end = struct
       | Args a1, Args a2 -> Vars.compare a1 a2
       | Args _, Args_with_top _ -> -1
       | Args_with_top _, Args _ -> 1
-      | ( Args_with_top { w = w1; vars = vars1 },
-          Args_with_top { w = w2; vars = vars2 } ) ->
+      | ( Args_with_top { top = top1; vars = vars1 },
+          Args_with_top { top = top2; vars = vars2 } ) ->
         let c = Vars.compare vars1 vars2 in
-        if c <> 0 then c else Witnesses.compare w1 w2
+        if c <> 0 then c else Top.compare top1 top2
 
     let cutoff_witnesses t ~n =
       match t with
       | Args vars -> Args (Vars.cutoff_witnesses vars n)
-      | Args_with_top { w; vars } ->
+      | Args_with_top { top; vars } ->
         Args_with_top
-          { w = Witnesses.cutoff w ~n; vars = Vars.cutoff_witnesses vars n }
+          { top = Top.cutoff top ~n; vars = Vars.cutoff_witnesses vars n }
 
     let equal t1 t2 = compare t1 t2 = 0
 
-    let var_with_top var ~var_witnesses w =
+    let var_with_top var ~var_witnesses top =
       let vars = Vars.singleton var var_witnesses in
-      Args_with_top { w; vars }
+      Args_with_top { top; vars }
 
     let vars ~var1 ~w1 ~var2 ~w2 =
       assert (not (Var.equal var1 var2));
       let vars = Vars.(update (singleton var1 w1) var2 w2) in
       Args vars
 
-    let add_top t w =
+    let add_top t top =
       match t with
-      | Args vars -> Args_with_top { w; vars }
-      | Args_with_top { w = w'; vars } ->
-        Args_with_top { w = Witnesses.join w w'; vars }
+      | Args vars -> Args_with_top { top; vars }
+      | Args_with_top { top = top'; vars } ->
+        Args_with_top { top = Top.join top top'; vars }
 
     let add_var t var witnesses =
       (* CR gyorsh: future optimization is to return [t] when vars is phys equal
          to (update vars).*)
       match t with
       | Args vars -> Args (Vars.update vars var witnesses)
-      | Args_with_top { w; vars } ->
-        Args_with_top { w; vars = Vars.update vars var witnesses }
+      | Args_with_top { top; vars } ->
+        Args_with_top { top; vars = Vars.update vars var witnesses }
 
     let flatten tr1 tr2 =
       match tr1, tr2 with
-      | ( Args_with_top { w = w1; vars = vars1 },
-          Args_with_top { w = w2; vars = vars2 } ) ->
-        Args_with_top { w = Witnesses.join w1 w2; vars = Vars.join vars1 vars2 }
-      | Args_with_top { w; vars }, Args vars'
-      | Args vars', Args_with_top { w; vars } ->
-        Args_with_top { w; vars = Vars.join vars vars' }
+      | ( Args_with_top { top = top1; vars = vars1 },
+          Args_with_top { top = top2; vars = vars2 } ) ->
+        Args_with_top { top = Top.join top1 top2; vars = Vars.join vars1 vars2 }
+      | Args_with_top { top; vars }, Args vars'
+      | Args vars', Args_with_top { top; vars } ->
+        Args_with_top { top; vars = Vars.join vars vars' }
       | Args vars1, Args vars2 -> Args (Vars.join vars1 vars2)
 
     let get_top t =
-      match t with Args_with_top { w; vars = _ } -> Some w | Args _ -> None
+      match t with Args_with_top { top; vars = _ } -> Some top | Args _ -> None
 
     let get_vars t =
-      match t with Args_with_top { w = _; vars } | Args vars -> vars
+      match t with Args_with_top { top = _; vars } | Args vars -> vars
 
     let same_vars t1 t2 = Vars.same_vars (get_vars t1) (get_vars t2)
 
     let has_witnesses t =
       match t with
-      | Args_with_top { w; vars } ->
-        Vars.has_witnesses vars || not (Witnesses.is_empty w)
+      | Args_with_top { top; vars } ->
+        Vars.has_witnesses vars || not (Witnesses.is_empty top.witnesses)
       | Args vars -> Vars.has_witnesses vars
 
     let replace_witnesses t w =
       match t with
       | Args vars -> Args (Vars.replace_witnesses vars w)
-      | Args_with_top { w = _; vars } ->
-        Args_with_top { w; vars = Vars.replace_witnesses vars w }
+      | Args_with_top { top; vars } ->
+        Args_with_top
+          { top = { top with witnesses = w };
+            vars = Vars.replace_witnesses vars w
+          }
 
     let print ~witnesses ppf t =
       match t with
       | Args vars ->
         Format.fprintf ppf "(transform:@.%a)@." (Vars.print ~witnesses) vars
-      | Args_with_top { w; vars } ->
-        Format.fprintf ppf "(transform:@.%a@.%a)@." (pp_top ~witnesses) w
-          (Vars.print ~witnesses) vars
+      | Args_with_top { top; vars } ->
+        Format.fprintf ppf "(transform:@.%a@.%a)@." (pp_top ~witnesses)
+          top.witnesses (Vars.print ~witnesses) vars
   end
 
   module Transforms : sig
@@ -634,7 +688,7 @@ end = struct
 
     (** [transform_top t w] replace each element x of [t] with "transform t (Top
         w)" *)
-    val transform_top : t -> Witnesses.t -> t
+    val transform_top : t -> Top.t -> t
 
     val transform_join : t -> t -> t
 
@@ -693,14 +747,14 @@ end = struct
       let from_trs = Transforms.map (fun tr' -> Transform.flatten tr tr') trs in
       { vars = Vars.empty; trs = Transforms.join from_vars from_trs }
 
-    let transform_top { vars; trs } w =
+    let transform_top { vars; trs } top =
       let from_vars =
         Vars.fold
           ~f:(fun var var_witnesses acc ->
-            Transforms.add (Transform.var_with_top var ~var_witnesses w) acc)
+            Transforms.add (Transform.var_with_top var ~var_witnesses top) acc)
           vars ~init:Transforms.empty
       in
-      let from_trs = Transforms.map (fun tr -> Transform.add_top tr w) trs in
+      let from_trs = Transforms.map (fun tr -> Transform.add_top tr top) trs in
       { vars = Vars.empty; trs = Transforms.join from_vars from_trs }
 
     let transform_var { vars; trs } var witnesses =
@@ -752,9 +806,9 @@ end = struct
 
     val tr_with_safe : Transform.t -> t
 
-    val tr_with_top : Transform.t -> Witnesses.t -> t
+    val tr_with_top : Transform.t -> Top.t -> t
 
-    val var_with_top : Var.t -> var_witnesses:Witnesses.t -> Witnesses.t -> t
+    val var_with_top : Var.t -> var_witnesses:Witnesses.t -> Top.t -> t
 
     val var_with_safe : Var.t -> Witnesses.t -> t
 
@@ -764,7 +818,7 @@ end = struct
 
     val trs : Transform.t -> Transform.t -> t
 
-    val add_top : t -> Witnesses.t -> t
+    val add_top : t -> Top.t -> t
 
     val add_safe : t -> t
 
@@ -779,11 +833,11 @@ end = struct
     val distribute_transform_var_over_join :
       t -> Var.t -> Witnesses.t -> unit -> t
 
-    val distribute_transform_top_over_join : t -> Witnesses.t -> unit -> t
+    val distribute_transform_top_over_join : t -> Top.t -> unit -> t
 
     val distribute_transform_over_joins : t -> t -> unit -> t
 
-    val get_top : t -> Witnesses.t option
+    val get_top : t -> Top.t option
 
     val has_safe : t -> bool
 
@@ -802,7 +856,7 @@ end = struct
     type t =
       | Args_with_safe of Args.t
       | Args_with_top of
-          { w : Witnesses.t;
+          { top : Top.t;
             args : Args.t
           }
       | Args of Args.t
@@ -833,34 +887,35 @@ end = struct
        Termination of fixpoint: [Args] is sorted, [Arg.cutoff] keeps the least
        [n], and [Arg.join] is used for fixpoint computation before applying the
        cutoff. *)
-    let args_with_top w args =
+    let args_with_top (top : Top.t) args =
       if not (Args.has_witnesses args)
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
           args;
       match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
-      | Keep_all -> Args_with_top { w; args }
+      | Keep_all -> Args_with_top { top; args }
       | No_details ->
-        Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
+        Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
+          top.witnesses
           (Args.print ~witnesses:true)
           args
       | At_most n ->
         (* Normal form after cutoff: args contains at least one element even
            after cutoff because [n] is guaranteed to be positive. *)
-        let len = Witnesses.size w in
+        let len = Witnesses.size top.witnesses in
         if len > n
         then
           Misc.fatal_errorf "expected at most %d witnesses, got %d: %a" n len
-            Witnesses.print w;
-        Args_with_top { w; args = Args.cutoff args n }
+            Witnesses.print top.witnesses;
+        Args_with_top { top; args = Args.cutoff args n }
 
     let tr_with_safe tr = Args_with_safe Args.(add_tr empty tr)
 
-    let tr_with_top tr w = args_with_top w Args.(add_tr empty tr)
+    let tr_with_top tr top = args_with_top top Args.(add_tr empty tr)
 
-    let var_with_top var ~var_witnesses w =
-      args_with_top w Args.(add_var empty var var_witnesses)
+    let var_with_top var ~var_witnesses (top : Top.t) =
+      args_with_top top Args.(add_var empty var var_witnesses)
 
     let var_with_safe var w = Args_with_safe Args.(add_var empty var w)
 
@@ -880,29 +935,29 @@ end = struct
       | Args_with_safe _ -> t
       | Args args -> Args_with_safe args
 
-    let add_top t witnesses =
+    let add_top t top =
       match t with
-      | Args_with_top { w; args } ->
-        args_with_top (Witnesses.join w witnesses) args
-      | Args_with_safe args | Args args -> args_with_top witnesses args
+      | Args_with_top { top = top'; args } ->
+        args_with_top (Top.join top' top) args
+      | Args_with_safe args | Args args -> args_with_top top args
 
     let add_var t var witnesses =
       match t with
       | Args_with_safe args -> Args_with_safe (Args.add_var args var witnesses)
       | Args args -> Args (Args.add_var args var witnesses)
-      | Args_with_top { w; args } ->
-        args_with_top w (Args.add_var args var witnesses)
+      | Args_with_top { top; args } ->
+        args_with_top top (Args.add_var args var witnesses)
 
     let flatten t1 t2 () =
       match t1, t2 with
       | Args a1, Args a2 -> Args (Args.join a1 a2)
       | Args_with_safe a1, Args_with_safe a2 -> Args_with_safe (Args.join a1 a2)
-      | Args_with_top { w; args = a1 }, (Args a2 | Args_with_safe a2)
-      | (Args a2 | Args_with_safe a2), Args_with_top { w; args = a1 } ->
-        args_with_top w (Args.join a1 a2)
-      | Args_with_top { w = w1; args = a1 }, Args_with_top { w = w2; args = a2 }
-        ->
-        args_with_top (Witnesses.join w1 w2) (Args.join a1 a2)
+      | Args_with_top { top; args = a1 }, (Args a2 | Args_with_safe a2)
+      | (Args a2 | Args_with_safe a2), Args_with_top { top; args = a1 } ->
+        args_with_top top (Args.join a1 a2)
+      | ( Args_with_top { top = top1; args = a1 },
+          Args_with_top { top = top2; args = a2 } ) ->
+        args_with_top (Top.join top1 top2) (Args.join a1 a2)
       | Args args1, Args_with_safe args2 | Args_with_safe args1, Args args2 ->
         Args_with_safe (Args.join args1 args2)
 
@@ -911,8 +966,8 @@ end = struct
       | Args_with_safe args ->
         let args = Args.(add_tr (transform args tr) tr) in
         Args args
-      | Args_with_top { w; args } ->
-        let tr' = Transform.add_top tr w in
+      | Args_with_top { top; args } ->
+        let tr' = Transform.add_top tr top in
         let args = Args.(add_tr (transform args tr) tr') in
         Args args
       | Args args -> Args (Args.transform args tr)
@@ -924,21 +979,21 @@ end = struct
           Args.add_var (Args.transform_var args var witnesses) var witnesses
         in
         Args args
-      | Args_with_top { w; args } ->
-        let tr' = Transform.var_with_top var ~var_witnesses:witnesses w in
+      | Args_with_top { top; args } ->
+        let tr' = Transform.var_with_top var ~var_witnesses:witnesses top in
         let args = Args.(add_tr (transform_var args var witnesses) tr') in
         Args args
       | Args args -> Args (Args.transform_var args var witnesses)
 
-    let distribute_transform_top_over_join t w () =
+    let distribute_transform_top_over_join t top () =
       match t with
       | Args_with_safe args ->
-        let args = Args.transform_top args w in
-        args_with_top w args
-      | Args_with_top { w = w'; args } ->
-        let args = Args.(transform_top args w) in
-        args_with_top (Witnesses.join w' w) args
-      | Args args -> Args (Args.transform_top args w)
+        let args = Args.transform_top args top in
+        args_with_top top args
+      | Args_with_top { top = top'; args } ->
+        let args = Args.(transform_top args top) in
+        args_with_top (Top.join top' top) args
+      | Args args -> Args (Args.transform_top args top)
 
     let distribute_transform_over_joins t1 t2 () =
       match t1, t2 with
@@ -949,8 +1004,8 @@ end = struct
       | Args_with_safe a1, Args a2 | Args a2, Args_with_safe a1 ->
         let new_args = Args.transform_join a1 a2 in
         Args (Args.join a2 new_args)
-      | Args_with_top { w = w1; args = a1 }, Args_with_top { w = w2; args = a2 }
-        ->
+      | ( Args_with_top { top = top1; args = a1 },
+          Args_with_top { top = top2; args = a2 } ) ->
         if debug
         then
           Format.printf "distribute_transform_over_joins:@.%a@.%a@."
@@ -960,30 +1015,30 @@ end = struct
             a2;
         let new_args = Args.transform_join a1 a2 in
         let args_top =
-          Args.join (Args.transform_top a1 w2) (Args.transform_top a2 w1)
+          Args.join (Args.transform_top a1 top2) (Args.transform_top a2 top1)
         in
-        args_with_top (Witnesses.join w1 w2) (Args.join new_args args_top)
-      | Args_with_top { w; args = a1 }, Args a2
-      | Args a2, Args_with_top { w; args = a1 } ->
+        args_with_top (Top.join top1 top2) (Args.join new_args args_top)
+      | Args_with_top { top; args = a1 }, Args a2
+      | Args a2, Args_with_top { top; args = a1 } ->
         let new_args = Args.transform_join a1 a2 in
-        let args_top = Args.transform_top a2 w in
+        let args_top = Args.transform_top a2 top in
         Args (Args.join new_args args_top)
-      | Args_with_top { w; args = a1 }, Args_with_safe a2
-      | Args_with_safe a2, Args_with_top { w; args = a1 } ->
+      | Args_with_top { top; args = a1 }, Args_with_safe a2
+      | Args_with_safe a2, Args_with_top { top; args = a1 } ->
         let new_args = Args.transform_join a1 a2 in
-        let args_top = Args.transform_top a2 w in
+        let args_top = Args.transform_top a2 top in
         let args = Args.join new_args args_top in
-        args_with_top w args
+        args_with_top top args
 
     let add_tr t tr =
       match t with
       | Args_with_safe args -> Args_with_safe (Args.add_tr args tr)
       | Args args -> Args (Args.add_tr args tr)
-      | Args_with_top { w; args } -> args_with_top w (Args.add_tr args tr)
+      | Args_with_top { top; args } -> args_with_top top (Args.add_tr args tr)
 
     let get_top t =
       match t with
-      | Args_with_top { w; args = _ } -> Some w
+      | Args_with_top { top; args = _ } -> Some top
       | Args _ | Args_with_safe _ -> None
 
     let has_safe t =
@@ -993,22 +1048,23 @@ end = struct
 
     let get t =
       match t with
-      | Args_with_top { w = _; args } | Args args | Args_with_safe args ->
+      | Args_with_top { top = _; args } | Args args | Args_with_safe args ->
         Args.get args
 
     let has_witnesses t =
       match t with
       | Args_with_safe args | Args args -> Args.has_witnesses args
-      | Args_with_top { w; args } ->
-        (not (Witnesses.is_empty w)) || Args.has_witnesses args
+      | Args_with_top { top; args } ->
+        (not (Witnesses.is_empty top.witnesses)) || Args.has_witnesses args
 
     let replace_witnesses t witnesses =
       match t with
       | Args_with_safe args ->
         Args_with_safe (Args.replace_witnesses args witnesses)
       | Args args -> Args (Args.replace_witnesses args witnesses)
-      | Args_with_top { w = _; args } ->
-        args_with_top witnesses (Args.replace_witnesses args witnesses)
+      | Args_with_top { top; args } ->
+        args_with_top { top with witnesses }
+          (Args.replace_witnesses args witnesses)
 
     let compare t1 t2 =
       match t1, t2 with
@@ -1018,14 +1074,14 @@ end = struct
       | _, Args _ -> 1
       | Args_with_safe _, _ -> -1
       | _, Args_with_safe _ -> 1
-      | Args_with_top { w = w1; args = a1 }, Args_with_top { w = w2; args = a2 }
-        ->
-        let c = Witnesses.compare w1 w2 in
+      | ( Args_with_top { top = top1; args = a1 },
+          Args_with_top { top = top2; args = a2 } ) ->
+        let c = Top.compare top1 top2 in
         if c <> 0 then c else Args.compare a1 a2
 
     let get_unresolved_names t =
       match t with
-      | Args_with_safe args | Args_with_top { w = _; args } | Args args ->
+      | Args_with_safe args | Args_with_top { top = _; args } | Args args ->
         let vars, trs = Args.get args in
         String.Set.union
           (Vars.get_unresolved_name vars)
@@ -1035,15 +1091,15 @@ end = struct
       match t with
       | Args_with_safe args ->
         Format.fprintf ppf "(join:@.Safe@.%a)@." (Args.print ~witnesses) args
-      | Args_with_top { w; args } ->
-        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) w
-          (Args.print ~witnesses) args
+      | Args_with_top { top; args } ->
+        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses)
+          top.witnesses (Args.print ~witnesses) args
       | Args args ->
         Format.fprintf ppf "(join:@.%a)@." (Args.print ~witnesses) args
   end
 
   type t =
-    | Resolved of Witnesses.t Zero_alloc_utils.Component.t
+    | Resolved of Top.t Zero_alloc_utils.Component.t
     (* unresolved *)
     | Var of
         { var : Var.t;
@@ -1058,7 +1114,11 @@ end = struct
 
   let safe = Resolved Safe
 
-  let top w = Resolved (Top w)
+  let top witnesses =
+    Resolved
+      (Top
+         { allocation_sources = Allocation_other_than_calling_arguments;
+           witnesses })
 
   let is_resolved t =
     match t with Resolved _ -> true | Var _ | Join _ | Transform _ -> false
@@ -1073,8 +1133,10 @@ end = struct
   let print ~witnesses ppf t =
     match t with
     | Resolved component ->
-      Zero_alloc_utils.Component.print ~print_top:(pp_top ~witnesses) ppf
-        component
+      Zero_alloc_utils.Component.print
+        ~print_top:(fun ppf ({ witnesses = w; _ } : Top.t) ->
+          pp_top ~witnesses ppf w)
+        ppf component
     | Var { var; witnesses = w } -> pp_var ~witnesses ppf var w
     | Join j -> Format.fprintf ppf "(join %a)@," (Join.print ~witnesses) j
     | Transform tr ->
@@ -1085,7 +1147,7 @@ end = struct
     | Var _ | Join _ | Transform _ -> unresolved ()
 
   let get_witnesses = function
-    | Resolved (Top w) -> w
+    | Resolved (Top { witnesses; _ }) -> witnesses
     | Resolved (Bot | Safe) -> Witnesses.empty
     | (Var _ | Transform _ | Join _) as t ->
       Misc.fatal_errorf "Zero_alloc_checker.get_witnesses: unresolved value %a"
@@ -1095,7 +1157,7 @@ end = struct
   let compare t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Zero_alloc_utils.Component.compare ~compare_top:Witnesses.compare c1 c2
+      Zero_alloc_utils.Component.compare ~compare_top:Top.compare c1 c2
     | Resolved _, (Var _ | Transform _ | Join _) -> -1
     | (Var _ | Transform _ | Join _), Resolved _ -> 1
     | Var { var = v1; witnesses = w1 }, Var { var = v2; witnesses = w2 } ->
@@ -1119,13 +1181,16 @@ end = struct
   let bounded_join f =
     try Join (f ())
     with Transforms.Widen witnesses ->
-      Resolved (Zero_alloc_utils.Component.Top witnesses)
+      Resolved
+        (Zero_alloc_utils.Component.Top
+           { witnesses;
+             allocation_sources = Allocation_other_than_calling_arguments })
 
   (* Keep [join] and [lessequal] in sync. *)
   let join t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Resolved (Zero_alloc_utils.Component.join ~join_top:Witnesses.join c1 c2)
+      Resolved (Zero_alloc_utils.Component.join ~join_top:Top.join c1 c2)
     | Resolved Bot, (Var _ | Transform _ | Join _) -> t2
     | (Var _ | Transform _ | Join _), Resolved Bot -> t1
     | Resolved Safe, Transform tr | Transform tr, Resolved Safe ->
@@ -1178,7 +1243,7 @@ end = struct
   let lessequal t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Zero_alloc_utils.Component.lessequal ~lessequal_top:Witnesses.lessequal c1
+      Zero_alloc_utils.Component.lessequal ~lessequal_top:Top.lessequal c1
         c2
     | Resolved Bot, (Var _ | Transform _ | Join _) -> true
     | (Var _ | Transform _ | Join _), Resolved Bot -> false
@@ -1204,7 +1269,7 @@ end = struct
     | Resolved Bot, _ | _, Resolved Bot -> Resolved Bot
     | Resolved Safe, t | t, Resolved Safe -> t
     | Resolved (Top w), Resolved (Top w') ->
-      Resolved (Top (Witnesses.join w w'))
+      Resolved (Top (Top.join w w'))
     | Resolved (Top w), Transform tr | Transform tr, Resolved (Top w) ->
       Transform (Transform.add_top tr w)
     | Resolved (Top w), Var { var; witnesses }
@@ -1237,23 +1302,40 @@ end = struct
 
   let replace_witnesses w t =
     match t with
-    | Resolved (Top _) -> Resolved (Top w)
+    | Resolved (Top { allocation_sources; _ }) ->
+      Resolved (Top { allocation_sources; witnesses = w })
     | Resolved (Bot | Safe) -> t
     | Join j -> Join (Join.replace_witnesses j w)
     | Transform tr -> Transform (Transform.replace_witnesses tr w)
     | Var { var; witnesses = _ } -> Var { var; witnesses = w }
+
+  let attribute_to_call_site witnesses t =
+    match t with
+    | Resolved (Top _) ->
+      Resolved
+        (Top
+           { witnesses;
+             (* CR-soon wsturgeon for wsturgeon: evaluate the conditional
+                guarantee of this call instead of assuming it will allocate
+                (work for the next PR in this split) *)
+              allocation_sources = Allocation_other_than_calling_arguments })
+    | Resolved (Bot | Safe) -> t
+    | Var _ | Transform _ | Join _ ->
+      Misc.fatal_errorf
+        "Zero_alloc_checker.attribute_to_call_site: unresolved value %a"
+        (print ~witnesses:false) t
 
   let diff_witnesses ~expected ~actual =
     (* If [actual] is Top and [expected] is not Top then return the [actual]
        witnesses. Otherwise, return empty. *)
     match actual, expected with
     | Resolved (Bot | Safe), Resolved (Bot | Safe) -> Witnesses.empty
-    | Resolved Bot, Resolved (Top w)
-    | Resolved Safe, Resolved (Top w)
-    | Resolved (Top _), Resolved (Top w) ->
-      assert (Witnesses.is_empty w);
+    | Resolved Bot, Resolved (Top { witnesses; _ })
+    | Resolved Safe, Resolved (Top { witnesses; _ })
+    | Resolved (Top _), Resolved (Top { witnesses; _ }) ->
+      assert (Witnesses.is_empty witnesses);
       Witnesses.empty
-    | Resolved (Top w), Resolved (Bot | Safe) -> w
+    | Resolved (Top { witnesses; _ }), Resolved (Bot | Safe) -> witnesses
     | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
       Misc.fatal_errorf
         "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
@@ -1263,7 +1345,7 @@ end = struct
   let meet t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Resolved (Zero_alloc_utils.Component.meet ~meet_top:Witnesses.meet c1 c2)
+      Resolved (Zero_alloc_utils.Component.meet ~meet_top:Top.meet c1 c2)
     | (Var _ | Transform _ | Join _), _ | _, (Var _ | Transform _ | Join _) ->
       Misc.fatal_error
         "Meet of unresolved is not implemented and shouldn't be needed."
