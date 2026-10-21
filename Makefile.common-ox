@@ -441,7 +441,7 @@ promote-one-no-rebuild:
 # under --only-packages the recursive forms fail on external/merlin's promoted
 # parsers, so build them non-recursively.
 merlin_index_packages = ocaml,oxcaml,oxcaml-dev
-have_ocaml_index = $(shell command -v ocaml-index)
+have_ocaml_index = $(shell $(opam_exec) which ocaml-index 2>/dev/null)
 merlin_index_flags = $(if $(have_ocaml_index),--only-packages $(merlin_index_packages))
 merlin_index_target = $(if $(have_ocaml_index),@@merlin-index)
 
