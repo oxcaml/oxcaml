@@ -2020,10 +2020,9 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~resolved:(Zero_alloc_utils.Component.map ~f:(fun _witnesses ->
-        Component.Top
-          (* CR wsturgeon for wsturgeon: inspect witnesses to refine this *)
-          Allocation_sources.Allocation_other_than_calling_arguments))
+      ~resolved:Zero_alloc_utils.(Component.map ~f:(fun _witnesses ->
+        (* CR wsturgeon for wsturgeon: inspect witnesses to refine this *)
+        Allocation_sources.Allocation_other_than_calling_arguments))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
