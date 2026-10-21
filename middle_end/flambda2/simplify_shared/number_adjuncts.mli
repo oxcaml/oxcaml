@@ -47,6 +47,8 @@ module type Num_common = sig
 
   val to_const : t -> Reg_width_const.t
 
+  val of_const : Reg_width_const.t -> t option
+
   val to_immediate : t -> Target_system.Machine_width.t -> Target_ocaml_int.t
 
   val to_naked_float32 : t -> Numeric_types.Float32_by_bit_pattern.t

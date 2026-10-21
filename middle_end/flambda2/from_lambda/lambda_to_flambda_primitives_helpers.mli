@@ -79,6 +79,21 @@ val print_list_of_lists_of_simple_or_prim :
 
 open Closure_conversion_aux
 
+(** Constant folding of primitives applied to known constants, used in classic
+    mode where the simplifier does not run. The evaluation semantics are those
+    of the simplifier. *)
+val fold_unary_int_primitive :
+  Flambda_primitive.unary_primitive ->
+  Reg_width_const.t ->
+  Reg_width_const.t option
+
+val fold_binary_primitive :
+  Target_system.Machine_width.t ->
+  Flambda_primitive.binary_primitive ->
+  Reg_width_const.t ->
+  Reg_width_const.t ->
+  Reg_width_const.t option
+
 val bind_recs :
   Acc.t ->
   Exn_continuation.t option ->

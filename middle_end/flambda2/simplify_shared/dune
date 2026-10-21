@@ -6,6 +6,8 @@
  (flags
   (:standard
    -open
+   Flambda2_algorithms
+   -open
    Flambda2_identifiers
    -open
    Flambda2_bound_identifiers
@@ -31,6 +33,7 @@
    Int_replace_polymorphic_compare))
  (libraries
   ocamlfrontend
+  flambda2_algorithms
   flambda2_identifiers
   flambda2_bound_identifiers
   flambda2_ui
