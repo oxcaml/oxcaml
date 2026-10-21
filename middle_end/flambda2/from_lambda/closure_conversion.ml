@@ -2422,7 +2422,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   let main_name = Function_slot.name unboxed_function_slot in
   let main_closure = Variable.create main_name K.value in
   let main_closure_duid = Flambda_debug_uid.none in
-  let return_continuation = Continuation.create () in
+  let return_continuation = Continuation.create ~sort:Return () in
   let exn_continuation = Continuation.create () in
   let my_closure = Variable.create "my_closure" K.value in
   let my_alloc_region = Variable.create "my_alloc_region" K.region in

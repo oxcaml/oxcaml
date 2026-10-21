@@ -59,7 +59,10 @@ type head_atom =
 type plan =
   { tables : bound_table iarray;
     input_stages : stage iarray;
-    num_existentials : int;
+    existential_stages : stage iarray;
+    (* Variables bound by existential stages are not accessible in the output,
+       which allows skipping the full existential stage once we have found any
+       satisfying instance. *)
     output_atoms : head_atom iarray
   }
 
