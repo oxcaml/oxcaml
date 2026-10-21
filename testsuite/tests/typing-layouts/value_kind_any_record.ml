@@ -143,3 +143,76 @@ let either (v : float# inline) (w : float# inline) =
   (apply (field_imm 1 (global Toploop!)) "either" either))
 val either : float# inline -> float# inline -> int = <fun>
 |}]
+
+(* The value kind of an unboxed record (or variant) whose parameter has layout
+   [any] is computed from its field type instantiated with the type arguments.
+   Here the field is an [or_null]. *)
+type ('a : any) unboxed_record = { field : 'a } [@@unboxed]
+[%%expect{|
+0
+type ('a : any) unboxed_record = { field : 'a; } [@@unboxed]
+|}]
+
+let unboxed_record_or_null (x : int) : int or_null unboxed_record =
+  { field = This x }
+[%%expect{|
+(let (unboxed_record_or_null = (function {nlocal = 0} x[value<int>] x))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_record_or_null"
+    unboxed_record_or_null))
+val unboxed_record_or_null : int -> int or_null unboxed_record = <fun>
+|}]
+
+let unboxed_record_or_null_poly (x : 'a) : 'a or_null unboxed_record =
+  { field = This x }
+[%%expect{|
+(let (unboxed_record_or_null_poly = (function {nlocal = 0} x x))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_record_or_null_poly"
+    unboxed_record_or_null_poly))
+val unboxed_record_or_null_poly :
+  ('a : value_maybe_separable). 'a -> 'a or_null unboxed_record = <fun>
+|}]
+
+type ('a : any) unboxed_variant = U of 'a [@@unboxed]
+[%%expect{|
+0
+type ('a : any) unboxed_variant = U of 'a [@@unboxed]
+|}]
+
+let unboxed_variant_or_null (x : int) : int or_null unboxed_variant =
+  U (This x)
+[%%expect{|
+(let (unboxed_variant_or_null = (function {nlocal = 0} x[value<int>] x))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_variant_or_null"
+    unboxed_variant_or_null))
+val unboxed_variant_or_null : int -> int or_null unboxed_variant = <fun>
+|}]
+
+type ('a : any) boxed_record = { boxed_field : 'a }
+[%%expect{|
+0
+type ('a : any) boxed_record = { boxed_field : 'a; }
+|}]
+
+let unboxed_product_or_null (x : int) : int or_null boxed_record# =
+  #{ boxed_field = This x }
+[%%expect{|
+(let (unboxed_product_or_null = (function {nlocal = 0} x[value<int>] x))
+  (apply (field_imm 1 (global Toploop!)) "unboxed_product_or_null"
+    unboxed_product_or_null))
+val unboxed_product_or_null : int -> int or_null boxed_record# = <fun>
+|}]
+
+(* Deep enough nesting that [value_kind] gives up and falls back to the jkind
+   of the type, rather than the [any] jkind of the declaration. *)
+let nested_unboxed_record_or_null (r : int or_null unboxed_record unboxed_record
+                                         unboxed_record) = r
+[%%expect{|
+(let
+  (nested_unboxed_record_or_null =
+     (function {nlocal = 0} r[value_or_null<int>] : int r))
+  (apply (field_imm 1 (global Toploop!)) "nested_unboxed_record_or_null"
+    nested_unboxed_record_or_null))
+val nested_unboxed_record_or_null :
+  int or_null unboxed_record unboxed_record unboxed_record ->
+  int or_null unboxed_record unboxed_record unboxed_record = <fun>
+|}]
