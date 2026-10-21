@@ -348,6 +348,9 @@ module Partial = struct
 
   let[@inline never] sum3 ~a ~b ~c = a + b + c
 
+  let[@inline never] text ?(indent = 0) ~wrap s =
+    String.make indent ' ' ^ s ^ string_of_int wrap
+
   let[@inline never] omit_first x = labelled ~b:x
 
   let neg = ( ~- )
@@ -363,6 +366,11 @@ let curried = Partial.labelled ~a:(Sys.opaque_identity 1)
 let first = Partial.sum3 ~a:(Sys.opaque_identity 1)
 
 let second = first ~b:(Sys.opaque_identity 2)
+
+(* Applying a function with optional arguments to a labelled argument only
+   makes the type checker eta-expand the application; the resulting
+   closure is the partial application too: [render.partial{Partial.text}]. *)
+let[@inline never] render l = List.map (Partial.text ~wrap:80) l
 
 (* {1 Primitives re-exported as values}
 
@@ -418,6 +426,7 @@ let _ =
   ignore (Partial.neg 5);
   ignore (curried ~b:6);
   ignore (second ~c:7);
+  ignore (render [ "a" ]);
   ignore (pick true);
   ignore (Prims.( < ) 1 2);
   ignore (Prims.compare 1 2)
