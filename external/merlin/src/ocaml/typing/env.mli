@@ -761,7 +761,12 @@ type error =
                 (most-recent loader first). *)
       }
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
+
+  val log_or_raise : error -> unit
+  val log_and_raise : error -> 'a
+end
 
 val in_signature: bool -> t -> t
 
@@ -876,10 +881,6 @@ val add_merlin_extension_module: Ident.t -> module_type -> t -> t
 val cleanup_functor_caches : stamp:int -> unit
 val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
 val cleanup_usage_tables : stamp:int -> unit
-
-(** This value should be filled in with [Msupport.raise_error]. [Env] cannot use this
-    function directly because [Msupport] depends on [Env] *)
-val msupport_raise_error : (?ignore_unify:bool -> exn -> unit) ref
 
 type 'acc fold_all_labels_f = {
   fold_all_labels_f : 'rcd. 'rcd record_form -> 'rcd gen_label_description -> 'acc -> 'acc

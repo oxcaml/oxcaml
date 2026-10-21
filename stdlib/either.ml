@@ -14,6 +14,7 @@
 (**************************************************************************)
 
 [@@@ocaml.flambda_o3]
+open! Stdlib
 
 type ('a : any, 'b : any) t = Left of 'a | Right of 'b
 

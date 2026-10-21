@@ -248,6 +248,9 @@ val defined_variables_by_scope : t -> Lifted_cont_params.t list
 
 val enter_continuation_handler : Lifted_cont_params.t -> t -> t
 
+val add_lifted_constant_state :
+  ?maybe_already_defined:unit -> t -> Lifted_constant_state.t -> t
+
 val variables_defined_in_current_continuation : t -> Lifted_cont_params.t
 
 val cost_of_lifting_continuations_out_of_current_one : t -> int
@@ -278,3 +281,7 @@ val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
 val has_seen_a_non_liftable_continuation : t -> bool
 
 val set_has_seen_a_non_liftable_continuation : t -> t
+
+val is_cold : t -> bool
+
+val mark_as_cold : t -> t

@@ -60,18 +60,6 @@ type error. The exact output may change slightly -- that's fine.
       {
         "start": {
           "line": 1,
-          "col": 8
-        },
-        "end": {
-          "line": 1,
-          "col": 25
-        },
-        "type": "int",
-        "tail": "no"
-      },
-      {
-        "start": {
-          "line": 1,
           "col": 1
         },
         "end": {
@@ -142,18 +130,6 @@ type error. The exact output may change slightly -- that's fine.
       {
         "start": {
           "line": 1,
-          "col": 8
-        },
-        "end": {
-          "line": 1,
-          "col": 37
-        },
-        "type": "int",
-        "tail": "no"
-      },
-      {
-        "start": {
-          "line": 1,
           "col": 1
         },
         "end": {
@@ -181,30 +157,6 @@ type error. The exact output may change slightly -- that's fine.
         "end": {
           "line": 1,
           "col": 19
-        },
-        "type": "int",
-        "tail": "no"
-      },
-      {
-        "start": {
-          "line": 1,
-          "col": 8
-        },
-        "end": {
-          "line": 1,
-          "col": 40
-        },
-        "type": "int -> ?z:int -> int -> int",
-        "tail": "no"
-      },
-      {
-        "start": {
-          "line": 1,
-          "col": 8
-        },
-        "end": {
-          "line": 1,
-          "col": 40
         },
         "type": "int",
         "tail": "no"

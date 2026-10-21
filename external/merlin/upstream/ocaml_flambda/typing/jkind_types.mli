@@ -85,7 +85,7 @@ module Sort : sig
        and type univar := univar
        and type base := base
 
-  val set_change_log : (change -> unit) -> unit
+  include With_backtracking.S with module Change := Change
 
   val equate : allow_mutation:bool -> t -> t -> bool
 

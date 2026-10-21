@@ -3054,13 +3054,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           block,
           new_ref_value ) ]
   | Pctconst const, _ -> (
-    match !Clflags.jsir with
-    | true ->
+    if Clflags.target_is_jsir ()
+    then
       Misc.fatal_errorf
         "Saw %a in JSIR mode, but it should've been simplified away in \
          [Lambda_to_lambda_transforms]:@ %a"
         Printlambda.primitive prim Debuginfo.print_compact dbg
-    | false -> (
+    else
       match const with
       | Big_endian -> [Simple (Simple.const_bool machine_width big_endian)]
       | Word_size ->
@@ -3099,7 +3099,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Config.architecture "arm64")) ]
-      | Backend_type -> [Simple (Simple.const_zero machine_width)]))
+      | Backend_type -> [Simple (Simple.const_zero machine_width)])
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)

@@ -65,7 +65,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
 let event_before loc exp lam = match lam with
 | Lstaticraise (_,_) -> lam
 | _ ->
-  if !Clflags.debug && not !Clflags.native_code
+  if !Clflags.debug && not (Clflags.target_is_native ())
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_before;
                     lev_repr = None;
@@ -73,7 +73,7 @@ let event_before loc exp lam = match lam with
   else lam
 
 let event_after loc exp lam =
-  if !Clflags.debug && not !Clflags.native_code
+  if !Clflags.debug && not (Clflags.target_is_native ())
   then Levent(lam, {lev_loc = loc;
                     lev_kind = Lev_after exp.exp_type;
                     lev_repr = None;
@@ -1812,7 +1812,7 @@ let peek_or_poke_layout_from_type ~prim_name error_loc env ty
        slambda eval. *)
     raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
   | Some _ | None ->
-  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
+  match Ctype.type_sort ~why:Peek_or_poke ~allow_mutation:false env ty with
   | Error _ -> None
   | Ok sort ->
     let sort = Jkind.Sort.default_to_scannable_and_get sort in
@@ -2578,7 +2578,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
             loc, layout, Unyielding)
   | Send_cache (apos, layout), [obj; meth; cache; pos] ->
       (* Cached mode only works in the native backend *)
-      if !Clflags.native_code then
+      if Clflags.target_is_native () then
         Lsend(Cached, meth, obj, [cache; pos], apos,
               not_alloc_stack, loc, layout,
               Unyielding)
@@ -2586,7 +2586,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
         Lsend(Public, meth, obj, [], apos, not_alloc_stack,
               loc, layout, Unyielding)
   | Frame_pointers, [] ->
-     (of_bool (!Clflags.native_code && Config.with_frame_pointers))
+     (of_bool (Clflags.target_is_native () && Config.with_frame_pointers))
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->
@@ -2801,9 +2801,9 @@ let transl_primitive
      let zero_alloc : Lambda.zero_alloc_attribute =
        match (zero_alloc_check : Zero_alloc.check option) with
        | None -> Default_zero_alloc
-       | Some { strict; opt; arity = _; loc; custom_error_msg } ->
+       | Some { strict; opt; arity = _; partial; loc; custom_error_msg } ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-         then Check { strict; loc; custom_error_msg }
+         then Check { strict; loc; custom_error_msg; partial }
          else Default_zero_alloc
      in
      lfunction

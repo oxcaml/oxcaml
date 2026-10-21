@@ -19,13 +19,9 @@ val create_stats : ?with_provenance:bool -> Table.Map.t -> stats
 
 val print_stats : Format.formatter -> stats -> unit
 
-type rule
-
-val create_rule : Lang.Variable.t_ list -> Lang.rule -> rule
-
 type t
 
-val saturate : rule list -> t
+val saturate : Lang.rule list -> t
 
 val fixpoint : t list -> t
 
