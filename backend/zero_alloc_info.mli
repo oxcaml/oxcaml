@@ -25,6 +25,15 @@ module Value : sig
     'a Zero_alloc_utils.Components.t
 end
 
+module Allocation_sources : sig
+  type t =
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of
+        { relevant_components_by_argument_index :
+            bool Zero_alloc_utils.Components.t Numbers.Int.Map.t
+        }
+end
+
 type t
 
 val create : unit -> t

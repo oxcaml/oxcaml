@@ -52,6 +52,15 @@ module Value = struct
       }
 end
 
+module Allocation_sources = struct
+  type t =
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of
+        { relevant_components_by_argument_index :
+            bool Zero_alloc_utils.Components.t Numbers.Int.Map.t
+        }
+end
+
 let get_value (t : t) s = String.Map.find_opt s t.zero_alloc
 
 let set_value (t : t) s (v : Value.t) =
