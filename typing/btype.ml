@@ -167,6 +167,9 @@ let add_to_sort_pool ~level v =
   let pool = pool_of_level level !pool_stack in
   pool.sort_pool <- v :: pool.sort_pool
 
+let () =
+  Jkind_types.Sort.set_add_to_pool add_to_sort_pool
+
 (**** Some type creators ****)
 
 let newty3 ~level ~scope desc =

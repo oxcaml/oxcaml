@@ -480,6 +480,11 @@ module Sort = struct
         v.contents v.level v.id
   end
 
+  let add_to_pool : (level:int -> t -> unit) ref =
+    ref (fun ~level:_ _ -> assert false)
+
+  let set_add_to_pool f = add_to_pool := f
+
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
   type sort_change =
     | Ccontents of t option
