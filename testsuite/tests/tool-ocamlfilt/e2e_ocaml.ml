@@ -466,6 +466,41 @@ module Nested_inst = Nested.Inner.Make (struct
   let x = 4
 end)
 
+(* A functor re-exported under a narrower signature, through a module alias
+   or directly: the field's coercion goes through the alias, and the wrapper
+   is named after the re-exported functor, [Reexport.Make.{coerce}] and
+   [Reexport_direct.Make.{coerce}]. *)
+module Reexport_impl (X : Coerced.S) = struct
+  let[@inline never] helper () = X.x * 3
+
+  let[@inline never] get () = helper () + 2
+end
+
+module Reexport : sig
+  module Make (X : Coerced.S) : sig
+    val get : unit -> int
+  end
+end = struct
+  module Alias = Reexport_impl
+  module Make = Alias
+end
+
+module Reexport_direct : sig
+  module Make (X : Coerced.S) : sig
+    val get : unit -> int
+  end
+end = struct
+  module Make = Reexport_impl
+end
+
+module Reexport_inst = Reexport.Make (struct
+  let x = 5
+end)
+
+module Reexport_direct_inst = Reexport_direct.Make (struct
+  let x = 6
+end)
+
 (* {1 A primitive used as a value}
 
    Passing a primitive such as [Fun.id] as a value eta-expands it into a
@@ -611,6 +646,8 @@ let _ =
   ignore (Captured.find_exn [ 1; 2 ] ~f:(fun x -> x > 1));
   ignore (Coerced_inst.get ());
   ignore (Nested_inst.get ());
+  ignore (Reexport_inst.get ());
+  ignore (Reexport_direct_inst.get ());
   ignore (First_class.use_id () 5);
   ignore (First_class.use_bump () 6);
   ignore (Generated.escape "a,b");
