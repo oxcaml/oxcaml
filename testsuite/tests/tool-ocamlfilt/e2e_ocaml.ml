@@ -501,6 +501,27 @@ module Reexport_direct_inst = Reexport_direct.Make (struct
   let x = 6
 end)
 
+(* An [external] coerced as an argument of [include functor] is wrapped like
+   one coerced by a signature, and the wrapper is named after the field:
+   [Include_functor.wrap], not [Include_functor.wrap.fn]. *)
+module type WRAP = sig
+  type t
+
+  val wrap : t -> int
+end
+
+module Make_scan (X : WRAP) = struct
+  let[@inline never] scan x = X.wrap x + 1
+end
+
+module Include_functor = struct
+  type t = int
+
+  external wrap : t -> int = "%identity"
+
+  include functor Make_scan
+end
+
 (* {1 A primitive used as a value}
 
    Passing a primitive such as [Fun.id] as a value eta-expands it into a
@@ -648,6 +669,7 @@ let _ =
   ignore (Nested_inst.get ());
   ignore (Reexport_inst.get ());
   ignore (Reexport_direct_inst.get ());
+  ignore (Include_functor.scan 3);
   ignore (First_class.use_id () 5);
   ignore (First_class.use_bump () 6);
   ignore (Generated.escape "a,b");
