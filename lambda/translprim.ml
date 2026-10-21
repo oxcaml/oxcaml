@@ -1890,7 +1890,8 @@ let rec mixed_block_element_with_any_mode
     Misc.fatal_error
       "Translprim.mixed_block_element_with_any_mode: unexpected [Float_boxed]"
   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-    | Vec512 | Mask | Word | Untagged_immediate | Splice_variable _ ) as elt ->
+    | Vec512 | Mask | Word | Untagged_immediate | Void | Splice_variable _ ) as
+    elt ->
     elt
 
 (* Specialize a primitive from available type information. *)
