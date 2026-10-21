@@ -469,11 +469,23 @@ end)
 (* {1 A primitive used as a value}
 
    Passing a primitive such as [Fun.id] as a value eta-expands it into a
-   closure, named after the primitive: [First_class.use_id.%identity]. *)
+   closure. Every such closure of a primitive does the same thing, so it is
+   named after the primitive's declaration rather than the use site:
+   [First_class.bump] below, and [Stdlib.Fun.id] for [use_id], a copy from
+   [Stdlib__Fun] shown at its definition site (the table excludes
+   stdlib-rooted symbols, so that one is only visible in the object; see
+   [e2e_inline.ml] for the cross-unit case). *)
 module First_class = struct
   let[@inline never] keep (f : int -> int) = Sys.opaque_identity f
 
   let[@inline never] use_id () = keep Fun.id
+
+  (* A C external used as a value: its closure is named after the external
+     as declared, [First_class.bump], not after the C symbol or the use
+     site, like the field a signature coercion makes of it. *)
+  external bump : int -> int = "caml_e2e_bump_stub"
+
+  let[@inline never] use_bump () = keep bump
 end
 
 (* {1 Compiler-generated variants of a function}
@@ -600,5 +612,6 @@ let _ =
   ignore (Coerced_inst.get ());
   ignore (Nested_inst.get ());
   ignore (First_class.use_id () 5);
+  ignore (First_class.use_bump () 6);
   ignore (Generated.escape "a,b");
   ignore (Generated.map [ 1; 2 ] ~f:(fun x -> x + 1))
