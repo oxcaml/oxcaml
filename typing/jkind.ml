@@ -661,14 +661,6 @@ module Layout = struct
     | Addressable t -> update_level level t
     | Box (t, _) -> update_level level t
 
-  let rec get_level : _ Layout.t -> int = function
-    | Any _ -> Btype.generic_level
-    | Sort (s, _) -> Sort.get_level s
-    | Product ts ->
-      List.fold_left (fun acc t -> min acc (get_level t)) Btype.generic_level ts
-    | Addressable t -> get_level t
-    | Box (t, _) -> get_level t
-
   let of_new_sort_var ~level sa =
     let sort = Sort.(of_var (new_var ~level)) in
     Sort (sort, sa), sort
@@ -3120,11 +3112,6 @@ let update_level level t =
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> Layout.update_level level l
-
-let get_level t =
-  match t.jkind.base with
-  | Kconstr _ -> Btype.generic_level
-  | Layout l -> Layout.get_level l
 
 let get t = Jkind_desc.get t.jkind
 
