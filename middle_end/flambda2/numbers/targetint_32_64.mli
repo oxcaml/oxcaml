@@ -135,6 +135,12 @@ val shift_right : t -> int -> t
     The result is unspecified if [y < 0] or [y >= bitsize]. *)
 val shift_right_logical : t -> int -> t
 
+val leading_zeros : t -> int
+
+val trailing_zeros : t -> int
+
+val popcount : t -> int
+
 (** Convert the given integer (type [int]) to a target integer (type [t]),
     modulo the target word size. *)
 val of_int : Target_system.Machine_width.t -> int -> t
