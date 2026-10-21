@@ -46,3 +46,28 @@ Database after schedule:
   edge(node:4, node:4).
   edge(node:5, node:4).
 
+Database after min_ancestor computation:
+  marked
+  ======
+  marked(node:1).
+  marked(node:2).
+  marked(node:4).
+  marked(node:5).
+  
+  edge
+  ====
+  edge(node:1, node:2).
+  edge(node:2, node:5).
+  edge(node:3, node:2).
+  edge(node:4, node:2).
+  edge(node:4, node:4).
+  edge(node:5, node:4).
+  
+  min_ancestor
+  ============
+  min_ancestor(node:1) = 1.
+  min_ancestor(node:2) = 1.
+  min_ancestor(node:3) = 3.
+  min_ancestor(node:4) = 1.
+  min_ancestor(node:5) = 1.
+
