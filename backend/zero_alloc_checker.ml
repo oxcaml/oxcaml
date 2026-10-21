@@ -2043,7 +2043,8 @@ end = struct
     Zero_alloc_info.Encoded.Components.encode_or_elide ~encode_component:encode
 
   let decode =
-    Zero_alloc_info.Encoded.Components.decode_maybe_elided ~decode_component:decode
+    Zero_alloc_info.Encoded.Components.decode_maybe_elided
+      ~decode_component:decode
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in
