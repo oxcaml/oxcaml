@@ -1143,12 +1143,17 @@ and transl_structure ~scopes loc
 and transl_include_functor ~generative ~input_repr ~yielding ~staticity
       modl params scopes loc =
   let input_repr = transl_module_representation input_repr in
+  (* The argument block is built like a structure coerced by a signature, so
+     that the wrappers its fields need (of a primitive declared as a value, of
+     a functor coerced to its parameter signature) are named after the field,
+     see [coerced_block]. *)
   let mod_block args =
-    Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
-          List.map (fun (name, cc) ->
-            apply_coercion loc Strict cc (Lvar name))
-            args,
-          loc)
+    let ids = Array.of_list (List.map fst args) in
+    coerced_block loc ~strict:Strict ~field_loc:(fun _ -> loc)
+      ~output_names:(List.map (fun (id, _) -> Ident.name id) args)
+      input_repr
+      (List.mapi (fun pos (_, cc) -> (pos, cc)) args)
+      (fun pos -> Lvar ids.(pos))
   in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl

@@ -30,8 +30,12 @@ camlE2e_ocaml__Make_N                                              E2e_ocaml.Mak
 camlE2e_ocaml__Make_N                                              E2e_ocaml.Make_N                                  (error)     E2e_ocaml.Make_N
 camlE2e_ocaml__Make_pair_N_M_code                                  E2e_ocaml.Make_pair_N_M_code                      (error)     E2e_ocaml.Make_pair_N_M_code
 camlE2e_ocaml__Make_pair_N                                         E2e_ocaml.Make_pair_N                             (error)     E2e_ocaml.Make_pair_N
+camlE2e_ocaml__Make_scan_N_M_code                                  E2e_ocaml.Make_scan_N_M_code                      (error)     E2e_ocaml.Make_scan_N_M_code
+camlE2e_ocaml__Make_scan_N                                         E2e_ocaml.Make_scan_N                             (error)     E2e_ocaml.Make_scan_N
 camlE2e_ocaml__Make_set_N                                          E2e_ocaml.Make_set_N                              (error)     E2e_ocaml.Make_set_N
 camlE2e_ocaml__Make_set_N_M_code                                   E2e_ocaml.Make_set_N_M_code                       (error)     E2e_ocaml.Make_set_N_M_code
+camlE2e_ocaml__Pmakeblock_N                                        E2e_ocaml.Pmakeblock_N                            (error)     E2e_ocaml.Pmakeblock_N
+camlE2e_ocaml__Pmakeblock_N                                        E2e_ocaml.Pmakeblock_N                            (error)     E2e_ocaml.Pmakeblock_N
 camlE2e_ocaml__Pmakeblock_N                                        E2e_ocaml.Pmakeblock_N                            (error)     E2e_ocaml.Pmakeblock_N
 camlE2e_ocaml__Pmakeblock_N                                        E2e_ocaml.Pmakeblock_N                            (error)     E2e_ocaml.Pmakeblock_N
 camlE2e_ocaml__Pmakeblock_N                                        E2e_ocaml.Pmakeblock_N                            (error)     E2e_ocaml.Pmakeblock_N
@@ -146,10 +150,10 @@ camlE2e_ocaml__fn$5be2e_ocaml.ml$3a354$2c36$2d$2d49$5d_N_M_code    E2e_ocaml.fn[
 camlE2e_ocaml__fn$5be2e_ocaml.ml$3a359$2c44$2d$2d65$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:359,44--65]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:359,44--65]_N_M_code
 camlE2e_ocaml__fn$5be2e_ocaml.ml$3a373$2c39$2d$2d62$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:373,39--62]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:373,39--62]_N_M_code
 camlE2e_ocaml__fn$5be2e_ocaml.ml$3a383$2c42$2d$2d72$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:383,42--72]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:383,42--72]_N_M_code
-camlE2e_ocaml__fn$5be2e_ocaml.ml$3a555$2c26$2d$2d1639$5d_N_M_code  E2e_ocaml.fn[e2e_ocaml.ml:555,26--1639]_N_M_code  (error)     E2e_ocaml.fn[e2e_ocaml.ml:555,26--1639]_N_M_code
-camlE2e_ocaml__fn$5be2e_ocaml.ml$3a579$2c13$2d$2d21$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:579,13--21]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:579,13--21]_N_M_code
-camlE2e_ocaml__fn$5be2e_ocaml.ml$3a646$2c40$2d$2d56$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:646,40--56]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:646,40--56]_N_M_code
-camlE2e_ocaml__fn$5be2e_ocaml.ml$3a654$2c36$2d$2d52$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:654,36--52]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:654,36--52]_N_M_code
+camlE2e_ocaml__fn$5be2e_ocaml.ml$3a576$2c26$2d$2d1639$5d_N_M_code  E2e_ocaml.fn[e2e_ocaml.ml:576,26--1639]_N_M_code  (error)     E2e_ocaml.fn[e2e_ocaml.ml:576,26--1639]_N_M_code
+camlE2e_ocaml__fn$5be2e_ocaml.ml$3a600$2c13$2d$2d21$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:600,13--21]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:600,13--21]_N_M_code
+camlE2e_ocaml__fn$5be2e_ocaml.ml$3a667$2c40$2d$2d56$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:667,40--56]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:667,40--56]_N_M_code
+camlE2e_ocaml__fn$5be2e_ocaml.ml$3a676$2c36$2d$2d52$5d_N_M_code    E2e_ocaml.fn[e2e_ocaml.ml:676,36--52]_N_M_code    (error)     E2e_ocaml.fn[e2e_ocaml.ml:676,36--52]_N_M_code
 camlE2e_ocaml__frametable                                          E2e_ocaml.frametable                              (error)     E2e_ocaml.frametable
 camlE2e_ocaml__gc_roots                                            E2e_ocaml.gc_roots                                (error)     E2e_ocaml.gc_roots
 camlE2e_ocaml__get_N_M_code                                        E2e_ocaml.get_N_M_code                            (error)     E2e_ocaml.get_N_M_code
@@ -243,6 +247,9 @@ camlE2e_ocaml__return_N_M_code                                     E2e_ocaml.ret
 camlE2e_ocaml__return_N                                            E2e_ocaml.return_N                                (error)     E2e_ocaml.return_N
 camlE2e_ocaml__scale_N_M_code                                      E2e_ocaml.scale_N_M_code                          (error)     E2e_ocaml.scale_N_M_code
 camlE2e_ocaml__scale_N                                             E2e_ocaml.scale_N                                 (error)     E2e_ocaml.scale_N
+camlE2e_ocaml__scan_N_M_code                                       E2e_ocaml.scan_N_M_code                           (error)     E2e_ocaml.scan_N_M_code
+camlE2e_ocaml__scan_N_M_code                                       E2e_ocaml.scan_N_M_code                           (error)     E2e_ocaml.scan_N_M_code
+camlE2e_ocaml__scan_N                                              E2e_ocaml.scan_N                                  (error)     E2e_ocaml.scan_N
 camlE2e_ocaml__siblings_and_nesting_N                              E2e_ocaml.siblings_and_nesting_N                  (error)     E2e_ocaml.siblings_and_nesting_N
 camlE2e_ocaml__siblings_and_nesting_N_M_code                       E2e_ocaml.siblings_and_nesting_N_M_code           (error)     E2e_ocaml.siblings_and_nesting_N_M_code
 camlE2e_ocaml__sum3_N                                              E2e_ocaml.sum3_N                                  (error)     E2e_ocaml.sum3_N
@@ -277,3 +284,5 @@ camlE2e_ocaml__with_opt_N                                          E2e_ocaml.wit
 camlE2e_ocaml__with_opt_N_M_code                                   E2e_ocaml.with_opt_N_M_code                       (error)     E2e_ocaml.with_opt_N_M_code
 camlE2e_ocaml__with_opt_inner_N                                    E2e_ocaml.with_opt_inner_N                        (error)     E2e_ocaml.with_opt_inner_N
 camlE2e_ocaml__with_opt_inner_N_M_code                             E2e_ocaml.with_opt_inner_N_M_code                 (error)     E2e_ocaml.with_opt_inner_N_M_code
+camlE2e_ocaml__wrap_N_M_code                                       E2e_ocaml.wrap_N_M_code                           (error)     E2e_ocaml.wrap_N_M_code
+camlE2e_ocaml__wrap_N                                              E2e_ocaml.wrap_N                                  (error)     E2e_ocaml.wrap_N
