@@ -677,9 +677,6 @@ val call_and_return :
   <fun>
 |}]
 
-(* CR dkalinichenko: the second definition should retain the [global] upper
-   bound on its intermediate closure. *)
-
 let opaque_return x y = Sys.opaque_identity x
 let global_opaque_return x : _ @ global = fun y -> Sys.opaque_identity x
 [%%expect{|
@@ -688,7 +685,8 @@ val opaque_return :
   'b @ 'm -> 'a @ [> aliased nonportable stateful dynamic] = <fun>
 val global_opaque_return :
   'a @ [< global many uncontended forkable unyielding read_write] ->
-  'b @ 'm -> 'a @ [> aliased nonportable stateful dynamic] = <fun>
+  ('b @ 'm -> 'a @ [> aliased nonportable stateful dynamic]) @ [< global > nonportable stateful] =
+  <fun>
 |}]
 
 let _ : (string -> (unit -> string) @ local) ref = ref opaque_return
