@@ -1,10 +1,10 @@
 ---
 layout: documentation-page
 collectionName: Kinds
-title: Implicit Kind Declarations
+title: Implicit kind declarations
 ---
 
-# Implicit Kind Declarations
+# Implicit kind declarations
 
 Type variable names can be declared to have *implicit kinds*.
 A type variable with a name that has an implicit kind will be instantiated
@@ -16,7 +16,7 @@ with that kind. Here's an example:
 type 'elt collection
 
 val singleton : 'elt -> 'elt collection
-val lenght : 'elt collection -> int
+val length : 'elt collection -> int
 ```
 
 This signature is equivalent to:
@@ -25,7 +25,7 @@ This signature is equivalent to:
 type ('elt : word) collection
 
 val singleton : ('elt : word) . 'elt -> 'elt collection
-val lenght : ('elt : word) . 'elt collection -> int
+val length : ('elt : word) . 'elt collection -> int
 ```
 
 You can declare implicit kinds for multiple variable names at once:
