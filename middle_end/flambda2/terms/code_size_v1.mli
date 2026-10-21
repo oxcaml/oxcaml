@@ -14,54 +14,33 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Computes an approximation for the code size corresponding to flambda terms.
-   The code size of a given term should be a rough estimate of the size of the
-   generated machine code. *)
-
-(** Values of type [t] may be negative *)
-type t
-
-(* Both are only there temporarly *)
-val of_int : int -> t
-
-val to_int : t -> int
-
-val zero : t
-
-val ( + ) : t -> t -> t
-
-val ( - ) : t -> t -> t
-
-val ( <= ) : t -> t -> bool
-
-val equal : t -> t -> bool
-
-val print : Format.formatter -> t -> unit
+(* The original code size model: estimates for individual Flambda terms, as
+   plain integers that do not depend on the target architecture. The
+   representation of sizes used by the rest of the compiler, and the arithmetic
+   on them, are in [Code_size], which wraps this module. *)
 
 val box_number :
   machine_width:Target_system.Machine_width.t ->
   Flambda_kind.Boxable_number.t ->
-  t
+  int
 
-val block : int -> t
+val block : int -> int
 
-val array : int -> t
+val array : int -> int
 
 val prim :
-  machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> t
+  machine_width:Target_system.Machine_width.t -> Flambda_primitive.t -> int
 
-val simple : Simple.t -> t
+val simple : Simple.t -> int
 
-val static_consts : unit -> t
+val static_consts : unit -> int
 
-val apply : Apply_expr.t -> t
+val apply : Apply_expr.t -> int
 
-val apply_cont : Apply_cont_expr.t -> t
+val apply_cont : Apply_cont_expr.t -> int
 
-val switch : Switch_expr.t -> t
+val switch : Switch_expr.t -> int
 
-val invalid : t
+val invalid : int
 
-val evaluate : args:Inlining_arguments.t -> t -> float
-
-val alloc_size : t
+val alloc_size : int

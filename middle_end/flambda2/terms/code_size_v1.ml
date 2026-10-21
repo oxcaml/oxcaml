@@ -16,18 +16,6 @@
 
 [@@@warning "-fragile-match"]
 
-type t = int
-
-let zero = 0
-
-let equal (a : t) (b : t) = a = b
-
-let ( + ) (a : t) (b : t) : t = a + b
-
-let ( - ) (a : t) (b : t) : t = a - b
-
-let ( <= ) (a : t) (b : t) = a <= b
-
 (* These functions are now available in Target_system.Machine_width *)
 
 (* Constants *)
@@ -577,11 +565,3 @@ let apply_cont apply_cont =
 let invalid = 0
 
 let switch switch = 0 + (5 * Switch_expr.num_arms switch)
-
-let [@ocamlformat "disable"] print ppf t = Format.fprintf ppf "%d" t
-
-let of_int t = t
-
-let to_int t = t
-
-let evaluate ~args:_ t = float_of_int t
