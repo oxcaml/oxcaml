@@ -43,7 +43,7 @@
  (if
    (!= (or (>>u (<< (load_mut int (+a t1/0 -8)) 8) 17) 1)
      (or (>>u (<< (load_mut int (+a t2/0 -8)) 8) 17) 1))
-   (raise_notrace{invalid.ml:25,45-63;stdlib.ml:39,17-33}
+   (raise_notrace{invalid.ml:25,45-63;stdlib/stdlib.ml:39,17-33}
      L:"camlInvalid__Pmakeblock_5")
    1) )
 

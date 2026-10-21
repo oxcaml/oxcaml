@@ -40,7 +40,7 @@ Error: Annotation check for zero_alloc strict failed on function Test_inference.
 File "test_inference.ml", line 70, characters 12-35:
 Error: called function may allocate on a path to exceptional return (indirect call)
 
-File "printf.ml", line 51, characters 18-43:
+File "stdlib/printf.ml", line 51, characters 18-43:
 Error: called function may allocate on a path to exceptional return (direct call camlStdlib__Printf__ksprintf_HIDE_STAMP)
 inlined from
 test_inference.ml:70,12--35[Test_inference.f_strict_fail]

@@ -134,7 +134,7 @@
     "class": "return",
     "value": [
       {
-        "file": "hashtbl.mli",
+        "file": "stdlib/hashtbl.mli",
         "start": {
           "line": 122,
           "col": 0
@@ -150,7 +150,7 @@
         "constructible": "Hashtbl.add _ _ _"
       },
       {
-        "file": "hashtbl.mli",
+        "file": "stdlib/hashtbl.mli",
         "start": {
           "line": 157,
           "col": 0
@@ -166,7 +166,7 @@
         "constructible": "Hashtbl.replace _ _ _"
       },
       {
-        "file": "hashtbl.mli",
+        "file": "stdlib/hashtbl.mli",
         "start": {
           "line": 307,
           "col": 0
@@ -182,7 +182,7 @@
         "constructible": "Hashtbl.add_seq _ _"
       },
       {
-        "file": "hashtbl.mli",
+        "file": "stdlib/hashtbl.mli",
         "start": {
           "line": 311,
           "col": 0
@@ -198,7 +198,7 @@
         "constructible": "Hashtbl.replace_seq _ _"
       },
       {
-        "file": "moreLabels.mli",
+        "file": "stdlib/moreLabels.mli",
         "start": {
           "line": 326,
           "col": 2
@@ -214,7 +214,7 @@
         "constructible": "MoreLabels.Hashtbl.add_seq _ _"
       },
       {
-        "file": "moreLabels.mli",
+        "file": "stdlib/moreLabels.mli",
         "start": {
           "line": 330,
           "col": 2
@@ -230,7 +230,7 @@
         "constructible": "MoreLabels.Hashtbl.replace_seq _ _"
       },
       {
-        "file": "result.mli",
+        "file": "stdlib/result.mli",
         "start": {
           "line": 64,
           "col": 0
@@ -246,7 +246,7 @@
         "constructible": "Result.bind _ _"
       },
       {
-        "file": "result.mli",
+        "file": "stdlib/result.mli",
         "start": {
           "line": 76,
           "col": 0
@@ -262,7 +262,7 @@
         "constructible": "Result.product _ _"
       },
       {
-        "file": "result.mli",
+        "file": "stdlib/result.mli",
         "start": {
           "line": 158,
           "col": 2
@@ -278,7 +278,7 @@
         "constructible": "Result.Syntax.and* _ _"
       },
       {
-        "file": "result.mli",
+        "file": "stdlib/result.mli",
         "start": {
           "line": 164,
           "col": 2

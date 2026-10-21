@@ -31,7 +31,7 @@ Error: Annotation check for zero_alloc strict failed on function Fail29_opt2.che
 File "fail29_opt2.ml", line 17, characters 38-76:
 Error: called function may allocate on a path to exceptional return (indirect call)
 
-File "printf.ml", line 51, characters 18-43:
+File "stdlib/printf.ml", line 51, characters 18-43:
 Error: called function may allocate on a path to exceptional return (direct call camlStdlib__Printf__ksprintf_HIDE_STAMP)
 inlined from
 fail29_opt2.ml:17,38--76[Fail29_opt2.check_me_strict]

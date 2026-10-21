@@ -99,7 +99,7 @@ let gen_rule ~ppf ~tgt_file ~base ~deps =
       Printf.fprintf ppf
         "(rule\n\
         \  (with-stdout-to %s\n\
-        \    (progn (echo \"# 2 \\\"%s\\\"\\n\") (cat ../%s))))\n\n"
+        \    (progn (echo \"# 2 \\\"stdlib/%s\\\"\\n\") (cat ../%s))))\n\n"
     src src src
   end;
   match ext with
