@@ -202,7 +202,7 @@ type 'cu path_item =
 
 and 'cu path = 'cu path_item list
 
-let rec mangle_path_item ~current_unit buf path_item =
+let rec mangle_path_item ~definition_unit buf path_item =
   let tag_prefixed ~tag sym = Printf.bprintf buf "%s%a" tag encode sym in
   (* A decimal number cannot be length-prefixed like an identifier (the two
      would run together), so it is terminated by [_] instead, which cannot start
@@ -224,40 +224,44 @@ let rec mangle_path_item ~current_unit buf path_item =
   | Anonymous_function n -> tag_prefixed_number ~tag:tag_anonymous_function n
   | Lazy n -> tag_prefixed_number ~tag:tag_lazy n
   | Partial callee ->
-    (* As for the enclosing path (see [mangle_ident]), the callee is only
-       qualified by its compilation unit when that is not the current one. The
-       number of items lets the parser know where the callee's path ends and the
-       enclosing path resumes. *)
+    (* The callee is only qualified by its compilation unit when that is not the
+       unit the enclosing function is defined in (see [mangle_ident]), so that
+       the item is the same in that unit and in the units into which a copy of
+       the function is specialized by inlining. The number of items lets the
+       parser know where the callee's path ends and the enclosing path
+       resumes. *)
     let callee =
       match callee with
       | Compilation_unit cu :: callee
-        when Compilation_unit.equal cu current_unit ->
+        when Compilation_unit.equal cu definition_unit ->
         callee
       | callee -> callee
     in
     tag_prefixed_number ~tag:tag_partial_function (List.length callee);
-    mangle_path ~current_unit buf callee
+    mangle_path ~definition_unit buf callee
   | Stamp n -> tag_prefixed_number ~tag:tag_stamp n
 
-and mangle_path ~current_unit buf path =
-  List.iter (mangle_path_item ~current_unit buf) path
+and mangle_path ~definition_unit buf path =
+  List.iter (mangle_path_item ~definition_unit buf) path
 
 let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
   (* Compare the current compilation unit with the one recorded in the [path] to
      avoid repetition in the mangled name when they are identical, and to add an
      explicit inline tag to separate the two compilation units (the one
-     currently created and the source of the code) when they differ. *)
-  let path =
-    Compilation_unit cu
-    ::
-    (match path with
-    | Compilation_unit cu' :: path' when Compilation_unit.equal cu cu' -> path'
-    | Compilation_unit _ :: _ -> Inline_marker :: path
-    | _ -> path)
+     currently created and the source of the code) when they differ. The unit
+     recorded in the path, where the function is defined, is also the one the
+     callees of partial applications are made relative to. *)
+  let definition_unit, path =
+    match path with
+    | Compilation_unit cu' :: path' when Compilation_unit.equal cu cu' ->
+      cu, Compilation_unit cu :: path'
+    | Compilation_unit cu' :: _ ->
+      cu', Compilation_unit cu :: Inline_marker :: path
+    | _ -> cu, Compilation_unit cu :: path
   in
   let b = Buffer.create 10 in
   Buffer.add_string b ocaml_prefix;
-  mangle_path ~current_unit:cu b path;
+  mangle_path ~definition_unit b path;
   Buffer.contents b
 
 module Parse = struct
