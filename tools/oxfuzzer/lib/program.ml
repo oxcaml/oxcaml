@@ -8,6 +8,7 @@ module Function = Ir.Function
 module Name = Ir.Name
 module NumberTy = Ir.NumberTy
 module Statement = Ir.Statement
+module Sum = Ir.Sum
 module Ty = Ir.Ty
 
 type t =
@@ -297,44 +298,46 @@ let rec print_value path ty expr =
         let path = path ^ "_field_" ^ string_of_int field.index in
         Exp.sequence (print_value path field.ty value) acc)
       record.fields unit_
-  | Ty.Variant variant ->
-    let cases =
-      List.map
-        (fun (constructor : Ty.constructor) ->
-          let args =
-            List.mapi
-              (fun index ty ->
-                let name =
-                  Format.sprintf "%s_case_%d_arg_%d" path
-                    constructor.constructor_index index
-                in
-                Name.of_string name, ty)
-              constructor.args
-          in
-          let body =
-            List.fold_right
-              (fun (name, ty) body ->
-                let name = Name.to_string name in
-                Exp.sequence (print_value name ty (ident name)) body)
-              args unit_
-          in
-          let tag =
-            apply
-              (qualified_ident "Printf" "printf")
-              [ Exp.constant
-                  (Const.string (Ty.constructor_name variant constructor ^ " "))
-              ]
-          in
-          Exp.case
-            (Ty.constructor_pattern variant constructor (List.map fst args))
-            (Exp.sequence tag body))
-        variant.constructors
-    in
-    Exp.match_ expr cases
+  | Ty.Variant variant -> print_sum path (Sum.Variant variant) expr
+  | Ty.Or_null payload -> print_sum path (Sum.Or_null payload) expr
   | Ty.Bool ->
     apply
       (qualified_ident "Printf" "printf")
       [Exp.constant (Const.string "%b "); expr]
+
+and print_sum path sum expr =
+  let cases =
+    List.map
+      (fun (constructor : Ty.constructor) ->
+        let args =
+          List.mapi
+            (fun index ty ->
+              let name =
+                Format.sprintf "%s_case_%d_arg_%d" path
+                  constructor.constructor_index index
+              in
+              Name.of_string name, ty)
+            constructor.args
+        in
+        let body =
+          List.fold_right
+            (fun (name, ty) body ->
+              let name = Name.to_string name in
+              Exp.sequence (print_value name ty (ident name)) body)
+            args unit_
+        in
+        let tag =
+          apply
+            (qualified_ident "Printf" "printf")
+            [ Exp.constant
+                (Const.string (Sum.constructor_name sum constructor ^ " ")) ]
+        in
+        Exp.case
+          (Sum.constructor_pattern sum constructor (List.map fst args))
+          (Exp.sequence tag body))
+      (Sum.constructors sum)
+  in
+  Exp.match_ expr cases
 
 let to_code
     { swarm;

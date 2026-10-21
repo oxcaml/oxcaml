@@ -159,6 +159,7 @@ module Ty = struct
     | Array of NumberTy.t * int list
     | Record of record
     | Variant of variant
+    | Or_null of t
     | Bool
 
   and record =
@@ -183,15 +184,16 @@ module Ty = struct
       args : t list
     }
 
-  let equal left right =
+  let rec equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
     | Array (l, ls), Array (r, rs) ->
       NumberTy.equal l r && List.equal Int.equal ls rs
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
+    | Or_null l, Or_null r -> equal l r
     | Bool, Bool -> true
-    | (Number _ | Array _ | Record _ | Variant _ | Bool), _ -> false
+    | (Number _ | Array _ | Record _ | Variant _ | Or_null _ | Bool), _ -> false
 
   let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
 
@@ -199,7 +201,49 @@ module Ty = struct
     Format.sprintf "Variant_%d_C%d" variant.variant_id
       constructor.constructor_index
 
-  let constructor_pattern variant constructor names =
+  let record_name { id; unboxed; _ } =
+    Format.sprintf "record_%d_%s" id (if unboxed then "u" else "b")
+
+  let field_name record { index; _ } =
+    Format.sprintf "%s_field_%d" (record_name record) index
+
+  let rec to_code = function
+    | Number nty -> NumberTy.to_code nty
+    | Array (nty, dimensions) ->
+      List.fold_left
+        (fun ty _ -> Typ.constr (lid "array") [ty])
+        (NumberTy.to_code nty) dimensions
+    | Record record -> Typ.constr (lid (record_name record)) []
+    | Variant variant -> Typ.constr (lid (variant_name variant)) []
+    | Or_null ty -> Typ.constr (lid "or_null") [to_code ty]
+    | Bool -> Typ.constr (lid "bool") []
+end
+
+module Sum = struct
+  type t =
+    | Variant of Ty.variant
+    | Or_null of Ty.t
+
+  let ty = function
+    | Variant variant -> Ty.Variant variant
+    | Or_null payload -> Ty.Or_null payload
+
+  let constructors = function
+    | Variant variant -> variant.constructors
+    | Or_null payload ->
+      [ { Ty.constructor_index = 0; args = [] };
+        { Ty.constructor_index = 1; args = [payload] } ]
+
+  let constructor_name sum (constructor : Ty.constructor) =
+    match sum with
+    | Variant variant -> Ty.constructor_name variant constructor
+    | Or_null _ -> (
+      match constructor.constructor_index with
+      | 0 -> "Null"
+      | 1 -> "This"
+      | _ -> Misc.fatal_errorf "Or_null: invalid constructor index")
+
+  let constructor_pattern sum (constructor : Ty.constructor) names =
     if List.length names <> List.length constructor.args
     then Misc.fatal_errorf "Constructor pattern: incorrect number of arguments";
     let patterns =
@@ -212,23 +256,7 @@ module Ty = struct
       | patterns ->
         Some ([], Pat.tuple (List.map (fun p -> None, p) patterns) Closed)
     in
-    Pat.construct (lid (constructor_name variant constructor)) arg
-
-  let record_name { id; unboxed; _ } =
-    Format.sprintf "record_%d_%s" id (if unboxed then "u" else "b")
-
-  let field_name record { index; _ } =
-    Format.sprintf "%s_field_%d" (record_name record) index
-
-  let to_code = function
-    | Number nty -> NumberTy.to_code nty
-    | Array (nty, dimensions) ->
-      List.fold_left
-        (fun ty _ -> Typ.constr (lid "array") [ty])
-        (NumberTy.to_code nty) dimensions
-    | Record record -> Typ.constr (lid (record_name record)) []
-    | Variant variant -> Typ.constr (lid (variant_name variant)) []
-    | Bool -> Typ.constr (lid "bool") []
+    Pat.construct (lid (constructor_name sum constructor)) arg
 end
 
 module Binding = struct
@@ -271,7 +299,7 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Record _ | Variant _ ->
+    | Bool | Array _ | Record _ | Variant _ | Or_null _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -279,7 +307,7 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ | Ty.Record _ | Ty.Variant _ ->
+      | Ty.Array _ | Ty.Record _ | Ty.Variant _ | Ty.Or_null _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -325,12 +353,12 @@ module Expr = struct
           expr : t
         }
     | Construct of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           constructor : Ty.constructor;
           args : (Name.t * t) list
         }
     | Match of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           scrutinee : t;
           cases : case list
         }
@@ -432,7 +460,7 @@ module Expr = struct
               from.fields
           in
           record_code target fields None)
-    | Construct { variant; constructor; args } ->
+    | Construct { sum; constructor; args } ->
       if List.length args <> List.length constructor.args
       then Misc.fatal_errorf "Constructor: incorrect number of arguments";
       let values =
@@ -446,7 +474,7 @@ module Expr = struct
           Some (Exp.tuple (List.map (fun value -> None, value) values))
       in
       let body =
-        Exp.construct (lid (Ty.constructor_name variant constructor)) arg
+        Exp.construct (lid (Sum.constructor_name sum constructor)) arg
       in
       (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
       (* Payload expressions can have effects: explicitly sequence their
@@ -454,16 +482,16 @@ module Expr = struct
       List.fold_right
         (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
         args body
-    | Match { variant; scrutinee; cases } ->
+    | Match { sum; scrutinee; cases } ->
       Exp.match_
-        (constrain (Ty.Variant variant) (to_code scrutinee))
+        (constrain (Sum.ty sum) (to_code scrutinee))
         (List.map
            (fun { constructor; bindings; body } ->
              let names =
                List.map (fun (binding : Binding.t) -> binding.name) bindings
              in
              Exp.case
-               (Ty.constructor_pattern variant constructor names)
+               (Sum.constructor_pattern sum constructor names)
                (to_code body))
            cases)
     | Opaque expr ->
