@@ -6,6 +6,8 @@ let[@inline never] unrelated_prefix x = Sys.opaque_identity (x * 7)
 
 let adder = Stability_lib_edited.make_adder (Sys.opaque_identity 10)
 
+let bound = Stability_lib_edited.bind_a (Sys.opaque_identity 4)
+
 let[@inline never] double_even numbers =
   let even = List.filter (fun[@cold] x -> x mod 2 = 0) numbers in
   List.map (fun[@cold] x -> x * 2) even
@@ -29,6 +31,7 @@ let () =
   ignore (unrelated_prefix 1);
   ignore (unrelated_suffix 1);
   ignore (adder 1);
+  ignore (bound ~b:1);
   ignore (double_even [ 1; 2; 3; 4 ]);
   ignore (omit_first 1 ~a:2);
   ignore (curried ~b:3);

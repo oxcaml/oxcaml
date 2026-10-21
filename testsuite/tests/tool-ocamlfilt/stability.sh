@@ -9,6 +9,9 @@
 # cross-unit entries (references to the other unit, and copies of its
 # closures that -O3 inlining may or may not create) are compared but not
 # printed, so that the reference does not depend on the optimization level.
+# The names the consumer defines in the library's namespace are the copies
+# of library closures made by inlining; each must be a name the library
+# defines itself, or the copies would not aggregate with the original.
 set -eu
 
 # Fixed locale for a stable [sort] order across platforms.
@@ -22,6 +25,14 @@ D="${test_build_directory}"
 # which ocamlfilt accepts as well); this includes references to other units.
 demangled_names () {
   nm "$1" | awk '$NF ~ /^_?_Caml[A-Z]/ { print $NF }' \
+    | "$OCAMLFILT" --format structured \
+    | sed -E "$2" | grep -v 'unrelated_' | sort -u
+}
+
+# As [demangled_names], for the symbols the object defines (not those it
+# merely refers to).
+defined_names () {
+  nm "$1" | awk 'NF == 3 && $2 != "U" && $NF ~ /^_?_Caml[A-Z]/ { print $NF }' \
     | "$OCAMLFILT" --format structured \
     | sed -E "$2" | grep -v 'unrelated_' | sort -u
 }
@@ -50,3 +61,17 @@ check stability_lib 's/^Stability_lib_edited\./Stability_lib./' \
 check stability \
   's/Stability_lib_edited\./Stability_lib./g; s/^Stability_edited\./Stability./' \
   'Stability\.'
+
+# Without cross-module inlining (e.g. under [Oclassic]) there are no copies and
+# the check is vacuous.
+defined_names "$D/stability.o" 's/^//' | grep '^Stability_lib\.' > "$D/copies" \
+  || true
+comm -23 "$D/copies" "$D/stability_lib.as_written" > "$D/foreign"
+if [ -s "$D/foreign" ]; then
+  {
+    echo "Copies of stability_lib closures in stability have names that"
+    echo "stability_lib does not define:"
+    cat "$D/foreign"
+  } > "$ocamltest_response"
+  exit "$TEST_FAIL"
+fi
