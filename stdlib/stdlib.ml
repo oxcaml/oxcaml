@@ -35,9 +35,9 @@ external raise :
 external raise_notrace :
   ('a : any). exn -> 'a @ portable unique @@ portable
   = "%raise_notrace"
-
-let failwith s = raise(Failure s)
-let invalid_arg s = raise(Invalid_argument s)
+let failwith (type a : any) s : a =
+                 raise(Failure s) and invalid_arg (type a : any) s : a =
+                    raise(Invalid_argument s)
 
 exception Exit
 exception Match_failure = Match_failure

@@ -6507,14 +6507,24 @@ let function_type_sort ~why ~loc_fun env ty =
   | Ok sort -> sort
   | Error err -> raise (Error (loc_fun, env, Function_type_not_rep (ty, err)))
 
-let function_return_sort ~loc_fun env ty_ret body
+let function_return_sort ~loc_fun ~outer_env env ty_ret body
   : Typedtree.function_return_sort =
   let never_returns =
     match body with
     | Tfunction_body exp -> never_returns exp
     | Tfunction_cases { fc_cases; _ } -> cases_never_return fc_cases
   in
-  if never_returns then Function_never_returns
+  if never_returns then
+    (* The result of a function that never returns still gets a sort when it
+       can have one, as for any other function: only a result that cannot have
+       one is left without. Equations from GADT patterns of the parameters do
+       not count, so its sort is looked for where the function is defined. *)
+    match
+      Ctype.type_sort ~why:Function_result ~allow_mutation:true outer_env
+        ty_ret
+    with
+    | Ok sort -> Function_returns sort
+    | Error _ -> Function_never_returns
   else
     Function_returns
       (function_type_sort ~why:Function_result ~loc_fun env ty_ret)
@@ -9692,7 +9702,7 @@ and type_binding_op_ident env s =
 *)
 and type_function
       env (expected_mode : expected_mode) ty_expected
-      params_suffix body_constraint body ~first ~in_function
+      params_suffix body_constraint body ~first ~in_function ~outer_env
   : type_function_result
   =
   let ty_fun, (loc_fun : Location.t) = in_function in
@@ -9716,7 +9726,7 @@ and type_function
             *)
             type_function env expected_mode
               (newvar (Jkind.Builtin.any ~why:Dummy_jkind))
-              rest body_constraint body ~in_function ~first
+              rest body_constraint body ~in_function ~first ~outer_env:env
           in
           (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info,
            calling_convention_sorts),
@@ -9858,7 +9868,7 @@ and type_function
                 =
                 type_function ext_env expected_inner_mode ty_expected
                   rest body_constraint body
-                  ~in_function ~first:false
+                  ~in_function ~first:false ~outer_env
               in
               let contains_gadt =
                 if param_contains_gadt then
@@ -10039,7 +10049,9 @@ and type_function
           let ret_mode =
             {ret_mode_annots with mode_modes = ret_mode }
           in
-          let ret_sort = function_return_sort ~loc_fun env ty_ret body in
+          let ret_sort =
+            function_return_sort ~loc_fun ~outer_env env ty_ret body
+          in
           Some { ret_sort; ret_mode; cases_arg_yielding = None },
           Calling_convention_sort.result ~ty:ty_ret ~sort:ret_sort ~env ~loc
       in
@@ -10115,7 +10127,7 @@ and type_function
           let type_cases_expect env expected_mode ty_expected =
             type_function_cases_expect
               env expected_mode ty_expected loc cases attributes ~in_function
-              ~first
+              ~first ~outer_env
           in
           let (cases, exp_type, fun_alloc_mode, ret_info,
                calling_convention_sorts), exp_extra =
@@ -11776,7 +11788,8 @@ and type_cases
     See [split_function_ty] for the meaning of [first] and [in_function].
 *)
 and type_function_cases_expect
-    env expected_mode ty_expected loc cases attrs ~first ~in_function =
+    env expected_mode ty_expected loc cases attrs ~first ~in_function
+    ~outer_env =
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
@@ -11845,7 +11858,8 @@ and type_function_cases_expect
     in
     let ret_sort =
       let _, loc_fun = in_function in
-      function_return_sort ~loc_fun env ty_ret (Tfunction_cases cases)
+      function_return_sort ~loc_fun ~outer_env env ty_ret
+        (Tfunction_cases cases)
     in
     let calling_convention_sorts =
       { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
@@ -12453,7 +12467,7 @@ and type_n_ary_function
           ret_info; fun_alloc_mode; calling_convention_sorts = _;
         } =
       type_function env expected_mode ty_expected params constraint_ body
-        ~in_function ~first:true
+        ~in_function ~first:true ~outer_env:env
     in
     let fun_alloc_mode, { ret_mode; ret_sort; cases_arg_yielding } =
       match fun_alloc_mode, ret_info with
