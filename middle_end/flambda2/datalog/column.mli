@@ -37,6 +37,11 @@ type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist
 
+type (_, _) columns = Columns : (_, 'k, 'v) hlist -> ('k, 'v) columns
+[@@unboxed]
+
+val cast_hlist : ('t, 'k, 'v) hlist -> ('k, 'u) columns
+
 val equal_key : ('t, 'k, 'v) id -> 'k -> 'k -> bool
 
 val print_key : ('t, 'k, 'v) id -> Format.formatter -> 'k -> unit

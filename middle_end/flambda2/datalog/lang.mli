@@ -102,7 +102,8 @@ type ('k, 'v) relation =
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
       -> ('k, unit) relation
 
-type atom = Atom : ('k, 'v) relation * 'k Term.hlist -> atom
+type atom =
+  | Atom : ('k, 'v) relation * 'k Term.hlist * 'v variable option -> atom
 
 val print_atom : Format.formatter -> atom -> unit
 

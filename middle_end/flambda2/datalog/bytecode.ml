@@ -385,7 +385,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let with_binding repr receiver body st =
     let (Bindings_ref_innermost_first (reprs, receivers)) = st.bindings in
-    body receiver
+    body
+      { value = receiver; name = repr.name }
       { st with
         bindings =
           Bindings_ref_innermost_first

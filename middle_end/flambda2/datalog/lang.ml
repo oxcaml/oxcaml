@@ -195,19 +195,26 @@ module Relation = struct
     | Callback_with_bindings (_fn, name) -> Format.fprintf ppf "not %s" name
 end
 
-type atom = Atom : ('k, 'v) relation * 'k Term.hlist -> atom
+type atom =
+  | Atom : ('k, 'v) relation * 'k Term.hlist * 'v variable option -> atom
 
-let print_atom ppf (Atom (relation, terms)) =
-  Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])@]" Relation.print relation
+let print_atom ppf (Atom (relation, terms, value)) =
+  Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Relation.print relation
     (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
     terms
+    (Format.pp_print_option (fun ppf term ->
+         Format.fprintf ppf " <=@ @[%a@]" Variable.print term))
+    value
 
-let print_neg_atom ppf (Atom (relation, terms)) =
-  Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])@]" Relation.print_neg relation
+let print_neg_atom ppf (Atom (relation, terms, value)) =
+  Format.fprintf ppf "@[<1>@[%a@](@,@[%a@])%a@]" Relation.print_neg relation
     (Term.print_hlist ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ "))
     terms
+    (Format.pp_print_option (fun ppf term ->
+         Format.fprintf ppf " <=@ @[%a@]" Variable.print term))
+    value
 
-let atom relation terms = Atom (relation, terms)
+let atom relation terms = Atom (relation, terms, None)
 
 let table tid args = atom (Table tid) args
 

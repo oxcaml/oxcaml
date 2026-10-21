@@ -88,7 +88,7 @@ type stats =
   }
 
 let extra_atoms_for_provenance ~stats ~rule_id atom =
-  let (Lang.Atom (relation, args)) = atom in
+  let (Lang.Atom (relation, args, _)) = atom in
   match relation with
   | Table tid when Table.Id.has_provenance tid ->
     let provenance_fn bindings keys =

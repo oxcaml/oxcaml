@@ -91,7 +91,9 @@ module Builder = struct
 
   module Env = struct
     type bound_var =
-      | Bound_var : 'a variable * 'a Channel.or_null_receiver -> bound_var
+      | Bound_var :
+          'a variable * 'a Channel.or_null_receiver with_name
+          -> bound_var
 
     module Output_map = Variable.Map.Make (struct
       type 'a t = 'a Bytecode.output_ref with_name
@@ -125,13 +127,13 @@ module Builder = struct
       | [] -> env, []
       | p :: ps ->
         let sender, receiver = Channel.create_or_null Or_null.null in
-        let env = bind_var env p receiver in
+        let env = bind_var env p { value = receiver; name = Variable.name p } in
         let env, senders = bind_vars env ps in
         env, sender :: senders
 
     let bind_input env var =
       let sender, receiver = Channel.create_or_null Or_null.null in
-      bind_var env var receiver, sender
+      bind_var env var { value = receiver; name = Variable.name var }, sender
 
     let bind_inputs env tables =
       let env, tables =
@@ -151,7 +153,7 @@ module Builder = struct
           Variable.print var
       | Bound_var (var', receiver) ->
         let Equal = Variable.must_be_equal var var' in
-        { value = receiver; name = Variable.name var' }
+        receiver
 
     let lit_to_string ?column lit =
       match column with
@@ -225,7 +227,10 @@ module Builder = struct
         Column.Iterator.create column outer_receiver.value inner_sender
       in
       let inner_env, { values; names } = join_iterators env rest in
-      let inner_env = Env.bind_var inner_env inner inner_receiver in
+      let inner_env =
+        Env.bind_var inner_env inner
+          { value = inner_receiver; name = Variable.name inner }
+      in
       ( inner_env,
         { values = iterator :: values; names = outer_receiver.name :: names } )
 
@@ -259,6 +264,17 @@ module Builder = struct
           | Filter (fn, args) ->
             Executor.if_ fn (Env.must_be_bound_term_hlist env args))
         @@ build_stages env stages (index + 1) k
+      | Let_stage (var, term) ->
+        (* A [let] stage cannot fail, and the term can already be represented as
+           a receiver, so we simply reuse the same receiver for the bound
+           variable as for its argument.
+
+           Note that we are compiling a strutured program, so there is no risk
+           of the value of the [term] changing from within the scope of the
+           [Let_stage]. *)
+        let receiver = Env.must_be_bound_term env term in
+        let env = Env.bind_var env var receiver in
+        build_stages env stages (index + 1) k
       | Existential_stage existential_stages ->
         Executor.exists
           (fun ~accept ->

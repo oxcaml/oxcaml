@@ -21,28 +21,40 @@ module Int = struct
   module Map = Tree.Map
 end
 
-type _ result_repr = Unit_repr : unit result_repr
+type _ result_repr =
+  | Unit_repr : unit result_repr
+  | Lattice_repr :
+      { print : Format.formatter -> 'a -> unit;
+        meet : 'a -> 'a -> 'a;
+        diff_or_null : 'a -> 'a -> 'a Or_null.t
+      }
+      -> 'a result_repr
 
 let unit_repr = Unit_repr
 
+let lattice_repr ~print ~meet ~diff_or_null =
+  Lattice_repr { print; meet; diff_or_null }
+
 let result_repr_print (type t) (repr : t result_repr) :
     Format.formatter -> t -> unit =
-  let Unit_repr = repr in
-  fun ppf () -> Format.fprintf ppf "()"
-
-let result_repr_default_value (type t) (repr : t result_repr) : t =
-  match repr with Unit_repr -> ()
+  match repr with
+  | Unit_repr -> fun ppf () -> Format.fprintf ppf "()"
+  | Lattice_repr { print; _ } -> print
 
 let result_repr_union (type t) (repr : t result_repr) : t -> t -> t =
-  match repr with Unit_repr -> fun () () -> ()
+  match repr with
+  | Unit_repr -> fun () () -> ()
+  | Lattice_repr { meet; _ } -> meet
 
 let result_repr_diff_or_null (type t) (repr : t result_repr) :
     t -> t -> t Or_null.t =
-  match repr with Unit_repr -> fun () () -> Or_null.null
+  match repr with
+  | Unit_repr -> fun () () -> Or_null.null
+  | Lattice_repr { diff_or_null; _ } -> diff_or_null
 
-let result_repr_is_unit (type v) (Unit_repr : v result_repr) :
+let result_repr_is_unit (type v) (repr : v result_repr) :
     (v, unit) Type.eq option =
-  Some Equal
+  match repr with Unit_repr -> Some Equal | Lattice_repr _ -> None
 
 let rec concat : type t k v. (t, k, v) Column.hlist -> earlier:t -> later:t -> t
     =
@@ -94,9 +106,6 @@ module Id = struct
   let has_provenance { provenance; _ } = provenance
 
   let[@inline] result_repr { result_repr; _ } = result_repr
-
-  let[@inline] default_value { result_repr; _ } =
-    result_repr_default_value result_repr
 
   let[@inline] columns { columns; _ } = columns
 
@@ -224,12 +233,18 @@ let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
       pp_row keys value)
     table
 
-let print_table (id : (_, _, _) Id.t) ppf table =
+let print_table (type t k v) (id : (t, k, v) Id.t) ppf table =
+  let repr = Id.result_repr id in
+  let print_value ppf value =
+    match result_repr_is_unit repr with
+    | None -> Format.fprintf ppf " =@ %a" (result_repr_print repr) value
+    | Some Equal -> ()
+  in
   Format.fprintf ppf "@[<v>%a@]"
-    (print id (fun keys _ ->
-         Format.fprintf ppf "@[%a(%a).@]" Id.print id
+    (print id (fun keys value ->
+         Format.fprintf ppf "@[%a(%a)%a.@]" Id.print id
            (Column.print_keys id.columns)
-           keys))
+           keys print_value value))
     table
 
 let print id ppf table =

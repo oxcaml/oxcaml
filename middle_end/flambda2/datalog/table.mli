@@ -17,6 +17,12 @@ type _ result_repr
 
 val unit_repr : unit result_repr
 
+val lattice_repr :
+  print:(Format.formatter -> 'a -> unit) ->
+  meet:('a -> 'a -> 'a) ->
+  diff_or_null:('a -> 'a -> 'a Or_null.t) ->
+  'a result_repr
+
 val result_repr_print : 'v result_repr -> Format.formatter -> 'v -> unit
 
 val result_repr_union : 'v result_repr -> 'v -> 'v -> 'v
@@ -24,8 +30,6 @@ val result_repr_union : 'v result_repr -> 'v -> 'v -> 'v
 val result_repr_diff_or_null : 'v result_repr -> 'v -> 'v -> 'v Or_null.t
 
 val result_repr_is_unit : 'v result_repr -> ('v, unit) Type.eq option
-
-val result_repr_default_value : 'v result_repr -> 'v
 
 module Id : sig
   type (!'t, !'k, !'v) t
@@ -57,8 +61,6 @@ module Id : sig
   val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
 
   val result_repr : ('t, 'k, 'v) t -> 'v result_repr
-
-  val default_value : ('t, 'k, 'v) t -> 'v
 
   val has_provenance : ('t, 'k, 'v) t -> bool
 

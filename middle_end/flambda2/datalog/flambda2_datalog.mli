@@ -71,9 +71,43 @@ module Datalog : sig
     end) : S with type t = int
   end
 
+  type 'v repr
+
+  val unit_repr : unit repr
+
+  (** The datalog engine can operate on a tables whose values are in a
+      user-provided lattice, extended with a distinguished maximal element
+      "null" (with [meet x null = meet null x = x] for all values [x] in the
+      user-provided lattice).
+
+      [diff_or_null y x] must compute the information provided by [y] that is
+      not already present in [x], i.e. any information added to [x] by
+      [meet x y]. More precisely, [diff_or_null] and [meet] must be related by
+      the following laws:
+
+      - [meet x (diff_or_null y x) = meet x y], and
+
+      - [meet x y = x ==> diff_or_null y x = null] (this is the criterion used
+        to detect fixed points)
+
+      {b Note}: [meet] and [diff_or_null] are only called if tables with this
+      representation are used as output of rules. *)
+  val lattice_repr :
+    print:(Format.formatter -> 'a -> unit) ->
+    meet:('a -> 'a -> 'a) ->
+    diff_or_null:('a -> 'a -> 'a Or_null.t) ->
+    'a repr
+
   type (!'t, !'k, !'v) table
 
   val columns : ('t, 'k, 'v) table -> ('t, 'k, 'v) Column.hlist
+
+  val create_table :
+    ?provenance:bool ->
+    name:string ->
+    ('t, 'k, 'v) Column.hlist ->
+    'v repr ->
+    ('t, 'k, 'v) table
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
@@ -159,7 +193,22 @@ module Datalog : sig
 
       let edge = atom edge_rel
       ]} *)
-  val atom : ('t, 'k) relation -> 'k Term.hlist -> [> `Atom of atom]
+  val atom : ('t, 'k, _) table -> 'k Term.hlist -> [> `Atom of atom]
+
+  (** [less_than_or_equal table args value], written [table(args) <= value],
+      represents the fact that the value stored in [table(args)] is at most
+      [value].
+
+      When used as an input, it binds the [value] to the value of [table(args)]
+      and this must be the only binding occurrence of [value].
+
+      When used as an output, it [meet]s the value with the existing content of
+      [table(args)].
+
+      {b Note}: [value] must be a local variable, not a constant or a parameter.
+  *)
+  val less_than_or_equal :
+    ('t, 'k, 'v) table -> 'k Term.hlist -> 'v Term.t -> [> `Atom of atom]
 
   val not : [< `Atom of atom] -> [> `Not_atom of atom]
 

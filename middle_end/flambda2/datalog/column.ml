@@ -70,6 +70,15 @@ type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
   | ( :: ) : ('t, 'k, 's) id * ('s, 'ks, 'v) hlist -> ('t, 'k -> 'ks, 'v) hlist
 
+type (_, _) columns = Columns : (_, 'k, 'v) hlist -> ('k, 'v) columns
+[@@unboxed]
+
+let rec cast_hlist : type t k v u. (t, k, v) hlist -> (k, u) columns = function
+  | [] -> Columns []
+  | ({ repr = Patricia_tree_repr; _ } as column) :: columns ->
+    let (Columns (columns : (_, _, u) hlist)) = cast_hlist columns in
+    Columns (column :: columns)
+
 let rec print_keys : type t k v.
     (t, k, v) hlist -> Format.formatter -> k Constant.hlist -> unit =
  fun columns ppf keys ->

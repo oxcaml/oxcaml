@@ -49,6 +49,7 @@ type stage =
   | Join_stage : 'k variable * 'k column_iterator list -> stage
   | Seek_stage : 'k term * 'k column_iterator list -> stage
   | Check_stage : check_atom -> stage
+  | Let_stage : 'k variable * 'k term -> stage
   | Existential_stage : stage iarray -> stage
 (* Variables bound by existential stages are not accessible in the output, which
    allows skipping the full existential stage once we have found any satisfying

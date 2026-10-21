@@ -49,6 +49,7 @@ type stage =
   | Join_stage : 'k variable * 'k column_iterator list -> stage
   | Seek_stage : 'k term * 'k column_iterator list -> stage
   | Check_stage : check_atom -> stage
+  | Let_stage : 'k variable * 'k term -> stage
   | Existential_stage : stage iarray -> stage
 
 type (_, _) union =
@@ -139,6 +140,10 @@ let rec print_stage ppf stage =
          ~pp_sep:(fun ppf () -> Format.fprintf ppf " ⨝@ ")
          (fun ppf (Column_iterator (_, tbl, _, _, _)) -> Variable.print ppf tbl))
       join_columns
+  | Let_stage (var, term) ->
+    Format.fprintf ppf "let %a = %a in" Variable.print var
+      (print_term (fun ppf _ -> Format.fprintf ppf "<cst>"))
+      term
   | Seek_stage (term, join_columns) ->
     let print_lit =
       match join_columns with
@@ -166,7 +171,7 @@ and print_stages print ppf stages =
     let extra_indent =
       match stage with
       | Join_stage _ -> 2
-      | Seek_stage _ | Check_stage _ | Existential_stage _ -> 0
+      | Seek_stage _ | Check_stage _ | Existential_stage _ | Let_stage _ -> 0
     in
     if extra_indent > 0
     then (
@@ -254,8 +259,15 @@ let vars_defined_by_iterators iterators =
       Variable.Id.Set.union vars (vars_defined_by_iterator iterator))
     Variable.Id.Set.empty iterators
 
+(* We currently only support unary value joins, i.e. copies.
+
+   CR-someday bclement: add support for non-unary value joins *)
+type 'a join_stage =
+  | Column_join of 'a column_iterator list
+  | Value_join of 'a variable
+
 module Join_stages = Variable.Map.Make (struct
-  type 'a t = 'a column_iterator list
+  type 'a t = 'a join_stage
 end)
 
 type context =
@@ -318,7 +330,9 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
     =
   let head_occurrences = Var_occurrences.create () in
   Iarray.iter
-    (fun (Atom (_, args)) -> Var_occurrences.add_terms head_occurrences args)
+    (fun (Atom (_, args, value)) ->
+      Var_occurrences.add_terms head_occurrences args;
+      Option.iter (Var_occurrences.add_var head_occurrences) value)
     head;
   (* Detect copies *)
   let detect_copy (type t k v s h u) (body_scalar : t variable)
@@ -348,7 +362,7 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
       (head_inner : (s, _, v) Column.hlist) (head_repr : v Table.result_repr) :
       t variable option =
     match Join_stages.find var !join_stages with
-    | [iterator] -> (
+    | Column_join [iterator] -> (
       let (Column_iterator
              (body_column, body_table, body_scalar, body_inner, body_repr)) =
         iterator
@@ -361,7 +375,7 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
       | Some Equal ->
         let Equal = Column.provably_equal_map head_column body_column in
         Some body_table)
-    | _ | (exception Not_found) -> None
+    | Column_join _ | Value_join _ | (exception Not_found) -> None
   in
   let vars_in_reverse_binding_time_order =
     Variable.Id.Map.fold
@@ -376,7 +390,7 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
     (not (Var_occurrences.mem_var body_occurrences var))
     &&
     match Join_stages.find var !join_stages with
-    | iterators
+    | Column_join iterators
       when Variable.Id.Set.for_all
              (fun var_id -> not (Var_occurrences.mem body_occurrences var_id))
              (vars_defined_by_iterators iterators) ->
@@ -404,28 +418,48 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
           Var_occurrences.remove_var body_occurrences table_var)
         iterators;
       true
-    | _ | (exception Not_found) -> false
+    | Column_join _ | Value_join _ | (exception Not_found) -> false
   in
-  let plan_head_table tid args =
+  let plan_head_table tid args value =
+    let atom_args = args in
     let rec loop : type t k v.
         (t, k, v) Column.hlist ->
         k Term.hlist ->
+        v variable option ->
         v Table.result_repr ->
         (t, v) union =
-     fun columns args repr ->
+     fun columns args value repr ->
       match columns, args with
       | [], [] ->
-        Union
-          ( columns,
-            args,
-            Literal (Table.result_repr_default_value repr),
-            [],
-            repr )
+        let value : v term =
+          match value with
+          | None -> (
+            match Table.result_repr_is_unit repr with
+            | Some Equal -> Literal ()
+            | None ->
+              Misc.fatal_errorf
+                "Non-unit atom must have an explicit value: %a(%a)"
+                Table.Id.print tid
+                (Term.print_columns
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+                   (Table.Id.columns tid))
+                atom_args)
+          | Some value ->
+            let rec resolve_value head_scalar =
+              match Join_stages.find head_scalar !join_stages with
+              | Value_join scalar ->
+                Var_occurrences.remove_var head_occurrences scalar;
+                resolve_value scalar
+              | Column_join _ | (exception Not_found) -> head_scalar
+            in
+            Variable (resolve_value value)
+        in
+        Union (columns, args, value, [], repr)
       | column :: columns, arg :: args -> (
         let[@local] no_copy outer args scalar inner repr =
           Union (column :: outer, arg :: args, scalar, inner, repr)
         in
-        match loop columns args repr with
+        match loop columns args value repr with
         | Union ((_ :: _ as outer), (_ :: _ as args), scalar, inner, repr) ->
           no_copy outer args scalar inner repr
         | Union ([], [], scalar, inner, repr) -> (
@@ -443,15 +477,17 @@ let introduce_copies context ~binding_times ~join_stages ~body_occurrences head
     in
     Output
       ( get_or_create_output context tid,
-        loop (Table.Id.columns tid) args (Table.Id.result_repr tid) )
+        loop (Table.Id.columns tid) args value (Table.Id.result_repr tid) )
   in
   Iarray.map
-    (fun (Atom (relation, args)) ->
+    (fun (Atom (relation, args, value)) ->
       match relation with
       | Unless _ | Distinct _ | Filter _ ->
         Misc.fatal_error "not supported in the head"
-      | Table tid -> plan_head_table tid args
+      | Table tid -> plan_head_table tid args value
       | Callback_with_bindings (fn, name) ->
+        if not (Option.is_none value)
+        then Misc.fatal_error "Callback atom cannot have a value";
         Callback_with_bindings ({ value = fn; name }, args))
     head
 
@@ -464,18 +500,51 @@ let prepare_rule context ~binding_times body head =
       := Variable.Id.Map.add (Variable.uid table) (Variable.Any table)
            !monotone_vars
   in
-  let plan_body_table tid table args =
+  let plan_body_table tid table args value =
     let rec loop : type t k v.
         min_binding_time:_ ->
         _ ->
         (t, k, v) Column.hlist ->
         t variable ->
         k Term.hlist ->
+        v variable option ->
         v Table.result_repr ->
         _ =
-     fun ~min_binding_time stages columns table args repr ->
+     fun ~min_binding_time stages columns table args value repr ->
       match columns, args with
-      | [], [] -> List.rev stages
+      | [], [] ->
+        let () =
+          match value with
+          | None -> ()
+          | Some value -> (
+            match Variable.Id.Map.find (Variable.uid value) binding_times with
+            | exception Not_found ->
+              Misc.fatal_errorf
+                "Cannot compile %a <= %a: value comparisons are not implemented"
+                Variable.print table Variable.print value
+            | value_binding_time when value_binding_time >= min_binding_time ->
+              (* Note: this is a binding stage for the [value] variable, so it
+                 must not be added to [body_occurrences]. *)
+              (match Join_stages.find value !join_stages with
+              | exception Not_found -> ()
+              | Value_join other_table ->
+                Misc.fatal_errorf
+                  "Value variable %a can only be bound once; cannot bind it to \
+                   %a (it is already bound to %a)"
+                  Variable.print value Variable.print table Variable.print
+                  other_table
+              | Column_join _ ->
+                Misc.fatal_errorf "Cannot join columns and values for %a"
+                  Variable.print value);
+              join_stages
+                := Join_stages.add value (Value_join table) !join_stages
+            | _ ->
+              Misc.fatal_errorf
+                "%a cannot be bound to %a: occurrences of local variables as \
+                 values must be binding"
+                Variable.print value Variable.print table)
+        in
+        List.rev stages
       | column :: columns, arg :: args ->
         Var_occurrences.add_var body_occurrences table;
         let scalar =
@@ -511,30 +580,36 @@ let prepare_rule context ~binding_times body head =
               (* Note: a join stage is the binding stage for the key variable,
                  so the [arg] must not be added to [body_occurrences]. *)
               let existing_iterators =
-                try Join_stages.find var !join_stages with Not_found -> []
+                match Join_stages.find var !join_stages with
+                | exception Not_found -> []
+                | Column_join iterators -> iterators
+                | Value_join _ ->
+                  Misc.fatal_errorf "Cannot join columns and values for %a"
+                    Variable.print var
               in
               join_stages
                 := Join_stages.add var
-                     (Column_iterator (column, table, scalar, columns, repr)
-                     :: existing_iterators)
+                     (Column_join
+                        (Column_iterator (column, table, scalar, columns, repr)
+                        :: existing_iterators))
                      !join_stages;
               stages, var_binding_time + 1
             | _ | (exception Not_found) -> add_seek_stage ())
           | Literal _ -> add_seek_stage ()
         in
-        loop ~min_binding_time stages columns scalar args repr
+        loop ~min_binding_time stages columns scalar args value repr
     in
     mark_as_monotone table;
-    loop ~min_binding_time:0 [] (Table.Id.columns tid) table args
+    loop ~min_binding_time:0 [] (Table.Id.columns tid) table args value
       (Table.Id.result_repr tid)
   in
   let stages =
     List.mapi
-      (fun atom_id (Atom (relation, args)) ->
+      (fun atom_id (Atom (relation, args, value)) ->
         match relation with
         | Table tid ->
           let table = get_or_create_table context atom_id tid in
-          plan_body_table tid table args
+          plan_body_table tid table args value
         | Unless tid ->
           let table = get_or_create_current context tid in
           Var_occurrences.add_var body_occurrences table;
@@ -557,7 +632,10 @@ let prepare_rule context ~binding_times body head =
   in
   ( ~skip_if_empty:(Variable.Id.Map.data !monotone_vars),
     Join_stages.fold
-      (fun (B (var, iterators)) stages -> Join_stage (var, iterators) :: stages)
+      (fun (B (var, join_stage)) stages ->
+        match join_stage with
+        | Column_join iterators -> Join_stage (var, iterators) :: stages
+        | Value_join value -> Let_stage (var, Variable value) :: stages)
       !join_stages stages
     |> Iarray.of_list,
     head )
@@ -567,6 +645,7 @@ let vars_used_by_term = function
   | Variable var -> Variable.Id.Set.singleton (Variable.uid var)
 
 let vars_defined_by_stage = function
+  | Let_stage (var, _term) -> Variable.Id.Set.singleton (Variable.uid var)
   | Join_stage (var, iterators) ->
     Variable.Id.Set.add (Variable.uid var) (vars_defined_by_iterators iterators)
   | Seek_stage (_arg, iterators) -> vars_defined_by_iterators iterators
@@ -580,6 +659,7 @@ let vars_used_by_check_atom = function
   | Filter (_fn, args) -> free_vars_term_hlist args
 
 let rec vars_used_by_stage = function
+  | Let_stage (_var, term) -> vars_used_by_term term
   | Join_stage (_var, iterators) -> vars_used_by_iterators iterators
   | Seek_stage (arg, iterators) ->
     Variable.Id.Set.union (vars_used_by_term arg)
@@ -601,6 +681,9 @@ let rec vars_used_by_stage = function
       Variable.Id.Set.empty stages
 
 let rec available_at_binding_time ~binding_times = function
+  | Let_stage (var, _) -> (
+    try Variable.Id.Map.find (Variable.uid var) binding_times
+    with Not_found -> Misc.fatal_error "*BUG*: Let stage without binding time")
   | Join_stage (var, _) -> (
     try Variable.Id.Map.find (Variable.uid var) binding_times
     with Not_found ->
@@ -740,6 +823,7 @@ let assert_consecutive_binding_times ~binding_times stages =
     Iarray.fold_right
       (fun stage vars ->
         match stage with
+        | Let_stage (var, _) -> Variable.Any var :: vars
         | Join_stage (var, _) -> Variable.Any var :: vars
         | Check_stage _ | Seek_stage _ -> vars
         | Existential_stage local_stages ->
@@ -886,6 +970,11 @@ let group_existential_stages ~binding_times ~required_vars stages =
               | Seek_stage _ as stage -> Dynarray.add_last new_stages stage
               | (Check_stage _ | Existential_stage _) as stage ->
                 Dynarray.add_last new_stages stage
+              | Let_stage _ ->
+                (* A [let] stage cannot fail and only defines its bound
+                   variable, so an existential consisting of a single [let]
+                   stage does nothing. *)
+                ()
               | Join_stage _ as stage ->
                 (* Must introduce an existential stage for a join stage to
                    ensure we only check for emptiness and don't perform a full
@@ -969,7 +1058,7 @@ let plan_incremental rules =
     List.iteri
       (fun rule_id rule ->
         Iarray.iteri
-          (fun atom_id (Atom (relation, _)) ->
+          (fun atom_id (Atom (relation, _, _)) ->
             match relation with
             | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> ()
             | Table tid ->

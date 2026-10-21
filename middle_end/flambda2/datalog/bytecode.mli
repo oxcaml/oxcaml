@@ -73,7 +73,7 @@ module Make (Iterator : Leapfrog.Iterator) : sig
   val for_in :
     (_, 'k, _) Column.id with_name ->
     'k Iterator.t list with_names ->
-    ('k Or_null_receiver.t -> assembler) ->
+    ('k Or_null_receiver.t with_name -> assembler) ->
     assembler
 
   (** [exists cond body] evaluates [cond] and if it runs its [accept] argument,
