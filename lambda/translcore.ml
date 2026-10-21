@@ -477,6 +477,26 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         kinst_loc = (of_location ~scopes e.exp_loc);
       }
   | Texp_constant cst -> Lconst (Const_base cst)
+  | Texp_let(Nonrecursive, [ { vb_expr; _ } as vb ],
+             ({ exp_desc = Texp_function _; exp_attributes; _ } as body))
+    when Builtin_attributes.has_eta_expansion_attribute exp_attributes ->
+      (* The type checker eta-expanded [vb_expr], an application missing
+         optional arguments, into [let arg = vb_expr in fun x -> arg ... x].
+         The function is the partial application of [vb_expr]'s callee and is
+         named as such, like the wrappers of partial applications, rather than
+         as an anonymous function. *)
+      let callee =
+        match vb_expr.exp_desc with
+        | Texp_ident { path; _ }
+        | Texp_apply ({ exp_desc = Texp_ident { path; _ }; _ },
+                      _, _, _, _, _) ->
+          partial_application_callee vb_expr.exp_env path
+        | _ -> []
+      in
+      let function_scopes = enter_partial_application ~scopes ~callee in
+      transl_let ~scopes ~return_layout:layout Nonrecursive [vb]
+        (event_before ~scopes body
+           (transl_scoped_exp ~scopes:function_scopes layout body))
   | Texp_let(rec_flag, pat_expr_list, body) ->
       transl_let ~scopes ~return_layout:layout rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes layout body))
