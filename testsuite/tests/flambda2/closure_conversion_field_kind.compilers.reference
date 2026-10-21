@@ -4,8 +4,8 @@ File "closure_conversion_field_kind.ml", lines 20-21, characters 4-21:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: A { _ }
 
-File "closure_conversion_field_kind.ml", lines 25-26, characters 4-21:
-25 | ....let (B r) = A { x = #0l; y } in
-26 |     String.length r.b
+File "closure_conversion_field_kind.ml", lines 24-25, characters 4-21:
+24 | ....let (B r) = A { x = #0l; y } in
+25 |     String.length r.b
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: A { _ }
