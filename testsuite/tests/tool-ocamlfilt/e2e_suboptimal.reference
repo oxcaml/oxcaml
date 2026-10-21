@@ -12,7 +12,7 @@ _CamlU14E2e_suboptimalM8Int_instF3cmpDN_DN_                            (error)  
 _CamlU14E2e_suboptimalM8Str_instF3cmpDN_DN_                            (error)                      E2e_suboptimal.Str_inst.cmp                     E2e_suboptimal.Str_inst.cmp
 _CamlU14E2e_suboptimalO3dogF12method_scaleDN_DN_                       (error)                      E2e_suboptimal.dog.method_scale                 E2e_suboptimal.dog.method_scale
 _CamlU14E2e_suboptimalO3dogF13method_renameDN_DN_                      (error)                      E2e_suboptimal.dog.method_rename                E2e_suboptimal.dog.method_rename
-_CamlU14E2e_suboptimalO3dogF2fnDN_DN_                                  (error)                      E2e_suboptimal.dog.fn                           E2e_suboptimal.dog.fn
+_CamlU14E2e_suboptimalO3dogFu15A7bI7d_obj_initDN_DN_                   (error)                      E2e_suboptimal.dog.{obj_init}                   E2e_suboptimal.dog.{obj_init}
 _CamlU14E2e_suboptimalO3dogFu17A7bK7d_class_initDN_DN_                 (error)                      E2e_suboptimal.dog.{class_init}                 E2e_suboptimal.dog.{class_init}
 _CamlU14E2e_suboptimalO6animalFu15A7bI7d_obj_initDN_DN_                (error)                      E2e_suboptimal.animal.{obj_init}                E2e_suboptimal.animal.{obj_init}
 _CamlU14E2e_suboptimalO6animalFu17A7bK7d_class_initDN_DN_              (error)                      E2e_suboptimal.animal.{class_init}              E2e_suboptimal.animal.{class_init}

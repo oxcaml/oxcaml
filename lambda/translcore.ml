@@ -2431,7 +2431,12 @@ and transl_curried_function ~scopes loc repr params body
           chunk { body; return_layout; return_mode; nlocal; region }
         =
         let chunk_length = List.length chunk in
-        let loc = of_location ~scopes loc in
+        (* The inner chunks are compiler-generated: the [curry] marker names
+           them under the function. *)
+        let loc =
+          of_location
+            ~scopes:(enter_compiler_generated ~scopes "curry") loc
+        in
         (* The current function is locally-allocated (and thus its
            enclosing chunk doesn't have a region) when nlocal isn't
            yet exhausted in the current chunk.
