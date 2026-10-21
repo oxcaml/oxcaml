@@ -72,7 +72,12 @@
     callee is unknown). The callee's compilation unit is omitted when it is the
     unit the function is defined in, as recorded at the head of the path, so
     that a copy of the function specialized into another unit by inlining
-    carries the same [P] item as the original.
+    carries the same [P] item as the original. A callee bound in the current
+    unit is named relative to the application site by the frontend, which builds
+    the wrapper when a labelled argument is omitted, and by its full definition
+    path by the middle end, which builds it for applications to too few
+    arguments; a search for the partial applications of a given callee is
+    therefore reliable for callees bound at module level, and only then.
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz], and the code of the second lambda directly inside
