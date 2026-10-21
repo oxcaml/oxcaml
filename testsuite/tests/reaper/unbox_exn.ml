@@ -1,7 +1,8 @@
 (* TEST
    flambda2;
    flags += "-flambda2-reaper";
-   { native; }		
+   { native; }
+   { jsir; }
  *)		
 		
 [@@@warning "-ignored-extra-argument"]
