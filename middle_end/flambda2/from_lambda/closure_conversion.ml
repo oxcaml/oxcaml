@@ -2984,7 +2984,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         unboxed_function_slot ~needs_region_wrapper
   in
   let contains_subfunctions = Acc.seen_a_function acc in
-  let cost_metrics = Acc.cost_metrics acc in
+  let cost_metrics = Acc.cost_metrics acc |> Cost_metrics.add_function_frame in
   let inline : Inline_attribute.t =
     (* We make a decision based on [fallback_inlining_heuristic] here to try to
        mimic Closure's behaviour as closely as possible, particularly when there

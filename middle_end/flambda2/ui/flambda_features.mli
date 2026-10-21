@@ -111,6 +111,13 @@ val dump_fexpr_annot : unit -> bool
 
 val dump_fexpr_annot_after : unit -> string list
 
+(** Which model is used to estimate the code size of Flambda terms. *)
+type code_size_model = Oxcaml_flags.Flambda2.code_size_model =
+  | V1
+  | V2
+
+val code_size_model : unit -> code_size_model
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

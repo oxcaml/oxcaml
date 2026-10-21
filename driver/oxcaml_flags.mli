@@ -240,6 +240,12 @@ module Flambda2 : sig
     val reaper : bool ref
   end
 
+  (** Which model estimates the size of the machine code for Flambda terms:
+      [V1] is the original model, [V2] the new one (see [Code_size]). *)
+  type code_size_model = V1 | V2
+
+  val code_size_model : code_size_model ref
+
   module Expert : sig
     module Default : sig
       val fallback_inlining_heuristic : bool

@@ -59,7 +59,8 @@ type 'f env =
     should_keep_param :
       Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
     should_preserve_direct_calls : should_preserve_direct_calls;
-    inside_code_definition : bool
+    inside_code_definition : bool;
+    function_continuations : (Continuation.t * Continuation.t) option
   }
 
 type rebuild_result =
@@ -755,6 +756,20 @@ let rewrite_apply_cont_expr env ac =
 let reaper_produce_invalid_when_never_returns =
   Sys.getenv_opt "REAPER_INVALIDS" <> None
 
+let apply_is_in_tail_position env apply =
+  match
+    env.function_continuations, Apply.continuation apply, Apply.position apply
+  with
+  | Some (return_continuation, exn_continuation), Return cont, Normal ->
+    let exn = Apply.exn_continuation apply in
+    Continuation.equal cont return_continuation
+    && Continuation.equal (Exn_continuation.exn_handler exn) exn_continuation
+    && Misc.Stdlib.List.is_empty (Exn_continuation.extra_args exn)
+  | None, (Return _ | Never_returns), (Normal | Nontail)
+  | Some _, Never_returns, (Normal | Nontail)
+  | Some _, Return _, Nontail ->
+    false
+
 let make_apply_wrapper env
     (make_apply : continuation:Apply_expr.Result_continuation.t -> Apply_expr.t)
     apply_continuation return_decisions =
@@ -762,7 +777,9 @@ let make_apply_wrapper env
   | Never_returns ->
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
-      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
+      ~free_names:(Apply.free_names apply)
+      ~code_size:
+        (Code_size.apply ~is_tail:(apply_is_in_tail_position env apply) apply)
   | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
@@ -872,7 +889,10 @@ let make_apply_wrapper env
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply)
+          ~code_size:
+            (Code_size.apply
+               ~is_tail:(apply_is_in_tail_position env apply)
+               apply)
       else
         let apply_expr = Expr.create_apply apply in
         let handler =
@@ -892,7 +912,10 @@ let make_apply_wrapper env
         in
         let body =
           RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
+            ~code_size:
+              (Code_size.apply
+                 ~is_tail:(apply_is_in_tail_position env apply)
+                 apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
     | Invalid ->
@@ -927,14 +950,20 @@ let make_apply_wrapper env
         let body =
           RE.from_expr ~expr:(Expr.create_apply apply)
             ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
+            ~code_size:
+              (Code_size.apply
+                 ~is_tail:(apply_is_in_tail_position env apply)
+                 apply)
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
         let apply = make_apply ~continuation:Never_returns in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply))
+          ~code_size:
+            (Code_size.apply
+               ~is_tail:(apply_is_in_tail_position env apply)
+               apply))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -2141,6 +2170,11 @@ and rebuild_function_params_and_body env res code_metadata
       } =
     params_and_body
   in
+  let env =
+    { env with
+      function_continuations = Some (return_continuation, exn_continuation)
+    }
+  in
   let code_id = Code_metadata.code_id code_metadata in
   let updating_calling_convention =
     Analysis.get_calling_convention_change env.solution code_id
@@ -2170,7 +2204,9 @@ and rebuild_function_params_and_body env res code_metadata
         res )
   in
   let update_size code_metadata (body : RE.t) =
-    let cost_metrics = Cost_metrics.from_size body.code_size in
+    let cost_metrics =
+      Cost_metrics.from_size body.code_size |> Cost_metrics.add_function_frame
+    in
     Code_metadata.with_inlining_decision
       (Function_decl_inlining_decision.make_decision
          ~inlining_arguments:(Code_metadata.inlining_arguments code_metadata)
@@ -2426,7 +2462,8 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
       cont_params_to_keep;
       should_keep_param;
       should_preserve_direct_calls;
-      inside_code_definition = false
+      inside_code_definition = false;
+      function_continuations = None
     }
   in
   let res =

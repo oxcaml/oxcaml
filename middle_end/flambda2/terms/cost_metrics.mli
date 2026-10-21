@@ -20,13 +20,26 @@ val zero : t
 
 val from_size : Code_size.t -> t
 
+(** Add the cost of the prologue and epilogue of a function whose body has the
+    given metrics; see [Code_size.add_function_frame]. *)
+val add_function_frame : t -> t
+
 val size : t -> Code_size.t
 
 val removed : t -> Removed_operations.t
 
 val print : Format.formatter -> t -> unit
 
+(** The metrics of two pieces of code whose relative placement is unknown. *)
 val ( + ) : t -> t -> t
+
+(** [seq a b] are the metrics of the code [a] followed by the code [b]; see
+    [Code_size.seq]. *)
+val seq : t -> t -> t
+
+(** The metrics of the code [t] together with code placed elsewhere; see
+    [Code_size.with_out_of_line]. *)
+val with_out_of_line : t -> out_of_line:t -> t
 
 type code_characteristics =
   { cost_metrics : t;

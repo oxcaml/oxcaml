@@ -142,8 +142,13 @@ let clear_cost_metrics t = { t with cost_metrics = Cost_metrics.zero }
 
 let with_cost_metrics cost_metrics t = { t with cost_metrics }
 
+(* Terms are rebuilt from the end of each sequence of code to its start, so code
+   whose metrics are added comes before the code accounted for so far. *)
 let notify_added ~code_size t =
-  { t with cost_metrics = Cost_metrics.notify_added ~code_size t.cost_metrics }
+  { t with
+    cost_metrics =
+      Cost_metrics.seq (Cost_metrics.from_size code_size) t.cost_metrics
+  }
 
 let notify_removed ~operation t =
   { t with
@@ -151,11 +156,17 @@ let notify_removed ~operation t =
   }
 
 let add_cost_metrics cost_metrics t =
-  { t with cost_metrics = Cost_metrics.( + ) t.cost_metrics cost_metrics }
+  { t with cost_metrics = Cost_metrics.seq cost_metrics t.cost_metrics }
+
+let add_out_of_line_cost_metrics cost_metrics t =
+  { t with
+    cost_metrics =
+      Cost_metrics.with_out_of_line t.cost_metrics ~out_of_line:cost_metrics
+  }
 
 let add_cost_metrics_and_with_name_occurrences t cost_metrics name_occurrences =
   { t with
-    cost_metrics = Cost_metrics.( + ) t.cost_metrics cost_metrics;
+    cost_metrics = Cost_metrics.seq cost_metrics t.cost_metrics;
     name_occurrences
   }
 

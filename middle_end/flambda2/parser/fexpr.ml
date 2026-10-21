@@ -417,7 +417,11 @@ and code =
     result_mode : alloc_mode_for_return
   }
 
-and code_size = int
+(* Sizes for x86-64 and arm64 respectively (see [Code_size]). *)
+and code_size =
+  { x86_64 : int;
+    arm64 : int
+  }
 
 and params_and_body =
   { params : kinded_parameter list;

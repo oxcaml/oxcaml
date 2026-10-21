@@ -14,10 +14,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* The original code size model: estimates for individual Flambda terms, as
-   plain integers that do not depend on the target architecture. The
-   representation of sizes used by the rest of the compiler, and the arithmetic
-   on them, are in [Code_size], which wraps this module. *)
+(* The original ("v1") code size model, the default: estimates for individual
+   Flambda terms, as plain integers that do not depend on the target
+   architecture. [Code_size] dispatches between this model and [Code_size_v2]
+   according to [-flambda2-code-size-model], and defines the representation of
+   sizes used by the rest of the compiler. *)
 
 val box_number :
   machine_width:Target_system.Machine_width.t ->

@@ -385,7 +385,13 @@ module Acc = struct
   let machine_width t = t.machine_width
 
   let increment_metrics metrics t =
-    { t with cost_metrics = Cost_metrics.( + ) t.cost_metrics metrics }
+    { t with cost_metrics = Cost_metrics.seq metrics t.cost_metrics }
+
+  let increment_metrics_out_of_line metrics t =
+    { t with
+      cost_metrics =
+        Cost_metrics.with_out_of_line t.cost_metrics ~out_of_line:metrics
+    }
 
   let with_cost_metrics cost_metrics t = { t with cost_metrics }
 
@@ -988,9 +994,22 @@ module Expr_with_acc = struct
     acc, Expr.create_apply_cont apply_cont
 
   let create_apply acc apply =
+    let is_in_tail_position =
+      match Acc.top_closure_info acc with
+      | None -> false
+      | Some { return_continuation; exn_continuation; _ } -> (
+        (match Apply_expr.continuation apply with
+          | Never_returns -> false
+          | Return cont -> Continuation.equal cont return_continuation)
+        && Exn_continuation.equal
+             (Apply_expr.exn_continuation apply)
+             exn_continuation
+        && match Apply.position apply with Normal -> true | Nontail -> false)
+    in
     let acc =
       Acc.increment_metrics
-        (Code_size.apply apply |> Cost_metrics.from_size)
+        (Code_size.apply ~is_tail:is_in_tail_position apply
+        |> Cost_metrics.from_size)
         acc
     in
     let is_tail_call =
@@ -1165,7 +1184,7 @@ module Let_cont_with_acc = struct
   let create_non_recursive acc cont handler ~body ~free_names_of_body
       ~cost_metrics_of_handler =
     let acc =
-      Acc.increment_metrics
+      Acc.increment_metrics_out_of_line
         (Cost_metrics.increase_due_to_let_cont_non_recursive
            ~cost_metrics_of_handler)
         acc
@@ -1181,7 +1200,7 @@ module Let_cont_with_acc = struct
   let create_recursive acc ~invariant_params handlers ~body
       ~cost_metrics_of_handlers =
     let acc =
-      Acc.increment_metrics
+      Acc.increment_metrics_out_of_line
         (Cost_metrics.increase_due_to_let_cont_recursive
            ~cost_metrics_of_handlers)
         acc

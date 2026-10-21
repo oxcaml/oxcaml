@@ -326,6 +326,10 @@ module Flambda2 = struct
     let reaper = ref false
   end
 
+  type code_size_model = V1 | V2
+
+  let code_size_model = ref V1 (* -flambda2-code-size-model *)
+
   module Expert = struct
     module Default = struct
       let fallback_inlining_heuristic = false
