@@ -1415,23 +1415,37 @@ let close_named acc env ~let_bound_ids_with_kinds (named : IR.named)
 type simplified_block_load =
   | Unknown
   | Not_a_block
+  | Incompatible_field_kind
   | Block_but_cannot_simplify of Code_or_metadata.t Value_approximation.t
   | Field_contents of Simple.t
 
-let simplify_block_load acc body_env ~block ~field : simplified_block_load =
+let simplify_block_load acc body_env ~block ~field ~result_kind :
+    simplified_block_load =
   match find_value_approximation_through_symbol acc body_env block with
   | Unknown _ -> Unknown
   | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
   | Block_approximation (_tag, _shape, approx, _alloc_mode) -> (
-    let approx =
-      let i = Target_ocaml_int.to_int field in
-      if i >= Array.length approx then None else Some approx.(i)
-    in
-    match approx with
-    | Some (Value_symbol sym) -> Field_contents (Simple.symbol sym)
-    | Some (Value_const c) -> Field_contents (Simple.const c)
-    | Some approx -> Block_but_cannot_simplify approx
-    | None -> Not_a_block)
+    let i = Target_ocaml_int.to_int field in
+    if i >= Array.length approx
+    then Not_a_block
+    else
+      let approx = approx.(i) in
+      let field_kind =
+        match approx with
+        | Unknown kind -> kind
+        | Value_const c -> Reg_width_const.kind c
+        | Value_symbol _ | Closure_approximation _ | Block_approximation _ ->
+          K.value
+      in
+      (* An unreachable match arm may project a different constructor's layout.
+         Do not propagate an approximation of the wrong kind into its body. *)
+      if not (K.equal field_kind result_kind)
+      then Incompatible_field_kind
+      else
+        match approx with
+        | Value_symbol sym -> Field_contents (Simple.symbol sym)
+        | Value_const c -> Field_contents (Simple.const c)
+        | approx -> Block_but_cannot_simplify approx)
 
 type block_static_kind =
   | Dynamic_block
@@ -1708,8 +1722,15 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                (Bound_static.create [Bound_static.Pattern.block_like symbol]))
             defining_expr ~body
         | Prim (Unary (Block_load { field; _ }, block), _) -> (
-          match simplify_block_load acc body_env ~block ~field with
+          match
+            simplify_block_load acc body_env ~block ~field
+              ~result_kind:(K.With_subkind.kind kind)
+          with
           | Unknown -> bind acc body_env
+          | Incompatible_field_kind ->
+            ( acc,
+              Expr.create_invalid
+                (Defining_expr_of_let (bound_pattern, defining_expr)) )
           | Not_a_block ->
             if Flambda_features.kind_checks ()
             then
@@ -4173,8 +4194,12 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
           let pos_str = string_of_int pos in
           let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
           let block = module_block_simple in
-          match simplify_block_load acc env ~block ~field with
-          | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
+          match
+            simplify_block_load acc env ~block ~field
+              ~result_kind:(kind_of_field pos)
+          with
+          | Unknown | Not_a_block | Incompatible_field_kind
+          | Block_but_cannot_simplify _ ->
             Let_bound
               ( Variable.create ("field_" ^ pos_str) (kind_of_field pos),
                 Flambda_debug_uid.none,
