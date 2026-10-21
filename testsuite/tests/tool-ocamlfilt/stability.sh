@@ -4,8 +4,11 @@
 # the structured symbols of the object compiled from the source as written
 # and from its [_edited] variant are demangled, the [_edited] unit names are
 # rewritten to the original ones and the [unrelated_*] functions dropped,
-# and the two lists must then be identical. The list for the unedited
-# source is printed, so that the reference documents the stable names.
+# and the two lists must then be identical. The names the unedited unit
+# defines are printed, so that the reference documents the stable names;
+# cross-unit entries (references to the other unit, and copies of its
+# closures that -O3 inlining may or may not create) are compared but not
+# printed, so that the reference does not depend on the optimization level.
 set -eu
 
 # Fixed locale for a stable [sort] order across platforms.
@@ -24,9 +27,11 @@ demangled_names () {
 }
 
 # $1: unit name; $2: sed expression rewriting the [_edited] unit names, which
-# matches nothing in the names of the unit as written.
+# matches nothing in the names of the unit as written; $3: the demangled
+# prefix of the unit's own names.
 check () {
   name=$1
+  own=$3
   demangled_names "$D/$name.o" "$2" > "$D/$name.as_written"
   demangled_names "$D/${name}_edited.o" "$2" > "$D/$name.edited"
   if ! diff "$D/$name.as_written" "$D/$name.edited" > "$D/$name.diff"; then
@@ -37,9 +42,11 @@ check () {
     exit "$TEST_FAIL"
   fi
   echo "# $name"
-  cat "$D/$name.as_written"
+  grep "^$own" "$D/$name.as_written"
 }
 
-check stability_lib 's/^Stability_lib_edited\./Stability_lib./'
+check stability_lib 's/^Stability_lib_edited\./Stability_lib./' \
+  'Stability_lib\.'
 check stability \
-  's/Stability_lib_edited\./Stability_lib./g; s/^Stability_edited\./Stability./'
+  's/Stability_lib_edited\./Stability_lib./g; s/^Stability_edited\./Stability./' \
+  'Stability\.'
