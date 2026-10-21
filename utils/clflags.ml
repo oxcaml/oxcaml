@@ -599,6 +599,7 @@ let set_dumped_pass s enabled =
 let dump_into_file = ref false (* -dump-into-file *)
 let dump_into_csv = ref false (* -dump-into-csv *)
 let dump_dir: string option ref = ref None (* -dump-dir *)
+let debug_action_trace = ref false (* -debug-action-trace *)
 
 type 'a env_reader = {
   parse : string -> 'a option;

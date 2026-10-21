@@ -177,6 +177,7 @@ module type Compiler_options = sig
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit
+  val _debug_action_trace : unit -> unit
 
   val _args: string -> string array
   val _args0: string -> string array
