@@ -1,0 +1,103 @@
+let code sum_pair_0 deleted in
+let $camlEscape_try_raise_local__const_block_1 = Block 0 (0, 0) in
+let code f_1 deleted in
+let $camlEscape_try_raise_local__const_block_2 = Block 12 (10, 0) in
+let $camlEscape_try_raise_local__const_block_3 =
+  Block 4 (0, 0, 0, $camlEscape_try_raise_local__const_block_2)
+in
+let $camlEscape_try_raise_local__immstring_4 = "%d\n" in
+let $camlEscape_try_raise_local__const_block_5 =
+  Block 0 ($camlEscape_try_raise_local__const_block_3,
+           $camlEscape_try_raise_local__immstring_4)
+in
+let $camlEscape_try_raise_local__immstring_0 = "Escape_try_raise_local.E" in
+apply ccall noalloc
+  ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+  where k (Pccall) =
+    let $camlEscape_try_raise_local__E_6 =
+      Block immutable_unique
+      248 ($camlEscape_try_raise_local__immstring_0, Pccall)
+    in
+    let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+          sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let Pfield = %block_load.[`1`] (p) in
+      let Pfield_1 = %block_load.[`0`] (p) in
+      let int_add = %int_barith.add (Pfield_1, Pfield) in
+      cont k (int_add)
+    in
+    let $camlEscape_try_raise_local__sum_pair_7 =
+      closure sum_pair_0_1 @sum_pair &toplevel
+    in
+    let code inline(never) loopify(never) size(49) newer_version_of(f_1)
+          f_1_1 (x : imm tagged)
+            my_closure &my_alloc_region my_depth
+            -> k * k1
+            : imm tagged =
+      let `region` = %begin_region () in
+      let ghost_region = %begin_ghost_region () in
+      (let try_region = %begin_try_region () in
+       let try_ghost_region = %begin_try_ghost_region () in
+       (let prim = %int_comp.gt (x, 0) in
+        switch prim
+          | 0 -> k2 ($camlEscape_try_raise_local__const_block_1)
+          | 1 -> k4
+          where k4 =
+            let int_add = %int_barith.add (x, 1) in
+            let Pmakeblock = %block.[`0`].my_alloc_region (x, int_add) in
+            cont k3 (Pmakeblock))
+         where k3 (Pmakeblock) =
+           let cse_param = Pmakeblock in
+           let `unit` = %end_try_region (try_region) in
+           let unit_1 = %end_try_ghost_region (try_ghost_region) in
+           cont k2 (cse_param))
+        where k2 (r : [ 0 of imm tagged * imm tagged ]) =
+          let int_add = %int_barith.add (x, 6) in
+          let int_add_1 = %int_barith.add (x, 5) in
+          let q =
+            %block.[`0`].my_alloc_region.local[`region`] (int_add_1, int_add)
+          in
+          (apply direct(sum_pair_0_1 &my_alloc_region)
+             ($camlEscape_try_raise_local__sum_pair_7 : _ -> imm tagged)
+               (r)
+               -> k2 * k1
+             where k2 (apply_result : imm tagged) =
+               (apply direct(sum_pair_0_1 &my_alloc_region)
+                  ($camlEscape_try_raise_local__sum_pair_7 : _ -> imm tagged)
+                    (q)
+                    -> k2 * k1
+                  where k2 (apply_result_1 : imm tagged) =
+                    let int_add_2 =
+                      %int_barith.add (apply_result_1, apply_result)
+                    in
+                    let region_end = %end_region (`region`) in
+                    let region_end_1 = %end_ghost_region (ghost_region) in
+                    cont k (int_add_2)))
+    in
+    let $camlEscape_try_raise_local__f_8 = closure f_1_1 @f &toplevel in
+    let $camlEscape_try_raise_local__Pmakeblock_9 =
+      Block 0 ($camlEscape_try_raise_local__f_8)
+    in
+    (apply direct(f_1_1 &toplevel)
+       ($camlEscape_try_raise_local__f_8 : _ -> imm tagged) (1) -> k1 * error
+       where k1 (apply_result : imm tagged) =
+         (apply direct(printf_13 &toplevel) inlined(never)
+            $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+              ($camlEscape_try_raise_local__const_block_5)
+              -> k1 * error
+            where k1 (full_apply) =
+              (apply &toplevel inlined(never)
+                 full_apply (apply_result) -> k2 * error
+                 where k2 (function_return : imm tagged) =
+                   cont k1
+                 where k1 =
+                   cont k))
+       where k =
+         let $camlEscape_try_raise_local =
+           Block 0 ($camlEscape_try_raise_local__E_6,
+                    $camlEscape_try_raise_local__sum_pair_7,
+                    $camlEscape_try_raise_local__Pmakeblock_9)
+         in
+         cont done ($camlEscape_try_raise_local))

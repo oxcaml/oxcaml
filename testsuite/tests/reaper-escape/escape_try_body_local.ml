@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Allocations in a [try] body that are not raised live in the enclosing region
@@ -19,4 +19,4 @@ end = struct
     sum_pair q + r
 end
 
-let () = Printf.printf "%d %d\n" (M.f 1) (M.f 200)
+let () = (Printf.printf [@inlined never]) "%d %d\n" (M.f 1) (M.f 200)

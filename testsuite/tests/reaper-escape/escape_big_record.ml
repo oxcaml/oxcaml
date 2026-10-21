@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A record too large for the reaper's unboxing (> reaper_max_unbox_size),
@@ -20,4 +20,4 @@ let[@inline never] f x =
   in
   (sum r [@nontail])
 
-let () = Printf.printf "%d\n" (f 1)
+let () = (Printf.printf [@inlined never]) "%d\n" (f 1)

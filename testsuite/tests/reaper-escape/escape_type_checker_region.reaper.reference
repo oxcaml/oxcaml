@@ -1,0 +1,157 @@
+let code sum_pair_0 deleted in
+let code sum_local_1 deleted in
+let code after_2 deleted in
+let code f_3 deleted in
+let $camlEscape_type_checker_region__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_type_checker_region__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_type_checker_region__const_block_0)
+in
+let $camlEscape_type_checker_region__immstring_2 = "%d\n" in
+let $camlEscape_type_checker_region__const_block_3 =
+  Block 0 ($camlEscape_type_checker_region__const_block_1,
+           $camlEscape_type_checker_region__immstring_2)
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+      sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_type_checker_region__sum_pair_4 =
+  closure sum_pair_0_1 @sum_pair &toplevel
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_local_1)
+      sum_local_1_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_type_checker_region__sum_local_5 =
+  closure sum_local_1_1 @sum_local &toplevel
+in
+let code inline(always) loopify(never) size(39) newer_version_of(after_2)
+      after_2_1 (p : [ 0 of imm tagged * imm tagged ], n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  let int_add = %int_barith.add (n, 1) in
+  let r = %block.[`0`].my_alloc_region.local[`region`] (n, int_add) in
+  let int_add_1 = %int_barith.add (n, 3) in
+  let int_add_2 = %int_barith.add (n, 2) in
+  let s = %block.[`0`].my_alloc_region.local[`region`] (int_add_2, int_add_1)
+  in
+  apply direct(sum_pair_0_1 &my_alloc_region)
+    ($camlEscape_type_checker_region__sum_pair_4 : _ -> imm tagged)
+      (p)
+      -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      (apply direct(sum_pair_0_1 &my_alloc_region)
+         ($camlEscape_type_checker_region__sum_pair_4 : _ -> imm tagged)
+           (s)
+           -> k2 * k1
+         where k2 (apply_result_1 : imm tagged) =
+           (apply direct(sum_pair_0_1 &my_alloc_region)
+              ($camlEscape_type_checker_region__sum_pair_4 : _ -> imm tagged)
+                (r)
+                -> k2 * k1
+              where k2 (apply_result_2 : imm tagged) =
+                let int_add_3 =
+                  %int_barith.add (apply_result_2, apply_result_1)
+                in
+                let int_add_4 = %int_barith.add (int_add_3, apply_result) in
+                let region_end = %end_region (`region`) in
+                let region_end_1 = %end_ghost_region (ghost_region) in
+                cont k (int_add_4)))
+in
+let $camlEscape_type_checker_region__after_6 =
+  closure after_2_1 @after &toplevel
+in
+let code inline(never) loopify(never) size(63) newer_version_of(f_3)
+      f_3_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  let region_1 = %begin_region () in
+  let l = %block.[`0`].my_alloc_region.local[region_1] (x, x) in
+  apply direct(sum_local_1_1 &my_alloc_region)
+    ($camlEscape_type_checker_region__sum_local_5 : _ -> imm tagged)
+      (l)
+      -> k2 * k1
+    where k2 (n : imm tagged) =
+      let int_add = %int_barith.add (x, 2) in
+      let int_add_1 = %int_barith.add (x, 1) in
+      let Pmakeblock = %block.[`0`].my_alloc_region (int_add_1, int_add) in
+      let `unit` = %end_region (region_1) in
+      let int_add_2 = %int_barith.add (n, 1) in
+      let r = %block.[`0`].my_alloc_region.local[`region`] (n, int_add_2) in
+      let int_add_3 = %int_barith.add (n, 3) in
+      let int_add_4 = %int_barith.add (n, 2) in
+      let s =
+        %block.[`0`].my_alloc_region.local[`region`] (int_add_4, int_add_3)
+      in
+      (apply direct(sum_pair_0_1 &my_alloc_region) inlining_state(depth(1))
+         ($camlEscape_type_checker_region__sum_pair_4 : _ -> imm tagged)
+           (Pmakeblock)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           (apply direct(sum_pair_0_1 &my_alloc_region)
+                   inlining_state(depth(1))
+              ($camlEscape_type_checker_region__sum_pair_4 : _ -> imm tagged)
+                (s)
+                -> k2 * k1
+              where k2 (apply_result_1 : imm tagged) =
+                (apply direct(sum_pair_0_1 &my_alloc_region)
+                        inlining_state(depth(1))
+                   ($camlEscape_type_checker_region__sum_pair_4
+                    : _ -> imm tagged)
+                     (r)
+                     -> k2 * k1
+                   where k2 (apply_result_2 : imm tagged) =
+                     let int_add_5 =
+                       %int_barith.add (apply_result_2, apply_result_1)
+                     in
+                     let int_add_6 =
+                       %int_barith.add (int_add_5, apply_result)
+                     in
+                     let region_end = %end_region (`region`) in
+                     let region_end_1 = %end_ghost_region (ghost_region) in
+                     cont k (int_add_6))))
+in
+let $camlEscape_type_checker_region__f_7 = closure f_3_1 @f &toplevel in
+let $camlEscape_type_checker_region__Pmakeblock_8 =
+  Block 0 ($camlEscape_type_checker_region__f_7)
+in
+apply direct(f_3_1 &toplevel)
+  ($camlEscape_type_checker_region__f_7 : _ -> imm tagged) (10) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_type_checker_region__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_type_checker_region =
+      Block 0 ($camlEscape_type_checker_region__sum_pair_4,
+               $camlEscape_type_checker_region__sum_local_5,
+               $camlEscape_type_checker_region__after_6,
+               $camlEscape_type_checker_region__Pmakeblock_8)
+    in
+    cont done ($camlEscape_type_checker_region)

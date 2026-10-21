@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A block pointing at another block, neither escaping: both can be
@@ -16,4 +16,4 @@ let[@inline never] f x y z =
   let outer = (inner, z) in
   (sum_nested outer [@nontail])
 
-let () = Printf.printf "%d\n" (f 1 2 3)
+let () = (Printf.printf [@inlined never]) "%d\n" (f 1 2 3)

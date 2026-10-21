@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A function returning at mode local called from a loop: the result lives in
@@ -19,4 +19,4 @@ end = struct
     done;
     !acc
 end
-let () = Printf.printf "%d\n" (M.f 10)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.f 10)

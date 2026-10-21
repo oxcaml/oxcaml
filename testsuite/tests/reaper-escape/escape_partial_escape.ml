@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Negative: [inner] is stored in [outer], which escapes, so [inner]
@@ -13,4 +13,4 @@ let[@inline never] f x y z =
 
 let () =
   let (a, b), c = f 1 2 3 in
-  Printf.printf "%d %d %d\n" a b c
+  (Printf.printf [@inlined never]) "%d %d %d\n" a b c

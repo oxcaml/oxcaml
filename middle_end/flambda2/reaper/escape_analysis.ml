@@ -83,7 +83,16 @@ open Datalog_helpers
 
 let enabled = Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape"
 
-(* [flow a x]: the value allocated at [a] may be the value of [x]. *)
+(* [flow a x]: the value allocated at [a] may be the value of [x]. This is the
+   restriction to candidates of the inverse of [sources] (from the points-to
+   analysis), except that it is not cut off at nodes with [any_source]. The
+   points-to analysis does not record the sources of such nodes, nor propagate
+   them any further, since it cannot change their representation anyway; but a
+   value joined with unknown values (for instance in a parameter of a function
+   that is also called with the result of an exported function) may still never
+   leave the scope of its allocation. Reusing [sources], and treating as
+   escaping any value reaching a node with [any_source], was measured to lose
+   about 40% of the stack allocations in the stdlib. *)
 let flow = rel2 "escape_flow" Cols.[n; n]
 
 let is_candidate = rel1 "escape_candidate" Cols.[n]

@@ -1,0 +1,75 @@
+let code apply_twice_0 deleted in
+let code h_2 deleted in
+let code g_1 deleted in
+let $camlEscape_closure_local__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_closure_local__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_closure_local__const_block_0)
+in
+let $camlEscape_closure_local__immstring_2 = "%d\n" in
+let $camlEscape_closure_local__const_block_3 =
+  Block 0 ($camlEscape_closure_local__const_block_1,
+           $camlEscape_closure_local__immstring_2)
+in
+let code inline(never) loopify(never) size(12) newer_version_of(apply_twice_0)
+      apply_twice_0_1 (f : val, x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply &my_alloc_region f (x) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      apply &my_alloc_region f (apply_result) -> k * k1
+in
+let $camlEscape_closure_local__apply_twice_4 =
+  closure apply_twice_0_1 @apply_twice &toplevel
+in
+let code loopify(never) size(9) newer_version_of(h_2)
+      h_2_1 (y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let a = %project_value_slot.[h].[unboxed_field_a] (my_closure) in
+  let b = %project_value_slot.[h].[unboxed_field_b] (my_closure) in
+  let int_mul = %int_barith.mul (y, a) in
+  let int_add = %int_barith.add (int_mul, b) in
+  cont k (int_add)
+in
+let code inline(never) loopify(never) size(25) newer_version_of(g_1)
+      g_1_1 (a : imm tagged, b : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let h = closure h_2_1 @h &my_alloc_region &`region`
+   with { unboxed_field_b = b; unboxed_field_a = a }
+   in
+   apply direct(apply_twice_0_1 &my_alloc_region)
+     ($camlEscape_closure_local__apply_twice_4 : _ -> imm tagged)
+       (h, 1)
+       -> k2 * k1)
+    where k2 (function_return_0_g_1 : imm tagged) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      cont k (function_return_0_g_1)
+in
+let $camlEscape_closure_local__g_5 = closure g_1_1 @g &toplevel in
+apply direct(g_1_1 &toplevel)
+  ($camlEscape_closure_local__g_5 : _ -> imm tagged) (2, 3) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_closure_local__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_closure_local =
+      Block 0 ($camlEscape_closure_local__apply_twice_4,
+               $camlEscape_closure_local__g_5)
+    in
+    cont done ($camlEscape_closure_local)

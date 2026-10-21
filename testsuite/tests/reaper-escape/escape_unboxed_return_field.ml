@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* The pair returned by [these] is unboxed by the reaper, so the option stored
@@ -22,4 +22,4 @@ end = struct
     n + use o + sum_pair p
 end
 
-let () = Printf.printf "%d\n" (M.test 41)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.test 41)

@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Negative: the pair is returned, so it must stay on the heap. *)
@@ -14,5 +14,5 @@ let[@inline never] maybe x y =
 let () =
   let a, b = mk 1 2 in
   match maybe a b with
-  | Some (c, d) -> Printf.printf "%d %d\n" c d
+  | Some (c, d) -> (Printf.printf [@inlined never]) "%d %d\n" c d
   | None -> print_endline "none"

@@ -1,0 +1,79 @@
+let code sum_pair_0 deleted in
+let code mk_1 deleted in
+let code f_2 deleted in
+let $camlEscape_interproc_return__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_interproc_return__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_interproc_return__const_block_0)
+in
+let $camlEscape_interproc_return__immstring_2 = "%d\n" in
+let $camlEscape_interproc_return__const_block_3 =
+  Block 0 ($camlEscape_interproc_return__const_block_1,
+           $camlEscape_interproc_return__immstring_2)
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+      sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_interproc_return__sum_pair_4 =
+  closure sum_pair_0_1 @sum_pair &toplevel
+in
+let code inline(never) loopify(never) size(8) newer_version_of(mk_1)
+      mk_1_1 (x, y)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] stack =
+  let Pmakeblock = %block.[`0`].my_alloc_region.local[my_region] (x, y) in
+  cont k (Pmakeblock)
+in
+let $camlEscape_interproc_return__mk_5 = closure mk_1_1 @mk &toplevel in
+let code inline(never) loopify(never) size(11) newer_version_of(f_2)
+      f_2_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  apply direct(mk_1_1 &my_alloc_region &`region` &ghost_region)
+    ($camlEscape_interproc_return__mk_5 : _ -> [ 0 of val * val ])
+      (x, y)
+      -> k3 * k1
+    where k3 (p : [ 0 of imm tagged * imm tagged ]) =
+      apply direct(sum_pair_0_1 &my_alloc_region)
+        ($camlEscape_interproc_return__sum_pair_4 : _ -> imm tagged)
+          (p)
+          -> k2 * k1
+    where k2 (function_return_0_f_2 : imm tagged) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      cont k (function_return_0_f_2)
+in
+let $camlEscape_interproc_return__f_6 = closure f_2_1 @f &toplevel in
+let $camlEscape_interproc_return__Pmakeblock_7 =
+  Block 0 ($camlEscape_interproc_return__f_6)
+in
+apply direct(f_2_1 &toplevel)
+  ($camlEscape_interproc_return__f_6 : _ -> imm tagged) (3, 4) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_interproc_return__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_interproc_return =
+      Block 0 ($camlEscape_interproc_return__sum_pair_4,
+               $camlEscape_interproc_return__Pmakeblock_7)
+    in
+    cont done ($camlEscape_interproc_return)

@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A two-argument closure partially applied through an unknown-arity call in a
@@ -24,4 +24,4 @@ end = struct
     let h y z = (y * a) + (b * z) in
     papp2 h
 end
-let () = Printf.printf "%d %d\n" (M.g 2 3) ((M.g2 2 3) 2)
+let () = (Printf.printf [@inlined never]) "%d %d\n" (M.g 2 3) ((M.g2 2 3) 2)

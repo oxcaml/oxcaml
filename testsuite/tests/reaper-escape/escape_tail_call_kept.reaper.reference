@@ -1,0 +1,72 @@
+let code sum_pair_0 deleted in
+let code g_1 deleted in
+let code f_2 deleted in
+let $camlEscape_tail_call_kept__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_tail_call_kept__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_tail_call_kept__const_block_0)
+in
+let $camlEscape_tail_call_kept__immstring_2 = "%d\n" in
+let $camlEscape_tail_call_kept__const_block_3 =
+  Block 0 ($camlEscape_tail_call_kept__const_block_1,
+           $camlEscape_tail_call_kept__immstring_2)
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_0)
+      sum_pair_0_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_tail_call_kept__sum_pair_4 =
+  closure sum_pair_0_1 @sum_pair &toplevel
+in
+let code inline(never) loopify(never) size(5) newer_version_of(g_1)
+      g_1_1 (s : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_mul = %int_barith.mul (s, 2) in
+  cont k (int_mul)
+in
+let $camlEscape_tail_call_kept__g_5 = closure g_1_1 @g &toplevel in
+let code inline(never) loopify(never) size(17) newer_version_of(f_2)
+      f_2_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  let p = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
+  apply direct(sum_pair_0_1 &my_alloc_region)
+    ($camlEscape_tail_call_kept__sum_pair_4 : _ -> imm tagged) (p) -> k2 * k1
+    where k2 (s : imm tagged) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      apply direct(g_1_1 &my_alloc_region)
+        ($camlEscape_tail_call_kept__g_5 : _ -> imm tagged) (s) -> k * k1
+in
+let $camlEscape_tail_call_kept__f_6 = closure f_2_1 @f &toplevel in
+apply direct(f_2_1 &toplevel)
+  ($camlEscape_tail_call_kept__f_6 : _ -> imm tagged) (3, 4) -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_tail_call_kept__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_tail_call_kept =
+      Block 0 ($camlEscape_tail_call_kept__sum_pair_4,
+               $camlEscape_tail_call_kept__g_5,
+               $camlEscape_tail_call_kept__f_6)
+    in
+    cont done ($camlEscape_tail_call_kept)

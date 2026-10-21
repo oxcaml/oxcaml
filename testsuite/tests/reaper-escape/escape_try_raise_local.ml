@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* The exception payload is allocated in the [try] body and caught by a handler
@@ -20,4 +20,4 @@ end = struct
     sum_pair q + sum_pair r
 end
 
-let () = Printf.printf "%d\n" (M.f 1)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.f 1)

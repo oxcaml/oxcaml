@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A submodule with a signature: the signature says nothing about
@@ -19,4 +19,4 @@ end = struct
     (sum_pair p [@nontail])
 end
 
-let () = Printf.printf "%d\n" (M.f 3 4)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.f 3 4)

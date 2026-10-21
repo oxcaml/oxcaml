@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* [f] has a region of its own from the type checker, for [l]; it is closed
@@ -27,4 +27,4 @@ end = struct
     after (x + 1, x + 2) n
 end
 
-let () = Printf.printf "%d\n" (M.f 10)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.f 10)

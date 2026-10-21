@@ -1,10 +1,11 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
-(* Mutable record: stores into it must not make it escape. *)
+(* Mutable record: the stores into it currently make it escape (a known
+   limitation of the analysis), so it stays on the heap. *)
 type t = { mutable a : int; mutable b : int }
 
 let[@inline never] bump r =
@@ -17,4 +18,4 @@ let[@inline never] f x =
   bump r;
   r.a + r.b
 
-let () = Printf.printf "%d\n" (f 1)
+let () = (Printf.printf [@inlined never]) "%d\n" (f 1)

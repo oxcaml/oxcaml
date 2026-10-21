@@ -1,0 +1,43 @@
+let code f_0 deleted in
+let $camlEscape_escape_unknown_call__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_escape_unknown_call__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_escape_unknown_call__const_block_0)
+in
+let $camlEscape_escape_unknown_call__immstring_2 = "%d\n" in
+let $camlEscape_escape_unknown_call__const_block_3 =
+  Block 0 ($camlEscape_escape_unknown_call__const_block_1,
+           $camlEscape_escape_unknown_call__immstring_2)
+in
+let code inline(never) loopify(never) size(17) newer_version_of(f_0)
+      f_0_1 (x, y)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let p = %block.[`0`].my_alloc_region (x, y) in
+  apply ccall inlining_state(depth(10))
+    ($`*extern*`.caml_hash_exn : val * val * val * val -> imm tagged)
+      (10, 100, 0, p)
+      -> k * k1
+in
+let $camlEscape_escape_unknown_call__f_4 = closure f_0_1 @f &toplevel in
+apply direct(f_0_1 &toplevel)
+  ($camlEscape_escape_unknown_call__f_4 : _ -> imm tagged)
+    (1, 2)
+    -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    let int_and = %int_barith.`and` (apply_result, 255) in
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_escape_unknown_call__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never) full_apply (int_and) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_escape_unknown_call =
+      Block 0 ($camlEscape_escape_unknown_call__f_4)
+    in
+    cont done ($camlEscape_escape_unknown_call)

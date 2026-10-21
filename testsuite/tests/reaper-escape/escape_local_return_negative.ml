@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Negative: [mk] is also called from a site that lets the result escape, so
@@ -21,4 +21,4 @@ end
 let () =
   M.g 5 6;
   let a, b = !M.cell in
-  Printf.printf "%d %d %d\n" (M.f 3 4) a b
+  (Printf.printf [@inlined never]) "%d %d %d\n" (M.f 3 4) a b

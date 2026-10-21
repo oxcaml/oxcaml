@@ -1,0 +1,60 @@
+let code f_0 deleted in
+let $camlEscape_escape_store__const_block_1 = Block 12 (10, 0) in
+let $camlEscape_escape_store__const_block_2 =
+  Block 4 (0, 0, 0, $camlEscape_escape_store__const_block_1)
+in
+let $camlEscape_escape_store__const_block_3 =
+  Block 12 (32, $camlEscape_escape_store__const_block_2)
+in
+let $camlEscape_escape_store__const_block_4 =
+  Block 4 (0, 0, 0, $camlEscape_escape_store__const_block_3)
+in
+let $camlEscape_escape_store__immstring_5 = "%d %d\n" in
+let $camlEscape_escape_store__const_block_6 =
+  Block 0 ($camlEscape_escape_store__const_block_4,
+           $camlEscape_escape_store__immstring_5)
+in
+let $camlEscape_escape_store__const_block_0 = Block 0 (0, 0) in
+let cell =
+  %block.mut.[`0`].`toplevel` ($camlEscape_escape_store__const_block_0)
+in
+let $camlEscape_escape_store__f_7 =
+  closure f_0_1 @f &toplevel
+and code inline(never) loopify(never) size(13) newer_version_of(f_0)
+      f_0_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let cell_1 = %project_value_slot.[f].[cell] ($camlEscape_escape_store__f_7)
+  in
+  let p = %block.[`0`].my_alloc_region (x, y) in
+  let Psetfield = %block_set.[`0`] (cell_1, p) in
+  cont k (0)
+  with { cell = cell }
+in
+apply direct(f_0_1 &toplevel)
+  ($camlEscape_escape_store__f_7 : _ -> imm tagged) (5, 6) -> k3 * error
+  where k3 (function_return : imm tagged) =
+    cont k2
+  where k2 =
+    cont k1
+  where k1 =
+    let `*match*` = %block_load.mut.[`0`] (cell) in
+    let Pmixedfield = %block_load.[`1`] (`*match*`) in
+    let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_escape_store__const_block_6)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (Pmixedfield_1, Pmixedfield) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_escape_store =
+      Block 0 (cell, $camlEscape_escape_store__f_7)
+    in
+    cont done ($camlEscape_escape_store)

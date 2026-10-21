@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Exceptions: raising past an open region is fine (the handler restores
@@ -19,5 +19,6 @@ let[@inline never] g x y =
   if x < 0 then raise (E p) else sum_pair p
 
 let () =
-  Printf.printf "%d\n" (f 1 2);
-  (try ignore (g (-1) 2) with E (a, b) -> Printf.printf "E %d %d\n" a b)
+  (Printf.printf [@inlined never]) "%d\n" (f 1 2);
+  (try ignore (g (-1) 2)
+   with E (a, b) -> (Printf.printf [@inlined never]) "E %d %d\n" a b)

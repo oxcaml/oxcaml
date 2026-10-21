@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Returning from inside a loop, and a loop-carried allocation. *)
@@ -22,4 +22,4 @@ let[@inline never] count n =
       if sum_pair p > 1000 then acc else loop (i + 1) (acc + sum_pair p)
   in
   loop 1 0
-let () = Printf.printf "%d %d\n" (find 100) (count 100)
+let () = (Printf.printf [@inlined never]) "%d %d\n" (find 100) (count 100)

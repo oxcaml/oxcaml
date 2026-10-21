@@ -1,0 +1,123 @@
+let code use_0 deleted in
+let code sum_pair_1 deleted in
+let code these_2 deleted in
+let code test_3 deleted in
+let $camlEscape_unboxed_return_field__const_block_0 = Block 12 (10, 0) in
+let $camlEscape_unboxed_return_field__const_block_1 =
+  Block 4 (0, 0, 0, $camlEscape_unboxed_return_field__const_block_0)
+in
+let $camlEscape_unboxed_return_field__immstring_2 = "%d\n" in
+let $camlEscape_unboxed_return_field__const_block_3 =
+  Block 0 ($camlEscape_unboxed_return_field__const_block_1,
+           $camlEscape_unboxed_return_field__immstring_2)
+in
+let code inline(never) loopify(never) size(13) newer_version_of(use_0)
+      use_0_1 (o : [ 0 | 0 of imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_int (o) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let Pfield = %block_load.[`0`] (o) in
+      cont k (Pfield)
+in
+let $camlEscape_unboxed_return_field__use_4 = closure use_0_1 @use &toplevel
+in
+let code inline(never) loopify(never) size(5) newer_version_of(sum_pair_1)
+      sum_pair_1_1 (p : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let int_add = %int_barith.add (Pfield_1, Pfield) in
+  cont k (int_add)
+in
+let $camlEscape_unboxed_return_field__sum_pair_5 =
+  closure sum_pair_1_1 @sum_pair &toplevel
+in
+let code inline(never) loopify(never) size(9) newer_version_of(these_2)
+      these_2_1 (x : imm tagged)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : val * val stack =
+  let Pmakeblock = %block.[`0`].my_alloc_region.local[my_region] (x) in
+  let int_add = %int_barith.add (x, 1) in
+  let Pmakeblock_into_Pmakeblock_field_1 = Pmakeblock in
+  let Pmakeblock_into_Pmakeblock_field_0 = int_add in
+  cont k
+         (Pmakeblock_into_Pmakeblock_field_0,
+          Pmakeblock_into_Pmakeblock_field_1)
+in
+let $camlEscape_unboxed_return_field__these_6 =
+  closure these_2_1 @these &toplevel
+in
+let code inline(never) loopify(never) size(30) newer_version_of(test_3)
+      test_3_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  apply direct(these_2_1 &my_alloc_region &`region` &ghost_region)
+    ($camlEscape_unboxed_return_field__these_6 : _ -> val * val)
+      (x)
+      -> k2 * k1
+    where k2
+            (`Pmakeblock_into_*match*_field_0`,
+             `Pmakeblock_into_*match*_field_1`) =
+      let n = `Pmakeblock_into_*match*_field_0` in
+      let int_add = %int_barith.add (n, 2) in
+      let int_add_1 = %int_barith.add (n, 1) in
+      let p =
+        %block.[`0`].my_alloc_region.local[`region`] (int_add_1, int_add)
+      in
+      (apply direct(sum_pair_1_1 &my_alloc_region)
+         ($camlEscape_unboxed_return_field__sum_pair_5 : _ -> imm tagged)
+           (p)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           ((let Pmixedfield = `Pmakeblock_into_*match*_field_1` in
+             apply direct(use_0_1 &my_alloc_region)
+               ($camlEscape_unboxed_return_field__use_4 : _ -> imm tagged)
+                 (Pmixedfield)
+                 -> k2 * k1)
+              where k2 (apply_result_1 : imm tagged) =
+                let int_add_2 = %int_barith.add (n, apply_result_1) in
+                let int_add_3 = %int_barith.add (int_add_2, apply_result) in
+                let region_end = %end_region (`region`) in
+                let region_end_1 = %end_ghost_region (ghost_region) in
+                cont k (int_add_3)))
+in
+let $camlEscape_unboxed_return_field__test_7 =
+  closure test_3_1 @test &toplevel
+in
+let $camlEscape_unboxed_return_field__Pmakeblock_8 =
+  Block 0 ($camlEscape_unboxed_return_field__test_7)
+in
+apply direct(test_3_1 &toplevel)
+  ($camlEscape_unboxed_return_field__test_7 : _ -> imm tagged)
+    (41)
+    -> k1 * error
+  where k1 (apply_result : imm tagged) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_unboxed_return_field__const_block_3)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_unboxed_return_field =
+      Block 0 ($camlEscape_unboxed_return_field__use_4,
+               $camlEscape_unboxed_return_field__sum_pair_5,
+               $camlEscape_unboxed_return_field__Pmakeblock_8)
+    in
+    cont done ($camlEscape_unboxed_return_field)

@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* The allocation is returned through two levels of calls before being read by
@@ -18,4 +18,4 @@ end = struct
     let p = mk2 x y in
     (sum_pair p [@nontail])
 end
-let () = Printf.printf "%d\n" (M.f 3 4)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.f 3 4)

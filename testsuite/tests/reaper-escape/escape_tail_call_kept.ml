@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* A local allocation followed by an unrelated tail call: the region must be
@@ -12,4 +12,4 @@ let[@inline never] f x y =
   let p = (x, y) in
   let s = sum_pair p in
   g s
-let () = Printf.printf "%d\n" (f 3 4)
+let () = (Printf.printf [@inlined never]) "%d\n" (f 3 4)

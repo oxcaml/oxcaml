@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* Simplest case: a pair built in [f] and only read by a same-unit callee.
@@ -19,4 +19,4 @@ let[@inline never] f x y =
   let p = (x, y) in
   (sum_pair p [@nontail])
 
-let () = Printf.printf "%d %d\n" (f_tail 3 4) (f 3 4)
+let () = (Printf.printf [@inlined never]) "%d %d\n" (f_tail 3 4) (f 3 4)

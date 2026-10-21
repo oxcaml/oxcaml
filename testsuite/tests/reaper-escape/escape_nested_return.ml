@@ -1,7 +1,7 @@
 (* TEST
    flambda2;
-   flags += "-flambda2-reaper -X reaper-escape=1";
-   { native; check-program-output; }
+   flags += "-flambda2-reaper -X reaper-escape=1 -reaper-debug-flags=nostamps";
+   { native with dump-reaper; check-fexpr-dump; }
  *)
 
 (* The inner option is reachable from the outer one, which is returned by [mk]
@@ -24,4 +24,4 @@ end = struct
     get y + sum_pair p
 end
 
-let () = Printf.printf "%d\n" (M.g 7)
+let () = (Printf.printf [@inlined never]) "%d\n" (M.g 7)
