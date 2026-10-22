@@ -259,9 +259,9 @@ let prepare_code ~env ~res ~code_id code =
       (* Code that does not use [my_closure] or project from any closure can
          share a single closure, which we bind here. This also provides a
          binding when the reaper unboxes a closure and deletes its
-         [Set_of_closures]. It must be bound in [prepare_code], as a static group
-         may list a [Set_of_closures] before the code it uses, and JSIR expects
-         variables to be defined before they are used. *)
+         [Set_of_closures]. It must be bound in [prepare_code], as a static
+         group may list a [Set_of_closures] before the code it uses, and JSIR
+         expects variables to be defined before they are used. *)
       let closure_bound_with_code =
         (not (Code0.is_my_closure_used code))
         && Function_slot.Set.is_empty
