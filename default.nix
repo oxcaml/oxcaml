@@ -1,6 +1,18 @@
 {
   pkgs ? import <nixpkgs> { },
-  src ? ./.,
+  src ? pkgs.lib.cleanSourceWith {
+    src = ./.;
+    filter =
+      path: type:
+      pkgs.lib.cleanSourceFilter path type
+      && !(
+        type == "directory"
+        && (
+          baseNameOf path == "_build"
+          || (dirOf path == toString ./. && pkgs.lib.hasPrefix "_" (baseNameOf path))
+        )
+      );
+  },
   # Short commit hash of src, recorded in the js_of_ocaml version.
   gitRev ? null,
   addressSanitizer ? false,
