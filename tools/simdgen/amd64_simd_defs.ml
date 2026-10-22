@@ -536,3 +536,92 @@ let loc_memory_width = function
         | R8 | R16 | R32 | R64 | MM | XMM | YMM | ZMM | K -> ())
       temps;
     Option.get !width
+
+module Intrin = struct
+  (* An instruction descriptor, possibly parameterized by EVEX zeroing. *)
+  type 'id bind =
+    | Instr of 'id instr
+    | Zeroing of (z:bool -> 'id instr) * bool
+
+  type 'id rnd_bind =
+    | Rnd of (rnd:evex_rounding -> 'id instr)
+    | Rnd_zeroing of (rnd:evex_rounding -> z:bool -> 'id instr) * bool
+
+  type 'id sae_bind =
+    | Sae of (sae:unit -> 'id instr)
+    | Sae_zeroing of (sae:unit -> z:bool -> 'id instr) * bool
+
+  (* The instruction's immediate, taken from the leading constant arguments. *)
+  type imm =
+    | No_imm
+    | Imm of int (* one constant in [0, max] *)
+    | Getmant of int * int
+      (* two constants (interval, sign), packed as [sign lsl 2 lor interval] *)
+    | Fixed of int (* no constant argument: implied by the intrinsic's name *)
+
+  (* The flag a KORTEST/KTEST flag reader tests. *)
+  type flag =
+    | Zf
+    | Cf
+
+  (* An instruction operand: one of the (non-constant) arguments, or a constant
+     synthesized for the unmasked gathers and scatters. *)
+  type operand =
+    | Value of int
+    | All_ones_mask
+    | Zero_vec128
+    | Zero_vec256
+    | Zero_vec512
+
+  (* [arity] is the number of non-constant arguments; [args.(n)] is the
+     instruction's [n]th operand. *)
+  type 'id t =
+    | Register of
+        { arity : int;
+          imm : imm;
+          bind : 'id bind;
+          args : operand array
+        }
+    | Embedded_rounding of
+        { arity : int;
+          bind : 'id rnd_bind;
+          cur : 'id bind option;
+          args : operand array
+        }
+      (* A leading rounding-control constant selects [bind] with a static
+         rounding mode (8-11) or [cur] (4, _MM_FROUND_CUR_DIRECTION). *)
+    | Suppress_all_exceptions of
+        { arity : int;
+          imm : imm;
+          bind : 'id sae_bind;
+          cur : 'id bind option;
+          args : operand array
+        }
+      (* After [imm], a constant selects [bind] (8 or 12, _MM_FROUND_NO_EXC) or
+         [cur] (4, _MM_FROUND_CUR_DIRECTION). *)
+    | Flag_reader of
+        { flag : flag;
+          instr : 'id instr
+        }
+    | Load of
+        { arity : int;
+          bind : 'id bind;
+          args : operand array
+        }
+    | Store of
+        { arity : int;
+          bind : 'id bind;
+          args : operand array
+        }
+    | Gather of
+        { arity : int;
+          instr : 'id instr;
+          args : operand array
+        }
+      (* A leading scale constant selects the addressing mode. *)
+    | Scatter of
+        { arity : int;
+          instr : 'id instr;
+          args : operand array
+        }
+end

@@ -1151,7 +1151,7 @@ let select_operation_fma ~dbg:_ op args =
    ordinary extcall (and a link error against the nonexistent C symbol), as with
    the hand-written intrinsics. *)
 module Intrins = struct
-  module T = Amd64_simd_intrins_defs
+  module T = Amd64_simd_defs.Intrin
 
   let table = lazy (Hashtbl.of_seq (Array.to_seq Amd64_simd_intrins.table))
 
@@ -1164,7 +1164,7 @@ module Intrins = struct
 
   let invalid_immediate op = bad_immediate "Invalid immediate for %s" op
 
-  let bind : T.bind -> Amd64_simd_instrs.instr = function
+  let bind : Amd64_simd_instrs.id T.bind -> Amd64_simd_instrs.instr = function
     | Instr simd -> simd
     | Zeroing (simd, z) -> simd ~z
 
@@ -1221,7 +1221,7 @@ module Intrins = struct
   let kflag : T.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
 
   (* The instruction and the (ungated) selection. *)
-  let select_ungated op (spec : T.t) args =
+  let select_ungated op (spec : Amd64_simd_instrs.id T.t) args =
     match spec with
     | Register { arity; imm = imm_spec; bind = b; args = ops } ->
       let i, args = imm op args imm_spec in
