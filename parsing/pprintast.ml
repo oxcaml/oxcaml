@@ -430,43 +430,40 @@ let string_loc ppf x = fprintf ppf "%s" x.txt
 let string_quot f x = pp f "`%a" ident_of_name x
 
 (* new mode and modality syntax *)
-let pp_mode_consts f consts =
-  pp_print_list ~pp_sep:(fun f () -> pp f " ")
-    (fun f c -> pp_print_string f c.txt) f consts
+let mode_consts f consts =
+  pp_print_list ~pp_sep:(fun f () -> pp f " ") string_loc f consts
+
+let mode_bound_elem f { elem_morph; elem_var; elem_mod } =
+  (match elem_morph with
+   | None -> pp f "'%s" elem_var.txt
+   | Some m -> pp f "%s('%s)" m.txt elem_var.txt);
+  match elem_mod with
+  | [] -> ()
+  | _ :: _ -> pp f " mod %a" mode_consts elem_mod
 
 let mode_bound sep f { bound_vars; bound_const } =
-  let pp_var f { elem_morph; elem_var; elem_mod } =
-    (match elem_morph with
-     | None -> pp f "'%s" elem_var.txt
-     | Some m -> pp f "%s('%s)" m.txt elem_var.txt);
-    match elem_mod with
-    | [] -> ()
-    | _ :: _ -> pp f " mod %a" pp_mode_consts elem_mod
+  let elems =
+    pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) mode_bound_elem
   in
-  let pp_vars = pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) pp_var in
   match bound_vars, bound_const with
-  | vars, [] -> pp_vars f vars
-  | [], consts -> pp_mode_consts f consts
-  | vars, consts -> pp f "%a%s%a" pp_vars vars sep pp_mode_consts consts
+  | vars, [] -> elems f vars
+  | [], consts -> mode_consts f consts
+  | vars, consts -> pp f "%a%s%a" elems vars sep mode_consts consts
 
-let mode_desc f m =
-  match m with
+let mode f { txt; _ } =
+  match txt with
   | Mode s -> pp_print_string f s
   | Mode_var v -> pp f "'%s" v.txt
-  | Mode_bounds { upper; lower } -> (
-      let is_empty { bound_vars; bound_const } =
-        match bound_vars, bound_const with
-        | [], [] -> true
-        | _, _ -> false
-      in
-      match is_empty upper, is_empty lower with
-      | false, true -> pp f "[< %a]" (mode_bound " & ") upper
-      | true, false -> pp f "[> %a]" (mode_bound " | ") lower
-      | false, false ->
-          pp f "[< %a > %a]" (mode_bound " & ") upper (mode_bound " | ") lower
-      | true, true -> pp f "[]")
-
-let mode f { txt; _ } = mode_desc f txt
+  | Mode_bounds
+      { upper = { bound_vars = []; bound_const = [] };
+        lower = { bound_vars = []; bound_const = [] } } ->
+      pp f "[]"
+  | Mode_bounds { upper; lower = { bound_vars = []; bound_const = [] } } ->
+      pp f "[< %a]" (mode_bound " & ") upper
+  | Mode_bounds { upper = { bound_vars = []; bound_const = [] }; lower } ->
+      pp f "[> %a]" (mode_bound " | ") lower
+  | Mode_bounds { upper; lower } ->
+      pp f "[< %a > %a]" (mode_bound " & ") upper (mode_bound " | ") lower
 
 let modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
