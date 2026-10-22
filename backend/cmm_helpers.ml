@@ -678,7 +678,7 @@ and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
   | Byte_unsigned | Byte_signed -> 8
   | Sixteen_unsigned | Sixteen_signed -> 16
   | Thirtytwo_unsigned | Thirtytwo_signed -> 32
-  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Word_int | Word_tagged_int | Word_mask | Word_val | Single _ | Double
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     arch_bits
@@ -1094,7 +1094,7 @@ let store ~dbg memory_chunk init ~addr ~new_value =
     | Byte_unsigned | Byte_signed -> low_bits ~bits:8 ~dbg new_value
     | Sixteen_unsigned | Sixteen_signed -> low_bits ~bits:16 ~dbg new_value
     | Thirtytwo_unsigned | Thirtytwo_signed -> low_bits ~bits:32 ~dbg new_value
-    | Word_int | Word_mask | Word_val | Single _ | Double
+    | Word_int | Word_tagged_int | Word_mask | Word_val | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
       new_value
@@ -1778,7 +1778,7 @@ let float_of_float16 dbg c =
           returns = true;
           effects = No_effects;
           coeffects = No_coeffects;
-          ty_args = [XInt]
+          ty_args = [XInt64]
         },
       [c],
       dbg )
@@ -1826,7 +1826,7 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed -> 4
   | Single { reg = Float64 | Float32 } -> 4
-  | Word_int -> size_int
+  | Word_int | Word_tagged_int -> size_int
   | Word_mask -> size_int
   | Word_val -> size_addr
   | Double -> size_float
@@ -1971,7 +1971,10 @@ let addr_array_ref arr ofs dbg =
   Cop (mk_load_mut Word_val, [array_indexing log2_size_addr arr ofs dbg], dbg)
 
 let int_array_ref arr ofs dbg =
-  Cop (mk_load_mut Word_int, [array_indexing log2_size_addr arr ofs dbg], dbg)
+  Cop
+    ( mk_load_mut Word_tagged_int,
+      [array_indexing log2_size_addr arr ofs dbg],
+      dbg )
 
 let unboxed_mutable_float_array_ref arr ofs dbg =
   Cop (mk_load_mut Double, [array_indexing log2_size_float arr ofs dbg], dbg)
@@ -2241,7 +2244,11 @@ let unboxed_float32_array_ref =
 let unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr ~array_index dbg
     =
   bind "arr" arr (fun arr ->
-      bind "index" array_index (fun index -> int_array_ref arr index dbg))
+      bind "index" array_index (fun index ->
+          Cop
+            ( mk_load_mut Word_int,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
 
 let unboxed_mask_array_ref arr ~array_index dbg =
   bind "arr" arr (fun arr ->
@@ -2310,7 +2317,7 @@ let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
 let get_field_computed imm_or_ptr mutability ~block ~index dbg =
   let memory_chunk =
     match imm_or_ptr with
-    | Lambda.Immediate -> Word_int
+    | Lambda.Immediate -> Word_tagged_int
     | Lambda.Pointer -> Word_val
   in
   get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words:index
@@ -2579,7 +2586,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_mask | Word_val -> 1
+  | Word_int | Word_tagged_int | Word_mask | Word_val -> 1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2593,7 +2600,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int | Word_mask -> generic_case ()
+  | Word_int | Word_tagged_int | Word_mask -> generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2708,7 +2715,7 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         then
           (* regular scanned part of a block *)
           match memory_chunk with
-          | Word_int | Word_val -> ok ()
+          | Word_int | Word_tagged_int | Word_val -> ok ()
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
@@ -2718,11 +2725,11 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         else
           (* flat suffix part of the block *)
           match memory_chunk with
-          | Word_int | Word_mask | Thirtytwo_unsigned | Thirtytwo_signed
-          | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-          | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
-          | Sixteen_unsigned | Sixteen_signed ->
+          | Word_int | Word_tagged_int | Word_mask | Thirtytwo_unsigned
+          | Thirtytwo_signed | Double | Onetwentyeight_unaligned
+          | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+          | Fivetwelve_unaligned | Fivetwelve_aligned | Single _ | Byte_unsigned
+          | Byte_signed | Sixteen_unsigned | Sixteen_signed ->
             ok ()
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
@@ -3336,9 +3343,7 @@ let make_switch arg cases actions dbg =
   let extract_uconstant = function
     (* Constant integers loaded from a table should end in 1, so that Cload
        never produces untagged integers *)
-    | Cconst_int (n, _) when n land 1 = 1 -> Some (Cint (Nativeint.of_int n))
-    | Cconst_natint (n, _) when Nativeint.(to_int (logand n one) = 1) ->
-      Some (Cint n)
+    | Cconst_tagged_int (n, _) -> Some (Cint (encode_tagged_int n))
     | Cconst_symbol (s, _) -> Some (Csymbol_address s)
     | _ -> None
   in
@@ -3374,10 +3379,11 @@ let make_switch arg cases actions dbg =
   let make_affine_computation ~offset ~slope arg dbg =
     (* In case the resulting integers are an affine function of the index, we
        don't emit a table, and just compute the result directly *)
-    add_int
-      (mul_int arg (natint_const_untagged dbg slope) dbg)
-      (natint_const_untagged dbg offset)
-      dbg
+    int64_as_value ~dbg
+      (add_int
+         (mul_int arg (natint_const_untagged dbg slope) dbg)
+         (natint_const_untagged dbg offset)
+         dbg)
   in
   let module Classify = struct
     type elt =
@@ -3597,7 +3603,8 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode
                   ( Ccmpi Ceq,
                     [ Cop
                         ( Casr,
-                          [ get_field_gen mut clos 1 dbg;
+                          [ get_field_gen_given_memory_chunk Word_int mut clos 1
+                              dbg;
                             Cconst_int (pos_arity_in_closinfo, dbg) ],
                           dbg );
                       Cconst_int (List.length extended_args_type, dbg) ],
@@ -3918,7 +3925,8 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
             ( Ccmpi Ceq,
               [ Cop
                   ( Casr,
-                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
+                    [ get_field_gen_given_memory_chunk Word_int
+                        Asttypes.Immutable (Cvar clos) 1 (dbg ());
                       Cconst_int (pos_arity_in_closinfo, dbg ()) ],
                     dbg () );
                 Cconst_int (List.length arity, dbg ()) ],
@@ -3953,7 +3961,10 @@ let send_function (arity, result, mode) =
     and pos = Cvar pos in
     let meths = V.create_local "meths" and cached = V.create_local "cached" in
     let real = V.create_local "real" in
-    let mask = get_field_gen Asttypes.Mutable (Cvar meths) 1 (dbg ()) in
+    let mask =
+      get_field_gen_given_memory_chunk Word_int Asttypes.Mutable (Cvar meths) 1
+        (dbg ())
+    in
     let cache_ptr = V.create_local "cache_ptr" in
     let cache_ptr_cvar = Cvar cache_ptr in
     let cache_ptr_expr =
@@ -3963,7 +3974,7 @@ let send_function (arity, result, mode) =
     let tag_pos =
       Cop
         ( Cadda,
-          [ Cop (Cadda, [cached_pos; Cvar meths], dbg ());
+          [ Cop (Cadda, [Cvar meths; cached_pos], dbg ());
             cconst_int ((3 * size_addr) - 1) ],
           dbg () )
     in
@@ -3997,7 +4008,7 @@ let send_function (arity, result, mode) =
                       ( mk_load_mut Word_val,
                         [ Cop
                             ( Cadda,
-                              [ Cop (Cadda, [Cvar real; Cvar meths], dbg ());
+                              [ Cop (Cadda, [Cvar meths; Cvar real], dbg ());
                                 cconst_int ((2 * size_addr) - 1) ],
                               dbg () ) ],
                         dbg () ) ) ) ) )
@@ -4190,7 +4201,10 @@ let read_from_closure_given_machtype t clos base_offset dbg =
     List.fold_left_map
       (fun (non_scanned_pos, scanned_pos) c ->
         match (c : machtype_component) with
-        | Tagged_int | Naked_int ->
+        | Tagged_int ->
+          ( (non_scanned_pos + 1, scanned_pos),
+            load Word_tagged_int non_scanned_pos )
+        | Naked_int ->
           (non_scanned_pos + 1, scanned_pos), load Word_int non_scanned_pos
         | Float ->
           ( (non_scanned_pos + ints_per_float, scanned_pos),
@@ -5267,11 +5281,11 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
   let ba_data_f = field_address bigarray 1 dbg in
   let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
   let addr =
-    array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
+    array_indexing ~typ:Naked_int (Misc.log2 elt_size) ba_data_p index dbg
   in
   match (elt_kind : Lambda.bigarray_kind) with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+    let addr' = add_int addr (int ~dbg (elt_size / 2)) dbg in
     box_complex dbg
       (load ~dbg elt_chunk Mutable ~addr)
       (load ~dbg elt_chunk Mutable ~addr:addr')
@@ -5289,11 +5303,11 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
   let ba_data_f = field_address bigarray 1 dbg in
   let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
   let addr =
-    array_indexing ~typ:Addr (Misc.log2 elt_size) ba_data_p index dbg
+    array_indexing ~typ:Naked_int (Misc.log2 elt_size) ba_data_p index dbg
   in
   match elt_kind with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = binary Cadda ~dbg addr (int ~dbg (elt_size / 2)) in
+    let addr' = add_int addr (int ~dbg (elt_size / 2)) dbg in
     return_unit dbg
       (sequence
          (store ~dbg elt_chunk Assignment ~addr
@@ -5879,7 +5893,7 @@ let atomic_address block offset dbg =
 
 let atomic_load ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block offset =
   let memory_chunk =
-    match imm_or_ptr with Immediate -> Word_int | Pointer -> Word_val
+    match imm_or_ptr with Immediate -> Word_tagged_int | Pointer -> Word_val
   in
   Cop (mk_load_atomic memory_chunk, [atomic_address block offset dbg], dbg)
 
@@ -5909,33 +5923,49 @@ let atomic_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block
   | Immediate ->
     let op = Catomic { op = Exchange; size = Word } in
     if Proc.operation_supported op
-    then Cop (op, [new_value; atomic_address block offset dbg], dbg)
+    then
+      bind "atomic_new_value" new_value (fun new_value ->
+          int64_as_value ~dbg
+            (Cop
+               ( op,
+                 [value_as_int64 ~dbg new_value; atomic_address block offset dbg],
+                 dbg )))
     else atomic_exchange_extcall ~dbg ~mode block offset ~new_value
   | Pointer -> atomic_exchange_extcall ~dbg ~mode block offset ~new_value
 
 let atomic_arith ~dbg ~op ~untag ~ext_name block offset i =
-  let i =
-    if untag then lsl_const (untag_int i dbg) 1 dbg else value_as_int64 ~dbg i
-  in
-  let op = Catomic { op; size = Word } in
-  if Proc.operation_supported op
-  then
-    (* input is a tagged integer *)
-    Cop (op, [i; atomic_address block offset dbg], dbg)
-  else
-    Cop
-      ( Cextcall
-          { func = ext_name;
-            builtin = false;
-            returns = true;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects;
-            ty = typ_tagged_int;
-            ty_args = [];
-            alloc = false
-          },
-        [block; atomic_field_index_for_extcall offset dbg; i],
-        dbg )
+  bind "atomic_arg" i (fun i ->
+      let i =
+        if untag
+        then lsl_const (untag_int i dbg) 1 dbg
+        else value_as_int64 ~dbg i
+      in
+      let atomic_op = Catomic { op; size = Word } in
+      if Proc.operation_supported atomic_op
+      then
+        (* input is a tagged integer *)
+        let result =
+          Cop (atomic_op, [i; atomic_address block offset dbg], dbg)
+        in
+        match op with
+        | Fetch_and_add | Exchange | Compare_exchange ->
+          int64_as_value ~dbg result
+        | Compare_set -> tag_int result dbg
+        | Add | Sub | Land | Lor | Lxor -> result
+      else
+        Cop
+          ( Cextcall
+              { func = ext_name;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty = typ_tagged_int;
+                ty_args = [];
+                alloc = false
+              },
+            [block; atomic_field_index_for_extcall offset dbg; i],
+            dbg ))
 
 let atomic_fetch_and_add ~dbg atomic offset i =
   atomic_arith ~dbg ~untag:true ~op:Fetch_and_add
@@ -5990,9 +6020,16 @@ let atomic_compare_and_set ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
     if Proc.operation_supported op
     then
       (* Use a bind to ensure [tag_int] gets optimised. *)
-      bind "res"
-        (Cop (op, [old_value; new_value; atomic_address block offset dbg], dbg))
-        (fun a2 -> tag_int a2 dbg)
+      bind "atomic_new_value" new_value (fun new_value ->
+          bind "atomic_old_value" old_value (fun old_value ->
+              bind "res"
+                (Cop
+                   ( op,
+                     [ value_as_int64 ~dbg old_value;
+                       value_as_int64 ~dbg new_value;
+                       atomic_address block offset dbg ],
+                     dbg ))
+                (fun a2 -> tag_int a2 dbg)))
     else
       atomic_compare_and_set_extcall ~dbg ~mode block offset ~old_value
         ~new_value
@@ -6021,7 +6058,16 @@ let atomic_compare_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
   | Immediate ->
     let op = Catomic { op = Compare_exchange; size = Word } in
     if Proc.operation_supported op
-    then Cop (op, [old_value; new_value; atomic_address block offset dbg], dbg)
+    then
+      bind "atomic_new_value" new_value (fun new_value ->
+          bind "atomic_old_value" old_value (fun old_value ->
+              int64_as_value ~dbg
+                (Cop
+                   ( op,
+                     [ value_as_int64 ~dbg old_value;
+                       value_as_int64 ~dbg new_value;
+                       atomic_address block offset dbg ],
+                     dbg ))))
     else
       atomic_compare_exchange_extcall ~dbg ~mode block offset ~old_value
         ~new_value

@@ -124,7 +124,7 @@ let memory_chunk_of_kind (kind : Flambda_kind.With_subkind.t) : Cmm.memory_chunk
   match Flambda_kind.With_subkind.kind kind with
   | Value -> (
     match Flambda_kind.With_subkind.non_null_value_subkind kind with
-    | Tagged_immediate -> Word_int
+    | Tagged_immediate -> Word_tagged_int
     | Anything | Boxed_float | Boxed_float32 | Boxed_int32 | Boxed_int64
     | Boxed_nativeint | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Boxed_mask
     | Variant _ | Float_block _ | Float_array | Immediate_array
@@ -159,7 +159,7 @@ let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
     | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Single _ | Double
     | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
     | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned
-    | Word_mask ) as mem ->
+    | Word_tagged_int | Word_mask ) as mem ->
     mem
 
 let machtype_of_kinded_parameter p = Bound_parameter.kind p |> machtype_of_kind
@@ -245,7 +245,8 @@ let rec const ~dbg cst =
     in
     mask ~dbg word0
   | Naked_nativeint t -> targetint ~dbg t
-  | Null -> targetint ~dbg (Targetint_32_64.zero Sixty_four)
+  | Null ->
+    int64_as_value ~dbg (targetint ~dbg (Targetint_32_64.zero Sixty_four))
   | Poison (kind, name) ->
     const ~dbg
       (Reg_width_const.of_int_of_kind Sixty_four kind (String.hash name))
@@ -501,7 +502,7 @@ let make_update env res dbg ({ kind; stride } : Update_kind.t) ~symbol var
       let memory_chunk : Cmm.memory_chunk =
         match kind with
         | Pointer -> Word_val
-        | Immediate -> Word_int
+        | Immediate -> Word_tagged_int
         | Naked_int8 | Naked_int16 ->
           (* CR layouts v5.1: we only support small integers in being
              sign-extended in word fields *)

@@ -541,7 +541,9 @@ let chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk =
   | Vec256 -> Twofiftysix_unaligned
   | Vec512 -> Fivetwelve_unaligned
   | Mask -> Word_mask
-  | Val | Addr | Tagged_int | Naked_int -> Word_val
+  | Val | Addr -> Word_val
+  | Tagged_int -> Word_tagged_int
+  | Naked_int -> Word_int
   | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
 let float_test_of_float_comparison :

@@ -345,6 +345,7 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int (* integer or pointer outside heap *)
+  | Word_tagged_int
   | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }

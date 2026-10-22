@@ -238,6 +238,7 @@ let static_cast_arg_type : Cmm.static_cast -> Cmm.machtype = function
 
 type expected_arg_type =
   | Exactly of Cmm.machtype
+  | Any_word
   | Any_machtype
       (** For argument slots whose machtype is not determined by the operation,
           e.g. arguments to an application whose signature is not known. *)
@@ -259,7 +260,7 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
       ([Exactly Cmm.typ_val (* closure or code pointer *)], Any_machtype)
   | Cextcall { ty_args = []; _ } ->
     (* An empty [ty_args] means "all arguments are machine words". *)
-    Any_number_of (Exactly Cmm.typ_addr)
+    Any_number_of Any_word
   | Cextcall { ty_args = (_ :: _) as ty_args; _ } ->
     Args
       (List.map
@@ -272,7 +273,7 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
            | XVec128 | XVec256 | XVec512 ->
              Exactly (Cmm.machtype_of_exttype ty_arg))
          ty_args)
-  | Cload _ -> Args [Exactly Cmm.typ_addr]
+  | Cload _ -> Args [Any_word]
   | Calloc (_, kind) ->
     let machtype_for_all_fields =
       match kind with
@@ -308,15 +309,16 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
       | Word_int ->
         (* A raw word slot is not scanned, so it accepts any word in a
            general-purpose register, including derived pointers. *)
-        Exactly Cmm.typ_addr
+        Any_word
       | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_val | Word_mask | Single _
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_tagged_int | Word_val
+      | Word_mask | Single _
       | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ->
         Exactly (Cmm.machtype_of_memory_chunk memory_chunk)
     in
-    Args [Exactly Cmm.typ_addr; payload_machtype]
+    Args [Any_word; payload_machtype]
   | Caddi | Csubi | Cand | Cor | Cxor | Ccmpi _ ->
     Args [Exactly Cmm.typ_naked_int; Exactly Cmm.typ_naked_int]
   | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cmuli64 _ ->
@@ -329,14 +331,14 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
       [ Exactly Cmm.typ_naked_int; Exactly Cmm.typ_naked_int;
         Exactly Cmm.typ_naked_int; Exactly Cmm.typ_naked_int ]
   | Ccsel ty -> Args [Exactly Cmm.typ_naked_int; Exactly ty; Exactly ty]
-  | Cprefetch _ -> Args [Exactly Cmm.typ_addr]
+  | Cprefetch _ -> Args [Any_word]
   | Catomic
       { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange; _ } ->
-    Args [Exactly Cmm.typ_naked_int; Exactly Cmm.typ_addr (* address *)]
+    Args [Exactly Cmm.typ_naked_int; Any_word]
   | Catomic { op = Compare_set | Compare_exchange; _ } ->
     Args
       [ Exactly Cmm.typ_naked_int; Exactly Cmm.typ_naked_int;
-        Exactly Cmm.typ_addr (* address *) ]
+        Any_word ]
   | Caddv -> Args [Exactly Cmm.typ_val; Exactly Cmm.typ_naked_int]
   | Cadda -> Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_naked_int]
   | Cnegf width | Cabsf width -> Args [Exactly (machtype_of_float_width width)]
@@ -558,9 +560,7 @@ and typecheck_cop env (op : Cmm.operation) (args : Cmm.expression list) dbg
     : inferred_machtype =
   let arg_tys = List.map (infer_machtype env) args in
   let check_arg arg_index expected actual =
-    match expected with
-    | Any_machtype -> ()
-    | Exactly expected ->
+    let check expected =
       check_machtype ~dbg ~expected actual ~what:(fun () ->
           Format.asprintf
             "operation: %s\n  argument machtypes: [%a]\n  argument %d"
@@ -569,6 +569,17 @@ and typecheck_cop env (op : Cmm.operation) (args : Cmm.expression list) dbg
                ~pp_sep:(fun ppf () -> Format.pp_print_string ppf "; ")
                print_inferred_machtype)
             arg_tys (arg_index + 1))
+    in
+    match expected with
+    | Any_machtype -> ()
+    | Exactly expected -> check expected
+    | Any_word ->
+      match actual with
+      | Never_returns -> ()
+      | Machtype ty ->
+        if Array.length ty <> 1
+           || not (Cmm.equal_machtype_component ty.(0) Naked_int)
+        then check Cmm.typ_addr
   in
   let arity_error expected_arity =
     Misc.fatal_errorf

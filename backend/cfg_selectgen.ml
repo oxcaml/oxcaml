@@ -407,7 +407,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         match init with Initialization -> false | Assignment -> true
       in
       match[@ocaml.warning "-fragile-match"] chunk with
-      | Word_int | Word_val ->
+      | Word_int | Word_tagged_int | Word_val ->
         let op, newarg2 =
           match Target.is_store_out_of_range chunk ~byte_offset:0 with
           | Within_range -> (
@@ -856,7 +856,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
          may point to heap values. However, any such blocks will be registered
          in the compilation unit's global roots structure, so adding this
          register to the frame table would be redundant *)
-      let r = Reg.createv Cmm.typ_naked_int in
+      let r = Reg.createv Cmm.typ_tagged_int in
       Ok (insert_op env sub_cfg (SU.make_const_symbol n) [||] r)
     | Cvar v -> (
       try Ok (SU.env_find v env)
@@ -1002,7 +1002,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (* For zero alloc checking we need to treat [Invalid] as returning. *)
       let label = Cmm.new_label () in
       let label_after = Some label in
-      let ty = Cmm.typ_naked_int in
+      let ty = Cmm.typ_tagged_int in
       let rd = Reg.createv ty in
       let term = Cfg.Invalid { message; stack_ofs; stack_align; label_after } in
       let loc_res =

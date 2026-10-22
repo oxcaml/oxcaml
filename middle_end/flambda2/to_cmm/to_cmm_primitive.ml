@@ -1243,7 +1243,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     let cmm =
       match reinterpret with
       | Tagged_int63_as_unboxed_int64 -> C.value_as_int64 ~dbg arg
-      | Unboxed_int64_as_tagged_int63 -> C.int64_as_value ~dbg arg
+      | Unboxed_int64_as_tagged_int63 ->
+        C.int64_as_value ~dbg (C.or_int (C.int 1 ~dbg) arg dbg)
       | Unboxed_int64_as_unboxed_float64 -> C.int64_as_float ~dbg arg
       | Unboxed_float64_as_unboxed_int64 -> C.float_as_int64 ~dbg arg
     in
@@ -1376,7 +1377,7 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
     C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
     |> C.return_unit dbg
   | Read_offset (kind, mut) ->
-    let addr = C.add_int x y dbg in
+    let addr = C.add_int_addr x y dbg in
     let memory_chunk = C.memory_chunk_of_kind kind in
     C.load ~dbg memory_chunk mut ~addr
 
@@ -1423,7 +1424,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
         let write_into_block =
           match mode with
           | Heap ->
-            let addr = C.add_int x y dbg in
+            let addr = C.add_int_addr x y dbg in
             C.caml_modify ~dbg addr z
           | Local ->
             (* divide to convert offset from bytes to field number *)
@@ -1444,7 +1445,7 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
       else
-        let addr = C.add_int x y dbg in
+        let addr = C.add_int_addr x y dbg in
         C.store ~dbg memory_chunk Assignment ~addr ~new_value:z
     in
     C.return_unit dbg store

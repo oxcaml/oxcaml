@@ -1600,6 +1600,7 @@ let emit_instr env i =
   | Lop (Load { memory_chunk; addressing_mode; is_atomic; _ }) -> (
     assert (
       Cmm.equal_memory_chunk memory_chunk Word_int
+      || Cmm.equal_memory_chunk memory_chunk Word_tagged_int
       || Cmm.equal_memory_chunk memory_chunk Word_val
       || not is_atomic);
     let dst = i.res.(0) in
@@ -1624,7 +1625,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
-    | Word_int | Word_val ->
+    | Word_int | Word_tagged_int | Word_val ->
       if is_atomic
       then (
         assert (
@@ -1677,7 +1678,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Word_val ->
+    | Word_int | Word_tagged_int | Word_val ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
       A.ins2 STR (H.reg_x src) addressing

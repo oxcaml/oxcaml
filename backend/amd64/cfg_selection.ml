@@ -432,7 +432,7 @@ let select_operation'
       | Some (op, args) -> Rewritten (Basic (Op op), args)
       | None -> Use_default))
   (* Recognize store instructions *)
-  | Cstore (((Word_int | Word_val) as chunk), _init) -> (
+  | Cstore (((Word_int | Word_tagged_int | Word_val) as chunk), _init) -> (
     match[@ocaml.warning "-fragile-match"] args with
     | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
       when Stdlib.( = ) loc loc' && int_is_immediate n ->

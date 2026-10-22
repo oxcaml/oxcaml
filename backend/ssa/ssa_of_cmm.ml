@@ -309,8 +309,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            [||])
     | Cconst_symbol (n, _dbg) ->
       Ok
-        (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_naked_int
-           [||])
+        (emit_op env c (SU.make_const_symbol n) Debuginfo.none
+           Cmm.typ_tagged_int [||])
     | Cvar v -> Ok (env_find v env)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list ->
@@ -364,7 +364,7 @@ and emit_invalid env c message symbol =
   in
   if current_function_is_check_enabled
   then (
-    let cont_block = new_block env ~params:Cmm.typ_naked_int in
+    let cont_block = new_block env ~params:Cmm.typ_tagged_int in
     finish_block env c ~dbg:Debuginfo.none
       (Invalid { message; args = arg_instrs; continuation = Some cont_block });
     Cursor.move c ~new_pos:cont_block;

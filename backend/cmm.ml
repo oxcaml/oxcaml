@@ -233,7 +233,7 @@ let machtype_of_exttype = function
   | XInt ->
     (* [XInt] only gets created from values, and LLVM needs to keep track of
        them properly. *)
-    if !Clflags.llvm_backend then typ_val else typ_naked_int
+    typ_val
   | XInt8 -> typ_naked_int
   | XInt16 -> typ_naked_int
   | XInt32 -> typ_naked_int
@@ -464,6 +464,7 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int
+  | Word_tagged_int
   | Word_mask
   | Word_val
   | Single of { reg : float_width }
@@ -479,7 +480,7 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed -> 1
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
-  | Word_int | Word_mask | Word_val | Double -> 8
+  | Word_int | Word_tagged_int | Word_mask | Word_val | Double -> 8
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
@@ -488,6 +489,7 @@ let machtype_of_memory_chunk : memory_chunk -> machtype = function
   | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
   | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
     typ_naked_int
+  | Word_tagged_int -> typ_tagged_int
   | Word_val -> typ_val
   | Word_mask -> typ_mask
   | Single { reg = Float64 } | Double -> typ_float
@@ -1179,6 +1181,8 @@ let equal_float_comparison left right =
 
 let equal_memory_chunk left right =
   match left, right with
+  | Word_tagged_int, Word_tagged_int -> true
+  | Word_tagged_int, _ | _, Word_tagged_int -> false
   | Byte_unsigned, Byte_unsigned -> true
   | Byte_signed, Byte_signed -> true
   | Sixteen_unsigned, Sixteen_unsigned -> true

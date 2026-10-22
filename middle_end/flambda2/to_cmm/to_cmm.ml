@@ -110,7 +110,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* CR mshinwell: This should at least be given a source file location. *)
   let dbg = Debuginfo.none in
   let body =
-    let unit_value = C.targetint ~dbg (Targetint_32_64.one Sixty_four) in
+    let unit_value = C.unit ~dbg in
     C.create_ccatch ~rec_flag:false ~body
       ~handlers:
         [ C.handler ~dbg return_cont

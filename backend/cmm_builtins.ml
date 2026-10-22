@@ -865,7 +865,9 @@ let transl_builtin name args dbg typ_res =
   | "caml_float32_of_int64" ->
     Some (Cop (Cstatic_cast (Float_of_int64 Float32), args, dbg))
   | "caml_int_clz_tagged_to_untagged" ->
-    if_operation_supported Cclz ~f:(fun () -> Cop (Cclz, args, dbg))
+    if_operation_supported Cclz ~f:(fun () ->
+        let arg = value_as_int64 ~dbg (one_arg name args) in
+        Cop (Cclz, [arg], dbg))
   | "caml_int_clz_untagged_to_untagged" ->
     if_operation_supported Cclz ~f:(fun () ->
         let arg = clear_sign_bit (one_arg name args) dbg in
@@ -884,7 +886,8 @@ let transl_builtin name args dbg typ_res =
     if_operation_supported Cpopcnt ~f:(fun () ->
         (* Having the argument tagged saves a shift, but there is one extra
            "set" bit, which is accounted for by the (-1) below. *)
-        Cop (Caddi, [Cop (Cpopcnt, args, dbg); Cconst_int (-1, dbg)], dbg))
+        let arg = value_as_int64 ~dbg (one_arg name args) in
+        Cop (Caddi, [Cop (Cpopcnt, [arg], dbg); Cconst_int (-1, dbg)], dbg))
   | "caml_int_popcnt_untagged_to_untagged" ->
     (* This code is expected to be faster than [popcnt(tagged_x) - 1] when the
        untagged argument is already available from a previous computation. *)
@@ -1002,15 +1005,19 @@ let transl_builtin name args dbg typ_res =
     Some (lsr_int arg count dbg)
   (* Native_pointer: handled as unboxed nativeint *)
   | "caml_ext_pointer_as_native_pointer" ->
-    Some (int_as_pointer (one_arg name args) dbg)
+    Some
+      (lsl_int (untag_int (one_arg name args) dbg) (Cconst_int (1, dbg)) dbg)
   | "caml_native_pointer_of_value" ->
     Some (value_as_int64 ~dbg (one_arg name args))
   | "caml_native_pointer_to_value" ->
     Some (int64_as_value ~dbg (one_arg name args))
-  | "caml_native_pointer_load_immediate"
+  | "caml_native_pointer_load_immediate" ->
+    Some (Cop (mk_load_mut Word_tagged_int, args, dbg))
   | "caml_native_pointer_load_unboxed_nativeint" ->
     Some (Cop (mk_load_mut Word_int, args, dbg))
-  | "caml_native_pointer_store_immediate"
+  | "caml_native_pointer_store_immediate" ->
+    Some
+      (return_unit dbg (Cop (Cstore (Word_tagged_int, Assignment), args, dbg)))
   | "caml_native_pointer_store_unboxed_nativeint" ->
     Some (return_unit dbg (Cop (Cstore (Word_int, Assignment), args, dbg)))
   | "caml_native_pointer_load_unboxed_int64" when size_int = 8 ->
@@ -1053,10 +1060,12 @@ let transl_builtin name args dbg typ_res =
     Some
       (return_unit dbg (Cop (Cstore (Sixteen_signed, Assignment), args, dbg)))
   (* Ext_pointer: handled as tagged int *)
-  | "caml_ext_pointer_load_immediate"
+  | "caml_ext_pointer_load_immediate" ->
+    ext_pointer_load Word_tagged_int name args dbg
   | "caml_ext_pointer_load_unboxed_nativeint" ->
     ext_pointer_load Word_int name args dbg
-  | "caml_ext_pointer_store_immediate"
+  | "caml_ext_pointer_store_immediate" ->
+    ext_pointer_store Word_tagged_int name args dbg
   | "caml_ext_pointer_store_unboxed_nativeint" ->
     ext_pointer_store Word_int name args dbg
   | "caml_ext_pointer_load_unboxed_int64" when size_int = 8 ->
