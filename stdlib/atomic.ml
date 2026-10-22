@@ -18,85 +18,85 @@ type (!'a : value_or_null) t : sync_data with 'a =
 external make
   : ('a : value_or_null).
   'a -> ('a t[@local_opt])
-  @@ portable
+  @@ stateless
   = "%makemutable"
 
 external make_contended
   : ('a : value_or_null).
   'a -> ('a t[@local_opt])
-  @@ portable
+  @@ stateless
   = "caml_atomic_make_contended"
 
 external get
   : ('a : value_or_null).
   'a t @ local -> 'a
-  @@ portable
+  @@ stateless
   = "%atomic_load"
 
 external set
   : ('a : value_or_null).
   ('a t [@local_opt]) -> 'a -> unit
-  @@ portable
+  @@ stateless
   = "%atomic_set"
 
 external exchange
   : ('a : value_or_null).
   ('a t [@local_opt]) -> 'a -> 'a
-  @@ portable
+  @@ stateless
   = "%atomic_exchange"
 
 external compare_and_set
   : ('a : value_or_null).
   ('a t [@local_opt]) -> 'a -> 'a -> bool
-  @@ portable
+  @@ stateless
   = "%atomic_cas"
 
 external compare_exchange
   : ('a : value_or_null).
   ('a t [@local_opt]) -> 'a -> 'a -> 'a
-  @@ portable
+  @@ stateless
   = "%atomic_compare_exchange"
 
 external fetch_and_add
   :  int t @ local
   -> int
   -> int
-  @@ portable
+  @@ stateless
   = "%atomic_fetch_add"
 
 external add
   :  int t @ local
   -> int
   -> unit
-  @@ portable
+  @@ stateless
   = "%atomic_add"
 
 external sub
   :  int t @ local
   -> int
   -> unit
-  @@ portable
+  @@ stateless
   = "%atomic_sub"
 
 external logand
   :  int t @ local
   -> int
   -> unit
-  @@ portable
+  @@ stateless
   = "%atomic_land"
 
 external logor
   :  int t @ local
   -> int
   -> unit
-  @@ portable
+  @@ stateless
   = "%atomic_lor"
 
 external logxor
   :  int t @ local
   -> int
   -> unit
-  @@ portable
+  @@ stateless
   = "%atomic_lxor"
 
 let incr r = add r 1
@@ -105,45 +105,45 @@ let decr r = sub r 1
 external get_contended
   : ('a : value_or_null).
   'a t @ contended local -> 'a @ contended
-  @@ portable
+  @@ stateless
   = "%atomic_load"
 
 module Loc = struct
   type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
   external get : ('a : value_or_null).
-    'a t @ local -> 'a @@ portable = "%atomic_load_loc"
+    'a t @ local -> 'a @@ stateless = "%atomic_load_loc"
   external set : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> unit @@ portable = "%atomic_set_loc"
+    ('a t [@local_opt]) -> 'a -> unit @@ stateless = "%atomic_set_loc"
   external exchange : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> 'a @@ portable = "%atomic_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a @@ stateless = "%atomic_exchange_loc"
   external compare_and_set : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> 'a -> bool @@ portable = "%atomic_cas_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> bool @@ stateless = "%atomic_cas_loc"
   external compare_exchange : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> 'a -> 'a @@ portable
+    ('a t [@local_opt]) -> 'a -> 'a -> 'a @@ stateless
     = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
-    : int t @ local -> int -> int @@ portable
+    : int t @ local -> int -> int @@ stateless
     = "%atomic_fetch_add_loc"
 
   external add
-    : int t @ local -> int -> unit @@ portable = "%atomic_add_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_add_loc"
 
   external sub
-    : int t @ local -> int -> unit @@ portable = "%atomic_sub_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_sub_loc"
 
   external logand
-    : int t @ local -> int -> unit @@ portable = "%atomic_land_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_land_loc"
 
   external logor
-    : int t @ local -> int -> unit @@ portable = "%atomic_lor_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_lor_loc"
 
   external logxor
-    : int t @ local -> int -> unit @@ portable = "%atomic_lxor_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_lxor_loc"
 
   let incr t = add t 1
   let decr t = sub t 1
 
   external get_contended : ('a : value_or_null).
-    'a t @ contended local -> 'a @ contended @@ portable = "%atomic_load_loc"
+    'a t @ contended local -> 'a @ contended @@ stateless = "%atomic_load_loc"
 end

@@ -28,7 +28,8 @@ type (!'a : value_or_null) t : sync_data with 'a =
   { mutable contents : 'a [@atomic] }
 
 (** Create an atomic reference. *)
-external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) = "%makemutable"
+external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) @@ stateless
+  = "%makemutable"
 
 (** Create an atomic reference that is alone on a cache line. It occupies 4-16x
     the memory of one allocated with [make v].
@@ -43,22 +44,23 @@ external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) = "%makemutable"
     enhance performance. *)
 external make_contended
   : ('a : value_or_null).
-  'a -> ('a t[@local_opt])
+  'a -> ('a t[@local_opt]) @@ stateless
   = "caml_atomic_make_contended"
 
 (** Get the current value of the atomic reference. *)
-external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load"
+external get : ('a : value_or_null). 'a t @ local -> 'a @@ stateless
+  = "%atomic_load"
 
 (** Set a new value for the atomic reference. *)
 external set
   : ('a : value_or_null).
-  ('a t [@local_opt]) -> 'a -> unit
+  ('a t [@local_opt]) -> 'a -> unit @@ stateless
   = "%atomic_set"
 
 (** Set a new value for the atomic reference, and return the current value. *)
 external exchange
   : ('a : value_or_null).
-  ('a t [@local_opt]) -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a @@ stateless
   = "%atomic_exchange"
 
 (** [compare_and_set r seen v] sets the new value of [r] to [v] only if its
@@ -67,7 +69,7 @@ external exchange
     happened) and [false] otherwise. *)
 external compare_and_set
   : ('a : value_or_null).
-  ('a t [@local_opt]) -> 'a -> 'a -> bool
+  ('a t [@local_opt]) -> 'a -> 'a -> bool @@ stateless
   = "%atomic_cas"
 
 (** [compare_exchange r seen v] sets the new value of [r] to [v] only if its
@@ -75,27 +77,28 @@ external compare_and_set
     occur atomically. Returns the previous value. *)
 external compare_exchange
   : ('a : value_or_null).
-  ('a t [@local_opt]) -> 'a -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a -> 'a @@ stateless
   = "%atomic_compare_exchange"
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
     returns the current value (before the increment). *)
-external fetch_and_add : int t @ local -> int -> int = "%atomic_fetch_add"
+external fetch_and_add : int t @ local -> int -> int @@ stateless
+  = "%atomic_fetch_add"
 
 (** [add r i] atomically adds [i] onto [r]. *)
-external add : int t @ local -> int -> unit =  "%atomic_add"
+external add : int t @ local -> int -> unit @@ stateless =  "%atomic_add"
 
 (** [sub r i] atomically subtracts [i] onto [r]. *)
-external sub : int t @ local -> int -> unit =  "%atomic_sub"
+external sub : int t @ local -> int -> unit @@ stateless =  "%atomic_sub"
 
 (** [logand r i] atomically bitwise-ands [i] onto [r]. *)
-external logand : int t @ local -> int -> unit =  "%atomic_land"
+external logand : int t @ local -> int -> unit @@ stateless =  "%atomic_land"
 
 (** [logor r i] atomically bitwise-ors [i] onto [r]. *)
-external logor : int t @ local -> int -> unit =  "%atomic_lor"
+external logor : int t @ local -> int -> unit @@ stateless =  "%atomic_lor"
 
 (** [logxor r i] atomically bitwise-xors [i] onto [r]. *)
-external logxor : int t @ local -> int -> unit =  "%atomic_lxor"
+external logxor : int t @ local -> int -> unit @@ stateless =  "%atomic_lxor"
 
 (** [incr r] atomically increments the value of [r] by [1]. *)
 val incr : int t @ local -> unit
@@ -106,7 +109,7 @@ val decr : int t @ local -> unit
 (** Like {!get}, but can be called on an atomic from another domain. *)
 external get_contended
   : ('a : value_or_null).
-  'a t @ contended local -> 'a @ contended
+  'a t @ contended local -> 'a @ contended @@ stateless
   = "%atomic_load"
 
 (** Atomic "locations", such as record fields. *)
@@ -127,40 +130,42 @@ module Loc : sig
      calls:
        Atomic.Loc.foo [%atomic.loc r.x] ...  *)
 
-  external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
+  external get : ('a : value_or_null). 'a t @ local -> 'a @@ stateless
+    = "%atomic_load_loc"
 
   external get_contended : ('a : value_or_null).
-    'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
+    'a t @ contended local -> 'a @ contended @@ stateless = "%atomic_load_loc"
 
   external set : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> unit = "%atomic_set_loc"
+    ('a t [@local_opt]) -> 'a -> unit @@ stateless = "%atomic_set_loc"
 
   external exchange : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> 'a = "%atomic_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a @@ stateless = "%atomic_exchange_loc"
 
   external compare_and_set : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> 'a -> bool = "%atomic_cas_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> bool @@ stateless = "%atomic_cas_loc"
 
   external compare_exchange : ('a : value_or_null).
-    ('a t [@local_opt]) -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> 'a @@ stateless
+    = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
-    : int t @ local -> int -> int = "%atomic_fetch_add_loc"
+    : int t @ local -> int -> int @@ stateless = "%atomic_fetch_add_loc"
 
   external add
-    : int t @ local -> int -> unit = "%atomic_add_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_add_loc"
 
   external sub
-    : int t @ local -> int -> unit = "%atomic_sub_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_sub_loc"
 
   external logand
-    : int t @ local -> int -> unit = "%atomic_land_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_land_loc"
 
   external logor
-    : int t @ local -> int -> unit = "%atomic_lor_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_lor_loc"
 
   external logxor
-    : int t @ local -> int -> unit = "%atomic_lxor_loc"
+    : int t @ local -> int -> unit @@ stateless = "%atomic_lxor_loc"
 
   val incr : int t @ local -> unit
   val decr : int t @ local -> unit
