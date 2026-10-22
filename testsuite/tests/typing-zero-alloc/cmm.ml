@@ -35,9 +35,26 @@ camlTOP2__apply_6_11_code:
 val apply : ('a -> 'b) -> 'a -> 'b = <fun>
 |}]
 
+let ylppa x f = f x
+[%%expect{|
+camlTOP3__ylppa_7_13_code:
+- Some [Argument { argument_index = 1 }]
+
+val ylppa : 'a -> ('a -> 'b) -> 'b = <fun>
+|}]
+
+let both f g x = f x, g x
+[%%expect{|
+camlTOP4__both_8_15_code:
+- Some [Argument { argument_index = 0 }]
+- Some [Argument { argument_index = 1 }]
+
+val both : ('a -> 'b) -> ('a -> 'c) -> 'a -> 'b * 'c = <fun>
+|}]
+
 let alias f x = let g = f in g x
 [%%expect{|
-camlTOP3__alias_7_13_code:
+camlTOP5__alias_9_17_code:
 - Some [Argument { argument_index = 0 }]
 
 val alias : ('a -> 'b) -> 'a -> 'b = <fun>
@@ -45,7 +62,7 @@ val alias : ('a -> 'b) -> 'a -> 'b = <fun>
 
 let shadow f x = let f = ignore in f x
 [%%expect{|
-camlTOP4__shadow_8_16_code:
+camlTOP6__shadow_10_20_code:
 
 val shadow : 'a -> 'b -> unit = <fun>
 |}]
@@ -54,8 +71,24 @@ val shadow : 'a -> 'b -> unit = <fun>
    multi-argument functions: *)
 let tupled (x, f) = f x
 [%%expect{|
-camlTOP5__tupled_10_18_code:
+camlTOP7__tupled_12_22_code:
 - Some [Argument { argument_index = 1 }]
 
 val tupled : 'a * ('a -> 'b) -> 'b = <fun>
+|}]
+
+let optional ?f x = match f with Some f -> f x | None -> ()
+[%%expect{|
+camlTOP8__optional_13_24_code:
+- None
+
+val optional : ?f:('a -> unit) -> 'a -> unit = <fun>
+|}]
+
+let curse_you_caml_apply f x y = f x y
+[%%expect{|
+camlTOP10__curse_you_caml_apply_17_30_code:
+- Some [Symbol G:"caml_apply2"]
+
+val curse_you_caml_apply : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
 |}]
