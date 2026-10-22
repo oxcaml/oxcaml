@@ -223,10 +223,7 @@ let () =
 type ur = { u1 : int64_u; u2 : string; u3 : int; }
 |}]
 
-(* All-void records. Natively the block is empty, which requires it to be
-   statically allocated and hence immutable; in bytecode each void field is
-   an empty block, so the record is not. Either way it must match the directly
-   constructed record. *)
+(* All-void records *)
 
 type all_void = { x : unit#; kept : unit# }
 

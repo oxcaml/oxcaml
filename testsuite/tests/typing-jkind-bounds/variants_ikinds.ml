@@ -805,6 +805,15 @@ Error: This type "(unit -> unit) t" should be an instance of type
 
 type ('a : value mod contended) t_test = 'a t require_portable
 [%%expect {|
+Line 1, characters 6-30:
+1 | type ('a : value mod contended) t_test = 'a t require_portable
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `value mod contended'
+  but was inferred to have kind `value mod portable contended'.
+
+type ('a : value mod portable contended) t_test = 'a t require_portable
+|}, Principal{|
 Line 1, characters 41-45:
 1 | type ('a : value mod contended) t_test = 'a t require_portable
                                              ^^^^

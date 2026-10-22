@@ -98,6 +98,8 @@ module type Int_number_kind = sig
 
     val xor : t -> t -> t
 
+    val not_ : t -> t
+
     val unsigned_div : t -> t -> t option
 
     val unsigned_mod : t -> t -> t option

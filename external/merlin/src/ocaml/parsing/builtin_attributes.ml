@@ -834,6 +834,7 @@ type zero_alloc_check =
   { strict: bool;
     opt: bool;
     arity: int;
+    partial: bool;
     loc: Location.t;
     custom_error_msg : string option;
   }
@@ -843,6 +844,7 @@ type zero_alloc_assume =
     never_returns_normally: bool;
     never_raises: bool;
     arity: int;
+    partial: bool;
     loc: Location.t;
   }
 
@@ -993,6 +995,13 @@ let filter_arity payload =
   in
   find_arity [] payload
 
+let partition_partial payload =
+  let is_partial = function
+    | (Ident, "partial") -> true
+    | _ -> false
+  in
+  List.exists is_partial payload, List.filter (Fun.negate is_partial) payload
+
 (* If "assume_unless_opt" is not found returns None, otherwise
    returns the rest of the payload. Note it may change the order of the payload,
    which is fine because we sort it later.  *)
@@ -1007,52 +1016,56 @@ let filter_assume_unless_opt payload =
 
 let zero_alloc_lookup_table =
   (* These are the possible payloads (sans arity) paired with a function that
-     returns the corresponding check_attribute, given the arity and the loc. *)
+     returns the corresponding check_attribute, given the arity, the partiality,
+     and the loc. *)
   [
     (["assume"],
-     fun arity loc _ ->
+     fun arity partial loc _ ->
        Assume { strict = false; never_returns_normally = false;
                 never_raises = false;
-                arity; loc; });
+                arity; partial; loc; });
     (["assume_unless_opt"],
-     fun arity loc _ ->
+     fun arity partial loc _ ->
        (* same as "assume" *)
        Assume { strict = false; never_returns_normally = false;
                 never_raises = false;
-                arity; loc; });
+                arity; partial; loc; });
     (["strict"],
-     fun arity loc custom_error_msg ->
-       Check { strict = true; opt = false; arity; loc; custom_error_msg; });
+     fun arity partial loc custom_error_msg ->
+       Check { strict = true; opt = false; arity; partial; loc;
+               custom_error_msg; });
     (["opt"],
-     fun arity loc custom_error_msg ->
-       Check { strict = false; opt = true; arity; loc; custom_error_msg; });
+     fun arity partial loc custom_error_msg ->
+       Check { strict = false; opt = true; arity; partial; loc;
+               custom_error_msg; });
     (["opt"; "strict"; ],
-     fun arity loc custom_error_msg ->
-       Check { strict = true; opt = true; arity; loc; custom_error_msg; });
+     fun arity partial loc custom_error_msg ->
+       Check { strict = true; opt = true; arity; partial; loc;
+               custom_error_msg; });
     (["assume"; "strict"],
-     fun arity loc _ ->
+     fun arity partial loc _ ->
        Assume { strict = true; never_returns_normally = false;
                 never_raises = false;
-                arity; loc; });
+                arity; partial; loc; });
     (["assume"; "never_returns_normally"],
-     fun arity loc _ ->
+     fun arity partial loc _ ->
        Assume {  strict = false; never_returns_normally = true;
                 never_raises = false;
-                arity; loc; });
+                arity; partial; loc; });
     (["assume"; "never_returns_normally"; "strict"],
-     fun arity loc _ ->
+     fun arity partial loc _ ->
        Assume { strict = true; never_returns_normally = true;
                 never_raises = false;
-                arity; loc; });
+                arity; partial; loc; });
     (["assume"; "error"],
-     fun arity loc _ ->
+     fun arity partial loc _ ->
        Assume { strict = true; never_returns_normally = true;
                 never_raises = true;
-                arity; loc; });
-    (["ignore"], fun _ _ _ -> Ignore_assert_all)
+                arity; partial; loc; });
+    (["ignore"], fun _ _ _ _ -> Ignore_assert_all)
   ]
 
-let parse_zero_alloc_payload ~loc ~arity ~custom_error_message
+let parse_zero_alloc_payload ~loc ~arity ~partial ~custom_error_message
       ~warn ~empty payload =
   (* This parses the remainder of the payload after arity has been parsed
      out. *)
@@ -1062,7 +1075,7 @@ let parse_zero_alloc_payload ~loc ~arity ~custom_error_message
     let payload = List.sort String.compare payload in
     match List.assoc_opt payload zero_alloc_lookup_table with
     | None -> warn ();  Default_zero_alloc
-    | Some ca -> ca arity loc custom_error_message
+    | Some ca -> ca arity partial loc custom_error_message
 
 let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr =
   match attr with
@@ -1072,9 +1085,10 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
       let ( %> ) f g x = g (f x) in
       let msg =
         let custom_payloads =
-          let fail _ _ _ = assert false in
+          let fail _ _ _ _ = assert false in
           [
             (["arity <int_constant>"], fail);
+            (["partial"], fail);
             (["custom_error_message <string_constant>"], fail)
           ]
         in
@@ -1085,12 +1099,13 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
       in
       Location.prerr_warning loc (Warnings.Attribute_payload (txt, msg))
     in
-    let empty arity custom_error_msg =
-      Check { strict = false; opt = false; arity; loc; custom_error_msg; }
+    let empty arity partial custom_error_msg =
+      Check
+        { strict = false; opt = false; arity; partial; loc; custom_error_msg; }
     in
     match get_optional_payload get_ids_and_constants_from_exp payload with
     | Error () -> warn (); Default_zero_alloc
-    | Ok None -> empty default_arity None
+    | Ok None -> empty default_arity false None
     | Ok (Some payload) ->
       let custom_error_message, payload =
         match filter_custom_error_message payload with
@@ -1119,10 +1134,12 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
                 signatures";
              default_arity, payload)
       in
+      let partial, payload = partition_partial payload in
       let _, payload = List.split payload in
       let parse p =
-        let empty = empty arity custom_error_message in
-        parse_zero_alloc_payload ~loc ~arity ~custom_error_message ~warn ~empty p
+        let empty = empty arity partial custom_error_message in
+        parse_zero_alloc_payload ~loc ~arity ~partial ~custom_error_message
+          ~warn ~empty p
       in
       match filter_assume_unless_opt payload with
       | None -> parse payload
@@ -1134,8 +1151,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
            (* Treat [@zero_alloc assume_unless_opt] as [@zero_alloc] in signatures. *)
            parse rest)
         else
-          let no_other_payload = List.compare_length_with rest 0 = 0 in
-          if no_other_payload then (
+          if List.is_empty rest then (
             if is_zero_alloc_check_enabled ~opt:true then
               (if on_application then
                  (* Treat as if there is no attribute.
@@ -1146,7 +1162,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
                     forcing the function to be checked.
                     Setting [opt = false] to satisfy [@zero_alloc]
                     and not only [@zero_alloc opt] on the corresponding signatures. *)
-                 empty arity custom_error_message)
+                 empty arity partial custom_error_message)
             else
               (* Treat "assume_unless_opt" as "assume".
                  Reuse standard parsing for better error messages. *)
