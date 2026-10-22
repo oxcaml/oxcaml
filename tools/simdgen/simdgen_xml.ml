@@ -21,13 +21,15 @@ type node =
     text : string
   }
 
-let attr node name = List.assoc_opt name node.attrs
+let attr node name = List.assoc name node.attrs
+
+let attr_opt node name = List.assoc_opt name node.attrs
 
 let children_named node tag =
   List.filter (fun child -> String.equal child.tag tag) node.children
 
 let child_named node tag =
-  match children_named node tag with child :: _ -> Some child | [] -> None
+  List.find (fun child -> String.equal child.tag tag) node.children
 
 let error msg = failwith ("Simdgen_xml: " ^ msg)
 

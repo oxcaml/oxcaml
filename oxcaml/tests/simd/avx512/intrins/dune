@@ -110,6 +110,22 @@
    (run %{cc} -c -I %{workspace_root}/runtime helpers.c gen512_stubs.c)
    (run ar rcs %{targets} helpers.o gen512_stubs.o))))
 
+(library
+ (name gen512_helpers)
+ (wrapped false)
+ (modes native)
+ (modules helpers)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")
+   (<> %{system} macosx)))
+ (flags
+  (:standard -extension simd_alpha))
+ (ocamlopt_flags
+  (:standard -favx512f -favx512vl -favx512dq -favx512bw))
+ (libraries stdlib_stable stdlib_upstream_compatible))
+
 (executables
  (names gen512 gen512_mem)
  (modules gen512 gen512_mem)
@@ -120,7 +136,7 @@
    (<> %{system} macosx)))
  (ocamlopt_flags
   (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw))
- (libraries stdlib_stable stdlib_upstream_compatible)
+ (libraries gen512_helpers)
  (foreign_archives gen512stubs))
 
 (executables
@@ -134,7 +150,7 @@
  (ocamlopt_flags
   (:standard -extension simd_alpha -favx512f -favx512vl -favx512dq -favx512bw
    -internal-assembler))
- (libraries stdlib_stable stdlib_upstream_compatible)
+ (libraries gen512_helpers)
  (foreign_archives gen512stubs))
 
 (rule

@@ -1151,7 +1151,11 @@ let select_operation_fma ~dbg:_ op args =
    ordinary extcall (and a link error against the nonexistent C symbol), as with
    the hand-written intrinsics. *)
 module Intrins = struct
-  module T = Amd64_simd_intrins
+  module T = Amd64_simd_intrins_defs
+
+  let table = lazy (Hashtbl.of_seq (Array.to_seq Amd64_simd_intrins.table))
+
+  let find op = Hashtbl.find_opt (Lazy.force table) op
 
   let bad_arity op =
     (* A user-declared external with the wrong number of parameters. *)
@@ -1284,7 +1288,7 @@ module Intrins = struct
 end
 
 let select_operation_intrins ~dbg:_ op args =
-  match Amd64_simd_intrins.find op with
+  match Intrins.find op with
   | None -> None
   | Some spec -> Intrins.select op spec args
 

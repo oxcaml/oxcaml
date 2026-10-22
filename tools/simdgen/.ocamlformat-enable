@@ -3,3 +3,4 @@ simdgen_types.ml
 simdgen_xml.ml
 simdgen_intrins.ml
 amd64_simd_defs.ml
+amd64_simd_intrins_defs.ml

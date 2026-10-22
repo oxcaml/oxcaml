@@ -1,5 +1,5 @@
-/* Helpers for the generated AVX512 intrinsics tests (the OCaml side is in the
-   preamble printed by tools/simdgen/simdgen_intrins.ml). */
+/* Helpers for the generated AVX512 intrinsics tests (the OCaml side is in
+   helpers.ml). */
 
 #include <caml/simd.h>
 #include <assert.h>
