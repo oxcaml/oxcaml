@@ -65,23 +65,17 @@ Setup creates a partial build, we expect inconsistencies
   $ errors direct.ml
   2:8 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
-FIXME The rebuild finishes. Locate should work and the error should be gone.
+The rebuild finishes. Locate should work and the error should be gone.
   $ build dep_tag 'val add : Dep_base.t -> unit' 3
   $ locate direct.ml 2:18
-  return: Not in environment 'Dep_tag.add'
+  return: found
   $ errors direct.ml
-  2:8 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
-BUG: this and every case below should match the fresh document. Locate fails
-because the failed import still registered the old Dep_tag crc in the state's
-consistency table, and the rebuilt Dep_tag has a different crc. That also
-keeps an edit above the reference from helping.
 
 Even after an edit below the reference.
   $ echo 'let _ = ()' >> direct.ml
   $ locate direct.ml 2:18
-  return: Not in environment 'Dep_tag.add'
+  return: found
   $ errors direct.ml
-  2:8 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
 An edit above the reference.
   $ (echo '(* edited *)'; cat direct.ml) > tmp && mv tmp direct.ml
@@ -110,28 +104,23 @@ Setup creates a partial build, we expect inconsistencies
   $ errors alias.ml
   0:-1 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
-FIXME The rebuild finishes. Locate should work and the error should be gone.
+The rebuild finishes. Locate should work and the error should be gone.
   $ build dep_tag 'val add : Dep_base.t -> unit' 4
   $ locate alias.ml 3:23
-  error: The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
+  return: found
   $ errors alias.ml
-  0:-1 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
-BUG: this and every case below should match the fresh document. The original
-error is memoized in Import's components.$
 
 Even after an edit below the reference.
   $ echo 'let _ = ()' >> alias.ml
   $ locate alias.ml 3:23
-  error: The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
+  return: found
   $ errors alias.ml
-  0:-1 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
 An edit above the reference.
   $ (echo '(* edited *)'; cat alias.ml) > tmp && mv tmp alias.ml
   $ locate alias.ml 4:23
-  error: The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
+  return: found
   $ errors alias.ml
-  0:-1 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
 For reference, a fresh document:
   $ cp alias.ml fresh_alias.ml
