@@ -5321,10 +5321,6 @@ let upon_shape env ty ~run ~default =
 (* Unify a [Tivar] [t1'] with the non-variable type [t2], whose expanded head
    is [t2']: link [t1'] to [t2] as for a [Tvar], then fill its ivar with the
    shape of [t2']. *)
-(* CR-someday aobrien: Under the [Eager] scheduling policy, filling an ivar
-   runs its handlers immediately. Errors raised by a handler escape as
-   [Unify] (not [Unify_trace]), skipping the cleanup of the enclosing
-   unification (e.g. [reset_trace_gadt_instances], [undo_compress]). *)
 let unify3_ivar uenv jkind1 ivar1 t1' t2 t2' =
   unify3_var uenv jkind1 t1' t2 t2' ~on_link:(On_link.Fill_ivar ivar1)
 
