@@ -40,6 +40,47 @@ let get_and_clear_output ({ contents } as t) =
   t.contents <- Or_null.null;
   contents
 
+type stats_ref =
+  { mutable time : float;
+    mutable num_outputs : int;
+    mutable num_iterations : int
+  }
+
+let create_stats () = { time = 0.; num_outputs = 0; num_iterations = 0 }
+
+type stats =
+  { total_time : float;
+    num_outputs : int;
+    num_iterations : int
+  }
+
+let get_and_clear_stats
+    ({ time; num_outputs; num_iterations } as stats_ref : stats_ref) =
+  stats_ref.time <- 0.;
+  stats_ref.num_iterations <- 0;
+  stats_ref.num_outputs <- 0;
+  { total_time = time; num_outputs; num_iterations }
+
+let print_stats ppf { total_time; num_outputs; num_iterations } =
+  if num_iterations = 0
+  then Format.fprintf ppf "---"
+  else
+    Format.fprintf ppf
+      "%d iteration(s) (total: %f, mean: %f), producing %d output(s) (average: \
+       %f, average time: %f)"
+      num_iterations total_time
+      (total_time /. float num_iterations)
+      num_outputs
+      (float num_outputs /. float num_iterations)
+      (total_time /. float num_outputs)
+
+type timer = { mutable start_time : float }
+
+type metrics_code =
+  | Timer_start of timer
+  | Timer_stop of timer
+  | Increase_outputs_count
+
 type bindings_ref =
   | Bindings_ref_innermost_first :
       ('k columns * 'k Or_null_receiver.hlist with_names)
@@ -114,6 +155,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * string list
         * label
         -> code
+    | If_let :
+        'v Or_null_sender.t
+        * string
+        * ('k Constant.hlist -> 'v Or_null.t)
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * label
+        -> code
     | Call_with_bindings :
         (bindings_ref -> 'b Constant.hlist -> unit)
         * string
@@ -132,16 +182,18 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * ('s, _, 'v) Column.hlist
         * 'v Table.result_repr
         -> code
+    | Metrics : metrics_code * stats_ref -> code
 
   let labels = function
-    | Exit () | Union _ | Call_with_bindings _ -> []
+    | Exit () | Union _ | Call_with_bindings _ | Metrics _ -> []
     | Goto lab
     | Init (_, _, _, _, lab)
     | Advance (_, _, _, _, lab)
     | Absent (_, _, _, _, _, lab)
     | Distinct (_, _, _, _, _, lab)
     | Seek (_, _, _, _, lab)
-    | Filter (_, _, _, _, lab) ->
+    | Filter (_, _, _, _, lab)
+    | If_let (_, _, _, _, _, _, lab) ->
       [lab]
 
   let print_list =
@@ -172,11 +224,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Filter (_, name, _, names, if_false) ->
       Format.fprintf ppf "filter@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_false
+    | If_let (_, name, _, fn, _, names, if_null) ->
+      Format.fprintf ppf "call@ %s,@ %s,@ [@[%a]@],@ %a" name fn print_list
+        names (print_label digits) if_null
     | Call_with_bindings (_, name, _, _, names) ->
       Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
     | Union (_, _, name, _, names, _, value_name, _, _) ->
       Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
         print_list names value_name
+    | Metrics (Timer_start _timer, _stats) -> Format.fprintf ppf "timer.start"
+    | Metrics (Timer_stop _timer, _stats) -> Format.fprintf ppf "timer.stop"
+    | Metrics (Increase_outputs_count, _stats) -> Format.fprintf ppf "count++"
 
   let print_code_iarray ppf code =
     let length = Iarray.length code in
@@ -327,7 +385,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let emit insn st = emit0 (fun _ -> insn) st
 
-  let emit_with_label label f st =
+  let emit_with_label f label st =
     emit0 (fun offsets -> f (get_label offsets label)) st
 
   let goto lab st =
@@ -340,7 +398,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let with_binding repr receiver body st =
     let (Bindings_ref_innermost_first (reprs, receivers)) = st.bindings in
-    body receiver
+    body
+      { value = receiver; name = repr.name }
       { st with
         bindings =
           Bindings_ref_innermost_first
@@ -350,30 +409,30 @@ module Make (Iterator : Leapfrog.Iterator) = struct
               } )
       }
 
-  let init receiver iterator label =
-    emit_with_label label (fun label ->
+  let init receiver iterator =
+    emit_with_label (fun label ->
         Init
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let advance receiver iterator label =
-    emit_with_label label (fun label ->
+  let advance receiver iterator =
+    emit_with_label (fun label ->
         Advance
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let absent columns { value = trie; name } { values = args; names } label =
-    emit_with_label label (fun label ->
+  let absent columns { value = trie; name } { values = args; names } =
+    emit_with_label (fun label ->
         Absent (columns, trie, name, args, names, label))
 
-  let distinct column key1 key2 label =
-    emit_with_label label (fun label ->
+  let distinct column key1 key2 =
+    emit_with_label (fun label ->
         Distinct (column, key1.value, key1.name, key2.value, key2.name, label))
 
-  let seek iterator { value = receiver; name } label =
-    emit_with_label label (fun label ->
+  let seek iterator { value = receiver; name } =
+    emit_with_label (fun label ->
         Seek (iterator.values, iterator.names, receiver, name, label))
 
-  let filter { value = fn; name } { values = args; names } label =
-    emit_with_label label (fun label -> Filter (fn, name, args, names, label))
+  let filter { value = fn; name } { values = args; names } =
+    emit_with_label (fun label -> Filter (fn, name, args, names, label))
 
   let ( ++ ) fn1 fn2 code =
     fn1 code;
@@ -418,6 +477,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let if_ fn args body = if_template (filter fn args) body
 
+  let if_let name fn args body st =
+    let sender, receiver = Channel.create_or_null Or_null.null in
+    let receiver = { value = receiver; name } in
+    if_template
+      (emit_with_label (fun label ->
+           If_let
+             (sender, name, fn.value, fn.name, args.values, args.names, label)))
+      (body receiver) st
+
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
 
@@ -434,6 +502,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
            value_name,
            inner_columns,
            repr ))
+
+  let with_timer ~stats body st =
+    let timer = { start_time = 0. } in
+    emit (Metrics (Timer_start timer, stats)) st;
+    body st;
+    emit (Metrics (Timer_stop timer, stats)) st
+
+  let increase_count ~stats st =
+    emit (Metrics (Increase_outputs_count, stats)) st
 
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
@@ -579,6 +656,12 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       else next ()
     | Filter (func, _name, args, _names, if_false) ->
       if func (read_hlist args) then next () else goto if_false
+    | If_let (sender, _name, fn, _fn_name, args, _names, if_null) -> (
+      match fn (read_hlist args) with
+      | Null -> goto if_null
+      | This value ->
+        write sender value;
+        next ())
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
       next ()
@@ -594,6 +677,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
             contents entry
         in
         table.contents <- Or_null.this contents);
+      next ()
+    | Metrics (Timer_start timer, stats) ->
+      stats.num_iterations <- stats.num_iterations + 1;
+      timer.start_time <- Sys.time ();
+      next ()
+    | Metrics (Timer_stop timer, stats) ->
+      let time = Sys.time () in
+      stats.time <- stats.time +. (time -. timer.start_time);
+      next ()
+    | Metrics (Increase_outputs_count, stats) ->
+      stats.num_outputs <- stats.num_outputs + 1;
       next ()
 
   let run t =

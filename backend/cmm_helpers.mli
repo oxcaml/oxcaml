@@ -1103,7 +1103,7 @@ val indirect_call :
   expression ->
   Extended_machtype.t list ->
   expression list ->
-  callees:Cmm.callee list option ->
+  callees:callee list option ->
   expression
 
 (** Same as {!direct_call} but for an indirect call that is know to be a full
