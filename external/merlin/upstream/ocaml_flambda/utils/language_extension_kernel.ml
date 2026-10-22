@@ -3,6 +3,10 @@ type maturity =
   | Beta
   | Alpha
 
+type scheduler_policy =
+  | Eager
+  | Delayed
+
 (* Remember to update [Language_extension.Exist.all] when changing this type. *)
 type _ t =
   | Comprehensions : unit t
@@ -22,8 +26,9 @@ type _ t =
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t
+  | Omnidirectionality : scheduler_policy t
 
-(* When you update this, update [pair_of_string] below too. *)
+(* When you update this, update [Exist_pair.of_string] below too. *)
 let to_string : type a. a t -> string = function
   | Comprehensions -> "comprehensions"
   | Mode -> "mode"
@@ -42,3 +47,4 @@ let to_string : type a. a t -> string = function
   | Let_mutable -> "let_mutable"
   | Layout_poly -> "layout_poly"
   | Runtime_metaprogramming -> "runtime_metaprogramming"
+  | Omnidirectionality -> "omnidirectionality"

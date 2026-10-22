@@ -5331,13 +5331,15 @@ let upon_shape env ty ~run ~default =
   let scheduler = scheduler () in
   let ty = expand_head env ty in
   match get_desc ty with
-  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
+  | Tvar _ when not (Language_extension.is_enabled Omnidirectionality) ->
+    Scheduler.add scheduler (fun () -> run (default ()))
   | Tvar { name; jkind } ->
     if get_level ty = generic_level
     then Misc.fatal_error "Ctype.upon_shape: generic type variable";
     let ivar = Ivar.create ~in_global_pool:true () in
     set_type_desc ty (Tivar { name; jkind; ivar });
     ivar_upon ivar ~run ~default ~scheduler
+  | Tivar { ivar; _ } -> ivar_upon ivar ~run ~default ~scheduler
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
   | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tlink _ | Tsubst _
   | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _
