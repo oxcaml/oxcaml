@@ -950,7 +950,7 @@ let intrins subcommand =
   let bindings = bindings_assoc () in
   let intrinsics = Simdgen_intrins.parse_intrinsics "x86-intel.xml" in
   match subcommand with
-  | "skiplist" -> Simdgen_intrins.print_skiplist ~bindings intrinsics
+  | "skipped" -> Simdgen_intrins.print_skipped ~bindings intrinsics
   | "selection" -> Simdgen_intrins.print_selection ~bindings intrinsics
   | "tests-ml" -> Simdgen_intrins.tests_ml ~memory:false ~bindings intrinsics
   | "tests-mem-ml" -> Simdgen_intrins.tests_ml ~memory:true ~bindings intrinsics

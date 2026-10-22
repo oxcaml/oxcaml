@@ -957,7 +957,7 @@ let is_lo_convert i =
   contains ~needle:"cvt" i.name
   && (contains ~needle:"lo_pd" i.name || contains ~needle:"pslo" i.name)
 
-(* [None] for the intrinsics that are not supported (the skip list). *)
+(* [None] for the skipped (unsupported) intrinsics. *)
 let spec ~by_mnem i =
   let zeroing instr = (xml_shape_of_form instr.form).zeroing in
   if is_flag_reader_name i.name
@@ -1484,7 +1484,7 @@ let print_selection ~bindings intrinsics =
     arms;
   print_string "  |]\n"
 
-let print_skiplist ~bindings intrinsics =
+let print_skipped ~bindings intrinsics =
   print_endline "# In-scope AVX512 intrinsics that are not supported.";
   specs ~bindings intrinsics
   |> List.filter_map (fun (i, spec) ->

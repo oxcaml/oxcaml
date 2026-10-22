@@ -27,13 +27,13 @@
    (run ./simdgen.exe amd64))))
 
 (rule
- (target amd64_simd_intrins_skiplist.txt)
+ (target amd64_simd_intrins_skipped.txt)
  (deps simdgen.exe amd64/amd64.csv x86-intel.xml)
  (mode promote)
  (action
   (with-stdout-to
-   amd64_simd_intrins_skiplist.txt
-   (run ./simdgen.exe intrins skiplist))))
+   amd64_simd_intrins_skipped.txt
+   (run ./simdgen.exe intrins skipped))))
 
 (rule
  (target amd64_simd_intrins.ml)
@@ -49,7 +49,7 @@
  (deps
   amd64_simd_instrs.ml
   amd64_simd_intrins.ml
-  amd64_simd_intrins_skiplist.txt))
+  amd64_simd_intrins_skipped.txt))
 
 (rule
  (enabled_if
