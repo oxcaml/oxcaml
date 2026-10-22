@@ -869,41 +869,28 @@ exception Unknown_code_id
 let prove_code_ids_generic_value _env
     (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
   match value_head with
-  | Closures { by_function_slot; alloc_mode = _ } -> (
-    let { TG.known_closures; other_closures } = by_function_slot in
-    try
-      let code_ids = Code_id.Set.empty in
-      let code_ids =
-        match other_closures with
-        | Bottom -> code_ids
-        | Ok _ ->
-          (* We lost track of the possible code IDs for this closure. If the
-             row-like domain is [Known], we know all the possible slots for the
-             set of closure, and we could go through these; however, in practice
-             this cannot happen (this would be represented with [known_closures]
-             entries for each of the closures in the set instead), so don't
-             bother. *)
-          raise_notrace Unknown_code_id
-      in
-      let code_ids =
-        Function_slot.Map.fold
-          (fun function_slot row_like acc ->
-            (* Here we are computing the code ID when we know that the closure
-               has exactly the function slot [function_slot]; cases with an
-               unknown function slot would end up in [other_closures].
+  | Closures { by_function_slot = { known_closures }; alloc_mode = _ } -> (
+    match
+      Function_slot.Map.fold
+        (fun function_slot row_like acc ->
+          (* Here we are computing the code ID when we know that the closure has
+             exactly the function slot [function_slot] (we only have a closure
+             type when we know a finite overapproximation of the function slots;
+             otherwise we would have an [Unknown] type).
 
-               We don't need to check the row-like index domain, as that only
-               gives us information about the {b other} closures in the set. *)
-            match
-              Function_slot.Map.find function_slot
-                row_like.TG.maps_to.TG.function_types
-            with
-            | Unknown | (exception Not_found) -> raise_notrace Unknown_code_id
-            | Known function_type -> Code_id.Set.add function_type.code_id acc)
-          known_closures code_ids
-      in
-      if Code_id.Set.is_empty code_ids then Invalid else Proved code_ids
-    with Unknown_code_id -> Unknown)
+             We don't need to check the row-like index domain, as that only
+             gives us information about the {b other} closures in the set. *)
+          match
+            Function_slot.Map.find function_slot
+              row_like.TG.maps_to.TG.function_types
+          with
+          | Unknown | (exception Not_found) -> raise_notrace Unknown_code_id
+          | Known function_type -> Code_id.Set.add function_type.code_id acc)
+        known_closures Code_id.Set.empty
+    with
+    | exception Unknown_code_id -> Unknown
+    | code_ids when Code_id.Set.is_empty code_ids -> Invalid
+    | code_ids -> Proved code_ids)
   | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
   | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
   | Boxed_mask _ | Boxed_int64 _ | Boxed_nativeint _ | String _ | Array _ ->

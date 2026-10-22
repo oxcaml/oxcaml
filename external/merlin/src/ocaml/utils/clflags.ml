@@ -19,6 +19,7 @@ let real_paths          = ref true
 let recursive_types     = ref false
 let strict_sequence     = ref false
 let applicative_functors = ref true
+let typing_recovery     = ref true
 
 let nopervasives        = ref false
 let strict_formats      = ref true
@@ -44,7 +45,7 @@ let binary_annotations_cms  = ref false
 let shape_format        = ref Old_merlin
 let store_occurrences   = ref true
 let print_types         = ref false
-let native_code         = ref false
+let[@inline] target_is_native () = false
 let error_size          = ref 500
 let dont_write_files    = ref true
 let keep_locs           = ref true

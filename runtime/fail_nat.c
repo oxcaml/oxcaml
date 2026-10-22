@@ -18,20 +18,15 @@
 /* Raising exceptions from C. */
 
 #include <stdio.h>
-#include <signal.h>
-#include "caml/alloc.h"
 #include "caml/callback.h"
 #include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/io.h"
-#include "caml/gc.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/printexc.h"
 #include "caml/signals.h"
-#include "caml/stack.h"
-#include "caml/roots.h"
 #include "caml/callback.h"
 #include "caml/signals.h"
 #include "caml/tsan.h"
@@ -144,8 +139,7 @@ CAMLno_asan void caml_raise_async(value v)
   Caml_state->local_top = Caml_state->current_stack->local_top;
   Caml_state->local_limit = Caml_state->current_stack->local_limit;
 
-  /* Fiber switch: flush dynamic binding cache */
-  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+  caml_fiber_switched();
 
   /* Do not run callbacks here: we are already raising an async exn,
      so no need to check for another one, and avoiding polling here

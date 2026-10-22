@@ -27,7 +27,6 @@
 #include "caml/fiber.h"
 #include "caml/finalise.h"
 #include "caml/gc.h"
-#include "caml/gc_ctrl.h"
 #include "caml/globroots.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"
@@ -40,7 +39,6 @@
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
 #include "caml/sizeclasses.h"
-#include "caml/startup_aux.h"
 #include "caml/weak.h"
 
 struct generic_table CAML_TABLE_STRUCT(char);
@@ -760,7 +758,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   caml_do_local_roots(
     &oldify_one, oldify_scanning_flags, &st,
     domain->local_roots, domain->current_stack, domain->gc_regs,
-    domain->dynamic_bindings,
+    domain->dynamic_bindings, &domain->tls_state,
     domain->c_stack);
 
   scan_roots_hook = atomic_load(&caml_scan_roots_hook);

@@ -124,7 +124,9 @@ let parse_sig =
     (Parser_raw.interface lexer lexbuf : Parsetree.signature)
 
 let type_sig env sg =
-  let sg = Typemod.transl_signature env sg in
+  let sg =
+    Typemod.transl_signature ~md_mode:Mode.With_regionality.Const.legacy env sg
+  in
   sg.Typedtree.sig_type
 
 (*

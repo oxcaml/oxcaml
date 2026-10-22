@@ -195,6 +195,15 @@ let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
     in
     lookup_path' path tree
 
+let lookup_singleton_field t index =
+  match lookup_path_producing_new_indexes t [index] with
+  | [new_index] -> new_index
+  | _ ->
+    Misc.fatal_errorf
+      "lookup_singleton_field: expected exactly one flattened index for field \
+       %d@ shape: %a"
+      index print t
+
 type ('a, 'b) singleton_or_product =
   | Singleton of 'a
   | Product of 'b
@@ -220,6 +229,7 @@ let singleton_or_product_of_mixed_block_element
   | Mask -> Singleton Mask
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate
+  | Void -> Product [||]
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
     Misc.fatal_error

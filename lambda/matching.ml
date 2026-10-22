@@ -319,7 +319,8 @@ end = struct
       | `Unboxed_unit -> `Unboxed_unit
       | `Unboxed_bool b -> `Unboxed_bool b
       | `Tuple ps ->
-          `Tuple (List.map (fun (label, p) -> label, alpha_pat env p) ps)
+          `Tuple
+            (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
       | `Unboxed_tuple ps ->
           `Unboxed_tuple
             (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
@@ -486,9 +487,13 @@ let matcher discr (p : Simple.pattern) rem =
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
   | Unboxed_unit, Unboxed_unit -> yes ()
   | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
-  | Tuple n1, Tuple n2 -> yesif (n1 = n2)
+  | Tuple l1, Tuple l2 ->
+      (* List lengths can differ with GADT refinements.
+         see [basic-more/robustmatch.ml] module [M7] for an example *)
+      yesif (List.length l1 = List.length l2 &&
+             List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
-    yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
+      yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Record (l, _), Record (l', _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
@@ -677,7 +682,7 @@ end
 let rec flatten_pat_line size p k =
   match p.pat_desc with
   | Tpat_any | Tpat_var _ -> Patterns.omegas size :: k
-  | Tpat_tuple args -> (List.map snd args) :: k
+  | Tpat_tuple args -> (List.map (fun (_, p, _) -> p) args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
   | Tpat_alias { pattern = p; _ } ->
@@ -1315,9 +1320,14 @@ module StoreExp = Switch.Store (struct
 
   type key = lambda
 
+  let with_annotations t _ = t
+
   let compare_key = Stdlib.compare
 
-  let make_key = Lambda.make_key
+  let make_key t =
+    match Lambda.make_key t with
+    | None -> None
+    | Some e -> Some (e, Branch_annotations.default)
 end)
 
 let make_exit i = Lstaticraise (i, [])
@@ -2115,7 +2125,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typeopt.transl_constructor_representation head.pat_env
+        Translrepr.transl_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2129,14 +2139,14 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let sem = add_barrier_to_read ubr Reads_agree in
   let make_void_access binding_kind sort =
     (* Accesses to the void arguments of a constant constructor must create a
-       void (represented in lambda as an empty unboxed product) or product of
-       voids rather than access a block.
+       void or product of voids rather than access a block.
 
        This is necessary for bytecode, where [Pmixedfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
        boxed in bytecode). *)
     let rec lambda_void_of_el el =
       match el with
+      | Void -> Lprim (Punbox_unit, [lambda_unit], loc), layout_unboxed_unit
       | Product shape ->
         let ll, layouts =
           Array.map lambda_void_of_el shape |> Array.to_list |> List.split
@@ -2449,7 +2459,7 @@ let inline_lazy_force arg pos loc =
         ap_specialised = Default_specialise;
         ap_probe=None;
       }
-  else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
+  else if Clflags.target_is_native () && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
        caml_obj_tag and the switch on arbitrary tags *)
     (* Lswitch generates compact and efficient native code *)
@@ -2482,37 +2492,12 @@ let divide_lazy ~scopes head ctx pm =
 let get_pat_args_tuple arity p rem =
   match p with
   | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
-  | { pat_desc = Tpat_tuple args } -> (List.map snd args) @ rem
-  | _ -> assert false
-
-let get_pat_args_unboxed_tuple arity p rem =
-  match p with
-  | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
+  | { pat_desc = Tpat_tuple args }
   | { pat_desc = Tpat_unboxed_tuple args } ->
     (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
-let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
-  let loc = head_loc ~scopes head in
-  let arity = Patterns.Head.arity head in
-  let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
-  let sem = add_barrier_to_read ubr Reads_agree in
-  let binding_kind = add_barrier_to_let_kind ubr Alias in
-  let rec make_args pos =
-    if pos >= arity then
-      rem
-    else
-      {
-        arg = Lprim (Pfield (pos, Pointer, sem), [ arg ], loc);
-        binding_kind;
-        mut = compose_mut mut Immutable;
-        sort = Jkind.Sort.Const.for_tuple_element;
-        layout = layout_tuple_element;
-      } :: make_args (pos + 1)
-  in
-  make_args 0
-
-let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
+let get_expr_args_tuple ~is_unboxed ~scopes shape head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let shape =
     List.map (fun (_, sort) ->
@@ -2523,29 +2508,37 @@ let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
       Typeopt.layout_of_sort (Scoped_location.to_location loc) sort
     ) shape
   in
-  let layouts = List.map (fun (_, layout) -> layout) shape in
+  let read, binding_kind =
+    let layouts = List.map (fun (_, layout) -> layout) shape in
+    if is_unboxed
+    then (fun pos -> Punboxed_product_field (pos, layouts)), Alias
+    else begin
+      let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
+      let sem = add_barrier_to_read ubr Reads_agree in
+      let block_shape =
+        Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+      in
+      (* No need to differentiate between [Pfield] and a [Pmixedfield] with
+         all value [block_shape], as they are treated the same. *)
+      let read pos = Pmixedfield ([pos], block_shape, sem) in
+      read, add_barrier_to_let_kind ubr Alias
+    end
+  in
   List.mapi (fun pos (sort, layout) ->
     {
-      arg = Lprim (Punboxed_product_field (pos, layouts), [ arg ], loc);
-      binding_kind = Alias;
+      arg = Lprim (read pos, [ arg ], loc);
+      binding_kind;
       mut = compose_mut mut Immutable;
       sort;
       layout;
     }) shape
   @ rem
 
-let divide_tuple ~scopes head ctx pm =
+let divide_tuple ~is_unboxed ~scopes head shape ctx pm =
   let arity = Patterns.Head.arity head in
   divide_line (Context.specialize head)
-    (get_expr_args_tuple ~scopes)
+    (get_expr_args_tuple ~is_unboxed ~scopes shape)
     (get_pat_args_tuple arity)
-    head ctx pm
-
-let divide_unboxed_tuple ~scopes head shape ctx pm =
-  let arity = Patterns.Head.arity head in
-  divide_line (Context.specialize head)
-    (get_expr_args_unboxed_tuple ~scopes shape)
-    (get_pat_args_unboxed_tuple arity)
     head ctx pm
 
 (* Matching against a record pattern *)
@@ -2582,7 +2575,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typeopt.transl_record_representation_and_sorts head.pat_env
+    Translrepr.transl_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
@@ -2592,8 +2585,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        Typeopt.label_sort_for_representation lbl lbl_repres ~record_sort:sort
-          ~variable_sorts
+        Translrepr.label_sort_for_representation lbl lbl_repres
+          ~record_sort:sort ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -3048,7 +3041,7 @@ module SArg = struct
   let make_isin loc h arg = Lprim (Pnot, [ make_isout loc h arg ], loc)
 
   let make_is_nonzero loc arg =
-    if !Clflags.native_code || Clflags.is_flambda2 ()
+    if Clflags.target_is_native () || Clflags.is_flambda2 ()
     then icmp Cne int arg (tagged_immediate 0) ~loc
     else arg
 
@@ -3090,9 +3083,10 @@ module SArg = struct
         loc, kind ))
 
   let make_catch kind handler =
-    make_catch_delayed kind handler
+    let i,h = make_catch_delayed kind handler in
+    i,Branch_annotations.default,h
 
-  let make_exit i = make_exit i
+  let make_exit i _ = make_exit i
 end
 
 (* Action sharing for Lswitch argument *)
@@ -3674,7 +3668,7 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   (* Keeping the Pisint test would make the bytecode
       slightly worse, but it lets the native compiler generate
       better code -- see #10681. *)
-  if !Clflags.native_code || Clflags.is_flambda2 () then
+  if Clflags.target_is_native () || Clflags.is_flambda2 () then
     Lifthenelse(Lprim (Pisint { variant_only = true }, [ arg ], loc),
                 if_none, if_some, value_kind)
   else
@@ -4472,13 +4466,13 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_test
             divide_unboxed_bool
             (combine_unboxed_bool value_kind ploc arg arg_partial)
-      | Tuple _ ->
+      | Tuple shape ->
           compile_no_test
-            (divide_tuple ~scopes ph)
+            (divide_tuple ~is_unboxed:false ~scopes ph shape)
             Context.combine
       | Unboxed_tuple shape ->
           compile_no_test
-            (divide_unboxed_tuple ~scopes ph shape)
+            (divide_tuple ~is_unboxed:true ~scopes ph shape)
             Context.combine
       | Record ([], _) | Record_unboxed_product ([], _) -> assert false
       | Record ((lbl :: _), _) ->
@@ -4776,13 +4770,15 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
     | Tpat_tuple patl, Lprim (Pmakeblock _, lams, _) ->
         opt := true;
         List.fold_left2
-          (fun acc (_, pat) lam ->
-             collect Jkind.Sort.Const.for_tuple_element acc pat lam)
+          (fun acc (_, pat, sort) lam ->
+             collect (Jkind.Sort.default_for_transl_and_get sort) acc pat lam)
           acc patl lams
-    | Tpat_tuple patl, Lconst (Const_block (_, scl)) ->
+    | Tpat_tuple patl,
+      Lconst (Const_block (_, scl) | Const_mixed_block (_, _, scl)) ->
         opt := true;
-        let collect_const acc (_, pat) sc =
-          collect Jkind.Sort.Const.for_tuple_element acc pat (Lconst sc)
+        let collect_const acc (_, pat, sort) sc =
+          collect
+            (Jkind.Sort.default_for_transl_and_get sort) acc pat (Lconst sc)
         in
         List.fold_left2 collect_const acc patl scl
     | _ ->
@@ -4889,9 +4885,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
 let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial =
   (* The arguments of a tupled function are always values since they must be
      tuple elements *)
-  let args = List.map (fun id ->
-    root_arg (Lvar id) Strict Jkind.Sort.Const.for_tuple_element
-      layout_tuple_element
+  let args = List.map (fun (id, sort, layout) ->
+    root_arg (Lvar id) Strict sort layout
   ) paraml in
   let handler =
     toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
@@ -4903,13 +4898,13 @@ let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial 
 
 let flatten_pattern size p =
   match p.pat_desc with
-  | Tpat_tuple args -> List.map snd args
+  | Tpat_tuple args -> List.map (fun (_, p, _) -> p) args
   | Tpat_any -> Patterns.omegas size
   | _ -> raise Cannot_flatten
 
 let flatten_simple_pattern size (p : Simple.pattern) =
   match p.pat_desc with
-  | `Tuple args -> (List.map snd args)
+  | `Tuple args -> (List.map (fun (_, p, _) -> p) args)
   | `Any -> Patterns.omegas size
   | `Array _
   | `Variant _
@@ -4981,16 +4976,20 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
 
 let do_for_multiple_match ~scopes ~return_layout loc idl mode
     pat_act_list partial =
-  (* CR layouts v5: This function is called in cases where the scrutinee of a
-     match is a literal tuple (e.g., [match e1, e2, e3 with ...]).  The
-     typechecker treats the scrutinee here like any other tuple, so it's fine to
-     assume the whole thing and the elements have sort value.  That will change
-     when we allow non-values in structures. *)
   let repr = None in
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
-    Lprim (Pmakeblock (0, Immutable, All_value, mode), param_lambda, sloc)
+    let shape =
+      Array.of_list
+        (List.map
+           (fun (_, _, layout) -> Lambda.mixed_block_element_of_layout layout)
+           idl)
+    in
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape) then
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Tuple shape;
+    Lprim (Pmakeblock (0, Immutable, Shape shape, mode), param_lambda, sloc)
   in
   let input_args =
     { first = root_arg (Tuple arg) Strict
@@ -5059,6 +5058,19 @@ let for_optional_arg_default
     Typeopt.layout pat.pat_env pat.pat_loc default_arg_sort pat.pat_type
   in
   let sloc = Scoped_location.of_location ~scopes loc in
+  let field_access =
+    (* CR-someday lmaurer: This is just a special case of [make_field_access]
+       inside [get_expr_args_constr], but deduplicating it is nontrivial at the
+       moment. Even better, we could factor out *all* the places that project a
+       field and have to do this dance. Then here we'd bake in the
+       representation, which we could expose in [Predef] as a function of the
+       argument sort. *)
+    match default_arg_layout with
+    | Pvalue _ -> Pfield (0, Pointer, Reads_agree)
+    | _ ->
+      let shape = [| mixed_block_element_of_layout default_arg_layout |] in
+      Pmixedfield ([ 0 ], shape, Reads_agree)
+  in
   let supplied_or_default =
     transl_match_on_option
       default_arg_layout
@@ -5073,9 +5085,7 @@ let for_optional_arg_default
               makes it impossible to overwrite and safe to use [Reads_agree]
               here. It would be slightly safer to use [Reads_vary] here, but
               that could degrade performance of programs not using uniqueness *)
-           (Pfield (0, Pointer, Reads_agree),
-            [ Lvar param ],
-            sloc))
+           (field_access, [ Lvar param ], sloc))
   in
   for_let ~scopes ~arg_sort:default_arg_sort ~return_layout
     loc supplied_or_default Immutable pat body

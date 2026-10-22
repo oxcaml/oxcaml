@@ -29,9 +29,15 @@ module type S = sig
   val union : t -> t -> t
   val map : (elt -> elt) -> t -> t
   val iter : (elt -> unit) -> t -> unit
+  val iter_in_memory : (elt -> unit) -> t -> unit
   val cardinal : t -> int
   val elements : t -> elt list
   val fold : ('acc -> elt -> 'acc) -> 'acc -> t -> 'acc
+  val fold_skipping_outdated :
+    ('acc -> elt -> ('acc, Granular_marshal.Outdated_store.t) result) ->
+    'acc ->
+    t ->
+    'acc * outdated:Granular_marshal.Outdated_store.Set.t
   val schema :
     Granular_marshal.iter -> (Granular_marshal.iter -> elt -> unit) -> t -> unit
 end
@@ -240,6 +246,28 @@ module Make (Ord : Set.OrderedType) = struct
     | Empty -> acc
     | Node { l; v; r; _ } -> fold f (f (fold f acc r) v) l
 
+  let fold_skipping_outdated f acc t =
+    let rec fold (acc, ~outdated) t =
+      match fetch t with
+      | exception Outdated_store outdated_store ->
+        ( acc,
+          ~outdated:(Granular_marshal.Outdated_store.Set.add outdated_store
+                       outdated) )
+      | Empty -> (acc, ~outdated)
+      | Node { l; v; r; _ } ->
+        let acc, ~outdated = fold (acc, ~outdated) r in
+        let acc, ~outdated =
+          match f acc v with
+          | Ok acc -> (acc, ~outdated)
+          | Error outdated_store ->
+            ( acc,
+              ~outdated:(Granular_marshal.Outdated_store.Set.add outdated_store
+                           outdated) )
+        in
+        fold (acc, ~outdated) l
+    in
+    fold (acc, ~outdated:Granular_marshal.Outdated_store.Set.empty) t
+
   let elements s = fold (fun acc v -> v :: acc) [] s
 
   let try_join l v r =
@@ -265,6 +293,15 @@ module Make (Ord : Set.OrderedType) = struct
       iter f l;
       f v;
       iter f r
+
+  let rec iter_in_memory f t =
+    if not (Granular_marshal.is_on_disk t) then
+      match fetch t with
+      | Empty -> ()
+      | Node { l; v; r; _ } ->
+        iter_in_memory f l;
+        f v;
+        iter_in_memory f r
 
   let type_id = Type.Id.make ()
 

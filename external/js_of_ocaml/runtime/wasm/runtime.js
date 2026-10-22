@@ -18,7 +18,7 @@
 (js) => async (args) => {
   // biome-ignore lint/suspicious/noRedundantUseStrict: needed for non-module execution
   "use strict";
-  const { link, src, generated, disable_effects } = args;
+  const { link, src, generated, enable_jspi, native_effects } = args;
 
   const isNode = globalThis.process?.versions?.node;
 
@@ -155,10 +155,12 @@
   var start_fiber;
 
   function make_suspending(f) {
-    return WebAssembly?.Suspending ? new WebAssembly.Suspending(f) : f;
+    return enable_jspi && WebAssembly?.Suspending
+      ? new WebAssembly.Suspending(f)
+      : f;
   }
   function make_promising(f) {
-    return !disable_effects && WebAssembly?.promising && f
+    return enable_jspi && WebAssembly?.promising && f
       ? WebAssembly.promising(f)
       : f;
   }
@@ -296,6 +298,23 @@
   const call = Function.prototype.call;
   const DV = DataView.prototype;
 
+  // Calls into OCaml from JavaScript. With native effects (stack
+  // switching), effects cannot be performed across JavaScript frames, so
+  // the effect_allowed flag is cleared for the duration of the call:
+  // %perform then raises Effect.Unhandled instead of trapping with an
+  // unhandled suspend. The flag is restored in a finally block so that a
+  // Wasm trap unwinding through this frame cannot leave it stale.
+  function callback(f, count, args, kind) {
+    if (!native_effects) return caml_callback(f, count, args, kind);
+    const saved = effect_allowed.value;
+    effect_allowed.value = 0;
+    try {
+      return caml_callback(f, count, args, kind);
+    } finally {
+      effect_allowed.value = saved;
+    }
+  }
+
   const bindings = {
     jstag:
       WebAssembly.JSTag ||
@@ -386,40 +405,40 @@
         if (args.length === 0) {
           args = [undefined];
         }
-        return caml_callback(f, args.length, args, 1);
+        return callback(f, args.length, args, 1);
       },
     wrap_callback_args: (f) =>
       function (...args) {
-        return caml_callback(f, 1, [args], 0);
+        return callback(f, 1, [args], 0);
       },
     wrap_callback_strict: (arity, f) =>
       function (...args) {
         args.length = arity;
-        return caml_callback(f, arity, args, 0);
+        return callback(f, arity, args, 0);
       },
     wrap_callback_unsafe: (f) =>
       function (...args) {
-        return caml_callback(f, args.length, args, 2);
+        return callback(f, args.length, args, 2);
       },
     wrap_meth_callback: (f) =>
       function (...args) {
         args.unshift(this);
-        return caml_callback(f, args.length, args, 1);
+        return callback(f, args.length, args, 1);
       },
     wrap_meth_callback_args: (f) =>
       function (...args) {
-        return caml_callback(f, 2, [this, args], 0);
+        return callback(f, 2, [this, args], 0);
       },
     wrap_meth_callback_strict: (arity, f) =>
       function (...args) {
         args.length = arity;
         args.unshift(this);
-        return caml_callback(f, args.length, args, 0);
+        return callback(f, args.length, args, 0);
       },
     wrap_meth_callback_unsafe: (f) =>
       function (...args) {
         args.unshift(this);
-        return caml_callback(f, args.length, args, 2);
+        return callback(f, args.length, args, 2);
       },
     wrap_fun_arguments: (f) =>
       function (...args) {
@@ -476,12 +495,33 @@
           e10 += s.length - (prec + 1);
         }
       }
+      // Rounding x at 10^-k is a tie iff 2 * x * 10^k is an odd integer,
+      // that is, iff y = x * 2^(k+1) is an odd integer (5^k is odd) and,
+      // when k < 0, a multiple of 5^-k. Scaling by a power of two is
+      // exact, so this test is exact.
+      function is_tie(x, k) {
+        var y = x * 2 ** (k + 1);
+        return y % 2 === 1 && (k >= 0 || y % 5 ** -k === 0);
+      }
+      // toFixed/toExponential round ties away from zero; C rounds them to
+      // even. s is x rounded at 10^-k, the digit at 10^-k being s[i]: on a
+      // tie, that digit is one too many iff it is odd.
+      function round_half_even(s, i, x, k) {
+        var c = s.charCodeAt(i);
+        return c % 2 === 1 && is_tie(x, k)
+          ? s.slice(0, i) + String.fromCharCode(c - 1) + s.slice(i + 1)
+          : s;
+      }
       function toExponential(x, prec) {
-        return prec > 100 ? exact_exponential(x, prec) : x.toExponential(prec);
+        if (prec > 100) return exact_exponential(x, prec);
+        var s = x.toExponential(prec);
+        var i = s.indexOf("e");
+        return round_half_even(s, i - 1, x, prec - +s.slice(i + 1));
       }
       function toFixed(x, dp) {
         if (dp > 100 || x >= 1e21) return exact_fixed(x, dp);
-        return x.toFixed(dp);
+        var s = x.toFixed(dp);
+        return round_half_even(s, s.length - 1, x, dp);
       }
       switch (conversion) {
         case 0:
@@ -499,7 +539,7 @@
           s = toExponential(x, prec - 1);
           var j = s.indexOf("e");
           var exp = +s.slice(j + 1);
-          if (exp < -4 || x >= 1e21 || x.toFixed(0).length > prec) {
+          if (exp < -4 || exp >= prec) {
             // remove trailing zeroes
             var i = j - 1;
             while (s.charAt(i) === "0") i--;
@@ -933,6 +973,7 @@
 
   var {
     caml_callback,
+    effect_allowed,
     caml_alloc_times,
     caml_alloc_tm,
     caml_alloc_stat,

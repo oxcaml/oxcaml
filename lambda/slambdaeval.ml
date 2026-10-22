@@ -273,8 +273,9 @@ end = struct
     | Punboxed_or_untagged_integer ui ->
       symbol_arg_of_unboxed_or_untagged_integer ui
     | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
-    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
     | Punboxed_mask -> "mask"
+    | Pvoid -> "void"
+    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
 
@@ -745,7 +746,7 @@ and eval_mixed_block_element :
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
@@ -761,7 +762,7 @@ and eval_layout env layout =
     let new_value_kind = eval_value_kind env old_value_kind in
     if new_value_kind == old_value_kind then layout else Pvalue new_value_kind
   | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _
-  | Punboxed_mask | Pbottom ->
+  | Punboxed_mask | Pvoid | Pbottom ->
     layout
 
 and eval_value_kind env ({ raw_kind = old_raw_kind; nullable } as value_kind) =
@@ -945,31 +946,12 @@ and eval_prim env loc prim =
     if new_layout == old_layout
     then prim
     else Patomic_compare_set_idx { layout = new_layout; mode }
-  | Patomic_load_ptr { layout = old_layout } ->
+  | Pbox (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout
-    then prim
-    else Patomic_load_ptr { layout = new_layout }
-  | Patomic_set_ptr { layout = old_layout; mode } ->
+    if new_layout == old_layout then prim else Pbox (new_layout, mode)
+  | Punbox old_layout ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout
-    then prim
-    else Patomic_set_ptr { layout = new_layout; mode }
-  | Patomic_exchange_ptr { layout = old_layout; mode } ->
-    let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout
-    then prim
-    else Patomic_exchange_ptr { layout = new_layout; mode }
-  | Patomic_compare_exchange_ptr { layout = old_layout; mode } ->
-    let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout
-    then prim
-    else Patomic_compare_exchange_ptr { layout = new_layout; mode }
-  | Patomic_compare_set_ptr { layout = old_layout; mode } ->
-    let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout
-    then prim
-    else Patomic_compare_set_ptr { layout = new_layout; mode }
+    if new_layout == old_layout then prim else Punbox new_layout
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
@@ -1008,11 +990,10 @@ and eval_prim env loc prim =
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
-  | Patomic_lor_idx | Patomic_lxor_idx | Patomic_fetch_add_ptr | Patomic_add_ptr
-  | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
-  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
-  | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
-  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
+  | Patomic_lor_idx | Patomic_lxor_idx | Pprobe_is_enabled _ | Pobj_dup
+  | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _
+  | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
@@ -1026,7 +1007,7 @@ exception Found_a_splice
 let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->
@@ -1038,7 +1019,7 @@ let assert_mixed_block_shape_contains_no_splices shape =
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask ->
+  | Punboxed_vector _ | Punboxed_mask | Pvoid ->
     ()
   | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
   | Punboxed_product layouts ->
@@ -1072,11 +1053,6 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pset_idx (layout, _)
   | Patomic_load_idx { layout }
   | Patomic_set_idx { layout; _ }
-  | Patomic_load_ptr { layout }
-  | Patomic_set_ptr { layout; _ }
-  | Patomic_exchange_ptr { layout; _ }
-  | Patomic_compare_exchange_ptr { layout; _ }
-  | Patomic_compare_set_ptr { layout; _ }
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)
   | Pget_ext_ptr (layout, _)

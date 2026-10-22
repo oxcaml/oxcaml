@@ -13,10 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let msupport_raise_error =
-  ref (fun ?ignore_unify:_ _ ->
-        failwith "Env.raise_error should be filled in with Msupport.raise_error")
-
 (* Environment handling *)
 
 module StdlibMap = Map
@@ -967,15 +963,32 @@ type error =
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
       { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+        chain : Global_module.t list;
       }
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
 
-let error err = raise (Error err)
+  val log_or_raise : error -> unit
+  val log_and_raise : error -> 'a
+end = struct
+   type exn += In_context of error
+
+  let log_and_raise err =
+    Typing_recovery.log_and_raise (In_context err)
+
+  let log_or_raise err =
+    Typing_recovery.log_or_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+        | In_context _ -> true
+        | _ -> false
+      )
+end
 
 let lookup_error loc env err =
-  error (Lookup_error(loc, env, err))
+  Error.log_and_raise (Lookup_error(loc, env, err))
 
 let env_labels (type rep) (record_form : rep record_form) env
     : (stage_lock, rep gen_label_description) TycompTbl.t  =
@@ -1355,8 +1368,9 @@ let is_parameter_unit modname =
 let is_imported_parameter modname =
   Persistent_env.is_imported_parameter !persistent_env modname
 
-let implemented_parameter modname =
-  Persistent_env.implemented_parameter !persistent_env modname
+let find_import ~chain modname =
+  try Persistent_env.find_import !persistent_env modname
+  with Not_found -> Error.log_and_raise (Cmi_not_found { modname; chain })
 
 let reset_declaration_caches () =
   Stamped_hashtable.clear value_declarations;
@@ -1856,7 +1870,7 @@ let global_of_instance_compilation_unit cu =
   let rec check (global : Global_module.t) =
     match global.hidden_args with
     | { param = name; _ } :: _ ->
-        raise (Error (Incomplete_instantiation { unset_param = name }))
+        (Error.log_and_raise (Incomplete_instantiation { unset_param = name }))
     | [] ->
         List.iter (fun Global_module.Argument.{ value; _ } -> check value)
           global.visible_args
@@ -2031,10 +2045,11 @@ and expand_module_path lax env path =
 let normalize_module_path oloc env path =
   try normalize_module_path (oloc = None) env path
   with Not_found ->
-    match oloc with None -> assert false
-    | Some loc ->
-        error (Missing_module(loc, path,
-                              normalize_module_path true env path))
+  match oloc with
+  | None -> assert false
+  | Some loc ->
+      Error.log_and_raise
+        (Missing_module(loc, path, normalize_module_path true env path))
 
 let rec normalize_path_prefix oloc env path =
   match path with
@@ -2719,7 +2734,7 @@ and check_value_name name loc =
        (Utf8_lexeme.starts_like_a_valid_identifier name) then
     for i = 1 to String.length name - 1 do
       if name.[i] = '#' then
-        error (Illegal_value_name(loc, name))
+        Error.log_or_raise (Illegal_value_name(loc, name))
     done
 
 and store_value ?check ~mode id addr decl shape env =
@@ -3292,7 +3307,7 @@ let enter_quote env =
 
 let enter_splice ~loc env =
   if env.stage = 0 then
-    raise (Error (Initial_stage_splice loc));
+    Error.log_and_raise (Initial_stage_splice loc);
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
 let enter_future env =
@@ -3305,7 +3320,7 @@ let mark_persistent_in_quotations ~scope env =
 let check_no_open_quotations loc env context =
   if env.stage = 0
   then ()
-  else raise (Error (Unsupported_inside_quotation (loc, context)))
+  else Error.log_and_raise (Unsupported_inside_quotation (loc, context))
 
 let stage env = env.stage
 
@@ -3466,10 +3481,6 @@ let read_signature modname cmi =
   (* [mode] read from the cmi is always a constant *)
   Subst.Lazy.force_signature mty,
   (Mode.With_regionality.zap_to_floor_exn mode).staticity
-
-let find_import ~chain modname =
-  try Persistent_env.find_import !persistent_env modname
-  with Not_found -> error (Cmi_not_found { modname; chain })
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3999,7 +4010,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
       with exn ->
-        !msupport_raise_error exn;
+        Typing_recovery.log_or_raise exn;
         vmode
     ) mode locks
 
@@ -4976,8 +4987,14 @@ let lookup_jkind ?(use=true) ~loc lid env =
   lookup_jkind ~errors:true ~use ~loc lid env
 
 let lookup_all_constructors ?(use=true) ~loc usage lid env =
-  match lookup_all_constructors ~errors:true ~use ~loc usage lid env with
-  | exception Error(Lookup_error(loc', env', err)) ->
+  match
+    (* We don't want errors to be logged here, as the caller will process them
+       (and log them if they see fit). *)
+    Typing_recovery.uncatch_errors (fun () ->
+        lookup_all_constructors ~errors:true ~use ~loc usage lid env
+      )
+  with
+  | exception Error.In_context (Lookup_error(loc', env', err)) ->
       (Error(loc', env', err) : _ result)
   | cstrs -> Ok cstrs
 
@@ -4988,8 +5005,14 @@ let lookup_all_constructors_from_type ?(use=true) ~loc usage ty_path env =
   lookup_all_constructors_from_type ~use ~loc usage ty_path env
 
 let lookup_all_labels ?(use=true) ~record_form ~loc usage lid env =
-  match lookup_all_labels ~errors:true ~use ~record_form ~loc usage lid env with
-  | exception Error(Lookup_error(loc', env', err)) ->
+  match
+    (* We don't want errors to be logged here, as the caller will process them
+       (and log them if they see fit). *)
+    Typing_recovery.uncatch_errors (fun () ->
+        lookup_all_labels ~errors:true ~use ~record_form ~loc usage lid env
+      )
+  with
+  | exception Error.In_context (Lookup_error(loc', env', err)) ->
       (Error(loc', env', err) : _ result)
   | lbls -> Ok lbls
 
@@ -5778,7 +5801,8 @@ let report_error_doc = function
         List.iter
           (fun loader ->
             Format_doc.fprintf ppf ",@ referenced from %a"
-              (Style.as_inline_code Compilation_unit.Name.print) loader)
+              (Style.as_inline_code Global_module.Name.print)
+              (Global_module.to_name loader))
           chain
       in
       Location.errorf ~loc:Location.none
@@ -5789,7 +5813,7 @@ let report_error_doc = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err ->
+      | Error.In_context err ->
           Some (report_error_doc err)
       | _ ->
           None

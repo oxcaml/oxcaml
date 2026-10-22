@@ -23,7 +23,11 @@ let is_control_flow = function
 let is_hard_barrier = function
   | Directive d -> (
     match d with
-    | New_label _ | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ -> true
+    | New_label (Label label, _) ->
+      not (Asm_targets.Asm_label.is_dwarf_only_label label)
+    | New_label (Symbol _, _)
+    | Bytes _ | Cfi_startproc | Cfi_endproc | Section _ ->
+      true
     | Align _ | Cfi_adjust_cfa_offset _ | Cfi_def_cfa_offset _ | Cfi_offset _
     | Cfi_remember_state | Cfi_restore_state | Cfi_def_cfa_register _
     | Comment _ | Const _ | Direct_assignment _ | File _ | Global _

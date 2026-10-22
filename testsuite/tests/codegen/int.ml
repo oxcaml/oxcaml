@@ -2,6 +2,7 @@
  flags += " -O3";
  flags += " -experimental-optimizations";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -61,11 +62,11 @@ div:
   leaq  1(%rax,%rax), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let div_by_constant x = x / 1234
@@ -114,11 +115,11 @@ rem:
   leaq  1(%rdx,%rdx), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 (* CR ttebbi: This could be:
@@ -217,12 +218,10 @@ logxor:
 |}]
 
 
-(* CR ttebbi: This could be `xorq  $-2, %rax` *)
 let lognot x = lnot x
 [%%expect_asm X86_64{|
 lognot:
-  xorq  $-1, %rax
-  orq   $1, %rax
+  xorq  $-2, %rax
   ret
 |}]
 

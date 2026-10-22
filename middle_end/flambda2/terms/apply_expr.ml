@@ -74,7 +74,7 @@ type t =
     exn_continuation : Exn_continuation.t;
     args : Simple.t list;
     args_arity : [`Complex] Flambda_arity.t;
-    return_arity : [`Unarized] Flambda_arity.t;
+    return_arity : [`Complex] Flambda_arity.t;
     call_kind : Call_kind.t;
     return_mode : Alloc_mode.For_applications.t;
     dbg : Debuginfo.t;
@@ -192,7 +192,7 @@ let invariant
         "For [C_call] applications the callee must be directly specified as a \
          [Symbol]:@ %a"
         print t);
-    match Flambda_arity.unarized_components return_arity with
+    match Flambda_arity.unarize return_arity with
     | [] | [_] | [_; _] ->
       (* CR xclerc: we currently support only pairs as unboxed return values. *)
       ()

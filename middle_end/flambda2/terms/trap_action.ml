@@ -112,9 +112,7 @@ let ids_for_export t =
 module Option = struct
   type nonrec t = t option
 
-  let [@ocamlformat "disable"] print ppf = function
-    | None -> ()
-    | Some t -> print ppf t
+  let print ppf = function None -> () | Some t -> print ppf t
 
   let ids_for_export = function
     | None -> Ids_for_export.empty

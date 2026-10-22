@@ -64,9 +64,6 @@ typedef cpuset_t cpu_set_t;
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/dynamic.h"
-#include "caml/finalise.h"
-#include "caml/gc_ctrl.h"
-#include "caml/globroots.h"
 #include "caml/intext.h"
 #include "caml/major_gc.h"
 #include "caml/minor_gc.h"
@@ -77,11 +74,8 @@ typedef cpuset_t cpu_set_t;
 #include "caml/platform.h"
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
-#include "caml/startup.h"
 #include "caml/startup_aux.h"
 #include "caml/sync.h"
-#include "caml/weak.h"
-#include "sync_posix.h"
 
 /* Check that the domain_state structure was laid out without padding,
    since the runtime assumes this in computing offsets */
@@ -786,7 +780,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   /* This call may fail, but fatally so we don't need an error path */
   domain_root_register(&domain_state->dls_state, Atom(0) /* Empty array */);
-  domain_root_register(&domain_state->tls_state, Atom(0) /* Empty array */);
+
+  /* [tls_state] is scanned directly in [caml_do_roots] and by the minor GC. */
+  domain_state->tls_state = Atom(0) /* Empty array */;
 
   // Must happen after taking the domain lock
   caml_enable_stack_caches(domain_state->stack_caches);
@@ -867,7 +863,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
 fail_main_stack:
   domain_root_remove(&domain_state->dls_state);
-  domain_root_remove(&domain_state->tls_state);
+  domain_state->tls_state = Val_unit;
   free_minor_heap();
 fail_minor_heap:
   caml_teardown_major_gc();
@@ -2514,13 +2510,24 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
    If argument is 0, the current domain no longer wants ticks */
 CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
 {
-  atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
+  /* We can do this test-and-set non-atomically, because:
+      - this is the only function that can modify this value
+      - we hold the domain lock, so we know no other threads are calling this function
+  */
+  bool changed = atomic_load_relaxed(&domain_self->tick_interval_usec)
+                 != (uintnat)interval_usec;
+  if (changed) {
+    atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
+  }
+
   if (interval_usec != 0) {
     caml_start_tick_thread();
   }
-  /* NOTE: We don't worry too much about spurious wakes here, since we assume
-     changing the tick interval is uncommon */
-  tick_thread_wake();
+
+  /* Only wake the tick thread if the interval actually changed. */
+  if (changed) {
+    tick_thread_wake();
+  }
 
   return 0;
 }
@@ -2734,7 +2741,7 @@ void caml_domain_terminate(bool last)
 
   /* We can not touch domain_self after here because it may be reused */
   domain_root_remove(&domain_state->dls_state);
-  domain_root_remove(&domain_state->tls_state);
+  domain_state->tls_state = Val_unit;
   domain_root_remove(&domain_state->backtrace_last_exn);
   caml_stat_free(domain_state->final_info);
   caml_stat_free(domain_state->ephe_info);
@@ -2938,17 +2945,20 @@ CAMLprim value caml_domain_dls_compare_and_set(value old, value new)
   }
 }
 
-/* Thread-local state */
+/* TLS state (see fiber.h) */
 
 CAMLprim value caml_domain_tls_set(value t)
 {
-  domain_root_set(&Caml_state->tls_state, t);
+  CAMLnoalloc;
+  /* Update both the owning stack and [Caml_state->tls_state]. */
+  caml_tls_find_owner(Caml_state->current_stack)->tls_state = t;
+  Caml_state->tls_state = t;
   return Val_unit;
 }
 
 CAMLprim value caml_domain_tls_get(value unused)
 {
-  return domain_root_get(&Caml_state->tls_state);
+  return Caml_state->tls_state;
 }
 
 CAMLprim value caml_recommended_domain_count(value unused)

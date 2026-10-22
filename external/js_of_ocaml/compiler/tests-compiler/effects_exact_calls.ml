@@ -16,7 +16,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Util
+open! Util
+
+(* The last test uses the [Effect] stdlib module, so it needs OCaml >= 5. *)
+[@@@if ocaml_version >= (5, 0, 0)]
 
 (* [write] has arity 1 and returns an arity-1 closure. It is bound by
    destructuring a tuple returned by [make], so the local flow analysis used
@@ -81,8 +84,8 @@ let%expect_test "over-application of a known-arity function / effects disabled" 
 let%expect_test "over-application of a known-arity function / double translation" =
   (* The direct-style version must call [write] exactly ([write(x)]) instead
      of going through [caml_call_gen] with both arguments at once. The
-     unyielding-call debug info is disabled so that the call to [!cb] keeps
-     [test] CPS-translated and both versions are emitted. *)
+     call to [!cb] keeps [test] CPS-translated, so that both versions are
+     emitted. *)
   let program =
     compile_and_parse
       ~effects:`Double_translation
@@ -220,17 +223,10 @@ let%expect_test "over-application executes correctly in all effects modes" =
 let%expect_test "over-application whose first application performs an effect" =
   (* The first half of the split application performs an effect: splitting
      must keep both halves CPS-translated so that the effect reaches the
-     handler and the continuation resumes with the second application.
-
-     This uses the legacy handle-less effects API: with the handle-based
-     [Effect.Safe] API the handle is local, and the mode system then requires
-     the over-application to be split in the source already. The
-     unyielding-call debug info is disabled so that the CPS analysis is
-     conservative about every call, as with the upstream OCaml 5 compiler. *)
+     handler and the continuation resumes with the second application. *)
   let code =
     {|
-         [@@@alert "-unsafe_effects"]
-
+         [@@@alert "-unsafe_effects"] (* OxCaml warns about [Effect.perform] *)
          open Effect
          open Effect.Deep
 
