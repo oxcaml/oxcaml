@@ -160,8 +160,8 @@ let simplify_exits lam =
          increases j's ref count *)
       count ~try_depth l1 ~tail:true;
       let ic = get_exit i in
-      incr_exit j ic.count
-        (Misc.Stdlib.Int.max try_depth ic.max_depth) ~tail:(tail && ic.tail_only)
+      incr_exit j ic.count (Misc.Stdlib.Int.max try_depth ic.max_depth)
+        ~tail:(tail && ic.tail_only)
   | Lstaticcatch(l1, (i,_), l2, r, _) ->
       count ~try_depth l1 ~tail:true;
       (* If l1 does not contain (exit i),

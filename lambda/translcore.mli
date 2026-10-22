@@ -35,14 +35,16 @@ val transl_apply: transl_ctx:transl_ctx
                   -> lambda
                   -> (arg_label * apply_arg) list
                   -> scoped_location -> lambda
-val transl_let: transl_ctx:transl_ctx -> return_layout:layout -> ?in_structure:bool
+val transl_let: transl_ctx:transl_ctx -> return_layout:layout
+                  -> ?in_structure:bool
                   -> rec_flag -> value_binding list -> lambda -> lambda
 
 val transl_extension_constructor: transl_ctx:transl_ctx ->
   Env.t -> Longident.t option ->
   extension_constructor -> lambda
 
-val transl_scoped_exp : transl_ctx:transl_ctx -> Lambda.layout -> expression -> lambda
+val transl_scoped_exp : transl_ctx:transl_ctx ->
+  Lambda.layout -> expression -> lambda
 
 type error =
     Free_super_var
