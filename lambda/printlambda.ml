@@ -1577,8 +1577,8 @@ let rec lam ppf = function
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
-      fprintf ppf "@[<2>(ktemplate@ %a%a@ %a%a)@]"
-        locality_mode ktmpl_env_mode
+      fprintf ppf "@[<2>(ktemplate%s@ %a@ %a%a)@]"
+        (locality_kind ktmpl_env_mode)
         template_env ktmpl_env
         pr_params ktmpl_params
         lfunction ktmpl_body

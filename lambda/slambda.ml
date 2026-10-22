@@ -25,6 +25,8 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+[@@@warning "+9"]
+
 open Lambda
 module Fmt = Format_doc
 
@@ -33,6 +35,9 @@ type error =
   | No_static_data of Compilation_unit.t
 
 exception Error of Location.t * error
+
+let raise_error ~loc e =
+  raise (Error (Debuginfo.Scoped_location.to_location loc, e))
 
 module Or_missing = struct
   type 'a t =
@@ -48,7 +53,7 @@ module Template_id = struct
   type t =
     { owner : Compilation_unit.t option;
       stamp : int;
-      name : Ident.t option
+      name : string option
     }
 
   let stamp = ref 0
@@ -62,8 +67,7 @@ module Template_id = struct
     Fmt.fprintf ppf "%a/%a/%i"
       (Fmt.pp_print_option Compilation_unit.print)
       t.owner
-      (Fmt.pp_print_option (fun ppf id ->
-           Fmt.pp_print_string ppf (Ident.name id)))
+      (Fmt.pp_print_option Fmt.pp_print_string)
       t.name t.stamp
 
   let equal t1 t2 =
@@ -86,7 +90,7 @@ end
 module rec Types : sig
   type template =
     | Kind of lkindtemplate
-    | Static of ltemplate
+    | Value of ltemplate
 
   type closure =
     { clo_template : template;
@@ -115,7 +119,7 @@ module rec Types : sig
 end = struct
   type template =
     | Kind of lkindtemplate
-    | Static of ltemplate
+    | Value of ltemplate
 
   type closure =
     { clo_template : template;
@@ -138,11 +142,11 @@ end = struct
     | Vrecord of record
     | Vclosure of Template_id.t
 
-  let print_closure ppf { clo_template; clo_env = _ } =
+  let print_closure ppf { clo_template; clo_runtime_env = _; clo_env = _ } =
     let body =
       match clo_template with
       | Kind template -> Lkindtemplate template
-      | Static template -> Ltemplate template
+      | Value template -> Ltemplate template
     in
     Fmt.fprintf ppf "@[<2>(closure ⟨env⟩@ %a)@]"
       (Fmt.deprecated Printlambda.lambda)
@@ -263,7 +267,10 @@ end = struct
 
   let symbol_arg_of_value (v : Types.value Or_missing.t) =
     match v with
-    | Missing -> "missing"
+    | Missing ->
+      (* [Missing] means the value has no static part, see [make_record] for a
+         when we'd actually pass it as an argument. *)
+      "missing"
     | Present (Vlayout l) -> symbol_arg_of_layout l
     | Present (Vrecord { id; values = _ }) -> id
     | Present (Vclosure id) -> Fmt.asprintf "%a" Template_id.print id
@@ -344,9 +351,7 @@ end = struct
   let get_cu_data t ~loc cu =
     match t.cu_static_data cu with
     | Some data -> data
-    | None ->
-      raise
-        (Error (Debuginfo.Scoped_location.to_location loc, No_static_data cu))
+    | None -> raise_error ~loc (No_static_data cu)
 
   let cu_static_data t ~loc cu = (get_cu_data t ~loc cu).cu
 
@@ -448,6 +453,9 @@ let expect (type a) (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
+let eval_layout_var env id =
+  Env.find env id |> expect_not_missing |> expect Tlayout
+
 let rec eval_structured_const env old_const =
   match old_const with
   | Const_mixed_block (n, old_shape, old_consts) ->
@@ -522,8 +530,7 @@ and eval_mixed_block_element :
  fun env old_element ->
   match old_element with
   | Splice_variable id ->
-    Env.find env id |> expect_not_missing |> expect Tlayout
-    |> mixed_block_element_of_layout
+    eval_layout_var env id |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
@@ -536,7 +543,7 @@ and eval_mixed_block_element :
 
 and eval_layout env old_layout =
   match old_layout with
-  | Psplicevar id -> Env.find env id |> expect_not_missing |> expect Tlayout
+  | Psplicevar id -> eval_layout_var env id
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -601,8 +608,9 @@ and eval_constructor_shape env old_constructor_shape =
 
 let dynamic slv_runtime = { slv_comptime = Missing; slv_runtime }
 
-(* An all-Missing record carries no static information. Use Missing so its fresh
-   identity doesn't cause needless template specializations. *)
+(* A record with all-Missing fields carries no static information. Use [Missing]
+   instead of a fresh identity so they are all identical to this evaluator and
+   therefore don't cause needless template specializations. *)
 let make_record ?name ctx fields : value Or_missing.t =
   if
     List.for_all
@@ -616,7 +624,7 @@ let make_record ?name ctx fields : value Or_missing.t =
         (Fmt.pp_print_option Compilation_unit.print)
         (Current_unit.get_cu ())
         (Fmt.pp_print_option Fmt.pp_print_string)
-        (Option.map Ident.name name)
+        name
       |> Ctx.uniqueify ctx
     in
     Present (Vrecord { id; values = Array.of_list fields })
@@ -652,8 +660,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          ap_result_layout = old_layout;
          _
        } as old_apply) ->
+    let new_args = eval_dynamic_list_reverse ctx env old_args in
     let new_func = eval_dynamic ctx env old_func in
-    let new_args = eval_dynamic_list ctx env old_args in
     let new_layout = eval_layout env old_layout in
     dynamic
       (if
@@ -675,7 +683,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          let { c = def_c; r = def_r } = eval_lam env def in
          let { c = body_c; r = body_r } = eval_lam {env with id=def_c} body in
          { c = body_c; r = << let id = def_r in body_r >> } *)
-    let new_def = eval_lam ~name:id ctx env old_def in
+    let new_def = eval_lam ~name:(Ident.name id) ctx env old_def in
     let body_env =
       Env.add env (Slambdaident.of_ident id) new_def.slv_comptime
     in
@@ -775,7 +783,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        then old_lambda
        else Lstringswitch (new_arg, new_cases, new_default, loc, new_layout))
   | Lstaticraise (label, old_args) ->
-    let new_args = eval_dynamic_list ctx env old_args in
+    let new_args = eval_dynamic_list_reverse ctx env old_args in
     dynamic
       (if new_args == old_args
        then old_lambda
@@ -836,7 +844,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Lsequence (new_left, new_right.slv_runtime))
     }
   | Lwhile { wh_cond = old_cond; wh_body = old_body } ->
-    (* Expansion visits the condition and body once, not once per iteration. *)
+    (* This is a run-time while loop so we don't loop here, however we do still
+       need to expand the body. *)
     let new_cond = eval_dynamic ctx env old_cond in
     let new_body = eval_dynamic ctx env old_body in
     dynamic
@@ -846,7 +855,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Lfor
       ({ for_from = old_from; for_to = old_to; for_body = old_body; _ } as
        old_loop) ->
-    (* Expand the body once; the loop variable is runtime-only. *)
+    (* This is a run-time for loop so we don't loop here, however we do still
+       need to expand the body. *)
     let new_from = eval_dynamic ctx env old_from in
     let new_to = eval_dynamic ctx env old_to in
     let new_body = eval_dynamic ctx env old_body in
@@ -874,9 +884,9 @@ let rec eval_lam ?name ctx env old_lambda : halves =
         loc,
         old_layout,
         yielding ) ->
-    let new_met = eval_dynamic ctx env old_met in
     let new_obj = eval_dynamic ctx env old_obj in
-    let new_args = eval_dynamic_list ctx env old_args in
+    let new_met = eval_dynamic ctx env old_met in
+    let new_args = eval_dynamic_list_reverse ctx env old_args in
     let new_layout = eval_layout env old_layout in
     dynamic
       (if
@@ -933,7 +943,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     eval_template ?name ctx env (Kind template) template.ktmpl_env
       template.ktmpl_env_mode template.ktmpl_loc
   | Ltemplate template ->
-    eval_template ?name ctx env (Static template) template.tmpl_env
+    eval_template ?name ctx env (Value template) template.tmpl_env
       template.tmpl_func.mode template.tmpl_func.loc
   | Lkindinstantiate
       { kinst_func = old_func;
@@ -946,13 +956,13 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          let { c = func_c; r = func_r } = eval_lam env func in
          let { c = inst_c; r = inst_r } = func_c [k1; ...; kn] in
          { c = inst_c; r = << inst_r func_r >> } *)
-    let new_func = eval_lam ctx env old_func in
     let new_args =
       Misc.Stdlib.Array.of_list_map
         (fun old_layout_arg ->
           Or_missing.Present (Vlayout (eval_layout env old_layout_arg)))
         old_args
     in
+    let new_func = eval_lam ctx env old_func in
     let instantiated =
       instantiate ctx ~loc:kinst_loc new_func.slv_comptime new_args
     in
@@ -979,24 +989,25 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          _
        } as old_apply) ->
     (* instantiate func arg1 ... argn ~>
-         let { c = func_c; r = func_r } = eval_lam env func in
          let { c = argn_c; r = argn_r } = eval_lam env argn in
          ...
          let { c = arg1_c; r = arg1_r } = eval_lam env arg1 in
+         let { c = func_c; r = func_r } = eval_lam env func in
          let { c = inst_c; r = inst_r } = func_c [arg1_c; ...; argn_c] in
          { c = inst_c; r = << inst_r func_r arg1_r ... argn_r >> } *)
-    let new_func = eval_lam ctx env old_func in
-    let new_args_c, new_args_r = eval_args_reverse ctx env old_args in
+    let args_c, new_args = eval_list_reverse ctx env old_args in
+    let { slv_comptime = func_c; slv_runtime = new_func } =
+      eval_lam ctx env old_func
+    in
     let instantiated =
-      instantiate ctx ~loc:old_apply.ap_loc new_func.slv_comptime
-        (Array.of_list new_args_c)
+      instantiate ctx ~loc:old_apply.ap_loc func_c (Array.of_list args_c)
     in
     { slv_comptime = instantiated.slv_comptime;
       slv_runtime =
         Lapply
           { old_apply with
             ap_func = instantiated.slv_runtime;
-            ap_args = new_func.slv_runtime :: new_args_r;
+            ap_args = new_func :: new_args;
             ap_result_layout = eval_layout env old_layout
           }
     }
@@ -1027,8 +1038,30 @@ and eval_lfunction ctx env
    returned static value is discarded. *)
 and eval_dynamic ctx env old_lambda = (eval_lam ctx env old_lambda).slv_runtime
 
-and eval_dynamic_list ctx env old_args =
-  Misc.Stdlib.List.map_sharing (eval_dynamic ctx env) old_args
+(* Primitive fields and static arguments are expanded right-to-left, while
+   preserving their original order in the residual code. *)
+and eval_list_reverse ctx env old_args =
+  match old_args with
+  | [] -> [], []
+  | old_arg :: old_rest ->
+    let rest_c, new_rest = eval_list_reverse ctx env old_rest in
+    let { slv_comptime = arg_c; slv_runtime = new_arg } =
+      eval_lam ctx env old_arg
+    in
+    let args_c = arg_c :: rest_c in
+    if new_arg == old_arg && new_rest == old_rest
+    then args_c, old_args
+    else args_c, new_arg :: new_rest
+
+and eval_dynamic_list_reverse ctx env old_args =
+  match old_args with
+  | [] -> []
+  | old_arg :: old_rest ->
+    let new_rest = eval_dynamic_list_reverse ctx env old_rest in
+    let new_arg = eval_dynamic ctx env old_arg in
+    if new_arg == old_arg && new_rest == old_rest
+    then old_args
+    else new_arg :: new_rest
 
 and eval_alist : 'a. Ctx.t -> Env.t -> ('a * lambda) list -> ('a * lambda) list
     =
@@ -1039,39 +1072,38 @@ and eval_alist : 'a. Ctx.t -> Env.t -> ('a * lambda) list -> ('a * lambda) list
       if new_body == old_body then old_entry else tag, new_body)
     old_entries
 
-(* Primitive fields and static arguments are expanded right-to-left, while
-   preserving their original order in the residual code. *)
-and eval_args_reverse ctx env old_args =
-  let rec loop unchanged new_args_c new_args_r = function
-    | [] -> new_args_c, if unchanged then old_args else new_args_r
-    | old_arg :: rest ->
-      let new_arg = eval_lam ctx env old_arg in
-      loop
-        (unchanged && new_arg.slv_runtime == old_arg)
-        (new_arg.slv_comptime :: new_args_c)
-        (new_arg.slv_runtime :: new_args_r)
-        rest
-  in
-  loop true [] [] (List.rev old_args)
-
 and eval_prim ?name ctx env old_lambda old_prim old_args loc =
   let wrong_arity expected =
     Misc.fatal_errorf "Slambda: %a takes exactly %d arguments, got %d"
       Printlambda.primitive old_prim expected (List.length old_args)
   in
-  let new_args_c, new_args_r = eval_args_reverse ctx env old_args in
-  let one_arg () =
-    match new_args_c with [arg_c] -> arg_c | _ -> wrong_arity 1
+  let args_c, new_args =
+    match old_prim, old_args with
+    | (Psequand | Psequor), [old_a; old_b] ->
+      (* (&&) and (||) evaluate left-to-right unlike everything else because
+         they're short-circuiting at runtime. *)
+      let { slv_comptime = a_c; slv_runtime = new_a } =
+        eval_lam ctx env old_a
+      in
+      let { slv_comptime = b_c; slv_runtime = new_b } =
+        eval_lam ctx env old_b
+      in
+      let args_c = [a_c; b_c] in
+      if new_a == old_a && new_b == old_b
+      then args_c, old_args
+      else args_c, [new_a; new_b]
+    | _ -> eval_list_reverse ctx env old_args
   in
+  let one_arg () = match args_c with [arg_c] -> arg_c | _ -> wrong_arity 1 in
   let result new_prim slv_comptime =
     { slv_comptime;
       slv_runtime =
-        (if new_prim == old_prim && new_args_r == old_args
+        (if new_prim == old_prim && new_args == old_args
          then old_lambda
-         else Lprim (new_prim, new_args_r, loc))
+         else Lprim (new_prim, new_args, loc))
     }
   in
-  let dynamic_prim new_prim = result new_prim Missing in
+  let dyn new_prim = result new_prim Missing in
   match old_prim with
   | Pgetglobal (cu, Static) ->
     (* (Pgetglobal c) [] ~>
@@ -1094,8 +1126,8 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     in
     begin match mut with
     | Immutable | Immutable_unique ->
-      result new_prim (make_record ?name ctx new_args_c)
-    | Mutable -> dynamic_prim new_prim
+      result new_prim (make_record ?name ctx args_c)
+    | Mutable -> dyn new_prim
     end
   | Pfield (pos, _, Reads_agree) ->
     (* e.(pos) ~>
@@ -1105,8 +1137,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     result old_prim (project_field arg_c pos)
   | Pduprecord (old_repr, size) ->
     let new_repr = eval_record_representation env loc old_repr in
-    dynamic_prim
-      (if new_repr == old_repr then old_prim else Pduprecord (new_repr, size))
+    dyn (if new_repr == old_repr then old_prim else Pduprecord (new_repr, size))
   | Pmixedfield (path, old_shape, sem) ->
     (* e.(pos1).(pos2) ~>
        let { c = e_c; r = e_r } = eval_lam env e in
@@ -1123,23 +1154,23 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     | Reads_agree ->
       let arg_c = one_arg () in
       result new_prim (List.fold_left project_field arg_c path)
-    | Reads_vary -> dynamic_prim new_prim
+    | Reads_vary -> dyn new_prim
     end
   | Psetmixedfield (is, old_shape, init_or_assign) ->
     let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
-    dynamic_prim
+    dyn
       (if new_shape == old_shape
        then old_prim
        else Psetmixedfield (is, new_shape, init_or_assign))
   | Patomic_load_mixed_field { index; shape = old_shape } ->
     let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
-    dynamic_prim
+    dyn
       (if new_shape == old_shape
        then old_prim
        else Patomic_load_mixed_field { index; shape = new_shape })
   | Patomic_set_mixed_field { index; shape = old_shape; mode } ->
     let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
-    dynamic_prim
+    dyn
       (if new_shape == old_shape
        then old_prim
        else Patomic_set_mixed_field { index; shape = new_shape; mode })
@@ -1147,7 +1178,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
-    dynamic_prim
+    dyn
       (if new_layouts == old_layouts
        then old_prim
        else Pmake_unboxed_product new_layouts)
@@ -1155,7 +1186,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
-    dynamic_prim
+    dyn
       (if new_layouts == old_layouts
        then old_prim
        else Punboxed_product_field (i, new_layouts))
@@ -1165,101 +1196,93 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
        polymorphic blocks, but this check covers non-lpoly blocks, too. *)
     let counts = Mixed_product_bytes.Wrt_path.count_shape new_shape i path in
     if Option.is_none (Mixed_product_bytes.Wrt_path.offset_and_gap counts)
-    then
-      raise
-        (Error
-           ( Debuginfo.Scoped_location.to_location loc,
-             Block_index_gap_overflow_possible ));
-    dynamic_prim
+    then raise_error ~loc Block_index_gap_overflow_possible;
+    dyn
       (if new_shape == old_shape
        then old_prim
        else Pmake_idx_mixed_field (new_shape, i, path))
   | Pmake_idx_array (kind, index_kind, old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
-    dynamic_prim
+    dyn
       (if new_element == old_element
        then old_prim
        else Pmake_idx_array (kind, index_kind, new_element, path))
   | Pidx_deepen (old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
-    dynamic_prim
+    dyn
       (if new_element == old_element
        then old_prim
        else Pidx_deepen (new_element, path))
   | Popaque old_layout ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
-      (if new_layout == old_layout then old_prim else Popaque new_layout)
+    dyn (if new_layout == old_layout then old_prim else Popaque new_layout)
   | Pobj_magic old_layout ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
-      (if new_layout == old_layout then old_prim else Pobj_magic new_layout)
+    dyn (if new_layout == old_layout then old_prim else Pobj_magic new_layout)
   | Pget_idx (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout then old_prim else Pget_idx (new_layout, mut))
   | Pset_idx (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout then old_prim else Pset_idx (new_layout, mode))
   | Pget_ptr (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout then old_prim else Pget_ptr (new_layout, mut))
   | Pset_ptr (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout then old_prim else Pset_ptr (new_layout, mode))
   | Pget_ext_ptr (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Pget_ext_ptr (new_layout, mut))
   | Pset_ext_ptr (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Pset_ext_ptr (new_layout, mode))
   | Patomic_load_idx { layout = old_layout } ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Patomic_load_idx { layout = new_layout })
   | Patomic_set_idx { layout = old_layout; mode } ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Patomic_set_idx { layout = new_layout; mode })
   | Patomic_exchange_idx { layout = old_layout; mode } ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Patomic_exchange_idx { layout = new_layout; mode })
   | Patomic_compare_exchange_idx { layout = old_layout; mode } ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Patomic_compare_exchange_idx { layout = new_layout; mode })
   | Patomic_compare_set_idx { layout = old_layout; mode } ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
+    dyn
       (if new_layout == old_layout
        then old_prim
        else Patomic_compare_set_idx { layout = new_layout; mode })
   | Pbox (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
-      (if new_layout == old_layout then old_prim else Pbox (new_layout, mode))
+    dyn (if new_layout == old_layout then old_prim else Pbox (new_layout, mode))
   | Punbox old_layout ->
     let new_layout = eval_layout env old_layout in
-    dynamic_prim
-      (if new_layout == old_layout then old_prim else Punbox new_layout)
+    dyn (if new_layout == old_layout then old_prim else Punbox new_layout)
   | Pbytes_to_string | Pbytes_of_string | Pignore
   | Pgetglobal (_, Dynamic)
   | Pgetpredef _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
@@ -1308,7 +1331,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
   | Pdomain_index | Ppoll | Pcpu_relax ->
-    dynamic_prim old_prim
+    dyn old_prim
 
 (** {[
     template p1 ... pn -> body, capturing id1=e1, ..., idm=em ~>
@@ -1322,7 +1345,7 @@ and eval_template ?name ctx env template old_captures mode loc =
   let func =
     match template with
     | Kind { ktmpl_body; _ } -> ktmpl_body
-    | Static { tmpl_func; _ } -> tmpl_func
+    | Value { tmpl_func; _ } -> tmpl_func
   in
   (match func.kind, template with
   | Curried _, _ -> ()
@@ -1333,7 +1356,7 @@ and eval_template ?name ctx env template old_captures mode loc =
     (* CR layouts-mixed-tuplify: once we have mixed tupled functions, we will
        hit this more. Regardless, it should be supported! *)
     Misc.fatal_error "Slambda does not currently support poly tupled functions"
-  | Tupled, Static _ ->
+  | Tupled, Value _ ->
     Misc.fatal_error "Tupled static functions are not currently supported");
   if List.length func.params > Lambda.max_arity () - 1
   then
@@ -1343,7 +1366,7 @@ and eval_template ?name ctx env template old_captures mode loc =
   let new_captures =
     old_captures
     |> Ident.Map.mapi (fun id (old_def, old_layout) ->
-        let new_def = eval_lam ~name:id ctx env old_def in
+        let new_def = eval_lam ~name:(Ident.name id) ctx env old_def in
         let new_layout = eval_layout env old_layout in
         new_def, new_layout)
     |> Ident.Map.bindings
@@ -1367,9 +1390,10 @@ and eval_template ?name ctx env template old_captures mode loc =
     List.map (fun (id, (_, new_layout)) -> id, new_layout) new_captures
   in
   let template =
+    (* CR-soon: This will be removed by dropping (k)tmpl_env entirely. *)
     match template with
     | Kind template -> Kind { template with ktmpl_env = Ident.Map.empty }
-    | Static template -> Static { template with tmpl_env = Ident.Map.empty }
+    | Value template -> Value { template with tmpl_env = Ident.Map.empty }
   in
   let closure = { clo_template = template; clo_runtime_env; clo_env } in
   let id =
@@ -1463,7 +1487,8 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
     in
     let new_kind =
       match old_kind, closure_param.mode with
-      | Curried { nlocal }, Alloc_local -> Curried { nlocal = nlocal + 1 }
+      | Curried _, Alloc_local ->
+        Curried { nlocal = List.length old_params + 1 }
       | Curried _, Alloc_heap -> old_kind
       | Tupled, _ ->
         Misc.fatal_error "Tupled static functions are not currently supported"
@@ -1472,8 +1497,7 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       Misc.Stdlib.List.map_sharing (eval_lparam env) old_params
     in
     let new_return = eval_layout env old_return in
-    (* All free variables are read from the environment parameter, so this
-       function has no captures and can be statically allocated. *)
+    (* All instances are closed functions and can therefore be heap-allocated *)
     lfunction' ~kind:new_kind
       ~params:(closure_param :: new_params)
       ~return:new_return ~body:new_body ~attr ~loc ~mode:alloc_heap ~ret_mode
@@ -1491,7 +1515,7 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
     let env = bind_params (Array.of_list ktmpl_params) in
     let new_body = eval_dynamic ctx env old_func.body in
     dynamic (close_function env ~env_mode:ktmpl_env_mode old_func new_body)
-  | Static { tmpl_func = old_func; tmpl_env = _ } ->
+  | Value { tmpl_func = old_func; tmpl_env = _ } ->
     let static_params =
       Misc.Stdlib.Array.of_list_map
         (fun { name; _ } -> Slambdaident.of_ident name)
@@ -1638,8 +1662,12 @@ let rec assert_no_splices (lam : Lambda.lambda) =
 let eval ~cu_static_data template_lam =
   Profile.record_call "static_eval" (fun () ->
       let ctx = Ctx.create ~cu_static_data in
-      let { slv_comptime; slv_runtime } = eval_lam ctx Env.empty template_lam in
+      let { slv_comptime; slv_runtime } =
+        eval_lam ~name:"main_module_block" ctx Env.empty template_lam
+      in
       let lambda =
+        (* All instantiations are closed functions (they were closure converted)
+           so they can be pulled to the top. *)
         List.fold_left
           (fun lam (id, def) ->
             Llet (Strict, layout_function, id, debug_uid_none, def, lam))
@@ -1657,7 +1685,7 @@ let eval ~cu_static_data template_lam =
         && not (template_lam == lambda)
       then
         Misc.fatal_error
-          "Static eval did something non-trivial but layout poly is disabled.";
+          "Value eval did something non-trivial but layout poly is disabled.";
       { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, lambda)
 
 let report_error_doc ppf = function
