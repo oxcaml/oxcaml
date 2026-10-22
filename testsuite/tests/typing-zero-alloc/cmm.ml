@@ -92,3 +92,22 @@ camlTOP9__curse_you_caml_apply_14_26_code:
 
 val curse_you_caml_apply : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
 |}]
+
+let rec iter ~f = function [] -> () | x :: xs -> f x; iter ~f xs [@@loop never]
+[%%expect{|
+camlTOP10__iter_15_28_code:
+- Some [Argument { argument_index = 0 }]
+- Some [Symbol G:"camlTOP10__iter_15_28_code"]
+
+val iter : f:('a -> 'b) -> 'a list -> unit = <fun>
+|}]
+
+(* With tail-call optimization into a loop: *)
+let rec iter ~f = function [] -> () | x :: xs -> f x; iter ~f xs [@@loop always]
+[%%expect{|
+camlTOP11__iter_16_30_code:
+- Some [Argument { argument_index = 0 }]
+- Some [Symbol G:"camlTOP10__iter_16_30_code"]
+
+val iter : f:('a -> 'b) -> 'a list -> unit = <fun>
+|}]
