@@ -248,66 +248,68 @@ let lambda_lifting =
   Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
 
 let calling_convention_changes_rules =
-  saturate_in_order
-    [ (let$ [x] = ["x"] in
-       [any_usage x] ==> cannot_change_witness_calling_convention x);
-      (let$ [allocation_id; alias; alias_source; v] =
-         ["allocation_id"; "alias"; "alias_source"; "v"]
-       in
-       [ usages allocation_id alias;
-         sources alias alias_source;
-         has_source alias_source;
-         distinct Cols.n alias_source allocation_id;
-         rev_accessor ~base:alias !!Field.code_id_of_call_witness ~to_:v;
-         has_usage v ]
-       ==> cannot_change_witness_calling_convention allocation_id);
-      (let$ [allocation_id; alias; v] = ["allocation_id"; "alias"; "v"] in
-       [ usages allocation_id alias;
-         any_source alias;
-         rev_accessor ~base:alias !!Field.code_id_of_call_witness ~to_:v;
-         has_usage v ]
-       ==> cannot_change_witness_calling_convention allocation_id);
-      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-       [ sources allocation_id source;
-         has_source source;
-         distinct Cols.n source allocation_id ]
-       ==> cannot_change_witness_calling_convention allocation_id);
-      (* Used but not its own source: either from any source, or it has no
-         source at all and it is dead code. In either case, do not unbox *)
-      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-       [ usages allocation_id usage;
-         has_usage usage;
-         ~~(sources allocation_id allocation_id) ]
-       ==> cannot_change_witness_calling_convention allocation_id);
-      (let$ [allocation_id] = ["allocation_id"] in
-       [any_source allocation_id]
-       ==> cannot_change_witness_calling_convention allocation_id);
-      (* If the calling convention of a witness cannot be changed, the calling
-         convention of its code_id cannot be either. From now on,
-         [cannot_change_witness_calling_convention] should no longer be used. *)
-      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-       [ constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:code_id;
-         has_usage call_witness;
-         cannot_change_witness_calling_convention call_witness ]
-       ==> cannot_change_calling_convention code_id);
-      (* CR ncourant: we're preventing changing the calling convention of
-         functions called with Indirect_unknown_arity. We could still allow
-         changing the calling convention, but this would require wrappers for
-         over- and partial applications, as well as untupling. As these wrappers
-         are complex to write correctly, this is not done yet. *)
-      (let$ [call_witness; set_of_closures; codeid] =
-         ["call_witness"; "set_of_closures"; "codeid"]
-       in
-       [ rev_constructor ~from:call_witness
-           !!Field.unknown_arity_call_witness
-           ~base:set_of_closures;
-         has_usage call_witness;
-         constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:codeid ]
-       ==> cannot_change_calling_convention codeid) ]
+  lazy
+    (saturate_in_order
+       [ (let$ [x] = ["x"] in
+          [any_usage x] ==> cannot_change_witness_calling_convention x);
+         (let$ [allocation_id; alias; alias_source; v] =
+            ["allocation_id"; "alias"; "alias_source"; "v"]
+          in
+          [ usages allocation_id alias;
+            sources alias alias_source;
+            has_source alias_source;
+            distinct Cols.n alias_source allocation_id;
+            rev_accessor ~base:alias !!Field.code_id_of_call_witness ~to_:v;
+            has_usage v ]
+          ==> cannot_change_witness_calling_convention allocation_id);
+         (let$ [allocation_id; alias; v] = ["allocation_id"; "alias"; "v"] in
+          [ usages allocation_id alias;
+            any_source alias;
+            rev_accessor ~base:alias !!Field.code_id_of_call_witness ~to_:v;
+            has_usage v ]
+          ==> cannot_change_witness_calling_convention allocation_id);
+         (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+          [ sources allocation_id source;
+            has_source source;
+            distinct Cols.n source allocation_id ]
+          ==> cannot_change_witness_calling_convention allocation_id);
+         (* Used but not its own source: either from any source, or it has no
+            source at all and it is dead code. In either case, do not unbox *)
+         (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+          [ usages allocation_id usage;
+            has_usage usage;
+            ~~(sources allocation_id allocation_id) ]
+          ==> cannot_change_witness_calling_convention allocation_id);
+         (let$ [allocation_id] = ["allocation_id"] in
+          [any_source allocation_id]
+          ==> cannot_change_witness_calling_convention allocation_id);
+         (* If the calling convention of a witness cannot be changed, the
+            calling convention of its code_id cannot be either. From now on,
+            [cannot_change_witness_calling_convention] should no longer be
+            used. *)
+         (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+          [ constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:code_id;
+            has_usage call_witness;
+            cannot_change_witness_calling_convention call_witness ]
+          ==> cannot_change_calling_convention code_id);
+         (* CR ncourant: we're preventing changing the calling convention of
+            functions called with Indirect_unknown_arity. We could still allow
+            changing the calling convention, but this would require wrappers for
+            over- and partial applications, as well as untupling. As these
+            wrappers are complex to write correctly, this is not done yet. *)
+         (let$ [call_witness; set_of_closures; codeid] =
+            ["call_witness"; "set_of_closures"; "codeid"]
+          in
+          [ rev_constructor ~from:call_witness
+              !!Field.unknown_arity_call_witness
+              ~base:set_of_closures;
+            has_usage call_witness;
+            constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:codeid ]
+          ==> cannot_change_calling_convention codeid) ])
 
 (* The analysis scope of the rules below. It is set before running them rather
    than passed as a parameter, so that the schedules are not rebuilt on each
@@ -317,247 +319,253 @@ let current_analysis_scope = ref Analysis_scope.Current_unit
 let is_local field = Analysis_scope.is_local_field !current_analysis_scope field
 
 let unboxing_rules =
-  saturate_in_order
-    [ (* If any usage is possible, do not change the representation. Note that
+  lazy
+    (saturate_in_order
+       [ (* If any usage is possible, do not change the representation. Note that
          this rule will change in the future, when local value slots are
          properly tracked: a closure will only local value slots that has
          any_use will still be able to have its representation changed. *)
-      (* (let$ [x] = ["x"] in [any_usage x] ==> cannot_change_representation0
+         (* (let$ [x] = ["x"] in [any_usage x] ==> cannot_change_representation0
          x); *)
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ any_usage x;
-         unless1 is_local field;
-         when1 Field.is_real_field field;
-         constructor ~base:x field ~from:y ]
-       ==> cannot_change_representation0 x);
-      (* If a block with a local field escapes, and that field is read again
-         from an [any_source] value, prevent changing the representation. This
-         ensures that for a block whose representation is changed, we can know
-         the source at each point. *)
-      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
-       [ any_usage x;
-         when1 is_local field;
-         reading_field field z;
-         constructor ~base:x field ~from:y ]
-       ==> cannot_change_representation0 x);
-      (* Likewise, if a block with a local field escapes, and that field is read
-         again from a value with several sources, prevent changing the
-         representation. *)
-      (let$ [usage; field; v; source1; source2] =
-         ["usage"; "field"; "v"; "source1"; "source2"]
-       in
-       [ rev_accessor ~base:usage field ~to_:v;
-         has_usage v;
-         when1 is_local field;
-         sources usage source1;
-         has_source source1;
-         sources usage source2;
-         has_source source2;
-         distinct Cols.n source1 source2 ]
-       ==> cannot_change_representation0 source1);
-      (* If there exists an alias which has another source, and which uses any
-         real field of our allocation, we cannot change the representation. This
-         currently requires 4 rules due to the absence of disjunction in the
-         datalog engine. *)
-      (let$ [allocation_id; alias; alias_source; field; v] =
-         ["allocation_id"; "alias"; "alias_source"; "field"; "v"]
-       in
-       [ usages allocation_id alias;
-         sources alias alias_source;
-         has_source alias_source;
-         distinct Cols.n alias_source allocation_id;
-         when1 Field.is_real_field field;
-         rev_accessor ~base:alias field ~to_:v;
-         has_usage v ]
-       ==> cannot_change_representation0 allocation_id);
-      (let$ [allocation_id; alias; field; v] =
-         ["allocation_id"; "alias"; "field"; "v"]
-       in
-       [ usages allocation_id alias;
-         any_source alias;
-         when1 Field.is_real_field field;
-         rev_accessor ~base:alias field ~to_:v;
-         has_usage v ]
-       ==> cannot_change_representation0 allocation_id);
-      (* If the allocation has a source distinct from itself, its representation
-         cannot be changed (in fact, in that case, it shouldn't even be an
-         allocation). *)
-      (let$ [allocation_id; source] = ["allocation_id"; "source"] in
-       [ sources allocation_id source;
-         has_source source;
-         distinct Cols.n source allocation_id ]
-       ==> cannot_change_representation0 allocation_id);
-      (* Used but not its own source: either from any source, or it has no
-         source at all and it is dead code. In either case, do not unbox or
-         change the representation. *)
-      (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
-       [ usages allocation_id usage;
-         has_usage usage;
-         ~~(sources allocation_id allocation_id) ]
-       ==> cannot_change_representation0 allocation_id);
-      (let$ [allocation_id] = ["allocation_id"] in
-       [any_source allocation_id]
-       ==> cannot_change_representation0 allocation_id);
-      (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
-       [ constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:code_id ]
-       ==> cannot_change_representation0 call_witness);
-      (* If the representation of any closure in a set of closures cannot be
-         changed, the representation of all the closures in the set cannot be
-         changed. *)
-      (let$ [x] = ["x"] in
-       [cannot_change_representation0 x] ==> cannot_change_representation1 x);
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ constructor ~base:x field ~from:y;
-         when1 Field.is_function_slot field;
-         cannot_change_representation0 x ]
-       ==> cannot_change_representation1 y);
-      (let$ [x] = ["x"] in
-       [cannot_change_representation1 x] ==> cannot_change_representation x);
-      (* Due to value_kinds rewriting not taking representation changes into
-         account for now, blocks cannot have their representation changed, so we
-         prevent it here. Boxed numbers are also prevented from changing their
-         representation, but for a different reason: since they only have a
-         single field, a representation change could never be useful. Either
-         that field is used, and no representation change is necessary, or it is
-         unused, and the whole boxed number should be replaced by a poison value
-         instead. *)
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ constructor ~base:x field ~from:y;
-         when1
-           (fun f ->
-             match Field.view f with
-             | Block _ | Is_int | Get_tag | Boxed_number _ -> true
-             | Value_slot _ | Function_slot _ | Call_witness _
-             | Return_of_call _ | Code_id_of_call_witness ->
-               false)
-           field ]
-       ==> cannot_change_representation x);
-      (* The use of [cannot_change_representation1] is here to still allow
-         unboxing of blocks, even if we cannot change their representation due
-         to the value_kind limitation. *)
-      (let$ [x] = ["x"] in
-       [cannot_change_representation1 x] ==> cannot_unbox0 x);
-      (* This is repeated from the earlier occurrence in
-         [cannot_change_representation0]. It is here because in the future, when
-         we want to allow the changing of the representation of local value
-         slots, it will remain necessary. *)
-      (let$ [x] = ["x"] in
-       [any_usage x] ==> cannot_unbox0 x);
-      (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ any_usage x;
+            unless1 is_local field;
+            when1 Field.is_real_field field;
+            constructor ~base:x field ~from:y ]
+          ==> cannot_change_representation0 x);
+         (* If a block with a local field escapes, and that field is read again
+            from an [any_source] value, prevent changing the representation.
+            This ensures that for a block whose representation is changed, we
+            can know the source at each point. *)
+         (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+          [ any_usage x;
+            when1 is_local field;
+            reading_field field z;
+            constructor ~base:x field ~from:y ]
+          ==> cannot_change_representation0 x);
+         (* Likewise, if a block with a local field escapes, and that field is
+            read again from a value with several sources, prevent changing the
+            representation. *)
+         (let$ [usage; field; v; source1; source2] =
+            ["usage"; "field"; "v"; "source1"; "source2"]
+          in
+          [ rev_accessor ~base:usage field ~to_:v;
+            has_usage v;
+            when1 is_local field;
+            sources usage source1;
+            has_source source1;
+            sources usage source2;
+            has_source source2;
+            distinct Cols.n source1 source2 ]
+          ==> cannot_change_representation0 source1);
+         (* If there exists an alias which has another source, and which uses
+            any real field of our allocation, we cannot change the
+            representation. This currently requires 4 rules due to the absence
+            of disjunction in the datalog engine. *)
+         (let$ [allocation_id; alias; alias_source; field; v] =
+            ["allocation_id"; "alias"; "alias_source"; "field"; "v"]
+          in
+          [ usages allocation_id alias;
+            sources alias alias_source;
+            has_source alias_source;
+            distinct Cols.n alias_source allocation_id;
+            when1 Field.is_real_field field;
+            rev_accessor ~base:alias field ~to_:v;
+            has_usage v ]
+          ==> cannot_change_representation0 allocation_id);
+         (let$ [allocation_id; alias; field; v] =
+            ["allocation_id"; "alias"; "field"; "v"]
+          in
+          [ usages allocation_id alias;
+            any_source alias;
+            when1 Field.is_real_field field;
+            rev_accessor ~base:alias field ~to_:v;
+            has_usage v ]
+          ==> cannot_change_representation0 allocation_id);
+         (* If the allocation has a source distinct from itself, its
+            representation cannot be changed (in fact, in that case, it
+            shouldn't even be an allocation). *)
+         (let$ [allocation_id; source] = ["allocation_id"; "source"] in
+          [ sources allocation_id source;
+            has_source source;
+            distinct Cols.n source allocation_id ]
+          ==> cannot_change_representation0 allocation_id);
+         (* Used but not its own source: either from any source, or it has no
+            source at all and it is dead code. In either case, do not unbox or
+            change the representation. *)
+         (let$ [allocation_id; usage] = ["allocation_id"; "usage"] in
+          [ usages allocation_id usage;
+            has_usage usage;
+            ~~(sources allocation_id allocation_id) ]
+          ==> cannot_change_representation0 allocation_id);
+         (let$ [allocation_id] = ["allocation_id"] in
+          [any_source allocation_id]
+          ==> cannot_change_representation0 allocation_id);
+         (let$ [call_witness; code_id] = ["call_witness"; "code_id"] in
+          [ constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:code_id ]
+          ==> cannot_change_representation0 call_witness);
+         (* If the representation of any closure in a set of closures cannot be
+            changed, the representation of all the closures in the set cannot be
+            changed. *)
+         (let$ [x] = ["x"] in
+          [cannot_change_representation0 x] ==> cannot_change_representation1 x);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ constructor ~base:x field ~from:y;
+            when1 Field.is_function_slot field;
+            cannot_change_representation0 x ]
+          ==> cannot_change_representation1 y);
+         (let$ [x] = ["x"] in
+          [cannot_change_representation1 x] ==> cannot_change_representation x);
+         (* Due to value_kinds rewriting not taking representation changes into
+            account for now, blocks cannot have their representation changed, so
+            we prevent it here. Boxed numbers are also prevented from changing
+            their representation, but for a different reason: since they only
+            have a single field, a representation change could never be useful.
+            Either that field is used, and no representation change is
+            necessary, or it is unused, and the whole boxed number should be
+            replaced by a poison value instead. *)
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ constructor ~base:x field ~from:y;
+            when1
+              (fun f ->
+                match Field.view f with
+                | Block _ | Is_int | Get_tag | Boxed_number _ -> true
+                | Value_slot _ | Function_slot _ | Call_witness _
+                | Return_of_call _ | Code_id_of_call_witness ->
+                  false)
+              field ]
+          ==> cannot_change_representation x);
+         (* The use of [cannot_change_representation1] is here to still allow
+            unboxing of blocks, even if we cannot change their representation
+            due to the value_kind limitation. *)
+         (let$ [x] = ["x"] in
+          [cannot_change_representation1 x] ==> cannot_unbox0 x);
+         (* This is repeated from the earlier occurrence in
+            [cannot_change_representation0]. It is here because in the future,
+            when we want to allow the changing of the representation of local
+            value slots, it will remain necessary. *)
+         (let$ [x] = ["x"] in
+          [any_usage x] ==> cannot_unbox0 x);
+         (* (let$ [x; field] = ["x"; "field"] in [ field_of_constructor_is_used x
          field; when1 field_cannot_be_destructured field ] ==> cannot_unbox0
          x); *)
-      (* Unboxing a closure requires changing its calling convention, as we must
+         (* Unboxing a closure requires changing its calling convention, as we must
          pass the value slots as extra arguments. Thus, we prevent unboxing of
          closures if their calling convention cannot be changed. *)
-      (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
-       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
-         constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:codeid;
-         cannot_change_calling_convention codeid ]
-       ==> cannot_unbox0 x);
-      (* Unless [-X reaper-lambda-lifting=1], prevent unboxing a closure that is
-         called. If the closure is never called (and still is used), it is
-         because it has been inlined and the closure block serves only for
-         holding data; so unboxing it is a good thing. However, if the closure
-         is called, unboxing it can prevent specialization of the closure,
-         especially for higher-order functions. In that case, we prevent the
-         unboxing of the closure, that is, we prevent lambda-lifting. *)
-      (let$ [x; call_witness] = ["x"; "call_witness"] in
-       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
-         has_usage call_witness;
-         filter (fun [] -> not (lambda_lifting ())) [] ]
-       ==> cannot_unbox0 x);
-      (* An allocation that is one of the results of a function can only be
-         unboxed if the function's calling conventation can be changed. *)
-      (let$ [alias; allocation_id; relation; call_witness; codeid] =
-         ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
-       in
-       [ sources alias allocation_id;
-         has_source allocation_id;
-         rev_constructor ~from:alias relation ~base:call_witness;
-         when1
-           (fun f ->
-             match[@ocaml.warning "-4"] Field.view f with
-             | Return_of_call _ -> true
-             | _ -> false)
-           relation;
-         constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:codeid;
-         cannot_change_calling_convention codeid ]
-       ==> cannot_unbox0 allocation_id);
-      (* Likewise, an allocation passed as a parameter of a function can only be
+         (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
+          [ constructor ~base:x
+              !!Field.known_arity_call_witness
+              ~from:call_witness;
+            constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:codeid;
+            cannot_change_calling_convention codeid ]
+          ==> cannot_unbox0 x);
+         (* Unless [-X reaper-lambda-lifting=1], prevent unboxing a closure that
+            is called. If the closure is never called (and still is used), it is
+            because it has been inlined and the closure block serves only for
+            holding data; so unboxing it is a good thing. However, if the
+            closure is called, unboxing it can prevent specialization of the
+            closure, especially for higher-order functions. In that case, we
+            prevent the unboxing of the closure, that is, we prevent
+            lambda-lifting. *)
+         (let$ [x; call_witness] = ["x"; "call_witness"] in
+          [ constructor ~base:x
+              !!Field.known_arity_call_witness
+              ~from:call_witness;
+            has_usage call_witness;
+            filter (fun [] -> not (lambda_lifting ())) [] ]
+          ==> cannot_unbox0 x);
+         (* An allocation that is one of the results of a function can only be
+            unboxed if the function's calling conventation can be changed. *)
+         (let$ [alias; allocation_id; relation; call_witness; codeid] =
+            ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
+          in
+          [ sources alias allocation_id;
+            has_source allocation_id;
+            rev_constructor ~from:alias relation ~base:call_witness;
+            when1
+              (fun f ->
+                match[@ocaml.warning "-4"] Field.view f with
+                | Return_of_call _ -> true
+                | _ -> false)
+              relation;
+            constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:codeid;
+            cannot_change_calling_convention codeid ]
+          ==> cannot_unbox0 allocation_id);
+         (* Likewise, an allocation passed as a parameter of a function can only be
          unboxed if the function's calling convention can be changed. *)
-      (* CR ncourant: note that this can fail to trigger if the alias is
+         (* CR ncourant: note that this can fail to trigger if the alias is
          any_source but has no use! This is not a problem but makes it necessary
          to replace unused params in calls with poison values. In the future, we
          could modify this check to ensure it only triggers if the variable is
          indeed used, allowing slightly more unboxing. *)
-      (let$ [alias; allocation_id; relation; call_witness; codeid] =
-         ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
-       in
-       [ sources alias allocation_id;
-         has_source allocation_id;
-         rev_parameter ~to_:alias relation ~base:call_witness;
-         constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:codeid;
-         cannot_change_calling_convention codeid ]
-       ==> cannot_unbox0 allocation_id);
-      (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
+         (let$ [alias; allocation_id; relation; call_witness; codeid] =
+            ["alias"; "allocation_id"; "relation"; "call_witness"; "codeid"]
+          in
+          [ sources alias allocation_id;
+            has_source allocation_id;
+            rev_parameter ~to_:alias relation ~base:call_witness;
+            constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:codeid;
+            cannot_change_calling_convention codeid ]
+          ==> cannot_unbox0 allocation_id);
+         (* Cannot unbox parameters of [Indirect_unknown_arity] calls, even if they
          do not escape. *)
-      (* (let$ [usage; allocation_id; relation; _v] = ["usage"; "allocation_id";
+         (* (let$ [usage; allocation_id; relation; _v] = ["usage"; "allocation_id";
          "relation"; "_v"] in [ sources usage allocation_id; argument usage
          relation _v; filter (fun [f] -> match CoField.decode f with | Param
          (Unknown_arity_code_pointer, _) -> true | Param
          (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
          allocation_id); *)
-      (* CR ncourant: I'm not sure this is useful? *)
-      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
+         (* CR ncourant: I'm not sure this is useful? *)
+         (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
          to symbols being always values; thus we prevent it. *)
-      (let$ [x; _source] = ["x"; "_source"] in
-       [ sources x _source;
-         when1
-           (fun x ->
-             Code_id_or_name.pattern_match x
-               ~symbol:(fun _ -> true)
-               ~var:(fun _ -> false)
-               ~code_id:(fun _ -> false))
-           x ]
-       ==> cannot_unbox0 x);
-      (* An allocation that is stored in another can only be unboxed if either
-         the representation of the other allocation can be changed, of it the
-         field it is stored in is never read, as in that case a poison value
-         will be stored instead. *)
-      (let$ [alias; relation; to_; allocation_id] =
-         ["alias"; "relation"; "to_"; "allocation_id"]
-       in
-       [ sources alias allocation_id;
-         rev_constructor ~from:alias relation ~base:to_;
-         field_of_constructor_is_used to_ relation;
-         cannot_change_representation to_;
-         when1 Field.is_real_field relation;
-         cannot_unbox0 to_ ]
-       ==> cannot_unbox0 allocation_id);
-      (* As previously: if any closure of a set of closures cannot be unboxed,
-         then every closure in the set cannot be unboxed. *)
-      (let$ [x] = ["x"] in
-       [cannot_unbox0 x] ==> cannot_unbox x);
-      (let$ [x; field; y] = ["x"; "field"; "y"] in
-       [ cannot_unbox0 x;
-         constructor ~base:x field ~from:y;
-         when1 Field.is_function_slot field ]
-       ==> cannot_unbox y);
-      (* Compute allocations to unbox or to change representation. This requires
-         the rules to be executed in order. *)
-      (let$ [x] = ["x"] in
-       [has_usage x; ~~(cannot_unbox x)] ==> to_unbox x);
-      (let$ [x] = ["x"] in
-       [has_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
-       ==> to_change_representation x) ]
+         (let$ [x; _source] = ["x"; "_source"] in
+          [ sources x _source;
+            when1
+              (fun x ->
+                Code_id_or_name.pattern_match x
+                  ~symbol:(fun _ -> true)
+                  ~var:(fun _ -> false)
+                  ~code_id:(fun _ -> false))
+              x ]
+          ==> cannot_unbox0 x);
+         (* An allocation that is stored in another can only be unboxed if
+            either the representation of the other allocation can be changed, of
+            it the field it is stored in is never read, as in that case a poison
+            value will be stored instead. *)
+         (let$ [alias; relation; to_; allocation_id] =
+            ["alias"; "relation"; "to_"; "allocation_id"]
+          in
+          [ sources alias allocation_id;
+            rev_constructor ~from:alias relation ~base:to_;
+            field_of_constructor_is_used to_ relation;
+            cannot_change_representation to_;
+            when1 Field.is_real_field relation;
+            cannot_unbox0 to_ ]
+          ==> cannot_unbox0 allocation_id);
+         (* As previously: if any closure of a set of closures cannot be
+            unboxed, then every closure in the set cannot be unboxed. *)
+         (let$ [x] = ["x"] in
+          [cannot_unbox0 x] ==> cannot_unbox x);
+         (let$ [x; field; y] = ["x"; "field"; "y"] in
+          [ cannot_unbox0 x;
+            constructor ~base:x field ~from:y;
+            when1 Field.is_function_slot field ]
+          ==> cannot_unbox y);
+         (* Compute allocations to unbox or to change representation. This
+            requires the rules to be executed in order. *)
+         (let$ [x] = ["x"] in
+          [has_usage x; ~~(cannot_unbox x)] ==> to_unbox x);
+         (let$ [x] = ["x"] in
+          [has_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
+          ==> to_change_representation x) ])
 
 type result =
   { db : Datalog.database;
@@ -699,7 +707,8 @@ let perform_analysis0 ?stats db ~analysis_scope =
         in
         List.fold_left
           (fun db rule -> Datalog.Schedule.run ?stats rule db)
-          db unboxing_rules)
+          db
+          (Lazy.force unboxing_rules))
   in
   let name_of_node =
     if Flambda_features.debug_reaper "nostamps"
@@ -874,7 +883,8 @@ let perform_analysis ?stats db ~analysis_scope =
         (fun () ->
           List.fold_left
             (fun db rule -> Datalog.Schedule.run ?stats rule db)
-            db calling_convention_changes_rules)
+            db
+            (Lazy.force calling_convention_changes_rules))
     else db
   in
   if

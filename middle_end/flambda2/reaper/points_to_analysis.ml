@@ -547,18 +547,19 @@ module Datalog_schedule = struct
     ]
 
   let schedule =
-    List.concat
-      [ reverse_rules;
-        alias_rules;
-        has_usage_rules;
-        has_source_rules;
-        any_usage_rules;
-        any_source_rules;
-        usages_rules;
-        sources_rules;
-        local_rules;
-        zero_alloc_rules ]
-    |> make_schedule
+    lazy
+      (List.concat
+         [ reverse_rules;
+           alias_rules;
+           has_usage_rules;
+           has_source_rules;
+           any_usage_rules;
+           any_source_rules;
+           usages_rules;
+           sources_rules;
+           local_rules;
+           zero_alloc_rules ]
+      |> make_schedule)
 end
 
 let datalog_schedule = Datalog_schedule.schedule
@@ -590,42 +591,48 @@ let add_usages_through_function_slots :
     follow_known_arity_calls:bool -> Datalog.database -> usages -> usages =
   let open! Fixit in
   let stmt =
-    let@ follow_known_arity_calls =
-      paramc "follow_known_arity_calls" One.cols One.of_bool
-    in
-    let@ in_ = param "in_" Cols.[n] in
-    let@ out = fix1' in_ in
-    [ (let$ [x; apply_witness; call_witness; code_id; my_closure_of_code_id; y] =
-         [ "x";
-           "apply_witness";
-           "call_witness";
-           "code_id";
-           "my_closure_of_code_id";
-           "y" ]
+    lazy
+      (let@ follow_known_arity_calls =
+         paramc "follow_known_arity_calls" One.cols One.of_bool
        in
-       [ One.flag follow_known_arity_calls;
-         out % [x];
-         rev_accessor ~base:x
-           !!Field.known_arity_call_witness
-           ~to_:apply_witness;
-         sources apply_witness call_witness;
-         constructor ~base:call_witness
-           !!Field.code_id_of_call_witness
-           ~from:code_id;
-         code_id_my_closure ~code_id ~my_closure:my_closure_of_code_id;
-         usages my_closure_of_code_id y;
-         has_usage y ]
-       ==> out % [y]);
-      (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
-       [ out % [x];
-         rev_accessor ~base:x field ~to_:y;
-         when1 Field.is_function_slot field;
-         usages y z;
-         has_usage z ]
-       ==> out % [z]) ]
+       let@ in_ = param "in_" Cols.[n] in
+       let@ out = fix1' in_ in
+       [ (let$ [ x;
+                 apply_witness;
+                 call_witness;
+                 code_id;
+                 my_closure_of_code_id;
+                 y ] =
+            [ "x";
+              "apply_witness";
+              "call_witness";
+              "code_id";
+              "my_closure_of_code_id";
+              "y" ]
+          in
+          [ One.flag follow_known_arity_calls;
+            out % [x];
+            rev_accessor ~base:x
+              !!Field.known_arity_call_witness
+              ~to_:apply_witness;
+            sources apply_witness call_witness;
+            constructor ~base:call_witness
+              !!Field.code_id_of_call_witness
+              ~from:code_id;
+            code_id_my_closure ~code_id ~my_closure:my_closure_of_code_id;
+            usages my_closure_of_code_id y;
+            has_usage y ]
+          ==> out % [y]);
+         (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
+          [ out % [x];
+            rev_accessor ~base:x field ~to_:y;
+            when1 Field.is_function_slot field;
+            usages y z;
+            has_usage z ]
+          ==> out % [z]) ])
   in
   fun ~follow_known_arity_calls db (Usages s) ->
-    Usages (run stmt db follow_known_arity_calls s)
+    Usages (run (Lazy.force stmt) db follow_known_arity_calls s)
 
 let compute_usages_by_function_slots_not_following_known_arity_calls :
     Datalog.database ->
@@ -634,23 +641,24 @@ let compute_usages_by_function_slots_not_following_known_arity_calls :
     usages Function_slot.Map.t Or_unknown.t =
   let open! Fixit in
   let stmt =
-    let@ in_ = param "in_" Cols.[f; n] in
-    let@ [out; top] = fix' [in_; empty One.cols] in
-    [ (let$ [fs; x; field; y; z] = ["fs"; "x"; "field"; "y"; "z"] in
-       [ out % [fs; x];
-         rev_accessor ~base:x field ~to_:y;
-         when1 Field.is_function_slot field;
-         usages y z;
-         has_usage z ]
-       ==> out % [field; z]);
-      (let$ [fs; x] = ["fs"; "x"] in
-       [out % [fs; x]; any_usage x] ==> One.flag top) ]
+    lazy
+      (let@ in_ = param "in_" Cols.[f; n] in
+       let@ [out; top] = fix' [in_; empty One.cols] in
+       [ (let$ [fs; x; field; y; z] = ["fs"; "x"; "field"; "y"; "z"] in
+          [ out % [fs; x];
+            rev_accessor ~base:x field ~to_:y;
+            when1 Field.is_function_slot field;
+            usages y z;
+            has_usage z ]
+          ==> out % [field; z]);
+         (let$ [fs; x] = ["fs"; "x"] in
+          [out % [fs; x]; any_usage x] ==> One.flag top) ])
   in
   fun db (Usages s) current_function_slot ->
     let table =
       Field.Map.singleton (Field.function_slot current_function_slot) s
     in
-    let [r; top] = run stmt db table in
+    let [r; top] = run (Lazy.force stmt) db table in
     if One.to_bool top
     then Or_unknown.Unknown
     else
@@ -665,44 +673,50 @@ let compute_usages_by_function_slots_not_following_known_arity_calls :
 let get_direct_usages : Datalog.database -> unit Code_id_or_name.Map.t -> usages
     =
   let open! Fixit in
-  run
-    (let+ usages =
-       let@ in_ = param "in_" Cols.[n] in
-       let@ out = fix1' (empty Cols.[n]) in
-       [ (let$ [x; y] = ["x"; "y"] in
-          [in_ % [x]; usages x y; has_usage y] ==> out % [y]) ]
-     in
-     Usages usages)
+  let stmt =
+    lazy
+      (let+ usages =
+         let@ in_ = param "in_" Cols.[n] in
+         let@ out = fix1' (empty Cols.[n]) in
+         [ (let$ [x; y] = ["x"; "y"] in
+            [in_ % [x]; usages x y; has_usage y] ==> out % [y]) ]
+       in
+       Usages usages)
+  in
+  fun db in_ -> run (Lazy.force stmt) db in_
 
 let get_one_field_usage :
     Datalog.database -> Field.t -> usages -> _ Or_unknown_or_bottom.t =
   let open! Fixit in
-  run
-    (let@ in_field = param1s "in_field" Cols.f in
-     let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
-     let+ [used_as_top; used_as_vars] =
-       let@ [used_as_top; used_as_vars] =
-         seq' [empty One.cols; empty Cols.[n]]
+  let stmt =
+    lazy
+      (let@ in_field = param1s "in_field" Cols.f in
+       let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
+       let+ [used_as_top; used_as_vars] =
+         let@ [used_as_top; used_as_vars] =
+           seq' [empty One.cols; empty Cols.[n]]
+         in
+         [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+            [ in_ % [x];
+              in_field % [field];
+              rev_accessor ~base:x field ~to_:y;
+              any_usage y ]
+            ==> One.flag used_as_top);
+           (let$ [x; field; y] = ["x"; "field"; "y"] in
+            [ ~~(One.flag used_as_top);
+              in_ % [x];
+              in_field % [field];
+              rev_accessor ~base:x field ~to_:y;
+              has_usage y ]
+            ==> used_as_vars % [y]) ]
        in
-       [ (let$ [x; field; y] = ["x"; "field"; "y"] in
-          [ in_ % [x];
-            in_field % [field];
-            rev_accessor ~base:x field ~to_:y;
-            any_usage y ]
-          ==> One.flag used_as_top);
-         (let$ [x; field; y] = ["x"; "field"; "y"] in
-          [ ~~(One.flag used_as_top);
-            in_ % [x];
-            in_field % [field];
-            rev_accessor ~base:x field ~to_:y;
-            has_usage y ]
-          ==> used_as_vars % [y]) ]
-     in
-     if One.to_bool used_as_top
-     then Or_unknown_or_bottom.Unknown
-     else if Code_id_or_name.Map.is_empty used_as_vars
-     then Or_unknown_or_bottom.Bottom
-     else Or_unknown_or_bottom.Ok used_as_vars)
+       if One.to_bool used_as_top
+       then Or_unknown_or_bottom.Unknown
+       else if Code_id_or_name.Map.is_empty used_as_vars
+       then Or_unknown_or_bottom.Bottom
+       else Or_unknown_or_bottom.Ok used_as_vars)
+  in
+  fun db field usages -> run (Lazy.force stmt) db field usages
 
 (** For an usage set, compute the way its fields are used. As function slots are
     transparent for [get_usages], functions slot usages are ignored here. *)
@@ -711,36 +725,39 @@ let get_fields :
     usages ->
     unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t =
   let open! Fixit in
-  run
-    (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
-     let+ [out1; out2] =
-       let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
-       [ (let$ [x; field; y] = ["x"; "field"; "y"] in
-          [ in_ % [x];
-            rev_accessor ~base:x field ~to_:y;
-            any_usage y;
-            unless1 Field.is_function_slot field ]
-          ==> out1 % [field]);
-         (let$ [x; field; y] = ["x"; "field"; "y"] in
-          [ in_ % [x];
-            rev_accessor ~base:x field ~to_:y;
-            has_usage y;
-            ~~(out1 % [field]);
-            unless1 Field.is_function_slot field ]
-          ==> out2 % [field; y]) ]
-     in
-     Field.Map.merge
-       (fun k x y ->
-         match x, y with
-         | None, None ->
-           Misc.fatal_errorf
-             "Field %a appeared in neither output in [get_fields_usage]"
-             Field.print k
-         | Some _, Some _ ->
-           Misc.fatal_errorf "Got two results for field %a" Field.print k
-         | Some (), None -> Some Or_unknown.Unknown
-         | None, Some m -> Some (Or_unknown.Known m))
-       out1 out2)
+  let stmt =
+    lazy
+      (let@ in_ = paramc "in_" Cols.[n] (fun (Usages s) -> s) in
+       let+ [out1; out2] =
+         let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+         [ (let$ [x; field; y] = ["x"; "field"; "y"] in
+            [ in_ % [x];
+              rev_accessor ~base:x field ~to_:y;
+              any_usage y;
+              unless1 Field.is_function_slot field ]
+            ==> out1 % [field]);
+           (let$ [x; field; y] = ["x"; "field"; "y"] in
+            [ in_ % [x];
+              rev_accessor ~base:x field ~to_:y;
+              has_usage y;
+              ~~(out1 % [field]);
+              unless1 Field.is_function_slot field ]
+            ==> out2 % [field; y]) ]
+       in
+       Field.Map.merge
+         (fun k x y ->
+           match x, y with
+           | None, None ->
+             Misc.fatal_errorf
+               "Field %a appeared in neither output in [get_fields_usage]"
+               Field.print k
+           | Some _, Some _ ->
+             Misc.fatal_errorf "Got two results for field %a" Field.print k
+           | Some (), None -> Some Or_unknown.Unknown
+           | None, Some m -> Some (Or_unknown.Known m))
+         out1 out2)
+  in
+  fun db usages -> run (Lazy.force stmt) db usages
 
 let get_one_field_usage_of_constructors :
     Datalog.database ->
@@ -748,61 +765,69 @@ let get_one_field_usage_of_constructors :
     Field.t ->
     _ Or_unknown_or_bottom.t =
   let open! Fixit in
-  run
-    (let@ in_ = param "in_" Cols.[n] in
-     let@ fieldt = param1s "field" Cols.f in
-     let+ [out1; out2] =
-       let@ [out1; out2] = seq' [empty One.cols; empty Cols.[n]] in
-       [ (let$ [x; field] = ["x"; "field"] in
-          [in_ % [x]; fieldt % [field]; field_of_constructor_is_used_top x field]
-          ==> One.flag out1);
-         (let$ [x; field; y] = ["x"; "field"; "y"] in
-          [ in_ % [x];
-            fieldt % [field];
-            field_of_constructor_is_used_as x field y;
-            ~~(One.flag out1) ]
-          ==> out2 % [y]) ]
-     in
-     if One.to_bool out1
-     then Or_unknown_or_bottom.Unknown
-     else if Code_id_or_name.Map.is_empty out2
-     then Or_unknown_or_bottom.Bottom
-     else Or_unknown_or_bottom.Ok out2)
+  let stmt =
+    lazy
+      (let@ in_ = param "in_" Cols.[n] in
+       let@ fieldt = param1s "field" Cols.f in
+       let+ [out1; out2] =
+         let@ [out1; out2] = seq' [empty One.cols; empty Cols.[n]] in
+         [ (let$ [x; field] = ["x"; "field"] in
+            [ in_ % [x];
+              fieldt % [field];
+              field_of_constructor_is_used_top x field ]
+            ==> One.flag out1);
+           (let$ [x; field; y] = ["x"; "field"; "y"] in
+            [ in_ % [x];
+              fieldt % [field];
+              field_of_constructor_is_used_as x field y;
+              ~~(One.flag out1) ]
+            ==> out2 % [y]) ]
+       in
+       if One.to_bool out1
+       then Or_unknown_or_bottom.Unknown
+       else if Code_id_or_name.Map.is_empty out2
+       then Or_unknown_or_bottom.Bottom
+       else Or_unknown_or_bottom.Ok out2)
+  in
+  fun db in_ field -> run (Lazy.force stmt) db in_ field
 
 let get_fields_usage_of_constructors :
     Datalog.database ->
     unit Code_id_or_name.Map.t ->
     unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t =
   let open! Fixit in
-  run
-    (let@ in_ = param "in_" Cols.[n] in
-     let+ [out1; out2] =
-       let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
-       [ (let$ [x; field] = ["x"; "field"] in
-          [ in_ % [x];
-            field_of_constructor_is_used_top x field;
-            unless1 Field.is_function_slot field ]
-          ==> out1 % [field]);
-         (let$ [x; field; y] = ["x"; "field"; "y"] in
-          [ in_ % [x];
-            field_of_constructor_is_used_as x field y;
-            ~~(out1 % [field]);
-            unless1 Field.is_function_slot field ]
-          ==> out2 % [field; y]) ]
-     in
-     Field.Map.merge
-       (fun k x y ->
-         match x, y with
-         | None, None ->
-           Misc.fatal_errorf
-             "Field %a appeared in neither output in \
-              [get_fields_usage_of_constructors]"
-             Field.print k
-         | Some _, Some _ ->
-           Misc.fatal_errorf "Got two results for field %a" Field.print k
-         | Some (), None -> Some Or_unknown.Unknown
-         | None, Some m -> Some (Or_unknown.Known m))
-       out1 out2)
+  let stmt =
+    lazy
+      (let@ in_ = param "in_" Cols.[n] in
+       let+ [out1; out2] =
+         let@ [out1; out2] = seq' [empty Cols.[f]; empty Cols.[f; n]] in
+         [ (let$ [x; field] = ["x"; "field"] in
+            [ in_ % [x];
+              field_of_constructor_is_used_top x field;
+              unless1 Field.is_function_slot field ]
+            ==> out1 % [field]);
+           (let$ [x; field; y] = ["x"; "field"; "y"] in
+            [ in_ % [x];
+              field_of_constructor_is_used_as x field y;
+              ~~(out1 % [field]);
+              unless1 Field.is_function_slot field ]
+            ==> out2 % [field; y]) ]
+       in
+       Field.Map.merge
+         (fun k x y ->
+           match x, y with
+           | None, None ->
+             Misc.fatal_errorf
+               "Field %a appeared in neither output in \
+                [get_fields_usage_of_constructors]"
+               Field.print k
+           | Some _, Some _ ->
+             Misc.fatal_errorf "Got two results for field %a" Field.print k
+           | Some (), None -> Some Or_unknown.Unknown
+           | None, Some m -> Some (Or_unknown.Known m))
+         out1 out2)
+  in
+  fun db constrs -> run (Lazy.force stmt) db constrs
 
 type 'a set_of_closures_def =
   | Not_a_set_of_closures
@@ -813,16 +838,17 @@ let get_set_of_closures_def :
     Code_id_or_name.t ->
     (Function_slot.t * Code_id_or_name.t) list set_of_closures_def =
   let q =
-    query
-      (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
-       [ constructor ~base:x relation ~from:y;
-         when1 Field.is_function_slot relation ]
-       =>? [relation; y])
+    lazy
+      (query
+         (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
+          [ constructor ~base:x relation ~from:y;
+            when1 Field.is_function_slot relation ]
+          =>? [relation; y]))
   in
   fun db v ->
     let l =
-      Cursor.fold_with_parameters q [v] db ~init:[] ~f:(fun [f; y] l ->
-          (Field.must_be_function_slot f, y) :: l)
+      Cursor.fold_with_parameters (Lazy.force q) [v] db ~init:[]
+        ~f:(fun [f; y] l -> (Field.must_be_function_slot f, y) :: l)
     in
     match l with [] -> Not_a_set_of_closures | _ :: _ -> Set_of_closures l
 
@@ -836,18 +862,19 @@ let get_set_of_closures_def_with_value_slots :
     Code_id_or_name.t ->
     function_and_value_slots set_of_closures_def =
   let q =
-    query
-      (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
-       [ constructor ~base:x relation ~from:y;
-         when1
-           (fun field ->
-             Field.is_function_slot field || Field.is_value_slot field)
-           relation ]
-       =>? [relation; y])
+    lazy
+      (query
+         (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
+          [ constructor ~base:x relation ~from:y;
+            when1
+              (fun field ->
+                Field.is_function_slot field || Field.is_value_slot field)
+              relation ]
+          =>? [relation; y]))
   in
   fun db v ->
     let function_slots, value_slots =
-      Cursor.fold_with_parameters q [v] db ~init:([], [])
+      Cursor.fold_with_parameters (Lazy.force q) [v] db ~init:([], [])
         ~f:(fun [field; y] (function_slots, value_slots) ->
           match Field.view field with
           | Function_slot function_slot ->
@@ -868,15 +895,16 @@ let get_set_of_closures_def_with_value_slots :
 
 let all_closure_names : Datalog.database -> Code_id_or_name.Set.t =
   let q =
-    query
-      (let$ [x; relation; y] = ["x"; "relation"; "y"] in
-       [ constructor ~base:x relation ~from:y;
-         when1 Field.is_function_slot relation ]
-       =>? [x])
+    lazy
+      (query
+         (let$ [x; relation; y] = ["x"; "relation"; "y"] in
+          [ constructor ~base:x relation ~from:y;
+            when1 Field.is_function_slot relation ]
+          =>? [x]))
   in
   fun db ->
-    Datalog.Cursor.fold q db ~init:Code_id_or_name.Set.empty ~f:(fun [x] acc ->
-        Code_id_or_name.Set.add x acc)
+    Datalog.Cursor.fold (Lazy.force q) db ~init:Code_id_or_name.Set.empty
+      ~f:(fun [x] acc -> Code_id_or_name.Set.add x acc)
 
 let any_usage_query =
   let^? [x], [] = ["x"], [] in
@@ -913,102 +941,103 @@ let not_local_field_has_source =
   fun db x field -> any_source_query [x] db || field_source_query [x; field] db
 
 let post_processing_rules =
-  saturate_in_order
-    [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-       [ constructor ~base relation ~from;
-         any_usage base;
-         unless1 is_local relation ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_top base relation ]);
-      (let$ [base; relation; from; usage; v] =
-         ["base"; "relation"; "from"; "usage"; "v"]
-       in
-       [ constructor ~base relation ~from;
-         usages base usage;
-         rev_accessor ~base:usage relation ~to_:v;
-         any_usage v ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_top base relation ]);
-      (let$ [base; relation; from; usage; v] =
-         ["base"; "relation"; "from"; "usage"; "v"]
-       in
-       [ constructor ~base relation ~from;
-         usages base usage;
-         rev_accessor ~base:usage relation ~to_:v;
-         has_usage v ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_as base relation v ]);
-      (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
-       [ constructor ~base relation ~from;
-         any_usage base;
-         reading_field relation x;
-         any_usage x ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_top base relation ]);
-      (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
-       [ constructor ~base relation ~from;
-         any_usage base;
-         reading_field relation x;
-         has_usage x ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_as base relation x ]);
-      (let$ [usage; base; relation; from; v] =
-         ["usage"; "base"; "relation"; "from"; "v"]
-       in
-       [ constructor ~base relation ~from;
-         sources usage base;
-         when1 is_local relation;
-         any_usage base;
-         rev_accessor ~base:usage relation ~to_:v;
-         has_usage v ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_as base relation v ]);
-      (let$ [usage; base; relation; from; v] =
-         ["usage"; "base"; "relation"; "from"; "v"]
-       in
-       [ constructor ~base relation ~from;
-         sources usage base;
-         when1 is_local relation;
-         any_usage base;
-         rev_accessor ~base:usage relation ~to_:v;
-         any_usage v ]
-       ==> and_
-             [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_top base relation ]);
-      (* CR ncourant: this marks any [Apply] field as
+  lazy
+    (saturate_in_order
+       [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+          [ constructor ~base relation ~from;
+            any_usage base;
+            unless1 is_local relation ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_top base relation ]);
+         (let$ [base; relation; from; usage; v] =
+            ["base"; "relation"; "from"; "usage"; "v"]
+          in
+          [ constructor ~base relation ~from;
+            usages base usage;
+            rev_accessor ~base:usage relation ~to_:v;
+            any_usage v ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_top base relation ]);
+         (let$ [base; relation; from; usage; v] =
+            ["base"; "relation"; "from"; "usage"; "v"]
+          in
+          [ constructor ~base relation ~from;
+            usages base usage;
+            rev_accessor ~base:usage relation ~to_:v;
+            has_usage v ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_as base relation v ]);
+         (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
+          [ constructor ~base relation ~from;
+            any_usage base;
+            reading_field relation x;
+            any_usage x ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_top base relation ]);
+         (let$ [base; relation; from; x] = ["base"; "relation"; "from"; "x"] in
+          [ constructor ~base relation ~from;
+            any_usage base;
+            reading_field relation x;
+            has_usage x ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_as base relation x ]);
+         (let$ [usage; base; relation; from; v] =
+            ["usage"; "base"; "relation"; "from"; "v"]
+          in
+          [ constructor ~base relation ~from;
+            sources usage base;
+            when1 is_local relation;
+            any_usage base;
+            rev_accessor ~base:usage relation ~to_:v;
+            has_usage v ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_as base relation v ]);
+         (let$ [usage; base; relation; from; v] =
+            ["usage"; "base"; "relation"; "from"; "v"]
+          in
+          [ constructor ~base relation ~from;
+            sources usage base;
+            when1 is_local relation;
+            any_usage base;
+            rev_accessor ~base:usage relation ~to_:v;
+            any_usage v ]
+          ==> and_
+                [ field_of_constructor_is_used base relation;
+                  field_of_constructor_is_used_top base relation ]);
+         (* CR ncourant: this marks any [Apply] field as
          [field_of_constructor_is_used], as long as the function is called.
          Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
-      (* (let$ [base; relation; from; coderel; call_witness] = ["base";
+         (* (let$ [base; relation; from; coderel; call_witness] = ["base";
          "relation"; "from"; "coderel"; "call_witness"] in [ constructor base
          relation from; when1 is_apply_field relation; constructor base coderel
          call_witness; any_usage indirect_call_witness; when1 is_code_field
          coderel ] ==> field_of_constructor_is_used base relation); *)
-      (* CR ncourant: should this be reenabled? I think this is no longer
+         (* CR ncourant: should this be reenabled? I think this is no longer
          necessary because we remove unused arguments of continuations,
          including return continuations. *)
-      (let$ [x] = ["x"] in
-       [any_source x] ==> multiple_allocation_points x);
-      (let$ [x; y; z] = ["x"; "y"; "z"] in
-       [ sources x y;
-         has_source y;
-         sources x z;
-         has_source z;
-         distinct Cols.n y z ]
-       ==> multiple_allocation_points x);
-      (* [allocation_point_dominator x y] is the same as
-         [dominated_by_allocation_point y x], which is that [y] is the
-         allocation point dominator of [x]. *)
-      (let$ [x; y] = ["x"; "y"] in
-       [sources x y; has_source y; ~~(multiple_allocation_points x)]
-       ==> and_
-             [allocation_point_dominator x y; dominated_by_allocation_point y x])
-    ]
+         (let$ [x] = ["x"] in
+          [any_source x] ==> multiple_allocation_points x);
+         (let$ [x; y; z] = ["x"; "y"; "z"] in
+          [ sources x y;
+            has_source y;
+            sources x z;
+            has_source z;
+            distinct Cols.n y z ]
+          ==> multiple_allocation_points x);
+         (* [allocation_point_dominator x y] is the same as
+            [dominated_by_allocation_point y x], which is that [y] is the
+            allocation point dominator of [x]. *)
+         (let$ [x; y] = ["x"; "y"] in
+          [sources x y; has_source y; ~~(multiple_allocation_points x)]
+          ==> and_
+                [ allocation_point_dominator x y;
+                  dominated_by_allocation_point y x ]) ])
 
 let has_source_query db x = has_source_query [x] db
 
@@ -1016,13 +1045,14 @@ let perform_analysis ?stats db ~analysis_scope =
   current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "analysis" (fun () ->
-        Datalog.Schedule.run ?stats datalog_schedule db)
+        Datalog.Schedule.run ?stats (Lazy.force datalog_schedule) db)
   in
   let db =
     Profile.record_call ~accumulate:true "compute_field_usages" (fun () ->
         List.fold_left
           (fun db rule -> Datalog.Schedule.run ?stats rule db)
-          db post_processing_rules)
+          db
+          (Lazy.force post_processing_rules))
   in
   db
 
