@@ -128,7 +128,8 @@ type region_close =
     function and all of its arguments were at mode [unyielding], so the
     call can never perform a free effect. Only meaningful for js_of_ocaml:
     bytecode records it in debug events, and Flambda 2 carries it through
-    to JSIR (see [Apply_expr.Yielding]), whereas the native backend ignores it. *)
+    to JSIR (see [Apply_expr.Yielding]), whereas the native backend ignores
+    it. *)
 type yielding_kind =
   | May_yield
   | Unyielding
