@@ -27,10 +27,12 @@
  ******************************************************************************)
 
 (** Translation of external (C) calls to Cmm, including passing and returning
-    unboxed products as C structs.
+    unboxed products as C structs (see [Extcall_abi] for the calling
+    conventions).
 
-    Unboxed products that the C ABI would pass in memory cannot currently be
-    compiled; [translate_external_call] reports a located error for them. *)
+    Unboxed products that the C ABI would pass by reference or return in memory
+    cannot currently be compiled; [translate_external_call] reports a located
+    error for them. *)
 
 val translate_external_call :
   To_cmm_env.t ->

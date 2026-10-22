@@ -25,6 +25,7 @@ sum_i64_pair_noalloc: 17
 seven_ints_f64_pair: 770.0000
 stack_single_value: 786
 all_void_arg: 4242
+void_arg: 2424
 void_between_args: 8421
 void_inside_f32: 1.0000
 void_nested: 139700

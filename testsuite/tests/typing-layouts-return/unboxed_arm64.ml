@@ -19,7 +19,7 @@
    compiler.
 
    Restricted to arm64, since on x86-64 these C structs exceed 16 bytes and so
-   are passed in memory, which is unsupported. *)
+   are returned in memory, which is unsupported. *)
 
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
@@ -30,6 +30,7 @@ external make_f32x4 : float# -> float# -> float# -> float# -> float32x4#
 external f32x4_lane : float32x4# -> int -> float# = "" "f32x4_lane_native"
 external f64x2_lane : float64x2# -> int -> float# = "" "f64x2_lane_native"
 external i64x2_lane : int64x2# -> int -> int64_u = "" "i64x2_lane_native"
+external make_i64x2 : int64_u -> int64_u -> int64x2# = "" "make_i64x2_native"
 
 let print_f32x4 name v =
   Printf.eprintf "%s: %.4f %.4f %.4f %.4f\n%!" name
@@ -184,3 +185,33 @@ let () =
   let c = make_f32x4 #100.0 #200.0 #300.0 #400.0 in
   let d = make_f32x4 #1000.0 #2000.0 #3000.0 #4000.0 in
   print_f32x4 "sum_f32x4_quad" (sum_f32x4_quad #(a, b, c, d))
+
+(* A homogeneous aggregate of two vectors with only one floating-point register
+   left: on the stack by value (32 bytes, 16-aligned), and by AAPCS64 rule C.3
+   the double after it goes on the stack too. *)
+external f64x7_i64x2_pair_f64 :
+  float# -> float# -> float# -> float# -> float# -> float# -> float#
+  -> #(int64x2# * int64x2#) -> float# -> float#
+  = "" "f64x7_i64x2_pair_f64_native"
+
+let () =
+  let a = make_i64x2 #8L #9L in
+  let b = make_i64x2 #10L #11L in
+  Printf.eprintf "f64x7_i64x2_pair_f64: %.4f\n%!"
+    (box_float
+       (f64x7_i64x2_pair_f64 #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #(a, b) #12.0))
+
+(* No floating-point register left: the aggregate and the double after it go
+   on the stack. *)
+external f64x8_f32x4_pair_f64 :
+  float# -> float# -> float# -> float# -> float# -> float# -> float# -> float#
+  -> #(float32x4# * float32x4#) -> float# -> float#
+  = "" "f64x8_f32x4_pair_f64_native"
+
+let () =
+  let a = make_f32x4 #1.0 #2.0 #3.0 #4.0 in
+  let b = make_f32x4 #5.0 #6.0 #7.0 #8.0 in
+  Printf.eprintf "f64x8_f32x4_pair_f64: %.4f\n%!"
+    (box_float
+       (f64x8_f32x4_pair_f64 #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #8.0 #(a, b)
+          #9.0))

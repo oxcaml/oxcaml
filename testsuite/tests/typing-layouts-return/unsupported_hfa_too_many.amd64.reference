@@ -1,6 +1,0 @@
-File "unsupported_hfa_too_many.ml", line 27, characters 11-44:
-27 | let g () = f #(#1.0, #2.0, #3.0, #4.0, #5.0)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The unboxed product argument of the external call to unsupported_hfa_too_many_stub cannot be compiled:
-       the corresponding C struct (40 bytes) would be passed in memory, since it is larger than 16 bytes.
-       Only unboxed products that C passes entirely in registers are currently supported.

@@ -1,6 +1,0 @@
-File "unsupported_too_few_int_regs.ml", line 20, characters 11-57:
-20 | let g () = f #1L #2L #3L #4L #5L #6L #7L #8L #(#9L, #10L)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The unboxed product argument of the external call to unsupported_too_few_int_regs_stub cannot be compiled:
-       the corresponding C struct (16 bytes) would be passed in memory, since too few argument registers remain for it.
-       Only unboxed products that C passes entirely in registers are currently supported.

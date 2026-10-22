@@ -131,3 +131,40 @@ float32x4_t sum_f32x4_quad_native(f32x4_quad_struct p) {
   return vaddq_f32(p.a, vmulq_f32(two, vaddq_f32(p.b, vmulq_f32(two,
            vaddq_f32(p.c, vmulq_f32(two, p.d))))));
 }
+
+/* Homogeneous aggregates of vectors passed on the stack. */
+
+int64x2_t make_i64x2_native(int64_t a, int64_t b) {
+  int64_t elts[2] = { a, b };
+  return vld1q_s64(elts);
+}
+
+typedef struct { int64x2_t a; int64x2_t b; } i64x2_pair_struct;
+
+static double i64x2_lanes(int64x2_t v) {
+  int64_t elts[2];
+  vst1q_s64(elts, v);
+  return (double) (elts[0] + 2 * elts[1]);
+}
+
+static double f32x4_lanes(float32x4_t v) {
+  float elts[4];
+  vst1q_f32(elts, v);
+  return (double) elts[0] + 2 * (double) elts[1] + 4 * (double) elts[2]
+    + 8 * (double) elts[3];
+}
+
+double f64x7_i64x2_pair_f64_native(double a0, double a1, double a2, double a3,
+                                   double a4, double a5, double a6,
+                                   i64x2_pair_struct p, double y) {
+  return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * a4 + 32 * a5 + 64 * a6
+    + 128 * i64x2_lanes(p.a) + 512 * i64x2_lanes(p.b) + 2048 * y;
+}
+
+double f64x8_f32x4_pair_f64_native(double a0, double a1, double a2, double a3,
+                                   double a4, double a5, double a6, double a7,
+                                   f32x4_pair_struct p, double y) {
+  return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * a4 + 32 * a5 + 64 * a6
+    + 128 * a7 + 256 * f32x4_lanes(p.a) + 4096 * f32x4_lanes(p.b)
+    + 65536 * y;
+}

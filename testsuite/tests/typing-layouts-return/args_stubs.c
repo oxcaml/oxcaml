@@ -408,6 +408,17 @@ value all_void_arg_bytecode(value p) {
   CAMLreturn(caml_copy_int64(4242));
 }
 
+/* A plain void argument likewise corresponds to no C arguments. */
+
+int64_t void_arg_native(void) {
+  return 2424;
+}
+
+value void_arg_bytecode(value u) {
+  CAMLparam1(u);
+  CAMLreturn(caml_copy_int64(2424));
+}
+
 /* Void arguments and components. Void corresponds to nothing in the native
    stubs; in bytecode it is [Val_unit], and void components remain tuple
    fields. */

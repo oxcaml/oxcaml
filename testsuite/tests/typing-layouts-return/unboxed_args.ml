@@ -21,8 +21,9 @@
    The native stubs in args_stubs.c take C structs by value, checking
    interoperability with the C compiler.
 
-   No C struct here is passed in memory, except single-component products which
-   may spill to the stack (since they are passed like their member). *)
+   No C struct here is passed on the stack, except single-component products
+   which may spill to it (since they are passed like their member); see
+   unboxed_args_stack.ml and unboxed_args_memory.ml for those. *)
 
 open Stdlib_stable
 
@@ -298,6 +299,11 @@ external all_void_arg : #(unit# * unit#) -> int64_u
 
 let () =
   Printf.eprintf "all_void_arg: %Ld\n%!" (box_int64 (all_void_arg #(#(), #())))
+
+(* A plain void argument: no C arguments. *)
+external void_arg : unit# -> int64_u = "void_arg_bytecode" "void_arg_native"
+
+let () = Printf.eprintf "void_arg: %Ld\n%!" (box_int64 (void_arg #()))
 
 (* Void scalar arguments between other arguments correspond to no C
    arguments. *)
