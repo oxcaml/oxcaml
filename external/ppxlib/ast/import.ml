@@ -109,8 +109,8 @@ module Select_ast (Ocaml : Versions.OCaml_version) = struct
   module To_ocaml = Versions.Convert (Js) (Ocaml)
 
   let rec of_ocaml : type ocaml js. (js, ocaml) Type.t -> ocaml -> js =
-    let open Of_ocaml in
     fun node ->
+      let open Of_ocaml in
       match node with
       (*$ foreach_type (fun _ s ->
             printf
@@ -145,8 +145,8 @@ module Select_ast (Ocaml : Versions.OCaml_version) = struct
           fun (x, y) -> (f x, g y)
 
   let rec to_ocaml : type ocaml js. (js, ocaml) Type.t -> js -> ocaml =
-    let open To_ocaml in
     fun node ->
+      let open To_ocaml in
       match node with
       (*$ foreach_type (fun _ s ->
             printf

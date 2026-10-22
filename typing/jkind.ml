@@ -300,23 +300,22 @@ module Layout = struct
           sa
   end
 
-  let rec get : Sort.t t -> Sort.Flat.t t =
-    let rec flatten_sort (s : Sort.t) sa : Sort.Flat.t t =
-      match s with
-      | Var v ->
-        (* [v.contents] guaranteed to be [None] *)
-        if Sort.is_genvar v
-        then Sort (Genvar v, sa)
-        else Sort (Var (Sort.Var.get_id v), sa)
-      | Base b ->
-        Sort (Base b, sa)
-        (* No need to call [Sort.get] here, because one [get] is deep. *)
-      | Product sorts ->
-        Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
-      | Univar x -> Sort (Univar x, sa)
-      | Addressable s -> Addressable (flatten_sort s sa)
-    in
-    function
+  let rec flatten_sort (s : Sort.t) sa : Sort.Flat.t t =
+    match s with
+    | Var v ->
+      (* [v.contents] guaranteed to be [None] *)
+      if Sort.is_genvar v
+      then Sort (Genvar v, sa)
+      else Sort (Var (Sort.Var.get_id v), sa)
+    | Base b ->
+      Sort (Base b, sa)
+      (* No need to call [Sort.get] here, because one [get] is deep. *)
+    | Product sorts ->
+      Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
+    | Univar x -> Sort (Univar x, sa)
+    | Addressable s -> Addressable (flatten_sort s sa)
+
+  let rec get : Sort.t t -> Sort.Flat.t t = function
     | Any sa -> Any sa
     | Sort (s, sa) -> flatten_sort (Sort.get s) sa
     | Product ts -> Product (List.map get ts)

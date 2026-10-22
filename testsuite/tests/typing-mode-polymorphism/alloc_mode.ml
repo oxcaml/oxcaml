@@ -235,67 +235,6 @@ val app_yielding :
   'a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
-(* The value-rec wrapper forwards at the closure's yielding mode, polymorphic
-  here: must be [apply[yielding]] (plain in typing-modes/yielding_lambda.ml).
-  The direct call [forward (x - 1)] is unyielding: can be plain [apply]. *)
-let rec forward =
-  let g = fun x -> if x <= 0 then 0 else forward (x - 1) in
-  g
-[%%expect{|
-(let (letrec_function_context/0 =? (caml_alloc_dummy 1))
-  (letrec
-    (forward/0
-       (function {nlocal = 1} x/10[L][value<int>] stub : int
-         (apply[yielding] (field_imm 0 letrec_function_context/0) x/10)))
-    (seq
-      (caml_update_dummy letrec_function_context/0
-        (let
-          (g/0 =
-             (function {nlocal = 1} x/11[L][value<int>] : int
-               (if (%int_lessequal x/11 0) 0
-                 (apply forward/0 (%int_sub x/11 1)))))
-          (makeblock 0 g/0)))
-      (apply (field_imm 1 (global Toploop!)) "forward" forward/0))))
-val forward :
-  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
-|}]
-
-(* Same wrapper, but closing over the yielding [y]: all calls must be
-  [apply[yielding]]. *)
-let forward_yielding (y @ yielding) =
-  let rec f =
-    let g = fun x -> use_yield y; if x <= 0 then 0 else f (x - 1) in
-    g
-  in
-  f
-[%%expect{|
-(let
-  (use_yield/0 =? (apply (field_imm 0 (global Toploop!)) "use_yield")
-   forward_yielding/0 =
-     (function {nlocal = 0} y/3?
-       (let (letrec_function_context/1 =? (caml_alloc_dummy 1))
-         (letrec
-           (f/2
-              (function {nlocal = 1} x/12[L][value<int>] stub : int
-                (apply[yielding] (field_imm 0 letrec_function_context/1)
-                  x/12)))
-           (seq
-             (caml_update_dummy letrec_function_context/1
-               (let
-                 (g/1 =
-                    (function {nlocal = 1} x/13[L][value<int>] : int
-                      (seq (apply[yielding] use_yield/0 y/3)
-                        (if (%int_lessequal x/13 0) 0
-                          (apply[yielding] f/2 (%int_sub x/13 1))))))
-                 (makeblock 0 g/1)))
-             f/2)))))
-  (apply (field_imm 1 (global Toploop!)) "forward_yielding"
-    forward_yielding/0))
-val forward_yielding :
-  'a @ [< global many > yielding] ->
-  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
-|}]
-
 (* A first-class primitive's synthesized application ([Id_prim]) uses its
   declared parameter modes, unyielding by default: can be plain [apply]. *)
 external revapply : 'a -> ('a -> 'b) -> 'b = "%revapply"

@@ -40,15 +40,10 @@ and (module A : S) =
 in
 ();;
 [%%expect{|
-Lines 2-6, characters 2-22:
-2 | ..let (module K : S with type t = A.t) = k in
-3 |   (module struct
-4 |     type t = K.t
-5 |   end : S
-6 |     with type t = K.t)
-Error: This expression has type "(module S with type t = A.t)"
-       but an expression was expected of type "'a"
-       The type constructor "A.t" would escape its scope
+Line 7, characters 12-13:
+7 | and (module A : S) =
+                ^
+Error: Only variables are allowed as left-hand side of "let rec"
 |}];;
 
 (* The locally abstract type lets us check the module's type
@@ -62,7 +57,10 @@ let f (type a) () =
   ()
 ;;
 [%%expect{|
-val f : unit -> unit = <fun>
+Line 2, characters 18-19:
+2 |   let rec (module M : S with type t = a) =
+                      ^
+Error: Only variables are allowed as left-hand side of "let rec"
 |}];;
 
 let f (type a) () =
@@ -73,7 +71,10 @@ let f (type a) () =
   in
   ();;
 [%%expect{|
-val f : unit -> unit = <fun>
+Line 2, characters 18-19:
+2 |   let rec (module M : S with type t = a) =
+                      ^
+Error: Only variables are allowed as left-hand side of "let rec"
 |}];;
 
 (* Reject scope escape via unification *)

@@ -8,7 +8,8 @@ let[@inline always] alloc size =
 type t = { func : unit -> int; foo : int }
 
 let[@inline never] mkrec () =
-  let rec t = { func = (fun () -> t.foo); foo = alloc 50 } in
-  t
+  let rec func () = foo
+  and foo = alloc 50 in
+  { func; foo }
 
 let () = Printf.printf "%d\n" ((mkrec ()).func ())

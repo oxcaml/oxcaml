@@ -1237,9 +1237,8 @@ let send_string ob s =
   Buffer.add_string ob s; Buffer.add_char ob '\n';;
 let send_int ob i = send_string ob (Int.to_string i);;
 
-let rec reader =
-  let count = ref 0 in
-  (fun ib ob ->
+let count = ref 0;;
+let rec reader ib ob =
     if Scanf.Scanning.beginning_of_input ib then begin
       count := 0; send_string ob "start"; writer ib ob end else
     Scanf.bscanf ib "%[^\n]\n" (function
@@ -1252,7 +1251,7 @@ let rec reader =
         send_int ob !count
         end else
       send_int ob l;
-      writer ib ob))
+      writer ib ob)
 
 and writer ib ob =
   Scanf.bscanf ib "%s\n" (function

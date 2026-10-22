@@ -327,15 +327,26 @@ module Make_run (R : Reducer) = struct
        so the reducer's own [Cursor.emit_op] calls route back through it (see
        [Context.Cursor.emit_op]). [ctx] and [reducer] are mutually recursive —
        the reducer is built from [ctx], but [ctx]'s stored hook calls into the
-       reducer — so we tie the knot with a [lazy] reducer. *)
-    let rec emit_op c ~op ~dbg ~typ ~args =
-      match R.emit_op (Lazy.force reducer) ~op ~dbg ~typ ~args with
+       reducer — so we tie the knot through a reference that is filled in as
+       soon as the reducer exists. *)
+    let reducer_ref = ref None in
+    let emit_op c ~op ~dbg ~typ ~args =
+      let reducer =
+        match !reducer_ref with
+        | Some reducer -> reducer
+        | None ->
+          Misc.fatal_error
+            "Ssa_reducer: emit_op called while creating the reducer"
+      in
+      match R.emit_op reducer ~op ~dbg ~typ ~args with
       | Unchanged -> Ssa.Cursor.emit_op out_graph c op dbg typ args
       | Reduce f -> f c
-    and ctx : Context.t =
+    in
+    let ctx : Context.t =
       { in_graph; out_graph; block_map; op_map; block_param_values; emit_op }
-    and reducer : R.t Lazy.t = lazy (R.create ctx) in
-    let reducer = Lazy.force reducer in
+    in
+    let reducer = R.create ctx in
+    reducer_ref := Some reducer;
     (* Finish a block: run its terminator through the reducer's [finish_block]
        hook, and when the reducer returns a replacement, re-reduce that (it must
        shrink each round to terminate) before finishing. Unlike [emit_op] this

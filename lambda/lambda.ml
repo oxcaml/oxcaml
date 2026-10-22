@@ -1739,7 +1739,6 @@ let layout_predef_value = nullable_value Pgenval
 let layout_lazy = nullable_value Pgenval
 let layout_lazy_contents = nullable_value Pgenval
 let layout_any_value = nullable_value Pgenval
-let layout_letrec = layout_any_value
 let layout_instance_var = nullable_value Pgenval
 let layout_method = nullable_value Pgenval
 let layout_initializer = nullable_value Pgenval

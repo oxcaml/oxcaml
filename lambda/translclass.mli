@@ -17,10 +17,20 @@ open Typedtree
 open Lambda
 open Debuginfo.Scoped_location
 
+(** Whether a class definition refers to a class of its recursive group. *)
+type class_kind =
+  | Recursive_class
+  | Non_recursive_class
+
 val transl_class :
   scopes:scopes -> Ident.t list -> Ident.t ->
   string list -> class_expr -> Asttypes.virtual_flag ->
-  lambda * Value_rec_types.recursive_binding_kind
+  lambda * class_kind
+
+(** Compile a recursive group of class definitions, as returned by
+    [transl_class], in front of a body. *)
+val compile_class_bindings :
+  (Ident.t * debug_uid * class_kind * lambda) list -> lambda -> lambda
 
 type error = Tags of string * string
 

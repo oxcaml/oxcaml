@@ -421,8 +421,8 @@ module Describe = struct
     pat
 
   let recursive_patterns fcons =
-    let rec pat = lazy (patterns @@ fcons (CLazy pat)) in
-    Lazy.force pat
+    let rec pat () = patterns @@ fcons (CLazy (lazy (pat ()))) in
+    pat ()
 
   let nullary : type p. string -> params:p param_cons -> p cons0 -> p conv =
    fun id ~params cons ->

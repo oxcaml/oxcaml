@@ -34,16 +34,14 @@ type 'a t = { f : 'b. 'b t }
 type 'a t = { f : 'b. 'b t; }
 |}]
 
-let rec v : 'a. 'a t = { f = v }
-let () = require_immutable_data v
+let f (v : 'a t) = require_immutable_data v
 (* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
-val v : 'a t = {f = <cycle>}
+val f : 'a t -> unit = <fun>
 |}, Principal{|
-val v : 'a t = {f = <cycle>}
-Line 2, characters 32-33:
-2 | let () = require_immutable_data v
-                                    ^
+Line 1, characters 42-43:
+1 | let f (v : 'a t) = require_immutable_data v
+                                              ^
 Error: The value "v" has type "'a t" but an expression was expected of type
          "('b : immutable_data)"
        The kind of 'a t is immutable_data with 'b. 'b t

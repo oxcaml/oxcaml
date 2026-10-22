@@ -57,5 +57,5 @@
   }
 
   $ $MERLIN single errors \
-  > -filename ./main.ml < ./main.ml | jq '.value[].message'
-  "This kind of expression is not allowed as right-hand side of let rec"
+  > -filename ./main.ml < ./main.ml | revert-newlines | jq '.value[].message'
+  "This kind of expression is not allowed as right-hand side of let rec.\nIt refers to x, but the names bound by a let rec may only be used\nby the functions and lazy values it binds or, through constructors,\nin the mutable fields of the records and references it binds."

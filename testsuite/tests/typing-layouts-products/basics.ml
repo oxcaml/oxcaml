@@ -1501,12 +1501,12 @@ Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]"/"[@@unsafe_unextende
 (* Test 10: not allowed in let recs *)
 
 (* An example that is allowed on tuples but not unboxed products *)
-let[@warning "-26"] e1 = let rec x = (1, y) and y = 42 in ()
-let[@warning "-26"] e2 = let rec x = #(1, y) and y = 42 in ()
+let[@warning "-26"] e1 = let rec x = (1, 2) and f () = x in ()
+let[@warning "-26"] e2 = let rec x = #(1, 2) and f () = x in ()
 [%%expect{|
 val e1 : unit = ()
 Line 2, characters 37-44:
-2 | let[@warning "-26"] e2 = let rec x = #(1, y) and y = 42 in ()
+2 | let[@warning "-26"] e2 = let rec x = #(1, 2) and f () = x in ()
                                          ^^^^^^^
 Error: This expression has type "#('a * 'b)"
        but an expression was expected of type "('c : value_or_null)"
@@ -1517,15 +1517,15 @@ Error: This expression has type "#('a * 'b)"
          because it's the type of the recursive variable x.
 |}]
 
-let[@warning "-26"] e1 = let rec x = (1, y) and y = 42 in ()
+let[@warning "-26"] e1 = let rec x = (1, 2) and f () = x in ()
 
 type letrec_record = #{ i1 : int; i2 : int }
-let[@warning "-26"] e2 = let rec x = #{ i1 = 1; i2 = y } and y = 42 in ()
+let[@warning "-26"] e2 = let rec x = #{ i1 = 1; i2 = 2 } and f () = x in ()
 [%%expect{|
 val e1 : unit = ()
 type letrec_record = #{ i1 : int; i2 : int; }
 Line 4, characters 37-56:
-4 | let[@warning "-26"] e2 = let rec x = #{ i1 = 1; i2 = y } and y = 42 in ()
+4 | let[@warning "-26"] e2 = let rec x = #{ i1 = 1; i2 = 2 } and f () = x in ()
                                          ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "letrec_record"
        but an expression was expected of type "('a : value_or_null)"
@@ -1544,7 +1544,10 @@ type letrec_record = #{ i : int; }
 Line 2, characters 21-31:
 2 | let e2 = let rec x = #{ i = y } and y = 42 in ()
                          ^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+Error: This kind of expression is not allowed as right-hand side of "let rec".
+       It refers to "y", but the names bound by a "let rec" may only be used
+       by the functions and lazy values it binds or, through constructors,
+       in the mutable fields of the records and references it binds.
 |}]
 
 (* These examples motivate having a check in [type_let], because

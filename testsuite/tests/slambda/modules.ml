@@ -205,7 +205,7 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
                 (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] H H)
                 (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] I I)
                 (let
-                  (j =?
+                  (j =
                      (let
                        (j_tables =o (opaque (makemutable 0 0 0 0))
                         j_init =
@@ -241,7 +241,7 @@ Warning 191 [unused-kind-declaration]: unused kind "l".
             (seq (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] H H)
               (apply (field_imm 1 (global CamlinternalMod!)) [0: [0]] I I)
               (let
-                (j =?
+                (j =
                    (let
                      (j_tables =o (opaque (makemutable 0 0 0 0))
                       j_init =

@@ -16,10 +16,11 @@ let rec copy_toplevel_phrase :
 and copy_directive_argument :
     From.Parsetree.directive_argument -> To.Parsetree.directive_argument option
     =
+ fun arg ->
   let wrap pdira_desc =
     Some { To.Parsetree.pdira_desc; To.Parsetree.pdira_loc = Location.none }
   in
-  function
+  match arg with
   | From.Parsetree.Pdir_none -> None
   | From.Parsetree.Pdir_string x0 -> To.Parsetree.Pdir_string x0 |> wrap
   | From.Parsetree.Pdir_int (x0, x1) ->
