@@ -728,7 +728,7 @@ module Sort = struct
     { contents = None; level; id = !last_var_id }
 
   (** Like [Types.proto_newty3], this function should not be called directly.
-      Instead, use [Btype.new_var] which adds the variable to a level pool. *)
+      Use [Btype.new_sort_var], which adds the variable to a level pool. *)
   let proto_new_var ~level =
     assert (level >= 0 && level <= generic_level);
     proto_new_var_unsafe ~level
