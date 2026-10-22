@@ -180,6 +180,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
+      ~yielding:(Apply.yielding apply)
       ~relative_history:(Apply.relative_history apply)
   in
   let perform_over_application_free_names =
@@ -303,6 +304,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
+      ~yielding:(Apply.yielding apply)
       ~relative_history:(Apply.relative_history apply)
   in
   let both_applications =
