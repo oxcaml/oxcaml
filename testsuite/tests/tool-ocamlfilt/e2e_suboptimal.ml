@@ -1,5 +1,5 @@
 (* TEST
- native-compiler;
+ native-compiler; setup-ocamlfilt;
  setup-ocamlopt.byte-build-env;
  flags = "-name-mangling-scheme structured -c";
  ocamlopt_byte_exit_status = "0";

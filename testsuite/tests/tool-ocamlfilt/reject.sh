@@ -2,7 +2,7 @@
 # Test that ocamlfilt correctly rejects invalid symbols. Like c++filt /
 # rustfilt, ocamlfilt passes unrecognised input through unchanged on stdout
 # rather than failing, so "rejected" here means "output equals input".
-OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
+OCAMLFILT="${ocamlfilt}"
 
 check_reject () {
   format=$1

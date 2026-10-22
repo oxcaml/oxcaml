@@ -1,6 +1,6 @@
 #!/bin/sh
 # Test ocamlfilt demangling with the Flat0 scheme (OCaml <= 5.2)
-OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
+OCAMLFILT="${ocamlfilt}"
 
 ${OCAMLFILT} --format flat0 \
   "camlFoo" \
