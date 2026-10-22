@@ -3489,12 +3489,12 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-       let jkind_inter =
-         Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection env
-           ty's_jkind jkind
-       in
-       Result.map (set_var_jkind ty) jkind_inter
+        Jkind.intersection_or_error ~type_equal ~context
+          ~reason:Tyvar_refinement_intersection env
+          ty's_jkind jkind
+        |> Result.map (fun jkind ->
+          Jkind.update_level (get_level ty) jkind;
+          set_var_jkind ty jkind)
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)

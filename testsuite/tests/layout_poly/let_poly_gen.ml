@@ -428,17 +428,14 @@ module Fst' : sig val fst : 'a * 'b -> 'a end
 
 let f ((_, _) : _ * _) = ()
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+val f : 'a * 'b -> unit = <fun>
 |}]
 
 let g ((_, d) : _ * int) = d
 let h x = g x
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+val g : 'a * int -> int = <fun>
+val h : 'a * int -> int = <fun>
 |}]
 
 let f' (#(_, _) : #(_ * _)) = ()
@@ -484,7 +481,6 @@ module Test = struct
 end;;
 Test.f (fun _ -> ()) () 1 2
 [%%expect{|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+module Test : sig val f : ('o -> unit) -> 'a -> 'o -> 'b -> unit end
+- : unit = ()
 |}]
