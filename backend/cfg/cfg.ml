@@ -305,6 +305,31 @@ let iter_blocks_dfs : t -> f:(Label.t -> basic_block -> unit) -> unit =
     iter_blocks cfg ~f:(fun label block ->
         if not (Label.Set.mem label !marked) then f label block)
 
+let iter_blocks_postorder_from :
+    t ->
+    from:Label.t ->
+    visited:unit Label.Tbl.t ->
+    f:(basic_block -> unit) ->
+    unit =
+ fun t ~from ~visited ~f ->
+  let rec visit (label : Label.t) : unit =
+    if not (Label.Tbl.mem visited label)
+    then (
+      Label.Tbl.replace visited label ();
+      let block = get_block_exn t label in
+      Label.Set.iter visit (successor_labels ~normal:true ~exn:true block);
+      f block)
+  in
+  visit from
+
+let reverse_postorder : t -> basic_block list =
+ fun t ->
+  let visited = Label.Tbl.create (Label.Tbl.length t.blocks) in
+  let accu = ref [] in
+  iter_blocks_postorder_from t ~from:t.entry_label ~visited ~f:(fun block ->
+      accu := block :: !accu);
+  !accu
+
 let fold_blocks t ~f ~init = Label.Tbl.fold f t.blocks init
 
 let fold_body_instructions t ~f ~init =
