@@ -7,10 +7,6 @@ _ktest_mask16_u8
 _ktest_mask32_u8
 _ktest_mask64_u8
 _ktest_mask8_u8
-_load_mask16
-_load_mask32
-_load_mask64
-_load_mask8
 _mm256_broadcast_f32x4
 _mm256_broadcast_f64x2
 _mm256_broadcast_i32x4
@@ -111,11 +107,9 @@ _mm512_cosd_pd
 _mm512_cosd_ps
 _mm512_cosh_pd
 _mm512_cosh_ps
-_mm512_cvt_roundps_ph
 _mm512_cvtepi32lo_pd
 _mm512_cvtepu32lo_pd
 _mm512_cvtpd_pslo
-_mm512_cvtps_ph
 _mm512_cvtpslo_pd
 _mm512_cvtsd_f64
 _mm512_cvtss_f32
@@ -201,11 +195,9 @@ _mm512_mask_cosd_pd
 _mm512_mask_cosd_ps
 _mm512_mask_cosh_pd
 _mm512_mask_cosh_ps
-_mm512_mask_cvt_roundps_ph
 _mm512_mask_cvtepi32lo_pd
 _mm512_mask_cvtepu32lo_pd
 _mm512_mask_cvtpd_pslo
-_mm512_mask_cvtps_ph
 _mm512_mask_cvtpslo_pd
 _mm512_mask_div_epi32
 _mm512_mask_div_epu32
@@ -305,8 +297,6 @@ _mm512_maskz_broadcast_i32x4
 _mm512_maskz_broadcast_i32x8
 _mm512_maskz_broadcast_i64x2
 _mm512_maskz_broadcast_i64x4
-_mm512_maskz_cvt_roundps_ph
-_mm512_maskz_cvtps_ph
 _mm512_mullox_epi64
 _mm512_nearbyint_pd
 _mm512_nearbyint_ps
@@ -348,10 +338,6 @@ _mm512_rem_epu64
 _mm512_rem_epu8
 _mm512_rint_pd
 _mm512_rint_ps
-_mm512_set1_epi16
-_mm512_set1_epi8
-_mm512_set1_pd
-_mm512_set1_ps
 _mm512_set4_epi32
 _mm512_set4_epi64
 _mm512_set4_pd
@@ -383,7 +369,6 @@ _mm512_sind_pd
 _mm512_sind_ps
 _mm512_sinh_pd
 _mm512_sinh_ps
-_mm512_stream_si512
 _mm512_svml_round_pd
 _mm512_tan_pd
 _mm512_tan_ps
@@ -397,12 +382,6 @@ _mm512_undefined
 _mm512_undefined_epi32
 _mm512_undefined_pd
 _mm512_undefined_ps
-_mm512_zextpd128_pd512
-_mm512_zextpd256_pd512
-_mm512_zextps128_ps512
-_mm512_zextps256_ps512
-_mm512_zextsi128_si512
-_mm512_zextsi256_si512
 _mm_comi_round_sd
 _mm_comi_round_ss
 _mm_mask_reduce_add_epi16
@@ -421,10 +400,6 @@ _mm_mask_reduce_mul_epi16
 _mm_mask_reduce_mul_epi8
 _mm_mask_reduce_or_epi16
 _mm_mask_reduce_or_epi8
-_mm_mask_store_sd
-_mm_mask_store_ss
-_mm_maskz_load_sd
-_mm_maskz_load_ss
 _mm_reduce_add_epi16
 _mm_reduce_add_epi8
 _mm_reduce_and_epi16
@@ -441,7 +416,3 @@ _mm_reduce_mul_epi16
 _mm_reduce_mul_epi8
 _mm_reduce_or_epi16
 _mm_reduce_or_epi8
-_store_mask16
-_store_mask32
-_store_mask64
-_store_mask8

@@ -91,6 +91,17 @@ let check_i64 name (a : int64) (b : int64) =
 
 let check_int name (a : int) (b : int) = if a <> b then fail name
 
+let check_f32 name (a : float32) (b : float32) =
+  if
+    not
+      (Int32.equal (Stdlib_stable.Float32.to_bits a)
+         (Stdlib_stable.Float32.to_bits b))
+  then fail name
+
+let check_f64 name (a : float) (b : float) =
+  if not (Int64.equal (Int64.bits_of_float a) (Int64.bits_of_float b))
+  then fail name
+
 let check_buf name = if buf_eq 0 <> 1 then fail name
 
 let va =
@@ -116,6 +127,12 @@ let vb256 = int64x4_of_int64s 0x4000000040400000L 0x3fc00000c1200000L
 
 let vc256 = int64x4_of_int64s 0x41000000c1a00000L 0x4048f5c33f800000L
     0x0000000600000007L 0xaaaaaaaa55555555L
+
+let f32a = Stdlib_stable.Float32.of_float 1.5
+
+let f32b = Stdlib_stable.Float32.of_float (-2.25)
+
+let f32c = Stdlib_stable.Float32.of_float 3.0e10
 
 let va128 = int64x2_of_int64s 0x3f8000004048f5c3L 0xbff0000040a00000L
 

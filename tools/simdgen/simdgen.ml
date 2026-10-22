@@ -871,10 +871,23 @@ let expand_modifiers instr =
     match instr.flags.r with
     | Rnd_none -> [instr]
     | Rnd_er | Rnd_sae ->
-      if Array.exists (fun (arg : arg) -> loc_allows_mem arg.loc) instr.args
+      let allows_mem =
+        Array.exists (fun (arg : arg) -> loc_allows_mem arg.loc)
+      in
+      let res_allows_mem =
+        match instr.res with
+        | Res rr -> allows_mem rr
+        | Arg _ | Res_none -> false
+      in
+      if allows_mem instr.args || res_allows_mem
       then
+        let res =
+          match instr.res with
+          | Res rr -> Res (drop_mem rr)
+          | (Arg _ | Res_none) as res -> res
+        in
         [ { instr with flags = { instr.flags with r = Rnd_none } };
-          { instr with args = drop_mem instr.args } ]
+          { instr with args = drop_mem instr.args; res } ]
       else [instr]
   in
   let expand_mask instr =

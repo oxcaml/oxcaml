@@ -1226,8 +1226,8 @@ module Generated = struct
       rnd_bind ~rnd:Rnd_near b :: Option.to_list (Option.map bind cur)
     | With_sae { bind = b; cur; _ } ->
       sae_bind b :: Option.to_list (Option.map bind cur)
-    | Flag { instr; _ } | Gather { instr; _ } | Scatter { instr; _ } ->
-      [instr]
+    | With_sae_imm { bind = b; cur; _ } -> [sae_bind b; bind cur]
+    | Flag { instr; _ } | Gather { instr; _ } | Scatter { instr; _ } -> [instr]
 
   let select_enabled op (spec : Amd64_simd_instrs.id Intrin.t) args =
     match spec with
@@ -1241,8 +1241,7 @@ module Generated = struct
       | Some rnd, (Some _ | None) -> instr (rnd_bind ~rnd b) args
       | None, Some cur when control = round_current -> instr (bind cur) args
       | None, (Some _ | None) -> bad_immediate op)
-    | With_sae
-        { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
+    | With_sae { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
       let i, args = imm op args imm_spec in
       let sae, args = extract_constant args op ~max:255 in
       let args = operands op ~arity ops args in
@@ -1253,6 +1252,13 @@ module Generated = struct
         match cur with
         | Some cur when sae = round_current -> instr (bind cur) ?i args
         | Some _ | None -> bad_immediate op)
+    | With_sae_imm { arity; bind = b; cur; args = ops } ->
+      let i, args = extract_constant args op ~max:255 in
+      let args = operands op ~arity ops args in
+      (* The instruction ignores bit 3 of its immediate, _MM_FROUND_NO_EXC. *)
+      if i land 8 <> 0
+      then instr (sae_bind b) ~i:(i land lnot 8) args
+      else instr (bind cur) ~i args
     | Flag { flag; instr = simd } ->
       let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
       seq (Seq.kflag (kflag flag) simd) args

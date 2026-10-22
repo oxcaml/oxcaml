@@ -588,48 +588,56 @@ module Intrin = struct
     | Zero_vec256
     | Zero_vec512
 
-  type 'id t =
+  type ('instr, 'bind, 'rnd_bind, 'sae_bind) spec =
     | Default of
         { arity : int;
           imm : imm;
-          bind : 'id bind;
+          bind : 'bind;
           args : operand array
         }
     | With_round of
         { arity : int;
-          bind : 'id rnd_bind;
-          cur : 'id bind option;
+          bind : 'rnd_bind;
+          cur : 'bind option;
           args : operand array
         }
     | With_sae of
         { arity : int;
           imm : imm;
-          bind : 'id sae_bind;
-          cur : 'id bind option;
+          bind : 'sae_bind;
+          cur : 'bind option;
+          args : operand array
+        }
+    | With_sae_imm of
+        { arity : int;
+          bind : 'sae_bind;
+          cur : 'bind;
           args : operand array
         }
     | Flag of
         { flag : flag;
-          instr : 'id instr
+          instr : 'instr
         }
     | Load of
         { arity : int;
-          bind : 'id bind;
+          bind : 'bind;
           args : operand array
         }
     | Store of
         { arity : int;
-          bind : 'id bind;
+          bind : 'bind;
           args : operand array
         }
     | Gather of
         { arity : int;
-          instr : 'id instr;
+          instr : 'instr;
           args : operand array
         }
     | Scatter of
         { arity : int;
-          instr : 'id instr;
+          instr : 'instr;
           args : operand array
         }
+
+  type 'id t = ('id instr, 'id bind, 'id rnd_bind, 'id sae_bind) spec
 end
