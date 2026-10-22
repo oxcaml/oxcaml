@@ -52,3 +52,18 @@
   flambda2_to_jsir
   flambda2_ui
   flambda2_reaper))
+
+; The root dune file installs the interfaces of the flambda2 libraries, which
+; it has to list by hand: check that none of the libraries defined here is
+; missing.
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} main))
+ (deps
+  (:dune_files
+   (glob_files_rec dune))
+  (:install %{workspace_root}/ocaml.install))
+ (action
+  (bash
+   "for lib in $(awk '/^\\(library/ { l = 1 } l && match($0, /\\(name flambda2[a-z0-9_]*\\)/) { print substr($0, RSTART + 6, RLENGTH - 7); l = 0 }' %{dune_files}); do grep -q \"\\\"compiler-libs/$lib.cmi\\\"\" %{install} || { echo \"$lib is not installed: add its interfaces to the compiler-libs installation in the root dune file\" >&2; exit 1; }; done")))

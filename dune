@@ -929,7 +929,7 @@
  (targets ocamloptcomp_with_flambda2.cma)
  (action
   (run
-   %{dep:tools/merge_archives.exe}
+   %{dep:tools/merge_archives.bc.exe}
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cma}
    %{dep:backend/asm_targets/asm_targets.cma}
@@ -970,7 +970,7 @@
  (targets ocamloptcomp_with_flambda2.cmxa)
  (action
   (run
-   %{dep:tools/merge_archives.exe}
+   %{dep:tools/merge_archives.bc.exe}
    %{targets}
    %{dep:backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa}
    %{dep:backend/asm_targets/asm_targets.cmxa}
@@ -1071,67 +1071,140 @@
   (alias_rec extract_externals/check)
   (alias_rec ocamltest/check)))
 
+; The interfaces of the compiler libraries (some of which
+; tools/gen_compiler_libs_installation.ml renames or leaves out) and their
+; compiled files. The interfaces are copies of the sources, which exist from
+; the start: Dune only knows what any package of the build installs once it
+; has read every list such as this one, so a list computed from compiled files
+; would hold up all installation until the end of the build.
 (rule
  (targets compiler-libs-installation.sexp)
  (deps
-  ; Note that Dune doesn't allow globbing in the path part of the filename,
-  ; so this is a bit more repetitive than it could be. Also, as far as I can
-  ; tell, (glob_files_rec) simply doesn't work.
   (glob_files *.mli)
-  (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlbytecomp.objs/native/*.cmx)
-  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlfrontend.objs/native/*.cmx)
-  (glob_files .ocamlcommon.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamlcommon.objs/native/*.cmx)
-  (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files .ocamloptcomp.objs/native/*.cmx)
-  (glob_files
-   backend/asm_targets/.asm_targets.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files_rec backend/asm_targets/.asm_targets.objs/native/*.cmx)
-  (glob_files
-   backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files
-   backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx)
-  (glob_files
-   backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files backend/arm64/ast/.arm64_ast.objs/native/*.cmx)
-  (glob_files
-   backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files
-   backend/arm64/binary_emitter/.arm64_binary_emitter.objs/native/*.cmx)
-  (glob_files middle_end/flambda2/.flambda2objs/byte/flambda2.{cmi,cmt})
-  (glob_files
-   middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2_to_cmm{,__To_cmm}.{cmi,cmt})
-  (glob_files
-   .oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti})
-  (glob_files .oxcaml_common.objs/native/oxcaml_{args,flags}.cmx)
-  backend/debug/dwarf/dwarf_flags/dwarf_flags.mli
-  (glob_files
-   backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/byte/dwarf_flags.{cmi,cmo,cmt,cmti})
-  backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/native/dwarf_flags.cmx
-  (glob_files
-   backend/debug/dwarf/dwarf_low/.dwarf_low.objs/byte/*.{cmi,cmo,cmt})
-  (glob_files backend/debug/dwarf/dwarf_low/.dwarf_low.objs/native/*.cmx)
-  (glob_files
-   backend/debug/dwarf/dwarf_high/.dwarf_high.objs/byte/*.{cmi,cmo,cmt})
-  (glob_files backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx)
-  (glob_files backend/debug/dwarf/dwarf_ocaml/.dwarf_ocaml.objs/native/*.cmx)
-  (glob_files external/owee/.compiler_owee.objs/byte/*.{cmi,cmo,cmt,cmti})
-  (glob_files external/owee/.compiler_owee.objs/native/*.cmx)
-  (glob_files
-   external/gc-timings/.gc_timings.objs/byte/gc_timings.{cmi,cmti})
-  external/gc-timings/.gc_timings.objs/native/gc_timings.cmx)
+  backend/debug/dwarf/dwarf_flags/dwarf_flags.mli)
  (action
   (with-stdout-to
    compiler-libs-installation.sexp
    (run tools/gen_compiler_libs_installation.exe %{deps}))))
 
+; Dune does not glob in directory names, hence the repetition.
 (install
  (section lib)
  (package ocaml)
  (files
-  (include compiler-libs-installation.sexp)))
+  (include compiler-libs-installation.sexp)
+  (glob_files
+   (.ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamlbytecomp.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamlfrontend.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.ocamlcommon.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamlcommon.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.ocamloptcomp.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/asm_targets/.asm_targets.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/asm_targets/.asm_targets.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/binary_emitter_intf/.binary_emitter_intf.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/ast/.arm64_ast.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/ast/.arm64_ast.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/binary_emitter/.arm64_binary_emitter.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/arm64/binary_emitter/.arm64_binary_emitter.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (.oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (.oxcaml_common.objs/native/oxcaml_{args,flags}.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/byte/dwarf_flags.{cmi,cmo,cmt,cmti} with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/native/dwarf_flags.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_low/.dwarf_low.objs/byte/*.{cmi,cmo,cmt} with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_low/.dwarf_low.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_high/.dwarf_high.objs/byte/*.{cmi,cmo,cmt} with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx with_prefix compiler-libs))
+  (glob_files
+   (backend/debug/dwarf/dwarf_ocaml/.dwarf_ocaml.objs/native/*.cmx with_prefix compiler-libs))
+  ; Only the interfaces of flambda2. Dune cannot glob across directories, so
+  ; every flambda2 sub-library has to be listed here by hand; a test in
+  ; middle_end/flambda2/dune fails if one is missing.
+  (glob_files
+   (middle_end/flambda2/.flambda2.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/algorithms/.flambda2_algorithms.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/bound_identifiers/.flambda2_bound_identifiers.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/classic_mode_types/.flambda2_classic_mode_types.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/cmx/.flambda2_cmx.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/compare/.flambda2_compare.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/datalog/.flambda2_datalog.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/from_lambda/.flambda2_from_lambda.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/identifiers/.flambda2_identifiers.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/import/.flambda2_import.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/kinds/.flambda2_kinds.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/lattices/.flambda2_lattices.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/nominal/.flambda2_nominal.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/numbers/.flambda2_numbers.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/numbers/floats/.flambda2_floats.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/parser/.flambda2_parser.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/reaper/.flambda2_reaper.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/simplify/.flambda2_simplify.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/simplify_shared/.flambda2_simplify_shared.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/term_basics/.flambda2_term_basics.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/terms/.flambda2_terms.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/to_jsir/.flambda2_to_jsir.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/types/.flambda2_types.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  (glob_files
+   (middle_end/flambda2/ui/.flambda2_ui.objs/byte/flambda2*.{cmi,cmsi,cms,cmti,cmt} with_prefix compiler-libs))
+  ; The vendored libraries go in the main library directory.
+  (glob_files
+   (external/owee/.compiler_owee.objs/byte/*.{cmi,cmo,cmt,cmti} with_prefix .))
+  (glob_files
+   (external/owee/.compiler_owee.objs/native/*.cmx with_prefix .))
+  (glob_files
+   (external/gc-timings/.gc_timings.objs/byte/gc_timings.{cmi,cmti} with_prefix .))
+  (glob_files
+   (external/gc-timings/.gc_timings.objs/native/gc_timings.cmx with_prefix .))))
 
 ; This is entirely redundant, but without it, each target in these libraries
 ; and their dependencies waits until ocamlfrontend is built, including those
