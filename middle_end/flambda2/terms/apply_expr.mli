@@ -45,6 +45,23 @@ module Position : sig
   val equal : t -> t -> bool
 end
 
+(** Whether the application might perform a free effect (one handled in the
+    parent stack). [Unyielding] means the type checker established that the
+    applied function and all of its arguments are at mode [unyielding], so the
+    call can never perform such an effect. This is only used by the JSIR backend
+    (see [Jsir.yielding_kind]); [May_yield] is always sound. *)
+module Yielding : sig
+  type t =
+    | May_yield
+    | Unyielding
+
+  val from_lambda : Lambda.yielding_kind -> t
+
+  val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
 (** Create an application expression. *)
 val create :
   callee:Simple.t option ->
@@ -60,6 +77,7 @@ val create :
   inlining_state:Inlining_state.t ->
   probe:Probe.t ->
   position:Position.t ->
+  yielding:Yielding.t ->
   relative_history:Inlining_history.Relative.t ->
   t
 
@@ -103,6 +121,9 @@ val inlined : t -> Inlined_attribute.t
 
 (** Whether the call was marked [@nontail] *)
 val position : t -> Position.t
+
+(** Whether the call might perform a free effect. *)
+val yielding : t -> Yielding.t
 
 val erase_callee : t -> t
 

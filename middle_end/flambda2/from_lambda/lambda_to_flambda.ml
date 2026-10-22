@@ -505,7 +505,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_result_layout;
         ap_region_close;
         ap_mode;
-        ap_yielding = _;
+        ap_yielding;
         ap_loc;
         ap_tailcall = _;
         ap_inlined;
@@ -517,7 +517,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     maybe_insert_let_cont "apply_result" ap_result_layout k acc env ccenv
       (fun acc env ccenv k ->
         cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
-          ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
+          ap_yielding ap_loc ap_inlined ap_probe ap_result_layout k k_exn)
   | Lfunction func ->
     let id = Ident.create_local (name_for_function func) in
     let id_duid = Flambda_debug_uid.none in
@@ -875,7 +875,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         let body acc ccenv = cps_tail acc body_env ccenv body k k_exn in
         CC.close_let_cont acc ccenv ~name:continuation ~is_exn_handler:false
           ~params ~recursive ~body ~handler)
-  | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout, _yielding) ->
+  | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout, yielding) ->
     cps_non_tail_simple acc env ccenv obj
       (fun acc env ccenv obj _obj_arity ->
         let obj = must_be_singleton_simple obj in
@@ -901,6 +901,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         args = List.flatten args;
                         loc;
                         region_close = pos;
+                        yielding;
                         inlined = Default_inlined;
                         probe = None;
                         mode;
@@ -1242,9 +1243,9 @@ and cps_non_tail_var :
           k acc env ccenv var arity))
     k_exn
 
-and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
-    ap_inlined ap_probe ap_return (k : Continuation.t) (k_exn : Continuation.t)
-    : Expr_with_acc.t =
+and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode
+    ap_yielding ap_loc ap_inlined ap_probe ap_return (k : Continuation.t)
+    (k_exn : Continuation.t) : Expr_with_acc.t =
   cps_non_tail_list acc env ccenv ap_args
     (fun acc env ccenv args args_arity ->
       cps_non_tail_var "func" acc env ccenv ap_func
@@ -1264,6 +1265,7 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               args = List.flatten args;
               loc = ap_loc;
               region_close = ap_region_close;
+              yielding = ap_yielding;
               inlined = ap_inlined;
               probe = ap_probe;
               mode = ap_mode;

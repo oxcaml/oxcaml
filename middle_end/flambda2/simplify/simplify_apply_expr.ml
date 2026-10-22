@@ -676,13 +676,16 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             @ Bound_parameters.simples remaining_params
           in
           let inlined = Inlined_attribute.forward_inlined () in
+          (* The full application also receives the remaining parameters, which
+             may be yielding even if the partial application itself cannot
+             yield. *)
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
               ~return_arity:result_arity ~call_kind ~return_mode:my_alloc_mode
               dbg ~inlined
               ~inlining_state:(Apply.inlining_state apply)
-              ~position:Normal ~probe:None
+              ~position:Normal ~probe:None ~yielding:May_yield
               ~relative_history:Inlining_history.Relative.empty
           in
           let cost_metrics =
@@ -1326,7 +1329,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
-        ~position:(Apply.position apply)
+        ~position:(Apply.position apply) ~yielding:(Apply.yielding apply)
         ~relative_history:
           (Inlining_history.Relative.concat
              ~earlier:(DE.relative_history (DA.denv dacc))
