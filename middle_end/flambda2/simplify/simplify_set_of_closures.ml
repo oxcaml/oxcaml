@@ -536,20 +536,17 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       assert (Are_rebuilding_terms.do_rebuild_terms are_rebuilding);
       Rebuilding new_code
   in
-  let is_newer_version =
-    let code_age_relation = DA.code_age_relation outer_dacc in
-    match
-      Code_age_relation.get_older_version_of code_age_relation old_code_id
-    with
-    | None -> false
-    | Some _older_version -> true
+  let old_code_was_simplified =
+    (* Simplifying records some crucial information so we can't really use an
+       unsimplified version *)
+    not (Code_id.Set.mem old_code_id (DA.code_ids_never_simplified outer_dacc))
   in
   let zero_improvements =
     let removed_ops = Cost_metrics.removed cost_metrics in
     Removed_operations.(equal zero removed_ops)
   in
   if
-    is_newer_version && (not should_resimplify)
+    old_code_was_simplified && (not should_resimplify)
     && C.single_set_of_size_one context
     && zero_improvements
   then
