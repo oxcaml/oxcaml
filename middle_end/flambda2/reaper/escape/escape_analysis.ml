@@ -92,16 +92,16 @@ let cannot_change_calling_convention =
 let to_unbox = Unboxing_analysis.to_unbox
 
 (* [candidate_source x a]: the value of [x] may be the value allocated at [a],
-   where [a] is a candidate ([is_candidate]). This is the restriction to
-   candidates of the [sources] relation of the points-to analysis, except that
-   it is not cut off at nodes with [any_source]. The points-to analysis does not
-   record the sources of such nodes, nor propagate them any further, since it
-   cannot change their representation anyway; but a value joined with unknown
-   values (for instance in a parameter of a function that is also called with
-   the result of an exported function) may still never leave the scope of its
-   allocation. Reusing [sources], and treating as escaping any value reaching a
-   node with [any_source], was measured to lose about 40% of the stack
-   allocations in the stdlib.
+   where [a] is a candidate not already known to escape (see [candidate_rules]).
+   This is the restriction to such candidates of the [sources] relation of the
+   points-to analysis, except that it is not cut off at nodes with [any_source].
+   The points-to analysis does not record the sources of such nodes, nor
+   propagate them any further, since it cannot change their representation
+   anyway; but a value joined with unknown values (for instance in a parameter
+   of a function that is also called with the result of an exported function)
+   may still never leave the scope of its allocation. Reusing [sources], and
+   treating as escaping any value reaching a node with [any_source], was
+   measured to lose about 40% of the stack allocations in the stdlib.
 
    The reached node comes first so that the rules below can be joined on it: the
    variable order of a rule (the order in which its variables are listed) is the
@@ -177,12 +177,29 @@ let candidate_rules =
        [partial_application_node ~node:q ~code_id:c]
        ==> partial_application_of_code c q);
       (let$ [a; s] = ["a"; "s"] in
-       [allocated_in ~alloc:a ~scope:s]
-       ==> and_ [is_candidate a; candidate_source a a]);
+       [allocated_in ~alloc:a ~scope:s] ==> is_candidate a);
+      (* [any_usage] is already propagated backwards along aliases by the
+         points-to analysis. Rule out these candidates before following their
+         flows, which can be quadratic even when all the allocations escape. *)
+      (let$ [a] = ["a"] in
+       [is_candidate a; any_usage a] ==> escapes_anywhere a);
+      (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
+       [ is_candidate a;
+         constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
+         partial_application_of_code c q;
+         any_usage q ]
+       ==> escapes_anywhere a);
+      (* Keep [is_candidate] for escaping allocations: values stored in them
+         must still escape via [contained_in]. Only prune the flow seeds, before
+         [flow_rules] extends [escapes_anywhere] with further reasons. *)
+      (let$ [a] = ["a"] in
+       [is_candidate a; ~~(escapes_anywhere a)] ==> candidate_source a a);
       (* A partial application of a candidate closure, through an unknown-arity
          call, yields a closure pointing at it. *)
       (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
        [ is_candidate a;
+         ~~(escapes_anywhere a);
          constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
          constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
          partial_application_of_code c q ]
@@ -209,18 +226,6 @@ let flow_rules =
              when1 Field.is_real_field relation;
              is_candidate base ]
            ==> contained_in a base);
-          (* Reached by unknown code. [any_usage] is propagated backwards along
-             aliases by the points-to analysis, so it is enough to test the
-             allocation itself, and the partial applications of a closure. *)
-          (let$ [a] = ["a"] in
-           [is_candidate a; any_usage a] ==> escapes_anywhere a);
-          (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
-           [ is_candidate a;
-             constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
-             constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
-             partial_application_of_code c q;
-             any_usage q ]
-           ==> escapes_anywhere a);
           (* Stored in a block that is not a candidate. *)
           (let$ [x; relation; base; a] = ["x"; "relation"; "base"; "a"] in
            [ candidate_source x a;
