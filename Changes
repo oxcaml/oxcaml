@@ -36,6 +36,10 @@ OCaml 5.4.1
   Now the runtime reports it as a fatal error instead.
   (Michael Bacarella, review by Gabriel Scherer)
 
+- #15043, #15076: runtime events library, fix an infinite loop when a user
+  event is larger than half the ring buffer.
+  (Tim McGilchrist, review by Sadiq Jaffer)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
