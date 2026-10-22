@@ -1294,6 +1294,7 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.r
       }
       (* S1 -> S2 *)
       (* Since [Types.module_representation = Jkind.sort array], this could've
@@ -1304,6 +1305,7 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.r
       }
       (* S1 -> () -> S2 *)
       (* In both functor cases, the [Mode.Yielding.l] is the join of the

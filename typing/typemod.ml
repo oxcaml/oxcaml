@@ -324,6 +324,22 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
           let sg_param = Mtype.sig_make_manifest sig_acc in
           Env.add_module ~arg:true id Mp_present (Mty_signature sg_param) env
       in
+      let funct_staticity =
+        With_regionality.proj_monadic Staticity funct_mode
+      in
+      (* The following [submode] recovers the functor's original staticity [m].
+         See Note [Staticity of functors] in [typedtree.mli] *)
+      let staticity =
+        With_regionality.proj_monadic Staticity mm_param
+        |> Staticity.apply_hint (Parameter_to_functor Location.none)
+        |> Staticity.disallow_left
+      in
+      Staticity.submode_err (loc, Functor) funct_staticity staticity;
+      let mm_result =
+        With_locality.join
+          [ With_locality.disallow_right mm_result;
+            With_locality.min_with_monadic Staticity funct_staticity; ]
+      in
       let incl_kind, sg_result, mm_result =
         (* Accept functor types of the forms:
               sig..end -> sig..end
@@ -331,15 +347,16 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor { input_coercion; input_repr; yielding }, sg_result,
-            mm_result
+            Tincl_functor { input_coercion; input_repr; yielding; staticity },
+            sg_result, mm_result
         | Mty_functor (Unit, mty_result, mm_result) -> begin
             check_for_generated_type_or_jkind ~funct_body env loc mty
               (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-              Tincl_gen_functor { input_coercion; input_repr; yielding },
-              sg_result, mm_result
+              Tincl_gen_functor { input_coercion; input_repr;
+                                  yielding; staticity },
+              sg_result, With_locality.disallow_right mm_result
             | sg ->
                 Error.log_and_raise loc env
                   (Signature_result_expected
@@ -3684,6 +3701,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~mty_res
         ~mode_res:(with_locality_as_regionality mm_res)
         ~mode_arg:None;
+      let staticity = With_locality.proj_monadic Staticity mm_res in
+      Staticity.submode_err (funct.mod_loc, Functor)
+        (Staticity.of_const ~hint:(Always_dynamic Generative_functor)
+            Dynamic)
+        staticity;
       { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar 0);
         mod_type = mty_res;
         mod_mode =
