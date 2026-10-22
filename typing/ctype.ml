@@ -3080,6 +3080,12 @@ let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
   | Ok ty | Error ty -> ty
 
+let unwrap_until_or_null env ty =
+  let unwrapped_ty = get_unboxed_type_approximation env ty in
+  match unwrapped_ty.or_null with
+  | Some { prev; _ } -> prev.ty
+  | None -> unwrapped_ty.ty
+
 
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
