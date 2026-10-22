@@ -38,8 +38,8 @@ module Witness = struct
         { bytes : int;
           dbginfo : Cmm.alloc_dbginfo
         }
-    | Indirect_call of { callee : string option }
-    | Indirect_tailcall of { callee : string option }
+    | Indirect_call of { callee : Cmm.callee option }
+    | Indirect_tailcall of { callee : Cmm.callee option }
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
@@ -95,10 +95,14 @@ module Witness = struct
     | Alloc { bytes; dbginfo = _ } -> fprintf ppf "allocation of %d bytes" bytes
     | Indirect_call { callee = None } -> fprintf ppf "indirect call"
     | Indirect_tailcall { callee = None } -> fprintf ppf "indirect tailcall"
-    | Indirect_call { callee = Some callee } ->
-      fprintf ppf "indirect call (possibly calling %s)" callee
-    | Indirect_tailcall { callee = Some callee } ->
-      fprintf ppf "indirect tailcall (possibly calling %s)" callee
+    | Indirect_call { callee = Some (Cmm.Symbol { sym_name; _ }) } ->
+      fprintf ppf "indirect call (possibly calling %s)" sym_name
+    | Indirect_tailcall { callee = Some (Cmm.Symbol { sym_name; _ }) } ->
+      fprintf ppf "indirect tailcall (possibly calling %s)" sym_name
+    | Indirect_call { callee = Some (Cmm.Argument index) } ->
+      fprintf ppf "indirect call through argument #%d" (index + 1)
+    | Indirect_tailcall { callee = Some (Cmm.Argument index) } ->
+      fprintf ppf "indirect tailcall through argument #%d" (index + 1)
     | Direct_call { callee } -> fprintf ppf "direct call %s" callee
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
@@ -119,7 +123,7 @@ let take_first_n t n ~to_seq ~of_seq ~cardinal =
   let len = cardinal t in
   if len <= n then t else t |> to_seq |> Seq.take n |> of_seq
 
-module Witnesses : sig
+module Witness_set : sig
   type t
 
   val empty : t
@@ -206,25 +210,103 @@ end = struct
     }
 end
 
-module Tag = struct
+module Allocation_sources = Zero_alloc_info.Allocation_sources
+module Call_outcomes = Zero_alloc_info.Call_outcomes
+
+module Witnesses = struct
   type t =
-    | N
-    | E
-    | D
+    { witnesses : Witness_set.t;
+      allocation_sources : Allocation_sources.t
+    }
 
-  let compare : t -> t -> int = fun t1 t2 -> Stdlib.compare t1 t2
+  let unknown =
+    { witnesses = Witness_set.empty;
+      allocation_sources = Allocation_sources.unknown
+    }
 
-  let print = function N -> "nor" | E -> "exn" | D -> "div"
+  let of_summary allocation_sources =
+    { witnesses = Witness_set.empty; allocation_sources }
+
+  let witnesses t = t.witnesses
+
+  let allocation_sources t = t.allocation_sources
+
+  let no_allocation_other_than_calling_arguments t : bool =
+    match t.allocation_sources with
+    | Allocation_other_than_calling_arguments -> false
+    | No_allocation_other_than_calling_arguments _ -> true
+
+  let create ~keep_witnesses ~outcomes ?hint kind dbg =
+    let witnesses =
+      if keep_witnesses
+      then Witness_set.create ?hint kind dbg
+      else Witness_set.empty
+    in
+    let allocation_sources =
+      match kind with
+      | Witness.Indirect_call { callee = Some (Cmm.Argument lowered_index) }
+      | Witness.Indirect_tailcall { callee = Some (Cmm.Argument lowered_index) }
+        ->
+        Allocation_sources.argument ~lowered_index ~outcomes
+      | Witness.Indirect_call { callee = None | Some (Cmm.Symbol _) }
+      | Witness.Indirect_tailcall { callee = None | Some (Cmm.Symbol _) }
+      | Witness.Alloc _ | Witness.Direct_call _ | Witness.Direct_tailcall _
+      | Witness.Extcall _ | Witness.Arch_specific _ | Witness.Probe _
+      | Witness.Widen ->
+        Allocation_sources.unknown
+    in
+    { witnesses; allocation_sources }
+
+  let widen = { unknown with witnesses = Witness_set.widen }
+
+  let is_empty t = Witness_set.is_empty t.witnesses
+
+  let size t = Witness_set.size t.witnesses
+
+  let cutoff t ~n = { t with witnesses = Witness_set.cutoff t.witnesses ~n }
+
+  let print ppf t = Witness_set.print ppf t.witnesses
+
+  let compare t1 t2 =
+    let c = Witness_set.compare t1.witnesses t2.witnesses in
+    if c <> 0
+    then c
+    else Allocation_sources.compare t1.allocation_sources t2.allocation_sources
+
+  let lessequal ~ignore_diagnostic_witnesses t1 t2 =
+    Allocation_sources.lessequal t1.allocation_sources t2.allocation_sources
+    && (ignore_diagnostic_witnesses
+       || Witness_set.lessequal t1.witnesses t2.witnesses)
+
+  let join t1 t2 =
+    { witnesses = Witness_set.join t1.witnesses t2.witnesses;
+      allocation_sources =
+        Allocation_sources.join t1.allocation_sources t2.allocation_sources
+    }
+
+  let meet t1 t2 =
+    { witnesses = Witness_set.meet t1.witnesses t2.witnesses;
+      allocation_sources =
+        Allocation_sources.meet t1.allocation_sources t2.allocation_sources
+    }
 end
+
+module Tag = Zero_alloc_info.Tag
 
 module Var : sig
   type t
 
-  val create : string -> Tag.t -> t
+  val create :
+    name:string ->
+    tag:Tag.t ->
+    known_arguments:Cmm.Known_arguments.t ->
+    t
 
   val name : t -> string
 
   val tag : t -> Tag.t
+
+  val known_arguments : t -> Cmm.Known_arguments.t
 
   val print : Format.formatter -> t -> unit
 
@@ -239,12 +321,18 @@ end = struct
   module T = struct
     type t =
       { name : string;
-        tag : Tag.t
+        tag : Tag.t;
+        known_arguments : Cmm.Known_arguments.t;
       }
 
-    let compare { tag = tag1; name = name1 } { tag = tag2; name = name2 } =
+    let compare
+        { tag = tag1; name = name1; known_arguments = args1 }
+        { tag = tag2; name = name2; known_arguments = args2 } =
       let c = String.compare name1 name2 in
-      if c = 0 then Tag.compare tag1 tag2 else c
+      if c <> 0 then c else
+      let c = Tag.compare tag1 tag2 in
+      if c <> 0 then c else
+      Cmm.Known_arguments.compare args1 args2
   end
 
   include T
@@ -257,10 +345,13 @@ end = struct
 
   let tag t = t.tag
 
-  let create name tag = { name; tag }
+  let known_arguments t = t.known_arguments
 
-  let print ppf { name; tag } =
-    Format.fprintf ppf "%s.%s@ " name (Tag.print tag)
+  let create ~name ~tag ~known_arguments = { name; tag; known_arguments }
+
+  let print ppf { name; tag; known_arguments } =
+    Format.fprintf ppf "%s.%s[args: %a]@ " name (Tag.print tag)
+      Cmm.Known_arguments.print known_arguments
 end
 
 (** Abstract value for each component of the domain. *)
@@ -270,17 +361,25 @@ module V : sig
   (** order of the abstract domain *)
   val lessequal : t -> t -> bool
 
+  val satisfies :
+    conditional:bool -> strict:bool -> actual:t -> expected:t -> bool
+
   val join : t -> t -> t
 
   val meet : t -> t -> t
 
   val transform : t -> t -> t
 
-  val replace_witnesses : Witnesses.t -> t -> t
+  val apply_call :
+    witnesses:Witnesses.t ->
+    callee_summary:t ->
+    known_arguments:Cmm.Known_arguments.t ->
+    t
 
-  val diff_witnesses : expected:t -> actual:t -> Witnesses.t
+  val diff_witnesses :
+    conditional:bool -> strict:bool -> expected:t -> actual:t -> Witness_set.t
 
-  val get_witnesses : t -> Witnesses.t
+  val get_witnesses : t -> Witness_set.t
 
   val print : witnesses:bool -> Format.formatter -> t -> unit
 
@@ -317,7 +416,10 @@ end = struct
   let pp_var ~witnesses ppf var w =
     Format.fprintf ppf "(%a%a)@," Var.print var (pp_w ~witnesses) w
 
-  let pp_top ~witnesses ppf w = Format.fprintf ppf "(top%a)" (pp_w ~witnesses) w
+  let pp_top ~witnesses ppf w =
+    Format.fprintf ppf "(top %a%a)" Allocation_sources.print
+      (Witnesses.allocation_sources w)
+      (pp_w ~witnesses) w
 
   (** Variables with witnesses *)
   module Vars : sig
@@ -342,12 +444,9 @@ end = struct
 
     val has_witnesses : t -> bool
 
-    val replace_witnesses : t -> Witnesses.t -> t
-
     val print : witnesses:bool -> Format.formatter -> t -> unit
 
-    val fold :
-      f:(Var.t -> Witnesses.t -> 'acc -> 'acc) -> init:'acc -> t -> 'acc
+    val fold : f:(Var.t -> Witnesses.t -> 'acc -> 'acc) -> init:'acc -> t -> 'acc
 
     val exists : (Var.t -> Witnesses.t -> bool) -> t -> bool
 
@@ -389,8 +488,6 @@ end = struct
           | None -> Some witnesses | Some w -> Some (Witnesses.join w witnesses))
         t
 
-    let replace_witnesses t w = Var.Map.map (fun _ -> w) t
-
     let print ~witnesses ppf t =
       Var.Map.iter (fun var w -> pp_var ~witnesses ppf var w) t
 
@@ -422,8 +519,6 @@ end = struct
     val equal : t -> t -> bool
 
     val has_witnesses : t -> bool
-
-    val replace_witnesses : t -> Witnesses.t -> t
 
     val flatten : t -> t -> t
 
@@ -520,12 +615,6 @@ end = struct
         Vars.has_witnesses vars || not (Witnesses.is_empty w)
       | Args vars -> Vars.has_witnesses vars
 
-    let replace_witnesses t w =
-      match t with
-      | Args vars -> Args (Vars.replace_witnesses vars w)
-      | Args_with_top { w = _; vars } ->
-        Args_with_top { w; vars = Vars.replace_witnesses vars w }
-
     let print ~witnesses ppf t =
       match t with
       | Args vars ->
@@ -580,7 +669,7 @@ end = struct
         then
           if M.exists (fun _var tr -> Transform.has_witnesses tr) t
           then raise (Widen Witnesses.widen)
-          else raise (Widen Witnesses.empty)
+          else raise (Widen Witnesses.unknown)
         else t
       | Error n ->
         if M.cardinal t > n
@@ -661,8 +750,6 @@ end = struct
     val transform_join : t -> t -> t
 
     val has_witnesses : t -> bool
-
-    val replace_witnesses : t -> Witnesses.t -> t
 
     val cutoff : t -> int -> t
 
@@ -755,11 +842,6 @@ end = struct
     let has_witnesses { vars; trs } =
       Vars.has_witnesses vars || Transforms.exists Transform.has_witnesses trs
 
-    let replace_witnesses { vars; trs } w =
-      { vars = Vars.replace_witnesses vars w;
-        trs = Transforms.map (fun tr -> Transform.replace_witnesses tr w) trs
-      }
-
     let cutoff { vars; trs } n =
       { vars = Vars.cutoff vars n; trs = Transforms.cutoff trs n }
 
@@ -798,8 +880,7 @@ end = struct
 
     val distribute_transform_over_join : t -> Transform.t -> unit -> t
 
-    val distribute_transform_var_over_join :
-      t -> Var.t -> Witnesses.t -> unit -> t
+    val distribute_transform_var_over_join : t -> Var.t -> Witnesses.t -> unit -> t
 
     val distribute_transform_top_over_join : t -> Witnesses.t -> unit -> t
 
@@ -814,8 +895,6 @@ end = struct
     val print : witnesses:bool -> Format.formatter -> t -> unit
 
     val has_witnesses : t -> bool
-
-    val replace_witnesses : t -> Witnesses.t -> t
 
     val compare : t -> t -> int
 
@@ -856,26 +935,26 @@ end = struct
        [n], and [Arg.join] is used for fixpoint computation before applying the
        cutoff. *)
     let args_with_top w args =
-      if not (Args.has_witnesses args)
-      then
-        Misc.fatal_errorf "Join Top without witnesses in args:%a"
-          (Args.print ~witnesses:false)
-          args;
-      match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
-      | Keep_all -> Args_with_top { w; args }
-      | No_details ->
-        Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
-          (Args.print ~witnesses:true)
-          args
-      | At_most n ->
-        (* Normal form after cutoff: args contains at least one element even
-           after cutoff because [n] is guaranteed to be positive. *)
-        let len = Witnesses.size w in
-        if len > n
-        then
-          Misc.fatal_errorf "expected at most %d witnesses, got %d: %a" n len
-            Witnesses.print w;
-        Args_with_top { w; args = Args.cutoff args n }
+      if
+        Witnesses.no_allocation_other_than_calling_arguments w
+        || not (Args.has_witnesses args)
+      then Args_with_top { w; args }
+      else
+        match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
+        | Keep_all -> Args_with_top { w; args }
+        | No_details ->
+          Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print w
+            (Args.print ~witnesses:true)
+            args
+        | At_most n ->
+          (* Normal form after cutoff: args contains at least one element even
+             after cutoff because [n] is guaranteed to be positive. *)
+          let len = Witnesses.size w in
+          if len > n
+          then
+            Misc.fatal_errorf "expected at most %d witnesses, got %d: %a" n len
+              Witnesses.print w;
+          Args_with_top { w; args = Args.cutoff args n }
 
     let tr_with_safe tr = Args_with_safe Args.(add_tr empty tr)
 
@@ -904,8 +983,7 @@ end = struct
 
     let add_top t witnesses =
       match t with
-      | Args_with_top { w; args } ->
-        args_with_top (Witnesses.join w witnesses) args
+      | Args_with_top { w; args } -> args_with_top (Witnesses.join w witnesses) args
       | Args_with_safe args | Args args -> args_with_top witnesses args
 
     let add_var t var witnesses =
@@ -1024,14 +1102,6 @@ end = struct
       | Args_with_top { w; args } ->
         (not (Witnesses.is_empty w)) || Args.has_witnesses args
 
-    let replace_witnesses t witnesses =
-      match t with
-      | Args_with_safe args ->
-        Args_with_safe (Args.replace_witnesses args witnesses)
-      | Args args -> Args (Args.replace_witnesses args witnesses)
-      | Args_with_top { w = _; args } ->
-        args_with_top witnesses (Args.replace_witnesses args witnesses)
-
     let compare t1 t2 =
       match t1, t2 with
       | Args a1, Args a2 | Args_with_safe a1, Args_with_safe a2 ->
@@ -1115,8 +1185,8 @@ end = struct
 
   let get_witnesses t =
     match t with
-    | Top w -> w
-    | Bot | Safe -> Witnesses.empty
+    | Top w -> Witnesses.witnesses w
+    | Bot | Safe -> Witness_set.empty
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf "Zero_alloc_checker.get_witnesses: unresolved value %a"
         (print ~witnesses:false) t
@@ -1170,9 +1240,14 @@ end = struct
       Join (Join.var_with_safe var witnesses)
     | (Top w as top), Var { var; witnesses }
     | Var { var; witnesses }, (Top w as top) ->
-      if Witnesses.is_empty witnesses
-      then top
-      else Join (Join.var_with_top var ~var_witnesses:witnesses w)
+      (* If [Top w] is already "as bad as possible" (i.e. permits allocation and
+         does *not* do so solely through its arguments), then there's nothing
+         more to learn, so we might as well save some time and space. *)
+      if
+        Witnesses.no_allocation_other_than_calling_arguments w
+        || not (Witnesses.is_empty witnesses)
+      then Join (Join.var_with_top var ~var_witnesses:witnesses w)
+      else top
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
       if Var.equal var1 var2
       then Var { var = var1; witnesses = Witnesses.join w1 w2 }
@@ -1197,9 +1272,18 @@ end = struct
          allocations. We can put a bound on the number of witnesses recorded,
          but it would make the resulting error messages sensitive to iteration
          order. *)
-      if Transform.has_witnesses tr then Join (Join.tr_with_top tr w) else top
-    | (Top w as top), Join j | Join j, (Top w as top) ->
-      if Join.has_witnesses j then Join (Join.add_top j w) else top
+      if
+        Witnesses.no_allocation_other_than_calling_arguments w
+        || Transform.has_witnesses tr
+      then Join (Join.tr_with_top tr w)
+      else top
+    | (Top w as top), Join j
+    | Join j, (Top w as top) ->
+      if
+        Witnesses.no_allocation_other_than_calling_arguments w
+        || Join.has_witnesses j
+      then Join (Join.add_top j w)
+      else top
     | Safe, Join j | Join j, Safe -> Join (Join.add_safe j)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       Join (Join.add_var j var witnesses)
@@ -1213,7 +1297,8 @@ end = struct
     match t1, t2 with
     | Bot, Bot -> true
     | Safe, Safe -> true
-    | Top w1, Top w2 -> Witnesses.lessequal w1 w2
+    | Top w1, Top w2 ->
+      Witnesses.lessequal ~ignore_diagnostic_witnesses:false w1 w2
     | Bot, Safe -> true
     | Bot, Top _ -> true
     | Safe, Top _ -> true
@@ -1224,6 +1309,39 @@ end = struct
     | (Safe | Top _ | Var _ | Transform _ | Join _), _ ->
       (* structural equality on the normal form *)
       equal (join t1 t2) t2
+
+  let satisfies ~conditional ~strict ~actual ~expected =
+    match actual, expected with
+    | Top actual, Top expected ->
+      Witnesses.lessequal ~ignore_diagnostic_witnesses:true actual expected
+    (* If we want something that conditionally never allocates,
+       but the function we're checking says it can sometimes allocate, ... *)
+    | Top witnesses, _ when conditional ->
+      (* ... we check the allocation sources of the function, ... *)
+      begin match Witnesses.allocation_sources witnesses with
+      (* ... check that nothing other than arguments can allocate, ... *)
+      | Allocation_other_than_calling_arguments -> false
+      | No_allocation_other_than_calling_arguments arguments_called ->
+        (* ... and check that, for all arguments that might allocate, ... *)
+        let allowed : Call_outcomes.t =
+          if strict then Call_outcomes.all else Call_outcomes.normal_return
+        in
+        Numbers.Int.Map.for_all (fun _ outcomes ->
+          (* ... as long as we assume those arguments do not allocate in
+            normal-return paths, then (conditionally) we're fine. *)
+          Call_outcomes.is_subset ~sub:outcomes ~super:allowed)
+          arguments_called
+      end
+    | Top _, (Safe | Bot) -> false
+    | (Safe | Bot), _ -> lessequal actual expected
+    | (Var _ | Transform _ | Join _), _
+    | _, (Var _ | Transform _ | Join _)
+      ->
+      Misc.fatal_errorf
+        "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
+        expected %a)"
+        (print ~witnesses:false) actual
+        (print ~witnesses:false) expected
 
   (* Abstract transformer. Commutative and Associative.
 
@@ -1259,10 +1377,14 @@ end = struct
     | Transform tr1, Transform tr2 -> Transform (Transform.flatten tr1 tr2)
     | Transform tr, Join j | Join j, Transform tr ->
       bounded_join (Join.distribute_transform_over_join j tr)
-    | (Top w as top), Join j | Join j, (Top w as top) ->
-      if Join.has_safe j && not (Join.has_witnesses j)
-      then top
-      else bounded_join (Join.distribute_transform_top_over_join j w)
+    | (Top w as top), Join j
+    | Join j, (Top w as top) ->
+      if
+        Witnesses.no_allocation_other_than_calling_arguments w
+        || not (Join.has_safe j)
+        || Join.has_witnesses j
+      then bounded_join (Join.distribute_transform_top_over_join j w)
+      else top
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       bounded_join (Join.distribute_transform_var_over_join j var witnesses)
     | Join j1, Join j2 ->
@@ -1274,35 +1396,94 @@ end = struct
      while keeping the comments about implementation choices and/or imperatives
      (e.g. why/how witnesses are tracked) next to the code. *)
 
-  let replace_witnesses w t =
-    match t with
-    | Top _ -> Top w
-    | Bot | Safe -> t
-    | Join j -> Join (Join.replace_witnesses j w)
-    | Transform tr -> Transform (Transform.replace_witnesses tr w)
-    | Var { var; witnesses = _ } -> Var { var; witnesses = w }
+  let apply_call ~witnesses ~callee_summary ~known_arguments =
+    let top allocation_sources =
+      Top { witnesses with Witnesses.allocation_sources }
+    in
+    (* Handle a known symbol passed as an argument to a function that we know
+       may call it: e.g. [f ignore] if we know that [f]'s allocation summary
+       depends on whether/how its first argument allocates. *)
+    let handle_call_to_symbol sym_name outcomes =
+      (* Handle aliases, e.g. the data block for a closure that points to the
+         code of that closure (though this is re-exported outside the same
+         compilation unit). *)
+      let name =
+        Zero_alloc_info.resolve_alias
+          (Compilenv.current_zero_alloc_info ())
+          sym_name
+      in
+      (* Fold over the parts of the allocation summary that matter for this
+         argument position, using the characteristics of the symbol passed. *)
+      List.fold_left
+        (fun acc tag ->
+          (* Can this symbol allocate on a (normal/exceptional/diverging) path
+             that matters to the callee at this argument position? *)
+          if Call_outcomes.is_subset ~sub:(Tag.outcome tag) ~super:outcomes
+          then
+            (* Soundly under-approximate that we know nothing about any
+               arguments passed to this symbol in the body of this function. *)
+            (* CR-someday wsturgeon for wsturgeon: store arity and/or known
+               arguments for each call so we have a real [~known_arguments] *)
+            let known_arguments = Cmm.Known_arguments.none 0 in
+            (* Mint a variable that depends on the symbol called. *)
+            let var = Var.create ~name ~tag ~known_arguments in
+            (* Join that dependency with other applicable outcomes (e.g.
+               normal/exceptional/diverging paths), if any. *)
+            join acc (unresolved witnesses var)
+          else acc)
+        Safe Tag.all
+    in
+    let handle_call_to_argument argument outcomes =
+      match Cmm.Known_arguments.find known_arguments argument with
+      | Some (Argument parameter) ->
+        top (Allocation_sources.argument ~lowered_index:parameter ~outcomes)
+      | Some (Symbol { sym_name; _ }) ->
+        handle_call_to_symbol sym_name outcomes
+      | None -> top Allocation_sources.unknown
+    in
+    match callee_summary with
+    | Top callee_witnesses -> (
+      match Witnesses.allocation_sources callee_witnesses with
+      | Allocation_other_than_calling_arguments ->
+        top Allocation_sources.unknown
+      | No_allocation_other_than_calling_arguments arguments_called ->
+        Numbers.Int.Map.fold
+          (fun argument outcomes result ->
+            join result (handle_call_to_argument argument outcomes))
+          arguments_called Safe)
+    | Bot | Safe -> callee_summary
+    | Var _ | Transform _ | Join _ ->
+      Misc.fatal_errorf "Zero_alloc_checker.apply_call: unresolved value %a"
+        (print ~witnesses:false) callee_summary
 
-  let diff_witnesses ~expected ~actual =
-    (* If [actual] is Top and [expected] is not Top then return the [actual]
-       witnesses. Otherwise, return empty. *)
-    match actual, expected with
-    | Bot, Bot | Safe, Safe | Bot, Safe -> Witnesses.empty
-    | Bot, Top w | Safe, Top w | Top _, Top w ->
-      assert (Witnesses.is_empty w);
-      Witnesses.empty
-    | Safe, Bot -> Witnesses.empty
-    | Top w, (Bot | Safe) -> w
-    | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
-      Misc.fatal_errorf
-        "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
-         expected %a)"
-        (print ~witnesses:false) actual (print ~witnesses:false) expected
+  let diff_witnesses ~conditional ~strict ~expected ~actual =
+    if satisfies ~conditional ~strict ~actual ~expected
+    then Witness_set.empty
+    else
+      (* If [actual] is Top and [expected] is not Top then return the [actual]
+         witnesses. Otherwise, return empty. *)
+      match actual, expected with
+      | Bot, Bot | Safe, Safe | Bot, Safe -> Witness_set.empty
+      | Bot, Top w | Safe, Top w | Top _, Top w ->
+        assert (Witnesses.is_empty w);
+        Witness_set.empty
+      | Safe, Bot -> Witness_set.empty
+      | Top w, (Bot | Safe) -> Witnesses.witnesses w
+      | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
+        Misc.fatal_errorf
+          "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
+           expected %a)"
+          (print ~witnesses:false) actual (print ~witnesses:false) expected
 
   let meet t1 t2 =
     match t1, t2 with
     | Bot, Bot -> Bot
     | Safe, Safe -> Safe
-    | Top w1, Top w2 -> Top (Witnesses.meet w1 w2)
+    | Top w1, Top w2 ->
+      let witnesses = Witnesses.meet w1 w2 in
+      if Allocation_sources.is_empty (Witnesses.allocation_sources witnesses)
+      then Safe
+      else Top witnesses
     | Safe, Bot | Bot, Safe -> Bot
     | Top _, Bot | Bot, Top _ -> Bot
     | Top _, Safe | Safe, Top _ -> Safe
@@ -1311,22 +1492,22 @@ end = struct
         "Meet of unresolved is not implemented and shouldn't be needed."
 
   let apply t ~env =
-    let get env var w =
-      match env var with
-      | None -> unresolved w var
-      | Some v -> replace_witnesses w v
-    in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
     in
+    let rec get env var ~witnesses =
+      match env var with
+      | None -> unresolved witnesses var
+      | Some callee_summary ->
+        let known_arguments = Var.known_arguments var in
+        aux (apply_call ~witnesses ~callee_summary ~known_arguments)
     (* CR-someday gyorsh: This is a naive implementation that reallocates the
        entire [t] whenever there is a change. Can be optimized to update the
        underlying sets and maps instead of using [fold]. *)
-    let rec aux t =
+    and aux t =
       match t with
       | Bot | Safe | Top _ -> t
-      | Var { var; witnesses } -> (
-        match env var with None -> t | Some v -> replace_witnesses witnesses v)
+      | Var { var; witnesses } -> get env var ~witnesses
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1336,7 +1517,7 @@ end = struct
             match Transform.get_top tr with None -> Safe | Some w -> Top w
           in
           Vars.fold
-            ~f:(fun var w acc -> transform (get env var w) acc)
+            ~f:(fun var witnesses acc -> transform (get env var ~witnesses) acc)
             ~init vars
       | Join j ->
         let vars, trs = Join.get j in
@@ -1354,7 +1535,9 @@ end = struct
             | Some w -> Top w
           in
           let acc =
-            Vars.fold ~f:(fun var w acc -> join (get env var w) acc) ~init vars
+            Vars.fold
+              ~f:(fun var witnesses acc -> join (get env var ~witnesses) acc)
+              ~init vars
           in
           Transforms.fold
             (fun tr acc ->
@@ -1372,15 +1555,28 @@ module Value : sig
 
   val transform : V.t -> t -> t
 
-  val replace_witnesses : Witnesses.t -> t -> t
+  val apply_call :
+    witnesses:Witnesses.t ->
+    callee_summary:t ->
+    known_arguments:Cmm.Known_arguments.t ->
+    t
 
   val get_unresolved_names : t -> String.Set.t
 
-  val get_witnesses : t -> Witnesses.components
+  val get_witnesses : t -> Witness_set.components
 
-  val diff_witnesses : expected:t -> actual:t -> Witnesses.components
+  val diff_witnesses :
+    conditional:bool ->
+    strict:bool ->
+    expected:t ->
+    actual:t ->
+    Witness_set.components
 
-  val unresolved : string -> Witnesses.t -> t
+  val unresolved :
+    string ->
+    Witnesses.t ->
+    known_arguments:Cmm.Known_arguments.t ->
+    t
 
   val is_resolved : t -> bool
 
@@ -1390,10 +1586,10 @@ module Value : sig
 end = struct
   include T
 
-  let unresolved name w =
-    { nor = Var.create name Tag.N |> V.unresolved w;
-      exn = Var.create name Tag.E |> V.unresolved w;
-      div = Var.create name Tag.D |> V.unresolved w
+  let unresolved name w ~known_arguments =
+    { nor = Var.create ~name ~tag:Tag.N ~known_arguments |> V.unresolved w;
+      exn = Var.create ~name ~tag:Tag.E ~known_arguments |> V.unresolved w;
+      div = Var.create ~name ~tag:Tag.D ~known_arguments |> V.unresolved w
     }
 
   let is_resolved t =
@@ -1420,22 +1616,34 @@ end = struct
       div = V.transform effect_ v.div
     }
 
-  let replace_witnesses w t =
-    { nor = V.replace_witnesses w t.nor;
-      exn = V.replace_witnesses w t.exn;
-      div = V.replace_witnesses w t.div
+  let apply_call ~witnesses ~callee_summary ~known_arguments =
+    { nor =
+        V.apply_call ~witnesses ~callee_summary:callee_summary.nor
+          ~known_arguments;
+      exn =
+        V.apply_call ~witnesses ~callee_summary:callee_summary.exn
+          ~known_arguments;
+      div =
+        V.apply_call ~witnesses ~callee_summary:callee_summary.div
+          ~known_arguments;
     }
 
-  let diff_witnesses ~expected ~actual =
-    { Witnesses.nor = V.diff_witnesses ~expected:expected.nor ~actual:actual.nor;
-      Witnesses.exn = V.diff_witnesses ~expected:expected.exn ~actual:actual.exn;
-      Witnesses.div = V.diff_witnesses ~expected:expected.div ~actual:actual.div
+  let diff_witnesses ~conditional ~strict ~expected ~actual =
+    { Witness_set.nor =
+        V.diff_witnesses ~conditional ~strict ~expected:expected.nor
+          ~actual:actual.nor;
+      Witness_set.exn =
+        V.diff_witnesses ~conditional ~strict ~expected:expected.exn
+          ~actual:actual.exn;
+      Witness_set.div =
+        V.diff_witnesses ~conditional ~strict ~expected:expected.div
+          ~actual:actual.div
     }
 
   let get_witnesses t =
-    { Witnesses.nor = V.get_witnesses t.nor;
-      Witnesses.exn = V.get_witnesses t.exn;
-      Witnesses.div = V.get_witnesses t.div
+    { Witness_set.nor = V.get_witnesses t.nor;
+      Witness_set.exn = V.get_witnesses t.exn;
+      Witness_set.div = V.get_witnesses t.div
     }
 end
 
@@ -1453,17 +1661,21 @@ module Annotation : sig
 
   val expected_value : t -> Value.t
 
+  val assumed_value : t -> num_params:int -> Value.t
+
   (** [valid t value] returns true if and only if the [value] satisfies the
       annotation, i.e., [value] is less or equal to [expected_value a] when
       ignoring witnesses. *)
 
-  val valid : t -> Value.t -> bool
+  val valid : expected:t -> actual:Value.t -> bool
 
-  val diff_witnesses : t -> Value.t -> Witnesses.components
+  val diff_witnesses : t -> Value.t -> Witness_set.components
 
   val is_assume : t -> bool
 
   val is_strict : t -> bool
+
+  val is_conditional : t -> bool
 
   val is_check_enabled : t option -> bool
 end = struct
@@ -1484,7 +1696,8 @@ end = struct
    *****************************************************************************)
 
   type t =
-    { strict : bool;  (** strict or relaxed? *)
+    { conditional : bool;
+      strict : bool;  (** strict or relaxed? *)
       assume : bool;
       never_returns_normally : bool;
       never_raises : bool;
@@ -1497,8 +1710,11 @@ end = struct
 
   let get_custom_error_msg t = t.custom_error_msg
 
+  (* Translate an annotation (e.g. [[@zero_alloc]]) into an expectation
+     (e.g. [{ normal = Safe; exceptional = Top; diverging = Top }]). *)
   let expected_value
-      { strict;
+      { conditional = _;
+        strict;
         never_returns_normally;
         never_raises;
         assume = _;
@@ -1507,28 +1723,57 @@ end = struct
       } =
     Value.of_annotation ~strict ~never_returns_normally ~never_raises
 
-  let valid t v =
-    (* Use Value.lessequal but ignore witnesses. *)
+  let assumed_value t ~num_params =
     let expected = expected_value t in
-    let actual = Value.replace_witnesses Witnesses.empty v in
-    Value.lessequal actual expected
+    match t.conditional with
+    | false -> expected
+    | true -> begin
+      let outcomes =
+        if t.strict then Call_outcomes.all else Call_outcomes.normal_return
+      in
+      let only_by_calling_arguments =
+        List.init num_params
+          (fun lowered_index ->
+            V.top
+              (Witnesses.of_summary
+                 (Allocation_sources.argument ~lowered_index ~outcomes)))
+        |> List.fold_left V.join V.safe
+      in
+      let conditional component =
+        V.match_with component ~safe:only_by_calling_arguments ~bot:component
+          ~top:(fun _ -> component)
+          ~unresolved:(fun () -> component)
+      in
+      { Value.nor = conditional expected.nor;
+        exn = conditional expected.exn;
+        div = conditional expected.div
+      }
+    end
+
+  let valid ~expected ~actual =
+    Value.satisfies ~conditional:expected.conditional ~strict:expected.strict
+      ~actual ~expected:(expected_value expected)
 
   let diff_witnesses t v =
     let expected = expected_value t in
-    Value.diff_witnesses ~actual:v ~expected
+    Value.diff_witnesses ~conditional:t.conditional ~strict:t.strict ~actual:v
+      ~expected
 
   let is_assume t = t.assume
 
   let is_strict t = t.strict
+
+  let is_conditional t = t.conditional
 
   let find codegen_options fun_name dbg =
     let a =
       List.filter_map
         (fun (c : Cmm.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
@@ -1536,9 +1781,10 @@ end = struct
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { conditional; strict; never_returns_normally; never_raises; loc } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
@@ -1562,9 +1808,10 @@ end = struct
       List.filter_map
         (fun (c : Cfg.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
@@ -1572,9 +1819,10 @@ end = struct
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { conditional; strict; never_returns_normally; never_raises; loc } ->
             Some
-              { strict;
+              { conditional;
+                strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
@@ -1600,24 +1848,32 @@ end
 module Metadata : sig
   (* CR-someday gyorsh: propagate assert of arbitrary expressions. *)
   val assume_value :
-    Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
+    Debuginfo.t ->
+    can_raise:bool ->
+    (Call_outcomes.t -> Witnesses.t) ->
+    Value.t option
 
   (* Redundantly ignore assumptions in which we haven't lost any information, so
-     we can check the soundness of the `zero_alloc` system itself. *)
+     we can check the soundness of the [zero_alloc] system itself. *)
   val assume_value_unless_inferred :
-    Debuginfo.t -> Witnesses.t -> Value.t option
+    Debuginfo.t -> (Call_outcomes.t -> Witnesses.t) -> Value.t option
 end = struct
   (* CR gyorsh: The return type of [Assume_info.get_value] is
      [Assume_info.Value.t]. It is not the same as [Zero_alloc_checker.Value.t],
-     because [Witnesses] in [Zero_alloc_checker] depend on Debuginfo and cannot
+     because [Witness_set] in [Zero_alloc_checker] depend on Debuginfo and cannot
      be used in Assume_info due to cyclic dependencies. The witnesses in
      Assume_info are always empty and the translation is trivial. Is there a
      better way to avoid duplicating [Zero_alloc_utils]? *)
   let transl w (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
     match v with Top _ -> V.top w | Safe -> V.safe | Bot -> V.bot
 
-  let transl w (v : Zero_alloc_utils.Assume_info.Value.t) : Value.t =
-    { nor = transl w v.nor; exn = transl w v.exn; div = transl w v.div }
+  let transl witnesses_for_outcome (v : Zero_alloc_utils.Assume_info.Value.t) :
+      Value.t =
+    { nor = transl (witnesses_for_outcome Call_outcomes.normal_return) v.nor;
+      exn =
+        transl (witnesses_for_outcome Call_outcomes.exceptional_return) v.exn;
+      div = transl (witnesses_for_outcome Call_outcomes.diverging) v.div
+    }
 
   let assume_value dbg ~can_raise w =
     (* [loc] can be obtained by [Debuginfo.to_location dbg], For now just return
@@ -1642,7 +1898,7 @@ module Report : sig
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.components
+      witnesses : Witness_set.components
     }
 
   exception Fail of t list
@@ -1653,7 +1909,7 @@ end = struct
     { a : Annotation.t;
       fun_name : string;
       fun_dbg : Debuginfo.t;
-      witnesses : Witnesses.components
+      witnesses : Witness_set.components
     }
 
   exception Fail of t list
@@ -1706,7 +1962,8 @@ end = struct
         |> String.concat ","
       in
       Fmt.fprintf ppf
-        "Annotation check for zero_alloc%s failed on function %s (%s).%s"
+        "Annotation check for zero_alloc%s%s failed on function %s (%s).%s"
+        (if Annotation.is_conditional t.a then " conditional" else "")
         (if Annotation.is_strict t.a then " strict" else "")
         scoped_name t.fun_name
         (match Annotation.get_custom_error_msg t.a with
@@ -1833,9 +2090,9 @@ end = struct
       Location.error_of_printer ~loc ~sub pp ()
     in
     let print_witnesses ws : Location.error list =
-      let { Witnesses.nor; exn; div } = Witnesses.simplify ws in
+      let { Witness_set.nor; exn; div } = Witness_set.simplify ws in
       let f ws component =
-        ws |> Witnesses.elements |> List.map (print_witness ~component)
+        ws |> Witness_set.elements |> List.map (print_witness ~component)
       in
       List.concat [f div "diverge"; f nor ""; f exn "exceptional return"]
     in
@@ -2028,20 +2285,11 @@ end = struct
   let add t ~caller ~callees = String.Set.iter (add_one t ~caller) callees
 
   let update t ~caller ~callees =
-    (* check that all callees are present *)
     String.Set.iter
       (fun callee ->
         match String.Tbl.find_opt t callee with
-        | None ->
-          Misc.fatal_errorf "Unresolved dependencies: missing callee %s of %s"
-            callee caller
-        | Some callers ->
-          if not (String.Set.mem caller callers)
-          then
-            Misc.fatal_errorf
-              "Unresolved_dependencies: missing caller %s for callee %s in \
-               unresolved "
-              caller callee)
+        | Some callers when String.Set.mem caller callers -> ()
+        | Some _ | None -> add_one t ~caller callee)
       callees;
     (* remove resolved callees of this caller *)
     let remove callee callers =
@@ -2071,8 +2319,9 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~top:(fun _ -> 0)
-      ~safe:1 ~bot:2
+      ~top:(fun witnesses ->
+        Zero_alloc_info.Top (Witnesses.allocation_sources witnesses))
+      ~safe:Zero_alloc_info.Safe ~bot:Zero_alloc_info.Bot
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
@@ -2082,26 +2331,24 @@ end = struct
      that appear in a function's summary are only used for error messages about
      that function, not about its callers. Witnesses from the summary of a
      callee are ignored, and replaced by the name of the callee. *)
-  let decoded_witness = Witnesses.empty
+  let decode_component = function
+    | Zero_alloc_info.Top sources -> V.top (Witnesses.of_summary sources)
+    | Zero_alloc_info.Safe -> V.safe
+    | Zero_alloc_info.Bot -> V.bot
 
-  let decode = function
-    | 0 -> V.top decoded_witness
-    | 1 -> V.safe
-    | 2 -> V.bot
-    | n -> Misc.fatal_errorf "Zero_alloc_checker cannot decode %d" n
+  let encode (v : Value.t) =
+    Zero_alloc_info.encode
+      { nor = encode v.nor; exn = encode v.exn; div = encode v.div }
 
-  let encode (v : Value.t) : Zero_alloc_info.value option =
-    let c = (encode v.div lsl 4) lor (encode v.exn lsl 2) lor encode v.nor in
-    if c = 0 then None else Some c
-
-  let decode : Zero_alloc_info.value option -> Value.t option = function
-    | None -> None
-    | Some d ->
-      if d = 0 then Misc.fatal_error "Zero_alloc_checker unexpected 0 encoding";
-      let nor = decode (d land 3) in
-      let exn = decode ((d lsr 2) land 3) in
-      let div = decode ((d lsr 4) land 3) in
-      Some { nor; exn; div }
+  let decode value =
+    Option.map
+      (fun value ->
+        let { Zero_alloc_info.nor; exn; div } = Zero_alloc_info.decode value in
+        { Value.nor = decode_component nor;
+          exn = decode_component exn;
+          div = decode_component div
+        })
+      value
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in
@@ -2200,7 +2447,7 @@ end = struct
         if
           (not (Annotation.is_assume a))
           && enabled ()
-          && not (Annotation.valid a func_info.value)
+          && not (Annotation.valid ~expected:a ~actual:func_info.value)
         then
           (* CR-soon gyorsh: keeping track of all the witnesses until the end of
              the compilation unit will be expensive. For functions that do not
@@ -2225,33 +2472,32 @@ end = struct
     Unit_info.iter unit_info ~f:record;
     match !errors with [] -> () | errors -> raise (Report.Fail errors)
 
-  let[@inline always] create_witnesses t ?hint kind dbg =
-    if t.keep_witnesses
-    then Witnesses.create ?hint kind dbg
-    else Witnesses.empty
+  let[@inline always] create_witnesses ?(outcomes = Call_outcomes.all) t ?hint
+      kind dbg =
+    Witnesses.create ~keep_witnesses:t.keep_witnesses ~outcomes ?hint kind dbg
 
   let is_caml_internal s =
     String.starts_with s ~prefix:"caml_apply"
     || String.starts_with s ~prefix:"camlCamlinternal"
 
   (* [find_callee] returns the value associated with the callee. *)
-  let find_callee t callee ~desc dbg (k : Witness.kind) =
+  let find_callee t callee ~desc dbg (k : Witness.kind) ~known_arguments =
     let unresolved reason =
       let w = create_witnesses t k dbg in
-      let v = Value.unresolved callee w in
+      let v = Value.unresolved callee w ~known_arguments in
       let msg = Printf.sprintf "unresolved %s (%s)" callee reason in
       report t v ~msg ~desc dbg;
       v
     in
-    let resolved v =
-      assert (Value.is_resolved v);
+    let resolved callee_summary =
+      assert (Value.is_resolved callee_summary);
       let msg = Printf.sprintf "resolved %s" callee in
-      report t v ~msg ~desc dbg;
+      report t callee_summary ~msg ~desc dbg;
       (* Abstract witnesses of a call to the single witness for the callee name.
          Summary of tailcall self won't be affected because it is not set to Top
          by [find_callee]. *)
-      let w = create_witnesses t k dbg in
-      Value.replace_witnesses w v
+      let witnesses = create_witnesses t k dbg in
+      Value.apply_call ~witnesses ~callee_summary
     in
     let return_top hint reason =
       let w = create_witnesses t ~hint k dbg in
@@ -2289,12 +2535,12 @@ end = struct
           else
             return_top Missing_summary
               "missing summary: callee compiled without checks"
-        | Some v -> resolved v)
+        | Some v -> resolved v ~known_arguments)
       | Some callee_info ->
         (* Callee defined earlier in the same compilation unit. May have
            unresolved dependencies. *)
         if Value.is_resolved callee_info.value
-        then resolved callee_info.value
+        then resolved callee_info.value ~known_arguments
         else unresolved "defined earlier with unresolved dependencies"
 
   let transform_return ~(effect_ : V.t) dst =
@@ -2322,19 +2568,20 @@ end = struct
 
   let transform_top t ~next ~exn w desc dbg =
     let effect_ =
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match Metadata.assume_value dbg ~can_raise:true (fun _ -> w) with
       | Some v -> v
       | None -> Value.top w
     in
     transform t ~next ~exn ~effect_ desc dbg
 
-  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg =
+  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg
+      ~known_arguments =
     report t next ~msg:"transform_call next" ~desc dbg;
     report t exn ~msg:"transform_call exn" ~desc dbg;
-    let v = find_callee t callee ~desc dbg k in
+    let v = find_callee t callee ~desc dbg k ~known_arguments in
     let effect_ =
       let w = create_witnesses t k dbg in
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match Metadata.assume_value dbg ~can_raise:true (fun _ -> w) with
       | Some v' ->
         assert (Value.is_resolved v');
         if Value.is_resolved v then Value.meet v v' else v'
@@ -2349,7 +2596,7 @@ end = struct
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
-      match Metadata.assume_value_unless_inferred dbg w with
+      match Metadata.assume_value_unless_inferred dbg (fun _ -> w) with
       | Some v -> v
       | None ->
         (* Conservatively assume that operation can return normally. *)
@@ -2371,7 +2618,7 @@ end = struct
 
     val add : Func_info.t -> Value.t -> t -> t
 
-    val get_value_exn : string -> t -> Value.t
+    val find_value : string -> t -> Value.t option
 
     val iter : t -> f:(Func_info.t -> Value.t -> unit) -> unit
 
@@ -2399,9 +2646,8 @@ end = struct
 
     let singleton (func_info : Func_info.t) approx = add func_info approx empty
 
-    let get_value_exn name t =
-      let d = String.Map.find name t in
-      d.approx
+    let find_value name t =
+      Option.map (fun d -> d.approx) (String.Map.find_opt name t)
 
     let map t ~f =
       String.Map.map
@@ -2429,7 +2675,14 @@ end = struct
   let fixpoint ppf init_env =
     (* CR gyorsh: this is a really dumb iteration strategy. *)
     let lookup env var =
-      let v = Env.get_value_exn (Var.name var) env in
+      let v =
+        match Env.find_value (Var.name var) env with
+        | Some v -> v
+        | None -> (
+          match Compilenv_utils.get_value_opt (Var.name var) with
+          | Some v -> v
+          | None -> Value.top Witnesses.unknown)
+      in
       Some (Value.get_component v (Var.tag var))
     in
     let rec loop env =
@@ -2548,8 +2801,8 @@ end = struct
         unresolved_deps;
     propagate ~callee:caller unit_info unresolved_deps ppf
 
-  let check_fun fun_name fun_dbg a check_body ~future_funcnames unit_info
-      unresolved_deps ppf =
+  let check_fun fun_name fun_dbg a check_body ~num_params ~future_funcnames
+      unit_info unresolved_deps ppf =
     let check () =
       let t = create ppf fun_name future_funcnames unit_info a in
       let really_check () =
@@ -2557,10 +2810,10 @@ end = struct
         report t res ~msg:"finished" ~desc:"fundecl" fun_dbg;
         if (not t.keep_witnesses) && Value.is_resolved res
         then (
-          let { Witnesses.nor; exn; div } = Value.get_witnesses res in
-          assert (Witnesses.is_empty nor);
-          assert (Witnesses.is_empty exn);
-          assert (Witnesses.is_empty div));
+          let { Witness_set.nor; exn; div } = Value.get_witnesses res in
+          assert (Witness_set.is_empty nor);
+          assert (Witness_set.is_empty exn);
+          assert (Witness_set.is_empty div));
         Unit_info.record unit_info fun_name res fun_dbg a;
         add_unresolved_dependencies fun_name unit_info unresolved_deps t.ppf;
         report_unit_info ppf unit_info ~msg:"after record"
@@ -2570,16 +2823,14 @@ end = struct
         then
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
-          Unit_info.record unit_info fun_name
-            (Value.top Witnesses.empty)
-            fun_dbg a
+          Unit_info.record unit_info fun_name (Value.top Witnesses.unknown) fun_dbg a
         else really_check ()
       in
       match a with
       | Some a when Annotation.is_assume a ->
-        let expected_value = Annotation.expected_value a in
-        report t expected_value ~msg:"assumed" ~desc:"fundecl" fun_dbg;
-        Unit_info.record unit_info fun_name expected_value fun_dbg None
+        let assumed_value = Annotation.assumed_value a ~num_params in
+        report t assumed_value ~msg:"assumed" ~desc:"fundecl" fun_dbg;
+        Unit_info.record unit_info fun_name assumed_value fun_dbg None
       | None -> really_check ()
       | Some a ->
         let expected_value = Annotation.expected_value a in
@@ -2603,17 +2854,39 @@ end = struct
 
       type error = unit
 
-      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
+      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg
+          ~known_arguments =
         report t next ~msg:"transform_call_indirect next" ~desc dbg;
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
         let effect_ =
           List.fold_left
-            (fun all_effects { Cmm.sym_name = callee; _ } ->
+            (fun all_effects callee ->
               let k = wkind callee in
-              let v = find_callee t callee ~desc dbg k in
-              let w = create_witnesses t k dbg in
+              let witnesses_for_outcome outcomes =
+                create_witnesses ~outcomes t k dbg
+              in
+              let v =
+                match callee with
+                | Cmm.Symbol { sym_name; _ } ->
+                  find_callee t sym_name ~desc dbg k ~known_arguments
+                | Cmm.Argument _ ->
+                  Value.
+                    { nor =
+                        V.top
+                          (witnesses_for_outcome Call_outcomes.normal_return);
+                      exn =
+                        V.top
+                          (witnesses_for_outcome
+                             Call_outcomes.exceptional_return);
+                      div =
+                        V.top (witnesses_for_outcome Call_outcomes.diverging)
+                    }
+              in
               let effect_ =
-                match Metadata.assume_value dbg ~can_raise:true w with
+                match
+                  Metadata.assume_value dbg ~can_raise:true
+                    witnesses_for_outcome
+                with
                 | Some v' ->
                   assert (Value.is_resolved v');
                   if Value.is_resolved v then Value.meet v v' else v'
@@ -2624,12 +2897,12 @@ end = struct
         in
         transform t ~next ~exn ~effect_ desc dbg
 
-      let transform_tailcall_imm t func dbg =
+      let transform_tailcall_imm t func dbg ~known_arguments =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
         let k = Witness.Direct_tailcall { callee = func } in
         transform_call t ~next:Value.normal_return ~exn:Value.exn_escape func k
           ~desc:("direct tailcall to " ^ func)
-          dbg
+          dbg ~known_arguments
 
       let operation t ~next (op : Operation.t) dbg =
         match op with
@@ -2673,7 +2946,7 @@ end = struct
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
-            match Metadata.assume_value_unless_inferred dbg w with
+            match Metadata.assume_value_unless_inferred dbg (fun _ -> w) with
             | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in
@@ -2709,22 +2982,20 @@ end = struct
         | Switch _ ->
           assert (not (Cfg.can_raise_terminator i.desc));
           next
-        | Tailcall_self _ ->
+        | Tailcall_self { known_arguments; _ } ->
           (* CR gyorsh: show this be treated as a jump, without affecting the
              summary? *)
-          transform_tailcall_imm t t.current_fun_name dbg
-        | Tailcall_func (Direct { sym_name; _ }) ->
-          transform_tailcall_imm t sym_name dbg
-        | Tailcall_func (Indirect (Some callees)) ->
+          transform_tailcall_imm t t.current_fun_name dbg ~known_arguments
+        | Tailcall_func { desc = Direct { sym_name; _ }; known_arguments } ->
+          transform_tailcall_imm t sym_name dbg ~known_arguments
+        | Tailcall_func { desc = Indirect (Some callees); known_arguments } ->
           transform_call_indirect t ~next:Value.normal_return
             ~exn:Value.exn_escape callees
             (fun callee -> Witness.Indirect_tailcall { callee = Some callee })
-            ~desc:"indirect tailcall" dbg
-        | Tailcall_func (Indirect None) ->
+            ~desc:"indirect tailcall" dbg ~known_arguments
+        | Tailcall_func { desc = Indirect None; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
-          let w =
-            create_witnesses t (Indirect_tailcall { callee = None }) dbg
-          in
+          let w = create_witnesses t (Indirect_tailcall { callee = None }) dbg in
           transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
             "indirect tailcall" dbg
         | Call_no_return { alloc = false; _ } ->
@@ -2745,24 +3016,37 @@ end = struct
         | Prim { op = External { alloc = true; func_symbol = func; _ }; _ } ->
           let w = create_witnesses t (Extcall { callee = func }) dbg in
           transform_top t ~next ~exn w ("external call to " ^ func) dbg
-        | Prim { op = Probe { name; handler_code_sym; enabled_at_init = _ }; _ }
-          ->
+        | Prim
+            { op =
+                Probe
+                  { name;
+                    handler_code_sym;
+                    enabled_at_init = _;
+                    known_arguments
+                  };
+              _
+            } ->
           let desc =
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
-        | Call { op = Indirect None; _ } ->
+            ~known_arguments
+        | Call { op = { desc = Indirect None; _ }; _ } ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Indirect (Some callees); _ } ->
+        | Call { op = { desc = Indirect (Some callees); known_arguments }; _ }
+          ->
           transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Indirect_call { callee = Some callee })
-            ~desc:"indirect call" dbg
-        | Call { op = Direct { sym_name = func; _ }; _ } ->
+            ~desc:"indirect call" dbg ~known_arguments
+        | Call
+            { op = { desc = Direct { sym_name = func; _ }; known_arguments };
+              _
+            } ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
-            dbg
+            dbg ~known_arguments
         | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
@@ -2793,14 +3077,15 @@ end = struct
         res
       | Aborted _ -> Misc.fatal_errorf "Analyzing function %s" fd.fun_name ()
       | Max_iterations_reached ->
-        let res = Value.top Witnesses.empty in
+        let res = Value.top Witnesses.unknown in
         report t res
           ~msg:
             "Can't reach fixpoint in max iterations, conservatively return Top"
           ~desc:"fundecl" fd.fun_dbg;
         res
     in
-    check_fun fd.fun_name fd.fun_dbg a check_body ~future_funcnames unit_info
+    check_fun fd.fun_name fd.fun_dbg a check_body
+      ~num_params:(Array.length fd.fun_args) ~future_funcnames unit_info
       unresolved_deps ppf
 end
 
@@ -2862,12 +3147,12 @@ let record_unit_info ppf_dump =
   Analysis.record_unit unit_info unresolved_deps ppf_dump;
   Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
-type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
+type iter_witnesses = (string -> Witness_set.components -> unit) -> unit
 
 let iter_witnesses f =
   Unit_info.iter unit_info ~f:(fun func_info ->
       f func_info.name
-        (Value.get_witnesses func_info.value |> Witnesses.simplify))
+        (Value.get_witnesses func_info.value |> Witness_set.simplify))
 
 let () = Location.register_error_of_exn Report.print
 

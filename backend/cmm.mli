@@ -219,6 +219,18 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+val compare_symbol : symbol -> symbol -> int
+
+type callee =
+  | Symbol of symbol
+  | Argument of int
+
+val equal_callee : callee -> callee -> bool
+
+val compare_callee : callee -> callee -> int
+
+val print_callee : Format.formatter -> callee -> unit
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -428,7 +440,7 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : callee list option
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
       }
@@ -596,6 +608,25 @@ and expression =
         symbol : symbol
       }
 
+module Known_arguments : sig
+  type t
+
+  val of_arguments :
+    parameters:(Backend_var.With_provenance.t * machtype) list ->
+    expression list ->
+    t
+
+  val none : int -> t
+
+  val find : t -> int -> callee option
+
+  val equal : t -> t -> bool
+
+  val compare : t -> t -> int
+
+  val print : Format.formatter -> t -> unit
+end
+
 type codegen_option =
   | Reduce_code_size
   | No_CSE
@@ -604,13 +635,15 @@ type codegen_option =
   | Use_regalloc_param of string list
   | Cold
   | Assume_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
         loc : Location.t
       }
   | Check_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         loc : Location.t;
         custom_error_msg : string option
       }

@@ -1,0 +1,430 @@
+(* TEST
+   flags = "-g";
+   expect.opt;
+*)
+
+(* [List.iter] isn't [zero_alloc], because [f] could allocate: *)
+let[@zero_alloc] iter ~f l = List.iter f l
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc] iter ~f l = List.iter f l
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP1.iter (camlTOP1__iter_0_1_code).
+File "list.ml", line 119, characters 12-15:
+Error: called function may allocate (indirect call through argument #1) (:1,29--42)
+|}]
+
+(* However, [List.iter] doesn't *itself* allocate, so it's
+   *conditionally* [zero_alloc]: *)
+let[@zero_alloc conditional] iter ~f l = List.iter f l
+[%%expect{|
+val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
+|}]
+
+let[@zero_alloc conditional] rec iter ~f : 'a list -> unit = function
+  | [] -> ()
+  | head :: tail -> (let () = f head in iter ~f tail)
+[%%expect{|
+val iter : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
+|}]
+
+let[@zero_alloc conditional] rec iter_even ~f : 'a list -> unit = function
+  | [] -> ()
+  | head :: tail -> (let () = f head in iter_odd ~f tail)
+and[@zero_alloc conditional] iter_odd ~f : 'a list -> unit = function
+  | [] -> ()
+  | head :: tail -> (let () = f head in iter_even ~f tail)
+[%%expect{|
+val iter_even : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
+val iter_odd : f:('a -> unit) -> 'a list -> unit [@@zero_alloc conditional] =
+  <fun>
+|}]
+
+(* Deceptively trivial-looking functions (e.g. if ['a] is a function): *)
+let[@zero_alloc conditional] apply f x = f x
+let[@zero_alloc conditional] id x = x
+[%%expect{|
+val apply : ('a -> 'b) -> 'a -> 'b [@@zero_alloc conditional] = <fun>
+val id : 'a -> 'a [@@zero_alloc conditional] = <fun>
+|}]
+
+(* Optional arguments are passed on the heap and lowered to [_ option], so they
+   are *not* valid (but would be valid with the [noalloc] mode): *)
+let[@zero_alloc conditional] apply_opt ?f x =
+  match f with
+  | Some f -> f x
+  | None -> ()
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] apply_opt ?f x =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP7.apply_opt (camlTOP7__apply_opt_7_15_code).
+Line 3, characters 14-17:
+3 |   | Some f -> f x
+                  ^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
+(* A trivially allocating function, to be used later: *)
+let state = ref (ref 42)
+let[@inline never] allocate () = state := ref 42
+[%%expect{|
+val state : int ref ref = {contents = {contents = 42}}
+val allocate : unit -> unit = <fun>
+|}]
+
+module Module_type_forces_zero_alloc_conditional : sig
+  val f : (unit -> unit) -> unit [@@zero_alloc conditional]
+end = struct
+  let f g = g ()
+end
+[%%expect{|
+module Module_type_forces_zero_alloc_conditional :
+  sig val f : (unit -> unit) -> unit [@@zero_alloc conditional] end
+|}]
+
+module Module_type_forces_zero_alloc_conditional : sig
+  val f : (unit -> unit) -> unit [@@zero_alloc conditional]
+end = struct
+  let f g = allocate ()
+end
+[%%expect{|
+Line 4, characters 8-23:
+4 |   let f g = allocate ()
+            ^^^^^^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP11.Module_type_forces_zero_alloc_conditional.f (camlTOP11__f_10_21_code).
+Line 4, characters 12-23:
+4 |   let f g = allocate ()
+                ^^^^^^^^^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
+let[@zero_alloc] iter_ignore l = List.iter ignore l
+[%%expect{|
+val iter_ignore : 'a list -> unit [@@zero_alloc] = <fun>
+|}]
+
+let[@zero_alloc] iter_alloc l = List.iter ~f:allocate l
+[%%expect{|
+Line 1, characters 45-53:
+1 | let[@zero_alloc] iter_alloc l = List.iter ~f:allocate l
+                                                 ^^^^^^^^
+Error: The function applied to this argument has type 'a list -> unit
+This argument cannot be applied with label "~f"
+|}]
+
+(* Unannotated stdlib functions need to know their conditions: *)
+let[@zero_alloc] ignore_ints (ints : int list) =
+  (List.iter [@inlined never]) ignore ints
+[%%expect{|
+val ignore_ints : int list -> unit [@@zero_alloc] = <fun>
+|}]
+
+let[@zero_alloc conditional] allocate_before_callback f =
+  allocate ();
+  f ()
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] allocate_before_callback f =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP15.allocate_before_callback (camlTOP15__allocate_before_callback_15_29_code).
+Line 2, characters 2-13:
+2 |   allocate ();
+      ^^^^^^^^^^^
+Error: called function may allocate (indirect call)
+Line 3, characters 2-6:
+3 |   f ()
+      ^^^^
+Error: called function may allocate (indirect tailcall through argument #1)
+|}]
+
+let[@zero_alloc conditional] allocate_after_callback f =
+  f ();
+  allocate ()
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] allocate_after_callback f =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP16.allocate_after_callback (camlTOP16__allocate_after_callback_16_31_code).
+Line 2, characters 2-6:
+2 |   f ();
+      ^^^^
+Error: called function may allocate (indirect call through argument #1)
+Line 3, characters 2-13:
+3 |   allocate ()
+      ^^^^^^^^^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
+let[@zero_alloc conditional] shadow_allocate f =
+  f ();
+  let f () = allocate () in
+  f ()
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] shadow_allocate f =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP17.shadow_allocate (camlTOP17__shadow_allocate_17_33_code).
+Line 2, characters 2-6:
+2 |   f ();
+      ^^^^
+Error: called function may allocate (indirect call through argument #1)
+Line 3, characters 13-24:
+3 |   let f () = allocate () in
+                 ^^^^^^^^^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
+let[@zero_alloc conditional] rec recursion_must_be_checked f b =
+  if b then f () else
+  recursion_must_be_checked allocate true
+(* Note that flambda turns the above into a loop, so there's no recursive call
+   left to highlight in a diagnostic. *)
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] rec recursion_must_be_checked f b =
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP18.recursion_must_be_checked (camlTOP18__recursion_must_be_checked_18_35_code).
+Line 2, characters 12-16:
+2 |   if b then f () else
+                ^^^^
+Error: called function may allocate (indirect tailcall)
+|}]
+
+(* Exceptions may or may not be assumed: *)
+exception After_allocating
+let[@zero_alloc] allocate_then_raise () = (allocate (); raise After_allocating)
+[%%expect{|
+exception After_allocating
+val allocate_then_raise : unit -> 'a [@@zero_alloc] = <fun>
+|}]
+
+(* Try to use inlining (via [apply]) to break soundness: *)
+module Inlining = struct
+  let[@inline always] [@zero_alloc conditional] apply f x = f x
+
+  let[@zero_alloc conditional] inlining_cant_expose_assumptions () =
+    (* Note that [apply] assumes its [f] argument is non-allocating, but
+      we have to be careful about scoping that, since in this invocation,
+      [f] is [allocate], and [apply] is [inline always], so its inlined body is
+      [(allocate [@zero_alloc assume]) ()], which would be accepted(!). *)
+    apply allocate ()
+end
+[%%expect{|
+Line 4, characters 7-17:
+4 |   let[@zero_alloc conditional] inlining_cant_expose_assumptions () =
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP21.Inlining.inlining_cant_expose_assumptions (camlTOP21__inlining_cant_expose_assumptions_21_41_code).
+Line 2, characters 60-63:
+2 |   let[@inline always] [@zero_alloc conditional] apply f x = f x
+                                                                ^^^
+Error: called function may allocate (indirect tailcall) (:9,4--21)
+|}]
+
+(* On a function instead of an argument, [conditional assume] does what it says:
+   "at call sites, if all arguments won't allocate, this won't allocate." *)
+module Zero_alloc_conditional_assume_allows_allocation = struct
+  let[@inline never][@zero_alloc conditional assume] secret (f : unit -> unit) =
+    allocate ()
+  let[@zero_alloc] danger () = secret ignore
+end
+[%%expect{|
+module Zero_alloc_conditional_assume_allows_allocation :
+  sig
+    val secret : (unit -> unit) -> unit [@@zero_alloc conditional]
+    val danger : unit -> unit [@@zero_alloc]
+  end
+|}]
+module Zero_alloc_conditional_assume_requires_non_allocating_arguments = struct
+  let[@inline never][@zero_alloc conditional assume] secret (f : unit -> unit) =
+    allocate ()
+  let[@zero_alloc] rejected_bc_argument_allocates () = secret allocate
+end
+[%%expect{|
+Line 4, characters 7-17:
+4 |   let[@zero_alloc] rejected_bc_argument_allocates () = secret allocate
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP23.Zero_alloc_conditional_assume_requires_non_allocating_arguments.rejected_bc_argument_allocates (camlTOP23__rejected_bc_argument_allocates_26_50_code).
+Line 4, characters 55-70:
+4 |   let[@zero_alloc] rejected_bc_argument_allocates () = secret allocate
+                                                           ^^^^^^^^^^^^^^^
+Error: called function may allocate (direct tailcall camlTOP23__secret_25_49_code)
+|}]
+
+(* Arguments are non-[strict] by default: *)
+let[@zero_alloc conditional] catch_nonstrict f = try f () with _ -> ()
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc conditional] catch_nonstrict f = try f () with _ -> ()
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc conditional failed on function TOP24.catch_nonstrict (camlTOP24__catch_nonstrict_27_52_code).
+Line 1, characters 53-57:
+1 | let[@zero_alloc conditional] catch_nonstrict f = try f () with _ -> ()
+                                                         ^^^^
+Error: called function may allocate (indirect call through argument #1)
+|}]
+
+(* Asking for [conditional strict] requires that *arguments* are [strict]: *)
+module Strict_requires_arguments_to_be_strict = struct
+  let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
+  let[@zero_alloc] enforced_at_call_sites () = catch_strict ignore
+end
+[%%expect{|
+module Strict_requires_arguments_to_be_strict :
+  sig
+    val catch_strict : (unit -> unit) -> unit
+      [@@zero_alloc conditional strict]
+    val enforced_at_call_sites : unit -> unit [@@zero_alloc]
+  end
+|}]
+
+module Strict_requires_arguments_to_be_strict = struct
+  let[@zero_alloc conditional strict] catch_strict f = try f () with _ -> ()
+  let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+end
+[%%expect{|
+Line 3, characters 7-17:
+3 |   let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+           ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP26.Strict_requires_arguments_to_be_strict.enforced_at_call_sites (camlTOP26__enforced_at_call_sites_32_61_code).
+Line 3, characters 47-79:
+3 |   let[@zero_alloc] enforced_at_call_sites () = catch_strict allocate_then_raise
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (direct tailcall camlTOP26__catch_strict_31_60_code)
+|}]
+
+(* CR-someday wsturgeon for wsturgeon: support arbitrary-arity callbacks, and
+   un-comment the tests below *)
+(*
+let[@zero_alloc conditional] apply2 f x y = f x y
+[%%expect{|
+val apply2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional] = <fun>
+|}]
+
+let[@inline never] [@zero_alloc strict] allocator () = allocate
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc] overapply () = apply2 allocator () ()
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+let[@inline never] [@zero_alloc strict] add_ints x y = x + y
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc] apply_two_argument_callback x y = apply2 add_ints x y
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc conditional] either f g x b =
+  if b then f x else g x
+[%%expect{|
+val either : ('a -> 'b) -> ('a -> 'b) -> 'a -> bool -> 'b
+  [@@zero_alloc conditional] = <fun>
+|}]
+
+let[@zero_alloc] cleverly_do_nothing b = either ignore ignore () b
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc] allocate_rhs b = either ignore allocate () b
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+let[@zero_alloc] allocate_lhs b = either allocate ignore () b
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+let[@zero_alloc] allocate_both b = either allocate allocate () b
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+let[@inline never] [@zero_alloc strict] id_strict x = x
+[%%expect{|
+val id_strict : 'a -> 'a [@@zero_alloc strict] = <fun>
+|}]
+
+let[@zero_alloc] allocating_callback_argument x = apply id_strict (ref x)
+[%%expect{|
+Line 1, characters 5-15:
+1 | let[@zero_alloc] allocating_callback_argument x = apply id_strict (ref x)
+         ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function TOP24.allocating_callback_argument (camlTOP24__allocating_callback_argument_23_46_code).
+Line 1, characters 50-73:
+1 | let[@zero_alloc] allocating_callback_argument x = apply id_strict (ref x)
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: called function may allocate (direct tailcall caml_apply2)
+Line 1, characters 66-73:
+1 | let[@zero_alloc] allocating_callback_argument x = apply id_strict (ref x)
+                                                                      ^^^^^^^
+Error: allocation of 16 bytes
+|}]
+
+(* Without inlining, arguments themselves can require conditional logic: *)
+let[@inline never][@zero_alloc conditional] forward2 f x y = f x y
+let[@zero_alloc] higher_order_ignore () = forward2 apply ignore ()
+[%%expect{|
+val forward2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional] =
+   <fun>
+val higher_order_ignore : unit -> unit [@@zero_alloc] = <fun>
+|}]
+let[@zero_alloc] higher_order_allocate () = forward2 apply allocate ()
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+(* Arity matters, and the above are all single-argument functions: *)
+let[@zero_alloc] two_arguments () () = ()
+let[@zero_alloc] higher_order_arity_2 () = forward2 two_arguments () ()
+[%%expect{|
+val higher_order : unit -> unit [@@zero_alloc] = <fun>
+CR wsturgeon: the latter has to fail
+|}]
+
+(* Callback arguments are themselves conditional: *)
+let[@zero_alloc conditional] arguments_are_conditional
+    (f : (unit -> unit) -> unit) g =
+  f g
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+let[@zero_alloc] no_op () =
+  arguments_are_conditional (fun f -> f ()) ignore
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+let[@zero_alloc] alloc () =
+  arguments_are_conditional (fun f -> f ()) allocate
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+let[@zero_alloc] alloc () =
+  arguments_are_conditional (fun f -> (allocate (); f ())) ignore
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+
+let[@zero_alloc conditional strict] rec insane () = apply insane ()
+[%%expect{|
+CR wsturgeon: this has to pass
+|}]
+
+let[@zero_alloc conditional strict] rec roundabout b =
+  if b then allocate () else
+  apply roundabout true
+[%%expect{|
+CR wsturgeon: this has to fail
+|}]
+*)

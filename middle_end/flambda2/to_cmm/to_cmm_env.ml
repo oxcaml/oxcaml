@@ -177,6 +177,9 @@ type t =
     (* All continuations that act as exception handlers. *)
     vars_extra : extra_info Variable.Map.t;
     (* Extra information associated with Flambda variables. *)
+    function_parameters : int Variable.Map.t;
+    (* Variables that refer directly to top-level function arguments, including
+       via aliases (a non-injective map from variables to indices). *)
     vars : (Cmm.expression * free_vars) Variable.Map.t;
     (* Cmm expressions (of the form [Cvar ...]) for all bound variables in
        scope. *)
@@ -297,15 +300,30 @@ let create offsets functions_info ~trans_prim ~return_continuation
     inline_once_aliases = Variable.Map.empty;
     vars_extra = Variable.Map.empty;
     vars = Variable.Map.empty;
+    function_parameters = Variable.Map.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
     symbol_inits = Backend_var.Map.empty
   }
 
-let enter_function_body env ~return_continuation ~return_continuation_arity
-    ~exn_continuation =
-  create env.offsets env.functions_info ~trans_prim:env.trans_prim
-    ~return_continuation ~return_continuation_arity ~exn_continuation
+let enter_function_body env ~params ~return_continuation
+    ~return_continuation_arity ~exn_continuation =
+  let env =
+    create env.offsets env.functions_info ~trans_prim:env.trans_prim
+      ~return_continuation ~return_continuation_arity ~exn_continuation
+  in
+  let function_parameters =
+    Misc.Stdlib.List.fold_lefti
+      (fun index indices param ->
+        Variable.Map.add (Bound_parameter.var param) index indices)
+      Variable.Map.empty (Bound_parameters.to_list params)
+  in
+  { env with function_parameters }
+
+let function_parameter_index env simple =
+  match Simple.must_be_var simple with
+  | None -> None
+  | Some (var, _coercion) -> Variable.Map.find_opt var env.function_parameters
 
 (* Debuginfo *)
 
@@ -1062,6 +1080,15 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
 
 let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
+  let env =
+    match Variable.Map.find_opt alias_of env.function_parameters with
+    | None -> env
+    | Some index ->
+      { env with
+        function_parameters =
+          Variable.Map.add (Bound_var.var var) index env.function_parameters
+      }
+  in
   let num_occurrences_of_var : Num_occurrences.t =
     let var = Bound_var.var var in
     match Variable.Map.find var num_normal_occurrences_of_bound_vars with

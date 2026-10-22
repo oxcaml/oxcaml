@@ -47,6 +47,7 @@ module Make (_ : Cfg_selectgen_target_intf.S) : sig
     Cmm.expression list ->
     Debuginfo.t ->
     label_after:Label.t ->
+    parameters:(Backend_var.With_provenance.t * Cmm.machtype) list ->
     Cfg.basic_or_terminator * Cmm.expression list
 
   val effects_of : Cmm.expression -> Select_utils.Effect_and_coeffect.t

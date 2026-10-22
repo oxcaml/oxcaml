@@ -30,13 +30,13 @@
 module type WS = sig
   type t
 
-  val empty : t
+  val unknown : t
 
   val join : t -> t -> t
 
   val meet : t -> t -> t
 
-  val lessequal : t -> t -> bool
+  val lessequal : ignore_diagnostic_witnesses:bool -> t -> t -> bool
 
   val print : Format.formatter -> t -> unit
 
@@ -55,6 +55,9 @@ module type Component = sig
   val bot : t
 
   val lessequal : t -> t -> bool
+
+  val satisfies :
+    conditional:bool -> strict:bool -> actual:t -> expected:t -> bool
 
   val join : t -> t -> t
 
@@ -99,12 +102,16 @@ module Make_component (Witnesses : WS) = struct
     match v1, v2 with
     | Bot, Bot -> true
     | Safe, Safe -> true
-    | Top w1, Top w2 -> Witnesses.lessequal w1 w2
+    | Top w1, Top w2 ->
+      Witnesses.lessequal ~ignore_diagnostic_witnesses:false w1 w2
     | Bot, Safe -> true
     | Bot, Top _ -> true
     | Safe, Top _ -> true
     | Top _, (Bot | Safe) -> false
     | Safe, Bot -> false
+
+  let satisfies ~conditional:_ ~strict:_ ~actual ~expected =
+    lessequal actual expected
 
   let compare t1 t2 =
     match t1, t2 with
@@ -141,6 +148,14 @@ struct
     V.lessequal v1.nor v2.nor && V.lessequal v1.exn v2.exn
     && V.lessequal v1.div v2.div
 
+  let satisfies ~conditional ~strict ~actual ~expected =
+    V.satisfies ~conditional ~strict ~actual:actual.nor
+      ~expected:expected.nor &&
+    V.satisfies ~conditional ~strict ~actual:actual.exn
+      ~expected:expected.exn &&
+    V.satisfies ~conditional ~strict ~actual:actual.div
+      ~expected:expected.div
+
   let join v1 v2 =
     { nor = V.join v1.nor v2.nor;
       exn = V.join v1.exn v2.exn;
@@ -166,7 +181,7 @@ struct
   let relaxed w = { nor = V.safe; exn = V.top w; div = V.top w }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
-    let res = if strict then safe else relaxed Witnesses.empty in
+    let res = if strict then safe else relaxed Witnesses.unknown in
     let res = if never_raises then { res with exn = V.bot } else res in
     if never_returns_normally then { res with nor = V.bot } else res
 
@@ -190,13 +205,13 @@ module Assume_info = struct
 
     let join _ _ = ()
 
-    let lessequal _ _ = true
+    let lessequal ~ignore_diagnostic_witnesses:_ _ _ = true
 
     let meet _ _ = ()
 
     let print _ _ = ()
 
-    let empty = ()
+    let unknown = ()
 
     let compare _ _ = 0
   end

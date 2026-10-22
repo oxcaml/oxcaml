@@ -54,13 +54,15 @@ type codegen_option =
   | Use_regalloc_param of string list
   | Cold
   | Assume_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
         loc : Location.t
       }
   | Check_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         loc : Location.t;
         custom_error_msg : string option
       }
@@ -73,11 +75,11 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
     match hd with
     | No_CSE -> No_CSE :: of_cmm_codegen_option tl
     | Reduce_code_size -> Reduce_code_size :: of_cmm_codegen_option tl
-    | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc } ->
-      Assume_zero_alloc { strict; never_returns_normally; never_raises; loc }
+    | Assume_zero_alloc { conditional; strict; never_returns_normally; never_raises; loc } ->
+      Assume_zero_alloc { conditional; strict; never_returns_normally; never_raises; loc }
       :: of_cmm_codegen_option tl
-    | Check_zero_alloc { strict; loc; custom_error_msg } ->
-      Check_zero_alloc { strict; loc; custom_error_msg }
+    | Check_zero_alloc { conditional; strict; loc; custom_error_msg } ->
+      Check_zero_alloc { conditional; strict; loc; custom_error_msg }
       :: of_cmm_codegen_option tl
     | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
     | Use_regalloc regalloc -> Use_regalloc regalloc :: of_cmm_codegen_option tl
@@ -170,7 +172,7 @@ let mem_block t label = Label.Tbl.mem t.blocks label
 
 let successor_labels_normal ti =
   match ti.desc with
-  | Tailcall_self { destination } -> Label.Set.singleton destination
+  | Tailcall_self { destination; _ } -> Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
   | Call_no_return _ -> Label.Set.empty
@@ -232,10 +234,9 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Float_test { width; lt; eq; gt; uo } ->
         Float_test { width; lt = f lt; eq = f eq; gt = f gt; uo = f uo }
       | Switch labels -> Switch (Array.map f labels)
-      | Tailcall_self { destination } ->
-        Tailcall_self { destination = f destination }
-      | Tailcall_func (Indirect _)
-      | Tailcall_func (Direct _)
+      | Tailcall_self { destination; known_arguments } ->
+        Tailcall_self { destination = f destination; known_arguments }
+      | Tailcall_func _
       | Return | Raise _ | Call_no_return _
       | Invalid { label_after = None; _ } ->
         block.terminator.desc
@@ -806,12 +807,24 @@ let equal_float_test
   && Label.equal left_gt right_gt
   && Label.equal left_uo right_uo
 
-let equal_func_call_operation left right =
+let equal_func_call_desc left right =
   match left, right with
   | Indirect left_callees, Indirect right_callees ->
-    Option.equal (List.equal Cmm.equal_symbol) left_callees right_callees
+    let equal_callee left right =
+      match left, right with
+      | Cmm.Symbol left, Cmm.Symbol right -> Cmm.equal_symbol left right
+      | Cmm.Argument left, Cmm.Argument right -> Int.equal left right
+      | Cmm.Symbol _, Cmm.Argument _ | Cmm.Argument _, Cmm.Symbol _ -> false
+    in
+    Option.equal (List.equal equal_callee) left_callees right_callees
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
   | (Indirect _ | Direct _), _ -> false
+
+let equal_func_call_operation
+    { desc = left_desc; known_arguments = left_args }
+    { desc = right_desc; known_arguments = right_args } =
+  equal_func_call_desc left_desc right_desc
+  && Cmm.Known_arguments.equal left_args right_args
 
 let equal_external_call_operation
     { func_symbol = left_func_symbol;
@@ -845,16 +858,19 @@ let equal_prim_call_operation left right =
   | ( Probe
         { name = left_name;
           handler_code_sym = left_handler;
-          enabled_at_init = left_enabled
+          enabled_at_init = left_enabled;
+          known_arguments = left_args
         },
       Probe
         { name = right_name;
           handler_code_sym = right_handler;
-          enabled_at_init = right_enabled
+          enabled_at_init = right_enabled;
+          known_arguments = right_args
         } ) ->
     String.equal left_name right_name
     && String.equal left_handler right_handler
     && Bool.equal left_enabled right_enabled
+    && Cmm.Known_arguments.equal left_args right_args
   | (External _ | Probe _), _ -> false
 
 let equal_with_label_after equal_op
@@ -879,9 +895,12 @@ let equal_terminator left right =
   | Return, Return -> true
   | Raise left_kind, Raise right_kind ->
     Lambda.equal_raise_kind left_kind right_kind
-  | ( Tailcall_self { destination = left_dest },
-      Tailcall_self { destination = right_dest } ) ->
+  | ( Tailcall_self
+        { destination = left_dest; known_arguments = left_args },
+      Tailcall_self
+        { destination = right_dest; known_arguments = right_args } ) ->
     Label.equal left_dest right_dest
+    && Cmm.Known_arguments.equal left_args right_args
   | Tailcall_func left_op, Tailcall_func right_op ->
     equal_func_call_operation left_op right_op
   | Call_no_return left_op, Call_no_return right_op ->

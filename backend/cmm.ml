@@ -310,6 +310,12 @@ let equal_is_global g g' =
   | Local, Local | Global, Global -> true
   | Local, Global | Global, Local -> false
 
+let compare_is_global g g' =
+  match g, g' with
+  | Local, Local | Global, Global -> 0
+  | Local, Global -> -1
+  | Global, Local -> 1
+
 type symbol =
   { sym_name : string;
     sym_global : is_global
@@ -319,6 +325,32 @@ let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
     { sym_name = right_sym_name; sym_global = right_sym_global } =
   String.equal left_sym_name right_sym_name
   && equal_is_global left_sym_global right_sym_global
+
+let compare_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
+    { sym_name = right_sym_name; sym_global = right_sym_global } =
+  let c = String.compare left_sym_name right_sym_name in
+  if c <> 0 then c else compare_is_global left_sym_global right_sym_global
+
+type callee =
+  | Symbol of symbol
+  | Argument of int
+
+let equal_callee c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> equal_symbol s1 s2
+  | Argument s1, Argument s2 -> s1 = s2
+  | Symbol _, Argument _ | Argument _, Symbol _ -> false
+
+let compare_callee c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> compare_symbol s1 s2
+  | Argument s1, Argument s2 -> compare s1 s2
+  | Symbol _, Argument _ -> -1
+  | Argument _, Symbol _ -> 1
+
+let print_callee ppf = function
+  | Symbol { sym_name; _ } -> Format.fprintf ppf "%s" sym_name
+  | Argument index -> Format.fprintf ppf "arg#%d" (index + 1)
 
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
@@ -556,7 +588,7 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : callee list option
       }
   | Cextcall of
       { func : string;
@@ -713,6 +745,40 @@ and expression =
         symbol : symbol
       }
 
+module Known_arguments = struct
+  type t = callee option list
+
+  let of_argument ~parameters = function[@ocaml.warning "-fragile-match"]
+    | Cvar var ->
+      List.find_index
+        (fun (parameter, _machtype) ->
+          Backend_var.same (Backend_var.With_provenance.var parameter) var)
+        parameters
+      |> Option.map (fun index -> Argument index)
+    | Cconst_symbol (symbol, _dbg) -> Some (Symbol symbol)
+    | _ -> None
+
+  let of_arguments ~parameters arguments =
+    List.map (of_argument ~parameters) arguments
+
+  let none length = List.init length (fun _ -> None)
+
+  let find t index = Option.join (List.nth_opt t index)
+
+  let equal = List.equal (Option.equal equal_callee)
+
+  let compare = List.compare (Option.compare compare_callee)
+
+  let print ppf t =
+    let print_argument ppf = function
+      | None -> Format.fprintf ppf "?"
+      | Some callee -> print_callee ppf callee
+    in
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+      print_argument ppf t
+end
+
 type codegen_option =
   | Reduce_code_size
   | No_CSE
@@ -721,13 +787,15 @@ type codegen_option =
   | Use_regalloc_param of string list
   | Cold
   | Assume_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
         loc : Location.t
       }
   | Check_zero_alloc of
-      { strict : bool;
+      { conditional : bool;
+        strict : bool;
         loc : Location.t;
         custom_error_msg : string option
       }

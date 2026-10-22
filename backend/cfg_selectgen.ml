@@ -349,7 +349,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Default instruction selection for operators *)
 
   let select_operation0 (op : Cmm.operation) (args : Cmm.expression list)
-      (dbg : Debuginfo.t) ~label_after :
+      (dbg : Debuginfo.t) ~label_after ~parameters :
       Cfg.basic_or_terminator * Cmm.expression list =
     let wrong_num_args n =
       Misc.fatal_errorf
@@ -371,10 +371,22 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     match[@ocaml.warning "+fragile-match"] op with
     | Capply { callees; _ } -> (
+      let known_arguments =
+        Cmm.Known_arguments.of_arguments ~parameters (List.tl args)
+      in
       match[@ocaml.warning "-fragile-match"] args with
       | Cconst_symbol (func, _dbg) :: rem ->
-        Terminator (Call { op = Direct func; label_after }), rem
-      | _ -> Terminator (Call { op = Indirect callees; label_after }), args)
+        ( Terminator
+            ( Call
+                { op = { desc = Direct func; known_arguments }; label_after }),
+          rem )
+      | _ ->
+        ( Terminator
+            ( Call
+                { op = { desc = Indirect callees; known_arguments };
+                  label_after
+               }),
+          args ))
     | Cextcall
         { func; alloc; ty; ty_args; returns; builtin; effects; coeffects = _ }
       ->
@@ -493,9 +505,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ( SU.basic_op (Intop_atomic { op; size; addr }),
           [compare_with; set_to; eloc] ))
     | Cprobe { name; handler_code_sym; enabled_at_init } ->
+      let known_arguments = Cmm.Known_arguments.of_arguments ~parameters args in
       ( Terminator
           (Prim
-             { op = Probe { name; handler_code_sym; enabled_at_init };
+             { op =
+                 Probe
+                   { name; handler_code_sym; enabled_at_init; known_arguments };
                label_after
              }),
         args )
@@ -508,7 +523,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Misc.fatal_error "Selection.select_oper"
 
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
-      (dbg : Debuginfo.t) ~label_after :
+      (dbg : Debuginfo.t) ~label_after ~parameters :
       Cfg.basic_or_terminator * Cmm.expression list =
     match
       Target.select_operation ~generic_select_condition:select_condition op args
@@ -517,12 +532,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
     | Select_operation_then_rewrite (op, args, dbg, rewriter) -> (
       let basic_or_terminator, args =
-        select_operation op args dbg ~label_after
+        select_operation op args dbg ~label_after ~parameters
       in
       match rewriter basic_or_terminator ~args with
       | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
       | Use_default -> basic_or_terminator, args)
-    | Use_default -> select_operation0 op args dbg ~label_after
+    | Use_default -> select_operation0 op args dbg ~label_after ~parameters
 
   let insert_return env sub_cfg (r : _ Or_never_returns.t)
       (traps : Cmm.trap_action list) =
@@ -1068,9 +1083,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       in
       let ty = SU.oper_result_type op in
       let label_after = Cmm.new_label () in
-      let new_op, new_args = select_operation op simple_args dbg ~label_after in
+      let new_op, new_args =
+        select_operation op simple_args dbg ~label_after
+          ~parameters:env.SU.parameters
+      in
       match new_op with
-      | Terminator (Call { op = Indirect _; label_after } as term) ->
+      | Terminator (Call { op = { desc = Indirect _; _ }; label_after } as term)
+        ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let rd = Reg.createv ty in
@@ -1089,7 +1108,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
         SU.set_traps_for_raise env;
         Ok rd
-      | Terminator (Call { op = Direct _; label_after } as term) ->
+      | Terminator (Call { op = { desc = Direct _; _ }; label_after } as term)
+        ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
@@ -1456,9 +1476,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Never_returns -> ()
     | Ok (simple_args, env) -> (
       let label_after = Cmm.new_label () in
-      let new_op, new_args = select_operation op simple_args dbg ~label_after in
+      let new_op, new_args =
+        select_operation op simple_args dbg ~label_after
+          ~parameters:env.SU.parameters
+      in
       match new_op with
-      | Terminator (Call { op = Indirect callees; label_after } as term) ->
+      | Terminator
+          (Call { op = { desc = Indirect _; _ } as op; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
@@ -1467,7 +1491,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in
         if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func (Indirect callees) in
+          let call = Cfg.Tailcall_func op in
           SU.insert_moves env sub_cfg rarg loc_arg;
           SU.insert_debug' env sub_cfg call dbg
             (Array.append [| r1.(0) |] loc_arg)
@@ -1481,7 +1505,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | Terminator (Call { op = Direct func; label_after } as term) ->
+      | Terminator
+          (Call
+             { op = { desc = Direct func; known_arguments } as op; label_after }
+           as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
@@ -1491,7 +1518,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           String.equal func.sym_name !SU.current_function_name
           && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_self { destination = env.SU.tailrec_label } in
+          let call =
+            Cfg.Tailcall_self
+              { destination = env.SU.tailrec_label; known_arguments }
+          in
           let loc_arg' =
             assert (stack_ofs >= 0);
             if stack_ofs = 0 then loc_arg else Proc.loc_parameters (Reg.typv r1)
@@ -1500,7 +1530,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg call dbg loc_arg' [||])
         else if stack_ofs = 0 && SU.trap_stack_is_empty env
         then (
-          let call = Cfg.Tailcall_func (Direct func) in
+          let call = Cfg.Tailcall_func op in
           SU.insert_moves env sub_cfg r1 loc_arg;
           SU.insert_debug' env sub_cfg call dbg loc_arg [||])
         else (
@@ -1739,7 +1769,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let rarg = Array.concat rargs in
     let loc_arg = Proc.loc_parameters (Reg.typv rarg) in
     let tailrec_label = Cmm.new_label () in
-    let env = SU.env_create ~tailrec_label in
+    let env = SU.env_create ~tailrec_label ~parameters:f.Cmm.fun_args in
     let env =
       List.fold_right2
         (fun (id, _ty) r env -> SU.env_add id r env)
