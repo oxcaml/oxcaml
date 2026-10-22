@@ -1101,11 +1101,7 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
     double d = Double_flat_field(base, pos);
-#define Setup_for_gc
-#define Restore_after_gc
     Alloc_small(res, Double_wosize, Double_tag, Alloc_small_enter_GC);
-#undef Setup_for_gc
-#undef Restore_after_gc
     Store_double_val(res, d);
     CAMLreturn (res);
   }
@@ -1149,6 +1145,14 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
     CAMLreturn (Val_unit);
   }
 #endif
+  // writing into an unboxed product that has been flattened into a singleton
+  if (depth == 0) {
+    CAMLassert (Wosize_val(base) == Wosize_val(v));
+    for (mlsize_t i = 0; i < Wosize_val(v); i++) {
+      caml_modify(&Field(base, i), Field(v, i));
+    }
+    CAMLreturn (Val_unit);
+  }
   volatile value* dst = &base;
   for (mlsize_t i = 0; i < depth; i++) {
     intnat pos = Long_val(Field(idx, i));
@@ -1267,19 +1271,18 @@ CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
 
 /* Concatenates idx_prefix and idx_suffix */
 CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
+  CAMLparam2 (idx_prefix, idx_suffix);
   mlsize_t prefix_depth = Wosize_val(idx_prefix);
   mlsize_t suffix_depth = Wosize_val(idx_suffix);
 
   mlsize_t wosize = prefix_depth + suffix_depth;
+  // both paths may be empty (singleton products and unboxed records)
+  if (wosize == 0) CAMLreturn (Atom(0));
   tag_t tag = 0;
   value block;
   mlsize_t i = 0;
   if (wosize <= Max_young_wosize) {
-#define Setup_for_gc
-#define Restore_after_gc
     Alloc_small(block, wosize, tag, Alloc_small_enter_GC);
-#undef Setup_for_gc
-#undef Restore_after_gc
     for (mlsize_t j = 0; j < prefix_depth; j++) {
       value jth = Field(idx_prefix, j);
       Field(block, i) = jth;
@@ -1301,7 +1304,7 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
       i++;
     }
   }
-  return block;
+  CAMLreturn (block);
 }
 
 /* generic [gather] functions for extraction and concatenation of sub-arrays */

@@ -21,12 +21,15 @@ open Heterogenous_list
     queries. *)
 
 module Term : sig
-  include Heterogenous_list.S
+  include Heterogenous_list.S with type 'a t = 'a Lang.term
 
   val constant : 'a -> 'a t
 end
 
-type atom = Atom : ('t, 'k, unit) Table.Id.t * 'k Term.hlist -> atom
+type atom =
+  | Atom :
+      ('t, 'k, 'v) Table.Id.t * 'k Term.hlist * 'v Lang.variable option
+      -> atom
 
 module String : sig
   include Heterogenous_list.S with type 'a t := string
@@ -53,6 +56,7 @@ val foreach :
 val where_atom :
   ('t, 'k, 'v) Table.Id.t ->
   'k Term.hlist ->
+  'v Lang.variable option ->
   ('p, 'a) program ->
   ('p, 'a) program
 
@@ -71,6 +75,13 @@ val unless_eq :
 
 val filter :
   ('k Constant.hlist -> bool) ->
+  'k Term.hlist ->
+  ('p, 'a) program ->
+  ('p, 'a) program
+
+val if_let :
+  'v Lang.variable ->
+  ('k Constant.hlist -> 'v Or_null.t) ->
   'k Term.hlist ->
   ('p, 'a) program ->
   ('p, 'a) program

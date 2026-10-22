@@ -39,11 +39,14 @@ type 'f solution =
 let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
-  let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
-  let db = PTA.perform_analysis datalog ~stats ~analysis_scope in
-  let (unboxing : UA.result) = UA.perform_analysis db ~stats ~analysis_scope in
-  if with_provenance || Flambda_features.debug_reaper "stats"
-  then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
+  let stats =
+    if with_provenance || Flambda_features.debug_reaper "stats"
+    then Some (Datalog.Schedule.create_stats ~with_provenance datalog)
+    else None
+  in
+  let db = PTA.perform_analysis datalog ?stats ~analysis_scope in
+  let (unboxing : UA.result) = UA.perform_analysis db ?stats ~analysis_scope in
+  Option.iter (Format.eprintf "%a@." Datalog.Schedule.print_stats) stats;
   if Flambda_features.debug_reaper "db"
   then Format.eprintf "%a@." Datalog.print db;
   unboxing

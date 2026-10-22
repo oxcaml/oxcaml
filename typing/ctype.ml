@@ -2607,6 +2607,9 @@ let rec try_reduce_once env t =
     end
   | _ -> raise Cannot_expand
 
+(** Apply a reduction step on [<[t]> eval].
+    [copy_persistent] relies on this function to always return copies,
+    and to behave well on ill-staged types. *)
 and try_reduce_quote_eval env t =
   let path_must_be_persistent env path =
     if not (Env.path_is_persistent_in_quotations env path) then
@@ -2729,6 +2732,22 @@ let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
   try try_reduce env ty'
   with Cannot_expand -> ty'
+
+(** Deeply reduce all [Tquote_eval]s appearing in a type.
+    The resulting type does not contain any [Tquote_eval]s and has no sharing.
+    Raises [Cannot_expand] on failure. *)
+let rec try_full_reduce_quote_eval_desc env = function
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
+  | Tvariant row ->
+    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
+    Tvariant (
+      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
+  | t ->
+    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
+and try_full_reduce_quote_eval env t =
+  try_full_reduce_quote_eval_desc env (get_desc t)
+  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
 
 (* [Predef]'s [eval] and [box] are special -- we want to always expand it in
    [reduce_head], so we special-case its abbreviation expansion there. *)
@@ -4480,6 +4499,14 @@ let rec is_aliasable_ty env ty =
   | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
 
+let copy_persistent env ty =
+  try_full_reduce_quote_eval env (new_quote_eval_ty ty)
+
+let is_persistent_ty env ty =
+  match copy_persistent env ty with
+  | _ -> true
+  | exception Cannot_expand -> false
+
 let compatible_paths p1 p2 =
   let open Predef in
   Path.same p1 p2 ||
@@ -5301,6 +5328,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tquote_eval t1, _) when is_persistent_ty (get_env uenv) t2' ->
+      let t2' = copy_persistent (get_env uenv) t2' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2')
+  | (_, Tquote_eval t2) when is_persistent_ty (get_env uenv) t1' ->
+      let t1' = copy_persistent (get_env uenv) t1' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1' t2)
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
@@ -6697,6 +6730,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when is_persistent_ty env t2' ->
+              let t2' = copy_persistent env t2' in
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
