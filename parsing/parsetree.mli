@@ -68,7 +68,6 @@ type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
 type mode = | Mode of string [@@unboxed]
-type mode_const = string loc list
 type modes = mode loc list
 
 type include_kind = Structure | Functor

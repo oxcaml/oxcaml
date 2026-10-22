@@ -5521,9 +5521,7 @@ module Reaching_path = struct
            Fmt.fprintf ppf "%a %s" Printtyp.path p
              (String.concat " " strs))
     in
-    let mod_strings =
-      Typemode.untransl_mod_bounds mod_bounds |> Typemode.const_mode_strings
-    in
+    let mod_strings = Typemode.untransl_mod_bounds mod_bounds in
     match mod_strings with
     | [] -> pp_base ppf base
     | _ ->

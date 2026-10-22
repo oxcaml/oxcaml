@@ -1037,7 +1037,6 @@ let residual_mode_strings { mode_bounds; axes; _ } =
   Jkind.Mod_bounds.of_axis_lattice restricted
   |> Typemode.close_implied_mod_bounds
   |> Typemode.untransl_mod_bounds ~verbose:false
-  |> Typemode.const_mode_strings
 
 let pp_provenance_residual ppf
     ({ provenance = { ty; plural; _ }; _ } as residual) =
