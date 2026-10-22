@@ -471,7 +471,7 @@ module Group = struct
   let function_params_and_body_for_code_not_rebuilt =
     lazy
       (Function_params_and_body.create
-         ~return_continuation:(Continuation.create ())
+         ~return_continuation:(Continuation.create ~sort:Return ())
          ~exn_continuation:(Continuation.create ()) Bound_parameters.empty
          ~body:(Expr.create_invalid Code_not_rebuilt)
          ~free_names_of_body:Unknown

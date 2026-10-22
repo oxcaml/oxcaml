@@ -86,24 +86,12 @@ and simplified_let_cont_handlers =
   }
 
 and simplified_apply = private
-  | Simplified_non_ocaml_function_call of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t
-      }
-  | Simplified_function_call_where_callee's_type_unavailable of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t
-      }
-  | Simplified_non_inlined_direct_full_application of
-      { apply : Apply.t;
-        use_id : Apply_cont_rewrite_id.t option;
-        exn_cont_use_id : Apply_cont_rewrite_id.t;
-        result_arity : [`Complex] Flambda_arity.t;
-        coming_from_indirect : bool;
-        callee's_code_metadata : Code_metadata.t
-      }
+  { apply : Apply.t;
+    use_id : Apply_cont_rewrite_id.t option;
+    exn_cont_use_id : Apply_cont_rewrite_id.t;
+    result_arity : [`Complex] Flambda_arity.t;
+    is_cold : bool
+  }
 
 and simplified_terminator = private
   | Simplified_apply of simplified_apply
@@ -149,25 +137,12 @@ val simplified_let :
 
 val simplified_let_cont : simplified_let_cont_handlers -> t -> t
 
-val simplified_non_ocaml_function_call :
+val simplified_apply :
+  ?result_arity:[`Complex] Flambda_arity.t ->
   Apply.t ->
   use_id:Apply_cont_rewrite_id.t option ->
   exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  t
-
-val simplified_function_call_where_callee's_type_unavailable :
-  Apply.t ->
-  use_id:Apply_cont_rewrite_id.t option ->
-  exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  t
-
-val simplified_non_inlined_direct_full_application :
-  Apply.t ->
-  use_id:Apply_cont_rewrite_id.t option ->
-  exn_cont_use_id:Apply_cont_rewrite_id.t ->
-  result_arity:[`Complex] Flambda_arity.t ->
-  coming_from_indirect:bool ->
-  callee's_code_metadata:Code_metadata.t ->
+  is_cold:bool ->
   t
 
 val simplified_apply_cont :

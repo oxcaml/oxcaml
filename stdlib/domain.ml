@@ -1,4 +1,3 @@
-# 2 "domain.ml"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -24,17 +23,23 @@ open Modes.Portable
 
 external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 
-module Obj_opt : sig @@ portable
+module Obj_slot : sig @@ portable
   type t : value non_float
-  val none : unit -> t
+
   val some : 'a -> t
-  val is_some : t -> bool
+  val none : unit -> t
+  val is_none : t -> bool
+
+  (** A sentinel marking a slot whose value is borrowed by [TLS.access]. *)
+  val borrowed : unit -> t
+  val is_borrowed : t -> bool
+
   val fresh : unit -> t array
   val grow_array : t array -> int -> int -> t array
   val compare_exchange : t array -> int -> t -> t -> t
 
   (** [unsafe_get obj] may only be called safely
-      if [is_some] is true.
+      if [is_none] and [is_borrowed] are both false.
 
       [unsafe_get (some v)] is equivalent to
       [Obj.obj (Obj.repr v)]. *)
@@ -44,13 +49,16 @@ end = struct
   type t = not_a_float
   let none = Sys.opaque_identity (Block { state = Immediate })
   let none () = Obj.magic_uncontended none
+  let borrowed = Sys.opaque_identity (Block { state = Immediate })
+  let borrowed () = Obj.magic_uncontended borrowed
   let fresh () = Array.make 7 (none ())
   let[@inline] some v : t =
    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
     * [x], which may be a [float] and conclude that the [st] is a float array.
     * We do not want OCaml's float array optimisation kicking in here. *)
     Sys.opaque_identity (Obj.magic v)
-  let[@inline] is_some obj = (obj != none ())
+  let[@inline] is_none obj = (obj == none ())
+  let[@inline] is_borrowed obj = (obj == borrowed ())
   let[@inline] unsafe_get obj = Obj.magic obj
 
   let[@inline never] grow_array st idx size =
@@ -107,7 +115,7 @@ type 'a t = {
 
 module DLS0 = struct
 
-  type dls_state = Obj_opt.t array
+  type dls_state = Obj_slot.t array
 
   external get_dls_state : unit -> dls_state @@ portable = "%dls_get"
 
@@ -119,7 +127,7 @@ module DLS0 = struct
     "caml_domain_dls_compare_and_set" [@@noalloc]
 
   let init () =
-    let st = Obj_opt.fresh () in
+    let st = Obj_slot.fresh () in
     set_dls_state st
 
   type 'a key = int * (unit -> 'a) Modes.Portable.t
@@ -156,7 +164,7 @@ module DLS0 = struct
     let sz = Array.length st in
     if idx < sz then st
     else begin
-      let new_st = Obj_opt.grow_array st idx sz in
+      let new_st = Obj_slot.grow_array st idx sz in
       (* We want an implementation that is safe with respect to single-domain
          multi-threading: retry if the DLS state has changed under our feet.
 
@@ -173,10 +181,10 @@ module DLS0 = struct
   let[@inline never] set (type a) ((idx, _init) : a key) (x : a) =
     let st = get_dls_state () in
     if idx < Array.length st
-    then Array.unsafe_set st idx (Obj_opt.some x)
+    then Array.unsafe_set st idx (Obj_slot.some x)
     else begin
       let st = maybe_grow idx in
-      Array.unsafe_set st idx (Obj_opt.some x)
+      Array.unsafe_set st idx (Obj_slot.some x)
     end
 
   let[@cold] get_or_init (type a) ((idx, { portable = init }) : a key) : a =
@@ -191,18 +199,18 @@ module DLS0 = struct
        threads observe a 'revert' that forgets previous modifications. *)
     let st = maybe_grow idx in
     let before =
-      Obj_opt.compare_exchange st idx (Obj_opt.none ()) (Obj_opt.some x)
+      Obj_slot.compare_exchange st idx (Obj_slot.none ()) (Obj_slot.some x)
     in
-    if Obj_opt.is_some before
-    then Obj_opt.unsafe_get before
-    else x
+    if Obj_slot.is_none before
+    then x
+    else Obj_slot.unsafe_get before
 
   (* Inlining is ok because it's safe to return a stale value. *)
   let[@inline] get (type a) ((idx, _) as key : a key) : a =
     let st = get_dls_state () in
     if idx < Array.length st
-       && Obj_opt.is_some (Array.unsafe_get st idx)
-    then Obj_opt.unsafe_get (Array.unsafe_get st idx)
+       && not (Obj_slot.is_none (Array.unsafe_get st idx))
+    then Obj_slot.unsafe_get (Array.unsafe_get st idx)
     else get_or_init key
 
   type key_value : value mod portable contended =
@@ -331,7 +339,7 @@ let max_domain_count = Raw.get_max_domain_count ()
 
 module TLS0 = struct
 
-  type tls_state = Obj_opt.t array
+  type tls_state = Obj_slot.t array
 
   external get_tls_state
     : unit -> tls_state @@ portable = "%tls_get"
@@ -367,32 +375,57 @@ module TLS0 = struct
     end;
     k
 
+  (* [@poll error] so that interrupts cannot grow the state.
+     [idx] must be in range. *)
+  let[@poll error] store idx obj =
+    Array.unsafe_set (get_tls_state ()) idx obj
+
   let[@cold] grow_and_set idx x =
     let old_st = get_tls_state () in
-    let new_st = Obj_opt.grow_array old_st idx (Array.length old_st) in
-    Array.unsafe_set new_st idx (Obj_opt.some x);
-    set_tls_state new_st
+    let new_st = Obj_slot.grow_array old_st idx (Array.length old_st) in
+    set_tls_state new_st;
+    store idx (Obj_slot.some x)
 
   (* Unlike with DLS we do not prevent inlining to prevent additional poll
      points as we assume each thread will have its own TLS and we consider TLS
      use in signal handlers as unsupported. *)
   let[@inline] set (type a) ((idx, _) : a key) (x : a) =
-    let st = get_tls_state () in
-    if idx < Array.length st
-    then Array.unsafe_set st idx (Obj_opt.some x)
+    if idx < Array.length (get_tls_state ())
+    then store idx (Obj_slot.some x)
     else grow_and_set idx x
 
-  let[@cold] init (type a) ((_, { portable = init }) as key : a key) : a =
-    let x = init () in
-    set key x;
-    x
+  let[@inline never] already_accessing () =
+    failwith "Domain.Safe.TLS: key is already being accessed"
+
+  let[@cold] init (type a) ((idx, { portable = init }) as key : a key) : a =
+    let st = get_tls_state () in
+    if idx < Array.length st && Obj_slot.is_borrowed (Array.unsafe_get st idx)
+    then already_accessing ()
+    else begin
+      let x = init () in
+      set key x;
+      x
+    end
 
   let[@inline] get (type a) ((idx, _) as key : a key) : a =
     let st = get_tls_state () in
     if idx < Array.length st
-       && Obj_opt.is_some (Array.unsafe_get st idx)
-    then Obj_opt.unsafe_get (Array.unsafe_get st idx)
+       && not (Obj_slot.is_none (Array.unsafe_get st idx))
+       && not (Obj_slot.is_borrowed (Array.unsafe_get st idx))
+    then Obj_slot.unsafe_get (Array.unsafe_get st idx)
     else init key
+
+  (* While [f] runs, the slot holds [Obj_slot.borrowed] instead of the value, so
+     [get] (hence [access] and splitting) raises on that key. *)
+  let access ((idx, _) as k) f = exclave_
+    let v = get k in
+    store idx (Obj_slot.borrowed ());
+    match f v with
+    | res -> store idx (Obj_slot.some v); res
+    | exception exn ->
+      let bt = Printexc.get_raw_backtrace () in
+      store idx (Obj_slot.some v);
+      Printexc.raise_with_backtrace exn bt
 
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
@@ -402,7 +435,7 @@ module TLS0 = struct
     type keys = key_value list
 
     let init () =
-      let st = Obj_opt.fresh () in
+      let st = Obj_slot.fresh () in
       set_tls_state st
 
     let get_initial_keys () : key_value list =
@@ -579,6 +612,9 @@ module Safe = struct
   module TLS = TLS0
 
   let spawn f =
+    (* CR-soon vkarvonen: Optimize [get_initial_keys] followed by
+       [set_initial_keys] combination, e.g. use an unboxed array rather than
+       a list and potentially avoid the allocation if possible. *)
     let tls_keys = TLS.Private.get_initial_keys () in
     spawn (fun () ->
       TLS.Private.init ();
@@ -586,27 +622,6 @@ module Safe = struct
       f ()) [@nontail]
 
   let at_exit = at_exit
-end
-
-module TLS = struct
-  module Private = TLS0.Private
-
-  type 'a key = 'a TLS0.key
-
-  let new_key ?split_from_parent f =
-    let split_from_parent =
-      match split_from_parent with
-      | None -> None
-      | Some split_from_parent ->
-        Some (Obj.magic_portable (fun x ->
-          Obj.magic_portable (fun () -> split_from_parent x)))
-    in
-    TLS0.new_key ?split_from_parent (Obj.magic_portable f)
-  ;;
-
-  let get = TLS0.get
-  let set = TLS0.set
-  let init = TLS0.Private.init
 end
 
 module DLS = struct
@@ -632,6 +647,6 @@ let spawn f = Safe.spawn (Obj.magic_portable f)
 let at_exit f = Safe.at_exit (Obj.magic_portable f)
 
 let () = DLS.init ()
-let () = TLS.init ()
+let () = Safe.TLS.Private.init ()
 
 let _ = Stdlib.do_domain_local_at_exit := do_at_exit
