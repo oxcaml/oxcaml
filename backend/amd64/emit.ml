@@ -46,10 +46,6 @@ module L = Asm_targets.Asm_label
 (* Name of current function *)
 let function_name = ref ""
 
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
-
 (* These callbacks are just instrumentation for expect_asm tests. *)
 let expect_asm_callbacks = ref []
 
@@ -62,8 +58,6 @@ let asm_collected_for_expect_asm = ref []
 let expect_asm_whole_function = ref false
 
 let register_expect_asm_callback f =
-  (* Reset label counter to make assembly more predictable. *)
-  Label.reset ();
   expect_asm_callbacks := f :: !expect_asm_callbacks
 
 let invoke_expect_asm_callbacks () =
@@ -382,7 +376,7 @@ let load_symbol_addr (s : Cmm.symbol) arg =
 (* Output .text section directive, or named .text.caml.<name> if enabled and
    supported on the target system. *)
 
-let emit_named_text_section ?(suffix = "") ?link_symbol func_name =
+let emit_named_text_section ?link_symbol func_name =
   (* CR-someday ksvetlitski: In the future we should consider extending this to
      also place other known-cold functions in a separate section (specifically
      [.text.unlikely.caml]). This would necessitate adding a new constructor to
@@ -416,7 +410,7 @@ let emit_named_text_section ?(suffix = "") ?link_symbol func_name =
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else if !Clflags.function_sections || !Oxcaml_flags.basic_block_sections
+  else if !Clflags.function_sections
   then (
     match[@ocaml.warning "-4"] system with
     | S_macosx
@@ -428,9 +422,7 @@ let emit_named_text_section ?(suffix = "") ?link_symbol func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      let name =
-        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
-      in
+      let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
       D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
       let link_symbol =
@@ -450,29 +442,6 @@ let emit_named_text_section ?(suffix = "") ?link_symbol func_name =
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
        function boundaries need not break delta chains. *)
     Emitaux.enter_code_section ".text")
-
-let emit_function_or_basic_block_section_name () =
-  let suffix =
-    if String.length !current_basic_block_section = 0
-    then ""
-    else "." ^ !current_basic_block_section
-  in
-  emit_named_text_section !function_name ~suffix
-
-let emit_Llabel fallthrough lbl section_name =
-  (if !Oxcaml_flags.basic_block_sections
-   then
-     match section_name with
-     | Some name ->
-       if not (String.equal name !current_basic_block_section)
-       then (
-         current_basic_block_section := name;
-         D.cfi_endproc ();
-         emit_function_or_basic_block_section_name ();
-         D.cfi_startproc ())
-     | None -> ());
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
-  D.define_label lbl
 
 (* Output a pseudo-register *)
 
@@ -829,6 +798,41 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
          sc_save_simd = save_simd
        }
        :: !stack_realloc
+
+(* Probe the prospective stack frame at [Domainstate.stack_guard_stride]-byte
+   strides, descending, so that a frame big enough to step over the stack's
+   guard page faults in it instead; the SEGV handler raises [Stack_overflow].
+   Used instead of [emit_stack_check] when stack checks are disabled. The probes
+   touch but do not change memory. Since a shrink-wrapped prologue may already
+   have moved %rsp by up to a page, we start probing at offset zero. We unroll
+   up to four strides; beyond that we generate a loop. *)
+let emit_stack_probes ~size_in_bytes ~save_registers =
+  let stride = Domainstate.stack_guard_stride in
+  assert (stride > 0 && size_in_bytes >= stride);
+  let full_strides = size_in_bytes / stride in
+  let probe ofs = I.or_ (int 0) (mem64 QWORD (-ofs) (Scalar RSP)) in
+  let max_unrolled_strides = 4 in
+  if full_strides <= max_unrolled_strides
+  then (
+    probe 0;
+    for i = 1 to full_strides do
+      probe (i * stride)
+    done)
+  else (
+    (* [r10] may be live here unless this is the function's first instruction
+       (cf. [Proc.destroyed_at_basic]); the push doubles as the anchoring probe,
+       and [bias] keeps the probed addresses the same either way. *)
+    if save_registers then push r10 else probe 0;
+    let bias = if save_registers then 8 else 0 in
+    let lbl = L.create Text in
+    I.mov (int (-(stride - bias))) r10;
+    D.define_label lbl;
+    I.or_ (int 0) (mem64 QWORD ~base:RSP 0 (Scalar R10));
+    I.sub (int stride) r10;
+    I.cmp (int (-(full_strides * stride) + bias)) r10;
+    I.j GE (emit_asm_label_arg lbl);
+    if save_registers then pop r10);
+  if size_in_bytes mod stride <> 0 then probe size_in_bytes
 
 (* Record jump tables *)
 type jump_table =
@@ -2068,6 +2072,11 @@ let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
+let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
+  let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
+  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  D.define_label lbl
+
 (* Emit an instruction *)
 let emit_instr ~first ~last ~fallthrough i =
   let open Simd_instrs in
@@ -2702,9 +2711,10 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel { label = lbl; section_name } ->
-    let lbl = label_to_asm_label ~section:Text lbl in
-    emit_Llabel fallthrough lbl section_name
+  | Llabel_for_jump_target label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label
+  | Llabel_for_dwarf label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
@@ -2790,9 +2800,14 @@ let emit_instr ~first ~last ~fallthrough i =
       I.pop r11;
       I.jmp r11)
   | Lstackcheck { max_frame_size_bytes } ->
-    emit_stack_check ~size_in_bytes:max_frame_size_bytes
-      ~save_registers:(not first)
-      ~save_simd:(must_save_simd_regs i.live)
+    if Config.no_stack_checks
+    then
+      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
+    else
+      emit_stack_check ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
+        ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~last ~fallthrough i =
   try emit_instr ~first ~last ~fallthrough i with
@@ -2823,7 +2838,7 @@ let emit_function_type_and_size fun_sym =
   (* Note: Symbol types and sizes are only needed on some platforms/systems.
      These functions check internally whether they are needed. *)
   D.type_symbol ~ty:Function fun_sym;
-  if not !Oxcaml_flags.basic_block_sections then D.size fun_sym
+  D.size fun_sym
 
 (* Emission of a function declaration *)
 
@@ -2847,9 +2862,7 @@ let fundecl fundecl =
   prologue_required := fundecl.fun_prologue_required;
   frame_required := fundecl.fun_frame_required;
   all_functions := fundecl :: !all_functions;
-  current_basic_block_section
-    := Option.value fundecl.fun_section_name ~default:"";
-  emit_function_or_basic_block_section_name ();
+  emit_named_text_section fundecl.fun_name;
   D.align ~fill:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
@@ -3159,7 +3172,11 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if (not Config.no_stack_checks) && n >= Stack_check.stack_threshold_size
+  if Config.no_stack_checks
+  then (
+    if Domainstate.stack_guard_stride > 0 && n >= Domainstate.stack_guard_stride
+    then emit_stack_probes ~size_in_bytes:n ~save_registers:true)
+  else if n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);

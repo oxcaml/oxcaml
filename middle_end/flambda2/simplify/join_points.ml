@@ -356,7 +356,8 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
        because they were defined on the path between the fork point and this
        particular use). *)
     let handler_env =
-      LCS.add_to_denv ~maybe_already_defined:() use_env consts_lifted_after_fork
+      DE.add_lifted_constant_state ~maybe_already_defined:() use_env
+        consts_lifted_after_fork
     in
     (* The use environment might have a deeper inlining depth increment than the
        fork environment. (e.g. where an [Apply] was inlined, revealing the
@@ -394,7 +395,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
        equation about a lifted constant (any such equation could not be
        materially more precise anyway). *)
     let denv = DE.with_replay_history replay env_at_fork in
-    let denv = LCS.add_to_denv denv consts_lifted_after_fork in
+    let denv = DE.add_lifted_constant_state denv consts_lifted_after_fork in
     let should_do_join =
       Flambda_features.join_points ()
       || match use_envs_with_ids with [] | [_] -> true | _ :: _ :: _ -> false
@@ -420,6 +421,12 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
         denv, None, previous_extra_params_and_args
     in
     let handler_env = DE.with_join_analysis join_analysis handler_env in
+    let only_cold_uses =
+      List.for_all (fun (use_env, _, _) -> DE.is_cold use_env) use_envs_with_ids
+    in
+    let handler_env =
+      if only_cold_uses then DE.mark_as_cold handler_env else handler_env
+    in
     let escapes =
       List.exists
         (fun (_, _, (cont_use_kind : Continuation_use_kind.t)) ->

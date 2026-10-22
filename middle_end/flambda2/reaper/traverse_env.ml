@@ -25,18 +25,20 @@ type t =
     conts : cont_kind Continuation.Map.t;
     current_code_id : Code_id.t option;
     should_preserve_direct_calls : should_preserve_direct_calls;
-    le_monde_exterieur : Name.t;
-    all_constants : Name.t
+    all_constants : Name.t;
+    function_slots_to_keep : Function_slot.Set.t;
+    value_slots_to_keep : Value_slot.Set.t
   }
 
 let create ~parent ~conts ~current_code_id ~should_preserve_direct_calls
-    ~le_monde_exterieur ~all_constants =
+    ~all_constants ~function_slots_to_keep ~value_slots_to_keep =
   { parent;
     conts;
     current_code_id;
     should_preserve_direct_calls;
-    le_monde_exterieur;
-    all_constants
+    all_constants;
+    function_slots_to_keep;
+    value_slots_to_keep
   }
 
 let parent t = t.parent
@@ -44,8 +46,6 @@ let parent t = t.parent
 let current_code_id t = t.current_code_id
 
 let should_preserve_direct_calls t = t.should_preserve_direct_calls
-
-let le_monde_exterieur t = t.le_monde_exterieur
 
 let all_constants t = t.all_constants
 
@@ -60,3 +60,20 @@ let find_cont t cont =
 
 let add_cont t cont cont_kind =
   { t with conts = Continuation.Map.add cont cont_kind t.conts }
+
+let function_slots_to_keep t = t.function_slots_to_keep
+
+let should_keep_function_slot _t _function_slot =
+  (* CR chambart/gbury: we currently do not track the used function slots
+     precisely enough in simplify/data_flow, see similar comment in
+     [slot_offsets.ml] *)
+  (* not (Current_unit.is_current (Function_slot.get_compilation_unit
+     function_slot)) || Function_slot.Set.mem function_slot
+     t.function_slots_to_keep *)
+  true
+
+let value_slots_to_keep t = t.value_slots_to_keep
+
+let should_keep_value_slot t value_slot =
+  (not (Current_unit.is_current (Value_slot.get_compilation_unit value_slot)))
+  || Value_slot.Set.mem value_slot t.value_slots_to_keep

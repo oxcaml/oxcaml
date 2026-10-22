@@ -532,7 +532,6 @@ let ocaml_ignored_flags =
     "-safe-matching";
     "-bin-annot-occurrences";
     (* flambda-backend specific *)
-    "-basic-block-sections";
     "-caml-apply-inline-fast-path";
     "-debug-ocaml";
     "-dgc-timings";
@@ -582,6 +581,7 @@ let ocaml_ignored_flags =
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
     "-directory";
+    "-typing-recovery";
     (* Jane Street specific *)
     "-disable-builtin-check";
     "-disable-poll-insertion";
@@ -613,6 +613,8 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-faes";
+    "-fno-aes";
     "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
@@ -671,6 +673,12 @@ let ocaml_ignored_flags =
     "-no-llvm-backend";
     "-ddwarf-types";
     "-ocamlcfg";
+    "-cfg-eliminate-dead-code-validate";
+    "-no-cfg-eliminate-dead-code-validate";
+    "-cfg-dominators-validate";
+    "-no-cfg-dominators-validate";
+    "-cfg-liveness-validate";
+    "-no-cfg-liveness-validate";
     "-cfg-prologue-validate";
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
@@ -687,6 +695,8 @@ let ocaml_ignored_flags =
     "-no-cfg-value-propagation-float";
     "-cfg-value-propagation-flow";
     "-no-cfg-value-propagation-flow";
+    "-cfg-copy-propagation";
+    "-no-cfg-copy-propagation";
     "-use-ssa";
     "-no-use-ssa";
     "-ssa-simplify";

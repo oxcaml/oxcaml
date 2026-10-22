@@ -34,7 +34,8 @@ type label =
 
 type t =
   { section : Asm_section.t;
-    label : label
+    label : label;
+    is_dwarf_only_label : bool
   }
 
 let encode_label label =
@@ -63,13 +64,13 @@ include Identifiable.Make (struct
   let output _ _ = Misc.fatal_error "Not yet implemented"
 end)
 
-let create_int section label =
+let create_int ?(is_dwarf_only_label = false) section label =
   assert (label >= 0);
-  { section; label = Int label }
+  { section; label = Int label; is_dwarf_only_label }
 
 let create_private_int section label =
   assert (label >= 0);
-  { section; label = Private_symbol label }
+  { section; label = Private_symbol label; is_dwarf_only_label = false }
 
 let contains_escapable_char label =
   let found_escapable_char = ref false in
@@ -81,9 +82,10 @@ let contains_escapable_char label =
 
 let create_string section label =
   assert (not (contains_escapable_char label));
-  { section; label = String label }
+  { section; label = String label; is_dwarf_only_label = false }
 
-let create_string_unchecked section label = { section; label = String label }
+let create_string_unchecked section label =
+  { section; label = String label; is_dwarf_only_label = false }
 
 let create_label_for_local_symbol section symbol =
   create_string_unchecked section (Asm_symbol.encode symbol)
@@ -98,6 +100,8 @@ let encode (t : t) =
   | Private_symbol label -> "l_caml" ^ string_of_int label
 
 let section t = t.section
+
+let is_dwarf_only_label t = t.is_dwarf_only_label
 
 let new_label_ref =
   ref (fun _section ->

@@ -94,8 +94,15 @@ and variant_subkind consts non_consts : Fexpr.subkind =
   in
   let non_consts =
     non_consts |> Tag.Scannable.Map.bindings
-    |> List.map (fun (tag, (_shape, sk)) ->
-        Tag.Scannable.to_int tag, List.map kind_with_subkind sk)
+    |> List.map (fun (tag, shape_and_fields) ->
+        ( Tag.Scannable.to_int tag,
+          match
+            (shape_and_fields
+              : Flambda_kind.With_subkind.Non_null_value_subkind
+                .constructor_shape)
+          with
+          | Undetermined -> None
+          | Determined (_shape, sk) -> Some (List.map kind_with_subkind sk) ))
   in
   Variant { consts; non_consts }
 
@@ -333,7 +340,7 @@ let rec expr env e =
   | Apply app -> apply_expr env app
   | Apply_cont app_cont -> apply_cont_expr env app_cont
   | Switch switch -> switch_expr env switch
-  | Invalid { message } -> invalid_expr env ~message
+  | Invalid _ -> Fexpr.Invalid
 
 and let_expr env le =
   Flambda.Let_expr.pattern_match le ~f:(fun bound ~body : Fexpr.expr ->
@@ -434,7 +441,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         Option.map (Env.find_code_id_exn env) (Code.newer_version_of code)
       in
       let param_arity = Some (complex_arity (Code.params_arity code)) in
-      let ret_arity = Code.result_arity code |> arity_opt in
+      let ret_arity =
+        Code.result_arity code |> Flambda_arity.unarize_t |> arity_opt
+      in
       let recursive = recursive_flag (Code.recursive code) in
       let inline =
         if Flambda2_terms.Inline_attribute.is_default (Code.inline code)
@@ -658,7 +667,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
   in
   let param_arity = Apply_expr.args_arity app in
-  let return_arity = Apply_expr.return_arity app in
+  let return_arity = Apply_expr.return_arity app |> Flambda_arity.unarize_t in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
     | Function { function_call = Indirect_known_arity _ } ->
@@ -735,7 +744,8 @@ and switch_expr env switch : Fexpr.expr =
   let scrutinee = simple env (Switch_expr.scrutinee switch) in
   let cases =
     List.map
-      (fun (imm, app_cont) ->
+      (fun (imm, arm) ->
+        let app_cont = Switch_arm.action arm in
         let tag =
           (* TODO: machine_width should be passed through properly here *)
           let machine_width = Target_system.Machine_width.Sixty_four in
@@ -748,8 +758,6 @@ and switch_expr env switch : Fexpr.expr =
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }
-
-and invalid_expr _env ~message : Fexpr.expr = Invalid { message }
 
 (* Iter on all sets of closures of a given program. *)
 module Iter = struct

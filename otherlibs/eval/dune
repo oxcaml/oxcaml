@@ -56,6 +56,7 @@
 
 (install
  (files
+  (META as eval/META)
   (.eval.objs/native/eval.cmx as eval.cmx)
   eval.cmxa
   eval.a

@@ -293,6 +293,7 @@ module Operation : sig
         | Succ  (** add 1 *)
         | Pred  (** subtract 1 *)
         | Bswap  (** byte swap; see scalars.md for semantics *)
+        | Not (* bitwise not *)
 
       val to_string : t -> string
     end

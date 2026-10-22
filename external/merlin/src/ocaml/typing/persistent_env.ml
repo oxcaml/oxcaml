@@ -62,6 +62,7 @@ type error =
         value: Global_module.Name.t;
       }
 
+(* These errors are location-less and will be logged and re-raised in Env *)
 exception Error of error
 let error err = raise (Error err)
 
@@ -103,7 +104,7 @@ type global_name_info = {
 type import = {
   imp_is_param : bool;
   imp_params : Global_module.Parameter_name.t list;
-  imp_arg_for : Global_module.Parameter_name.t option;
+  imp_arg_signature : Types.arg_signature option;
   imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
@@ -241,11 +242,6 @@ let find_import_info_in_cache {imports; _} import =
   | Missing _ -> None
   | Found imp -> Some imp
 
-let find_name_info_in_cache {persistent_names; _} name =
-  match Hashtbl.find persistent_names name with
-  | exception Not_found -> None
-  | pn -> Some pn
-
 let find_info_in_cache {persistent_structures; _} name =
   match Hashtbl.find persistent_structures name with
   | exception Not_found -> None
@@ -262,8 +258,8 @@ let register_parameter ({param_imports; _} as penv) modname =
       ()
   | Some imp ->
       if not imp.imp_is_param then
-        raise (Error (Not_compiled_as_parameter
-                        (Global_module.Name.of_parameter_name modname)))
+        error (Not_compiled_as_parameter
+                 (Global_module.Name.of_parameter_name modname))
   end;
   param_imports := Param_set.add modname !param_imports
 
@@ -415,9 +411,10 @@ let acknowledge_import penv ~check modname pers_sig =
     | Normal _ -> false
     | Parameter -> true
   in
-  let arg_for, impl =
+  let arg_signature, impl =
     match kind with
-    | Normal { cmi_arg_for; cmi_impl } -> cmi_arg_for, Some cmi_impl
+    | Normal { cmi_arg_signature; cmi_impl } ->
+        cmi_arg_signature, Some cmi_impl
     | Parameter -> None, None
   in
   let uid =
@@ -435,7 +432,7 @@ let acknowledge_import penv ~check modname pers_sig =
   let import =
     { imp_is_param = is_param;
       imp_params = params;
-      imp_arg_for = arg_for;
+      imp_arg_signature = arg_signature;
       imp_impl = impl;
       imp_raw_sign = sign;
       imp_filename = filename;
@@ -656,13 +653,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
         (fun (param, value) ->
             (* Argument with no parameter: fine only if allowed by flag *)
             if not allow_excess_args then
-              raise
-                (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
-                          valid_parameters = params;
-                          parameter = param;
-                          value = value |> Global_module.to_name;
-                        })))
+              error (Imported_module_has_no_such_parameter {
+                  imported = CU.Name.of_head_of_global_name modname;
+                  valid_parameters = params;
+                  parameter = param;
+                  value = value |> Global_module.to_name;
+                }))
       ~both:
         (fun expected_type (_arg_name, arg_value_global) ->
             let arg_value = arg_value_global |> Global_module.to_name in
@@ -671,21 +667,21 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
                 ~allow_excess_args
             in
             let actual_type =
-              match pn.pn_import.imp_arg_for with
+              match pn.pn_import.imp_arg_signature with
               | None ->
                   error (Not_compiled_as_argument
                            { param = expected_type; value = arg_value;
                              filename = pn.pn_import.imp_filename })
-              | Some ty -> ty
+              | Some { Types.arg_param; _ } -> arg_param
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
-              raise (Error (Argument_type_mismatch {
+              error (Argument_type_mismatch {
                   value = arg_value;
                   filename = pn.pn_import.imp_filename;
                   expected = expected_type;
                   actual = actual_type;
-                }))
+                })
             end)
   end;
   (* Form the name without any arguments at all, then substitute in all the
@@ -1139,8 +1135,7 @@ let loaded_transitive_dependencies penv intfs =
   !names
 
 let find_import penv modname =
-  let import = find_import ~allow_hidden:true penv ~check:true modname in
-  import.imp_impl, import.imp_params, import.imp_raw_sign
+  find_import ~allow_hidden:true penv ~check:true modname
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
@@ -1191,11 +1186,6 @@ let looked_up {persistent_structures; _} modname =
 
 let is_imported_opaque {imported_opaque_units; _} s =
   CU.Name.Set.mem s !imported_opaque_units
-
-let implemented_parameter penv modname =
-  match find_name_info_in_cache penv modname with
-  | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
-  | None -> None
 
 let make_cmi penv modname kind sign alerts =
   let flags =

@@ -1,6 +1,7 @@
 (* TEST
  flags += " -cfg-block-layout -dcfg-invariants";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -24,6 +25,7 @@ sum_loop:
   leaq  -2(%rdi), %rsi
   cmpq  $1, %rsi
   jl    .L1
+  subq  $8, %rsp
   sarq  $1, %rsi
   movl  $1, %eax
   xorl  %edx, %edx
@@ -36,16 +38,16 @@ sum_loop:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
+  addq  $8, %rsp
   ret
 .L1:
   movl  $1, %eax
   ret
 .L2:
   leaq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L3:
 |}]
 
 (* Same property for a straight-line function: the cold bounds-check failure
@@ -65,9 +67,9 @@ get_mid:
   leaq  1(%rax,%rax), %rax
   ret
 .L0:
+  subq  $8, %rsp
   leaq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]

@@ -290,6 +290,11 @@ let reg_tmp1_base = R.reg_x 16
 
 let reg_x_tmp1 = H.reg_x reg_tmp1
 
+(* Second scratch, used only by [emit_stack_probes] *)
+let reg_tmp2 = phys_reg Int X17
+
+let reg_x_tmp2 = H.reg_x reg_tmp2
+
 let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
 
 let reg_x8 = phys_reg Int X8
@@ -1223,6 +1228,9 @@ let assembly_code_for_poll env i ~far ~return_label =
 
 let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
+  (* Reached only with stack checks enabled; [emit_stack_probes] handles the
+     disabled case and never needs the far/realloc machinery. *)
+  assert (not Config.no_stack_checks);
   let sc_label = L.create Text and sc_return = L.create Text in
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
@@ -1242,12 +1250,47 @@ let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   D.define_label sc_return;
   sc_label, sc_return
 
-let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
-  let sc_label, sc_return =
-    assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
+(* When stack checks are disabled, probe the prospective stack frame at
+   [Domainstate.stack_guard_stride]-byte strides so that a frame big enough to
+   step over the stack's guard page faults. Each probe loads (and discards) into
+   x16, a reserved temporary. *)
+let emit_stack_probes ~max_frame_size_bytes =
+  let stride = Domainstate.stack_guard_stride in
+  assert (stride > 0 && max_frame_size_bytes >= stride);
+  let full_pages = max_frame_size_bytes / stride in
+  let probe_at offset =
+    A.ins_mov_from_sp ~dst:reg_x_tmp1;
+    if offset <> 0 then emit_subimm reg_x_tmp1 reg_x_tmp1 offset;
+    A.ins2 LDR reg_x_tmp1 (H.mem reg_tmp1_base)
   in
-  Env.set_stack_realloc env
-    { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
+  probe_at 0;
+  let max_unrolled_pages = 4 in
+  if full_pages <= max_unrolled_pages
+  then
+    for i = 1 to full_pages do
+      probe_at (i * stride)
+    done
+  else (
+    A.ins_mov_reg reg_x_tmp2 O.xzr;
+    let loop = L.create Text in
+    D.define_label loop;
+    emit_addimm reg_x_tmp2 reg_x_tmp2 stride;
+    A.ins_mov_from_sp ~dst:reg_x_tmp1;
+    A.ins4 SUB_shifted_register reg_x_tmp1 reg_x_tmp1 reg_x_tmp2 O.optional_none;
+    A.ins2 LDR reg_x_tmp1 (H.mem reg_tmp1_base);
+    emit_cmpimm reg_x_tmp2 (full_pages * stride);
+    A.ins1 (B_cond (Branch_cond.Int CC)) (local_label loop));
+  if max_frame_size_bytes mod stride <> 0 then probe_at max_frame_size_bytes
+
+let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
+  if Config.no_stack_checks
+  then emit_stack_probes ~max_frame_size_bytes
+  else
+    let sc_label, sc_return =
+      assembly_code_for_stack_check0 ~far ~max_frame_size_bytes
+    in
+    Env.set_stack_realloc env
+      { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
 
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
@@ -1930,7 +1973,7 @@ let emit_instr env i =
         A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond EQ))
   | Lreloadretaddr -> ()
   | Lreturn -> A.ins0 RET
-  | Llabel { label = lbl; _ } ->
+  | Llabel_for_jump_target lbl | Llabel_for_dwarf lbl ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl
   | Lbranch lbl -> emit_branch lbl
@@ -2031,9 +2074,10 @@ let compute_instruction_sizes env code =
     match instr.Linear.desc with
     | Lend -> ()
     | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-    | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Ladjust_stack_offset _
-    | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
+    | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel_for_jump_target _
+    | Llabel_for_dwarf _ | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
+    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+    | Lstackcheck _ ->
       let m = measure_emit_instr env instr in
       let size : Branch_relaxation_intf.instruction_size =
         { size = m.count; max_displacement = m.min_max_displacement }
@@ -2094,10 +2138,13 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
     in
     ()
   | Far_stackcheck { max_frame_size_bytes } ->
-    let _sc_label, _sc_return =
-      assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
-    in
-    ()
+    if Config.no_stack_checks
+    then emit_stack_probes ~max_frame_size_bytes
+    else
+      let _sc_label, _sc_return =
+        assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
+      in
+      ()
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
   | Branch lbl -> emit_branch lbl
 

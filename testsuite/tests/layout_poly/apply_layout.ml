@@ -168,15 +168,9 @@ end @ static) = struct
     (x', y')
 end
 [%%expect{|
-Line 7, characters 9-11:
-7 |     (x', y')
-             ^^
-Error: The value "y'" has type "float#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because it's the type of a tuple element.
+module H :
+  functor (M : sig val poly_ id : 'a -> 'a end @ static) ->
+    sig val use : int -> float# -> int * float# end
 |}]
 
 (* Let binding: binding a layout-poly value *)

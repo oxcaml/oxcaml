@@ -439,20 +439,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of { layout : layout }
-  | Patomic_set_ptr of { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -510,6 +496,8 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -628,8 +616,6 @@ and value_kind_non_null =
   | Pboxedvectorval of boxed_vector
   | Pboxedmaskval
 
-(* Because we check for and error on void in the translation to lambda, we don't
-   need a constructor for it here. *)
 and layout =
   | Ptop
   | Pvalue of value_kind
@@ -637,7 +623,9 @@ and layout =
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
   | Punboxed_mask
+  | Pvoid
   | Punboxed_product of layout list
+    (** Invariant: the layout list has length >= 2 *)
   | Pbottom
   | Psplicevar of Slambdaident.t
 
@@ -663,7 +651,9 @@ and 'a mixed_block_element =
   | Mask
   | Word
   | Untagged_immediate
+  | Void
   | Product of 'a mixed_block_element array
+    (** Invariant: the mixed_block_element array has length >= 2 *)
   | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
@@ -697,6 +687,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -869,6 +860,7 @@ type zero_alloc_attribute =
                   This definition may not be applicable to new properties. *)
                loc: Location.t;
                custom_error_msg: string option;
+               partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
@@ -1270,15 +1262,6 @@ val main_module_representation :
 type program =
   { compilation_unit : Compilation_unit.t;
     main_module_block_format : main_module_block_format;
-    arg_block_idx : int option;         (* Index of argument block (see
-                                           [arg_descr]). If
-                                           [main_module_block_format] is
-                                           [Mb_struct], this is an index into
-                                           the main module block of the
-                                           compilation unit. For
-                                           [Mb_instantiating_functor], this is
-                                           an index into the module returned by
-                                           the instantiating functor. *)
     required_globals : Compilation_unit.Set.t;
                                         (* Modules whose initializer side effects
                                            must occur before [code]. *)
@@ -1296,27 +1279,6 @@ type program =
      Initialize_symbol(module_name, 0,
        [getfield 0; ...; getfield (main_module_block_size mbf - 1)])
 *)
-
-(* Info for a compilation unit that implements a parameter (that is, was
-   compiled with [-as-argument-for]). Note that if the CU is itself
-   parameterised, this information (in particular [arg_block_idx]) describes
-   instances rather than the base CU gs. *)
-type arg_descr =
-  { arg_param: Global_module.Parameter_name.t;
-                                        (* The parameter implemented (the [P] in
-                                           [-as-argument-for P]) *)
-    arg_block_idx: int;                 (* The index within the main module
-                                           block of the _argument block_. If
-                                           this compilation unit is used as an
-                                           argument when instantiating,
-                                           [-instantiate] will pass the argument
-                                           block to the instantiating functor
-                                           (see [main_module_block_format]). The
-                                           argument block's signature is exactly
-                                           that of the parameter, which is in
-                                           general a supertype of this
-                                           compilation unit's signature. *)
-  }
 
 (* Sharing key *)
 val make_key: lambda -> lambda option
@@ -1359,16 +1321,8 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
-(* A layout that is Pgenval because it is the field of a block being considered
-   for the tmc transformation
-*)
-val layout_tmc_field : layout
-(* A layout that is Pgenval because it is an optional argument *)
-val layout_optional_arg : layout
 val layout_value_field : layout
 val layout_predef_value : layout
 val layout_lazy : layout
@@ -1499,6 +1453,10 @@ val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> mixed_block_shape
   -> 'a mixed_block_element array
+
+(* Translate a representable layout, turning generalized sorts into splices.
+   Rejects [Any] and [Univar]. *)
+val transl_layout : Jkind_types.Layout.Const.t -> unit mixed_block_element
 
 val transl_module_representation :
   Types.module_representation -> module_representation
@@ -1645,6 +1603,8 @@ val mod_field:
 val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> 'a mixed_block_element
+
+val layout_of_mixed_block_element : _ mixed_block_element -> layout
 
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)

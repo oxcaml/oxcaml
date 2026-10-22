@@ -147,12 +147,16 @@ let concat ~outer ~inner =
         (fun id extra_args1 extra_args2 ->
           match extra_args1, extra_args2 with
           | None, None -> None
-          | Some _, None | None, Some _ ->
+          | Some Or_invalid.Invalid, _ | _, Some Or_invalid.Invalid ->
+            (* If either of [outer] or [inner] has proven that the use is
+               invalid, that is enough -- the other case may have used that
+               information to restrict the set of uses and hence not have extra
+               args for that use. *)
+            Some Or_invalid.Invalid
+          | Some (Or_invalid.Ok _), None | None, Some (Or_invalid.Ok _) ->
             Misc.fatal_errorf
               "concat: mismatching domains on id %a.@\nouter: %a@\ninner: %a"
               Apply_cont_rewrite_id.print id print outer print inner
-          | Some Or_invalid.Invalid, Some _ | Some _, Some Or_invalid.Invalid ->
-            Some Or_invalid.Invalid
           | Some (Or_invalid.Ok extra_args1), Some (Or_invalid.Ok extra_args2)
             ->
             Some (Or_invalid.Ok (extra_args1 @ extra_args2)))

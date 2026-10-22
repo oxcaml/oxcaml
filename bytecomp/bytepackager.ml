@@ -317,7 +317,6 @@ let package_object_files ~ppf_dump files target coercion =
         cu_pos = pos_code;
         cu_codesize = pos_debug - pos_code;
         cu_reloc = List.rev state.relocs;
-        cu_arg_descr = None;
         cu_imports = Array.of_list (import_info_for_the_pack_itself :: imports);
         cu_format = format;
         cu_primitives = List.rev state.primitives;

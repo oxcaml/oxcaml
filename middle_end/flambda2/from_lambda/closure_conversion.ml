@@ -1011,9 +1011,9 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
        Lambda.external_call_description) as prim_desc) ~args exn_continuation
     dbg ~current_region ~current_ghost_region k =
   let prim_desc =
-    match !Clflags.jsir with
-    | false -> prim_desc
-    | true ->
+    if not (Clflags.target_is_jsir ())
+    then prim_desc
+    else
       (* [close_c_call0] checks [prim_native_name] to see whether we should
          invoke the bytecode name or native name; for JavaScript compilation, we
          should use the bytecode name unless it involves unboxed products, for
@@ -1320,16 +1320,12 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
-      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
-      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
+      | Pscalar _ | Pphys_equal _ | Pcpu_relax | Pbox _ | Punbox _ ->
         (* Inconsistent with outer match *)
         assert false
     in
@@ -1916,7 +1912,7 @@ let close_exact_or_unknown_apply acc env
     in
     if Flambda_features.classic_mode ()
     then
-      if !Clflags.jsir
+      if Clflags.target_is_jsir ()
       then
         let apply =
           Apply.with_inlined_attribute apply
@@ -2016,9 +2012,11 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       let scrutinee = Simple.var comparison_result in
       let acc, action = action acc in
       let machine_width = Acc.machine_width acc in
+      (* CR bclement: use likelihood information from annotations. *)
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
-           ~if_true:action ~if_false:default_action)
+           ~if_true:(Switch_arm.from_apply_cont action)
+           ~if_false:(Switch_arm.from_apply_cont default_action))
     in
     let acc, body =
       Let_with_acc.create acc
@@ -2064,7 +2062,12 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               Target_ocaml_int.Map.fold
                 (fun case action (acc, arms) ->
                   let acc, arm = action acc in
-                  acc, Target_ocaml_int.Map.add case arm arms)
+                  (* CR bclement: use likelihood annotations from lambda to
+                     compute logits *)
+                  ( acc,
+                    Target_ocaml_int.Map.add case
+                      (Switch_arm.from_apply_cont arm)
+                      arms ))
                 arms
                 (acc, Target_ocaml_int.Map.empty)
             in
@@ -2265,7 +2268,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      (Flambda_kind.With_subkind.kind kind)
                  in
                  Bound_parameter.create var kind Flambda_debug_uid.none)
-               (Flambda_arity.unarized_components return))
+               (Flambda_arity.unarize return))
         in
         let handler acc =
           let acc, apply_cont =
@@ -2302,7 +2305,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       let boxed_variable = Variable.create "boxed_result" K.value in
       let boxed_variable_duid = Flambda_debug_uid.none in
       let return =
-        match Flambda_arity.unarized_components return with
+        match Flambda_arity.unarize return with
         | [return] -> return
         | [] | _ :: _ :: _ ->
           Misc.fatal_error
@@ -2419,7 +2422,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   let main_name = Function_slot.name unboxed_function_slot in
   let main_closure = Variable.create main_name K.value in
   let main_closure_duid = Flambda_debug_uid.none in
-  let return_continuation = Continuation.create () in
+  let return_continuation = Continuation.create ~sort:Return () in
   let exn_continuation = Continuation.create () in
   let my_closure = Variable.create "my_closure" K.value in
   let my_alloc_region = Variable.create "my_alloc_region" K.region in
@@ -2554,7 +2557,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
-             (Flambda_arity.unarized_components result_arity_main_code))
+             (Flambda_arity.unarize result_arity_main_code))
       in
       let handler, free_names_of_handler =
         let boxed_return = Variable.create "boxed_return" K.value in
@@ -3509,7 +3512,11 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
-      ~name:(Ident.name wrapper_id) ~is_always_immediate:false K.value
+      ~name:(Ident.name wrapper_id)
+      ~size:
+        (Function_slot.size_from_arity
+           ~num_complex_params:(Flambda_arity.num_params missing_arity)
+           ~is_tupled:false)
   in
   let num_provided = Flambda_arity.num_params provided_arity in
   let missing_arity_and_param_modes =
@@ -3738,7 +3745,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components apply.return_arity)
+          (Flambda_arity.unarize apply.return_arity)
       in
       let handler acc =
         let acc, call_return_continuation =
@@ -3816,7 +3823,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         missing_arity : [`Complex] Flambda_arity.t;
         missing_param_modes : Alloc_mode.For_types.t list;
-        result_arity : [`Unarized] Flambda_arity.t
+        result_arity : [`Complex] Flambda_arity.t
       }
   | Over_app of
       { full : IR.simple list;
@@ -4137,6 +4144,10 @@ let final_module_block_representation acc
   in
   block_shape, field_count, block_access, kind_of_field
 
+type final_module_block_field =
+  | Simple of Simple.t
+  | Let_bound of Variable.t * Flambda_debug_uid.t * Named.t
+
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
@@ -4158,18 +4169,34 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | _ -> simple_var
     in
     let field_vars =
-      List.init field_count (fun pos ->
+      List.init field_count (fun pos : final_module_block_field ->
           let pos_str = string_of_int pos in
-          ( pos,
-            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
-            Flambda_debug_uid.none ))
+          let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
+          let block = module_block_simple in
+          match simplify_block_load acc env ~block ~field with
+          | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
+            Let_bound
+              ( Variable.create ("field_" ^ pos_str) (kind_of_field pos),
+                Flambda_debug_uid.none,
+                Named.create_prim
+                  (Unary
+                     ( Block_load
+                         { kind = block_access pos; mut = Immutable; field },
+                       block ))
+                  Debuginfo.none )
+          | Field_contents sim -> Simple sim)
     in
     let acc, body =
       let static_const : Static_const.t =
         let field_vars =
           List.map
-            (fun (_, var, _) ->
-              Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
+            (fun field ->
+              let s =
+                match field with
+                | Simple simple -> simple
+                | Let_bound (var, _, _) -> Simple.var var
+              in
+              Simple.With_debuginfo.create s Debuginfo.none)
             field_vars
         in
         Static_const.block module_block_tag Immutable block_shape field_vars
@@ -4196,24 +4223,13 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         named ~body:return
     in
     List.fold_left
-      (fun (acc, body) (pos, var, var_duid) ->
-        let var = VB.create var var_duid Name_mode.normal in
-        let pat = Bound_pattern.singleton var in
-        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
-        let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field with
-        | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
-          let named =
-            Named.create_prim
-              (Unary
-                 ( Block_load { kind = block_access pos; mut = Immutable; field },
-                   block ))
-              Debuginfo.none
-          in
+      (fun (acc, body) field ->
+        match field with
+        | Let_bound (var, var_duid, named) ->
+          let var = VB.create var var_duid Name_mode.normal in
+          let pat = Bound_pattern.singleton var in
           Let_with_acc.create acc pat named ~body
-        | Field_contents sim ->
-          let named = Named.create_simple sim in
-          Let_with_acc.create acc pat named ~body)
+        | Simple _ -> acc, body)
       (acc, body) (List.rev field_vars)
   in
   let load_fields_handler_param =

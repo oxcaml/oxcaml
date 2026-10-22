@@ -1,0 +1,197 @@
+; Checks the documentation examples. An {@ocaml[ ... ]} code block in a
+; js_of_ocaml .mli doc-comment or .mld manual page is type-checked by default, so
+; an example that no longer matches the API breaks `dune build @runtest`. The
+; {@ocaml parse[ ... ]} and {@ocaml skip[ ... ]} markers opt out of type-checking
+; (parse-only) and of checking entirely; plain {[ ... ]} blocks are never checked.
+; See extract_examples.ml and README.md.
+
+(executable
+ (name extract_examples)
+ (modules extract_examples))
+
+; --- Type-checked blocks ---------------------------------------------------
+
+; Each type unit is a library (not an executable): building the .cma type-checks
+; every module but skips the final link, so an example that declares/uses an
+; `external` primitive that only exists in JS still checks.
+
+; Manual examples: every manual/*.mld page. The pages read with `open Js_of_ocaml`
+; assumed throughout, so we inject it (--open) rather than repeat it in every
+; small block; the rendered blocks stay clean and are checked as-is. The same
+; glob feeds the parse tier below (pages with only parse-only blocks, e.g.
+; lwt.mld, and pages with no blocks contribute nothing here).
+
+(rule
+ (target examples_manual.ml)
+ (deps
+  extract_examples.exe
+  (:mlds
+   (glob_files ../*.mld)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./extract_examples.exe --open Js_of_ocaml %{mlds}))))
+
+(library
+ (name examples_manual)
+ (modules examples_manual)
+ (modes byte)
+ ; dynlink / wasm_of_ocaml-compiler.dynlink / js_of_ocaml-toplevel.worker: the
+ ; build-toplevel page's loadfile and worker examples. js_of_ocaml.deriving +
+ ; the ppx_deriving_json preprocessor: the ppx-deriving page.
+ (libraries
+  js_of_ocaml
+  js_of_ocaml.deriving
+  dynlink
+  wasm_of_ocaml-compiler.dynlink
+  js_of_ocaml-toplevel.worker)
+ (flags
+  (:standard -w -a))
+ (preprocess
+  (pps js_of_ocaml-ppx js_of_ocaml-ppx_deriving_json)))
+
+; API examples, from the js_of_ocaml library .mli doc-comments. `open Js_of_ocaml`
+; is injected (the examples reference Js, Dom_html, Intl, Console, ... unqualified).
+
+(rule
+ (target examples_lib.ml)
+ (deps
+  extract_examples.exe
+  (:mlis
+   (glob_files ../../lib/js_of_ocaml/*.mli)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./extract_examples.exe --open Js_of_ocaml %{mlis}))))
+
+(library
+ (name examples_lib)
+ (modules examples_lib)
+ (modes byte)
+ (libraries js_of_ocaml)
+ (flags
+  (:standard -w -a))
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+; js_of_ocaml-tyxml examples (the functional Tyxml_js.Html API).
+
+(rule
+ (target examples_tyxml.ml)
+ (deps
+  extract_examples.exe
+  (:mlis
+   (glob_files ../../lib/tyxml/*.mli)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./extract_examples.exe --open Js_of_ocaml_tyxml %{mlis}))))
+
+(library
+ (name examples_tyxml)
+ (modules examples_tyxml)
+ (modes byte)
+ (libraries js_of_ocaml-tyxml)
+ (flags
+  (:standard -w -a))
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+; js_of_ocaml-lwt examples: need the js ppx (##.), with Lwt_js_events opened so
+; the event functions resolve unqualified. The examples use Lwt.Syntax (let*)
+; rather than lwt_ppx's let%lwt, so no lwt_ppx is required (it is unavailable on
+; some environments, e.g. OxCaml).
+
+(rule
+ (target examples_lwt.ml)
+ (deps
+  extract_examples.exe
+  (:mlis
+   (glob_files ../../lib/lwt/*.mli)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./extract_examples.exe --open Js_of_ocaml_lwt.Lwt_js_events %{mlis}))))
+
+(library
+ (name examples_lwt)
+ (modules examples_lwt)
+ (modes byte)
+ (libraries js_of_ocaml js_of_ocaml-lwt lwt)
+ (flags
+  (:standard -w -a))
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+; --- Parse-only blocks -----------------------------------------------------
+
+; The {@ocaml parse[ ... ]} blocks of the same pages: syntax-checked only (they
+; reference hypothetical identifiers or placeholder types). No ppx and no --open:
+; `##`/`object%js` parse as plain OCaml, names are never resolved, and injecting
+; an `open` before a bare-expression block would itself be a syntax error.
+
+(rule
+ (target examples_manual_parse.ml)
+ (deps
+  extract_examples.exe
+  (:mlds
+   (glob_files ../*.mld)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./extract_examples.exe --select parse %{mlds}))))
+
+(rule
+ (target examples_lib_parse.ml)
+ (deps
+  extract_examples.exe
+  (:mlis
+   (glob_files ../../lib/js_of_ocaml/*.mli)))
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./extract_examples.exe --select parse %{mlis}))))
+
+; --- Run the checks under @runtest -----------------------------------------
+
+; The check only runs on Unix: the parse tier invokes ocamlc through
+; %{ocaml_bin}, which resolves to a bare `ocamlc` (no `.exe`) on Windows, and
+; the check adds no coverage that the Unix jobs don't already provide.
+
+; Type tier: build the archives (type-checking) — never executed.
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{os_type} Unix))
+ (deps
+  examples_manual.cma
+  examples_lib.cma
+  examples_tyxml.cma
+  examples_lwt.cma)
+ (action (progn)))
+
+; Parse tier: stop after parsing, so undefined identifiers are allowed but a
+; genuine syntax error fails.
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{os_type} Unix))
+ (deps examples_manual_parse.ml)
+ (action
+  (run
+   %{ocaml_bin}/ocamlc
+   -stop-after
+   parsing
+   -w
+   -a
+   examples_manual_parse.ml)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{os_type} Unix))
+ (deps examples_lib_parse.ml)
+ (action
+  (run %{ocaml_bin}/ocamlc -stop-after parsing -w -a examples_lib_parse.ml)))

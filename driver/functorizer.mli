@@ -34,8 +34,7 @@ val functorize :
   with_info:
     (dump_ext:string -> Unit_info.t -> (Compile_common.info -> unit) -> unit) ->
   impl_ext:string ->
-  read_format:
-    (Misc.filepath -> Lambda.main_module_block_format * Lambda.arg_descr option) ->
+  read_format:(Misc.filepath -> Lambda.main_module_block_format) ->
   compile_program:(Compile_common.info -> Lambda.program -> unit) ->
   unit
 (** Dispatch on the target extension: [.cmi] writes just the bundle interface;
