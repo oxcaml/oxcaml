@@ -222,7 +222,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
         (-1)
       |> To_jsir_shared.reg_width_const
     in
-    use_prim ~env ~res (Extern extern_name) [x; Pc minus_one]
+    use_prim ~env ~res (Extern (extern_name, None)) [x; Pc minus_one]
   | Int_arith (kind, Swap_byte_endianness) -> (
     match kind with
     | Naked_int8 -> identity ~env ~res x
