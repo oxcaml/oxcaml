@@ -154,46 +154,30 @@ let modality i ppf modality =
 let modalities i ppf modalities =
   List.iter (fun m -> modality i ppf m) modalities
 
-let string_of_mode_bound sep { bound_vars; bound_const } =
-  let string_of_elem { elem_morph; elem_var; elem_mod } =
-    let base =
-      match elem_morph with
-      | None -> "'" ^ elem_var.txt
-      | Some m -> m.txt ^ "('" ^ elem_var.txt ^ ")"
-    in
-    match elem_mod with
-    | [] -> base
-    | _ :: _ ->
-      base ^ " mod " ^ String.concat " " (List.map (fun c -> c.txt) elem_mod)
-  in
-  let vars = List.map string_of_elem bound_vars in
-  let consts =
-    match bound_const with
-    | [] -> []
-    | _ :: _ ->
-      [String.concat " " (List.map (fun c -> c.txt) bound_const)]
-  in
-  String.concat sep (vars @ consts)
+let mode_bound_elem i ppf { elem_morph; elem_var; elem_mod } =
+  line i ppf "mode_bound_elem\n";
+  option (i+1) string_loc ppf elem_morph;
+  string_loc (i+1) ppf elem_var;
+  list (i+1) string_loc ppf elem_mod
 
-let string_of_mode = function
-  | Mode s -> s
-  | Mode_var v -> "'" ^ v.txt
+let mode_bound i ppf { bound_vars; bound_const } =
+  list i mode_bound_elem ppf bound_vars;
+  list i string_loc ppf bound_const
+
+let mode i ppf (mode : mode loc) =
+  match mode.txt with
+  | Mode x ->
+    line i ppf "mode %a\n" fmt_string_loc { mode with txt = x }
+  | Mode_var v ->
+    line i ppf "mode %a\n" fmt_location mode.loc;
+    line (i+1) ppf "Mode_var %a\n" fmt_string_loc v
   | Mode_bounds { upper; lower } ->
-    let upper =
-      match string_of_mode_bound " & " upper with
-      | "" -> []
-      | s -> ["< " ^ s]
-    in
-    let lower =
-      match string_of_mode_bound " | " lower with
-      | "" -> []
-      | s -> ["> " ^ s]
-    in
-    "[" ^ String.concat " " (upper @ lower) ^ "]"
-
-let mode i ppf mode =
-  line i ppf "mode %a\n" fmt_string_loc
-    (Location.map string_of_mode mode)
+    line i ppf "mode %a\n" fmt_location mode.loc;
+    line (i+1) ppf "Mode_bounds\n";
+    line (i+2) ppf "upper\n";
+    mode_bound (i+3) ppf upper;
+    line (i+2) ppf "lower\n";
+    mode_bound (i+3) ppf lower
 
 let modes i ppf modes =
   List.iter (fun m -> mode i ppf m) modes
