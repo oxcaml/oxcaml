@@ -181,31 +181,23 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
   in
   simplify_expr dacc expr ~down_to_up
 
-let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
-    ~result_arity ~coming_from_indirect ~callee's_code_metadata uacc
-    ~after_rebuild =
-  let uacc =
-    if coming_from_indirect
-    then
-      UA.notify_removed ~operation:Removed_operations.direct_call_of_indirect
-        uacc
-    else uacc
-  in
+let rebuild_apply
+    ({ apply; use_id; exn_cont_use_id; result_arity; is_cold } :
+      SE.simplified_apply) uacc ~after_rebuild =
   let apply =
     Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
       apply
   in
   let erase_callee = false in
   (* CR ncourant: find out how we can erase the callee in simplify mode and
-     still update to newer code pointers after resimplification. *)
+      still update to newer code pointers after resimplification. *)
   (* let erase_callee =
-   *   match Apply.callee apply with
-   *   | None -> false
-   *   | Some callee ->
-   *     Simple.is_symbol callee
-   *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
-   * in *)
-  let is_cold = Code_metadata.cold callee's_code_metadata in
+    *   match Apply.callee apply with
+    *   | None -> false
+    *   | Some callee ->
+    *     Simple.is_symbol callee
+    *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
+    * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
   let uacc, expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold
@@ -420,10 +412,22 @@ let simplify_direct_full_application ~simplify_expr ~rebuild_expr dacc apply
       let dacc =
         record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
       in
-      down_to_up dacc
-        (SE.simplified_non_inlined_direct_full_application apply ~use_id
-           ~exn_cont_use_id ~result_arity ~coming_from_indirect
-           ~callee's_code_metadata))
+      let expr =
+        (* CR-someday bclement: it's not clear that either of the [result_arity]
+           from the callee's code metadata or the [apply]'s [return_arity] is
+           more precise than the other, but it would be better to be consistent
+           and use the same one everywhere. *)
+        SE.simplified_apply apply ~use_id ~exn_cont_use_id ~result_arity
+          ~is_cold:(Code_metadata.cold callee's_code_metadata)
+      in
+      let expr =
+        if coming_from_indirect
+        then
+          SE.notify_removed
+            ~operation:Removed_operations.direct_call_of_indirect expr
+        else expr
+      in
+      down_to_up dacc expr)
 
 (* CR mshinwell: need to work out what to do for local alloc transformations
    when there are zero args. *)
@@ -558,7 +562,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       let result_mode = Code_metadata.result_mode callee's_code_metadata in
       let wrapper_taking_remaining_args, wrapper_alloc_mode, dacc, code_id, code
           =
-        let return_continuation = Continuation.create () in
+        let return_continuation = Continuation.create ~sort:Return () in
         let remaining_params =
           List.map
             (fun kind ->
@@ -885,24 +889,6 @@ let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
   let args = Flambda_arity.unarize_per_parameter args_arity in
   has_mismatch params args
 
-let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
-    ~exn_cont_use_id uacc ~after_rebuild =
-  let apply =
-    Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
-      apply
-  in
-  let apply =
-    Apply.with_inlined_attribute apply
-      (Inlined_attribute.with_use_info (Apply.inlined apply)
-         Unused_because_function_unknown)
-  in
-  let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold:false
-      (Flambda_arity.unarize_t (Apply.return_arity apply))
-      apply
-  in
-  after_rebuild expr uacc
-
 let simplify_function_call_where_callee's_type_unavailable dacc apply
     (call : Call_kind.Function_call.t) ~down_to_up =
   fail_if_probe apply;
@@ -962,12 +948,16 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       else Call_kind.direct_function_call code_id
   in
   let apply = Apply_expr.with_call_kind apply call_kind in
+  let apply =
+    Apply_expr.with_inlined_attribute apply
+      (Inlined_attribute.with_use_info (Apply.inlined apply)
+         Unused_because_function_unknown)
+  in
   let dacc =
     record_free_names_of_apply_as_used ~use_id ~exn_cont_use_id dacc apply
   in
   down_to_up dacc
-    (SE.simplified_function_call_where_callee's_type_unavailable apply ~use_id
-       ~exn_cont_use_id)
+    (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 
 let simplify_direct_function_call ~simplify_expr ~rebuild_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_metadata_from_type
@@ -1344,40 +1334,6 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
     in
     Ok (dacc, callee_ty, apply, arg_types, inlined_forwarded_from)
 
-let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
-    ~after_rebuild =
-  let apply =
-    Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
-      apply
-  in
-  let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id ~is_cold:false
-      (Flambda_arity.unarize_t (Apply.return_arity apply))
-      apply
-  in
-  after_rebuild expr uacc
-
-let rebuild_apply (simplified_apply : SE.simplified_apply) uacc ~after_rebuild =
-  match simplified_apply with
-  | Simplified_non_ocaml_function_call { apply; use_id; exn_cont_use_id } ->
-    rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
-      ~after_rebuild
-  | Simplified_function_call_where_callee's_type_unavailable
-      { apply; use_id; exn_cont_use_id } ->
-    rebuild_function_call_where_callee's_type_unavailable apply ~use_id
-      ~exn_cont_use_id uacc ~after_rebuild
-  | Simplified_non_inlined_direct_full_application
-      { apply;
-        use_id;
-        exn_cont_use_id;
-        result_arity;
-        coming_from_indirect;
-        callee's_code_metadata
-      } ->
-    rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
-      ~result_arity ~coming_from_indirect ~callee's_code_metadata uacc
-      ~after_rebuild
-
 let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
   fail_if_probe apply;
   let callee_kind = T.kind callee_ty in
@@ -1418,8 +1374,8 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
       ~exn_cont_use_id apply
   in
   down_to_up dacc
-    (SE.simplified_non_ocaml_function_call apply ~use_id:(Some use_id)
-       ~exn_cont_use_id)
+    (SE.simplified_apply apply ~use_id:(Some use_id) ~exn_cont_use_id
+       ~is_cold:false)
 
 let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     =
@@ -1478,7 +1434,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
       record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
     in
     down_to_up dacc
-      (SE.simplified_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
+      (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
   | Invalid ->
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
 
@@ -1546,7 +1502,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
   in
   down_to_up dacc
-    (SE.simplified_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
+    (SE.simplified_apply apply ~use_id ~exn_cont_use_id ~is_cold:false)
 
 let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
   match simplify_apply_shared dacc apply with
