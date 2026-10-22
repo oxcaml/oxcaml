@@ -3539,6 +3539,11 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         | Tvar _ ->
             Typecore.Error.log_and_raise
               smod.pmod_loc env Typecore.Cannot_infer_signature
+        | Tivar _ ->
+            (* CR-someday omni: fails like a [Tvar]. Smarter: suspend on the
+               ivar until it is filled with a package type. *)
+            Typecore.Error.log_and_raise
+              smod.pmod_loc env Typecore.Cannot_infer_signature
         | _ ->
             Error.log_and_raise smod.pmod_loc env
               (Not_a_packed_module exp.exp_type)

@@ -104,6 +104,22 @@ let extract_target_type env ty =
         None
     | ty -> Some ty
 
+let args_are_distinct_vars env args =
+  Types.with_type_mark (fun mark ->
+      List.for_all
+        (fun ty ->
+          let ty = Ctype.expand_head env ty in
+          Types.try_mark_node mark ty
+          &&
+          match Types.get_desc ty with
+          | Tvar _ -> true
+          | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+          | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _
+          | Tquote_eval _ | Tnil | Tlink _ | Tsubst _ | Tvariant _
+          | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _
+          | Tbox _ -> false)
+        args)
+
 let extract_target_parameters env ty =
   match extract_target_type env ty with
   | None -> None
@@ -111,7 +127,7 @@ let extract_target_parameters env ty =
       let tgt = Ctype.expand_head env tgt in
       match Types.get_desc tgt with
       | Tconstr (path, (_ :: _ as args), _)
-        when Ctype.all_distinct_vars env args ->
+        when args_are_distinct_vars env args ->
           Some (path, args)
       | _ -> None
 
@@ -142,7 +158,7 @@ let match_generic_printer_type env ty =
       with
       | exception Ctype.Unify _ -> None
       | args ->
-          if Ctype.all_distinct_vars env args
+          if args_are_distinct_vars env args
           then
             Some (Generic { ty_path; arity = List.length params; })
           else None

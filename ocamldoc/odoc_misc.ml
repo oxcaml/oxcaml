@@ -515,6 +515,7 @@ let remove_option typ =
     | Tof_kind _
     | Tbox _ -> t
     | Tlink t2 -> trim (get_desc t2)
+    | Tivar _ -> Misc.fatal_error "Odoc_misc.remove_option: unexpected Tivar"
     | Tsubst _ -> assert false
   in
   Transient_expr.type_expr

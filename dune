@@ -172,6 +172,7 @@
   lazy_backtrack
   with_backtracking_intf
   with_backtracking
+  union_find
   diffing
   diffing_with_keys
   linkdeps
@@ -247,6 +248,8 @@
   ;; ocamlcommon with the rest of utils/) because it depends on typing/
   profile_counters_functions
   ;; TYPING
+  scheduler
+  ivar
   path
   current_unit
   jkind

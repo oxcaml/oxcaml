@@ -27,6 +27,8 @@ let s_table create size =
   global_bindings.refs <- (Table { ref; init }) :: global_bindings.refs;
   ref
 
+let s_ref_of_create create arg = s_table create arg
+
 let s_ref k =
   let ref = ref k in
   assert (not global_bindings.frozen);

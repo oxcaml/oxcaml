@@ -102,6 +102,7 @@ let rec create_type_tree ty : Type_tree.t =
   | Tmod (ty, _) -> create_type_tree ty
   | Tnil
   | Tvar _
+  | Tivar _
   | Tsubst _
   | Tunivar _
   | Tpackage _

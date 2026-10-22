@@ -668,6 +668,7 @@ let rec typexp copy_scope s ty =
         For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
         ty'
       else ty
+  | Tivar _ -> Misc.fatal_error "Subst.typexp: Tivar is not supported yet"
   | Tsubst (ty, _) ->
       ty
   | Tfield (m, k, _t1, _t2) when not should_duplicate_vars && m = dummy_method
@@ -746,7 +747,7 @@ let rec typexp copy_scope s ty =
                     typexp copy_scope s more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
-                    else if dup && is_Tvar more then newgenty mored
+                    else if dup && is_row_Tvar more then newgenty mored
                     else more
                 | _ -> assert false
               in

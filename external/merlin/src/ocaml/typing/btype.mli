@@ -104,7 +104,6 @@ val new_sort_var: level:int -> Jkind_types.Sort.var
 
 (**** Types ****)
 
-val is_Tvar: type_expr -> bool
 val is_Tunivar: type_expr -> bool
 val is_Tconstr: type_expr -> bool
 val is_Tpoly: type_expr -> bool
@@ -112,6 +111,9 @@ val is_poly_Tpoly: type_expr -> bool
 val dummy_method: label
 val type_kind_is_abstract: type_declaration -> bool
 val type_origin: type_declaration -> type_origin
+
+(** [is_param_Tvar p] returns true when the type parameter [p] is a [Tvar]. *)
+val is_param_Tvar : type_expr -> bool
 
 (**** polymorphic variants ****)
 
@@ -142,6 +144,9 @@ val hash_variant: label -> int
 val proxy: type_expr -> type_expr
         (* Return the proxy representative of the type: either itself
            or a row variable *)
+
+(** [is_row_Tvar ty] returns true when the row type [ty] is a [Tvar].*)
+val is_row_Tvar : type_expr -> bool
 
 (* Poly types. *)
 
