@@ -70,6 +70,14 @@ val perform_analysis :
 val adjust_code_metadata :
   Datalog.database -> Code_id.t -> Code_metadata.t -> Code_metadata.t
 
+(** The candidate allocations (see [Escape_graph.Relations.allocated_in]), and
+    the partial applications treated as such. *)
+val candidate_tbl :
+  ( unit Code_id_or_name.Map.t,
+    Code_id_or_name.t -> Datalog.nil,
+    unit )
+  Datalog.table
+
 (** Allocations (variables) that may be turned into stack allocations. *)
 val local_allocation_tbl :
   ( unit Code_id_or_name.Map.t,

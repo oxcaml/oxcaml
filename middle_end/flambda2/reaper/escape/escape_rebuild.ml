@@ -26,6 +26,60 @@ type closers =
 
 let no_closers = Variable.Map.empty
 
+(* Statistics on the heap allocations rebuilt (blocks, boxed numbers and sets of
+   closures: the allocations the analysis handles), printed on standard error
+   with the reaper debug flag [escape-stats] (one line per compilation unit) or
+   [escape-stats-verbose] (also one line per allocation). Lines are made of
+   [key=value] fields separated by single spaces, [at] being the last field: it
+   holds the compact debug info of the allocation (see
+   [Debuginfo.print_compact]) and may be empty. Sizes are in words, including
+   the header.
+
+   reaper-escape-stats: unit=U local_allocs=N local_words=W heap_allocs=N
+   heap_words=W heap_candidate_allocs=N heap_candidate_words=W
+
+   reaper-escape-alloc: unit=U result=local|heap candidate=true|false kind=block
+   tag=T fields=F words=W at=LOC
+
+   reaper-escape-alloc: ... kind=boxed number=float|... words=W at=LOC
+
+   reaper-escape-alloc: ... kind=closure functions=F value_slots=V words=W
+   at=LOC
+
+   The [heap_candidate_*] fields count the allocations the analysis considered
+   (see [Escape_graph.Relations.allocated_in]) but left on the heap. Allocations
+   that were already local in the input, and candidates unboxed by the reaper
+   (which no longer exist), are not counted. *)
+type stats =
+  { local_allocs : int;
+    local_words : int;
+    heap_allocs : int;
+    heap_words : int;
+    heap_candidate_allocs : int;
+    heap_candidate_words : int
+  }
+
+let empty_stats =
+  { local_allocs = 0;
+    local_words = 0;
+    heap_allocs = 0;
+    heap_words = 0;
+    heap_candidate_allocs = 0;
+    heap_candidate_words = 0
+  }
+
+type stats_mode =
+  | No_stats
+  | Summary
+  | Verbose
+
+let stats_mode () =
+  if Flambda_features.debug_reaper "escape-stats-verbose"
+  then Verbose
+  else if Flambda_features.debug_reaper "escape-stats"
+  then Summary
+  else No_stats
+
 type region =
   { region : Variable.t;
     ghost_region : Variable.t;
@@ -51,7 +105,8 @@ type 'r t =
     regions : region list;
     (* Access to the closers in the result of the rebuilding. *)
     closers_of : 'r -> closers;
-    with_closers : closers -> 'r -> 'r
+    with_closers : closers -> 'r -> 'r;
+    stats_mode : stats_mode
   }
 
 let create ~solution ~code_ids_directly_called ~params_of_continuation
@@ -66,45 +121,219 @@ let create ~solution ~code_ids_directly_called ~params_of_continuation
     return_continuation;
     regions = [];
     closers_of;
-    with_closers
+    with_closers;
+    stats_mode = stats_mode ()
   }
 
+(* Descriptions of the allocations for the statistics (see [stats]). *)
+type allocation =
+  | Block of
+      { tag : int;
+        fields : int;
+        words : int
+      }
+  | Boxed_number of
+      { number : string;
+        words : int
+      }
+  | Closure of
+      { functions : int;
+        value_slots : int;
+        words : int
+      }
+
+let words_of_allocation = function
+  | Block { words; _ } | Boxed_number { words; _ } | Closure { words; _ } ->
+    words
+
+let print_allocation ppf = function
+  | Block { tag; fields; words = _ } ->
+    Format.fprintf ppf "kind=block tag=%d fields=%d" tag fields
+  | Boxed_number { number; words = _ } ->
+    Format.fprintf ppf "kind=boxed number=%s" number
+  | Closure { functions; value_slots; words = _ } ->
+    Format.fprintf ppf "kind=closure functions=%d value_slots=%d" functions
+      value_slots
+
+(* Sizes in words of the fields of blocks, on 64-bit targets. *)
+let words_of_naked_number (kind : K.Naked_number_kind.t) =
+  match kind with
+  | Naked_immediate | Naked_float32 | Naked_float | Naked_int8 | Naked_int16
+  | Naked_int32 | Naked_int64 | Naked_nativeint | Naked_mask ->
+    1
+  | Naked_vec128 -> 2
+  | Naked_vec256 -> 4
+  | Naked_vec512 -> 8
+
+let words_of_kind (kind : K.t) =
+  match kind with
+  | Value -> 1
+  | Naked_number kind -> words_of_naked_number kind
+  | Region | Rec_info -> 0
+
+let block_allocation (block_kind : P.Block_kind.t) ~num_fields ~dbg =
+  let tag, _ = P.Block_kind.to_shape block_kind in
+  let field_words =
+    match block_kind with
+    | Values _ | Naked_floats -> num_fields
+    | Mixed (_, shape) -> K.Mixed_block_shape.size_in_words shape
+  in
+  ( Block { tag = Tag.to_int tag; fields = num_fields; words = 1 + field_words },
+    dbg )
+
+(* Boxed floats are plain blocks, boxed vectors flat blocks, and the other boxed
+   numbers custom blocks with a pointer to their operations (see the headers in
+   [Cmm_helpers]). *)
+let boxed_number_allocation (kind : K.Boxable_number.t) ~dbg =
+  let number, words =
+    match kind with
+    | Naked_float -> "float", 2
+    | Naked_float32 -> "float32", 3
+    | Naked_int32 -> "int32", 3
+    | Naked_int64 -> "int64", 3
+    | Naked_nativeint -> "nativeint", 3
+    | Naked_vec128 -> "vec128", 3
+    | Naked_vec256 -> "vec256", 5
+    | Naked_vec512 -> "vec512", 9
+    | Naked_mask -> "mask", 2
+  in
+  Boxed_number { number; words }, dbg
+
+(* The layout of [Slot_offsets]: the function slots, each preceded by an infix
+   header except the first, then the value slots. *)
+let closure_allocation set_of_closures ~code_metadata =
+  let funs =
+    Function_declarations.funs (Set_of_closures.function_decls set_of_closures)
+  in
+  let functions = Function_slot.Map.cardinal funs in
+  let function_words, dbg =
+    Function_slot.Map.fold
+      (fun _ (decl : Function_declarations.code_id_in_function_declaration)
+           (words, dbg) ->
+        match decl with
+        | Deleted { function_slot_size; dbg = dbg' } ->
+          ( words + function_slot_size,
+            if Debuginfo.is_none dbg then dbg' else dbg )
+        | Code_id { code_id; only_full_applications = _ } ->
+          let code_metadata = code_metadata code_id in
+          ( words + Code_metadata.function_slot_size code_metadata,
+            if Debuginfo.is_none dbg
+            then Code_metadata.dbg code_metadata
+            else dbg ))
+      funs (0, Debuginfo.none)
+  in
+  let value_slots = Set_of_closures.value_slots set_of_closures in
+  let value_slot_words =
+    Value_slot.Map.fold
+      (fun slot _ words -> words + words_of_kind (Value_slot.kind slot))
+      value_slots 0
+  in
+  ( Closure
+      { functions;
+        value_slots = Value_slot.Map.cardinal value_slots;
+        words = 1 + function_words + max 0 (functions - 1) + value_slot_words
+      },
+    dbg )
+
+let unit_name () =
+  Compilation_unit.full_path_as_string (Current_unit.get_cu_exn ())
+
+let record_allocation t stats ~is_local ~candidate allocation =
+  match t.stats_mode with
+  | No_stats -> stats
+  | Summary | Verbose ->
+    let allocation, dbg = allocation () in
+    let words = words_of_allocation allocation in
+    (match t.stats_mode with
+    | Verbose ->
+      Format.eprintf
+        "reaper-escape-alloc: unit=%s result=%s candidate=%b %a words=%d \
+         at=%a@."
+        (unit_name ())
+        (if is_local then "local" else "heap")
+        candidate print_allocation allocation words Debuginfo.print_compact dbg
+    | No_stats | Summary -> ());
+    if is_local
+    then
+      { stats with
+        local_allocs = stats.local_allocs + 1;
+        local_words = stats.local_words + words
+      }
+    else
+      let stats =
+        { stats with
+          heap_allocs = stats.heap_allocs + 1;
+          heap_words = stats.heap_words + words
+        }
+      in
+      if candidate
+      then
+        { stats with
+          heap_candidate_allocs = stats.heap_candidate_allocs + 1;
+          heap_candidate_words = stats.heap_candidate_words + words
+        }
+      else stats
+
+let report_stats t stats =
+  match t.stats_mode with
+  | No_stats -> ()
+  | Summary | Verbose ->
+    Format.eprintf
+      "reaper-escape-stats: unit=%s local_allocs=%d local_words=%d \
+       heap_allocs=%d heap_words=%d heap_candidate_allocs=%d \
+       heap_candidate_words=%d@."
+      (unit_name ()) stats.local_allocs stats.local_words stats.heap_allocs
+      stats.heap_words stats.heap_candidate_allocs stats.heap_candidate_words
+
 (* Turn a heap allocation into a stack allocation in the region of the innermost
-   region scope when the escape analysis has decided it is local. *)
-let localize_alloc_mode0 t ~is_local (alloc_mode : Alloc_mode.For_allocations.t)
-    =
+   region scope when the escape analysis has decided it is local, and record it
+   in the statistics. Allocations already local in the input are not ours. *)
+let localize t stats ~is_local ~candidate ~allocation
+    (alloc_mode : Alloc_mode.For_allocations.t) =
   match alloc_mode, t.regions with
+  | Local _, _ -> alloc_mode, stats
   | Heap { alloc_region }, { region; _ } :: _ when is_local ->
-    Alloc_mode.For_allocations.local ~alloc_region ~region
-  | (Heap _ | Local _), _ -> alloc_mode
+    ( Alloc_mode.For_allocations.local ~alloc_region ~region,
+      record_allocation t stats ~is_local:true ~candidate allocation )
+  | Heap _, _ ->
+    alloc_mode, record_allocation t stats ~is_local:false ~candidate allocation
 
-let localize_alloc_mode t var alloc_mode =
-  localize_alloc_mode0 t
+let localize_make_block t stats bv block_kind alloc_mode ~num_fields ~dbg =
+  let var = Bound_var.var bv in
+  localize t stats
     ~is_local:(Escape_solution.is_local_allocation t.solution var)
+    ~candidate:(Escape_solution.is_candidate t.solution var)
+    ~allocation:(fun () -> block_allocation block_kind ~num_fields ~dbg)
     alloc_mode
 
-let localize_alloc_mode_of_pattern t (bp : Bound_pattern.t) alloc_mode =
-  match bp with
-  | Singleton bv -> localize_alloc_mode t (Bound_var.var bv) alloc_mode
-  | Set_of_closures _ | Static _ -> alloc_mode
-
-let localize_set_of_closures_alloc_mode t bvs alloc_mode =
-  localize_alloc_mode0 t
+let localize_set_of_closures t stats bvs set_of_closures ~code_metadata
+    alloc_mode =
+  let vars = List.map Bound_var.var bvs in
+  localize t stats
     ~is_local:
-      (List.for_all
-         (fun bv ->
-           Escape_solution.is_local_allocation t.solution (Bound_var.var bv))
-         bvs)
+      (List.for_all (Escape_solution.is_local_allocation t.solution) vars)
+    ~candidate:(List.for_all (Escape_solution.is_candidate t.solution) vars)
+    ~allocation:(fun () -> closure_allocation set_of_closures ~code_metadata)
     alloc_mode
 
-let localize_box_number t bv (defining_expr : Named.t) : Named.t =
+let localize_box_number t stats bv (defining_expr : Named.t) =
   match[@ocaml.warning "-fragile-match"] defining_expr with
-  | Prim (Unary (Box_number (bn, alloc_mode), contents), dbg)
-    when Escape_solution.is_local_allocation t.solution (Bound_var.var bv) ->
-    let alloc_mode = localize_alloc_mode0 t ~is_local:true alloc_mode in
-    Named.create_prim (Unary (Box_number (bn, alloc_mode), contents)) dbg
+  | Prim (Unary (Box_number (bn, alloc_mode), contents), dbg) ->
+    let var = Bound_var.var bv in
+    let alloc_mode', stats =
+      localize t stats
+        ~is_local:(Escape_solution.is_local_allocation t.solution var)
+        ~candidate:(Escape_solution.is_candidate t.solution var)
+        ~allocation:(fun () -> boxed_number_allocation bn ~dbg)
+        alloc_mode
+    in
+    if alloc_mode' == alloc_mode
+    then defining_expr, stats
+    else
+      ( Named.create_prim (Unary (Box_number (bn, alloc_mode'), contents)) dbg,
+        stats )
   | Prim _ | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ ->
-    defining_expr
+    defining_expr, stats
 
 (* The regions to close when jumping to continuation [k] from the current point:
    those of the enclosing region scopes in which [k] is not defined. Nothing is

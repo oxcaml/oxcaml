@@ -21,6 +21,10 @@ type t
     remove (see [Unboxing_analysis.result]). *)
 val create : Datalog.database -> unboxed_fields:_ Code_id_or_name.Map.t -> t
 
+(** Whether the allocation bound to the given variable was a candidate for stack
+    allocation (see [Escape_graph.Relations.allocated_in]). *)
+val is_candidate : t -> Variable.t -> bool
+
 (** Whether the allocation bound to the given variable may be turned into a
     stack allocation. *)
 val is_local_allocation : t -> Variable.t -> bool

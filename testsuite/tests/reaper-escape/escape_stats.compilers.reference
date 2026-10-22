@@ -1,0 +1,7 @@
+reaper-escape-alloc: unit=Escape_stats result=heap candidate=true kind=block tag=0 fields=2 words=3 at=escape_stats.ml:33,27--31
+reaper-escape-alloc: unit=Escape_stats result=local candidate=true kind=closure functions=1 value_slots=1 words=5 at=escape_stats.ml:30,10--25
+reaper-escape-alloc: unit=Escape_stats result=local candidate=true kind=boxed number=float words=2 at=escape_stats.ml:29,12--26
+reaper-escape-alloc: unit=Escape_stats result=local candidate=true kind=block tag=0 fields=2 words=3 at=escape_stats.ml:28,12--20
+reaper-escape-alloc: unit=Escape_stats result=heap candidate=true kind=boxed number=float words=2 at=escape_stats.ml:18,41--48
+reaper-escape-alloc: unit=Escape_stats result=heap candidate=false kind=block tag=0 fields=1 words=2 at=escape_stats.ml:36,8--35
+reaper-escape-stats: unit=Escape_stats local_allocs=3 local_words=10 heap_allocs=3 heap_words=7 heap_candidate_allocs=2 heap_candidate_words=5

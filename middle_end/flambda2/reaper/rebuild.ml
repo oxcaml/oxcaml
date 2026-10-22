@@ -68,7 +68,8 @@ and rebuild_result =
     code_ids_to_remember : Code_id.Set.t;
     (* Region-closing continuations pending for the enclosing region scopes (see
        [Escape_rebuild]). *)
-    escape_closers : Escape_rebuild.closers
+    escape_closers : Escape_rebuild.closers;
+    escape_stats : Escape_rebuild.stats
   }
 
 let freshen_decisions :
@@ -1586,8 +1587,8 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
           to_bind hole)
     hole bvs
 
-let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
-    ~(defining_expr : Named.t) ~hole =
+let rebuild_singleton_binding_whose_representation_is_being_changed env stats bp
+    bv ~(defining_expr : Named.t) ~hole =
   (* TODO when this block is stored anywhere else, the subkind is no longer
      correct... we need to fix that somehow *)
   match[@ocaml.warning "-fragile-match"] defining_expr with
@@ -1618,7 +1619,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     let size_of_defining_expr =
       Code_size.prim ~machine_width:env.machine_width prim
     in
-    RE.create_let bp named ~size_of_defining_expr ~body:hole
+    RE.create_let bp named ~size_of_defining_expr ~body:hole, stats
   | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
     let fields =
       Option.get
@@ -1686,24 +1687,22 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           | None -> Simple.const_zero env.machine_width
           | Some x -> x)
     in
-    let alloc_mode =
-      Escape_rebuild.localize_alloc_mode env.escape (Bound_var.var bv)
-        alloc_mode
+    let block_kind =
+      P.Block_kind.Values
+        (Tag.Scannable.zero, List.map (fun _ -> KS.any_value) args)
+    in
+    let alloc_mode, stats =
+      Escape_rebuild.localize_make_block env.escape stats bv block_kind
+        alloc_mode ~num_fields:(List.length args) ~dbg
     in
     let prim =
-      P.Variadic
-        ( Make_block
-            ( P.Block_kind.Values
-                (Tag.Scannable.zero, List.map (fun _ -> KS.any_value) args),
-              Immutable,
-              alloc_mode ),
-          args )
+      P.Variadic (Make_block (block_kind, Immutable, alloc_mode), args)
     in
     let named = Named.create_prim prim dbg in
     let size_of_defining_expr =
       Code_size.prim ~machine_width:env.machine_width prim
     in
-    RE.create_let bp named ~size_of_defining_expr ~body:hole
+    RE.create_let bp named ~size_of_defining_expr ~body:hole, stats
   | _ ->
     (* In a situation such as:
      *   x is a variable whose representation is being changed
@@ -1718,21 +1717,23 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     let defining_expr, size_of_defining_expr =
       rebuild_named_default_case env defining_expr
     in
-    RE.create_let bp defining_expr ~size_of_defining_expr ~body:hole
+    RE.create_let bp defining_expr ~size_of_defining_expr ~body:hole, stats
 
-let rebuild_make_block_default_case env (bp : Bound_pattern.t)
+let rebuild_make_block_default_case env stats (bp : Bound_pattern.t)
     ~(block_kind : P.Block_kind.t) ~mutability ~alloc_mode ~fields ~hole dbg =
-  let bound_name =
+  let bv =
     match bp with
-    | Singleton v -> Name.var (Bound_var.var v)
+    | Singleton bv -> bv
     | Set_of_closures _ | Static _ ->
       Misc.fatal_errorf
         "Expected singleton bound pattern in \
          [rebuild_make_block_default_case], got %a"
         Bound_pattern.print bp
   in
-  let alloc_mode =
-    Escape_rebuild.localize_alloc_mode_of_pattern env.escape bp alloc_mode
+  let bound_name = Name.var (Bound_var.var bv) in
+  let alloc_mode, stats =
+    Escape_rebuild.localize_make_block env.escape stats bv block_kind alloc_mode
+      ~num_fields:(List.length fields) ~dbg
   in
   let _tag, block_shape = P.Block_kind.to_shape block_kind in
   let block_kind =
@@ -1777,11 +1778,12 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
   let prim : P.t =
     Variadic (Make_block (block_kind, mutability, alloc_mode), fields)
   in
-  RE.create_let bp
-    (Named.create_prim prim dbg)
-    ~size_of_defining_expr:
-      (Code_size.prim ~machine_width:env.machine_width prim)
-    ~body:hole
+  ( RE.create_let bp
+      (Named.create_prim prim dbg)
+      ~size_of_defining_expr:
+        (Code_size.prim ~machine_width:env.machine_width prim)
+      ~body:hole,
+    stats )
 
 let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
     ~alloc_mode ~hole =
@@ -1800,38 +1802,39 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound set_of_closures
     in
+    let code_metadata code_id =
+      if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+      then
+        match Code_id.Map.find code_id res.all_code with
+        | exception Not_found ->
+          Misc.fatal_errorf
+            "When rebuilding set of closures %a, code_id %a not found in \
+             [all_code]"
+            Set_of_closures.print set_of_closures Code_id.print code_id
+        | code -> Code.code_metadata code
+      else env.get_code_metadata code_id
+    in
     let size_of_defining_expr =
       Cost_metrics.size
         (Cost_metrics.set_of_closures
            ~find_code_characteristics:(fun code_id ->
-             let code_metadata =
-               if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-               then
-                 match Code_id.Map.find code_id res.all_code with
-                 | exception Not_found ->
-                   Misc.fatal_errorf
-                     "When rebuilding set of closures %a, code_id %a not found \
-                      in [all_code]"
-                     Set_of_closures.print set_of_closures Code_id.print code_id
-                 | code -> Code.code_metadata code
-               else env.get_code_metadata code_id
-             in
+             let code_metadata = code_metadata code_id in
              { cost_metrics = Code_metadata.cost_metrics code_metadata;
                function_slot_size =
                  Code_metadata.function_slot_size code_metadata
              })
            set_of_closures)
     in
-    let alloc_mode =
-      Escape_rebuild.localize_set_of_closures_alloc_mode env.escape bvs
-        alloc_mode
+    let alloc_mode, escape_stats =
+      Escape_rebuild.localize_set_of_closures env.escape res.escape_stats bvs
+        set_of_closures ~code_metadata alloc_mode
     in
     let expr =
       RE.create_let bound_pattern
         (Named.create_set_of_closures ~alloc_mode set_of_closures)
         ~size_of_defining_expr ~body:hole
     in
-    expr, res
+    expr, { res with escape_stats }
 
 let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
     RE.t * rebuild_result =
@@ -1850,19 +1853,24 @@ let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
       res )
   else if bound_vars_will_have_their_representation_changed env [bv]
   then
-    ( rebuild_singleton_binding_whose_representation_is_being_changed env
+    let expr, escape_stats =
+      rebuild_singleton_binding_whose_representation_is_being_changed env
+        res.escape_stats
         (Bound_pattern.singleton bv)
-        bv ~defining_expr ~hole,
-      res )
+        bv ~defining_expr ~hole
+    in
+    expr, { res with escape_stats }
   else
     let bound_pattern = Bound_pattern.singleton bv in
     match[@ocaml.warning "-fragile-match"] defining_expr with
     | Flambda.Prim
         (Variadic (Make_block (block_kind, mutability, alloc_mode), fields), dbg)
       ->
-      ( rebuild_make_block_default_case env bound_pattern ~block_kind
-          ~mutability ~alloc_mode ~fields ~hole dbg,
-        res )
+      let expr, escape_stats =
+        rebuild_make_block_default_case env res.escape_stats bound_pattern
+          ~block_kind ~mutability ~alloc_mode ~fields ~hole dbg
+      in
+      expr, { res with escape_stats }
     | Flambda.Prim (Unary (Box_number (bn, _alloc_mode), _contents), _dbg)
       when not
              (Analysis.field_used env.solution
@@ -1880,12 +1888,13 @@ let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
       let defining_expr, size_of_defining_expr =
         rebuild_named_default_case env defining_expr
       in
-      let defining_expr =
-        Escape_rebuild.localize_box_number env.escape bv defining_expr
+      let defining_expr, escape_stats =
+        Escape_rebuild.localize_box_number env.escape res.escape_stats bv
+          defining_expr
       in
       ( RE.create_let bound_pattern defining_expr ~size_of_defining_expr
           ~body:hole,
-        res )
+        { res with escape_stats } )
 
 let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
   let bound_and_group =
@@ -2490,11 +2499,12 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
   let res =
     { all_code = Code_id.Map.empty;
       code_ids_to_remember = Code_id.Set.empty;
-      escape_closers = Escape_rebuild.no_closers
+      escape_closers = Escape_rebuild.no_closers;
+      escape_stats = Escape_rebuild.empty_stats
     }
   in
   let ( rebuilt_expr,
-        ({ all_code; code_ids_to_remember; escape_closers = _ } :
+        ({ all_code; code_ids_to_remember; escape_closers = _; escape_stats } :
           rebuild_result) ) =
     Profile.record_call ~accumulate:true "up" (fun () ->
         let res =
@@ -2506,6 +2516,7 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
         in
         rebuild_expr env res toplevel_expr)
   in
+  Escape_rebuild.report_stats env.escape escape_stats;
   let exported_code =
     Exported_code.add_code
       ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)

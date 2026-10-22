@@ -13,7 +13,8 @@
 (**************************************************************************)
 
 type t =
-  { local_allocations : unit Code_id_or_name.Map.t;
+  { candidates : unit Code_id_or_name.Map.t;
+    local_allocations : unit Code_id_or_name.Map.t;
     scopes_needing_region : unit Code_id_or_name.Map.t;
     local_returns : unit Code_id_or_name.Map.t
   }
@@ -38,10 +39,14 @@ let create db ~unboxed_fields =
       local_allocations
       (Datalog.get_table Escape_analysis.scope_with_local_call_result_tbl db)
   in
-  { local_allocations;
+  { candidates = Datalog.get_table Escape_analysis.candidate_tbl db;
+    local_allocations;
     scopes_needing_region;
     local_returns = Datalog.get_table Escape_analysis.local_return_tbl db
   }
+
+let is_candidate t var =
+  Code_id_or_name.Map.mem (Code_id_or_name.var var) t.candidates
 
 let is_local_allocation t var =
   Code_id_or_name.Map.mem (Code_id_or_name.var var) t.local_allocations

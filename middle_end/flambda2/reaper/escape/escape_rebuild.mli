@@ -28,6 +28,17 @@ type closers
 
 val no_closers : closers
 
+(** Statistics on the heap allocations rebuilt (blocks, boxed numbers and sets
+    of closures): how many were made local and how many stayed on the heap, with
+    their sizes in words. Printed by [report_stats] with the reaper debug flag
+    [escape-stats] (one line per compilation unit) or [escape-stats-verbose]
+    (also one line per allocation); see [escape_rebuild.ml] for the format. *)
+type stats
+
+val empty_stats : stats
+
+val report_stats : _ t -> stats -> unit
+
 val create :
   solution:Escape_solution.t ->
   code_ids_directly_called:(Name.t -> Code_id.Set.t Or_unknown.t) ->
@@ -40,31 +51,35 @@ val create :
   with_closers:(closers -> 'r -> 'r) ->
   'r t
 
-(** The allocation mode for the block bound to the given variable (resp. bound
-    pattern, sets of closures): local in the innermost region if the analysis
-    decided so. *)
-val localize_alloc_mode :
+(** The allocation mode for the block of the given kind, with the given number
+    of fields, bound to the given variable: local in the innermost region if the
+    analysis decided so. The allocation is recorded in the statistics. *)
+val localize_make_block :
   _ t ->
-  Variable.t ->
+  stats ->
+  Bound_var.t ->
+  Flambda_primitive.Block_kind.t ->
   Alloc_mode.For_allocations.t ->
-  Alloc_mode.For_allocations.t
+  num_fields:int ->
+  dbg:Debuginfo.t ->
+  Alloc_mode.For_allocations.t * stats
 
-val localize_alloc_mode_of_pattern :
+(** The same for a set of closures bound to the given variables; [code_metadata]
+    gives the metadata of the code of its functions. *)
+val localize_set_of_closures :
   _ t ->
-  Bound_pattern.t ->
-  Alloc_mode.For_allocations.t ->
-  Alloc_mode.For_allocations.t
-
-val localize_set_of_closures_alloc_mode :
-  _ t ->
+  stats ->
   Bound_var.t list ->
+  Flambda.Set_of_closures.t ->
+  code_metadata:(Code_id.t -> Code_metadata.t) ->
   Alloc_mode.For_allocations.t ->
-  Alloc_mode.For_allocations.t
+  Alloc_mode.For_allocations.t * stats
 
 (** Make a [Box_number] bound to the given variable allocate locally if the
-    analysis decided so (other defining expressions are left unchanged). *)
+    analysis decided so (other defining expressions are left unchanged), and
+    record it in the statistics. *)
 val localize_box_number :
-  _ t -> Bound_var.t -> Flambda.Named.t -> Flambda.Named.t
+  _ t -> stats -> Bound_var.t -> Flambda.Named.t -> Flambda.Named.t * stats
 
 (** Close the regions left by a jump to the given continuation, before the given
     expression (which performs the jump). *)

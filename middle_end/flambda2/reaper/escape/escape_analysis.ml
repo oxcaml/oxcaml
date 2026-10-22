@@ -126,7 +126,9 @@ let to_unbox = Unboxing_analysis.to_unbox
    once its preceding columns are bound. *)
 let candidate_source = rel2 "escape_candidate_source" Cols.[n; n]
 
-let is_candidate = rel1 "escape_candidate" Cols.[n]
+let candidate_tbl = Datalog.create_relation ~name:"escape_candidate" Cols.[n]
+
+let is_candidate x = candidate_tbl % [x]
 
 let escapes = rel1 "escapes" Cols.[n]
 
