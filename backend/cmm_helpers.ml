@@ -1853,8 +1853,7 @@ let get_field_gen mut ptr n dbg =
   get_field_gen_given_memory_chunk Word_val mut ptr n dbg
 
 let get_field_codepointer mut ptr n dbg =
-  int64_as_value ~dbg
-    (get_field_gen_given_memory_chunk Word_int mut ptr n dbg)
+  int64_as_value ~dbg (get_field_gen_given_memory_chunk Word_int mut ptr n dbg)
 
 let set_field ptr n newval init dbg =
   Cop (Cstore (Word_val, init), [field_address ptr n dbg; newval], dbg)
@@ -3779,7 +3778,7 @@ let cache_public_method meths tag cache dbg =
         Cifthenelse
           ( Cop
               ( Ccmpi Clt,
-                [ tag;
+                [ value_as_int64 ~dbg tag;
                   Cop
                     ( mk_load_mut Word_int,
                       [ Cop
@@ -3984,7 +3983,10 @@ let send_function (arity, result, mode) =
                 Clet
                   ( VP.create real,
                     Cifthenelse
-                      ( Cop (Ccmpi Cne, [tag'; tag], dbg ()),
+                      ( Cop
+                          ( Ccmpi Cne,
+                            [tag'; value_as_int64 ~dbg:(dbg ()) tag],
+                            dbg () ),
                         dbg (),
                         cache_public_method (Cvar meths) tag cache_ptr_cvar
                           (dbg ()),

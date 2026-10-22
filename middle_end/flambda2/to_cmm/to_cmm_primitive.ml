@@ -916,10 +916,14 @@ let arithmetic_conversion dbg src dst arg ~signedness =
     extra, C.Scalar_type.static_cast ~dbg ~src ~dst ~signedness arg
 
 let phys_equal _env dbg op x y =
-  match (op : P.equality_comparison) with
-  (* General case *)
-  | Eq -> C.eq ~dbg x y
-  | Neq -> C.neq ~dbg x y
+  C.bind "phys_equal_y" y (fun y ->
+      C.bind "phys_equal_x" x (fun x ->
+          let y = C.value_as_int64 ~dbg y in
+          let x = C.value_as_int64 ~dbg x in
+          match (op : P.equality_comparison) with
+          (* General case *)
+          | Eq -> C.eq ~dbg x y
+          | Neq -> C.neq ~dbg x y))
 
 let requires_sign_or_zero_extended_operands : P.binary_int_arith_op -> bool =
   function
@@ -1052,9 +1056,13 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
       x
 
 let binary_int_comp_primitive _env dbg kind cmp x y =
-  match
-    integral_of_standard_int kind, (cmp : P.signed_or_unsigned P.comparison)
-  with
+  let int_type = integral_of_standard_int kind in
+  let x, y =
+    match int_type with
+    | Tagged_int -> C.value_as_int64 ~dbg x, C.value_as_int64 ~dbg y
+    | Naked_int _ -> x, y
+  in
+  match int_type, (cmp : P.signed_or_unsigned P.comparison) with
   (* [x] and [y] are expressions yielding well-formed tagged immediates, that is
      to say, their least significant bit (LSB) is 1. However when comparing
      tagged immediates, there always exists one argument (i.e. either [x] or
@@ -1103,7 +1111,7 @@ let binary_int_comp_primitive_yielding_int _env dbg kind
      monotone. *)
   let widen =
     match integral_of_standard_int kind with
-    | Tagged_int -> fun exp -> exp
+    | Tagged_int -> C.value_as_int64 ~dbg
     | Naked_int _ as kind ->
       let signedness : Scalar.Signedness.t =
         match signed with Signed -> Signed | Unsigned -> Unsigned
@@ -1202,7 +1210,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Is_int _ ->
     let arg = C.value_as_int64 ~dbg arg in
     None, res, C.and_int arg (C.int ~dbg 1) dbg
-  | Is_null -> None, res, C.eq ~dbg arg (C.nativeint ~dbg 0n)
+  | Is_null ->
+    None, res, C.eq ~dbg (C.value_as_int64 ~dbg arg) (C.nativeint ~dbg 0n)
   | Get_tag -> None, res, C.get_tag arg dbg
   | Array_length (Array_kind array_kind) ->
     None, res, array_length ~dbg arg array_kind
@@ -1301,12 +1310,13 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
        [caml_array_of_uniform_array], which is used by non-Flambda 2 compilers.
        This seems reasonable given known existing use cases of naked pointers
        and the fact that they will be forbidden entirely in OCaml 5. *)
+    let arg_as_int64 = C.value_as_int64 ~dbg arg in
     ( None,
       res,
       C.ite
         (C.or_int
-           (C.and_int arg (C.int 1 ~dbg) dbg)
-           (C.eq arg (C.int 0 ~dbg) ~dbg)
+           (C.and_int arg_as_int64 (C.int 1 ~dbg) dbg)
+           (C.eq arg_as_int64 (C.int 0 ~dbg) ~dbg)
            dbg)
         ~dbg ~then_:(C.int 0 ~dbg) ~then_dbg:dbg
         ~else_:(C.eq (C.get_tag arg dbg) (C.int Obj.double_tag ~dbg) ~dbg)
@@ -1427,7 +1437,9 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
         match write_offset_kind with
         | Into_block -> write_into_block
         | Into_block_or_off_heap ->
-          let base_is_null = C.eq ~dbg x (C.nativeint ~dbg 0n) in
+          let base_is_null =
+            C.eq ~dbg (C.value_as_int64 ~dbg x) (C.nativeint ~dbg 0n)
+          in
           C.ite ~dbg base_is_null
             ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
