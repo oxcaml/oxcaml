@@ -134,3 +134,21 @@ let va128 = of_w128 0x3f8000004048f5c3L 0xbff0000040a00000L
 let vb128 = of_w128 0x4000000040400000L 0x3fc00000c1200000L
 
 let vc128 = of_w128 0x41000000c1a00000L 0x4048f5c33f800000L
+
+(* Gather/scatter indices: distinct lanes within [-8, 31], lane [j] being
+   [(j * 7 mod 40) - 8] for 32-bit indices and [(j * 11 mod 40) - 8] for 64-bit
+   ones. *)
+let idx32_512 = of_w 0xfffffffffffffff8L 0xd00000006L 0x1b00000014L
+    0x1fffffffaL 0xf00000008L 0x1d00000016L 0x3fffffffcL 0x110000000aL
+
+let idx32_256 = of_w256 0xfffffffffffffff8L 0xd00000006L 0x1b00000014L
+    0x1fffffffaL
+
+let idx32_128 = of_w128 0xfffffffffffffff8L 0xd00000006L
+
+let idx64_512 = of_w 0xfffffffffffffff8L 0x3L 0xeL 0x19L 0xfffffffffffffffcL
+    0x7L 0x12L 0x1dL
+
+let idx64_256 = of_w256 0xfffffffffffffff8L 0x3L 0xeL 0x19L
+
+let idx64_128 = of_w128 0xfffffffffffffff8L 0x3L

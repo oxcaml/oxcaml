@@ -17,8 +17,8 @@
  (targets gen512.ml)
  (deps
   (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
-  (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
-  (:xml %{workspace_root}/tools/simdgen/x86-intel.xml))
+  %{workspace_root}/tools/simdgen/amd64/amd64.csv
+  %{workspace_root}/tools/simdgen/x86-intel.xml)
  (enabled_if
   (and
    (= %{context_name} "main")
@@ -27,14 +27,16 @@
  (action
   (with-stdout-to
    %{targets}
-   (run %{gen} intrins tests-ml %{csv} %{xml}))))
+   (chdir
+    %{workspace_root}/tools/simdgen
+    (run %{gen} intrins tests-ml)))))
 
 (rule
  (targets gen512_mem.ml)
  (deps
   (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
-  (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
-  (:xml %{workspace_root}/tools/simdgen/x86-intel.xml))
+  %{workspace_root}/tools/simdgen/amd64/amd64.csv
+  %{workspace_root}/tools/simdgen/x86-intel.xml)
  (enabled_if
   (and
    (= %{context_name} "main")
@@ -43,14 +45,16 @@
  (action
   (with-stdout-to
    %{targets}
-   (run %{gen} intrins tests-mem-ml %{csv} %{xml}))))
+   (chdir
+    %{workspace_root}/tools/simdgen
+    (run %{gen} intrins tests-mem-ml)))))
 
 (rule
  (targets gen512_stubs.c)
  (deps
   (:gen %{workspace_root}/tools/simdgen/simdgen.exe)
-  (:csv %{workspace_root}/tools/simdgen/amd64/amd64.csv)
-  (:xml %{workspace_root}/tools/simdgen/x86-intel.xml))
+  %{workspace_root}/tools/simdgen/amd64/amd64.csv
+  %{workspace_root}/tools/simdgen/x86-intel.xml)
  (enabled_if
   (and
    (= %{context_name} "main")
@@ -59,7 +63,9 @@
  (action
   (with-stdout-to
    %{targets}
-   (run %{gen} intrins tests-c %{csv} %{xml}))))
+   (chdir
+    %{workspace_root}/tools/simdgen
+    (run %{gen} intrins tests-c)))))
 
 (rule
  (targets gen512_ia.ml)
