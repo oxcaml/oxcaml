@@ -524,11 +524,7 @@ let f x =
   ignore_local g;
   r
 [%%expect{|
-Line 2, characters 14-62:
-2 |   let rec g = stack_ (fun n -> if n = 0 then x else g (n - 1)) in
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+val f : 'a -> 'a = <fun>
 |}]
 
 let f x =
@@ -539,11 +535,7 @@ let f x =
   ignore_local odd;
   r
 [%%expect{|
-Line 2, characters 17-67:
-2 |   let rec even = stack_ (fun n -> if n = 0 then x else odd (n - 1))
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global".
+val f : bool -> bool = <fun>
 |}]
 
 (* All the closures of a [let rec] share a mode, so a single [stack_] makes all
@@ -553,9 +545,9 @@ let f x =
   and odd = fun n -> if n = 0 then not x else even (n - 1) in
   ref odd
 [%%expect{|
-Line 2, characters 17-67:
-2 |   let rec even = stack_ (fun n -> if n = 0 then x else odd (n - 1))
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 4, characters 6-9:
+4 |   ref odd
+          ^^^
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global".
 |}]
