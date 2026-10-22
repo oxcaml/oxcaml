@@ -76,6 +76,14 @@ module Relations : sig
   (** [result] receives a return value of an unknown-arity application. *)
   val indirect_call_result : Code_id_or_name.t term -> _ atom
 
+  (** As [indirect_call_result], for an application taking place in region scope
+      [scope] (resp. outside of any region scope): where a partial application
+      would be allocated (see [Escape_analysis]). *)
+  val scoped_indirect_call_result :
+    result:Code_id_or_name.t term -> scope:Code_id_or_name.t term -> _ atom
+
+  val unscoped_indirect_call_result : Code_id_or_name.t term -> _ atom
+
   (** [partial_application_node ~node ~code_id]: [node] stands for the closure
       resulting from a partial application of a function with code [code_id]
       (see [Traverse_acc.create_unknown_arity_call_witnesses]); such a closure
@@ -113,6 +121,13 @@ val add_unscoped_call_result : t -> Variable.t -> unit
 (** Record that [result] receives a return value of an unknown-arity
     application. *)
 val add_indirect_call_result : t -> Variable.t -> unit
+
+(** Record that [result] receives a return value of an unknown-arity application
+    in region scope [scope] (resp. outside of any region scope). *)
+val add_scoped_indirect_call_result :
+  t -> result:Variable.t -> scope:Code_id_or_name.t -> unit
+
+val add_unscoped_indirect_call_result : t -> Variable.t -> unit
 
 (** Record that [node] stands for the closure resulting from a partial
     application of the function [code_id]. *)

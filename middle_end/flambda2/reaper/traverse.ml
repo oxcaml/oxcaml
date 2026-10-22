@@ -420,7 +420,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         ~exn:exn_arg
     in
     let closure = Acc.simple_to_node acc ~denv (must_have_callee apply) in
-    Escape_traverse.record_indirect_call_results acc return_args;
+    Escape_traverse.record_indirect_call_results denv acc return_args;
     Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
       ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc

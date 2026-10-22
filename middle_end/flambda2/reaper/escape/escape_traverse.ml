@@ -59,8 +59,19 @@ let record_call_results denv acc ~call_widget return_args =
       return_args
   | None -> List.iter (Escape_graph.add_unscoped_call_result graph) return_args
 
-let record_indirect_call_results acc return_args =
-  List.iter (Escape_graph.add_indirect_call_result (graph acc)) return_args
+(* Also record where a partial application would be allocated (see
+   [Escape_analysis]). *)
+let record_indirect_call_results denv acc return_args =
+  let graph = graph acc in
+  List.iter (Escape_graph.add_indirect_call_result graph) return_args;
+  match Escape_env.region_scope (Env.escape denv) with
+  | Some scope ->
+    List.iter
+      (fun result ->
+        Escape_graph.add_scoped_indirect_call_result graph ~result ~scope)
+      return_args
+  | None ->
+    List.iter (Escape_graph.add_unscoped_indirect_call_result graph) return_args
 
 let is_exn_handler acc cont =
   match Continuation.Map.find_opt cont (Acc.get_continuation_info acc) with

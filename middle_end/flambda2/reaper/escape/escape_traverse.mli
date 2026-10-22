@@ -44,8 +44,10 @@ val record_call_results :
   Variable.t list ->
   unit
 
-(** Record the results of an unknown-arity application. *)
-val record_indirect_call_results : Traverse_acc.t -> Variable.t list -> unit
+(** Record the results of an unknown-arity application, and the region scope it
+    takes place in. *)
+val record_indirect_call_results :
+  Traverse_env.t -> Traverse_acc.t -> Variable.t list -> unit
 
 (** Note a jump to the given continuation: a region scope from which an
     exception may be raised to a handler defined outside of it gets no region.

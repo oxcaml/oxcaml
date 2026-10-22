@@ -18,7 +18,36 @@
     computed by [Points_to_analysis]: an allocation recorded with
     [Escape_graph.Relations.allocated_in] is "local" if the allocated value
     cannot flow to a place that outlives the activation of the function
-    containing the allocation. *)
+    containing the allocation.
+
+    The analysis relies on the following properties of the surrounding passes:
+
+    - Every flow of a value known to the points-to analysis appears in its
+      [alias] relation (flows through block fields, and through the parameters
+      and results of calls, are turned into aliases), and a value with a flow it
+      does not know about has [any_usage]. Following [rev_alias] from an
+      allocation, and treating [any_usage] as escaping, thus covers every use of
+      the allocated value.
+
+    - Mutations ([Block_set], [Array_set], ...) are not modelled by the
+      points-to analysis: both the block and the stored value get [any_usage],
+      so a value stored into a mutable field escapes.
+
+    - Try-regions are never removed by Simplify, so the handler of a [try]
+      always restores the local stack pointer (see the discussion of the
+      exceptional path in [escape_analysis.ml]).
+
+    - Regions are closed by restoring a saved stack pointer, so closing the
+      outermost of the regions left by a jump also closes the inner ones (see
+      [Escape_rebuild]).
+
+    - The curry functions allocate a partial application locally when the code
+      of the callee has [nlocal] equal to its arity, and on the heap otherwise.
+      The code of a local closure is given the former, as the type checker does
+      for its own local closures, and its partial applications are treated as
+      allocations in the region scope of their call site (see
+      [escape_analysis.ml]), so that no heap block points at the local stack and
+      no partial application outlives its region. *)
 
 (** Whether the analysis is enabled (see [Escape_graph.enabled]). *)
 val enabled : unit -> bool
@@ -49,7 +78,9 @@ val local_allocation_tbl :
   Datalog.table
 
 (** The region scopes (code ids of functions, or dummy variables naming
-    recursive [Let_cont]s) in which the given allocation was recorded. *)
+    recursive [Let_cont]s) in which the given allocation takes place (an
+    allocation recorded with [allocated_in], or a partial application treated as
+    one). *)
 val scopes_of_allocation :
   Datalog.database -> Code_id_or_name.t -> Code_id_or_name.t list
 

@@ -29,6 +29,8 @@ type t =
     mutable call_result : NNN.t;
     mutable unscoped_call_result : N.t;
     mutable indirect_call_result : N.t;
+    mutable scoped_indirect_call_result : NN.t;
+    mutable unscoped_indirect_call_result : N.t;
     mutable partial_application_node : NN.t;
     (* Not a Datalog relation: the continuations defined inside each region
        scope, for the traversal and the rebuilding. *)
@@ -49,6 +51,11 @@ let unscoped_call_result = N.create ~name:"unscoped_call_result"
 
 let indirect_call_result = N.create ~name:"indirect_call_result"
 
+let scoped_indirect_call_result = NN.create ~name:"scoped_indirect_call_result"
+
+let unscoped_indirect_call_result =
+  N.create ~name:"unscoped_indirect_call_result"
+
 let partial_application_node = NN.create ~name:"partial_application_node"
 
 (* Nothing is recorded when the analysis is disabled, so that it costs nothing
@@ -65,6 +72,8 @@ let create () =
     call_result = NNN.empty;
     unscoped_call_result = N.empty;
     indirect_call_result = N.empty;
+    scoped_indirect_call_result = NN.empty;
+    unscoped_indirect_call_result = N.empty;
     partial_application_node = NN.empty;
     scope_conts = Code_id_or_name.Map.empty
   }
@@ -77,6 +86,9 @@ let to_datalog t db =
   @@ Datalog.set_table call_result t.call_result
   @@ Datalog.set_table unscoped_call_result t.unscoped_call_result
   @@ Datalog.set_table indirect_call_result t.indirect_call_result
+  @@ Datalog.set_table scoped_indirect_call_result t.scoped_indirect_call_result
+  @@ Datalog.set_table unscoped_indirect_call_result
+       t.unscoped_indirect_call_result
   @@ Datalog.set_table partial_application_node t.partial_application_node
   @@ db
 
@@ -99,6 +111,12 @@ module Relations = struct
   let unscoped_call_result result = Datalog.atom unscoped_call_result [result]
 
   let indirect_call_result result = Datalog.atom indirect_call_result [result]
+
+  let scoped_indirect_call_result ~result ~scope =
+    Datalog.atom scoped_indirect_call_result [result; scope]
+
+  let unscoped_indirect_call_result result =
+    Datalog.atom unscoped_indirect_call_result [result]
 
   let partial_application_node ~node ~code_id =
     Datalog.atom partial_application_node [node; code_id]
@@ -143,6 +161,22 @@ let add_indirect_call_result t result =
   then
     t.indirect_call_result
       <- N.add_or_replace [Code_id_or_name.var result] () t.indirect_call_result
+
+let add_scoped_indirect_call_result t ~result ~scope =
+  if enabled ()
+  then
+    t.scoped_indirect_call_result
+      <- NN.add_or_replace
+           [Code_id_or_name.var result; scope]
+           () t.scoped_indirect_call_result
+
+let add_unscoped_indirect_call_result t result =
+  if enabled ()
+  then
+    t.unscoped_indirect_call_result
+      <- N.add_or_replace
+           [Code_id_or_name.var result]
+           () t.unscoped_indirect_call_result
 
 let add_partial_application_node t ~node ~code_id =
   if enabled ()

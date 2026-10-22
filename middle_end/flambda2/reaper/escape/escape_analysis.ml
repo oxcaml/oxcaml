@@ -73,11 +73,24 @@
    mode local (see [adjust_code_metadata] for the code metadata, and
    [Escape_rebuild] for the function bodies and call sites).
 
-   A partial application of a local closure (through an unknown-arity call)
-   yields a closure pointing at it, allocated on the heap by the curry functions
-   (as for the closures of the type checker); the nodes standing for such
-   partial applications in the call witness chains are considered to contain the
-   closure, so that they must not outlive its region either. *)
+   A dynamic partial application (an unknown-arity call with fewer arguments
+   than the arity of the callee) allocates, in the curry functions, a closure
+   pointing at the callee: on the heap, or in the region that is current at the
+   call site, according to the code metadata of the callee (see
+   [Lambda.curried_function_kind]). A heap block must never point at the local
+   stack, so the code of a local closure is given the metadata the type checker
+   gives its own local closures ([nlocal] equal to the arity, see
+   [adjust_code_metadata]), which makes every partial application of that code a
+   local allocation, in the region current at the call site. Such a partial
+   application is therefore treated as a candidate allocation in the region
+   scope of the call site (see [allocation]), containing the closure. Allocated
+   in the region current while the closure is alive, it cannot outlive the
+   closure unless it leaves that region, which the rules for allocations
+   prevent; and if it escapes, so does the closure, whose code then keeps
+   allocating its partial applications on the heap. The call witnesses of the
+   points-to analysis being per code, this concerns the partial applications of
+   every closure of the code; one made outside of any region scope makes the
+   closure escape. *)
 
 [@@@ocaml.warning "-not-principal"]
 
@@ -147,9 +160,19 @@ let reaches_indirect_call_result =
 let reaches_unscoped_call_result =
   rel1 "escape_reaches_unscoped_call_result" Cols.[n]
 
-(* Index of [partial_application_node] in the order needed below. *)
-let partial_application_of_code =
-  rel2 "escape_partial_application_of_code" Cols.[n; n]
+(* [partial_result_of_code c r]: [r] is the result of an unknown-arity
+   application with fewer arguments than the arity of its callee, which may have
+   code [c]: a partial application of that code, allocated by the curry
+   functions (see the preamble). *)
+let partial_result_of_code = rel2 "escape_partial_result_of_code" Cols.[n; n]
+
+(* [candidate_code c]: [c] is the code of a candidate closure. *)
+let candidate_code = rel1 "escape_candidate_code" Cols.[n]
+
+(* [allocation a s]: the candidate [a] is allocated in region scope [s]: an
+   allocation recorded by the traversal ([allocated_in]), or a partial
+   application of a candidate code at a call site in [s]. *)
+let allocation = rel2 "escape_allocation" Cols.[n; n]
 
 let local_allocation_tbl =
   Datalog.create_relation ~name:"local_allocation" Cols.[n]
@@ -177,37 +200,55 @@ let scope_with_local_call_result x = scope_with_local_call_result_tbl % [x]
 
 let candidate_rules =
   saturate_in_order
-    [ (let$ [q; c] = ["q"; "c"] in
-       [partial_application_node ~node:q ~code_id:c]
-       ==> partial_application_of_code c q);
+    [ (* The result of an unknown-arity application is aliased to a partial
+         application node of the code of its callee exactly when fewer arguments
+         than the arity are supplied. *)
+      (let$ [q; c; r] = ["q"; "c"; "r"] in
+       [ partial_application_node ~node:q ~code_id:c;
+         rev_alias ~from:q ~to_:r;
+         indirect_call_result r ]
+       ==> partial_result_of_code c r);
+      (let$ [x; s; wit; c] = ["x"; "s"; "wit"; "c"] in
+       [ allocated_in ~alloc:x ~scope:s;
+         constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c ]
+       ==> candidate_code c);
       (let$ [a; s] = ["a"; "s"] in
-       [allocated_in ~alloc:a ~scope:s] ==> is_candidate a);
+       [allocated_in ~alloc:a ~scope:s] ==> allocation a s);
+      (let$ [c; r; s] = ["c"; "r"; "s"] in
+       [ candidate_code c;
+         partial_result_of_code c r;
+         scoped_indirect_call_result ~result:r ~scope:s ]
+       ==> allocation r s);
+      (let$ [a; s] = ["a"; "s"] in
+       [allocation a s] ==> is_candidate a);
       (* [any_usage] is already propagated backwards along aliases by the
          points-to analysis. Rule out these candidates before following their
          flows, which can be quadratic even when all the allocations escape. *)
       (let$ [a] = ["a"] in
        [is_candidate a; any_usage a] ==> escapes_anywhere a);
-      (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
-       [ is_candidate a;
-         constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
+      (* Partially applied outside of any region scope: the partial application
+         would be allocated in an unknown region (see the preamble). *)
+      (let$ [x; wit; c; r] = ["x"; "wit"; "c"; "r"] in
+       [ is_candidate x;
+         constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
          constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
-         partial_application_of_code c q;
-         any_usage q ]
-       ==> escapes_anywhere a);
+         partial_result_of_code c r;
+         unscoped_indirect_call_result r ]
+       ==> escapes_anywhere x);
       (* Keep [is_candidate] for escaping allocations: values stored in them
          must still escape via [contained_in]. Only prune the flow seeds, before
          [flow_rules] extends [escapes_anywhere] with further reasons. *)
       (let$ [a] = ["a"] in
        [is_candidate a; ~~(escapes_anywhere a)] ==> candidate_source a a);
-      (* A partial application of a candidate closure, through an unknown-arity
-         call, yields a closure pointing at it. *)
-      (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
-       [ is_candidate a;
-         ~~(escapes_anywhere a);
-         constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
+      (* A partial application points at the closure applied. *)
+      (let$ [x; wit; c; r] = ["x"; "wit"; "c"; "r"] in
+       [ is_candidate x;
+         constructor ~base:x !!Field.known_arity_call_witness ~from:wit;
          constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
-         partial_application_of_code c q ]
-       ==> candidate_source q a) ]
+         partial_result_of_code c r;
+         is_candidate r ]
+       ==> contained_in x r) ]
 
 (* When calling conventions may not be changed, no function may be made to
    return at mode local. *)
@@ -237,8 +278,15 @@ let flow_rules =
              when1 Field.is_real_field relation;
              ~~(is_candidate base) ]
            ==> escapes_anywhere a);
+          (* A partial application is itself the result of such an application
+             (see [allocation]); the application producing it does not return
+             it. *)
           (let$ [q; a] = ["q"; "a"] in
-           [indirect_call_result q; candidate_source q a]
+           [ indirect_call_result q;
+             candidate_source q a;
+             Datalog.filter
+               (fun [q; a] -> not (Code_id_or_name.equal q a))
+               [q; a] ]
            ==> reaches_indirect_call_result a);
           (let$ [q; a] = ["q"; "a"] in
            [unscoped_call_result q; candidate_source q a]
@@ -255,8 +303,7 @@ let scope_rules =
         [ (let$ [a] = ["a"] in
            [escapes_anywhere a] ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
-           [allocated_in ~alloc:a ~scope:s; ~~(escapes_anywhere a)]
-           ==> owner a s);
+           [allocation a s; ~~(escapes_anywhere a)] ==> owner a s);
           (let$ [a; b; s] = ["a"; "b"; "s"] in
            [contained_in a b; owner b s; ~~(escapes_anywhere a)] ==> owner a s);
           (let$ [s; r; a] = ["s"; "r"; "a"] in
@@ -303,7 +350,7 @@ let scope_rules =
 let decision_rules =
   saturate_in_order
     [ (let$ [a; s] = ["a"; "s"] in
-       [allocated_in ~alloc:a ~scope:s; ~~(escapes a)]
+       [allocation a s; ~~(escapes a)]
        ==> and_ [local_allocation a; scope_with_local_allocation s]);
       (* Unboxed allocations no longer exist, so need no local return (but the
          local allocations they contain may). *)
@@ -326,7 +373,7 @@ let scopes_of_allocation =
   let scopes =
     query
       (let^$ [a], [s] = ["a"], ["s"] in
-       [allocated_in ~alloc:a ~scope:s] =>? [s])
+       [allocation a s] =>? [s])
   in
   fun db a ->
     Cursor.fold_with_parameters scopes [a] db ~init:[] ~f:(fun [s] acc ->
@@ -360,30 +407,33 @@ let perform_analysis (unboxing : Unboxing_analysis.result) ~stats =
         let db = Schedule.run ~stats scope_rules db in
         { unboxing with db = run db decision_rules })
 
-(* A function returning at mode local, or whose closure is allocated locally,
-   has [nlocal = 1] (see [Lambda.curried_function_kind]). *)
+(* As for the functions of the type checker (see [Lambda.curried_function_kind]
+   and [Typecore]): a function returning at mode local has [nlocal >= 1], and
+   one whose closure is allocated locally has [nlocal] equal to its arity, which
+   makes the curry functions allocate all of its partial applications locally
+   (see the preamble). *)
 let adjust_code_metadata db code_id code_metadata =
-  let with_nlocal_one code_metadata =
+  let num_params =
+    Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+  in
+  let with_nlocal_at_least nlocal code_metadata =
     match Code_metadata.first_complex_local_param code_metadata with
     | Never_partially_applied -> code_metadata
     | Index index ->
-      let num_params =
-        Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
-      in
-      if index >= num_params && num_params > 0
+      let index' = num_params - nlocal in
+      if num_params > 0 && index' < index
       then
-        Code_metadata.with_first_complex_local_param
-          (Index (num_params - 1))
+        Code_metadata.with_first_complex_local_param (Index index')
           code_metadata
       else code_metadata
   in
   let code_metadata =
     if returns_local db code_id
     then
-      with_nlocal_one
+      with_nlocal_at_least 1
         (Code_metadata.with_result_mode Lambda.maybe_alloc_stack code_metadata)
     else code_metadata
   in
   if is_local_closure_code db code_id
-  then with_nlocal_one code_metadata
+  then with_nlocal_at_least num_params code_metadata
   else code_metadata

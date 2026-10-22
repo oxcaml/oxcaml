@@ -20,7 +20,10 @@ let $camlEscape_partial_application__const_block_5 =
            $camlEscape_partial_application__immstring_4)
 in
 let code inline(never) loopify(never) size(6) newer_version_of(papp_0)
-      papp_0_1 (f : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
+      papp_0_1 (f : val)
+        my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+        -> k * k1
+        : val stack =
   apply &my_alloc_region f (1) -> k * k1
 in
 let $camlEscape_partial_application__papp_6 =
@@ -55,10 +58,10 @@ let code inline(never) loopify(never) size(36) newer_version_of(g_2)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let h = closure h_3_1 @h &my_alloc_region &`region`
+  (let h = closure h_3_1 @h &my_alloc_region
    with { unboxed_field_b = b; unboxed_field_a = a }
    in
-   apply direct(papp_0_1 &my_alloc_region)
+   apply direct(papp_0_1 &my_alloc_region &`region` &ghost_region)
      ($camlEscape_partial_application__papp_6 : _ -> val) (h) -> k3 * k1
      where k3 (p : val) =
        apply &my_alloc_region p (2) -> k2 * k1)
