@@ -97,9 +97,6 @@ module Pcompare_string = struct
 end
 
 module Kflag = struct
-  (* Mask flag-reader pseudo-ops: a KORTEST/KTEST followed by a SETcc reading ZF
-     or CF. The underlying instruction determines KORTEST vs KTEST and the mask
-     width. *)
   type t =
     | Zf
     | Cf
@@ -242,7 +239,6 @@ module Seq = struct
     | Vpcompare_string p1, Vpcompare_string p2 ->
       if Pcompare_string.equal p1 p2 then return_true () else false
     | Kflag k0, Kflag k1 ->
-      (* Distinct mask widths share a [Kflag] kind but differ in [instr]. *)
       Kflag.equal k0 k1 && Amd64_simd_instrs.equal instr0 instr1
     | ( ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
         | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X

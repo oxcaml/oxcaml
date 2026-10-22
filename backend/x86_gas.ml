@@ -122,13 +122,13 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     | Evex { evex_z; evex_b; evex_ll; evex_w; _ } ->
       let rounding, broadcast =
         match evex_ll with
-        | Ll_round rnd -> evex_rounding rnd, ""
+        | Ll_round rnd -> Some (evex_rounding rnd), ""
         | Ll_len len ->
           if not evex_b
-          then "", ""
+          then None, ""
           else if has_mem
-          then "", evex_broadcast evex_w len
-          else "{sae}", ""
+          then None, evex_broadcast evex_w len
+          else Some "{sae}", ""
       in
       (if evex_z then "{z}" else ""), rounding, broadcast
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
@@ -172,26 +172,23 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
   (* The assembler requires the rounding mode to follow the immediate, except
      for the GPR-source converts (vcvtsi2ss etc.), where it must follow the GPR
      operand instead. *)
-  let rounding_after_gpr =
-    match args with
-    | [||] -> false
-    | args -> (
-      match args.(0) with
-      | Reg32 _ | Reg64 _ -> true
-      | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ | Regmask _ | Mem _
-      | Mem64_RIP _ ->
-        false)
+  let gpr_source =
+    Array.length args > 0
+    &&
+    match args.(0) with
+    | Reg32 _ | Reg64 _ -> true
+    | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ | Regmask _ | Mem _
+    | Mem64_RIP _ ->
+      false
   in
   (match imm with Some imm -> bprintf b "%a, " arg imm | None -> ());
-  if (not rounding_after_gpr) && String.length rounding > 0
-  then bprintf b "%s, " rounding;
+  if not gpr_source then Option.iter (bprintf b "%s, ") rounding;
   let last = Array.length args - 1 in
   Array.iteri
     (fun i a ->
       if i > 0 then Buffer.add_string b ", ";
       arg b a;
-      if i = 0 && rounding_after_gpr && String.length rounding > 0
-      then bprintf b ", %s" rounding;
+      if i = 0 && gpr_source then Option.iter (bprintf b ", %s") rounding;
       if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
       if i = last then bprintf b "%a%s" mask writemask zeroing)
     args
