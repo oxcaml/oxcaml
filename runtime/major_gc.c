@@ -1696,9 +1696,9 @@ void caml_darken(void* state, value v, volatile value* ignored) {
       hd = mark_header(v, hd, caml_global_heap_state.MARKED);
       if (Scannable_hd(hd)) {
         mark_stack_push_block(domain_state->mark_stack, v);
-        Caml_state->mark_work_done_between_slices += 1; /* just the header */
+        domain_state->mark_work_done_between_slices += 1; /* just the header */
       } else {
-        Caml_state->mark_work_done_between_slices += Whsize_hd(hd);
+        domain_state->mark_work_done_between_slices += Whsize_hd(hd);
       }
     }
   }
