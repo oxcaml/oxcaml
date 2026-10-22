@@ -107,7 +107,9 @@
   (or
    (= %{profile} with-native-effects)
    (= %{profile} with-effects)
-   (= %{profile} with-effects-double-translation)))
+   (= %{profile} with-effects-double-translation)
+   ; OxCaml's build, which uses CPS effects (see main in Makefile.common-ox).
+   (= %{profile} main)))
  (libraries js_of_ocaml)
  (action
   (ignore-outputs

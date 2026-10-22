@@ -30,8 +30,8 @@
   withMerlin ? true,
   withAstDependentLibs ? true,
   withJsoo ? true,
-  # Test-only sources for make jsoo-test; not needed to build the compiler.
-  withJsooTestSources ? pkgs.lib.inNixShell,
+  # Test-only sources for make jsoo-test, which the check phase runs.
+  withJsooTestSources ? withJsoo,
 }:
 let
   inherit (pkgs) lib;
@@ -669,13 +669,6 @@ let
     postInstall = wrapWasmOfOcaml;
   };
 
-  mkJsooTest = mkAstDependentLibsBuild {
-    pname = "oxcaml-jsoo-test";
-    buildTarget = "jsoo-test";
-    sources = ppxlibSources // jsooSources // jsooTestSources;
-    extraNativeBuildInputs = jsooTools;
-  };
-
   # Builds and runs small js_of_ocaml programs using only what a compiler
   # package built withJsoo ships.
   mkJsooSmokeTest =
@@ -879,15 +872,16 @@ stdenv.mkDerivation {
     autoconf --force
   '';
 
-  checkPhase = lib.optionalString ocamltest ''
-    # The testsuite/tests/unicode test compiles modules with non-ASCII source
-    # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
-    # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
-    # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
-    # This exercises unicode source filenames, which we don't use; drop the test
-    # so the rest of `make ci` runs.
-    rm -rf testsuite/tests/unicode
-    make ci
+  # Only the js_of_ocaml tests: the compiler's own testsuite runs in the
+  # non-nix CI jobs, and `make ci` is not sandbox-clean (test scripts with
+  # /usr/bin/env shebangs, unicode source filenames vs. the toolchain, ...).
+  doCheck = withJsoo;
+  checkPhase = ''
+    runHook preCheck
+    # The tests of the js_of_ocaml that the package ships, as built with it.
+    # SHELL: the Makefile's /usr/bin/env bash does not exist in the sandbox.
+    make SHELL="$SHELL" jsoo-test
+    runHook postCheck
   '';
 
   postInstall =
@@ -970,7 +964,6 @@ stdenv.mkDerivation {
       lldb
       mkPpxlibLibs
       mkJsooLibs
-      mkJsooTest
       mkJsooSmokeTest
       mkInstalledLibrariesCheck
       mkMerlinPackages
