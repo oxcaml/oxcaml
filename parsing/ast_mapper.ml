@@ -33,6 +33,9 @@ type mapper = {
   attribute: mapper -> attribute -> attribute;
   attributes: mapper -> attribute list -> attribute list;
   modes : mapper -> modes -> modes;
+  mode : mapper -> mode Location.loc -> mode Location.loc;
+  mode_bound : mapper -> mode_bound -> mode_bound;
+  mode_bound_elem : mapper -> mode_bound_elem -> mode_bound_elem;
   modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;
@@ -1040,27 +1043,31 @@ let default_mapper =
          { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc });
 
     modes = (fun this m ->
-      let map_bound_elem { elem_morph; elem_var; elem_mod } =
-        { elem_morph = Option.map (map_loc this) elem_morph;
-          elem_var = map_loc this elem_var;
-          elem_mod = List.map (map_loc this) elem_mod
-        }
-      in
-      let map_bound { bound_vars; bound_const } =
-        { bound_vars = List.map map_bound_elem bound_vars;
-          bound_const = List.map (map_loc this) bound_const
-        }
-      in
-      let map_mode : mode -> mode = function
+      List.map (this.mode this) m);
+
+    mode = (fun this { txt; loc } ->
+      let txt =
+        match txt with
         | Mode _ as mode -> mode
         | Mode_var v -> Mode_var (map_loc this v)
         | Mode_bounds { upper; lower } ->
-          Mode_bounds { upper = map_bound upper; lower = map_bound lower }
+          Mode_bounds
+            { upper = this.mode_bound this upper;
+              lower = this.mode_bound this lower
+            }
       in
-      List.map
-        (fun ({ txt; loc } : mode Location.loc) ->
-          { txt = map_mode txt; loc = this.location this loc })
-        m);
+      { txt; loc = this.location this loc });
+
+    mode_bound = (fun this { bound_vars; bound_const } ->
+      { bound_vars = List.map (this.mode_bound_elem this) bound_vars;
+        bound_const = List.map (map_loc this) bound_const
+      });
+
+    mode_bound_elem = (fun this { elem_morph; elem_var; elem_mod } ->
+      { elem_morph = Option.map (map_loc this) elem_morph;
+        elem_var = map_loc this elem_var;
+        elem_mod = List.map (map_loc this) elem_mod
+      });
 
     modalities = (fun this m ->
       List.map (map_loc this) m);
