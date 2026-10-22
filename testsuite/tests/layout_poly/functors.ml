@@ -131,8 +131,9 @@ val r5m : int = 2
 val r5m' : float = 4.
 |}]
 
-(* Distinct all-dynamic arguments share a Missing static argument, but each
-   application must still use its own runtime argument and run its effects. *)
+(* The argument to [F] has no static content, so it is statically [Missing]
+   and all three applications share one instance. But at runtime, the
+   applications _of_ that instance must _not_ be shared. *)
 let (missing_calls, missing_first, missing_second, missing_again) =
   let calls = ref 0 in
   let module F = functor[@inline never] (X : S @ static) -> struct
@@ -468,21 +469,21 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Recursive functor. Force the recursive reference through an instantiation,
-   since instantiations accept Missing arguments, deferring the error. *)
-let (x12, y12) =
+(* Recursive functor. This is more broken that it initially looks.
+   [Recursive.M12.id]'s first argument is [value_or_null] even though it should
+   be polymorphic. *)
+let x12 =
  let module Recursive = struct
-    module type S_thunk = sig val y : unit -> int end
-    module rec F12 : (functor (X : S_thunk @ static) -> Id @ static) @ static =
-      functor (X : S_thunk @ static) -> struct
-        let poly_ id x = ignore (M12.y ()); x
+    module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
+      functor (X : Id @ static) -> struct
+        let poly_ id x = M12.id x
       end
-    and M12 : sig module Y : Id include S_thunk end @ static = struct
+    and M12 : Id @ static = struct
       module Y = F12 (M12)
-      let y () = 6
+      let poly_ id x = Y.id x
     end
   end in
-  (Recursive.M12.y (), Recursive.M12.Y.id 7)
+  Recursive.M12.id 7
 [%%expect{|
 >> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
