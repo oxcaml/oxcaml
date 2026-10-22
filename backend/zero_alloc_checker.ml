@@ -2127,11 +2127,25 @@ end = struct
     | Safe -> V.safe
     | Bot -> V.bot
 
-  let encode =
-    Zero_alloc_info.Encoded.Components.encode_or_elide ~encode_component:encode
+  let encode components =
+    let encoded =
+      Zero_alloc_info.Encoded.Components.encode
+        ~encode_component:encode
+        components
+    in
+    (* Artifact-size optimization: if this summary is all [Top] (the most
+        common case), then leave it out, and let readers infer that a missing
+        summary is all [Top]. *)
+    if[@ocaml.warning "-44"]
+      Zero_alloc_info.Encoded.Components.(encoded = all_top)
+    then None
+    else Some encoded
 
-  let decode =
-    Zero_alloc_info.Encoded.Components.decode_maybe_elided ~decode_component:decode
+  let decode i =
+    if[@ocaml.warning "-44"]
+      Zero_alloc_info.Encoded.Components.(i = all_top)
+    then Misc.fatal_error "Zero_alloc_checker: unexpected all-Top encoding"
+    else Zero_alloc_info.Encoded.Components.decode ~decode_component:decode i
 
   let set_value s (v : Value.t) =
     let info = Compilenv.current_zero_alloc_info () in

@@ -62,6 +62,12 @@ module Components : sig
   val lessequal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+
+  val print :
+    (Format.formatter -> 'component -> unit) ->
+    Format.formatter ->
+    'component t ->
+    unit
 end
 
 module Relevant_components_by_argument_index : sig
@@ -74,6 +80,8 @@ module Relevant_components_by_argument_index : sig
   val meet : t -> t -> t
 
   val lessequal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
 end
 
 module Allocation_sources : sig
@@ -106,6 +114,12 @@ module Allocation_sources : sig
     'args_only t
 
   val other_than_calling_arguments : 'args_only t -> bool
+
+  val print :
+    (Format.formatter -> 'args_only -> unit) ->
+    Format.formatter ->
+    'args_only t ->
+    unit
 end
 
 (** Abstract domain used in static analysis for checking [@zero_alloc]

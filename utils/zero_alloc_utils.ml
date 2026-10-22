@@ -125,6 +125,10 @@ module Components = struct
     else
       let c = f e1 e2 in
       if c <> 0 then c else f d1 d2
+
+  let print print_component ppf { nor; exn; div } =
+    Format.fprintf ppf "@[<hv 2>{ nor = %a;@ exn = %a;@ div = %a }@]"
+      print_component nor print_component exn print_component div
 end
 
 module Relevant_components_by_argument_index = struct
@@ -153,6 +157,9 @@ module Relevant_components_by_argument_index = struct
         | None -> false
         | Some c2 -> Components.lessequal (fun r1 r2 -> (not r1) || r2) c1 c2)
       t1
+
+  let print ppf t =
+    Numbers.Int.Map.print (Components.print Format.pp_print_bool) ppf t
 end
 
 module Allocation_sources = struct
@@ -203,6 +210,13 @@ module Allocation_sources = struct
   let other_than_calling_arguments = function
     | Allocation_other_than_calling_arguments -> true
     | No_allocation_other_than_calling_arguments _ -> false
+
+  let print print_args_only ppf = function
+    | Allocation_other_than_calling_arguments ->
+      Format.fprintf ppf "Allocation_other_than_calling_arguments"
+    | No_allocation_other_than_calling_arguments args_only ->
+      Format.fprintf ppf "No_allocation_other_than_calling_arguments %a"
+        print_args_only args_only
 end
 
 module type WS = sig

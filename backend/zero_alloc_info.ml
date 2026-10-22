@@ -8,15 +8,13 @@ module Encoded = struct
   module Component = struct
     type t = int
 
-    let encode : _ Allocation_sources.t Component.t -> int =
-      function
+    let encode : _ Allocation_sources.t Component.t -> int = function
       | Bot -> 0
       | Safe -> 1
       | Top (No_allocation_other_than_calling_arguments _) -> 2
       | Top Allocation_other_than_calling_arguments -> 3
 
-    let decode : int -> unit Allocation_sources.t Component.t =
-      function
+    let decode : int -> unit Allocation_sources.t Component.t = function
       | 0 -> Bot
       | 1 -> Safe
       | 2 -> Top (No_allocation_other_than_calling_arguments ())
@@ -29,26 +27,11 @@ module Encoded = struct
   module Components = struct
     type t = int
 
-    let encode (components : Component.t Zero_alloc_utils.Components.t) =
-      components.nor lor (components.exn lsl 2) lor (components.div lsl 4)
-
-    let all_top =
-      Zero_alloc_utils.Components.create (fun _ignore_tag ->
-          Component.encode (Top Allocation_other_than_calling_arguments))
-
-    let all_top_encoding = encode all_top
-
-    let encode_or_elide ~(encode_component : 'a -> Component.t)
-        (components : 'a Components.t) : t option =
-      let encoded =
-        encode
-          (Zero_alloc_utils.Components.map components ~f:(fun _tag ->
-               encode_component))
-      in
-      (* Artifact-size optimization: if this summary is all [Top] (the most
-         common case), then leave it out, and let readers infer that a missing
-         summary is all [Top]. *)
-      if encoded = all_top_encoding then None else Some encoded
+    let encode ~(encode_component : 'a -> Component.t)
+        (components : 'a Components.t) : t =
+      (encode_component components.nor)
+      lor ((encode_component components.exn) lsl 2)
+      lor ((encode_component components.div) lsl 4)
 
     let decode ~(decode_component : Component.t -> 'a) (i : t) :
         'a Zero_alloc_utils.Components.t =
@@ -57,13 +40,21 @@ module Encoded = struct
         div = decode_component ((i lsr 4) land 3)
       }
 
-    let decode_maybe_elided ~(decode_component : Component.t -> 'a) i :
-        'a Zero_alloc_utils.Components.t =
-      if i = all_top_encoding
-      then Misc.fatal_error "Zero_alloc_checker unexpected all-Top encoding"
-      else decode ~decode_component i
+    let all_top : t =
+      Zero_alloc_utils.(Components.create (fun _ignore_tag ->
+          Component.Top
+            Allocation_sources.Allocation_other_than_calling_arguments))
+      |> encode ~encode_component:Component.encode
+    [@@ocaml.warning "-44"]
+
+    let ( = ) = ( = )
   end
 end
+
+let encode components =
+  Encoded.Components.encode ~encode_component:Encoded.Component.encode components
+
+let decode = Encoded.Components.decode ~decode_component:Encoded.Component.decode
 
 type t = { mutable zero_alloc : Encoded.Components.t String.Map.t }
 
