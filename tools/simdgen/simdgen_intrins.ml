@@ -448,7 +448,9 @@ let imm_max (p : param) =
 
 let is_imm p = String.equal p.etype "IMM"
 
-let is_mask_param p = String.equal p.etype "MASK"
+(* [__mmaskN*] pointers also have the MASK etype. *)
+let is_mask_param p =
+  String.equal p.etype "MASK" && not (String.contains p.ctype '*')
 
 let res_is_k (instr : instr_emit) =
   match instr.res with
@@ -798,10 +800,7 @@ let memory_spec ~binding ~zeroing i =
   let ptr =
     List.find_map (fun (p, j) -> if is_ptr_param p then Some j else None) params
   in
-  (* [__mmaskN*] pointers also have the MASK etype. *)
-  let masks =
-    indices (fun p -> is_mask_param p && not (is_ptr_param p)) params
-  in
+  let masks = indices is_mask_param params in
   let vectors =
     indices
       (fun p ->
