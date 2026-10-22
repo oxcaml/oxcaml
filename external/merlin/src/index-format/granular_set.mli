@@ -31,6 +31,17 @@ module type S = sig
   val cardinal : t -> int
   val elements : t -> elt list
   val fold : ('acc -> elt -> 'acc) -> 'acc -> t -> 'acc
+
+  (** Like [fold], but subtrees that cannot be read because they live in an
+      outdated store are skipped. [f] may also result in an outdated store
+      error. Returns a (deduplicated) list of the outdated store errors, in
+      addition to the accumulator. *)
+  val fold_skipping_outdated :
+    ('acc -> elt -> ('acc, Granular_marshal.Outdated_store.t) result) ->
+    'acc ->
+    t ->
+    'acc * outdated:Granular_marshal.Outdated_store.Set.t
+
   val schema :
     Granular_marshal.iter -> (Granular_marshal.iter -> elt -> unit) -> t -> unit
 end

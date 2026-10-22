@@ -69,18 +69,7 @@ end
 type 'a t : mutable_data = 'a F(Ref).t
 [%%expect {|
 module Ref : sig type 'a t = 'a ref end
-Line 4, characters 0-38:
-4 | type 'a t : mutable_data = 'a F(Ref).t
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a F(Ref).t" is
-           mutable_data with 'a @@ forkable unyielding many
-         because of the definition of t at line 2, characters 2-40.
-       But the kind of type "'a F(Ref).t" must be a subkind of mutable_data
-         because of the definition of t at line 4, characters 0-38.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
-         statefulness: mod stateless with 'a ≰ mod stateless
+type ('a : value mod stateless) t = 'a F(Ref).t
 |}]
 
 module F (M : sig

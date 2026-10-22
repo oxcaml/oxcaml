@@ -71,20 +71,24 @@ and iter = { yield : 'a. 'a link -> 'a link Type.Id.t -> 'a schema -> unit }
 (** A schema usable when the ['a] value does not contain any links. *)
 val schema_no_sublinks : 'a schema
 
-(** Exception raised when attempting to consult an outdated store. *)
-exception
-  Outdated_store of
+module Outdated_store : sig
+  type t =
     { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
 
-(** [write oc ~id schema value] writes the [value] in the output channel [oc],
-    creating unmarshalling boundaries on every link in [value] specified by the
-    [schema]. [id] is used as index UID. File pointers are made relative to the
-    current working directory. *)
+  module Set : Set.S with type elt := t
+end
+
+(** Exception raised when attempting to consult an outdated store. *)
+exception Outdated_store of Outdated_store.t
+
+(** [write oc ~filename schema value] writes the [value] in the output channel
+    [oc], creating unmarshalling boundaries on every link in [value] specified
+    by the [schema]. File pointers are made relative to the directory of
+    [filename], the final location of the file. *)
 val write :
   ?flags:Marshal.extern_flags list ->
   out_channel ->
   filename:string ->
-  id:int ->
   'a schema ->
   'a ->
   unit
