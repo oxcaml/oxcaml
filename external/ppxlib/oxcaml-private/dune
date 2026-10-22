@@ -1,0 +1,5 @@
+; Private dependencies, linked here by the top-level Makefile (see
+; joinConsumingProject in default.nix): they belong to this project, and are
+; installed as sub-libraries of its packages.
+
+(vendored_dirs *)
