@@ -2534,7 +2534,10 @@ let without_param fp =
 
 let quote_modes loc modes =
   Typemode.untransl_mode modes
-  |> List.map (fun { Location.txt; _ } -> Printast.string_of_mode txt)
+  |> List.map (function
+    | { loc = _; txt = Parsetree.Mode m } -> m
+    | { loc = _; txt = Parsetree.(Mode_var _ | Mode_bounds _) } ->
+      fatal_error "Translquote.quote_modes: non-constant mode")
   |> Modes.of_string_list loc |> Modes.wrap
 
 let type_constraint_of_ambiguity loc env ambiguity =
