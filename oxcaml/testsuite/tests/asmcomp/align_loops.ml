@@ -1,10 +1,15 @@
 (* TEST
  arch_amd64;
+ not-macos;
+ not-msvc;
  {
    flags = "-S -align-loops";
    reference = "${test_source_directory}/align_loops.reference";
    native;
  }{
+   (* Keep e.g. [experimental-optimizations=1] in OCAMLPARAM from enabling
+      -align-loops. *)
+   set OCAMLPARAM = "_,";
    flags = "-S";
    reference = "${test_source_directory}/align_loops.off.reference";
    native;

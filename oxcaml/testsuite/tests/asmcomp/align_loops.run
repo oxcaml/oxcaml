@@ -8,14 +8,19 @@ ${program}
 # now check the assembly file produced during compilation: for each function,
 # look for a 16-byte alignment directive immediately preceding a numeric local
 # label (a loop head). Function entries are also aligned to 16 bytes, but are
-# followed by symbol names rather than .L<n> labels.
+# followed by symbol names rather than .L<n> labels. Code symbols use either
+# the flat (camlAlign_loops__<fn>_<stamps>_code) or the structured
+# (_CamlU11Align_loopsF<len><fn>_<stamps>_code) mangling scheme. Any other
+# symbol ends the current function, so its loops are not counted.
 asm=${test_build_directory}/align_loops.s
 awk '
-  /^camlAlign_loops__[a-z_]+(_[0-9]+)+(_code)?:$/ {
+  /^[^[:space:].][^:]*:$/ {
     fn = $0
-    sub(/^camlAlign_loops__/, "", fn)
-    sub(/(_[0-9]+)+(_code)?:$/, "", fn)
-    if (!(fn in aligned)) { order[n++] = fn; aligned[fn] = 0 }
+    if ((sub(/^camlAlign_loops__/, "", fn) \
+         || sub(/^_CamlU11Align_loopsF[0-9]+/, "", fn)) \
+        && sub(/(_[0-9]+)+(_code)?:$/, "", fn)) {
+      if (!(fn in aligned)) { order[n++] = fn; aligned[fn] = 0 }
+    } else fn = ""
     pending = 0
     next
   }
