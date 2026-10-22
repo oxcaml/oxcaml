@@ -327,7 +327,11 @@ module V : sig
 
   val safe : t
 
-  val top : Witnesses.t -> t
+  val top :
+    allocation_sources:Zero_alloc_utils.(
+      Relevant_components_by_argument_index.t Allocation_sources.t) ->
+    witnesses:Witnesses.t ->
+    t
 
   (** [compare] is structural on terms (for the use of [V.t] as a key in sets
       and maps), whereas [lessequal] is the order of the abstract domain (for
@@ -1114,11 +1118,8 @@ end = struct
 
   let safe = Resolved Safe
 
-  let top witnesses =
-    Resolved
-      (Top
-         { allocation_sources = Allocation_other_than_calling_arguments;
-           witnesses })
+  let top ~allocation_sources ~witnesses =
+    Resolved (Top { allocation_sources; witnesses })
 
   let is_resolved t =
     match t with Resolved _ -> true | Var _ | Join _ | Transform _ -> false
@@ -1409,7 +1410,26 @@ end = struct
     aux t
 end
 
-module T = Zero_alloc_utils.Make_value (Witnesses) (V)
+module Allocation_sources :
+  Zero_alloc_utils.Allocation_sources with type t =
+    Zero_alloc_utils.(
+      Relevant_components_by_argument_index.t Allocation_sources.t)
+= struct
+  type t = Zero_alloc_utils.(
+    Relevant_components_by_argument_index.t Allocation_sources.t)
+
+  let top =
+    Zero_alloc_utils.Allocation_sources.Allocation_other_than_calling_arguments
+
+  let argument ~argument_index ~tag :
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t) =
+    Zero_alloc_utils.(
+      Allocation_sources.No_allocation_other_than_calling_arguments
+        (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
+end
+
+module T = Zero_alloc_utils.Make_value (Allocation_sources) (Witnesses) (V)
 
 module Value : sig
   include module type of T
@@ -1644,8 +1664,13 @@ end = struct
      be used in Assume_info due to cyclic dependencies. The witnesses in
      Assume_info are always empty and the translation is trivial. Is there a
      better way to avoid duplicating [Zero_alloc_utils]? *)
-  let transl w (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
-    match v with Top _ -> V.top w | Safe -> V.safe | Bot -> V.bot
+  let transl witnesses (v : Zero_alloc_utils.Assume_info.V.t) : V.t =
+    match v with
+    | Top () ->
+      V.top ~allocation_sources:Allocation_other_than_calling_arguments
+        ~witnesses
+    | Safe -> V.safe
+    | Bot -> V.bot
 
   let transl w (v : Zero_alloc_utils.Assume_info.Value.t) : Value.t =
     { nor = transl w v.nor; exn = transl w v.exn; div = transl w v.div }
@@ -2105,23 +2130,26 @@ end = struct
   let encode (v : V.t) =
     V.match_with v
       ~resolved:Zero_alloc_utils.(Component.map ~f:(fun _witnesses ->
-        (* CR wsturgeon for wsturgeon: inspect witnesses to refine this *)
+        (* CR wsturgeon for wsturgeon: refine this *)
         Allocation_sources.Allocation_other_than_calling_arguments))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
           (V.print ~witnesses:false) v)
     |> Zero_alloc_info.Encoded.Component.encode
+  [@@warning "-44"]
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
      that function, not about its callers. Witnesses from the summary of a
      callee are ignored, and replaced by the name of the callee. *)
-  let decoded_witness = Witnesses.empty
+  let decoded_witnesses = Witnesses.empty
 
   let decode v =
     match Zero_alloc_info.Encoded.Component.decode v with
-    | Top Allocation_other_than_calling_arguments -> V.top decoded_witness
+    | Top Allocation_other_than_calling_arguments ->
+      V.top ~allocation_sources:Allocation_other_than_calling_arguments
+        ~witnesses:decoded_witnesses
     | Top (No_allocation_other_than_calling_arguments ()) ->
       Misc.fatal_error "(* CR wsturgeon for wsturgeon: TODO *)"
     | Safe -> V.safe
@@ -2296,8 +2324,8 @@ end = struct
       Value.replace_witnesses w v
     in
     let return_top hint reason =
-      let w = create_witnesses t ~hint k dbg in
-      let v = Value.top w in
+      let witnesses = create_witnesses t ~hint k dbg in
+      let v = Value.top ~allocation_sources:Allocation_sources.top ~witnesses in
       let msg = Printf.sprintf "conservative %s (%s)" callee reason in
       report t v ~msg ~desc dbg;
       v
@@ -2363,11 +2391,11 @@ end = struct
     report t r ~msg:"transform result" ~desc dbg;
     r
 
-  let transform_top t ~next ~exn w desc dbg =
+  let transform_top t ~next ~exn witnesses desc dbg =
     let effect_ =
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match Metadata.assume_value dbg ~can_raise:true witnesses with
       | Some v -> v
-      | None -> Value.top w
+      | None -> Value.top ~allocation_sources:Allocation_sources.top ~witnesses
     in
     transform t ~next ~exn ~effect_ desc dbg
 
@@ -2391,12 +2419,16 @@ end = struct
     report t next ~msg:"transform_specific next" ~desc dbg;
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect_ =
-      let w = create_witnesses t (Arch_specific s) dbg in
-      match Metadata.assume_value_unless_inferred dbg w with
+      let witnesses = create_witnesses t (Arch_specific s) dbg in
+      match Metadata.assume_value_unless_inferred dbg witnesses with
       | Some v -> v
       | None ->
         (* Conservatively assume that operation can return normally. *)
-        let nor = if Arch.operation_allocates s then V.top w else V.safe in
+        let nor =
+          if Arch.operation_allocates s
+          then V.top ~allocation_sources:Allocation_sources.top ~witnesses
+          else V.safe
+        in
         (* Specific operations cannot raise *)
         let exn = V.bot in
         (* Assume that the operation does not diverge. *)
@@ -2614,7 +2646,8 @@ end = struct
           (* Do not analyze the body of the function, conservatively assume that
              the summary is top. *)
           Unit_info.record unit_info fun_name
-            (Value.top Witnesses.empty)
+            (Value.top ~allocation_sources:Allocation_sources.top
+               ~witnesses:Witnesses.empty)
             fun_dbg a
         else really_check ()
       in
@@ -2653,16 +2686,19 @@ end = struct
           List.fold_left
             (fun all_effects (callee : Cmm.callee) ->
               let k = wkind callee in
-              let w = create_witnesses t k dbg in
+              let witnesses = create_witnesses t k dbg in
               let v =
                 match callee with
                 | Symbol { sym_name; _ } -> find_callee t sym_name ~desc dbg k
-                | Argument { argument_index = _ } ->
-                  (* CR-soon wsturgeon for wsturgeon: this is a separate PR *)
-                  Value.top w
+                | Argument { argument_index } ->
+                  Zero_alloc_utils.Components.create (fun tag ->
+                    V.top
+                      ~allocation_sources:(
+                        Allocation_sources.argument ~argument_index ~tag)
+                      ~witnesses)
               in
               let effect_ =
-                match Metadata.assume_value dbg ~can_raise:true w with
+                match Metadata.assume_value dbg ~can_raise:true witnesses with
                 | Some v' ->
                   assert (Value.is_resolved v');
                   if Value.is_resolved v then Value.meet v v' else v'
@@ -2720,11 +2756,16 @@ end = struct
           next
         | Alloc { mode = Local; _ } -> next
         | Alloc { mode = Heap; bytes; dbginfo } ->
-          let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
+          let witnesses = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ : _ Zero_alloc_utils.Components.t =
-            match Metadata.assume_value_unless_inferred dbg w with
+            match Metadata.assume_value_unless_inferred dbg witnesses with
             | Some effect_ -> effect_
-            | None -> { nor = V.top w; exn = V.bot; div = V.bot }
+            | None ->
+              { nor =
+                  V.top ~allocation_sources:Allocation_sources.top ~witnesses;
+                exn = V.bot;
+                div = V.bot
+              }
           in
           transform t ~effect_ ~next ~exn:Value.bot "heap allocation" dbg
         | Specific s -> transform_specific t s ~next ~exn:Value.bot dbg
@@ -2842,7 +2883,10 @@ end = struct
         res
       | Aborted _ -> Misc.fatal_errorf "Analyzing function %s" fd.fun_name ()
       | Max_iterations_reached ->
-        let res = Value.top Witnesses.empty in
+        let res =
+          Value.top ~allocation_sources:Allocation_sources.top
+            ~witnesses:Witnesses.empty
+        in
         report t res
           ~msg:
             "Can't reach fixpoint in max iterations, conservatively return Top"

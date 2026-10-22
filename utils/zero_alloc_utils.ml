@@ -126,6 +126,8 @@ module Components = struct
       let c = f e1 e2 in
       if c <> 0 then c else f d1 d2
 
+  let one_hot = Fun.compose create ( = )
+
   let print print_component ppf { nor; exn; div } =
     Format.fprintf ppf "@[<hv 2>{ nor = %a;@ exn = %a;@ div = %a }@]"
       print_component nor print_component exn print_component div
@@ -211,6 +213,8 @@ module Allocation_sources = struct
     | Allocation_other_than_calling_arguments -> true
     | No_allocation_other_than_calling_arguments _ -> false
 
+  let top = Allocation_other_than_calling_arguments
+
   let print print_args_only ppf = function
     | Allocation_other_than_calling_arguments ->
       Format.fprintf ppf "Allocation_other_than_calling_arguments"
@@ -235,12 +239,25 @@ module type WS = sig
   val compare : t -> t -> int
 end
 
+module type Allocation_sources = sig
+  type t
+
+  val top : t
+
+  val argument : argument_index:int -> tag:Tag.t -> t
+end
+
 module type Component = sig
   type t
 
+  type allocation_sources
+
   type witnesses
 
-  val top : witnesses -> t
+  val top :
+    allocation_sources:allocation_sources ->
+    witnesses:witnesses ->
+    t
 
   val safe : t
 
@@ -263,7 +280,7 @@ module Make_component (Witnesses : WS) = struct
 
   let bot = Component.Bot
 
-  let top w = Component.Top w
+  let top ~allocation_sources:() ~witnesses = Component.Top witnesses
 
   let safe = Component.Safe
 
@@ -284,8 +301,9 @@ module Make_component (Witnesses : WS) = struct
 end
 
 module Make_value
+    (Allocation_sources : Allocation_sources)
     (Witnesses : WS)
-    (V : Component with type witnesses := Witnesses.t) =
+    (V : Component with type allocation_sources := Allocation_sources.t and type witnesses := Witnesses.t) =
 struct
   (** Lifts V to triples *)
   type t = V.t Components.t
@@ -306,12 +324,17 @@ struct
 
   let safe = Components.create (fun _ignore_tag -> V.safe)
 
-  let top w = Components.create (fun _ignore_tag -> V.top w)
+  let top ~allocation_sources ~witnesses =
+    Components.create (fun _ignore_tag -> V.top ~allocation_sources ~witnesses)
 
-  let relaxed w : t = { nor = V.safe; exn = V.top w; div = V.top w }
+  let relaxed ~witnesses : t =
+    { nor = V.safe;
+      exn = V.top ~allocation_sources:Allocation_sources.top ~witnesses;
+      div = V.top ~allocation_sources:Allocation_sources.top ~witnesses
+    }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
-    let res = if strict then safe else relaxed Witnesses.empty in
+    let res = if strict then safe else relaxed ~witnesses:Witnesses.empty in
     let res = if never_raises then { res with exn = V.bot } else res in
     if never_returns_normally then { res with nor = V.bot } else res
 
@@ -320,6 +343,14 @@ struct
     Format.fprintf ppf "{ nor=%a;@ exn=%a;@ div=%a }@," pp nor pp exn pp div
 
   let compare = Components.compare V.compare
+end
+
+module No_allocation_sources : (Allocation_sources with type t = unit) = struct
+  type t = unit
+
+  let top = ()
+
+  let argument ~argument_index:_ ~tag:_ = ()
 end
 
 module Assume_info = struct
@@ -340,7 +371,7 @@ module Assume_info = struct
   end
 
   module V = Make_component (Witnesses)
-  module Value = Make_value (Witnesses) (V)
+  module Value = Make_value (No_allocation_sources) (Witnesses) (V)
 
   type t =
     | No_assume
