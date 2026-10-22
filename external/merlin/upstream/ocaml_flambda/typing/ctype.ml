@@ -4482,6 +4482,15 @@ let find_expansion_scope env path =
   | { type_manifest = None ; _ } | exception Not_found -> generic_level
   | decl -> decl.type_expansion_scope
 
+(* Unlike [find_expansion_scope env p <> lowest_level], this is [false] for
+   abstract and unbound paths: those can still be expanded (by path
+   normalization) without relying on local equations. *)
+let has_local_equation env p =
+  match Env.find_type p env with
+  | { type_manifest = Some _; type_expansion_scope; _ } ->
+    type_expansion_scope <> lowest_level
+  | _ | (exception Not_found) -> false
+
 let non_aliasable p decl =
   (* in_pervasives p ||  (subsumed by in_current_module) *)
   in_current_module p && not decl.type_is_newtype
@@ -5148,7 +5157,7 @@ let rigid_variants = ref false
 
 let unify1_var uenv t1 t2 =
   let jkind = match get_desc t1 with
-    | Tvar { jkind } -> jkind
+    | Tvar { jkind } | Tivar { jkind; _ } -> jkind
     | _ -> assert false
   in
   occur_for Unify uenv t1 t2;
@@ -5219,17 +5228,56 @@ let fill_ivar env ivar ty =
       if not (equal_type_shape shape expected)
       then raise_for Unify (Shape_mismatch { got = shape; expected }))
 
+(* Like [expand_head_unif], but stops at a type constructor with a local (e.g.
+   GADT) equation: a [Tivar]'s ivar must not rely on an equation that may not
+   hold where its variable lives. *)
+let expand_head_without_equations env ty =
+  let rec loop ty =
+    match get_desc ty with
+    | Tlink _ | Tsubst _ -> assert false
+    | Tconstr (p, _, _) when not (has_local_equation env p) -> (
+      match expand_abbrev env ty with
+      | ty -> loop ty
+      | exception Cannot_expand -> reduce_and_continue ty
+      | exception Escape e -> raise_for Unify (Escape e))
+    | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
+    | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
+    | Tnil | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _
+    | Tof_kind _ | Tbox _ ->
+      reduce_and_continue ty
+  and reduce_and_continue ty =
+    match try_reduce env ty with ty -> loop ty | exception Cannot_expand -> ty
+  in
+  loop ty
+
+let unify1_ivar uenv t1 ivar t2 =
+  let env = get_env uenv in
+  let t2' = expand_head_without_equations env t2 in
+  match get_desc t2' with
+  | Tvar _ | Tivar _ -> false
+  | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+  | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tvariant _
+  | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _ | Tof_kind _ | Tbox _ ->
+    unify1_var uenv t1 t2
+    &&
+    (fill_ivar env ivar t2';
+     true)
+  | Tlink _ | Tsubst _ -> assert false
+
 (** What [unify3_var] does after linking [from_] to [to_]. *)
 module On_link = struct
   type t =
     | Noop
     | Fill_ivar of type_shape Ivar.t
-        (** Fill the ivar with the shape of [to_expanded]. *)
+        (** Fill the ivar with the shape of [to_], expanded without local
+            equations (see [expand_head_without_equations]). *)
 
-  let run t ~uenv ~from_jkind:_ ~from_:_ ~to_:_ ~to_expanded:t2' =
+  let run t ~uenv ~from_jkind:_ ~to_:t2 =
     match t with
     | Noop -> ()
-    | Fill_ivar ivar1 -> fill_ivar (get_env uenv) ivar1 t2'
+    | Fill_ivar ivar1 ->
+      let env = get_env uenv in
+      fill_ivar env ivar1 (expand_head_without_equations env t2)
 end
 
 (* Called from unify3. [on_link] is run after [t1'] is linked to [t2], but not
@@ -5250,8 +5298,7 @@ let unify3_var ~(on_link : On_link.t) uenv jkind1 t1' t2 t2' =
   with
   | () ->
       link_type t1' t2;
-      On_link.run on_link ~uenv ~from_jkind:jkind1 ~from_:t1' ~to_:t2
-        ~to_expanded:t2'
+      On_link.run on_link ~uenv ~from_jkind:jkind1 ~to_:t2
   | exception Unify_trace _ when in_pattern_mode uenv ->
       backtrack snap;
       reify uenv t1';
@@ -5366,22 +5413,26 @@ let rec unify uenv t1 t2 =
   try
     type_changed := true;
     begin match (get_desc t1, get_desc t2) with
-      (Tconstr _, Tvar _) when deep_occur t2 t1 ->
+      (Tconstr _, (Tvar _ | Tivar _)) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tconstr _) when deep_occur t1 t2 ->
+    | ((Tvar _ | Tivar _), Tconstr _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
-    | (Tquote _, Tvar _) when deep_occur t2 t1 ->
+    | (Tquote _, (Tvar _ | Tivar _)) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tquote _) when deep_occur t1 t2 ->
+    | ((Tvar _ | Tivar _), Tquote _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
-    | (Tsplice _, Tvar _) when deep_occur t2 t1 ->
+    | (Tsplice _, (Tvar _ | Tivar _)) when deep_occur t2 t1 ->
         unify2 uenv t1 t2
-    | (Tvar _, Tsplice _) when deep_occur t1 t2 ->
+    | ((Tvar _ | Tivar _), Tsplice _) when deep_occur t1 t2 ->
         unify2 uenv t1 t2
     | (Tvar _, _) ->
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
     | (_, Tvar _) ->
         if unify1_var uenv t2 t1 then () else unify2 uenv t1 t2
+    | (Tivar { ivar; _ }, _) ->
+        if unify1_ivar uenv t1 ivar t2 then () else unify2 uenv t1 t2
+    | (_, Tivar { ivar; _ }) ->
+        if unify1_ivar uenv t2 ivar t1 then () else unify2 uenv t1 t2
     | (Tunivar { jkind = k1 }, Tunivar { jkind = k2 }) ->
         unify_univar_for Unify (get_env uenv) t1 t2 k1 k2 !univar_pairs;
         update_level_for Unify (get_env uenv) (get_level t1) t2;
