@@ -171,10 +171,16 @@ let make () @ portable = { x = 1 }
 
 [%%expect {|
 type 'a t = { mutable x : 'a; }
-Line 2, characters 25-34:
-2 | let make () @ portable = { x = 1 }
-                             ^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
+val make : unit -> int t @ portable = <fun>
+|}]
+
+(* Mutable fields kept by a record update are crossed at the instance of
+   their type. *)
+type 'a u = { mutable m : 'a; k : int }
+let update r @ portable = ({ r with k = 1 }, ignore (r.m + 1))
+[%%expect {|
+type 'a u = { mutable m : 'a; k : int; }
+val update : int u -> int u * unit @ portable = <fun>
 |}]
 
 (* Other crossing sites *)
