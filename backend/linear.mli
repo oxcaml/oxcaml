@@ -96,7 +96,11 @@ and instruction_desc =
   | Lcall_op of call_operation
   | Lreloadretaddr
   | Lreturn
-  | Llabel_for_jump_target of label
+  | Llabel_for_jump_target of
+      { label : label;
+        is_loop_header : bool
+            (* target of a backward branch in the linearized order *)
+      }
   | Llabel_for_dwarf of label
       (** Only delimits DWARF ranges, never a jump target. *)
   | Lbranch of label
