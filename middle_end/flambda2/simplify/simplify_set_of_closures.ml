@@ -802,7 +802,6 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
-      ~single_set_of_size_one:(Function_slot.Lmap.is_singleton closure_symbols)
   in
   let closure_bound_names_inside =
     C.closure_bound_names_inside_functions_exactly_one_set context
@@ -888,8 +887,6 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
-      ~single_set_of_size_one:
-        (Function_slot.Lmap.is_singleton function_declarations_in_order)
   in
   let closure_bound_names_inside =
     C.closure_bound_names_inside_functions_exactly_one_set context
@@ -1176,15 +1173,10 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
       all_sets_of_closures
   in
   let value_slot_types_all_sets = List.map snd value_slots_and_types_all_sets in
-  let single_set_of_size_one =
-    match all_sets_of_closures_and_symbols with
-    | [(functions, _)] -> Function_slot.Lmap.is_singleton functions
-    | _ -> false
-  in
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures ~closure_bound_names_all_sets
-      ~value_slot_types_all_sets ~single_set_of_size_one
+      ~value_slot_types_all_sets
   in
   let closure_bound_names_inside_functions_all_sets =
     C.closure_bound_names_inside_functions_all_sets context

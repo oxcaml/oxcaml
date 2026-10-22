@@ -326,8 +326,7 @@ let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
     denv_inside_functions, free_depth_variables
 
 let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
-    ~closure_bound_names_all_sets ~value_slot_types_all_sets
-    ~single_set_of_size_one =
+    ~closure_bound_names_all_sets ~value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
     DE.enter_set_of_closures denv
@@ -357,6 +356,14 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
          ~closure_bound_names_inside_functions_all_sets
          ~closure_types_inside_functions_all_sets
     |> DA.with_denv dacc_prior_to_sets
+  in
+  let single_set_of_size_one =
+    match all_sets_of_closures with
+    | [(set_of_closures, _)] ->
+      Function_slot.Lmap.is_singleton
+        (Function_declarations.funs_in_order
+           (Set_of_closures.function_decls set_of_closures))
+    | _ -> false
   in
   { dacc_prior_to_sets;
     dacc_inside_functions;
