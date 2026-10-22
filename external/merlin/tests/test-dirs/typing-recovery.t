@@ -95,12 +95,12 @@
           pattern (test.ml[2,15+4]..test.ml[2,15+5])
             Tpat_var \"f\"
             sort value
-            value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#6<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
+            return_mode proj_Locality(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -116,8 +116,8 @@
                     []
                   Tpat_var \"x\"
                   sort value
-                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
+                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#c<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -282,12 +282,12 @@
           pattern (test2.ml[2,15+4]..test2.ml[2,15+5])
             Tpat_var \"f\"
             sort value
-            value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#6<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
+            return_mode proj_Locality(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -304,7 +304,7 @@
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_any
-                proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
+                proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -660,7 +660,7 @@ make sure we also handle that correctly in structures:
               []
             Tpat_var \"foo2\"
             sort value
-            value_mode id(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#c<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+28])
             extra (test_ct.ml[3,20+4]..test_ct.ml[3,20+28]) ghost
               Texp_constraint
@@ -713,7 +713,7 @@ make sure we also handle that correctly in structures:
               []
             Tpat_var \"foo3\"
             sort value
-            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(unique,contended,immutable,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(unique,contended,immutable,static)(modevar#17<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+27])
             extra (test_ct.ml[5,50+4]..test_ct.ml[5,50+27]) ghost
               Texp_constraint
