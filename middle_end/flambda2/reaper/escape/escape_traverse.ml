@@ -17,8 +17,7 @@ module Acc = Traverse_acc
 module Env = Traverse_env
 module K = Flambda_kind
 
-let enabled () =
-  Escape_analysis.enabled () && Flambda_features.stack_allocation_enabled ()
+let enabled = Escape_graph.enabled
 
 let graph acc = Global_flow_graph.escape (Acc.deps acc)
 
@@ -79,7 +78,7 @@ let is_exn_handler acc cont =
 let note_jump_to denv acc cont =
   let escape = Env.escape denv in
   if
-    is_exn_handler acc cont
+    enabled () && is_exn_handler acc cont
     && not (Continuation.equal cont (Escape_env.exn_continuation escape))
   then
     let graph = graph acc in
@@ -94,6 +93,7 @@ let record_apply denv acc apply =
     (Exn_continuation.exn_handler (Apply.exn_continuation apply));
   let escape = Env.escape denv in
   match Apply.continuation apply, Apply.position apply with
+  | _ when not (enabled ()) -> ()
   | Return k, Normal
     when Continuation.equal k (Escape_env.return_continuation escape) ->
     (* Tail call: the regions of the enclosing scopes are closed before it, so
@@ -174,41 +174,44 @@ let record_candidate_allocation denv acc ~(bound_pattern : Bound_pattern.t)
    [Escape_analysis]). *)
 let enter_let denv acc ~(bound_pattern : Bound_pattern.t)
     (defining_expr : Named.t) =
-  let escape = Env.escape denv in
-  let with_region_var region f =
-    Simple.pattern_match' region
-      ~const:(fun _ -> escape)
-      ~symbol:(fun _ ~coercion:_ -> escape)
-      ~var:(fun region ~coercion:_ -> f region)
-  in
-  let escape =
-    match[@ocaml.warning "-fragile-match"] defining_expr, bound_pattern with
-    | Prim (Variadic (Begin_region _, _), _), Singleton bv ->
-      Escape_env.enter_foreign_region escape (Bound_var.var bv)
-    | Prim (Unary (End_region _, region), _), _ ->
-      with_region_var region (Escape_env.exit_foreign_region escape)
-    | Prim (Variadic (Begin_try_region _, _), _), Singleton bv ->
-      (* Try-regions are only closed by the handlers of the corresponding [try],
-         so allocations in its body belong to the enclosing region (see
-         [Lambda_to_flambda]). *)
-      Escape_env.enter_try_region escape (Bound_var.var bv)
-    | Prim (Unary (End_try_region _, region), _), _ ->
-      with_region_var region (fun region ->
-          (* Closing the try-region frees everything allocated since it was
-             opened, including any value passed to the handler closing it (the
-             exception, or mutable variables turned into extra parameters). *)
-          let graph = graph acc in
-          List.iter
-            (fun scope ->
-              List.iter
-                (fun param -> Escape_graph.add_scope_exit graph ~scope ~param)
-                (Escape_env.handler_params_freed_by_end_of_try_region escape
-                   region))
-            (Escape_env.enclosing_region_scopes escape);
-          Escape_env.exit_try_region escape region)
-    | _ -> escape
-  in
-  Env.with_escape denv escape
+  if not (enabled ())
+  then denv
+  else
+    let escape = Env.escape denv in
+    let with_region_var region f =
+      Simple.pattern_match' region
+        ~const:(fun _ -> escape)
+        ~symbol:(fun _ ~coercion:_ -> escape)
+        ~var:(fun region ~coercion:_ -> f region)
+    in
+    let escape =
+      match[@ocaml.warning "-fragile-match"] defining_expr, bound_pattern with
+      | Prim (Variadic (Begin_region _, _), _), Singleton bv ->
+        Escape_env.enter_foreign_region escape (Bound_var.var bv)
+      | Prim (Unary (End_region _, region), _), _ ->
+        with_region_var region (Escape_env.exit_foreign_region escape)
+      | Prim (Variadic (Begin_try_region _, _), _), Singleton bv ->
+        (* Try-regions are only closed by the handlers of the corresponding
+           [try], so allocations in its body belong to the enclosing region (see
+           [Lambda_to_flambda]). *)
+        Escape_env.enter_try_region escape (Bound_var.var bv)
+      | Prim (Unary (End_try_region _, region), _), _ ->
+        with_region_var region (fun region ->
+            (* Closing the try-region frees everything allocated since it was
+               opened, including any value passed to the handler closing it (the
+               exception, or mutable variables turned into extra parameters). *)
+            let graph = graph acc in
+            List.iter
+              (fun scope ->
+                List.iter
+                  (fun param -> Escape_graph.add_scope_exit graph ~scope ~param)
+                  (Escape_env.handler_params_freed_by_end_of_try_region escape
+                     region))
+              (Escape_env.enclosing_region_scopes escape);
+            Escape_env.exit_try_region escape region)
+      | _ -> escape
+    in
+    Env.with_escape denv escape
 
 (* The handlers of a recursive [Let_cont] form a region scope of their own (see
    [Escape_analysis]): every continuation currently in scope, including the
@@ -228,4 +231,6 @@ let enter_recursive_handlers denv acc =
   region_scope, Env.with_escape denv escape
 
 let enter_handler denv ~params =
-  Env.with_escape denv (Escape_env.enter_handler (Env.escape denv) ~params)
+  if not (enabled ())
+  then denv
+  else Env.with_escape denv (Escape_env.enter_handler (Env.escape denv) ~params)

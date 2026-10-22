@@ -51,6 +51,12 @@ let indirect_call_result = N.create ~name:"indirect_call_result"
 
 let partial_application_node = NN.create ~name:"partial_application_node"
 
+(* Nothing is recorded when the analysis is disabled, so that it costs nothing
+   then: the tables below stay empty. *)
+let enabled =
+  let flag = Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape" in
+  fun () -> flag () && Flambda_features.stack_allocation_enabled ()
+
 let create () =
   { allocated_in = NN.empty;
     scope_exit = NN.empty;
@@ -99,46 +105,62 @@ module Relations = struct
 end
 
 let add_allocated_in t ~alloc ~scope =
-  t.allocated_in <- NN.add_or_replace [alloc; scope] () t.allocated_in
+  if enabled ()
+  then t.allocated_in <- NN.add_or_replace [alloc; scope] () t.allocated_in
 
 let add_scope_exit t ~scope ~param =
-  t.scope_exit
-    <- NN.add_or_replace [scope; Code_id_or_name.var param] () t.scope_exit
+  if enabled ()
+  then
+    t.scope_exit
+      <- NN.add_or_replace [scope; Code_id_or_name.var param] () t.scope_exit
 
 let add_unsafe_scope t scope =
-  t.unsafe_scope <- N.add_or_replace [scope] () t.unsafe_scope
+  if enabled ()
+  then t.unsafe_scope <- N.add_or_replace [scope] () t.unsafe_scope
 
 let add_return_of t ~scope ~result =
-  t.return_of
-    <- NN.add_or_replace [scope; Code_id_or_name.var result] () t.return_of
+  if enabled ()
+  then
+    t.return_of
+      <- NN.add_or_replace [scope; Code_id_or_name.var result] () t.return_of
 
 let add_call_result t ~result ~scope ~call_widget =
-  t.call_result
-    <- NNN.add_or_replace
-         [Code_id_or_name.var result; scope; call_widget]
-         () t.call_result
+  if enabled ()
+  then
+    t.call_result
+      <- NNN.add_or_replace
+           [Code_id_or_name.var result; scope; call_widget]
+           () t.call_result
 
 let add_unscoped_call_result t result =
-  t.unscoped_call_result
-    <- N.add_or_replace [Code_id_or_name.var result] () t.unscoped_call_result
+  if enabled ()
+  then
+    t.unscoped_call_result
+      <- N.add_or_replace [Code_id_or_name.var result] () t.unscoped_call_result
 
 let add_indirect_call_result t result =
-  t.indirect_call_result
-    <- N.add_or_replace [Code_id_or_name.var result] () t.indirect_call_result
+  if enabled ()
+  then
+    t.indirect_call_result
+      <- N.add_or_replace [Code_id_or_name.var result] () t.indirect_call_result
 
 let add_partial_application_node t ~node ~code_id =
-  t.partial_application_node
-    <- NN.add_or_replace
-         [node; Code_id_or_name.code_id code_id]
-         () t.partial_application_node
+  if enabled ()
+  then
+    t.partial_application_node
+      <- NN.add_or_replace
+           [node; Code_id_or_name.code_id code_id]
+           () t.partial_application_node
 
 let add_scope_cont t ~scope cont =
-  t.scope_conts
-    <- Code_id_or_name.Map.update scope
-         (function
-           | None -> Some (Continuation.Set.singleton cont)
-           | Some conts -> Some (Continuation.Set.add cont conts))
-         t.scope_conts
+  if enabled ()
+  then
+    t.scope_conts
+      <- Code_id_or_name.Map.update scope
+           (function
+             | None -> Some (Continuation.Set.singleton cont)
+             | Some conts -> Some (Continuation.Set.add cont conts))
+           t.scope_conts
 
 let scope_conts t = t.scope_conts
 

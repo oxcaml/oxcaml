@@ -22,6 +22,11 @@
 
 type t
 
+(** Whether the escape analysis is enabled ([-X reaper-escape=1], with stack
+    allocation available). When it is not, the [add_*] functions below record
+    nothing, so that the analysis costs nothing. *)
+val enabled : unit -> bool
+
 val create : unit -> t
 
 (** Add the recorded facts to a Datalog database. *)

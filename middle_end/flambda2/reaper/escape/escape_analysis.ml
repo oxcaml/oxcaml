@@ -39,15 +39,19 @@
 
    Besides, nothing is done to close regions on exceptional paths: as for the
    regions introduced by the type checker, the handler catching the exception is
-   expected to restore the local stack pointer (handlers of try-with have a
-   try-region of their own for that purpose, which they close on entry: this
-   frees everything allocated in the body of the [try], so values passed to such
-   a handler are treated as leaving the scope, see [Escape_traverse]), or
-   failing that, the next [End_region] of an enclosing region does. This is
-   however not enough for the region of a loop iteration raising to a handler
-   outside of the loop, since an enclosing loop could then accumulate unclosed
-   regions; such scopes are marked [unsafe_scope] and get no local allocations
-   (see [Escape_traverse]).
+   expected to restore the local stack pointer. Handlers of try-with have a
+   try-region of their own for that purpose, which they close on entry (and
+   which Simplify never removes): this frees everything allocated since the
+   [try] started, so values passed to such a handler are treated as leaving the
+   scope (see [Escape_traverse]). This also frees the region of a scope left by
+   the exception, provided the [try] started outside of that scope. We do not
+   track where it started, so a scope from which an exception may reach a
+   handler defined outside of it (other than the exception continuation of the
+   function, whose caller is responsible for the handling) is conservatively
+   marked [unsafe_scope] and gets no local allocations (see [Escape_traverse]):
+   had the [try] started inside the scope (as when the handler has been lifted
+   out of it), the region would be left open on that path, and an enclosing loop
+   could accumulate such regions.
 
    Finally, since an allocation always goes to the innermost region open at
    runtime, no allocation is a candidate while a region pre-existing in the term
@@ -83,7 +87,7 @@ open Escape_graph.Relations
 open! Datalog_helpers.Syntax
 open Datalog_helpers
 
-let enabled = Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape"
+let enabled = Escape_graph.enabled
 
 (* Relations computed by [Unboxing_analysis]. *)
 let cannot_change_calling_convention =

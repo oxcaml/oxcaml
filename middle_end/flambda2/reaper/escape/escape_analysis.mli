@@ -20,7 +20,7 @@
     cannot flow to a place that outlives the activation of the function
     containing the allocation. *)
 
-(** Whether the analysis is enabled ([-X reaper-escape=1]). *)
+(** Whether the analysis is enabled (see [Escape_graph.enabled]). *)
 val enabled : unit -> bool
 
 (** Run the analysis on the database of [Unboxing_analysis.perform_analysis]
