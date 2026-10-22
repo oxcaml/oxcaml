@@ -67,9 +67,13 @@ type location_stack = Location.t list
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
+type mode_const = string
+type mode_var = string
+type mode_morph = string
+
 type mode =
-  | Mode of string
-  | Mode_var of string loc
+  | Mode of mode_const
+  | Mode_var of mode_var
   | Mode_bounds of mode_bounds
 
 and mode_bounds =
@@ -79,13 +83,13 @@ and mode_bounds =
 
 and mode_bound =
   { bound_vars : mode_bound_elem list;
-    bound_const : string loc list;
+    bound_const : mode_const loc list;
   }
 
 and mode_bound_elem =
-  { elem_morph : string loc option;
-    elem_var : string loc;
-    elem_mod : string loc list;
+  { elem_morph : mode_morph loc option;
+    elem_var : mode_var loc;
+    elem_mod : mode_const loc list;
   }
 
 type modes = mode loc list
