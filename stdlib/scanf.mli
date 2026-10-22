@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Formatted input functions. *)
 
@@ -102,7 +102,7 @@ open! Stdlib
 
 (** {1 Formatted input channel} *)
 
-module (Scanning @@ nonportable) : sig @@ portable
+module (Scanning @@ stateful) : sig @@ portable
 
 type in_channel
 (** The notion of input channel for the {!Scanf} module:
@@ -256,6 +256,7 @@ exception Scan_failure of string
 (** {1 The general formatted input function} *)
 
 val bscanf : Scanning.in_channel -> ('a, 'b, 'c, 'd) scanner
+  @@ stateful portable
 
 (** [bscanf ic fmt r1 ... rN f] reads characters from the
     {!Scanning.in_channel} formatted input channel [ic] and converts them to
@@ -272,6 +273,7 @@ val bscanf : Scanning.in_channel -> ('a, 'b, 'c, 'd) scanner
 *)
 
 val bscanf_opt : Scanning.in_channel -> ('a, 'b, 'c, 'd) scanner_opt
+  @@ stateful portable
 (** Same as {!Scanf.bscanf}, but returns [None] in case of scanning failure.
 
     @since 5.0 *)
@@ -490,27 +492,27 @@ val bscanf_opt : Scanning.in_channel -> ('a, 'b, 'c, 'd) scanner_opt
 
 (** {1 Specialised formatted input functions} *)
 
-val sscanf : string -> ('a, 'b, 'c, 'd) scanner
+val sscanf : string -> ('a, 'b, 'c, 'd) scanner @@ stateful portable
 (** Same as {!Scanf.bscanf}, but reads from the given string. *)
 
-val sscanf_opt : string -> ('a, 'b, 'c, 'd) scanner_opt
+val sscanf_opt : string -> ('a, 'b, 'c, 'd) scanner_opt @@ stateful portable
 (** Same as {!Scanf.sscanf}, but returns [None] in case of scanning failure.
 
     @since 5.0 *)
 
-val scanf : ('a, 'b, 'c, 'd) scanner @@ nonportable
+val scanf : ('a, 'b, 'c, 'd) scanner @@ stateful
 (** Same as {!Scanf.bscanf}, but reads from the predefined formatted input
     channel {!Scanf.Scanning.stdin} that is connected to {!Stdlib.stdin}.
 *)
 
-val scanf_opt : ('a, 'b, 'c, 'd) scanner_opt @@ nonportable
+val scanf_opt : ('a, 'b, 'c, 'd) scanner_opt @@ stateful
 (** Same as {!Scanf.scanf}, but returns [None] in case of scanning failure.
 
     @since 5.0 *)
 
 val kscanf :
   Scanning.in_channel -> (Scanning.in_channel -> exn -> 'd) ->
-    ('a, 'b, 'c, 'd) scanner
+    ('a, 'b, 'c, 'd) scanner @@ stateful portable
 (** Same as {!Scanf.bscanf}, but takes an additional function argument
     [ef] that is called in case of error: if the scanning process or
     some conversion fails, the scanning function aborts and calls the
@@ -520,7 +522,7 @@ val kscanf :
 
 val ksscanf :
   string -> (Scanning.in_channel -> exn -> 'd) ->
-    ('a, 'b, 'c, 'd) scanner
+    ('a, 'b, 'c, 'd) scanner @@ stateful portable
 (** Same as {!Scanf.kscanf} but reads from the given string.
     @since 4.02 *)
 
@@ -528,7 +530,7 @@ val ksscanf :
 
 val bscanf_format :
   Scanning.in_channel -> ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
-    (('a, 'b, 'c, 'd, 'e, 'f) format6 -> 'g) -> 'g
+    (('a, 'b, 'c, 'd, 'e, 'f) format6 -> 'g) -> 'g @@ stateful portable
 (** [bscanf_format ic fmt f] reads a format string token from the formatted
     input channel [ic], according to the given format string [fmt], and
     applies [f] to the resulting format string value.
@@ -539,7 +541,7 @@ val bscanf_format :
 
 val sscanf_format :
   string -> ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
-    (('a, 'b, 'c, 'd, 'e, 'f) format6 -> 'g) -> 'g
+    (('a, 'b, 'c, 'd, 'e, 'f) format6 -> 'g) -> 'g @@ stateful portable
 (** Same as {!Scanf.bscanf_format}, but reads from the given string.
     @since 3.09
 *)
@@ -547,6 +549,7 @@ val sscanf_format :
 val format_from_string :
   string ->
     ('a, 'b, 'c, 'd, 'e, 'f) format6 -> ('a, 'b, 'c, 'd, 'e, 'f) format6
+  @@ stateful portable
 (** [format_from_string s fmt] converts a string argument to a format string,
     according to the given format string [fmt].
     @raise Scan_failure if [s], considered as a format string, does not
@@ -554,7 +557,7 @@ val format_from_string :
     @since 3.10
 *)
 
-val unescaped : string -> string
+val unescaped : string -> string @@ stateful portable
 (** [unescaped s] return a copy of [s] with escape sequences (according to
     the lexical conventions of OCaml) replaced by their corresponding special
     characters.

@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -25,7 +25,7 @@ open! Stdlib
 
 (** {1:combinators Combinators} *)
 
-external id : ('a : value_or_null) . 'a -> 'a @@ stateless = "%identity"
+external id : ('a : value_or_null) . 'a -> 'a = "%identity"
 (** [id] is the identity function. For any argument [x], [id x] is [x]. *)
 
 val const : ('a : value_or_null) ('b : value_or_null)
@@ -55,6 +55,7 @@ val negate : ('a : value_or_null) . ('a -> bool) -> ('a -> bool)
 
 val protect : ('a : value_or_null).
   finally:(unit -> unit) @ local once -> (unit -> 'a) @ local once -> 'a
+  @@ reading portable
 (** [protect ~finally work] invokes [work ()] and then [finally ()]
     before [work ()] returns with its value or an exception. In the
     latter case the exception is re-raised after [finally ()]. If

@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** Ephemerons and weak hash tables.
 
@@ -149,7 +149,7 @@ end
 (** The output signature of the functors {!K1.MakeSeeded} and {!K2.MakeSeeded}.
 *)
 
-module K1 : sig
+module K1 : sig @@ stateless
   type ('k,'d) t (** an ephemeron with one key *)
 
   val make : 'k -> 'd -> ('k,'d) t
@@ -160,19 +160,23 @@ module K1 : sig
       ephemeron's data) if [key] is physically equal to [eph]'s key, and
       [None] if [eph] is empty or [key] is not equal to [eph]'s key. *)
 
-  module Make (H:Hashtbl.HashedType) : S with type key = H.t
+  module (Make @@ stateful portable)
+    (H:Hashtbl.HashedType) : S with type key = H.t
   (** Functor building an implementation of a weak hash table *)
 
-  module MakePortable (H:sig @@ portable include Hashtbl.HashedType end)
+  module (MakePortable @@ stateful portable)
+    (H:sig @@ portable include Hashtbl.HashedType end)
     : sig @@ portable include S with type key = H.t end
   (** Like {!Make}, but takes a portable [hash] function to
       portable [Ephemeron] operations. *)
 
-  module MakeSeeded (H:Hashtbl.SeededHashedType) : SeededS with type key = H.t
+  module (MakeSeeded @@ stateful portable)
+    (H:Hashtbl.SeededHashedType) : SeededS with type key = H.t
   (** Functor building an implementation of a weak hash table.
       The seed is similar to the one of {!Hashtbl.MakeSeeded}. *)
 
-  module MakeSeededPortable (H:sig @@ portable include Hashtbl.SeededHashedType end)
+  module (MakeSeededPortable @@ stateful portable)
+    (H:sig @@ portable include Hashtbl.SeededHashedType end)
     : sig @@ portable include SeededS with type key = H.t end
   (** Like {!MakeSeeded}, but takes a portable [seeded_hash] function to
       portable [Ephemeron] operations. *)
@@ -205,10 +209,10 @@ module K1 : sig
 
   end
 
-end
+end @@ stateful portable
 (** Ephemerons with one key. *)
 
-module K2 : sig
+module K2 : sig @@ stateless
   type ('k1,'k2,'d) t (** an ephemeron with two keys *)
 
   val make : 'k1 -> 'k2 -> 'd -> ('k1,'k2,'d) t
@@ -217,27 +221,27 @@ module K2 : sig
   val query : ('k1,'k2,'d) t -> 'k1 -> 'k2 -> 'd option
   (** Same as {!Ephemeron.K1.query} *)
 
-  module Make
+  module (Make @@ stateful portable)
       (H1:Hashtbl.HashedType)
       (H2:Hashtbl.HashedType) :
     S with type key = H1.t * H2.t
   (** Functor building an implementation of a weak hash table *)
 
-  module MakePortable
+  module (MakePortable @@ stateful portable)
       (H1:sig @@ portable include Hashtbl.HashedType end)
       (H2:sig @@ portable include Hashtbl.HashedType end) :
     sig @@ portable include S with type key = H1.t * H2.t end
   (** Like {!Make}, but takes portable [hash] functions to
       portable [Ephemeron] operations. *)
 
-  module MakeSeeded
+  module (MakeSeeded @@ stateful portable)
       (H1:Hashtbl.SeededHashedType)
       (H2:Hashtbl.SeededHashedType) :
     SeededS with type key = H1.t * H2.t
   (** Functor building an implementation of a weak hash table.
       The seed is similar to the one of {!Hashtbl.MakeSeeded}. *)
 
-  module MakeSeededPortable
+  module (MakeSeededPortable @@ stateful portable)
       (H1:sig @@ portable include Hashtbl.SeededHashedType end)
       (H2:sig @@ portable include Hashtbl.SeededHashedType end) :
     sig @@ portable include SeededS with type key = H1.t * H2.t end
@@ -272,10 +276,10 @@ module K2 : sig
 
   end
 
-end
+end @@ stateful portable
 (** Ephemerons with two keys. *)
 
-module Kn : sig
+module Kn : sig @@ stateless
   type ('k,'d) t (** an ephemeron with an arbitrary number of keys
                       of the same type *)
 
@@ -285,24 +289,24 @@ module Kn : sig
   val query : ('k,'d) t -> 'k array -> 'd option
   (** Same as {!Ephemeron.K1.query} *)
 
-  module Make
+  module (Make @@ stateful portable)
       (H:Hashtbl.HashedType) :
     S with type key = H.t array
   (** Functor building an implementation of a weak hash table *)
 
-  module MakePortable
+  module (MakePortable @@ stateful portable)
       (H:sig @@ portable include Hashtbl.HashedType end) :
     sig @@ portable include S with type key = H.t array end
   (** Like {!Make}, but takes a portable [hash] function to
       portable [Ephemeron] operations. *)
 
-  module MakeSeeded
+  module (MakeSeeded @@ stateful portable)
       (H:Hashtbl.SeededHashedType) :
     SeededS with type key = H.t array
   (** Functor building an implementation of a weak hash table.
       The seed is similar to the one of {!Hashtbl.MakeSeeded}. *)
 
-  module MakeSeededPortable
+  module (MakeSeededPortable @@ stateful portable)
       (H:sig @@ portable include Hashtbl.SeededHashedType end) :
     sig @@ portable include SeededS with type key = H.t array end
   (** Like {!MakeSeeded}, but takes a portable [seeded_hash] function to
@@ -336,5 +340,5 @@ module Kn : sig
 
   end
 
-end
+end @@ stateful portable
 (** Ephemerons with arbitrary number of keys of the same type. *)

@@ -1,3 +1,5 @@
+@@ stateless
+
 type 'a t = { mutable v : 'a; }
 val make : 'a -> 'a t
 val get : 'a t -> 'a
