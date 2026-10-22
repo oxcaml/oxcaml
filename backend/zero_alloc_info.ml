@@ -11,15 +11,27 @@ module Encoded = struct
     let encode : _ Allocation_sources.t Component.t -> int = function
       | Bot -> 0
       | Safe -> 1
-      | Top (No_allocation_other_than_calling_arguments _) ->
-        (* CR wsturgeon for wsturgeon: encode this information! *)
-        2
+      | Top
+          (No_allocation_other_than_calling_arguments
+             _relevant_components_by_argument_index) ->
+        Misc.fatal_error
+          "(* CR wsturgeon for wsturgeon: TODO *)"
       | Top Allocation_other_than_calling_arguments -> 3
 
-    let decode : int -> unit Allocation_sources.t Component.t = function
+    let decode :
+        int ->
+        Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+      = function
       | 0 -> Bot
       | 1 -> Safe
-      | 2 -> Top (No_allocation_other_than_calling_arguments ())
+      | 2 ->
+        let relevant_components_by_argument_index =
+          Misc.fatal_error
+            "(* CR wsturgeon for wsturgeon: TODO *)"
+        in
+        Top
+          (No_allocation_other_than_calling_arguments
+             relevant_components_by_argument_index)
       | 3 -> Top Allocation_other_than_calling_arguments
       | _ ->
         Misc.fatal_error

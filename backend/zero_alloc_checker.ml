@@ -2129,9 +2129,9 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~resolved:Zero_alloc_utils.(Component.map ~f:(fun _witnesses ->
-        (* CR wsturgeon for wsturgeon: refine this *)
-        Allocation_sources.Allocation_other_than_calling_arguments))
+      ~resolved:Zero_alloc_utils.(
+        Component.map
+          ~f:(fun ({ allocation_sources; _ } : Top.t) -> allocation_sources))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
@@ -2147,11 +2147,8 @@ end = struct
 
   let decode v =
     match Zero_alloc_info.Encoded.Component.decode v with
-    | Top Allocation_other_than_calling_arguments ->
-      V.top ~allocation_sources:Allocation_other_than_calling_arguments
-        ~witnesses:decoded_witnesses
-    | Top (No_allocation_other_than_calling_arguments ()) ->
-      Misc.fatal_error "(* CR wsturgeon for wsturgeon: TODO *)"
+    | Top allocation_sources ->
+      V.top ~allocation_sources ~witnesses:decoded_witnesses
     | Safe -> V.safe
     | Bot -> V.bot
 

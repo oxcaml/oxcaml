@@ -8,12 +8,16 @@ module Encoded : sig
     type t
 
     val encode :
-      Zero_alloc_utils.('args_only Allocation_sources.t Component.t) ->
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t
+          Component.t) ->
       t
 
     val decode :
       t ->
-      Zero_alloc_utils.(unit Allocation_sources.t Component.t)
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t
+          Component.t)
   end
 
   module Components : sig
@@ -36,12 +40,16 @@ module Encoded : sig
 end
 
 val encode :
-  Zero_alloc_utils.('args_only Allocation_sources.t Component.t Components.t) ->
+  Zero_alloc_utils.(
+    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+      Components.t) ->
   Encoded.Components.t
 
 val decode :
   Encoded.Components.t ->
-  Zero_alloc_utils.(unit Allocation_sources.t Component.t Components.t)
+  Zero_alloc_utils.(
+    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+      Components.t)
 
 type t
 
