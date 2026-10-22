@@ -375,6 +375,21 @@ let f (x : t) : float# = magic x
 [%%expect{|
 external magic : ('a : any) ('b : any). 'a -> 'b = "%identity"
   [@@layout_poly]
+Line 3, characters 31-32:
+3 | let f (x : t) : float# = magic x
+                                   ^
+Error: The value "x" has type "t" but an expression was expected of type
+         "('a : float64)"
+       The layout of t is value non_pointer
+         because of the definition of t at line 4, characters 0-18.
+       But the layout of t must be a sublayout of float64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+       Note: The layout of immediate is value non_pointer.
+|}, Principal{|
+external magic : ('a : any) ('b : any). 'a -> 'b = "%identity"
+  [@@layout_poly]
 Line 3, characters 25-32:
 3 | let f (x : t) : float# = magic x
                              ^^^^^^^
