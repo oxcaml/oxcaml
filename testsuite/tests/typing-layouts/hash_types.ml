@@ -277,7 +277,15 @@ type r = { i : int ; mutable s : string }
 type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many dynamic; }
+Line 2, characters 0-81:
+2 | type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type "r#"
+       Fields do not match:
+         "mutable s : string;"
+       is not the same as:
+         "s : string @@ global many dynamic;"
+       The original is mutable and this is not.
 |}]
 
 (* Unboxed versions of records with mutable fields are invariant, and don't
@@ -286,7 +294,12 @@ type 'a r = { mutable x : 'a; y : int }
 type +'a t = 'a r#
 [%%expect{|
 type 'a r = { mutable x : 'a; y : int; }
-type 'a t = 'a r#
+Line 2, characters 0-18:
+2 | type +'a t = 'a r#
+    ^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 type r = { mutable s : int; t : int }
@@ -298,19 +311,25 @@ type r1 = { mutable s1 : int; }
 
 let con (x : r# @ contended) : r# @ uncontended = x
 [%%expect{|
-val con : r# @ contended -> r# = <fun>
+Line 1, characters 50-51:
+1 | let con (x : r# @ contended) : r# @ uncontended = x
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let vis (x : r# @ immutable) : r# @ read_write = x
 [%%expect{|
-val vis : r# @ immutable -> r# = <fun>
+Line 1, characters 49-50:
+1 | let vis (x : r# @ immutable) : r# @ read_write = x
+                                                     ^
+Error: This value is "immutable" but is expected to be "read_write".
 |}]
 
 let loc (x : r# @ local) : r# = x
 let loc1 (x : r1# @ local) : r1# = x
 [%%expect{|
-val loc : r# @ local -> r# = <fun>
-val loc1 : r1# @ local -> r1# = <fun>
+val loc : r# @ local -> r# @ local = <fun>
+val loc1 : r1# @ local -> r1# @ local = <fun>
 |}]
 
 type u : mutable_data & mutable_data = r#

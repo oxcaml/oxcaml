@@ -2680,14 +2680,11 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
       else
         Lprim (Punboxed_product_field (pos, lbl_layouts), [ arg ], loc)
       in
-      let binding_kind, mut =
-        if Types.is_mutable lbl.lbl_mut then
-          fatal_error
-            ("Matching.get_expr_args_record_unboxed_product: "
-             ^ "unboxed record labels are never mutable")
-        else
-          Alias, compose_mut mut Immutable
-      in
+      (* CR zeisbach: Currently, unboxed record fields cannot be mutated.
+         This assumption will change with mutable kinds. When that happens,
+         this code should be reconsidered.
+         (How to make sure we don't forget...?) *)
+      let binding_kind, mut = Alias, compose_mut mut Immutable in
       let lbl_sort =
         Jkind.Sort.default_for_transl_and_get
           (unboxed_label_sort lbl lbl_repres)

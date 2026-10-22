@@ -8238,9 +8238,6 @@ and type_expect_
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
           Unboxed_product lid
       in
-      if Types.is_mutable label.lbl_mut then
-        fatal_error
-          "Typecore.type_expect_: unboxed record labels are never mutable";
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }

@@ -1470,7 +1470,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
       List.map
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
-            ld_mutable = Immutable;
+            ld_mutable = ld.ld_mutable;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
                   are affected by the mutability of the boxed label, even

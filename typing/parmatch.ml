@@ -2408,13 +2408,11 @@ let inactive ~partial pat =
               ldps
         | Tpat_record_unboxed_product (ldps,_,_) ->
             List.for_all
-              (fun (_, lbl, p) ->
-                 match lbl.lbl_mut with
-                 | Immutable -> loop p
-                 | Mutable _ ->
-                   fatal_error
-                     ("Parmatch.inactive: "
-                        ^ "unboxed record labels are never mutable"))
+            (* CR zeisbach: Currently, unboxed record fields cannot be mutated.
+               This assumption will change with mutable kinds. When that
+               happens, this code should be reconsidered.
+               (How to make sure we don't forget...?) *)
+              (fun (_, _lbl, p) -> loop p)
               ldps
         | Tpat_or (p,q,_) ->
             loop p && loop q
