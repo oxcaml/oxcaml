@@ -426,6 +426,26 @@ end = Fst
 module Fst' : sig val fst : 'a * 'b -> 'a end
 |}]
 
+let f ((_, _) : _ * _) = ()
+[%%expect{|
+>> Fatal error: Jkind_types.instance_var: free genvar
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let g ((_, d) : _ * int) = d
+let h x = g x
+[%%expect{|
+>> Fatal error: Jkind_types.instance_var: free genvar
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let f' (#(_, _) : #(_ * _)) = ()
+[%%expect{|
+val f' : #('a * 'b) -> unit = <fun>
+|}]
+
 (** Lowering the type lowers the layout **)
 
 (* We use type constraints, which lower to [global_level],
@@ -446,4 +466,25 @@ Test.f () () 42 "abc"
 [%%expect{|
 module Test : sig val f : unit -> 'a -> 'o -> 'b -> 'b end
 - : string = "abc"
+|}]
+
+(* Intersecting with [any] does not update levels,
+   so we check they are updated regardless. *)
+
+module Test = struct
+  let f (k : ('o : any) -> unit) =
+  let poly_ g _ y z =
+    let id = M.id in
+    M.ignore #(id y, id z);   (* set sorts of x and y equal *)
+    k (y : 'o);               (* lower [y]'s type below the scope of [poly_],
+                                 but because ['o]'s layout is [any] the
+                                 level needs lowering separately *)
+  in
+  g
+end;;
+Test.f (fun _ -> ()) () 1 2
+[%%expect{|
+>> Fatal error: Jkind_types.instance_var: free genvar
+Uncaught exception: Misc.Fatal_error
+
 |}]
