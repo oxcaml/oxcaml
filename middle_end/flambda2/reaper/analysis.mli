@@ -31,19 +31,8 @@ val has_use : 'f solution -> Code_id_or_name.t -> bool
 
 val has_source : 'f solution -> Code_id_or_name.t -> bool
 
-(** Whether the allocation bound to the given variable may be turned into a
-    stack allocation (see [Escape_analysis]). *)
-val is_local_allocation : 'f solution -> Variable.t -> bool
-
-(** Whether the given region scope (the code id of a function, or the dummy
-    variable of a recursive [Let_cont], see [Traverse_env.region_scope])
-    contains at least one allocation for which [is_local_allocation] holds and
-    which will not be unboxed, so that a region must be introduced. *)
-val scope_needs_region : 'f solution -> Code_id_or_name.t -> bool
-
-(** Whether the function is to allocate its result in its caller's region (see
-    [Escape_analysis.returns_local]). *)
-val returns_local : 'f solution -> Code_id.t -> bool
+(** The decisions of the escape analysis (see [Escape_analysis]). *)
+val escape : 'f solution -> Escape_solution.t
 
 val field_used : 'f solution -> Code_id_or_name.t -> Field.t -> bool
 

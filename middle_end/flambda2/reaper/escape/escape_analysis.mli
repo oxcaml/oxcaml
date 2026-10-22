@@ -16,19 +16,30 @@
 
     This is formulated as a few extra Datalog rules on top of the relations
     computed by [Points_to_analysis]: an allocation recorded with
-    [Global_flow_graph.Relations.allocated_in] is "local" if the allocated value
+    [Escape_graph.Relations.allocated_in] is "local" if the allocated value
     cannot flow to a place that outlives the activation of the function
     containing the allocation. *)
 
 (** Whether the analysis is enabled ([-X reaper-escape=1]). *)
 val enabled : unit -> bool
 
-(** Run the escape analysis rules. The database must already contain the results
-    of [Points_to_analysis.perform_analysis] and of
-    [Unboxing_analysis.perform_analysis] (for
-    [cannot_change_calling_convention]). *)
+(** Run the analysis on the database of [Unboxing_analysis.perform_analysis]
+    (whose relations [cannot_change_calling_convention] and [to_unbox] it uses),
+    which must itself have been run on the result of
+    [Points_to_analysis.perform_analysis]. Does nothing when the analysis is
+    disabled (see [enabled]). *)
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> Datalog.database
+  Unboxing_analysis.result ->
+  stats:Datalog.Schedule.stats ->
+  Unboxing_analysis.result
+
+(** Adjust the metadata of a function according to the decisions of the
+    analysis: a function made to return at mode local gets a [result_mode] of
+    kind [Maybe_alloc_stack] (its call sites get a [return_mode] of that kind,
+    see [Escape_rebuild]), and such a function or the code of a local closure
+    gets [nlocal = 1] (see [First_complex_local_param]). *)
+val adjust_code_metadata :
+  Datalog.database -> Code_id.t -> Code_metadata.t -> Code_metadata.t
 
 (** Allocations (variables) that may be turned into stack allocations. *)
 val local_allocation_tbl :
@@ -64,13 +75,3 @@ val local_return_tbl :
     Code_id_or_name.t -> Datalog.nil,
     unit )
   Datalog.table
-
-(** Whether the function is to allocate its result in its caller's region: its
-    code must get [my_alloc_mode] and [result_mode] of kind [Maybe_alloc_stack],
-    and its call sites a [return_mode] of that kind too. *)
-val returns_local : Datalog.database -> Code_id.t -> bool
-
-(** Whether a set of closures containing the given code is made local, in which
-    case the closure information must say so (see [First_complex_local_param]).
-*)
-val is_local_closure_code : Datalog.database -> Code_id.t -> bool

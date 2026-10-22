@@ -220,6 +220,13 @@ let pp_changed_representation ff = function
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
+let cannot_change_calling_convention =
+  rel1 "cannot_change_calling_convention" Cols.[n]
+
+(* The relation above is exposed for [Escape_analysis] under this name, since
+   the name is reused below for a query function. *)
+let cannot_change_calling_convention_relation = cannot_change_calling_convention
+
 let cannot_change_representation0 = rel1 "cannot_change_representation0" Cols.[n]
 
 let cannot_change_representation1 = rel1 "cannot_change_representation1" Cols.[n]
@@ -231,6 +238,10 @@ let cannot_unbox0_tbl = Datalog.create_relation ~name:"cannot_unbox0" Cols.[n]
 let cannot_unbox0 x = cannot_unbox0_tbl % [x]
 
 let cannot_unbox = rel1 "cannot_unbox" Cols.[n]
+
+let to_unbox_tbl = Datalog.create_relation ~name:"to_unbox" Cols.[n]
+
+let to_unbox x = to_unbox_tbl % [x]
 
 let to_change_representation_tbl =
   Datalog.create_relation ~name:"to_change_representation" Cols.[n]
@@ -887,6 +898,12 @@ type code_change =
 
 type code_changes = code_change Code_id.Map.t
 
+let map_code_metadata f code_changes =
+  Code_id.Map.mapi
+    (fun code_id change ->
+      { change with code_metadata = f code_id change.code_metadata })
+    code_changes
+
 let arity_of_decisions params_decisions =
   let arity =
     List.fold_left
@@ -1090,37 +1107,6 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
           ( Changing_calling_convention
               { params_decisions; return_decisions; my_closure_decision },
             code_metadata )
-      in
-      (* Changes decided by the escape analysis (see [Escape_analysis]). A
-         function returning at mode local, or whose closure is allocated
-         locally, has [nlocal = 1] (see [Lambda.curried_function_kind]). *)
-      let code_metadata =
-        let with_nlocal_one code_metadata =
-          match Code_metadata.first_complex_local_param code_metadata with
-          | Never_partially_applied -> code_metadata
-          | Index index ->
-            let num_params =
-              Flambda_arity.num_params
-                (Code_metadata.params_arity code_metadata)
-            in
-            if index >= num_params && num_params > 0
-            then
-              Code_metadata.with_first_complex_local_param
-                (Index (num_params - 1))
-                code_metadata
-            else code_metadata
-        in
-        let code_metadata =
-          if Escape_analysis.returns_local uses.db code_id
-          then
-            with_nlocal_one
-              (Code_metadata.with_result_mode Lambda.maybe_alloc_stack
-                 code_metadata)
-          else code_metadata
-        in
-        if Escape_analysis.is_local_closure_code uses.db code_id
-        then with_nlocal_one code_metadata
-        else code_metadata
       in
       let code_metadata =
         match Code_metadata.result_types code_metadata with

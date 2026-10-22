@@ -20,27 +20,6 @@
     parameters. *)
 type cont_kind = Normal of Variable.t list
 
-(** Where heap allocations may be turned into stack allocations (see
-    [Escape_analysis]):
-
-    - [No_region_scope]: nowhere in the current function, not even in recursive
-      continuation handlers. This is used when the analysis is disabled, and for
-      functions that may allocate their result in the caller's region (such
-      allocations must not happen while an inner region is open).
-
-    - [Toplevel]: not at the current point, but recursive continuation handlers
-      may open their own region scopes. Used for the toplevel of the unit.
-
-    - [Scope scope]: allocations at the current point are candidates, in the
-      region scope named by [scope]: the code id of the enclosing function, or a
-      dummy variable naming a recursive [Let_cont] whose handlers get a region
-      each (so that a function-level region does not grow with every iteration).
-*)
-type region_scope =
-  | No_region_scope
-  | Toplevel
-  | Scope of Code_id_or_name.t
-
 (** Controls whether the reaper preserves direct function calls when the code_id
     being called might otherwise be dead. The typical situation is a call to a
     code_id [f], which has two newer versions [f1] and [f2], and the closure
@@ -73,59 +52,13 @@ val create :
   all_constants:Name.t ->
   function_slots_to_keep:Function_slot.Set.t ->
   value_slots_to_keep:Value_slot.Set.t ->
-  region_scope:region_scope ->
-  return_continuation:Continuation.t ->
-  exn_continuation:Continuation.t ->
+  escape:Escape_env.t ->
   t
 
-(** The region scope in which allocations at the current point are candidates
-    for stack allocation, if any. There is none while a region pre-existing in
-    the term (see [enter_foreign_region]) is open, since allocations would go to
-    that region instead. *)
-val region_scope : t -> Code_id_or_name.t option
+(** The part of the environment used by the escape analysis. *)
+val escape : t -> Escape_env.t
 
-(** All region scopes enclosing the current point, innermost first. *)
-val enclosing_region_scopes : t -> Code_id_or_name.t list
-
-(** The return continuation of the enclosing function (or of the unit, at
-    toplevel): applications returning to it are tail calls. *)
-val return_continuation : t -> Continuation.t
-
-(** The exception continuation of the enclosing function (or of the unit). *)
-val exn_continuation : t -> Continuation.t
-
-(** Enter the handlers of a recursive [Let_cont] whose region scope is named by
-    [scope]. *)
-val enter_recursive_handler : t -> scope:Variable.t -> t
-
-(** Note that the given region, defined by a [Begin_region] or
-    [Begin_try_region] primitive pre-existing in the term (as inserted for
-    [local_] allocations or [try] bodies), is open at the current point. *)
-val enter_foreign_region : t -> Variable.t -> t
-
-(** Note that the given region has been closed by an [End_region] or
-    [End_try_region] primitive. *)
-val exit_foreign_region : t -> Variable.t -> t
-
-(** Note that the given try-region, defined by a [Begin_try_region] primitive,
-    is open at the current point. Unlike the regions above, try-regions are not
-    closed on the normal path, so allocations made while they are open belong to
-    the enclosing region and remain candidates. *)
-val enter_try_region : t -> Variable.t -> t
-
-(** Note that the given try-region has been closed by an [End_try_region]
-    primitive. *)
-val exit_try_region : t -> Variable.t -> t
-
-(** Enter the handler of a continuation with the given parameters. *)
-val enter_handler : t -> params:Variable.t list -> t
-
-(** The parameters of the enclosing continuation handlers that were defined
-    while the given try-region was open: closing that try-region frees
-    everything allocated since it was opened, so no such value may be among the
-    arguments passed to these handlers. *)
-val handler_params_freed_by_end_of_try_region :
-  t -> Variable.t -> Variable.t list
+val with_escape : t -> Escape_env.t -> t
 
 (** The parameters of all continuations currently in scope. *)
 val all_continuation_params : t -> Variable.t list

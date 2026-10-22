@@ -276,18 +276,6 @@ module Relations = struct
 
   let escaping_field = rel2 "escaping_field" Cols.[f; n]
 
-  (* [cannot_change_calling_convention code_id]: not all call sites of the
-     function are known, or some of them are not direct calls. Computed by
-     [Unboxing_analysis], also used by [Escape_analysis]. *)
-  let cannot_change_calling_convention =
-    rel1 "cannot_change_calling_convention" Cols.[n]
-
-  (* [to_unbox x]: the allocation [x] is going to be unboxed. Computed by
-     [Unboxing_analysis], also used by [Escape_analysis]. *)
-  let to_unbox_tbl = Datalog.create_relation ~name:"to_unbox" Cols.[n]
-
-  let to_unbox x = to_unbox_tbl % [x]
-
   let nontop_usages x y = `Only_if ([~~(any_usage x)], usages x y)
 
   let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)

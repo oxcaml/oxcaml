@@ -62,6 +62,14 @@ type my_closure_param_decision =
 
 val print_param_decision : Format.formatter -> param_decision -> unit
 
+(** [cannot_change_calling_convention code_id] means that not all call sites of
+    the function are known direct calls. *)
+val cannot_change_calling_convention_relation :
+  Code_id_or_name.t Datalog.Term.t -> [> `Atom of Datalog.atom]
+
+(** [to_unbox x] means that the allocation [x] is going to be unboxed. *)
+val to_unbox : Code_id_or_name.t Datalog.Term.t -> [> `Atom of Datalog.atom]
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
@@ -78,6 +86,13 @@ type calling_convention_change =
       }
 
 type code_changes
+
+(** Apply the given function to the code metadata of every code id in
+    [code_changes]. *)
+val map_code_metadata :
+  (Code_id.t -> Code_metadata.t -> Code_metadata.t) ->
+  code_changes ->
+  code_changes
 
 val get_calling_convention_change :
   code_changes ->

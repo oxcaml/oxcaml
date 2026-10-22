@@ -165,51 +165,6 @@ val add_zero_alloc_source : t -> Code_id_or_name.t -> unit
 (** Record the [my_closure] variable associated with a code id. *)
 val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
 
-(** Record that [alloc] is a heap allocation in the region scope [scope] which
-    is a candidate for stack allocation. *)
-val add_allocated_in :
-  t -> alloc:Code_id_or_name.t -> scope:Code_id_or_name.t -> unit
-
-(** Record that values flowing into [param] leave the region scope [scope]. *)
-val add_scope_exit : t -> scope:Code_id_or_name.t -> param:Variable.t -> unit
-
-(** Record that no allocation of the given region scope may be made local. *)
-val add_unsafe_scope : t -> Code_id_or_name.t -> unit
-
-(** Record that [result] stands for a return value of the function [scope]. *)
-val add_return_of : t -> scope:Code_id_or_name.t -> result:Variable.t -> unit
-
-(** Record that [result] receives a return value of the known-arity application
-    [call_widget], in region scope [scope]. *)
-val add_call_result :
-  t ->
-  result:Variable.t ->
-  scope:Code_id_or_name.t ->
-  call_widget:Code_id_or_name.t ->
-  unit
-
-(** As [add_call_result], for an application outside of any region scope. *)
-val add_unscoped_call_result : t -> Variable.t -> unit
-
-(** Record that [result] receives a return value of an unknown-arity
-    application. *)
-val add_indirect_call_result : t -> Variable.t -> unit
-
-(** Whether [continuation_info] has been recorded for the given continuation
-    with [is_exn_handler] set. *)
-val is_exn_handler : t -> Continuation.t -> bool
-
-(** Record that a continuation is defined inside the region scope [scope]. *)
-val add_scope_cont : t -> scope:Code_id_or_name.t -> Continuation.t -> unit
-
-(** Whether the given continuation has been recorded, by [add_scope_cont], as
-    defined inside the region scope [scope]. *)
-val scope_contains_continuation :
-  t -> scope:Code_id_or_name.t -> Continuation.t -> bool
-
-(** The continuations defined inside each region scope. *)
-val get_scope_conts : t -> Continuation.Set.t Code_id_or_name.Map.t
-
 (** Convert a [Simple.t] to a dependency graph node. Constants map to the
     [all_constants] node; variables map to themselves; symbols from other
     compilation units are recorded in the [delayed_deps]. *)

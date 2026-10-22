@@ -35,24 +35,25 @@
    loop-carried values escape.
 
    - an argument (or the callee) of a tail call, since the region is closed
-   before the call to keep it a tail call (see [Traverse.traverse_apply]).
+   before the call to keep it a tail call (see [Escape_traverse.record_apply]).
 
    Besides, nothing is done to close regions on exceptional paths: as for the
    regions introduced by the type checker, the handler catching the exception is
    expected to restore the local stack pointer (handlers of try-with have a
    try-region of their own for that purpose, which they close on entry: this
    frees everything allocated in the body of the [try], so values passed to such
-   a handler are treated as leaving the scope, see [Traverse]), or failing that,
-   the next [End_region] of an enclosing region does. This is however not enough
-   for the region of a loop iteration raising to a handler outside of the loop,
-   since an enclosing loop could then accumulate unclosed regions; such scopes
-   are marked [unsafe_scope] and get no local allocations (see [Traverse]).
+   a handler are treated as leaving the scope, see [Escape_traverse]), or
+   failing that, the next [End_region] of an enclosing region does. This is
+   however not enough for the region of a loop iteration raising to a handler
+   outside of the loop, since an enclosing loop could then accumulate unclosed
+   regions; such scopes are marked [unsafe_scope] and get no local allocations
+   (see [Escape_traverse]).
 
    Finally, since an allocation always goes to the innermost region open at
    runtime, no allocation is a candidate while a region pre-existing in the term
    (as introduced by the type checker for [local_] allocations, and closed
    before the enclosing function returns) is open: see
-   [Traverse_env.enter_foreign_region].
+   [Escape_env.enter_foreign_region].
 
    Values that flow into a callee and come back through its result are tracked
    by the aliases created by the points-to analysis for calls, so no special
@@ -65,8 +66,8 @@
    then has to obey the rules of the scope of each call site, which is expressed
    by the [owner] relation. Functions for which this happens are recorded in
    [local_return]: their calling convention is changed so that they return at
-   mode local (see [Unboxing_analysis.compute_code_changes] for the code
-   metadata, and [Rebuild] for the function bodies and call sites).
+   mode local (see [adjust_code_metadata] for the code metadata, and
+   [Escape_rebuild] for the function bodies and call sites).
 
    A partial application of a local closure (through an unknown-arity call)
    yields a closure pointing at it, allocated on the heap by the curry functions
@@ -78,10 +79,17 @@
 
 open Global_flow_graph.Relations
 open Points_to_analysis.Relations
+open Escape_graph.Relations
 open! Datalog_helpers.Syntax
 open Datalog_helpers
 
 let enabled = Oxcaml_args.Extra_options.bool __LOC__ "reaper-escape"
+
+(* Relations computed by [Unboxing_analysis]. *)
+let cannot_change_calling_convention =
+  Unboxing_analysis.cannot_change_calling_convention_relation
+
+let to_unbox = Unboxing_analysis.to_unbox
 
 (* [flow a x]: the value allocated at [a] may be the value of [x]. This is the
    restriction to candidates of the inverse of [sources] (from the points-to
@@ -307,17 +315,48 @@ let is_local_closure_code db code_id =
     (Code_id_or_name.code_id code_id)
     (Datalog.get_table local_closure_code_tbl db)
 
-let perform_analysis db ~stats =
-  Profile.record_call ~accumulate:true "escape_analysis" (fun () ->
-      let run db rules =
-        List.fold_left (fun db rule -> Schedule.run ~stats rule db) db rules
+let perform_analysis (unboxing : Unboxing_analysis.result) ~stats =
+  if not (enabled ())
+  then unboxing
+  else
+    Profile.record_call ~accumulate:true "escape_analysis" (fun () ->
+        let run db rules =
+          List.fold_left (fun db rule -> Schedule.run ~stats rule db) db rules
+        in
+        let db = run unboxing.db candidate_rules in
+        let db =
+          if Flambda_features.reaper_change_calling_conventions ()
+          then db
+          else run db no_calling_convention_change_rules
+        in
+        let db = Schedule.run ~stats flow_rules db in
+        let db = Schedule.run ~stats scope_rules db in
+        { unboxing with db = run db decision_rules })
+
+(* A function returning at mode local, or whose closure is allocated locally,
+   has [nlocal = 1] (see [Lambda.curried_function_kind]). *)
+let adjust_code_metadata db code_id code_metadata =
+  let with_nlocal_one code_metadata =
+    match Code_metadata.first_complex_local_param code_metadata with
+    | Never_partially_applied -> code_metadata
+    | Index index ->
+      let num_params =
+        Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
       in
-      let db = run db candidate_rules in
-      let db =
-        if Flambda_features.reaper_change_calling_conventions ()
-        then db
-        else run db no_calling_convention_change_rules
-      in
-      let db = Schedule.run ~stats flow_rules db in
-      let db = Schedule.run ~stats scope_rules db in
-      run db decision_rules)
+      if index >= num_params && num_params > 0
+      then
+        Code_metadata.with_first_complex_local_param
+          (Index (num_params - 1))
+          code_metadata
+      else code_metadata
+  in
+  let code_metadata =
+    if returns_local db code_id
+    then
+      with_nlocal_one
+        (Code_metadata.with_result_mode Lambda.maybe_alloc_stack code_metadata)
+    else code_metadata
+  in
+  if is_local_closure_code db code_id
+  then with_nlocal_one code_metadata
+  else code_metadata

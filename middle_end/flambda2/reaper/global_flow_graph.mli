@@ -111,55 +111,6 @@ module Relations : sig
     code_id:Code_id_or_name.t term ->
     my_closure:Code_id_or_name.t term ->
     _ atom
-
-  (** [allocated_in ~alloc ~scope] means that [alloc] is a heap allocation
-      (block, boxed number or set of closures) that is a candidate for stack
-      allocation, performed in the region scope [scope]. A region scope is
-      either the body of a function (the scope node is its code id) or the
-      handlers of a recursive [Let_cont] (the scope node is a dummy variable);
-      see [Escape_analysis]. *)
-  val allocated_in :
-    alloc:Code_id_or_name.t term -> scope:Code_id_or_name.t term -> _ atom
-
-  (** [scope_exit ~scope ~param] means that a value flowing into [param] leaves
-      the region scope [scope]: [param] is a parameter of a continuation defined
-      outside of the scope (for a function, the variables standing for its
-      return and exception values). *)
-  val scope_exit :
-    scope:Code_id_or_name.t term -> param:Code_id_or_name.t term -> _ atom
-
-  (** [unsafe_scope scope] means that no allocation in the region scope [scope]
-      may be made local, because the region could not be closed on some path
-      leaving the scope (an exception caught outside of it). *)
-  val unsafe_scope : Code_id_or_name.t term -> _ atom
-
-  (** [return_of ~scope ~result]: [result] stands for a return value of the
-      function whose code id is [scope]. *)
-  val return_of :
-    scope:Code_id_or_name.t term -> result:Code_id_or_name.t term -> _ atom
-
-  (** [call_result ~result ~scope ~call_widget]: [result] receives a return
-      value of the known-arity application modelled by [call_widget], which
-      takes place in region scope [scope]. *)
-  val call_result :
-    result:Code_id_or_name.t term ->
-    scope:Code_id_or_name.t term ->
-    call_widget:Code_id_or_name.t term ->
-    _ atom
-
-  (** Like [call_result] but for an application taking place outside of any
-      region scope. *)
-  val unscoped_call_result : Code_id_or_name.t term -> _ atom
-
-  (** [result] receives a return value of an unknown-arity application. *)
-  val indirect_call_result : Code_id_or_name.t term -> _ atom
-
-  (** [partial_application_node ~node ~code_id]: [node] stands for the closure
-      resulting from a partial application of a function with code [code_id]
-      (see [Traverse_acc.create_unknown_arity_call_witnesses]); such a closure
-      points at the closure being applied. *)
-  val partial_application_node :
-    node:Code_id_or_name.t term -> code_id:Code_id_or_name.t term -> _ atom
 end
 
 val add_alias : graph -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
@@ -204,32 +155,10 @@ val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
-val add_allocated_in :
-  graph -> alloc:Code_id_or_name.t -> scope:Code_id_or_name.t -> unit
-
-val add_scope_exit :
-  graph -> scope:Code_id_or_name.t -> param:Variable.t -> unit
-
-val add_unsafe_scope : graph -> Code_id_or_name.t -> unit
-
-val add_return_of :
-  graph -> scope:Code_id_or_name.t -> result:Variable.t -> unit
-
-val add_call_result :
-  graph ->
-  result:Variable.t ->
-  scope:Code_id_or_name.t ->
-  call_widget:Code_id_or_name.t ->
-  unit
-
-val add_unscoped_call_result : graph -> Variable.t -> unit
-
-val add_indirect_call_result : graph -> Variable.t -> unit
-
-val add_partial_application_node :
-  graph -> node:Code_id_or_name.t -> code_id:Code_id.t -> unit
-
 val create : unit -> graph
+
+(** The facts recorded for the escape analysis (see [Escape_graph]). *)
+val escape : graph -> Escape_graph.t
 
 val add_opaque_let_dependency :
   graph -> to_:Bound_pattern.t -> from:Name_occurrences.t -> unit

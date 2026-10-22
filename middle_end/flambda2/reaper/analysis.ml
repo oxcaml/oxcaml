@@ -34,9 +34,7 @@ type 'f solution =
     types_rewrite_context :
       ('f, Types_rewriter.rewrite_context) Traverse.With_types.t;
     final_typing_env : ('f, typing_env option) Traverse.With_types.t;
-    local_allocations : unit Code_id_or_name.Map.t;
-    scopes_needing_region : unit Code_id_or_name.Map.t;
-    local_returns : unit Code_id_or_name.Map.t
+    escape : Escape_solution.t
   }
 
 let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
@@ -45,12 +43,7 @@ let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
   let db = PTA.perform_analysis datalog ~stats ~analysis_scope in
   let (unboxing : UA.result) = UA.perform_analysis db ~stats ~analysis_scope in
-  let unboxing =
-    if Escape_analysis.enabled ()
-    then
-      { unboxing with db = Escape_analysis.perform_analysis unboxing.db ~stats }
-    else unboxing
-  in
+  let unboxing = Escape_analysis.perform_analysis unboxing ~stats in
   let db = unboxing.db in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
@@ -155,6 +148,9 @@ let solve (type f) (problem : f Traverse.Problem.t)
                ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
+  let code_changes =
+    UA.map_code_metadata (Escape_analysis.adjust_code_metadata db) code_changes
+  in
   let slot_offsets =
     Slot_offsets_analysis.compute ~free_names ~analysis_scope unboxing
   in
@@ -168,25 +164,6 @@ let solve (type f) (problem : f Traverse.Problem.t)
         (Option.map
            (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol)
            final_typing_env)
-  in
-  let local_allocations =
-    Datalog.get_table Escape_analysis.local_allocation_tbl db
-  in
-  (* A region is only needed in scopes where a local allocation survives
-     rebuilding, that is, is not unboxed, or where a function returning at mode
-     local is called. *)
-  let scopes_needing_region =
-    Code_id_or_name.Map.fold
-      (fun alloc () acc ->
-        if Code_id_or_name.Map.mem alloc unboxing.unboxed_fields
-        then acc
-        else
-          List.fold_left
-            (fun acc scope -> Code_id_or_name.Map.add scope () acc)
-            acc
-            (Escape_analysis.scopes_of_allocation db alloc))
-      local_allocations
-      (Datalog.get_table Escape_analysis.scope_with_local_call_result_tbl db)
   in
   { analysis_scope;
     has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
@@ -202,21 +179,10 @@ let solve (type f) (problem : f Traverse.Problem.t)
     slot_offsets;
     types_rewrite_context;
     final_typing_env;
-    local_allocations;
-    scopes_needing_region;
-    local_returns = Datalog.get_table Escape_analysis.local_return_tbl db
+    escape = Escape_solution.create db ~unboxed_fields:unboxing.unboxed_fields
   }
 
-let is_local_allocation solution var =
-  Code_id_or_name.Map.mem (Code_id_or_name.var var) solution.local_allocations
-
-let scope_needs_region solution scope =
-  Code_id_or_name.Map.mem scope solution.scopes_needing_region
-
-let returns_local solution code_id =
-  Code_id_or_name.Map.mem
-    (Code_id_or_name.code_id code_id)
-    solution.local_returns
+let escape solution = solution.escape
 
 let get_unboxed_fields solution cn =
   Code_id_or_name.Map.find_opt cn solution.unboxed_fields
