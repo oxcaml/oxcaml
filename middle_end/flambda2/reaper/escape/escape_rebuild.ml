@@ -158,22 +158,27 @@ let set_local_return_mode t apply =
   let returns_local code_id =
     Escape_solution.returns_local t.solution code_id
   in
+  (* The callee may be given by the call kind, or be one of the functions the
+     callee expression is known to evaluate to (which is how [Rebuild] changes
+     the calling convention of known-arity indirect calls). *)
+  let callee_code_ids_return_local () =
+    match Apply.callee apply with
+    | None -> false
+    | Some callee ->
+      Simple.pattern_match callee
+        ~const:(fun _ -> false)
+        ~name:(fun name ~coercion:_ ->
+          match t.code_ids_directly_called name with
+          | Unknown -> false
+          | Known code_ids -> Code_id.Set.exists returns_local code_ids)
+  in
   let callee_returns_local =
     match Apply.call_kind apply with
-    | Function { function_call = Direct code_id; _ } -> (
-      returns_local code_id
-      ||
-      match Apply.callee apply with
-      | None -> false
-      | Some callee ->
-        Simple.pattern_match callee
-          ~const:(fun _ -> false)
-          ~name:(fun name ~coercion:_ ->
-            match t.code_ids_directly_called name with
-            | Unknown -> false
-            | Known code_ids -> Code_id.Set.exists returns_local code_ids))
-    | Function
-        { function_call = Indirect_known_arity _ | Indirect_unknown_arity; _ }
+    | Function { function_call = Direct code_id; _ } ->
+      returns_local code_id || callee_code_ids_return_local ()
+    | Function { function_call = Indirect_known_arity _; _ } ->
+      callee_code_ids_return_local ()
+    | Function { function_call = Indirect_unknown_arity; _ }
     | Method _ | C_call _ | Effect _ ->
       false
   in
