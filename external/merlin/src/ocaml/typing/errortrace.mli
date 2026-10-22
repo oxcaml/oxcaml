@@ -108,6 +108,9 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Shape_mismatch : type_shape diff -> ('a, _) elt
+      (** A type variable whose ivar holds shape [expected] (from a default)
+          was unified with a type of shape [got]. *)
   | Mode_mismatch :
       arrow_position * Mode.With_locality.error -> ('a, comparison) elt
 

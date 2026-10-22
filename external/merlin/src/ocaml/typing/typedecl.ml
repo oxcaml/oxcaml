@@ -540,7 +540,7 @@ let set_private_row env loc p decl =
         else more
     | Tobject (ty, _) ->
         let r = snd (Ctype.flatten_fields ty) in
-        if not (Btype.is_Tvar r) then
+        if not (Btype.is_row_Tvar r) then
           (* a syntactically open object was closed by a constraint *)
           raise (Error(loc, Invalid_private_row_declaration tm));
         r
@@ -5665,7 +5665,7 @@ let report_error ~loc = function
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
       | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
       | Function_label_mismatch _ | Tuple_label_mismatch _
-      | First_class_module _ -> None
+      | First_class_module _ | Shape_mismatch _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->

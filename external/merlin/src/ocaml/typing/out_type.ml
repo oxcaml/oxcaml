@@ -938,8 +938,15 @@ type type_or_scheme = Type | Type_scheme
 
 let is_non_gen mode ty =
   match mode with
-  | Type_scheme -> is_Tvar ty && get_level ty <> generic_level
-  | Type        -> false
+  | Type_scheme -> (
+    match get_desc ty with
+    | Tvar _ -> get_level ty <> generic_level
+    | Tivar _ -> true
+    | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _
+    | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil
+    | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _
+    | Tpackage _ | Tof_kind _ | Tbox _ -> false)
+  | Type -> false
 
 let nameable_row row =
   row_name row <> None &&
@@ -1452,7 +1459,9 @@ end = struct
 
   let add_named_var tty =
     match tty.desc with
-      Tvar { name = Some name } | Tunivar { name = Some name } ->
+    | Tvar { name = Some name }
+    | Tivar { name = Some name; _ }
+    | Tunivar { name = Some name } ->
         if List.mem name !named_vars then () else
         named_vars := name :: !named_vars
     | _ -> ()
@@ -1463,7 +1472,7 @@ end = struct
     if not (List.memq px !visited_for_named_vars) then begin
       visited_for_named_vars := px :: !visited_for_named_vars;
       match tty.desc with
-      | Tvar _ | Tunivar _ ->
+      | Tvar _ | Tivar _ | Tunivar _ ->
           add_named_var tty
       | _ ->
           printer_iter_type_expr add_named_vars (Fun.const ()) ty
@@ -2405,7 +2414,8 @@ end = struct
       try TransientTypeMap.find t !weak_var_map with Not_found ->
       let name =
         match t.desc with
-          Tvar { name = Some name } | Tunivar { name = Some name } ->
+          Tvar { name = Some name } | Tivar { name = Some name; _ }
+        | Tunivar { name = Some name } ->
             (* Some part of the type we've already printed has assigned another
              * unification variable to that name. We want to keep the name, so
              * try adding a number until we find a name that's not taken. *)
@@ -2524,7 +2534,7 @@ module Aliases = struct
 
   let aliasable ty =
     match get_desc ty with
-      Tvar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
+      Tvar _ | Tivar _ | Tunivar _ | Tpoly _ | Trepr _ -> false
     | Tconstr (p, _, _) -> begin
         match best_type_path_resolution p with
         | Nth _ -> false
@@ -2537,7 +2547,7 @@ module Aliases = struct
     if List.memq px visited && aliasable ty then add_proxy px else
       let visited = px :: visited in
       match get_desc ty with
-      | Tvar _ -> Variable_names.reserve ty
+      | Tvar _ | Tivar _ -> Variable_names.reserve ty
       | Tarrow(_, ty1, ty2, _) ->
           mark_loops_rec visited ty1; mark_loops_rec visited ty2
       | Ttuple tyl | Tunboxed_tuple tyl ->
@@ -2801,7 +2811,7 @@ let rec tree_of_modal_typexp mode modal ty =
   let pr_typ acc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
-    | Tvar _ ->
+    | Tvar _ | Tivar _ ->
         let non_gen = is_non_gen mode ty in
         let name_gen = Variable_names.new_var_name ~non_gen ty in
         Otyp_var (non_gen, Variable_names.name_of_type name_gen tty)
@@ -3406,8 +3416,7 @@ let tree_of_type_decl ?(print_non_value_inferred_jkind = false) id decl =
     let vari =
       List.map2
         (fun ty v ->
-          let is_var = is_Tvar ty in
-          if !Clflags.print_variance || abstr || not is_var then
+          if !Clflags.print_variance || abstr || not (is_param_Tvar ty) then
             let inj =
               !Clflags.print_variance && Variance.mem Inj v ||
               type_kind_is_abstract decl && Variance.mem Inj v &&
@@ -3824,7 +3833,7 @@ let rec prepare_class_type params = function
   | Cty_constr (_p, tyl, cty) ->
       let row = Btype.self_type_row cty in
       if List.memq (proxy row) !Aliases.visited_objects
-      || not (List.for_all is_Tvar params)
+      || not (List.for_all is_param_Tvar params)
       || deep_occur_list row tyl
       then prepare_class_type params cty
       else List.iter prepare_type tyl
@@ -3844,7 +3853,7 @@ let rec tree_of_class_type mode params =
   | Cty_constr (p', tyl, cty) ->
       let row = Btype.self_type_row cty in
       if List.memq (proxy row) !Aliases.visited_objects
-      || not (List.for_all is_Tvar params)
+      || not (List.for_all is_param_Tvar params)
       then
         tree_of_class_type mode params cty
       else
@@ -3908,7 +3917,10 @@ let rec tree_of_class_type mode params =
 
 let tree_of_class_param param variance =
   let ot_variance =
-    if is_Tvar param then Asttypes.(NoVariance, NoInjectivity) else variance in
+    if is_param_Tvar param
+    then Asttypes.(NoVariance, NoInjectivity)
+    else variance
+  in
   (* CR layouts: fix next line when adding support for jkind
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in
@@ -4311,7 +4323,7 @@ let trees_of_type_expansion'
     let out = tree_of_typexp mode ty in
     if var_jkinds then
       match get_desc ty with
-      | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
+      | Tvar { jkind; _ } | Tivar { jkind; _ } | Tunivar { jkind; _ } ->
           let okind = out_jkind_of_desc !printing_env (Jkind.get jkind) in
           Otyp_jkind_annot (out, okind)
       | _ ->
