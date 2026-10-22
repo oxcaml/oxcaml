@@ -48,9 +48,7 @@ let f2_3 (x : int#) =
   y;;
 [%%expect{|
 val f2_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
-val f2_2 :
-  ('a : untagged_immediate).
-    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+val f2_2 : ('a : untagged_immediate). 'a t_untagged_immediate_id -> 'a =
   <fun>
 val f2_3 : int# -> int# = <fun>
 |}];;
@@ -99,9 +97,7 @@ val f4_1 : t_untagged_immediate -> t_untagged_immediate * bool = <fun>
 
 let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
 [%%expect{|
-val f4_2 :
-  ('a : untagged_immediate).
-    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id * bool =
+val f4_2 : ('a : untagged_immediate). 'a t_untagged_immediate_id -> 'a * bool =
   <fun>
 |}];;
 
@@ -309,9 +305,9 @@ Line 1, characters 20-53:
 Error: This expression has type
          "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a value layout
+       The layout of 'a is untagged_immediate
+         because of the definition of make_t_untagged_immediate_id at line 2, characters 33-79.
+       But the layout of 'a must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -339,13 +335,11 @@ let f9_3 () = twice f1_3 (make_intu ());;
 [%%expect{|
 val twice :
   ('a : untagged_immediate).
-    ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) ->
-    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
+    ('a t_untagged_immediate_id -> 'a) -> 'a t_untagged_immediate_id -> 'a =
   <fun>
-val f9_1 : unit -> t_untagged_immediate t_untagged_immediate_id = <fun>
-val f9_2 : ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id =
-  <fun>
-val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
+val f9_1 : unit -> t_untagged_immediate = <fun>
+val f9_2 : ('a : untagged_immediate). unit -> 'a = <fun>
+val f9_3 : unit -> int# = <fun>
 |}];;
 
 (**************************************************)
