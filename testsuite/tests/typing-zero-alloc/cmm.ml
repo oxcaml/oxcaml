@@ -87,7 +87,7 @@ val optional : ?f:('a -> unit) -> 'a -> unit = <fun>
 
 let curse_you_caml_apply f x y = f x y
 [%%expect{|
-camlTOP10__curse_you_caml_apply_17_30_code:
+camlTOP9__curse_you_caml_apply_14_26_code:
 - Some [Symbol G:"caml_apply2"]
 
 val curse_you_caml_apply : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c = <fun>
