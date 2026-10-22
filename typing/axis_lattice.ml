@@ -538,6 +538,12 @@ let sync_data : t =
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
 
+(* An unboxed record has no block of its own, so a mutable label only
+   contributes the axes on which a mutable block exceeds an immutable one.
+   Joining [immutable_data] with the kind of [r#] then gives the kind of
+   [r]. *)
+let mutable_unboxed_label : t = co_sub mutable_data immutable_data
+
 let value : t =
   create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.max ~uniqueness:Mode.Uniqueness.Const.Unique

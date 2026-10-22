@@ -98,6 +98,9 @@ val mutable_data : t
 
 val sync_data : t
 
+(** The contribution of a mutable label to the kind of an unboxed record. *)
+val mutable_unboxed_label : t
+
 val value : t
 
 val arrow : t

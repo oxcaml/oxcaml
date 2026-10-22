@@ -328,8 +328,8 @@ Error: This value is "immutable" but is expected to be "read_write".
 let loc (x : r# @ local) : r# = x
 let loc1 (x : r1# @ local) : r1# = x
 [%%expect{|
-val loc : r# @ local -> r# @ local = <fun>
-val loc1 : r1# @ local -> r1# @ local = <fun>
+val loc : r# @ local -> r# = <fun>
+val loc1 : r1# @ local -> r1# = <fun>
 |}]
 
 type u : mutable_data & mutable_data = r#
@@ -339,26 +339,64 @@ type u = r#
 
 type u : immutable_data & immutable_data = r#
 [%%expect{|
-type u = r#
+Line 1, characters 0-45:
+1 | type u : immutable_data & immutable_data = r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "r#" is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "r#" must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of u at line 1, characters 0-45.
 |}]
 
 type u1 : immutable_data = r1#
 [%%expect{|
-type u1 = r1#
+Line 1, characters 0-30:
+1 | type u1 : immutable_data = r1#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "r1#" is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "r1#" must be a subkind of immutable_data
+         because of the definition of u1 at line 1, characters 0-30.
 |}]
 
 type ('a : immutable_data & immutable_data) p = P
 type x = r# p
 [%%expect{|
 type ('a : immutable_data & immutable_data) p = P
-type x = r# p
+Line 2, characters 9-11:
+2 | type x = r# p
+             ^^
+Error: This type "r#" should be an instance of type
+         "('a : immutable_data & immutable_data)"
+       The kind of r# is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of r# must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of p at line 1, characters 0-49.
 |}]
 
 let f (type a : immutable_data & immutable_data) (x : a) = x
 let g (y : r#) = f y
 [%%expect{|
 val f : ('a : immutable_data & immutable_data). 'a -> 'a = <fun>
-val g : r# -> r# = <fun>
+Line 2, characters 19-20:
+2 | let g (y : r#) = f y
+                       ^
+Error: The value "y" has type "r#" but an expression was expected of type
+         "('a : immutable_data & immutable_data)"
+       The kind of r# is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of r# must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of f at line 1, characters 6-60.
 |}]
 
 module M : sig
@@ -367,7 +405,26 @@ end = struct
   type u = r#
 end
 [%%expect{|
-module M : sig type u : immutable_data & immutable_data end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type u = r#
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type u = r# end
+       is not included in
+         sig type u : immutable_data & immutable_data end
+       Type declarations do not match:
+         type u = r#
+       is not included in
+         type u : immutable_data & immutable_data
+       The kind of the first is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of the first must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of u at line 2, characters 2-42.
 |}]
 
 (*******************)

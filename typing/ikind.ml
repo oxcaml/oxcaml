@@ -1101,12 +1101,19 @@ let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
     Jkind.Sub_failure_reason.t list =
   List.map (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis) axes
 
-let label_mutability_contribution (ctx : Solver.ctx)
+let label_mutability_contribution ~unboxed_product (ctx : Solver.ctx)
     (lbl : Types.label_declaration) =
   match lbl.ld_mutable with
   (* [immediate] is below every base this is summed into, so omitting it keeps
      immutable fields out of the untracked part of a provenance residual. *)
   | Immutable -> Ldd.bot
+  | Mutable { atomic = Atomic; _ } when unboxed_product ->
+    Misc.fatal_error
+      "Ikind.label_mutability_contribution: atomic label in an unboxed record"
+  | Mutable { atomic = Nonatomic; _ } when unboxed_product ->
+    Solver.with_provenance_text ctx
+      (fun () -> "mutable fields")
+      (Ldd.const Axis_lattice.mutable_unboxed_label)
   | Mutable { atomic = Atomic; _ } ->
     Solver.with_provenance_text ctx
       (fun () -> "atomic mutable fields")
@@ -1116,13 +1123,14 @@ let label_mutability_contribution (ctx : Solver.ctx)
       (fun () -> "mutable fields")
       (Ldd.const Axis_lattice.mutable_data)
 
-let sum_record_label_contributions ~(ctx : Solver.ctx) ~(base : Ldd.node)
+let sum_record_label_contributions ?(unboxed_product = false)
+    ~(ctx : Solver.ctx) ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
-        (label_mutability_contribution ctx lbl)
+        (label_mutability_contribution ~unboxed_product ctx lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
 
 let decl_base_provenance (ctx : Solver.ctx) source poly =
@@ -1289,7 +1297,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
         Ldd.const Axis_lattice.immediate
         |> decl_base_provenance ctx "unboxed records"
       in
-      sum_record_label_contributions ~ctx ~base
+      sum_record_label_contributions ~unboxed_product:true ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
         lbls
     | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->

@@ -685,6 +685,26 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
+  ; under_mutable_label : Mode.Modality.Const.t option
+    (* [None] if we have not stepped through a mutable label of an unboxed
+       record. Otherwise [Some m], where [m] is the modality above the
+       outermost such label. Like [modality], [m] is relative to the type the
+       unwrapping started from, so we only know it while descending through
+       all the steps.
+
+       A mutable label stops the original type from crossing contention and
+       visibility, unless a modality above the label hides this. A modality
+       can only make a type cross more, so this can't be folded into
+       [modality]. And [modality] includes the modalities below the label,
+       which only apply to its contents, so we record the modality at the
+       label itself: the kind of the original type is [modality] applied to
+       the kind of [ty], joined with [Axis_lattice.mutable_unboxed_label]
+       masked by [m].
+
+       Only the outermost mutable label matters. Modalities only accumulate,
+       so a label further down is masked by at least as much, and all mutable
+       labels add the same bounds (atomic labels are not allowed in unboxed
+       records). *)
   ; or_null : unwrapped_or_null option;
     (* We store the declaration and arguments rather than a bool to avoid
        re-writing the with-bounds of [or_null], and to be more robust for the
