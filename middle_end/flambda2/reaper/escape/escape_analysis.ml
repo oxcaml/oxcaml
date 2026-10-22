@@ -18,8 +18,8 @@
    reached once control leaves that scope, and is never stored in a block that
    lives on the heap. We follow the allocated value forwards through the [alias]
    relation computed by the points-to analysis (which already accounts for flow
-   through function arguments, results and known block fields), and declare that
-   it escapes if it reaches:
+   through function arguments, results and known block fields), see
+   [candidate_source], and declare that it escapes if it reaches:
 
    - a node with [any_usage] (unknown function, external call, mutation, ...);
 
@@ -91,17 +91,23 @@ let cannot_change_calling_convention =
 
 let to_unbox = Unboxing_analysis.to_unbox
 
-(* [flow a x]: the value allocated at [a] may be the value of [x]. This is the
-   restriction to candidates of the inverse of [sources] (from the points-to
-   analysis), except that it is not cut off at nodes with [any_source]. The
-   points-to analysis does not record the sources of such nodes, nor propagate
-   them any further, since it cannot change their representation anyway; but a
-   value joined with unknown values (for instance in a parameter of a function
-   that is also called with the result of an exported function) may still never
-   leave the scope of its allocation. Reusing [sources], and treating as
-   escaping any value reaching a node with [any_source], was measured to lose
-   about 40% of the stack allocations in the stdlib. *)
-let flow = rel2 "escape_flow" Cols.[n; n]
+(* [candidate_source x a]: the value of [x] may be the value allocated at [a],
+   where [a] is a candidate ([is_candidate]). This is the restriction to
+   candidates of the [sources] relation of the points-to analysis, except that
+   it is not cut off at nodes with [any_source]. The points-to analysis does not
+   record the sources of such nodes, nor propagate them any further, since it
+   cannot change their representation anyway; but a value joined with unknown
+   values (for instance in a parameter of a function that is also called with
+   the result of an exported function) may still never leave the scope of its
+   allocation. Reusing [sources], and treating as escaping any value reaching a
+   node with [any_source], was measured to lose about 40% of the stack
+   allocations in the stdlib.
+
+   The reached node comes first so that the rules below can be joined on it: the
+   variable order of a rule (the order in which its variables are listed) is the
+   nesting order of its loops, and a relation is only iterated on a variable
+   once its preceding columns are bound. *)
+let candidate_source = rel2 "escape_candidate_source" Cols.[n; n]
 
 let is_candidate = rel1 "escape_candidate" Cols.[n]
 
@@ -121,18 +127,25 @@ let owner = rel2 "escape_owner" Cols.[n; n]
    the candidate block allocated at [b]. *)
 let contained_in = rel2 "escape_contained_in" Cols.[n; n]
 
-(* [returned a r]: the value allocated at [a], or a candidate block containing
-   it, may be the value of the function result [r]. *)
+(* [result_of a s]: the value allocated at [a] may be a result of the function
+   [s]; [returned a s]: the same, or a candidate block containing the value may
+   be. *)
+let result_of = rel2 "escape_result_of" Cols.[n; n]
+
 let returned = rel2 "escape_returned" Cols.[n; n]
 
-(* Indexes of input tables in the order needed by the rules below. *)
-let is_function_result = rel1 "escape_is_function_result" Cols.[n]
+(* [reaches_indirect_call_result a] (resp. [reaches_unscoped_call_result a]):
+   the value allocated at [a] may be the result of an unknown-arity application
+   (resp. of an application outside of any region scope). *)
+let reaches_indirect_call_result =
+  rel1 "escape_reaches_indirect_call_result" Cols.[n]
 
+let reaches_unscoped_call_result =
+  rel1 "escape_reaches_unscoped_call_result" Cols.[n]
+
+(* Index of [partial_application_node] in the order needed below. *)
 let partial_application_of_code =
   rel2 "escape_partial_application_of_code" Cols.[n; n]
-
-(* [is_closure_of a c]: the candidate [a] is a closure whose code is [c]. *)
-let is_closure_of = rel2 "escape_closure_of" Cols.[n; n]
 
 let local_allocation_tbl =
   Datalog.create_relation ~name:"local_allocation" Cols.[n]
@@ -160,18 +173,20 @@ let scope_with_local_call_result x = scope_with_local_call_result_tbl % [x]
 
 let candidate_rules =
   saturate_in_order
-    [ (let$ [s; r] = ["s"; "r"] in
-       [return_of ~scope:s ~result:r] ==> is_function_result r);
-      (let$ [q; c] = ["q"; "c"] in
+    [ (let$ [q; c] = ["q"; "c"] in
        [partial_application_node ~node:q ~code_id:c]
        ==> partial_application_of_code c q);
       (let$ [a; s] = ["a"; "s"] in
-       [allocated_in ~alloc:a ~scope:s] ==> and_ [is_candidate a; flow a a]);
-      (let$ [a; wit; c] = ["a"; "wit"; "c"] in
+       [allocated_in ~alloc:a ~scope:s]
+       ==> and_ [is_candidate a; candidate_source a a]);
+      (* A partial application of a candidate closure, through an unknown-arity
+         call, yields a closure pointing at it. *)
+      (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
        [ is_candidate a;
          constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
-         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c ]
-       ==> is_closure_of a c) ]
+         constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
+         partial_application_of_code c q ]
+       ==> candidate_source q a) ]
 
 (* When calling conventions may not be changed, no function may be made to
    return at mode local. *)
@@ -185,24 +200,31 @@ let no_calling_convention_change_rules =
 let flow_rules =
   Schedule.fixpoint
     [ Schedule.saturate
-        [ (let$ [a; x; y] = ["a"; "x"; "y"] in
-           [flow a x; rev_alias ~from:x ~to_:y] ==> flow a y);
-          (let$ [a; c; q] = ["a"; "c"; "q"] in
-           [is_closure_of a c; partial_application_of_code c q] ==> flow a q);
-          (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
-           [ flow a x;
+        [ (let$ [x; y; a] = ["x"; "y"; "a"] in
+           [candidate_source x a; rev_alias ~from:x ~to_:y]
+           ==> candidate_source y a);
+          (let$ [x; relation; base; a] = ["x"; "relation"; "base"; "a"] in
+           [ candidate_source x a;
              rev_constructor ~from:x relation ~base;
              when1 Field.is_real_field relation;
              is_candidate base ]
            ==> contained_in a base);
-          (let$ [a; x] = ["a"; "x"] in
-           [flow a x; any_usage x] ==> escapes_anywhere a);
-          (let$ [a; x; relation; base] = ["a"; "x"; "relation"; "base"] in
-           [ flow a x;
+          (* Reached by unknown code. *)
+          (let$ [x; a] = ["x"; "a"] in
+           [candidate_source x a; any_usage x] ==> escapes_anywhere a);
+          (* Stored in a block that is not a candidate. *)
+          (let$ [x; relation; base; a] = ["x"; "relation"; "base"; "a"] in
+           [ candidate_source x a;
              rev_constructor ~from:x relation ~base;
              when1 Field.is_real_field relation;
              ~~(is_candidate base) ]
            ==> escapes_anywhere a);
+          (let$ [q; a] = ["q"; "a"] in
+           [indirect_call_result q; candidate_source q a]
+           ==> reaches_indirect_call_result a);
+          (let$ [q; a] = ["q"; "a"] in
+           [unscoped_call_result q; candidate_source q a]
+           ==> reaches_unscoped_call_result a);
           (let$ [a; b] = ["a"; "b"] in
            [contained_in a b; escapes_anywhere b] ==> escapes_anywhere a) ] ]
 
@@ -219,54 +241,44 @@ let scope_rules =
            ==> owner a s);
           (let$ [a; b; s] = ["a"; "b"; "s"] in
            [contained_in a b; owner b s; ~~(escapes_anywhere a)] ==> owner a s);
-          (let$ [a; r] = ["a"; "r"] in
-           [flow a r; is_function_result r; ~~(escapes_anywhere a)]
-           ==> returned a r);
-          (let$ [a; b; r] = ["a"; "b"; "r"] in
-           [contained_in a b; returned b r; ~~(escapes_anywhere a)]
-           ==> returned a r);
+          (let$ [s; r; a] = ["s"; "r"; "a"] in
+           [ return_of ~scope:s ~result:r;
+             candidate_source r a;
+             ~~(escapes_anywhere a) ]
+           ==> and_ [result_of a s; returned a s]);
+          (let$ [a; b; s] = ["a"; "b"; "s"] in
+           [contained_in a b; returned b s; ~~(escapes_anywhere a)]
+           ==> returned a s);
           (let$ [a; b] = ["a"; "b"] in
            [contained_in a b; escapes b] ==> escapes a);
-          (let$ [a; s; x] = ["a"; "s"; "x"] in
-           [owner a s; flow a x; scope_exit ~scope:s ~param:x] ==> escapes a);
+          (* Leaving an owning scope. *)
+          (let$ [s; x; a] = ["s"; "x"; "a"] in
+           [scope_exit ~scope:s ~param:x; candidate_source x a; owner a s]
+           ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
            [owner a s; unsafe_scope s] ==> escapes a);
           (* Returned from a function whose calling convention cannot be
              changed. *)
-          (let$ [a; s; r] = ["a"; "s"; "r"] in
-           [ owner a s;
-             flow a r;
-             return_of ~scope:s ~result:r;
-             cannot_change_calling_convention s ]
+          (let$ [a; s] = ["a"; "s"] in
+           [result_of a s; owner a s; cannot_change_calling_convention s]
            ==> escapes a);
           (* Returned to a call site that cannot host a local result. *)
-          (let$ [a; s; r; q] = ["a"; "s"; "r"; "q"] in
-           [ owner a s;
-             flow a r;
-             return_of ~scope:s ~result:r;
-             flow a q;
-             indirect_call_result q ]
+          (let$ [a; s] = ["a"; "s"] in
+           [result_of a s; owner a s; reaches_indirect_call_result a]
            ==> escapes a);
-          (let$ [a; s; r; q] = ["a"; "s"; "r"; "q"] in
-           [ owner a s;
-             flow a r;
-             return_of ~scope:s ~result:r;
-             flow a q;
-             unscoped_call_result q ]
+          (let$ [a; s] = ["a"; "s"] in
+           [result_of a s; owner a s; reaches_unscoped_call_result a]
            ==> escapes a);
           (* Returned to a call site in scope [s']: the value is then also owned
              by [s']. *)
-          (let$ [a; s; r; q; s'; w; wit] =
-             ["a"; "s"; "r"; "q"; "s'"; "w"; "wit"]
-           in
-           [ owner a s;
-             flow a r;
-             return_of ~scope:s ~result:r;
-             ~~(cannot_change_calling_convention s);
-             flow a q;
-             call_result ~result:q ~scope:s' ~call_widget:w;
+          (let$ [q; s'; w; wit; s; a] = ["q"; "s'"; "w"; "wit"; "s"; "a"] in
+           [ call_result ~result:q ~scope:s' ~call_widget:w;
              sources w wit;
-             constructor ~base:wit !!Field.code_id_of_call_witness ~from:s ]
+             constructor ~base:wit !!Field.code_id_of_call_witness ~from:s;
+             ~~(cannot_change_calling_convention s);
+             candidate_source q a;
+             result_of a s;
+             owner a s ]
            ==> owner a s') ] ]
 
 let decision_rules =
@@ -276,12 +288,8 @@ let decision_rules =
        ==> and_ [local_allocation a; scope_with_local_allocation s]);
       (* Unboxed allocations no longer exist, so need no local return (but the
          local allocations they contain may). *)
-      (let$ [a; s; r] = ["a"; "s"; "r"] in
-       [ owner a s;
-         local_allocation a;
-         ~~(to_unbox a);
-         returned a r;
-         return_of ~scope:s ~result:r ]
+      (let$ [a; s] = ["a"; "s"] in
+       [local_allocation a; owner a s; returned a s; ~~(to_unbox a)]
        ==> local_return s);
       (let$ [x; wit; c] = ["x"; "wit"; "c"] in
        [ local_allocation x;
