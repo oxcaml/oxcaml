@@ -161,6 +161,7 @@ let () =
   (* Test constant folding *)
   assert (Smallint.compare (Smallint.unsigned_div #0xFFFFS #1S) #0S < 0);
   assert (Smallint.compare (Smallint.unsigned_rem #0xFFFES #0xFFFFS) #0S < 0);
+  assert (Smallint.equal (Smallint.lognot #1S) (-#2S));
   ()
 
 (* test that the value is stored sign-extended in the register *)

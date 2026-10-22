@@ -420,13 +420,16 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check { strict; opt; arity; partial; loc; custom_error_msg = _ }
+      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+           && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { strict;
           never_returns_normally = false;
           never_raises = false;
-          arity = c.arity;
-          loc = c.loc }
+          arity;
+          partial;
+          loc }
       in
       Builtin_attributes.assume_zero_alloc ~inferred:true assume
     | Check _ | Default_zero_alloc | Ignore_assert_all | Assume _ ->
@@ -2421,15 +2424,17 @@ and transl_function
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc)
-    | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
+    | Check { strict; opt; arity = _; partial; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { strict; loc; custom_error_msg }
+      then Check { strict; loc; custom_error_msg; partial }
       else Default_zero_alloc
     | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
       Assume { strict; never_returns_normally; never_raises; loc }

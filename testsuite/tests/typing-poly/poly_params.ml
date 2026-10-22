@@ -202,6 +202,13 @@ Line 3, characters 15-16:
 3 |   else with_id f
                    ^
 Error: The value "f" has type "('b -> 'b) -> 'c"
+       but an expression was expected of type "('a. 'a -> 'a) -> 'c"
+       The universal variable "'a" would escape its scope
+|}, Principal{|
+Line 3, characters 15-16:
+3 |   else with_id f
+                   ^
+Error: The value "f" has type "('b -> 'b) -> 'c"
        but an expression was expected of type "('a. 'a -> 'a) -> 'd"
        The universal variable "'a" would escape its scope
 |}];;

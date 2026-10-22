@@ -273,8 +273,9 @@ end = struct
     | Punboxed_or_untagged_integer ui ->
       symbol_arg_of_unboxed_or_untagged_integer ui
     | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
-    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
     | Punboxed_mask -> "mask"
+    | Pvoid -> "void"
+    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
     | Ptop | Pbottom | Psplicevar _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
 
@@ -745,7 +746,7 @@ and eval_mixed_block_element :
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
@@ -761,7 +762,7 @@ and eval_layout env layout =
     let new_value_kind = eval_value_kind env old_value_kind in
     if new_value_kind == old_value_kind then layout else Pvalue new_value_kind
   | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _
-  | Punboxed_mask | Pbottom ->
+  | Punboxed_mask | Pvoid | Pbottom ->
     layout
 
 and eval_value_kind env ({ raw_kind = old_raw_kind; nullable } as value_kind) =
@@ -1006,7 +1007,7 @@ exception Found_a_splice
 let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->
@@ -1018,7 +1019,7 @@ let assert_mixed_block_shape_contains_no_splices shape =
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask ->
+  | Punboxed_vector _ | Punboxed_mask | Pvoid ->
     ()
   | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
   | Punboxed_product layouts ->
