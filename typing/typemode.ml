@@ -362,12 +362,7 @@ let address_modalities mut =
   let should_drop (Modality.Atom (ax, _)) =
     List.exists (fun p -> Modality.Axis.compare p (P ax) = 0) dropped_axes
   in
-  let mut =
-    match (mut : Asttypes.mutable_flag) with
-    | Mutable -> true
-    | Immutable -> false
-  in
-  mutable_implied_modalities ~for_mutable_variable:false mut
+  mutable_implied_modalities ~for_mutable_variable:false (Types.is_mutable mut)
   |> List.filter (fun atom -> not (should_drop atom))
   |> modality_of_atoms
 

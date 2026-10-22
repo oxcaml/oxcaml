@@ -1716,10 +1716,7 @@ end = struct
     modal_child modality (Projection.Array_index i) t
 
   let address_load mut t =
-    let modality =
-      Typemode.address_modalities
-        (if Types.is_mutable mut then Mutable else Immutable)
-    in
+    let modality = Typemode.address_modalities mut in
     modal_child modality Projection.Address_load t
 
   let memory_address t = child Projection.Memory_address t

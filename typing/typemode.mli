@@ -53,7 +53,7 @@ val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
 
 (** The modalities of the contents of an address of the given mutability. *)
-val address_modalities : Asttypes.mutable_flag -> Mode.Modality.Const.t
+val address_modalities : Types.mutability -> Mode.Modality.Const.t
 
 (** Similar to [transl_modalities] but takes an explicit [default] modality
     instead of computing it from mutability. Used when merging explicit

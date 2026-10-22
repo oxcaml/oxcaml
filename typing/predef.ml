@@ -1010,7 +1010,9 @@ let decl_of_type_constr type_constr =
        ~jkind:(fun param ->
          builtin Jkind.Const.Builtin.kind_of_addr |>
          Jkind.add_with_bounds
-           ~modality:(Typemode.address_modalities Mutable)
+           ~modality:(Typemode.address_modalities (Mutable {
+             mode = Mode.With_regionality.Comonadic.legacy;
+             atomic = Nonatomic }))
            ~type_expr:param)
        ()
   | `Addr_imm ->
