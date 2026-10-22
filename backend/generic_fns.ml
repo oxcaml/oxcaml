@@ -366,8 +366,11 @@ let compile ~cache ~shared tbl =
   List.concat_map H.curry_function curry_fun
   @ List.map H.send_function send_fun
   @ List.map H.apply_function apply_fun
-  @ if cache then [] else (H.fail_if_called_indirectly_function ()
-                           @ H.emit_divide_by_zero_message ())
+  @
+  if cache
+  then []
+  else
+    H.fail_if_called_indirectly_function () @ H.emit_divide_by_zero_message ()
 
 let imported_units p =
   Partition.Set.to_seq p |> Seq.map Partition.to_cu |> List.of_seq
