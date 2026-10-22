@@ -516,3 +516,46 @@ Line 2, characters 17-24:
 Error: This cannot be marked as stack_, because it is either not a primitive,
        or the primitive does not allocate.
 |}]
+
+(* [stack_] on recursive closures *)
+let f x =
+  let rec g = stack_ (fun n -> if n = 0 then x else g (n - 1)) in
+  let r = g 10 in
+  ignore_local g;
+  r
+[%%expect{|
+Line 2, characters 14-62:
+2 |   let rec g = stack_ (fun n -> if n = 0 then x else g (n - 1)) in
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+let f x =
+  let rec even = stack_ (fun n -> if n = 0 then x else odd (n - 1))
+  and odd = stack_ (fun n -> if n = 0 then not x else even (n - 1)) in
+  let r = even 10 in
+  ignore_local even;
+  ignore_local odd;
+  r
+[%%expect{|
+Line 2, characters 17-67:
+2 |   let rec even = stack_ (fun n -> if n = 0 then x else odd (n - 1))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* All the closures of a [let rec] share a mode, so a single [stack_] makes all
+   of them local. *)
+let f x =
+  let rec even = stack_ (fun n -> if n = 0 then x else odd (n - 1))
+  and odd = fun n -> if n = 0 then not x else even (n - 1) in
+  ref odd
+[%%expect{|
+Line 2, characters 17-67:
+2 |   let rec even = stack_ (fun n -> if n = 0 then x else odd (n - 1))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global".
+|}]
