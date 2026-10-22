@@ -55,17 +55,17 @@ let code inline(never) loopify(never) size(36) newer_version_of(g_2)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let h = closure h_3_1 @h &my_alloc_region &`region`
-   with { unboxed_field_b = b; unboxed_field_a = a }
-   in
-   apply direct(papp_0_1 &my_alloc_region)
-     ($camlEscape_partial_application__papp_6 : _ -> val) (h) -> k3 * k1
-     where k3 (p : val) =
-       apply &my_alloc_region p (2) -> k2 * k1)
-    where k2 (function_return_0_g_2 : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_g_2)
+  let h = closure h_3_1 @h &my_alloc_region &`region`
+  with { unboxed_field_b = b; unboxed_field_a = a }
+  in
+  apply direct(papp_0_1 &my_alloc_region)
+    ($camlEscape_partial_application__papp_6 : _ -> val) (h) -> k2 * k1
+    where k2 (p : val) =
+      (apply &my_alloc_region p (2) -> k2 * k1
+         where k2 (function_return_0_g_2 : imm tagged) =
+           let region_end = %end_region (`region`) in
+           let region_end_1 = %end_ghost_region (ghost_region) in
+           cont k (function_return_0_g_2))
 in
 let $camlEscape_partial_application__g_8 = closure g_2_1 @g &toplevel in
 let code loopify(never) size(13) newer_version_of(h_5)

@@ -59,9 +59,18 @@ val localize_box_number : t -> Bound_var.t -> Flambda.Named.t -> Flambda.Named.t
 val end_regions_before_jump :
   t -> Continuation.t -> Rebuilt_expr.t -> Rebuilt_expr.t
 
-(** Redirect the jump of a [Switch] arm through a continuation closing the
-    regions it leaves, if any. *)
-val redirect_switch_arm : t -> Apply_cont_expr.t -> Apply_cont_expr.t
+(** Continuations closing the regions left by a jump, to be bound around the
+    expression performing the jump with [bind_closers]. *)
+type closers
+
+(** Redirect the arms of a [Switch] jumping to continuations that leave regions
+    through closing continuations, which are returned with the arms. *)
+val redirect_switch_arms :
+  t ->
+  Switch_arm.t Target_ocaml_int.Map.t ->
+  Switch_arm.t Target_ocaml_int.Map.t * closers
+
+val bind_closers : closers -> Rebuilt_expr.t -> Rebuilt_expr.t
 
 (** Rebuild an application with [rebuild], after giving it a local return mode
     if the callee was made to return at mode local, and close the regions left

@@ -2112,15 +2112,13 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
             match rewrite_apply_cont_expr env (Switch_arm.action arm) with
             | None -> None
             | Some action ->
-              let action =
-                Escape_rebuild.redirect_switch_arm env.escape action
-              in
               Some
                 (Switch_arm.create
                    ~annotations:(Switch_arm.annotations arm)
                    action))
           (Switch_expr.arms switch)
       in
+      let arms, closers = Escape_rebuild.redirect_switch_arms env.escape arms in
       if Target_ocaml_int.Map.is_empty arms
       then
         RE.from_expr
@@ -2137,7 +2135,8 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
         in
         let expr = Expr.create_switch switch in
         let free_names = Switch_expr.free_names switch in
-        RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch)
+        Escape_rebuild.bind_closers closers
+          (RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch))
     | Apply apply ->
       Escape_rebuild.rebuild_apply env.escape apply ~rebuild:(rebuild_apply env)
   in

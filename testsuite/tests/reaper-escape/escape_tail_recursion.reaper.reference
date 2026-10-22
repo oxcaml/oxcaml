@@ -33,30 +33,30 @@ and code rec loopify(never) size(35) newer_version_of(pong_2)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let prim = %phys_eq (n, 0) in
-   switch prim
-     | 0 -> k3
-     | 1 -> k2 (acc)
-     where k3 =
-       let p = %block.[`0`].my_alloc_region.local[`region`] (n, 2) in
-       (apply direct(sum_pair_0_1 &my_alloc_region)
-          ($camlEscape_tail_recursion__sum_pair_4 : _ -> imm tagged)
-            (p)
-            -> k3 * k1
-          where k3 (apply_result : imm tagged) =
-            let int_add = %int_barith.add (acc, apply_result) in
-            let int_sub = %int_barith.sub (n, 1) in
-            let region_end = %end_region (`region`) in
-            let region_end_1 = %end_ghost_region (ghost_region) in
-            apply direct(ping_1_1 &my_alloc_region)
-              ($camlEscape_tail_recursion__ping_5 ~ depth my_depth -> succ my_depth
-               : _ -> imm tagged)
-                (int_sub, int_add)
-                -> k * k1))
-    where k2 (function_return_0_pong_2 : imm tagged) =
+  let prim = %phys_eq (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3 (acc)
+    where k3 (function_return_0_pong_2 : imm tagged) =
       let region_end = %end_region (`region`) in
       let region_end_1 = %end_ghost_region (ghost_region) in
       cont k (function_return_0_pong_2)
+    where k2 =
+      let p = %block.[`0`].my_alloc_region.local[`region`] (n, 2) in
+      (apply direct(sum_pair_0_1 &my_alloc_region)
+         ($camlEscape_tail_recursion__sum_pair_4 : _ -> imm tagged)
+           (p)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           let int_add = %int_barith.add (acc, apply_result) in
+           let int_sub = %int_barith.sub (n, 1) in
+           let region_end = %end_region (`region`) in
+           let region_end_1 = %end_ghost_region (ghost_region) in
+           apply direct(ping_1_1 &my_alloc_region)
+             ($camlEscape_tail_recursion__ping_5 ~ depth my_depth -> succ my_depth
+              : _ -> imm tagged)
+               (int_sub, int_add)
+               -> k * k1)
 and code rec loopify(never) size(35) newer_version_of(ping_1)
       ping_1_1 (n : imm tagged, acc : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -64,30 +64,30 @@ and code rec loopify(never) size(35) newer_version_of(ping_1)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let prim = %phys_eq (n, 0) in
-   switch prim
-     | 0 -> k3
-     | 1 -> k2 (acc)
-     where k3 =
-       let p = %block.[`0`].my_alloc_region.local[`region`] (n, 1) in
-       (apply direct(sum_pair_0_1 &my_alloc_region)
-          ($camlEscape_tail_recursion__sum_pair_4 : _ -> imm tagged)
-            (p)
-            -> k3 * k1
-          where k3 (apply_result : imm tagged) =
-            let int_add = %int_barith.add (acc, apply_result) in
-            let int_sub = %int_barith.sub (n, 1) in
-            let region_end = %end_region (`region`) in
-            let region_end_1 = %end_ghost_region (ghost_region) in
-            apply direct(pong_2_1 &my_alloc_region)
-              ($camlEscape_tail_recursion__pong_6 ~ depth my_depth -> succ my_depth
-               : _ -> imm tagged)
-                (int_sub, int_add)
-                -> k * k1))
-    where k2 (function_return_0_ping_1 : imm tagged) =
+  let prim = %phys_eq (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3 (acc)
+    where k3 (function_return_0_ping_1 : imm tagged) =
       let region_end = %end_region (`region`) in
       let region_end_1 = %end_ghost_region (ghost_region) in
       cont k (function_return_0_ping_1)
+    where k2 =
+      let p = %block.[`0`].my_alloc_region.local[`region`] (n, 1) in
+      (apply direct(sum_pair_0_1 &my_alloc_region)
+         ($camlEscape_tail_recursion__sum_pair_4 : _ -> imm tagged)
+           (p)
+           -> k2 * k1
+         where k2 (apply_result : imm tagged) =
+           let int_add = %int_barith.add (acc, apply_result) in
+           let int_sub = %int_barith.sub (n, 1) in
+           let region_end = %end_region (`region`) in
+           let region_end_1 = %end_ghost_region (ghost_region) in
+           apply direct(pong_2_1 &my_alloc_region)
+             ($camlEscape_tail_recursion__pong_6 ~ depth my_depth -> succ my_depth
+              : _ -> imm tagged)
+               (int_sub, int_add)
+               -> k * k1)
 in
 apply direct(ping_1_1 &toplevel)
   ($camlEscape_tail_recursion__ping_5 : _ -> imm tagged)

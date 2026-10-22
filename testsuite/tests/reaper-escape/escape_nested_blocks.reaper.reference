@@ -33,12 +33,12 @@ let code inline(never) loopify(never) size(21) newer_version_of(f_1)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let inner = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
-   let outer = %block.[`0`].my_alloc_region.local[`region`] (inner, z) in
-   apply direct(sum_nested_0_1 &my_alloc_region)
-     ($camlEscape_nested_blocks__sum_nested_4 : _ -> imm tagged)
-       (outer)
-       -> k2 * k1)
+  let inner = %block.[`0`].my_alloc_region.local[`region`] (x, y) in
+  let outer = %block.[`0`].my_alloc_region.local[`region`] (inner, z) in
+  apply direct(sum_nested_0_1 &my_alloc_region)
+    ($camlEscape_nested_blocks__sum_nested_4 : _ -> imm tagged)
+      (outer)
+      -> k2 * k1
     where k2 (function_return_0_f_1 : imm tagged) =
       let region_end = %end_region (`region`) in
       let region_end_1 = %end_ghost_region (ghost_region) in

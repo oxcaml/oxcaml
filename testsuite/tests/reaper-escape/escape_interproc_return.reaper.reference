@@ -42,16 +42,16 @@ let code inline(never) loopify(never) size(11) newer_version_of(f_2)
   apply direct(mk_1_1 &my_alloc_region &`region` &ghost_region)
     ($camlEscape_interproc_return__mk_5 : _ -> [ 0 of val * val ])
       (x, y)
-      -> k3 * k1
-    where k3 (p : [ 0 of imm tagged * imm tagged ]) =
-      apply direct(sum_pair_0_1 &my_alloc_region)
-        ($camlEscape_interproc_return__sum_pair_4 : _ -> imm tagged)
-          (p)
-          -> k2 * k1
-    where k2 (function_return_0_f_2 : imm tagged) =
-      let region_end = %end_region (`region`) in
-      let region_end_1 = %end_ghost_region (ghost_region) in
-      cont k (function_return_0_f_2)
+      -> k2 * k1
+    where k2 (p : [ 0 of imm tagged * imm tagged ]) =
+      (apply direct(sum_pair_0_1 &my_alloc_region)
+         ($camlEscape_interproc_return__sum_pair_4 : _ -> imm tagged)
+           (p)
+           -> k2 * k1
+         where k2 (function_return_0_f_2 : imm tagged) =
+           let region_end = %end_region (`region`) in
+           let region_end_1 = %end_ghost_region (ghost_region) in
+           cont k (function_return_0_f_2))
 in
 let $camlEscape_interproc_return__f_6 = closure f_2_1 @f &toplevel in
 let $camlEscape_interproc_return__Pmakeblock_7 =

@@ -51,34 +51,34 @@ let code inline(never) loopify(never) size(46) newer_version_of(f_1)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  (let int_add = %int_barith.add (x, 11) in
-   let int_add_1 = %int_barith.add (x, 10) in
-   let int_add_2 = %int_barith.add (x, 9) in
-   let int_add_3 = %int_barith.add (x, 8) in
-   let int_add_4 = %int_barith.add (x, 7) in
-   let int_add_5 = %int_barith.add (x, 6) in
-   let int_add_6 = %int_barith.add (x, 5) in
-   let int_add_7 = %int_barith.add (x, 4) in
-   let int_add_8 = %int_barith.add (x, 3) in
-   let int_add_9 = %int_barith.add (x, 2) in
-   let int_add_10 = %int_barith.add (x, 1) in
-   let r =
-     %block.[`0`].my_alloc_region.local[`region`]
-       (x,
-        int_add_10,
-        int_add_9,
-        int_add_8,
-        int_add_7,
-        int_add_6,
-        int_add_5,
-        int_add_4,
-        int_add_3,
-        int_add_2,
-        int_add_1,
-        int_add)
-   in
-   apply direct(sum_0_1 &my_alloc_region)
-     ($camlEscape_big_record__sum_4 : _ -> imm tagged) (r) -> k2 * k1)
+  let int_add = %int_barith.add (x, 11) in
+  let int_add_1 = %int_barith.add (x, 10) in
+  let int_add_2 = %int_barith.add (x, 9) in
+  let int_add_3 = %int_barith.add (x, 8) in
+  let int_add_4 = %int_barith.add (x, 7) in
+  let int_add_5 = %int_barith.add (x, 6) in
+  let int_add_6 = %int_barith.add (x, 5) in
+  let int_add_7 = %int_barith.add (x, 4) in
+  let int_add_8 = %int_barith.add (x, 3) in
+  let int_add_9 = %int_barith.add (x, 2) in
+  let int_add_10 = %int_barith.add (x, 1) in
+  let r =
+    %block.[`0`].my_alloc_region.local[`region`]
+      (x,
+       int_add_10,
+       int_add_9,
+       int_add_8,
+       int_add_7,
+       int_add_6,
+       int_add_5,
+       int_add_4,
+       int_add_3,
+       int_add_2,
+       int_add_1,
+       int_add)
+  in
+  apply direct(sum_0_1 &my_alloc_region)
+    ($camlEscape_big_record__sum_4 : _ -> imm tagged) (r) -> k2 * k1
     where k2 (function_return_0_f_1 : imm tagged) =
       let region_end = %end_region (`region`) in
       let region_end_1 = %end_ghost_region (ghost_region) in

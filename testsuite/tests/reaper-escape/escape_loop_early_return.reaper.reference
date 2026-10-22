@@ -85,7 +85,7 @@ let code inline(never) loopify(never) size(63) newer_version_of(find_1)
 in
 let $camlEscape_loop_early_return__find_8 = closure find_1_1 @find &toplevel
 in
-let code loopify(done) size(50) newer_version_of(loop_4)
+let code loopify(done) size(52) newer_version_of(loop_4)
       loop_4_1 (i : imm tagged, acc : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -94,46 +94,48 @@ let code loopify(done) size(50) newer_version_of(loop_4)
     where rec `self` (i_1 : imm tagged, acc_1 : imm tagged) =
       let `region` = %begin_region () in
       let ghost_region = %begin_ghost_region () in
-      ((let n = %project_value_slot.[loop_1].[unboxed_field_n_1] (my_closure)
-        in
-        let prim = %int_comp.gt (i_1, n) in
-        switch prim
-          | 0 -> k3
-          | 1 -> k2 (acc_1)
-          where k3 =
-            let p = %block.[`0`].my_alloc_region.local[`region`] (i_1, i_1)
-            in
-            (apply direct(sum_pair_0_1 &my_alloc_region)
-               ($camlEscape_loop_early_return__sum_pair_7 : _ -> imm tagged)
-                 (p)
-                 -> k3 * k1
-               where k3 (apply_result : imm tagged) =
-                 let prim_1 = %int_comp.gt (apply_result, 1000) in
-                 (switch prim_1
-                    | 0 -> k3
-                    | 1 -> k2 (acc_1)
-                    where k3 =
-                      (apply direct(sum_pair_0_1 &my_alloc_region)
-                         ($camlEscape_loop_early_return__sum_pair_7
-                          : _ -> imm tagged)
-                           (p)
-                           -> k3 * k1
-                         where k3 (apply_result_1 : imm tagged) =
-                           let int_add =
-                             %int_barith.add (acc_1, apply_result_1)
-                           in
-                           let int_add_1 = %int_barith.add (i_1, 1) in
-                           let region_end = %end_region (`region`) in
-                           let region_end_1 =
-                             %end_ghost_region (ghost_region)
-                           in
-                           cont `self` (int_add_1, int_add)))))
-         where k2 (function_return_0_loop_4 : imm tagged) =
+      let n = %project_value_slot.[loop_1].[unboxed_field_n_1] (my_closure)
+      in
+      let prim = %int_comp.gt (i_1, n) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3 (acc_1)
+         where k3 (function_return_0_loop_4 : imm tagged) =
            let region_end = %end_region (`region`) in
            let region_end_1 = %end_ghost_region (ghost_region) in
-           cont k (function_return_0_loop_4))
+           cont k (function_return_0_loop_4)
+         where k2 =
+           let p = %block.[`0`].my_alloc_region.local[`region`] (i_1, i_1) in
+           (apply direct(sum_pair_0_1 &my_alloc_region)
+              ($camlEscape_loop_early_return__sum_pair_7 : _ -> imm tagged)
+                (p)
+                -> k2 * k1
+              where k2 (apply_result : imm tagged) =
+                let prim_1 = %int_comp.gt (apply_result, 1000) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3 (acc_1)
+                   where k3 (function_return_0_loop_4 : imm tagged) =
+                     let region_end = %end_region (`region`) in
+                     let region_end_1 = %end_ghost_region (ghost_region) in
+                     cont k (function_return_0_loop_4)
+                   where k2 =
+                     (apply direct(sum_pair_0_1 &my_alloc_region)
+                        ($camlEscape_loop_early_return__sum_pair_7
+                         : _ -> imm tagged)
+                          (p)
+                          -> k2 * k1
+                        where k2 (apply_result_1 : imm tagged) =
+                          let int_add =
+                            %int_barith.add (acc_1, apply_result_1)
+                          in
+                          let int_add_1 = %int_barith.add (i_1, 1) in
+                          let region_end = %end_region (`region`) in
+                          let region_end_1 = %end_ghost_region (ghost_region)
+                          in
+                          cont `self` (int_add_1, int_add)))))
 in
-let code inline(never) loopify(never) size(63) newer_version_of(count_3)
+let code inline(never) loopify(never) size(65) newer_version_of(count_3)
       count_3_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
