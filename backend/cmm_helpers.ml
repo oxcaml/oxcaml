@@ -2437,14 +2437,14 @@ let set_field_unboxed ~dbg memory_chunk block ~index_in_words newval =
 let string_length exp dbg =
   bind "str" exp (fun str ->
       let tmp_var = V.create_local "tmp" in
+      (* A string header never has reserved (mixed-block) bits set, so the size
+         can be read from the unmasked header. *)
+      let size = lsr_const (get_header str dbg) 10 dbg in
       Clet
         ( VP.create tmp_var,
           Cop
             ( Csubi,
-              [ Cop
-                  ( Clsl,
-                    [get_size str dbg; Cconst_int (log2_size_addr, dbg)],
-                    dbg );
+              [ Cop (Clsl, [size; Cconst_int (log2_size_addr, dbg)], dbg);
                 Cconst_int (1, dbg) ],
               dbg ),
           Cop
@@ -2589,6 +2589,7 @@ module Extended_machtype = struct
       typ_any_int
     | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int
     | Pvalue _ -> typ_val
+    | Pvoid -> [||]
     | Punboxed_product fields -> Array.concat (List.map of_layout fields)
 end
 

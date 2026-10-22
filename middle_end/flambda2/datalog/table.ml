@@ -13,45 +13,48 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Datalog_imports
+
 module Int = struct
   include Numbers.Int
   module Tree = Patricia_tree.Make (Numbers.Int)
   module Map = Tree.Map
 end
 
-type _ result_repr = Unit_repr : unit result_repr
+type _ result_repr =
+  | Unit_repr : unit result_repr
+  | Lattice_repr :
+      { print : Format.formatter -> 'a -> unit;
+        meet : 'a -> 'a -> 'a;
+        diff_or_null : 'a -> 'a -> 'a Or_null.t
+      }
+      -> 'a result_repr
 
 let unit_repr = Unit_repr
 
+let lattice_repr ~print ~meet ~diff_or_null =
+  Lattice_repr { print; meet; diff_or_null }
+
 let result_repr_print (type t) (repr : t result_repr) :
     Format.formatter -> t -> unit =
-  let Unit_repr = repr in
-  fun ppf () -> Format.fprintf ppf "()"
-
-let result_repr_default_value (type t) (repr : t result_repr) : t =
-  match repr with Unit_repr -> ()
+  match repr with
+  | Unit_repr -> fun ppf () -> Format.fprintf ppf "()"
+  | Lattice_repr { print; _ } -> print
 
 let result_repr_union (type t) (repr : t result_repr) : t -> t -> t =
-  match repr with Unit_repr -> fun () () -> ()
+  match repr with
+  | Unit_repr -> fun () () -> ()
+  | Lattice_repr { meet; _ } -> meet
 
 let result_repr_diff_or_null (type t) (repr : t result_repr) :
     t -> t -> t Or_null.t =
-  match repr with Unit_repr -> fun () () -> Or_null.null
+  match repr with
+  | Unit_repr -> fun () () -> Or_null.null
+  | Lattice_repr { diff_or_null; _ } -> diff_or_null
 
-let rec union : type t k v.
-    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t =
- fun columns repr t1 t2 ->
-  match columns with
-  | [] -> result_repr_union repr t1 t2
-  | column :: columns -> Column.union_total column (union columns repr) t1 t2
-
-let rec diff_or_null : type t k v.
-    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t Or_null.t =
- fun columns repr t1 t2 ->
-  match columns with
-  | [] -> result_repr_diff_or_null repr t1 t2
-  | column :: columns ->
-    Column.diff_or_null column (diff_or_null columns repr) t1 t2
+let result_repr_is_unit (type v) (repr : v result_repr) :
+    (v, unit) Type.eq option =
+  match repr with Unit_repr -> Some Equal | Lattice_repr _ -> None
 
 let rec concat : type t k v. (t, k, v) Column.hlist -> earlier:t -> later:t -> t
     =
@@ -67,13 +70,10 @@ module Id = struct
   type (!'t, !'k, !'v) t =
     { id : ('t * 'k) Type.Id.t;
       name : string;
-      is_trie : ('t, 'k, 'v) Trie.is_trie;
       columns : ('t, 'k, 'v) Column.hlist;
       result_repr : 'v result_repr;
       provenance : bool
     }
-
-  let is_trie { is_trie; _ } = is_trie
 
   let name { name; _ } = name
 
@@ -101,20 +101,11 @@ module Id = struct
     compare (Type.Id.uid id1) (Type.Id.uid id2)
 
   let create ~provenance ~name ~columns ~result_repr =
-    (* Store the [is_trie] value in order to avoid a double loop to create it
-       when it is used. *)
-    (* CR bclement: most iterations on [is_trie] could probably be replaced with
-       iterations on [columns] instead, at which point we could get rid of
-       [is_trie] entirely. *)
-    let is_trie = Column.is_trie columns in
-    { id = Type.Id.make (); name; is_trie; columns; result_repr; provenance }
+    { id = Type.Id.make (); name; columns; result_repr; provenance }
 
   let has_provenance { provenance; _ } = provenance
 
   let[@inline] result_repr { result_repr; _ } = result_repr
-
-  let[@inline] default_value { result_repr; _ } =
-    result_repr_default_value result_repr
 
   let[@inline] columns { columns; _ } = columns
 
@@ -125,11 +116,114 @@ module Id = struct
     match Type.Id.provably_equal r1.id r2.id with
     | Some Equal -> t
     | None -> Misc.fatal_error "Inconsistent type for uid."
+
+  module Map = struct
+    module type S = sig
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type t
+
+      type 'a elt
+
+      type binding = B : ('t, 'k, 'v) id * 't elt -> binding
+
+      val empty : t
+
+      val singleton : ('t, 'k, 'v) id -> 't elt -> t
+
+      val add : ('t, 'k, 'v) id -> 't elt -> t -> t
+
+      val remove : ('t, 'k, 'v) id -> t -> t
+
+      val find : ('t, 'k, 'v) id -> t -> 't elt
+
+      val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
+
+      val iter : (binding -> unit) -> t -> unit
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) =
+    struct
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt = 'a T.t
+
+      type binding = B : ('t, 'k, 'v) id * 't elt -> binding
+
+      type t = binding Int.Map.t
+
+      let empty = Int.Map.empty
+
+      let singleton key elt = Int.Map.singleton (uid key) (B (key, elt))
+
+      let add key elt t = Int.Map.add (uid key) (B (key, elt)) t
+
+      let remove key t = Int.Map.remove (uid key) t
+
+      let find (type t k v) (key : (t, k, v) id) t : t elt =
+        let (B (key', elt)) = Int.Map.find (uid key) t in
+        let Equal = provably_equal_exn key key' in
+        elt
+
+      let fold f t acc = Int.Map.fold (fun _ binding acc -> f binding acc) t acc
+
+      let iter f t = Int.Map.iter (fun _ binding -> f binding) t
+    end
+
+    module Or_null_sender = Make (Or_null_sender)
+    module Or_null_receiver = Make (Or_null_receiver)
+  end
+
+  module Tbl = struct
+    module type S = sig
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt
+
+      type binding = B : ('a, _, _) id * 'a elt -> binding
+
+      type t
+
+      val create : int -> t
+
+      val replace : t -> ('t, 'k, 'v) id -> 't elt -> unit
+
+      val find : t -> ('t, 'k, 'v) id -> 't elt
+
+      val iter : (binding -> unit) -> t -> unit
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) =
+    struct
+      type ('t, 'k, 'v) id = ('t, 'k, 'v) t
+
+      type 'a elt = 'a T.t
+
+      type binding = B : ('a, _, _) t * 'a elt -> binding
+
+      type t = binding Int.Tbl.t
+
+      let create n = Int.Tbl.create n
+
+      let replace t id elt = Int.Tbl.replace t (uid id) (B (id, elt))
+
+      let find (type t k v) t (id : (t, k, v) id) : t elt =
+        let (B (id', elt)) = Int.Tbl.find t (uid id) in
+        let Equal = provably_equal_exn id id' in
+        elt
+
+      let iter f t = Int.Tbl.iter (fun _ binding -> f binding) t
+    end
+  end
 end
 
 let iter id f table =
-  let is_trie = Id.is_trie id in
-  Trie.iter is_trie f table
+  let columns = Id.columns id in
+  Column.iter_hlist columns f table
 
 let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
   let first = ref true in
@@ -139,12 +233,18 @@ let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
       pp_row keys value)
     table
 
-let print_table (id : (_, _, _) Id.t) ppf table =
+let print_table (type t k v) (id : (t, k, v) Id.t) ppf table =
+  let repr = Id.result_repr id in
+  let print_value ppf value =
+    match result_repr_is_unit repr with
+    | None -> Format.fprintf ppf " =@ %a" (result_repr_print repr) value
+    | Some Equal -> ()
+  in
   Format.fprintf ppf "@[<v>%a@]"
-    (print id (fun keys _ ->
-         Format.fprintf ppf "@[%a(%a).@]" Id.print id
+    (print id (fun keys value ->
+         Format.fprintf ppf "@[%a(%a)%a.@]" Id.print id
            (Column.print_keys id.columns)
-           keys))
+           keys print_value value))
     table
 
 let print id ppf table =
@@ -168,13 +268,21 @@ module Map = struct
       tables;
     Format.fprintf ppf "@]"
 
-  let get (type t k v) (id : (t, k, v) Id.t) tables : t =
+  let get_or_null (type t k v) (id : (t, k, v) Id.t) tables : t Or_null.t =
     match Int.Map.find_opt (Id.uid id) tables with
-    | Some (Binding (existing_id, table)) -> Id.cast_exn existing_id id table
-    | None -> Trie.empty (Id.is_trie id)
+    | Some (Binding (existing_id, table)) ->
+      Or_null.this (Id.cast_exn existing_id id table)
+    | None -> Or_null.null
 
   let set (type t k v) (id : (t, k, v) Id.t) (table : t) tables =
-    Int.Map.add (Id.uid id) (Binding (id, table)) tables
+    if Column.is_empty_hlist (Id.columns id) table
+    then Int.Map.remove (Id.uid id) tables
+    else Int.Map.add (Id.uid id) (Binding (id, table)) tables
+
+  let set_or_null id (table : _ Or_null.t) tables =
+    match table with
+    | Null -> Int.Map.remove (Id.uid id) tables
+    | This table -> set id table tables
 
   let empty = Int.Map.empty
 
@@ -191,4 +299,10 @@ module Map = struct
       tables1 tables2
 
   let fold ~f m ~init = Int.Map.fold (fun _ binding acc -> f binding acc) m init
+
+  let send t senders =
+    Int.Map.iter
+      (fun _ (Id.Map.Or_null_sender.B (tid, sender)) ->
+        Channel.send_or_null sender (get_or_null tid t))
+      senders
 end
