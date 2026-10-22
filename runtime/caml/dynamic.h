@@ -88,8 +88,8 @@ extern void caml_dynamic_cache_delete(dynamic_cache_t);
    Called by [st_stubs.c] upon switching threads. */
 extern void caml_dynamic_cache_enter_thread(dynamic_cache_t);
 
-/* Clear a dynamic cache.
-   Called upon switching fibers or when the parent of the current fiber changes. */
+/* Clear a dynamic cache. Typically called via [caml_fiber_switched] upon
+   switching fibers. */
 extern void caml_dynamic_cache_flush(dynamic_cache_t);
 
 /* Apply a GC scanning action to all bindings in a dynamic cache. */
