@@ -1747,7 +1747,8 @@ module Jkind0 = struct
               { nullability = Maybe_null; separability = Maybe_separable };
             base Bits64 Scannable_axes.max ]
 
-      (* Addresses cross like records with a field of the same mutability. *)
+      (* Addresses have the same modal base kind as a record with a field of the same
+         mutability. *)
       let kind_of_addr =
         { jkind =
             { base = Layout addr_layout;
