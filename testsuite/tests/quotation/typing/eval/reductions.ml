@@ -65,6 +65,13 @@ val f : <[string]> expr -> string = <fun>
 
 let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
 [%%expect {|
+Line 1, characters 41-42:
+1 | let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
+                                             ^
+Error: The value "x" has type "<[int]> expr"
+       but an expression was expected of type "<[string]> expr"
+       Type "int" is not compatible with type "string"
+|}, Principal{|
 Line 1, characters 36-42:
 1 | let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
                                         ^^^^^^
@@ -449,6 +456,7 @@ Line 1, characters 42-43:
                                               ^
 Error: The value "x" has type "<[<[int]>]> eval eval"
        but an expression was expected of type "int"
+       Type "$(<[<[int]>]> eval)" is not compatible with type "int"
 |}]
 let f (x : <[ <[ <[int]> ]> ]> eval eval eval) : int = x
 [%%expect {|
@@ -457,6 +465,7 @@ Line 1, characters 55-56:
                                                            ^
 Error: The value "x" has type "<[<[<[int]>]>]> eval eval eval"
        but an expression was expected of type "int"
+       Type "$(<[<[<[int]>]>]> eval eval)" is not compatible with type "int"
 |}]
 let f (x : <[ <[ <[int]> ]> ]> eval eval expr) : <[int]> expr = x
 [%%expect {|
@@ -550,6 +559,7 @@ Line 1, characters 60-61:
                                                                 ^
 Error: The value "x" has type "<[<[int]> eval]> eval" = "int"
        but an expression was expected of type "<[<[int]>]> eval eval"
+       Type "int" is not compatible with type "$(<[<[int]>]> eval)"
 |}]
 (* This one should definitely succeed *)
 let f (x : <[<[int]> eval]> eval) : int = x
