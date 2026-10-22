@@ -686,8 +686,9 @@ let rec choice ctx t =
     | Ltrywith (l1, id, id_duid, l2, kind) ->
         (* in [try l1 with id -> l2], the term [l1] is
            not in tail-call position (after it returns
-           we need to remove the exception handler) *)
-        let+ l1 = choice ctx ~tail:false l1
+           we need to remove the exception handler), so it
+           is not in TMC position either *)
+        let+ l1 = Choice.lambda (traverse ctx l1)
         and+ l2 = choice ctx ~tail l2 in
         Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->

@@ -75,38 +75,20 @@ let add_if_not_exists sources tid args provenance =
   | None -> FactMap.add fact provenance sources
   | Some _ -> sources
 
-(** A rule consists of:
-
-    - A [Cursor.t] to iterates on the entries produced by the right-hand side of
-      the rule (hypotheses);
-
-    - A list of [binder]s that are bound to the tables appearing in the
-      left-hand side of the rule (conclusion) and updated throughout rule
-      evaluation;
-
-    - An unique identifier for logging/tracing purposes.
-
-    The cursor embeds callbacks to update the [binder]s. *)
-
-type rule_executor = Rule_executor : { cursor : 'a Cursor.t } -> rule_executor
-
 type rule =
-  | Rule :
-      { executor : rule_executor;
-        rule_id : rule_id;
-        rule : Lang.rule
-      }
-      -> rule
+  { rule_id : rule_id;
+    rule : Lang.rule
+  }
 
 type stats =
-  { timings : (rule_id, float) Hashtbl.t;
-    rules : (rule_id, rule) Hashtbl.t;
+  { rules : (rule_id, Lang.rule) Hashtbl.t;
+    mutable rule_stats : Cursor.Incremental.stats list;
     with_provenance : bool;
     mutable provenance : provenance FactMap.t
   }
 
 let extra_atoms_for_provenance ~stats ~rule_id atom =
-  let (Lang.Atom (relation, args)) = atom in
+  let (Lang.Atom (relation, args, _)) = atom in
   match relation with
   | Table tid when Table.Id.has_provenance tid ->
     let provenance_fn bindings keys =
@@ -121,34 +103,26 @@ let extra_atoms_for_provenance ~stats ~rule_id atom =
     in
     let name = Table.Id.name tid ^ ".provenance" in
     [Lang.callback_with_bindings ~name provenance_fn args]
-  | Table _ | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> []
+  | If_let _ | Table _ | Unless _ | Distinct _ | Filter _
+  | Callback_with_bindings _ ->
+    []
 
-let compile_rule ?with_provenance ~rule_id rule =
-  let rule =
-    match with_provenance with
-    | None -> rule
-    | Some stats ->
-      let extra_atoms =
-        Iarray.fold_right
-          (fun atom extra_atoms ->
-            List.append
-              (extra_atoms_for_provenance ~stats ~rule_id atom)
-              extra_atoms)
-          rule.Lang.head []
-      in
-      let head = Iarray.append rule.Lang.head (Iarray.of_list extra_atoms) in
-      { rule with Lang.head }
-  in
-  let cursor =
-    Cursor.With_parameters.create_from_rule [] rule
-    |> Cursor.With_parameters.without_parameters
-  in
-  Rule_executor { cursor }
+let maybe_add_provenance ~stats ~rule_id rule =
+  if not stats.with_provenance
+  then rule
+  else
+    let extra_atoms =
+      Iarray.fold_right
+        (fun atom extra_atoms ->
+          List.append
+            (extra_atoms_for_provenance ~stats ~rule_id atom)
+            extra_atoms)
+        rule.Lang.head []
+    in
+    let head = Iarray.append rule.Lang.head (Iarray.of_list extra_atoms) in
+    { rule with Lang.head }
 
-let create_rule rule =
-  let rule_id = fresh_rule_id () in
-  let executor = compile_rule ~rule_id rule in
-  Rule { rule_id; rule; executor }
+let create_rule rule = { rule_id = fresh_rule_id (); rule }
 
 let provenance_from_db db =
   Table.Map.fold db ~init:FactMap.empty ~f:(fun (Binding (tid, _)) provenance ->
@@ -163,20 +137,11 @@ let create_stats ?(with_provenance = false) db =
   let provenance =
     if with_provenance then provenance_from_db db else FactMap.empty
   in
-  { timings = Hashtbl.create 17;
-    rules = Hashtbl.create 17;
-    provenance;
-    with_provenance
-  }
+  { rules = Hashtbl.create 17; rule_stats = []; provenance; with_provenance }
 
 let record_rule ~stats rule =
-  let (Rule { rule_id; _ }) = rule in
+  let { rule_id; rule } = rule in
   Hashtbl.replace stats.rules rule_id rule
-
-let add_timing ~stats rule time =
-  let (Rule { rule_id; _ }) = rule in
-  Hashtbl.replace stats.timings rule_id
-    (time +. try Hashtbl.find stats.timings rule_id with Not_found -> -0.)
 
 module CharMap = Map.Make (Char)
 
@@ -215,13 +180,12 @@ let print_string_with_unique_prefix len ppf s =
     (String.sub s 0 len) Flambda_colours.pop
     (String.sub s len (String.length s - len))
 
-let print_rule char_trie ppf
-    (Rule { executor = Rule_executor { cursor }; rule_id; _ }) =
+let print_rule ~rule_id char_trie ppf rule =
   let rule_id = rule_id_to_string rule_id in
   let len = unique_prefix_len char_trie rule_id ~pos:0 in
   Format.fprintf ppf "%a:@ @[%a@]"
     (print_string_with_unique_prefix len)
-    rule_id Cursor.print cursor
+    rule_id Lang.print_rule rule
 
 let print_fact ppf (tid, args) =
   Format.fprintf ppf "@[%a(@;<1 2>@[<hv>%a@]@,)@]" Table.Id.print tid
@@ -302,7 +266,8 @@ let print_provenance char_trie rule_defs ppf provenance =
               Table.Id.print tid
               (print_string_with_unique_prefix len)
               rule_id_s header_marker;
-            Format.fprintf ppf "%a@ " (print_rule char_trie)
+            Format.fprintf ppf "%a@ "
+              (print_rule ~rule_id char_trie)
               (Hashtbl.find rule_defs rule_id);
             print_provenance_group char_trie rule_id ppf group;
             Format.fprintf ppf "@]")
@@ -318,106 +283,51 @@ let print_stats ppf stats =
       Hashtbl.fold
         (fun rule_id _time char_trie ->
           add_to_trie char_trie (rule_id_to_string rule_id) ~pos:0)
-        stats.timings char_trie
+        stats.rules char_trie
     else char_trie
   in
   Format.fprintf ppf "@[<v>";
-  Hashtbl.iter
-    (fun rule_id time ->
-      let rule = Hashtbl.find stats.rules rule_id in
-      Format.fprintf ppf "@[<v 2>%a@,: %f@]@ " (print_rule char_trie) rule time)
-    stats.timings;
+  Format.pp_print_list ~pp_sep:Format.pp_print_space
+    Cursor.Incremental.print_stats ppf stats.rule_stats;
   if stats.with_provenance
   then (
     Format.fprintf ppf "Provenance@ ==========@ ";
     print_provenance char_trie stats.rules ppf stats.provenance);
   Format.fprintf ppf "@]"
 
-(** Evaluate a single rule using semi-naive evaluation.
-
-    The [previous], [diff], and [current] parameters represent the state of the
-    database in which we are evaluating the cursor (see the documentaion of
-    {!Cursor.seminaive_run}).
-
-    The [output_db] parameter is the database where we are accumulating the
-    result of the rule, and its new value is returned.
-
-    {b Note}: there needs not be any relationship between the input database
-    represented by the [(previous, diff, current)] triple and the output
-    database [output_db]. *)
-let run_rule_incremental ?stats ~previous ~diff ~current ~output ~added
-    (Rule { executor = Rule_executor { cursor }; _ } as rule) =
-  Option.iter (fun stats -> record_rule ~stats rule) stats;
-  let time0 = Sys.time () in
-  let ~output, ~added =
-    Cursor.seminaive_run cursor ~previous ~diff ~current ~output ~added
-  in
-  let time1 = Sys.time () in
-  let seminaive_time = time1 -. time0 in
-  Option.iter (fun stats -> add_timing ~stats rule seminaive_time) stats;
-  ~output, ~added
-
 type t =
-  | Saturate of rule list
+  | Saturate of Cursor.Incremental.t * rule list
   | Fixpoint of t list
 
-let recompile_rule_with_provenance ~stats rule =
-  let (Rule { rule_id; rule; _ }) = rule in
-  let executor = compile_rule ~with_provenance:stats ~rule_id rule in
-  Rule { rule_id; rule; executor }
-
-let rec recompile_schedule_with_provenance ~stats schedule =
+let rec recompile_schedule_for_stats ~stats schedule =
   match schedule with
   | Fixpoint schedules ->
     Fixpoint
       (List.map
-         (fun schedule -> recompile_schedule_with_provenance ~stats schedule)
+         (fun schedule -> recompile_schedule_for_stats ~stats schedule)
          schedules)
-  | Saturate rules ->
-    Saturate (List.map (recompile_rule_with_provenance ~stats) rules)
+  | Saturate (_, rules) ->
+    List.iter (record_rule ~stats) rules;
+    let cursor =
+      Cursor.Incremental.from_rules ~with_stats:true
+        (List.map
+           (fun { rule_id; rule } -> maybe_add_provenance ~stats ~rule_id rule)
+           rules)
+    in
+    Saturate (cursor, rules)
 
-let maybe_recompile_with_provenance ?stats schedule =
+let maybe_recompile_for_stats ?stats schedule =
   match stats with
-  | None | Some { with_provenance = false; _ } -> schedule
-  | Some ({ with_provenance = true; _ } as stats) ->
-    recompile_schedule_with_provenance ~stats schedule
+  | None -> schedule
+  | Some stats -> recompile_schedule_for_stats ~stats schedule
 
 let fixpoint schedule = Fixpoint schedule
 
 let saturate rules =
   let rules = List.map create_rule rules in
-  Saturate rules
-
-let run_rules_incremental ?stats rules ~previous ~diff ~current output =
-  List.fold_left
-    (fun (~output, ~added) rule ->
-      run_rule_incremental ?stats ~previous ~diff ~current ~output ~added rule)
-    (~output, ~added:Table.Map.empty)
-    rules
-
-(** Repeatedly apply the rules in [rules] to the database [current] until
-    reaching a fixpoint.
-
-    Returns an incremental database containing the new state of [current] along
-    with all the new facts added during saturation. *)
-let saturate_rules_incremental ?stats rules ~previous ~diff ~current =
-  let rec saturate_rules_incremental ?stats ~previous ~diff ~current rules
-      full_diff =
-    (* After one call to [run_rules_incremental], all deductions from facts in
-       [current] have been processed, so we only need to keep evaluating rules
-       with at least one fact in [incremental_db.difference]. *)
-    let ~output, ~added =
-      run_rules_incremental ?stats ~previous ~diff ~current rules current
-    in
-    if Table.Map.is_empty added
-    then ~output, ~added:full_diff
-    else
-      saturate_rules_incremental ?stats ~previous:current ~diff:added
-        ~current:output rules
-        (Table.Map.concat ~earlier:full_diff ~later:added)
-  in
-  saturate_rules_incremental ?stats rules Table.Map.empty ~previous ~diff
-    ~current
+  Saturate
+    ( Cursor.Incremental.from_rules (List.map (fun { rule; _ } -> rule) rules),
+      rules )
 
 (** Run the evaluation functions in [fns] until reaching a fixpoint. *)
 let run_list_incremental fns ~previous ~diff ~current =
@@ -462,19 +372,26 @@ let run_list_incremental fns ~previous ~diff ~current =
     (current, [0, diff], 0, Table.Map.empty)
     (List.map (fun fn -> fn, previous, -1) fns)
 
-let rec run_incremental ?stats schedule ~previous ~diff ~current =
+let rec run_incremental schedule ~previous ~diff ~current =
   match schedule with
-  | Saturate rules ->
-    saturate_rules_incremental ?stats rules ~previous ~diff ~current
+  | Saturate (cursor, _rules) ->
+    Cursor.Incremental.seminaive_run cursor ~previous ~diff ~current
   | Fixpoint schedules ->
     run_list_incremental
-      (List.map (run_incremental ?stats) schedules)
+      (List.map run_incremental schedules)
       ~previous ~diff ~current
 
+let rec collect_stats stats = function
+  | Saturate (cursor, _) ->
+    Cursor.Incremental.get_and_clear_stats cursor :: stats
+  | Fixpoint schedules -> List.fold_left collect_stats stats schedules
+
 let run ?stats schedule db =
-  let schedule = maybe_recompile_with_provenance ?stats schedule in
+  let schedule = maybe_recompile_for_stats ?stats schedule in
   let ~output, ~added:_ =
-    run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
-      ~current:db
+    run_incremental schedule ~previous:Table.Map.empty ~diff:db ~current:db
   in
+  (match stats with
+  | None -> ()
+  | Some stats -> stats.rule_stats <- collect_stats stats.rule_stats schedule);
   output
