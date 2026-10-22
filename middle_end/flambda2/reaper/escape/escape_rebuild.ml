@@ -142,10 +142,13 @@ let end_regions t regions (body : RE.t) : RE.t =
         (Code_size.prim ~machine_width:t.machine_width end_region)
       ~body
   in
-  List.fold_left
-    (fun body { region; ghost_region; _ } ->
-      end_region ~ghost:false region (end_region ~ghost:true ghost_region body))
-    body regions
+  (* The regions are innermost first. Restoring the outermost exited checkpoint
+     also frees the nested regions; restoring an inner checkpoint afterwards
+     would retain allocations that should have been freed. *)
+  match List.rev regions with
+  | [] -> body
+  | { region; ghost_region; _ } :: _ ->
+    end_region ~ghost:false region (end_region ~ghost:true ghost_region body)
 
 let begin_regions t { region; ghost_region; _ } (body : RE.t) : RE.t =
   let begin_region ~ghost region body =

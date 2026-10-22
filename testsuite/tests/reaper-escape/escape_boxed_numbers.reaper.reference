@@ -1,0 +1,79 @@
+let code sum_0 deleted in
+let $camlEscape_boxed_numbers__float_0 = 0x1p+1 in
+let code f_1 deleted in
+let $camlEscape_boxed_numbers__const_block_2 = Block 0 (0, 0) in
+let $camlEscape_boxed_numbers__const_block_3 = Block 0 (1) in
+let $camlEscape_boxed_numbers__const_block_4 = Block 12 (10, 0) in
+let $camlEscape_boxed_numbers__const_block_5 =
+  Block 8 ($camlEscape_boxed_numbers__const_block_2,
+           0,
+           $camlEscape_boxed_numbers__const_block_3,
+           $camlEscape_boxed_numbers__const_block_4)
+in
+let $camlEscape_boxed_numbers__immstring_6 = "%.1f\n" in
+let $camlEscape_boxed_numbers__const_block_7 =
+  Block 0 ($camlEscape_boxed_numbers__const_block_5,
+           $camlEscape_boxed_numbers__immstring_6)
+in
+let code inline(never) loopify(never) size(12) newer_version_of(sum_0)
+      sum_0_1 (p : [ 0 of float boxed * float boxed ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  let Pfield = %block_load.[`1`] (p) in
+  let Pfield_1 = %block_load.[`0`] (p) in
+  let prim = %unbox_num.`float` (Pfield) in
+  let prim_1 = %unbox_num.`float` (Pfield_1) in
+  let prim_2 = %bfloat_arith.add (prim_1, prim) in
+  let float_add = %box_num.`float`.my_alloc_region (prim_2) in
+  cont k (float_add)
+in
+let $camlEscape_boxed_numbers__sum_8 = closure sum_0_1 @sum &toplevel in
+let code inline(never) loopify(never) size(29) newer_version_of(f_1)
+      f_1_1 (x : float boxed)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  (let prim = %unbox_num.`float` (x) in
+   let prim_1 = %bfloat_arith.add (prim, 0x1p+1) in
+   let float_add = %box_num.`float`.my_alloc_region.local[`region`] (prim_1)
+   in
+   let prim_2 = %bfloat_arith.add (prim, 0x1p+0) in
+   let float_add_1 =
+     %box_num.`float`.my_alloc_region.local[`region`] (prim_2)
+   in
+   let p =
+     %block.[`0`].my_alloc_region.local[`region`] (float_add_1, float_add)
+   in
+   apply direct(sum_0_1 &my_alloc_region)
+     ($camlEscape_boxed_numbers__sum_8 : _ -> float boxed) (p) -> k2 * k1)
+    where k2 (function_return_0_f_1 : float boxed) =
+      let region_end = %end_region (`region`) in
+      let region_end_1 = %end_ghost_region (ghost_region) in
+      cont k (function_return_0_f_1)
+in
+let $camlEscape_boxed_numbers__f_9 = closure f_1_1 @f &toplevel in
+apply direct(f_1_1 &toplevel)
+  ($camlEscape_boxed_numbers__f_9 : _ -> float boxed)
+    ($camlEscape_boxed_numbers__float_0)
+    -> k1 * error
+  where k1 (apply_result : float boxed) =
+    (apply direct(printf_13 &toplevel) inlined(never)
+       $Stdlib__Printf.camlStdlib__Printf__printf_13_12
+         ($camlEscape_boxed_numbers__const_block_7)
+         -> k1 * error
+       where k1 (full_apply) =
+         (apply &toplevel inlined(never)
+            full_apply (apply_result) -> k2 * error
+            where k2 (function_return : imm tagged) =
+              cont k1
+            where k1 =
+              cont k))
+  where k =
+    let $camlEscape_boxed_numbers =
+      Block 0 ($camlEscape_boxed_numbers__sum_8,
+               $camlEscape_boxed_numbers__f_9)
+    in
+    cont done ($camlEscape_boxed_numbers)
