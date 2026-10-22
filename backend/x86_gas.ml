@@ -136,7 +136,8 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
   let mem_suffix =
     (* GAS cannot infer the operand size of a memory (e.g. spilled) source for
        the narrowing converts and vfpclass, whose other operands do not
-       determine it; disambiguate with the x/y/z length suffix. *)
+       determine it; disambiguate with the x/y/z length suffix. Likewise, it
+       assumes a 32-bit integer source for the unsigned converts. *)
     if not has_mem
     then ""
     else
@@ -152,6 +153,8 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
       | "vcvtqq2ps" | "vcvtuqq2ps" ->
         len_letter ~z:false
       | "vfpclassps" | "vfpclasspd" -> len_letter ~z:true
+      | "vcvtusi2ss" | "vcvtusi2sd" ->
+        if Amd64_simd_defs.instr_allows_temp instr M64 then "q" else "l"
       | _ -> ""
   in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
@@ -298,7 +301,17 @@ let print_instr b = function
     | Cmpsd, [| imm; arg1; arg2 |] ->
       i2 b ("cmp" ^ string_of_float_condition_imm imm ^ "sd") arg1 arg2
     (* The assembler needs a suffix to disambiguate the memory argument. *)
+    | (Crc32_r32_r8m8 | Crc32_r64_r8m8), [| arg1; arg2 |] ->
+      i2 b "crc32b" arg1 arg2
+    | Crc32_r32_r16m16, [| arg1; arg2 |] -> i2 b "crc32w" arg1 arg2
+    | Crc32_r32_r32m32, [| arg1; arg2 |] -> i2 b "crc32l" arg1 arg2
     | Crc32_r64_r64m64, [| arg1; arg2 |] -> i2 b "crc32q" arg1 arg2
+    | ( (Vcvtpd2dq_X_Xm128 | Vcvttpd2dq_X_Xm128 | Vcvtpd2ps_X_Xm128),
+        [| arg1; arg2 |] ) ->
+      i2 b (instr.mnemonic ^ "x") arg1 arg2
+    | ( (Vcvtpd2dq_X_Ym256 | Vcvttpd2dq_X_Ym256 | Vcvtpd2ps_X_Ym256),
+        [| arg1; arg2 |] ) ->
+      i2 b (instr.mnemonic ^ "y") arg1 arg2
     | Cvtsi2sd_X_r64m64, [| arg1; arg2 |] -> i2 b "cvtsi2sdq" arg1 arg2
     | Cvtsi2ss_X_r64m64, [| arg1; arg2 |] -> i2 b "cvtsi2ssq" arg1 arg2
     | Vcvtsi2sd_X_X_r64m64, [| arg1; arg2; arg3 |] ->

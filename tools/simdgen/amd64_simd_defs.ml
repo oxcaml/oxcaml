@@ -189,6 +189,14 @@ let instr_expects_mask instr =
       | RM_r | RM_rm | Vex_v | Implicit | Immediate -> false)
     instr.args
 
+(* Whether the masked output merge perserves lanes from the destination,
+   implying the destination is an input. VBLENDM/VPBLENDM instead take lanes
+   from their first source. *)
+let merge_reads_dst mnemonic =
+  not
+    (String.starts_with ~prefix:"vblendm" mnemonic
+    || String.starts_with ~prefix:"vpblendm" mnemonic)
+
 let instr_is_evex (instr : _ instr) =
   match instr.enc.prefix with Evex _ -> true | Legacy _ | Vex _ -> false
 
@@ -416,6 +424,14 @@ let loc_allows_reg = function
 let loc_allows_mem = function
   | Pin _ -> false
   | Temp temps -> Array.exists (fun temp -> not (temp_is_reg temp)) temps
+
+let instr_allows_temp (instr : _ instr) temp =
+  Array.exists
+    (fun (arg : arg) ->
+      match arg.loc with
+      | Temp temps -> Array.exists (equal_temp temp) temps
+      | Pin _ -> false)
+    instr.args
 
 let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
 

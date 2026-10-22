@@ -479,14 +479,10 @@ let reorder ~binding ~zeroing i =
   else
     match mask_positions with
     | [k] -> (
-      if res_is_k binding.instr || zeroing
+      if
+        res_is_k binding.instr || zeroing
+        || not (merge_reads_dst binding.instr.mnemonic)
       then Some (non_mask @ [k])
-      else if contains ~needle:"blendm" binding.instr.mnemonic
-      then
-        (* blend: background is SRC1, duplicated as the merge destination *)
-        match non_mask with
-        | a :: rest -> Some ((a :: a :: rest) @ [k])
-        | [] -> None
       else if contains ~needle:"_mask3_" i.name
       then
         (* accumulator [c] is the overwrite target (VF...231) *)
@@ -563,79 +559,139 @@ let hardcoded_predicate_imm ~mnemonic name =
    These types mirror that one, naming instruction descriptors by their
    binding. *)
 
-type g_bind =
-  { binding_name : string;
-    zeroing : bool option (* [Some z] when the binding takes [~z] *)
-  }
+module Intrin = Amd64_simd_defs.Intrin
 
-type g_imm =
-  | G_no_imm
-  | G_imm of int (* max *)
-  | G_getmant of int * int (* interval max, sign max *)
-  | G_fixed of int
+module Bind = struct
+  type t =
+    { name : string;
+      zeroing : bool option (* [Some z] when the binding takes [~z] *)
+    }
 
-type g_operand =
-  | G_value of int
-  | G_all_ones_mask
-  | G_zero_vec of int (* width in bits *)
+  let make ~zeroing (b : binding) =
+    { name = b.bname;
+      zeroing = (if b.instr.flags.z then Some zeroing else None)
+    }
 
-type g_spec =
-  | G_register of
-      { arity : int;
-        imm : g_imm;
-        bind : g_bind;
-        args : int list
-      }
-  | G_embedded_rounding of
-      { arity : int;
-        bind : g_bind;
-        cur : g_bind option;
-        args : int list
-      }
-  | G_suppress_all_exceptions of
-      { arity : int;
-        imm : g_imm;
-        bind : g_bind;
-        cur : g_bind option;
-        args : int list
-      }
-  | G_flag_reader of
-      { flag : string;
-        bname : string
-      }
-  | G_load of
-      { arity : int;
-        bind : g_bind;
-        args : int list
-      }
-  | G_store of
-      { arity : int;
-        bind : g_bind;
-        args : int list
-      }
-  | G_gather of
-      { arity : int;
-        bname : string;
-        args : g_operand list
-      }
-  | G_scatter of
-      { arity : int;
-        bname : string;
-        args : g_operand list
-      }
+  let print ?(ctor = "Instr", "Zeroing") { name; zeroing } =
+    let plain, zeroing_ctor = ctor in
+    match zeroing with
+    | None -> sprintf "%s %s" plain name
+    | Some z -> sprintf "%s (%s, %b)" zeroing_ctor name z
+end
 
-let g_bind ~zeroing (b : binding) =
-  { binding_name = b.bname;
-    zeroing = (if b.instr.flags.z then Some zeroing else None)
-  }
+module Spec = struct
+  type t =
+    | Register of
+        { arity : int;
+          imm : Intrin.imm;
+          bind : Bind.t;
+          args : int list
+        }
+    | Embedded_rounding of
+        { arity : int;
+          bind : Bind.t;
+          cur : Bind.t option;
+          args : int list
+        }
+    | Suppress_all_exceptions of
+        { arity : int;
+          imm : Intrin.imm;
+          bind : Bind.t;
+          cur : Bind.t option;
+          args : int list
+        }
+    | Flag_reader of
+        { flag : Intrin.flag;
+          instr : string
+        }
+    | Load of
+        { arity : int;
+          bind : Bind.t;
+          args : int list
+        }
+    | Store of
+        { arity : int;
+          bind : Bind.t;
+          args : int list
+        }
+    | Gather of
+        { arity : int;
+          instr : string;
+          args : Intrin.operand list
+        }
+    | Scatter of
+        { arity : int;
+          instr : string;
+          args : Intrin.operand list
+        }
+
+  let print_imm : Intrin.imm -> string = function
+    | No_imm -> "No_imm"
+    | Imm max -> sprintf "Imm %d" max
+    | Getmant (interval, sign) -> sprintf "Getmant (%d, %d)" interval sign
+    | Fixed i -> sprintf "Fixed %d" i
+
+  let print_flag : Intrin.flag -> string = function Zf -> "Zf" | Cf -> "Cf"
+
+  let print_cur = function
+    | None -> "None"
+    | Some b -> sprintf "Some (%s)" (Bind.print b)
+
+  let print_operands args =
+    List.map
+      (fun (operand : Intrin.operand) ->
+        match operand with
+        | Value j -> sprintf "Value %d" j
+        | All_ones_mask -> "All_ones_mask"
+        | Zero_vec128 -> "Zero_vec128"
+        | Zero_vec256 -> "Zero_vec256"
+        | Zero_vec512 -> "Zero_vec512")
+      args
+    |> String.concat "; " |> sprintf "[|%s|]"
+
+  let print_args args = print_operands (List.map (fun j -> Intrin.Value j) args)
+
+  let print = function
+    | Register { arity; imm; bind; args } ->
+      sprintf "Register { arity = %d; imm = %s; bind = %s; args = %s }" arity
+        (print_imm imm) (Bind.print bind) (print_args args)
+    | Embedded_rounding { arity; bind; cur; args } ->
+      sprintf "Embedded_rounding { arity = %d; bind = %s; cur = %s; args = %s }"
+        arity
+        (Bind.print ~ctor:("Rnd", "Rnd_zeroing") bind)
+        (print_cur cur) (print_args args)
+    | Suppress_all_exceptions { arity; imm; bind; cur; args } ->
+      sprintf
+        "Suppress_all_exceptions { arity = %d; imm = %s; bind = %s; cur = %s; \
+         args = %s }"
+        arity (print_imm imm)
+        (Bind.print ~ctor:("Sae", "Sae_zeroing") bind)
+        (print_cur cur) (print_args args)
+    | Flag_reader { flag; instr } ->
+      sprintf "Flag_reader { flag = %s; instr = %s }" (print_flag flag) instr
+    | Load { arity; bind; args } ->
+      sprintf "Load { arity = %d; bind = %s; args = %s }" arity
+        (Bind.print bind) (print_args args)
+    | Store { arity; bind; args } ->
+      sprintf "Store { arity = %d; bind = %s; args = %s }" arity
+        (Bind.print bind) (print_args args)
+    | Gather { arity; instr; args } ->
+      sprintf "Gather { arity = %d; instr = %s; args = %s }" arity instr
+        (print_operands args)
+    | Scatter { arity; instr; args } ->
+      sprintf "Scatter { arity = %d; instr = %s; args = %s }" arity instr
+        (print_operands args)
+end
 
 (* Number of operation arguments the binding takes, with [~z:zeroing] applied
-   when it is zeroing-parameterized (the merge form also reads the
+   when it is zeroing-parameterized (the merge form usually also reads the
    destination). *)
 let binding_arity ~zeroing (instr : instr_emit) =
   let n = Array.length instr.args in
   match instr.res with
-  | Res rr when instr.flags.z && not zeroing -> n + Array.length rr
+  | Res rr when instr.flags.z && merge_reads_dst instr.mnemonic && not zeroing
+    ->
+    n + Array.length rr
   | Res _ | Arg _ | Res_none -> n
 
 let register_spec ~by_mnem ~binding ~zeroing i =
@@ -650,7 +706,7 @@ let register_spec ~by_mnem ~binding ~zeroing i =
     (* e.g. [_mm512_setzero_ps], an xor of a register with itself. *)
     None
   | Some args -> (
-    let bind = g_bind ~zeroing binding in
+    let bind = Bind.make ~zeroing binding in
     (* The non-rounding form selected by _MM_FROUND_CUR_DIRECTION. *)
     let cur () =
       let target_seq, target_mask, _ = instr_hw_seq binding.instr in
@@ -662,40 +718,40 @@ let register_spec ~by_mnem ~binding ~zeroing i =
           &&
           let s, m, _ = instr_hw_seq b.instr in
           Bool.equal m target_mask && List.equal String.equal target_seq s)
-      |> Option.map (g_bind ~zeroing)
+      |> Option.map (Bind.make ~zeroing)
     in
     (* The instruction's own immediate, from the C imm params other than sae. *)
     let real_imm () =
       match real_imms with
-      | [] -> Some G_no_imm
-      | [p] -> Some (G_imm (imm_max p))
+      | [] -> Some Intrin.No_imm
+      | [p] -> Some (Intrin.Imm (imm_max p))
       | [interval; sign] ->
         (* getmant packs two enums into one imm8: sign<<2 | interval. *)
-        Some (G_getmant (imm_max interval, imm_max sign))
+        Some (Intrin.Getmant (imm_max interval, imm_max sign))
       | _ -> None
     in
     match binding.instr.flags.r with
     | Rnd_er ->
       if List.length real_imms <> 1 || sae_imms <> []
       then None
-      else Some (G_embedded_rounding { arity; bind; cur = cur (); args })
+      else Some (Spec.Embedded_rounding { arity; bind; cur = cur (); args })
     | Rnd_sae ->
       if List.length sae_imms <> 1
       then None
       else
         let* imm = real_imm () in
         Some
-          (G_suppress_all_exceptions { arity; imm; bind; cur = cur (); args })
+          (Spec.Suppress_all_exceptions { arity; imm; bind; cur = cur (); args })
     | Rnd_none -> (
       if sae_imms <> []
       then None
       else
-        let register imm = G_register { arity; imm; bind; args } in
+        let register imm = Spec.Register { arity; imm; bind; args } in
         match binding.instr.imm, real_imms with
-        | Imm_none, [] -> Some (register G_no_imm)
+        | Imm_none, [] -> Some (register Intrin.No_imm)
         | (Imm_spec | Imm_reg), [] ->
           hardcoded_predicate_imm ~mnemonic:binding.instr.mnemonic i.name
-          |> Option.map (fun imm -> register (G_fixed imm))
+          |> Option.map (fun imm -> register (Intrin.Fixed imm))
         | (Imm_spec | Imm_reg), _ :: _ -> Option.map register (real_imm ())
         | Imm_none, _ :: _ -> None))
 
@@ -707,11 +763,11 @@ let flag_reader_spec ~by_mnem i =
   let* _, flag =
     List.find_opt
       (fun (needle, _) -> contains ~needle i.name)
-      ["testz", "Zf"; "testc", "Cf"]
+      ["testz", Intrin.Zf; "testc", Intrin.Cf]
   in
   match bindings_of ~by_mnem instr.mnemonic with
   | [binding] when Array.length binding.instr.args = 2 ->
-    Some (G_flag_reader { flag; bname = binding.bname })
+    Some (Spec.Flag_reader { flag; instr = binding.bname })
   | _ -> None
 
 (* -------------------------------------------------------------------------- *)
@@ -800,7 +856,10 @@ let memory_spec ~binding ~zeroing i =
     (* The merge (~z:false) variant prepends the destination as a source; the
        stored operand list (shared with ~z:true) omits it. *)
     let operand_locs =
-      if binding.instr.flags.z && not zeroing
+      if
+        binding.instr.flags.z
+        && merge_reads_dst binding.instr.mnemonic
+        && not zeroing
       then
         match binding.instr.res with
         | Res rr -> Array.to_list rr @ stored
@@ -819,12 +878,12 @@ let memory_spec ~binding ~zeroing i =
     then None
     else
       let arity = List.length i.params in
-      let bind = g_bind ~zeroing binding in
+      let bind = Bind.make ~zeroing binding in
       let args = List.filter_map Fun.id operands in
       Some
         (if String.starts_with ~prefix:"__m" i.ret.ctype
-         then G_load { arity; bind; args }
-         else G_store { arity; bind; args })
+         then Spec.Load { arity; bind; args }
+         else Spec.Store { arity; bind; args })
 
 (* -------------------------------------------------------------------------- *)
 (* Gathers/scatters *)
@@ -919,33 +978,33 @@ let gather_scatter_spec ~binding i =
   let base = find is_ptr_param in
   let k =
     match find is_mask_param with
-    | Some k -> G_value k
-    | None -> G_all_ones_mask
+    | Some k -> Intrin.Value k
+    | None -> Intrin.All_ones_mask
   in
   let zero_dst () =
     match gs_loc_class binding.instr.args.(0).loc with
-    | Some "XMM" -> Some (G_zero_vec 128)
-    | Some "YMM" -> Some (G_zero_vec 256)
-    | Some "ZMM" -> Some (G_zero_vec 512)
+    | Some "XMM" -> Some Intrin.Zero_vec128
+    | Some "YMM" -> Some Intrin.Zero_vec256
+    | Some "ZMM" -> Some Intrin.Zero_vec512
     | _ -> None
   in
   let gather dst base vindex =
-    G_gather
+    Spec.Gather
       { arity;
-        bname = binding.bname;
-        args = [dst; G_value base; G_value vindex; k]
+        instr = binding.bname;
+        args = [dst; Value base; Value vindex; k]
       }
   in
   match base, is_gather, vectors with
-  | Some base, true, [src; vindex] -> Some (gather (G_value src) base vindex)
+  | Some base, true, [src; vindex] -> Some (gather (Value src) base vindex)
   | Some base, true, [vindex] ->
     Option.map (fun zero -> gather zero base vindex) (zero_dst ())
   | Some base, false, [vindex; data] ->
     Some
-      (G_scatter
+      (Spec.Scatter
          { arity;
-           bname = binding.bname;
-           args = [G_value base; G_value vindex; G_value data; k]
+           instr = binding.bname;
+           args = [Value base; Value vindex; Value data; k]
          })
   | _ -> None
 
@@ -1099,14 +1158,14 @@ let tests ~bindings intrinsics =
       in
       let masked = List.exists is_mask_param i.params in
       let* spec = spec in
-      match spec with
-      | G_register _ | G_suppress_all_exceptions _ | G_flag_reader _ ->
+      match (spec : Spec.t) with
+      | Register _ | Suppress_all_exceptions _ | Flag_reader _ ->
         test Compare_result ~memory:false ()
-      | G_embedded_rounding _ -> test Compare_result ~memory:false ~er:true ()
-      | G_load _ -> test Compare_result ~memory:true ()
-      | G_gather _ -> test Compare_result ~memory:true ~reuse_mask:masked ()
-      | G_store _ -> test Compare_buffers ~memory:true ()
-      | G_scatter _ -> test Compare_buffers ~memory:true ~reuse_mask:masked ())
+      | Embedded_rounding _ -> test Compare_result ~memory:false ~er:true ()
+      | Load _ -> test Compare_result ~memory:true ()
+      | Gather _ -> test Compare_result ~memory:true ~reuse_mask:masked ()
+      | Store _ -> test Compare_buffers ~memory:true ()
+      | Scatter _ -> test Compare_buffers ~memory:true ~reuse_mask:masked ())
   |> List.sort_uniq (fun a b -> String.compare a.i.name b.i.name)
 
 (* Values enumerated for an immediate parameter. Rounding immediates follow the
@@ -1406,64 +1465,6 @@ let tests_c ~bindings intrinsics =
 (* Selection table *)
 (* -------------------------------------------------------------------------- *)
 
-let print_bind ?(ctor = "Instr", "Zeroing") { binding_name; zeroing } =
-  let plain, zeroing_ctor = ctor in
-  match zeroing with
-  | None -> sprintf "%s %s" plain binding_name
-  | Some z -> sprintf "%s (%s, %b)" zeroing_ctor binding_name z
-
-let print_imm = function
-  | G_no_imm -> "No_imm"
-  | G_imm max -> sprintf "Imm %d" max
-  | G_getmant (interval, sign) -> sprintf "Getmant (%d, %d)" interval sign
-  | G_fixed i -> sprintf "Fixed %d" i
-
-let print_cur = function
-  | None -> "None"
-  | Some b -> sprintf "Some (%s)" (print_bind b)
-
-let print_operands args =
-  List.map
-    (function
-      | G_value j -> sprintf "Value %d" j
-      | G_all_ones_mask -> "All_ones_mask"
-      | G_zero_vec width -> sprintf "Zero_vec%d" width)
-    args
-  |> String.concat "; " |> sprintf "[|%s|]"
-
-let print_args args = print_operands (List.map (fun j -> G_value j) args)
-
-let print_spec = function
-  | G_register { arity; imm; bind; args } ->
-    sprintf "Register { arity = %d; imm = %s; bind = %s; args = %s }" arity
-      (print_imm imm) (print_bind bind) (print_args args)
-  | G_embedded_rounding { arity; bind; cur; args } ->
-    sprintf "Embedded_rounding { arity = %d; bind = %s; cur = %s; args = %s }"
-      arity
-      (print_bind ~ctor:("Rnd", "Rnd_zeroing") bind)
-      (print_cur cur) (print_args args)
-  | G_suppress_all_exceptions { arity; imm; bind; cur; args } ->
-    sprintf
-      "Suppress_all_exceptions { arity = %d; imm = %s; bind = %s; cur = %s; \
-       args = %s }"
-      arity (print_imm imm)
-      (print_bind ~ctor:("Sae", "Sae_zeroing") bind)
-      (print_cur cur) (print_args args)
-  | G_flag_reader { flag; bname } ->
-    sprintf "Flag_reader { flag = %s; instr = %s }" flag bname
-  | G_load { arity; bind; args } ->
-    sprintf "Load { arity = %d; bind = %s; args = %s }" arity (print_bind bind)
-      (print_args args)
-  | G_store { arity; bind; args } ->
-    sprintf "Store { arity = %d; bind = %s; args = %s }" arity (print_bind bind)
-      (print_args args)
-  | G_gather { arity; bname; args } ->
-    sprintf "Gather { arity = %d; instr = %s; args = %s }" arity bname
-      (print_operands args)
-  | G_scatter { arity; bname; args } ->
-    sprintf "Scatter { arity = %d; instr = %s; args = %s }" arity bname
-      (print_operands args)
-
 let print_selection ~bindings intrinsics =
   let arms =
     specs ~bindings intrinsics
@@ -1480,7 +1481,7 @@ let print_selection ~bindings intrinsics =
      let table : (string * id t) array =\n\
     \  [|\n";
   List.iter
-    (fun (name, spec) -> printf "    %S, %s;\n" name (print_spec spec))
+    (fun (name, spec) -> printf "    %S, %s;\n" name (Spec.print spec))
     arms;
   print_string "  |]\n"
 

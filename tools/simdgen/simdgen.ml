@@ -712,17 +712,20 @@ let print_one bind instr =
   in
   let args, res =
     match instr.res with
-    | Res rr when instr.flags.z ->
+    | Res rr when instr.flags.z && merge_reads_dst instr.mnemonic ->
       (* Without zeroing, masked-off lanes of the destination are preserved, so
-         the destination must also be an input operand. With zeroing, the
-         destination must be a register because EVEX.z is invalid with a memory
-         destination. *)
+         the destination must also be an input operand (restricted like a
+         result, see [print_result_args]). With zeroing, the destination must be
+         a register because EVEX.z is invalid with a memory destination. *)
       let args = print_args instr.args in
-      let res_args = print_args rr in
+      let res_args = print_result_args rr in
       let zeroing_res_args = print_register_args rr in
       let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
       ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
         sprintf "(if z then Res [|%s|] else Arg [|%s|])" zeroing_res_args idxs )
+    | Res rr when instr.flags.z ->
+      ( sprintf "[|%s|]" (print_args instr.args),
+        sprintf "Res [|%s|]" (print_register_args rr) )
     | (Res_none | Arg _ | Res _) as res ->
       sprintf "[|%s|]" (print_args instr.args), print_res res
   in

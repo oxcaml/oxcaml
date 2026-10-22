@@ -1146,10 +1146,10 @@ let select_operation_fma ~dbg:_ op args =
     | _ -> None
 
 (* The AVX512 [caml_<intel-name>] builtins, selected by interpreting the
-   generated [Amd64_simd_intrins] table. Extension gating happens per
-   instruction: a disabled instruction selects [None], falling through to an
-   ordinary extcall (and a link error against the nonexistent C symbol), as with
-   the hand-written intrinsics. *)
+   generated [Amd64_simd_intrins] table. If any instruction an intrinsic may
+   select is disabled, it selects [None] before checking its immediates, falling
+   through to an ordinary extcall (and a link error against the nonexistent C
+   symbol), as with the hand-written intrinsics. *)
 module Intrins = struct
   module T = Amd64_simd_defs.Intrin
 
@@ -1167,6 +1167,14 @@ module Intrins = struct
   let bind : Amd64_simd_instrs.id T.bind -> Amd64_simd_instrs.instr = function
     | Instr simd -> simd
     | Zeroing (simd, z) -> simd ~z
+
+  let rnd_bind ~rnd (b : _ T.rnd_bind) =
+    match b with Rnd simd -> simd ~rnd | Rnd_zeroing (simd, z) -> simd ~rnd ~z
+
+  let sae_bind (b : _ T.sae_bind) =
+    match b with
+    | Sae simd -> simd ~sae:()
+    | Sae_zeroing (simd, z) -> simd ~sae:() ~z
 
   let imm op args : T.imm -> int option * Cmm.expression list = function
     | No_imm -> None, args
@@ -1220,27 +1228,30 @@ module Intrins = struct
 
   let kflag : T.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
 
-  (* The instruction and the (ungated) selection. *)
-  let select_ungated op (spec : Amd64_simd_instrs.id T.t) args =
+  (* Every instruction [spec] may select. The rounding mode does not affect the
+     required extensions. *)
+  let instrs (spec : Amd64_simd_instrs.id T.t) =
+    match spec with
+    | Register { bind = b; _ } | Load { bind = b; _ } | Store { bind = b; _ } ->
+      [bind b]
+    | Embedded_rounding { bind = b; cur; _ } ->
+      rnd_bind ~rnd:Rnd_near b :: Option.to_list (Option.map bind cur)
+    | Suppress_all_exceptions { bind = b; cur; _ } ->
+      sae_bind b :: Option.to_list (Option.map bind cur)
+    | Flag_reader { instr; _ } | Gather { instr; _ } | Scatter { instr; _ } ->
+      [instr]
+
+  let select_enabled op (spec : Amd64_simd_instrs.id T.t) args =
     match spec with
     | Register { arity; imm = imm_spec; bind = b; args = ops } ->
       let i, args = imm op args imm_spec in
-      let simd = bind b in
-      simd, instr simd ?i (operands op ~arity ops args)
+      instr (bind b) ?i (operands op ~arity ops args)
     | Embedded_rounding { arity; bind = b; cur; args = ops } -> (
       let control, args = extract_constant args op ~max:255 in
       let args = operands op ~arity ops args in
       match rounding control, cur with
-      | Some rnd, (Some _ | None) ->
-        let simd =
-          match b with
-          | Rnd simd -> simd ~rnd
-          | Rnd_zeroing (simd, z) -> simd ~rnd ~z
-        in
-        simd, instr simd args
-      | None, Some cur when control = cur_direction ->
-        let simd = bind cur in
-        simd, instr simd args
+      | Some rnd, (Some _ | None) -> instr (rnd_bind ~rnd b) args
+      | None, Some cur when control = cur_direction -> instr (bind cur) args
       | None, (Some _ | None) -> invalid_immediate op)
     | Suppress_all_exceptions
         { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
@@ -1249,42 +1260,33 @@ module Intrins = struct
       let args = operands op ~arity ops args in
       (* _MM_FROUND_NO_EXC, alone or with _MM_FROUND_CUR_DIRECTION. *)
       if sae = 8 || sae = 12
-      then
-        let simd =
-          match b with
-          | Sae simd -> simd ~sae:()
-          | Sae_zeroing (simd, z) -> simd ~sae:() ~z
-        in
-        simd, instr simd ?i args
+      then instr (sae_bind b) ?i args
       else
         match cur with
-        | Some cur when sae = cur_direction ->
-          let simd = bind cur in
-          simd, instr simd ?i args
+        | Some cur when sae = cur_direction -> instr (bind cur) ?i args
         | Some _ | None -> invalid_immediate op)
     | Flag_reader { flag; instr = simd } ->
       let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
-      simd, seq (Seq.kflag (kflag flag) simd) args
+      seq (Seq.kflag (kflag flag) simd) args
     | Load { arity; bind = b; args = ops } ->
-      let simd = bind b in
       let args = operands op ~arity ops args in
-      simd, simd_load ~mode:Arch.identity_addressing simd args
+      simd_load ~mode:Arch.identity_addressing (bind b) args
     | Store { arity; bind = b; args = ops } ->
-      let simd = bind b in
       let args = operands op ~arity ops args in
-      simd, simd_store ~mode:Arch.identity_addressing simd args
+      simd_store ~mode:Arch.identity_addressing (bind b) args
     | Gather { arity; instr = simd; args = ops } ->
       let scale, args = extract_scale args op in
       let args = operands op ~arity ops args in
-      simd, simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
+      simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
     | Scatter { arity; instr = simd; args = ops } ->
       let scale, args = extract_scale args op in
       let args = operands op ~arity ops args in
-      simd, simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
+      simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
 
   let select op spec args =
-    let simd, selected = select_ungated op spec args in
-    if Arch.Extension.enabled_instruction simd then selected else None
+    if List.for_all Arch.Extension.enabled_instruction (instrs spec)
+    then select_enabled op spec args
+    else None
 end
 
 let select_operation_intrins ~dbg:_ op args =

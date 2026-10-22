@@ -9641,8 +9641,8 @@ let vblendmpd_X_X_Xm128 = {
 let vblendmpd_X_X_Xm128_K ~z = {
     id = Vblendmpd_X_X_Xm128_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmpd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9659,8 +9659,8 @@ let vblendmpd_X_X_m64 = {
 let vblendmpd_X_X_m64_K ~z = {
     id = Vblendmpd_X_X_m64_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmpd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9677,8 +9677,8 @@ let vblendmpd_Y_Y_Ym256 = {
 let vblendmpd_Y_Y_Ym256_K ~z = {
     id = Vblendmpd_Y_Y_Ym256_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmpd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9695,8 +9695,8 @@ let vblendmpd_Y_Y_m64 = {
 let vblendmpd_Y_Y_m64_K ~z = {
     id = Vblendmpd_Y_Y_m64_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmpd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9713,8 +9713,8 @@ let vblendmpd_Z_Z_Zm512 = {
 let vblendmpd_Z_Z_Zm512_K ~z = {
     id = Vblendmpd_Z_Z_Zm512_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmpd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9731,8 +9731,8 @@ let vblendmpd_Z_Z_m64 = {
 let vblendmpd_Z_Z_m64_K ~z = {
     id = Vblendmpd_Z_Z_m64_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmpd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9749,8 +9749,8 @@ let vblendmps_X_X_Xm128 = {
 let vblendmps_X_X_Xm128_K ~z = {
     id = Vblendmps_X_X_Xm128_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmps"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9767,8 +9767,8 @@ let vblendmps_X_X_m32 = {
 let vblendmps_X_X_m32_K ~z = {
     id = Vblendmps_X_X_m32_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmps"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9785,8 +9785,8 @@ let vblendmps_Y_Y_Ym256 = {
 let vblendmps_Y_Y_Ym256_K ~z = {
     id = Vblendmps_Y_Y_Ym256_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmps"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9803,8 +9803,8 @@ let vblendmps_Y_Y_m32 = {
 let vblendmps_Y_Y_m32_K ~z = {
     id = Vblendmps_Y_Y_m32_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmps"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9821,8 +9821,8 @@ let vblendmps_Z_Z_Zm512 = {
 let vblendmps_Z_Z_Zm512_K ~z = {
     id = Vblendmps_Z_Z_Zm512_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmps"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -9839,8 +9839,8 @@ let vblendmps_Z_Z_m32 = {
 let vblendmps_Z_Z_m32_K ~z = {
     id = Vblendmps_Z_Z_m32_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vblendmps"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 101 }
@@ -12134,7 +12134,7 @@ let vcvtps2ph_Xm64_X = {
 let vcvtps2ph_Xm64_X_K ~z = {
     id = Vcvtps2ph_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_spec
   ; mnemonic = "vcvtps2ph"
@@ -27911,8 +27911,8 @@ let vpblendmb_X_X_Xm128 = {
 let vpblendmb_X_X_Xm128_K ~z = {
     id = Vpblendmb_X_X_Xm128_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmb"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 102 }
@@ -27929,8 +27929,8 @@ let vpblendmb_Y_Y_Ym256 = {
 let vpblendmb_Y_Y_Ym256_K ~z = {
     id = Vpblendmb_Y_Y_Ym256_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmb"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 102 }
@@ -27947,8 +27947,8 @@ let vpblendmb_Z_Z_Zm512 = {
 let vpblendmb_Z_Z_Zm512_K ~z = {
     id = Vpblendmb_Z_Z_Zm512_K
   ; ext = [|AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmb"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 102 }
@@ -27965,8 +27965,8 @@ let vpblendmd_X_X_Xm128 = {
 let vpblendmd_X_X_Xm128_K ~z = {
     id = Vpblendmd_X_X_Xm128_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -27983,8 +27983,8 @@ let vpblendmd_X_X_m32 = {
 let vpblendmd_X_X_m32_K ~z = {
     id = Vpblendmd_X_X_m32_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28001,8 +28001,8 @@ let vpblendmd_Y_Y_Ym256 = {
 let vpblendmd_Y_Y_Ym256_K ~z = {
     id = Vpblendmd_Y_Y_Ym256_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28019,8 +28019,8 @@ let vpblendmd_Y_Y_m32 = {
 let vpblendmd_Y_Y_m32_K ~z = {
     id = Vpblendmd_Y_Y_m32_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28037,8 +28037,8 @@ let vpblendmd_Z_Z_Zm512 = {
 let vpblendmd_Z_Z_Zm512_K ~z = {
     id = Vpblendmd_Z_Z_Zm512_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28055,8 +28055,8 @@ let vpblendmd_Z_Z_m32 = {
 let vpblendmd_Z_Z_m32_K ~z = {
     id = Vpblendmd_Z_Z_m32_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M32|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmd"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = false; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28073,8 +28073,8 @@ let vpblendmq_X_X_Xm128 = {
 let vpblendmq_X_X_Xm128_K ~z = {
     id = Vpblendmq_X_X_Xm128_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmq"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28091,8 +28091,8 @@ let vpblendmq_X_X_m64 = {
 let vpblendmq_X_X_m64_K ~z = {
     id = Vpblendmq_X_X_m64_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmq"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28109,8 +28109,8 @@ let vpblendmq_Y_Y_Ym256 = {
 let vpblendmq_Y_Y_Ym256_K ~z = {
     id = Vpblendmq_Y_Y_Ym256_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmq"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28127,8 +28127,8 @@ let vpblendmq_Y_Y_m64 = {
 let vpblendmq_Y_Y_m64_K ~z = {
     id = Vpblendmq_Y_Y_m64_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmq"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28145,8 +28145,8 @@ let vpblendmq_Z_Z_Zm512 = {
 let vpblendmq_Z_Z_Zm512_K ~z = {
     id = Vpblendmq_Z_Z_Zm512_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmq"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28163,8 +28163,8 @@ let vpblendmq_Z_Z_m64 = {
 let vpblendmq_Z_Z_m64_K ~z = {
     id = Vpblendmq_Z_Z_m64_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|M64|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmq"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = true; evex_z = z }; rm_reg = Reg; opcode = 100 }
@@ -28181,8 +28181,8 @@ let vpblendmw_X_X_Xm128 = {
 let vpblendmw_X_X_Xm128_K ~z = {
     id = Vpblendmw_X_X_Xm128_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmw"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L128; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 102 }
@@ -28199,8 +28199,8 @@ let vpblendmw_Y_Y_Ym256 = {
 let vpblendmw_Y_Y_Ym256_K ~z = {
     id = Vpblendmw_Y_Y_Ym256_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|YMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|YMM|]; enc = Vex_v };{ loc = Temp [|YMM;M256|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|YMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmw"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L256; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 102 }
@@ -28217,8 +28217,8 @@ let vpblendmw_Z_Z_Zm512 = {
 let vpblendmw_Z_Z_Zm512_K ~z = {
     id = Vpblendmw_Z_Z_Zm512_K
   ; ext = [|AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|])
-  ; res = (if z then Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|] else Arg [|0|])
+  ; args = [|{ loc = Temp [|ZMM|]; enc = Vex_v };{ loc = Temp [|ZMM;M512|]; enc = RM_rm };{ loc = Temp [|K|]; enc = Mask }|]
+  ; res = Res [|{ loc = Temp [|ZMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "vpblendmw"
   ; enc = { prefix = Evex { evex_m = Vexm_0F38; evex_w = true; evex_ll = Ll_len L512; evex_p = Prx_66; evex_b = false; evex_z = z }; rm_reg = Reg; opcode = 102 }
@@ -34832,7 +34832,7 @@ let vpmovdb_Xm32_X = {
 let vpmovdb_Xm32_X_K ~z = {
     id = Vpmovdb_Xm32_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovdb"
@@ -34850,7 +34850,7 @@ let vpmovdb_Xm64_Y = {
 let vpmovdb_Xm64_Y_K ~z = {
     id = Vpmovdb_Xm64_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovdb"
@@ -34940,7 +34940,7 @@ let vpmovdw_Xm64_X = {
 let vpmovdw_Xm64_X_K ~z = {
     id = Vpmovdw_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovdw"
@@ -35183,7 +35183,7 @@ let vpmovqb_Xm16_X = {
 let vpmovqb_Xm16_X_K ~z = {
     id = Vpmovqb_Xm16_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M16|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovqb"
@@ -35201,7 +35201,7 @@ let vpmovqb_Xm32_Y = {
 let vpmovqb_Xm32_Y_K ~z = {
     id = Vpmovqb_Xm32_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovqb"
@@ -35219,7 +35219,7 @@ let vpmovqb_Xm64_Z = {
 let vpmovqb_Xm64_Z_K ~z = {
     id = Vpmovqb_Xm64_Z_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovqb"
@@ -35309,7 +35309,7 @@ let vpmovqd_Xm64_X = {
 let vpmovqd_Xm64_X_K ~z = {
     id = Vpmovqd_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovqd"
@@ -35417,7 +35417,7 @@ let vpmovqw_Xm32_X = {
 let vpmovqw_Xm32_X_K ~z = {
     id = Vpmovqw_Xm32_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovqw"
@@ -35435,7 +35435,7 @@ let vpmovqw_Xm64_Y = {
 let vpmovqw_Xm64_Y_K ~z = {
     id = Vpmovqw_Xm64_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovqw"
@@ -35525,7 +35525,7 @@ let vpmovsdb_Xm32_X = {
 let vpmovsdb_Xm32_X_K ~z = {
     id = Vpmovsdb_Xm32_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsdb"
@@ -35543,7 +35543,7 @@ let vpmovsdb_Xm64_Y = {
 let vpmovsdb_Xm64_Y_K ~z = {
     id = Vpmovsdb_Xm64_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsdb"
@@ -35633,7 +35633,7 @@ let vpmovsdw_Xm64_X = {
 let vpmovsdw_Xm64_X_K ~z = {
     id = Vpmovsdw_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsdw"
@@ -35723,7 +35723,7 @@ let vpmovsqb_Xm16_X = {
 let vpmovsqb_Xm16_X_K ~z = {
     id = Vpmovsqb_Xm16_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M16|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsqb"
@@ -35741,7 +35741,7 @@ let vpmovsqb_Xm32_Y = {
 let vpmovsqb_Xm32_Y_K ~z = {
     id = Vpmovsqb_Xm32_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsqb"
@@ -35759,7 +35759,7 @@ let vpmovsqb_Xm64_Z = {
 let vpmovsqb_Xm64_Z_K ~z = {
     id = Vpmovsqb_Xm64_Z_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsqb"
@@ -35849,7 +35849,7 @@ let vpmovsqd_Xm64_X = {
 let vpmovsqd_Xm64_X_K ~z = {
     id = Vpmovsqd_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsqd"
@@ -35957,7 +35957,7 @@ let vpmovsqw_Xm32_X = {
 let vpmovsqw_Xm32_X_K ~z = {
     id = Vpmovsqw_Xm32_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsqw"
@@ -35975,7 +35975,7 @@ let vpmovsqw_Xm64_Y = {
 let vpmovsqw_Xm64_Y_K ~z = {
     id = Vpmovsqw_Xm64_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovsqw"
@@ -36065,7 +36065,7 @@ let vpmovswb_Xm64_X = {
 let vpmovswb_Xm64_X_K ~z = {
     id = Vpmovswb_Xm64_X_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovswb"
@@ -36497,7 +36497,7 @@ let vpmovusdb_Xm32_X = {
 let vpmovusdb_Xm32_X_K ~z = {
     id = Vpmovusdb_Xm32_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusdb"
@@ -36515,7 +36515,7 @@ let vpmovusdb_Xm64_Y = {
 let vpmovusdb_Xm64_Y_K ~z = {
     id = Vpmovusdb_Xm64_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusdb"
@@ -36605,7 +36605,7 @@ let vpmovusdw_Xm64_X = {
 let vpmovusdw_Xm64_X_K ~z = {
     id = Vpmovusdw_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusdw"
@@ -36695,7 +36695,7 @@ let vpmovusqb_Xm16_X = {
 let vpmovusqb_Xm16_X_K ~z = {
     id = Vpmovusqb_Xm16_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M16|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusqb"
@@ -36713,7 +36713,7 @@ let vpmovusqb_Xm32_Y = {
 let vpmovusqb_Xm32_Y_K ~z = {
     id = Vpmovusqb_Xm32_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusqb"
@@ -36731,7 +36731,7 @@ let vpmovusqb_Xm64_Z = {
 let vpmovusqb_Xm64_Z_K ~z = {
     id = Vpmovusqb_Xm64_Z_K
   ; ext = [|AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|ZMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusqb"
@@ -36821,7 +36821,7 @@ let vpmovusqd_Xm64_X = {
 let vpmovusqd_Xm64_X_K ~z = {
     id = Vpmovusqd_Xm64_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusqd"
@@ -36929,7 +36929,7 @@ let vpmovusqw_Xm32_X = {
 let vpmovusqw_Xm32_X_K ~z = {
     id = Vpmovusqw_Xm32_X_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M32|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusqw"
@@ -36947,7 +36947,7 @@ let vpmovusqw_Xm64_Y = {
 let vpmovusqw_Xm64_Y_K ~z = {
     id = Vpmovusqw_Xm64_Y_K
   ; ext = [|AVX512VL;AVX512F|]
-  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|YMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovusqw"
@@ -37037,7 +37037,7 @@ let vpmovuswb_Xm64_X = {
 let vpmovuswb_Xm64_X_K ~z = {
     id = Vpmovuswb_Xm64_X_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovuswb"
@@ -37172,7 +37172,7 @@ let vpmovwb_Xm64_X = {
 let vpmovwb_Xm64_X_K ~z = {
     id = Vpmovwb_Xm64_X_K
   ; ext = [|AVX512VL;AVX512BW|]
-  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM;M64|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
+  ; args = (if z then [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|] else [|{ loc = Temp [|XMM|]; enc = RM_rm };{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|K|]; enc = Mask }|])
   ; res = (if z then Res [|{ loc = Temp [|XMM|]; enc = RM_rm }|] else Arg [|0|])
   ; imm = Imm_none
   ; mnemonic = "vpmovwb"
