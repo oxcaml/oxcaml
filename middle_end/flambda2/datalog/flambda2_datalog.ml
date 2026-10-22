@@ -41,17 +41,24 @@ module Datalog = struct
 
   include Datalog
 
+  type 'v repr = 'v Table.result_repr
+
+  let unit_repr = Table.unit_repr
+
+  let lattice_repr ~print ~meet ~diff_or_null =
+    Table.lattice_repr ~print ~meet ~diff_or_null
+
   type (!'t, !'k, !'v) table = ('t, 'k, 'v) Table.Id.t
 
-  let create_table ?(provenance = true) ~name ~result_repr columns =
-    Table.Id.create ~provenance ~name ~columns ~result_repr
+  let create_table ?(provenance = true) ~name columns repr =
+    Table.Id.create ~provenance ~name ~columns ~result_repr:repr
 
   let columns table = Table.Id.columns table
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
   let create_relation ?provenance ~name columns =
-    create_table ?provenance ~name ~result_repr:Table.unit_repr columns
+    create_table ?provenance ~name columns unit_repr
 
   module Schema = struct
     module type S0 = sig
@@ -110,7 +117,7 @@ module Datalog = struct
 
       let result_repr = S.result_repr
 
-      let create ~name = create_table ~name columns ~result_repr
+      let create ~name = create_table ~name columns result_repr
 
       let empty = C.Map.empty
 
@@ -194,7 +201,12 @@ module Datalog = struct
     | `Distinct of equality
     | `Filter of filter ]
 
-  let atom id args = `Atom (Atom (id, args))
+  let atom id args = `Atom (Atom (id, args, None))
+
+  let less_than_or_equal id args term =
+    match term with
+    | Lang.Literal _ -> Misc.fatal_error "Cannot use constants here"
+    | Lang.Variable var -> `Atom (Atom (id, args, Some var))
 
   let not (`Atom atom) = `Not_atom atom
 
@@ -206,11 +218,15 @@ module Datalog = struct
     List.fold_left
       (fun f predicate ->
         match predicate with
-        | `Atom (Atom (id, args)) -> where_atom id args f
-        | `Not_atom (Atom (id, args)) -> unless_atom id args f
+        | `Atom (Atom (id, args, value)) -> where_atom id args value f
+        | `Not_atom (Atom (id, args, _)) -> unless_atom id args f
         | `Distinct (Equality (column, t1, t2)) -> unless_eq column t1 t2 f
         | `Filter (Filter (p, args)) -> Datalog.filter p args f)
       f predicates
+
+  let bind name f args body =
+    let v = Lang.Variable.create name in
+    Datalog.if_let v f args (body (Lang.var v))
 
   module Cursor = struct
     type ('p, 'v) with_parameters = ('p, 'v) Cursor.With_parameters.t

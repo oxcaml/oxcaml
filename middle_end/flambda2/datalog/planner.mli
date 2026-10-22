@@ -31,41 +31,93 @@ open Lang
 
 type 'k column_iterator =
   | Column_iterator :
-      ('t, 'k, 'v) Column.id * 't variable * 'v variable
+      ('t, 'k, 's) Column.id
+      * 't variable
+      * 's variable
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
       -> 'k column_iterator
+
+type check_atom =
+  | Distinct : (_, 'k, _) Column.id * 'k term * 'k term -> check_atom
+  | Unless :
+      ('t, 'k, 'v) Column.hlist * 't variable * 'k Term.hlist
+      -> check_atom
+  | Filter : ('k Constant.hlist -> bool) with_name * 'k Term.hlist -> check_atom
 
 type stage =
   | Join_stage : 'k variable * 'k column_iterator list -> stage
   | Seek_stage : 'k term * 'k column_iterator list -> stage
-  | Check_stage : atom -> stage
+  | Check_stage : check_atom -> stage
+  | Let_stage : 'k variable * 'k term -> stage
+  | If_let_stage :
+      'v variable option
+      * ('k Constant.hlist -> 'v Or_null.t) with_name
+      * 'k Term.hlist
+      -> stage
+  | Existential_stage : stage iarray -> stage
+(* Variables bound by existential stages are not accessible in the output, which
+   allows skipping the full existential stage once we have found any satisfying
+   instance. *)
 
-type bound_table =
-  | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
-
-type head_atom =
+type (_, _) union =
   | Union :
-      ('t, _, _) Table.Id.t
-      * ('t, 'k, 's) Column.hlist
+      ('t, 'k, 's) Column.hlist
       * 'k Term.hlist
       * 's term
       * ('s, _, 'v) Column.hlist
       * 'v Table.result_repr
-      -> head_atom
+      -> ('t, 'v) union
+
+type head_atom =
+  | Output : 't variable * ('t, _) union -> head_atom
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) with_name
       * 'k Term.hlist
       -> head_atom
 
-type plan =
-  { tables : bound_table iarray;
+type rule_plan =
+  { rule_id : int;
+        (** Index in the list of rules provided to [plan_incremental], or [0]
+            for [plan_rule]. *)
+    skip_if_empty : Variable.t_ list;
     input_stages : stage iarray;
-    existential_stages : stage iarray;
-    (* Variables bound by existential stages are not accessible in the output,
-       which allows skipping the full existential stage once we have found any
-       satisfying instance. *)
     output_atoms : head_atom iarray
   }
+
+module Variable_map : Table.Id.Map.S with type 'a elt = 'a variable
+
+module Variable_and_plans_map :
+  Table.Id.Map.S with type 'a elt = 'a variable * rule_plan list
+
+type plan =
+  { rule_plan : rule_plan;
+    inputs : Variable_map.t;
+    outputs : Variable_map.t
+  }
+
+val print_rule_plan : Format.formatter -> rule_plan -> unit
 
 val print_plan : Format.formatter -> plan -> unit
 
 val plan_rule : rule -> plan
+
+type incremental_plan =
+  { initial_plans : rule_plan list;
+        (** Non-incremental version of the rules. *)
+    incremental_plans : Variable_and_plans_map.t;
+        (** For each table appearing as a monotone input of any rule, the
+            variable representing the incremental update ("diff") for that table
+            and the associated rules. *)
+    current_inputs : Variable_map.t;
+        (** For each table appearing as (monotone or non-monotone) input of any
+            rule, the variable representing its "current" state. *)
+    previous_inputs : Variable_map.t;
+        (** For each table appearing as a monotone input of any rule, the
+            variable representing its "previous" state. *)
+    outputs : Variable_map.t
+        (** For each table appearing as output of a rule, the variable
+            representing the facts learned by the plan. *)
+  }
+
+val plan_incremental : rule list -> incremental_plan

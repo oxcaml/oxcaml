@@ -223,8 +223,12 @@ type callee =
   | Symbol of symbol
   | Argument of
       { argument_index : int
-            (** The index of this argument, in the list of the *surrounding*
-                function's arguments. *)
+            (** The index of this argument in the list of arguments to the
+                immediately surrounding closure.
+
+                For example, in [... -> fun g -> fun x f -> f x], the
+                [argument_index] on [f x] would be 1, to refer to the argument
+                [f] (index 1 in the list [["x"; "f"]]). *)
       }
 
 val equal_callee : callee -> callee -> bool
