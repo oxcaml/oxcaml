@@ -36,8 +36,8 @@ let child_named node tag =
 
 (* Decode the small set of XML entities present in the data. *)
 let decode_entities s =
-  let buf = Buffer.create (String.length s) in
   let n = String.length s in
+  let buf = Buffer.create n in
   let i = ref 0 in
   while !i < n do
     match if s.[!i] = '&' then String.index_from_opt s !i ';' else None with
