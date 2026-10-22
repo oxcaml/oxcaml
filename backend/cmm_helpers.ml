@@ -1474,10 +1474,18 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
 
 let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 
-let divide_by_zero dividend ~dbg =
+let divide_by_zero_message = "Division by zero after check"
+
+let divide_by_zero_message_symbol =
+  { sym_name = "caml_divide_by_zero_uncaught";
+    sym_global = Global
+  }
+
+let divide_by_zero dividend ~dbg:_ =
   bind "dividend" dividend (fun _ ->
       (* Unreachable code (since Flambda already introduces a check). *)
-      Cconst_int (0, dbg))
+      Cinvalid { message = divide_by_zero_message;
+                 symbol = divide_by_zero_message_symbol })
 
 let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_negative_one ~dividend ~dbg = neg_int dividend dbg in
@@ -4761,6 +4769,11 @@ let fail_if_called_indirectly_function () =
     }
   in
   [Cdata string_data; Cfunction fn]
+
+(* Error message for division by zero after the check *)
+let emit_divide_by_zero_message () =
+  [ Cdata (emit_string_constant divide_by_zero_message_symbol
+             divide_by_zero_message []) ]
 
 (* Generate the entry point *)
 (*
