@@ -453,7 +453,7 @@ let mode_bound sep f { bound_vars; bound_const } =
 let mode f { txt; _ } =
   match txt with
   | Mode s -> pp_print_string f s
-  | Mode_var v -> pp f "'%s" v.txt
+  | Mode_var v -> pp f "'%s" v
   | Mode_bounds
       { upper = { bound_vars = []; bound_const = [] };
         lower = { bound_vars = []; bound_const = [] } } ->

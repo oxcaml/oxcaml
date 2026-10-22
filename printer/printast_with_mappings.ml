@@ -190,7 +190,7 @@ let mode i ppf (mode : mode loc) =
     line i ppf "mode %a\n" fmt_string_loc { mode with txt = x }
   | Mode_var v ->
     line i ppf "mode %a\n" fmt_location mode.loc;
-    line (i+1) ppf "Mode_var %a\n" fmt_string_loc v
+    line (i+1) ppf "Mode_var \"%s\"\n" v
   | Mode_bounds { upper; lower } ->
     line i ppf "mode %a\n" fmt_location mode.loc;
     line (i+1) ppf "Mode_bounds\n";

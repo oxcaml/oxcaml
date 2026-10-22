@@ -4764,26 +4764,29 @@ strict_function_or_labeled_tuple_type:
   | LIDENT { mkloc $1 (make_loc $sloc) }
 ;
 
-%inline mode_bound_var:
+%inline mode_consts:
+  | mode_const+ { $1 }
+;
+
+%inline mode_morph:
+  | LIDENT { mkloc $1 (make_loc $sloc) }
+;
+
+%inline mode_var:
   | QUOTE ident { mkloc $2 (make_loc $sloc) }
 ;
 
-mode_bound_elem_core:
-  | v = mode_bound_var
-      { { elem_morph = None; elem_var = v; elem_mod = [] } }
-  | morph = mode_const LPAREN v = mode_bound_var RPAREN
-      { { elem_morph = Some morph; elem_var = v; elem_mod = [] } }
-;
-
 mode_bound_elem:
-  | e = mode_bound_elem_core
-      { e }
-  | e = mode_bound_elem_core MOD consts = mode_const+
-      { { e with elem_mod = consts } }
+  | elem_var = mode_var
+    elem_mod = iloption(preceded(MOD, mode_consts))
+      { { elem_morph = None; elem_var; elem_mod } }
+  | elem_morph = mode_morph LPAREN elem_var = mode_var RPAREN
+    elem_mod = iloption(preceded(MOD, mode_consts))
+      { { elem_morph = Some elem_morph; elem_var; elem_mod } }
 ;
 
 mode_bound(SEP):
-  | consts = mode_const+
+  | consts = mode_consts
       { { bound_vars = []; bound_const = consts } }
   | e = mode_bound_elem
       { { bound_vars = [e]; bound_const = [] } }
@@ -4791,27 +4794,20 @@ mode_bound(SEP):
       { { rest with bound_vars = e :: rest.bound_vars } }
 ;
 
-%inline empty_mode_bound:
-  | { { bound_vars = []; bound_const = [] } }
-;
-
-%inline nonconst_mode:
-  | v = mode_bound_var { mkloc (Mode_var v) (make_loc $sloc) }
-  | LBRACKETLESS upper = mode_bound(AMPERSAND) lower = empty_mode_bound
-    RBRACKET
-      { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
+mode_bounds:
+  | LBRACKETLESS upper = mode_bound(AMPERSAND) RBRACKET
+      { { upper; lower = { bound_vars = []; bound_const = [] } } }
   | LBRACKETLESS upper = mode_bound(AMPERSAND) GREATER
     lower = mode_bound(BAR) RBRACKET
-      { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
-  | LBRACKETGREATER upper = empty_mode_bound lower = mode_bound(BAR) RBRACKET
-      { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
+      { { upper; lower } }
+  | LBRACKETGREATER lower = mode_bound(BAR) RBRACKET
+      { { upper = { bound_vars = []; bound_const = [] }; lower } }
 ;
 
 %inline mode:
-  | c = mode_const
-      { mkloc (Mode c.txt) c.loc }
-  | m = nonconst_mode
-      { m }
+  | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
+  | v = mode_var { mkloc (Mode_var v.txt) v.loc }
+  | b = mode_bounds { mkloc (Mode_bounds b) (make_loc $sloc) }
 ;
 
 %inline mode_expr:

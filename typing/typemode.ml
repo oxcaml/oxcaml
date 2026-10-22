@@ -250,7 +250,7 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let mode_const_of_modes annots =
+let mode_consts_of_modes annots =
   List.map
     (fun { txt; loc } ->
       match (txt : Parsetree.mode) with
@@ -266,7 +266,7 @@ let transl_mode_annots annots =
         try { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
-      (mode_const_of_modes annots)
+      (mode_consts_of_modes annots)
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
@@ -684,7 +684,7 @@ let transl_mod_bounds ?(warn = true) annots =
           in
           nonmodal, base, atoms, seen_ev)
       (Nonmodal_bounds.empty, Modality.Const.id, [], false)
-      (mode_const_of_modes annots)
+      (mode_consts_of_modes annots)
     |> fun (nm, base, atoms, _) ->
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
