@@ -1069,6 +1069,15 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
 
 let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
+  let env =
+    { env with
+      arguments =
+        match Variable.Map.find_opt alias_of env.arguments with
+        | None -> env.arguments
+        | Some argument_index ->
+          Variable.Map.add (Bound_var.var var) argument_index env.arguments
+    }
+  in
   let num_occurrences_of_var : Num_occurrences.t =
     let var = Bound_var.var var in
     match Variable.Map.find var num_normal_occurrences_of_bound_vars with
