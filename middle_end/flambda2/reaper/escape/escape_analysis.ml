@@ -209,9 +209,18 @@ let flow_rules =
              when1 Field.is_real_field relation;
              is_candidate base ]
            ==> contained_in a base);
-          (* Reached by unknown code. *)
-          (let$ [x; a] = ["x"; "a"] in
-           [candidate_source x a; any_usage x] ==> escapes_anywhere a);
+          (* Reached by unknown code. [any_usage] is propagated backwards along
+             aliases by the points-to analysis, so it is enough to test the
+             allocation itself, and the partial applications of a closure. *)
+          (let$ [a] = ["a"] in
+           [is_candidate a; any_usage a] ==> escapes_anywhere a);
+          (let$ [a; wit; c; q] = ["a"; "wit"; "c"; "q"] in
+           [ is_candidate a;
+             constructor ~base:a !!Field.known_arity_call_witness ~from:wit;
+             constructor ~base:wit !!Field.code_id_of_call_witness ~from:c;
+             partial_application_of_code c q;
+             any_usage q ]
+           ==> escapes_anywhere a);
           (* Stored in a block that is not a candidate. *)
           (let$ [x; relation; base; a] = ["x"; "relation"; "base"; "a"] in
            [ candidate_source x a;
@@ -251,9 +260,10 @@ let scope_rules =
            ==> returned a s);
           (let$ [a; b] = ["a"; "b"] in
            [contained_in a b; escapes b] ==> escapes a);
-          (* Leaving an owning scope. *)
-          (let$ [s; x; a] = ["s"; "x"; "a"] in
-           [scope_exit ~scope:s ~param:x; candidate_source x a; owner a s]
+          (* Leaving an owning scope. Driven by [owner], which is small: the
+             scope exits are then looked up in [candidate_source]. *)
+          (let$ [a; s; x] = ["a"; "s"; "x"] in
+           [owner a s; scope_exit ~scope:s ~param:x; candidate_source x a]
            ==> escapes a);
           (let$ [a; s] = ["a"; "s"] in
            [owner a s; unsafe_scope s] ==> escapes a);
