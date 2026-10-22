@@ -1048,8 +1048,7 @@ let default_mapper =
     mode = (fun this { txt; loc } ->
       let txt =
         match txt with
-        | Mode _ as mode -> mode
-        | Mode_var v -> Mode_var (map_loc this v)
+        | (Mode _ | Mode_var _) as mode -> mode
         | Mode_bounds { upper; lower } ->
           Mode_bounds
             { upper = this.mode_bound this upper;
