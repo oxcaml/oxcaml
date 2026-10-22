@@ -40,7 +40,8 @@ val block_like :
 
 (** Prepare a static block of code to be translated: reserve its address and
     parameter variables, and add them and any used value or function slots to
-    the environment. No instructions are emitted. *)
+    the environment. If the code does not depend on its closure, also bind its
+    shared closure in the enclosing block. *)
 val prepare_code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
@@ -48,8 +49,7 @@ val prepare_code :
   Flambda.function_params_and_body Code0.t ->
   To_jsir_env.t * To_jsir_result.t
 
-(** Translate a static block of code, emitting its shared closure in the
-    enclosing block if it does not depend on its closure. *)
+(** Translate a static block of code. *)
 val code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
