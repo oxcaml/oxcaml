@@ -52,13 +52,14 @@ val transl_primitive_application :
   Lambda.lambda list -> Typedtree.expression list ->
   Lambda.region_close -> Lambda.lambda
 
-(** [sort_of_native_repr] returns the sort expected after typechecking (which
-    may be different than the sort used in the external interface).
+(** [sort_of_native_repr_or_elided] returns the sort expected after typechecking
+    (which may be different than the sort used in the external interface).
 
-    [poly_sort] must be [Some sort] when [Repr_poly] is given. It will produce
-    fatal error if it's [None].  *)
-val sort_of_native_repr :
-  poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Jkind.Sort.Const.t
+    [Elided_void] has sort [void]. [poly_sort] must be [Some sort] when
+    [Native_repr Repr_poly] is given; [None] produces a fatal error. *)
+val sort_of_native_repr_or_elided :
+  poly_sort:Jkind.Sort.t option -> Primitive.native_repr_or_elided ->
+  Jkind.Sort.Const.t
 
 (* Errors *)
 

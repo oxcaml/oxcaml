@@ -210,6 +210,9 @@ type error =
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
   | Multiple_native_repr_attributes
+  | Elide_void_on_non_void
+  | Elide_void_in_return_position
+  | All_external_arguments_elided
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error

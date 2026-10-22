@@ -239,10 +239,16 @@ let sort_of_native_repr ~poly_sort repr =
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
 
+let sort_of_native_repr_or_elided ~poly_sort = function
+  | Elided_void -> Jkind.Sort.Const.void
+  | Native_repr r -> sort_of_native_repr ~poly_sort r
+
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
-    List.map
-    (fun (m, r) -> m, extern_repr_of_native_repr ~poly_sort r)
+    List.filter_map
+    (function
+      | _, Elided_void -> None
+      | m, Native_repr r -> Some (m, extern_repr_of_native_repr ~poly_sort r))
       prim.prim_native_repr_args
   in
   let native_repr_res =
@@ -629,7 +635,12 @@ let array_vec_primitives =
 let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
-    List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
+    List.filter_map
+      (function
+        | _, Elided_void -> None
+        | (_, Native_repr _) as repr ->
+          Some (to_modify_mode ~poly:poly_mode repr))
+      p.prim_native_repr_args
   in
   let get_first_arg_mode () =
     match arg_modes with
@@ -1829,21 +1840,22 @@ let layout_of_ty_for_idx_set env loc ty =
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
-let specialize_primitive env loc ty ~has_constant_constructor prim =
-  let param_tys, rest_ty =
-    match is_function_type env ty with
-    | None -> [], ty
-    | Some (p1, rhs) ->
-      match is_function_type env rhs with
-      | None -> [p1], rhs
-      | Some (p2, rhs) ->
-        match is_function_type env rhs with
-        | None -> [p1;p2], rhs
-        | Some (p3, rhs) ->
-          match is_function_type env rhs with
-          | None -> [p1;p2;p3], rhs
-          | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
+let specialize_primitive env loc (p : Primitive.description) ty
+      ~has_constant_constructor prim =
+  let rec parameter_types reprs ty =
+    match reprs with
+    | [] -> [], ty
+    | (_, repr) :: reprs ->
+      match is_function_type env ty with
+      | None -> [], ty
+      | Some (arg_ty, result_ty) ->
+        let param_tys, rest_ty = parameter_types reprs result_ty in
+        match repr with
+        | Elided_void -> param_tys, rest_ty
+        | Native_repr _ -> arg_ty :: param_tys, rest_ty
   in
+  let param_tys, rest_ty = parameter_types p.prim_native_repr_args ty in
+  let resolved_params = List.length param_tys in
   match prim, param_tys with
   | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
       match fst (maybe_pointer_type env p2) with
@@ -1852,9 +1864,11 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     end
   | Primitive (Pfield (n, Pointer, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
-      let is_int = match is_function_type env ty with
-        | None -> Pointer
-        | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
+      let is_int =
+        if resolved_params <> 1
+        then Pointer
+        else fst (maybe_pointer_type env rest_ty)
+      in
       Some (Primitive (Pfield (n, is_int, mut), arity))
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
@@ -2004,15 +2018,15 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       None
     end
   | Peek _, _ -> (
-    match is_function_type env ty with
+    if resolved_params <> 1
+    then None
+    else
+    match
+      peek_or_poke_layout_from_type ~prim_name:"peek"
+        (to_location loc) env rest_ty
+    with
     | None -> None
-    | Some (_p1, result_ty) ->
-      match
-        peek_or_poke_layout_from_type ~prim_name:"peek"
-          (to_location loc) env result_ty
-      with
-      | None -> None
-      | Some contents_layout -> Some (Peek (Some contents_layout))
+    | Some contents_layout -> Some (Peek (Some contents_layout))
   )
   | Poke _, _ptr_ty :: new_value_ty :: _ -> (
     match
@@ -2023,23 +2037,20 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     | Some contents_layout -> Some (Poke (Some contents_layout))
   )
   | Atomic (Load, Field_like ((Ref | Loc) as kind, Pointer)), _ ->
-    (match is_function_type env ty with
-    | None -> None
-    | Some (_, rhs) ->
-      match fst (maybe_pointer_type env rhs) with
-      | Pointer -> None
-      | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
+    if resolved_params <> 1
+    then None
+    else (
+    match fst (maybe_pointer_type env rest_ty) with
+    | Pointer -> None
+    | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
   | Atomic (Load, Field_like (Field, Pointer)), _ ->
-    (match is_function_type env ty with
-    | None -> None
-    | Some (_, ty) ->
-      match is_function_type env ty with
-      | None -> None
-      | Some (_, rhs) ->
-        match fst (maybe_pointer_type env rhs) with
-        | Pointer -> None
-        | Immediate ->
-          Some (Atomic (Load, Field_like (Field, Immediate))))
+    if resolved_params <> 2
+    then None
+    else (
+    match fst (maybe_pointer_type env rest_ty) with
+    | Pointer -> None
+    | Immediate ->
+      Some (Atomic (Load, Field_like (Field, Immediate))))
   | Atomic (Set _ as op, Field_like ((Ref | Loc) as kind, Pointer)), [_; v]
   | Atomic (Set _ as op, Field_like (Field as kind, Pointer)), [_; _; v]
   | Atomic (Exchange _ as op, Field_like ((Ref | Loc) as kind, Pointer)),
@@ -2576,23 +2587,33 @@ let check_primitive_arity loc p =
   in
   let ok =
     match prim with
-    | Primitive (_,arity) -> arity = p.prim_arity
+    | Primitive (_,arity) -> arity = p.prim_apply_arity
     | External _ -> true
-    | Sys_argv -> p.prim_arity = 0
-    | Comparison _ -> p.prim_arity = 2
-    | Raise _ -> p.prim_arity = 1
-    | Raise_with_backtrace -> p.prim_arity = 2
-    | Lazy_force _ -> p.prim_arity = 1
-    | Loc _ -> p.prim_arity = 1 || p.prim_arity = 0
-    | Send _ | Send_self _ -> p.prim_arity = 2
-    | Send_cache _ -> p.prim_arity = 4
-    | Frame_pointers -> p.prim_arity = 0
-    | Identity | Peek _ -> p.prim_arity = 1
-    | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
-    | Atomic (op, kind) -> p.prim_arity = atomic_arity op kind
+    | Sys_argv -> p.prim_apply_arity = 0
+    | Comparison _ -> p.prim_apply_arity = 2
+    | Raise _ -> p.prim_apply_arity = 1
+    | Raise_with_backtrace -> p.prim_apply_arity = 2
+    | Lazy_force _ -> p.prim_apply_arity = 1
+    | Loc _ -> p.prim_apply_arity = 1 || p.prim_apply_arity = 0
+    | Send _ | Send_self _ -> p.prim_apply_arity = 2
+    | Send_cache _ -> p.prim_apply_arity = 4
+    | Frame_pointers -> p.prim_apply_arity = 0
+    | Identity | Peek _ -> p.prim_apply_arity = 1
+    | Apply _ | Revapply _ | Poke _ -> p.prim_apply_arity = 2
+    | Atomic (op, kind) -> p.prim_apply_arity = atomic_arity op kind
     | Unsupported _ -> true
   in
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
+
+(* For an [args] list that zippable with the parameters of [p], produce the
+   sublist of [args] that corresponds to the non-elided parameters of [p]. *)
+let filter_elided_args (p : Primitive.description) args =
+  List.filter_map
+    (fun ((_, repr), arg) ->
+      match repr with
+      | Elided_void -> None
+      | Native_repr _ -> Some arg)
+    (List.combine p.prim_native_repr_args args)
 
 (* Eta-expand a primitive *)
 
@@ -2614,7 +2635,7 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
     | _ -> false
   in
   if should_specialize_primitive p then
-    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    match specialize_primitive env loc p ty ~has_constant_constructor prim with
     | None -> prim
     | Some prim -> prim
   else
@@ -2626,7 +2647,7 @@ let transl_primitive
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
   in
-  let to_locality = to_locality ~poly:poly_mode in
+  let to_locality repr = to_locality ~poly:poly_mode repr in
   let error_loc = to_location loc in
   let rec make_params ty repr_args repr_res =
     match repr_args, repr_res with
@@ -2639,7 +2660,7 @@ let transl_primitive
           Misc.fatal_errorf "Primitive %s type does not correspond to arity"
             (Primitive.byte_name p)
       | Some (arg_ty, ret_ty) ->
-          let arg_sort = sort_of_native_repr arg_repr ~poly_sort in
+          let arg_sort = sort_of_native_repr_or_elided arg_repr ~poly_sort in
           let arg_layout =
             Typeopt.layout env error_loc arg_sort arg_ty
           in
@@ -2659,7 +2680,9 @@ let transl_primitive
   let params, return =
     make_params ty p.prim_native_repr_args p.prim_native_repr_res
   in
-  let args = List.map (fun p -> Lvar p.name) params in
+  let args =
+    filter_elided_args p (List.map (fun p -> Lvar p.name) params)
+  in
   let yielding = transl_yielding_mode_l yielding in
   match params with
   | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
@@ -2878,9 +2901,10 @@ let primitive_needs_event_after = function
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     ~yielding path exp args arg_exps pos =
+  let apply_arg_exps = filter_elided_args p arg_exps in
   let prim =
     transl_primitive_common
-      loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
+      loc ~poly_mode ~poly_sort pos p env ty (Some path) apply_arg_exps
   in
   if stack then begin
     match prim with
@@ -2905,19 +2929,44 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
-  let lam =
-    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
-  in
-  let lam =
-    if primitive_needs_event_after prim then begin
+  let build args =
+    let lam =
+      lambda_of_prim p.prim_name prim ~yielding loc args (Some apply_arg_exps)
+    in
+    if primitive_needs_event_after prim then
       match exp with
       | None -> lam
       | Some exp -> event_after loc exp lam
-    end else begin
-      lam
-    end
+    else lam
   in
-  lam
+  if p.prim_apply_arity = p.prim_type_arity then build args
+  else
+    let short_circuit =
+      match p.prim_name with
+      | "%sequand" | "%sequor" -> true
+      | _ -> false
+    in
+    (* Evaluate strict arguments right-to-left, discarding only elided
+       arguments. We eagerly evaluate the elided arguments of short-circuiting
+       operators (while keeping the RHS lazy). *)
+    let rec bind_args reprs args arg_exps k =
+      match reprs, args, arg_exps with
+      | [], [], [] -> k []
+      | (_, repr) :: reprs, arg :: args, arg_exp :: arg_exps ->
+        bind_args reprs args arg_exps (fun args ->
+          match repr with
+          | Elided_void -> Lsequence (arg, k args)
+          | Native_repr _ when short_circuit -> k (arg :: args)
+          | Native_repr repr ->
+            let sort = sort_of_native_repr ~poly_sort repr in
+            let layout =
+              Typeopt.layout env arg_exp.exp_loc sort arg_exp.exp_type
+            in
+            name_lambda Strict arg layout (fun id -> k (Lvar id :: args)))
+      | _ ->
+        Misc.fatal_error "transl_primitive_application: argument mismatch"
+    in
+    bind_args p.prim_native_repr_args args arg_exps build
 
 (* Error report *)
 

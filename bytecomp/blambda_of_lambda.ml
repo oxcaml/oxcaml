@@ -893,7 +893,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       in
       Prim (Setfield last_idx, [target_block; value_expr])
     | Pduprecord _ -> unary (Ccall "caml_obj_dup")
-    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
+    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_apply_arity
     | Pperform -> context_switch Perform ~arity:1
     | Poffsetref n -> unary (Offsetref n)
     | Pstringlength -> unary (Ccall "caml_ml_string_length")
