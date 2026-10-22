@@ -105,20 +105,20 @@ module Genarray = struct
      : ('a : any) ('b : any) ('c : any).
        ('a, 'b) kind -> 'c layout -> (int array[@local_opt])
        -> ('a, 'b, 'c) t @ unique
-     @@ portable
+     @@ stateless
      = "caml_ba_create"
   external get
      : ('a : value_or_null) ('b : any) ('c : any).
        (('a, 'b, 'c) t[@local_opt]) @ read
        -> (int array[@local_opt])
        -> 'a
-     @@ portable
+     @@ stateless
      = "caml_ba_get_generic"
   external set
      : ('a : value_or_null) ('b : any) ('c : any).
        (('a, 'b, 'c) t[@local_opt]) -> (int array[@local_opt])
        -> ('a[@local_opt]) -> unit
-     @@ portable
+     @@ stateless
      = "caml_ba_set_generic"
 
   let rec cloop arr idx f col (max @ local) =
@@ -166,7 +166,7 @@ module Genarray = struct
     = "caml_ba_layout"
   external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
      = "caml_ba_change_layout"
 
   let size_in_bytes arr =
@@ -174,33 +174,33 @@ module Genarray = struct
 
   external sub_left
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ portable
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
      = "caml_ba_sub"
   external sub_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
-    @@ portable
+    @@ stateless
      = "caml_ba_sub"
   external slice_left
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, c_layout) t -> (int array[@local_opt]) -> ('a, 'b, c_layout) t
-    @@ portable
+    @@ stateless
      = "caml_ba_slice"
   external slice_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> (int array[@local_opt])
-      -> ('a, 'b, fortran_layout) t @@ portable
+      -> ('a, 'b, fortran_layout) t @@ stateless
      = "caml_ba_slice"
   external blit
      : ('a : any) ('b : any) ('c : any).
        (('a, 'b, 'c) t[@local_opt]) @ read
        -> (('a, 'b, 'c) t[@local_opt])
        -> unit
-     @@ portable
+     @@ stateless
      = "caml_ba_blit"
   external fill
      : ('a : value_or_null) ('b : any) ('c : any).
-       (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ portable
+       (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
      = "caml_ba_fill"
 end
 
@@ -221,7 +221,7 @@ module Array0 = struct
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr = kind_size_in_bytes (kind arr)
@@ -230,11 +230,11 @@ module Array0 = struct
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
       -> unit
-    @@ portable
+    @@ stateless
     = "caml_ba_blit"
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ portable
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
 
   let of_value kind layout v =
@@ -251,22 +251,22 @@ module Array1 = struct
   external get
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> ('a[@local_opt])
-    @@ portable
+    @@ stateless
     = "%caml_ba_ref_1"
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
-    @@ portable
+    @@ stateless
     = "%caml_ba_set_1"
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> ('a[@local_opt])
-    @@ portable
+    @@ stateless
     = "%caml_ba_unsafe_ref_1"
   external unsafe_set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> ('a[@local_opt]) -> unit
-    @@ portable
+    @@ stateless
     = "%caml_ba_unsafe_set_1"
   external dim
     : ('a : any) ('b : any) ('c : any).
@@ -289,13 +289,13 @@ module Array1 = struct
   external unsafe_smart_globalize
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, 'c) t @ local -> ('a, 'b, 'c) t
-    @@ portable
+    @@ stateless
     = "caml_ba_unsafe_smart_globalize"
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> 'd layout -> (('a, 'b, 'd) t[@local_opt])
-    @@ portable
+    @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
@@ -304,7 +304,7 @@ module Array1 = struct
   external sub
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> (('a, 'b, 'c) t[@local_opt])
-    @@ portable
+    @@ stateless
     = "caml_ba_sub"
 
   let slice (type (a : any) (b : any) (c : any)) (a : (a, b, c) Genarray.t) n =
@@ -315,11 +315,11 @@ module Array1 = struct
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
       -> unit
-    @@ portable
+    @@ stateless
     = "caml_ba_blit"
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ portable
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   let c_init arr dim f =
     for i = 0 to pred dim do unsafe_set arr i (f i) done
@@ -355,12 +355,12 @@ module Array2 = struct
       -> int
       -> int
       -> ('a[@local_opt])
-    @@ portable
+    @@ stateless
     = "%caml_ba_ref_2"
   external set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
-    @@ portable
+    @@ stateless
     = "%caml_ba_set_2"
   external unsafe_get
     : ('a : value_or_null) ('b : any) ('c : any).
@@ -368,12 +368,12 @@ module Array2 = struct
       -> int
       -> int
       -> ('a[@local_opt])
-    @@ portable
+    @@ stateless
     = "%caml_ba_unsafe_ref_2"
   external unsafe_set
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> int -> int -> ('a[@local_opt]) -> unit
-    @@ portable
+    @@ stateless
     = "%caml_ba_unsafe_set_2"
   external dim1
     : ('a : any) ('b : any) ('c : any).
@@ -394,7 +394,7 @@ module Array2 = struct
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
@@ -402,12 +402,12 @@ module Array2 = struct
 
   external sub_left
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ portable
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
      = "caml_ba_sub"
   external sub_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
-    @@ portable
+    @@ stateless
      = "caml_ba_sub"
   let slice_left a n = Genarray.slice_left a [|n|]
   let slice_right a n = Genarray.slice_right a [|n|]
@@ -415,11 +415,11 @@ module Array2 = struct
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> (('a, 'b, 'c) t[@local_opt])
       -> unit
-    @@ portable
+    @@ stateless
     = "caml_ba_blit"
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ portable
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   let c_init arr dim1 dim2 f =
     for i = 0 to pred dim1 do
@@ -468,25 +468,25 @@ module Array3 = struct
     : ('a : value_or_null) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ read -> int -> int -> int
       -> ('a[@local_opt])
-    @@ portable
+    @@ stateless
     = "%caml_ba_ref_3"
   external set
      : ('a : value_or_null) ('b : any) ('c : any).
        (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
        -> unit
-     @@ portable
+     @@ stateless
      = "%caml_ba_set_3"
   external unsafe_get
      : ('a : value_or_null) ('b : any) ('c : any).
        (('a, 'b, 'c) t[@local_opt]) @ read -> int -> int -> int
        -> ('a[@local_opt])
-     @@ portable
+     @@ stateless
      = "%caml_ba_unsafe_ref_3"
   external unsafe_set
      : ('a : value_or_null) ('b : any) ('c : any).
        (('a, 'b, 'c) t[@local_opt]) -> int -> int -> int -> ('a[@local_opt])
        -> unit
-     @@ portable
+     @@ stateless
      = "%caml_ba_unsafe_set_3"
   external dim1
     : ('a : any) ('b : any) ('c : any).
@@ -511,7 +511,7 @@ module Array3 = struct
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ portable
+      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t @@ stateless
     = "caml_ba_change_layout"
 
   let size_in_bytes arr =
@@ -519,12 +519,12 @@ module Array3 = struct
 
   external sub_left
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ portable
+      ('a, 'b, c_layout) t -> int -> int -> ('a, 'b, c_layout) t @@ stateless
      = "caml_ba_sub"
   external sub_right
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, fortran_layout) t -> int -> int -> ('a, 'b, fortran_layout) t
-    @@ portable
+    @@ stateless
      = "caml_ba_sub"
   let slice_left_1 a n m = Genarray.slice_left a [|n; m|]
   let slice_right_1 a n m = Genarray.slice_right a [|n; m|]
@@ -535,11 +535,11 @@ module Array3 = struct
       (('a, 'b, 'c) t[@local_opt]) @ read
       -> (('a, 'b, 'c) t[@local_opt])
       -> unit
-    @@ portable
+    @@ stateless
     = "caml_ba_blit"
   external fill
     : ('a : value_or_null) ('b : any) ('c : any).
-      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ portable
+      (('a, 'b, 'c) t[@local_opt]) -> ('a[@local_opt]) -> unit @@ stateless
     = "caml_ba_fill"
   let c_init arr dim1 dim2 dim3 f =
     for i = 0 to pred dim1 do
@@ -593,22 +593,22 @@ end
 external genarray_of_array0
   : ('a : any) ('b : any) ('c : any).
     (('a, 'b, 'c) Array0.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ portable
+  @@ stateless
   = "%identity"
 external genarray_of_array1
   : ('a : any) ('b : any) ('c : any).
     (('a, 'b, 'c) Array1.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ portable
+  @@ stateless
   = "%identity"
 external genarray_of_array2
   : ('a : any) ('b : any) ('c : any).
     (('a, 'b, 'c) Array2.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ portable
+  @@ stateless
   = "%identity"
 external genarray_of_array3
   : ('a : any) ('b : any) ('c : any).
     (('a, 'b, 'c) Array3.t[@local_opt]) -> (('a, 'b, 'c) Genarray.t[@local_opt])
-  @@ portable
+  @@ stateless
   = "%identity"
 let array0_of_genarray a =
   if Genarray.num_dims a = 0 then a
@@ -627,7 +627,7 @@ external reshape
   : ('a : any) ('b : any) ('c : any).
     ('a, 'b, 'c) Genarray.t -> (int array[@local_opt])
     -> ('a, 'b, 'c) Genarray.t
-  @@ portable
+  @@ stateless
    = "caml_ba_reshape"
 let reshape_0 a = reshape a [||]
 let reshape_1 a dim1 = reshape a [|dim1|]
@@ -645,9 +645,9 @@ let _ =
   ()
 
 [@@@ocaml.warning "-32"]
-external get1: unit -> unit @@ portable = "caml_ba_get_1"
-external get2: unit -> unit @@ portable = "caml_ba_get_2"
-external get3: unit -> unit @@ portable = "caml_ba_get_3"
-external set1: unit -> unit @@ portable = "caml_ba_set_1"
-external set2: unit -> unit @@ portable = "caml_ba_set_2"
-external set3: unit -> unit @@ portable = "caml_ba_set_3"
+external get1: unit -> unit @@ stateless = "caml_ba_get_1"
+external get2: unit -> unit @@ stateless = "caml_ba_get_2"
+external get3: unit -> unit @@ stateless = "caml_ba_get_3"
+external set1: unit -> unit @@ stateless = "caml_ba_set_1"
+external set2: unit -> unit @@ stateless = "caml_ba_set_2"
+external set3: unit -> unit @@ stateless = "caml_ba_set_3"
