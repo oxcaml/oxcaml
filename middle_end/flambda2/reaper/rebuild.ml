@@ -60,12 +60,15 @@ type 'f env =
       Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
     should_preserve_direct_calls : should_preserve_direct_calls;
     inside_code_definition : bool;
-    escape : Escape_rebuild.t
+    escape : rebuild_result Escape_rebuild.t
   }
 
-type rebuild_result =
+and rebuild_result =
   { all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
+    code_ids_to_remember : Code_id.Set.t;
+    (* Region-closing continuations pending for the enclosing region scopes (see
+       [Escape_rebuild]). *)
+    escape_closers : Escape_rebuild.closers
   }
 
 let freshen_decisions :
@@ -2083,28 +2086,31 @@ and rebuild_holed env res (rev_expr : Rev_expr.rev_expr_holed) (hole : RE.t) :
 and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
     RE.t * rebuild_result =
   let { Rev_expr.expr; holed_expr } = rev_expr in
-  let expr =
+  let expr, res =
     match expr with
     | Invalid { message } ->
-      RE.from_expr
-        ~expr:(Expr.create_invalid (Message message))
-        ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+      ( RE.from_expr
+          ~expr:(Expr.create_invalid (Message message))
+          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
+        res )
     | Apply_cont ac -> (
       match rewrite_apply_cont_expr env ac with
       | None ->
-        RE.from_expr
-          ~expr:
-            (Expr.create_invalid
-               (Message
-                  (Format.asprintf "Dead variable in apply cont: %a"
-                     Apply_cont_expr.print ac)))
-          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+        ( RE.from_expr
+            ~expr:
+              (Expr.create_invalid
+                 (Message
+                    (Format.asprintf "Dead variable in apply cont: %a"
+                       Apply_cont_expr.print ac)))
+            ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
+          res )
       | Some ac ->
         let expr = Expr.create_apply_cont ac in
         let free_names = Apply_cont_expr.free_names ac in
-        Escape_rebuild.end_regions_before_jump env.escape
-          (Apply_cont_expr.continuation ac)
-          (RE.from_expr ~expr ~free_names ~code_size:(Code_size.apply_cont ac)))
+        ( Escape_rebuild.end_regions_before_jump env.escape
+            (Apply_cont_expr.continuation ac)
+            (RE.from_expr ~expr ~free_names ~code_size:(Code_size.apply_cont ac)),
+          res ))
     | Switch switch ->
       let arms =
         Target_ocaml_int.Map.filter_map
@@ -2118,12 +2124,16 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
                    action))
           (Switch_expr.arms switch)
       in
-      let arms, closers = Escape_rebuild.redirect_switch_arms env.escape arms in
+      let arms, escape_closers =
+        Escape_rebuild.redirect_switch_arms env.escape res.escape_closers arms
+      in
+      let res = { res with escape_closers } in
       if Target_ocaml_int.Map.is_empty arms
       then
-        RE.from_expr
-          ~expr:(Expr.create_invalid Zero_switch_arms)
-          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+        ( RE.from_expr
+            ~expr:(Expr.create_invalid Zero_switch_arms)
+            ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
+          res )
       else
         let switch =
           Switch_expr.create
@@ -2135,10 +2145,13 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
         in
         let expr = Expr.create_switch switch in
         let free_names = Switch_expr.free_names switch in
-        Escape_rebuild.bind_closers closers
-          (RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch))
+        RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch), res
     | Apply apply ->
-      Escape_rebuild.rebuild_apply env.escape apply ~rebuild:(rebuild_apply env)
+      let expr, escape_closers =
+        Escape_rebuild.rebuild_apply env.escape res.escape_closers apply
+          ~rebuild:(rebuild_apply env)
+      in
+      expr, { res with escape_closers }
   in
   rebuild_holed env res holed_expr expr
 
@@ -2470,12 +2483,19 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
                  (Continuation.Map.find k cont_params_to_keep)))
           ~conts_per_scope:scope_conts ~continuation_info ~machine_width
           ~return_continuation:(Flambda_unit.return_continuation unit)
+          ~closers_of:(fun (res : rebuild_result) -> res.escape_closers)
+          ~with_closers:(fun escape_closers res -> { res with escape_closers })
     }
   in
   let res =
-    { all_code = Code_id.Map.empty; code_ids_to_remember = Code_id.Set.empty }
+    { all_code = Code_id.Map.empty;
+      code_ids_to_remember = Code_id.Set.empty;
+      escape_closers = Escape_rebuild.no_closers
+    }
   in
-  let rebuilt_expr, ({ all_code; code_ids_to_remember } : rebuild_result) =
+  let ( rebuilt_expr,
+        ({ all_code; code_ids_to_remember; escape_closers = _ } :
+          rebuild_result) ) =
     Profile.record_call ~accumulate:true "up" (fun () ->
         let res =
           Array.fold_left

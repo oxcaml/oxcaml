@@ -17,6 +17,15 @@ module K = Flambda_kind
 module P = Flambda_primitive
 module RE = Rebuilt_expr
 
+(* The continuations closing the regions left by a jump from a [Switch] arm or a
+   non-tail application (see [closer]), shared by all such jumps of a region and
+   bound at the start of its scope. They are accumulated in the result of the
+   rebuilding, keyed by the region. *)
+type closers =
+  (Continuation.t * RE.continuation_handler) Continuation.Map.t Variable.Map.t
+
+let no_closers = Variable.Map.empty
+
 type region =
   { region : Variable.t;
     ghost_region : Variable.t;
@@ -26,7 +35,7 @@ type region =
     closable : bool
   }
 
-type t =
+type 'r t =
   { solution : Escape_solution.t;
     code_ids_directly_called : Name.t -> Code_id.Set.t Or_unknown.t;
     params_of_continuation : Continuation.t -> Bound_parameter.t list;
@@ -39,11 +48,15 @@ type t =
     return_continuation : Continuation.t;
     (* The regions of the enclosing region scopes being rebuilt, innermost
        first. *)
-    regions : region list
+    regions : region list;
+    (* Access to the closers in the result of the rebuilding. *)
+    closers_of : 'r -> closers;
+    with_closers : closers -> 'r -> 'r
   }
 
 let create ~solution ~code_ids_directly_called ~params_of_continuation
-    ~conts_per_scope ~continuation_info ~machine_width ~return_continuation =
+    ~conts_per_scope ~continuation_info ~machine_width ~return_continuation
+    ~closers_of ~with_closers =
   { solution;
     code_ids_directly_called;
     params_of_continuation;
@@ -51,7 +64,9 @@ let create ~solution ~code_ids_directly_called ~params_of_continuation
     continuation_info;
     machine_width;
     return_continuation;
-    regions = []
+    regions = [];
+    closers_of;
+    with_closers
   }
 
 (* Turn a heap allocation into a stack allocation in the region of the innermost
@@ -195,73 +210,70 @@ let set_local_return_mode t apply =
 
 (* A continuation that closes the regions left when jumping to [k], then jumps
    to [k]. Used where an [End_region] cannot simply be inserted before the jump:
-   [Switch] arms, and non-tail applications returning to [k]. Such closing
-   continuations are bound locally, around the [Switch] or the application. *)
-type closers = (Continuation.t * RE.continuation_handler) list
+   [Switch] arms, and non-tail applications returning to [k]. *)
+let closer t closers k =
+  match t.regions with
+  | [] ->
+    Misc.fatal_errorf "[closer]: no region to close before jumping to %a"
+      Continuation.print k
+  | innermost :: _ -> (
+    let region_closers =
+      Option.value ~default:Continuation.Map.empty
+        (Variable.Map.find_opt innermost.region closers)
+    in
+    match Continuation.Map.find_opt k region_closers with
+    | Some (k_close, _) -> k_close, closers
+    | None ->
+      let k_close = Continuation.create () in
+      let params = t.params_of_continuation k in
+      let apply_cont =
+        Apply_cont_expr.create k
+          ~args:(List.map (fun p -> Simple.var (Bound_parameter.var p)) params)
+          ~dbg:Debuginfo.none
+      in
+      let handler =
+        RE.from_expr
+          ~expr:(Expr.create_apply_cont apply_cont)
+          ~free_names:(Apply_cont_expr.free_names apply_cont)
+          ~code_size:(Code_size.apply_cont apply_cont)
+      in
+      let handler = end_regions t (regions_exited_by t k) handler in
+      let handler =
+        RE.create_continuation_handler
+          (Bound_parameters.create params)
+          ~handler ~is_exn_handler:false ~is_cold:false
+      in
+      ( k_close,
+        Variable.Map.add innermost.region
+          (Continuation.Map.add k (k_close, handler) region_closers)
+          closers ))
 
-let closer t k =
-  let k_close = Continuation.create () in
-  let params = t.params_of_continuation k in
-  let apply_cont =
-    Apply_cont_expr.create k
-      ~args:(List.map (fun p -> Simple.var (Bound_parameter.var p)) params)
-      ~dbg:Debuginfo.none
-  in
-  let handler =
-    RE.from_expr
-      ~expr:(Expr.create_apply_cont apply_cont)
-      ~free_names:(Apply_cont_expr.free_names apply_cont)
-      ~code_size:(Code_size.apply_cont apply_cont)
-  in
-  let handler = end_regions t (regions_exited_by t k) handler in
-  let handler =
-    RE.create_continuation_handler
-      (Bound_parameters.create params)
-      ~handler ~is_exn_handler:false ~is_cold:false
-  in
-  k_close, handler
+let redirect_switch_arms t closers arms =
+  Target_ocaml_int.Map.fold
+    (fun discriminant arm (arms, closers) ->
+      let action = Switch_arm.action arm in
+      let k = Apply_cont_expr.continuation action in
+      match regions_exited_by t k with
+      | [] -> Target_ocaml_int.Map.add discriminant arm arms, closers
+      | _ :: _ ->
+        let k_close, closers = closer t closers k in
+        let arm =
+          Switch_arm.create
+            ~annotations:(Switch_arm.annotations arm)
+            (Apply_cont_expr.with_continuation action k_close)
+        in
+        Target_ocaml_int.Map.add discriminant arm arms, closers)
+    arms
+    (Target_ocaml_int.Map.empty, closers)
 
-let bind_closers (closers : closers) body =
-  List.fold_left
-    (fun body (k_close, handler) ->
-      RE.create_non_recursive_let_cont k_close handler ~body)
-    body closers
-
-let redirect_switch_arms t arms =
-  let arms, closers =
-    Target_ocaml_int.Map.fold
-      (fun discriminant arm (arms, closers) ->
-        let action = Switch_arm.action arm in
-        let k = Apply_cont_expr.continuation action in
-        match regions_exited_by t k with
-        | [] -> Target_ocaml_int.Map.add discriminant arm arms, closers
-        | _ :: _ ->
-          let k_close, closers =
-            match Continuation.Map.find_opt k closers with
-            | Some (k_close, _) -> k_close, closers
-            | None ->
-              let k_close, handler = closer t k in
-              k_close, Continuation.Map.add k (k_close, handler) closers
-          in
-          let arm =
-            Switch_arm.create
-              ~annotations:(Switch_arm.annotations arm)
-              (Apply_cont_expr.with_continuation action k_close)
-          in
-          Target_ocaml_int.Map.add discriminant arm arms, closers)
-      arms
-      (Target_ocaml_int.Map.empty, Continuation.Map.empty)
-  in
-  arms, List.map snd (Continuation.Map.bindings closers)
-
-let rebuild_apply t apply ~rebuild =
+let rebuild_apply t closers apply ~rebuild =
   let apply = set_local_return_mode t apply in
   let expr : RE.t = rebuild apply in
   match Apply.continuation apply with
-  | Never_returns -> expr
+  | Never_returns -> expr, closers
   | Return k -> (
     match regions_exited_by t k with
-    | [] -> expr
+    | [] -> expr, closers
     | regions ->
       let is_tail_call =
         Continuation.equal k t.return_continuation
@@ -272,17 +284,16 @@ let rebuild_apply t apply ~rebuild =
         (* Tail call: close the regions beforehand so that it remains a tail
            call; no local value is passed to it (see
            [Escape_traverse.record_apply]). *)
-        end_regions t regions expr
+        end_regions t regions expr, closers
       else
-        let k_close, handler = closer t k in
+        let k_close, closers = closer t closers k in
         let renaming = Renaming.add_continuation Renaming.empty k k_close in
-        RE.create_non_recursive_let_cont k_close handler
-          ~body:
-            (RE.from_expr
-               ~expr:(Expr.apply_renaming expr.expr renaming)
-               ~free_names:
-                 (Name_occurrences.apply_renaming expr.free_names renaming)
-               ~code_size:expr.code_size))
+        ( RE.from_expr
+            ~expr:(Expr.apply_renaming expr.expr renaming)
+            ~free_names:
+              (Name_occurrences.apply_renaming expr.free_names renaming)
+            ~code_size:expr.code_size,
+          closers ))
 
 (* Rebuild the body of a region scope (a function body or a recursive
    continuation handler), adding a region around it if the escape analysis found
@@ -309,6 +320,17 @@ let rebuild_region_scope t ~scope ~rebuild_body =
       }
     in
     let body, res = rebuild_body { t with regions = region :: t.regions } in
+    let closers = t.closers_of res in
+    let body =
+      match Variable.Map.find_opt region.region closers with
+      | None -> body
+      | Some region_closers ->
+        Continuation.Map.fold
+          (fun _ (k_close, handler) body ->
+            RE.create_non_recursive_let_cont k_close handler ~body)
+          region_closers body
+    in
+    let res = t.with_closers (Variable.Map.remove region.region closers) res in
     begin_regions t region body, res
 
 (* A function returning at mode local allocates in its caller's region, which it

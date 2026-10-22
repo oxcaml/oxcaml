@@ -17,7 +17,16 @@
     regions they live in, and changing the calling convention of the functions
     made to return at mode local. These functions are called from [Rebuild]. *)
 
-type t
+(** ['r] is the type of the result accumulated by [Rebuild], through which the
+    continuations closing regions are threaded (see [closers]). *)
+type 'r t
+
+(** Continuations closing the regions left by a jump from a [Switch] arm or a
+    non-tail application, shared by all such jumps of a region and bound at the
+    start of its scope. *)
+type closers
+
+val no_closers : closers
 
 val create :
   solution:Escape_solution.t ->
@@ -27,82 +36,81 @@ val create :
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   machine_width:Target_system.Machine_width.t ->
   return_continuation:Continuation.t ->
-  t
+  closers_of:('r -> closers) ->
+  with_closers:(closers -> 'r -> 'r) ->
+  'r t
 
 (** The allocation mode for the block bound to the given variable (resp. bound
     pattern, sets of closures): local in the innermost region if the analysis
     decided so. *)
 val localize_alloc_mode :
-  t ->
+  _ t ->
   Variable.t ->
   Alloc_mode.For_allocations.t ->
   Alloc_mode.For_allocations.t
 
 val localize_alloc_mode_of_pattern :
-  t ->
+  _ t ->
   Bound_pattern.t ->
   Alloc_mode.For_allocations.t ->
   Alloc_mode.For_allocations.t
 
 val localize_set_of_closures_alloc_mode :
-  t ->
+  _ t ->
   Bound_var.t list ->
   Alloc_mode.For_allocations.t ->
   Alloc_mode.For_allocations.t
 
 (** Make a [Box_number] bound to the given variable allocate locally if the
     analysis decided so (other defining expressions are left unchanged). *)
-val localize_box_number : t -> Bound_var.t -> Flambda.Named.t -> Flambda.Named.t
+val localize_box_number :
+  _ t -> Bound_var.t -> Flambda.Named.t -> Flambda.Named.t
 
 (** Close the regions left by a jump to the given continuation, before the given
     expression (which performs the jump). *)
 val end_regions_before_jump :
-  t -> Continuation.t -> Rebuilt_expr.t -> Rebuilt_expr.t
-
-(** Continuations closing the regions left by a jump, to be bound around the
-    expression performing the jump with [bind_closers]. *)
-type closers
+  _ t -> Continuation.t -> Rebuilt_expr.t -> Rebuilt_expr.t
 
 (** Redirect the arms of a [Switch] jumping to continuations that leave regions
-    through closing continuations, which are returned with the arms. *)
+    through closing continuations. *)
 val redirect_switch_arms :
-  t ->
+  _ t ->
+  closers ->
   Switch_arm.t Target_ocaml_int.Map.t ->
   Switch_arm.t Target_ocaml_int.Map.t * closers
-
-val bind_closers : closers -> Rebuilt_expr.t -> Rebuilt_expr.t
 
 (** Rebuild an application with [rebuild], after giving it a local return mode
     if the callee was made to return at mode local, and close the regions left
     when it returns. *)
 val rebuild_apply :
-  t ->
+  _ t ->
+  closers ->
   Flambda.Apply.t ->
   rebuild:(Flambda.Apply.t -> Rebuilt_expr.t) ->
-  Rebuilt_expr.t
+  Rebuilt_expr.t * closers
 
 (** Rebuild the handler of a recursive [Let_cont] forming the given region scope
     (see [Rev_expr.Let_cont_rec.region_scope]), adding a region around it if
     needed. *)
 val rebuild_region_scope :
-  t ->
+  'r t ->
   scope:Code_id_or_name.t ->
-  rebuild_body:(t -> Rebuilt_expr.t * 'a) ->
-  Rebuilt_expr.t * 'a
+  rebuild_body:('r t -> Rebuilt_expr.t * 'r) ->
+  Rebuilt_expr.t * 'r
 
 (** Enter the body of a function: returns its allocation mode, made
     [Maybe_alloc_stack] if the function is to return at mode local. *)
 val enter_function :
-  t ->
+  'r t ->
   code_id:Code_id.t ->
   return_continuation:Continuation.t ->
   my_alloc_mode:Alloc_mode.For_applications.t ->
-  Alloc_mode.For_applications.t * t
+  Alloc_mode.For_applications.t * 'r t
 
 (** Rebuild the body of a function (entered with [enter_function]), adding a
     region around it if needed. *)
 val rebuild_function_body :
-  t ->
+  'r t ->
   code_id:Code_id.t ->
-  rebuild_body:(t -> Rebuilt_expr.t * 'a) ->
-  Rebuilt_expr.t * 'a
+  rebuild_body:('r t -> Rebuilt_expr.t * 'r) ->
+  Rebuilt_expr.t * 'r

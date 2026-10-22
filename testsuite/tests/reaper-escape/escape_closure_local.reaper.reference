@@ -40,13 +40,13 @@ let code inline(never) loopify(never) size(25) newer_version_of(g_1)
         : imm tagged =
   let `region` = %begin_region () in
   let ghost_region = %begin_ghost_region () in
-  let h = closure h_2_1 @h &my_alloc_region &`region`
-  with { unboxed_field_b = b; unboxed_field_a = a }
-  in
-  apply direct(apply_twice_0_1 &my_alloc_region)
-    ($camlEscape_closure_local__apply_twice_4 : _ -> imm tagged)
-      (h, 1)
-      -> k2 * k1
+  (let h = closure h_2_1 @h &my_alloc_region &`region`
+   with { unboxed_field_b = b; unboxed_field_a = a }
+   in
+   apply direct(apply_twice_0_1 &my_alloc_region)
+     ($camlEscape_closure_local__apply_twice_4 : _ -> imm tagged)
+       (h, 1)
+       -> k2 * k1)
     where k2 (function_return_0_g_1 : imm tagged) =
       let region_end = %end_region (`region`) in
       let region_end_1 = %end_ghost_region (ghost_region) in
