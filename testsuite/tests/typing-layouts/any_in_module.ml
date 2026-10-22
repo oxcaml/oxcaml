@@ -269,9 +269,7 @@ module type Including_S = sig
   include S
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module type Including_S = sig type t : any val x : t val y : int end
 |}]
 
 (* But we need to know the module representation to include in structures. *)

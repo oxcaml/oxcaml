@@ -2333,7 +2333,7 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
     let incl =
       { incl_mod = tmty;
         incl_type = sg;
-        incl_repr = expect_fixed_representation sg;
+        incl_repr = ();
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;

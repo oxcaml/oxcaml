@@ -1295,19 +1295,19 @@ and include_kind =
          (and no runtime application), so the field is a conservative
          [Yielding.max]. *)
 
-and 'a include_infos =
+and ('a, 'repr) include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
-     incl_repr: Types.module_representation;
+     incl_repr: 'repr;
      incl_loc: Location.t;
      incl_kind: include_kind;
      incl_attributes: attribute list;
     }
 
-and include_description = module_type include_infos
+and include_description = (module_type, unit) include_infos
 
-and include_declaration = module_expr include_infos
+and include_declaration = (module_expr, Types.module_representation) include_infos
 
 and with_constraint =
     Twith_type of type_declaration
