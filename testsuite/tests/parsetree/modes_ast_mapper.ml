@@ -18,7 +18,8 @@ let mapper: Ast_mapper.mapper =
       | [] -> ();
       | _ ->
         Format.printf "modes: %s\n"
-          (locs_to_string m Printast.string_of_mode)
+          (locs_to_string m (fun m ->
+             Format.asprintf "%a" Pprintast.mode (Location.mknoloc m)))
       );
       default_mapper.modes sub m
     );
