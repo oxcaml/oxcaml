@@ -955,7 +955,7 @@ let print_test_ml buf ({ i; kind; reuse_mask; _ } as test) =
       in
       let label = i.name ^ suffix in
       match masks with
-      | [] -> bprintf buf "let () = let name = %S in %s\n" label body
+      | [] -> bprintf buf "let () = test %S (fun name -> %s)\n" label body
       | _ :: _ ->
         let bindings =
           String.concat ""

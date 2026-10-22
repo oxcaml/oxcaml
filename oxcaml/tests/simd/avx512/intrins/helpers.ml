@@ -47,8 +47,12 @@ external buf_reset : (int[@untagged]) -> (int[@untagged])
 external buf_eq : (int[@untagged]) -> (int[@untagged]) = "" "test_buf_eq"
 [@@noalloc]
 
+(* Each test is its own function: a module initializer containing all of them
+   is too large for the register allocators. *)
+let[@inline never] test name f = f name
+
 (* Include both outcomes of mask flag tests and both scalar mask-bit states. *)
-let test_masks name f =
+let[@inline never] test_masks name f =
   List.iteri
     (fun i masks -> f (Printf.sprintf "%s/mask%d" name i) masks)
     [ 0L, 0L; -1L, 0L; 0L, -1L; -1L, -1L;
