@@ -532,10 +532,9 @@ module type S_for_mode_polymorphism = sig
 end
 
 [%%expect{|
-Line 2, characters 22-24:
-2 |   val variable : 'a @ 'm -> 'a @ 'm
-                          ^^
-Error: Mode variables and mode bounds are not yet supported.
+>> Fatal error: Line 2, characters 22-24: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 module type Mixed_mode_annotations = sig
@@ -543,10 +542,9 @@ module type Mixed_mode_annotations = sig
 end
 
 [%%expect{|
-Line 2, characters 29-31:
-2 |   val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
-                                 ^^
-Error: Mode variables and mode bounds are not yet supported.
+>> Fatal error: Line 2, characters 29-31: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* kitchen sink, with new @ syntax *)
