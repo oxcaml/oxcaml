@@ -307,6 +307,38 @@ Error: In this definition, expected parameter variances are not satisfied.
        but it is injective invariant.
 |}]
 
+type -'a t = 'a r#
+[%%expect{|
+Line 1, characters 0-18:
+1 | type -'a t = 'a r#
+    ^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be contravariant,
+       but it is injective invariant.
+|}]
+
+type !'a t = 'a r#
+[%%expect{|
+type 'a t = 'a r#
+|}]
+
+(* As for boxed records, only parameters in mutable fields are invariant *)
+type 'a r = { mutable x : int; y : 'a }
+type +'a t = 'a r
+type +'a t = 'a r#
+[%%expect{|
+type 'a r = { mutable x : int; y : 'a; }
+type 'a t = 'a r
+type 'a t = 'a r#
+|}]
+
+type 'a r = { x : 'a; y : int }
+type +'a t = 'a r#
+[%%expect{|
+type 'a r = { x : 'a; y : int; }
+type 'a t = 'a r#
+|}]
+
 type r = { mutable s : int; t : int }
 type r1 = { mutable s1 : int }
 [%%expect{|
