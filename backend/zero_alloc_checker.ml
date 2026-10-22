@@ -1309,6 +1309,7 @@ end = struct
     | Transform tr -> Transform (Transform.replace_witnesses tr w)
     | Var { var; witnesses = _ } -> Var { var; witnesses = w }
 
+  (*
   let attribute_to_call_site witnesses t =
     match t with
     | Resolved (Top _) ->
@@ -1324,6 +1325,7 @@ end = struct
       Misc.fatal_errorf
         "Zero_alloc_checker.attribute_to_call_site: unresolved value %a"
         (print ~witnesses:false) t
+  *)
 
   let diff_witnesses ~expected ~actual =
     (* If [actual] is Top and [expected] is not Top then return the [actual]
@@ -2121,9 +2123,7 @@ end = struct
     match Zero_alloc_info.Encoded.Component.decode v with
     | Top Allocation_other_than_calling_arguments -> V.top decoded_witness
     | Top (No_allocation_other_than_calling_arguments ()) ->
-      (* CR wsturgeon for wsturgeon: do we need to distinguish allocation
-         sources here? *)
-      V.conditional decoded_witness
+      Misc.fatal_error "(* CR wsturgeon for wsturgeon: TODO *)"
     | Safe -> V.safe
     | Bot -> V.bot
 

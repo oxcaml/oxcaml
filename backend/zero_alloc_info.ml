@@ -11,7 +11,9 @@ module Encoded = struct
     let encode : _ Allocation_sources.t Component.t -> int = function
       | Bot -> 0
       | Safe -> 1
-      | Top (No_allocation_other_than_calling_arguments _) -> 2
+      | Top (No_allocation_other_than_calling_arguments _) ->
+        (* CR wsturgeon for wsturgeon: encode this information! *)
+        2
       | Top Allocation_other_than_calling_arguments -> 3
 
     let decode : int -> unit Allocation_sources.t Component.t = function
