@@ -34,6 +34,17 @@ Error: This expression has type "t_any" but an expression was expected of type
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
        But the layout of t_any must be representable
+         because we must know concretely how to return a function result.
+|}, Principal{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+Line 3, characters 14-36:
+3 | let f () = id (assert false : t_any)
+                  ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "t_any" but an expression was expected of type
+         "('a : '_representable_layout_1)"
+       The layout of t_any is any
+         because of the definition of t_any at line 3, characters 0-16.
+       But the layout of t_any must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -535,6 +546,19 @@ external[@layout_poly] id : ('a : any) ('b : any). 'a -> 'b = "%identity"
 let f (x: float#): int64_u = id x
 
 [%%expect{|
+external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+Line 2, characters 32-33:
+2 | let f (x: float#): int64_u = id x
+                                    ^
+Error: The value "x" has type "float#" but an expression was expected of type
+         "('a : bits64)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a sublayout of bits64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 Line 2, characters 29-33:
 2 | let f (x: float#): int64_u = id x

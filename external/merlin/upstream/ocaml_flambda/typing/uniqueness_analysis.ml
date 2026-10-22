@@ -1398,8 +1398,15 @@ end = struct
         Projection.Map.update proj
           (function
             | None ->
-              (* Path doesn't exist, treat as Unused and create node *)
-              Some (update ~f rest empty)
+              (* A missing child has the usage of its parent, as in [mapi2] *)
+              let child =
+                { empty with
+                  usage = tree.usage;
+                  overwrites =
+                    Overwrites.promote_mutation_to_children tree.overwrites
+                }
+              in
+              Some (update ~f rest child)
             | Some child -> Some (update ~f rest child))
           tree.children
       in

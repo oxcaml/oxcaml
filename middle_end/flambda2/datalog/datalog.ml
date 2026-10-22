@@ -46,7 +46,10 @@ module Term = struct
 end
 
 (* CR-soon bclement: we should just use [Lang.atom]. *)
-type atom = Atom : ('t, 'k, unit) Table.Id.t * 'k Term.hlist -> atom
+type atom =
+  | Atom :
+      ('t, 'k, 'v) Table.Id.t * 'k Term.hlist * 'v Lang.variable option
+      -> atom
 
 type callback = Lang.atom
 
@@ -55,7 +58,7 @@ let create_callback_with_bindings func ~name args =
 
 type (_, _) terminator =
   | Yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) terminator
-  | Deduce : atom list -> (Heterogenous_list.nil, Schedule.rule) terminator
+  | Deduce : atom list -> (Heterogenous_list.nil, Lang.rule) terminator
 
 type levels = Levels : 'a Variable.hlist -> levels
 
@@ -81,13 +84,16 @@ let add_condition condition program =
 let add_filter filter program =
   { program with filters = filter :: program.filters }
 
-let where_atom tid args body = add_condition (Lang.table tid args) body
+let where_atom tid args value body =
+  add_condition (Lang.Atom (Table tid, args, value)) body
 
 let unless_atom tid args body = add_filter (Lang.unless tid args) body
 
 let unless_eq repr x y body = add_filter (Lang.distinct repr x y) body
 
 let filter fn args body = add_filter (Lang.filter fn args) body
+
+let if_let var fn args body = add_filter (Lang.if_let var fn args) body
 
 let yield args =
   { conditions = [];
@@ -128,20 +134,20 @@ let compile_terminator : type p a.
         args
     in
     let variables = Lang.Variable.hlist_to_list variables in
-    Cursor.With_parameters.create_from_rule ~callback parameters variables
-      (Lang.rule ~head:(yield :: head) ~body)
+    Cursor.With_parameters.create_from_rule ~callback parameters
+      (Lang.rule ~variables ~head:(yield :: head) ~body)
   | Deduce deductions ->
     let [] = parameters in
     let head =
       List.rev_append
         (List.rev_map
-           (fun (Atom (table, args)) -> Lang.table table args)
+           (fun (Atom (table, args, value)) ->
+             Lang.Atom (Table table, args, value))
            deductions)
         head
     in
-    Schedule.create_rule
-      (Lang.Variable.hlist_to_list variables)
-      (Lang.rule ~head ~body)
+    let variables = Lang.Variable.hlist_to_list variables in
+    Lang.rule ~variables ~head ~body
 
 let compile_program parameters
     { conditions; filters; callbacks; terminator; levels } =
