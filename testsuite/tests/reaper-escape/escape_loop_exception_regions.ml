@@ -8,9 +8,10 @@
 (* Unlike [escape_loop_try], there is no pre-existing region for [acc]. In
    [inside], the reaper can introduce an iteration region: the handler's
    try-region reset must preserve [p], which was allocated before the try.
-   In [outside], the handler is outside the iteration scope, which must remain
-   unsafe for local allocation. [boom] also opens a function region: on raising,
-   the caller's try-region reset must unwind that region too. *)
+   In [outside], the handler is outside the iteration scope, which the
+   analysis conservatively treats as unsafe for local allocation (see
+   [unsafe_scope] in [Escape_analysis]). [boom] also opens a function region:
+   on raising, the caller's try-region reset must unwind that region too. *)
 external local_stack_offset : unit -> int = "caml_local_stack_offset"
 
 let[@inline never] sum_pair (p : int * int) = fst p + snd p
