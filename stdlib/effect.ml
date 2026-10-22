@@ -24,7 +24,7 @@ external perform : 'a t -> 'a = "%perform"
 
 module Handler = struct
   type t : void mod external_ many stateless immutable
-  external unsafe_make : unit -> t @ yielding = "%unbox_unit"
+  external unsafe_make : unit -> t @ yielding @@ stateless = "%unbox_unit"
 end
 
 module Safe = struct
@@ -344,7 +344,7 @@ module Deep = struct
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
 end
 
@@ -566,6 +566,6 @@ module Shallow = struct
   end
 
   external get_callstack :
-    ('a,'b) continuation -> int -> Printexc.raw_backtrace =
+    ('a,'b) continuation -> int -> Printexc.raw_backtrace @@ stateless =
     "caml_get_continuation_callstack"
 end

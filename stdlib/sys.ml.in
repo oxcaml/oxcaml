@@ -23,17 +23,17 @@ type backend_type =
   | Other of string
 (* System interface *)
 
-external get_config: unit -> string * int * bool @@ portable = "caml_sys_get_config"
-external get_executable_name : unit -> string @@ portable = "caml_sys_executable_name"
+external get_config: unit -> string * int * bool @@ stateless = "caml_sys_get_config"
+external get_executable_name : unit -> string @@ stateless = "caml_sys_executable_name"
 external argv : string array @@ portable = "%sys_argv"
-external big_endian : unit -> bool @@ portable = "%big_endian"
-external word_size : unit -> int @@ portable = "%word_size"
-external int_size : unit -> int @@ portable = "%int_size"
-external max_wosize : unit -> int @@ portable = "%max_wosize"
-external unix : unit -> bool @@ portable = "%ostype_unix"
-external win32 : unit -> bool @@ portable = "%ostype_win32"
-external cygwin : unit -> bool @@ portable = "%ostype_cygwin"
-external get_backend_type : unit -> backend_type @@ portable = "%backend_type"
+external big_endian : unit -> bool @@ stateless = "%big_endian"
+external word_size : unit -> int @@ stateless = "%word_size"
+external int_size : unit -> int @@ stateless = "%int_size"
+external max_wosize : unit -> int @@ stateless = "%max_wosize"
+external unix : unit -> bool @@ stateless = "%ostype_unix"
+external win32 : unit -> bool @@ stateless = "%ostype_win32"
+external cygwin : unit -> bool @@ stateless = "%ostype_cygwin"
+external get_backend_type : unit -> backend_type @@ stateless = "%backend_type"
 
 let executable_name = get_executable_name()
 let (os_type, _, _) = get_config()
@@ -100,28 +100,28 @@ let max_unboxed_vec256_array_length =
   | Native -> max_array_length / (256 / word_size)
   | Bytecode | Other _ -> max_array_length
 
-external runtime_variant : unit -> string @@ portable = "caml_runtime_variant"
-external runtime_parameters : unit -> string @@ portable = "caml_runtime_parameters"
+external runtime_variant : unit -> string @@ stateless = "caml_runtime_variant"
+external runtime_parameters : unit -> string @@ reading portable = "caml_runtime_parameters"
 external poll_actions : unit -> unit @@ portable = "%poll"
 
-external file_exists: string -> bool @@ portable = "caml_sys_file_exists"
-external is_directory : string -> bool @@ portable = "caml_sys_is_directory"
-external is_regular_file : string -> bool @@ portable = "caml_sys_is_regular_file"
+external file_exists: string -> bool @@ reading portable = "caml_sys_file_exists"
+external is_directory : string -> bool @@ reading portable = "caml_sys_is_directory"
+external is_regular_file : string -> bool @@ reading portable = "caml_sys_is_regular_file"
 external remove: string -> unit @@ portable = "caml_sys_remove"
 external rename : string -> string -> unit @@ portable = "caml_sys_rename"
-external getenv: string -> string @@ portable = "caml_sys_getenv"
-external getenv_opt: string -> string option @@ portable = "caml_sys_getenv_opt"
+external getenv: string -> string @@ reading portable = "caml_sys_getenv"
+external getenv_opt: string -> string option @@ reading portable = "caml_sys_getenv_opt"
 
 external command: string -> int @@ portable = "caml_sys_system_command"
-external time: unit -> (float [@unboxed]) @@ portable =
+external time: unit -> (float [@unboxed]) @@ reading portable =
   "caml_sys_time" "caml_sys_time_unboxed" [@@noalloc]
 external chdir: string -> unit @@ portable = "caml_sys_chdir"
 external mkdir: string -> int -> unit @@ portable = "caml_sys_mkdir"
 external rmdir: string -> unit @@ portable = "caml_sys_rmdir"
-external getcwd: unit -> string @@ portable = "caml_sys_getcwd"
-external readdir : string -> string array @@ portable = "caml_sys_read_directory"
+external getcwd: unit -> string @@ reading portable = "caml_sys_getcwd"
+external readdir : string -> string array @@ reading portable = "caml_sys_read_directory"
 
-external io_buffer_size: unit -> int = "caml_sys_io_buffer_size"
+external io_buffer_size: unit -> int @@ stateless = "caml_sys_io_buffer_size"
 let io_buffer_size = io_buffer_size ()
 
 let interactive = ref false
@@ -209,9 +209,9 @@ let signal_to_string s =
   else if s < sigwinch then invalid_arg "Sys.signal_to_string"
   else "SIG(" ^ string_of_int s ^ ")"
 
-external rev_convert_signal_number: int -> int @@ portable =
+external rev_convert_signal_number: int -> int @@ stateless =
   "caml_sys_rev_convert_signal_number"
-external convert_signal_number: int -> int @@ portable =
+external convert_signal_number: int -> int @@ stateless =
   "caml_sys_convert_signal_number"
 
 let signal_of_int i =
@@ -240,7 +240,7 @@ external with_async_exns : (unit -> 'a) -> 'a @@ portable = "caml_with_async_exn
 
 external enable_runtime_warnings: bool -> unit @@ portable =
   "caml_ml_enable_runtime_warnings"
-external runtime_warnings_enabled: unit -> bool @@ portable =
+external runtime_warnings_enabled: unit -> bool @@ reading portable =
   "caml_ml_runtime_warnings_enabled"
 
 (* The version string is found in file ../VERSION *)
@@ -270,7 +270,7 @@ let ocaml_release = {
 (* Optimization *)
 
 external[@layout_poly] opaque_identity :
-  ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) @@ portable = "%opaque"
+  ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) @@ stateless = "%opaque"
 
 module Immediate64 = struct
   module type Non_immediate = sig
@@ -285,7 +285,7 @@ module Immediate64 = struct
     type 'a repr =
       | Immediate : Immediate.t repr
       | Non_immediate : Non_immediate.t repr
-    external magic : _ repr -> t repr @@ portable = "%identity"
+    external magic : _ repr -> t repr @@ stateless = "%identity"
     let repr =
       if word_size = 64 then
         magic Immediate
@@ -309,8 +309,8 @@ type arch =
   | Amd64
   | Arm64
 
-external amd64 : unit -> bool @@ portable = "%arch_amd64"
-external arm64 : unit -> bool @@ portable = "%arch_arm64"
+external amd64 : unit -> bool @@ stateless = "%arch_amd64"
+external arm64 : unit -> bool @@ stateless = "%arch_arm64"
 
 let amd64 = amd64 ()
 let arm64 = arm64 ()
