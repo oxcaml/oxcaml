@@ -10,4 +10,4 @@
  (deps
   (:first_dep ../gen/gen.exe))
  (action
-  (run %{first_dep} -o %{targets} %{ocaml_where}/compiler-libs/ocamltoplevel.cma)))
+  (run %{first_dep} -o %{targets} %{lib:compiler-libs.toplevel:ocamltoplevel.cma})))

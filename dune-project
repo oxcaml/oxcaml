@@ -18,3 +18,15 @@
 (package
   (name oxcaml-dev)
 )
+
+; Public names for libraries that installed compilers provide through findlib,
+; for the vendored libraries in external/ast-dependent-libs, which are separate
+; dune projects and cannot see this project's private libraries (see
+; compilerlibs/dune). Nothing installs these packages.
+(package
+  (name compiler-libs)
+)
+
+(package
+  (name unix)
+)

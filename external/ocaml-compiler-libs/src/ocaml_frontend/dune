@@ -11,5 +11,5 @@
  (deps
   (:first_dep ../gen/gen.exe))
  (action
-  (run %{first_dep} -o %{targets} %{ocaml_where}/compiler-libs/ocamlcommon.cma
-                                  %{ocaml_where}/compiler-libs/ocamlfrontend.cma)))
+  (run %{first_dep} -o %{targets} %{lib:compiler-libs.common:ocamlcommon.cma}
+                                  %{lib:compiler-libs.frontend:ocamlfrontend.cma})))

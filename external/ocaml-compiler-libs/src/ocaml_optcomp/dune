@@ -11,4 +11,4 @@
  (deps
   (:first_dep ../gen/gen.exe))
  (action
-  (run %{first_dep} -o %{targets} %{ocaml_where}/compiler-libs/ocamloptcomp.cma)))
+  (run %{first_dep} -o %{targets} %{lib:compiler-libs.optcomp:ocamloptcomp.cma})))

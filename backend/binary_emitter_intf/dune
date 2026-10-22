@@ -1,5 +1,6 @@
 (library
  (name binary_emitter_intf)
+ (public_name compiler-libs.internal.binary_emitter_intf)
  (wrapped false)
  (libraries asm_targets)
  (ocamlopt_flags

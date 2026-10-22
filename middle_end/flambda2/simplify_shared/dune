@@ -2,6 +2,7 @@
 
 (library
  (name flambda2_simplify_shared)
+ (public_name compiler-libs.internal.flambda2_simplify_shared)
  (wrapped true)
  (flags
   (:standard

@@ -4,6 +4,7 @@
 
 (library
  (name flambda2_types)
+ (public_name compiler-libs.internal.flambda2_types)
  (wrapped true)
  (instrumentation (backend bisect_ppx))
  (flags

@@ -833,6 +833,9 @@ stdenv.mkDerivation {
   separateDebugInfo = false;
   dontStrip = true;
 
+  # Build js_of_ocaml and the libraries it needs along with the compiler.
+  makeFlags = lib.optionals withJsoo [ "WITH_JSOO=1" ];
+
   # Disable _multioutConfig hook which adds --libdir=$out/lib into
   # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure
   # step, which expects --libdir to be $out/lib/ocaml
@@ -892,7 +895,7 @@ stdenv.mkDerivation {
       $out/bin/generate_cached_generic_functions.exe $out/lib/ocaml/cached-generic-functions
     ''
     + lib.optionalString withJsoo ''
-      make SHELL="$SHELL" jsoo-install-shipped OXCAML_INSTALL="$out" AST_DEPENDENT_LIBS_PREFIX="$out"
+      make SHELL="$SHELL" jsoo-install-shipped AST_DEPENDENT_LIBS_PREFIX="$out"
       ${wrapWasmOfOcaml}
     ''
     # Get rid of unused artifacts

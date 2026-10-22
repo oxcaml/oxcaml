@@ -44,6 +44,11 @@ compiler, and an empty findlib configuration keeps host packages out.
 under `lib/` and executables under `bin/`. The Nix `jsoo` and `ppxlib`
 packages are built this way.
 
+`make compiler WITH_JSOO=1` builds the same packages as part of the compiler
+build instead, in its main context, against the compiler being built and its
+libraries (see `compilerlibs/dune`). `make jsoo-install-shipped` installs from
+that build.
+
 The Nix `oxcaml` compiler package ships most of it, installed by
 `make jsoo-install-shipped`: the `js_of_ocaml`, `jsoo_minify`,
 `wasm_of_ocaml`, `jsoo_mkcmis` and `jsoo_listunits` executables; the
