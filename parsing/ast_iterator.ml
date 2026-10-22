@@ -28,6 +28,9 @@ type iterator = {
   attribute: iterator -> attribute -> unit;
   attributes: iterator -> attribute list -> unit;
   modes : iterator -> modes -> unit;
+  mode : iterator -> mode Location.loc -> unit;
+  mode_bound : iterator -> mode_bound -> unit;
+  mode_bound_elem : iterator -> mode_bound_elem -> unit;
   modalities : iterator -> modalities -> unit;
   binding_op: iterator -> binding_op -> unit;
   case: iterator -> case -> unit;
@@ -868,24 +871,28 @@ let default_iterator =
 
     (* Location inside a mode expression needs to be traversed. *)
     modes = (fun this m ->
-      let iter_bound_elem { elem_morph; elem_var; elem_mod } =
-        Option.iter (iter_loc this) elem_morph;
-        iter_loc this elem_var;
-        List.iter (iter_loc this) elem_mod
-      in
-      let iter_bound { bound_vars; bound_const } =
-        List.iter iter_bound_elem bound_vars;
-        List.iter (iter_loc this) bound_const
-      in
-      let iter_mode : mode -> unit = function
-        | Mode _ -> ()
-        | Mode_var v -> iter_loc this v
-        | Mode_bounds { upper; lower } -> iter_bound upper; iter_bound lower
-      in
-      List.iter
-        (fun ({ txt; loc } : mode Location.loc) ->
-          iter_mode txt; this.location this loc)
-        m
+      List.iter (this.mode this) m
+    );
+
+    mode = (fun this { txt; loc } ->
+      (match txt with
+       | Mode _ -> ()
+       | Mode_var v -> iter_loc this v
+       | Mode_bounds { upper; lower } ->
+         this.mode_bound this upper;
+         this.mode_bound this lower);
+      this.location this loc
+    );
+
+    mode_bound = (fun this { bound_vars; bound_const } ->
+      List.iter (this.mode_bound_elem this) bound_vars;
+      List.iter (iter_loc this) bound_const
+    );
+
+    mode_bound_elem = (fun this { elem_morph; elem_var; elem_mod } ->
+      Option.iter (iter_loc this) elem_morph;
+      iter_loc this elem_var;
+      List.iter (iter_loc this) elem_mod
     );
 
     modalities = (fun this m ->
