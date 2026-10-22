@@ -60,13 +60,13 @@ external acquire_tick : interval_usec:int -> int @@ portable
 external release_tick : int -> unit @@ portable = "caml_thread_release_tick"
 
 let create (fn @ once) arg =
-  let tls_keys = Domain.TLS.Private.get_initial_keys () in
+  let tls_keys = Domain.Safe.TLS.Private.get_initial_keys () in
   let tick = acquire_tick ~interval_usec in
   match
     thread_new
       (fun () ->
-        Domain.TLS.Private.init ();
-        Domain.TLS.Private.set_initial_keys tls_keys;
+        Domain.Safe.TLS.Private.init ();
+        Domain.Safe.TLS.Private.set_initial_keys tls_keys;
         try
           fn arg;
           release_tick tick;

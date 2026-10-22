@@ -2626,6 +2626,9 @@ let rec try_reduce_once env t =
     end
   | _ -> raise Cannot_expand
 
+(** Apply a reduction step on [<[t]> eval].
+    [copy_persistent] relies on this function to always return copies,
+    and to behave well on ill-staged types. *)
 and try_reduce_quote_eval env t =
   let path_must_be_persistent env path =
     if not (Env.path_is_persistent_in_quotations env path) then
@@ -2749,6 +2752,22 @@ let rec try_reduce env ty =
   try try_reduce env ty'
   with Cannot_expand -> ty'
 
+(** Deeply reduce all [Tquote_eval]s appearing in a type.
+    The resulting type does not contain any [Tquote_eval]s and has no sharing.
+    Raises [Cannot_expand] on failure. *)
+let rec try_full_reduce_quote_eval_desc env = function
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
+  | Tvariant row ->
+    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
+    Tvariant (
+      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
+  | t ->
+    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
+and try_full_reduce_quote_eval env t =
+  try_full_reduce_quote_eval_desc env (get_desc t)
+  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
+
 (* [Predef]'s [eval] and [box] are special -- we want to always expand it in
    [reduce_head], so we special-case its abbreviation expansion there. *)
 let expand_reducible_abbrevs env ty =
@@ -2843,7 +2862,17 @@ let rec extract_concrete_typedecl env ty =
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
-  | Tbox ty -> extract_concrete_typedecl env ty
+  | Tbox inner ->
+      begin match try_expand_head try_expand_safe env ty with
+      | ty -> extract_concrete_typedecl env ty
+      | exception Cannot_expand ->
+          match extract_concrete_typedecl env inner with
+          | May_have_typedecl -> May_have_typedecl
+          (* If [inner] has a concrete typedecl, [inner box] can never
+             expand further: types with concrete kinds cannot be refined
+             by GADT equations (see [is_instantiable]). *)
+          | Typedecl _ | Has_no_typedecl -> Has_no_typedecl
+      end
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -3704,8 +3733,19 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                  We could still estimate the kind on the left better. *)
               error ()
           in
-          match get_desc ty with
-          | Tconstr _ ->
+          let requirements =
+            Ikind.type_var_requirements ~type_equal ~context ~allow_mutation
+              env ty ty's_jkind jkind
+          in
+          match requirements, get_desc ty with
+          | Ok requirements, _ ->
+            List.fold_left
+              (fun result (tvar, mod_bounds) ->
+                 Result.bind result (fun () ->
+                   loop ~fuel ~expanded:false env tvar ty's_jkind
+                     (Jkind.of_mod_bounds ~history:jkind.history mod_bounds)))
+              (Ok ()) requirements
+          | Error error, Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
@@ -3717,9 +3757,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
                | Final_result ->
-                 Error
-                   (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+                 Error error
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
                  estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
@@ -3729,16 +3767,14 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                | Stepped_record_unboxed_product unwrapped_tys ->
                  product ~fuel:(fuel - 1) unwrapped_tys
                end
-          | Tunboxed_tuple ltys ->
+          | Error _, Tunboxed_tuple ltys ->
             (* Note: here we "duplicate" the fuel, which may seem like cheating.
                Fuel counts expansions, and its purpose is to guard against
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | _ ->
-            Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          | Error error, _ -> Error error
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
@@ -4491,6 +4527,14 @@ let rec is_aliasable_ty env ty =
   | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
 
+let copy_persistent env ty =
+  try_full_reduce_quote_eval env (new_quote_eval_ty ty)
+
+let is_persistent_ty env ty =
+  match copy_persistent env ty with
+  | _ -> true
+  | exception Cannot_expand -> false
+
 let compatible_paths p1 p2 =
   let open Predef in
   Path.same p1 p2 ||
@@ -5222,9 +5266,13 @@ let rec unify uenv t1 t2 =
         unify2 uenv t1 t2
     end;
     reset_trace_gadt_instances reset_tracing;
-  with Unify_trace trace ->
+  with
+  | Unify_trace trace ->
     reset_trace_gadt_instances reset_tracing;
     raise_trace_for Unify (Diff {got = t1; expected = t2} :: trace)
+  | exn ->
+    reset_trace_gadt_instances reset_tracing;
+    raise exn
 
 and unify2 uenv t1 t2 = unify2_expand uenv t1 t1 t2 t2
 
@@ -5308,6 +5356,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tquote_eval t1, _) when is_persistent_ty (get_env uenv) t2' ->
+      let t2' = copy_persistent (get_env uenv) t2' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2')
+  | (_, Tquote_eval t2) when is_persistent_ty (get_env uenv) t1' ->
+      let t1' = copy_persistent (get_env uenv) t1' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1' t2)
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
@@ -5864,11 +5918,15 @@ let unify_var uenv t1 t2 =
         unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
-      with Unify_trace trace ->
+      with
+      | Unify_trace trace ->
         reset_trace_gadt_instances reset_tracing;
         raise (Unify (expand_to_unification_error
                         env
                         (Diff { got = t1; expected = t2 } :: trace)))
+      | exn ->
+        reset_trace_gadt_instances reset_tracing;
+        raise exn
       end
   | _ ->
       unify uenv t1 t2
@@ -5898,10 +5956,7 @@ let enforce_current_level env ty =
 (**** Special cases of unification ****)
 
 let expand_head_trace env t =
-  let reset_tracing = check_trace_gadt_instances env in
-  let t = expand_head_unif env t in
-  reset_trace_gadt_instances reset_tracing;
-  t
+  wrap_trace_gadt_instances env (expand_head_unif env) t
 
 (*
    Unify [t] and [l:'a -> 'b]. Return ['a] and ['b].
@@ -6703,6 +6758,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when is_persistent_ty env t2' ->
+              let t2' = copy_persistent env t2' in
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->

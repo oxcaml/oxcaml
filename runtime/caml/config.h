@@ -190,14 +190,25 @@ typedef uint64_t uintnat;
 /* Number of words used in the control structure at the start of a stack
    (must match sizeof(struct stack_info) from fiber.h) */
 #ifdef ARCH_SIXTYFOUR
-#define Stack_ctx_words (12 + 1)
+#define Stack_ctx_words (13 + 1)
 #else
-#define Stack_ctx_words (12 + 2)
+#define Stack_ctx_words (13 + 2)
 #endif
 
 /* Whether to use guard pages for fiber stacks */
 #if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
 #define STACK_GUARD_PAGES
+#endif
+
+/* A lower bound on the size of the stack guard page: the smallest
+   page size of any supported target. Functions whose frames are at
+   least this large probe for a stack guard page using this
+   stride. Zero when there is no guard page to defend (stack checks
+   enabled); the compiler then emits no probes. */
+#if !defined(STACK_CHECKS_ENABLED)
+#define Stack_guard_stride 4096
+#else
+#define Stack_guard_stride 0
 #endif
 
 /* Whether to offset Stack_high to preserve alignment. */
