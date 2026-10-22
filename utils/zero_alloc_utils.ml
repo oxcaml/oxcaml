@@ -160,14 +160,38 @@ module Relevant_components_by_argument_index = struct
         | Some c2 -> Components.lessequal (fun r1 r2 -> (not r1) || r2) c1 c2)
       t1
 
+  let print_argument ppf (argument_index, (relevant : bool Components.t)) =
+    let paths =
+      List.filter_map
+        (fun (is_relevant, path) -> if is_relevant then Some path else None)
+        [ relevant.nor, "normal";
+          relevant.exn, "exceptional";
+          relevant.div, "diverging" ]
+    in
+    Format.fprintf ppf "argument #%d on %a paths" (argument_index + 1)
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "/")
+         Format.pp_print_string)
+      paths
+
   let print ppf t =
-    Numbers.Int.Map.print (Components.print Format.pp_print_bool) ppf t
+    Format.fprintf ppf "{@[<hov>%a@]}"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+         print_argument)
+      (Numbers.Int.Map.bindings t)
 end
 
 module Allocation_sources = struct
   type 'args_only t =
     | Allocation_other_than_calling_arguments
     | No_allocation_other_than_calling_arguments of 'args_only
+
+  let map ~f = function
+    | Allocation_other_than_calling_arguments ->
+      Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments args_only ->
+      No_allocation_other_than_calling_arguments (f args_only)
 
   let compare ~compare_args_only t1 t2 =
     match t1, t2 with
@@ -219,7 +243,8 @@ module Allocation_sources = struct
     | Allocation_other_than_calling_arguments ->
       Format.fprintf ppf "Allocation_other_than_calling_arguments"
     | No_allocation_other_than_calling_arguments args_only ->
-      Format.fprintf ppf "No_allocation_other_than_calling_arguments %a"
+      Format.fprintf ppf
+        "@[<hv 2>No_allocation_other_than_calling_arguments@ %a@]"
         print_args_only args_only
 end
 

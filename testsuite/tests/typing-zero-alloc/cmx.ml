@@ -18,21 +18,23 @@ let read_cmx load_path prefix =
       (name, Zero_alloc_info.decode value) :: !summaries);
   !summaries
 ;;
-let print_allocation_sources = Allocation_sources.print (fun _ppf () -> ());;
+let print_allocation_sources =
+  Allocation_sources.print Relevant_components_by_argument_index.print;;
 [%%expect{|
 val read_cmx :
   string ->
   string ->
   (string *
-   unit Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+   Zero_alloc_utils.Relevant_components_by_argument_index.t
+   Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
    Zero_alloc_utils.Components.t)
   list = <fun>
 val print_allocation_sources :
-  Format.formatter -> unit Zero_alloc_utils.Allocation_sources.t -> unit =
+  Format.formatter -> Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t -> unit =
   <fun>
 |}]
 
-#install_printer Relevant_components_by_argument_index.print;;
 #install_printer print_allocation_sources;;
 
 let _ =
@@ -42,7 +44,8 @@ let _ =
 ;;
 [%%expect{|
 - : (string *
-     unit Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
 =
@@ -65,16 +68,39 @@ let _ =
 ;;
 [%%expect{|
 - : (string *
-     unit Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__catch_and_discard_exceptions_0_1_code",
+[("camlCmx_lib__catch_and_discard_exceptions_0_2_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal/exceptional paths};
-   Components.exn = Component.Bot;
-   Components.div =
+   exn = Component.Bot;
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #1 on diverging paths}})]
+|}]
+
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__either_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__either_1_3_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #1 on normal/exceptional paths};
+   exn = Component.Bot;
+   div =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on diverging paths}})]
 |}]

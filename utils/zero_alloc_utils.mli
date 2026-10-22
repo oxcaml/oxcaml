@@ -91,6 +91,8 @@ module Allocation_sources : sig
     | Allocation_other_than_calling_arguments
     | No_allocation_other_than_calling_arguments of 'args_only
 
+  val map : f:('a -> 'b) -> 'a t -> 'b t
+
   val compare :
     compare_args_only:('args_only -> 'args_only -> int) ->
     'args_only t ->
