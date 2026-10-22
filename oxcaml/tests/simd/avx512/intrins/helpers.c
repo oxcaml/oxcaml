@@ -1,6 +1,3 @@
-/* Helpers for the generated AVX512 intrinsics tests (the OCaml side is in
-   helpers.ml). */
-
 #include <caml/simd.h>
 #include <assert.h>
 #include <stdint.h>
@@ -9,7 +6,6 @@
 
 #define BUILTIN(name) void name() { assert(0); }
 
-/* Builtins, only called if not selected. */
 BUILTIN(caml_vec512_unreachable)
 BUILTIN(caml_mask_of_int64)
 BUILTIN(caml_int64_of_mask)
@@ -49,9 +45,6 @@ intnat test_buf_eq(intnat unused)
   return memcmp(bufs[1], bufs[2], 512) == 0;
 }
 
-/* Without AVX512 (when compiled by a C compiler lacking the newer intrinsic
-   names, in which case the tests do not run), these are aborting stubs so that
-   the test executables still link. */
 #ifdef ARCH_AVX512
 #include <immintrin.h>
 

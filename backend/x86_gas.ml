@@ -134,10 +134,7 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
   in
   let mem_suffix =
-    (* GAS cannot infer the operand size of a memory (e.g. spilled) source for
-       the narrowing converts and vfpclass, whose other operands do not
-       determine it; disambiguate with the x/y/z length suffix. Likewise, it
-       assumes a 32-bit integer source for the unsigned converts. *)
+    (* The below instructions require disambiguated memory operand sizes. *)
     if not has_mem
     then ""
     else
@@ -158,8 +155,6 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
       | _ -> ""
   in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
-  (* [emit_simd_instr] passes the immediate first, then the writemask, then the
-     remaining operands in AT&T order. *)
   let imm, args =
     match instr.imm with
     | Imm_spec | Imm_reg ->
@@ -172,18 +167,9 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     else None, args
   in
   bprintf b "\t%s%s\t" instr.mnemonic mem_suffix;
-  (* The assembler requires the rounding mode to follow the immediate, except
-     for the GPR-source converts (vcvtsi2ss etc.), where it must follow the GPR
-     operand instead. *)
-  let gpr_source =
-    Array.length args > 0
-    &&
-    match args.(0) with
-    | Reg32 _ | Reg64 _ -> true
-    | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ | Regmask _ | Mem _
-    | Mem64_RIP _ ->
-      false
-  in
+  (* The rounding mode must follow the immediate, except for GPR conversions
+     (vcvtsi2ss etc.), where it must follow the GPR instead. *)
+  let gpr_source = Amd64_simd_defs.instr_allows_gpr instr in
   (match imm with Some imm -> bprintf b "%a, " arg imm | None -> ());
   if not gpr_source then Option.iter (bprintf b "%s, ") rounding;
   let last = Array.length args - 1 in

@@ -1145,38 +1145,32 @@ let select_operation_fma ~dbg:_ op args =
     | "caml_fma_float32_neg_mul_sub" -> instr vfnmsub213ss_X_X_Xm32 args
     | _ -> None
 
-(* The AVX512 [caml_<intel-name>] builtins, selected by interpreting the
-   generated [Amd64_simd_intrins] table. If any instruction an intrinsic may
-   select is disabled, it selects [None] before checking its immediates, falling
-   through to an ordinary extcall (and a link error against the nonexistent C
-   symbol), as with the hand-written intrinsics. *)
-module Intrins = struct
-  module T = Amd64_simd_defs.Intrin
+(* Interprets the generated [Amd64_simd_intrins] table. *)
+module Generated = struct
+  module Intrin = Amd64_simd_defs.Intrin
 
   let table = lazy (Hashtbl.of_seq (Array.to_seq Amd64_simd_intrins.table))
 
   let find op = Hashtbl.find_opt (Lazy.force table) op
 
   let bad_arity op =
-    (* A user-declared external with the wrong number of parameters. *)
     let msg = "Wrong number of arguments for SIMD intrinsic " ^ op in
     raise (Error (Bad_arity msg))
 
-  let invalid_immediate op = bad_immediate "Invalid immediate for %s" op
+  let bad_immediate op = bad_immediate "Invalid immediate for %s" op
 
-  let bind : Amd64_simd_instrs.id T.bind -> Amd64_simd_instrs.instr = function
-    | Instr simd -> simd
-    | Zeroing (simd, z) -> simd ~z
+  let bind (b : _ Intrin.bind) =
+    match b with Instr simd -> simd | Zeroing (simd, z) -> simd ~z
 
-  let rnd_bind ~rnd (b : _ T.rnd_bind) =
+  let rnd_bind ~rnd (b : _ Intrin.rnd_bind) =
     match b with Rnd simd -> simd ~rnd | Rnd_zeroing (simd, z) -> simd ~rnd ~z
 
-  let sae_bind (b : _ T.sae_bind) =
+  let sae_bind (b : _ Intrin.sae_bind) =
     match b with
     | Sae simd -> simd ~sae:()
     | Sae_zeroing (simd, z) -> simd ~sae:() ~z
 
-  let imm op args : T.imm -> int option * Cmm.expression list = function
+  let imm op args : Intrin.imm -> int option * Cmm.expression list = function
     | No_imm -> None, args
     | Imm max ->
       let i, args = extract_constant args op ~max in
@@ -1187,10 +1181,7 @@ module Intrins = struct
       Some ((i1 lsl 2) lor i0), args
     | Fixed i -> Some i, args
 
-  (* Constants synthesized for the unmasked gathers and scatters: the AVX512
-     instructions always take a write mask, and gathers overwrite the
-     destination completely under an all-ones mask. *)
-  let operand args : T.operand -> Cmm.expression =
+  let operand args : Intrin.operand -> Cmm.expression =
     let dbg = Debuginfo.none in
     function
     | Value j -> args.(j)
@@ -1210,11 +1201,13 @@ module Intrins = struct
           word7 = 0L
         }
 
-  (* The (non-constant) arguments in instruction operand order. *)
-  let operands op ~arity (ops : T.operand array) args =
+  let operands op ~arity (ops : Intrin.operand array) args =
     let args = Array.of_list args in
     if Array.length args <> arity then bad_arity op;
     Array.fold_right (fun o operands -> operand args o :: operands) ops []
+
+  (* _MM_FROUND_CUR_DIRECTION *)
+  let round_current = 4
 
   let rounding : int -> Amd64_simd_defs.evex_rounding option = function
     | 8 -> Some Rnd_near
@@ -1223,49 +1216,44 @@ module Intrins = struct
     | 11 -> Some Rnd_zero
     | _ -> None
 
-  (* _MM_FROUND_CUR_DIRECTION, selecting the non-rounding form. *)
-  let cur_direction = 4
+  let kflag : Intrin.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
 
-  let kflag : T.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
-
-  (* Every instruction [spec] may select. The rounding mode does not affect the
-     required extensions. *)
-  let instrs (spec : Amd64_simd_instrs.id T.t) =
+  let instrs (spec : Amd64_simd_instrs.id Intrin.t) =
     match spec with
-    | Register { bind = b; _ } | Load { bind = b; _ } | Store { bind = b; _ } ->
+    | Default { bind = b; _ } | Load { bind = b; _ } | Store { bind = b; _ } ->
       [bind b]
-    | Embedded_rounding { bind = b; cur; _ } ->
+    | With_round { bind = b; cur; _ } ->
       rnd_bind ~rnd:Rnd_near b :: Option.to_list (Option.map bind cur)
-    | Suppress_all_exceptions { bind = b; cur; _ } ->
+    | With_sae { bind = b; cur; _ } ->
       sae_bind b :: Option.to_list (Option.map bind cur)
-    | Flag_reader { instr; _ } | Gather { instr; _ } | Scatter { instr; _ } ->
+    | Flag { instr; _ } | Gather { instr; _ } | Scatter { instr; _ } ->
       [instr]
 
-  let select_enabled op (spec : Amd64_simd_instrs.id T.t) args =
+  let select_enabled op (spec : Amd64_simd_instrs.id Intrin.t) args =
     match spec with
-    | Register { arity; imm = imm_spec; bind = b; args = ops } ->
+    | Default { arity; imm = imm_spec; bind = b; args = ops } ->
       let i, args = imm op args imm_spec in
       instr (bind b) ?i (operands op ~arity ops args)
-    | Embedded_rounding { arity; bind = b; cur; args = ops } -> (
+    | With_round { arity; bind = b; cur; args = ops } -> (
       let control, args = extract_constant args op ~max:255 in
       let args = operands op ~arity ops args in
       match rounding control, cur with
       | Some rnd, (Some _ | None) -> instr (rnd_bind ~rnd b) args
-      | None, Some cur when control = cur_direction -> instr (bind cur) args
-      | None, (Some _ | None) -> invalid_immediate op)
-    | Suppress_all_exceptions
+      | None, Some cur when control = round_current -> instr (bind cur) args
+      | None, (Some _ | None) -> bad_immediate op)
+    | With_sae
         { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
       let i, args = imm op args imm_spec in
       let sae, args = extract_constant args op ~max:255 in
       let args = operands op ~arity ops args in
-      (* _MM_FROUND_NO_EXC, alone or with _MM_FROUND_CUR_DIRECTION. *)
+      (* _MM_FROUND_NO_EXC or _MM_FROUND_NO_EXC|_MM_FROUND_CUR_DIRECTION. *)
       if sae = 8 || sae = 12
       then instr (sae_bind b) ?i args
       else
         match cur with
-        | Some cur when sae = cur_direction -> instr (bind cur) ?i args
-        | Some _ | None -> invalid_immediate op)
-    | Flag_reader { flag; instr = simd } ->
+        | Some cur when sae = round_current -> instr (bind cur) ?i args
+        | Some _ | None -> bad_immediate op)
+    | Flag { flag; instr = simd } ->
       let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
       seq (Seq.kflag (kflag flag) simd) args
     | Load { arity; bind = b; args = ops } ->
@@ -1289,10 +1277,10 @@ module Intrins = struct
     else None
 end
 
-let select_operation_intrins ~dbg:_ op args =
-  match Intrins.find op with
+let select_operation_generated ~dbg:_ op args =
+  match Generated.find op with
   | None -> None
-  | Some spec -> Intrins.select op spec args
+  | Some spec -> Generated.select op spec args
 
 let select_operation_cfg ~dbg op args =
   let or_else try_ opt =
@@ -1315,7 +1303,7 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_avx2
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
-  |> or_else select_operation_intrins
+  |> or_else select_operation_generated
 
 let rax = Proc.phys_reg Int (P RAX)
 

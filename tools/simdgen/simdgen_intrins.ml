@@ -653,22 +653,22 @@ module Spec = struct
 
   let print = function
     | Register { arity; imm; bind; args } ->
-      sprintf "Register { arity = %d; imm = %s; bind = %s; args = %s }" arity
+      sprintf "Default { arity = %d; imm = %s; bind = %s; args = %s }" arity
         (print_imm imm) (Bind.print bind) (print_args args)
     | Embedded_rounding { arity; bind; cur; args } ->
-      sprintf "Embedded_rounding { arity = %d; bind = %s; cur = %s; args = %s }"
+      sprintf "With_round { arity = %d; bind = %s; cur = %s; args = %s }"
         arity
         (Bind.print ~ctor:("Rnd", "Rnd_zeroing") bind)
         (print_cur cur) (print_args args)
     | Suppress_all_exceptions { arity; imm; bind; cur; args } ->
       sprintf
-        "Suppress_all_exceptions { arity = %d; imm = %s; bind = %s; cur = %s; \
+        "With_sae { arity = %d; imm = %s; bind = %s; cur = %s; \
          args = %s }"
         arity (print_imm imm)
         (Bind.print ~ctor:("Sae", "Sae_zeroing") bind)
         (print_cur cur) (print_args args)
     | Flag_reader { flag; instr } ->
-      sprintf "Flag_reader { flag = %s; instr = %s }" (print_flag flag) instr
+      sprintf "Flag { flag = %s; instr = %s }" (print_flag flag) instr
     | Load { arity; bind; args } ->
       sprintf "Load { arity = %d; bind = %s; args = %s }" arity
         (Bind.print bind) (print_args args)
