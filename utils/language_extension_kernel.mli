@@ -12,9 +12,13 @@ type maturity =
   | Beta
   | Alpha
 
+(** [scheduler_policy] dictates when the omnidirectional type-inference
+    scheduler runs jobs. *)
 type scheduler_policy =
-  | Eager
+  | Eager  (** Run each job immediately when it is scheduled. *)
   | Delayed
+      (** Queue jobs and run when the scheduler is drained (e.g. prior to
+          generalization). *)
 
 (** The type of language extensions. An ['a t] is an extension that can either
     be off or be set to have any value in ['a], so a [unit t] can be either on
