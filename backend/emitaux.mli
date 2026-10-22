@@ -65,6 +65,26 @@ val enter_code_section : string -> unit
    cannot be emitted (currently only MASM, which lacks .uleb128). *)
 val disable_short_descriptors : bool ref
 
+(** The number of frame descriptors emitted by the last [emit_frames]. *)
+val num_frame_descriptors : int ref
+
+(** Set by [Asmlink] before assembling the startup unit of an executable, and
+    only then: the startup object reserves the [caml_frame_index] section (see
+    [Frame_index_layout]) for the post-link frame-descriptor index.
+    [other_descriptors] is the pre-link estimate of the descriptors in every
+    other linked object; with [full = false] only the header is reserved, which
+    marks the index as absent. *)
+type frame_index_reservation =
+  { other_descriptors : int;
+    full : bool
+  }
+
+val frame_index_reservation : frame_index_reservation option ref
+
+(** Emit the reservation, if any, and clear [frame_index_reservation]. Must be
+    called after [emit_frames] for the same unit. *)
+val emit_frame_index_reservation : unit -> unit
+
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
 val with_snapshot : f:(unit -> 'a) -> 'a
