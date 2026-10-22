@@ -11,8 +11,8 @@ open Typedtree
     itself.
 
     This function needs to translate expressions from Typedtree into Lambda, and
-    so is parameterized by [Translcore.transl_exp], its [transl_ctx] argument, and
-    the [loc]ation. *)
+    so is parameterized by [Translcore.transl_exp], its [transl_ctx] argument,
+    and the [loc]ation. *)
 val comprehension :
   transl_exp:(transl_ctx:transl_ctx -> Lambda.layout -> expression -> lambda) ->
   transl_ctx:transl_ctx ->

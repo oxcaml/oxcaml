@@ -421,8 +421,8 @@ let rec build_object_init ~transl_ctx cl_table obj params inh_init obj_init cl =
                    let (inh_init, obj_init') =
                      (* Reset [params]. The current ones will be bound
                         outside the structure. *)
-                     build_object_init ~transl_ctx cl_table (Lvar obj) [] inh_init
-                       (fun _ -> lambda_unit) cl
+                     build_object_init ~transl_ctx cl_table (Lvar obj) []
+                       inh_init (fun _ -> lambda_unit) cl
                    in
                    (* Since [obj] is bound to a concrete object,
                       only the side-effects of [obj_init'] are relevant. *)
@@ -444,7 +444,8 @@ let rec build_object_init ~transl_ctx cl_table obj params inh_init obj_init cl =
         (inh_init,
          List.fold_right
            (fun (id, expr) rem ->
-              lsequence (Lifused (id, set_inst_var ~transl_ctx obj id expr)) rem)
+              lsequence (Lifused (id, set_inst_var ~transl_ctx obj id expr))
+                rem)
            params obj_init,
          has_init))
   | Tcl_fun (_, pat, vals, cl, partial) ->
@@ -486,7 +487,8 @@ let rec build_object_init ~transl_ctx cl_table obj params inh_init obj_init cl =
       let (inh_init, obj_init) =
         build_object_init ~transl_ctx cl_table obj params inh_init obj_init cl
       in
-      (inh_init, transl_apply ~transl_ctx ~result_layout:layout_object obj_init oexprs Loc_unknown)
+      (inh_init, transl_apply ~transl_ctx ~result_layout:layout_object obj_init
+                   oexprs Loc_unknown)
   | Tcl_let (rec_flag, defs, vals, cl) ->
       (* See comment on the [Tcl_fun] case for the meaning of [vals] *)
       let (inh_init, obj_init) =
@@ -520,7 +522,8 @@ let rec build_object_init_0
       let obj = if ids = [] then lambda_unit else Lvar self in
       let envs = if top then None else Some env in
       let ((_,inh_init), obj_init) =
-        build_object_init ~transl_ctx cl_table obj params (envs,[]) copy_env cl in
+        build_object_init ~transl_ctx cl_table obj params (envs,[]) copy_env
+          cl in
       let obj_init =
         if ids = []
         then obj_init
@@ -611,7 +614,8 @@ let class_field i = Pfield (i, Pointer, Reads_vary)
     - [msubst] replaces methods with builtin methods when possible.
     - [top] is [false] if the current class is under [Translobj.oo_wrap].
     - [cl] is the class we're compiling *)
-let rec build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top cl =
+let rec build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top
+    cl =
   let scopes = transl_ctx.scopes in
   match cl.cl_desc with
   | Tcl_ident _ ->
@@ -709,7 +713,8 @@ let rec build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top 
       (inh_init, bind_methods cla str.cstr_meths values cl_init)
   | Tcl_fun (_, _pat, vals, cl, _) ->
       let (inh_init, cl_init) =
-        build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top cl
+        build_class_init
+          ~transl_ctx cla cstr super inh_init cl_init msubst top cl
       in
       (* Create anonymous instance variables and define them in the table *)
       let vals = List.map bind_id_as_val vals in
@@ -718,7 +723,8 @@ let rec build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top 
       build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top cl
   | Tcl_let (_rec_flag, _defs, vals, cl) ->
       let (inh_init, cl_init) =
-        build_class_init ~transl_ctx cla cstr super inh_init cl_init msubst top cl
+        build_class_init
+          ~transl_ctx cla cstr super inh_init cl_init msubst top cl
       in
       (* Create anonymous instance variables and define them in the table *)
       let vals = List.map bind_id_as_val vals in
@@ -854,7 +860,9 @@ let rec transl_class_rebind ~transl_ctx obj_init cl vf =
   | Tcl_apply (cl, oexprs) ->
       let path, path_lam, obj_init =
         transl_class_rebind ~transl_ctx obj_init cl vf in
-      (path, path_lam, transl_apply ~transl_ctx ~result_layout:layout_class obj_init oexprs Loc_unknown)
+      (path, path_lam,
+       transl_apply ~transl_ctx ~result_layout:layout_class obj_init oexprs
+         Loc_unknown)
   | Tcl_let (rec_flag, defs, _vals, cl) ->
       let path, path_lam, obj_init =
         transl_class_rebind ~transl_ctx obj_init cl vf in
@@ -1206,7 +1214,8 @@ let transl_class ~transl_ctx ids cl_id pub_meths cl vflag =
     build_object_init_0 ~transl_ctx cla [] cl copy_env subst_env top ids in
   let inh_init' = List.rev inh_init in
   let (inh_init', cl_init) =
-    build_class_init ~transl_ctx cla true ([],[]) inh_init' obj_init msubst top cl
+    build_class_init
+      ~transl_ctx cla true ([],[]) inh_init' obj_init msubst top cl
   in
   assert (inh_init' = []);
   let table = Ident.create_local "table"

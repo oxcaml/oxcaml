@@ -632,8 +632,8 @@ let merge_functors ~transl_ctx mexp coercion root_path =
         let inline_attribute =
           merge_inline_attributes inline_attribute inline_attribute' loc
         in
-        merge ~transl_ctx body res_coercion path ((param, loc, arg_coercion) :: acc)
-          inline_attribute staticity
+        merge ~transl_ctx body res_coercion path
+          ((param, loc, arg_coercion) :: acc) inline_attribute staticity
         end
       end
     | _ -> finished
@@ -859,7 +859,8 @@ and transl_structure ~transl_ctx loc
           in
           (* Then, translate remainder of struct *)
           let body, repr =
-            transl_structure ~transl_ctx loc ext_fields cc rootpath final_env rem
+            transl_structure ~transl_ctx loc ext_fields cc rootpath final_env
+              rem
           in
           mk_lam_let body, repr
       | Tstr_primitive descr ->
@@ -878,7 +879,8 @@ and transl_structure ~transl_ctx loc
             transl_structure ~transl_ctx loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          transl_type_extension ~transl_ctx item.str_env rootpath tyext body, repr
+          transl_type_extension ~transl_ctx item.str_env rootpath tyext body,
+          repr
       | Tstr_exception ext ->
           let id = ext.tyexn_constructor.ext_id in
           let id_duid = Lambda.debug_uid_none in
@@ -953,7 +955,9 @@ and transl_structure ~transl_ctx loc
           in
           lam, repr
       | Tstr_class cl_list ->
-          let (ids, class_bindings) = transl_class_bindings ~transl_ctx cl_list in
+          let (ids, class_bindings) =
+            transl_class_bindings ~transl_ctx cl_list
+          in
           let newfields =
             List.map (fun id -> id, Jkind.Sort.(of_const Const.for_class)) ids
           in
@@ -972,7 +976,8 @@ and transl_structure ~transl_ctx loc
           let incl_repr = transl_module_representation incl.incl_repr in
           let rec rebind_idents pos newfields = function
               [] ->
-                transl_structure ~transl_ctx loc newfields cc rootpath final_env rem
+                transl_structure ~transl_ctx loc newfields cc rootpath final_env
+                  rem
             | (id, sort) :: ids_with_sorts ->
                 let const_sort = Jkind.Sort.default_for_transl_and_get sort in
                 let lambda_layout =
@@ -1059,8 +1064,8 @@ and transl_structure ~transl_ctx loc
           transl_structure ~transl_ctx loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative ~input_repr ~yielding modl params transl_ctx
-      loc =
+and transl_include_functor ~generative ~input_repr ~yielding modl params
+      transl_ctx loc =
   let input_repr = transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
@@ -1375,8 +1380,9 @@ let transl_toplevel_item ~transl_ctx item =
       transl_exp ~transl_ctx layout expr
   | Tstr_value(rec_flag, pat_expr_list) ->
       let idents = let_bound_idents pat_expr_list in
-      transl_let ~transl_ctx ~return_layout:Lambda.layout_unit ~in_structure:true
-        rec_flag pat_expr_list (make_sequence toploop_setvalue_id idents)
+      transl_let ~transl_ctx ~return_layout:Lambda.layout_unit
+        ~in_structure:true rec_flag pat_expr_list
+        (make_sequence toploop_setvalue_id idents)
   | Tstr_typext(tyext) ->
       let idents =
         List.map (fun ext -> ext.ext_id) tyext.tyext_constructors
@@ -1431,11 +1437,11 @@ let transl_toplevel_item ~transl_ctx item =
         | Tincl_structure ->
             transl_module ~transl_ctx Tcoerce_none None modl
         | Tincl_functor { input_coercion; input_repr; yielding } ->
-            transl_include_functor ~generative:false modl input_coercion transl_ctx
-              loc ~input_repr ~yielding
+            transl_include_functor ~generative:false modl input_coercion
+              transl_ctx loc ~input_repr ~yielding
         | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
-            transl_include_functor ~generative:true modl input_coercion transl_ctx
-              loc ~input_repr ~yielding
+            transl_include_functor ~generative:true modl input_coercion
+              transl_ctx loc ~input_repr ~yielding
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in
