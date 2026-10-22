@@ -280,6 +280,77 @@ type r = { i : int; mutable s : string; }
 type u = r# = #{ i : int; s : string @@ global many dynamic; }
 |}]
 
+(* Unboxed versions of records with mutable fields are invariant, and don't
+   cross contention or visibility. They still cross locality. *)
+type 'a r = { mutable x : 'a; y : int }
+type +'a t = 'a r#
+[%%expect{|
+type 'a r = { mutable x : 'a; y : int; }
+type 'a t = 'a r#
+|}]
+
+type r = { mutable s : int; t : int }
+type r1 = { mutable s1 : int }
+[%%expect{|
+type r = { mutable s : int; t : int; }
+type r1 = { mutable s1 : int; }
+|}]
+
+let con (x : r# @ contended) : r# @ uncontended = x
+[%%expect{|
+val con : r# @ contended -> r# = <fun>
+|}]
+
+let vis (x : r# @ immutable) : r# @ read_write = x
+[%%expect{|
+val vis : r# @ immutable -> r# = <fun>
+|}]
+
+let loc (x : r# @ local) : r# = x
+let loc1 (x : r1# @ local) : r1# = x
+[%%expect{|
+val loc : r# @ local -> r# = <fun>
+val loc1 : r1# @ local -> r1# = <fun>
+|}]
+
+type u : mutable_data & mutable_data = r#
+[%%expect{|
+type u = r#
+|}]
+
+type u : immutable_data & immutable_data = r#
+[%%expect{|
+type u = r#
+|}]
+
+type u1 : immutable_data = r1#
+[%%expect{|
+type u1 = r1#
+|}]
+
+type ('a : immutable_data & immutable_data) p = P
+type x = r# p
+[%%expect{|
+type ('a : immutable_data & immutable_data) p = P
+type x = r# p
+|}]
+
+let f (type a : immutable_data & immutable_data) (x : a) = x
+let g (y : r#) = f y
+[%%expect{|
+val f : ('a : immutable_data & immutable_data). 'a -> 'a = <fun>
+val g : r# -> r# = <fun>
+|}]
+
+module M : sig
+  type u : immutable_data & immutable_data
+end = struct
+  type u = r#
+end
+[%%expect{|
+module M : sig type u : immutable_data & immutable_data end
+|}]
+
 (*******************)
 (* Type parameters *)
 
