@@ -60,6 +60,22 @@
  * Within a frametable, descriptors are concatenated in increasing
  * return-address order.
  *
+ * A unit's frametable is normally a native-word descriptor count
+ * followed by the descriptors. A unit compiled with
+ * -frametable-sections instead has a header:
+ *
+ *   intnat  tag        = FRAMETABLE_SECTIONS_TAG
+ *   intnat  count      (before any linker garbage collection)
+ *   int32   begin_rel  offset from this field to the first piece
+ *   int32   end_rel    offset from this field to the end of the pieces
+ *
+ * Each function's descriptors form a "piece" in a section linked to
+ * the function's code (SHF_LINK_ORDER), so the linker keeps the piece
+ * exactly when it keeps the code; zero-size marker pieces linked to
+ * the unit's code_begin and code_end delimit the unit's pieces. The
+ * pieces are byte-contiguous, with no count or padding, and each
+ * starts with an escaped descriptor.
+ *
  * There are three descriptor layouts: "short", "medium", and "long".
  *
  * Almost all descriptors are "short". A short descriptor is preceded
@@ -134,9 +150,11 @@
  *
  * Each debug word is the byte offset, from its own address, of a
  * debuginfo record chain or suffix-sharing jump word (see
- * runtime/backtrace_nat.c); these are emitted after the descriptors,
- * so the offset is positive. In an allocating frame a zero word means
- * that allocation has no debuginfo. */
+ * runtime/backtrace_nat.c). The offset is signed: the records follow
+ * the descriptors of a count-prefixed table, but under
+ * -frametable-sections they follow the header, which may precede the
+ * pieces. In an allocating frame a zero word means that allocation has
+ * no debuginfo. */
 
 typedef unsigned char frame_descr;
 
@@ -147,6 +165,9 @@ typedef unsigned char frame_descr;
 #define FRAME_LONG_MARKER 0x7FFF
 
 #define FRAME_DELTA_ESCAPE 0
+
+/* A count is never negative */
+#define FRAMETABLE_SECTIONS_TAG ((intnat)-1)
 
 /* The eight most common GC-root registers. The compiler
  * (frame_hot_regs in backend/<arch>/arch.ml) and the runtime must

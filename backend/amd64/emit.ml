@@ -382,7 +382,7 @@ let load_symbol_addr (s : Cmm.symbol) arg =
 (* Output .text section directive, or named .text.caml.<name> if enabled and
    supported on the target system. *)
 
-let emit_named_text_section ?(suffix = "") func_name =
+let emit_named_text_section ?(suffix = "") ?link_symbol func_name =
   (* CR-someday ksvetlitski: In the future we should consider extending this to
      also place other known-cold functions in a separate section (specifically
      [.text.unlikely.caml]). This would necessitate adding a new constructor to
@@ -405,7 +405,11 @@ let emit_named_text_section ?(suffix = "") func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
-      Emitaux.enter_code_section ".text.startup.caml";
+      (* Linkers place [.text.startup.*] before the rest of [.text], so a piece
+         linked to this section would sort before the unit's begin marker. *)
+      Emitaux.enter_code_section
+        ~link_symbol:(emit_symbol (Cmm_helpers.make_symbol "code_begin"))
+        ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -429,7 +433,12 @@ let emit_named_text_section ?(suffix = "") func_name =
       in
       D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
-      Emitaux.enter_code_section name;
+      let link_symbol =
+        match link_symbol with
+        | Some link_symbol -> link_symbol
+        | None -> emit_symbol func_name
+      in
+      Emitaux.enter_code_section ~link_symbol name;
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
          file, we pretend the section is called Text rather than the function
@@ -3116,7 +3125,8 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   stack_offset := !stack_offset + 8;
   (* Emit function entry code *)
   D.comment (Printf.sprintf "probe %s %s" probe_name handler_code_sym);
-  emit_named_text_section (S.encode wrap_label);
+  emit_named_text_section ~link_symbol:(S.encode wrap_label)
+    (S.encode wrap_label);
   D.align ~fill:Nop ~bytes:16;
   D.define_symbol_label ~section:Text wrap_label;
   D.cfi_startproc ();
@@ -3291,6 +3301,8 @@ let end_assembly () =
   in
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames ~debug_strings_section
+    ~code_begin:(emit_symbol (Cmm_helpers.make_symbol "code_begin"))
+    ~code_end:(emit_symbol code_end)
     { efa_code_label =
         (fun l ->
           let l = label_to_asm_label ~section:Text l in
@@ -3309,7 +3321,7 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Read_only_data lbl in
+          let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
           let ofs = Targetint.of_int32 ofs in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:ofs);
@@ -3321,7 +3333,7 @@ let end_assembly () =
           D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun l ->
-          let lbl = label_to_asm_label ~section:Read_only_data l in
+          let lbl = label_to_asm_label ~section:(D.current_section ()) l in
           D.define_label lbl)
     };
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in

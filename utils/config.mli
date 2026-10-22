@@ -316,6 +316,11 @@ val function_sections : bool
 (** Whether the compiler was configured to generate
     each function in a separate section *)
 
+val frametable_sections : bool
+(** Whether [-frametable-sections] is supported, i.e. whether each function's
+    frame descriptors can be emitted in a section linked (SHF_LINK_ORDER) to
+    the function's code *)
+
 val probes : bool
 (** Whether the target supports tracing probes *)
 

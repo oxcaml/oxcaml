@@ -152,24 +152,52 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
    a short descriptor's address is the running address plus its delta. */
 typedef struct {
   const unsigned char *next; /* points at the next descriptor's delta byte */
+  const unsigned char *end;  /* end of the pieces; NULL if count-prefixed */
   uintnat retaddr;           /* running absolute return address */
-  intnat remaining;          /* descriptors left to yield */
+  intnat remaining;          /* descriptors left to yield (at most, if [end]) */
 } frametable_iter;
+
+static const unsigned char *frametable_rel(const unsigned char *p)
+{
+  return p + caml_read_unaligned_int32(p);
+}
 
 static void frametable_iter_start(frametable_iter *it, intnat *tbl)
 {
-  it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
-  it->next = (const unsigned char *)(tbl + 1);
+  if (tbl[0] == FRAMETABLE_SECTIONS_TAG) {
+    const unsigned char *offsets = (const unsigned char *)(tbl + 2);
+    it->remaining = tbl[1];
+    it->next = frametable_rel(offsets);
+    it->end = frametable_rel(offsets + sizeof(int32_t));
+    if (it->next > it->end)
+      caml_fatal_error("frametable pieces out of order "
+                       "(was the unit's code reordered by the linker?)");
+  } else {
+    it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
+    it->next = (const unsigned char *)(tbl + 1);
+    it->end = NULL;
+  }
   it->retaddr = 0;
 }
 
+static bool frametable_iter_more(frametable_iter *it)
+{
+  return it->end != NULL ? it->next < it->end : it->remaining > 0;
+}
+
 /* Yield the next descriptor body and its absolute return address. Must
-   only be called while [it->remaining > 0]. */
+   only be called while [frametable_iter_more(it)]. */
 static frame_descr *frametable_iter_next(frametable_iter *it,
                                          uintnat *retaddr_out)
 {
   const unsigned char *p = it->next;
   frame_descr *d;
+  /* The count sized the hashtable, so a range holding more descriptors
+     (another unit's pieces, placed inside it by the linker) must not be
+     entered into it. */
+  if (it->remaining <= 0)
+    caml_fatal_error("frametable pieces hold more descriptors than counted "
+                     "(was the unit's code reordered by the linker?)");
   if (*p == FRAME_DELTA_ESCAPE) {
     d = (frame_descr *)p;
     it->retaddr = Retaddr_frame(d);
@@ -197,7 +225,9 @@ static frame_descr *frametable_iter_next(frametable_iter *it,
 static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
-    num_descr += (intnat)caml_read_unaligned_uintnat(cur->frametable);
+    frametable_iter it;
+    frametable_iter_start(&it, cur->frametable);
+    num_descr += it.remaining;
   }
   return num_descr;
 }
@@ -222,7 +252,7 @@ static void fill_hashtable(
   iter_list(new_frametables,cur) {
     frametable_iter it;
     frametable_iter_start(&it, (intnat *) cur->frametable);
-    while (it.remaining > 0) {
+    while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *d = frametable_iter_next(&it, &retaddr);
       uintnat h = Hash_retaddr(retaddr, table->mask);
@@ -273,8 +303,10 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
   while (cur != NULL) {
     frametable_iter it;
     frametable_iter_start(&it, (intnat *) cur->frametable);
+    /* Subtract the count, as [add_frame_descriptors] added it, even if the
+       linker dropped some of a range's descriptors. */
     intnat len = it.remaining;
-    while (it.remaining > 0) {
+    while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *d = frametable_iter_next(&it, &retaddr);
       remove_entry(table, retaddr, d);
@@ -971,7 +1003,7 @@ static void add_descriptor_to_stats(frame_descr *d,
         p += (uintnat)(*p) + 1;
       }
       for (uint32_t i = 0; i < dec->num_debuginfo; ++i) {
-        uint32_t offset = caml_read_unaligned_uint32(p);
+        int32_t offset = caml_read_unaligned_int32(p);
         if (offset) { /* there may be invalid debuginfo slots */
           caml_debuginfo_measure((debuginfo)(p + offset));
         }
@@ -991,17 +1023,18 @@ static void add_frametable_to_stats(intnat *frametable,
                                     struct frametable_stats *stats)
 {
   ++ stats->frametables;
-  if (!stats->min_descr ||
-      ((unsigned char*)frametable < stats->min_descr)) {
-    stats->min_descr = (unsigned char*)frametable;
-  }
-  if (!stats->max_descr ||
-      ((unsigned char*)frametable > stats->max_descr)) {
-    stats->max_descr = (unsigned char*)(frametable+1);
-  }
   frametable_iter it;
   frametable_iter_start(&it, frametable);
-  while (it.remaining > 0) {
+  /* A range's descriptors are away from its header, in the pieces */
+  unsigned char *start =
+    it.end != NULL ? (unsigned char *)it.next : (unsigned char *)frametable;
+  if (!stats->min_descr || (start < stats->min_descr)) {
+    stats->min_descr = start;
+  }
+  if (!stats->max_descr || (start > stats->max_descr)) {
+    stats->max_descr = (unsigned char *)it.next;
+  }
+  while (frametable_iter_more(&it)) {
     uintnat retaddr;
     frame_descr *d = frametable_iter_next(&it, &retaddr);
     struct frame_descr_decoded dec;

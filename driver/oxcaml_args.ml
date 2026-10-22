@@ -299,6 +299,21 @@ let mk_module_entry_functions_section f =
     in
     ("-module-entry-functions-section", Arg.Unit err, " (option not available)")
 
+let mk_frametable_sections f =
+  if Config.frametable_sections then
+    ( "-frametable-sections",
+      Arg.Unit f,
+      " Emit each function's frame descriptors in a separate section, linked \
+       to the function's code so that the linker can drop them together. \
+       Requires -function-sections." )
+  else
+    let err () =
+      raise
+        (Arg.Bad
+           "OCaml has been configured without support for -frametable-sections")
+    in
+    ("-frametable-sections", Arg.Unit err, " (option not available)")
+
 let mk_dasm_comments f =
   ("-dasm-comments", Arg.Unit f, " Add comments in .s files (e.g. for DWARF)")
 
@@ -1397,6 +1412,7 @@ module type Oxcaml_options = sig
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
+  val frametable_sections : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
   val heap_reduction_threshold : int -> unit
@@ -1603,6 +1619,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
+      mk_frametable_sections F.frametable_sections;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
       mk_heap_reduction_threshold F.heap_reduction_threshold;
@@ -1983,6 +2000,7 @@ module Oxcaml_options_impl = struct
   let module_entry_functions_section () =
     set' Oxcaml_flags.module_entry_functions_section ()
 
+  let frametable_sections () = set' Oxcaml_flags.frametable_sections ()
   let dasm_comments = set' Oxcaml_flags.dasm_comments
   let dno_asm_comments = clear' Oxcaml_flags.dasm_comments
   let dump_inlining_paths = set' Oxcaml_flags.dump_inlining_paths
@@ -2581,6 +2599,7 @@ module Extra_params = struct
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
+    | "frametable-sections" -> set' Oxcaml_flags.frametable_sections
     | "heap-reduction-threshold" ->
         set_int' Oxcaml_flags.heap_reduction_threshold
     | "zero-alloc-check" -> (

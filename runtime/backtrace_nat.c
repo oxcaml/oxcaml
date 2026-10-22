@@ -324,7 +324,7 @@ Caml_inline debuginfo debuginfo_resolve_jumps(debuginfo dbg)
 static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
 {
   unsigned char* infoptr;
-  uint32_t debuginfo_offset;
+  int32_t debuginfo_offset;
   struct frame_descr_decoded dec;
 
   /* The special frames marking returns from Caml to C are never
@@ -363,7 +363,7 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
     CAMLassert(alloc_idx == -1);
   }
   /* read offset to debuginfo */
-  debuginfo_offset = caml_read_unaligned_uint32(infoptr);
+  debuginfo_offset = caml_read_unaligned_int32(infoptr);
   return debuginfo_resolve_jumps((debuginfo)(infoptr + debuginfo_offset));
 }
 

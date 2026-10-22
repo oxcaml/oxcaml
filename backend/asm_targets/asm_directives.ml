@@ -36,10 +36,13 @@ let emit_assembly_comments_ref = ref None
 let not_initialized () =
   Misc.fatal_error "[Asm_directives.initialize] has not been called"
 
-let current_section_is_text () =
+let current_section () =
   match !current_section_ref with
   | None -> not_initialized ()
-  | Some section -> Asm_section.section_is_text section
+  | Some section -> section
+
+let current_section_is_text () =
+  Asm_section.section_is_text (current_section ())
 
 let emit_comments () =
   let emit_assembly_comments =
