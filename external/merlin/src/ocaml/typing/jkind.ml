@@ -3494,8 +3494,6 @@ module Format_history = struct
         "it's the layout polymorphic type in an external declaration@ \
          ([@@layout_poly] forces all variables of layout 'any' to be@ \
          representable at call sites)"
-    | Peek_or_poke ->
-      fprintf ppf "it's the type being used for a peek or poke primitive"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
@@ -4733,7 +4731,6 @@ module Debug_printers = struct
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Tuple_element -> fprintf ppf "Tuple_element"
-    | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
     | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
