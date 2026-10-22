@@ -2469,12 +2469,12 @@ let table : (string * id t) array =
     "caml_mm512_xor_pd", Default { arity = 2; imm = No_imm; bind = Instr vxorpd_Z_Z_Zm512; args = [|Value 0; Value 1|] };
     "caml_mm512_xor_ps", Default { arity = 2; imm = No_imm; bind = Instr vxorps_Z_Z_Zm512; args = [|Value 0; Value 1|] };
     "caml_mm512_xor_si512", Default { arity = 2; imm = No_imm; bind = Instr vpxord_Z_Z_Zm512; args = [|Value 0; Value 1|] };
-    "caml_mm512_zextpd128_pd512", Default { arity = 1; imm = No_imm; bind = Instr vmovaps_X_Xm128; args = [|Value 0|] };
-    "caml_mm512_zextpd256_pd512", Default { arity = 1; imm = No_imm; bind = Instr vmovaps_Y_Ym256; args = [|Value 0|] };
-    "caml_mm512_zextps128_ps512", Default { arity = 1; imm = No_imm; bind = Instr vmovaps_X_Xm128; args = [|Value 0|] };
-    "caml_mm512_zextps256_ps512", Default { arity = 1; imm = No_imm; bind = Instr vmovaps_Y_Ym256; args = [|Value 0|] };
-    "caml_mm512_zextsi128_si512", Default { arity = 1; imm = No_imm; bind = Instr vmovaps_X_Xm128; args = [|Value 0|] };
-    "caml_mm512_zextsi256_si512", Default { arity = 1; imm = No_imm; bind = Instr vmovaps_Y_Ym256; args = [|Value 0|] };
+    "caml_mm512_zextpd128_pd512", Default { arity = 1; imm = No_imm; bind = Instr vmovups_X_Xm128; args = [|Value 0|] };
+    "caml_mm512_zextpd256_pd512", Default { arity = 1; imm = No_imm; bind = Instr vmovups_Y_Ym256; args = [|Value 0|] };
+    "caml_mm512_zextps128_ps512", Default { arity = 1; imm = No_imm; bind = Instr vmovups_X_Xm128; args = [|Value 0|] };
+    "caml_mm512_zextps256_ps512", Default { arity = 1; imm = No_imm; bind = Instr vmovups_Y_Ym256; args = [|Value 0|] };
+    "caml_mm512_zextsi128_si512", Default { arity = 1; imm = No_imm; bind = Instr vmovups_X_Xm128; args = [|Value 0|] };
+    "caml_mm512_zextsi256_si512", Default { arity = 1; imm = No_imm; bind = Instr vmovups_Y_Ym256; args = [|Value 0|] };
     "caml_mm_abs_epi64", Default { arity = 1; imm = No_imm; bind = Instr vpabsq_X_Xm128; args = [|Value 0|] };
     "caml_mm_add_round_sd", With_round { arity = 2; bind = Rnd vaddsd_X_X_X; cur = Some (Instr vaddsd_X_X_Xm64); args = [|Value 0; Value 1|] };
     "caml_mm_add_round_ss", With_round { arity = 2; bind = Rnd vaddss_X_X_X; cur = Some (Instr vaddss_X_X_Xm32); args = [|Value 0; Value 1|] };

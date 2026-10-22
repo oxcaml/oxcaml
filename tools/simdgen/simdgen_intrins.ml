@@ -635,19 +635,20 @@ let flag_spec ~by_mnem i : Spec.t =
   | [b] -> Flag { flag; instr = b.bname }
   | _ -> raise Unsupported
 
-(* Single instructions, as compiled by clang, that the XML lists as sequences or
-   without an instruction. VEX moves zero the upper bits. *)
+(* Single instructions that the XML lists as sequences or without an
+   instruction. VEX moves zero the upper bits; the unaligned ones cannot fault
+   on a spilled source. *)
 let single_instruction =
   [ "_mm512_set1_epi8", "vpbroadcastb_Z_r32";
     "_mm512_set1_epi16", "vpbroadcastw_Z_r32";
     "_mm512_set1_ps", "vbroadcastss_Z_Xm32";
     "_mm512_set1_pd", "vbroadcastsd_Z_Xm64";
-    "_mm512_zextps128_ps512", "vmovaps_X_Xm128";
-    "_mm512_zextpd128_pd512", "vmovaps_X_Xm128";
-    "_mm512_zextsi128_si512", "vmovaps_X_Xm128";
-    "_mm512_zextps256_ps512", "vmovaps_Y_Ym256";
-    "_mm512_zextpd256_pd512", "vmovaps_Y_Ym256";
-    "_mm512_zextsi256_si512", "vmovaps_Y_Ym256" ]
+    "_mm512_zextps128_ps512", "vmovups_X_Xm128";
+    "_mm512_zextpd128_pd512", "vmovups_X_Xm128";
+    "_mm512_zextsi128_si512", "vmovups_X_Xm128";
+    "_mm512_zextps256_ps512", "vmovups_Y_Ym256";
+    "_mm512_zextpd256_pd512", "vmovups_Y_Ym256";
+    "_mm512_zextsi256_si512", "vmovups_Y_Ym256" ]
 
 (* Aliases for a cast and the full-width intrinsic. *)
 let is_low_half i =
