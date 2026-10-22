@@ -184,14 +184,152 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Mutable fields are not allowed *)
+(* Fields can be declared mutable, which affects variance and kind, but can't
+   be mutated *)
 
-type mut = #{ mutable i : int }
+type mut = #{ mutable i : int; j : int }
 [%%expect{|
-Line 1, characters 14-29:
-1 | type mut = #{ mutable i : int }
-                  ^^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+type mut = #{ mutable i : int; j : int; }
+|}]
+
+type atomic = #{ mutable i : int [@atomic] }
+[%%expect{|
+Line 1, characters 17-42:
+1 | type atomic = #{ mutable i : int [@atomic] }
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be atomic
+|}]
+
+let set (r : mut) = r.i <- 1
+[%%expect{|
+Line 1, characters 20-21:
+1 | let set (r : mut) = r.i <- 1
+                        ^
+Error: This expression has type "mut",
+       which is an unboxed record rather than a boxed one.
+|}]
+
+type b = { f : mut }
+let idx_imm (_ : b) = (.f.#i)
+[%%expect{|
+type b = { f : mut; }
+Line 2, characters 22-29:
+2 | let idx_imm (_ : b) = (.f.#i)
+                          ^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* An index through a mutable boxed field is mutable, as it is for immutable
+   unboxed fields *)
+type c = { mutable g : mut }
+let idx_mut = (.g.#i)
+[%%expect{|
+type c = { mutable g : mut; }
+val idx_mut : (c, int) idx_mut = <abstr>
+|}]
+
+module M : sig
+  type t = #{ mutable i : int }
+end = struct
+  type t = #{ i : int }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ i : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ i : int; } end
+       is not included in
+         sig type t = #{ mutable i : int; } end
+       Type declarations do not match:
+         type t = #{ i : int; }
+       is not included in
+         type t = #{ mutable i : int; }
+       Fields do not match:
+         "i : int;"
+       is not the same as:
+         "mutable i : int;"
+       The second is mutable and the first is not.
+|}]
+
+module M : sig
+  type t = #{ i : int }
+end = struct
+  type t = #{ mutable i : int }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ mutable i : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ mutable i : int; } end
+       is not included in
+         sig type t = #{ i : int; } end
+       Type declarations do not match:
+         type t = #{ mutable i : int; }
+       is not included in
+         type t = #{ i : int; }
+       Fields do not match:
+         "mutable i : int;"
+       is not the same as:
+         "i : int;"
+       The first is mutable and the second is not.
+|}]
+
+(* Otherwise, mutable fields behave like immutable ones *)
+let project (x : mut @ contended) = match x with #{ i; _ } -> i, x.#j
+[%%expect{|
+val project : mut @ contended -> int * int = <fun>
+|}]
+
+let update (x : mut) = #{ x with i = 1 }
+[%%expect{|
+val update : mut -> mut = <fun>
+|}]
+
+type 'a mut_poly = #{ mutable l : 'a list; k : int }
+let generalized = #{ l = []; k = 0 }
+[%%expect{|
+type 'a mut_poly = #{ mutable l : 'a list; k : int; }
+val generalized : 'a mut_poly = #{l = []; k = 0}
+|}]
+
+type +'a covariant = 'a mut_poly
+[%%expect{|
+Line 1, characters 0-32:
+1 | type +'a covariant = 'a mut_poly
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type not_immutable : immutable_data & immutable_data = int mut_poly
+[%%expect{|
+Line 1, characters 0-67:
+1 | type not_immutable : immutable_data & immutable_data = int mut_poly
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int mut_poly" is
+           mutable_data mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because of the definition of mut_poly at line 1, characters 0-52.
+       But the kind of type "int mut_poly" must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of not_immutable at line 1, characters 0-67.
+|}]
+
+(* No "never mutated" warning, as unboxed record fields can't be mutated *)
+module M : sig end = struct
+  type t = #{ mutable read : int }
+  let read t = t.#read
+end [@warning "+69"]
+[%%expect{|
+module M : sig end
 |}]
 
 (*********************************)

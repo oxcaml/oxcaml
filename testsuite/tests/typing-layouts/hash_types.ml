@@ -288,6 +288,11 @@ Error: This variant or record definition does not match that of type "r#"
        The original is mutable and this is not.
 |}]
 
+type u = r# = #{ i : int ; mutable s : string }
+[%%expect{|
+type u = r# = #{ i : int; mutable s : string; }
+|}]
+
 (* Unboxed versions of records with mutable fields are invariant, and don't
    cross contention or visibility. They still cross locality. *)
 type 'a r = { mutable x : 'a; y : int }

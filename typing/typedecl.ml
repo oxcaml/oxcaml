@@ -88,7 +88,7 @@ type error =
   | Duplicate_constructor of string
   | Too_many_constructors
   | Duplicate_label of string
-  | Unboxed_mutable_label
+  | Unboxed_atomic_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -600,13 +600,13 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           | Immutable, true ->
               Error.log_and_raise loc (Atomic_field_must_be_mutable name.txt)
           | Mutable, is_atomic ->
-              match record_form with
-              | Legacy -> Mutable {
+              match record_form, is_atomic with
+              | Legacy, _ | Unboxed_product, false -> Mutable {
                 mode = Mode.With_regionality.Comonadic.legacy;
                 atomic = if is_atomic then Atomic else Nonatomic
               }
-              | Unboxed_product ->
-                  Error.log_and_raise loc Unboxed_mutable_label
+              | Unboxed_product, true ->
+                  Error.log_and_raise loc Unboxed_atomic_label
          in
          let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
@@ -5679,8 +5679,8 @@ let report_error ~loc = function
       (Config.max_tag + 1)
   | Duplicate_label s ->
       Location.errorf "Two labels are named %a" Style.inline_code s
-  | Unboxed_mutable_label ->
-      Location.errorf ~loc "Unboxed record labels cannot be mutable"
+  | Unboxed_atomic_label ->
+      Location.errorf ~loc "Unboxed record labels cannot be atomic"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
