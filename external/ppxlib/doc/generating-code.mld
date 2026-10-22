@@ -11,7 +11,7 @@ constructors directly:
 - The AST type might change at a version bump. In this case, the types used in
 the PPX would become incompatible with the types of the new OCaml version.
 
-The second point is important: since [ppxlib] {{!page-driver.compat_mult_ver}translates} the AST to
+The second point is important: since [ppxlib] {{!page-compatibility.compat_mult_ver}translates} the AST to
 the newest OCaml AST available before rewriting, your PPX would not
 only become incompatible with the new OCaml version, but also with all [ppxlib]
 versions released after the new AST type is introduced.
@@ -169,7 +169,7 @@ changes when a new feature modifies the function in use.
 If a feature that was introduced in some recent version of OCaml is essential
 for your PPX to work, it might imply that you need to restrict the OCaml version
 on your opam dependencies.
-{{!page-driver.compat_mult_ver}Remember} that
+{{!page-compatibility.compat_mult_ver}Remember} that
 [ppxlib] will rewrite using the latest [Parsetree] version, {e but} it will then migrate the
 [Parsetree] back to the OCaml version of the switch, possibly losing the information
 given by the new feature.
@@ -226,16 +226,16 @@ other kind of nodes, such as {{!Ppxlib.Parsetree.expression}[expressions]} or {{
   {{!Ppxlib.Parsetree.structure}[structure]}
   and {{!Ppxlib.Parsetree.signature}[signature]}.
   {[
-let str =
-  [%str
-    let x = 5
-    let y = 6.3]
+  let str =
+    [%str
+      let x = 5
+      let y = 6.3]
 
-let sig_ =
-  [%sig:
-    val x : int
-    val y : float]
-]}
+  let sig_ =
+    [%sig:
+      val x : int
+      val y : float]
+  ]}
 
 Note the replacement work when the extension node is an "expression"
 extension node: Indeed, the [payload] is a {e value} (of [Parsetree] type) that would not fit
@@ -329,18 +329,18 @@ The syntax for anti-quotation depends on the type of the node you wish to insert
   {{!Ppxlib.Parsetree.structure_item}[structure_item]} or
   {{!Ppxlib.Parsetree.signature_item}[signature_item]}. Note that the syntax for structure/signature item extension nodes uses two [%%]:
   {[
-let f some_structure_item_node =
-  [%str
-    let a = 1
+  let f some_structure_item_node =
+    [%str
+      let a = 1
 
-    [%%i some_structure_item_node]]
+      [%%i some_structure_item_node]]
 
-let f some_signature_item_node =
-  [%sig:
-    val a : int
+  let f some_signature_item_node =
+    [%sig:
+      val a : int
 
-    [%%i some_signature_item_node]]
-]}
+      [%%i some_signature_item_node]]
+  ]}
 
 If an anti-quote extension node is in the wrong context, it won't be
 rewritten by {{!Ppxlib_metaquot}[Metaquot]}. For instance, in [[%expr match [] with [%e some_value] -> 1]]

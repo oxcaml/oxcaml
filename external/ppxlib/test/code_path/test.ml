@@ -89,8 +89,13 @@ module Functor() = struct
   end
 end
 let _ = let module M = Functor() in !M.code_path
-[%%expect{|
+[%%expect_in <= 5.2 {|
 module Functor : functor () -> sig val code_path : string ref end
+- : string =
+"(code_path(main_module_name Test)(submodule_path(Functor _))(enclosing_module First_class)(enclosing_value(x))(value(x))(fully_qualified_path Test.Functor._.x))"
+|}]
+[%%expect_in >= 5.3 {|
+module Functor : () -> sig val code_path : string ref end
 - : string =
 "(code_path(main_module_name Test)(submodule_path(Functor _))(enclosing_module First_class)(enclosing_value(x))(value(x))(fully_qualified_path Test.Functor._.x))"
 |}]
@@ -141,4 +146,15 @@ let _ =
 [%%expect{|
 - : string =
 "(code_path(main_module_name Test)(submodule_path())(enclosing_module Test)(enclosing_value())(value())(fully_qualified_path Test))"
+|}]
+
+
+let _ =
+  (* The main module name should properly remove all extensions *)
+  let code_path =
+    Code_path.top_level ~file_path:"some_dir/module_name.cppo.ml"
+  in
+  Code_path.main_module_name code_path
+[%%expect{|
+- : string = "Module_name"
 |}]

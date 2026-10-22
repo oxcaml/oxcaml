@@ -15,4 +15,5 @@
  (libraries ppxlib register_print_ctxt))
 
 (cram
+ (package ppxlib)
  (deps standalone_print_ctxt.exe map_structure_print_ctxt.exe))

@@ -8,8 +8,7 @@ is caught and prepended to the last valid AST
 
   $ echo "let _ = [%raise]" > impl.ml
   $ ../raiser.exe -embed-errors impl.ml
-  [%%ocaml.error "Raising inside the rewriter"]
-  let _ = [%raise ]
+  let _ = [%ocaml.error "Raising inside the rewriter"]
 
 The same is true when using the `-as-ppx` mode (note that the error is reported
 by ocaml itself)

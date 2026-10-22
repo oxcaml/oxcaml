@@ -5,4 +5,5 @@
   (pps ppxlib.metaquot)))
 
 (cram
+ (package ppxlib)
  (deps print_cookie_driver.exe))

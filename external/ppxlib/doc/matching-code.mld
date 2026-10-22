@@ -209,7 +209,7 @@ Now that we know what these patterns represent and how to use them, and have see
 example in the {{!ast_pattern_intro}introduction} on {{!Ppxlib.Ast_pattern}[Ast_pattern]}, the
 combinators in the {{!Ppxlib.Ast_pattern}API} should be much more easily
 understandable. So, for a comprehensive list of the different values in the
-module, the reader should directly refer to the API. In this guide; however, we
+module, the reader should directly refer to the API. In this guide, however, we
 explain in more detail a few important values with examples.
 
 {b The wildcard pattern [| x -> ]}. The simplest way to extract a value from something
@@ -246,7 +246,7 @@ such values are {{!Ppxlib.Ast_pattern.int}[Ast_pattern.int]}, {{!Ppxlib.Ast_patt
 {b The common deconstructors}. Many usual common constructors have
 "deconstructors" in {{!Ppxlib.Ast_pattern}[Ast_pattern]}. For instance:
 -  [some __] corresponds to [Some a],
-- [__ ^:: drop ^:: nil] correspnds to [a :: _ :: []],
+- [__ ^:: drop ^:: nil] corresponds to [a :: _ :: []],
 -  [pair __ __] (or equivalently [__ ** __]) corresponds to [(a,b)], etc.
 
 {b The Parsetree deconstructors}. All constructors from {{!Ppxlib.Ast_builder}[Ast_builder]} have a
@@ -257,7 +257,7 @@ named {{!Ppxlib.Ast_pattern.pstr_value}[pstr_value]} which, given ways to destru
 [value_binding] lists, creates a destructor for structure items.
 
 {b The continuation modifiers}. Many {{!Ppxlib.Ast_pattern}[Ast_pattern]} values allow modifying the
-continuation. It can be it a map on the continuation itself, the argument to the
+continuation. It can be a map on the continuation itself, the argument to the
 continuation, or the result of the continuation. So, {{!Ppxlib.Ast_pattern.map}[Ast_pattern.map]} transforms the
 continuation itself, e.g., [map ~f:Fun.flip] will switch the arguments of
 the function. {{!Ppxlib.Ast_pattern.map1}[map<i>]} modifies the arguments to a
