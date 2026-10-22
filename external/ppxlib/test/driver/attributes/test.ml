@@ -59,6 +59,14 @@ Line _, characters 13-17:
 Error: Attribute `blah' was not used
 |}]
 
+(* Attributes interpreted by the compiler are accepted, with or without the
+   [ocaml.] prefix. *)
+
+external f : (int8#[@unsafe_unextended]) -> int8# = "f_byte" "f"
+[%%expect{|
+external f : (int8# [@unsafe_unextended]) -> int8# = "f_byte" "f"
+|}]
+
 (* Attribute drops *)
 
 let faulty_transformation = object
