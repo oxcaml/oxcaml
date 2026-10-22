@@ -244,31 +244,18 @@ end = struct
 end
 
 module Top = struct
-  type t =
-    { witnesses : Witnesses.t;
-    }
+  type t = { witnesses : Witnesses.t }
 
-  let compare
-      { witnesses = w1 }
-      { witnesses = w2 } =
-    Witnesses.compare w1 w2
+  let compare { witnesses = w1 } { witnesses = w2 } = Witnesses.compare w1 w2
 
-  let lessequal
-      { witnesses = w1 }
-      { witnesses = w2 } =
+  let lessequal { witnesses = w1 } { witnesses = w2 } =
     Witnesses.lessequal w1 w2
 
-  let join
-      { witnesses = w1 }
-      { witnesses = w2 } =
-    { witnesses = Witnesses.join w1 w2
-    }
+  let join { witnesses = w1 } { witnesses = w2 } =
+    { witnesses = Witnesses.join w1 w2 }
 
-  let meet
-      { witnesses = w1 }
-      { witnesses = w2 } =
-    { witnesses = Witnesses.meet w1 w2
-    }
+  let meet { witnesses = w1 } { witnesses = w2 } =
+    { witnesses = Witnesses.meet w1 w2 }
 
   let cutoff t ~n = { witnesses = Witnesses.cutoff t.witnesses ~n }
 end
@@ -515,7 +502,9 @@ end = struct
       | Args vars1, Args vars2 -> Args (Vars.join vars1 vars2)
 
     let get_top t =
-      match t with Args_with_top { top; vars = _ } -> Some top | Args _ -> None
+      match t with
+      | Args_with_top { top; vars = _ } -> Some top
+      | Args _ -> None
 
     let get_vars t =
       match t with Args_with_top { top = _; vars } | Args vars -> vars
@@ -533,9 +522,7 @@ end = struct
       | Args vars -> Args (Vars.replace_witnesses vars w)
       | Args_with_top { top = _; vars } ->
         Args_with_top
-          { top = { witnesses = w };
-            vars = Vars.replace_witnesses vars w
-          }
+          { top = { witnesses = w }; vars = Vars.replace_witnesses vars w }
 
     let print ~witnesses ppf t =
       match t with
@@ -1042,8 +1029,7 @@ end = struct
         Args_with_safe (Args.replace_witnesses args witnesses)
       | Args args -> Args (Args.replace_witnesses args witnesses)
       | Args_with_top { top = _; args } ->
-        args_with_top { witnesses }
-          (Args.replace_witnesses args witnesses)
+        args_with_top { witnesses } (Args.replace_witnesses args witnesses)
 
     let compare t1 t2 =
       match t1, t2 with
@@ -1071,8 +1057,8 @@ end = struct
       | Args_with_safe args ->
         Format.fprintf ppf "(join:@.Safe@.%a)@." (Args.print ~witnesses) args
       | Args_with_top { top; args } ->
-        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses)
-          top.witnesses (Args.print ~witnesses) args
+        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) top.witnesses
+          (Args.print ~witnesses) args
       | Args args ->
         Format.fprintf ppf "(join:@.%a)@." (Args.print ~witnesses) args
   end
@@ -1093,10 +1079,7 @@ end = struct
 
   let safe = Resolved Safe
 
-  let top witnesses =
-    Resolved
-      (Top
-         { witnesses })
+  let top witnesses = Resolved (Top { witnesses })
 
   let is_resolved t =
     match t with Resolved _ -> true | Var _ | Join _ | Transform _ -> false
@@ -1159,9 +1142,7 @@ end = struct
   let bounded_join f =
     try Join (f ())
     with Transforms.Widen witnesses ->
-      Resolved
-        (Zero_alloc_utils.Component.Top
-           { witnesses })
+      Resolved (Zero_alloc_utils.Component.Top { witnesses })
 
   (* Keep [join] and [lessequal] in sync. *)
   let join t1 t2 =
@@ -1220,8 +1201,7 @@ end = struct
   let lessequal t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Zero_alloc_utils.Component.lessequal ~lessequal_top:Top.lessequal c1
-        c2
+      Zero_alloc_utils.Component.lessequal ~lessequal_top:Top.lessequal c1 c2
     | Resolved Bot, (Var _ | Transform _ | Join _) -> true
     | (Var _ | Transform _ | Join _), Resolved Bot -> false
     | (Resolved Safe | Resolved (Top _) | Var _ | Transform _ | Join _), _ ->
@@ -1245,8 +1225,7 @@ end = struct
     match t, t' with
     | Resolved Bot, _ | _, Resolved Bot -> Resolved Bot
     | Resolved Safe, t | t, Resolved Safe -> t
-    | Resolved (Top w), Resolved (Top w') ->
-      Resolved (Top (Top.join w w'))
+    | Resolved (Top w), Resolved (Top w') -> Resolved (Top (Top.join w w'))
     | Resolved (Top w), Transform tr | Transform tr, Resolved (Top w) ->
       Transform (Transform.add_top tr w)
     | Resolved (Top w), Var { var; witnesses }
@@ -1279,8 +1258,7 @@ end = struct
 
   let replace_witnesses w t =
     match t with
-    | Resolved (Top { witnesses = _ }) ->
-      Resolved (Top { witnesses = w })
+    | Resolved (Top { witnesses = _ }) -> Resolved (Top { witnesses = w })
     | Resolved (Bot | Safe) -> t
     | Join j -> Join (Join.replace_witnesses j w)
     | Transform tr -> Transform (Transform.replace_witnesses tr w)
@@ -2063,9 +2041,11 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~resolved:Zero_alloc_utils.(Component.map ~f:(fun _witnesses ->
-        (* CR wsturgeon for wsturgeon: inspect witnesses to refine this *)
-        ()))
+      ~resolved:
+        Zero_alloc_utils.(
+          Component.map ~f:(fun _witnesses ->
+              (* CR wsturgeon for wsturgeon: inspect witnesses to refine this *)
+              ()))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
