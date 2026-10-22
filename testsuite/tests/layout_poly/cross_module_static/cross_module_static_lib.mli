@@ -8,10 +8,10 @@ val calls : int ref
 
 val counted_id : layout_ l. ('a : l). 'a -> 'a
 
-module Capture (X : sig
+module Stamper (X : sig
   val offset : int @@ dynamic
-  val state : int ref @@ dynamic
+  val counter : int ref @@ dynamic
 end @ static) : sig
   val initial : int @@ dynamic
-  val capture : layout_ l. ('a : l). 'a -> #(int * 'a)
+  val with_stamp : layout_ l. ('a : l). 'a -> #(int * 'a)
 end @ static
