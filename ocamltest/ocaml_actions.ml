@@ -1657,6 +1657,19 @@ let run_ocamldoc =
     (Result.fail_with_reason reason, env)
   end
 
+let setup_ocamlfilt =
+  Actions.make ~name:"setup-ocamlfilt"
+    ~description:"Ensure ocamlfilt is available"
+    ~does_something:false
+    @@ fun _loc env ->
+  let filename = Ocaml_files.ocamlfilt in
+  let env = Environments.add Ocaml_variables.ocamlfilt filename env in
+  let reason = filename ^ " does not exist" in
+  if not (Sys.file_exists filename) then
+    (Result.fail_with_reason reason, env)
+  else
+    (Result.pass, env)
+
 let init () =
   Environments.register_initializer Environments.Post
     "find_source_modules" find_source_modules;
@@ -1709,6 +1722,7 @@ let init () =
     setup_ocamldoc_build_env;
     run_ocamldoc;
     check_ocamldoc_output;
+    setup_ocamlfilt;
     ocamlmklib;
     fexpr;
     check_fexpr_dump;

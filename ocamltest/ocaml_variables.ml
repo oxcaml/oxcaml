@@ -234,6 +234,10 @@ let ocaml_script_as_argument =
   Variables.make ( "ocaml_script_as_argument",
     "Whether the ocaml script should be passed as argument or on stdin")
 
+let ocamlfilt =
+  Variables.make ( "ocamlfilt",
+    "Path to ocamlfilt")
+
 let plugins =
   Variables.make ( "plugins", "plugins for ocamldoc" )
 
@@ -318,6 +322,7 @@ let init () =
     ocamldoc_exit_status;
     ocamldebug_flags;
     ocaml_script_as_argument;
+    ocamlfilt;
     os_type;
     plugins;
     shared_library_cflags;
