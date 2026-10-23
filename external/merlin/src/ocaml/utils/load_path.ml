@@ -572,7 +572,6 @@ let find_uncap_loading_manifests fn_uncap =
       find_in_pending_manifests ~uncap:true fn_uncap)
 
 let init ~auto_include ~visible ~hidden =
-<<<<<<< Merlin:manifest-line
   assert (not Config.merlin || Local_store.is_bound ());
   let get_new_dirs ~get_visibility ~get_path new_entries old_dirs =
     let create_dir entry = Dir.create (get_visibility entry) (get_path entry) in
@@ -621,47 +620,6 @@ let init ~auto_include ~visible ~hidden =
     List.iter Path_cache.prepend_add new_visible;
     (*= init_manifests (); *)
     auto_include_callback := auto_include
-||||||| Compiler:last-imported
-  reset ();
-  visible_dirs :=
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
-        Dir.create (Visible { cmx_guaranteed }) path)
-      visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
-  Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !hidden_dirs);
-  Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !visible_dirs);
-  init_manifests ();
-  auto_include_callback := auto_include
-=======
-  reset ();
-  visible_dirs :=
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
-        Dir.create (Visible { cmx_guaranteed }) path)
-      visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
-  Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !hidden_dirs);
-  Profile.record_call ~accumulate:true "load_hidden_files" (fun () ->
-    List.iter
-      (fun ({ visible_path; actual_path; cmx_guaranteed }
-             : Clflags.hidden_include_file) ->
-        let actual_path =
-          Dune_manifests_reader.Path.Load_root_relative.of_string actual_path
-          |> Dune_manifests_reader.Path.Load_root_relative.to_cwd_relative
-          |> Dune_manifests_reader.Path.Cwd_relative.to_string
-        in
-        Path_cache.prepend_add_single ~hidden:true ~cmx_guaranteed
-          (Filename.basename visible_path) actual_path)
-      !Clflags.hidden_include_files);
-  Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !visible_dirs);
-  init_manifests ();
-  auto_include_callback := auto_include
->>>>>>> Compiler:HEAD
 
 let remove_dir dir =
   assert (not Config.merlin || Local_store.is_bound ());
