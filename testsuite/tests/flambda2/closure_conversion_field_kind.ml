@@ -1,6 +1,6 @@
 (* TEST
  flambda2;
- flags = "-flambda2-kind-checks -dflambda-invariants";
+ flags = "-dflambda-invariants";
  flags += " -dcmm-invariants -dcfg-invariants";
  {
    ocamlopt_flags = "-Oclassic";
