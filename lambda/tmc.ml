@@ -65,8 +65,8 @@ let add_dst_params ({var; offset} : Ident.t destination) params =
   { name = var ; layout = Lambda.layout_block ;
     debug_uid= Lambda.debug_uid_none;
     (* The destination parameters are generated internally as part of the TMC
-       optimization. As such, they are not user visible, and we do not associate
-       them with a [debug_uid]. *)
+       optimization. As such, they are not user visible, and we do not
+       associate them with a [debug_uid]. *)
     attributes = Lambda.default_param_attribute ; mode = alloc_heap } ::
   { name = offset ; layout = Lambda.layout_int ;
     debug_uid= Lambda.debug_uid_none;
@@ -79,6 +79,22 @@ let add_dst_args ({var; offset} : offset destination) args =
 let assign_to_dst {var; offset; loc} lam =
   Lprim(Psetfield_computed(Pointer, Heap_initialization),
         [Lvar var; offset_code offset; lam], loc)
+
+(* When [lam] is moved out of tail position, the calls in its tail position
+   must no longer close the current region. Calls in a nested region only
+   close that region, which [shallow_map] treats as non-tail. *)
+let rec remove_close_at_apply lam =
+  let region_close : region_close -> region_close = function
+    | Rc_close_at_apply -> Rc_normal
+    | (Rc_normal | Rc_nontail) as rc -> rc
+  in
+  match lam with
+  | Lapply ap ->
+      Lapply { ap with ap_region_close = region_close ap.ap_region_close }
+  | Lsend (k, lmet, lobj, largs, rc, mode, loc, layout, yielding) ->
+      Lsend (k, lmet, lobj, largs, region_close rc, mode, loc, layout,
+             yielding)
+  | _ -> shallow_map ~tail:remove_close_at_apply ~non_tail:Fun.id lam
 
 module Constr : sig
   (** The type [Constr.t] represents a reified constructor with
@@ -220,11 +236,16 @@ module Dps : sig
   (** A term parameterized over a destination.  The [tail] argument
       is passed by the caller to indicate whether the term will be placed
       in tail-position -- this allows to generate correct @tailcall
-      annotations. *)
+      annotations, and to close the region at tail calls. *)
 
   type 'a t
 
   val make : lambda dps -> lambda t
+
+  (** [non_tail d] places [d] out of tail position, whatever the position of
+      its context. *)
+  val non_tail : 'a t -> 'a t
+
   val run : lambda t -> lambda dps
   val delay_constructor : Constr.t -> lambda t -> lambda t
 
@@ -319,13 +340,13 @@ end = struct
 
   let lambda (v : lambda) : lambda t = {
     code = (fun ~delayed ~tail:_ ~dst ->
-      write_to_dst dst delayed v
+      write_to_dst dst delayed (remove_close_at_apply v)
     );
     delayed_use_count = 1;
   }
   (** Create a new destination-passing-style term which is simply
       setting the destination with the given [v], hence "returning"
-      it.
+      it. [v] is no longer in tail position.
    *)
 
   let unit : unit t = {
@@ -376,6 +397,11 @@ end = struct
 
   let make (dps : 'a dps) : 'a t =
     reify_delay dps
+
+  let non_tail d = {
+    d with code = (fun ~delayed ~tail:_ ~dst ->
+      d.code ~delayed ~tail:false ~dst);
+  }
 
   let delay_constructor constr d =
     let d = ensures_affine d in {
@@ -479,6 +505,9 @@ module Choice = struct
   let dps (c : lambda t) ~tail ~dst =
     Dps.run c.dps ~tail ~dst
 
+  let non_tail c = { c with dps = Dps.non_tail c.dps }
+  (** Place the destination-passing-style code out of tail position. *)
+
   let pair ((c1, c2) : 'a t * 'b t) : ('a * 'b) t = {
     dps = Dps.pair c1.dps c2.dps;
     direct = (fun () -> (c1.direct (), c2.direct ()));
@@ -579,14 +608,74 @@ end
 
 open Choice.Syntax
 
+(* Region closing:
+
+   TMC needs to close a function's region when making a recursive call in
+   order to preserve the constant stack-space usage. However, this is not
+   always safe: if a value passed to the call lives in the current region,
+   closing it would leave the callee with a dangling reference.
+
+   It's safe to close the region if the callee and every argument of the call
+   are in one of the following categories:
+   - A variable bound outside the function body, such as a parameter, a
+     closure of the enclosing [let rec] or a free variable. It is allocated
+     before the function is entered, so it outlives its region.
+   - A field projection of such a variable that doesn't allocate, for the
+     same reason. A projection that allocates might allocate in the region.
+   - A non-pointer value, such as an immediate.
+   - A value at the global mode, as it cannot be stack-allocated. This
+     includes heap-allocated closures and blocks, module globals and results
+     of calls that return at the global mode.
+
+   It's also safe if the call already closes the region in the source, as the
+   type checker has checked its arguments. *)
+
 type context = {
   specialized: specialized Ident.Map.t;
+  outlives_region: Ident.Set.t;
 }
 and specialized = {
   arity: int;
   dps_id: Ident.t;
   direct_kind: function_kind;
+  params: lparam list;
 }
+
+let rec is_non_pointer_layout : layout -> bool = function
+  | Pvalue { raw_kind = Pintval; _ }
+  | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+      true
+  | Punboxed_product layouts -> List.for_all is_non_pointer_layout layouts
+  | Pvalue _ | Punboxed_mask | Ptop | Pbottom | Psplicevar _ -> false
+
+(* Is this expression guaranteed to outlive the current region? *)
+let rec outlives_region ctx lam =
+  match lam with
+  | Lvar id -> Ident.Set.mem id ctx.outlives_region
+  | Lconst _ -> true
+  | Lfunction { mode; _ } -> is_heap_mode mode
+  | Lapply { ap_mode; _ } -> Lambda.is_not_alloc_stack ap_mode
+  | Lprim ((Pgetglobal _ | Pgetpredef _), _, _) -> true
+  | Lprim (Pfield _, [arg], _) -> outlives_region ctx arg
+  | Lprim (Pfloatfield (_, _, mode), _, _) -> is_heap_mode mode
+  | Lprim ((Pmakeblock (_, _, _, mode)
+           | Pmakefloatblock (_, mode)
+           | Pmakeufloatblock (_, mode)
+           | Pmakearray (_, _, mode)), _, _) ->
+      is_heap_mode mode
+  | Lprim (Pscalar op, _, _) ->
+      begin match (Scalar.Operation.info op).result with
+      | Value (Integral (Taggable _)) | Naked _ -> true
+      | Value (Integral (Boxable (Int32 mode | Nativeint mode | Int64 mode))
+              | Floating (Float32 mode | Float64 mode)) ->
+          is_heap_mode mode
+      end
+  | _ -> false
+
+let add_outlives_region ctx ~layout var def =
+  if is_non_pointer_layout layout || outlives_region ctx def
+  then { ctx with outlives_region = Ident.Set.add var ctx.outlives_region }
+  else ctx
 
 let llets lk vk bindings body =
   List.fold_right (fun (var, var_duid, def) body ->
@@ -611,11 +700,11 @@ let declare_binding ctx (var, def) =
   let arity = List.length lfun.params in
   let dps_id = Ident.create_local (Ident.name var ^ "_dps") in
   let direct_kind = lfun.kind in
-  let cand = { arity; dps_id; direct_kind; } in
-  { specialized = Ident.Map.add var cand ctx.specialized }
+  let cand = { arity; dps_id; direct_kind; params = lfun.params } in
+  { ctx with specialized = Ident.Map.add var cand ctx.specialized }
 
 let rec choice ctx t =
-  let rec choice ctx ~tail t =
+  let rec choice ctx ~tail ~region_depth t =
     match t with
     | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lsend _
       | Lassign _ | Lfor _ | Lwhile _) ->
@@ -626,35 +715,42 @@ let rec choice ctx t =
        of construction [Lprim(Pmakeblock(...), ...)] is handled by
        [choice_makeblock] *)
     | Lprim (prim, primargs, loc) ->
-        choice_prim ctx ~tail prim primargs loc
+        choice_prim ctx ~tail ~region_depth prim primargs loc
 
     (* [choice_apply] handles applications, in particular tail-calls which
        generate Set choices at the leaves *)
     | Lapply apply ->
-        choice_apply ctx ~tail apply
+        choice_apply ctx ~tail ~region_depth apply
     (* other cases use the [lift] helper that takes the sub-terms in tail
        position and the context around them, and generates a choice for
        the whole term from choices for the tail subterms. *)
     | Lsequence (l1, l2) ->
         let l1 = traverse ctx l1 in
-        let+ l2 = choice ctx ~tail l2 in
+        let+ l2 = choice ctx ~tail ~region_depth l2 in
         Lsequence (l1, l2)
     | Lifthenelse (l1, l2, l3, kind) ->
         let l1 = traverse ctx l1 in
-        let+ (l2, l3) = choice_pair ctx ~tail (l2, l3) in
+        let+ (l2, l3) = choice_pair ctx ~tail ~region_depth (l2, l3) in
         Lifthenelse (l1, l2, l3, kind)
     | Lmutlet (vk, var, var_duid, def, body) ->
         (* mutable bindings are not TMC-specialized *)
         let def = traverse ctx def in
-        let+ body = choice ctx ~tail body in
+        let+ body = choice ctx ~tail ~region_depth body in
         Lmutlet (vk, var, var_duid, def, body)
     | Llet (lk, vk, var, var_duid, def, body) ->
         let ctx, bindings = traverse_let ctx var var_duid def in
-        let+ body = choice ctx ~tail body in
+        let ctx = add_outlives_region ctx ~layout:vk var def in
+        let+ body = choice ctx ~tail ~region_depth body in
         llets lk vk bindings body
     | Lletrec (bindings, body) ->
         let ctx, bindings = traverse_letrec ctx bindings in
-        let+ body = choice ctx ~tail body in
+        let ctx =
+          List.fold_left (fun ctx { id; def; _ } ->
+              add_outlives_region ctx ~layout:Lambda.layout_function id
+                (Lfunction def))
+            ctx bindings
+        in
+        let+ body = choice ctx ~tail ~region_depth body in
         Lletrec(bindings, body)
     | Lswitch (l1, sw, loc, kind) ->
         (* decompose *)
@@ -662,9 +758,10 @@ let rec choice ctx t =
         let blocks_lhs, blocks_rhs = List.split sw.sw_blocks in
         (* transform *)
         let l1 = traverse ctx l1 in
-        let+ consts_rhs = choice_list ctx ~tail consts_rhs
-        and+ blocks_rhs = choice_list ctx ~tail blocks_rhs
-        and+ sw_failaction = choice_option ctx ~tail sw.sw_failaction in
+        let+ consts_rhs = choice_list ctx ~tail ~region_depth consts_rhs
+        and+ blocks_rhs = choice_list ctx ~tail ~region_depth blocks_rhs
+        and+ sw_failaction =
+          choice_option ctx ~tail ~region_depth sw.sw_failaction in
         (* rebuild *)
         let sw_consts = List.combine consts_lhs consts_rhs in
         let sw_blocks = List.combine blocks_lhs blocks_rhs in
@@ -675,8 +772,8 @@ let rec choice ctx t =
         let cases_lhs, cases_rhs = List.split cases in
         (* transform *)
         let l1 = traverse ctx l1 in
-        let+ cases_rhs = choice_list ctx ~tail cases_rhs
-        and+ fail = choice_option ctx ~tail fail in
+        let+ cases_rhs = choice_list ctx ~tail ~region_depth cases_rhs
+        and+ fail = choice_option ctx ~tail ~region_depth fail in
         (* rebuild *)
         let cases = List.combine cases_lhs cases_rhs in
         Lstringswitch (l1, cases, fail, loc, kind)
@@ -689,31 +786,38 @@ let rec choice ctx t =
            we need to remove the exception handler), so it
            is not in TMC position either *)
         let+ l1 = Choice.lambda (traverse ctx l1)
-        and+ l2 = choice ctx ~tail l2 in
+        and+ l2 = choice ctx ~tail ~region_depth l2 in
         Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->
         (* In [static-catch l1 with ids -> l2],
            the term [l1] is in fact in tail-position *)
-        let+ l1 = choice ctx ~tail l1
-        and+ l2 = choice ctx ~tail l2 in
+        let handler_region_depth =
+          match r with
+          | Same_region -> region_depth
+          (* the innermost region is considered closed in the handler *)
+          | Popped_region -> region_depth - 1
+        in
+        let+ l1 = choice ctx ~tail ~region_depth l1
+        and+ l2 = choice ctx ~tail ~region_depth:handler_region_depth l2 in
         Lstaticcatch (l1, ids, l2, r, kind)
     | Levent (lam, lev) ->
-        let+ lam = choice ctx ~tail lam in
+        let+ lam = choice ctx ~tail ~region_depth lam in
         Levent (lam, lev)
     | Lifused (x, lam) ->
-        let+ lam = choice ctx ~tail lam in
+        let+ lam = choice ctx ~tail ~region_depth lam in
         Lifused (x, lam)
     | Lregion (lam, layout) ->
-        let+ lam = choice ctx ~tail lam in
+        (* this region has to be closed after [lam] returns *)
+        let+ lam = choice ctx ~tail ~region_depth:(region_depth + 1) lam in
         Lregion (lam, layout)
     | Lexclave lam ->
-        let+ lam = choice ctx ~tail lam in
+        let+ lam = choice ctx ~tail ~region_depth:(region_depth - 1) lam in
         Lexclave lam
     | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
     | Linstantiate _ ->
       fatal_error_invalid_constructor t
 
-  and choice_apply ctx ~tail apply =
+  and choice_apply ctx ~tail ~region_depth apply =
     let exception No_tmc in
     try
       let explicit_tailcall_request =
@@ -757,12 +861,45 @@ let rec choice ctx t =
           (* This application is in tail position of a region=true function
              (or Tmc_local_returning would have occurred), so it must be Heap *)
           assert (Lambda.is_not_alloc_stack apply.ap_mode);
+          (* We don't need to close the region if we aren't in one to begin
+             with *)
+          let should_close_region =
+            match apply.ap_region_close with
+            | Rc_normal | Rc_close_at_apply -> region_depth >= 1
+            | Rc_nontail -> false
+          in
+          let can_close_region =
+            region_depth = 1 &&
+            match apply.ap_region_close with
+            (* The type checker already checked the call can close it *)
+            | Rc_close_at_apply -> true
+            | Rc_normal | Rc_nontail ->
+                (* The callee's closure must not live in the region *)
+                outlives_region ctx (Lvar f) &&
+                (* Arguments passed at mode global or that are not
+                   pointers cannot point into the region *)
+                List.for_all2 (fun (param : lparam) arg ->
+                    is_heap_mode param.mode
+                    || is_non_pointer_layout param.layout
+                    || outlives_region ctx arg)
+                  specialized.params args
+          in
           {
             Choice.dps = Dps.make (fun ~tail ~dst ->
+              let ap_region_close =
+                if tail && should_close_region && can_close_region
+                then Rc_close_at_apply
+                else apply.ap_region_close
+              in
+              if tail && should_close_region && not can_close_region then
+                Location.prerr_warning
+                  (Debuginfo.Scoped_location.to_location apply.ap_loc)
+                  Warnings.Tmc_breaks_tailcall_region;
               Lapply { apply with
                        ap_func = Lvar specialized.dps_id;
                        ap_args = add_dst_args dst args;
                        ap_tailcall = tailcall tail;
+                       ap_region_close;
                      });
             direct = (fun () ->
               Lapply { apply with ap_tailcall = tailcall tail });
@@ -786,23 +923,18 @@ let rec choice ctx t =
           | other -> other
         in
         { apply with ap_tailcall } in
-      (* The call will not be in tail position, so the close-on-apply flag must
-         not be set. *)
-      let ap_region_close =
-        match apply.ap_region_close with
-        | Rc_close_at_apply -> Rc_normal
-        | (Rc_normal | Rc_nontail) as reg_close -> reg_close
-      in
-      let apply = { apply with ap_region_close } in
       { (Choice.lambda (Lapply apply)) with
         direct = (fun () -> Lapply apply_no_bailout);
       }
 
-  and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
+  and choice_makeblock ctx ~tail:_ ~region_depth (tag, flag, shape, mode)
+        blockargs loc =
     let choices =
       (* We look at each position in the block to find candidates for the TMC
          hole transformation. We only consider fields of layout Value. *)
-      let[@inline always] of_value arg = choice ctx ~tail:false arg in
+      let[@inline always] of_value arg =
+        choice ctx ~tail:false ~region_depth arg
+      in
       let[@inline always] of_non_value arg = Choice.lambda (traverse ctx arg) in
       match shape with
       | All_value -> List.map of_value blockargs
@@ -901,18 +1033,20 @@ let rec choice ctx t =
             choice.explicit_tailcall_request;
         }
 
-  and choice_prim ctx ~tail prim primargs loc =
+  and choice_prim ctx ~tail ~region_depth prim primargs loc =
     match prim with
     (* The important case is the construction case *)
     | Pmakeblock (tag, flag, shape, mode) ->
-        choice_makeblock ctx ~tail (tag, flag, shape, mode) primargs loc
+        choice_makeblock ctx ~tail ~region_depth (tag, flag, shape, mode)
+          primargs loc
 
-    (* Some primitives have arguments in tail-position *)
+    (* The argument of [opaque] is in TMC position, but not in
+       tail-position *)
     | Popaque layout ->
         let l1 = match primargs with
           |  [l1] -> l1
           | _ -> invalid_arg "choice_prim" in
-        let+ l1 = choice ctx ~tail l1 in
+        let+ l1 = Choice.non_tail (choice ctx ~tail:false ~region_depth l1) in
         Lprim (Popaque layout, [l1], loc)
 
     (* in common cases we just return *)
@@ -1051,14 +1185,15 @@ let rec choice ctx t =
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 
-  and choice_list ctx ~tail terms =
-    Choice.list (List.map (choice ctx ~tail) terms)
-  and choice_pair ctx ~tail (t1, t2) =
-    Choice.pair (choice ctx ~tail t1, choice ctx ~tail t2)
-  and choice_option ctx ~tail t =
-    Choice.option (Option.map (choice ctx ~tail) t)
+  and choice_list ctx ~tail ~region_depth terms =
+    Choice.list (List.map (choice ctx ~tail ~region_depth) terms)
+  and choice_pair ctx ~tail ~region_depth (t1, t2) =
+    Choice.pair (choice ctx ~tail ~region_depth t1,
+                 choice ctx ~tail ~region_depth t2)
+  and choice_option ctx ~tail ~region_depth t =
+    Choice.option (Option.map (choice ctx ~tail ~region_depth) t)
 
-  in choice ctx t
+  in fun ~tail -> choice ctx ~tail ~region_depth:0 t
 
 and traverse ctx = function
   | Llet (lk, vk, var, var_duid, def, body) ->
@@ -1112,7 +1247,12 @@ and traverse_letrec_binding ctx { id; debug_uid; def } =
 
 and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
   let special = Ident.Map.find var inner_ctx.specialized in
-  let fun_choice = choice outer_ctx ~tail:true lfun.body in
+  let fun_choice =
+    (* The variables bound outside the body are allocated before the function
+       is entered, so they outlive its region. *)
+    let outlives_region = free_variables lfun.body in
+    choice { outer_ctx with outlives_region } ~tail:true lfun.body
+  in
   if fun_choice.Choice.tmc_calls = [] then
     Location.prerr_warning
       (Debuginfo.Scoped_location.to_location lfun.loc)
@@ -1158,7 +1298,9 @@ and traverse_list ctx terms =
   List.map (traverse ctx) terms
 
 let rewrite t =
-  let ctx = { specialized = Ident.Map.empty } in
+  let ctx =
+    { specialized = Ident.Map.empty; outlives_region = Ident.Set.empty }
+  in
   traverse ctx t
 
 module Style = Misc.Style
