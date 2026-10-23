@@ -40,6 +40,11 @@ module Block = struct
 
   let tag e = J.EAccess (e, ANormal, zero)
 
+  (* Like [tag], but evaluates to [undefined] instead of throwing when [e] is
+     not an object. Used by OxCaml for type tests on values that are not known
+     to be OCaml blocks *)
+  let tag_nullish e = J.EAccess (e, ANullish, zero)
+
   let field e idx =
     let adjusted = J.ENum (J.Num.of_targetint (Targetint.of_int_exn (idx + 1))) in
     J.EAccess (e, ANormal, adjusted)

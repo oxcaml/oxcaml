@@ -70,6 +70,16 @@ val from_cma :
   -> in_channel
   -> one
 
+type jsir_unit =
+  { name : string
+  ; program : Code.program
+  ; info : Unit_info.t
+  }
+
+val from_cmj : in_channel -> jsir_unit
+
+val from_cmja : in_channel -> jsir_unit list
+
 val from_channel :
      in_channel
   -> [ `Cmo of Ocaml_compiler.Cmo_format.t | `Cma of Cmo_format.library | `Exe ]

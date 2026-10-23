@@ -87,6 +87,12 @@ module Sort : sig
 
   include With_backtracking.S with module Change := Change
 
+  val set_add_to_pool : (level:int -> t -> unit) -> unit
+
+  (** Use [Jkind.Sort.instance_with] instead, which passes in [new_var]. *)
+  val instance_with :
+    new_var:(unit -> var) -> var list -> (unit -> 'a) -> var list * 'a
+
   val equate : allow_mutation:bool -> t -> t -> bool
 
   val constrain_addressable : allow_mutation:bool -> t -> bool
@@ -239,8 +245,6 @@ module Layout : sig
   end
 
   val of_const : Const.t -> Sort.t t
-
-  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
 
   val get_const : Sort.t t -> Const.t option
 
