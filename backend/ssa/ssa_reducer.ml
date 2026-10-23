@@ -175,10 +175,11 @@ module Context = struct
     | Switch { index; targets } ->
       Switch
         { index = map_value t index; targets = Array.map (map_block t) targets }
-    | Call { op; args; continuation; may_raise; nontail } ->
+    | Call { op; args; known_arguments; continuation; may_raise; nontail } ->
       Call
         { op;
           args = map_values t args;
+          known_arguments;
           continuation = map_continuation t continuation;
           may_raise;
           nontail

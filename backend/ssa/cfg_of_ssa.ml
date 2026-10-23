@@ -458,13 +458,19 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         let index_reg = get_reg env index in
         let labels = Array.map (label_of env) targets in
         make_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
-    | Call { op; args; continuation = Return; nontail; may_raise = _ } ->
+    | Call
+        { op;
+          args;
+          known_arguments;
+          continuation = Return;
+          nontail;
+          may_raise = _
+        } ->
       assert (not nontail);
       let call_op : Cfg.func_call_operation =
         match op with
-        | Direct sym -> { desc = Direct sym; known_arguments = [] }
-        | Indirect candidates ->
-          { desc = Indirect candidates; known_arguments = [] }
+        | Direct sym -> { desc = Direct sym; known_arguments }
+        | Indirect candidates -> { desc = Indirect candidates; known_arguments }
         | External _ | Probe _ ->
           Misc.fatal_error
             "Cfg_of_ssa: external functions cannot be tail called"
@@ -496,7 +502,8 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       | Direct _ | Indirect _ | Probe _ ->
         Misc.fatal_error
           "Cfg_of_ssa: only an external call can have continuation Unreachable")
-    | Call { op; args; continuation = Goto continuation; _ } -> (
+    | Call { op; args; known_arguments; continuation = Goto continuation; _ }
+      -> (
       let virt_args = Array.map (get_reg env) args in
       let virt_res = get_block_params_regs env continuation in
       let ocaml_call (call_op : Cfg_intf.S.func_call_operation) =
@@ -521,9 +528,9 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           loc_res dbg
       in
       match op with
-      | Direct sym -> ocaml_call { desc = Direct sym; known_arguments = [] }
+      | Direct sym -> ocaml_call { desc = Direct sym; known_arguments }
       | Indirect candidates ->
-        ocaml_call { desc = Indirect candidates; known_arguments = [] }
+        ocaml_call { desc = Indirect candidates; known_arguments }
       | External ({ ty_args; _ } as ext) ->
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
