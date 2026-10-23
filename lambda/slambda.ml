@@ -38,6 +38,136 @@ exception Error of Location.t * error
 
 let raise_error ~loc e =
   raise (Error (Debuginfo.Scoped_location.to_location loc, e))
+(* Check that expansion left no unresolved layouts or templates. *)
+
+exception Found_a_splice
+
+let rec assert_mixed_block_element_contains_no_splices : type a.
+    a Lambda.mixed_block_element -> unit = function
+  | Splice_variable _ -> raise Found_a_splice
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Void
+    ->
+    ()
+  | Product elements ->
+    Array.iter assert_mixed_block_element_contains_no_splices elements
+
+let assert_mixed_block_shape_contains_no_splices shape =
+  Array.iter assert_mixed_block_element_contains_no_splices shape
+
+let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
+  | Psplicevar _ -> raise Found_a_splice
+  | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask | Pvoid ->
+    ()
+  | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
+  | Punboxed_product layouts ->
+    List.iter assert_layout_contains_no_splices layouts
+
+and assert_value_kind_contains_no_splices { raw_kind; nullable = _ } =
+  assert_raw_value_kind_contains_no_splices raw_kind
+
+and assert_raw_value_kind_contains_no_splices = function
+  | Pvariant { consts = _; non_consts } ->
+    List.iter
+      (fun (_, constructor_shape) ->
+        assert_constructor_shape_contains_no_splices constructor_shape)
+      non_consts
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ | Pboxedmaskval ->
+    ()
+
+and assert_constructor_shape_contains_no_splices = function
+  | Constructor_shape_undetermined -> ()
+  | Constructor_shape_uniform value_kinds ->
+    List.iter assert_value_kind_contains_no_splices value_kinds
+  | Constructor_shape_mixed mixed_block_shape ->
+    assert_mixed_block_shape_contains_no_splices mixed_block_shape
+
+let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
+  match prim with
+  | Popaque layout | Pobj_magic layout ->
+    assert_layout_contains_no_splices layout
+  | Pget_idx (layout, _)
+  | Pset_idx (layout, _)
+  | Patomic_load_idx { layout }
+  | Patomic_set_idx { layout; _ }
+  | Patomic_exchange_idx { layout; _ }
+  | Patomic_compare_exchange_idx { layout; _ }
+  | Patomic_compare_set_idx { layout; _ }
+  | Pget_ptr (layout, _)
+  | Pset_ptr (layout, _)
+  | Pget_ext_ptr (layout, _)
+  | Pset_ext_ptr (layout, _)
+  | Pbox (layout, _)
+  | Punbox layout ->
+    assert_layout_contains_no_splices layout
+  | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
+    List.iter assert_layout_contains_no_splices layouts
+  | Pmakeblock (_, _, Shape shape, _)
+  | Patomic_load_mixed_field { shape; _ }
+  | Patomic_set_mixed_field { shape; _ }
+  | Pduprecord
+      ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
+    ->
+    assert_mixed_block_shape_contains_no_splices shape
+  | Pmixedfield (_, shape, _) ->
+    Array.iter assert_mixed_block_element_contains_no_splices shape
+  | Psetmixedfield (_, shape, _) ->
+    assert_mixed_block_shape_contains_no_splices shape
+  | Pmake_idx_mixed_field (shape, _, _) ->
+    assert_mixed_block_shape_contains_no_splices shape
+  | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
+    assert_mixed_block_element_contains_no_splices element
+  | _ -> ()
+
+let assert_function_contains_no_splices { Lambda.params; return; _ } =
+  List.iter
+    (fun { Lambda.layout; _ } -> assert_layout_contains_no_splices layout)
+    params;
+  assert_layout_contains_no_splices return
+
+let rec assert_constant_contains_no_splices = function
+  | Const_block (_, fields) ->
+    List.iter assert_constant_contains_no_splices fields
+  | Const_mixed_block (_, shape, fields) ->
+    assert_mixed_block_shape_contains_no_splices shape;
+    List.iter assert_constant_contains_no_splices fields
+  | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
+  | Const_null ->
+    ()
+
+let rec assert_no_splices (lam : Lambda.lambda) =
+  (match lam with
+  | Lvar _ | Lmutvar _ -> ()
+  | Lconst constant -> assert_constant_contains_no_splices constant
+  | Lapply { ap_result_layout; _ } ->
+    assert_layout_contains_no_splices ap_result_layout
+  | Lfunction func -> assert_function_contains_no_splices func
+  | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
+  | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
+  | Lletrec _ -> ()
+  | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
+  | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
+  | Lstringswitch (_, _, _, _, layout) ->
+    assert_layout_contains_no_splices layout
+  | Lstaticraise _ -> ()
+  | Lstaticcatch (_, (_, bindings), _, _, layout) ->
+    List.iter
+      (fun (_, _, layout) -> assert_layout_contains_no_splices layout)
+      bindings;
+    assert_layout_contains_no_splices layout
+  | Ltrywith (_, _, _, _, layout) -> assert_layout_contains_no_splices layout
+  | Lifthenelse (_, _, _, layout) -> assert_layout_contains_no_splices layout
+  | Lsequence _ | Lwhile _ | Lfor _ | Lassign _ -> ()
+  | Lsend (_, _, _, _, _, _, _, layout, _) ->
+    assert_layout_contains_no_splices layout
+  | Levent _ | Lifused _ -> ()
+  | Lregion (_, layout) -> assert_layout_contains_no_splices layout
+  | Lexclave _ -> ()
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam);
+  Lambda.iter_head_constructor assert_no_splices lam
 
 module Or_missing = struct
   type 'a t =
@@ -178,7 +308,14 @@ and Env : sig
 
   val find_value : t -> Ident.t -> Types.value Or_missing.t
 
-  val find_layout : t -> Ident.t -> layout
+  (** Keep only the given idents and sort variables, all of which must be bound.
+  *)
+  val restrict : t -> idents:Ident.Set.t -> sort_vars:Layout_ident.Set.t -> t
+
+  val idents_and_layouts : t -> (Ident.t * layout) list
+
+  (** Rename every ident to a fresh one, returning the renaming. *)
+  val freshen_idents : t -> t * Ident.t Ident.Map.t
 
   val find_sort_var : t -> Layout_ident.t -> layout
 end = struct
@@ -200,12 +337,44 @@ end = struct
     | Some (_, value) -> value
     | None -> Or_missing.Missing
 
-  let find_layout t id =
-    match Ident.Map.find_opt id t.idents with
-    | Some (layout, _) -> layout
-    | None ->
-      Misc.fatal_errorf "Slambda: no layout bound for variable %a" Ident.print
-        id
+  let restrict t ~idents ~sort_vars =
+    let idents =
+      Ident.Set.fold
+        (fun id restricted ->
+          match Ident.Map.find_opt id t.idents with
+          | Some entry -> Ident.Map.add id entry restricted
+          | None ->
+            Misc.fatal_errorf "Slambda: no layout bound for variable %a"
+              Ident.print id)
+        idents Ident.Map.empty
+    in
+    let sort_vars =
+      Layout_ident.Set.fold
+        (fun var restricted ->
+          match Layout_ident.Map.find_opt var t.sort_vars with
+          | Some layout -> Layout_ident.Map.add var layout restricted
+          | None ->
+            Misc.fatal_errorf "Slambda: no layout bound for sort variable %a"
+              Layout_ident.print var)
+        sort_vars Layout_ident.Map.empty
+    in
+    { idents; sort_vars }
+
+  let idents_and_layouts t =
+    Ident.Map.bindings t.idents
+    |> List.map (fun (id, (layout, _)) -> id, layout)
+
+  let freshen_idents t =
+    let idents, renaming =
+      Ident.Map.fold
+        (fun id entry (idents, renaming) ->
+          let fresh_id = Ident.rename id in
+          ( Ident.Map.add fresh_id entry idents,
+            Ident.Map.add id fresh_id renaming ))
+        t.idents
+        (Ident.Map.empty, Ident.Map.empty)
+    in
+    { t with idents }, renaming
 
   let find_sort_var t var =
     match Layout_ident.Map.find_opt var t.sort_vars with
@@ -318,6 +487,30 @@ module CU_data = struct
       Template_store.print templates
 end
 
+(** Each instantiation gets its own copy of the closure with fresh idents, so
+    instantiations have distinct binders and the idents of closures loaded from
+    other compilation units can't clash with local ones. Instantiation arguments
+    are static values, which contain no idents, so they need no renaming.
+
+    [clo_runtime_env] is renamed in place rather than rebuilt from [clo_env]
+    because its order must match the fields of the runtime environment block,
+    which may have been built in another compilation unit. *)
+let freshen_closure { Types.clo_template; clo_runtime_env; clo_env } =
+  let clo_env, renaming = Env.freshen_idents clo_env in
+  let duplicate = Lambda.duplicate_function ~rename:renaming in
+  let clo_template =
+    match clo_template with
+    | Types.Kind { ktmpl_params; ktmpl_body } ->
+      Types.Kind { ktmpl_params; ktmpl_body = duplicate ktmpl_body }
+    | Types.Value func -> Types.Value (duplicate func)
+  in
+  let clo_runtime_env =
+    List.map
+      (fun (id, layout) -> Ident.Map.find id renaming, layout)
+      clo_runtime_env
+  in
+  { Types.clo_template; clo_runtime_env; clo_env }
+
 module Ctx : sig
   type t
 
@@ -414,14 +607,11 @@ end = struct
         (* eval_apply might recursively call this function so mark this name as
            visited before calling it. *)
         Ident.Tbl.replace t.instantiated_templates name None;
-        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
-        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
-        let instantiation =
-          Lambda.subst
-            (fun _ _ env -> env)
-            ~freshen_bound_variables:true Ident.Map.empty slv_runtime
+        let { Types.slv_comptime; slv_runtime } =
+          eval_apply (freshen_closure closure) args
         in
-        t.instantiations <- (name, instantiation) :: t.instantiations;
+        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
+        t.instantiations <- (name, slv_runtime) :: t.instantiations;
         slv_comptime
         end
     in
@@ -1363,7 +1553,8 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
 (** {[
     template p1 ... pn -> body ~>
         let fv1, ..., fvk = free variables of the template in
-        { c = closure (template, env);
+        { c = closure (template, env restricted to fv1 ... fvk and the
+                       template's free sort variables);
           r = << makeblock fv1 ... fvk >> }
     ]} *)
 and eval_template ?name ctx env template =
@@ -1388,11 +1579,17 @@ and eval_template ?name ctx env template =
     Misc.fatal_errorf
       "Slambda does not currently support functions with over %i arguments"
       (Lambda.max_arity () - 1);
-  let clo_runtime_env =
-    Lambda.free_variables (Lfunction func)
-    |> Ident.Set.to_list
-    |> List.map (fun id -> id, Env.find_layout env id)
+  let template_lam =
+    match template with
+    | Kind template -> Lkindtemplate template
+    | Value template -> Ltemplate template
   in
+  let clo_env =
+    Env.restrict env
+      ~idents:(Lambda.free_variables template_lam)
+      ~sort_vars:(Lambda.free_sort_vars template_lam)
+  in
+  let clo_runtime_env = Env.idents_and_layouts clo_env in
   let new_shape =
     Misc.Stdlib.Array.of_list_map
       (fun (_, new_layout) -> mixed_block_element_of_layout new_layout)
@@ -1401,7 +1598,7 @@ and eval_template ?name ctx env template =
   Typeopt.assert_mixed_product_support_for_lambda_shape
     (Debuginfo.Scoped_location.to_location func.loc)
     Block new_shape;
-  let closure = { clo_template = template; clo_runtime_env; clo_env = env } in
+  let closure = { clo_template = template; clo_runtime_env; clo_env } in
   let id =
     Template_store.add (Ctx.store ctx) ~cu:(Current_unit.get_cu ()) ~name
       closure
@@ -1499,8 +1696,17 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       try
         List.fold_left2
           (fun env var arg ->
-            Env.add_sort_var env var
-              (arg |> expect_not_missing |> expect Tlayout))
+            let layout = arg |> expect_not_missing |> expect Tlayout in
+            (* Static values are fully evaluated, so they never contain sort
+               variables. This means that the sort variables in a closure from
+               another compilation unit can't clash with local ones, so
+               [freshen_closure] doesn't need to rename them. *)
+            (try assert_layout_contains_no_splices layout
+             with Found_a_splice ->
+               Misc.fatal_errorf
+                 "Slambda: kind argument %a contains sort variables"
+                 Printlambda.layout layout);
+            Env.add_sort_var env var layout)
           clo_env ktmpl_params args
       with Invalid_argument _ ->
         Misc.fatal_error "Layout poly kind function should be fully applied."
@@ -1541,137 +1747,6 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       |> lfunction_with_yielding yielding
     in
     { slv_comptime = body_c; slv_runtime = close_function new_func }
-
-(* Check that expansion left no unresolved layouts or templates. *)
-
-exception Found_a_splice
-
-let rec assert_mixed_block_element_contains_no_splices : type a.
-    a Lambda.mixed_block_element -> unit = function
-  | Splice_variable _ -> raise Found_a_splice
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Void
-    ->
-    ()
-  | Product elements ->
-    Array.iter assert_mixed_block_element_contains_no_splices elements
-
-let assert_mixed_block_shape_contains_no_splices shape =
-  Array.iter assert_mixed_block_element_contains_no_splices shape
-
-let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
-  | Psplicevar _ -> raise Found_a_splice
-  | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask | Pvoid ->
-    ()
-  | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
-  | Punboxed_product layouts ->
-    List.iter assert_layout_contains_no_splices layouts
-
-and assert_value_kind_contains_no_splices { raw_kind; nullable = _ } =
-  assert_raw_value_kind_contains_no_splices raw_kind
-
-and assert_raw_value_kind_contains_no_splices = function
-  | Pvariant { consts = _; non_consts } ->
-    List.iter
-      (fun (_, constructor_shape) ->
-        assert_constructor_shape_contains_no_splices constructor_shape)
-      non_consts
-  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
-  | Pboxedvectorval _ | Pboxedmaskval ->
-    ()
-
-and assert_constructor_shape_contains_no_splices = function
-  | Constructor_shape_undetermined -> ()
-  | Constructor_shape_uniform value_kinds ->
-    List.iter assert_value_kind_contains_no_splices value_kinds
-  | Constructor_shape_mixed mixed_block_shape ->
-    assert_mixed_block_shape_contains_no_splices mixed_block_shape
-
-let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
-  match prim with
-  | Popaque layout | Pobj_magic layout ->
-    assert_layout_contains_no_splices layout
-  | Pget_idx (layout, _)
-  | Pset_idx (layout, _)
-  | Patomic_load_idx { layout }
-  | Patomic_set_idx { layout; _ }
-  | Patomic_exchange_idx { layout; _ }
-  | Patomic_compare_exchange_idx { layout; _ }
-  | Patomic_compare_set_idx { layout; _ }
-  | Pget_ptr (layout, _)
-  | Pset_ptr (layout, _)
-  | Pget_ext_ptr (layout, _)
-  | Pset_ext_ptr (layout, _)
-  | Pbox (layout, _)
-  | Punbox layout ->
-    assert_layout_contains_no_splices layout
-  | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
-    List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _)
-  | Patomic_load_mixed_field { shape; _ }
-  | Patomic_set_mixed_field { shape; _ }
-  | Pduprecord
-      ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
-    ->
-    assert_mixed_block_shape_contains_no_splices shape
-  | Pmixedfield (_, shape, _) ->
-    Array.iter assert_mixed_block_element_contains_no_splices shape
-  | Psetmixedfield (_, shape, _) ->
-    assert_mixed_block_shape_contains_no_splices shape
-  | Pmake_idx_mixed_field (shape, _, _) ->
-    assert_mixed_block_shape_contains_no_splices shape
-  | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
-    assert_mixed_block_element_contains_no_splices element
-  | _ -> ()
-
-let assert_function_contains_no_splices { Lambda.params; return; _ } =
-  List.iter
-    (fun { Lambda.layout; _ } -> assert_layout_contains_no_splices layout)
-    params;
-  assert_layout_contains_no_splices return
-
-let rec assert_constant_contains_no_splices = function
-  | Const_block (_, fields) ->
-    List.iter assert_constant_contains_no_splices fields
-  | Const_mixed_block (_, shape, fields) ->
-    assert_mixed_block_shape_contains_no_splices shape;
-    List.iter assert_constant_contains_no_splices fields
-  | Const_base _ | Const_float_array _ | Const_immstring _ | Const_float_block _
-  | Const_null ->
-    ()
-
-let rec assert_no_splices (lam : Lambda.lambda) =
-  (match lam with
-  | Lvar _ | Lmutvar _ -> ()
-  | Lconst constant -> assert_constant_contains_no_splices constant
-  | Lapply { ap_result_layout; _ } ->
-    assert_layout_contains_no_splices ap_result_layout
-  | Lfunction func -> assert_function_contains_no_splices func
-  | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
-  | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
-  | Lletrec _ -> ()
-  | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
-  | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
-  | Lstringswitch (_, _, _, _, layout) ->
-    assert_layout_contains_no_splices layout
-  | Lstaticraise _ -> ()
-  | Lstaticcatch (_, (_, bindings), _, _, layout) ->
-    List.iter
-      (fun (_, _, layout) -> assert_layout_contains_no_splices layout)
-      bindings;
-    assert_layout_contains_no_splices layout
-  | Ltrywith (_, _, _, _, layout) -> assert_layout_contains_no_splices layout
-  | Lifthenelse (_, _, _, layout) -> assert_layout_contains_no_splices layout
-  | Lsequence _ | Lwhile _ | Lfor _ | Lassign _ -> ()
-  | Lsend (_, _, _, _, _, _, _, layout, _) ->
-    assert_layout_contains_no_splices layout
-  | Levent _ | Lifused _ -> ()
-  | Lregion (_, layout) -> assert_layout_contains_no_splices layout
-  | Lexclave _ -> ()
-  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
-    Lambda.fatal_error_invalid_constructor lam);
-  Lambda.iter_head_constructor assert_no_splices lam
 
 let eval ~cu_static_data template_lam =
   Profile.record_call "static_eval" (fun () ->
