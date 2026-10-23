@@ -560,3 +560,20 @@ let print_variant =
 [%%expect{|
 val print_variant : int t * float# t = (Some 42, Some <abstr>)
 |}]
+
+(* recursive function *)
+type ('a : any) list = Nil | Cons of #('a * 'a list);;
+
+let poly_ map f =
+  let rec go = function
+    | Nil -> Nil
+    | Cons #(x, xs) -> Cons #(f x, go xs)
+  in go
+in
+map (fun x -> #(x, x)) (Cons #(#0.1, Cons #(#0.2, Nil))),
+map (fun x -> #(x, x)) (Cons #(0.1, Cons #(0.2, Nil)))
+[%%expect{|
+type ('a : any) list = Nil | Cons of #('a * 'a list)
+- : #(float# * float#) list * #(float * float) list =
+(Cons <unboxed product>, Cons <unboxed product>)
+|}]
