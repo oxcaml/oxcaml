@@ -209,6 +209,7 @@ type error =
   | Val_poly_and_layout
   | Unsatisfiable_mode_bound
   | Unsatisfiable_mode_variable of string
+  | Local_opt_with_mode_variable
 
 module Error : sig
     type exn += private In_context of Location.t * Env.t * error

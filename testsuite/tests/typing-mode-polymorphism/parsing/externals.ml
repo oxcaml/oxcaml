@@ -370,12 +370,18 @@ external add_opt_res : int32 @ 'n -> int32 @ 'm -> (int32 [@local_opt])
 
 external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
 [%%expect{|
-external opt_arg_var : (int32 [@local_opt]) -> int32 = "%int32_neg"
+Line 1, characters 24-29:
+1 | external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
+                            ^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_res_var : int32 -> (int32 [@local_opt]) @ [> 'm] = "%int32_neg"
 [%%expect{|
-external opt_res_var : int32 -> (int32 [@local_opt]) = "%int32_neg"
+Line 1, characters 33-38:
+1 | external opt_res_var : int32 -> (int32 [@local_opt]) @ [> 'm] = "%int32_neg"
+                                     ^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_global_var :

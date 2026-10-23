@@ -115,6 +115,7 @@ type error =
   | Val_poly_and_layout
   | Unsatisfiable_mode_bound
   | Unsatisfiable_mode_variable of string
+  | Local_opt_with_mode_variable
 
 exception Error_forward of Location.error
 
@@ -1188,9 +1189,10 @@ let shared_local_opt_mode loc =
     TyVarEnv.remember_used_mode local_opt_mode_name m loc;
     m
 
-let local_opt_sig_mode loc (mode : sig_mode Typemode.modes) =
+let local_opt_sig_mode env loc (mode : sig_mode Typemode.modes) =
   match mode.mode_modes with
-  | Sig_var _ | Sig_prim _ -> mode
+  | Sig_var _ -> Error.log_and_raise loc env Local_opt_with_mode_variable
+  | Sig_prim _ -> mode
   | Sig_const c ->
     let shared = shared_local_opt_mode loc in
     let m =
@@ -1230,21 +1232,23 @@ let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
     in
     { mode_modes = Sig_const mode_modes; mode_desc }
 
-let with_local_opt ~local_opt sty mode =
+let with_local_opt env ~local_opt sty mode =
   if local_opt && Builtin_attributes.has_local_opt sty.ptyp_attributes
-  then local_opt_sig_mode sty.ptyp_loc mode
+  then local_opt_sig_mode env sty.ptyp_loc mode
   else mode
 
 let rec extract_params env ~local_opt styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = with_local_opt ~local_opt a (transl_arrow_mode env ma) in
+      let arg_mode =
+        with_local_opt env ~local_opt a (transl_arrow_mode env ma)
+      in
       let ret_mode = transl_arrow_mode env mr in
       let params, ret, ret_mode =
         match r.ptyp_desc with
         | Ptyp_arrow _ when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
           extract_params env ~local_opt r
-        | _ -> [], r, with_local_opt ~local_opt r ret_mode
+        | _ -> [], r, with_local_opt env ~local_opt r ret_mode
       in
       (l, arg_mode, a) :: params, ret, ret_mode
   | _ -> assert false
@@ -2513,6 +2517,10 @@ let report_error_doc loc env = function
       Location.errorf ~loc
         "The mode constraints on %a cannot be satisfied."
         Style.inline_code ("'" ^ name)
+  | Local_opt_with_mode_variable ->
+      Location.errorf ~loc
+        "%a cannot be combined with mode variables."
+        Style.inline_code "[@local_opt]"
 
 let () =
   Location.register_error_of_exn
