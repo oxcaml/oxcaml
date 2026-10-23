@@ -61,6 +61,7 @@ type mode =
   | Prim_local
   | Prim_global
   | Prim_poly
+  | Prim_mode_poly
 (* [Prim_poly] arguments and results are subject to mode inference,
    allowing e.g. (+.) to work on local or global floats. After
    typechecking, all [Prim_poly] modes on a given primitive application

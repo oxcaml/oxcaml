@@ -1033,6 +1033,7 @@ type sig_var =
 type sig_mode =
   | Sig_const of With_locality.Const.t
   | Sig_var of sig_var
+  | Sig_prim of With_locality.Const.t
 
 let transl_modepoly_var { txt; loc } =
   try TyVarEnv.lookup_local_mode txt
@@ -1126,15 +1127,16 @@ let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
       { mode = m; upper_const }
 
 let alloc_of_sig_mode = function
-  | Sig_const c -> With_locality.of_const c
+  | Sig_const c | Sig_prim c -> With_locality.of_const c
   | Sig_var { mode; _ } -> mode
 
 let curry_acc_of_sig_mode : sig_mode -> Curry_mode.t = function
-  | Sig_const c -> Const c
+  | Sig_const c -> Curry_mode.const c
+  | Sig_prim c -> Curry_mode.primitive c
   | Sig_var { mode; upper_const } ->
     Variable
       { comonadic = With_locality.Comonadic.disallow_right mode.comonadic;
-        areality = upper_const.areality }
+        areality = Some upper_const.areality }
 
 let alloc_modes_of_sig_modes
     ({ Typemode.mode_modes; mode_desc } : sig_mode Typemode.modes)
@@ -1146,12 +1148,12 @@ let sig_mode_legacy = Sig_const With_locality.Const.legacy
 let curry_sig_mode acc_mode arg_mode =
   let acc_mode =
     match arg_mode with
-    | Sig_const arg -> Curry_mode.add_const_arg acc_mode arg
+    | Sig_const arg | Sig_prim arg -> Curry_mode.add_const_arg acc_mode arg
     | Sig_var { mode; upper_const } ->
       Curry_mode.add_arg acc_mode mode ~upper_areality:upper_const.areality
   in
   match acc_mode with
-  | Const curry -> acc_mode, Sig_const curry
+  | Const { mode = curry; _ } -> acc_mode, Sig_const curry
   | Variable { comonadic; areality } ->
     let curry = With_locality.newvar (get_current_level ()) in
     With_locality.Comonadic.submode_exn comonadic curry.comonadic;
@@ -1159,6 +1161,60 @@ let curry_sig_mode acc_mode arg_mode =
       { comonadic = With_locality.Comonadic.disallow_right curry.comonadic;
         areality },
     Sig_var { mode = curry; upper_const = With_locality.Const.max }
+
+let local_opt_mode_name = "[@local_opt]"
+
+let open_local_opt_axes (c : With_locality.Const.t) =
+  { c with
+    areality = Locality.Const.min;
+    forkable = Forkable.Const.min;
+    yielding = Yielding.Const.min },
+  { c with
+    areality = Locality.Const.max;
+    forkable = Forkable.Const.max;
+    yielding = Yielding.Const.max }
+
+let new_local_opt_mode c =
+  let lower, upper = open_local_opt_axes c in
+  let m = With_locality.newvar (get_current_level ()) in
+  With_locality.submode_exn (With_locality.of_const lower) m;
+  With_locality.submode_exn m (With_locality.of_const upper);
+  m
+
+let shared_local_opt_mode loc =
+  try TyVarEnv.lookup_local_mode local_opt_mode_name
+  with Not_found ->
+    let m = new_local_opt_mode With_locality.Const.legacy in
+    TyVarEnv.remember_used_mode local_opt_mode_name m loc;
+    m
+
+let local_opt_sig_mode loc (mode : sig_mode Typemode.modes) =
+  match mode.mode_modes with
+  | Sig_var _ | Sig_prim _ -> mode
+  | Sig_const c ->
+    let shared = shared_local_opt_mode loc in
+    let m =
+      if With_locality.Const.equal
+           (fst (open_local_opt_axes c))
+           (fst (open_local_opt_axes With_locality.Const.legacy))
+      then shared
+      else begin
+        let m = new_local_opt_mode c in
+        Locality.equate_exn
+          (With_locality.proj_comonadic Areality m)
+          (With_locality.proj_comonadic Areality shared);
+        Forkable.equate_exn
+          (With_locality.proj_comonadic Forkable m)
+          (With_locality.proj_comonadic Forkable shared);
+        Yielding.equate_exn
+          (With_locality.proj_comonadic Yielding m)
+          (With_locality.proj_comonadic Yielding shared);
+        m
+      end
+    in
+    { mode with
+      mode_modes =
+        Sig_var { mode = m; upper_const = With_locality.Const.max } }
 
 let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
   if Typemode.has_mode_variables pmodes
@@ -1174,16 +1230,21 @@ let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
     in
     { mode_modes = Sig_const mode_modes; mode_desc }
 
-let rec extract_params env styp =
+let with_local_opt ~local_opt sty mode =
+  if local_opt && Builtin_attributes.has_local_opt sty.ptyp_attributes
+  then local_opt_sig_mode sty.ptyp_loc mode
+  else mode
+
+let rec extract_params env ~local_opt styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = transl_arrow_mode env ma in
+      let arg_mode = with_local_opt ~local_opt a (transl_arrow_mode env ma) in
       let ret_mode = transl_arrow_mode env mr in
       let params, ret, ret_mode =
         match r.ptyp_desc with
         | Ptyp_arrow _ when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
-          extract_params env r
-        | _ -> [], r, ret_mode
+          extract_params env ~local_opt r
+        | _ -> [], r, with_local_opt ~local_opt r ret_mode
       in
       (l, arg_mode, a) :: params, ret, ret_mode
   | _ -> assert false
@@ -1311,7 +1372,12 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_arrow _ ->
-      let args, ret, ret_mode = extract_params env styp in
+      let local_opt =
+        match mode with
+        | Sig_prim _ -> Language_extension.(is_at_least Mode_polymorphism Alpha)
+        | Sig_const _ | Sig_var _ -> false
+      in
+      let args, ret, ret_mode = extract_params env ~local_opt styp in
       let rec loop acc_mode args =
         match args with
         | (l, arg_mode, arg) :: rest ->
@@ -2073,7 +2139,7 @@ let transl_type_scheme_mono env mode styp =
   let typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false mode styp
+      transl_simple_type_impl ~new_var_jkind:Sort env ~policy:Open mode styp
     end
     ~before_generalize:generalize_ctyp
   in
@@ -2095,11 +2161,10 @@ let transl_type_scheme_poly env mode attrs loc vars inner_type =
       let typ =
         if Language_extension.erasable_extensions_only () then
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Closed_for_upstream_compatibility (Sig_const mode)
-            inner_type
+            ~policy:Closed_for_upstream_compatibility mode inner_type
         else
           transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Open (Sig_const mode) inner_type
+            ~policy:Open mode inner_type
       in
       (typed_vars, univars, typ)
     end
@@ -2196,7 +2261,8 @@ let transl_type_scheme_newlayout env mode attrs loc vars inner_type =
     ident_var_pairs |> List.map snd |> List.rev, ctyp
   end
 
-let transl_type_scheme env mode styp valdecl_flag =
+let transl_type_scheme env ~primitive mode styp valdecl_flag =
+  let mode = if primitive then Sig_prim mode else Sig_const mode in
   match styp.ptyp_desc, valdecl_flag with
   | Ptyp_newlayout _, Lpoly ->
     Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly

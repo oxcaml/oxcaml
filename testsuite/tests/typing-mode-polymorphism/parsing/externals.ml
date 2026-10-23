@@ -3,77 +3,69 @@
  expect;
 *)
 
-(* This is fine *)
+(* A mode polymorphic primitive: identity *)
+
 external magic : 'a @ [< 'm] -> 'b @ [> 'm] = "%identity"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external magic : 'a @ [< 'm] -> 'b @ [> 'm] = "%identity"
 |}];;
 
+(* we can instantiate it under various annotations *)
 (magic : 'a -> 'a);;
 [%%expect{|
-Line 1, characters 1-6:
-1 | (magic : 'a -> 'a);;
-     ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (magic : 'a @ local -> 'a @ local);;
 [%%expect{|
-Line 1, characters 1-6:
-1 | (magic : 'a @ local -> 'a @ local);;
-     ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (magic : 'a @ unique -> 'a @ unique);;
 [%%expect{|
-Line 1, characters 1-6:
-1 | (magic : 'a @ unique -> 'a @ unique);;
-     ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun x -> magic x : 'a -> 'a);;
 [%%expect{|
-Line 1, characters 10-15:
-1 | (fun x -> magic x : 'a -> 'a);;
-              ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun x -> magic x : 'a @ unique -> 'a @ unique);;
 [%%expect{|
-Line 1, characters 10-15:
-1 | (fun x -> magic x : 'a @ unique -> 'a @ unique);;
-              ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun x -> exclave_ magic x : 'a @ local -> 'a @ local);;
 [%%expect{|
-Line 1, characters 19-24:
-1 | (fun x -> exclave_ magic x : 'a @ local -> 'a @ local);;
-                       ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun x -> magic x : 'a @ yielding -> 'a @ yielding);;
 [%%expect{|
-Line 1, characters 10-15:
-1 | (fun x -> magic x : 'a @ yielding -> 'a @ yielding);;
-              ^^^^^
-Error: Unbound value "magic"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (* But not under an instantiation that violates the mode polymorphic signature *)
 (fun x -> magic x : 'a @ aliased -> 'a @ unique);;
 [%%expect{|
-Line 1, characters 10-15:
+Line 1, characters 10-17:
 1 | (fun x -> magic x : 'a @ aliased -> 'a @ unique);;
-              ^^^^^
-Error: Unbound value "magic"
+              ^^^^^^^
+Error: This value is "aliased" but is expected to be "unique".
 |}];;
+
+(* If we expose a primitive as a val, this should be equivalent to eta-expanding
+   the primitive. This means we lose some polymorphism over locality: recall
+   that [fun x -> id x] pushes a global bound to the argument since we can't remember
+   regionality across function calls. *)
 
 module Id_locality_should_fail : sig
   val id : 'a @ [< 'm] -> 'a @ [> 'm]
@@ -81,9 +73,11 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
 
 |}];;
+
+(* We can stay polymorphic over other axes *)
 
 module Foo : sig
   val id : 'a @ [< 'm] -> 'a @ [> 'm | local]
@@ -91,7 +85,7 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
 
 |}]
 
@@ -101,7 +95,7 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
 
 |}]
 
@@ -111,63 +105,55 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+module Foo : sig external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity" end
 |}];;
+
+(* A primitive can have a fully polymorphic curry mode. The following [add] will
+   have a curry mode with the mode @ [> close('m) | nonportable stateful dynamic].
+   Its locality will follow from the locality the primitive is instantiated at at
+   the call-site. *)
 
 external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+  = "%int32_add"
 |}];;
 
 (fun x y -> add x y);;
 [%%expect{|
-Line 1, characters 12-15:
-1 | (fun x y -> add x y);;
-                ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (x @ local) y -> exclave_ add x y);;
 [%%expect{|
-Line 1, characters 31-34:
-1 | (fun (x @ local) y -> exclave_ add x y);;
-                                   ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (add : int32 -> int32 -> int32);;
 [%%expect{|
-Line 1, characters 1-4:
-1 | (add : int32 -> int32 -> int32);;
-     ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (add : int32 @ local -> int32 @ local -> int32 @ local);;
 [%%expect{|
-Line 1, characters 1-4:
-1 | (add : int32 @ local -> int32 @ local -> int32 @ local);;
-     ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun x -> add x);;
 [%%expect{|
-Line 1, characters 10-13:
-1 | (fun x -> add x);;
-              ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (x @ local) -> exclave_ add x);;
 [%%expect{|
-Line 1, characters 29-32:
-1 | (fun (x @ local) -> exclave_ add x);;
-                                 ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 let () =
@@ -177,97 +163,176 @@ let () =
   use_global (add xh);
   use_global (add xl) (* should fail *)
 [%%expect{|
-Line 5, characters 14-17:
-5 |   use_global (add xh);
-                  ^^^
-Error: Unbound value "add"
+Line 6, characters 13-21:
+6 |   use_global (add xl) (* should fail *)
+                 ^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}];;
+
+module M_stateless = struct
+  external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+    @@ stateless = "%int32_add"
+end
+[%%expect{|
+module M_stateless :
+  sig
+    external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+      = "%int32_add"
+  end
+|}];;
+
+(fun x -> M_stateless.add x);;
+[%%expect{|
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
+|}];;
+
+module M_stateless_val : sig
+  val add : int32 @ [< 'm & global] -> int32 @ [< 'm & global] -> int32 @ [> 'm]
+    @@ stateless
+end = struct
+  external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+    @@ stateless = "%int32_add"
+end
+[%%expect{|
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   external add : int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]
+6 |     @@ stateless = "%int32_add"
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external add :
+             int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+             = "%int32_add"
+         end
+       is not included in
+         sig
+           val add :
+             int32 @ [< 'n & global] ->
+             int32 @ [< 'm & global] -> int32 @ [> 'm | 'n] @@ stateless
+         end
+       Values do not match:
+         external add :
+           int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+           = "%int32_add"
+       is not included in
+         val add :
+           int32 @ [< 'n & global] ->
+           int32 @ [< 'm & global] -> int32 @ [> 'm | 'n] @@ stateless
+       The type
+         "int32 @ [< 'o & past('m)] ->
+         (int32 @ [< 'n] -> int32 @ [> 'n | 'o]) @ [> past('m) | nonportable stateful]"
+       is not compatible with the type
+         "int32 @ [< 'mm0 & past('p) & global] ->
+         (int32 @ [< 'q & global] -> int32 @ [> 'q | 'mm0]) @ [> past('p)]"
+       The return mode was expected to be "stateless" but is "stateful"
+|}];;
+
+(* We do not lose [@local_opt] *)
 
 external add_old :
   (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
   = "%int32_add"
 [%%expect{|
 external add_old :
-  (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
+  (int32 [@local_opt]) @ 'm ->
+  (int32 [@local_opt]) @ 'm ->
+  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
   = "%int32_add"
 |}];;
 
 (add_old : int32 -> int32 -> int32);;
 [%%expect{|
 - : int32 -> int32 -> int32 = <fun>
+|}, Principal{|
+Uncaught exception: Mode.Cannot_zap_generic
+
 |}];;
 
 (fun x -> add_old x);;
 [%%expect{|
-- : int32 @ [< global] -> (int32 -> int32) @ [> nonportable stateful dynamic]
-= <fun>
+Uncaught exception: Mode.Cannot_zap_generic
+
 |}];;
 
 external add_indep : int32 @ [< 'm] -> int32 @ [< 'n] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external add_indep : int32 @ [< 'm] -> int32 @ 'n -> int32 @ [> 'm]
+  = "%int32_add"
 |}];;
+
+(* Although [add_indep] shows no relation between the second argument and
+   the return, [add_indep x y] is local when [y] is local.
+
+   This is because of our handling of the signature's locality axis: the locality of
+   a mode polymorphic argument/return in a primite gets overwritten at the call-site,
+   where we conservatively approximate that the locality of a return is the join of all
+   preceding arguments. *)
+
+(* CR ageorges: perhaps this is not needed if we are able to distinguish curry-modes
+   from the final return *)
 
 (fun x (y @ local) -> add_indep x y);;
 [%%expect{|
-Line 1, characters 22-31:
-1 | (fun x (y @ local) -> add_indep x y);;
-                          ^^^^^^^^^
-Error: Unbound value "add_indep"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
+
+(* We can mix constant and polymorphic arguments *)
 
 external add_local_arg : int32 @ local -> int32 @ [< 'm] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external add_local_arg : int32 @ local -> int32 @ [< 'm] -> int32 @ [> 'm]
+  = "%int32_add"
 |}];;
 
 (fun (x @ local) y -> add_local_arg x y);;
 [%%expect{|
-Line 1, characters 22-35:
-1 | (fun (x @ local) y -> add_local_arg x y);;
-                          ^^^^^^^^^^^^^
-Error: Unbound value "add_local_arg"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (fun x (y @ local) -> exclave_ add_local_arg x y);;
 [%%expect{|
-Line 1, characters 31-44:
-1 | (fun x (y @ local) -> exclave_ add_local_arg x y);;
-                                   ^^^^^^^^^^^^^
-Error: Unbound value "add_local_arg"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
+
+(* Here the locality of the first argument will be considered [Prim_global] *)
 
 external add_global :
   int32 @ [< 'm & global] -> int32 @ [< 'm] -> int32 @ [> 'm] = "%int32_add"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external add_global :
+  int32 @ [< 'n & global] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+  = "%int32_add"
 |}];;
 
 (fun (x @ local) y -> exclave_ add_global x y);;
 [%%expect{|
-Line 1, characters 31-41:
+Line 1, characters 42-43:
 1 | (fun (x @ local) y -> exclave_ add_global x y);;
-                                   ^^^^^^^^^^
-Error: Unbound value "add_global"
+                                              ^
+Error: This value is "local" but is expected to be "global".
 |}];;
 
 (fun x (y @ local) -> exclave_ add_global x y);;
 [%%expect{|
-Line 1, characters 31-41:
-1 | (fun x (y @ local) -> exclave_ add_global x y);;
-                                   ^^^^^^^^^^
-Error: Unbound value "add_global"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
+
+(* Primitives with higher-order functions, and more complex mode signatures *)
 
 external revapply : 'a @ [< 'm] -> ('a @ [> 'm] -> 'b) -> 'b = "%revapply"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external revapply : 'a @ [< 'm] -> ('a @ [> 'm] -> 'b) -> 'b = "%revapply"
 |}];;
 
 let use_global (_ @ global) = ()
@@ -277,34 +342,36 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 
 (fun x -> revapply x (fun y -> use_global y));;
 [%%expect{|
-Line 1, characters 10-18:
-1 | (fun x -> revapply x (fun y -> use_global y));;
-              ^^^^^^^^
-Error: Unbound value "revapply"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (x @ local) -> revapply x (fun y -> use_global y));;
 [%%expect{|
-Line 1, characters 20-28:
+Line 1, characters 52-53:
 1 | (fun (x @ local) -> revapply x (fun y -> use_global y));;
-                        ^^^^^^^^
-Error: Unbound value "revapply"
+                                                        ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}];;
 
-(* local_opt should never be used in a signature with mode polymorphic annotations *)
+(* [@local_opt] should never be used in a signature with mode polymorphic annotations *)
 
 external add_opt : (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external add_opt :
+  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  int32 @ [< 'm] -> int32 @ [> 'm] = "%int32_add"
 |}];;
 
 external add_opt_res :
   int32 @ [< 'm] -> int32 @ [< 'm] -> (int32 [@local_opt]) = "%int32_add"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external add_opt_res :
+  int32 @ 'n ->
+  int32 @ 'm ->
+  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]
+  = "%int32_add"
 |}];;
 
 external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
@@ -314,8 +381,7 @@ external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
 
 external opt_res_var : int32 -> (int32 [@local_opt]) @ [> 'm] = "%int32_neg"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external opt_res_var : int32 -> (int32 [@local_opt]) @ 'm = "%int32_neg"
 |}];;
 
 external opt_global_var :
@@ -323,50 +389,58 @@ external opt_global_var :
   = "%int32_add"
 [%%expect{|
 external opt_global_var :
-  (int32 [@local_opt]) -> int32 @ [< global] -> (int32 [@local_opt])
+  (int32 [@local_opt]) @ 'm ->
+  int32 @ [< global] ->
+  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
   = "%int32_add"
 |}];;
 
 external opt_callback_arg :
   ('a [@local_opt]) -> ('a @ [< 'm] -> 'b) -> 'b = "%revapply"
 [%%expect{|
-external opt_callback_arg : ('a [@local_opt]) -> ('a @ 'm -> 'b) -> 'b
-  = "%revapply"
+external opt_callback_arg :
+  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  ('a @ 'm -> 'b) -> 'b = "%revapply"
 |}];;
 
 external opt_callback_res :
   ('a [@local_opt]) -> ('a -> 'b @ [> 'm]) -> 'b = "%revapply"
 [%%expect{|
-external opt_callback_res : ('a [@local_opt]) -> ('a -> 'b @ 'm) -> 'b
-  = "%revapply"
+external opt_callback_res :
+  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  ('a -> 'b @ 'm) -> 'b = "%revapply"
 |}];;
 
 external opt_variant :
   ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit = "caml_opt_variant"
 [%%expect{|
-external opt_variant : ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit
-  = "caml_opt_variant"
+external opt_variant :
+  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  [ `A of 'a @ 'm -> unit ] -> unit = "caml_opt_variant"
 |}];;
 
 external opt_object :
   ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit = "caml_opt_object"
 [%%expect{|
-external opt_object : ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit
-  = "caml_opt_object"
+external opt_object :
+  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  < f : 'a @ 'm -> unit > -> unit = "caml_opt_object"
 |}];;
 
 external opt_polytype :
   ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit = "caml_opt_polytype"
 [%%expect{|
-external opt_polytype : ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit
-  = "caml_opt_polytype"
+external opt_polytype :
+  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  ('b. 'b @ 'm -> unit) -> unit = "caml_opt_polytype"
 |}];;
 
 external opt_constr_arg :
   ('a [@local_opt]) -> ('a @ [< 'm] -> unit) list -> unit = "caml_opt_list"
 [%%expect{|
-external opt_constr_arg : ('a [@local_opt]) -> ('a @ 'm -> unit) list -> unit
-  = "caml_opt_list"
+external opt_constr_arg :
+  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  ('a @ 'm -> unit) list -> unit = "caml_opt_list"
 |}];;
 
 external opt_returned_closure :
@@ -374,8 +448,8 @@ external opt_returned_closure :
   = "caml_opt_closure"
 [%%expect{|
 external opt_returned_closure :
-  (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
-  = "caml_opt_closure"
+  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
+  (int32 @ [< 'm] -> int32 @ [> 'm]) = "caml_opt_closure"
 |}];;
 
 external opt_only :
@@ -383,55 +457,60 @@ external opt_only :
   = "%int32_add"
 [%%expect{|
 external opt_only :
-  (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
+  (int32 [@local_opt]) @ 'm ->
+  (int32 [@local_opt]) @ 'm ->
+  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
   = "%int32_add"
 |}];;
 
+(* Mode variables in argument position only *)
+
+(* Note that the printed signature prints this as independent mode variables, which is
+   equivalent due to mode weakening. *)
 external set32 : bytes @ [< 'm] -> int @ [< 'm] -> int32 @ [< 'm] -> unit
   = "%caml_bytes_set32"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external set32 : bytes @ 'o -> int @ 'n -> int32 @ 'm -> unit
+  = "%caml_bytes_set32"
 |}];;
+
+(* Various partial applications of [set32] *)
 
 let set32_one_arg = set32 (Bytes.create 4)
 [%%expect{|
-Line 1, characters 20-25:
-1 | let set32_one_arg = set32 (Bytes.create 4)
-                        ^^^^^
-Error: Unbound value "set32"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 let set32_two_args = set32 (Bytes.create 4) 0
 [%%expect{|
-Line 1, characters 21-26:
-1 | let set32_two_args = set32 (Bytes.create 4) 0
-                         ^^^^^
-Error: Unbound value "set32"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (b @ local) -> exclave_ set32 b);;
 [%%expect{|
-Line 1, characters 29-34:
-1 | (fun (b @ local) -> exclave_ set32 b);;
-                                 ^^^^^
-Error: Unbound value "set32"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (b @ local) -> exclave_ set32 b 0);;
 [%%expect{|
-Line 1, characters 29-34:
-1 | (fun (b @ local) -> exclave_ set32 b 0);;
-                                 ^^^^^
-Error: Unbound value "set32"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (b @ local) -> set32 b);;
 [%%expect{|
-Line 1, characters 20-25:
+Line 1, characters 20-27:
 1 | (fun (b @ local) -> set32 b);;
-                        ^^^^^
-Error: Unbound value "set32"
+                        ^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+Hint: This is a partial application
+      Adding 2 more arguments will make the value non-local
 |}];;
 
 module Set32_val : sig
@@ -441,7 +520,7 @@ end = struct
     = "%caml_bytes_set32"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
 
 |}];;
 
@@ -459,7 +538,7 @@ struct
     = "%caml_bytes_set32"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
 
 |}];;
 
@@ -471,67 +550,77 @@ Line 1, characters 27-39:
 Error: Unbound module "Set32_legacy"
 |}];;
 
+(* The return value has constant locality. Unlike [Id_locality_should_fail] the following
+   should succeed. *)
+
 module type Same_type = sig
   external e : bytes @ [< 'm] -> int @ [< 'm] -> int32 @ [< 'm] -> unit
     = "%caml_bytes_set32"
   val v : bytes @ [< 'm] -> int @ [< 'm] -> int32 @ [< 'm] -> unit
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+module type Same_type =
+  sig
+    external e : bytes @ 'o -> int @ 'n -> int32 @ 'm -> unit
+      = "%caml_bytes_set32"
+    val v : bytes @ 'o -> int @ 'n -> int32 @ 'm -> unit
+  end
 |}];;
 
 let same_type_external (module X : Same_type) = X.e (Bytes.create 4)
 [%%expect{|
-Line 1, characters 35-44:
-1 | let same_type_external (module X : Same_type) = X.e (Bytes.create 4)
-                                       ^^^^^^^^^
-Error: Unbound module type "Same_type"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 let same_type_val (module X : Same_type) = X.v (Bytes.create 4)
 [%%expect{|
-Line 1, characters 30-39:
+Line 1, characters 43-63:
 1 | let same_type_val (module X : Same_type) = X.v (Bytes.create 4)
-                                  ^^^^^^^^^
-Error: Unbound module type "Same_type"
+                                               ^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+Hint: This is a partial application
+      Adding 2 more arguments will make the value non-local
 |}];;
 
 external set32_local_bytes :
   bytes @ local -> int @ [< 'm] -> int32 @ [< 'm] -> unit
   = "%caml_bytes_set32"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external set32_local_bytes : bytes @ local -> int @ 'n -> int32 @ 'm -> unit
+  = "%caml_bytes_set32"
 |}];;
 
 (fun (b @ local) -> exclave_ set32_local_bytes b 0);;
 [%%expect{|
-Line 1, characters 29-46:
-1 | (fun (b @ local) -> exclave_ set32_local_bytes b 0);;
-                                 ^^^^^^^^^^^^^^^^^
-Error: Unbound value "set32_local_bytes"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
+
+(* The partial application of [eq] closes over a type that does not mode cross *)
 
 external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external eq : 'a @ 'n -> 'a @ 'm -> bool = "%equal"
 |}];;
 
 let eq_one_arg = eq "a"
 [%%expect{|
-Line 1, characters 17-19:
-1 | let eq_one_arg = eq "a"
-                     ^^
-Error: Unbound value "eq"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
+
+(* Since [Eq_val.eq] is a [val], the curry mode will be lower-bounded by [local], and will
+   always be stack allocated *)
 
 module Eq_val : sig val eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool end = struct
   external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
 
 |}];;
 
@@ -543,14 +632,42 @@ Line 1, characters 21-27:
 Error: Unbound module "Eq_val"
 |}];;
 
+(* [Eq_val_close.eq] can't be inhabited, not even by a primitive which by itself
+   behaves with a polymorphic curry mode. However, a [val] can't have a curry mode
+   that is polymorphic over locality. *)
+
 module Eq_val_close : sig
   val eq : 'a @ [< 'm] -> ('a @ [< 'm] -> bool) @ [> close('m)]
 end = struct
   external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig external eq : 'a @ 'n -> 'a @ 'm -> bool = "%equal" end
+       is not included in
+         sig
+           val eq :
+             'a @ [< past('n)] ->
+             ('a @ [< past('m)] -> bool) @ [> past('m) | past('n)]
+         end
+       Values do not match:
+         external eq : 'a @ 'n -> 'a @ 'm -> bool = "%equal"
+       is not included in
+         val eq :
+           'a @ [< past('n)] ->
+           ('a @ [< past('m)] -> bool) @ [> past('m) | past('n)]
+       The type
+         "'a @ [< past('m) > past('o)] ->
+         ('a @ [> past('n)] -> bool) @ [> past('m) | nonportable stateful]"
+       is not compatible with the type
+         "'a @ [< past('q) & past('o)] ->
+         ('a @ [< past('p) & past('n)] -> bool) @ [> past('p) | past('q)]"
+       The return mode was expected to be "stateless" but is "stateful"
 |}];;
 
 module Eq_val_shared : sig
@@ -559,46 +676,71 @@ end = struct
   external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig external eq : 'a @ 'n -> 'a @ 'm -> bool = "%equal" end
+       is not included in
+         sig val eq : 'a @ [< 'n] -> ('a @ [< 'm] -> bool) @ [> 'm | 'n] end
+       Values do not match:
+         external eq : 'a @ 'n -> 'a @ 'm -> bool = "%equal"
+       is not included in
+         val eq : 'a @ [< 'n] -> ('a @ [< 'm] -> bool) @ [> 'm | 'n]
+       The type
+         "'a @ [< past('m) > past('o)] ->
+         ('a @ [> past('n)] -> bool) @ [> past('m) | nonportable stateful]"
+       is not compatible with the type
+         "'a @ [< 'q & past('o)] ->
+         ('a @ [< 'p & past('n)] -> bool) @ [> 'p | 'q]"
+       The return mode was expected to be "stateless" but is "stateful"
 |}];;
 
+(* [p] becomes local because we apply it to the local [y], and the conservative estimate
+   of the locality of the curry mode takes every argument of the primite into account. *)
+
+(* CR ageorges: This mimics the behavior of [@local_opt] but is it necessary? *)
 let eq_later_arg_local (y @ local) =
   let p = eq "a" in
   let _ = p y in
   p
 [%%expect{|
-Line 2, characters 10-12:
-2 |   let p = eq "a" in
-              ^^
-Error: Unbound value "eq"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
+(* If all uses are global [p] can be heap allocated *)
 let eq_later_arg_global (y : string) =
   let p = eq "a" in
   let _ = p y in
   p
 [%%expect{|
-Line 2, characters 10-12:
-2 |   let p = eq "a" in
-              ^^
-Error: Unbound value "eq"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
 (fun (x @ nonportable) -> eq x);;
 [%%expect{|
-Line 1, characters 26-28:
-1 | (fun (x @ nonportable) -> eq x);;
-                              ^^
-Error: Unbound value "eq"
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
 |}];;
 
+(* Although [x] is portable, the partial application is nonportable. This is due to
+   the mode of [eq] itself. *)
+(fun (x @ portable) -> eq x);;
+[%%expect{|
+Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
+
+|}];;
+
+(* [add_alias] creates an instance of [add], which is why the curry mode is no longer
+   polymorphic over locality *)
 let add_alias = add
 [%%expect{|
-Line 1, characters 16-19:
-1 | let add_alias = add
-                    ^^^
-Error: Unbound value "add"
+Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
+
 |}];;
 
 (add_alias : int32 -> int32 -> int32);;
@@ -623,9 +765,17 @@ module type Of_struct = module type of struct
   let add_val = add
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+module type Of_struct =
+  sig
+    external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+      = "%int32_add"
+    val add_val :
+      int32 @ [< 'o & past('m)] ->
+      (int32 @ [< 'n] -> int32 @ [> 'n | 'o]) @ [> past('m) | nonportable stateful]
+  end
 |}];;
+
+(* The implementaiton holds a more general primitive than the in the signature *)
 
 module Ext_legacy : sig
   external add : int32 -> int32 -> int32 = "%int32_add"
@@ -634,8 +784,8 @@ end = struct
     = "%int32_add"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+module Ext_legacy :
+  sig external add : int32 -> int32 -> int32 = "%int32_add" end
 |}];;
 
 module Ext_local_opt : sig
@@ -647,8 +797,14 @@ end = struct
     = "%int32_add"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+module Ext_local_opt :
+  sig
+    external add :
+      (int32 [@local_opt]) @ 'm ->
+      (int32 [@local_opt]) @ 'm ->
+      (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+      = "%int32_add"
+  end
 |}];;
 
 module Id_local_opt : sig
@@ -657,8 +813,13 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+module Id_local_opt :
+  sig
+    external id :
+      ('a [@local_opt]) @ 'm ->
+      ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+      = "%identity"
+  end
 |}];;
 
 (* The implementation is *less* general than the interface *)
@@ -671,8 +832,35 @@ end = struct
   external id : 'a @ [< 'm & unyielding] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   external id : 'a @ [< 'm & unyielding] -> 'a @ [> 'm] = "%identity"
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external id : 'a @ [< 'm & unyielding] -> 'a @ [> 'm]
+             = "%identity"
+         end
+       is not included in
+         sig
+           external id :
+             ('a [@local_opt]) @ 'm ->
+             ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+             = "%identity"
+         end
+       Values do not match:
+         external id : 'a @ [< 'm & unyielding] -> 'a @ [> 'm] = "%identity"
+       is not included in
+         external id :
+           ('a [@local_opt]) @ 'm ->
+           ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+           = "%identity"
+       The type "'a @ [< 'm & unyielding] -> 'a @ [> 'm]"
+       is not compatible with the type
+         "'a @ 'n ->
+         'a @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'n"
+       The argument mode was expected to be "unyielding" but is "yielding"
 |}];;
 
 (* Similar for forkability *)
@@ -682,8 +870,34 @@ end = struct
   external id : 'a @ [< 'm & forkable] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   external id : 'a @ [< 'm & forkable] -> 'a @ [> 'm] = "%identity"
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external id : 'a @ [< 'm & forkable] -> 'a @ [> 'm] = "%identity"
+         end
+       is not included in
+         sig
+           external id :
+             ('a [@local_opt]) @ 'm ->
+             ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+             = "%identity"
+         end
+       Values do not match:
+         external id : 'a @ [< 'm & forkable] -> 'a @ [> 'm] = "%identity"
+       is not included in
+         external id :
+           ('a [@local_opt]) @ 'm ->
+           ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+           = "%identity"
+       The type "'a @ [< 'm & forkable] -> 'a @ [> 'm]"
+       is not compatible with the type
+         "'a @ 'n ->
+         'a @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'n"
+       The argument mode was expected to be "forkable" but is "unforkable"
 |}];;
 
 module Ext_from_legacy : sig
@@ -693,8 +907,32 @@ end = struct
   external add : int32 -> int32 -> int32 = "%int32_add"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   external add : int32 -> int32 -> int32 = "%int32_add"
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig external add : int32 -> int32 -> int32 = "%int32_add" end
+       is not included in
+         sig
+           external add :
+             int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+             = "%int32_add"
+         end
+       Values do not match:
+         external add : int32 -> int32 -> int32 = "%int32_add"
+       is not included in
+         external add :
+           int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+           = "%int32_add"
+       The type "int32 -> int32 -> int32" is not compatible with the type
+         "int32 @ [< 'o & past('m)] ->
+         (int32 @ [< 'n] -> int32 @ [> 'n | 'o]) @ [> past('m) | nonportable stateful]"
+       Type "int32 -> int32" is not compatible with type
+         "int32 @ [< 'n] -> int32 @ [> 'n | 'o]"
+       The argument mode was expected to be "global"
+       because it crosses with something but is "local"
 |}];;
 
 module Ext_from_local_opt : sig
@@ -706,16 +944,59 @@ end = struct
     = "%int32_add"
 end
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+Lines 4-8, characters 6-3:
+4 | ......struct
+5 |   external add :
+6 |     (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
+7 |     = "%int32_add"
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external add :
+             (int32 [@local_opt]) @ 'm ->
+             (int32 [@local_opt]) @ 'm ->
+             (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+             = "%int32_add"
+         end
+       is not included in
+         sig
+           external add :
+             int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+             = "%int32_add"
+         end
+       Values do not match:
+         external add :
+           (int32 [@local_opt]) @ 'm ->
+           (int32 [@local_opt]) @ 'm ->
+           (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+           = "%int32_add"
+       is not included in
+         external add :
+           int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
+           = "%int32_add"
+       The type
+         "int32 @ 'o ->
+         (int32 @ 'o ->
+          int32 @ [< past('m) & many uncontended read_write > past('n) mod many portable forkable unyielding stateless | aliased nonportable stateful dynamic]as 'o) @ [> past('m) | nonportable stateful]"
+       is not compatible with the type
+         "int32 @ [< 'mm0 & past('p)] ->
+         (int32 @ [< 'q & past('n)] -> int32 @ [> 'q | 'mm0]) @ [> past('p) | nonportable stateful]"
+       Type "int32 @ 'o -> int32 @ 'o" is not compatible with type
+         "int32 @ [< 'q & past('n)] -> int32 @ [> 'q | 'mm0]"
+       The return mode was expected to be "unique" but is "aliased"
 |}];;
+
+(* By putting parentheses, the mode of the returned closure is translated as legacy *)
 
 external returns_closure :
   int32 @ [< 'm] -> (int32 @ [< 'm] -> int32 -> int32) = "caml_returns_closure"
 [%%expect{|
-Uncaught exception: File "typing/typedecl.ml", line 4553, characters 12-18: Assertion failed
-
+external returns_closure : int32 @ 'n -> (int32 @ 'm -> int32 -> int32)
+  = "caml_returns_closure"
 |}];;
+
+(* We can have mode polymorphic callbacks in a primitive *)
 
 external takes_callback :
   (int32 @ [< 'm] -> int32 @ [< 'm] -> int32 @ [> 'm]) -> unit

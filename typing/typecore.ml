@@ -9906,6 +9906,11 @@ and type_ident env ?(recarg=Rejected) lid =
          Misc.fatal_error "type_ident: Val_prim with non-empty val_lpoly";
        let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
+       let mode =
+         match mode with
+         | Some _ -> mode
+         | None -> prim_local_opt_locality prim ty
+       in
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
