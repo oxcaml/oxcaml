@@ -38,6 +38,7 @@
 #include "caml/platform.h"
 #include "caml/misc.h"
 #include "caml/major_gc.h"
+#include "caml/minor_gc.h"
 #include "caml/memory.h"
 #include "caml/obj.h"
 #include "caml/runtime_events.h"
@@ -63,15 +64,20 @@
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 #if defined(TARGET_amd64) || defined(TARGET_arm64)
-/* caml_reperform (in asm) reads [idled_from] at Stack_idled_from. */
-static_assert(offsetof(struct stack_info, idled_from) == 112, "");
+/* caml_reperform (in asm) reads [idled_from_high] at Stack_idled_from_high. */
+static_assert(offsetof(struct stack_info, idled_from_high) == 112, "");
 #endif
 
 static _Atomic int64_t fiber_id_global = 0;
 static CAMLthread_local int64_t fiber_id_local = 0;
 
 #define NUM_STACK_SIZE_CLASSES 5
-#define MAX_STACK_CACHE_LIMIT  Max_domains_max
+
+/* Ceiling on pushes to a local stack cache (per size class), doubling
+   as the disabled-cache bias (see [caml_disable_stack_caches]).
+   Deliberately a constant: deriving it from [Max_domains_max] made it
+   1 in single-domain builds, defeating the caches entirely. */
+#define MAX_STACK_CACHE_LIMIT  4096
 
 /* Parameters settable with OCAMLRUNPARAM */
 uintnat caml_init_main_stack_wsz = 0;   /* Xmain_stack_size= */
@@ -315,55 +321,68 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 /**** Guarded and idle stacks (STACK_GUARD_PAGES only) ****
 
    Without stack checks, every stack in use is "guarded": a fixed-size
-   mapping with a guard page, which is expensive to create and consumes
-   kernel mappings. To bound the number of mappings, only stacks that can
-   run need to be guarded:
+   mapping with a guard page. These stacks never grow
+   ([caml_try_realloc_stack] is a stub): by default the same ~8 MiB for
+   main, thread and fiber stacks alike, so in practice every stack
+   lives in the first stack-cache size class. A guarded stack consumes
+   address space and two kernel mappings (the guard page splits the
+   mapping in two), and mappings are scarce (vm.max_map_count defaults
+   to 65530).
+
+   To allow large numbers of fibers, and therefore large numbers of
+   stacks, we have "idle" stacks. A stack which can't currently run is
+   "idled" - copied into a malloc'ed block - so that the guarded stack
+   can be used for some other fiber.
 
    - Running stacks (the current stack of some thread and its ancestors)
      and the stacks of continuations on the minor heap are guarded.
-   - When a continuation is promoted to the major heap, its stacks become
-     "idle": their data is copied into malloced buffers and their guarded
-     stacks are recycled; [idled_from] records each vanished guarded
-     stack's [Stack_high]. Stack-internal absolute pointers (the exception
-     chain and, with frame pointers, the frame-pointer chain) are left
-     unrelocated: nothing follows them while the continuation is
-     suspended.
+   - When a continuation is promoted to the major heap, its stacks are
+     "idled": their data is copied into malloced buffers and their
+     guarded stacks are recycled. Pointers into the interior of the
+     stack are left unrelocated, because nothing follows them while
+     the continuation is suspended.
    - When such a continuation is resumed, [caml_continuation_use_noexc]
-     wakes each stack: copies it onto a fresh guarded stack and relocates
-     those chains by the distance the data has moved.
-   - A minor collection can also promote a continuation *mid-perform*,
-     invalidating the raw last-fiber pointer that the handler code is
-     forwarding (the [last_fiber] argument of effect handlers).
-     caml_reperform therefore checks for an idled chain and wakes it in
-     place ([caml_cont_wake_stacks]) before appending to it; the chain
-     then stays guarded until resumed.
+     "wakes" each stack: copies it onto a fresh guarded stack and
+     relocates those pointers (the exception-handler and frame-pointer
+     chains) by the distance the data has moved.
+   - When reperforming an effect, it's possible for a minor collection
+     to idle the continuation mid-perform; caml_reperform has to
+     detect this and wake the stacks if necessary.
 
-   Guarded stacks are cached on three levels. Freed ones go to the
-   freeing domain's cache ([Caml_state->stack_caches], one lock-free
-   list per size class, pushed by any domain, popped by the owner). At
-   the start of each minor collection every domain demotes its local
-   caches to the global cache: anything still there has gone a whole
-   minor cycle unused. During compaction the global cache's mappings
-   are returned to the OS. [caml_max_guarded_stacks] is a soft bound
-   on the total number of guarded stacks: allocating beyond it
-   requests a minor collection (but still succeeds), and cached ones
-   beyond it are parked on an "extra" cache whose use also requests a
-   minor collection. These requests back off geometrically (see
+   When allocating a guarded stack, if the total number of guarded
+   stacks reaches [caml_max_guarded_stacks] (Xmax_guarded_stacks), a
+   minor collection is requested. The allocation still
+   succeeds. These minor-GC requests back off geometrically (see
    [minor_gc_request_hysteresis]) so that a large population of live
-   stacks does not force a collection per allocation. Idling (and the
-   GC requests that serve it) can be disabled with Xno_idle_stacks=1:
-   every stack then stays guarded for life. The global and
-   extra caches are shared by all
-   domains, so they are multiple-consumer: lock-free popping would
-   suffer from ABA, so they are protected by [stack_cache_global_lock]
-   instead (they are off the fast path).
+   stacks does not force a collection per allocation.
 
-   This relies on two invariants. A captured stack chain has no live C
-   frames -- callbacks mask the stack's handlers (see callback.c), so
-   effects cannot cross the C boundary -- and therefore no [c_stack_link]
-   points into it, it contains no C-entry chunk (so no asynchronous-
-   exception trap frame, and [Caml_state->async_exn_handler] never
-   points into it), and nothing re-enters it except resumption. */
+   Guarded stacks are cached on three levels:
+
+   - Newly-freed ones go to the owning domain's cache
+     [Caml_state->stack_caches]: one lock-free list per size class,
+     pushed by any domain, popped by the owner.
+   - At the start of each minor collection every domain flushes its
+     own cache to the global cache.
+   - If the global cache reaches [caml_max_guarded_stacks]
+     (Xmax_guarded_stacks), additional cached stacks go to an "extra"
+     cache whose use requests a minor collection.
+
+   At the end of each major cycle, stacks in the extra cache are
+   returned to the OS, as are stacks in the global cache if they
+   haven't been used for a whole major cycle. During compaction all
+   stacks in the global and extra cache are returned to the OS.
+
+   This whole mechanism can be disabled with Xno_idle_stacks=1: every
+   stack then stays guarded for life. The global and extra caches are
+   shared by all domains, so they are multiple-consumer, protected by
+   [stack_cache_global_lock].
+
+   This relies on these invariants:
+
+   - [c_stack_link] and [async_exn_handler] never point into a stack
+     when it is idled (effects cannot cross the C boundary).
+   - Nothing runs on an idle stack.
+   */
 
 /* This code runs on amd64 and arm64: configure forces stack checks on
    everywhere else. A port needs, in the architecture's assembly:
@@ -388,14 +407,6 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 static struct stack_cache stack_cache_global[NUM_STACK_SIZE_CLASSES];
 static struct stack_cache stack_cache_extra[NUM_STACK_SIZE_CLASSES];
 static caml_plat_mutex stack_cache_global_lock = CAML_PLAT_MUTEX_INITIALIZER;
-
-/* Ask for a minor collection at the next safe point, to reduce the
-   population of guarded stacks. */
-static void minor_gc_request(void)
-{
-  Caml_state->requested_minor_gc = 1;
-  caml_interrupt_self();
-}
 
 /* Pop a stack of size class [bucket] from cache [c], or return NULL.
    Must be called with [stack_cache_global_lock] held. */
@@ -505,7 +516,7 @@ static struct stack_stats stack_stats_sum(void)
    requested a collection. */
 static atomic_uintnat stack_gc_requested_at = 0;
 
-/* As [minor_gc_request], with geometric hysteresis: only request once
+/* As [caml_minor_gc_request], with geometric hysteresis: only request once
    the population has grown 50% beyond the last request (collections
    evidently were not reclaiming stacks, so most must be live). A
    shrinking population re-arms the threshold. Racing domains just skip
@@ -524,7 +535,7 @@ static void minor_gc_request_hysteresis(void)
     } else if (count - prev >= prev / 2) {
       if (atomic_compare_exchange_weak(&stack_gc_requested_at,
                                        &prev, count)) {
-        minor_gc_request();
+        caml_minor_gc_request();
         return;
       }
     } else {
@@ -551,7 +562,7 @@ stack_alloc_uncached(mlsize_t wosize, int cache_bucket, int64_t id)
     } else {
       cached = cache_pop_with_lock(&stack_cache_extra[cache_bucket]);
       if (cached != NULL) {
-        /* Dipping into the over-bound reserve. */
+        /* Dipping into the reserve. */
         caml_atomic_counter_incr(Stack_stat(hits_extra));
         minor_gc_request_hysteresis();
       }
@@ -633,7 +644,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   hand->parent = NULL;
   stack->sp = Stack_high(stack);
   stack->exception_ptr = NULL;
-  stack->idled_from = NULL;
+  stack->idled_from_high = NULL;
   stack->id = id;
   stack->domain_idx = Caml_state->id;
   stack->local_arenas = NULL;
@@ -1559,7 +1570,7 @@ void caml_free_stack (struct stack_info* stack)
   CAMLnoalloc;
 
 #ifdef STACK_GUARD_PAGES
-  CAMLassert(stack->idled_from == NULL);
+  CAMLassert(stack->idled_from_high == NULL);
 #endif
 
   // Don't need to update local_sp since this is no longer the current stack.
@@ -1585,7 +1596,7 @@ void caml_free_gc_regs_buckets(value *gc_regs_buckets)
    return the idle copy, which takes over the fiber state (local
    allocations, dynamic bindings). The exception and frame-pointer chains
    are left pointing into the old guarded stack, to be relocated from
-   [idled_from] when the stack is woken. Cannot raise: aborts on
+   [idled_from_high] when the stack is woken. Cannot raise: aborts on
    allocation failure, as the caller (the minor GC) cannot recover. */
 static struct stack_info* stack_idle(struct stack_info* stack)
 {
@@ -1596,7 +1607,7 @@ static struct stack_info* stack_idle(struct stack_info* stack)
   size_t handler_off = round_up_p2(sizeof(struct stack_info) + data_bytes,
                                    16);
 
-  CAMLassert(stack->idled_from == NULL);
+  CAMLassert(stack->idled_from_high == NULL);
   CAMLassert(stack->magic == 42);
 
   struct stack_info* idle =
@@ -1607,7 +1618,7 @@ static struct stack_info* stack_idle(struct stack_info* stack)
   *idle = *stack;
   idle->sp = (char*)idle + handler_off - data_bytes;
   idle->handler = (struct stack_handler*)((char*)idle + handler_off);
-  idle->idled_from = Stack_high(stack);
+  idle->idled_from_high = Stack_high(stack);
   memcpy(idle->sp, stack->sp, data_bytes + sizeof(struct stack_handler));
 
   caml_atomic_counter_incr(Stack_stat(idled));
@@ -1637,7 +1648,7 @@ static struct stack_info* stack_wake(struct stack_info* idle,
 {
   int bucket = idle->cache_bucket;
 
-  CAMLassert(idle->idled_from != NULL);
+  CAMLassert(idle->idled_from_high != NULL);
   CAMLassert(idle->magic == 42);
   /* Only fibers are ever captured in continuations, and fibers are
      always of the first (smallest) pooled size class. */
@@ -1669,30 +1680,36 @@ static struct stack_info* stack_wake(struct stack_info* idle,
      frame-pointer chain by the distance the stack data has moved since
      it was idled. Both chains climb the stack, reaching non-stack
      memory (NULL, or the eventual resumer's stack) at their final link. */
-  char* old_high = (char*)idle->idled_from;
+  char* old_high = (char*)idle->idled_from_high;
   char* old_low = old_high - ((char*)Stack_high(idle) - (char*)idle->sp);
   ptrdiff_t delta = (char*)Stack_high(stack) - old_high;
   reloc->old_low = old_low;
   reloc->old_high = old_high;
   reloc->delta = delta;
 
-  /* Relocate chain of exception handler pointers */
-  char** p = (char**)&stack->exception_ptr;
-  while (old_low <= *p && *p < old_high) {
-    *p = *p + delta;
-    p = (char**)*p;
-  }
+  /* A zero [delta] means the stack woke onto the very mapping it was
+     idled from (common when a lone fiber idles and wakes repeatedly:
+     its wake pops the mapping its idling pushed), so every
+     stack-internal pointer is already correct. */
+  if (delta != 0) {
+    /* Relocate chain of exception handler pointers */
+    char** p = (char**)&stack->exception_ptr;
+    while (old_low <= *p && *p < old_high) {
+      *p = *p + delta;
+      p = (char**)*p;
+    }
 #ifdef WITH_FRAME_POINTERS
-  /* Relocate chain of frame pointers, starting at [sp] with the frame
-     pointer pushed when the stack was suspended (by
-     SWITCH_OCAML_STACKS). The chain's last link is rewritten by
-     UPDATE_BASE_POINTER when the stack is resumed. */
-  p = (char**)stack->sp;
-  while (old_low <= *p && *p < old_high) {
-    *p = *p + delta;
-    p = (char**)*p;
-  }
+    /* Relocate chain of frame pointers, starting at [sp] with the frame
+       pointer pushed when the stack was suspended (by
+       SWITCH_OCAML_STACKS). The chain's last link is rewritten by
+       UPDATE_BASE_POINTER when the stack is resumed. */
+    p = (char**)stack->sp;
+    while (old_low <= *p && *p < old_high) {
+      *p = *p + delta;
+      p = (char**)*p;
+    }
 #endif
+  }
 
   caml_atomic_counter_incr(Stack_stat(woken));
   caml_atomic_counter_add_relaxed(Stack_stat(woken_bytes),
@@ -1703,9 +1720,9 @@ static struct stack_info* stack_wake(struct stack_info* idle,
   return stack;
 }
 
-struct stack_info* caml_cont_idle_stacks(value cont)
+struct stack_info* caml_cont_idle_stacks_from_stw(value cont)
 {
-  struct stack_info* stack = Ptr_val(Field(cont, 0));
+  struct stack_info* stack = Ptr_val(Cont_fiber(cont));
   struct stack_info* head = NULL;
   struct stack_info* prev = NULL;
 
@@ -1725,9 +1742,9 @@ struct stack_info* caml_cont_idle_stacks(value cont)
     prev = idle;
     stack = next;
   }
-  /* Fields 0 and 1 hold integer-tagged pointers: plain stores are fine. */
-  Field(cont, 0) = Val_ptr(head);
-  Field(cont, 1) = Val_ptr(prev);
+  /* Both fields hold integer-tagged pointers: plain stores are fine. */
+  Cont_fiber(cont) = Val_ptr(head);
+  Cont_last_fiber(cont) = Val_ptr(prev);
   return head;
 }
 
@@ -1756,18 +1773,19 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
          when the chain is resumed. The offset is as in
          UPDATE_BASE_POINTER (amd64.S and arm64.S agree on it). */
       char** slot = (char**)((char*)prev->handler - 48);
-      if (reloc.old_low <= *slot && *slot < reloc.old_high)
+      if (reloc.delta != 0 &&
+          reloc.old_low <= *slot && *slot < reloc.old_high)
         *slot = *slot + reloc.delta;
 #endif
     }
     prev = stack;
     idle = next;
   }
-  Field(cont, 1) = Val_ptr(prev);
+  Cont_last_fiber(cont) = Val_ptr(prev);
   return Val_ptr(head);
 }
 
-void caml_stack_cache_flush_local(void)
+void caml_stack_cache_flush_from_stw(void)
 {
   struct stack_cache* caches = Caml_state->stack_caches;
   uintnat cached = 0;
@@ -1819,7 +1837,7 @@ void caml_stack_cache_flush_local(void)
    the extra cache, and any global-cache stack that has sat there for
    a whole major cycle. Called by one domain at the end of each major
    cycle. */
-void caml_stack_cache_trim(void)
+void caml_stack_cache_trim_from_stw_single(void)
 {
   uintnat freed = 0;
   /* [caml_major_cycles_completed] has already been advanced for the
@@ -1866,7 +1884,7 @@ void caml_stack_cache_trim(void)
   }
 }
 
-void caml_stack_cache_free_unused(void)
+void caml_stack_cache_compact_from_stw_single(void)
 {
   uintnat freed = 0;
 
@@ -1950,10 +1968,10 @@ static value continuation_take(value cont)
   if (!Is_young(cont) && caml_marking_started())
     caml_darken_cont(cont);
 
-  v = Field(cont, 0);
+  v = Cont_fiber(cont);
 
   if (caml_domain_alone()) {
-    Field(cont, 0) = null_stk;
+    Cont_fiber(cont) = null_stk;
     return v;
   }
 
@@ -1972,13 +1990,13 @@ CAMLprim value caml_continuation_use_noexc (value cont)
   value v = continuation_take(cont);
 #ifdef STACK_GUARD_PAGES
   struct stack_info* stk = Ptr_val(v);
-  if (stk != NULL && stk->idled_from != NULL)
+  if (stk != NULL && stk->idled_from_high != NULL)
     v = continuation_wake_stacks(cont, stk);
 #endif
   return v;
 }
 
-value caml_continuation_use_raw_noexc (value cont)
+value caml_continuation_take_noexc (value cont)
 {
   return continuation_take(cont);
 }
@@ -2006,7 +2024,7 @@ bool caml_continuation_is_preemption(value cont) {
 value* caml_continuation_gc_regs(value cont) {
   assert_is_cont(cont);
   if (caml_continuation_is_preemption(cont)) {
-    return (value*)Field(cont, 2);
+    return (value*)Cont_gc_regs(cont);
   } else {
     return NULL;
   }
@@ -2037,13 +2055,13 @@ CAMLprim value caml_continuation_update_handler_noexc
   value stack;
   struct stack_info* stk;
 
-  stack = caml_continuation_use_raw_noexc (cont);
+  stack = caml_continuation_take_noexc (cont);
   stk = Ptr_val(stack);
   if (stk == NULL) {
     /* The continuation has already been taken */
     return cont;
   }
-  stk = Ptr_val(Field(cont, 1));
+  stk = Ptr_val(Cont_last_fiber(cont));
   check_preemptable(stk, htick);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;
@@ -2066,7 +2084,7 @@ CAMLprim value caml_continuation_update_tick_handler_noexc
   value stack;
   struct stack_info *stk;
 
-  stack = caml_continuation_use_raw_noexc (cont);
+  stack = caml_continuation_take_noexc (cont);
   stk = Ptr_val(stack);
   if (stk == NULL) {
     /* The continuation has already been taken */

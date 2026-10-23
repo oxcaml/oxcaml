@@ -284,7 +284,7 @@ CAMLprim value caml_get_continuation_callstack (value cont, value max_frames)
   struct stack_info* stack;
 
   /* The raw variant: no need to map the stacks just to read them. */
-  stack = Ptr_val(caml_continuation_use_raw_noexc(cont));
+  stack = Ptr_val(caml_continuation_take_noexc(cont));
   if (stack == NULL) caml_raise_continuation_already_resumed();
   {
     CAMLnoalloc;

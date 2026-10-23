@@ -1507,8 +1507,8 @@ do_resume: {
       caml_fiber_switched();
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
-      Field(cont, 0) = Val_ptr(old_stack);
-      Field(cont, 1) = Val_ptr(old_stack);
+      Cont_fiber(cont) = Val_ptr(old_stack);
+      Cont_last_fiber(cont) = Val_ptr(old_stack);
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       extra_args = Long_val(sp[1]);

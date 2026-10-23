@@ -419,7 +419,7 @@ CAMLprim value caml_get_continuation_callstack (value cont, value max_frames)
   struct stack_info *stack;
   value *sp;
 
-  stack = Ptr_val(caml_continuation_use_raw_noexc(cont));
+  stack = Ptr_val(caml_continuation_take_noexc(cont));
   if (stack == NULL) caml_raise_continuation_already_resumed();
   {
     CAMLnoalloc; /* GC must not see the stack outside the cont */
