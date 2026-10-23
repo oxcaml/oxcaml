@@ -190,7 +190,7 @@ let rec mixed_block_element print_value_kind ppf el =
     fprintf ppf "product %a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
-  | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
+  | Splice_variable id -> fprintf ppf "$%a" Layout_ident.print id
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
@@ -258,7 +258,7 @@ let rec layout ppf lay_ =
     fprintf ppf "@[<hov 1>#(%a)@]"
       (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") layout)
       layouts
-  | Psplicevar id -> fprintf ppf "$%a" Slambdaident.print id
+  | Psplicevar id -> fprintf ppf "$%a" Layout_ident.print id
 
 let layout_annotation ppf lay_ =
   match lay_ with
@@ -306,7 +306,7 @@ let return_kind ppf (mode, kind) =
   | Ptop -> fprintf ppf ": top@ "
   | Pbottom -> fprintf ppf ": bottom@ "
   | Pvoid -> fprintf ppf ": void@ "
-  | Psplicevar id -> fprintf ppf ": $%a@ " Slambdaident.print id
+  | Psplicevar id -> fprintf ppf ": $%a@ " Layout_ident.print id
 
 let locality_kind = function
   | Alloc_heap -> ""
@@ -369,7 +369,7 @@ let rec mixed_block_element
   | Void -> fprintf ppf "void"
   | Product shape ->
     fprintf ppf "product %a" (mixed_block_shape (fun _ _ -> ())) shape
-  | Splice_variable id -> fprintf ppf "$%a" Slambdaident.print id
+  | Splice_variable id -> fprintf ppf "$%a" Layout_ident.print id
 
 and mixed_block_shape
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element array -> _
@@ -1574,7 +1574,7 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lkindtemplate {ktmpl_params; ktmpl_body} ->
       let pr_params ppf params =
-        List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
+        List.iter (fun l -> fprintf ppf "%a@ " Layout_ident.print l) params
       in
       fprintf ppf "@[<2>(ktemplate@ %a%a)@]"
         pr_params ktmpl_params

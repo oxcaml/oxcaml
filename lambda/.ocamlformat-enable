@@ -1,13 +1,13 @@
 assume_info.ml
 assume_info.mli
+layout_ident.ml
+layout_ident.mli
 mixed_block_shape.ml
 mixed_block_shape.mli
 mixed_product_bytes.ml
 mixed_product_bytes.mli
 slambda.ml
 slambda.mli
-slambdaident.ml
-slambdaident.mli
 transl_array_comprehension.ml
 transl_array_comprehension.mli
 transl_comprehension_utils.ml
