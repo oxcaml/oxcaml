@@ -279,6 +279,8 @@ val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option ->
         (Primitive.mode * Primitive.native_repr) -> level:int
         -> (Mode.allowed * 'r) Mode.Locality.t
+val prim_local_opt_locality:
+        Primitive.description -> type_expr -> Mode.Locality.lr option
 val instance_prim:
         Env.t ->
         Primitive.description -> type_expr ->
@@ -316,10 +318,16 @@ val curry_mode :
     arguments it may close over. *)
 module Curry_mode : sig
   type t =
-    | Const of With_locality.Const.t
+    | Const of { mode : With_locality.Const.t; pin_areality : bool }
     | Variable of
         { comonadic : With_locality.Comonadic.l;
-          areality : Locality.Const.t }
+          areality : Locality.Const.t option }
+
+  val const : With_locality.Const.t -> t
+
+  val legacy : t
+
+  val primitive : With_locality.Const.t -> t
 
   val add_const_arg : t -> With_locality.Const.t -> t
 
