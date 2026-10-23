@@ -80,3 +80,27 @@ let () =
   Printf.printf "relay: %d %.1f\n"
     (Cross_module_static_relay.relay_id 5)
     (to_float (Cross_module_static_relay.relay_id #6.0))
+
+(* An imported static functor returns a template capturing both its dynamic
+   argument and a value computed by the functor body. Applications to
+   all-dynamic arguments must keep their runtime values and effects separate. *)
+let () =
+  let module A = struct
+    let offset = Sys.opaque_identity 10
+    let counter = ref 0
+  end in
+  let module B = struct
+    let offset = Sys.opaque_identity 20
+    let counter = ref 100
+  end in
+  let module A_stamper = Lib.Stamper (A) in
+  let module B_stamper = Lib.Stamper (B) in
+  let #(si, i) = A_stamper.with_stamp 7 in
+  let #(sj, j) = B_stamper.with_stamp 8 in
+  let #(sf, f) = A_stamper.with_stamp #3.5 in
+  let #(sg, g) = B_stamper.with_stamp #4.5 in
+  Printf.printf "A initial: %d\nA stamps: %d@%d %.1f@%d\n"
+    A_stamper.initial i si (to_float f) sf;
+  Printf.printf "B initial: %d\nB stamps: %d@%d %.1f@%d\n"
+    B_stamper.initial j sj (to_float g) sg;
+  Printf.printf "calls: %d\n" !Lib.calls
