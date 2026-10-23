@@ -450,10 +450,12 @@
            all_modules = "monoid_of_semigroup.cmo string_semigroup.cmo";
            ocamlc.byte;
 
+           (* Arguments can be given as compilation unit names *)
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate monoid_utils.cmo \
+             Monoid_of_semigroup(Semigroup)(String_semigroup)";
            program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmo";
-           all_modules = "monoid_utils.cmo monoid_of_semigroup-String_semigroup.cmo";
+           all_modules = "";
            ocamlc.byte;
 
            module = "";
@@ -481,9 +483,9 @@
            ocamlc.byte;
 
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate import.cmo Int_list_element String_semigroup";
            program = "import-Int_list_element-String_semigroup.cmo";
-           all_modules = "import.cmo int_list_element.cmo string_semigroup.cmo";
+           all_modules = "";
            ocamlc.byte;
 
            module = "";
@@ -947,10 +949,12 @@
            all_modules = "monoid_of_semigroup.cmx string_semigroup.cmx";
            ocamlopt.byte;
 
+           (* Arguments can be given as compilation unit names *)
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate monoid_utils.cmx \
+             Monoid_of_semigroup(Semigroup)(String_semigroup)";
            program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmx";
-           all_modules = "monoid_utils.cmx monoid_of_semigroup-String_semigroup.cmx";
+           all_modules = "";
            ocamlopt.byte;
 
            module = "";
@@ -978,9 +982,9 @@
            ocamlopt.byte;
 
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate import.cmx Int_list_element String_semigroup";
            program = "import-Int_list_element-String_semigroup.cmx";
-           all_modules = "import.cmx int_list_element.cmx string_semigroup.cmx";
+           all_modules = "";
            ocamlopt.byte;
 
            module = "";
