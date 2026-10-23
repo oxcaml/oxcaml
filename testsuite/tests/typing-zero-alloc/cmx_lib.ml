@@ -12,7 +12,7 @@ let[@inline never][@loop always] rec iter_loop ~f = function
   | [] -> ()
   | head :: tail ->
     f head;
-    iter_rec ~f tail
+    iter_loop ~f tail
 
 let[@inline never] apply f x = f x
 let[@inline never] ylppa x f = apply f x
