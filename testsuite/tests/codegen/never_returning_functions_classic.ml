@@ -119,18 +119,18 @@ Reinlined.through_partial:
   jmp   camlTOP3__never_5_5@PLT
 
 Reinlined.non_tail:
-  subq  $8, %rsp
   movq  %rax, %rbx
   cmpq  $1, %rbx
   jle   .L1
+  subq  $8, %rsp
   movl  $1, %eax
   call  camlTOP3__never_5_5@PLT
 .L0:
-  jmp   .L2
+  leaq  <hidden PC-relative offset>(%rip), %rax
+  movq  %rax, %rdi
+  call  caml_flambda2_invalid@PLT
 .L1:
   movq  %rbx, %rax
-.L2:
   addq  $2, %rax
-  addq  $8, %rsp
   ret
 |}]

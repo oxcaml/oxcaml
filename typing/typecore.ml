@@ -4996,6 +4996,45 @@ let is_prim ~name funct =
       prim_name = name
   | _ -> false
 
+let is_false_literal exp =
+  match exp.exp_desc with
+  | Texp_construct(_, {cstr_name="false"}, _, _, _) -> true
+  | _ -> false
+
+let is_never_returning_prim_apply funct args =
+  match funct.exp_desc with
+  | Texp_ident { desc = {val_kind=Val_prim p}; kind = Id_prim _; _ } ->
+      Primitive.prim_name_never_returns p.prim_name
+      && List.length args >= p.prim_arity
+      && List.for_all
+           (fun (_, arg) ->
+              match arg with Arg _ -> true | Omitted _ -> false)
+           args
+  | _ -> false
+
+let rec never_returns exp =
+  match exp.exp_desc with
+  | Texp_unreachable -> true
+  | Texp_assert (cond, _) -> is_false_literal cond
+  | Texp_apply (funct, args, _, _, _, _) ->
+      is_never_returning_prim_apply funct args
+  | Texp_let (_, _, e)
+  | Texp_letmutable (_, e)
+  | Texp_letmodule (_, _, _, _, e)
+  | Texp_letexception (_, e)
+  | Texp_open (_, e)
+  | Texp_exclave e
+  | Texp_sequence (_, _, e) -> never_returns e
+  | Texp_ifthenelse (_, ifso, Some ifnot) ->
+      never_returns ifso && never_returns ifnot
+  | Texp_match (_, _, cases, [], _) -> cases_never_return cases
+  | Texp_try (body, cases, []) ->
+      never_returns body && cases_never_return cases
+  | _ -> false
+
+and cases_never_return : type k. k case list -> bool = fun cases ->
+  List.for_all (fun c -> never_returns c.c_rhs) cases
+
 (* List labels in a function type, and whether return type is a variable *)
 let rec list_labels_aux env visited ls ty_fun =
   let ty = expand_head env ty_fun in
@@ -6661,7 +6700,6 @@ type split_function_ty =
     *)
     filtered_arrow: filtered_arrow;
     arg_sort : Jkind.sort;
-    ret_sort : Jkind.sort;
     (* An instance of [a_i], unless [x_i] is annotated as polymorphic,
        in which case it's just [a_i] (not an instance).
     *)
@@ -6701,6 +6739,25 @@ type split_function_ty =
     @param in_function Information about the [Pexp_function] node that's in
       the process of being typechecked (its overall type and its location).
 *)
+
+let function_type_sort ~why ~loc_fun env ty =
+  match Ctype.type_sort ~why ~allow_mutation:true env ty with
+  | Ok sort -> sort
+  | Error err ->
+      Error.log_and_raise loc_fun env (Function_type_not_rep (ty, err))
+
+let function_return_sort ~loc_fun env ty_ret body
+  : Typedtree.function_return_sort =
+  let never_returns =
+    match body with
+    | Tfunction_body exp -> never_returns exp
+    | Tfunction_cases { fc_cases; _ } -> cases_never_return fc_cases
+  in
+  if never_returns then Function_never_returns
+  else
+    Function_returns
+      (function_type_sort ~why:Function_result ~loc_fun env ty_ret)
+
 let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~param_loc ~ret_loc ~in_function
@@ -6799,16 +6856,15 @@ let split_function_ty
     with_locality_to_regionality_l2r { arg_mode with monadic = env_monadic }
   in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
-  let type_sort ~why ty =
-    match Ctype.type_sort ~why ~allow_mutation:true env ty with
-    | Ok sort -> sort
-    | Error err ->
-        Error.log_and_raise loc_fun env (Function_type_not_rep (ty, err))
+  let arg_sort =
+    function_type_sort ~why:Function_argument ~loc_fun env ty_arg
   in
-  let arg_sort = type_sort ~why:Function_argument ty_arg in
-  let ret_sort = type_sort ~why:Function_result ty_ret in
+  if not is_final_val_param then
+    ignore
+      (function_type_sort ~why:Function_result ~loc_fun env ty_ret
+       : Jkind.sort);
   env,
-  { filtered_arrow; arg_sort; ret_sort;
+  { filtered_arrow; arg_sort;
     locality_mode; closure_mode=closure_mode.comonadic; ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
     really_poly; env_mode=(With_locality.Monadic.disallow_left env_monadic)
@@ -6840,6 +6896,10 @@ module Calling_convention_sort : sig
       ccs_kind : [`Argument | `Result];
     }
 
+  val result :
+    ty:type_expr -> sort:Typedtree.function_return_sort -> env:Env.t ->
+    loc:Location.t -> t list
+
   val check_doesn't_rely_on_partial_match :
     partial:partial -> has_default:bool -> match_loc:Location.t ->
     outer_env:Env.t -> branch_env:Env.t -> t list -> unit
@@ -6851,6 +6911,13 @@ end = struct
       ccs_loc : Location.t;
       ccs_kind : [`Argument | `Result];
     }
+
+  let result ~ty ~(sort : Typedtree.function_return_sort) ~env ~loc =
+    match sort with
+    | Function_returns sort ->
+      [ { ccs_ty = ty; ccs_sort = sort; ccs_env = env; ccs_loc = loc;
+          ccs_kind = `Result } ]
+    | Function_never_returns -> []
 
   let added_constraints_from_partial_match
         ~partial ~has_default ~outer_env ~branch_env =
@@ -6934,8 +7001,7 @@ type type_function_result =
 and type_function_ret_info =
   { (* The mode the function returns at. *)
     ret_mode: return_mode modes;
-    (* The sort returned by the function. *)
-    ret_sort: Jkind.sort;
+    ret_sort: Typedtree.function_return_sort;
     cases_arg_yielding: Mode.Yielding.l option;
   }
 
@@ -8901,11 +8967,9 @@ and type_expect_
           (mk_expected ~explanation:Assert_condition Predef.type_bool)
       in
       let exp_type =
-        match cond.exp_desc with
-        | Texp_construct(_, {cstr_name="false"}, _, _, _) ->
-            instance ty_expected
-        | _ ->
-            instance Predef.type_unit
+        if is_false_literal cond
+        then instance ty_expected
+        else instance Predef.type_unit
       in
       let rec innermost_location loc_stack =
         match loc_stack with
@@ -10067,7 +10131,7 @@ and type_function
       in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
-            arg_sort; ret_sort;
+            arg_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
             locality_mode; closure_mode; really_poly; env_mode
           } =
@@ -10320,6 +10384,24 @@ and type_function
             };
         }
       in
+      let return_from_exclave = !excl in
+      let ret_mode =
+        create_function_return_mode ~return_from_exclave ret_mode
+      in
+      (* [ret_info] is [None] only in the innermost recursive call to
+         [type_function], when it is initially computed. In the other calls,
+         the result sort is already in [inner_calling_convention_sorts]. *)
+      let ret_info, ret_ccs =
+        match ret_info with
+        | Some _ as x -> x, []
+        | None ->
+          let ret_mode =
+            {ret_mode_annots with mode_modes = ret_mode }
+          in
+          let ret_sort = function_return_sort ~loc_fun env ty_ret body in
+          Some { ret_sort; ret_mode; cases_arg_yielding = None },
+          Calling_convention_sort.result ~ty:ty_ret ~sort:ret_sort ~env ~loc
+      in
       let calling_convention_sorts =
         (* These sorts are added after the call to
            [Calling_convention_sort.check_doesn't_rely_on_partial_match]
@@ -10333,29 +10415,7 @@ and type_function
           { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
             ccs_env = env; ccs_loc = pparam_loc; ccs_kind = `Argument }
         in
-        (* [ret_info] is [None] only in the innermost recursive call to
-           [type_function], when it is initially computed. In the other calls,
-           the result sort is already in [inner_calling_convention_sorts]. *)
-        let ret_ccs =
-          if Option.is_some ret_info then []
-          else
-            [ { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
-                ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
-        in
         arg_ccs :: ret_ccs @ inner_calling_convention_sorts
-      in
-      let return_from_exclave = !excl in
-      let ret_mode =
-        create_function_return_mode ~return_from_exclave ret_mode
-      in
-      let ret_info =
-        match ret_info with
-        | Some _ as x -> x
-        | None ->
-          let ret_mode =
-            {ret_mode_annots with mode_modes = ret_mode }
-          in
-          Some { ret_sort ; ret_mode; cases_arg_yielding = None }
       in
       let fun_alloc_mode =
         { fun_closure_mode = closure_mode;
@@ -11139,7 +11199,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
               ret_mode =
                 { mode_modes = fc_ret_mode;
                   mode_desc = [] };
-              ret_sort;
+              ret_sort = Function_returns ret_sort;
               locality_mode = Typedtree.create_locality_mode_r locality_mode;
               yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
@@ -12172,7 +12232,7 @@ and type_function_cases_expect
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
-          arg_sort; ret_sort; closure_mode;
+          arg_sort; closure_mode;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; locality_mode;
         } =
       split_function_ty
@@ -12240,11 +12300,14 @@ and type_function_cases_expect
       { fun_closure_mode = closure_mode;
         locality_mode }
     in
+    let ret_sort =
+      let _, loc_fun = in_function in
+      function_return_sort ~loc_fun env ty_ret (Tfunction_cases cases)
+    in
     let calling_convention_sorts =
-      [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
-          ccs_env = env; ccs_loc = loc; ccs_kind = `Argument };
-        { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
-          ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
+      { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
+        ccs_env = env; ccs_loc = loc; ccs_kind = `Argument }
+      :: Calling_convention_sort.result ~ty:ty_ret ~sort:ret_sort ~env ~loc
     in
     let return_from_exclave = !excl in
     cases, ty_fun, fun_alloc_mode,
