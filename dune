@@ -1058,6 +1058,29 @@
   (alias_rec extract_externals/check)
   (alias_rec ocamltest/check)))
 
+; Index files for Merlin's project-wide occurrences (find-all-references) in
+; the same code as merlin-support. The root ocaml-index alias would also pull in
+; code that doesn't build in this workspace, so list the root libraries'
+; indexes explicitly.
+(alias
+ (name merlin-index)
+ (deps
+  .ocamlcommon.objs/cctx.ocaml-index
+  .ocamlfrontend.objs/cctx.ocaml-index
+  .ocamlbytecomp.objs/cctx.ocaml-index
+  .ocamloptcomp.objs/cctx.ocaml-index
+  .ocamljcomp.objs/cctx.ocaml-index
+  .oxcaml_common.objs/cctx.ocaml-index
+  (alias_rec middle_end/ocaml-index)
+  (alias_rec backend/ocaml-index)
+  (alias_rec driver/ocaml-index)
+  (alias_rec file_formats/ocaml-index)
+  (alias_rec lex/ocaml-index)
+  (alias_rec printer/ocaml-index)
+  (alias_rec chamelon/ocaml-index)
+  (alias_rec extract_externals/ocaml-index)
+  (alias_rec ocamltest/ocaml-index)))
+
 (rule
  (targets compiler-libs-installation.sexp)
  (deps
