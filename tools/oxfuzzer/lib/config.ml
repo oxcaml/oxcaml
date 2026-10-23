@@ -32,10 +32,12 @@ let max_constructor_args = 3
 
 let max_match_count = 8
 
-(* Percentages. *)
+(* Probabilities in percent, conditional on reaching each choice. *)
 let record_probability = 25
 
 let variant_probability = 25
+
+let or_null_probability = 25
 
 let match_in_match_probability = 50
 
@@ -66,6 +68,7 @@ module Swarm = struct
       boxed_records : bool;
       unboxed_records : bool;
       variants : bool;
+      or_null : bool;
       matches : bool;
       record_updates : bool;
       record_representation_conversions : bool;
@@ -91,6 +94,7 @@ module Swarm = struct
       boxed_records = Random.State.bool random_state;
       unboxed_records = Random.State.bool random_state;
       variants = Random.State.bool random_state;
+      or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
@@ -116,6 +120,7 @@ module Swarm = struct
       "boxed_records", t.boxed_records;
       "unboxed_records", t.unboxed_records;
       "variants", t.variants;
+      "or_null", t.or_null;
       "matches", t.matches;
       "record_updates", t.record_updates;
       "record_representation_conversions", t.record_representation_conversions;

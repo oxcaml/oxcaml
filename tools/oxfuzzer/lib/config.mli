@@ -35,6 +35,8 @@ val record_probability : int
 
 val variant_probability : int
 
+val or_null_probability : int
+
 val match_in_match_probability : int
 
 val nested_record_probability : int
@@ -64,6 +66,7 @@ module Swarm : sig
       boxed_records : bool;
       unboxed_records : bool;
       variants : bool;
+      or_null : bool;
       matches : bool;
       record_updates : bool;
       record_representation_conversions : bool;

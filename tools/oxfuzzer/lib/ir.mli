@@ -74,6 +74,7 @@ module Ty : sig
     | Array of NumberTy.t * int list
     | Record of record
     | Variant of variant
+    | Or_null of t
     | Bool
 
   and record =
@@ -104,14 +105,26 @@ module Ty : sig
 
   val constructor_name : variant -> constructor -> string
 
-  val constructor_pattern :
-    variant -> constructor -> Name.t list -> Parsetree.pattern
-
   val record_name : record -> string
 
   val field_name : record -> field -> string
 
   val to_code : t -> Parsetree.core_type
+end
+
+module Sum : sig
+  type t =
+    | Variant of Ty.variant
+    | Or_null of Ty.t
+
+  val ty : t -> Ty.t
+
+  val constructors : t -> Ty.constructor list
+
+  val constructor_name : t -> Ty.constructor -> string
+
+  val constructor_pattern :
+    t -> Ty.constructor -> Name.t list -> Parsetree.pattern
 end
 
 module Binding : sig
@@ -170,12 +183,12 @@ module Expr : sig
           expr : t
         }
     | Construct of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           constructor : Ty.constructor;
           args : (Name.t * t) list
         }
     | Match of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           scrutinee : t;
           cases : case list
         }
