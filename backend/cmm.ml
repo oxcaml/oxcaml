@@ -567,7 +567,8 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : callee list option
+        callees : callee list option;
+        known_arguments : callee option array
       }
   | Cextcall of
       { func : string;
