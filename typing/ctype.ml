@@ -179,22 +179,39 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
-   Defaulting calls each handler's [run] with its [default ()]; [run]'s
-   unification fills the ivar (see [upon_shape]). *)
-let run_scheduler_and_default_ivars () =
+let run_scheduler_loop ~(f : continue : (unit -> unit) -> unit) =
   let rec loop () =
     Scheduler.run (scheduler ());
-    let defaulted = ref false in
-    List.iter (fun (Ivar.Packed ivar) ->
-        if Ivar.is_empty ivar then begin
-          defaulted := true;
-          Ivar.cancel_all ivar ~scheduler:(scheduler ())
-        end)
-      (Ivar.Global_pool.take ());
-    if !defaulted then loop ()
+    let continue = ref false in
+    f ~continue:(fun () -> continue := true);
+    if !continue then loop ()
   in
   loop ()
+
+let default_all_ivars ~continue =
+  Ivar.Global_pool.take ()
+  |> List.iter (fun (Ivar.Packed ivar) ->
+    if Ivar.is_empty ivar then (
+      Ivar.cancel_all ivar ~scheduler:(scheduler ());
+      continue ()))
+
+let default_local_ivars ~level ~continue =
+  iter_pool ~level (fun ty ->
+      let ty = Transient_expr.type_expr ty in
+      if get_level ty >= level
+      then
+        match get_desc ty with
+        | Tivar { ivar; _ } ->
+          assert (Ivar.is_empty ivar);
+          Ivar.cancel_all ivar ~scheduler:(scheduler ());
+          continue ()
+        | _ -> ())
+
+let run_scheduler_and_default_local_ivars ~level =
+  run_scheduler_loop ~f:(default_local_ivars ~level)
+
+let run_scheduler_and_default_all () =
+  run_scheduler_loop ~f:default_all_ivars
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -226,23 +243,16 @@ let mark_persistent_in_quotations env =
 
 (* [with_local_level_gen] handles both the scoping structure of levels
    and automatic generalization through pools (cf. btype.ml) *)
-let with_local_level_gen ~begin_def ~structure ?before_generalize f =
+let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
+    =
   begin_def ();
   let level = !current_level in
   let result, pool =
     with_new_pool ~level:!current_level begin fun () ->
-      let result =
-        wrap_end_def (fun () ->
-            let result = f () in
-            (* Before exiting the current pool, we must run all
-               pending ivar handlers. If any ivars are pending
-               after running the scheduler, we default them and
-               loop *)
-            if not structure then
-            run_scheduler_and_default_ivars ();
-            result)
-      in
+      let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
+      if not structure then run_scheduler_and_default_local_ivars ~level;
+      generalize result;
       result
     end
   in
@@ -268,8 +278,12 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
            without introducing polymorphism *)
         if ty.level >= level then Transient_expr.set_level ty !current_level;
         add_to_pool ~level:ty.level ty
+    | Tivar _ when ty.level < level ->
+      (* A [Tivar] whose level was lowered is not generalized, so is not
+         defaulted. Move it to an outer pool. *)
+      add_to_pool ~level:ty.level ty
     | Tivar _ ->
-      (* [Tivar]s cannot exist after defaulting *)
+      (* Generalizable [Tivar]s cannot exist after defaulting *)
       fatal_error "Ctype.with_local_level_gen: unsupported Tivar"
     | Tlink _ -> ()
         (* If a node is no longer used as representative, no need
@@ -300,23 +314,23 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   end pool;
   result
 
-let with_local_level_generalize ~before_generalize f =
-  with_local_level_gen ~begin_def ~structure:false ~before_generalize f
-let with_local_level_generalize_if cond ~before_generalize f =
-  if cond then with_local_level_generalize ~before_generalize f else f ()
-let with_local_level_generalize_structure ~before_generalize f =
-  with_local_level_gen ~begin_def ~structure:true ~before_generalize f
-let with_local_level_generalize_structure_if cond ~before_generalize f =
+let with_local_level_generalize ?before_generalize ~generalize f =
+  with_local_level_gen ~begin_def ~structure:false ?before_generalize ~generalize f
+let with_local_level_generalize_if cond ?before_generalize ~generalize f =
+  if cond then with_local_level_generalize ?before_generalize ~generalize f else f ()
+let with_local_level_generalize_structure ?before_generalize ~generalize f =
+  with_local_level_gen ~begin_def ~structure:true ?before_generalize ~generalize f
+let with_local_level_generalize_structure_if cond ?before_generalize ~generalize f =
   if cond then
-    with_local_level_generalize_structure ~before_generalize f
+    with_local_level_generalize_structure ?before_generalize ~generalize f
   else f ()
-let with_local_level_generalize_structure_if_principal ~before_generalize f =
+let with_local_level_generalize_structure_if_principal ?before_generalize ~generalize f =
   if !Clflags.principal then
-    with_local_level_generalize_structure ~before_generalize f
+    with_local_level_generalize_structure ?before_generalize ~generalize f
   else f ()
-let with_local_level_generalize_for_class ~before_generalize f =
+let with_local_level_generalize_for_class ?before_generalize ~generalize f =
   with_local_level_gen
-    ~begin_def:begin_class_def ~structure:false ~before_generalize f
+    ~begin_def:begin_class_def ~structure:false ?before_generalize ~generalize f
 
 let with_local_level ?post f =
   begin_def ();
@@ -5385,15 +5399,15 @@ let upon_shape env ty ~run ~default =
 let unify3_ivar uenv jkind1 ivar1 t1' t2 t2' =
   unify3_var uenv jkind1 t1' t2 t2' ~on_link:(On_link.Fill_ivar ivar1)
 
-(* Unify two [Tivar]s: intersect their jkinds, merge their ivars and link
-   [t1'] to [t2']. *)
-let unify_ivars uenv jkind1 ivar1 t1' ivar2 t2' =
+(* Unify two [Tivar]s: intersect their jkinds, merge their ivars.
+   Like [unify3_var], we link [t1'] to [t2], to keep abbreviations. *)
+let unify_ivars uenv jkind1 ivar1 t1' ivar2 t2 t2' =
   unification_jkind_check uenv t2' (Jkind.disallow_left jkind1);
   Ivar.merge ivar1 ivar2 ~scheduler:(scheduler ())
     ~f:(fun got expected ->
       if equal_type_shape got expected then expected
       else raise_for Unify (Shape_mismatch { got; expected }));
-  link_type t1' t2'
+  link_type t1' t2
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -5541,7 +5555,7 @@ and unify3 uenv t1 t1' t2 t2' =
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1' ~on_link:Noop
   | (Tivar { jkind; ivar = ivar1; _ }, Tivar { ivar = ivar2; _ }) ->
-      unify_ivars uenv jkind ivar1 t1' ivar2 t2'
+      unify_ivars uenv jkind ivar1 t1' ivar2 t2 t2'
   | (Tivar { jkind; ivar; _ }, _) ->
       unify3_ivar uenv jkind ivar t1' t2 t2'
   | (_, Tivar { jkind; ivar; _ }) ->
@@ -7268,7 +7282,7 @@ let moregeneral ~self_check env inst_nongen
         subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
       with Moregen_trace trace -> subj_inst, Error trace
     end
-      ~before_generalize:(fun (subj_inst, _) ->
+      ~generalize:(fun (subj_inst, _) ->
         ignore
           (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
@@ -7896,7 +7910,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
          the original types, but that would be rather ad hoc.
        *)
       with_level ~level:(subject_level - 1) begin fun () ->
-        with_local_level_generalize ~before_generalize:ignore begin fun () ->
+        with_local_level_generalize ~generalize:ignore begin fun () ->
           assert (!current_level = subject_level);
           (*
             Generic variables are first duplicated with [instance].  So,

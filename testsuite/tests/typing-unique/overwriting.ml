@@ -80,18 +80,18 @@ Line 2, characters 21-22:
 let gc_soundness_bug (r @ local unique) (local_ x) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
-Line 2, characters 31-32:
-2 |   exclave_ overwrite_ r with { x }
-                                   ^
+Line 1, characters 48-49:
+1 | let gc_soundness_bug (r @ local unique) (local_ x) =
+                                                    ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let disallowed_by_locality (r @ local unique) (local_ x) =
   overwrite_ r with { x }
 [%%expect{|
-Line 2, characters 22-23:
-2 |   overwrite_ r with { x }
-                          ^
+Line 1, characters 54-55:
+1 | let disallowed_by_locality (r @ local unique) (local_ x) =
+                                                          ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is the field "x" of the record at line 2, characters 20-25
@@ -101,18 +101,18 @@ Error: This value is "local" to the parent region
 let gc_soundness_bug (r @ unique) (local_ x) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
-Line 2, characters 31-32:
-2 |   exclave_ overwrite_ r with { x }
-                                   ^
+Line 1, characters 42-43:
+1 | let gc_soundness_bug (r @ unique) (local_ x) =
+                                              ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let disallowed_by_locality (r @ unique) (local_ x) =
   overwrite_ r with { x }
 [%%expect{|
-Line 2, characters 22-23:
-2 |   overwrite_ r with { x }
-                          ^
+Line 1, characters 48-49:
+1 | let disallowed_by_locality (r @ unique) (local_ x) =
+                                                    ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
          because it is the field "x" of the record at line 2, characters 20-25
@@ -150,9 +150,9 @@ let disallowed_by_locality () x =
   let r = stack_ { x = ""; y = "" } in
   overwrite_ r with { x }
 [%%expect{|
-Line 3, characters 13-14:
+Lines 2-3, characters 2-25:
+2 | ..let r = stack_ { x = ""; y = "" } in
 3 |   overwrite_ r with { x }
-                 ^
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.

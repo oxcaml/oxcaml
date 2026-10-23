@@ -34,18 +34,43 @@ exception Incompatible
 
 (* All the following wrapper functions revert to the original level,
    even in case of exception. *)
-val with_local_level_generalize:
-    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_if:
-        bool -> before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure:
-    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure_if:
-        bool -> before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure_if_principal:
-    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_for_class:
-    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+val with_local_level_generalize :
+  ?before_generalize:('a -> unit) ->
+  generalize:('a -> unit) ->
+  (unit -> 'a) ->
+  'a
+
+val with_local_level_generalize_if :
+  bool ->
+  ?before_generalize:('a -> unit) ->
+  generalize:('a -> unit) ->
+  (unit -> 'a) ->
+  'a
+
+val with_local_level_generalize_structure :
+  ?before_generalize:('a -> unit) ->
+  generalize:('a -> unit) ->
+  (unit -> 'a) ->
+  'a
+
+val with_local_level_generalize_structure_if :
+  bool ->
+  ?before_generalize:('a -> unit) ->
+  generalize:('a -> unit) ->
+  (unit -> 'a) ->
+  'a
+
+val with_local_level_generalize_structure_if_principal :
+  ?before_generalize:('a -> unit) ->
+  generalize:('a -> unit) ->
+  (unit -> 'a) ->
+  'a
+
+val with_local_level_generalize_for_class :
+  ?before_generalize:('a -> unit) ->
+  generalize:('a -> unit) ->
+  (unit -> 'a) ->
+  'a
 
 val with_local_level: ?post:('a -> unit) -> (unit -> 'a) -> 'a
         (* [with_local_level (fun () -> cmd) ~post] evaluates [cmd] at a
@@ -100,6 +125,9 @@ val newivar : ?name:string -> jkind_lr -> type_expr
 (** The scheduler on which filling a [Tivar] during unification
     enqueues the ivar's handlers. Unification never runs it. *)
 val scheduler: unit -> Scheduler.t
+
+(** Runs the scheduler and defaults the pending ivars. *)
+val run_scheduler_and_default_all : unit -> unit
 
 val new_rep_var
   : ?name:string

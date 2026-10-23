@@ -48,7 +48,9 @@ let f2_3 (x : int#) =
   y;;
 [%%expect{|
 val f2_1 : t_untagged_immediate -> t_untagged_immediate = <fun>
-val f2_2 : ('a : untagged_immediate). 'a t_untagged_immediate_id -> 'a =
+val f2_2 :
+  ('a : untagged_immediate).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
   <fun>
 val f2_3 : int# -> int# = <fun>
 |}];;
@@ -97,7 +99,9 @@ val f4_1 : t_untagged_immediate -> t_untagged_immediate * bool = <fun>
 
 let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
 [%%expect{|
-val f4_2 : ('a : untagged_immediate). 'a t_untagged_immediate_id -> 'a * bool =
+val f4_2 :
+  ('a : untagged_immediate).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id * bool =
   <fun>
 |}];;
 
@@ -335,11 +339,13 @@ let f9_3 () = twice f1_3 (make_intu ());;
 [%%expect{|
 val twice :
   ('a : untagged_immediate).
-    ('a t_untagged_immediate_id -> 'a) -> 'a t_untagged_immediate_id -> 'a =
+    ('a t_untagged_immediate_id -> 'a t_untagged_immediate_id) ->
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id =
   <fun>
-val f9_1 : unit -> t_untagged_immediate = <fun>
-val f9_2 : ('a : untagged_immediate). unit -> 'a = <fun>
-val f9_3 : unit -> int# = <fun>
+val f9_1 : unit -> t_untagged_immediate t_untagged_immediate_id = <fun>
+val f9_2 : ('a : untagged_immediate). unit -> 'a t_untagged_immediate_id =
+  <fun>
+val f9_3 : unit -> int# t_untagged_immediate_id = <fun>
 |}];;
 
 (**************************************************)
