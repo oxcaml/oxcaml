@@ -1403,6 +1403,12 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
+type transl_ctx =
+  {
+    scopes: Debuginfo.Scoped_location.scopes;
+    label_map : static_label Ident.Map.t
+  }
+
 let rec try_to_find_location lam =
   (* This is very much best-effort and may overshoot, but will still likely be
      better than nothing. *)

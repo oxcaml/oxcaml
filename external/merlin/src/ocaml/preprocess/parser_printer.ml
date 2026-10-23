@@ -162,6 +162,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_COLON) -> ":"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_CLASS) -> "class"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_CHAR) -> "CHAR"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_BREAK) -> "break_"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_BORROW) -> "borrow_"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_BEGIN) -> "begin"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_BARRBRACKET) -> "|]"
@@ -602,6 +603,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_COLON -> (fun _ -> ":")
   | MenhirInterpreter.T MenhirInterpreter.T_CLASS -> (fun _ -> "class")
   | MenhirInterpreter.T MenhirInterpreter.T_CHAR -> (fun _ -> "CHAR")
+  | MenhirInterpreter.T MenhirInterpreter.T_BREAK -> (fun _ -> "break_")
   | MenhirInterpreter.T MenhirInterpreter.T_BORROW -> (fun _ -> "borrow_")
   | MenhirInterpreter.T MenhirInterpreter.T_BEGIN -> (fun _ -> "begin")
   | MenhirInterpreter.T MenhirInterpreter.T_BARRBRACKET -> (fun _ -> "|]")
@@ -1041,6 +1043,7 @@ let print_token = function
   | COLON -> print_value (MenhirInterpreter.T MenhirInterpreter.T_COLON) ()
   | CLASS -> print_value (MenhirInterpreter.T MenhirInterpreter.T_CLASS) ()
   | CHAR v -> print_value (MenhirInterpreter.T MenhirInterpreter.T_CHAR) v
+  | BREAK -> print_value (MenhirInterpreter.T MenhirInterpreter.T_BREAK) ()
   | BORROW -> print_value (MenhirInterpreter.T MenhirInterpreter.T_BORROW) ()
   | BEGIN -> print_value (MenhirInterpreter.T MenhirInterpreter.T_BEGIN) ()
   | BARRBRACKET -> print_value (MenhirInterpreter.T MenhirInterpreter.T_BARRBRACKET) ()
@@ -1203,6 +1206,7 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_COLON -> COLON
   | MenhirInterpreter.T_CLASS -> CLASS
   | MenhirInterpreter.T_CHAR -> CHAR v
+  | MenhirInterpreter.T_BREAK -> BREAK
   | MenhirInterpreter.T_BORROW -> BORROW
   | MenhirInterpreter.T_BEGIN -> BEGIN
   | MenhirInterpreter.T_BARRBRACKET -> BARRBRACKET

@@ -572,6 +572,7 @@ let rec of_expression_desc loc = function
   | Texp_quote exp -> of_expression exp
   | Texp_splice exp -> of_expression exp
   | Texp_apply_layout (exp, _) -> of_expression exp
+  | Texp_break _ -> id_fold
 
 (* We should consider taking into account param.fp_loc at some point, as it
    allows us to respond with the *parameter*'s type (as opposed to the
