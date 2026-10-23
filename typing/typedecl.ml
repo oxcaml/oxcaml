@@ -4568,9 +4568,7 @@ let make_native_repr
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present Unpacked,
-    Sort ((Product _ | Addressable (Product _)) as sort) ->
-    (* Addressability does not affect the non-boxed representation *)
+  | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
     (if Language_extension.erasable_extensions_only ()
      then
        Location.prerr_warning core_type.ptyp_loc
