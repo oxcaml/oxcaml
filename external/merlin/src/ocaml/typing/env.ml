@@ -3475,7 +3475,7 @@ let add_loop_label env =
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.undefined;
       val_loc = Location.none;
-      val_uid = Uid.mk ~current_unit:(get_current_unit ())
+      val_uid = Uid.internal_not_actually_unique
     }
   in
   (id, add_value ~mode:Mode.With_regionality.legacy id desc env)
