@@ -621,6 +621,7 @@ module Parsetree = struct
     | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
     | Pexp_hole
     | Pexp_borrow of expression
+    | Pexp_break (** break_ *)
 
   and case (*IF_CURRENT = Parsetree.case *) =
     {
