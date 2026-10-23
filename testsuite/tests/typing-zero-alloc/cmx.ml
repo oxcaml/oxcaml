@@ -133,11 +133,11 @@ let _ =
    exn =
     Component.Top
      No_allocation_other_than_calling_arguments
-     {argument #1 on normal/exceptional paths};
+      {argument #1 on normal/exceptional paths};
    div =
     Component.Top
      No_allocation_other_than_calling_arguments
-     {argument #1 on normal/diverging paths}})]
+      {argument #1 on normal/diverging paths}})]
 |}]
 
 let _ =
@@ -159,9 +159,9 @@ let _ =
    exn =
     Component.Top
      No_allocation_other_than_calling_arguments
-     {argument #1 on normal/exceptional paths};
+      {argument #1 on normal/exceptional paths};
    div =
     Component.Top
      No_allocation_other_than_calling_arguments
-     {argument #1 on normal/diverging paths}})]
+      {argument #1 on normal/diverging paths}})]
 |}]

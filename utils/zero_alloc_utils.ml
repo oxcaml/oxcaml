@@ -244,7 +244,7 @@ module Allocation_sources = struct
       Format.fprintf ppf "Allocation_other_than_calling_arguments"
     | No_allocation_other_than_calling_arguments args_only ->
       Format.fprintf ppf
-        "@[<hv>No_allocation_other_than_calling_arguments@ %a@]"
+        "@[<hv 1>No_allocation_other_than_calling_arguments@ %a@]"
         print_args_only args_only
 end
 
