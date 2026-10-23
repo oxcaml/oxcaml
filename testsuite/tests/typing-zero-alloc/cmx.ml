@@ -75,7 +75,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__catch_and_discard_exceptions_0_6_code",
+[("camlCmx_lib__catch_and_discard_exceptions_0_15_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments
@@ -99,7 +99,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__either_1_7_code",
+[("camlCmx_lib__either_1_16_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments
@@ -127,7 +127,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__iter_rec_2_8_code",
+[("camlCmx_lib__iter_rec_2_17_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -154,7 +154,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__iter_loop_3_9_code",
+[("camlCmx_lib__iter_loop_3_18_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -181,7 +181,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__apply_4_10_code",
+[("camlCmx_lib__apply_4_19_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -207,8 +207,7 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]
 
 (* Across compilation units: *)
@@ -223,8 +222,7 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]
 
 (* Mutual recursion: *)
@@ -239,8 +237,7 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]
 
 (* Mutual recursion: *)
@@ -255,8 +252,7 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]
 
 (* [caml_apply]: *)
@@ -298,8 +294,7 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]
 
 (* Always exit with [raise Fail]: *)
@@ -316,7 +311,7 @@ let _ =
     list
 =
 [("camlCmx_lib__fail_11_26_code",
-  {Components.nor = Component.Bot; exn = Component.Safe; div = Component.Bot}
+  {Components.nor = Component.Bot; exn = Component.Safe; div = Component.Bot})]
 |}]
 
 (* Always diverge with [while true ...]: *)
@@ -333,7 +328,7 @@ let _ =
     list
 =
 [("camlCmx_lib__diverge_12_27_code",
-  {Components.nor = Component.Bot; exn = Component.Bot; div = Component.Bot})
+  {Components.nor = Component.Bot; exn = Component.Bot; div = Component.Bot})]
 |}]
 (* CR-someday wsturgeon for wsturgeon: the above [div = Bot] is a known bug *)
 
@@ -349,8 +344,7 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]
 
 (* Passing constant symbols to conditionally zero-alloc functions: *)
@@ -365,6 +359,5 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[]
+= []
 |}]

@@ -1355,7 +1355,9 @@ end = struct
       match List.nth_opt arguments_passed callee_argument_index with
       | None ->
         (* This is a partial application, and there is no nth argument. *)
-        Misc.fatal_error "(* CR wsturgeon for wsturgeon: partial application *)"
+        (* CR wsturgeon for wsturgeon: this probably doesn't always allocate *)
+        top ~allocation_sources:Allocation_other_than_calling_arguments
+          ~witnesses:caller_witnesses
       | Some None ->
         (* We don't statically know what's passed here, so it could allocate. *)
         top ~allocation_sources:Allocation_other_than_calling_arguments
@@ -1417,7 +1419,8 @@ end = struct
       | None -> unresolved w var
       | Some callee_contract ->
         attribute_to_call_site ~caller_witnesses:w ~callee_contract
-          ~arguments_passed:(Misc.fatal_error "(* CR wsturgeon: TODO *)")
+          (* CR wsturgeon for wsturgeon: non-empty *)
+          ~arguments_passed:[]
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1433,7 +1436,8 @@ end = struct
         | None -> t
         | Some callee_contract ->
           attribute_to_call_site ~caller_witnesses:witnesses ~callee_contract
-            ~arguments_passed:(Misc.fatal_error "(* CR wsturgeon: TODO *)"))
+            (* CR wsturgeon for wsturgeon: non-empty *)
+            ~arguments_passed:[])
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -2397,7 +2401,8 @@ end = struct
          by [find_callee]. *)
       let caller_witnesses = create_witnesses t k dbg in
       Value.attribute_to_call_site ~caller_witnesses ~callee_contract
-        ~arguments_passed:(Misc.fatal_error "(* CR wsturgeon: TODO *)")
+        (* CR wsturgeon for wsturgeon: non-empty *)
+        ~arguments_passed:[]
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in

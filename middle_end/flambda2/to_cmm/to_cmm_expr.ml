@@ -305,20 +305,29 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let params_arity = Code_metadata.params_arity code_metadata in
     if not (C.check_arity params_arity args)
     then Misc.fatal_errorf "Wrong arity for direct call";
-    let args =
+    let arguments =
+      List.map2
+        (fun expression simple ->
+          { Cmm.expression; callee = check_known_argument env res simple })
+        args
+        (Apply.args apply)
+    in
+    let arguments =
       if Code_metadata.is_my_closure_used code_metadata
       then
         let callee =
           match callee with
-          | Some callee -> callee
+          | Some callee ->
+            { Cmm.expression = callee;
+              callee = Option.bind callee_simple (check_known_argument env res) }
           | None ->
             Misc.fatal_errorf
               "Need callee to compile call to@ %a@ but application expression \
                did not supply one:@ %a"
               Code_metadata.print code_metadata Apply.print apply
         in
-        args @ [callee]
-      else args
+        arguments @ [callee]
+      else arguments
     in
     let code_sym =
       To_cmm_result.symbol_of_code_id res code_id
@@ -326,13 +335,6 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      let arguments =
-        List.map2
-          (fun expression simple ->
-            { Cmm.expression; callee = check_known_argument env res simple })
-          args
-          (Apply.args apply)
-      in
       ( C.direct_call ~dbg
           (C.Extended_machtype.to_machtype return_ty)
           pos code_sym arguments,
