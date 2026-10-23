@@ -227,6 +227,17 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   in
   cmm, free_vars, env, res, Ece.all
 
+let check_known_argument env res : Simple.t -> Cmm.callee option =
+  Simple.pattern_match
+    ~const:(fun _ -> None)
+    ~name:(fun name ~coercion:_ ->
+      Name.pattern_match name
+        ~var:(fun var ->
+          Env.argument_index_by_name env var
+          |> Option.map (fun argument_index -> Cmm.Argument { argument_index }))
+        ~symbol:(fun symbol ->
+          Some (Cmm.Symbol (To_cmm_result.symbol res symbol))))
+
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
   let args = Apply.args apply in
@@ -284,10 +295,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   in
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   let arguments_possibly_being_called =
-    let bind f = function None -> None | Some x -> f x in
-    callee_simple |> bind Simple.must_be_var
-    |> bind (fun (var, _) -> Env.argument_index_by_name env var)
-    |> Option.map (fun argument_index -> [Cmm.Argument { argument_index }])
+    check_known_argument env res
+    |> Option.bind callee_simple
+    |> Option.map List.singleton
   in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
