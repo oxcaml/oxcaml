@@ -437,6 +437,54 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+(* The mangling path of the callee of a partial application, carried by the
+   [P] item of the wrapper's symbol: the callee's compilation unit and enclosing
+   modules, then the function itself, as in the path of the callee's own
+   symbol. Module aliases and [open]s are expanded so that every way of
+   referring to the callee gives the same name, and the compilation unit is
+   taken from the callee's address so that [-for-pack] prefixes and instance
+   arguments agree with the middle end's naming of the same callee. A callee
+   reached through a functor application cannot be named, and the path of a
+   callee bound in the current unit is relative to the application site. *)
+let partial_application_callee env (path : Path.t) :
+    Compilation_unit.t Structured_mangling.path =
+  match Path.flatten (Env.normalize_value_path None env path) with
+  | `Contains_apply -> []
+  | `Ok (name, []) -> [Structured_mangling.Function (Ident.name name)]
+  | `Ok (head, names) ->
+    let modules, name = Misc.split_last names in
+    let head : _ Structured_mangling.path_item =
+      match Env.find_module_address (Pident head) env with
+      | Env.Aunit (cu, _) -> Compilation_unit cu
+      | Env.Alocal _ | Env.Adot _ | exception Not_found ->
+        Module (Ident.name head)
+    in
+    (head :: List.map (fun m -> Structured_mangling.Module m) modules)
+    @ [Structured_mangling.Function name]
+
+(* The number of parameters in the declared type of the function [path],
+   which an application of it supplying fewer arguments leaves partially
+   applied. The type is taken from the environment, as the one recorded by
+   the type checker in [Texp_ident] is instantiated at the use site (so that
+   ['a -> 'a] applied to a function would count that function's parameters).
+   Abbreviations are not expanded, so an abbreviated function type counts as
+   having no parameters, and applications of it as complete. *)
+let declared_arity env (path : Path.t) =
+  let rec count ty n =
+    match get_desc ty with
+    | Tarrow (_, _, ret, _) -> count ret (n + 1)
+    | Tpoly (ty, _) -> count ty n
+    | _ -> n
+  in
+  match Env.find_value path env with
+  | desc -> count (Subst.Lazy.force_value_description desc).val_type 0
+  | exception Not_found -> 0
+
+let supplied_arguments (args : (arg_label * apply_arg) list) =
+  List.length
+    (List.filter (fun (_, (arg : apply_arg)) ->
+       match arg with Arg _ -> true | Omitted _ -> false) args)
+
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
 
@@ -477,6 +525,34 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         kinst_loc = (of_location ~scopes e.exp_loc);
       }
   | Texp_constant cst -> Lconst (Const_base cst)
+  | Texp_let(Nonrecursive, [ { vb_expr; _ } as vb ],
+             ({ exp_desc = Texp_function _; exp_attributes; exp_loc; _ }
+              as body))
+    when Builtin_attributes.has_eta_expansion_attribute exp_attributes
+         && exp_loc.loc_ghost ->
+      (* The type checker eta-expanded [vb_expr], a function with optional
+         arguments the expected type lacks, into
+         [let arg = vb_expr in fun x -> arg ... x]. The function is a partial
+         application of [vb_expr]'s value and is named as such, like the
+         wrappers of partial applications, rather than as an anonymous
+         function. That value is the callee of [vb_expr] when [vb_expr] is
+         the callee itself or applies it to fewer arguments than its type
+         declares; a complete application returns some other function, which
+         is left unknown rather than attributed to the applied one. *)
+      let callee =
+        match vb_expr.exp_desc with
+        | Texp_ident { path; _ } ->
+          partial_application_callee vb_expr.exp_env path
+        | Texp_apply ({ exp_desc = Texp_ident { path; _ }; _ },
+                      args, _, _, _, _)
+          when supplied_arguments args < declared_arity vb_expr.exp_env path ->
+          partial_application_callee vb_expr.exp_env path
+        | _ -> []
+      in
+      let function_scopes = enter_partial_application ~scopes ~callee in
+      transl_let ~scopes ~return_layout:layout Nonrecursive [vb]
+        (event_before ~scopes body
+           (transl_scoped_exp ~scopes:function_scopes layout body))
   | Texp_let(rec_flag, pat_expr_list, body) ->
       transl_let ~scopes ~return_layout:layout rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes layout body))
@@ -526,8 +602,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let lam =
         let loc =
           map_scopes
-            (fun ~scopes ~loc:_ ->
-              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            (fun scopes -> update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             (of_location ~scopes e.exp_loc)
         in
         Translprim.transl_primitive_application
@@ -545,7 +620,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode ~yielding
+             ~position ~mode ~yielding ~callee:(path, e.exp_env)
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
       end
@@ -560,11 +635,16 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
+      let callee =
+        match funct.exp_desc with
+        | Texp_ident { path; _ } -> Some (path, funct.exp_env)
+        | _ -> None
+      in
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
            ~result_layout:layout
-           ~position ~mode ~yielding
+           ~position ~mode ~yielding ?callee
            (transl_exp ~scopes Lambda.layout_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, [], partial) ->
@@ -1701,6 +1781,7 @@ and transl_apply ~scopes
       ?(position=Rc_normal)
       ?(mode=not_alloc_stack)
       ?(yielding=May_yield)
+      ?callee
       ~result_layout
       lam sargs loc
   =
@@ -1749,8 +1830,7 @@ and transl_apply ~scopes
          always false currently for them. *)
         let loc =
           map_scopes
-            (fun ~scopes ~loc:_ ->
-              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            (fun scopes -> update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             loc
         in
         Lapply {
@@ -1866,7 +1946,16 @@ and transl_apply ~scopes
         let id_arg_duid = Lambda.debug_uid_none in
         (* Process remaining arguments and build closure *)
         let body =
-          let loc = map_scopes enter_partial_or_eta_wrapper loc in
+          let loc =
+            let callee =
+              match callee with
+              | None -> []
+              | Some (path, env) -> partial_application_callee env path
+            in
+            map_scopes
+              (fun scopes -> enter_partial_application ~scopes ~callee)
+              loc
+          in
           let mode = transl_typed_locality_mode_r mode_closure in
           let arg_mode = transl_typed_locality_mode_l mode_arg in
           let ret_mode = transl_ret_mode mode_ret in

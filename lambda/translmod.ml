@@ -128,10 +128,8 @@ let rec apply_coercion loc strict restr arg =
           else layout_of_module_field input_repr pos
         in
         let lam =
-          Lprim(block_of_module_representation
-                  ~loc:(to_location loc) output_repr,
-                List.map (apply_coercion_field loc get_field) pos_cc_list,
-                loc)
+          coerced_block loc ~strict:Alias ~field_loc:(fun _ -> loc)
+            output_repr pos_cc_list get_field
         in
         wrap_id_pos_list loc id_pos_list get_field get_layout lam)
   | Tcoerce_functor(cc_arg, cc_res, yielding) ->
@@ -145,7 +143,19 @@ let rec apply_coercion loc strict restr arg =
   | Tcoerce_kindtemplate tc ->
       apply_kindtemplate_coercion loc tc arg
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
-                        pc_yielding; pc_kindtemplate; pc_zero_alloc_check } ->
+                        pc_yielding; pc_kindtemplate; pc_zero_alloc_check;
+                        pc_name } ->
+      (* The wrapper closure of a primitive declared as a value by the
+         signature is named after that value in its debug scopes; see
+         [coerced_block] for its name in the middle end. *)
+      let loc =
+        Debuginfo.Scoped_location.map_scopes
+          (fun scopes ->
+            Debuginfo.Scoped_location.enter_value_definition ~scopes
+              ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
+              (Ident.create_local pc_name))
+          loc
+      in
       Translprim.transl_primitive loc pc_desc pc_env pc_type
         ~poly_mode:pc_poly_mode
         ~poly_sort:pc_poly_sort
@@ -159,8 +169,33 @@ let rec apply_coercion loc strict restr arg =
         (fun _ -> apply_coercion loc Alias cc lam)
   | Tcoerce_invalid -> Misc.fatal_error "Translmod: invalid coercion"
 
-and apply_coercion_field loc get_field (pos, cc) =
-  apply_coercion loc Alias cc (get_field pos)
+(* Builds the block of a structure coerced by [pos_cc_list]. The wrapper
+   function of a primitive coerced to a value is let-bound around the block,
+   to a variable named after the value, so that the middle end names the
+   function after that variable (see the [Llet] of an [Lfunction] in
+   [Lambda_to_flambda]); bound around the field alone, the binding would be
+   removed by [Simplif]. *)
+and coerced_block loc ~strict ~field_loc output_repr pos_cc_list get_field =
+  let bindings, fields =
+    List.fold_right
+      (fun (pos, cc) (bindings, fields) ->
+        let field = apply_coercion (field_loc cc) strict cc (get_field pos) in
+        match cc, field with
+        | Tcoerce_primitive { pc_name; _ }, Lfunction _ ->
+          let id = Ident.create_local pc_name in
+          (id, field) :: bindings, Lvar id :: fields
+        | _, _ -> bindings, field :: fields)
+      pos_cc_list ([], [])
+  in
+  let block =
+    Lprim(block_of_module_representation ~loc:(to_location loc) output_repr,
+          fields, loc)
+  in
+  List.fold_right
+    (fun (id, wrapper) body ->
+      Llet(Strict, Lambda.layout_function, id, Lambda.debug_uid_none,
+           wrapper, body))
+    bindings block
 
 and apply_coercion_result loc strict funct params args yielding cc_res =
   match cc_res with
@@ -799,17 +834,13 @@ and transl_structure ~scopes loc
             in
             let output_repr = transl_module_representation output_repr in
             let lam =
-              Lprim(block_of_module_representation
-                      ~loc:(to_location loc) output_repr,
-                  List.map
-                    (fun (pos, cc) ->
-                      let loc =
-                        match cc with
-                        | Tcoerce_primitive p -> of_location ~scopes p.pc_loc
-                        | _ -> loc
-                      in
-                      apply_coercion loc Strict cc (get_field pos))
-                    pos_cc_list, loc)
+              let field_loc cc =
+                match cc with
+                | Tcoerce_primitive p -> of_location ~scopes p.pc_loc
+                | _ -> loc
+              in
+              coerced_block loc ~strict:Strict ~field_loc output_repr
+                pos_cc_list get_field
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list

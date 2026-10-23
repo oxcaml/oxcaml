@@ -368,6 +368,14 @@ val get_tracing_probe_payload :
 
 val has_atomic: Parsetree.attributes -> bool
 
+(** The attribute the type checker puts on the function it synthesizes when
+    eta-expanding an application that omits optional arguments (see
+    [Typecore]), so that the translation to Lambda can name that function as
+    the partial application it stands for. Not meant to be written in
+    source programs. *)
+val eta_expansion_attribute : Parsetree.attribute
+val has_eta_expansion_attribute : Parsetree.attributes -> bool
+
 (* Merlin specific *)
 
 (** The name of the attribute used to identify punned let expressions. When a let

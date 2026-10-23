@@ -549,6 +549,13 @@ let has_unboxed attrs = has_attribute "unboxed" attrs
 let has_boxed attrs = has_attribute "boxed" attrs
 let has_atomic attrs = has_attribute "atomic" attrs
 
+let eta_expansion_attribute : Parsetree.attribute =
+  { attr_name = Location.mknoloc "ocaml.eta_expansion";
+    attr_payload = PStr [];
+    attr_loc = Location.none }
+
+let has_eta_expansion_attribute attrs = has_attribute "eta_expansion" attrs
+
 let has_flatten_floats attrs = has_attribute "flatten_floats" attrs
 
 let has_represent_as_float_array attrs =
