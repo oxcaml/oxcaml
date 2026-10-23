@@ -454,6 +454,7 @@ let ocaml_ignored_flags =
     "-dcanonical-ids";
     "-dclambda";
     "-dcmm";
+    "-dcode-sizes";
     "-dcse";
     "-dflambda";
     "-dflambda-no-invariants";

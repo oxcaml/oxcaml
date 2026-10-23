@@ -22,6 +22,11 @@ val from_size : Code_size.t -> t
 
 val size : t -> Code_size.t
 
+(** The part of [size] that is the size of the code of the closures defined
+    within the expression (see [set_of_closures]), as opposed to the code of the
+    expression itself. *)
+val size_of_nested_code : t -> Code_size.t
+
 val removed : t -> Removed_operations.t
 
 val print : Format.formatter -> t -> unit
@@ -48,6 +53,9 @@ val increase_due_to_let_cont_recursive : cost_metrics_of_handlers:t -> t
 val notify_added : code_size:Code_size.t -> t -> t
 
 val notify_removed : operation:Removed_operations.t -> t -> t
+
+(** [t] with its removed operations forgotten (the sizes are kept). *)
+val without_removed_operations : t -> t
 
 val evaluate : args:Inlining_arguments.t -> t -> float
 

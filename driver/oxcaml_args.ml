@@ -1231,6 +1231,12 @@ let mk_dreaper f =
     Arg.Unit f,
     " Dump debug info for the reaper pass (Flambda 2 only)" )
 
+let mk_dcode_sizes f =
+  ( "-dcode-sizes",
+    Arg.Unit f,
+    " Write a CSV file of code size estimates for each function\n\
+    \     alongside each compilation unit (Flambda 2 only)" )
+
 module Debugging = Dwarf_flags
 
 (* CR mshinwell: These help texts should show the default values. *)
@@ -1557,6 +1563,7 @@ module type Oxcaml_options = sig
   val dflow : unit -> unit
   val dsimplify : unit -> unit
   val dreaper : unit -> unit
+  val dcode_sizes : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
   val x : string -> unit
@@ -1803,6 +1810,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dflow F.dflow;
       mk_dsimplify F.dsimplify;
       mk_dreaper F.dreaper;
+      mk_dcode_sizes F.dcode_sizes;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
       mk_x F.x;
@@ -2388,6 +2396,7 @@ module Oxcaml_options_impl = struct
   let dflow = set' Flambda2.Dump.flow
   let dsimplify = set' Flambda2.Dump.simplify
   let dreaper = set' Flambda2.Dump.reaper
+  let dcode_sizes = set' Flambda2.Dump.code_sizes
 
   let use_cached_generic_functions =
     set' Oxcaml_flags.use_cached_generic_functions
@@ -2774,6 +2783,7 @@ module Extra_params = struct
     | "flambda2-expert-max-function-simplify-run" ->
         set_int Flambda2.Expert.max_function_simplify_run
     | "flambda2-match-in-match" -> set Flambda2.match_in_match
+    | "dcode-sizes" -> set' Flambda2.Dump.code_sizes
     | "flambda2-expert-cont-lifting-budget" ->
         (match Compenv.check_int ppf name v with
         | Some i -> Flambda2.Expert.cont_lifting_budget := Oxcaml_flags.Set i

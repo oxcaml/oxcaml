@@ -183,7 +183,9 @@ let bind_fields fields arg_fields hole =
       let simple = Simple.var arg in
       RE.create_let bp
         (Named.create_simple simple)
-        ~size_of_defining_expr:(Code_size.simple simple) ~body:hole)
+        ~cost_metrics_of_defining_expr:
+          (Cost_metrics.from_size (Code_size.simple simple))
+        ~body:hole)
     fields arg_fields hole
 
 (* Bind the variable of an unboxed field, which must not itself be further
@@ -201,7 +203,9 @@ let bind_field_to_simple (var : _ Unboxed_fields.u) simple hole =
   in
   RE.create_let bp
     (Named.create_simple simple)
-    ~size_of_defining_expr:(Code_size.simple simple) ~body:hole
+    ~cost_metrics_of_defining_expr:
+      (Cost_metrics.from_size (Code_size.simple simple))
+    ~body:hole
 
 let bound_vars_will_be_unboxed env bvs =
   List.exists
@@ -762,7 +766,8 @@ let make_apply_wrapper env
   | Never_returns ->
     let apply = make_apply ~continuation:Never_returns in
     RE.from_expr ~expr:(Expr.create_apply apply)
-      ~free_names:(Apply.free_names apply) ~code_size:(Code_size.apply apply)
+      ~free_names:(Apply.free_names apply)
+      ~cost_metrics:(Cost_metrics.from_size (Code_size.apply apply))
   | Return return_cont -> (
     let return_decisions = List.map freshen_decisions return_decisions in
     let apply_decisions =
@@ -872,7 +877,7 @@ let make_apply_wrapper env
         let apply = make_apply ~continuation:(Return return_cont) in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply)
+          ~cost_metrics:(Cost_metrics.from_size (Code_size.apply apply))
       else
         let apply_expr = Expr.create_apply apply in
         let handler =
@@ -882,7 +887,8 @@ let make_apply_wrapper env
           RE.from_expr
             ~expr:(Expr.create_apply_cont apply_cont)
             ~free_names:(Apply_cont_expr.free_names apply_cont)
-            ~code_size:(Code_size.apply_cont apply_cont)
+            ~cost_metrics:
+              (Cost_metrics.from_size (Code_size.apply_cont apply_cont))
         in
         let cont_handler =
           RE.create_continuation_handler
@@ -892,7 +898,7 @@ let make_apply_wrapper env
         in
         let body =
           RE.from_expr ~expr:apply_expr ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
+            ~cost_metrics:(Cost_metrics.from_size (Code_size.apply apply))
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
     | Invalid ->
@@ -917,7 +923,8 @@ let make_apply_wrapper env
                     (Format.asprintf "Function call to %a never returns"
                        Simple.print
                        (Option.get (Apply.callee apply)))))
-            ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+            ~free_names:Name_occurrences.empty
+            ~cost_metrics:(Cost_metrics.from_size Code_size.invalid)
         in
         let cont_handler =
           RE.create_continuation_handler
@@ -927,14 +934,14 @@ let make_apply_wrapper env
         let body =
           RE.from_expr ~expr:(Expr.create_apply apply)
             ~free_names:(Apply.free_names apply)
-            ~code_size:(Code_size.apply apply)
+            ~cost_metrics:(Cost_metrics.from_size (Code_size.apply apply))
         in
         RE.create_non_recursive_let_cont return_cont_wrapper cont_handler ~body
       else
         let apply = make_apply ~continuation:Never_returns in
         RE.from_expr ~expr:(Expr.create_apply apply)
           ~free_names:(Apply.free_names apply)
-          ~code_size:(Code_size.apply apply))
+          ~cost_metrics:(Cost_metrics.from_size (Code_size.apply apply)))
 
 let rewrite_call_kind env (call_kind : Call_kind.t) =
   let rewrite_simple = rewrite_simple env in
@@ -1063,7 +1070,8 @@ let rebuild_apply env apply =
                  "[This invalid should not appear in the output code] Callee \
                   or one of the args has no source for apply %a"
                  Apply.print apply)))
-      ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+      ~free_names:Name_occurrences.empty
+      ~cost_metrics:(Cost_metrics.from_size Code_size.invalid)
   else
     (* CR ncourant: we never rewrite alloc_mode. This is currently ok because we
        never remove begin- or end-region primitives, but might be needed later
@@ -1118,7 +1126,8 @@ let rebuild_apply env apply =
                   (Format.asprintf
                      "Unboxed callee %a cannot actually be a function"
                      Simple.print callee)))
-          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+          ~free_names:Name_occurrences.empty
+          ~cost_metrics:(Cost_metrics.from_size Code_size.invalid)
       | None | Some _ ->
         (* Format.eprintf "NOT CHANGING CALLING CONVENTION %a@." Apply.print
            apply; *)
@@ -1416,10 +1425,11 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
                   oarg )
             in
             let named = Named.create_prim prim dbg in
-            let size_of_defining_expr =
-              Code_size.prim ~machine_width:env.machine_width prim
+            let cost_metrics_of_defining_expr =
+              Cost_metrics.from_size
+                (Code_size.prim ~machine_width:env.machine_width prim)
             in
-            RE.create_let bp named ~size_of_defining_expr ~body:hole)
+            RE.create_let bp named ~cost_metrics_of_defining_expr ~body:hole)
           (Unboxed to_bind) arg hole)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
       -> (
@@ -1448,10 +1458,11 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
                   oarg )
             in
             let named = Named.create_prim prim dbg in
-            let size_of_defining_expr =
-              Code_size.prim ~machine_width:env.machine_width prim
+            let cost_metrics_of_defining_expr =
+              Cost_metrics.from_size
+                (Code_size.prim ~machine_width:env.machine_width prim)
             in
-            RE.create_let bp named ~size_of_defining_expr ~body:hole)
+            RE.create_let bp named ~cost_metrics_of_defining_expr ~body:hole)
           (Unboxed to_bind) arg hole))
 
 let rebuild_singleton_binding_which_is_being_unboxed env bv
@@ -1611,10 +1622,11 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           arg )
     in
     let named = Named.create_prim prim dbg in
-    let size_of_defining_expr =
-      Code_size.prim ~machine_width:env.machine_width prim
+    let cost_metrics_of_defining_expr =
+      Cost_metrics.from_size
+        (Code_size.prim ~machine_width:env.machine_width prim)
     in
-    RE.create_let bp named ~size_of_defining_expr ~body:hole
+    RE.create_let bp named ~cost_metrics_of_defining_expr ~body:hole
   | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
     let fields =
       Option.get
@@ -1692,10 +1704,11 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           args )
     in
     let named = Named.create_prim prim dbg in
-    let size_of_defining_expr =
-      Code_size.prim ~machine_width:env.machine_width prim
+    let cost_metrics_of_defining_expr =
+      Cost_metrics.from_size
+        (Code_size.prim ~machine_width:env.machine_width prim)
     in
-    RE.create_let bp named ~size_of_defining_expr ~body:hole
+    RE.create_let bp named ~cost_metrics_of_defining_expr ~body:hole
   | _ ->
     (* In a situation such as:
      *   x is a variable whose representation is being changed
@@ -1710,7 +1723,10 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     let defining_expr, size_of_defining_expr =
       rebuild_named_default_case env defining_expr
     in
-    RE.create_let bp defining_expr ~size_of_defining_expr ~body:hole
+    RE.create_let bp defining_expr
+      ~cost_metrics_of_defining_expr:
+        (Cost_metrics.from_size size_of_defining_expr)
+      ~body:hole
 
 let rebuild_make_block_default_case env (bp : Bound_pattern.t)
     ~(block_kind : P.Block_kind.t) ~mutability ~alloc_mode ~fields ~hole dbg =
@@ -1768,8 +1784,9 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
   in
   RE.create_let bp
     (Named.create_prim prim dbg)
-    ~size_of_defining_expr:
-      (Code_size.prim ~machine_width:env.machine_width prim)
+    ~cost_metrics_of_defining_expr:
+      (Cost_metrics.from_size
+         (Code_size.prim ~machine_width:env.machine_width prim))
     ~body:hole
 
 let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
@@ -1789,32 +1806,30 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound set_of_closures
     in
-    let size_of_defining_expr =
-      Cost_metrics.size
-        (Cost_metrics.set_of_closures
-           ~find_code_characteristics:(fun code_id ->
-             let code_metadata =
-               if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-               then
-                 match Code_id.Map.find code_id res.all_code with
-                 | exception Not_found ->
-                   Misc.fatal_errorf
-                     "When rebuilding set of closures %a, code_id %a not found \
-                      in [all_code]"
-                     Set_of_closures.print set_of_closures Code_id.print code_id
-                 | code -> Code.code_metadata code
-               else env.get_code_metadata code_id
-             in
-             { cost_metrics = Code_metadata.cost_metrics code_metadata;
-               function_slot_size =
-                 Code_metadata.function_slot_size code_metadata
-             })
-           set_of_closures)
+    let cost_metrics_of_defining_expr =
+      Cost_metrics.set_of_closures
+        ~find_code_characteristics:(fun code_id ->
+          let code_metadata =
+            if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+            then
+              match Code_id.Map.find code_id res.all_code with
+              | exception Not_found ->
+                Misc.fatal_errorf
+                  "When rebuilding set of closures %a, code_id %a not found in \
+                   [all_code]"
+                  Set_of_closures.print set_of_closures Code_id.print code_id
+              | code -> Code.code_metadata code
+            else env.get_code_metadata code_id
+          in
+          { cost_metrics = Code_metadata.cost_metrics code_metadata;
+            function_slot_size = Code_metadata.function_slot_size code_metadata
+          })
+        set_of_closures
     in
     let expr =
       RE.create_let bound_pattern
         (Named.create_set_of_closures ~alloc_mode set_of_closures)
-        ~size_of_defining_expr ~body:hole
+        ~cost_metrics_of_defining_expr ~body:hole
     in
     expr, res
 
@@ -1859,13 +1874,17 @@ let rebuild_let_expr_singleton env res bv ~(defining_expr : Named.t) ~hole :
       let simple = poison "reaper_unused_boxed_number" K.value in
       ( RE.create_let bound_pattern
           (Named.create_simple simple)
-          ~size_of_defining_expr:(Code_size.simple simple) ~body:hole,
+          ~cost_metrics_of_defining_expr:
+            (Cost_metrics.from_size (Code_size.simple simple))
+          ~body:hole,
         res )
     | _ ->
       let defining_expr, size_of_defining_expr =
         rebuild_named_default_case env defining_expr
       in
-      ( RE.create_let bound_pattern defining_expr ~size_of_defining_expr
+      ( RE.create_let bound_pattern defining_expr
+          ~cost_metrics_of_defining_expr:
+            (Cost_metrics.from_size size_of_defining_expr)
           ~body:hole,
         res )
 
@@ -1937,7 +1956,8 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
   ( RE.create_let
       (Bound_pattern.static (Bound_static.create bound_static))
       (Named.create_static_consts group)
-      ~size_of_defining_expr:(Code_size.static_consts ())
+      ~cost_metrics_of_defining_expr:
+        (Cost_metrics.from_size (Code_size.static_consts ()))
       ~body:hole,
     res )
 
@@ -1955,7 +1975,8 @@ and rebuild_let_expr_holed env res ~(bound_pattern : Bound_pattern.t)
              (Message
                 (Format.asprintf "Dead variable in bound pattern: %a"
                    Bound_pattern.print bound_pattern)))
-        ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
+        ~free_names:Name_occurrences.empty
+        ~cost_metrics:(Cost_metrics.from_size Code_size.invalid),
       res )
   else
     let subexpr, res =
@@ -2009,7 +2030,8 @@ and rebuild_holed env res (rev_expr : Rev_expr.rev_expr_holed) (hole : RE.t) :
             in
             ( RE.from_expr
                 ~expr:(Expr.create_invalid (Message msg))
-                ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
+                ~free_names:Name_occurrences.empty
+                ~cost_metrics:(Cost_metrics.from_size Code_size.invalid),
               res )
         in
         let l = get_parameters parameters_to_keep in
@@ -2068,7 +2090,8 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
     | Invalid { message } ->
       RE.from_expr
         ~expr:(Expr.create_invalid (Message message))
-        ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+        ~free_names:Name_occurrences.empty
+        ~cost_metrics:(Cost_metrics.from_size Code_size.invalid)
     | Apply_cont ac -> (
       match rewrite_apply_cont_expr env ac with
       | None ->
@@ -2078,11 +2101,13 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
                (Message
                   (Format.asprintf "Dead variable in apply cont: %a"
                      Apply_cont_expr.print ac)))
-          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+          ~free_names:Name_occurrences.empty
+          ~cost_metrics:(Cost_metrics.from_size Code_size.invalid)
       | Some ac ->
         let expr = Expr.create_apply_cont ac in
         let free_names = Apply_cont_expr.free_names ac in
-        RE.from_expr ~expr ~free_names ~code_size:(Code_size.apply_cont ac))
+        RE.from_expr ~expr ~free_names
+          ~cost_metrics:(Cost_metrics.from_size (Code_size.apply_cont ac)))
     | Switch switch ->
       let arms =
         Target_ocaml_int.Map.filter_map
@@ -2100,7 +2125,8 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
       then
         RE.from_expr
           ~expr:(Expr.create_invalid Zero_switch_arms)
-          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid
+          ~free_names:Name_occurrences.empty
+          ~cost_metrics:(Cost_metrics.from_size Code_size.invalid)
       else
         let switch =
           Switch_expr.create
@@ -2112,7 +2138,8 @@ and rebuild_expr env (res : rebuild_result) (rev_expr : Rev_expr.rev_expr) :
         in
         let expr = Expr.create_switch switch in
         let free_names = Switch_expr.free_names switch in
-        RE.from_expr ~expr ~free_names ~code_size:(Code_size.switch switch)
+        RE.from_expr ~expr ~free_names
+          ~cost_metrics:(Cost_metrics.from_size (Code_size.switch switch))
     | Apply apply -> rebuild_apply env apply
   in
   rebuild_holed env res holed_expr expr
@@ -2166,11 +2193,18 @@ and rebuild_function_params_and_body env res code_metadata
       in
       ( RE.from_expr
           ~expr:(Expr.create_invalid (Message msg))
-          ~free_names:Name_occurrences.empty ~code_size:Code_size.invalid,
+          ~free_names:Name_occurrences.empty
+          ~cost_metrics:(Cost_metrics.from_size Code_size.invalid),
         res )
   in
   let update_size code_metadata (body : RE.t) =
-    let cost_metrics = Cost_metrics.from_size body.code_size in
+    (* Only the sizes are recomputed: the reaper does not track the operations
+       it removes, and the removed operations of the nested closures (added by
+       [Cost_metrics.set_of_closures]) are not attributed to this function, as
+       before. *)
+    let cost_metrics =
+      Cost_metrics.without_removed_operations body.cost_metrics
+    in
     Code_metadata.with_inlining_decision
       (Function_decl_inlining_decision.make_decision
          ~inlining_arguments:(Code_metadata.inlining_arguments code_metadata)

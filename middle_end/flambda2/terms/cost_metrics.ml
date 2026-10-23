@@ -21,6 +21,9 @@
 
 type t =
   { size : Code_size.t;
+    size_of_nested_code : Code_size.t;
+        (* The part of [size] that is the size of the code of the closures
+           defined within the expression (see [set_of_closures]). *)
     removed : Removed_operations.t
   }
 
@@ -29,17 +32,29 @@ type code_characteristics =
     function_slot_size : int
   }
 
-let zero = { size = Code_size.zero; removed = Removed_operations.zero }
+let zero =
+  { size = Code_size.zero;
+    size_of_nested_code = Code_size.zero;
+    removed = Removed_operations.zero
+  }
 
 let size t = t.size
+
+let size_of_nested_code t = t.size_of_nested_code
 
 let removed t = t.removed
 
 let print ppf t =
-  Format.fprintf ppf "@[<hov 1>size: %a removed: {%a}@]" Code_size.print t.size
+  Format.fprintf ppf
+    "@[<hov 1>size: %a (of which nested code: %a) removed: {%a}@]"
+    Code_size.print t.size Code_size.print t.size_of_nested_code
     Removed_operations.print t.removed
 
-let from_size size = { size; removed = Removed_operations.zero }
+let from_size size =
+  { size;
+    size_of_nested_code = Code_size.zero;
+    removed = Removed_operations.zero
+  }
 
 let notify_added ~code_size t =
   { t with size = Code_size.( + ) t.size code_size }
@@ -47,15 +62,29 @@ let notify_added ~code_size t =
 let notify_removed ~operation t =
   { t with removed = Removed_operations.( + ) t.removed operation }
 
+let without_removed_operations t = { t with removed = Removed_operations.zero }
+
 let ( + ) a b =
   { size = Code_size.( + ) a.size b.size;
+    size_of_nested_code =
+      Code_size.( + ) a.size_of_nested_code b.size_of_nested_code;
     removed = Removed_operations.( + ) a.removed b.removed
+  }
+
+(* The metrics of the code of a closure defined within the expression: its size
+   is added both to [size] and to [size_of_nested_code]. *)
+let add_nested_code t ~nested =
+  let t = t + nested in
+  { t with
+    size_of_nested_code = Code_size.( + ) t.size_of_nested_code nested.size
   }
 
 (* The metrics for a set of closures are the sum of the metrics for each closure
    it contains. The intuition behind it is that if we do inline a function f in
    which a set of closure is defined then we will copy the body of all functions
-   referred by this set of closure as they are dependent upon f. *)
+   referred by this set of closure as they are dependent upon f.
+   [size_of_nested_code] records that part of the size, so that the size of
+   the expression's own code can be recovered (see [Code_size_report]). *)
 (*
  * A set of closures introduces implicitly an alloc whose size (as in OCaml 4.11)
  * is:
@@ -81,7 +110,7 @@ let set_of_closures ~find_code_characteristics set_of_closures =
             find_code_characteristics code_id
           in
           (* We need to include the size of the infix headers *)
-          ( metrics + cost_metrics,
+          ( add_nested_code metrics ~nested:cost_metrics,
             Stdlib.( + ) num_words (Stdlib.( + ) function_slot_size 1) ))
       funs (zero, num_clos_vars)
   in
@@ -102,6 +131,8 @@ let increase_due_to_let_cont_recursive ~cost_metrics_of_handlers =
 let evaluate ~args (t : t) =
   Code_size.evaluate ~args t.size -. Removed_operations.evaluate ~args t.removed
 
-let equal { size = size1; removed = removed1 }
-    { size = size2; removed = removed2 } =
-  Code_size.equal size1 size2 && Removed_operations.equal removed1 removed2
+let equal { size = size1; size_of_nested_code = nested1; removed = removed1 }
+    { size = size2; size_of_nested_code = nested2; removed = removed2 } =
+  Code_size.equal size1 size2
+  && Code_size.equal nested1 nested2
+  && Removed_operations.equal removed1 removed2

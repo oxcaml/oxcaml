@@ -55,6 +55,10 @@ val prepare_for_export :
 
 val iter_code : t -> f:(Code.t -> unit) -> unit
 
+(** Apply [f] to the metadata of every piece of code, whether or not its body is
+    present (see [Code_or_metadata]). *)
+val iter_code_metadata : t -> f:(Code_metadata.t -> unit) -> unit
+
 val from_raw : sections:File_sections.t -> raw -> t
 
 val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
