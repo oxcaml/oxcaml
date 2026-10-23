@@ -2,6 +2,7 @@
 
 #include <caml/lf_skiplist.h>
 #include <caml/memory.h>
+#include <caml/platform.h>
 #include <assert.h>
 #define FMT ARCH_INTNAT_PRINTF_FORMAT
 
@@ -13,7 +14,7 @@ CAMLprim value test_skiplist_serial(value val) {
   caml_lf_skiplist_init(&list);
 
   for (int c = 1; c < 10000; c++) {
-    assert(caml_lf_skiplist_insert(&list, c, c));
+    assert(!caml_lf_skiplist_insert(&list, c, c));
   }
 
   for (int c = 1; c < 10000; c++) {
@@ -28,7 +29,7 @@ CAMLprim value test_skiplist_serial(value val) {
 
   for (int c = 1; c < 10000; c++) {
     uintnat j = 0;
-    assert(caml_lf_skiplist_insert(&list, c, c));
+    assert(!caml_lf_skiplist_insert(&list, c, c));
     caml_lf_skiplist_find(&list, c, &j);
     assert(j == c);
     assert(caml_lf_skiplist_remove(&list, c));
@@ -54,9 +55,9 @@ CAMLprim value cardinal_skiplist(value val) {
   CAMLreturn(Val_long(r));
 }
 
-static int get_len(struct  lf_skipcell *p, struct lf_skipcell *end) {
+static int get_len(struct  lf_skipcell *p) {
   int len = 0 ;
-  for ( ; p != end; p = atomic_load(&p->garbage_next)) len++ ;
+  for ( ; p != NULL; p = atomic_load(&p->garbage_next)) len++ ;
   return len ;
 }
 
@@ -82,7 +83,7 @@ CAMLprim value clean_skiplist(value val) {
 
   assert (count_marks(&the_list) == 0) ;
   {
-    int len = get_len(atomic_load(&the_list.garbage_head),the_list.head) ;
+    int len = get_len(atomic_load(&the_list.garbage_head)) ;
     if (v >= 0) {
       if (len != v) {
         fprintf(stderr,"len=%d, and v=%" FMT "d differ, space leak detected\n",
@@ -91,7 +92,7 @@ CAMLprim value clean_skiplist(value val) {
     }
   }
   caml_lf_skiplist_free_garbage(&the_list);
-  assert(get_len(atomic_load(&the_list.garbage_head),the_list.head) == 0) ;
+  assert(get_len(atomic_load(&the_list.garbage_head)) == 0) ;
   CAMLreturn(Val_unit);
 }
 
@@ -102,7 +103,7 @@ CAMLprim value hammer_skiplist(value domain_id_val) {
 
   for (int i = 0; i < 100; i++) {
     for (int c = 10000 * domain_id + 1; c < 10000 * (domain_id + 1); c++) {
-      assert(caml_lf_skiplist_insert(&the_list, c, c));
+      assert(!caml_lf_skiplist_insert(&the_list, c, c));
     }
 
     for (int c = 10000 * domain_id + 1; c < 10000 * (domain_id + 1); c++) {
@@ -117,11 +118,95 @@ CAMLprim value hammer_skiplist(value domain_id_val) {
 
     for (int c = 10000 * domain_id + 1; c < 10000 * (domain_id + 1); c++) {
       uintnat j = 0;
-      assert(caml_lf_skiplist_insert(&the_list, c, c));
+      assert(!caml_lf_skiplist_insert(&the_list, c, c));
       caml_lf_skiplist_find(&the_list, c, &j);
       assert(j == c);
       assert(caml_lf_skiplist_remove(&the_list, c));
     }
+  }
+
+  CAMLreturn(Val_unit);
+}
+
+static uint32_t barrier_domains = 0;
+static uint32_t _Atomic barrier_passed;
+static uint32_t _Atomic barrier_waiters;
+
+CAMLprim value hammer_skiplist_randomly_in_range_setup(value v_n_domains) {
+  CAMLparam1(v_n_domains);
+  uint32_t n_domains = Int_val(v_n_domains);
+  assert(barrier_domains == 0);
+  barrier_domains = n_domains;
+  atomic_store(&barrier_waiters, n_domains);
+  atomic_store(&barrier_passed, 0);
+  CAMLreturn(Val_unit);
+}
+
+static bool barrier_await(uint32_t n_domains) {
+  assert(n_domains > 0);
+
+  bool winner = atomic_fetch_add(&barrier_passed, 1) == (n_domains - 1);
+
+  if (winner) {
+    atomic_exchange(&barrier_passed, 0);
+    atomic_exchange(&barrier_waiters, 0);
+  }
+
+  while (atomic_load(&barrier_waiters) == n_domains) {
+    cpu_relax();
+  }
+
+  atomic_fetch_add(&barrier_waiters, 1);
+  while (atomic_load(&barrier_waiters) < n_domains) {
+    cpu_relax();
+  }
+
+  return winner;
+}
+
+/* This randomly performs both insert and remove operations in a small range.  The
+   intention is that this is run in parallel and the goal is to try to provoke bad
+   interleavings.  The range must not be "trivial", i.e. operations should access
+   multiple different nodes close to each other. */
+CAMLprim value hammer_skiplist_randomly_in_range(value v_unit) {
+  CAMLparam1(v_unit);
+
+  uint32_t n_domains = barrier_domains;
+
+  caml_enter_blocking_section();
+  barrier_await(n_domains);
+  caml_leave_blocking_section();
+  // The test shouldn't be allocating memory from the OCaml heap after this.
+
+  unsigned short r_state[3] = {rand(), rand(), rand()};
+
+  const int range_mask = 15;
+
+  for (int round = 0; round < 10000; round++) {
+    barrier_await(n_domains);
+
+    for (int i = 0; i < 100; i++) {
+      long r = nrand48(r_state);
+      uintnat key = 1 + ((r >> 1) & range_mask); // NOTE: 0 must not be used as key
+      bool remove = r & 1;
+      if (remove) {
+        caml_lf_skiplist_remove(&the_list, key);
+      } else {
+        caml_lf_skiplist_insert(&the_list, key, 0);
+      }
+    }
+
+    if (barrier_await(n_domains)) {
+      clean_skiplist(Val_long(-1));
+    }
+  }
+
+  if (barrier_await(n_domains)) {
+    for (uintnat key=1; key <= range_mask + 1; key++) {
+      caml_lf_skiplist_remove(&the_list, key);
+    }
+
+    clean_skiplist(Val_long(-1));
   }
 
   CAMLreturn(Val_unit);
@@ -139,7 +224,7 @@ CAMLprim value insert_skiplist(value turn_val,value ndoms_val,value domain_id_va
   uintnat v =  calc_value(domain_id) ;
   //  fprintf(stderr,"I: %" FMT "u -> %" FMT "u\n",k,v);
   int r = caml_lf_skiplist_insert(&the_list, k, v) ;
-  assert(r);
+  assert(!r);
   CAMLreturn(Val_unit);
 }
 
