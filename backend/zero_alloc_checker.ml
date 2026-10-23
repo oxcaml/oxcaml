@@ -1336,8 +1336,11 @@ end = struct
   let transfer_allocation_sources_from_callee_to_caller
       ~(callee_contract :
          Zero_alloc_utils.Relevant_components_by_argument_index.t) :
-      Zero_alloc_utils.Relevant_components_by_argument_index.t =
-    callee_contract
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t) =
+    let open Zero_alloc_utils in
+    Allocation_sources.No_allocation_other_than_calling_arguments
+      callee_contract
 
   let attribute_to_call_site ~caller_witnesses ~callee_contract =
     match callee_contract with
@@ -1345,7 +1348,7 @@ end = struct
       Resolved
         (Top
            { allocation_sources =
-               Zero_alloc_utils.Allocation_sources.map
+               Zero_alloc_utils.Allocation_sources.bind
                  ~f:(fun callee_contract ->
                    transfer_allocation_sources_from_callee_to_caller
                      ~callee_contract)
