@@ -60,7 +60,7 @@ ocamlc.byte;
 
 (* Ordering of -I and -Ix determines which version of A is seen, just like
    ordering of -I flags.  B was compiled against liba, so using liba_alt for A
-   causes inconsistent assumptions. *)
+   makes B.x ill-typed. *)
 {
   split [
   | (* Test: -Ix liba before -I liba_alt: liba wins, compiles fine. *)
@@ -75,9 +75,9 @@ ocamlc.byte;
 {
   not-windows;
   split [
-  | (* Test: -Ix liba_alt before -I liba: liba_alt wins, inconsistent. *)
+  | (* Test: -Ix liba_alt before -I liba: liba_alt wins, type error. *)
     flags = "-Ix liba_alt -I liba -I libb -nocwd";
-  | (* Test: -I liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
+  | (* Test: -I liba_alt before -Ix liba: liba_alt wins, type error. *)
     flags = "-I liba_alt -Ix liba -I libb -nocwd";
   ]
   module = "libc/c1.ml";
@@ -98,7 +98,7 @@ ocamlc.byte;
   ocamlc.byte;
 }
 {
-  (* -Ix liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
+  (* -Ix liba_alt before -Ix liba: liba_alt wins, type error. *)
   not-windows;
   flags = "-Ix liba_alt -Ix liba -I libb -nocwd";
   module = "libc/c1.ml";

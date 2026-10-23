@@ -214,12 +214,8 @@ open Cmo_format
 exception Load_failed
 
 let check_consistency ppf filename cu =
-  try Env.import_crcs ~source:filename cu.cu_imports
-  with Persistent_env.Consistbl.Inconsistency {
-      unit_name = name;
-      inconsistent_source = user;
-      original_source = auth;
-    } ->
+  try Bytelink.check_consistency filename cu
+  with Bytelink.Error (Bytelink.Inconsistent_import (name, user, auth)) ->
     fprintf ppf "@[<hv 0>The files %s@ and %s@ \
                  disagree over interface %a@]@."
             user auth (Format_doc.compat Compilation_unit.Name.print) name;
@@ -322,7 +318,6 @@ and really_load_file recursive ppf name filename ic =
   with Load_failed -> false
 
 let init () =
-  let crc_intfs = Symtable.init_toplevel () in
+  let (_ : Import_info.t array) = Symtable.init_toplevel () in
   Compmisc.init_path ();
-  Env.import_crcs ~source:Sys.executable_name crc_intfs;
   ()
