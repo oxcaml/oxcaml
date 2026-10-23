@@ -2393,7 +2393,7 @@ end = struct
     || String.starts_with s ~prefix:"camlCamlinternal"
 
   (* [find_callee] returns the value associated with the callee. *)
-  let find_callee t callee ~desc dbg (k : Witness.kind) =
+  let find_callee t callee ~desc dbg (k : Witness.kind) ~known_arguments =
     let unresolved reason =
       let w = create_witnesses t k dbg in
       let v = Value.unresolved callee w in
@@ -2410,8 +2410,7 @@ end = struct
          by [find_callee]. *)
       let caller_witnesses = create_witnesses t k dbg in
       Value.attribute_to_call_site ~caller_witnesses ~callee_contract
-        (* CR wsturgeon for wsturgeon: non-empty *)
-        ~arguments_passed:[]
+        ~arguments_passed:known_arguments
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in
@@ -2489,10 +2488,11 @@ end = struct
     in
     transform t ~next ~exn ~effect_ desc dbg
 
-  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg =
+  let transform_call t ~next ~exn callee (k : Witness.kind) ~desc dbg
+      ~known_arguments =
     report t next ~msg:"transform_call next" ~desc dbg;
     report t exn ~msg:"transform_call exn" ~desc dbg;
-    let v = find_callee t callee ~desc dbg k in
+    let v = find_callee t callee ~desc dbg k ~known_arguments in
     let effect_ =
       let w = create_witnesses t k dbg in
       match Metadata.assume_value dbg ~can_raise:true w with
@@ -2769,7 +2769,8 @@ end = struct
 
       type error = unit
 
-      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg =
+      let transform_call_indirect t ~next ~exn callees wkind ~desc dbg
+          ~known_arguments =
         report t next ~msg:"transform_call_indirect next" ~desc dbg;
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
         let effect_ =
@@ -2779,7 +2780,8 @@ end = struct
               let witnesses = create_witnesses t k dbg in
               let v =
                 match callee with
-                | Symbol { sym_name; _ } -> find_callee t sym_name ~desc dbg k
+                | Symbol { sym_name; _ } ->
+                  find_callee t sym_name ~desc dbg k ~known_arguments
                 | Argument { argument_index } ->
                   Zero_alloc_utils.Components.create (fun tag ->
                       V.top
@@ -2799,12 +2801,12 @@ end = struct
         in
         transform t ~next ~exn ~effect_ desc dbg
 
-      let transform_tailcall_imm t func dbg =
+      let transform_tailcall_imm t func dbg ~known_arguments =
         (* Sound to ignore [next] and [exn] because the call never returns. *)
         let k = Witness.Direct_tailcall { callee = func } in
         transform_call t ~next:Value.normal_return ~exn:Value.exn_escape func k
           ~desc:("direct tailcall to " ^ func)
-          dbg
+          dbg ~known_arguments
 
       let operation t ~next (op : Operation.t) dbg =
         match op with
@@ -2889,17 +2891,17 @@ end = struct
         | Switch _ ->
           assert (not (Cfg.can_raise_terminator i.desc));
           next
-        | Tailcall_self _ ->
+        | Tailcall_self { known_arguments; _ } ->
           (* CR gyorsh: show this be treated as a jump, without affecting the
              summary? *)
-          transform_tailcall_imm t t.current_fun_name dbg
-        | Tailcall_func { desc = Direct { sym_name; _ }; _ } ->
-          transform_tailcall_imm t sym_name dbg
-        | Tailcall_func { desc = Indirect (Some callees); _ } ->
+          transform_tailcall_imm t t.current_fun_name dbg ~known_arguments
+        | Tailcall_func { desc = Direct { sym_name; _ }; known_arguments } ->
+          transform_tailcall_imm t sym_name dbg ~known_arguments
+        | Tailcall_func { desc = Indirect (Some callees); known_arguments } ->
           transform_call_indirect t ~next:Value.normal_return
             ~exn:Value.exn_escape callees
             (fun callee -> Witness.Indirect_tailcall { callee = Some callee })
-            ~desc:"indirect tailcall" dbg
+            ~desc:"indirect tailcall" dbg ~known_arguments
         | Tailcall_func { desc = Indirect None; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
           let w =
@@ -2932,17 +2934,23 @@ end = struct
           in
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
+            (* CR-someday wsturgeon for wsturgeon: propagate probe arguments *)
+            ~known_arguments:[]
         | Call { op = { desc = Indirect None; _ }; _ } ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = { desc = Indirect (Some callees); _ }; _ } ->
+        | Call { op = { desc = Indirect (Some callees); known_arguments }; _ }
+          ->
           transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Indirect_call { callee = Some callee })
-            ~desc:"indirect call" dbg
-        | Call { op = { desc = Direct { sym_name = func; _ }; _ }; _ } ->
+            ~desc:"indirect call" dbg ~known_arguments
+        | Call
+            { op = { desc = Direct { sym_name = func; _ }; known_arguments };
+              _
+            } ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
-            dbg
+            dbg ~known_arguments
         | Invalid _ -> next
 
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
