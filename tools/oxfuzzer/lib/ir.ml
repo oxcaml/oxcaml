@@ -1,5 +1,4 @@
 (* The generator's internal representation of a subset of OxCaml. *)
-open Ast_helper
 open Asttypes
 open Parsetree_helpers
 
@@ -92,7 +91,7 @@ module NumberTy = struct
       | Float32 | Nativeint | Int64 | Int32 -> true
       | Float | Int | Int16 | Int8 -> false
     in
-    Typ.constr (lid (to_string ~no_hash t)) []
+    Ast_helper.Typ.constr (lid (to_string ~no_hash t)) []
 
   let converter_name ~from ~to_ =
     Format.sprintf "%s_of_%s"
@@ -140,17 +139,17 @@ module Number = struct
     | Float bits ->
       apply
         (qualified_ident "Int64" "float_of_bits")
-        [Exp.constant (Const.int64 bits)]
+        [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)]
     | Float32 bits ->
       apply
         (qualified_ident "Float32" "of_bits")
-        [Exp.constant (Const.int32 bits)]
-    | Int n -> Exp.constant (Const.int n)
-    | Nativeint n -> Exp.constant (Const.nativeint n)
-    | Int64 n -> Exp.constant (Const.int64 n)
-    | Int32 n -> Exp.constant (Const.int32 n)
-    | Int16 n -> Exp.constant (Const.int ~suffix:'S' n)
-    | Int8 n -> Exp.constant (Const.int ~suffix:'s' n)
+        [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)]
+    | Int n -> Ast_helper.Exp.constant (Ast_helper.Const.int n)
+    | Nativeint n -> Ast_helper.Exp.constant (Ast_helper.Const.nativeint n)
+    | Int64 n -> Ast_helper.Exp.constant (Ast_helper.Const.int64 n)
+    | Int32 n -> Ast_helper.Exp.constant (Ast_helper.Const.int32 n)
+    | Int16 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'S' n)
+    | Int8 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'s' n)
 end
 
 module Ty = struct
@@ -216,14 +215,15 @@ module Ty = struct
     | Number nty -> NumberTy.to_code nty
     | Array (nty, dimensions) ->
       List.fold_left
-        (fun ty _ -> Typ.constr (lid "array") [ty])
+        (fun ty _ -> Ast_helper.Typ.constr (lid "array") [ty])
         (NumberTy.to_code nty) dimensions
     | Unboxed_tuple components ->
-      Typ.unboxed_tuple (List.map (fun ty -> None, to_code ty) components)
-    | Record record -> Typ.constr (lid (record_name record)) []
-    | Variant variant -> Typ.constr (lid (variant_name variant)) []
-    | Or_null ty -> Typ.constr (lid "or_null") [to_code ty]
-    | Bool -> Typ.constr (lid "bool") []
+      Ast_helper.Typ.unboxed_tuple
+        (List.map (fun ty -> None, to_code ty) components)
+    | Record record -> Ast_helper.Typ.constr (lid (record_name record)) []
+    | Variant variant -> Ast_helper.Typ.constr (lid (variant_name variant)) []
+    | Or_null ty -> Ast_helper.Typ.constr (lid "or_null") [to_code ty]
+    | Bool -> Ast_helper.Typ.constr (lid "bool") []
 end
 
 module Sum = struct
@@ -254,16 +254,21 @@ module Sum = struct
     if List.length names <> List.length constructor.args
     then Misc.fatal_errorf "Constructor pattern: incorrect number of arguments";
     let patterns =
-      List.map (fun name -> Pat.var (loc (Name.to_string name))) names
+      List.map
+        (fun name -> Ast_helper.Pat.var (loc (Name.to_string name)))
+        names
     in
     let arg =
       match patterns with
       | [] -> None
       | [pattern] -> Some ([], pattern)
       | patterns ->
-        Some ([], Pat.tuple (List.map (fun p -> None, p) patterns) Closed)
+        Some
+          ( [],
+            Ast_helper.Pat.tuple (List.map (fun p -> None, p) patterns) Closed
+          )
     in
-    Pat.construct (lid (constructor_name sum constructor)) arg
+    Ast_helper.Pat.construct (lid (constructor_name sum constructor)) arg
 end
 
 module Binding = struct
@@ -412,28 +417,36 @@ module Expr = struct
 
   let bind name expr body =
     let name = Name.to_string name in
-    Exp.let_ Immutable Nonrecursive
-      [Vb.mk (Pat.var (loc name)) expr]
+    Ast_helper.Exp.let_ Immutable Nonrecursive
+      [Ast_helper.Vb.mk (Ast_helper.Pat.var (loc name)) expr]
       (body (ident name))
 
-  let constrain ty expr = Exp.constraint_ expr (Some (Ty.to_code ty)) []
+  let constrain ty expr =
+    Ast_helper.Exp.constraint_ expr (Some (Ty.to_code ty)) []
 
   let field_code (record : Ty.record) field receiver =
-    let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+    let project =
+      if record.unboxed
+      then Ast_helper.Exp.unboxed_field
+      else Ast_helper.Exp.field
+    in
     project
       (constrain (Ty.Record record) receiver)
       (lid (Ty.field_name record field))
 
   let record_code (record : Ty.record) fields source =
     let make =
-      if record.unboxed then Exp.record_unboxed_product else Exp.record
+      if record.unboxed
+      then Ast_helper.Exp.record_unboxed_product
+      else Ast_helper.Exp.record
     in
     constrain (Ty.Record record) (make fields source)
 
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
     | Read place -> place_to_code place
-    | Array_literal elements -> Exp.array Mutable (List.map to_code elements)
+    | Array_literal elements ->
+      Ast_helper.Exp.array Mutable (List.map to_code elements)
     | Array_make { dimensions; init_name; init } ->
       bind init_name (to_code init) (fun initial_value ->
           let rec make = function
@@ -442,12 +455,13 @@ module Expr = struct
             | size :: rest ->
               apply
                 (qualified_ident "Array" "init")
-                [int size; function_ [value_param (Pat.any ())] (make rest)]
+                [ int size;
+                  function_ [value_param (Ast_helper.Pat.any ())] (make rest) ]
           in
           make dimensions)
     | Unboxed_tuple components ->
       let body =
-        Exp.unboxed_tuple
+        Ast_helper.Exp.unboxed_tuple
           (List.map
              (fun (name, _) -> None, ident (Name.to_string name))
              components)
@@ -494,10 +508,13 @@ module Expr = struct
         | [] -> None
         | [value] -> Some value
         | values ->
-          Some (Exp.tuple (List.map (fun value -> None, value) values))
+          Some
+            (Ast_helper.Exp.tuple (List.map (fun value -> None, value) values))
       in
       let body =
-        Exp.construct (lid (Sum.constructor_name sum constructor)) arg
+        Ast_helper.Exp.construct
+          (lid (Sum.constructor_name sum constructor))
+          arg
       in
       (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
       (* Payload expressions can have effects: explicitly sequence their
@@ -506,14 +523,14 @@ module Expr = struct
         (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
         args body
     | Match { sum; scrutinee; cases } ->
-      Exp.match_
+      Ast_helper.Exp.match_
         (constrain (Sum.ty sum) (to_code scrutinee))
         (List.map
            (fun { constructor; bindings; body } ->
              let names =
                List.map (fun (binding : Binding.t) -> binding.name) bindings
              in
-             Exp.case
+             Ast_helper.Exp.case
                (Sum.constructor_pattern sum constructor names)
                (to_code body))
            cases)
@@ -537,23 +554,26 @@ module Expr = struct
     | Unboxed_tuple_component { tuple; arity; index; name } ->
       let name = Name.to_string name in
       let pattern =
-        Pat.unboxed_tuple
+        Ast_helper.Pat.unboxed_tuple
           (List.init arity (fun i ->
-               None, if i = index then Pat.var (loc name) else Pat.any ()))
+               ( None,
+                 if i = index
+                 then Ast_helper.Pat.var (loc name)
+                 else Ast_helper.Pat.any () )))
           Closed
       in
-      Exp.let_ Immutable Nonrecursive
-        [Vb.mk pattern (place_to_code tuple)]
+      Ast_helper.Exp.let_ Immutable Nonrecursive
+        [Ast_helper.Vb.mk pattern (place_to_code tuple)]
         (ident name)
 
   let assignment_to_code place value =
     match place with
     | Variable name ->
-      Exp.setinstvar (loc (Name.to_string name)) (to_code value)
+      Ast_helper.Exp.setinstvar (loc (Name.to_string name)) (to_code value)
     | Field (parent, record, field) ->
       if record.unboxed || not field.is_mutable
       then Misc.fatal_errorf "Assign: field is not mutable";
-      Exp.setfield
+      Ast_helper.Exp.setfield
         (constrain (Ty.Record record) (place_to_code parent))
         (lid (Ty.field_name record field))
         (to_code value)
@@ -601,10 +621,10 @@ module Statement = struct
 
   let let_binding ({ name; ty; is_mutable } : Binding.t) expr body =
     let mutability = if is_mutable then Mutable else Immutable in
-    Exp.let_ mutability Nonrecursive
-      [ Vb.mk
-          (Pat.constraint_
-             (Pat.var (loc (Name.to_string name)))
+    Ast_helper.Exp.let_ mutability Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.constraint_
+             (Ast_helper.Pat.var (loc (Name.to_string name)))
              (Some (Ty.to_code ty))
              [])
           expr ]
@@ -627,19 +647,24 @@ module Statement = struct
           is_mutable = true
         }
         (Expr.to_code init)
-        (Exp.let_ Immutable Nonrecursive
-           [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
+        (Ast_helper.Exp.let_ Immutable Nonrecursive
+           [ Ast_helper.Vb.mk
+               (Ast_helper.Pat.var (loc bound_name))
+               (Expr.to_code bound) ]
            (* CR-someday xclerc: Sometimes emit as a for loop instead. *)
-           (Exp.while_
+           (Ast_helper.Exp.while_
               (op comparison [ident name; ident bound_name])
-              (Exp.sequence (to_code body)
-                 (Exp.setinstvar (loc name) (op "+" [ident name; int stride])))))
+              (Ast_helper.Exp.sequence (to_code body)
+                 (Ast_helper.Exp.setinstvar (loc name)
+                    (op "+" [ident name; int stride])))))
     | Let (binding, expr, body) ->
       let_binding binding (Expr.to_code expr) (to_code body)
     | Seq statements ->
-      List.fold_right Exp.sequence (List.map to_code statements) unit_
+      List.fold_right Ast_helper.Exp.sequence
+        (List.map to_code statements)
+        unit_
     | If (condition, if_true, if_false) ->
-      Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
+      Ast_helper.Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
         (Some (to_code if_false))
 end
 
@@ -651,7 +676,8 @@ module Inline = struct
 
   let to_attributes inline =
     let attribute payload =
-      [Attr.mk (loc "inline") (PStr [Str.eval (ident payload)])]
+      [ Ast_helper.Attr.mk (loc "inline")
+          (PStr [Ast_helper.Str.eval (ident payload)]) ]
     in
     match inline with
     | Default -> []
@@ -672,19 +698,21 @@ module Function = struct
   let to_code { name; params; inline; body; return_ty; result } =
     let to_param ({ name; ty; _ } : Binding.t) =
       value_param
-        (Pat.constraint_
-           (Pat.var (loc (Name.to_string name)))
+        (Ast_helper.Pat.constraint_
+           (Ast_helper.Pat.var (loc (Name.to_string name)))
            (Some (Ty.to_code ty))
            [])
     in
     let function_params =
       match params with
-      | [] -> [value_param (Pat.construct (lid "()") None)]
+      | [] -> [value_param (Ast_helper.Pat.construct (lid "()") None)]
       | _ -> List.map to_param params
     in
     let body =
-      Exp.sequence (Statement.to_code body)
-        (Exp.constraint_ (Expr.to_code result) (Some (Ty.to_code return_ty)) [])
+      Ast_helper.Exp.sequence (Statement.to_code body)
+        (Ast_helper.Exp.constraint_ (Expr.to_code result)
+           (Some (Ty.to_code return_ty))
+           [])
     in
     let body =
       List.fold_right
@@ -694,9 +722,9 @@ module Function = struct
             body)
         params body
     in
-    Str.value Nonrecursive
-      [ Vb.mk
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
           ~attrs:(Inline.to_attributes inline)
-          (Pat.var (loc (Name.to_string name)))
+          (Ast_helper.Pat.var (loc (Name.to_string name)))
           (function_ function_params body) ]
 end
