@@ -787,7 +787,7 @@ let kind_decl_is_alias sdecl =
   | None
   | Some { pjka_desc =
              ( Pjk_operator _ | Pjk_default | Pjk_mod _ | Pjk_with _
-             | Pjk_kind_of _ | Pjk_product _ ); _ }
+             | Pjk_kind_of _ | Pjk_product _ | Pjk_inherit _ ); _ }
     -> None
 
 let params_are_constrained =

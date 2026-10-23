@@ -561,7 +561,10 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_type; olab_modalities } =
+    { olab_name; olab_inherit; olab_mut; olab_type; olab_modalities } =
+  let inherit_ =
+    match olab_inherit with Not_inherited -> "" | Inherited -> "inherit "
+  in
   (* See the notes [NON-LEGACY MODES] *)
   let mut, atomic =
     match olab_mut with
@@ -573,7 +576,8 @@ and print_out_label ppf
     | Nonatomic -> ()
     | Atomic -> fprintf ppf " [@@atomic]"
   in
-  fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
+  fprintf ppf "@[<2>%s%s%a :@ %a%a%a@];"
+    inherit_
     mut
     print_lident olab_name
     print_out_type olab_type

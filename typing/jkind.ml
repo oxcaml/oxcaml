@@ -766,6 +766,7 @@ module Error = struct
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
+    | Inherit_outside_product
     | Box_on_abstract_kind of Path.t
 
   exception User_error of Location.t * t
@@ -2679,6 +2680,12 @@ module Const = struct
         List.fold_left
           (fun (layouts, mod_bounds_acc, with_bounds_acc)
                (annot : Parsetree.jkind_annotation) ->
+            (* [&] makes the components that are not [inherit] addressable *)
+            let annot, inherit_loc =
+              match annot.pjka_desc with
+              | Pjk_inherit inner -> inner, Some annot.pjka_loc
+              | _ -> annot, None
+            in
             let { base; mod_bounds; with_bounds } =
               of_user_written_annotation_unchecked_level ~use_abstract_jkinds
                 ~warn env context annot
@@ -2689,7 +2696,13 @@ module Const = struct
                  internal ticket 5769 *)
               match base with
               | Kconstr _ -> raise ~loc Abstract_kind_in_product
-              | Layout l -> Layout.Const.addressable l
+              | Layout l -> (
+                match inherit_loc with
+                | None -> Layout.Const.addressable l
+                | Some loc ->
+                  if warn && Layout.Const.equal (Layout.Const.addressable l) l
+                  then warn_redundant_kind_modifier ~loc (annot, []);
+                  l)
             in
             ( layout :: layouts,
               Mod_bounds.join mod_bounds mod_bounds_acc,
@@ -2743,6 +2756,7 @@ module Const = struct
             mod_bounds = Mod_bounds.max;
             with_bounds = expanded.with_bounds
           }))
+    | Pjk_inherit _ -> raise ~loc Inherit_outside_product
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -5320,6 +5334,10 @@ let report_error ~loc : Error.t -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right kind.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
+  | Inherit_outside_product ->
+    Location.errorf ~loc
+      "%a must be on the outside of a component of a product kind."
+      Misc.Style.inline_code "inherit"
   | Box_on_abstract_kind p ->
     Location.errorf ~loc
       "The kind constructor box cannot yet be applied to the abstract kind %s."

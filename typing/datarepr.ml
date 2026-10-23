@@ -309,6 +309,7 @@ let dummy_label (type rep) (record_form : rep record_form)
   | Unboxed_product -> Record_unboxed_product
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
+    lbl_inherit = Not_inherited;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
     lbl_sort = None;
     lbl_pos = (-1); lbl_all = [||];
@@ -328,6 +329,7 @@ let label_descrs record_form ty_res lbls repres priv =
           { lbl_name = Ident.name l.ld_id;
             lbl_res = ty_res;
             lbl_arg = l.ld_type;
+            lbl_inherit = l.ld_inherit;
             lbl_mut = l.ld_mutable;
             lbl_modalities = l.ld_modalities;
             lbl_sort = l.ld_sort;
