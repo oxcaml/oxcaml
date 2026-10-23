@@ -211,6 +211,9 @@ let external_calling_conventions
       loc.(i) <- (if Cmm.is_phantom_exttype ty_arg then [||]
                   else [| phys_reg ty reg |])
     | [] ->
+      if Cmm.is_phantom_exttype ty_arg then
+        Misc.fatal_error
+          "Proc.loc_external_arguments: no register left for a phantom";
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;
       loc.(i) <- [| stack_slot (make_stack !ofs) ty |];

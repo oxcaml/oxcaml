@@ -108,40 +108,36 @@ members are extended.
 ### Supported products {#supported-products}
 
 Native code supports x86-64 (Linux and macOS) and arm64 (Linux and macOS).
-Windows is not supported. Only products that C passes entirely in registers
-are supported:
+Windows is not supported. Products that C passes by reference or returns in
+memory are not supported. Specifically:
 
-- products of at most 16 bytes, and
-- on arm64, also products of up to four components that are all `float64`, all
-  `float32`, or all 128-bit vectors (C's "homogeneous aggregates"), such as
-  `#(float# * float# * float# * float#)`.
+- Arguments: on x86-64, any product; on arm64, products of at most 16
+  bytes, or of up to four components that are all `float64`, all `float32`, or
+  all 128-bit vectors (C's "homogeneous aggregates"), such as
+  `#(float# * float# * float# * float#)`;
+- Returns: products of at most 16 bytes, and on arm64 homogeneous
+  aggregates.
 
-A product is also passed in memory if too few argument registers are left
-for it, so this is not supported either. For example, on x86-64 the six
-integer argument registers are used up here:
+As in C, a product argument that does not fit in the remaining argument
+registers (or, on x86-64, is over 16 bytes) is passed on the stack.
 
-```ocaml
-external f :
-  int64# -> int64# -> int64# -> int64# -> int64# -> int64# ->
-  #(int64# * int64#) -> int64# =
-  "f_bytecode" "f_native"
-```
-
-Declarations that C would pass in memory are rejected when compiling to native
-code:
+Unsupported declarations are rejected when compiling to native code, e.g. on
+arm64:
 
 ```
 Error: The unboxed product argument of the external call to f_native cannot be
-       compiled: the corresponding C struct (16 bytes) would be passed in
-       memory, since too few argument registers remain for it. Only unboxed
-       products that C passes entirely in registers are currently supported.
+       compiled: the corresponding C struct (24 bytes) would be passed by
+       reference, since it is larger than 16 bytes and not a homogeneous
+       floating-point or vector aggregate of at most four members. Only
+       unboxed product arguments that C passes by value are currently
+       supported.
 ```
 
 To pass such a product, split it into smaller products, or use
 [`[@unpacked]`](#unpacked).
 
 A product with a single non-void component, such as `#(int * unit#)`, is passed
-like that component, and so may be passed on the stack.
+like that component.
 
 ## Unboxed product arguments: `[@unpacked]` {#unpacked}
 
@@ -215,5 +211,5 @@ value f_native(value a, value b, value c, value d, value e,
 ```
 
 Without `[@unpacked]`, the product would be a two-word struct that does not fit
-in the one remaining register, which is not supported on x86-64 (see
-[above](#supported-products)).
+in the one remaining register, so the whole struct would be passed on the
+stack.

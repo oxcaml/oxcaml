@@ -74,3 +74,26 @@ let () =
   eqi (box_int64 (sum_mask_i64 #(mask 0x5aL, #10L))) 110L;
   (* 10 + 2 * 0x5a *)
   eqi (box_int64 (sum_i64_mask #(#10L, mask 0x5aL))) 190L
+
+(* Spilled products, with a register left for a phantom. *)
+
+external i64x5_mask_i64 :
+  int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> #(mask# * int64_u)
+  -> int64_u
+  = "" "extcall512_i64x5_mask_i64"
+
+external i64x4_mask_pair :
+  int64_u -> int64_u -> int64_u -> int64_u -> mask# -> #(int64_u * int64_u)
+  -> int64_u
+  = "" "extcall512_i64x4_mask_pair"
+[@@noalloc]
+
+let () =
+  (* 1 + 2 * 2 + 4 * 3 + 8 * 4 + 16 * 5 + 32 * 0x5a + 64 * 7 *)
+  eqi
+    (box_int64 (i64x5_mask_i64 #1L #2L #3L #4L #5L #(mask 0x5aL, #7L)))
+    3457L;
+  (* 1 + 2 * 2 + 4 * 3 + 8 * 4 + 16 * 0x5a + 32 * 6 + 64 * 7 *)
+  eqi
+    (box_int64 (i64x4_mask_pair #1L #2L #3L #4L (mask 0x5aL) #(#6L, #7L)))
+    2129L

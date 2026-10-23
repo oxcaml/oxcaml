@@ -240,4 +240,22 @@ int64_t extcall512_sum_i64_mask(extcall512_i64_mask p)
     return p.i + 2 * (int64_t)p.m;
 }
 
+typedef struct { int64_t a; int64_t b; } extcall512_i64_i64;
+
+int64_t extcall512_i64x5_mask_i64(int64_t a0, int64_t a1, int64_t a2,
+                                  int64_t a3, int64_t a4,
+                                  extcall512_mask_i64 p)
+{
+    return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * a4 + 32 * (int64_t)p.m
+        + 64 * p.i;
+}
+
+int64_t extcall512_i64x4_mask_pair(int64_t a0, int64_t a1, int64_t a2,
+                                   int64_t a3, __mmask64 m,
+                                   extcall512_i64_i64 p)
+{
+    return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * (int64_t)m + 32 * p.a
+        + 64 * p.b;
+}
+
 #endif /* ARCH_AVX512 */

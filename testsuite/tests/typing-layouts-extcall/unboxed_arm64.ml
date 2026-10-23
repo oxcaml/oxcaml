@@ -13,18 +13,12 @@
  }
 *)
 
-(* Test of unboxed products of 128-bit vectors and homogeneous floating-point
-   aggregates in external calls. The native stubs in vec128_stubs.c use C
-   structs of NEON vector types, checking interoperability with the C
-   compiler.
-
-   Restricted to arm64, since on x86-64 these C structs exceed 16 bytes and so
-   are returned in memory, which is unsupported. *)
+(* Vectors and homogeneous aggregates on arm64. Not x86-64, which returns
+   these in memory. *)
 
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
 
-(* Helpers for constructing and inspecting vectors, all via C. *)
 external make_f32x4 : float# -> float# -> float# -> float# -> float32x4#
   = "" "make_f32x4_native"
 external f32x4_lane : float32x4# -> int -> float# = "" "f32x4_lane_native"
@@ -49,7 +43,6 @@ let print_i64x2 name v =
     (box_int64 (i64x2_lane v 0))
     (box_int64 (i64x2_lane v 1))
 
-(* A pair of float32x4s, returned in q0 and q1. *)
 external ret_f32x4_pair : unit -> #(float32x4# * float32x4#)
   = "" "ret_f32x4_pair_native"
 
@@ -58,7 +51,6 @@ let () =
   print_f32x4 "f32x4_pair.a" a;
   print_f32x4 "f32x4_pair.b" b
 
-(* A pair of float64x2s. *)
 external ret_f64x2_pair : unit -> #(float64x2# * float64x2#)
   = "" "ret_f64x2_pair_native"
 
@@ -67,8 +59,7 @@ let () =
   print_f64x2 "f64x2_pair.a" a;
   print_f64x2 "f64x2_pair.b" b
 
-(* A pair of int64x2s: integer-element vectors still use the SIMD
-   registers. *)
+(* Integer-element vectors still use SIMD registers. *)
 external ret_i64x2_pair : unit -> #(int64x2# * int64x2#)
   = "" "ret_i64x2_pair_native"
 
@@ -77,9 +68,7 @@ let () =
   print_i64x2 "i64x2_pair.a" a;
   print_i64x2 "i64x2_pair.b" b
 
-(* Vectors of different element types: the AAPCS64 classifies aggregates by
-   the fundamental data type of their members, which for both of these is
-   "128-bit short vector", so this is still a homogeneous aggregate. *)
+(* Mixed element types still form a homogeneous short-vector aggregate. *)
 external ret_mixed_pair : unit -> #(float32x4# * int64x2#)
   = "" "ret_mixed_pair_native"
 
@@ -88,8 +77,6 @@ let () =
   print_f32x4 "mixed_pair.a" a;
   print_i64x2 "mixed_pair.b" b
 
-(* Vector arguments (in v0 and v1) combined with a vector-pair return (in q0
-   and q1). *)
 external swap_f32x4 : float32x4# -> float32x4# -> #(float32x4# * float32x4#)
   = "" "swap_f32x4_native"
 
@@ -100,8 +87,6 @@ let () =
   print_f32x4 "swap.a" a;
   print_f32x4 "swap.b" b
 
-(* [@@noalloc] version, which uses the direct call path rather than going
-   via [caml_c_call]. *)
 external ret_f32x4_pair_noalloc : unit -> #(float32x4# * float32x4#)
   = "" "ret_f32x4_pair_native"
   [@@noalloc]
@@ -111,8 +96,6 @@ let () =
   print_f32x4 "f32x4_pair_noalloc.a" a;
   print_f32x4 "f32x4_pair_noalloc.b" b
 
-(* An unboxed product *argument* of two vectors: a homogeneous short-vector
-   aggregate passed in v0 and v1, with the (vector) result in q0. *)
 external add_f32x4_pairwise : #(float32x4# * float32x4#) -> float32x4#
   = "" "add_f32x4_pairwise_native"
 
@@ -121,8 +104,6 @@ let () =
   let y = make_f32x4 #10.0 #20.0 #30.0 #40.0 in
   print_f32x4 "add_pairwise" (add_f32x4_pairwise #(x, y))
 
-(* Homogeneous floating-point aggregates of more than two float64s, in
-   d0-d3. *)
 external ret_f64_triple : unit -> #(float# * float# * float#)
   = "" "ret_f64_triple_native"
 
@@ -146,7 +127,7 @@ let () =
   Printf.eprintf "sum_f64_quad: %.4f\n%!"
     (box_float (sum_f64_quad #(#1.0, #2.0, #3.0, #4.0)))
 
-(* Nested products of float64s are still homogeneous aggregates (d0-d2). *)
+(* Nested products are still homogeneous aggregates. *)
 external sum_nested_f64 : #(#(float# * float#) * float#) -> float#
   = "" "sum_nested_f64_native"
 
@@ -162,8 +143,7 @@ let () =
   Printf.eprintf "ret_nested_f64: %.4f %.4f %.4f\n%!" (box_float a)
     (box_float b) (box_float c)
 
-(* Four 128-bit vectors: a 64-byte homogeneous aggregate, the largest passed
-   in registers (v0-v3 as an argument, q0-q3 as a result). *)
+(* The largest aggregate passed in registers: 64 bytes. *)
 external ret_f32x4_quad :
   unit -> #(float32x4# * float32x4# * float32x4# * float32x4#)
   = "" "ret_f32x4_quad_native"
@@ -186,9 +166,8 @@ let () =
   let d = make_f32x4 #1000.0 #2000.0 #3000.0 #4000.0 in
   print_f32x4 "sum_f32x4_quad" (sum_f32x4_quad #(a, b, c, d))
 
-(* A homogeneous aggregate of two vectors with only one floating-point register
-   left: on the stack by value (32 bytes, 16-aligned), and by AAPCS64 rule C.3
-   the double after it goes on the stack too. *)
+(* One float register left: spills, with the double after it (AAPCS64
+   C.3). *)
 external f64x7_i64x2_pair_f64 :
   float# -> float# -> float# -> float# -> float# -> float# -> float#
   -> #(int64x2# * int64x2#) -> float# -> float#
@@ -201,8 +180,6 @@ let () =
     (box_float
        (f64x7_i64x2_pair_f64 #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #(a, b) #12.0))
 
-(* No floating-point register left: the aggregate and the double after it go
-   on the stack. *)
 external f64x8_f32x4_pair_f64 :
   float# -> float# -> float# -> float# -> float# -> float# -> float# -> float#
   -> #(float32x4# * float32x4#) -> float# -> float#

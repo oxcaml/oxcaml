@@ -1,8 +1,5 @@
-/* Stubs for unboxed_args_stack.ml: C structs passed by value on the stack
-   because too few argument registers remain for them.
-
-   Sums weight successive components by powers of two, so that swapped
-   components or arguments are detected. */
+/* Stubs for unboxed_args_stack.ml. Sums weight components by powers of two,
+   so that swaps are detected. */
 
 #include <stdint.h>
 #include "caml/mlvalues.h"
@@ -26,23 +23,18 @@ static double fsum8(double a0, double a1, double a2, double a3, double a4,
     + 128 * a7;
 }
 
-/* Eight int64s then a pair: the pair spills on both ABIs. */
 int64_t i64x8_pair_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
                           int64_t a4, int64_t a5, int64_t a6, int64_t a7,
                           args_i64_i64 p) {
   return sum8(a0, a1, a2, a3, a4, a5, a6, a7) + 256 * p.a + 512 * p.b;
 }
 
-/* Five int64s then a pair then an int64: on x86-64 the pair spills (one
-   register left) and y takes that register. */
 int64_t i64x5_pair_i64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
                               int64_t a4, args_i64_i64 p, int64_t y) {
   return a0 + 2 * a1 + 4 * a2 + 8 * a3 + 16 * a4 + 32 * p.a + 64 * p.b
     + 128 * y;
 }
 
-/* Seven int64s then a pair then an int64: on arm64 the pair spills (one
-   register left) and y goes on the stack after it. */
 int64_t i64x7_pair_i64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
                               int64_t a4, int64_t a5, int64_t a6,
                               args_i64_i64 p, int64_t y) {
@@ -50,8 +42,6 @@ int64_t i64x7_pair_i64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
     + 128 * p.a + 256 * p.b + 512 * y;
 }
 
-/* Seven doubles then a pair then a double: the pair spills on both ABIs; y
-   takes the last register on x86-64 and goes on the stack on arm64. */
 double f64x7_pair_f64_native(double a0, double a1, double a2, double a3,
                              double a4, double a5, double a6, args_f64_f64 p,
                              double y) {
@@ -59,8 +49,6 @@ double f64x7_pair_f64_native(double a0, double a1, double a2, double a3,
     + 128 * p.a + 256 * p.b + 512 * y;
 }
 
-/* Eight doubles then a pair then a double: everything after the eighth double
-   goes on the stack. */
 double f64x8_pair_f64_native(double a0, double a1, double a2, double a3,
                              double a4, double a5, double a6, double a7,
                              args_f64_f64 p, double y) {
@@ -68,10 +56,6 @@ double f64x8_pair_f64_native(double a0, double a1, double a2, double a3,
     + 1024 * y;
 }
 
-/* Seven doubles then three float32s then a float32: a 12-byte struct that
-   spills on both ABIs (two SSE eightbytes on x86-64; a three-member
-   homogeneous aggregate on arm64), followed by a scalar whose slot depends
-   on the struct's size on the stack. */
 double f64x7_f32x3_f32_native(double a0, double a1, double a2, double a3,
                               double a4, double a5, double a6, args_f32x3 p,
                               float y) {
@@ -80,8 +64,6 @@ double f64x7_f32x3_f32_native(double a0, double a1, double a2, double a3,
     + 1024 * (double) y;
 }
 
-/* Six int64s then a mixed pair then a double: on x86-64 the pair needs an
-   integer register and spills, but y still takes an SSE register. */
 double i64x6_mixed_f64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
                               int64_t a4, int64_t a5, args_i64_f64 p,
                               double y) {
@@ -89,8 +71,6 @@ double i64x6_mixed_f64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
     + 64 * (double) p.a + 128 * p.b + 256 * y;
 }
 
-/* Eight int64s then a mixed pair then a double: the pair spills on both ABIs
-   and y takes a floating-point register on both. */
 double i64x8_mixed_f64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
                               int64_t a4, int64_t a5, int64_t a6, int64_t a7,
                               args_i64_f64 p, double y) {
@@ -98,7 +78,6 @@ double i64x8_mixed_f64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
     + 512 * p.b + 1024 * y;
 }
 
-/* Two spilled structs then scalars of each class. */
 double i64x8_pairs_i64_f64_native(int64_t a0, int64_t a1, int64_t a2,
                                   int64_t a3, int64_t a4, int64_t a5,
                                   int64_t a6, int64_t a7, args_i64_i64 p,
@@ -109,7 +88,6 @@ double i64x8_pairs_i64_f64_native(int64_t a0, int64_t a1, int64_t a2,
     + 8192 * z;
 }
 
-/* A spilled struct of small integers followed by a small scalar. */
 int64_t i64x8_i16_i32_i32_native(int64_t a0, int64_t a1, int64_t a2,
                                  int64_t a3, int64_t a4, int64_t a5,
                                  int64_t a6, int64_t a7, args_i16_i32 p,
@@ -118,15 +96,12 @@ int64_t i64x8_i16_i32_i32_native(int64_t a0, int64_t a1, int64_t a2,
     + 512 * (int64_t) p.b + 1024 * (int64_t) y;
 }
 
-/* A spilled struct containing a value. */
 int64_t i64x8_val_i64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
                              int64_t a4, int64_t a5, int64_t a6, int64_t a7,
                              args_val_i64 p) {
   return sum8(a0, a1, a2, a3, a4, a5, a6, a7) + 256 * Long_val(p.a)
     + 512 * p.b;
 }
-
-/* Nested structs. */
 
 typedef struct { int32_t a; int32_t b; } args_i32_i32;
 typedef struct { args_i32_i32 p; int64_t c; } args_nested;

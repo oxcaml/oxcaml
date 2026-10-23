@@ -383,7 +383,12 @@ let loc_external_arguments ty_args =
   in
   let loc =
     List.mapi (fun i ty_arg ->
-        if Cmm.is_phantom_exttype ty_arg then [||] else [| loc.(i) |])
+        match Cmm.is_phantom_exttype ty_arg, (loc.(i) : Reg.t).loc with
+        | false, _ -> [| loc.(i) |]
+        | true, Reg _ -> [||]
+        | true, (Stack _ | Unknown) ->
+          Misc.fatal_error
+            "Proc.loc_external_arguments: no register left for a phantom")
       ty_args
     |> Array.of_list
   in

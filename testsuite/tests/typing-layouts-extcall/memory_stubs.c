@@ -1,8 +1,5 @@
-/* Stubs for unboxed_args_memory.ml: C structs over 16 bytes, which the x86-64
-   psABI classifies as MEMORY and passes by value on the stack.
-
-   Sums weight successive components by powers of two, so that swapped
-   components or arguments are detected. */
+/* Stubs for unboxed_args_memory.ml. Sums weight components by powers of two,
+   so that swaps are detected. */
 
 #include <stdint.h>
 #include "caml/mlvalues.h"
@@ -20,24 +17,19 @@ double f64x5_native(args_f64x5 p) {
   return p.a + 2 * p.b + 4 * p.c + 8 * p.d + 16 * p.e;
 }
 
-/* The struct goes on the stack; the scalars after it take the first
-   registers of their classes. */
 double i64x3_i64_f64_native(args_i64x3 p, int64_t y, double z) {
   return (double) (p.a + 2 * p.b + 4 * p.c + 8 * y) + 16 * z;
 }
 
-/* Floating-point members inside a struct of class MEMORY. */
 double mixed_native(args_mixed p) {
   return (double) p.a + 2 * (double) p.b + 4 * (double) p.c
     + 8 * (double) p.d;
 }
 
-/* Padding inside the struct. */
 int64_t padded_native(args_padded p) {
   return (int64_t) p.a + 2 * p.b + 4 * (int64_t) p.c;
 }
 
-/* Two structs on the stack after a scalar already on the stack. */
 int64_t i64x7_i64x3_i64x3_i64_native(int64_t a0, int64_t a1, int64_t a2,
                                      int64_t a3, int64_t a4, int64_t a5,
                                      int64_t a6, args_i64x3 p, args_i64x3 q,
@@ -46,8 +38,6 @@ int64_t i64x7_i64x3_i64x3_i64_native(int64_t a0, int64_t a1, int64_t a2,
     + 128 * p.a + 256 * p.b + 512 * p.c + 1024 * q.a + 2048 * q.b
     + 4096 * q.c + 8192 * y;
 }
-
-/* Nested structs. */
 
 typedef struct { int64_t a; int64_t b; } args_i64_i64;
 typedef struct { args_i64_i64 p; int64_t c; } args_nested_i64x3;
@@ -69,4 +59,26 @@ _Static_assert(sizeof(args_f32x5) == 20, "five floats should be 20 bytes");
 double f32x5_native(args_f32x5 p) {
   return (double) p.a + 2 * (double) p.b + 4 * (double) p.c
     + 8 * (double) p.d + 16 * (double) p.e;
+}
+
+typedef struct { int64_t a; int64_t b; int64_t c; int64_t d; } args_i64x4;
+typedef struct { double a; double b; double c; double d; } args_f64x4;
+typedef struct { int32_t a; float b; int16_t c; int8_t d; } args_i32_f32_i16_i8;
+typedef struct {
+  args_i64x4 i;
+  args_f64x4 f;
+  args_i32_f32_i16_i8 s;
+  int64_t z;
+} args_big;
+
+_Static_assert(sizeof(args_big) == 88, "big should be 88 bytes");
+
+static double big_sum(args_big p) {
+  return p.i.a + 2 * p.i.b + 4 * p.i.c + 8 * p.i.d + 16 * p.f.a + 32 * p.f.b
+    + 64 * p.f.c + 128 * p.f.d + 256 * (double) p.s.a + 512 * (double) p.s.b
+    + 1024 * (double) p.s.c + 2048 * (double) p.s.d + 4096 * (double) p.z;
+}
+
+double big_pair_native(int64_t x, args_big p, double y, args_big q) {
+  return x + 2 * y + 4 * big_sum(p) + 32768 * big_sum(q);
 }

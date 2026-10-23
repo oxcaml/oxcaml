@@ -95,8 +95,6 @@ value f64_f64_make_bytecode(value unit) {
   CAMLreturn (res);
 }
 
-/* The native versions return C structs by value. */
-
 #include "caml/float32.h"
 
 typedef struct { int32_t a; int32_t b; } i32_i32_struct;
@@ -402,10 +400,6 @@ value ret_n_i32_bytecode(value unit) {
   CAMLreturn(res);
 }
 
-/* #(int64# * unit#): the void component is erased in native code, so the
-   native stub returns a plain int64_t. In bytecode the void component
-   occupies a field of the returned tuple. */
-
 int64_t ret_i64_void_native(value unit) {
   return 999;
 }
@@ -420,8 +414,6 @@ value ret_i64_void_bytecode(value unit) {
   CAMLreturn(res);
 }
 
-/* #(unit# * float#): likewise the native stub returns a plain double. */
-
 double ret_void_f64_native(value unit) {
   return 2.25;
 }
@@ -435,8 +427,6 @@ value ret_void_f64_bytecode(value unit) {
   Field(res, 1) = b;
   CAMLreturn(res);
 }
-
-/* Voids between, around and nested among other components. */
 
 f32_i32_struct ret_void_mixed_native(value unit) {
   f32_i32_struct res = { -2.5f, 5 };
@@ -498,9 +488,6 @@ value ret_void_single_nested_bytecode(value unit) {
   CAMLreturn(res);
 }
 
-/* Ten tagged-integer arguments (some of which are passed on the stack on
-   both x86-64 and arm64) with an unboxed product return. */
-
 typedef struct { int32_t a; float b; } combine10_struct;
 
 combine10_struct combine10_native(value x1, value x2, value x3, value x4,
@@ -527,10 +514,6 @@ value combine10_bytecode(value *argv, int argn) {
   CAMLreturn(res);
 }
 
-/* An [@unpacked] product argument (components passed as separate C
-   arguments) with an unboxed product return (following the C struct
-   convention). */
-
 typedef struct { int64_t a; double b; } i64_f64_struct;
 
 i64_f64_struct swap_f64_i64_native(double a, int64_t b) {
@@ -548,9 +531,6 @@ value swap_f64_i64_bytecode(value prod) {
   Field(res, 1) = b;
   CAMLreturn(res);
 }
-
-/* Returns of more than two components, nested returns, and heap pointers in
-   returns. */
 
 typedef struct { int32_t a; int32_t b; int64_t c; } i32_i32_i64_struct;
 typedef struct { float a; float b; float c; float d; } f32x4_struct;
@@ -707,9 +687,6 @@ value ret_string_i64_bytecode(value n) {
   Field(res, 1) = m;
   CAMLreturn(res);
 }
-
-/* A product all of whose components are void corresponds to no C result
-   at all. */
 
 void all_void_return_native(value unit) {
   return;

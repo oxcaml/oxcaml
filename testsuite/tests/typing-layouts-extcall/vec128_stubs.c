@@ -1,16 +1,10 @@
-/* Stubs for unboxed_arm64.ml. The native versions take and return C
-   structs of NEON vector types by value.
-
-   The test using this file is native-only and arm64-only, so there are no
-   bytecode stubs and arm_neon.h is included unconditionally. */
+/* Stubs for unboxed_arm64.ml (native only). */
 
 #include <stdint.h>
 #include <arm_neon.h>
 #include "caml/mlvalues.h"
 
-/* Helpers for constructing and inspecting vectors. (Lane indices are passed
-   as tagged OCaml integers; the NEON lane intrinsics require constant
-   indices, so we go via memory instead.) */
+/* The NEON lane intrinsics need constant indices, so these go via memory. */
 
 float32x4_t make_f32x4_native(double a, double b, double c, double d) {
   float elts[4] = { (float) a, (float) b, (float) c, (float) d };
@@ -131,8 +125,6 @@ float32x4_t sum_f32x4_quad_native(f32x4_quad_struct p) {
   return vaddq_f32(p.a, vmulq_f32(two, vaddq_f32(p.b, vmulq_f32(two,
            vaddq_f32(p.c, vmulq_f32(two, p.d))))));
 }
-
-/* Homogeneous aggregates of vectors passed on the stack. */
 
 int64x2_t make_i64x2_native(int64_t a, int64_t b) {
   int64_t elts[2] = { a, b };

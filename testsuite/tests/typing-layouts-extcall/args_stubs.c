@@ -1,8 +1,5 @@
-/* Stubs for unboxed_args.ml. The native versions take C structs by value;
-   the bytecode versions use (possibly nested) tuples.
-
-   Sums weight successive components by powers of two, so that swapped
-   components or arguments are detected. */
+/* Stubs for unboxed_args.ml. Sums weight components by powers of two, so that
+   swaps are detected. */
 
 #include <stdint.h>
 #include "caml/alloc.h"
@@ -124,7 +121,6 @@ value sum_nested_bytecode(value p) {
   CAMLreturn(caml_copy_int64(res));
 }
 
-/* See [sum_nested_padded] in unboxed_args.ml. */
 _Static_assert(sizeof(args_nested_padded) == 12,
                "nested struct with trailing padding should be 12 bytes");
 _Static_assert(sizeof(args_flat_i32_i16_i16) == 8,
@@ -183,8 +179,6 @@ value mixed_args_bytecode(value x, value fp, value n, value ip, value d) {
   CAMLreturn(caml_copy_int64(res));
 }
 
-/* #(int64# * unit#): the void component is erased in native code. */
-
 int64_t sum_i64_void_native(int64_t x) {
   return x;
 }
@@ -193,8 +187,6 @@ value sum_i64_void_bytecode(value p) {
   CAMLparam1(p);
   CAMLreturn(caml_copy_int64(Int64_val(Field(p, 0))));
 }
-
-/* See [stack_single] in unboxed_args.ml. */
 
 typedef struct { int16_t a; } args_i16;
 
@@ -232,8 +224,6 @@ value swap_mixed_bytecode(value p) {
   CAMLreturn(res);
 }
 
-/* More than two components per register. */
-
 typedef struct { int16_t a; int16_t b; int16_t c; int16_t d; } args_i16x4;
 typedef struct { int8_t a; int8_t b; int16_t c; int32_t d; } args_i8_i8_i16_i32;
 
@@ -269,8 +259,6 @@ value sum_i8_i8_i16_i32_bytecode(value p) {
   CAMLreturn(caml_copy_int64(res));
 }
 
-/* Floating-point components in less common positions. */
-
 typedef struct { float a; int64_t b; } args_f32_i64;
 typedef struct { float a; float b; float c; } args_f32x3;
 
@@ -297,8 +285,6 @@ value sum_f32_triple_bytecode(value p) {
   CAMLreturn(caml_copy_double(res));
 }
 
-/* Heap pointers as components. */
-
 typedef struct { value s; int64_t n; } args_string_i64;
 
 int64_t sum_string_i64_native(args_string_i64 p) {
@@ -311,8 +297,6 @@ value sum_string_i64_bytecode(value p) {
     + Int64_val(Field(p, 1));
   CAMLreturn(caml_copy_int64(res));
 }
-
-/* Stack arguments. */
 
 int64_t sum_three_pairs_then_int_native(args_i64_i64 p, args_i64_i64 q,
                                         args_i64_i64 r, value n) {
@@ -328,9 +312,6 @@ value sum_three_pairs_then_int_bytecode(value p, value q, value r, value n) {
     + 64 * Long_val(n);
   CAMLreturn(caml_copy_int64(res));
 }
-
-/* Seven integer arguments exhaust the six x86-64 integer registers (the
-   seventh goes on the stack) but leave the SSE registers for the pair. */
 
 double seven_ints_f64_pair_native(value i0, value i1, value i2, value i3,
                                   value i4, value i5, value i6,
@@ -349,8 +330,6 @@ value seven_ints_f64_pair_bytecode(value *argv, int argn) {
   sum += Double_val(Field(argv[7], 0)) + 2 * Double_val(Field(argv[7], 1));
   CAMLreturn(caml_copy_double(sum));
 }
-
-/* A one-member struct of a value on the stack, followed by a scalar. */
 
 typedef struct { value a; } args_val;
 
@@ -372,11 +351,6 @@ value stack_single_value_bytecode(value *argv, int argn) {
   CAMLreturn(caml_copy_int64(sum));
 }
 
-/* A one-member struct of a float passed on the stack, followed by a bare
-   float. On Apple arm64 the struct takes the 4-byte slot of its member (unlike
-   the 8-byte slot of [args_i16] above), so [y] is at offset 4; an 8-byte slot
-   would put [y] at offset 8. */
-
 typedef struct { float a; } args_f32;
 
 double stack_single_f32_native(double a0, double a1, double a2, double a3,
@@ -396,9 +370,6 @@ value stack_single_f32_bytecode(value *argv, int argn) {
   CAMLreturn(caml_copy_double(sum));
 }
 
-/* A product all of whose components are void corresponds to no C
-   arguments at all. */
-
 int64_t all_void_arg_native(void) {
   return 4242;
 }
@@ -408,8 +379,6 @@ value all_void_arg_bytecode(value p) {
   CAMLreturn(caml_copy_int64(4242));
 }
 
-/* A plain void argument likewise corresponds to no C arguments. */
-
 int64_t void_arg_native(void) {
   return 2424;
 }
@@ -418,10 +387,6 @@ value void_arg_bytecode(value u) {
   CAMLparam1(u);
   CAMLreturn(caml_copy_int64(2424));
 }
-
-/* Void arguments and components. Void corresponds to nothing in the native
-   stubs; in bytecode it is [Val_unit], and void components remain tuple
-   fields. */
 
 int64_t void_between_args_native(int64_t x, args_i32_i32 p, int64_t y) {
   return x + 2 * (int64_t) p.a + 4 * (int64_t) p.b + 8 * y;
@@ -448,7 +413,6 @@ value void_inside_f32_bytecode(value p) {
   CAMLreturn(caml_copy_double(res));
 }
 
-/* The all-void middle product has no counterpart. */
 typedef struct { int32_t b; } args_i32;
 typedef struct { args_i16 p; args_i32 r; } args_void_nested;
 
