@@ -39,7 +39,8 @@ module Component_for_creation : sig
          propagate information about void layouts, even though the corresponding
          variables have no runtime representation, as they interact with
          currying. (For example void parameters cannot just be erased.) *)
-    | Unboxed_product : _ t list -> [`Complex] t
+    | Unboxed_product : [`Complex] t list -> [> `Complex] t
+    | Unknown : [> `Unknown] t
 
   (** Conversion from a Lambda layout, which might involve unboxed products. *)
   val from_lambda :
@@ -74,6 +75,21 @@ val equal_exact : 'a t -> 'a t -> bool
     ones with a single component.) *)
 val is_one_param_of_kind_value : _ t -> bool
 
+val unknown : [`Complex | `Unknown] t
+
+val known : [`Complex | `Unknown] t -> [`Complex] t option
+
+val with_unknown : [`Complex] t -> [`Complex | `Unknown] t
+
+(** The arity of a continuation receiving values of the given arity. Assumes
+    continuations with unknown arity are never called. *)
+val receiving_arity : [`Complex | `Unknown] t -> [`Complex] t
+
+(** Whether an application at the first arity can call code of result arity
+    [of_]. *)
+val is_instance_ignoring_subkinds :
+  [`Complex] t -> of_:[`Complex | `Unknown] t -> bool
+
 (** Convert, in a left-to-right depth-first order, an arity into a flattened
     list of kinds for all parameters. (For [`Unarized] arities this simply
     returns the components.) *)
@@ -98,10 +114,12 @@ val with_unarized_kinds : 'uc t -> Flambda_kind.With_subkind.t list -> 'uc t
     corresponding kinds) whose length matches [unarize t], with names derived
     from the given identifier. *)
 val fresh_idents_unarized :
-  _ t -> id:Ident.t -> (Ident.t * Flambda_kind.With_subkind.t) list
+  [< `Complex | `Unarized] t ->
+  id:Ident.t ->
+  (Ident.t * Flambda_kind.With_subkind.t) list
 
 (** The length of the list returned by [unarize]. *)
-val cardinal_unarized : _ t -> int
+val cardinal_unarized : [< `Complex | `Unarized] t -> int
 
 val group_by_parameter : [`Complex] t -> 'a list -> 'a list list
 

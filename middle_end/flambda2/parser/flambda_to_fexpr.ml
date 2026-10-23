@@ -441,8 +441,11 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         Option.map (Env.find_code_id_exn env) (Code.newer_version_of code)
       in
       let param_arity = Some (complex_arity (Code.params_arity code)) in
-      let ret_arity =
-        Code.result_arity code |> Flambda_arity.unarize_t |> arity_opt
+      let ret_arity : Fexpr.code_return_arity =
+        match Flambda_arity.known (Code.result_arity code) with
+        | Some arity ->
+          Code_returns (arity |> Flambda_arity.unarize_t |> arity_opt)
+        | None -> Code_unknown_arity
       in
       let recursive = recursive_flag (Code.recursive code) in
       let inline =

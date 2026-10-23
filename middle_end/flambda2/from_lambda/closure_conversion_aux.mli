@@ -313,6 +313,10 @@ module Acc : sig
 
   val top_closure_info : t -> closure_info option
 
+  (** Whether the application returns to the current function's return
+      continuation and raises to its exception continuation. *)
+  val is_tail_call : t -> Apply_expr.t -> bool
+
   val push_closure_info :
     t ->
     return_continuation:Continuation.t ->
@@ -370,7 +374,7 @@ module Function_decls : sig
       params:param list ->
       params_arity:[`Complex] Flambda_arity.t ->
       removed_params:Ident.Set.t ->
-      return:[`Complex] Flambda_arity.t ->
+      return:[`Complex | `Unknown] Flambda_arity.t ->
       calling_convention:calling_convention ->
       return_continuation:Continuation.t ->
       exn_continuation:IR.exn_continuation ->
@@ -399,7 +403,7 @@ module Function_decls : sig
 
     val params_arity : t -> [`Complex] Flambda_arity.t
 
-    val return : t -> [`Complex] Flambda_arity.t
+    val return : t -> [`Complex | `Unknown] Flambda_arity.t
 
     val calling_convention : t -> calling_convention
 

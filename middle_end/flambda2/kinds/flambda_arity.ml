@@ -20,7 +20,8 @@ module KS = Flambda_kind.With_subkind
 module Component = struct
   type _ t =
     | Singleton : KS.t -> [> ] t
-    | Unboxed_product : _ t list -> [`Complex] t
+    | Unboxed_product : [`Complex] t list -> [> `Complex] t
+    | Unknown : [> `Unknown] t
 
   let rec equal_ignoring_subkinds : type uc1 uc2. uc1 t -> uc2 t -> bool =
    fun t1 t2 ->
@@ -29,7 +30,8 @@ module Component = struct
       KS.equal (KS.erase_subkind kind1) (KS.erase_subkind kind2)
     | Unboxed_product ts1, Unboxed_product ts2 ->
       Misc.Stdlib.List.equal equal_ignoring_subkinds ts1 ts2
-    | Singleton _, Unboxed_product _ | Unboxed_product _, Singleton _ -> false
+    | Unknown, Unknown -> true
+    | (Singleton _ | Unboxed_product _ | Unknown), _ -> false
 
   let rec equal_exact : type uc1 uc2. uc1 t -> uc2 t -> bool =
    fun t1 t2 ->
@@ -37,13 +39,15 @@ module Component = struct
     | Singleton kind1, Singleton kind2 -> KS.equal kind1 kind2
     | Unboxed_product ts1, Unboxed_product ts2 ->
       Misc.Stdlib.List.equal equal_exact ts1 ts2
-    | Singleton _, Unboxed_product _ | Unboxed_product _, Singleton _ -> false
+    | Unknown, Unknown -> true
+    | (Singleton _ | Unboxed_product _ | Unknown), _ -> false
 
   let rec print : type uc. Format.formatter -> uc t -> unit =
    fun ppf t ->
     match t with
     | Singleton kind -> KS.print ppf kind
     | Unboxed_product [] -> Format.pp_print_string ppf "void"
+    | Unknown -> Format.pp_print_string ppf "unknown"
     | Unboxed_product ts ->
       Format.fprintf ppf "@[<hov 1>%t#%t(%a)@]" Flambda_colours.unboxed_product
         Flambda_colours.pop
@@ -58,6 +62,7 @@ module Component = struct
     | Singleton kind -> [kind]
     | Unboxed_product [] -> []
     | Unboxed_product ts -> List.concat_map unarize ts
+    | Unknown -> Misc.fatal_error "Cannot unarize an unknown arity component"
 
   let component : [`Unarized] t -> KS.t =
    fun t -> match t with Singleton kind -> kind
@@ -76,6 +81,8 @@ module Component = struct
       match with_unarized_kinds_list ts kinds with
       | None -> None
       | Some (ts, kinds) -> Some (Unboxed_product ts, kinds))
+    | Unknown ->
+      Misc.fatal_error "Cannot replace the kinds of an unknown arity component"
 
   and with_unarized_kinds_list : type uc.
       uc t list -> KS.t list -> (uc t list * KS.t list) option =
@@ -96,7 +103,8 @@ type 'uc t = 'uc Component.t list
 module Component_for_creation = struct
   type 'uc t = 'uc Component.t =
     | Singleton : KS.t -> [> ] t
-    | Unboxed_product : _ t list -> [`Complex] t
+    | Unboxed_product : [`Complex] t list -> [> `Complex] t
+    | Unknown : [> `Unknown] t
 
   let rec from_lambda (layout : Lambda.layout) ~machine_width =
     match layout with
@@ -117,7 +125,8 @@ module Component_for_creation = struct
     | Pvoid -> Unboxed_product []
     | Punboxed_product layouts ->
       Unboxed_product (List.map (from_lambda ~machine_width) layouts)
-    | Ptop | Pbottom ->
+    | Pbottom -> Unboxed_product []
+    | Ptop ->
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
         Printlambda.layout layout
@@ -146,7 +155,35 @@ let is_one_param_of_kind_value : type uc. uc t -> bool =
  fun t ->
   match t with
   | [Component.Singleton kind] when K.equal (KS.kind kind) K.value -> true
-  | [] | Singleton _ :: _ | Unboxed_product _ :: _ -> false
+  | [] | (Singleton _ | Unboxed_product _ | Unknown) :: _ -> false
+
+let unknown = [Component.Unknown]
+
+let known (t : [`Complex | `Unknown] t) : [`Complex] t option =
+  List.fold_right
+    (fun (component : [`Complex | `Unknown] Component.t) known ->
+      match component, known with
+      | Singleton kind, Some known -> Some (Component.Singleton kind :: known)
+      | Unboxed_product ts, Some known ->
+        Some (Component.Unboxed_product ts :: known)
+      | Unknown, _ | _, None -> None)
+    t (Some [])
+
+let with_unknown (t : [`Complex] t) : [`Complex | `Unknown] t =
+  List.map
+    (fun (component : [`Complex] Component.t) :
+         [`Complex | `Unknown] Component.t ->
+      match component with
+      | Singleton kind -> Singleton kind
+      | Unboxed_product ts -> Unboxed_product ts)
+    t
+
+let receiving_arity t = match known t with Some t -> t | None -> []
+
+let is_instance_ignoring_subkinds t ~of_ =
+  match known of_ with
+  | None -> true
+  | Some of_ -> equal_ignoring_subkinds t of_
 
 let unarize t = t |> List.map Component.unarize |> List.concat
 

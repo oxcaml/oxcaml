@@ -1083,6 +1083,23 @@ and apply_expr env res apply =
      In case 3 we can avoid flushing the environment due to the linearity of the
      control flow. We know that flushing will eventually happen by virtue of the
      recursive call to [expr]. *)
+  (* A call with an empty result arity may return to a continuation with
+     parameters: it then never returns (see
+     [Inlining_helpers.wrap_inlined_body]). *)
+  let never_returns_to params =
+    List.is_empty (Flambda_arity.unarize (Apply.return_arity apply))
+    && not (List.is_empty params)
+  in
+  let call_then_unreachable () =
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
+    let unreachable, res =
+      C.invalid res ~message:"Return from a call that never returns"
+    in
+    let cmm, free_vars, symbol_inits =
+      wrap (C.sequence call unreachable) free_vars Env.Symbol_inits.empty
+    in
+    cmm, free_vars, symbol_inits, res
+  in
   match Apply.continuation apply with
   | Never_returns ->
     (* Case 1 *)
@@ -1098,7 +1115,9 @@ and apply_expr env res apply =
       let apply_result_arity =
         Flambda_arity.unarize (Apply.return_arity apply)
       in
-      if List.compare_lengths apply_result_arity param_types = 0
+      if
+        List.compare_lengths apply_result_arity param_types = 0
+        || never_returns_to param_types
       then
         let wrap, _, res =
           Env.flush_delayed_lets ~mode:Flush_everything env res
@@ -1112,6 +1131,11 @@ and apply_expr env res apply =
           "Types (%a) do not match arguments for the return cont of@ %a"
           (Format.pp_print_list ~pp_sep:Format.pp_print_space Printcmm.machtype)
           param_types Apply.print apply
+    | Jump { param_types; cont = _ } when never_returns_to param_types ->
+      call_then_unreachable ()
+    | Inline { handler_params; _ }
+      when never_returns_to (Bound_parameters.to_list handler_params) ->
+      call_then_unreachable ()
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
       let wrap, _, res =

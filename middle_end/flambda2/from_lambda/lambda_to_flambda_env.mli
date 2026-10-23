@@ -37,6 +37,10 @@ val create :
   my_alloc_region:Ident.t ->
   t
 
+val add_never_called_continuation : t -> Continuation.t -> t
+
+val is_never_called_continuation : t -> Continuation.t -> bool
+
 val current_unit : t -> Compilation_unit.t
 
 val machine_width : t -> Target_system.Machine_width.t
