@@ -471,10 +471,15 @@ let
         rm -r bench bin doc examples test test_json5 lib/json5
         ${joinConsumingProject}
         ${dropSeqDependency "lib/dune"}
+        # Only Yojson is meant to be visible; -open Oxcaml_private_yojson would
+        # otherwise put T, Basic, Safe, ... in scope in every consuming module.
         substituteInPlace lib/dune \
           --replace-fail '(name yojson)' '(name oxcaml_private_yojson)' \
           --replace-fail '(public_name yojson)' \
-            '(public_name js_of_ocaml-compiler.private.yojson)'
+            '(public_name js_of_ocaml-compiler.private.yojson)' \
+          --replace-fail '(modules yojson t basic safe raw common codec lexer_utils)' \
+            '(modules yojson t basic safe raw common codec lexer_utils)
+             (private_modules t basic safe raw common codec lexer_utils)'
         # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
         substituteInPlace lib/write.ml \
           --replace-fail 'let write_intlit = Buffer.add_string' \

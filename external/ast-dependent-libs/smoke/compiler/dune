@@ -1,9 +1,6 @@
 (executable
  (name minify)
- (libraries
-  js_of_ocaml-compiler
-  js_of_ocaml-compiler.cmdline
-  js_of_ocaml-compiler.runtime-files))
+ (libraries js_of_ocaml-compiler js_of_ocaml-compiler.runtime-files))
 
 (rule
  (with-stdout-to

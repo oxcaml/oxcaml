@@ -385,7 +385,6 @@ ppxlib-install: ppxlib-build
 jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
 
-# jsoo_mktop, which needs ocamlfind, is not shipped.
 SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler \
   js_of_ocaml-toplevel
 SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
@@ -394,7 +393,6 @@ SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 .PHONY: jsoo-install-shipped
 jsoo-install-shipped: jsoo-build
 	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
-	rm -f "$(AST_DEPENDENT_LIBS_PREFIX)/bin/jsoo_mktop"
 	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
 
 .PHONY: jsoo-test

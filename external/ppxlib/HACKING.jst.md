@@ -32,6 +32,10 @@ nix-provided sources into `oxcaml-private/`, and default.nix makes it the
 wrapped library `oxcaml_private_ppx_derivers`, installed as
 `ppxlib.private.ppx_derivers`. `src` sees the usual module name through
 `-open Oxcaml_private_ppx_derivers`. See `external/js_of_ocaml/HACKING.jst.md`.
+ppx_derivers is a registry shared between ppx frameworks, so this also means
+that derivers registered through another copy of it (a ppx_deriving plugin
+built against a user's own ppx_derivers) are not visible to this ppxlib's
+`Deriving`.
 
 sexp_type is shared on purpose, as its own public `sexp_type` package: its
 type appears in ppxlib's interface (`Stdppx.Sexp.t`), and has to be the same

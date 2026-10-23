@@ -49,18 +49,18 @@ The Nix `oxcaml` compiler package ships most of it, installed by
 `wasm_of_ocaml`, `jsoo_mkcmis` and `jsoo_listunits` executables; the
 `js_of_ocaml`, `js_of_ocaml-runtime`, `js_of_ocaml-ppx`,
 `js_of_ocaml-compiler`, `wasm_of_ocaml-compiler` and `js_of_ocaml-toplevel`
-libraries with their private dependencies; and the ppxlib stack. `jsoo_mktop`
-is not shipped. The Nix `jsoo-smoke-test` check builds and runs
-`external/ast-dependent-libs/smoke` against that package.
+libraries with their private dependencies; and the ppxlib stack. The Nix
+`jsoo-smoke-test` check builds and runs `external/ast-dependent-libs/smoke`
+against that package.
 
 Downstream packaging changes:
 
 - `lib/runtime` is its own package, `js_of_ocaml-runtime`, instead of
   upstream's `js_of_ocaml-compiler.runtime`, so that the `js_of_ocaml` library
   installs without the compiler library.
-- `compiler/lib-cmdline` is public, as `js_of_ocaml-compiler.cmdline`.
-- `jsoo_mkcmis`, `jsoo_listunits` and `jsoo_mktop` build without findlib. They
-  then accept only `.cmi`/`.cma` arguments, not findlib package names.
+- `jsoo_mkcmis` and `jsoo_listunits` build without findlib, and then accept
+  only `.cmi`/`.cma` arguments, not findlib package names. `jsoo_mktop`, which
+  drives ocamlfind, is not built.
 - The `js_of_ocaml-toplevel`, `.common` and `.worker` libraries are bytecode
   only: they need `compiler-libs.toplevel`, which has no native archive.
 - `js_of_ocaml-toplevel` doesn't depend on `js_of_ocaml-compiler.dynlink`,
