@@ -373,6 +373,11 @@ module Expr = struct
       [Vb.mk (Pat.var (loc name)) expr]
       (body (ident name))
 
+  (* CR-soon xclerc for xclerc: the constraint always sends the expression
+     through the type checker's expected-type path. Consider sometimes omitting
+     it, e.g. under a swarm flag, so that plain inference is exercised too;
+     generated constructor and field names are unique, so disambiguation does
+     not require it. *)
   let constrain ty expr = Exp.constraint_ expr (Some (Ty.to_code ty)) []
 
   let field_code (record : Ty.record) field receiver =

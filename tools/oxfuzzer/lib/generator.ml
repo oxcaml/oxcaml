@@ -250,7 +250,7 @@ let gen_constructor_type (st : State.t) constructor_index =
 let gen_variant_type (st : State.t) variant_id =
   let constructors =
     List.init
-      (random_int_in_range st ~min:2 ~max:Config.max_variant_constructors)
+      (random_int_in_range st ~min:1 ~max:Config.max_variant_constructors)
       (gen_constructor_type st)
   in
   { Ty.variant_id; constructors }
