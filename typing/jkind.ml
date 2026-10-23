@@ -3504,7 +3504,7 @@ module Format_history = struct
     match arity with 1 -> "" | _ -> to_ordinal position ^ " "
 
   let format_concrete_creation_reason ppf :
-    History.concrete_creation_reason -> unit = function
+      History.concrete_creation_reason -> unit = function
     | Match -> fprintf ppf "a value of this type is matched against a pattern"
     | Extension_constructor_declaration _ ->
       fprintf ppf "it's the type of an argument to an extension constructor"

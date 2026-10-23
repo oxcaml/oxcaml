@@ -668,9 +668,7 @@ module M1 = struct
   include functor F
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module M1 : sig type t = int val x : int val y : int end
 |}]
 
 (* Same signature can be used at two different layouts *)
@@ -680,9 +678,7 @@ module M2 = struct
   include functor F
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module M2 : sig type t = float# val x : float# val y : int end
 |}]
 
 (* Generative functor *)
@@ -697,9 +693,7 @@ module M3 = struct
 end
 [%%expect{|
 module F_gen : functor (M : S) () -> sig val y : int end
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module M3 : sig type t = int val x : int val y : int end
 |}]
 
 (* Includes in signatures have no runtime argument, so the items passed to the
@@ -712,9 +706,7 @@ module type T = sig
 end
 [%%expect{|
 module type F_type = functor (M : S) -> sig val y : int end
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module type T = sig type t : any val x : t val y : int end
 |}]
 
 (* Module aliases. A bare alias to a path inside an unrepresentable module is

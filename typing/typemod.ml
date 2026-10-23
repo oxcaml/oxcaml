@@ -276,11 +276,48 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
     | Some tj ->
         Error.log_and_raise loc env (exn tj)
 
+let include_functor_input_repr env sig_acc input_coercion =
+  (* build the input representation from the sorts of items in [sig_acc] *)
+  let items =
+    List.fold_left
+      (fun items item -> Ident.Map.add (signature_item_id item) item items)
+      Ident.Map.empty sig_acc
+  in
+  let sort_of_type ty =
+    match Ctype.type_sort ~why:Structure_item ~allow_mutation:false env ty with
+    | Ok sort -> sort
+    | Error _ ->
+      (* this should be unreachable: structure items must be representable *)
+      Misc.fatal_error "include_functor_input_repr: unrepresentable item"
+  in
+  List.map
+    (fun (id, cc) ->
+       match cc with
+       | Tcoerce_alias _ -> Jkind.Sort.(of_const Const.for_module)
+       | Tcoerce_primitive pc -> sort_of_type pc.pc_type
+       | Tcoerce_none | Tcoerce_structure _ | Tcoerce_functor _
+       | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
+         match
+           Env.sort_of_signature_item ~why:Structure_item env
+             (Subst.Lazy.of_signature_item (Ident.Map.find id items))
+         with
+         | Ok (Some sort) -> sort
+         | Ok None ->
+           Misc.fatal_error
+             "include_functor_input_repr: item absent at runtime"
+         | Error _ ->
+           (* unreachable: structure items must be representable *)
+           Misc.fatal_error
+             "include_functor_input_repr: unrepresentable item")
+    input_coercion
+  |> Array.of_list
+
 (* Extract the signature and the mode of a functor's return, given the signature
    [sig_acc] and mode [md_mode] of the functor argument. [funct_mode] is the
-   mode of the functor expression itself. *)
+   mode of the functor expression itself. [input_repr] computes the
+   representation of the functor's argument from its coercion. *)
 let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
-      ~funct_mode =
+      ~funct_mode ~input_repr =
   let sig_acc = List.rev sig_acc in
   (* Applying the functor runs its body, which can perform a free effect if the
      functor closes over a yielding value (its own mode) or if the enclosing
@@ -310,7 +347,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
         with Includemod.Error msg ->
           Error.log_and_raise loc env (Not_included_functor msg)
       in
-      let input_repr = expect_fixed_representation sg_param in
+      let input_repr = input_repr input_coercion in
       (* We must scrape the result type in an environment expanded with the
          parameter type (to avoid `Not_found` exceptions when it is referenced).
          Because we don't have an actual parameter, we create definitions for
@@ -2302,7 +2339,7 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
         let funct_mode = With_regionality.disallow_right With_regionality.max in
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc
-            md_mode ~funct_mode
+            md_mode ~funct_mode ~input_repr:(fun _ -> ())
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -3924,6 +3961,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let sg, mode, incl_kind =
           extract_sig_functor_open funct_body env smodl.pmod_loc
             modl.mod_type sig_acc md_mode ~funct_mode
+            ~input_repr:(include_functor_input_repr env sig_acc)
         in
         incl_kind, sg, With_regionality.disallow_right mode
       | Structure ->
