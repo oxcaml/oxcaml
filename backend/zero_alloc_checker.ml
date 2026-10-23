@@ -1350,9 +1350,9 @@ end = struct
        (see the last line of this function). *)
     let fold
         (callee_argument_index : int)
-        (_relevant_components : bool Components.t)
-        (_acc : t) : t =
-      match List.nth_opt arguments_passed callee_argument_index with
+        (relevant_components : bool Components.t)
+        (acc : t) : t =
+      begin match List.nth_opt arguments_passed callee_argument_index with
       | None ->
         (* This is a partial application, and there is no nth argument. *)
         (* CR wsturgeon for wsturgeon: this probably doesn't always allocate *)
@@ -1362,10 +1362,19 @@ end = struct
         (* We don't statically know what's passed here, so it could allocate. *)
         top ~allocation_sources:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
-      | Some (Some (_ : Cmm.callee)) ->
-        (* We know statically what's passed here, so we can combine its
-           zero-alloc summary with the callee's. *)
-        Misc.fatal_error "(* CR wsturgeon for wsturgeon: callee-to-caller *)"
+      | Some (Some (Argument { argument_index = caller_argument_index })) ->
+        top
+          ~allocation_sources:(
+            No_allocation_other_than_calling_arguments
+              ( Numbers.Int.Map.singleton caller_argument_index
+                  relevant_components ) )
+          ~witnesses:caller_witnesses
+      | Some (Some (Symbol _)) ->
+        (* CR wsturgeon for wsturgeon: look up this symbol's summary *)
+        top ~allocation_sources:Allocation_other_than_calling_arguments
+          ~witnesses:caller_witnesses
+      end
+      |> join acc
     in
     Numbers.Int.Map.fold fold callee_contract bot
 
