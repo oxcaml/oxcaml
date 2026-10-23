@@ -2933,11 +2933,17 @@ type unbox_result =
 
 (* We pass in [ty] as an [unwrapped_type_expr], which represents the state of a
    process of unwrapping before we do this extra step. This allows us to
-   backtrack in case an [or_null] we unwrap here cannot be re-applied: see
-   Note [unwrapped_type_expr backtracking for or_null].
+   backtrack in case an [or_null] we unwrap here cannot be re-applied, such as
+   for:
 
-   (In most callers of this, there is no ongoing state of unwrapping, so we just
-   use [mk_unwrapped_type_expr]). *)
+     let rec bad () : float# or_null = Null
+
+   Although this is ill-typed, we don't realize this when we typecheck it with
+   [type_approx], which we use for recursive functions. This gets us into
+   trouble when [type_approx] calls [type_jkind], which could then unwrap and
+   re-wrap an invalid application of [or_null] like the above. So, to avoid
+   needing to consider invalid applications of [or_null], we use the previous
+   [unwrapped_type_expr] as a fallback. *)
 let unbox_once env ty =
   match get_desc ty.ty with
   | Tconstr (p, args, _) ->
