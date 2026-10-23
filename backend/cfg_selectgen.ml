@@ -971,9 +971,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop
         ( (Capply
-             { result_type = ty; region = Rc_normal; callees = _;
-               known_arguments = _ }
-           as op),
+             { result_type = ty;
+               region = Rc_normal;
+               callees = _;
+               known_arguments = _
+             } as op),
           args,
           dbg ) ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -1512,9 +1514,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | Terminator
           (Call
-             { op = { desc = Direct func; known_arguments } as op;
-               label_after
-             } as term) ->
+             { op = { desc = Direct func; known_arguments } as op; label_after }
+           as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in

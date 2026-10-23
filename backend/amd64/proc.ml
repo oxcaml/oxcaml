@@ -627,7 +627,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if stack_ofs > 0
     then Lazy.force all_phys_regs
     else Lazy.force destroyed_at_c_call
-  | Call {op = { desc = Indirect _ | Direct _; _ }; _} -> Lazy.force all_phys_regs
+  | Call {op = { desc = Indirect _ | Direct _; _ }; _} ->
+    Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns

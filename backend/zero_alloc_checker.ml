@@ -1364,17 +1364,16 @@ end = struct
        wouldn't have reached this function. Specifically, [callee_contract]
        describes the positional arguments to [f] that affect whether [f] may
        allocate. We have to look at those positions, see what [g] is passing to
-       [f] in those positions, and impose the resulting requirements on [g].
-       To do this, we fold over the callee ([f])'s relevant argument indices
-       (see the last line of this function). *)
-    let fold
-        (callee_argument_index : int)
-        (relevant_components : bool Components.t)
-        (acc : t) : t =
+       [f] in those positions, and impose the resulting requirements on [g]. To
+       do this, we fold over the callee ([f])'s relevant argument indices (see
+       the last line of this function). *)
+    let fold (callee_argument_index : int)
+        (relevant_components : bool Components.t) (acc : t) : t =
       begin match List.nth_opt arguments_passed callee_argument_index with
       | None ->
         (* This is a partial application, and there is no nth argument. *)
-        (* CR wsturgeon for wsturgeon: this probably doesn't always allocate *)
+        (* CR wsturgeon for wsturgeon: this doesn't always allocate (work for
+           the next PR) *)
         top ~allocation_sources:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
       | Some None ->
@@ -1383,13 +1382,14 @@ end = struct
           ~witnesses:caller_witnesses
       | Some (Some (Argument { argument_index = caller_argument_index })) ->
         top
-          ~allocation_sources:(
-            No_allocation_other_than_calling_arguments
-              ( Numbers.Int.Map.singleton caller_argument_index
-                  relevant_components ) )
+          ~allocation_sources:
+            (No_allocation_other_than_calling_arguments
+               (Numbers.Int.Map.singleton caller_argument_index
+                  relevant_components))
           ~witnesses:caller_witnesses
       | Some (Some (Symbol _)) ->
-        (* CR wsturgeon for wsturgeon: look up this symbol's summary *)
+        (* CR wsturgeon for wsturgeon: look up this symbol's summary (work for
+           the next PR) *)
         top ~allocation_sources:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
       end
@@ -1397,10 +1397,8 @@ end = struct
     in
     Numbers.Int.Map.fold fold callee_contract bot
 
-  let attribute_to_call_site
-      ~(caller_witnesses : Witnesses.t)
-      ~(callee_contract : t)
-      ~(arguments_passed : Cmm.callee option list) =
+  let attribute_to_call_site ~(caller_witnesses : Witnesses.t)
+      ~(callee_contract : t) ~(arguments_passed : Cmm.callee option list) =
     match callee_contract with
     | Resolved (Top { allocation_sources; witnesses = _ }) ->
       begin match allocation_sources with
@@ -1584,7 +1582,7 @@ end = struct
         V.replace_witnesses w)
 
   let attribute_to_call_site ~caller_witnesses ~callee_contract
-        ~arguments_passed =
+      ~arguments_passed =
     Zero_alloc_utils.Components.map
       ~f:(fun _ignore_tag callee_contract ->
         V.attribute_to_call_site ~caller_witnesses ~callee_contract
@@ -2951,7 +2949,8 @@ end = struct
             Printf.sprintf "probe %s handler %s" name handler_code_sym
           in
           let k = Witness.Probe { name; handler_code_sym } in
-          transform_call t ~next ~exn handler_code_sym k ~desc dbg
+          transform_call t ~next ~exn handler_code_sym k ~desc
+            dbg
             (* CR-someday wsturgeon for wsturgeon: propagate probe arguments *)
             ~known_arguments:[]
         | Call { op = { desc = Indirect None; _ }; _ } ->

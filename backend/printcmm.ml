@@ -268,8 +268,8 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply
-      { result_type = _ty; region = _; callees = _; known_arguments = _ } ->
+  | Capply { result_type = _ty; region = _; callees = _; known_arguments = _ }
+    ->
     "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)

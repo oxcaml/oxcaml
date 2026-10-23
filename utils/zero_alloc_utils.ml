@@ -196,8 +196,7 @@ module Allocation_sources = struct
   let bind ~f = function
     | Allocation_other_than_calling_arguments ->
       Allocation_other_than_calling_arguments
-    | No_allocation_other_than_calling_arguments args_only ->
-      f args_only
+    | No_allocation_other_than_calling_arguments args_only -> f args_only
 
   let compare ~compare_args_only t1 t2 =
     match t1, t2 with

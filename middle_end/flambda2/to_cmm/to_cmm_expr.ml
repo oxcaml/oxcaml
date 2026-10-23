@@ -296,8 +296,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let return_ty = C.extended_machtype_of_return_arity return_arity in
   let arguments_possibly_being_called =
     check_known_argument env res
-    |> Option.bind callee_simple
-    |> Option.map List.singleton
+    |> Option.bind callee_simple |> Option.map List.singleton
   in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
@@ -309,8 +308,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       List.map2
         (fun expression simple ->
           { Cmm.expression; callee = check_known_argument env res simple })
-        args
-        (Apply.args apply)
+        args (Apply.args apply)
     in
     let arguments =
       if Code_metadata.is_my_closure_used code_metadata
@@ -319,7 +317,8 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           match callee with
           | Some callee ->
             { Cmm.expression = callee;
-              callee = Option.bind callee_simple (check_known_argument env res) }
+              callee = Option.bind callee_simple (check_known_argument env res)
+            }
           | None ->
             Misc.fatal_errorf
               "Need callee to compile call to@ %a@ but application expression \

@@ -5388,7 +5388,7 @@ let direct_call ~dbg ty pos f_code_sym args =
           known_arguments = List.map (fun { callee; _ } -> callee) args
         },
       Cconst_symbol (f_code_sym, dbg)
-        :: List.map (fun { expression; _ } -> expression) args,
+      :: List.map (fun { expression; _ } -> expression) args,
       dbg )
 
 let indirect_call ~dbg ty pos alloc_mode f args_type args ~callees =
