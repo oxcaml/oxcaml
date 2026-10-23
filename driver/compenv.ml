@@ -848,7 +848,7 @@ let process_action
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
       else if !Clflags.instantiate then
-        (* Other anonymous args are argument unit names. *)
+        (* Other anonymous args are argument units (names or paths). *)
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
