@@ -727,6 +727,10 @@ val get_unboxed_type_approximation :
        [get_unboxed_type_representation], but doesn't indicate whether the type
        was fully expanded or not. *)
 
+val unwrap_until_or_null : Env.t -> type_expr -> type_expr
+    (* Like [get_unboxed_type_approximation], but the result is the [or_null]
+       application if one was unwrapped, so that it keeps its nullability. *)
+
 val contained_without_boxing : Env.t -> type_expr -> type_expr list
     (* Return all types that are directly contained without boxing
        (or "without indirection" or "flatly"); in the case of [@@unboxed]

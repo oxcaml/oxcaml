@@ -3080,6 +3080,12 @@ let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
   | Ok ty | Error ty -> ty
 
+let unwrap_until_or_null env ty =
+  let unwrapped_ty = get_unboxed_type_approximation env ty in
+  match unwrapped_ty.or_null with
+  | Some { prev; _ } -> prev.ty
+  | None -> unwrapped_ty.ty
+
 
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
@@ -3159,8 +3165,12 @@ let apply_jkind_wrapping_l ~env ~level
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
-let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
-      jkind =
+(* Given some unwrapped type [t] and kind [k], try to produce some [t'] and
+   [k'] such that the constraint [t : k] can be reduced to [t' : k'] (where the
+   latter implies the former).
+
+   Fails if no [t] could have kind [k]. *)
+let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty; modality; or_null } jkind =
   begin
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
@@ -3171,7 +3181,7 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
     else
       Ok jkind
   end
-  |> Result.map (Jkind.apply_modality_r modality)
+  |> Result.map (fun jkind -> ty, Jkind.apply_modality_r modality jkind)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3559,7 +3569,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           (Jkind.Violation.of_ ~context env
                              (Not_a_subjkind
                                 (ty's_jkind, jkind, sub_failure_reasons)))
-                      | Ok jkind ->
+                      | Ok (ty, jkind) ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3571,16 +3581,15 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env
-                          unwrapped_ty.ty jkind
+                        estimate_jkind_and_loop ~fuel ~expanded:false env ty
+                          jkind
                       | _ ->
                         (* In this case, there's nothing to gain by
                            re-estimating: either it's already a product and we
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
-                          ty's_jkind jkind)
+                        loop ~fuel ~expanded:false env ty ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
