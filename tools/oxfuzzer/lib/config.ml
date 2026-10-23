@@ -1,4 +1,4 @@
-(* CR-someday hwasilewski: Make sure all constants, including probabilities, are
+(* CR-someday xclerc: Make sure all constants, including probabilities, are
    inside Config. *)
 let max_function_count = 10
 

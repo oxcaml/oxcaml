@@ -33,7 +33,7 @@ let create ~swarm ~record_types ~variant_types ~functions ~toplevel_decls
 let is_floating_point_to_integral ~from ~to_ =
   NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
 
-(* CR-someday hwasilewski: Optimize the prelude for faster compilation. Some
+(* CR-someday xclerc: Optimize the prelude for faster compilation. Some
    possibilities are precompiling the prelude into a .cmxa file and only linking
    it during fuzzing, possibly only emitting the subset of functions that are
    needed. *)

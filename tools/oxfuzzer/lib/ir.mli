@@ -1,4 +1,4 @@
-(* CR-someday hwasilewski: Turn on strong warnings (unused value etc.). *)
+(* CR-someday xclerc: Turn on strong warnings (unused value etc.). *)
 module Name : sig
   type t
 
@@ -147,7 +147,7 @@ module Bin_op : sig
     | Shift_left
     | Shift_right
     | Shift_right_logical
-    | Eq (* CR-someday hwasilewski: Also add non-equality. *)
+    | Eq (* CR-someday xclerc: Also add non-equality. *)
     | Lt
     | Le
     | Gt
