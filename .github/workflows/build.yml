@@ -65,6 +65,7 @@ jobs:
             config: --enable-dev --enable-keyword-edition=5.2
             os: warp-ubuntu-latest-x64-8x
             install_path: _custom_install
+            run_oxfuzzer: true
             sysdeps: gdb
 
           - name: debug stack-checks (x86_64-linux)
