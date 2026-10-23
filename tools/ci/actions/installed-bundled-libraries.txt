@@ -10,7 +10,6 @@ dynlink
 eval
 js_of_ocaml
 js_of_ocaml-compiler
-js_of_ocaml-compiler.cmdline
 js_of_ocaml-compiler.dynlink
 js_of_ocaml-compiler.private.cmdliner
 js_of_ocaml-compiler.private.gen

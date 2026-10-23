@@ -1,6 +1,5 @@
 (library
  (name jsoo_cmdline)
- (public_name js_of_ocaml-compiler.cmdline)
  (libraries oxcaml_private_cmdliner js_of_ocaml-compiler)
  (flags
   (:standard -open Oxcaml_private_cmdliner)))
