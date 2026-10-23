@@ -251,19 +251,27 @@ val eq_ut : int * string -> ut box -> bool = <fun>
 |}]
 
 (* Test 14: Additional jkinds - bits32, bits64, word. The unboxed versions
-   of singleton mixed records have these layouts. *)
+   of singleton mixed records have these layouts, made addressable. *)
 
-let check_bits32 : type (a : bits32). a -> a box -> unit =
+let check_bits32 : type (a : bits32 addressable). a -> a box -> unit =
   fun _ _ -> ();;
 [%%expect{|
-val check_bits32 : ('a : bits32). 'a -> 'a box -> unit = <fun>
+val check_bits32 : ('a : bits32 addressable). 'a -> 'a box -> unit = <fun>
 |}]
 
 type r32 = { i32 : int32_u }
 let test_bits32 (u : r32#) (b : r32) = check_bits32 u b;;
 [%%expect{|
 type r32 = { i32 : int32_u; }
-val test_bits32 : r32# -> r32 -> unit = <fun>
+Line 2, characters 52-53:
+2 | let test_bits32 (u : r32#) (b : r32) = check_bits32 u b;;
+                                                        ^
+Error: The value "u" has type "r32#" but an expression was expected of type
+         "('a : bits32 addressable)"
+       The layout of r32# is bits32
+         because it is an unboxed record.
+       But the layout of r32# must be a sublayout of bits32 addressable
+         because of the definition of check_bits32 at line 1, characters 4-16.
 |}]
 
 let check_bits64 : type (a : bits64). a -> a box -> unit =

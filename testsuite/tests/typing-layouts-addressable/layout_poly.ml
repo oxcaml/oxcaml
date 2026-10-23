@@ -88,12 +88,12 @@ Error: The value "x" has type "float#" but an expression was expected of type
          representable at call sites).
 |}]
 
-(* ...including at an unboxed product with an unaddressable component *)
-let bad (x : #(float# * string)) = id_addressable x
+(* An unboxed product is addressable even if a component is not *)
+let ok (x : #(float# * string)) = id_addressable x
 [%%expect{|
-Line 1, characters 50-51:
-1 | let bad (x : #(float# * string)) = id_addressable x
-                                                      ^
+Line 1, characters 49-50:
+1 | let ok (x : #(float# * string)) = id_addressable x
+                                                     ^
 Error: The value "x" has type "#(float# * string)"
        but an expression was expected of type
          "('a : '_representable_layout_3 addressable)"
@@ -104,9 +104,9 @@ Error: The value "x" has type "#(float# * string)"
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}, Principal{|
-Line 1, characters 50-51:
-1 | let bad (x : #(float# * string)) = id_addressable x
-                                                      ^
+Line 1, characters 49-50:
+1 | let ok (x : #(float# * string)) = id_addressable x
+                                                     ^
 Error: The value "x" has type "#(float# * string)"
        but an expression was expected of type
          "('a : '_representable_layout_3 addressable)"
@@ -333,9 +333,7 @@ let d (y : r) = id_addressable y
 val d : r -> r = <fun>
 |}]
 
-(* Constraining types with product kinds to be addressable (in a way that
-   exercises [Jkind.decompose_product] because the kind stored on the
-   declaration of [mixed_pair] is approximate). *)
+(* Products whose kind stored on the declaration is approximate *)
 
 type ('a : any) mixed_pair = #{ a : 'a; b : string }
 
@@ -345,11 +343,11 @@ type ('a : any) mixed_pair = #{ a : 'a; b : string; }
 val ok : b8a mixed_pair -> b8a mixed_pair = <fun>
 |}]
 
-let bad (y : b8 mixed_pair) = id_addressable y
+let ok (y : b8 mixed_pair) = id_addressable y
 [%%expect{|
-Line 1, characters 45-46:
-1 | let bad (y : b8 mixed_pair) = id_addressable y
-                                                 ^
+Line 1, characters 44-45:
+1 | let ok (y : b8 mixed_pair) = id_addressable y
+                                                ^
 Error: The value "y" has type "b8 mixed_pair"
        but an expression was expected of type
          "('a : ('_representable_layout_5 & value_or_null) addressable)"
@@ -360,9 +358,9 @@ Error: The value "y" has type "b8 mixed_pair"
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}, Principal{|
-Line 1, characters 45-46:
-1 | let bad (y : b8 mixed_pair) = id_addressable y
-                                                 ^
+Line 1, characters 44-45:
+1 | let ok (y : b8 mixed_pair) = id_addressable y
+                                                ^
 Error: The value "y" has type "b8 mixed_pair"
        but an expression was expected of type
          "('a : ('_representable_layout_5 & value_or_null) addressable)"

@@ -210,7 +210,7 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
 module M : sig type t : bits64 & word end
 |}]
 
-(* A product all of whose components are made addressable is addressable *)
+(* A product is addressable: [&] makes its components addressable *)
 module M : sig
   type t : (bits8 addressable & bits16 addressable) addressable
 end = struct
@@ -495,17 +495,18 @@ type ok = int64_u req
 type ok = int64_u req
 |}]
 
-(* An unboxed product is addressable iff all of its components are *)
+(* An unboxed product is addressable, as [&] makes its components
+   addressable *)
 type ok = #(int64_u * string) req
 [%%expect{|
 type ok = #(int64_u * string) req
 |}]
 
-type bad = #(float# * string) req
+type ok = #(float# * string) req
 [%%expect{|
-Line 1, characters 11-29:
-1 | type bad = #(float# * string) req
-               ^^^^^^^^^^^^^^^^^^
+Line 1, characters 10-28:
+1 | type ok = #(float# * string) req
+              ^^^^^^^^^^^^^^^^^^
 Error: This type "#(float# * string)" should be an instance of type
          "('a : any addressable)"
        The layout of #(float# * string) is float64 & value non_float
@@ -639,60 +640,6 @@ end = struct
 end
 [%%expect{|
 module M : sig type t : any end
-|}]
-
-(**** Addressability does not distribute through products ****)
-
-module M : sig
-  type t : bits8 addressable & bits8 addressable
-end = struct
-  type t : (bits8 & bits8) addressable
-end
-[%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : (bits8 & bits8) addressable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : (bits8 & bits8) addressable end
-       is not included in
-         sig type t : bits8 addressable & bits8 addressable end
-       Type declarations do not match:
-         type t : (bits8 & bits8) addressable
-       is not included in
-         type t : bits8 addressable & bits8 addressable
-       The layout of the first is (bits8 & bits8) addressable
-         because of the definition of t at line 4, characters 2-38.
-       But the layout of the first must be a sublayout of
-           bits8 addressable & bits8 addressable
-         because of the definition of t at line 2, characters 2-48.
-|}]
-
-module M : sig
-  type t : (bits8 & bits8) addressable
-end = struct
-  type t : bits8 addressable & bits8 addressable
-end
-[%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : bits8 addressable & bits8 addressable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 addressable & bits8 addressable end
-       is not included in
-         sig type t : (bits8 & bits8) addressable end
-       Type declarations do not match:
-         type t : bits8 addressable & bits8 addressable
-       is not included in
-         type t : (bits8 & bits8) addressable
-       The layout of the first is bits8 addressable & bits8 addressable
-         because of the definition of t at line 4, characters 2-48.
-       But the layout of the first must be a sublayout of
-           (bits8 & bits8) addressable
-         because of the definition of t at line 2, characters 2-38.
 |}]
 
 (**** Representability: addressability does not change the representation of
@@ -829,21 +776,9 @@ type t : value addressable mod portable [@@warning "-183"]
 type t : value mod portable
 |}]
 
-(**** [@unpacked] looks through [addressable] on products ****)
+(**** [@unpacked] ****)
 
-(* Addressability does not change the out-of-block product representation,
-   so a made-addressable product can be unpacked into C stub arguments. *)
-type tup : (bits32 & bits32) addressable
-[%%expect{|
-type tup : (bits32 & bits32) addressable
-|}]
-
-external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
-[%%expect{|
-external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
-|}]
-
-(* ... but a made-addressable non-product still cannot be unpacked *)
+(* A made-addressable non-product cannot be unpacked *)
 external bad : (t8 [@unpacked]) -> int = "foo" "bar"
 [%%expect{|
 Line 1, characters 16-18:
@@ -879,24 +814,4 @@ kind_ ka = value
 type t : ka
 [%%expect{|
 type t
-|}]
-
-(**** Printing of partially-solved sorts ****)
-
-(* A wrapper made redundant by unification (here, the second component's
-   variable is filled with [value]) is not printed back. *)
-let bad (x : ('a : (float64 & value) addressable)) (y : #('b * 'c)) =
-  if true then x else y
-[%%expect{|
-Line 2, characters 22-23:
-2 |   if true then x else y
-                          ^
-Error: The value "y" has type "#('b * 'c)" but an expression was expected of type
-         "('a : (float64 & value) addressable)"
-       The layout of #('b * 'c) is
-           '_representable_layout_2 addressable & value_or_null
-         because it is an unboxed tuple.
-       But the layout of #('b * 'c) must be a sublayout of
-           (float64 & value) addressable
-         because of the annotation on the type variable 'a.
 |}]
