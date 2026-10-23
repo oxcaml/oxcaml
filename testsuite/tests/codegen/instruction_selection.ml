@@ -86,6 +86,47 @@ logand_branch:
   ret
 |}]
 
+let lognot_branch x y f = if Int64_u.equal (Int64_u.lognot x) #0L then f ()
+[%%expect_asm X86_64{|
+lognot_branch:
+  movq  %rdi, %rbx
+  cmpq  $-1, %rax
+  jne   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_neq_branch x f =
+  if Int64_u.to_int64 (Int64_u.lognot x) <> 0L then f ()
+[%%expect_asm X86_64{|
+lognot_neq_branch:
+  cmpq  $-1, %rax
+  je    .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
+let lognot_lt_branch x f =
+  if Int64_u.to_int64 (Int64_u.lognot x) < 7L then f ()
+[%%expect_asm X86_64{|
+lognot_lt_branch:
+  cmpq  $-8, %rax
+  jle   .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize comparison result bits despite
    only using them for a single branch. Also, the `_ -> 0`
@@ -235,15 +276,15 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jl    .L0
-  subq  %rax, %rax
-  incq  %rax
-  cmpq  $1, %rax
-  jne   .L1
+  jge   .L1
 .L0:
   movl  $7, %eax
   ret
 .L1:
+  subq  %rax, %rax
+  incq  %rax
+  cmpq  $1, %rax
+  je    .L0
   movl  $9, %eax
   ret
 |}]
