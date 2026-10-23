@@ -64,11 +64,11 @@ test the behavior of indexes when some are missing.
   >   file="$1"
   >   shift
   >   [ "$1" = -- ] && shift
-  >   mv -- "$file" "$file.moved" || exit
+  >   mv -- "$file" "$file.moved" || return
   >   "$@"
   >   status="$?"
   >   mv -- "$file.moved" "$file"
-  >   exit $status
+  >   return $status
   > }
 
 The standalone index is the same as before, even when the component indexes are
