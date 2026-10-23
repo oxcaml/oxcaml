@@ -516,6 +516,37 @@ type ('a, 'b) labeled_fn =
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
+module type S_for_mode_polymorphism = sig
+  val variable : 'a @ 'm -> 'a @ 'm
+  val bounds : 'a @ [< 'm & 'n] -> 'a @ [> 'm | 'n]
+  val constants : 'a @ [< portable many] -> 'a @ [> local once]
+  val combined : 'a @ [< 'm & portable > 'n | dynamic] -> 'a @ [> 'm]
+  val past : 'a @ [< past('m)] -> 'a @ [> past('m)]
+  val modified :
+    'a @ [< 'm mod portable contended & past('n) mod global] ->
+    'a @ [> 'm mod many aliased | past('n) mod local]
+  val close :
+    'a @ [< 'm] ->
+    ('b @ 'n -> 'a @ [> 'm]) @
+      [> close('m) mod portable | close('n) | local once]
+end
+
+[%%expect{|
+>> Fatal error: Line 2, characters 22-24: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+module type Mixed_mode_annotations = sig
+  val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
+end
+
+[%%expect{|
+>> Fatal error: Line 2, characters 29-31: mode variables and mode bounds are not yet supported
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 (* kitchen sink, with new @ syntax *)
 let f ~(x1 @ many)
       ~(x2 : string @ local)

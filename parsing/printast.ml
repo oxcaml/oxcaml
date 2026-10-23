@@ -154,9 +154,30 @@ let modality i ppf modality =
 let modalities i ppf modalities =
   List.iter (fun m -> modality i ppf m) modalities
 
-let mode i ppf mode =
-  line i ppf "mode %a\n" fmt_string_loc
-    (Location.map (fun (Mode x) -> x) mode)
+let mode_bound_elem i ppf { elem_morph; elem_var; elem_mod } =
+  line i ppf "mode_bound_elem\n";
+  option (i+1) string_loc ppf elem_morph;
+  string_loc (i+1) ppf elem_var;
+  list (i+1) string_loc ppf elem_mod
+
+let mode_bound i ppf { bound_vars; bound_const } =
+  list i mode_bound_elem ppf bound_vars;
+  list i string_loc ppf bound_const
+
+let mode i ppf (mode : mode loc) =
+  match mode.txt with
+  | Mode x ->
+    line i ppf "mode %a\n" fmt_string_loc { mode with txt = x }
+  | Mode_var v ->
+    line i ppf "mode %a\n" fmt_location mode.loc;
+    line (i+1) ppf "Mode_var \"%s\"\n" v
+  | Mode_bounds { upper; lower } ->
+    line i ppf "mode %a\n" fmt_location mode.loc;
+    line (i+1) ppf "Mode_bounds\n";
+    line (i+2) ppf "upper\n";
+    mode_bound (i+3) ppf upper;
+    line (i+2) ppf "lower\n";
+    mode_bound (i+3) ppf lower
 
 let modes i ppf modes =
   List.iter (fun m -> mode i ppf m) modes

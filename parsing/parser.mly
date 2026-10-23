@@ -4760,8 +4760,54 @@ strict_function_or_labeled_tuple_type:
 ;
 
 /* New mode annotation, introduced by AT or ATAT */
+%inline mode_const:
+  | LIDENT { mkloc $1 (make_loc $sloc) }
+;
+
+%inline mode_consts:
+  | mode_const+ { $1 }
+;
+
+%inline mode_morph:
+  | LIDENT { mkloc $1 (make_loc $sloc) }
+;
+
+%inline mode_var:
+  | QUOTE ident { mkloc $2 (make_loc $sloc) }
+;
+
+mode_bound_elem:
+  | elem_var = mode_var
+    elem_mod = iloption(preceded(MOD, mode_consts))
+      { { elem_morph = None; elem_var; elem_mod } }
+  | elem_morph = mode_morph LPAREN elem_var = mode_var RPAREN
+    elem_mod = iloption(preceded(MOD, mode_consts))
+      { { elem_morph = Some elem_morph; elem_var; elem_mod } }
+;
+
+mode_bound(SEP):
+  | consts = mode_consts
+      { { bound_vars = []; bound_const = consts } }
+  | e = mode_bound_elem
+      { { bound_vars = [e]; bound_const = [] } }
+  | e = mode_bound_elem SEP rest = mode_bound(SEP)
+      { { rest with bound_vars = e :: rest.bound_vars } }
+;
+
+mode_bounds:
+  | LBRACKETLESS upper = mode_bound(AMPERSAND) RBRACKET
+      { { upper; lower = { bound_vars = []; bound_const = [] } } }
+  | LBRACKETLESS upper = mode_bound(AMPERSAND) GREATER
+    lower = mode_bound(BAR) RBRACKET
+      { { upper; lower } }
+  | LBRACKETGREATER lower = mode_bound(BAR) RBRACKET
+      { { upper = { bound_vars = []; bound_const = [] }; lower } }
+;
+
 %inline mode:
   | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
+  | v = mode_var { mkloc (Mode_var v.txt) v.loc }
+  | b = mode_bounds { mkloc (Mode_bounds b) (make_loc $sloc) }
 ;
 
 %inline mode_expr:
