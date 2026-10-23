@@ -200,11 +200,17 @@ end
 module Var : sig
   type t
 
-  val create : string -> Zero_alloc_utils.Tag.t -> t
+  val create :
+    string ->
+    Zero_alloc_utils.Tag.t ->
+    known_arguments:Cmm.callee option list ->
+    t
 
   val name : t -> string
 
   val tag : t -> Zero_alloc_utils.Tag.t
+
+  val known_arguments : t -> Cmm.callee option list
 
   val print : Format.formatter -> t -> unit
 
@@ -219,12 +225,23 @@ end = struct
   module T = struct
     type t =
       { name : string;
-        tag : Zero_alloc_utils.Tag.t
+        tag : Zero_alloc_utils.Tag.t;
+        known_arguments : Cmm.callee option list
       }
 
-    let compare { tag = tag1; name = name1 } { tag = tag2; name = name2 } =
+    let compare { tag = tag1; name = name1; known_arguments = known_arguments1 }
+        { tag = tag2; name = name2; known_arguments = known_arguments2 } =
       let c = String.compare name1 name2 in
-      if c = 0 then Zero_alloc_utils.Tag.compare tag1 tag2 else c
+      if c <> 0
+      then c
+      else
+        let c = Zero_alloc_utils.Tag.compare tag1 tag2 in
+        if c <> 0
+        then c
+        else
+          List.compare
+            (Option.compare Cmm.compare_callee)
+            known_arguments1 known_arguments2
   end
 
   include T
@@ -237,9 +254,11 @@ end = struct
 
   let tag t = t.tag
 
-  let create name tag = { name; tag }
+  let known_arguments t = t.known_arguments
 
-  let print ppf { name; tag } =
+  let create name tag ~known_arguments = { name; tag; known_arguments }
+
+  let print ppf { name; tag; known_arguments = _ } =
     Format.fprintf ppf "%s.%s@ " name (Zero_alloc_utils.Tag.print tag)
 end
 
@@ -1428,8 +1447,7 @@ end = struct
       | None -> unresolved w var
       | Some callee_contract ->
         attribute_to_call_site ~caller_witnesses:w ~callee_contract
-          (* CR wsturgeon for wsturgeon: non-empty *)
-          ~arguments_passed:[]
+          ~arguments_passed:(Var.known_arguments var)
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1445,8 +1463,7 @@ end = struct
         | None -> t
         | Some callee_contract ->
           attribute_to_call_site ~caller_witnesses:witnesses ~callee_contract
-            (* CR wsturgeon for wsturgeon: non-empty *)
-            ~arguments_passed:[])
+            ~arguments_passed:(Var.known_arguments var))
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1529,7 +1546,8 @@ module Value : sig
   val diff_witnesses :
     expected:t -> actual:t -> Witnesses.t Zero_alloc_utils.Components.t
 
-  val unresolved : string -> Witnesses.t -> t
+  val unresolved :
+    string -> Witnesses.t -> known_arguments:Cmm.callee option list -> t
 
   val is_resolved : t -> bool
 
@@ -1539,9 +1557,9 @@ module Value : sig
 end = struct
   include T
 
-  let unresolved name w =
+  let unresolved name w ~known_arguments =
     Zero_alloc_utils.Components.create (fun tag ->
-        Var.create name tag |> V.unresolved w)
+        Var.create name tag ~known_arguments |> V.unresolved w)
 
   let is_resolved (t : _ Zero_alloc_utils.Components.t) =
     V.is_resolved t.nor && V.is_resolved t.exn && V.is_resolved t.div
@@ -2396,7 +2414,7 @@ end = struct
   let find_callee t callee ~desc dbg (k : Witness.kind) ~known_arguments =
     let unresolved reason =
       let w = create_witnesses t k dbg in
-      let v = Value.unresolved callee w in
+      let v = Value.unresolved callee w ~known_arguments in
       let msg = Printf.sprintf "unresolved %s (%s)" callee reason in
       report t v ~msg ~desc dbg;
       v

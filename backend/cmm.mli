@@ -233,6 +233,8 @@ type callee =
 
 val equal_callee : callee -> callee -> bool
 
+val compare_callee : callee -> callee -> int
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
