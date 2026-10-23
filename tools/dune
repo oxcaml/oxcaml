@@ -158,13 +158,17 @@
 
 (executable
  (name ocamlfilt)
- (modes byte native)
+ ; The C stubs rule out a plain bytecode executable.
+ (modes byte_complete native)
  (modules ocamlfilt)
+ (foreign_stubs
+  (language c)
+  (names demangle demangle_stubs))
  (libraries ocamlfrontend))
 
 (install
  (files
-  (ocamlfilt.bc as ocamlfilt.byte)
+  (ocamlfilt.bc.exe as ocamlfilt.byte)
   (ocamlfilt.exe as ocamlfilt))
  (section bin)
  (package ocaml))
