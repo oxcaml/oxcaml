@@ -223,7 +223,43 @@ let () =
 type ur = { u1 : int64_u; u2 : string; u3 : int; }
 |}]
 
+(* Singleton products. A record whose only field is an unboxed product is laid
+   out like that product, even when the product is wrapped in a singleton
+   unboxed record. So boxing the tuple, and constructing or boxing either
+   record, must all give blocks that agree. *)
+
+type one_values = { p : #(int * string) }
+type wrapped = #{ wt : #(int * string) }
+type one_wrapped = { pw : wrapped }
+
+let () =
+  let check_values block =
+    check_shape block { p = #(42, s) };
+    let #(i, s') = (Obj.magic block : one_values).p in
+    assert (i = 42 && s' == s)
+  in
+  check_values { p = #(42, s) };
+  check_values { pw = #{ wt = #(42, s) } };
+  check_values (box #(42, s));
+  check_values (box #{ p = #(42, s) } : one_values);
+  check_values (box #{ pw = #{ wt = #(42, s) } } : one_wrapped);
+[%%expect{|
+type one_values = { p : #(int * string); }
+type wrapped = #{ wt : #(int * string); }
+type one_wrapped = { pw : wrapped; }
+|}]
+
 (* All-void records *)
+
+type one_void = { u : unit# }
+
+let () =
+  let boxed : one_void = box #{ u = #() } in
+  check_shape boxed { u = #() };
+  assert (Obj.size (Obj.repr boxed) = if native () then 0 else 1)
+[%%expect{|
+type one_void = { u : unit#; }
+|}]
 
 type all_void = { x : unit#; kept : unit# }
 
