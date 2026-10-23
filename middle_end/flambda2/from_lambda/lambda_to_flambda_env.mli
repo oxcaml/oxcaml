@@ -35,9 +35,14 @@ val create :
   exn_continuation:Continuation.t ->
   my_region:Region_stack_element.t option ->
   my_alloc_region:Ident.t ->
+  fdo_naming_context:Fdo_fingerprint.Naming_context.t option ->
   t
 
 val current_unit : t -> Compilation_unit.t
+
+(** The context that functions defined here get their FDO identities in (see
+    [Fdo_fingerprint]), when [-fdo-counters] is in effect. *)
+val fdo_naming_context : t -> Fdo_fingerprint.Naming_context.t option
 
 val machine_width : t -> Target_system.Machine_width.t
 

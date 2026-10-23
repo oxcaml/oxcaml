@@ -1,11 +1,11 @@
 ; Tests for the FDO system with pseudo-instrumentation
 
+; The operations on pseudo-instrumentation counters ([Fdo_counter]).
+
 (executable
  (name fdo_counters)
  (modules fdo_counters)
  (libraries ocamlcommon))
-
-; The operations on pseudo-instrumentation counters ([Fdo_counter]).
 
 (rule
  (enabled_if
@@ -22,3 +22,53 @@
  (deps fdo_counters.output fdo_counters.output.corrected)
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
+
+; Stability of function identities ([Fdo_fingerprint]): the entry counters of
+; function_ids.ml and of function_ids_edited.ml (the same module with extra anonymous
+; functions inserted, compiled under the same module name via -o) must agree
+; except for the inserted functions. Additionally, the discriminators should distinguish
+; functions with the same name (or anonymous functions with the same body).
+
+(executable
+ (name fdo_entries)
+ (modules fdo_entries)
+ (libraries ocamlcommon))
+
+(rule
+ (targets function_ids.output.corrected)
+ (deps function_ids.ml function_ids_edited.ml fdo_entries.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    function_ids.ml)
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    -o
+    function_ids.edited.cmx
+    function_ids_edited.ml)
+   (with-stdout-to
+    function_ids.output.corrected
+    (run ./fdo_entries.exe function_ids.raw.fl function_ids.edited.raw.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps function_ids.output function_ids.output.corrected)
+ (action
+  (diff function_ids.output function_ids.output.corrected)))
