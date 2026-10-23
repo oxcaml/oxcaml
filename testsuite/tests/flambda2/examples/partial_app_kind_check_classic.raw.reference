@@ -1,3 +1,4 @@
+let $camlPartial_app_kind_check_classic__s2 = Block 0 () in
 (let code inline(never) size(1)
        f_1 (param, param_1)
          my_closure &my_alloc_region my_depth
@@ -14,13 +15,10 @@
  in
  let $camlPartial_app_kind_check_classic__s0 = closure test_0 @test &toplevel
  in
- let $camlPartial_app_kind_check_classic__s2 =
+ let $camlPartial_app_kind_check_classic__s1 = closure f_1 @f &toplevel in
+ let $camlPartial_app_kind_check_classic =
    Block 0 ($camlPartial_app_kind_check_classic__s0)
  in
- let $camlPartial_app_kind_check_classic__s1 = closure f_1 @f &toplevel in
- cont k ($camlPartial_app_kind_check_classic__s2))
+ cont k ($camlPartial_app_kind_check_classic))
   where k define_root_symbol (module_block) =
-    let $camlPartial_app_kind_check_classic =
-      Block 0 ($camlPartial_app_kind_check_classic__s0)
-    in
     cont done ($camlPartial_app_kind_check_classic)

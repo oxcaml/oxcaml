@@ -44,11 +44,9 @@ let $camlDuplicate_block_mixed_record_length__first_const_0 = Block 0 () in
  in
  let update = closure update_0 @update &toplevel in
  let update_inlined = closure update_inlined_1 @update_inlined &toplevel in
- let Pmakeblock = %block.[`0`].`toplevel` (update, update_inlined) in
- cont k (Pmakeblock))
+ let $camlDuplicate_block_mixed_record_length =
+   Block 0 (update, update_inlined)
+ in
+ cont k ($camlDuplicate_block_mixed_record_length))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
-    let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
-    let $camlDuplicate_block_mixed_record_length = Block 0 (field_0, field_1)
-    in
     cont done ($camlDuplicate_block_mixed_record_length)

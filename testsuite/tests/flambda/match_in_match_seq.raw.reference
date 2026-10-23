@@ -294,9 +294,7 @@ let $camlMatch_in_match_seq__first_const_0 = Block 0 () in
   let Pmakeblock = %block.[`0`].`toplevel` (foo) in
   cont k1 (Pmakeblock))
    where k1 (Seq : val) =
-     let Pmakeblock = %block.[`0`].`toplevel` (Seq) in
-     cont k (Pmakeblock))
+     let $camlMatch_in_match_seq = Block 0 (Seq) in
+     cont k ($camlMatch_in_match_seq))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
-    let $camlMatch_in_match_seq = Block 0 (field_0) in
     cont done ($camlMatch_in_match_seq)

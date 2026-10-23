@@ -1,0 +1,32 @@
+let code f_0 deleted in
+let $camlModule_block_toplevel_simplify__immstring_0 = "s" in
+let code inline(never) loopify(never) size(3) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, 1) in
+  cont k (int_add)
+in
+let $camlModule_block_toplevel_simplify__f_1 = closure f_0_1 @f &toplevel in
+(let Popaque = %opaque (41) in
+ apply direct(f_0_1 &toplevel)
+   ($camlModule_block_toplevel_simplify__f_1 : _ -> imm tagged)
+     (Popaque)
+     -> k * error)
+  where k (y : imm tagged) =
+    let $camlModule_block_toplevel_simplify__Pmakeblock_2 =
+      Block 0 (y, $camlModule_block_toplevel_simplify__immstring_0)
+    in
+    let `*match*` =
+      %opaque ($camlModule_block_toplevel_simplify__Pmakeblock_2)
+    in
+    let Pmixedfield = %block_load.[`1`] (`*match*`) in
+    let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
+    let $camlModule_block_toplevel_simplify =
+      Block 0 ($camlModule_block_toplevel_simplify__f_1,
+               y,
+               Pmixedfield_1,
+               Pmixedfield)
+    in
+    cont done ($camlModule_block_toplevel_simplify)
