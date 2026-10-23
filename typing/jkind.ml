@@ -2904,15 +2904,23 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-let for_unboxed_record lbls =
+(* The component layouts of an unboxed record, given the layouts of its
+   fields. A sole field is made addressable unless it is [inherit]; several
+   fields are made addressable by [&]. *)
+let unboxed_record_layouts lbls layouts =
+  match lbls, layouts with
+  | [lbl], [layout] ->
+    [Layout.apply_operator layout (Types.unboxed_record_field_operator lbl)]
+  | _ -> layouts
+
+let for_unboxed_record lbls_with_layouts =
   let open Types in
+  let lbls, layouts = List.split lbls_with_layouts in
   let tys_modalities =
-    List.map
-      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
-      lbls
+    List.map (fun { ld_type; ld_modalities; _ } -> ld_type, ld_modalities) lbls
   in
-  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  Builtin.product ~why:Unboxed_record tys_modalities
+    (unboxed_record_layouts lbls layouts)
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
