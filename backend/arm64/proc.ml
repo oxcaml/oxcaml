@@ -202,11 +202,14 @@ let external_calling_conventions
       | XVec128 -> Vec128, float_registers, 1, size_vec128
       | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
+      | XPhantom_int -> Int, int_registers, 1, size_int
+      | XPhantom_float -> Float, float_registers, 1, size_float
     in
     match !registers with
     | reg :: regs ->
       registers := regs;
-      loc.(i) <- [| phys_reg ty reg |]
+      loc.(i) <- (if Cmm.is_phantom_exttype ty_arg then [||]
+                  else [| phys_reg ty reg |])
     | [] ->
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;

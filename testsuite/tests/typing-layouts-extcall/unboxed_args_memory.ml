@@ -116,3 +116,12 @@ external nested_tail_padded : #(#(int64_u * int8#) * int8#) -> int64_u
 let () =
   Printf.eprintf "nested_tail_padded: %Ld\n%!"
     (box_int64 (nested_tail_padded #(#(#1L, i8 2), i8 3)))
+
+(* 20 bytes: the third slot holds one float32. *)
+external f32x5 :
+  #(float32_u * float32_u * float32_u * float32_u * float32_u) -> float#
+  = "" "f32x5_native"
+
+let () =
+  Printf.eprintf "f32x5: %.4f\n%!"
+    (box_float (f32x5 #(f32 1.0, f32 2.0, f32 3.0, f32 4.0, f32 (-5.0))))

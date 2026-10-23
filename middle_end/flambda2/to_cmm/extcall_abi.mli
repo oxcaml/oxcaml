@@ -55,7 +55,7 @@ end
 (** Part of a struct occupying one stack slot. *)
 module Unit : sig
   type t =
-    { components : Component.t list;  (** None for padding *)
+    { components : Component.t list;  (** Empty for padding *)
       size : int  (** In bytes *)
     }
 
@@ -106,7 +106,7 @@ module Slot : sig
 end
 
 (** The [Cextcall]'s argument list. *)
-module Args_plan : sig
+module Arg_slots : sig
   type t =
     { args : Arg.t array;  (** Indexed by C argument *)
       slots : Slot.t list

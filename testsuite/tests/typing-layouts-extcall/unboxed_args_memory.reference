@@ -7,3 +7,4 @@ padded: 15
 i64x7_i64x3_i64x3_i64: 212993
 nested_i64x3: 17
 nested_tail_padded: 17
+f32x5: -31.0000

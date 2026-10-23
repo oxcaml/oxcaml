@@ -721,3 +721,162 @@ value all_void_return_bytecode(value unit) {
   Field(res, 1) = Val_unit;
   return res;
 }
+
+typedef struct { int32_t a; int32_t b; int32_t c; } i32x3_struct;
+typedef struct { double a; float b; float c; } f64_f32_f32_struct;
+typedef struct { int64_t a; int8_t b; } i64_i8_struct;
+typedef struct { int8_t a; double b; } i8_f64_struct;
+typedef struct { float a; int64_t b; } f32_i64_struct;
+typedef struct { int32_t a; int32_t b; double c; } i32_i32_f64_struct;
+typedef struct { int8_t a; int8_t b; } i8_i8_inner_struct;
+typedef struct { i8_i8_inner_struct p; int16_t c; } nested2_struct;
+typedef struct { nested2_struct p; int32_t d; } nested3_struct;
+typedef struct { int32_t a; int8_t b; } i32_i8_inner_struct;
+typedef struct { int8_t a; i32_i8_inner_struct p; } nested_inner_padded_struct;
+
+_Static_assert(sizeof(i32x3_struct) == 12, "three int32s should be 12 bytes");
+_Static_assert(sizeof(i64_i8_struct) == 16, "int64, int8 should be 16 bytes");
+_Static_assert(sizeof(i8_f64_struct) == 16, "int8, double should be 16 bytes");
+_Static_assert(sizeof(f32_i64_struct) == 16, "float, int64 should be 16 bytes");
+_Static_assert(sizeof(nested3_struct) == 8, "nested3 should be 8 bytes");
+_Static_assert(sizeof(nested_inner_padded_struct) == 12,
+               "int8, { int32, int8 } should be 12 bytes");
+
+i32x3_struct ret_i32_triple_native(value unit) {
+  i32x3_struct res = { -1, 20, -300 };
+  return res;
+}
+
+value ret_i32_triple_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal4(res, a, b, c);
+  a = caml_copy_int32(-1);
+  b = caml_copy_int32(20);
+  c = caml_copy_int32(-300);
+  res = caml_alloc_small(3, 0);
+  Field(res, 0) = a;
+  Field(res, 1) = b;
+  Field(res, 2) = c;
+  CAMLreturn(res);
+}
+
+f64_f32_f32_struct ret_f64_f32_f32_native(value unit) {
+  f64_f32_f32_struct res = { -4.5, 100.25f, -0.5f };
+  return res;
+}
+
+value ret_f64_f32_f32_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal4(res, a, b, c);
+  a = caml_copy_double(-4.5);
+  b = caml_copy_float32(100.25f);
+  c = caml_copy_float32(-0.5f);
+  res = caml_alloc_small(3, 0);
+  Field(res, 0) = a;
+  Field(res, 1) = b;
+  Field(res, 2) = c;
+  CAMLreturn(res);
+}
+
+i64_i8_struct ret_i64_i8_native(value unit) {
+  i64_i8_struct res = { 123456789012LL, -100 };
+  return res;
+}
+
+value ret_i64_i8_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal2(res, a);
+  a = caml_copy_int64(123456789012LL);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = a;
+  Field(res, 1) = Val_int8(-100);
+  CAMLreturn(res);
+}
+
+i8_f64_struct ret_i8_f64_native(value unit) {
+  i8_f64_struct res = { -7, 2.5 };
+  return res;
+}
+
+value ret_i8_f64_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal2(res, b);
+  b = caml_copy_double(2.5);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = Val_int8(-7);
+  Field(res, 1) = b;
+  CAMLreturn(res);
+}
+
+f32_i64_struct ret_f32_i64_native(value unit) {
+  f32_i64_struct res = { 1.25f, -999 };
+  return res;
+}
+
+value ret_f32_i64_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal3(res, a, b);
+  a = caml_copy_float32(1.25f);
+  b = caml_copy_int64(-999);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = a;
+  Field(res, 1) = b;
+  CAMLreturn(res);
+}
+
+i32_i32_f64_struct ret_i32_i32_f64_native(value unit) {
+  i32_i32_f64_struct res = { 11, -22, 0.75 };
+  return res;
+}
+
+value ret_i32_i32_f64_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal4(res, a, b, c);
+  a = caml_copy_int32(11);
+  b = caml_copy_int32(-22);
+  c = caml_copy_double(0.75);
+  res = caml_alloc_small(3, 0);
+  Field(res, 0) = a;
+  Field(res, 1) = b;
+  Field(res, 2) = c;
+  CAMLreturn(res);
+}
+
+nested3_struct ret_nested3_native(value unit) {
+  nested3_struct res = { { { 1, -2 }, 300 }, -40000 };
+  return res;
+}
+
+value ret_nested3_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal4(res, mid, inner, d);
+  inner = caml_alloc_small(2, 0);
+  Field(inner, 0) = Val_int8(1);
+  Field(inner, 1) = Val_int8(-2);
+  mid = caml_alloc_small(2, 0);
+  Field(mid, 0) = inner;
+  Field(mid, 1) = Val_int16(300);
+  d = caml_copy_int32(-40000);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = mid;
+  Field(res, 1) = d;
+  CAMLreturn(res);
+}
+
+nested_inner_padded_struct ret_nested_inner_padded_native(value unit) {
+  nested_inner_padded_struct res = { -1, { 100000, 7 } };
+  return res;
+}
+
+value ret_nested_inner_padded_bytecode(value unit) {
+  CAMLparam1(unit);
+  CAMLlocal3(res, inner, b);
+  b = caml_copy_int32(100000);
+  inner = caml_alloc_small(2, 0);
+  Field(inner, 0) = b;
+  Field(inner, 1) = Val_int8(7);
+  res = caml_alloc_small(2, 0);
+  Field(res, 0) = Val_int8(-1);
+  Field(res, 1) = inner;
+  CAMLreturn(res);
+}

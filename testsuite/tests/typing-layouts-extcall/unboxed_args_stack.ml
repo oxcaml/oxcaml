@@ -279,3 +279,37 @@ let () =
     (box_float
        (i64x6_f64x8_mixed #1L #2L #3L #4L #5L #6L #1.0 #2.0 #3.0 #4.0 #5.0 #6.0
           #7.0 #8.0 #(#7L, #8L) #(#9.0, #10.0) #9L #11.0))
+
+(* 12 bytes: two slots, the second half used. *)
+external i64x8_i32_triple :
+  int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u
+  -> int64_u -> #(int32_u * int32_u * int32_u) -> int64_u
+  = "" "i64x8_i32_triple_native"
+
+let () =
+  Printf.eprintf "i64x8_i32_triple: %Ld\n%!"
+    (box_int64
+       (i64x8_i32_triple #1L #2L #3L #4L #5L #6L #7L #8L
+          #(i32 9l, i32 (-10l), i32 11l)))
+
+(* Padding inside a struct on the stack. *)
+external i64x8_i8_i64 :
+  int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u
+  -> int64_u -> #(int8# * int64_u) -> int64_u
+  = "" "i64x8_i8_i64_native"
+
+let () =
+  Printf.eprintf "i64x8_i8_i64: %Ld\n%!"
+    (box_int64 (i64x8_i8_i64 #1L #2L #3L #4L #5L #6L #7L #8L #(i8 (-9), #10L)))
+
+(* One 8-byte slot, or two 4-byte ones on Apple arm64. *)
+external f64x8_f32_pair :
+  float# -> float# -> float# -> float# -> float# -> float# -> float# -> float#
+  -> #(float32_u * float32_u) -> float#
+  = "" "f64x8_f32_pair_native"
+
+let () =
+  Printf.eprintf "f64x8_f32_pair: %.4f\n%!"
+    (box_float
+       (f64x8_f32_pair #1.0 #2.0 #3.0 #4.0 #5.0 #6.0 #7.0 #8.0
+          #(f32 9.0, f32 (-10.0))))

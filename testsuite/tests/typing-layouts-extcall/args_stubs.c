@@ -543,3 +543,171 @@ value void_swap_bytecode(value u1, value p, value u2) {
   Field(res, 2) = b;
   CAMLreturn(res);
 }
+
+typedef struct { int32_t a; int32_t b; int32_t c; } args_i32x3;
+typedef struct { double a; float b; float c; } args_f64_f32_f32;
+typedef struct { int8_t a; double b; } args_i8_f64;
+typedef struct { float a; double b; } args_f32_f64;
+typedef struct { int64_t a; int8_t b; } args_i64_i8;
+typedef struct { int16_t a; float b; } args_i16_f32;
+typedef struct { int32_t a; int32_t b; double c; } args_i32_i32_f64;
+typedef struct { value a; value b; } args_int_int;
+typedef struct { intnat a; int64_t b; } args_n_i64;
+typedef struct { int8_t a; int8_t b; } args_i8_i8;
+typedef struct { args_i8_i8 p; int16_t c; } args_nested2;
+typedef struct { args_nested2 p; int32_t d; } args_nested3;
+typedef struct { int32_t a; int8_t b; } args_i32_i8;
+typedef struct { int8_t a; args_i32_i8 p; } args_nested_inner_padded;
+
+_Static_assert(sizeof(args_i32x3) == 12, "three int32s should be 12 bytes");
+_Static_assert(sizeof(args_i8_f64) == 16, "int8, double should be 16 bytes");
+_Static_assert(sizeof(args_f32_f64) == 16, "float, double should be 16 bytes");
+_Static_assert(sizeof(args_i64_i8) == 16, "int64, int8 should be 16 bytes");
+_Static_assert(sizeof(args_nested3) == 8, "nested3 should be 8 bytes");
+_Static_assert(sizeof(args_nested_inner_padded) == 12,
+               "int8, { int32, int8 } should be 12 bytes");
+
+double sum_f32_pair_native(args_f32_f32 p) {
+  return (double) p.a + 2 * (double) p.b;
+}
+
+value sum_f32_pair_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Float32_val(Field(p, 0))
+    + 2 * (double) Float32_val(Field(p, 1));
+  CAMLreturn(caml_copy_double(res));
+}
+
+int64_t sum_i32_triple_native(args_i32x3 p) {
+  return (int64_t) p.a + 2 * (int64_t) p.b + 4 * (int64_t) p.c;
+}
+
+value sum_i32_triple_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) Int32_val(Field(p, 0))
+    + 2 * (int64_t) Int32_val(Field(p, 1))
+    + 4 * (int64_t) Int32_val(Field(p, 2));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+double sum_f64_f32_f32_native(args_f64_f32_f32 p) {
+  return p.a + 2 * (double) p.b + 4 * (double) p.c;
+}
+
+value sum_f64_f32_f32_bytecode(value p) {
+  CAMLparam1(p);
+  double res = Double_val(Field(p, 0)) + 2 * (double) Float32_val(Field(p, 1))
+    + 4 * (double) Float32_val(Field(p, 2));
+  CAMLreturn(caml_copy_double(res));
+}
+
+double sum_i8_f64_native(args_i8_f64 p) {
+  return (double) p.a + 2 * p.b;
+}
+
+value sum_i8_f64_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Int8_val(Field(p, 0)) + 2 * Double_val(Field(p, 1));
+  CAMLreturn(caml_copy_double(res));
+}
+
+double sum_f32_f64_native(args_f32_f64 p) {
+  return (double) p.a + 2 * p.b;
+}
+
+value sum_f32_f64_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Float32_val(Field(p, 0)) + 2 * Double_val(Field(p, 1));
+  CAMLreturn(caml_copy_double(res));
+}
+
+int64_t sum_i64_i8_native(args_i64_i8 p) {
+  return p.a + 2 * (int64_t) p.b;
+}
+
+value sum_i64_i8_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = Int64_val(Field(p, 0)) + 2 * (int64_t) Int8_val(Field(p, 1));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+double sum_i16_f32_native(args_i16_f32 p) {
+  return (double) p.a + 2 * (double) p.b;
+}
+
+value sum_i16_f32_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Int16_val(Field(p, 0))
+    + 2 * (double) Float32_val(Field(p, 1));
+  CAMLreturn(caml_copy_double(res));
+}
+
+double sum_i32_i32_f64_native(args_i32_i32_f64 p) {
+  return (double) p.a + 2 * (double) p.b + 4 * p.c;
+}
+
+value sum_i32_i32_f64_bytecode(value p) {
+  CAMLparam1(p);
+  double res = (double) Int32_val(Field(p, 0))
+    + 2 * (double) Int32_val(Field(p, 1)) + 4 * Double_val(Field(p, 2));
+  CAMLreturn(caml_copy_double(res));
+}
+
+value sum_int_int_native(args_int_int p) {
+  return Val_long(Long_val(p.a) + 2 * Long_val(p.b));
+}
+
+value sum_int_int_bytecode(value p) {
+  return Val_long(Long_val(Field(p, 0)) + 2 * Long_val(Field(p, 1)));
+}
+
+int64_t sum_n_i64_native(args_n_i64 p) {
+  return (int64_t) p.a + 2 * p.b;
+}
+
+value sum_n_i64_bytecode(value p) {
+  CAMLparam1(p);
+  int64_t res = (int64_t) Nativeint_val(Field(p, 0))
+    + 2 * Int64_val(Field(p, 1));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+int64_t sum_nested3_native(args_nested3 p) {
+  return (int64_t) p.p.p.a + 2 * (int64_t) p.p.p.b + 4 * (int64_t) p.p.c
+    + 8 * (int64_t) p.d;
+}
+
+value sum_nested3_bytecode(value p) {
+  CAMLparam1(p);
+  value mid = Field(p, 0);
+  value inner = Field(mid, 0);
+  int64_t res = (int64_t) Int8_val(Field(inner, 0))
+    + 2 * (int64_t) Int8_val(Field(inner, 1))
+    + 4 * (int64_t) Int16_val(Field(mid, 1))
+    + 8 * (int64_t) Int32_val(Field(p, 1));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+int64_t sum_nested_inner_padded_native(args_nested_inner_padded p) {
+  return (int64_t) p.a + 2 * (int64_t) p.p.a + 4 * (int64_t) p.p.b;
+}
+
+value sum_nested_inner_padded_bytecode(value p) {
+  CAMLparam1(p);
+  value inner = Field(p, 1);
+  int64_t res = (int64_t) Int8_val(Field(p, 0))
+    + 2 * (int64_t) Int32_val(Field(inner, 0))
+    + 4 * (int64_t) Int8_val(Field(inner, 1));
+  CAMLreturn(caml_copy_int64(res));
+}
+
+double attr_scalars_native(intnat n, args_i32_i32 p, double d) {
+  return (double) n + 2 * (double) p.a + 4 * (double) p.b + 8 * d;
+}
+
+value attr_scalars_bytecode(value n, value p, value d) {
+  CAMLparam3(n, p, d);
+  double res = (double) Long_val(n) + 2 * (double) Int32_val(Field(p, 0))
+    + 4 * (double) Int32_val(Field(p, 1)) + 8 * Double_val(d);
+  CAMLreturn(caml_copy_double(res));
+}

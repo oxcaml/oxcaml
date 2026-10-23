@@ -45,23 +45,22 @@ module C = struct
   include To_cmm_shared
 end
 
-(* See [Extcall_abi] for details on how unboxed products of an external call are
-   passed. *)
+(* See [Extcall_abi] for how unboxed products of an external call are passed. *)
 
+(* An element of the [Cextcall]'s argument list. *)
 module Cmm_arg = struct
   type t = Cmm.expression * Cmm.exttype
 
-  let dummy ~dbg (reg_class : Abi.Reg_class.t) : t =
+  let dummy (reg_class : Abi.Reg_class.t) : t =
     match reg_class with
-    | Int_regs -> Cconst_int (0, dbg), XInt64
-    | Float_regs -> Cconst_float (0., dbg), XFloat
+    | Int_regs -> Ctuple [], XPhantom_int
+    | Float_regs -> Ctuple [], XPhantom_float
 
   let padding ~dbg : t = Cconst_int (0, dbg), XInt64
 end
 
 module Pack = struct
-  (* The bit pattern of a component, as an untagged integer in the low [8 *
-     size] bits of a word (the bits above being unspecified). *)
+  (* In the low [8 * size] bits of a word, the rest unspecified. *)
   let component_bits ~dbg (component : Abi.Component.t) cmm : Cmm.expression =
     match K.With_subkind.kind component.kind with
     | Naked_number
@@ -72,8 +71,7 @@ module Pack = struct
     | Naked_number Naked_float32 ->
       Cop (Creinterpret_cast Int32_of_float32, [cmm], dbg)
     | Value ->
-      (* Values are word-sized, hence never share a unit, and are passed
-         directly. *)
+      (* Values are word-sized, so never share a unit. *)
       Misc.fatal_error "To_cmm_extcall.Pack.component_bits: value component"
     | Naked_number (Naked_vec128 | Naked_vec256 | Naked_vec512)
     | Region | Rec_info ->
@@ -81,7 +79,6 @@ module Pack = struct
         "To_cmm_extcall.Pack.component_bits: component of kind %a"
         K.With_subkind.print component.kind
 
-  (* Pair the components of a unit with their expressions, one each. *)
   let with_exprs (components : Abi.Component.t list) exprs =
     if List.compare_lengths components exprs <> 0
     then
@@ -90,17 +87,15 @@ module Pack = struct
         (List.length components) (List.length exprs);
     List.combine components exprs
 
-  (* Pack components sharing an 8-byte unit into one word, as if that part of
-     the C struct had been loaded into an integer register. *)
+  (* Components sharing a unit, packed into one word as C would load them. *)
   let int_bits ~dbg
       (components_with_args :
         (Abi.Component.t * Cmm.expression) Nonempty_list.t) =
     let bits_of ((component : Abi.Component.t), arg) =
       let bits = component_bits ~dbg component arg in
       let bits =
-        (* No mask is needed when the component reaches the top of the unit: the
-           left shift below (or the width of the unit itself) discards the
-           unspecified bits above the component. *)
+        (* No mask needed: the shift (or the unit's width) drops the bits
+           above. *)
         if component.offset + component.size >= 8
         then bits
         else C.zero_extend ~bits:(8 * component.size) ~dbg bits
@@ -115,19 +110,22 @@ module Pack = struct
         C.or_int acc (bits_of component_with_arg) dbg)
       (bits_of first) rest
 
-  (* A unit on the stack is passed as its single component if it has one, and
-     otherwise as the integer holding its bytes (see [Abi.Unit.exttype]). *)
   let unit ~dbg (unit : Abi.Unit.t) exprs : Cmm_arg.t =
-    match Abi.Unit.single_component unit, with_exprs unit.components exprs with
-    | Some _, [(_, expr)] -> expr, Abi.Unit.exttype unit
-    | None, [] -> Cmm_arg.padding ~dbg
-    | None, first :: rest ->
-      int_bits ~dbg (first :: rest), Abi.Unit.exttype unit
-    | Some _, ([] | _ :: _ :: _) ->
-      Misc.fatal_error "To_cmm_extcall.Pack.unit: single component mismatch"
+    let expr : Cmm.expression =
+      match
+        Abi.Unit.single_component unit, with_exprs unit.components exprs
+      with
+      | Some _, [(_, expr)] -> expr
+      | None, [] ->
+        Cconst_int (0, dbg)
+        (* This is a dummy value. [Abi.Unit.exttype] assigns a phantom exttype,
+           so no move occurs. *)
+      | None, first :: rest -> int_bits ~dbg (first :: rest)
+      | Some _, ([] | _ :: _ :: _) ->
+        Misc.fatal_error "To_cmm_extcall.Pack.unit: single component mismatch"
+    in
+    expr, Abi.Unit.exttype unit
 
-  (* A register unit is passed as the register's contents (see
-     [Abi.Reg_unit.exttype]). *)
   let reg_unit ~dbg (reg_unit : Abi.Reg_unit.t) exprs : Cmm_arg.t =
     let components_with_exprs =
       with_exprs (Nonempty_list.to_list reg_unit.components) exprs
@@ -148,8 +146,7 @@ module Pack = struct
     in
     expr, Abi.Reg_unit.exttype reg_unit
 
-  (* The Cmm arguments of one C argument, one per slot, consuming its component
-     expressions in order. *)
+  (* One Cmm argument per slot of [arg]. *)
   let arg ~dbg (arg : Abi.Arg.t) component_exprs : Cmm_arg.t list =
     let each ~num_components ~pack parts =
       let leftover_exprs, cmm_args =
@@ -180,7 +177,6 @@ module Pack = struct
         (List.length component_exprs)
 end
 
-(* Extracting the components of a return value from its register units. *)
 module Unpack = struct
   (* Returned small integer values need to be sign-extended because it's not
      clear whether C code that returns a small integer returns one that is sign
@@ -200,7 +196,7 @@ module Unpack = struct
       | Value | Rec_info | Region ->
         cmm
 
-  (* The machtype in which the value of a unit of a return value is received. *)
+  (* The machtype in which a unit of a return value is received. *)
   let reg_unit_machtype ({ reg_class; components } : Abi.Reg_unit.t) =
     match reg_class, components with
     | Float_regs, [component] -> C.machtype_of_kind component.kind
@@ -212,9 +208,6 @@ module Unpack = struct
         Cmm.typ_int (* float bits in an integer register (arm64) *))
     | Int_regs, _ :: _ :: _ -> Cmm.typ_int
 
-  (* Extract one component of a return value from the value of its unit.
-     Components that arrive in a register of the correct class without any
-     packing get the usual sign extension of small integer results. *)
   let component ~dbg ~builtin_sign_extends (t : Abi.Reg_unit.t) unit_value
       (component : Abi.Component.t) : Cmm.expression =
     let shifted value =
@@ -263,12 +256,10 @@ module Unpack = struct
         K.With_subkind.print component.kind
 end
 
-(* Translation of the arguments of an external call. *)
 module Args = struct
-  (* Returns the Cmm arguments and the [exttype]s describing what is actually
-     passed. [args] is the flat list of unarized Cmm arguments. *)
+  (* [args] are the unarized Cmm arguments. *)
   let translate apply ~dbg args =
-    let plan = Abi.Args_plan.create apply in
+    let plan = Abi.Arg_slots.create apply in
     let component_exprs_per_arg =
       Flambda_arity.group_by_parameter (Apply.args_arity apply) args
     in
@@ -283,13 +274,12 @@ module Args = struct
       (fun (slot : Abi.Slot.t) ->
         match slot with
         | Arg { arg; slot } -> cmm_args_per_arg.(arg).(slot)
-        | Dummy reg_class -> Cmm_arg.dummy ~dbg reg_class
+        | Dummy reg_class -> Cmm_arg.dummy reg_class
         | Padding -> Cmm_arg.padding ~dbg)
       plan.slots
     |> List.split
 end
 
-(* Translation of the return value of an external call. *)
 module Return = struct
   let machtype (t : Abi.Return.t) ~return_ty =
     match t with
@@ -297,7 +287,6 @@ module Return = struct
     | Reg_units reg_units ->
       Array.concat (List.map Unpack.reg_unit_machtype reg_units)
 
-  (* Rebuild the unarized return values from the received register units. *)
   let unpack_reg_units ~dbg ~builtin_sign_extends reg_units return_values =
     let unit_tys =
       Array.of_list (List.map Unpack.reg_unit_machtype reg_units)

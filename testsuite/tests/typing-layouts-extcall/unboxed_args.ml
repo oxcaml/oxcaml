@@ -172,7 +172,7 @@ let () =
 (* A product with a single non-void component, passed on the stack after eight
    int64s have used up the integer argument registers. On Apple arm64 it takes
    an 8-byte slot, unlike a bare int16_t; see
-   [To_cmm_extcall.Component.exttype_when_alone]. *)
+   [Extcall_abi.Component.exttype_when_alone]. *)
 external stack_single :
   int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> int64_u
   -> int64_u -> int32_u -> #(int16# * unit#) -> int32_u -> int64_u
@@ -391,3 +391,103 @@ external void_swap :
 let () =
   let #(#(), a, b) = void_swap #() #(i32 12l, #(), f32 0.75) #() in
   Printf.eprintf "void_swap: %.4f %ld\n%!" (f32' a) (box_int32 b)
+
+(* One SSE register on x86-64; a homogeneous aggregate on arm64. *)
+external sum_f32_pair : #(float32_u * float32_u) -> float#
+  = "sum_f32_pair_bytecode" "sum_f32_pair_native"
+
+let () =
+  Printf.eprintf "sum_f32_pair: %.4f\n%!"
+    (box_float (sum_f32_pair #(f32 1.5, f32 (-0.25))))
+
+(* 12 bytes: two registers, the second holding one int32. *)
+external sum_i32_triple : #(int32_u * int32_u * int32_u) -> int64_u
+  = "sum_i32_triple_bytecode" "sum_i32_triple_native"
+
+let () =
+  Printf.eprintf "sum_i32_triple: %Ld\n%!"
+    (box_int64 (sum_i32_triple #(i32 (-1l), i32 20l, i32 300l)))
+
+(* xmm0 and a packed xmm1 on x86-64; two integer registers on arm64. *)
+external sum_f64_f32_f32 : #(float# * float32_u * float32_u) -> float#
+  = "sum_f64_f32_f32_bytecode" "sum_f64_f32_f32_native"
+
+let () =
+  Printf.eprintf "sum_f64_f32_f32: %.4f\n%!"
+    (box_float (sum_f64_f32_f32 #(#1.5, f32 0.5, f32 0.25)))
+
+(* Padding after the int8. *)
+external sum_i8_f64 : #(int8# * float#) -> float#
+  = "sum_i8_f64_bytecode" "sum_i8_f64_native"
+
+let () =
+  Printf.eprintf "sum_i8_f64: %.4f\n%!"
+    (box_float (sum_i8_f64 #(i8 (-7), #0.5)))
+
+(* Padding after the float32. *)
+external sum_f32_f64 : #(float32_u * float#) -> float#
+  = "sum_f32_f64_bytecode" "sum_f32_f64_native"
+
+let () =
+  Printf.eprintf "sum_f32_f64: %.4f\n%!"
+    (box_float (sum_f32_f64 #(f32 0.25, #3.0)))
+
+(* Padding at the end. *)
+external sum_i64_i8 : #(int64_u * int8#) -> int64_u
+  = "sum_i64_i8_bytecode" "sum_i64_i8_native"
+
+let () =
+  Printf.eprintf "sum_i64_i8: %Ld\n%!"
+    (box_int64 (sum_i64_i8 #(#1000L, i8 (-3))))
+
+(* An int16 and a float32 share an integer register. *)
+external sum_i16_f32 : #(int16# * float32_u) -> float#
+  = "sum_i16_f32_bytecode" "sum_i16_f32_native"
+
+let () =
+  Printf.eprintf "sum_i16_f32: %.4f\n%!"
+    (box_float (sum_i16_f32 #(i16 (-300), f32 0.5)))
+
+(* Two packed int32s, then a float64. *)
+external sum_i32_i32_f64 : #(int32_u * int32_u * float#) -> float#
+  = "sum_i32_i32_f64_bytecode" "sum_i32_i32_f64_native"
+
+let () =
+  Printf.eprintf "sum_i32_i32_f64: %.4f\n%!"
+    (box_float (sum_i32_i32_f64 #(i32 1l, i32 (-2l), #0.5)))
+
+external sum_int_int : #(int * int) -> int
+  = "sum_int_int_bytecode" "sum_int_int_native"
+
+let () = Printf.eprintf "sum_int_int: %d\n%!" (sum_int_int #(17, -4))
+
+external sum_n_i64 : #(nativeint_u * int64_u) -> int64_u
+  = "sum_n_i64_bytecode" "sum_n_i64_native"
+
+let () =
+  Printf.eprintf "sum_n_i64: %Ld\n%!" (box_int64 (sum_n_i64 #(#5n, #7L)))
+
+(* Three levels of nesting. *)
+external sum_nested3 : #(#(#(int8# * int8#) * int16#) * int32_u) -> int64_u
+  = "sum_nested3_bytecode" "sum_nested3_native"
+
+let () =
+  Printf.eprintf "sum_nested3: %Ld\n%!"
+    (box_int64 (sum_nested3 #(#(#(i8 1, i8 (-2)), i16 300), i32 (-40000l))))
+
+(* Padding before an inner struct more aligned than the member before it. *)
+external sum_nested_inner_padded : #(int8# * #(int32_u * int8#)) -> int64_u
+  = "sum_nested_inner_padded_bytecode" "sum_nested_inner_padded_native"
+
+let () =
+  Printf.eprintf "sum_nested_inner_padded: %Ld\n%!"
+    (box_int64 (sum_nested_inner_padded #(i8 (-1), #(i32 100000l, i8 7))))
+
+(* [@untagged] and [@unboxed] scalars around a product. *)
+external attr_scalars :
+  (int[@untagged]) -> #(int32_u * int32_u) -> (float[@unboxed]) -> float#
+  = "attr_scalars_bytecode" "attr_scalars_native"
+
+let () =
+  Printf.eprintf "attr_scalars: %.4f\n%!"
+    (box_float (attr_scalars 3 #(i32 10l, i32 20l) 0.5))

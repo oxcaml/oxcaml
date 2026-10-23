@@ -34,3 +34,16 @@ void_regs_int: 321
 void_regs_float: 1793.0000
 void_record: 97
 void_swap: 0.7500 12
+sum_f32_pair: 1.0000
+sum_i32_triple: 1239
+sum_f64_f32_f32: 3.5000
+sum_i8_f64: -6.0000
+sum_f32_f64: 6.2500
+sum_i64_i8: 994
+sum_i16_f32: -299.0000
+sum_i32_i32_f64: -1.0000
+sum_int_int: 9
+sum_n_i64: 19
+sum_nested3: -318803
+sum_nested_inner_padded: 200027
+attr_scalars: 107.0000

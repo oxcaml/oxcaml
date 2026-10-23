@@ -384,3 +384,72 @@ external swap_f64_i64 : (#(float# * int64_u) [@unpacked]) -> #(int64_u * float#)
 let () =
   let #(a, b) = swap_f64_i64 #(#3.25, #111L) in
   Printf.eprintf "swap_f64_i64: %Ld %.4f\n%!" (box_int64 a) (box_float b)
+
+(* 12 bytes: two registers, the second holding one int32. *)
+external ret_i32_triple : unit -> #(int32_u * int32_u * int32_u)
+  = "ret_i32_triple_bytecode" "ret_i32_triple_native"
+
+let () =
+  let #(a, b, c) = ret_i32_triple () in
+  Printf.eprintf "i32_triple: %ld %ld %ld\n%!" (box_int32 a) (box_int32 b)
+    (box_int32 c)
+
+(* xmm0 and a packed xmm1 on x86-64; x0 and x1 on arm64. *)
+external ret_f64_f32_f32 : unit -> #(float# * float32_u * float32_u)
+  = "ret_f64_f32_f32_bytecode" "ret_f64_f32_f32_native"
+
+let () =
+  let #(a, b, c) = ret_f64_f32_f32 () in
+  Printf.eprintf "f64_f32_f32: %.4f %.4f %.4f\n%!" (box_float a) (f32 b)
+    (f32 c)
+
+(* Padding at the end. *)
+external ret_i64_i8 : unit -> #(int64_u * int8#)
+  = "ret_i64_i8_bytecode" "ret_i64_i8_native"
+
+let () =
+  let #(a, b) = ret_i64_i8 () in
+  Printf.eprintf "i64_i8: %Ld %d\n%!" (box_int64 a) (i8 b)
+
+(* Padding after the int8. *)
+external ret_i8_f64 : unit -> #(int8# * float#)
+  = "ret_i8_f64_bytecode" "ret_i8_f64_native"
+
+let () =
+  let #(a, b) = ret_i8_f64 () in
+  Printf.eprintf "i8_f64: %d %.4f\n%!" (i8 a) (box_float b)
+
+(* Padding after the float32. *)
+external ret_f32_i64 : unit -> #(float32_u * int64_u)
+  = "ret_f32_i64_bytecode" "ret_f32_i64_native"
+
+let () =
+  let #(a, b) = ret_f32_i64 () in
+  Printf.eprintf "f32_i64: %.4f %Ld\n%!" (f32 a) (box_int64 b)
+
+(* Two packed int32s, then a float64. *)
+external ret_i32_i32_f64 : unit -> #(int32_u * int32_u * float#)
+  = "ret_i32_i32_f64_bytecode" "ret_i32_i32_f64_native"
+
+let () =
+  let #(a, b, c) = ret_i32_i32_f64 () in
+  Printf.eprintf "i32_i32_f64: %ld %ld %.4f\n%!" (box_int32 a) (box_int32 b)
+    (box_float c)
+
+(* Three levels of nesting. *)
+external ret_nested3 : unit -> #(#(#(int8# * int8#) * int16#) * int32_u)
+  = "ret_nested3_bytecode" "ret_nested3_native"
+
+let () =
+  let #(#(#(a, b), c), d) = ret_nested3 () in
+  Printf.eprintf "nested3: %d %d %d %ld\n%!" (i8 a) (i8 b) (i16 c)
+    (box_int32 d)
+
+(* Padding before an inner struct more aligned than the member before it. *)
+external ret_nested_inner_padded : unit -> #(int8# * #(int32_u * int8#))
+  = "ret_nested_inner_padded_bytecode" "ret_nested_inner_padded_native"
+
+let () =
+  let #(a, #(b, c)) = ret_nested_inner_padded () in
+  Printf.eprintf "nested_inner_padded: %d %ld %d\n%!" (i8 a) (box_int32 b)
+    (i8 c)

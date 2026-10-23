@@ -381,7 +381,13 @@ let loc_external_arguments ty_args =
     then win64_loc_external_arguments arg
     else unix_loc_external_arguments arg
   in
-  Array.map (fun reg -> [|reg|]) loc, stack_ofs, align
+  let loc =
+    List.mapi (fun i ty_arg ->
+        if Cmm.is_phantom_exttype ty_arg then [||] else [| loc.(i) |])
+      ty_args
+    |> Array.of_list
+  in
+  loc, stack_ofs, align
 
 let loc_exn_bucket = rax
 

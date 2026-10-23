@@ -61,3 +61,12 @@ int64_t nested_i64x3_native(args_nested_i64x3 p) {
 int64_t nested_tail_padded_native(args_nested_tail_padded p) {
   return p.p.a + 2 * (int64_t) p.p.b + 4 * (int64_t) p.c;
 }
+
+typedef struct { float a; float b; float c; float d; float e; } args_f32x5;
+
+_Static_assert(sizeof(args_f32x5) == 20, "five floats should be 20 bytes");
+
+double f32x5_native(args_f32x5 p) {
+  return (double) p.a + 2 * (double) p.b + 4 * (double) p.c
+    + 8 * (double) p.d + 16 * (double) p.e;
+}

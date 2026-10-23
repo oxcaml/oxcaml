@@ -191,3 +191,31 @@ double i64x6_f64x8_mixed_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
     + 16384 * (double) p.a + 32768 * (double) p.b + 65536 * q.a
     + 131072 * q.b + 262144 * (double) y + 524288 * z;
 }
+
+typedef struct { int32_t a; int32_t b; int32_t c; } args_i32x3;
+typedef struct { int8_t a; int64_t b; } args_i8_i64;
+typedef struct { float a; float b; } args_f32_f32;
+
+_Static_assert(sizeof(args_i32x3) == 12, "three int32s should be 12 bytes");
+_Static_assert(sizeof(args_i8_i64) == 16, "int8, int64 should be 16 bytes");
+
+int64_t i64x8_i32_triple_native(int64_t a0, int64_t a1, int64_t a2,
+                                int64_t a3, int64_t a4, int64_t a5,
+                                int64_t a6, int64_t a7, args_i32x3 p) {
+  return sum8(a0, a1, a2, a3, a4, a5, a6, a7) + 256 * (int64_t) p.a
+    + 512 * (int64_t) p.b + 1024 * (int64_t) p.c;
+}
+
+int64_t i64x8_i8_i64_native(int64_t a0, int64_t a1, int64_t a2, int64_t a3,
+                            int64_t a4, int64_t a5, int64_t a6, int64_t a7,
+                            args_i8_i64 p) {
+  return sum8(a0, a1, a2, a3, a4, a5, a6, a7) + 256 * (int64_t) p.a
+    + 512 * p.b;
+}
+
+double f64x8_f32_pair_native(double a0, double a1, double a2, double a3,
+                             double a4, double a5, double a6, double a7,
+                             args_f32_f32 p) {
+  return fsum8(a0, a1, a2, a3, a4, a5, a6, a7) + 256 * (double) p.a
+    + 512 * (double) p.b;
+}

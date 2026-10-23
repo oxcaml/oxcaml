@@ -52,7 +52,7 @@ end
    ([Unit.in_registers], [Unit.on_stack]), following the ABI rules
 
    - Simulating the ABI's register assignment and producing the [Cextcall]'s
-   argument list ([Args_plan]), with reordering + dummy arguments to match the
+   argument list ([Arg_slots]), with reordering + dummy arguments to match the
    backend's per-slot assignment.
 
    The bit-level packing of components into slots, and unpacking of return
@@ -174,8 +174,9 @@ module Reg_class = struct
 
   let of_exttype (exttype : Cmm.exttype) : t =
     match exttype with
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 -> Int_regs
-    | XFloat | XFloat32 | XVec128 | XVec256 | XVec512 -> Float_regs
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XPhantom_int -> Int_regs
+    | XFloat | XFloat32 | XVec128 | XVec256 | XVec512 | XPhantom_float ->
+      Float_regs
 end
 
 (* Counts of int and float registers to keep track of free argument
@@ -282,6 +283,8 @@ module Component = struct
     | XVec128 -> Float_regs, 16
     | XVec256 -> Float_regs, 32
     | XVec512 -> Float_regs, 64
+    | XPhantom_int | XPhantom_float ->
+      Misc.fatal_error "Extcall_abi.Component.reg_class_and_size: phantom"
 
   let exttype t = To_cmm_shared.exttype_of_kind (K.With_subkind.kind t.kind)
 
@@ -424,7 +427,7 @@ end
 
    * a vector member
 
-   * a member of ancarm64 homogeneous aggregate
+   * a member of an arm64 homogeneous aggregate
 
    * padding (no components) *)
 module Unit = struct
@@ -728,8 +731,9 @@ module Slot = struct
   let exttype (args : Arg.t array) t : Cmm.exttype =
     match t with
     | Arg { arg; slot } -> List.nth (Arg.exttypes args.(arg)) slot
-    | Dummy Int_regs | Padding -> XInt64
-    | Dummy Float_regs -> XFloat
+    | Dummy Int_regs -> XPhantom_int
+    | Dummy Float_regs -> XPhantom_float
+    | Padding -> XInt64
 
   let reg_class args t = Reg_class.of_exttype (exttype args t)
 
@@ -741,6 +745,8 @@ module Slot = struct
     | XVec128 -> 16
     | XVec256 -> 32
     | XVec512 -> 64
+    | XPhantom_int | XPhantom_float ->
+      Misc.fatal_error "Extcall_abi.Slot.amd64_stack_size: phantom"
 end
 
 (* The slots of the stack-bound arguments, in order.
@@ -799,7 +805,7 @@ end
 
 (* The [Cextcall]'s argument list for a call with unboxed product arguments, and
    what each element of it is. *)
-module Args_plan = struct
+module Arg_slots = struct
   type t =
     { args : Arg.t array;  (** Indexed by C argument *)
       slots : Slot.t list
@@ -871,7 +877,7 @@ module Args_plan = struct
         Scalar { component; exttype = Component.exttype component }
       | _ :: _ :: _ ->
         Misc.fatal_errorf
-          "Extcall_abi.Args_plan.scalars_only: product argument %a"
+          "Extcall_abi.Arg_slots.scalars_only: product argument %a"
           Arity_component_head.print arg_head
     in
     let args = Array.of_list (List.map2 arg arg_heads arg_layouts) in
