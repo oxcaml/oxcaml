@@ -1033,22 +1033,22 @@ let curry_mode_of_occurrence :
     Curry_mode.t =
   fun ?instance ~arg m ->
     match With_locality.zap_to_legacy ~arg m with
-    | Some c -> Const c
+    | Some c -> Curry_mode.const c
     | None ->
       if mode_polymorphism_printing_enabled ()
       then
         let m = Option.value instance ~default:m in
         Variable
           { comonadic = With_locality.Comonadic.disallow_right m.comonadic;
-            areality = (With_locality.Guts.get_ceil m).areality }
-      else Const (With_locality.zap_to_legacy_force ~arg m)
+            areality = Some (With_locality.Guts.get_ceil m).areality }
+      else Curry_mode.const (With_locality.zap_to_legacy_force ~arg m)
 
 (** Whether the return mode [m] of an arrow is the constant curry mode
     implied by [acc_mode]. Mutating: [m] is equated with the constant. *)
 let equate_with_const_curry : With_locality.lr -> Curry_mode.t -> bool =
   fun m acc_mode ->
     match acc_mode with
-    | Const c ->
+    | Const { mode = c; _ } ->
       Result.is_ok (With_locality.equate m (With_locality.of_const c))
     | Variable _ -> false
 
@@ -1075,7 +1075,7 @@ module Variable_names : sig
 
 
   val reserve: type_expr -> unit
-  val reserve_with_base: base:With_locality.Const.t -> type_expr -> unit
+  val reserve_with_base: base:Curry_mode.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -2186,7 +2186,7 @@ end = struct
       | Tpoly (ty, _) | Trepr (ty, _) | Tmod (ty, _) | Tquote ty | Tsplice ty ->
         register (~acc_mode, ~acc_mode_rigid) ty
       | _ ->
-        let acc = Curry_mode.Const With_locality.Const.legacy in
+        let acc = Curry_mode.legacy in
         printer_iter_type_expr
           (register (~acc_mode:acc, ~acc_mode_rigid:acc))
           (Fun.const ()) ty
@@ -2211,13 +2211,12 @@ end = struct
     (* Link each non-curry mode (e.g. argument modes) between the two
        instances. *)
     equate_non_curry_modes ~instances_generic ~instances_rigid ty;
-    let acc = Curry_mode.Const base in
     (* [register_suppressed_curries] walks [ty] as the printer does, threading
        the curry accumulator along with its rigid instance. A generic curry
        mode is hidden when the type with the curry mode replaced by the one
        implied by the accumulator is as general. *)
     register_suppressed_curries ~instances_generic ~instances_rigid
-      ~visited:[] (~acc_mode:acc, ~acc_mode_rigid:acc) ty
+      ~visited:[] (~acc_mode:base, ~acc_mode_rigid:base) ty
 
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
@@ -2399,7 +2398,7 @@ end = struct
       suppress_curry_modes ~base ty
     end
 
-  let reserve ty = reserve_with_base ~base:With_locality.Const.legacy ty
+  let reserve ty = reserve_with_base ~base:Curry_mode.legacy ty
 end
 
 module Aliases = struct
@@ -2482,7 +2481,7 @@ let prepare_type_with_base base ty =
   Variable_names.reserve_with_base ~base ty;
   Aliases.mark_loops ty
 
-let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
+let prepare_type ty = prepare_type_with_base Curry_mode.legacy ty
 
 
 let reset_except_conflicts () =
@@ -2497,7 +2496,7 @@ let prepare_for_printing_with_base ~base tyl =
   List.iter (prepare_type_with_base base) tyl
 
 let prepare_for_printing tyl =
-  prepare_for_printing_with_base ~base:With_locality.Const.legacy tyl
+  prepare_for_printing_with_base ~base:Curry_mode.legacy tyl
 
 let add_type_to_preparation = prepare_type
 
@@ -2618,7 +2617,7 @@ let tree_of_modes : With_locality.lr -> Curry_mode.t -> string list =
     | Variable _ ->
       [ (Fmt.asprintf "%s"
             (Variable_names.name_of_modes modes))]
-    | Const c -> tree_of_modes_const c
+    | Const { mode = c; _ } -> tree_of_modes_const c
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
@@ -2863,7 +2862,7 @@ let rec tree_of_modal_typexp mode modal ty =
     let tree =
       Otyp_alias
         {non_gen;
-         aliased = pr_typ (Curry_mode.Const With_locality.Const.legacy);
+         aliased = pr_typ Curry_mode.legacy;
          alias}
     in
     not_arrow tree end
@@ -2879,7 +2878,7 @@ and tree_of_acc_typexp mode acc_mode ty =
   tree_of_modal_typexp mode (Other acc_mode) ty
 
 and tree_of_typexp mode mode_with_locality ty =
-  tree_of_acc_typexp mode (Curry_mode.Const mode_with_locality) ty
+  tree_of_acc_typexp mode (Curry_mode.const mode_with_locality) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
@@ -3027,11 +3026,11 @@ and tree_of_package mode {pack_path; pack_cstrs} =
             tree_of_typexp mode With_locality.Const.legacy ty))
         pack_cstrs }
 
-let tree_of_typexp ~base mode ty =
+let tree_of_acc_typexp ~base mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode base ty)
+  wrap_mutation (fun () -> tree_of_acc_typexp mode base ty)
 
-let tree_of_typexp ~base mode ty =
+let tree_of_acc_typexp ~base mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
@@ -3039,9 +3038,12 @@ let tree_of_typexp ~base mode ty =
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)
-      (fun () -> tree_of_typexp ~base mode ty)
+      (fun () -> tree_of_acc_typexp ~base mode ty)
   else
-    tree_of_typexp ~base mode ty
+    tree_of_acc_typexp ~base mode ty
+
+let tree_of_typexp ~base mode ty =
+  tree_of_acc_typexp ~base:(Curry_mode.const base) mode ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp ~base:With_locality.Const.legacy mode ty)
@@ -3571,8 +3573,14 @@ let tree_of_value_description id decl =
     Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
     |> Mode.Const.value_to_alloc_r2l
   in
+  let base =
+    match decl.val_kind with
+    | Val_prim _ -> Curry_mode.primitive base
+    | Val_reg _ | Val_mut _ | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Curry_mode.const base
+  in
   let () = prepare_for_printing_with_base ~base [decl.val_type] in
-  let ty = tree_of_typexp ~base Type_scheme decl.val_type in
+  let ty = tree_of_acc_typexp ~base Type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   let oval_poly, qsvs, qtvs =

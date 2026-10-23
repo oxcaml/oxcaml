@@ -56,6 +56,7 @@ type mode =
   | Prim_local
   | Prim_global
   | Prim_poly
+  | Prim_mode_poly
 
 (* CR-someday lmaurer: We should consider moving [prim_alloc], [prim_effects],
    and [prim_coeffects] into a variant to replace the [bool] in
@@ -406,7 +407,7 @@ let print p osig_val_decl =
   in
   let attrs_of_mode_and_repr (m, repr) =
     (match m with
-     | Prim_local | Prim_global -> []
+     | Prim_local | Prim_global | Prim_mode_poly -> []
      | Prim_poly -> [oattr_local_opt])
     @
     (match repr with
