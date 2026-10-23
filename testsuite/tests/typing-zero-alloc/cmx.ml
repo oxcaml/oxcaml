@@ -1,6 +1,6 @@
 (* TEST
    readonly_files = "cmx_lib.ml";
-   flags = "-I +compiler-libs -I ocamlopt.opt";
+   flags = "-g -I +compiler-libs -I ocamlopt.opt";
    setup-ocamlopt.opt-build-env;
    module = "cmx_lib.ml";
    ocamlopt.opt;
@@ -75,7 +75,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__catch_and_discard_exceptions_0_6_code",
+[("camlCmx_lib__catch_and_discard_exceptions_0_15_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments
@@ -99,7 +99,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__either_1_7_code",
+[("camlCmx_lib__either_1_16_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments
@@ -114,7 +114,7 @@ let _ =
       {argument #1 on diverging paths; argument #2 on diverging paths}})]
 |}]
 
-(* CR wsturgeon: fix (work for the next PR) *)
+(* Tail-recursive, *not* optimized into a loop: *)
 let _ =
   read_cmx
     "cmx_lib.cmx"
@@ -126,22 +126,8 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
-|}]
-
-let _ =
-  read_cmx
-    "cmx_lib.cmx"
-    "camlCmx_lib__iter_loop_"
-;;
-[%%expect{|
-- : (string *
-     Zero_alloc_utils.Relevant_components_by_argument_index.t
-     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
-     Zero_alloc_utils.Components.t)
-    list
 =
-[("camlCmx_lib__iter_loop_3_9_code",
+[("camlCmx_lib__iter_rec_2_17_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -155,6 +141,34 @@ let _ =
       {argument #1 on normal/diverging paths}})]
 |}]
 
+(* Tail-recursive, optimized into a loop: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__iter_loop_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__iter_loop_3_18_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/diverging paths}})]
+|}]
+
+(* Call sites: *)
 let _ =
   read_cmx
     "cmx_lib.cmx"
@@ -167,7 +181,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__apply_4_10_code",
+[("camlCmx_lib__apply_4_19_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -181,11 +195,197 @@ let _ =
       {argument #1 on diverging paths}})]
 |}]
 
-(* CR wsturgeon: fix (work for the next PR) *)
+(* Call sites, flipping argument order: *)
 let _ =
   read_cmx
     "cmx_lib.cmx"
     "camlCmx_lib__ylppa_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__ylppa_5_20_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on diverging paths}})]
+|}]
+
+(* Across compilation units: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__iter_flipped_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__iter_flipped_6_21_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on normal/diverging paths}})]
+|}]
+
+(* Mutual recursion: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__ping_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__ping_7_22_code",
+  {Components.nor = Component.Bot;
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/diverging paths}})]
+|}]
+
+(* Mutual recursion: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__pong_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__pong_8_23_code",
+  {Components.nor = Component.Bot;
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/diverging paths}})]
+|}]
+
+(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
+(* [caml_apply]: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__apply2_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+= []
+|}]
+
+(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
+(* [caml_apply]: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__ylppa2_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+= []
+|}]
+
+(* Always exit with [raise Fail]: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__fail_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__fail_11_26_code",
+  {Components.nor = Component.Bot; exn = Component.Safe; div = Component.Bot})]
+|}]
+
+(* Always diverge with [while true ...]: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__diverge_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__diverge_12_27_code",
+  {Components.nor = Component.Bot; exn = Component.Bot; div = Component.Bot})]
+|}]
+(* CR-someday wsturgeon for wsturgeon: the above [div = Bot] is a known bug *)
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__iter_fail_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+= []
+|}]
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__iter_diverge_"
 ;;
 [%%expect{|
 - : (string *

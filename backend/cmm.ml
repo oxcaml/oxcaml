@@ -331,6 +331,25 @@ let equal_callee c1 c2 =
     a1 = a2
   | Symbol _, Argument _ | Argument _, Symbol _ -> false
 
+let compare_is_global g g' =
+  match g, g' with
+  | Local, Local | Global, Global -> 0
+  | Local, Global -> -1
+  | Global, Local -> 1
+
+let compare_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
+    { sym_name = right_sym_name; sym_global = right_sym_global } =
+  let c = String.compare left_sym_name right_sym_name in
+  if c <> 0 then c else compare_is_global left_sym_global right_sym_global
+
+let compare_callee c1 c2 =
+  match c1, c2 with
+  | Symbol s1, Symbol s2 -> compare_symbol s1 s2
+  | Argument { argument_index = a1 }, Argument { argument_index = a2 } ->
+    Int.compare a1 a2
+  | Symbol _, Argument _ -> -1
+  | Argument _, Symbol _ -> 1
+
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
   | Cphantom_const_symbol of symbol
@@ -567,7 +586,8 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : callee list option
+        callees : callee list option;
+        known_arguments : callee option list
       }
   | Cextcall of
       { func : string;
@@ -723,6 +743,11 @@ and expression =
       { message : string;
         symbol : symbol
       }
+
+type argument =
+  { expression : expression;
+    callee : callee option
+  }
 
 type codegen_option =
   | Reduce_code_size
