@@ -76,20 +76,35 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
-      (* Cextcall with neither effects nor coeffects is simple if its arguments
-         are *)
+      (* A [Cextcall] with neither effects nor coeffects is simple if its
+         arguments are, provided it cannot allocate. An allocating external call
+         goes through [caml_c_call] and may trigger a GC, so it must not be
+         deferred: in particular, [emit_stores] evaluates the deferred arguments
+         of a [Calloc] after the [Alloc] instruction, and a GC during such a
+         call would see the uninitialised fields of the new block. *)
       | Cextcall
           { func = _;
             ty = _;
             ty_args = _;
-            alloc = _;
+            alloc = false;
             builtin = _;
             returns = _;
             effects = No_effects;
             coeffects = No_coeffects
           } ->
         List.for_all is_simple_expr args
-        (* The following may have side effects *)
+        (* The following may have side effects (or, in the first case, trigger a
+           GC) *)
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = true;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = No_coeffects
+          }
       | Cextcall
           { func = _;
             ty = _;

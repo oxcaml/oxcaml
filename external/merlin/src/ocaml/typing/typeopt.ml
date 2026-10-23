@@ -1255,7 +1255,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                    Language_extension.(is_at_least SIMD Beta) ->
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.layout_unboxed_unit
+    Lambda.layout_void
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
