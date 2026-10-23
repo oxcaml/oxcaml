@@ -32,7 +32,6 @@ val for_name : Compilation_unit.t -> string -> t
 val for_structured_mangling_path :
     compilation_unit:Compilation_unit.t ->
     path:Compilation_unit.t Structured_mangling.path ->
-    suffix:string ->
     t
 
 val for_compilation_unit : Compilation_unit.t -> t

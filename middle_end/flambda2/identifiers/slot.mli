@@ -33,6 +33,9 @@ module type S = sig
 
   val name : t -> string
 
+  (** The stamp making this slot unique within its compilation unit. *)
+  val stamp : t -> int
+
   val canonical_name : t -> string
 
   val payload : t -> payload
