@@ -16,6 +16,7 @@
 module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
 
 let main argv ppf =
+  Profile.write_dummy_profile_data ();
   Clflags.set_target Clflags.Target.Js_of_ocaml;
   let program = "ocamlj" in
   let columns =

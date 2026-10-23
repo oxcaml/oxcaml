@@ -75,3 +75,5 @@ val all_columns : Clflags.profile_column list
 val generate : string
 val transl : string
 val typing : string
+
+val write_dummy_profile_data : unit -> unit
