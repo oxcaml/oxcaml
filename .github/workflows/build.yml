@@ -450,7 +450,7 @@ jobs:
         if: matrix.run_oxfuzzer == true && steps.build.conclusion == 'success' && always()
         run: |
           python3 tools/oxfuzzer/oxfuzzer.py \
-            -o "$GITHUB_WORKSPACE/_oxfuzzer" --iterations 100 --jobs "$J" \
+            -o "$GITHUB_WORKSPACE/_oxfuzzer" --iterations 1000 --jobs "$J" \
             --seed "$GITHUB_RUN_ID"
 
       - name: Upload oxfuzzer failures
