@@ -1335,27 +1335,38 @@ end = struct
      figure out what this means for the allocation sources of [g]. *)
   let transfer_allocation_sources_from_callee_to_caller
       ~(callee_contract :
-         Zero_alloc_utils.Relevant_components_by_argument_index.t) :
-      Zero_alloc_utils.(
-        Relevant_components_by_argument_index.t Allocation_sources.t) =
+         Zero_alloc_utils.Relevant_components_by_argument_index.t) : t =
     let open Zero_alloc_utils in
-    Allocation_sources.No_allocation_other_than_calling_arguments
-      callee_contract
+    (* We're analyzing e.g. [g x = f x], so we have a *caller* ([g]) and a
+       *callee* ([f]). The callee ([f]) has a conditional contract, or else we
+       wouldn't have reached this function. Specifically, [callee_contract]
+       describes the positional arguments to [f] that affect whether [f] may
+       allocate. We have to look at those positions, see what [g] is passing to
+       [f] in those positions, and impose the resulting requirements on [g].
+       To do this, we fold over the callee ([f])'s relevant argument indices
+       (see the last line of this function). *)
+    let fold
+        (callee_argument_index : int)
+        (relevant_components : bool Components.t)
+        (acc : t) : t =
+      ignore callee_argument_index;
+      ignore relevant_components;
+      ignore acc;
+      top ~allocation_sources:Allocation_other_than_calling_arguments
+        ~witnesses:Witnesses.empty
+    in
+    Numbers.Int.Map.fold fold callee_contract bot
 
   let attribute_to_call_site ~caller_witnesses ~callee_contract =
     match callee_contract with
-    | Resolved (Top { allocation_sources = callee_contract; witnesses = _ }) ->
-      Resolved
-        (Top
-           { allocation_sources =
-               Zero_alloc_utils.Allocation_sources.bind
-                 ~f:(fun callee_contract ->
-                   transfer_allocation_sources_from_callee_to_caller
-                     ~callee_contract)
-                 callee_contract;
-             (* CR-someday wsturgeon for wsturgeon: new kind of witness tracing
-                through function-call attribution? *)
-             witnesses = caller_witnesses })
+    | Resolved (Top { allocation_sources; witnesses = _ }) ->
+      begin match allocation_sources with
+      | Allocation_other_than_calling_arguments ->
+        Resolved (Top { allocation_sources; witnesses = caller_witnesses })
+      | No_allocation_other_than_calling_arguments callee_contract ->
+        transfer_allocation_sources_from_callee_to_caller
+          ~callee_contract
+      end
     | Resolved (Bot | Safe) -> callee_contract
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf
