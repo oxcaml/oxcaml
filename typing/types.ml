@@ -570,6 +570,7 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
+    ld_inherit: inherit_flag;
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
@@ -1083,9 +1084,10 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
-let field_kind_operator (_ : label_declaration)
-    : Jkind_types.Kind_operator.t =
-  Addressable
+let field_kind_operator ld : Jkind_types.Kind_operator.t =
+  match ld.ld_inherit with
+  | Not_inherited -> Addressable
+  | Inherited -> Id
 
 let find_unboxed_type decl =
   match decl.type_kind with

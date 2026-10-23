@@ -815,6 +815,7 @@ and type_kind =
 and label_declaration =
     {
      pld_name: string loc;
+     pld_inherit: inherit_flag;
      pld_mutable: mutable_flag;
      pld_modalities: modalities;
      pld_type: core_type;
@@ -827,7 +828,10 @@ and label_declaration =
                              is {{!Asttypes.mutable_flag.Immutable}[Immutable]},
    - [{ ...; mutable l: T; ... }]
                            when {{!label_declaration.pld_mutable}[pld_mutable]}
-                             is {{!Asttypes.mutable_flag.Mutable}[Mutable]}.
+                             is {{!Asttypes.mutable_flag.Mutable}[Mutable]},
+   - [#{ inherit l: T }]
+                           when {{!label_declaration.pld_inherit}[pld_inherit]}
+                             is {{!Asttypes.inherit_flag.Inherited}[Inherited]}.
 
    Note: [T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]}.
 *)
@@ -1421,6 +1425,9 @@ and jkind_annotation_desc =
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
+  | Pjk_inherit of jkind_annotation
+  (** [Pjk_inherit K] represents [K inherit], a component of a product kind
+      that the product does not make addressable. *)
 
 and jkind_annotation =
   { pjka_loc : Location.t

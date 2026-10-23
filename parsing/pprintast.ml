@@ -398,6 +398,9 @@ let constant f const = constant_desc f const.pconst_desc
 let mutable_flag f = function
   | Immutable -> ()
   | Mutable -> pp f "mutable@;"
+let inherit_flag f = function
+  | Not_inherited -> ()
+  | Inherited -> pp f "inherit@;"
 let virtual_flag f  = function
   | Concrete -> ()
   | Virtual -> pp f "virtual@;"
@@ -559,6 +562,10 @@ and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
     Misc.pp_parens_if nested (fun f ts ->
       pp f "@[%a@]" (list (jkind_annotation ~nested:true ctxt) ~sep:"@ & ") ts
     ) f ts
+  | Pjk_inherit t ->
+    Misc.pp_parens_if nested (fun f t ->
+      pp f "%a inherit" (jkind_annotation ~nested:true ctxt) t
+    ) f t
 
 and tyvar_jkind tyvar f (str, jkind) =
   match jkind with
@@ -2199,7 +2206,8 @@ and type_def_list ctxt f (rf, exported, l) =
 
 and record_declaration ctxt f ~unboxed lbls =
   let type_record_field f pld =
-    pp f "@[<2>%a%a:@;%a%a@;%a@]"
+    pp f "@[<2>%a%a%a:@;%a%a@;%a@]"
+      inherit_flag pld.pld_inherit
       mutable_flag pld.pld_mutable
       ident_of_name pld.pld_name.txt
       (core_type ctxt) pld.pld_type
