@@ -7313,15 +7313,23 @@ and type_expect_
             lbl_exp_list
         in
         let unify_kept record_loc extended_expr_loc ty_exp mode lbl =
-          let _, ty_arg1, ty_res1 = instance_label ~fixed:false lbl in
-          unify_exp_types extended_expr_loc env ty_exp ty_res1;
+          let ty_arg1 =
+            with_local_level_generalize_structure_if_principal
+              ~before_generalize:generalize_structure
+              begin fun () ->
+                let _, ty_arg1, ty_res1 = instance_label ~fixed:false lbl in
+                unify_exp_types extended_expr_loc env ty_exp ty_res1;
+                ty_arg1
+              end
+          in
           match matching_label lbl with
           | lid, _lbl, lbl_exp ->
               (* do not connect result types for overridden labels *)
               Overridden (lid, lbl_exp)
           | exception Not_found -> begin
+              let ty_arg = instance ty_arg1 in
               let _, ty_arg2, ty_res2 = instance_label ~fixed:false lbl in
-              unify_exp_types record_loc env ty_arg1 ty_arg2;
+              unify_exp_types record_loc env ty_arg ty_arg2;
               with_explanation (fun () ->
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env
@@ -7339,7 +7347,7 @@ and type_expect_
                 cross_left ~loc:extended_expr_loc env ty_arg1 mode
               in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
-                ~ty:ty_arg2 ~modalities:lbl.lbl_modalities record_mode;
+                ~ty:ty_arg1 ~modalities:lbl.lbl_modalities record_mode;
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
                   container = (record_loc, Expression) }
@@ -7349,7 +7357,7 @@ and type_expect_
                   ~modalities:lbl.lbl_modalities record_mode
               in
               submode ~loc:extended_expr_loc ~env mode argument_mode;
-              Kept (ty_arg1, lbl.lbl_mut,
+              Kept (ty_arg, lbl.lbl_mut,
                     unique_use ~loc:record_loc ~env mode
                       (as_single_mode argument_mode))
             end
