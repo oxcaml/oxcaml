@@ -384,8 +384,6 @@ end = struct
 
     val exists : (Var.t -> Witnesses.t -> bool) -> t -> bool
 
-    val cutoff : t -> int -> t
-
     val cutoff_witnesses : t -> int -> t
   end = struct
     type t = Witnesses.t Var.Map.t
@@ -428,11 +426,6 @@ end = struct
       Var.Map.iter (fun var w -> pp_var ~witnesses ppf var w) t
 
     let cutoff_witnesses t n = Var.Map.map (Witnesses.cutoff ~n) t
-
-    let cutoff t n =
-      let t = cutoff_witnesses t n in
-      take_first_n t n ~to_seq:Var.Map.to_seq ~of_seq:Var.Map.of_seq
-        ~cardinal:Var.Map.cardinal
   end
 
   (** Normal form of Transform. [Transform] represents an abstract transformer
@@ -582,7 +575,7 @@ end = struct
 
     val compare : t -> t -> int
 
-    val cutoff : t -> int -> t
+    val cutoff_witnesses : t -> n:int -> t
 
     val iter : (Transform.t -> unit) -> t -> unit
 
@@ -656,9 +649,7 @@ end = struct
 
     let map f t = M.fold (fun _key tr acc -> add (f tr) acc) t M.empty
 
-    let cutoff t n =
-      let t = map (Transform.cutoff_witnesses ~n) t in
-      take_first_n t n ~to_seq:M.to_seq ~of_seq:M.of_seq ~cardinal:M.cardinal
+    let cutoff_witnesses t ~n = map (Transform.cutoff_witnesses ~n) t
   end
 
   (* CR-someday gyorsh: treatment of vars and top is duplicated between Args and
@@ -700,7 +691,7 @@ end = struct
 
     val replace_witnesses : t -> Witnesses.t -> t
 
-    val cutoff : t -> int -> t
+    val cutoff_witnesses : t -> int -> t
 
     val compare : t -> t -> int
 
@@ -796,8 +787,10 @@ end = struct
         trs = Transforms.map (fun tr -> Transform.replace_witnesses tr w) trs
       }
 
-    let cutoff { vars; trs } n =
-      { vars = Vars.cutoff vars n; trs = Transforms.cutoff trs n }
+    let cutoff_witnesses { vars; trs } n =
+      { vars = Vars.cutoff_witnesses vars n;
+        trs = Transforms.cutoff_witnesses trs ~n
+      }
 
     let compare { vars = vars1; trs = trs1 } { vars = vars2; trs = trs2 } =
       let c = Vars.compare vars1 vars2 in
@@ -892,7 +885,10 @@ end = struct
        [n], and [Arg.join] is used for fixpoint computation before applying the
        cutoff. *)
     let args_with_top (top : Top.t) args =
-      if not (Args.has_witnesses args)
+      if
+        (not (Args.has_witnesses args))
+        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+             top.allocation_sources
       then
         Misc.fatal_errorf "Join Top without witnesses in args:%a"
           (Args.print ~witnesses:false)
@@ -900,10 +896,15 @@ end = struct
       match !Oxcaml_flags.zero_alloc_checker_details_cutoff with
       | Keep_all -> Args_with_top { top; args }
       | No_details ->
-        Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
-          top.witnesses
-          (Args.print ~witnesses:true)
-          args
+        if
+          Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+            top.allocation_sources
+        then
+          Misc.fatal_errorf "unexpected: (Join (Top %a) %a) " Witnesses.print
+            top.witnesses
+            (Args.print ~witnesses:true)
+            args
+        else Args_with_top { top; args }
       | At_most n ->
         (* Normal form after cutoff: args contains at least one element even
            after cutoff because [n] is guaranteed to be positive. *)
@@ -912,7 +913,7 @@ end = struct
         then
           Misc.fatal_errorf "expected at most %d witnesses, got %d: %a" n len
             Witnesses.print top.witnesses;
-        Args_with_top { top; args = Args.cutoff args n }
+        Args_with_top { top; args = Args.cutoff_witnesses args n }
 
     let tr_with_safe tr = Args_with_safe Args.(add_tr empty tr)
 
@@ -1201,7 +1202,10 @@ end = struct
       Join (Join.var_with_safe var witnesses)
     | (Resolved (Top w) as top), Var { var; witnesses }
     | Var { var; witnesses }, (Resolved (Top w) as top) ->
-      if Witnesses.is_empty witnesses
+      if
+        Witnesses.is_empty witnesses
+        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+             w.allocation_sources
       then top
       else Join (Join.var_with_top var ~var_witnesses:witnesses w)
     | Var { var = var1; witnesses = w1 }, Var { var = var2; witnesses = w2 } ->
@@ -1229,9 +1233,21 @@ end = struct
          allocations. We can put a bound on the number of witnesses recorded,
          but it would make the resulting error messages sensitive to iteration
          order. *)
-      if Transform.has_witnesses tr then Join (Join.tr_with_top tr w) else top
+      if
+        Transform.has_witnesses tr
+        || not
+             (Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+                w.allocation_sources)
+      then Join (Join.tr_with_top tr w)
+      else top
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
-      if Join.has_witnesses j then Join (Join.add_top j w) else top
+      if
+        Join.has_witnesses j
+        || not
+             (Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+                w.allocation_sources)
+      then Join (Join.add_top j w)
+      else top
     | Resolved Safe, Join j | Join j, Resolved Safe -> Join (Join.add_safe j)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       Join (Join.add_var j var witnesses)
@@ -1287,7 +1303,11 @@ end = struct
     | Transform tr, Join j | Join j, Transform tr ->
       bounded_join (Join.distribute_transform_over_join j tr)
     | (Resolved (Top w) as top), Join j | Join j, (Resolved (Top w) as top) ->
-      if Join.has_safe j && not (Join.has_witnesses j)
+      if
+        (Join.has_safe j || Option.is_some (Join.get_top j))
+        && (not (Join.has_witnesses j))
+        && Zero_alloc_utils.Allocation_sources.other_than_calling_arguments
+             w.allocation_sources
       then top
       else bounded_join (Join.distribute_transform_top_over_join j w)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
