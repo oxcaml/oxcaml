@@ -210,14 +210,7 @@ type ('a : float64) t = #{ i: 'a }
 type floatu_t : float64 addressable = float# t
 [%%expect{|
 type ('a : float64) t = #{ i : 'a; }
-Line 2, characters 0-46:
-2 | type floatu_t : float64 addressable = float# t
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "float# t" is float64
-         because of the definition of t at line 1, characters 0-34.
-       But the layout of type "float# t" must be a sublayout of
-           float64 addressable
-         because of the definition of floatu_t at line 2, characters 0-46.
+type floatu_t = float# t
 |}]
 
 type 'a t = #{ i : 'a ; j : 'a }

@@ -155,13 +155,7 @@ type u : bits8 = #{ inherit t : t }
 type v : bits8 addressable = #{ t : t }
 [%%expect{|
 type u = #{ inherit t : t; }
-Line 2, characters 0-39:
-2 | type v : bits8 addressable = #{ t : t }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "v" is bits8
-         because it is an unboxed record.
-       But the layout of type "v" must be a sublayout of bits8 addressable
-         because of the annotation on the declaration of the type v.
+type v = #{ t : t; }
 |}]
 
 (**** [inherit] must agree between a signature and its implementation ****)
