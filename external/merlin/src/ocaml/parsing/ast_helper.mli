@@ -281,7 +281,8 @@ module Type:
       constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?mut:mutable_flag -> ?modalities:modality with_loc list -> str -> core_type ->
+      ?inherit_:inherit_flag -> ?mut:mutable_flag ->
+      ?modalities:modality with_loc list -> str -> core_type ->
       label_declaration
   end
 

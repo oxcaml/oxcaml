@@ -337,35 +337,30 @@ module Layout = struct
     | (Any _ | Product _ | Box _) as t -> t
 
   (* [constrain_below_addressable t] constrains [t < t addressable] *)
-  let rec constrain_below_addressable ~allow_mutation : Sort.t t -> bool =
-    function
+  let constrain_below_addressable ~allow_mutation : Sort.t t -> bool = function
     | Any _ -> false
     | Addressable _ -> true
     | Box _ -> true
     | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
-    | Product ts ->
-      List.for_all (constrain_below_addressable ~allow_mutation) ts
+    | Product _ -> true
 
   (* [constrain_above_addressable t] constrains [t addressable < t].
-     This differs from [constrain_below_addressable] only for kinds containing
-     [any]. *)
-  let rec constrain_above_addressable ~allow_mutation : Sort.t t -> bool =
-    function
+     This differs from [constrain_below_addressable] only for [any]. *)
+  let constrain_above_addressable ~allow_mutation : Sort.t t -> bool = function
     | Any _ -> true
     | Addressable _ -> true
     | Box _ -> true
     | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
-    | Product ts ->
-      List.for_all (constrain_above_addressable ~allow_mutation) ts
+    | Product _ -> true
 
-  let rec is_surely_addressable_flat : Sort.Flat.t t -> bool = function
+  let is_surely_addressable_flat : Sort.Flat.t t -> bool = function
     | Addressable _ -> true
     | Box _ -> true
     | Any _ -> false
     | Sort (Sort.Flat.Base b, _) -> Sort.base_is_addressable b
     | Sort ((Sort.Flat.Var _ | Sort.Flat.Genvar _ | Sort.Flat.Univar _), _) ->
       false
-    | Product ts -> List.for_all is_surely_addressable_flat ts
+    | Product _ -> true
 
   (* Filling sort variables in [t] can only lower [implied_box_axes t].
 
@@ -426,9 +421,9 @@ module Layout = struct
       | None -> false
       | Some sorts ->
         let sorts = List.map (fun x -> Sort (x, Scannable_axes.max)) sorts in
-        List.equal (equate_or_equal ~allow_mutation) ts sorts)
+        List.equal (equate_components ~allow_mutation) ts sorts)
     | Product ts1, Product ts2 ->
-      List.equal (equate_or_equal ~allow_mutation) ts1 ts2
+      List.equal (equate_components ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | Addressable l1, Addressable l2 ->
       (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
@@ -448,6 +443,13 @@ module Layout = struct
       constrain_below_addressable ~allow_mutation t2
       && equate_or_equal ~allow_mutation (Addressable l1) (Addressable t2)
     | (Any _ | Sort _ | Product _ | Box _), _ -> false
+
+  (* [&] makes its components addressable, so components are compared with
+     their own addressability stripped. *)
+  and equate_components ~allow_mutation t1 t2 =
+    equate_or_equal ~allow_mutation
+      (strip_head_addressable t1)
+      (strip_head_addressable t2)
 
   let rec get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
@@ -535,7 +537,7 @@ module Layout = struct
         else Not_le
       | Product ts1, Product ts2 ->
         if List.compare_lengths ts1 ts2 = 0
-        then Misc.Le_result.combine_list (List.map2 sub ts1 ts2)
+        then Misc.Le_result.combine_list (List.map2 sub_components ts1 ts2)
         else Not_le
       | Product ts1, Sort (s2, _) -> (
         match Sort.decompose_into_product s2 (List.length ts1) with
@@ -543,7 +545,7 @@ module Layout = struct
         | Some ss2 ->
           Misc.Le_result.combine_list
             (List.map2
-               (fun t1 s2 -> sub t1 (Sort (s2, Scannable_axes.max)))
+               (fun t1 s2 -> sub_components t1 (Sort (s2, Scannable_axes.max)))
                ts1 ss2))
       | Sort (s1, _), Product ts2 -> (
         match Sort.decompose_into_product s1 (List.length ts2) with
@@ -551,8 +553,11 @@ module Layout = struct
         | Some ss1 ->
           Misc.Le_result.combine_list
             (List.map2
-               (fun s1 t2 -> sub (Sort (s1, Scannable_axes.max)) t2)
+               (fun s1 t2 -> sub_components (Sort (s1, Scannable_axes.max)) t2)
                ss1 ts2))
+    (* See [equate_components] *)
+    and sub_components t1 t2 =
+      sub (strip_head_addressable t1) (strip_head_addressable t2)
     in
     Sub_result.of_le_result (sub t1 t2) ~failure_reason:(fun () ->
         [Layout_disagreement])
@@ -560,7 +565,13 @@ module Layout = struct
   let rec intersection t1 t2 =
     (* pre-condition to [products]: [ts1] and [ts2] have the same length *)
     let products ts1 ts2 =
-      let components = List.map2 intersection ts1 ts2 in
+      (* See [equate_components] *)
+      let components =
+        List.map2
+          (fun t1 t2 ->
+            intersection (strip_head_addressable t1) (strip_head_addressable t2))
+          ts1 ts2
+      in
       Option.map
         (fun x -> Product x)
         (Misc.Stdlib.List.some_if_all_elements_are_some components)
@@ -632,9 +643,10 @@ module Layout = struct
           Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+        let ts = List.map strip_head_addressable ts in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
       | Addressable t ->
-        if constrain_below_addressable ~allow_mutation:false t
+        if is_surely_addressable t
         then pp_element ~nested ppf t
         else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
       | Box (t, sa) ->
@@ -2909,15 +2921,23 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-let for_unboxed_record lbls =
+(* The component layouts of an unboxed record, given the layouts of its
+   fields. A sole field is made addressable unless it is [inherit]; several
+   fields are made addressable by [&]. *)
+let unboxed_record_layouts lbls layouts =
+  match lbls, layouts with
+  | [lbl], [layout] ->
+    [Layout.apply_operator layout (Types.unboxed_record_field_operator lbl)]
+  | _ -> layouts
+
+let for_unboxed_record lbls_with_layouts =
   let open Types in
+  let lbls, layouts = List.split lbls_with_layouts in
   let tys_modalities =
-    List.map
-      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
-      lbls
+    List.map (fun { ld_type; ld_modalities; _ } -> ld_type, ld_modalities) lbls
   in
-  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  Builtin.product ~why:Unboxed_record tys_modalities
+    (unboxed_record_layouts lbls layouts)
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
@@ -3273,6 +3293,40 @@ let apply_or_null_l env jkind =
     | Some l -> Ok (set_layout jkind l)
     | None -> Error ())
 
+let apply_operator_l (operator : Jkind_types.Kind_operator.t) jkind =
+  match operator with
+  | Id -> jkind
+  | Addressable ->
+    let base =
+      match jkind.jkind.base with
+      | Layout l -> Layout (Layout.addressable l)
+      | Kconstr (p, sa, op) ->
+        Kconstr (p, sa, Jkind_types.Kind_operator.compose op Addressable)
+    in
+    { jkind with jkind = { jkind.jkind with base } }
+
+let apply_operator_r env (operator : Jkind_types.Kind_operator.t) jkind =
+  match operator with
+  | Id -> Ok jkind
+  | Addressable -> (
+    let jkind =
+      { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+    in
+    match jkind.jkind.base with
+    | Layout l ->
+      if Layout.constrain_above_addressable ~allow_mutation:true l
+      then Ok (set_layout jkind (Layout.strip_head_addressable l))
+      else Error ()
+    | Kconstr (p, sa, Addressable) ->
+      Ok { jkind with jkind = { jkind.jkind with base = Kconstr (p, sa, Id) } }
+    | Kconstr (_, _, Id) -> Error ())
+
+let is_surely_addressable env jkind =
+  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
+  | Layout l -> Layout.is_surely_addressable l
+  | Kconstr (_, _, Addressable) -> true
+  | Kconstr (_, _, Id) -> false
+
 let apply_or_null_r env jkind =
   let payload_axes ({ nullability; separability } : Scannable_axes.t) :
       Scannable_axes.t option =
@@ -3336,21 +3390,16 @@ let for_or_null_variant env ~payload_type ~modality ~payload_jkind =
 
 let get_annotation jk = jk.annotation
 
+(* The components of [k_0 & k_1 & ...] are [k_0 addressable],
+   [k_1 addressable], etc. *)
 let decompose_product env jk =
-  let mk_jkind layout = set_layout jk layout in
+  let mk_jkind layout = set_layout jk (Layout.addressable layout) in
   let rec deal_with_sort : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts ->
       Some (List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts)
-    | Addressable s ->
-      (* Given a kind [jk] which should equal [k_0 & k_1 & ...] (e.g. for an
-         unboxed tuple/record being inspected in [Ctype.constrain_type_jkind]),
-         [decompose_product] tries to return the list of [k_i]s.
-
-         When [jk = _ addressable], the only way for [k_0 & k_1 & ...] to equal
-         [jk] is for each component to be addressable. *)
-      Option.map (List.map (fun l -> Layout.Addressable l)) (deal_with_sort s)
+    | Addressable s -> deal_with_sort s
     | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
   match extract_layout env jk with
@@ -3358,11 +3407,7 @@ let decompose_product env jk =
   | Ok layout ->
     let rec deal_with_layout : _ Layout.t -> _ = function
       | Any _ -> None
-      | Addressable l ->
-        (* see [deal_with_sort] *)
-        Option.map
-          (List.map (fun l -> Layout.Addressable l))
-          (deal_with_layout l)
+      | Addressable l -> deal_with_layout l
       | Product layouts -> Some layouts
       | Sort (s, _) -> deal_with_sort (Sort.get s)
       | Box _ -> None

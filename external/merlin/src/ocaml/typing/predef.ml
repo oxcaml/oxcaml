@@ -1001,6 +1001,7 @@ let decl_of_type_constr type_constr =
            let id = Ident.create_predef field in
              {
                ld_id=id;
+               ld_inherit=Not_inherited;
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;

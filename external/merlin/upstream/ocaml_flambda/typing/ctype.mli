@@ -685,7 +685,7 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : unwrapped_or_null option;
+  ; or_null : unwrapped_or_null option
     (* We store the declaration and arguments rather than a bool to avoid
        re-writing the with-bounds of [or_null], and to be more robust for the
        future where we have user-defined [or_null]-like types
@@ -708,6 +708,9 @@ type unwrapped_type_expr =
        This hack should be removed when we refactor [type_jkind] and
        [estimate_type_jkind] to fix another bug.
     *)
+  ; operator : Jkind_types.Kind_operator.t
+    (* Applied to the kind of [ty] (under the modality) by the types that were
+       unwrapped: a record makes its field addressable. *)
   }
 
 and unwrapped_or_null
