@@ -262,13 +262,13 @@ let gen_variant_types (st : State.t) =
         in
         { Ty.variant_id; constructors })
 
+(* [or_null] needs a non-null [value] payload. Arrays and boxed aggregates
+   qualify even when their contents have unboxed layouts. *)
 let gen_or_null_payload_type (st : State.t) =
   if
     st.swarm.arrays && with_probability st ~probability:Config.array_probability
   then Ty.Array (random_number_ty st, gen_array_dimensions st)
   else
-    (* [or_null] needs a non-null [value] payload. Arrays and boxed aggregates
-       qualify even when their contents have unboxed layouts. *)
     let numbers =
       List.filter_map
         (fun (nty : NumberTy.t) ->

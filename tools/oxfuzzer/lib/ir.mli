@@ -112,7 +112,6 @@ module Ty : sig
   val to_code : t -> Parsetree.core_type
 end
 
-(** Shared construction and matching for declared variants and [or_null]. *)
 module Sum : sig
   type t =
     | Variant of Ty.variant
