@@ -3480,6 +3480,66 @@ int main(void) {
 }
 ]])], AC_DEFINE([HAS_FMA]) has_fma=yes, [])
 
+AC_SUBST([has_avx512f])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512f")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512F]) has_avx512f=yes, [])
+
+AC_SUBST([has_avx512dq])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512dq")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512DQ]) has_avx512dq=yes, [])
+
+AC_SUBST([has_avx512cd])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512cd")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512CD]) has_avx512cd=yes, [])
+
+AC_SUBST([has_avx512bw])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512bw")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512BW]) has_avx512bw=yes, [])
+
+AC_SUBST([has_avx512vl])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("avx512vl")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AVX512VL]) has_avx512vl=yes, [])
+
 oc_cflags="$common_cflags $internal_cflags"
 oc_cppflags="$common_cppflags $internal_cppflags"
 
