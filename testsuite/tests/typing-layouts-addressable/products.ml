@@ -281,3 +281,236 @@ external e : (tup [@unpacked]) -> int = "foo" "bar"
 type tup : bits32 & bits32
 external e : (tup [@unpacked]) -> int = "foo" "bar"
 |}]
+
+(**** [inherit] on a component ****)
+
+(* An [inherit] component is not made addressable *)
+type t : bits8 & bits16 inherit
+[%%expect{|
+type t : bits8 & bits16 inherit
+|}]
+
+module M : sig
+  type t : bits8 & bits16
+end = struct
+  type t : bits8 & bits16 inherit
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : bits8 & bits16 inherit
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 & bits16 inherit end
+       is not included in
+         sig type t : bits8 & bits16 end
+       Type declarations do not match:
+         type t : bits8 & bits16 inherit
+       is not included in
+         type t : bits8 & bits16
+       The layout of the first is bits8 & bits16 inherit
+         because of the definition of t at line 4, characters 2-33.
+       But the layout of the first must be a sublayout of bits8 & bits16
+         because of the definition of t at line 2, characters 2-25.
+|}]
+
+module M : sig
+  type t : bits8 & bits16 inherit
+end = struct
+  type t : bits8 & bits16
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : bits8 & bits16
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 & bits16 end
+       is not included in
+         sig type t : bits8 & bits16 inherit end
+       Type declarations do not match:
+         type t : bits8 & bits16
+       is not included in
+         type t : bits8 & bits16 inherit
+       The layout of the first is bits8 & bits16
+         because of the definition of t at line 4, characters 2-25.
+       But the layout of the first must be a sublayout of
+           bits8 & bits16 inherit
+         because of the definition of t at line 2, characters 2-33.
+|}]
+
+(* Addressability does not distribute through products: a product with an
+   [inherit] component made addressable is not the product of the components
+   made addressable. *)
+type t : (bits8 & bits16 inherit) addressable
+[%%expect{|
+type t : (bits8 & bits16 inherit) addressable
+|}]
+
+module M : sig
+  type t : bits8 & bits16
+end = struct
+  type t : (bits8 & bits16 inherit) addressable
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : (bits8 & bits16 inherit) addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : (bits8 & bits16 inherit) addressable end
+       is not included in
+         sig type t : bits8 & bits16 end
+       Type declarations do not match:
+         type t : (bits8 & bits16 inherit) addressable
+       is not included in
+         type t : bits8 & bits16
+       The layout of the first is (bits8 & bits16 inherit) addressable
+         because of the definition of t at line 4, characters 2-47.
+       But the layout of the first must be a sublayout of bits8 & bits16
+         because of the definition of t at line 2, characters 2-25.
+|}]
+
+module M : sig
+  type t : (bits8 & bits16 inherit) addressable
+end = struct
+  type t : bits8 & bits16 inherit
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : bits8 & bits16 inherit
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 & bits16 inherit end
+       is not included in
+         sig type t : (bits8 & bits16 inherit) addressable end
+       Type declarations do not match:
+         type t : bits8 & bits16 inherit
+       is not included in
+         type t : (bits8 & bits16 inherit) addressable
+       The layout of the first is bits8 & bits16 inherit
+         because of the definition of t at line 4, characters 2-33.
+       But the layout of the first must be a sublayout of
+           (bits8 & bits16 inherit) addressable
+         because of the definition of t at line 2, characters 2-47.
+|}]
+
+type ti : bits8 & bits16 inherit
+type ta : (bits8 & bits16 inherit) addressable
+type ok = ta req
+[%%expect{|
+type ti : bits8 & bits16 inherit
+type ta : (bits8 & bits16 inherit) addressable
+type ok = ta req
+|}]
+
+type bad = ti req
+[%%expect{|
+Line 1, characters 11-13:
+1 | type bad = ti req
+               ^^
+Error: This type "ti" should be an instance of type "('a : any addressable)"
+       The layout of ti is bits8 & bits16 inherit
+         because of the definition of ti at line 1, characters 0-32.
+       But the layout of ti must be a sublayout of any addressable
+         because of the definition of req at line 1, characters 0-31.
+|}]
+
+(* [inherit] on an inherently addressable component changes nothing *)
+module M : sig
+  type t : bits64 & value
+end = struct
+  type t : bits64 inherit & value
+end
+[%%expect{|
+Line 4, characters 11-25:
+4 |   type t : bits64 inherit & value
+               ^^^^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits64".
+
+module M : sig type t : bits64 & value end
+|}]
+
+(* [inherit] is only allowed on a component of a product *)
+type t : bits8 inherit
+[%%expect{|
+Line 1, characters 9-22:
+1 | type t : bits8 inherit
+             ^^^^^^^^^^^^^
+Error: "inherit" must be on the outside of a component of a product kind.
+|}]
+
+type t : bits8 & bits16 inherit addressable
+[%%expect{|
+Line 1, characters 17-31:
+1 | type t : bits8 & bits16 inherit addressable
+                     ^^^^^^^^^^^^^^
+Error: "inherit" must be on the outside of a component of a product kind.
+|}]
+
+type t : (bits8 inherit) mod portable
+[%%expect{|
+Line 1, characters 9-24:
+1 | type t : (bits8 inherit) mod portable
+             ^^^^^^^^^^^^^^^
+Error: "inherit" must be on the outside of a component of a product kind.
+|}]
+
+type t : (bits8 & bits16 inherit) mod portable
+[%%expect{|
+type t : bits8 mod portable & (bits16 mod portable) inherit
+|}]
+
+(* A tuple makes its components addressable, so its kind has no [inherit]
+   component *)
+type ('a : bits8 & bits16 inherit) ri
+type bad = #(int8# * int16#) ri
+[%%expect{|
+type ('a : bits8 & bits16 inherit) ri
+Line 2, characters 11-28:
+2 | type bad = #(int8# * int16#) ri
+               ^^^^^^^^^^^^^^^^^
+Error: This type "#(int8# * int16#)" should be an instance of type
+         "('a : bits8 & bits16 inherit)"
+       The layout of #(int8# * int16#) is bits8 & bits16
+         because it is an unboxed tuple.
+       But the layout of #(int8# * int16#) must be a sublayout of
+           bits8 & bits16 inherit
+         because of the definition of ri at line 1, characters 0-37.
+|}]
+
+let f (x : int8#) (y : int16#) : ('a : bits8 & bits16 inherit) = #(x, y)
+[%%expect{|
+Line 1, characters 65-72:
+1 | let f (x : int8#) (y : int16#) : ('a : bits8 & bits16 inherit) = #(x, y)
+                                                                     ^^^^^^^
+Error: This expression has type "#('b * 'c)"
+       but an expression was expected of type "('a : bits8 & bits16 inherit)"
+       The layout of #('a * 'b) is bits8 & '_representable_layout_1
+         because it is an unboxed tuple.
+       But the layout of #('a * 'b) must be a sublayout of
+           bits8 & bits16 inherit
+         because of the annotation on the type variable 'a.
+|}]
+
+(* [@unpacked] accepts a product with an [inherit] component, made addressable
+   or not *)
+type tup : bits32 & bits32 inherit
+external e : (tup [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+type tup : bits32 & bits32 inherit
+external e : (tup [@unpacked]) -> int = "foo" "bar"
+|}]
+
+type tup : (bits32 & bits32 inherit) addressable
+external e : (tup [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+type tup : (bits32 & bits32 inherit) addressable
+external e : (tup [@unpacked]) -> int = "foo" "bar"
+|}]
