@@ -16,12 +16,18 @@ type t : any addressable
 
 type t : (bits8 & bits16) addressable
 [%%expect{|
-type t : (bits8 & bits16) addressable
+Line 1, characters 26-37:
+1 | type t : (bits8 & bits16) addressable
+                              ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits16".
+
+type t : bits8 & bits16
 |}]
 
 type t : bits8 addressable & bits16
 [%%expect{|
-type t : bits8 addressable & bits16
+type t : bits8 & bits16
 |}]
 
 type t : void addressable
@@ -88,7 +94,7 @@ Line 1, characters 50-61:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
-type t : bits8 addressable & bits16 addressable
+type t : bits8 & bits16
 |}]
 
 type t : (any mod portable) addressable addressable
@@ -115,7 +121,13 @@ type t : any addressable mod portable
 
 type t : (bits8 & bits16) addressable mod portable
 [%%expect{|
-type t : (bits8 & bits16) addressable mod portable
+Line 1, characters 26-37:
+1 | type t : (bits8 & bits16) addressable mod portable
+                              ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits16".
+
+type t : bits8 mod portable & bits16 mod portable
 |}]
 
 (**** Equalities: [k addressable = k] for addressable [k] ****)
@@ -223,7 +235,7 @@ Line 2, characters 52-63:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
-module M : sig type t : bits8 addressable & bits16 addressable end
+module M : sig type t : bits8 & bits16 end
 |}]
 
 module M : sig
@@ -238,7 +250,7 @@ Line 4, characters 52-63:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
-module M : sig type t : bits8 addressable & bits16 addressable end
+module M : sig type t : bits8 & bits16 end
 |}]
 
 (* ... also with a mix of intrinsically and made addressable components *)
@@ -254,7 +266,7 @@ Line 2, characters 38-49:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & word".
 
-module M : sig type t : bits8 addressable & word end
+module M : sig type t : bits8 & word end
 |}]
 
 (**** Inequalities: [k addressable] and [k] are incomparable for
@@ -504,18 +516,7 @@ type ok = #(int64_u * string) req
 
 type ok = #(float# * string) req
 [%%expect{|
-Line 1, characters 10-28:
-1 | type ok = #(float# * string) req
-              ^^^^^^^^^^^^^^^^^^
-Error: This type "#(float# * string)" should be an instance of type
-         "('a : any addressable)"
-       The layout of #(float# * string) is float64 & value non_float
-         because it is an unboxed tuple.
-       But the layout of #(float# * string) must be a sublayout of
-           any addressable
-         because of the definition of req at line 1, characters 0-31.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+type ok = #(float# * string) req
 |}]
 
 type tb8 : bits8
