@@ -136,7 +136,7 @@ type u2 = #{ a : unit_u; b : unit_u }
 type u3 = { a : unit_u } [@@unboxed]
 type nested = #{ a : unit_u; b : #(unit_u * unit_u) }
 type b1 = { a : unit_u }
-type b1_unboxed : void = b1#
+type b1_unboxed : void addressable = b1#
 type inline = A of { a : nested }
 [%%expect{|
 type u1 = #{ a : unit_u; }
@@ -144,8 +144,13 @@ type u2 = #{ a : unit_u; b : unit_u; }
 type u3 = { a : unit_u; } [@@unboxed]
 type nested = #{ a : unit_u; b : #(unit_u * unit_u); }
 type b1 = { a : unit_u; }
-type b1_unboxed = b1#
-type inline = A of { a : nested; }
+Line 6, characters 0-40:
+6 | type b1_unboxed : void addressable = b1#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "b1#" is void
+         because it is an unboxed record.
+       But the layout of type "b1#" must be a sublayout of void addressable
+         because of the definition of b1_unboxed at line 6, characters 0-40.
 |}]
 
 (* Mutability of `void` fields in all-`void` records. *)
