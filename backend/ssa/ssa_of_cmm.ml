@@ -393,8 +393,9 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Ok (Block.params cont_block)
   in
   match new_op with
-  | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
-  | Call { op = Indirect candidates; _ } ->
+  | Call { op = { desc = Direct sym; _ }; _ } ->
+    call_returning_to (Direct sym) ty
+  | Call { op = { desc = Indirect candidates; _ }; _ } ->
     call_returning_to (Indirect candidates) ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
     call_returning_to (External ext_call) ty_res

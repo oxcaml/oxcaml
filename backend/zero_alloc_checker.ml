@@ -2893,14 +2893,14 @@ end = struct
           (* CR gyorsh: show this be treated as a jump, without affecting the
              summary? *)
           transform_tailcall_imm t t.current_fun_name dbg
-        | Tailcall_func (Direct { sym_name; _ }) ->
+        | Tailcall_func { desc = Direct { sym_name; _ }; _ } ->
           transform_tailcall_imm t sym_name dbg
-        | Tailcall_func (Indirect (Some callees)) ->
+        | Tailcall_func { desc = Indirect (Some callees); _ } ->
           transform_call_indirect t ~next:Value.normal_return
             ~exn:Value.exn_escape callees
             (fun callee -> Witness.Indirect_tailcall { callee = Some callee })
             ~desc:"indirect tailcall" dbg
-        | Tailcall_func (Indirect None) ->
+        | Tailcall_func { desc = Indirect None; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns. *)
           let w =
             create_witnesses t (Indirect_tailcall { callee = None }) dbg
@@ -2932,14 +2932,14 @@ end = struct
           in
           let k = Witness.Probe { name; handler_code_sym } in
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
-        | Call { op = Indirect None; _ } ->
+        | Call { op = { desc = Indirect None; _ }; _ } ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
           transform_top t ~next ~exn w "indirect call" dbg
-        | Call { op = Indirect (Some callees); _ } ->
+        | Call { op = { desc = Indirect (Some callees); _ }; _ } ->
           transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Indirect_call { callee = Some callee })
             ~desc:"indirect call" dbg
-        | Call { op = Direct { sym_name = func; _ }; _ } ->
+        | Call { op = { desc = Direct { sym_name = func; _ }; _ }; _ } ->
           let k = Witness.Direct_call { callee = func } in
           transform_call t ~next ~exn func k ~desc:("direct call to " ^ func)
             dbg
