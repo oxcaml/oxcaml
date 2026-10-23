@@ -22,6 +22,11 @@ val from_size : Code_size.t -> t
 
 val size : t -> Code_size.t
 
+(** The part of [size] that is the size of the code of the closures defined
+    within the expression (see [set_of_closures]), as opposed to the code of the
+    expression itself. *)
+val size_of_nested_code : t -> Code_size.t
+
 val removed : t -> Removed_operations.t
 
 val print : Format.formatter -> t -> unit

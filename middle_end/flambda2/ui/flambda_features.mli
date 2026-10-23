@@ -111,6 +111,10 @@ val dump_fexpr_annot : unit -> bool
 
 val dump_fexpr_annot_after : unit -> string list
 
+(** Whether to write a CSV file of the code size estimates of the functions of
+    each compilation unit (see [Code_size_report]). *)
+val dump_code_sizes : unit -> bool
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

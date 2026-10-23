@@ -3,6 +3,7 @@
 #
 
 ws_main   = --workspace=duneconf/main.ws
+ws_code_sizes = --workspace=duneconf/code_sizes.ws
 
 ifeq ($(coverage),yes)
   coverage_dune_flags=--instrument-with bisect_ppx
@@ -24,6 +25,11 @@ else
 main_ocamlopt_optimization_flags := -O3
 endif
 
+# The ocamlopt flags of the main context; ws_extra_ocamlopt_flags is set per
+# workspace file below.
+main_ocamlopt_flags = $(strip \
+  $(main_ocamlopt_optimization_flags) -fno-asan $(ws_extra_ocamlopt_flags))
+
 define dune_main_context
 (lang dune 3.23)
 (using oxcaml 0.1)
@@ -38,7 +44,7 @@ define dune_main_context
     (bin_annot_cms true)
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
-    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
+    (ocamlopt_flags (:standard $(main_ocamlopt_flags)))
     $(ENV_VARS)))))
 endef
 
@@ -74,6 +80,30 @@ compiler: boot-compiler
           testsuite/lib/testing.cm{,x}a \
           @middle_end/flambda2/tests/tools/all \
           $(ocamldir)/tools/dumpobj.bc
+
+# Build the compiler distribution a second time, with -dcode-sizes, in a
+# separate dune build directory (_build/code_sizes, leaving _build/main alone),
+# and compare the resulting code size estimates against the machine code
+# actually emitted (see tools/code_size_histogram.py): the histogram is drawn
+# to _build/code_sizes.pdf and printed, and the per-function data is written
+# to _build/code_sizes.csv. Needs Python 3 with matplotlib, and objdump or
+# llvm-objdump. The stdlib, which is built by the boot compiler, is not
+# included.
+#
+# The build directory is cleaned first: the .code_sizes.csv files are not
+# known to dune, which deletes them when it next loads the rules of their
+# directories, so an incremental build would be left with the files of the
+# recompiled units only.
+code_sizes_build_dir = $(CURDIR)/_build/code_sizes
+.PHONY: code-size-report
+code-size-report: boot-compiler duneconf/code_sizes.ws
+	$(dune) clean --build-dir=$(code_sizes_build_dir)
+	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
+          $(dune) build --always-show-command-line $(ws_code_sizes) \
+          --build-dir=$(code_sizes_build_dir) --only-package=ocaml @install
+	python3 tools/code_size_histogram.py _build/code_sizes/main \
+          --csv _build/code_sizes.csv --plot _build/code_sizes.pdf
 
 .PHONY: minimize-failure
 minimize-failure: boot-minimizer boot-compiler
@@ -114,7 +144,12 @@ runtest-dwarf: compiler
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
+duneconf/main.ws: ws_extra_ocamlopt_flags =
 duneconf/main.ws: export contents = $(dune_main_context)
+# The workspace for the code-size-report target: the main context again, with
+# -dcode-sizes added.
+duneconf/code_sizes.ws: ws_extra_ocamlopt_flags = -dcode-sizes
+duneconf/code_sizes.ws: export contents = $(dune_main_context)
 duneconf/%.ws: Makefile.common-ox
 	echo "$$contents" > $@
 

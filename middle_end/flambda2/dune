@@ -36,7 +36,7 @@
    -O3
    -open
    Int_replace_polymorphic_compare))
- (modules flambda2)
+ (modules flambda2 code_size_report)
  (libraries
   ocamlfrontend
   ocamlbytecomp

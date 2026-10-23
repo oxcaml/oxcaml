@@ -249,6 +249,8 @@ let flambda_to_flambda0 : type m.
   in
   print_flambda last_pass_name (Flambda_features.dump_flambda ()) ppf flambda;
   print_fexpr last_pass_name (Flambda_features.dump_fexpr Last_pass) ppf flambda;
+  if Flambda_features.dump_code_sizes ()
+  then Code_size_report.dump ~prefixname all_code;
   let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
