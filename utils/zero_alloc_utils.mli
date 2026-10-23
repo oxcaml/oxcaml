@@ -62,6 +62,70 @@ module Components : sig
   val lessequal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+
+  val one_hot : Tag.t -> bool t
+
+  val print :
+    (Format.formatter -> 'component -> unit) ->
+    Format.formatter ->
+    'component t ->
+    unit
+end
+
+module Relevant_components_by_argument_index : sig
+  type t = bool Components.t Numbers.Int.Map.t
+
+  val compare : t -> t -> int
+
+  val join : t -> t -> t
+
+  val meet : t -> t -> t
+
+  val lessequal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
+module Allocation_sources : sig
+  type 'args_only t =
+    | Allocation_other_than_calling_arguments
+    | No_allocation_other_than_calling_arguments of 'args_only
+
+  val map : f:('a -> 'b) -> 'a t -> 'b t
+
+  val compare :
+    compare_args_only:('args_only -> 'args_only -> int) ->
+    'args_only t ->
+    'args_only t ->
+    int
+
+  val lessequal :
+    lessequal_args_only:('args_only -> 'args_only -> bool) ->
+    'args_only t ->
+    'args_only t ->
+    bool
+
+  val join :
+    join_args_only:('args_only -> 'args_only -> 'args_only) ->
+    'args_only t ->
+    'args_only t ->
+    'args_only t
+
+  val meet :
+    meet_args_only:('args_only -> 'args_only -> 'args_only) ->
+    'args_only t ->
+    'args_only t ->
+    'args_only t
+
+  val other_than_calling_arguments : 'args_only t -> bool
+
+  val top : 'args_only t
+
+  val print :
+    (Format.formatter -> 'args_only -> unit) ->
+    Format.formatter ->
+    'args_only t ->
+    unit
 end
 
 (** Abstract domain used in static analysis for checking [@zero_alloc]
@@ -84,14 +148,24 @@ module type WS = sig
   val compare : t -> t -> int
 end
 
+module type Allocation_sources = sig
+  type t
+
+  val top : t
+
+  val argument : argument_index:int -> tag:Tag.t -> t
+end
+
 module type Component = sig
   (** Abstract value for each component of the domain. *)
   type t
 
+  type allocation_sources
+
   type witnesses
 
   (** Property may not hold on some paths. *)
-  val top : witnesses -> t
+  val top : allocation_sources:allocation_sources -> witnesses:witnesses -> t
 
   (** Property holds on all paths. *)
   val safe : t
@@ -117,12 +191,20 @@ end
 module Make_component (Witnesses : WS) : sig
   type t = Witnesses.t Component.t
 
-  include Component with type witnesses := Witnesses.t and type t := t
+  include
+    Component
+      with type allocation_sources := unit
+       and type witnesses := Witnesses.t
+       and type t := t
 end
 
 module Make_value
+    (Allocation_sources : Allocation_sources)
     (Witnesses : WS)
-    (V : Component with type witnesses := Witnesses.t) : sig
+    (V :
+      Component
+        with type allocation_sources := Allocation_sources.t
+         and type witnesses := Witnesses.t) : sig
   (** Abstract value associated with each program location in a function. *)
   type t = V.t Components.t
 
@@ -132,7 +214,8 @@ module Make_value
 
   val meet : t -> t -> t
 
-  val top : Witnesses.t -> t
+  val top :
+    allocation_sources:Allocation_sources.t -> witnesses:Witnesses.t -> t
 
   val bot : t
 
@@ -155,7 +238,7 @@ module Make_value
 
   (** [relaxed] means the property holds on paths that lead to normal returns
       only (i.e., [nor] component is Safe, others are Top. *)
-  val relaxed : Witnesses.t -> t
+  val relaxed : witnesses:Witnesses.t -> t
 
   (** Constructs a value from a user annotation. The witness will be empty. *)
   val of_annotation :
@@ -176,6 +259,8 @@ module Make_value
       "Top" values with different witnesses. *)
   val compare : t -> t -> int
 end
+
+module No_allocation_sources : Allocation_sources with type t = unit
 
 (** The [Assume_info] module contains an instantiation of the abstract domain
     with trivial witnesses. It is used to propagate assume annotations from the
@@ -228,7 +313,8 @@ module Assume_info : sig
 
   module V : module type of Make_component (Witnesses)
 
-  module Value : module type of Make_value (Witnesses) (V)
+  module Value :
+      module type of Make_value (No_allocation_sources) (Witnesses) (V)
 
   val get_value : t -> Value.t option
 end
