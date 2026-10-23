@@ -452,7 +452,7 @@ let rec infer_machtype env (expr : Cmm.expression) : inferred_machtype =
     match infer_machtype env expr1 with
     | Never_returns -> Never_returns
     | Machtype _ -> infer_machtype env expr2)
-  | Cifthenelse (cond, _, ifso, _, ifnot, dbg) -> (
+  | Cifthenelse (cond, _, _, ifso, _, _, ifnot, dbg) -> (
     let cond_ty = infer_machtype env cond in
     check_machtype ~dbg
       ~what:(fun () -> "if-then-else condition")
@@ -473,7 +473,7 @@ let rec infer_machtype env (expr : Cmm.expression) : inferred_machtype =
       join_inferred_machtype_list ~dbg
         (Array.to_list
            (Array.map
-              (fun (case, _) -> infer_machtype env case)
+              (fun (case, _, _) -> infer_machtype env case)
               cases)))
   | Ccatch (_, handlers, body) ->
     let env =
