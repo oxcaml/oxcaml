@@ -303,7 +303,10 @@ module V : sig
 
   val replace_witnesses : Witnesses.t -> t -> t
 
-  val attribute_to_call_site : Witnesses.t -> t -> t
+  val attribute_to_call_site :
+    caller_witnesses:Witnesses.t ->
+    callee_contract:t ->
+    t
 
   val diff_witnesses : expected:t -> actual:t -> Witnesses.t
 
@@ -1328,22 +1331,33 @@ end = struct
     | Transform tr -> Transform (Transform.replace_witnesses tr witnesses)
     | Var { var; witnesses = _ } -> Var { var; witnesses }
 
-  let attribute_to_call_site witnesses t =
-    match t with
-    | Resolved (Top _) ->
+  (* At a call site e.g. [g x = f x] where [f] is [[@zero_alloc conditional]],
+     figure out what this means for the allocation sources of [g]. *)
+  let transfer_allocation_sources_from_callee_to_caller
+      ~(callee_contract :
+         Zero_alloc_utils.Relevant_components_by_argument_index.t) :
+      Zero_alloc_utils.Relevant_components_by_argument_index.t =
+    callee_contract
+
+  let attribute_to_call_site ~caller_witnesses ~callee_contract =
+    match callee_contract with
+    | Resolved (Top { allocation_sources = callee_contract; witnesses = _ }) ->
       Resolved
         (Top
-           { (* CR-soon wsturgeon for wsturgeon: evaluate the conditional
-                guarantee of this call instead of assuming it will allocate
-                (work for the next PR in this split) *)
-             allocation_sources = Allocation_other_than_calling_arguments;
-             witnesses
-           })
-    | Resolved (Bot | Safe) -> t
+           { allocation_sources =
+               Zero_alloc_utils.Allocation_sources.map
+                 ~f:(fun callee_contract ->
+                   transfer_allocation_sources_from_callee_to_caller
+                     ~callee_contract)
+                 callee_contract;
+             (* CR-someday wsturgeon for wsturgeon: new kind of witness tracing
+                through function-call attribution? *)
+             witnesses = caller_witnesses })
+    | Resolved (Bot | Safe) -> callee_contract
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf
         "Zero_alloc_checker.attribute_to_call_site: unresolved value %a"
-        (print ~witnesses:false) t
+        (print ~witnesses:false) callee_contract
 
   let diff_witnesses ~expected ~actual =
     (* If [actual] is Top and [expected] is not Top then return the [actual]
@@ -1374,7 +1388,8 @@ end = struct
     let get env var w =
       match env var with
       | None -> unresolved w var
-      | Some v -> attribute_to_call_site w v
+      | Some callee_contract ->
+        attribute_to_call_site ~caller_witnesses:w ~callee_contract
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1388,7 +1403,8 @@ end = struct
       | Var { var; witnesses } -> (
         match env var with
         | None -> t
-        | Some v -> attribute_to_call_site witnesses v)
+        | Some callee_contract ->
+          attribute_to_call_site ~caller_witnesses:witnesses ~callee_contract)
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1458,7 +1474,10 @@ module Value : sig
 
   val replace_witnesses : Witnesses.t -> t -> t
 
-  val attribute_to_call_site : Witnesses.t -> t -> t
+  val attribute_to_call_site :
+    caller_witnesses:Witnesses.t ->
+    callee_contract:t ->
+    t
 
   val get_unresolved_names : t -> String.Set.t
 
@@ -1503,9 +1522,11 @@ end = struct
     Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
         V.replace_witnesses w)
 
-  let attribute_to_call_site w =
-    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
-        V.attribute_to_call_site w)
+  let attribute_to_call_site ~caller_witnesses ~callee_contract =
+    Zero_alloc_utils.Components.map
+      ~f:(fun _ignore_tag callee_contract ->
+        V.attribute_to_call_site ~caller_witnesses ~callee_contract)
+      callee_contract
 
   let diff_witnesses ~expected ~actual =
     Zero_alloc_utils.Components.map2
@@ -2335,15 +2356,15 @@ end = struct
       report t v ~msg ~desc dbg;
       v
     in
-    let resolved v =
-      assert (Value.is_resolved v);
+    let resolved callee_contract =
+      assert (Value.is_resolved callee_contract);
       let msg = Printf.sprintf "resolved %s" callee in
-      report t v ~msg ~desc dbg;
+      report t callee_contract ~msg ~desc dbg;
       (* Abstract witnesses of a call to the single witness for the callee name.
          Summary of tailcall self won't be affected because it is not set to Top
          by [find_callee]. *)
-      let w = create_witnesses t k dbg in
-      Value.attribute_to_call_site w v
+      let caller_witnesses = create_witnesses t k dbg in
+      Value.attribute_to_call_site ~caller_witnesses ~callee_contract
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in
