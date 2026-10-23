@@ -96,7 +96,12 @@ and instruction_desc =
   | Lcall_op of call_operation
   | Lreloadretaddr
   | Lreturn
-  | Llabel_for_jump_target of label
+  | Llabel_for_jump_target of
+      { label : label;
+        is_loop_header : bool
+            (* the block starting at this label is a loop header that is not
+               cold, see [Cfg.basic_block.is_loop_header] *)
+      }
   | Llabel_for_dwarf of label
       (** Only delimits DWARF ranges, never a jump target. *)
   | Lbranch of label

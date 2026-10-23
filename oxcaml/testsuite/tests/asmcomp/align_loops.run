@@ -1,0 +1,35 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# first, run the program to make sure it doesn't crash
+${program}
+
+# now check the assembly file produced during compilation: for each function,
+# look for a 16-byte alignment directive immediately preceding a numeric local
+# label (a loop head). Function entries are also aligned to 16 bytes, but are
+# followed by symbol names rather than .L<n> labels. Code symbols use either
+# the flat (camlAlign_loops__<fn>_<stamps>_code) or the structured
+# (_CamlU11Align_loopsF<len><fn>_<stamps>_code) mangling scheme. Any other
+# symbol ends the current function, so its loops are not counted.
+asm=${test_build_directory}/align_loops.s
+awk '
+  /^[^[:space:].][^:]*:$/ {
+    fn = $0
+    if ((sub(/^camlAlign_loops__/, "", fn) \
+         || sub(/^_CamlU11Align_loopsF[0-9]+/, "", fn)) \
+        && sub(/(_[0-9]+)+(_code)?:$/, "", fn)) {
+      if (!(fn in aligned)) { order[n++] = fn; aligned[fn] = 0 }
+    } else fn = ""
+    pending = 0
+    next
+  }
+  /^[[:space:]]*\.align[[:space:]]+16/ { pending = 1; next }
+  /^\.L[0-9]+:/ { if (pending && fn != "") aligned[fn] = 1 }
+  { pending = 0 }
+  END {
+    for (i = 0; i < n; i++)
+      printf "%s: aligned loop head: %s\n", order[i],
+        (aligned[order[i]] ? "yes" : "no")
+  }
+' "${asm}" | sort
