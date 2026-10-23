@@ -106,10 +106,10 @@ let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
 
 let evex_rounding : Amd64_simd_defs.evex_rounding -> string = function
-  | Rnd_near -> "{rn-sae}, "
-  | Rnd_down -> "{rd-sae}, "
-  | Rnd_up -> "{ru-sae}, "
-  | Rnd_zero -> "{rz-sae}, "
+  | Rnd_near -> "{rn-sae}"
+  | Rnd_down -> "{rd-sae}"
+  | Rnd_up -> "{ru-sae}"
+  | Rnd_zero -> "{rz-sae}"
 
 let evex_broadcast evex_w (len : Amd64_simd_defs.evex_length) =
   let bits = match len with L128 -> 128 | L256 -> 256 | L512 -> 512 in
@@ -122,20 +122,39 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     | Evex { evex_z; evex_b; evex_ll; evex_w; _ } ->
       let rounding, broadcast =
         match evex_ll with
-        | Ll_round rnd -> evex_rounding rnd, ""
+        | Ll_round rnd -> Some (evex_rounding rnd), ""
         | Ll_len len ->
           if not evex_b
-          then "", ""
+          then None, ""
           else if has_mem
-          then "", evex_broadcast evex_w len
-          else "{sae}, ", ""
+          then None, evex_broadcast evex_w len
+          else Some "{sae}", ""
       in
       (if evex_z then "{z}" else ""), rounding, broadcast
     | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
   in
+  let mem_suffix =
+    (* The below instructions require disambiguated memory operand sizes. *)
+    if not has_mem
+    then ""
+    else
+      let len_letter ~z =
+        match instr.enc.prefix with
+        | Evex { evex_ll = Ll_len L128; _ } -> "x"
+        | Evex { evex_ll = Ll_len L256; _ } -> "y"
+        | Evex { evex_ll = Ll_len L512; _ } -> if z then "z" else ""
+        | Evex { evex_ll = Ll_round _; _ } | Legacy _ | Vex _ -> ""
+      in
+      match instr.mnemonic with
+      | "vcvtpd2dq" | "vcvttpd2dq" | "vcvtpd2udq" | "vcvttpd2udq" | "vcvtpd2ps"
+      | "vcvtqq2ps" | "vcvtuqq2ps" ->
+        len_letter ~z:false
+      | "vfpclassps" | "vfpclasspd" -> len_letter ~z:true
+      | "vcvtusi2ss" | "vcvtusi2sd" ->
+        if Amd64_simd_defs.instr_allows_temp instr M64 then "q" else "l"
+      | _ -> ""
+  in
   let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
-  (* [emit_simd_instr] passes the immediate first, then the writemask, then the
-     remaining operands in AT&T order. *)
   let imm, args =
     match instr.imm with
     | Imm_spec | Imm_reg ->
@@ -147,17 +166,18 @@ let ievex b (instr : Amd64_simd_instrs.instr) args =
     then Some args.(0), Array.sub args 1 (Array.length args - 1)
     else None, args
   in
-  bprintf b "\t%s\t" instr.mnemonic;
-  (* The assembler requires the rounding mode to follow the immediate. *)
-  (match imm with
-  | Some imm -> bprintf b "%a, " arg imm
-  | None -> ());
-  Buffer.add_string b rounding;
+  bprintf b "\t%s%s\t" instr.mnemonic mem_suffix;
+  (* The rounding mode must follow the immediate, except for GPR conversions
+     (vcvtsi2ss etc.), where it must follow the GPR instead. *)
+  let gpr_source = Amd64_simd_defs.instr_allows_gpr instr in
+  (match imm with Some imm -> bprintf b "%a, " arg imm | None -> ());
+  if not gpr_source then Option.iter (bprintf b "%s, ") rounding;
   let last = Array.length args - 1 in
   Array.iteri
     (fun i a ->
       if i > 0 then Buffer.add_string b ", ";
       arg b a;
+      if i = 0 && gpr_source then Option.iter (bprintf b ", %s") rounding;
       if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
       if i = last then bprintf b "%a%s" mask writemask zeroing)
     args
@@ -267,7 +287,17 @@ let print_instr b = function
     | Cmpsd, [| imm; arg1; arg2 |] ->
       i2 b ("cmp" ^ string_of_float_condition_imm imm ^ "sd") arg1 arg2
     (* The assembler needs a suffix to disambiguate the memory argument. *)
+    | (Crc32_r32_r8m8 | Crc32_r64_r8m8), [| arg1; arg2 |] ->
+      i2 b "crc32b" arg1 arg2
+    | Crc32_r32_r16m16, [| arg1; arg2 |] -> i2 b "crc32w" arg1 arg2
+    | Crc32_r32_r32m32, [| arg1; arg2 |] -> i2 b "crc32l" arg1 arg2
     | Crc32_r64_r64m64, [| arg1; arg2 |] -> i2 b "crc32q" arg1 arg2
+    | ( (Vcvtpd2dq_X_Xm128 | Vcvttpd2dq_X_Xm128 | Vcvtpd2ps_X_Xm128),
+        [| arg1; arg2 |] ) ->
+      i2 b (instr.mnemonic ^ "x") arg1 arg2
+    | ( (Vcvtpd2dq_X_Ym256 | Vcvttpd2dq_X_Ym256 | Vcvtpd2ps_X_Ym256),
+        [| arg1; arg2 |] ) ->
+      i2 b (instr.mnemonic ^ "y") arg1 arg2
     | Cvtsi2sd_X_r64m64, [| arg1; arg2 |] -> i2 b "cvtsi2sdq" arg1 arg2
     | Cvtsi2ss_X_r64m64, [| arg1; arg2 |] -> i2 b "cvtsi2ssq" arg1 arg2
     | Vcvtsi2sd_X_X_r64m64, [| arg1; arg2; arg3 |] ->
