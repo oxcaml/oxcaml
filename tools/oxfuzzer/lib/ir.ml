@@ -115,8 +115,8 @@ module Number = struct
     | Int16 of int
     | Int8 of int
 
-  (* CR-someday hwasilewski: This feels like a hacky workaround, maybe change
-     the generation to be more direct for each numeric type. *)
+  (* CR-someday xclerc: This feels like a hacky workaround, maybe change the
+     generation to be more direct for each numeric type. *)
 
   (* This function truncates an int64 to an int of a given [width], meaning that
      its last [width] bits are kept, the rest is zeroed and the sign is
@@ -274,10 +274,10 @@ module Binding = struct
     }
 end
 
-(* CR-someday hwasilewski: Add unary operations as well. *)
+(* CR-someday xclerc: Add unary operations as well. *)
 module Bin_op = struct
-  (* CR-soon hwasilewski: Add more operators. Especially division and modulo
-     (with safe wrappers). *)
+  (* CR-soon xclerc: Add more operators. Especially division and modulo (with
+     safe wrappers). *)
   type t =
     | Add
     | Sub
@@ -330,7 +330,7 @@ module Bin_op = struct
     | Shift_right -> call "shift_right"
     | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
-    (* CR-someday hwasilewski: Sometimes emit compare x y = 0 instead. *)
+    (* CR-someday xclerc: Sometimes emit compare x y = 0 instead. *)
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
     | Gt -> op ">" [call "compare"; int 0]
@@ -340,9 +340,9 @@ module Bin_op = struct
 end
 
 module Expr = struct
-  (* CR-soon hwasilewski: Currently this type is constructed manually, but that
-     is a mistake, as we can create for example a [Bin_op] with invalid types.
-     To mitigate, we should make [t] private and add smart constructors. *)
+  (* CR-soon xclerc: Currently this type is constructed manually, but that is a
+     mistake, as we can create for example a [Bin_op] with invalid types. To
+     mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
     | Read of place
@@ -629,7 +629,7 @@ module Statement = struct
         (Expr.to_code init)
         (Exp.let_ Immutable Nonrecursive
            [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
-           (* CR-someday hwasilewski: Sometimes emit as a for loop instead. *)
+           (* CR-someday xclerc: Sometimes emit as a for loop instead. *)
            (Exp.while_
               (op comparison [ident name; ident bound_name])
               (Exp.sequence (to_code body)

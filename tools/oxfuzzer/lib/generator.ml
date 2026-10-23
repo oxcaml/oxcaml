@@ -74,7 +74,7 @@ module Env = struct
     { t with loop_variables = loop_variable :: t.loop_variables }
 end
 
-(* CR-someday hwasilewski: We should consider changing this to be a monad, which
+(* CR-someday xclerc: We should consider changing this to be a monad, which
    would allow our generators to backtrack and fail. This would mimic
    Quickcheck-style generators more closely. *)
 module Gen = struct
@@ -144,7 +144,7 @@ let with_probability (st : State.t) ~probability =
 let maybe_opaque st ~enabled ~probability expr =
   if enabled && with_probability st ~probability then Expr.Opaque expr else expr
 
-(* CR-soon hwasilewski: Add general expressions for shift counts. *)
+(* CR-soon xclerc: Add general expressions for shift counts. *)
 let gen_shift_count (st : State.t) (nty : NumberTy.t) =
   let width =
     match nty.base with
@@ -314,7 +314,7 @@ let gen_sum_type (st : State.t) =
            Gen.when_ st.swarm.or_null (fun () ->
                Sum.Or_null (gen_or_null_payload_type st)) ) ])
 
-(* CR-soon hwasilewski: Add boolean variable generation. *)
+(* CR-soon xclerc: Add boolean variable generation. *)
 let gen_type (st : State.t) =
   gen_type_with_unboxed_tuples st ~leaf:(fun () ->
       if
@@ -497,7 +497,7 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
                [ 5, small ~min:(-1) ~max:1;
                  5, small ~min:(-10) ~max:10;
                  10, Gen.create (fun () -> Random.State.bits64 st.random_state)
-                 (* CR-soon hwasilewski: Add max_int and min_int. *) ])
+                 (* CR-soon xclerc: Add max_int and min_int. *) ])
         in
         Expr.Const (Number.of_integral_bits base bits))
   in
@@ -543,8 +543,7 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
   in
   gen_const nty
 
-(* CR-someday hwasilewski: Let arrays have arbitrary types, including
-   records. *)
+(* CR-someday xclerc: Let arrays have arbitrary types, including records. *)
 let gen_array st env nty dimensions =
   if with_probability st ~probability:Config.array_literal_probability
   then
@@ -612,8 +611,8 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          1, gen_fun_call st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
 
-(* CR-someday hwasilewski: These function calls can have side effects, because
-   of mutable records. Currently we rely on a de facto right-to-left evaluation
+(* CR-someday xclerc: These function calls can have side effects, because of
+   mutable records. Currently we rely on a de facto right-to-left evaluation
    order, which holds in many cases but is not specified. We should either do
    some sort of effect analysis in the style of Efftester, make sure we pull
    function calls out of expressions into let-bindings for example. Or we can
@@ -676,7 +675,7 @@ and gen_fun_call (st : State.t) caller_env return_ty =
           in
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
-          (* CR-someday hwasilewski: Make sure we use a result that uses as many
+          (* CR-someday xclerc: Make sure we use a result that uses as many
              generated variables as possible. Otherwise, most of the function
              might become dead code, which is a waste of CPU time for
              fuzzing. *)
@@ -898,9 +897,9 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let env, body = gen env (remaining - 1) in
             env, Statement.Let (binding, expr, body))
       in
-      (* CR-someday hwasilewski: Skew the generation of loop bounds, so that
-         they fit inside the bounds of an array dimensions with higher
-         probability. (Similar to CSmith) *)
+      (* CR-someday xclerc: Skew the generation of loop bounds, so that they fit
+         inside the bounds of an array dimensions with higher probability.
+         (Similar to CSmith) *)
       let gen_bounded_loop =
         Gen.when_ st.swarm.bounded_loops (fun () ->
             let name = State.fresh st in
