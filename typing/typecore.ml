@@ -2426,7 +2426,7 @@ let solve_Ppat_tuple ~is_unboxed ~pat_mode loc env args expected_ty =
       (fun (label, _) mode ->
          let jkind, sort =
            Jkind.of_new_sort_var ~why:Jkind.History.Tuple_element
-             ~level:(Ctype.get_current_level ())
+             ~level:(get_current_level ())
          in
         ( label,
           newgenvar jkind,
@@ -9930,7 +9930,7 @@ and type_ident env ?(recarg=Rejected) lid =
             (Staticity.of_const ~hint:Lpoly_inst Static)
        end;
        let layout_args, val_type =
-         Jkind_types.Sort.instance_with ~level:(get_current_level ())
+         Jkind.Sort.instance_with ~level:(get_current_level ())
            lvars
            (fun () -> instance desc.val_type)
        in
@@ -12514,7 +12514,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             ~on_determined:(fun () -> generalize ty)
             ~on_to_generalize:(fun loc ->
               let (), genvars =
-                Jkind_types.Sort.generalize_with (fun () -> generalize ty)
+                Jkind.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty genvars then
                 Error.log_and_raise loc env Useless_lpoly;

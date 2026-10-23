@@ -316,6 +316,22 @@ let mk_module_entry_functions_section f =
     in
     ("-module-entry-functions-section", Arg.Unit err, " (option not available)")
 
+let mk_jump_table_sections f =
+  if Config.function_sections then
+    ( "-jump-table-sections",
+      Arg.Unit f,
+      " Emit each function's jump tables into a separate section. Has an \
+       effect only with -function-sections, and only on amd64 (arm64 emits its \
+       jump tables inline)." )
+  else
+    let err () =
+      raise
+        (Arg.Bad
+           "OCaml has been configured without support for -function-sections \
+            which is required for -jump-table-sections")
+    in
+    ("-jump-table-sections", Arg.Unit err, " (option not available)")
+
 let mk_frametable_sections f =
   if Config.frametable_sections then
     ( "-frametable-sections",
@@ -1436,6 +1452,7 @@ module type Oxcaml_options = sig
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val module_entry_functions_section : unit -> unit
+  val jump_table_sections : unit -> unit
   val frametable_sections : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
@@ -1651,6 +1668,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_module_entry_functions_section F.module_entry_functions_section;
+      mk_jump_table_sections F.jump_table_sections;
       mk_frametable_sections F.frametable_sections;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
@@ -2042,6 +2060,8 @@ module Oxcaml_options_impl = struct
 
   let module_entry_functions_section () =
     set' Oxcaml_flags.module_entry_functions_section ()
+
+  let jump_table_sections () = set' Oxcaml_flags.jump_table_sections ()
 
   let frametable_sections () = set' Oxcaml_flags.frametable_sections ()
   let dasm_comments = set' Oxcaml_flags.dasm_comments
@@ -2646,6 +2666,7 @@ module Extra_params = struct
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
+    | "jump-table-sections" -> set' Oxcaml_flags.jump_table_sections
     | "frametable-sections" -> set' Oxcaml_flags.frametable_sections
     | "heap-reduction-threshold" ->
         set_int' Oxcaml_flags.heap_reduction_threshold

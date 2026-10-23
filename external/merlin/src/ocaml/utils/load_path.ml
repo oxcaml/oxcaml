@@ -276,6 +276,7 @@ end = struct
   type t = {
     path : string;
     files : entry list;
+    file_id : File_id.t;
     visibility : visibility;
   }
 
@@ -302,14 +303,20 @@ end = struct
     in
     List.find_map search t.files
 
+  (* Merlin: In server mode we need each typer instance to know that a directory
+     changed at some point. Relying on the global [Directory_content_cache]
+     means only the first such check will notice the invalidation but not
+     following ones. We thus use individual [file_id]s for directory
+     invalidation, so that every impacted instance is eventually updated. *)
+
   let check visibility t =
-    visibility_eq visibility t.visibility && Directory_content_cache.check t.path
+    visibility_eq visibility t.visibility && File_id.check (File_id.get t.path) t.file_id
 
   let create visibility path =
     let files = Array.to_list (Directory_content_cache.read path)
       |> List.map (
         fun basename -> { basename; path = Filename.concat path basename }) in
-    { path; files; visibility }
+    { path; files; file_id = File_id.get path; visibility }
 end
 
 (** Stores cached paths to files *)
