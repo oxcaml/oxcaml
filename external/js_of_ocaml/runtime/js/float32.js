@@ -26,6 +26,8 @@ function caml_float32_of_float(x) {
 }
 
 //Provides: caml_float32_of_int const
+//Alias: caml_float32_of_int32
+//Alias: caml_float32_of_nativeint
 //Version: >= 5.2
 //If: oxcaml
 function caml_float32_of_int(x) {
@@ -33,6 +35,8 @@ function caml_float32_of_int(x) {
 }
 
 //Provides: caml_int_of_float32 const
+//Alias: caml_int32_of_float32
+//Alias: caml_nativeint_of_float32
 //Version: >= 5.2
 //If: oxcaml
 function caml_int_of_float32(x) {

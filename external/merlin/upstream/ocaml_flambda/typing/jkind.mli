@@ -51,6 +51,8 @@ module Sort : sig
        and type base = Jkind_types.Sort.base
        and type Const.t = Jkind_types.Sort.Const.t
 
+  val new_var : level:int -> var
+
   module Flat : sig
     (** A flat sort is returned from [get]. *)
     type t =
@@ -618,6 +620,8 @@ val default_to_scannable : 'd Types.jkind -> unit
 (** Generalize the sorts in a jkind when in sort generalization context. Only
     has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit
+
+val update_level : int -> 'd Types.jkind -> unit
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)

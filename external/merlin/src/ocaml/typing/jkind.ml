@@ -62,7 +62,13 @@ end
 
 (* A *sort* is the information the middle/back ends need to be able to
    compile a manipulation (storing, passing, etc) of a runtime value. *)
-module Sort = Jkind_types.Sort
+module Sort = struct
+  include Jkind_types.Sort
+
+  let new_var = Btype.new_sort_var
+
+  let instance_with ~level = instance_with ~new_var:(fun () -> new_var ~level)
+end
 
 type sort = Sort.t
 
@@ -647,6 +653,17 @@ module Layout = struct
     | Any _ -> ()
     | Addressable t -> generalize ~current_level t
     | Box (t, _) -> generalize ~current_level t
+
+  let rec update_level level : _ Layout.t -> unit = function
+    | Any _ -> ()
+    | Sort (s, _) -> Sort.update_level level s
+    | Product ts -> List.iter (update_level level) ts
+    | Addressable t -> update_level level t
+    | Box (t, _) -> update_level level t
+
+  let of_new_sort_var ~level sa =
+    let sort = Sort.(of_var (new_var ~level)) in
+    Sort (sort, sa), sort
 end
 
 module Externality = Externality
@@ -3090,6 +3107,11 @@ let generalize ~current_level t =
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
+
+let update_level level t =
+  match t.jkind.base with
+  | Kconstr _ -> ()
+  | Layout l -> Layout.update_level level l
 
 let get t = Jkind_desc.get t.jkind
 

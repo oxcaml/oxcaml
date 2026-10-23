@@ -13,8 +13,11 @@
 
 module Float_u = Stdlib_upstream_compatible.Float_u
 
+external set_idx : 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+
 type ('a : any) big = {
-  x : 'a; f0 : float#; f1 : float#; f2 : float#; f3 : float#; f4 : float#;
+  mutable x : 'a;
+  f0 : float#; f1 : float#; f2 : float#; f3 : float#; f4 : float#;
   f5 : float#; f6 : float#; f7 : float#; f8 : float#; f9 : float#; f10 : float#;
   f11 : float#; f12 : float#; f13 : float#; f14 : float#; f15 : float#;
   f16 : float#; f17 : float#; f18 : float#; f19 : float#; f20 : float#;
@@ -146,3 +149,23 @@ let () =
   let r = update_x (Sys.opaque_identity (mk ())) (String.make 3 'a') in
   Printf.printf "scannable axes x=%s " r.x;
   check "scannable axes" r.f0 r.f100 r.f253 r.y
+
+(* Pduprecord must deeply copy unboxed products, which are represented as
+   blocks in bytecode, so that mutating the copy doesn't affect the original
+   and vice versa. *)
+type r = #{ i : int; j : int }
+
+let mk_r () : r big = { (mk ()) with x = #{ i = 1; j = 2 } }
+
+let () =
+  let r1 = mk_r () in
+  let r2 = { r1 with y = 1000 } in
+  set_idx r2 (.x.#i) 100;
+  Printf.printf "mutate copy: r1.x.#i=%d r2.x.#i=%d\n" r1.x.#i r2.x.#i
+
+let () =
+  let r1 = mk_r () in
+  (* Force [r2] onto the heap so that it's created with Pduprecord. *)
+  let r2 @ global = { r1 with y = 1000 } in
+  set_idx r1 (.x.#j) 200;
+  Printf.printf "mutate original: r1.x.#j=%d r2.x.#j=%d\n" r1.x.#j r2.x.#j

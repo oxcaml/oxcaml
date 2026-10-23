@@ -1238,6 +1238,8 @@ val apply_function :
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
+val emit_divide_by_zero_message : unit -> Cmm.phrase list
+
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
 val perform : dbg:Debuginfo.t -> expression -> expression

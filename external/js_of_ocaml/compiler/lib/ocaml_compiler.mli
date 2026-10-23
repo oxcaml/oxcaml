@@ -112,6 +112,18 @@ module Cmo_format : sig
   val hints_size : t -> int
 end
 
+(** Table of contents of a [.cmj] file produced by the OxCaml JSIR
+    backend. *)
+module Cmj_format : sig
+  type compilation_unit_descr
+
+  type library
+
+  val unit_pos : compilation_unit_descr -> int
+
+  val units : library -> compilation_unit_descr list
+end
+
 module Hint : sig
   type t
 

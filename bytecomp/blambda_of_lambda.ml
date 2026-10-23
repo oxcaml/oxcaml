@@ -216,6 +216,14 @@ let static_cast ~src ~dst x =
        modulo 2^8 or 2^16. *)
     sign_extend dst x
 
+(** Build a chain of nested [Let] bindings around [body]. *)
+let lets bindings body =
+  List.fold_right (fun (id, arg) body -> Let { id; arg; body }) bindings body
+
+(** Build a chain of nested [Sequence]s coming before [last]. *)
+let seqs exprs last =
+  List.fold_right (fun expr rest -> Sequence (expr, rest)) exprs last
+
 (** [copy_mixed_block_element elt expr] generates Blambda code that creates a
     fresh deep copy of [expr] if [elt] is an unboxed product. For non-product
     elements, returns [expr] unchanged. For products, allocates a fresh block
@@ -226,14 +234,19 @@ let static_cast ~src ~dst x =
     a mutable field (or to/from an array slot) would alias the original, causing
     mutations to affect both. *)
 let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
-    (expr : Blambda.blambda) : Blambda.blambda =
+    (expr : blambda) : blambda =
+  Option.value (copy_if_product elt expr) ~default:expr
+
+and copy_if_product (elt : _ Lambda.mixed_block_element) (expr : blambda) :
+    blambda option =
   match elt with
   | Product elements ->
-    copy_product_fields elements expr ~make_block:(fun fields ->
-        Prim (Makeblock { tag = 0 }, fields))
+    Some
+      (copy_product_fields elements expr ~make_block:(fun fields ->
+           Prim (Makeblock { tag = 0 }, fields)))
   | Value _ | Void | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-    expr
+    None
   | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
 
 and copy_product_fields elements expr ~make_block =
@@ -277,19 +290,30 @@ let overwrite_singleton_product shape ~block value =
     copy_product_fields elements value ~make_block:(fun fields ->
         let set_fields =
           List.mapi
-            (fun i field -> Blambda.Prim (Setfield i, [Var block_id; field]))
+            (fun i field -> Prim (Setfield i, [Var block_id; field]))
             fields
         in
-        Let
-          { id = block_id;
-            arg = block;
-            body =
-              List.fold_right
-                (fun set rest -> Blambda.Sequence (set, rest))
-                set_fields unit
-          })
+        Let { id = block_id; arg = block; body = seqs set_fields unit })
   | None ->
     Misc.fatal_error "overwrite_singleton_product: not a singleton product"
+
+(** [duplicate_mixed_block shape expr] generates Blambda code that duplicates
+    the block [expr] deeply by first using [caml_obj_dup], then deeply copying
+    each contained mixed block. *)
+let duplicate_mixed_block (shape : _ Lambda.mixed_block_element array) expr =
+  let dup_id = Ident.create_local "dup" in
+  let copy_field i elt =
+    copy_if_product elt (Prim (Getfield i, [Var dup_id]))
+    |> Option.map (fun field -> Prim (Setfield i, [Var dup_id; field]))
+  in
+  let copies =
+    List.filter_map Fun.id (List.mapi copy_field (Array.to_list shape))
+  in
+  Let
+    { id = dup_id;
+      arg = Prim (Ccall "caml_obj_dup", [expr]);
+      body = seqs copies (Var dup_id)
+    }
 
 (** [block_primitive shape ~tag ~total_len] is the primitive that allocates a
     block of shape [shape] with [total_len] fields: a regular block if all of
@@ -305,13 +329,6 @@ let block_primitive (shape : Lambda.block_shape) ~tag ~total_len :
 let element_of_array_kind (k : Lambda.array_kind) :
     unit Lambda.mixed_block_element =
   Lambda.mixed_block_element_of_layout (Lambda.element_layout_of_array_kind k)
-
-(** Build a chain of nested [Let] bindings around [body]. *)
-let lets (bindings : (Ident.t * Blambda.blambda) list) (body : Blambda.blambda)
-    : Blambda.blambda =
-  List.fold_right
-    (fun (id, arg) body -> Blambda.Let { id; arg; body })
-    bindings body
 
 (** [in_place_copy_array_slice ~length ~offset ~array ~elt] evaluates [length],
     then [offset], then [array], binding each to a local. Then, for each [i] in
@@ -946,7 +963,20 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         in
         Prim (Setfield last_idx, [target_block; value_expr])
       | [] -> overwrite_singleton_product shape ~block value)
-    | Pduprecord _ -> unary (Ccall "caml_obj_dup")
+    | Pduprecord (repres, _) -> (
+      match repres with
+      | Record_mixed shape ->
+        let arg =
+          match args with
+          | [arg] -> comp_expr arg
+          | _ -> wrong_arity ~expected:1
+        in
+        duplicate_mixed_block shape arg
+      | Record_inlined _
+      (* Aliased products in inline records can't be observed, as block indices
+         into inline records are disallowed. *)
+      | Record_boxed | Record_float | Record_ufloat | Record_unboxed ->
+        unary (Ccall "caml_obj_dup"))
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1
     | Poffsetref n -> unary (Offsetref n)
