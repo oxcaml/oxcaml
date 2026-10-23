@@ -772,3 +772,19 @@ Line 2, characters 12-17:
                 ^^^^^
 Error: This expression has type "'a -> 'b" which is not a record type.
 |}]
+
+(* CR mode-poly-printing: the curry mode of [g]'s type should be hidden *)
+let optional_arg ?(g = fun x y -> x) () = ()
+[%%expect{|
+val optional_arg :
+  ?g:('a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [< past('o) & global] ->
+  (unit @ 'q -> unit @ 'p) @ [> past('o)] = <fun>
+|}]
+
+let shared_curry g = [g; (fun x y -> y)]
+[%%expect{|
+val shared_curry :
+  ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)]) @ [< 'o & global] ->
+  ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)])
+  list @ [> 'o] = <fun>
+|}]
