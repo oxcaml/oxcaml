@@ -118,6 +118,10 @@ module Lib = E2e_inline_lib
 
 let[@inline never] omit_first_alias x = Lib.labelled ~b:x
 
+(* A primitive of the library used as a value: its closure is a copy named
+   after the declaration, [E2e_inline_lib.bump]. *)
+let[@inline never] use_lib_prim () = Sys.opaque_identity E2e_inline_lib.bump
+
 let () =
   ignore (add_one 41);
   ignore (omit_first 1 ~a:2);
@@ -133,4 +137,5 @@ let () =
   ignore (local_inline 12);
   ignore (use_functor [1; 2; 3]);
   ignore (use_first_class 9);
-  ignore (use_transitive 4)
+  ignore (use_transitive 4);
+  ignore (use_lib_prim () 5)

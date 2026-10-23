@@ -21,13 +21,12 @@
    STRUCTURED column of [e2e_suboptimal.reference] for the demangled
    names. *)
 
-(* {1 Functor instances are indistinguishable; the body name doubles}
+(* {1 Functor instances are indistinguishable}
 
    The two applications below produce two separate compiled copies of
    [run], but both mangle identically to [Make.run]: the application
    site ([Int_inst] / [Str_inst]) never appears in the name, so the
-   copies cannot be told apart. The functor's own body symbol also
-   doubles its name, mangling to [Make.Make]. *)
+   copies cannot be told apart. (The functor's own body is [Make].) *)
 module type ORD = sig
   type t
 
@@ -50,26 +49,19 @@ module Str_inst = Make (struct
   let cmp = compare
 end)
 
-(* {1 Classes and objects get poor symbols across the board}
+(* {1 Classes and objects}
 
-   OxCaml emits no DWARF for the OOP fragment of OCaml and the linker
-   names are correspondingly weak. Recording them here documents what
-   future object support (Shape.t object variants, then DWARF
-   [DW_TAG_class_type] / [DW_TAG_subprogram] / [DW_TAG_inheritance])
-   would aim to fix.
-
-   - Method bodies lose their name: every method below mangles to an
-     anonymous [fn] -- mostly a bare top-level [E2e_suboptimal.fn],
-     rarely as [<class>.fn] -- so methods are indistinguishable from
-     each other, from the unrelated top-level [scale], and from
-     ordinary anonymous functions.
+   OxCaml emits no DWARF for the OOP fragment of OCaml, but the linker
+   names now carry the class: methods are [<class>.method_<name>] and the
+   closures the class compiler generates are marked,
+   [<class>.{class_init}] and [<class>.{obj_init}]. What remains lossy:
    - Instance variables ([val nick], [val count]) and their accessors
      produce no symbol of their own.
    - A [virtual] class yields no constructor symbol, and [inherit]
      leaves no trace in any name.
    - An immediate object ([object ... end] with no class, in
-     [make_logger]) loses even the name of the binding it is attached
-     to. *)
+     [make_logger]) is a class named [object]:
+     [make_logger.object.method_log]. *)
 let scale k = k + 1
 
 class virtual animal = object

@@ -888,7 +888,8 @@ let module_coercion sub = function
         (sub.module_coercion sub c1, sub.module_coercion sub c2, yielding)
   | Tcoerce_alias (env, p, c1) ->
       Tcoerce_alias (sub.env sub env, p, sub.module_coercion sub c1)
-  | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
+  | Tcoerce_structure
+      { input_repr; output_repr; pos_cc_list; output_names; id_pos_list } ->
       let pos_cc_list =
         List.map
           (fun (i,c) -> i, sub.module_coercion sub c) pos_cc_list
@@ -896,7 +897,8 @@ let module_coercion sub = function
       let id_pos_list =
         List.map (fun (id,i,c) -> id, i, sub.module_coercion sub c) id_pos_list
       in
-      Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
+      Tcoerce_structure
+        { input_repr; output_repr; pos_cc_list; output_names; id_pos_list }
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}

@@ -903,15 +903,20 @@ module Code_id = struct
 
   (* Make sure [path], the mangling path of the scopes enclosing a function,
      ends with an item identifying the function itself. It already does when its
-     last item is the function's own binding, an anonymous function, a lazy
-     expression or a partial application; otherwise (e.g. for a functor body,
-     whose innermost scope is the module it defines, or a body without location
+     last item is the function's own binding, a compiler-generated marker, an
+     anonymous function, a lazy expression or a partial application, or when the
+     function is the body of the functor whose module is the last item (the body
+     is named after the functor); otherwise (e.g. for a body without location
      information), [name], the name the middle end gave the function, is
      appended. *)
   let add_function_name ~name
       (path : Compilation_unit.t Structured_mangling.path) =
     match Misc.last path with
     | Some (Function name') when String.equal name name' -> path
+    | Some (Function payload) when Structured_mangling.is_marker_payload payload
+      ->
+      path
+    | Some (Module functor_name) when String.equal name functor_name -> path
     | Some (Anonymous_function _ | Lazy _ | Partial _) -> path
     | Some
         ( Compilation_unit _ | Inline_marker | Module _ | Anonymous_module _
