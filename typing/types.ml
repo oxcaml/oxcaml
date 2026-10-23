@@ -570,6 +570,7 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
+    ld_inherit: inherit_flag;
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
