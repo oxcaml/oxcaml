@@ -78,6 +78,32 @@ val crossing_of_jkind :
 
 val crossing_of_type : Env.t -> Types.type_expr -> Mode.Crossing.t
 
+(** [upon_crossing_of_type env ty ~cross ~later] is
+    [cross (crossing_of_type env ty)] if [ty]'s kind does not depend on any
+    non-generic type variables.
+
+    Otherwise, it returns [p], where [(p, ~run) = later ()] and calls
+    [run (cross c)] once those variables are solved or defaulted, where [c] is
+    [ty]'s crossing. *)
+val upon_crossing_of_type :
+  Env.t ->
+  Types.type_expr ->
+  cross:(Mode.Crossing.t -> 'a) ->
+  later:(unit -> 'a * run:('a -> unit)) ->
+  'a
+
+(** [Ctype.upon]. *)
+val upon_later :
+  (Env.t ->
+  Types.type_expr ->
+  run:(Types.type_shape option -> unit) ->
+  default:(unit -> unit) ->
+  unit)
+  Defined_later.Fun.t
+
+(** [Ctype.scheduler]. *)
+val scheduler_later : (unit -> Scheduler.t) Defined_later.Fun.t
+
 val instance_poly_for_jkind' :
   (Types.type_expr list -> Types.type_expr -> Types.type_expr) ref
 

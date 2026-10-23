@@ -28,6 +28,9 @@ module type S = sig
 
   type var
 
+  (** Unique and stable for non-rigid variables. *)
+  val var_id : var -> int
+
   module Name : Ordered
 
   (** Constructors. *)
@@ -80,8 +83,12 @@ module type S = sig
 
   val map_rigid : (Name.t -> node) -> node -> node
 
+  val iter_unsolved_vars : (var -> unit) -> node -> unit
+
   (** Pretty printers and checks. *)
   val pp : node -> string
 
   val pp_debug : node -> string
+
+  include With_backtracking.S
 end
