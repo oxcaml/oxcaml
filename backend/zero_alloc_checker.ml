@@ -309,6 +309,8 @@ module V : sig
 
   val replace_witnesses : Witnesses.t -> t -> t
 
+  val attribute_to_call_site : Witnesses.t -> t -> t
+
   val diff_witnesses : expected:t -> actual:t -> Witnesses.t
 
   val get_witnesses : t -> Witnesses.t
@@ -1321,32 +1323,31 @@ end = struct
      while keeping the comments about implementation choices and/or imperatives
      (e.g. why/how witnesses are tracked) next to the code. *)
 
-  let replace_witnesses w t =
+  let replace_witnesses witnesses t =
     match t with
     | Resolved (Top { allocation_sources; _ }) ->
-      Resolved (Top { allocation_sources; witnesses = w })
+      Resolved (Top { allocation_sources; witnesses })
     | Resolved (Bot | Safe) -> t
-    | Join j -> Join (Join.replace_witnesses j w)
-    | Transform tr -> Transform (Transform.replace_witnesses tr w)
-    | Var { var; witnesses = _ } -> Var { var; witnesses = w }
+    | Join j -> Join (Join.replace_witnesses j witnesses)
+    | Transform tr -> Transform (Transform.replace_witnesses tr witnesses)
+    | Var { var; witnesses = _ } -> Var { var; witnesses }
 
-  (*
   let attribute_to_call_site witnesses t =
     match t with
     | Resolved (Top _) ->
       Resolved
         (Top
-           { witnesses;
-             (* CR-soon wsturgeon for wsturgeon: evaluate the conditional
+           { (* CR-soon wsturgeon for wsturgeon: evaluate the conditional
                 guarantee of this call instead of assuming it will allocate
                 (work for the next PR in this split) *)
-              allocation_sources = Allocation_other_than_calling_arguments })
+             allocation_sources = Allocation_other_than_calling_arguments;
+             witnesses
+           })
     | Resolved (Bot | Safe) -> t
     | Var _ | Transform _ | Join _ ->
       Misc.fatal_errorf
         "Zero_alloc_checker.attribute_to_call_site: unresolved value %a"
         (print ~witnesses:false) t
-  *)
 
   let diff_witnesses ~expected ~actual =
     (* If [actual] is Top and [expected] is not Top then return the [actual]
@@ -1377,7 +1378,7 @@ end = struct
     let get env var w =
       match env var with
       | None -> unresolved w var
-      | Some v -> replace_witnesses w v
+      | Some v -> attribute_to_call_site w v
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1389,7 +1390,9 @@ end = struct
       match t with
       | Resolved _ -> t
       | Var { var; witnesses } -> (
-        match env var with None -> t | Some v -> replace_witnesses witnesses v)
+        match env var with
+        | None -> t
+        | Some v -> attribute_to_call_site witnesses v)
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1458,6 +1461,8 @@ module Value : sig
 
   val replace_witnesses : Witnesses.t -> t -> t
 
+  val attribute_to_call_site : Witnesses.t -> t -> t
+
   val get_unresolved_names : t -> String.Set.t
 
   val get_witnesses : t -> Witnesses.t Zero_alloc_utils.Components.t
@@ -1500,6 +1505,10 @@ end = struct
   let replace_witnesses w =
     Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
         V.replace_witnesses w)
+
+  let attribute_to_call_site w =
+    Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
+        V.attribute_to_call_site w)
 
   let diff_witnesses ~expected ~actual =
     Zero_alloc_utils.Components.map2
@@ -2338,7 +2347,7 @@ end = struct
          Summary of tailcall self won't be affected because it is not set to Top
          by [find_callee]. *)
       let w = create_witnesses t k dbg in
-      Value.replace_witnesses w v
+      Value.attribute_to_call_site w v
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in
