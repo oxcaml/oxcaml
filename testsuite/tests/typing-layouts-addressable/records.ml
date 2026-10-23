@@ -313,6 +313,46 @@ type r = { a : int8#; }
 val f : r# -> r# = <fun>
 |}]
 
+(**** Externals ****)
+
+(* Addressability does not change the unboxed representation, so a singleton
+   record can still be passed to C as its field *)
+type t = #{ f : float# }
+external f : (t [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
+[%%expect{|
+type t = #{ f : float#; }
+Line 2, characters 14-15:
+2 | external f : (t [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
+                  ^
+Error: Don't know how to unbox this type.
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
+       the corresponding unboxed types can be marked unboxed.
+|}]
+
+type t = #{ i : int32_u }
+external f : (t [@unboxed]) -> (int32 [@unboxed]) = "foo" "bar"
+[%%expect{|
+type t = #{ i : int32_u; }
+Line 2, characters 14-15:
+2 | external f : (t [@unboxed]) -> (int32 [@unboxed]) = "foo" "bar"
+                  ^
+Error: Don't know how to unbox this type.
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
+       the corresponding unboxed types can be marked unboxed.
+|}]
+
+type t = #{ u : unit# }
+external f : (t [@unboxed]) -> int = "foo" "bar"
+[%%expect{|
+type t = #{ u : unit#; }
+Line 2, characters 14-15:
+2 | external f : (t [@unboxed]) -> int = "foo" "bar"
+                  ^
+Error: Don't know how to unbox this type.
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
+       the corresponding unboxed types can be marked unboxed.
+|}]
+
 (**** Boxed records ****)
 
 (* The boxed record's own kind is unchanged *)
