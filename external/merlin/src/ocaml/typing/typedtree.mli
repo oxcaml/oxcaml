@@ -767,15 +767,11 @@ and expression_desc =
   | Texp_hole of unique_use (** _ *)
   | Texp_quote of expression
   | Texp_splice of expression
-<<<<<<< Merlin:jwshii-add-breaks-to-loops
   (* merlin-specific: a [Texp_typed_hole] is a typed hole written by the user as a
       placeholder. This is in contrast to a Texp_hole, which is used in overwrite
       expressions *)
   | Texp_typed_hole
-||||||| Compiler:last-imported
-=======
   | Texp_break of Ident.t
->>>>>>> Compiler:HEAD
 
 and meth =
     Tmeth_name of string

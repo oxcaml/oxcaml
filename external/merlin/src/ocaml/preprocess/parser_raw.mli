@@ -145,6 +145,7 @@ type token =
   | COLON
   | CLASS
   | CHAR of (char)
+  | BREAK
   | BORROW
   | BEGIN
   | BARRBRACKET
@@ -351,6 +352,7 @@ module MenhirInterpreter : sig
     | T_COLON : unit terminal
     | T_CLASS : unit terminal
     | T_CHAR : (char) terminal
+    | T_BREAK : unit terminal
     | T_BORROW : unit terminal
     | T_BEGIN : unit terminal
     | T_BARRBRACKET : unit terminal

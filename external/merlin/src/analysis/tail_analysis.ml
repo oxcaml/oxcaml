@@ -94,7 +94,8 @@ let expr_tail_positions = function
   | Texp_quote _
   | Texp_splice _
   | Texp_unboxed_unit
-  | Texp_unboxed_bool _ -> []
+  | Texp_unboxed_bool _
+  | Texp_break _ -> []
   | Texp_match (_, _, cs, _, _) -> List.map cs ~f:(fun c -> Case c)
   | Texp_try (_, cs, _) -> List.map cs ~f:(fun c -> Case c)
   | Texp_letmodule (_, _, _, _, e)

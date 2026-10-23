@@ -455,12 +455,8 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quote of expression
   | Texp_splice of expression
-<<<<<<< Merlin:jwshii-add-breaks-to-loops
   | Texp_typed_hole
-||||||| Compiler:last-imported
-=======
   | Texp_break of Ident.t
->>>>>>> Compiler:HEAD
 
 and ident_kind =
   | Id_value
