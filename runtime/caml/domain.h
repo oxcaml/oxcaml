@@ -25,6 +25,7 @@
 #include "config.h"
 #include "mlvalues.h"
 #include "domain_state.h"
+#include "misc.h"
 
 #ifdef MULTIDOMAIN
 #ifdef ARCH_SIXTYFOUR
@@ -42,7 +43,7 @@
 
 /* Force tick thread to use usleep instead of epoll. Settable with
    OCAMLRUNPARAM */
-extern uintnat caml_tick_use_usleep;   /* -Xtick_use_usleep= */
+extern uintnat caml_tick_use_usleep;   /* Xtick_use_usleep= */
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)
@@ -155,14 +156,13 @@ int caml_domain_terminating(caml_domain_state *);
 int caml_domain_is_terminating(void);
 void caml_domain_terminate(bool last);
 
+/* As [caml_try_run_on_all_domains] (synchronous), but domains awaiting
+   entry to the STW section run opportunistic major GC slices (see
+   [caml_do_opportunistic_major_slice] in major_gc.h). */
 int caml_try_run_on_all_domains_with_spin_work(
-  int sync,
   void (*handler)(caml_domain_state*, void*, int, caml_domain_state**),
   void* data,
-  void (*leader_setup)(caml_domain_state*, void*),
-  /* return nonzero if there may still be useful work to do while spinning */
-  int (*enter_spin_callback)(caml_domain_state*, void*),
-  void* enter_spin_data);
+  void (*leader_setup)(caml_domain_state*, void*));
 int caml_try_run_on_all_domains(
   void (*handler)(caml_domain_state*, void*, int, caml_domain_state**),
   void*,

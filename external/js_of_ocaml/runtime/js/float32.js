@@ -26,6 +26,8 @@ function caml_float32_of_float(x) {
 }
 
 //Provides: caml_float32_of_int const
+//Alias: caml_float32_of_int32
+//Alias: caml_float32_of_nativeint
 //Version: >= 5.2
 //If: oxcaml
 function caml_float32_of_int(x) {
@@ -33,6 +35,8 @@ function caml_float32_of_int(x) {
 }
 
 //Provides: caml_int_of_float32 const
+//Alias: caml_int32_of_float32
+//Alias: caml_nativeint_of_float32
 //Version: >= 5.2
 //If: oxcaml
 function caml_int_of_float32(x) {
@@ -523,4 +527,25 @@ function caml_bytes_setf32(ba, i, v) {
 //If: oxcaml
 function caml_bytes_setf32u(ba, i, v) {
   return caml_bytes_set32u(ba, i, caml_float32_to_bits_bytecode(v));
+}
+
+// Primitives used by the js_of_ocaml compiler,
+// which represents 32-bit floats as 32-bit integer bit patterns.
+
+//Provides: jsoo_float32_of_float const
+//Requires: caml_int32_bits_of_float
+function jsoo_float32_of_float(x) {
+  return caml_int32_bits_of_float(x);
+}
+
+//Provides: jsoo_float32_to_float const
+//Requires: caml_int32_float_of_bits
+function jsoo_float32_to_float(x) {
+  return caml_int32_float_of_bits(x);
+}
+
+//Provides: jsoo_float32_of_boxed const
+//Requires: caml_int32_bits_of_float
+function jsoo_float32_of_boxed(x) {
+  return caml_int32_bits_of_float(x);
 }

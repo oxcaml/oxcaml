@@ -270,7 +270,7 @@ let event_after ~scopes exp lam =
   Translprim.event_after (of_location ~scopes exp.exp_loc) exp lam
 
 let event_function ~scopes exp lam =
-  if !Clflags.debug && not !Clflags.native_code then
+  if !Clflags.debug && not (Clflags.target_is_native ()) then
     let repr = Some (ref 0) in
     let (info, body) = lam repr in
     (info,
@@ -420,13 +420,16 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check c when c.arity = num_args && (use_opt || not c.opt) ->
+    | Check { strict; opt; arity; partial; loc; custom_error_msg = _ }
+      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+           && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
-        { strict = c.strict;
+        { strict;
           never_returns_normally = false;
           never_raises = false;
-          arity = c.arity;
-          loc = c.loc }
+          arity;
+          partial;
+          loc }
       in
       Builtin_attributes.assume_zero_alloc ~inferred:true assume
     | Check _ | Default_zero_alloc | Ignore_assert_all | Assume _ ->
@@ -612,18 +615,41 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_unboxed_bool b ->
       Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, locality_mode) ->
-      let ll, shape =
-        transl_value_list_with_shape ~scopes
-          (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
+      let ll, sorts, layouts =
+        transl_list_with_layout ~scopes
+          (List.map
+             (fun (_, e, s) -> e, Jkind.Sort.default_for_transl_and_get s) el)
+        |> Misc.Stdlib.List.split3
       in
-      begin try
-        Lconst(Const_block(0, List.map extract_constant ll))
-      with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable,
-                         Lambda.block_shape_of_value_kinds (Some shape),
-                         transl_typed_locality_mode_r locality_mode),
-              ll,
-              (of_location ~scopes e.exp_loc))
+      let shape =
+        Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+      in
+      (* Shapes containing splices are checked after static evaluation *)
+      if not (Lambda.mixed_block_shape_has_splices shape) then
+        Typeopt.assert_mixed_product_support_for_lambda_shape e.exp_loc Tuple
+          shape;
+      let constant =
+        match List.map extract_constant ll with
+        | exception Not_constant -> None
+        | constants ->
+            if List.for_all Jkind.Sort.Const.is_scannable sorts then
+              (* Ensure that uniform tuple constants are optimized *)
+              Some (Const_block(0, constants))
+            else if Clflags.target_is_native () then
+              Some (Const_mixed_block(0, shape, constants))
+            else
+              (* CR layouts v5.9: Structured constants for mixed blocks should
+                 be supported in bytecode. See symtable.ml for the difficulty.
+              *)
+              None
+      in
+      begin match constant with
+      | Some constant -> Lconst constant
+      | None ->
+          Lprim(Pmakeblock(0, Immutable, Shape shape,
+                           transl_typed_locality_mode_r locality_mode),
+                ll,
+                (of_location ~scopes e.exp_loc))
       end
   | Texp_unboxed_tuple el ->
       let el =
@@ -648,7 +674,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | _ -> assert false
       end else begin
         let shape =
-          Typeopt.transl_constructor_representation e.exp_env e.exp_loc
+          Translrepr.transl_constructor_representation e.exp_env e.exp_loc
             shape
         in
         let ll =
@@ -694,7 +720,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
-                  if !Clflags.native_code then
+                  if Clflags.target_is_native () then
                     Some (Const_mixed_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -804,14 +830,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       end
   | Texp_record {fields; representation; extended_expression; locality_mode} ->
       let representation =
-        Typeopt.transl_record_representation e.exp_env e.exp_loc
+        Translrepr.transl_record_representation e.exp_env e.exp_loc
           representation
       in
       let extended_expression =
         Option.map
           (fun (init_expr, sort, repres, ubr) ->
              let repres =
-               Typeopt.transl_record_representation e.exp_env e.exp_loc
+               Translrepr.transl_record_representation e.exp_env e.exp_loc
                  repres
              in
              (init_expr, sort, repres, ubr))
@@ -834,7 +860,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let record_repres =
-        Typeopt.transl_record_representation e.exp_env e.exp_loc
+        Translrepr.transl_record_representation e.exp_env e.exp_loc
           record_repres
       in
       let repres = match record_repres with
@@ -864,7 +890,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  record_repres; lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->
       let record_repres =
-        Typeopt.transl_record_representation arg.exp_env e.exp_loc
+        Translrepr.transl_record_representation arg.exp_env e.exp_loc
           record_repres
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -1002,11 +1028,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         Jkind.Sort.Const.for_boxed_record
       in
       let record_repres, ~variable_sorts =
-        Typeopt.transl_record_representation_and_sorts arg.exp_env
+        Translrepr.transl_record_representation_and_sorts arg.exp_env
           e.exp_loc record_repres
       in
       let sort_newval =
-        Typeopt.label_sort_for_representation lbl record_repres
+        Translrepr.label_sort_for_representation lbl record_repres
           ~record_sort:sort_arg ~variable_sorts
       in
       let arg_layout = layout_exp sort_arg arg in
@@ -1420,7 +1446,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                !transl_module ~scopes Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
-    if !Clflags.native_code && !Clflags.probes then begin
+    if Clflags.target_is_native () && !Clflags.probes then begin
       let lam = transl_exp ~scopes Lambda.layout_probe_arg exp in
       let map =
         Ident.Set.fold (fun v acc -> Ident.Map.add v (Ident.rename v) acc)
@@ -1508,7 +1534,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in
       let funcid_duid = Lambda.debug_uid_none in
-      let return_layout = layout_unit (* Probe bodies have type unit. *) in
+      (* Probe bodies have type unit, but the handler returns [#()] so that the
+         probe call has no return value. *)
+      let return_layout = layout_unboxed_unit in
+      let body = Lprim (Punbox_unit, [body], of_location ~scopes exp.exp_loc) in
       let handler =
         let assume_zero_alloc = get_assume_zero_alloc ~scopes in
         let scopes = enter_value_definition ~scopes ~assume_zero_alloc funcid in
@@ -1547,7 +1576,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let lam =
         if !Clflags.emit_optimized_probes then
           let ap_probe = Some {name; enabled_at_init} in
-          Lapply (app ~ap_probe)
+          Lsequence (Lapply (app ~ap_probe), lambda_unit)
         else
           (* Slower implementation of probes where there isn't clever
              architecture-specific codegen. Read the semaphore each time. *)
@@ -1556,8 +1585,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  (Pprobe_is_enabled
                     { name; enabled_at_init = Some enabled_at_init },
                       [], ap_loc),
-               (* probe handler has type [unit] *)
-               Lapply (app ~ap_probe:None),
+               Lsequence (Lapply (app ~ap_probe:None), lambda_unit),
                lambda_unit,
                layout_unit ))
       in
@@ -1566,7 +1594,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       lambda_unit
     end
   | Texp_probe_is_enabled {name} ->
-    if !Clflags.native_code && !Clflags.probes then
+    if Clflags.target_is_native () && !Clflags.probes then
       Lprim(Pprobe_is_enabled {name; enabled_at_init = None},
             [], of_location ~scopes e.exp_loc)
     else
@@ -1615,15 +1643,6 @@ and transl_list_with_layout ~scopes expr_list =
     let layout = layout_exp sort exp in
     transl_exp ~scopes layout exp, sort, layout)
     expr_list
-
-(* Will raise if a list element has a non-value layout. *)
-and transl_value_list_with_shape ~scopes expr_list =
-  let transl_with_shape (e, sort) =
-    let layout = layout_exp sort e in
-    let shape = Lambda.must_be_value layout in
-    transl_exp ~scopes layout e, shape
-  in
-  List.split (List.map transl_with_shape expr_list)
 
 and transl_guard ~scopes guard rhs_layout rhs =
   let layout = rhs_layout in
@@ -1913,7 +1932,7 @@ and transl_apply ~scopes
     - [Curried]. It takes each argument individually.
 
    We first try treating the function as taking a flattened tupled argument (in
-   [trans_tupled_function]) and, if that doesn't work, we fall back to treating
+   [transl_tupled_function]) and, if that doesn't work, we fall back to treating
    the function as taking each argument individually (in
    [trans_curried_function]).
 *)
@@ -1962,14 +1981,26 @@ and transl_tupled_function
      (whose alloc mode must be global) and the function itself is global. It may
      actually be sound to tuplify locally-allocated functions, but we haven't
      thought it through. *)
+  (* CR layouts-mixed-tuplify: We also currently require every component of the
+     tuple pattern to have the value sort, since the backend does not currently
+     support optimizing mixed tupled functions. This should change, especially
+     to properly support layout poly tupled functions. *)
+  let all_components_are_values pl =
+    List.for_all
+      (fun (_, _, sort) ->
+         Jkind.Sort.Const.is_scannable
+           (Jkind.Sort.default_for_transl_and_get sort))
+      pl
+  in
   match eligible_cases with
   | Some
       (({ c_lhs = { pat_desc = Tpat_tuple pl } } as first_case),
        rest_cases, partial, arg_mode, arg_sort)
     when is_alloc_heap mode
       && is_alloc_heap (transl_typed_locality_mode_l arg_mode)
-      && !Clflags.native_code
-      && List.length pl <= (Lambda.max_arity ()) ->
+      && Clflags.target_is_native ()
+      && List.length pl <= (Lambda.max_arity ())
+      && all_components_are_values pl ->
       begin try
         let cases = first_case :: rest_cases in
         let size = List.length pl in
@@ -1986,8 +2017,9 @@ and transl_tupled_function
                 Pvariant { consts = [];
                            non_consts = [0, Constructor_shape_uniform kinds] }
             } ->
-              (* CR layouts v5: to change when we have non-value tuple
-                 elements. *)
+              (* CR layouts-mixed-tuplify: we should support the
+                 [Constructor_mixed] case, once the backend supports this
+                 optimization for non-values. *)
               Some kinds
           | _ -> None
         in
@@ -2002,6 +2034,9 @@ and transl_tupled_function
                tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
              with
              | Some kinds -> kinds
+             (* CR layouts-mixed-tuplify: this should compute a layout (not
+                necessarily a value_kind) from the stored sorts, following
+                backend support. *)
              | None -> List.init size (fun _ -> Lambda.generic_value))
           else
             match
@@ -2016,22 +2051,23 @@ and transl_tupled_function
         in
         let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
-          List.map2 (fun kind (_, fld_pat) ->
+          List.map2 (fun layout (_, fld_pat, sort) ->
               let debug_uid =
                 Typecore.create_uid_for_pattern_kind Value_pattern_in_argument
               in
+              let sort = Jkind.Sort.default_for_transl_and_get sort in
               add_type_shapes_of_param ~env:first_case.c_lhs.pat_env
-                ~uid:debug_uid ~sort:Jkind.Sort.Const.for_tuple_element
-                ~type_expr:fld_pat.pat_type;
-              {
-                name = Ident.create_local "param";
-                debug_uid;
-                layout = kind;
-                attributes = Lambda.default_param_attribute;
-                mode = alloc_heap
-              }) kinds pl
+                ~uid:debug_uid ~sort ~type_expr:fld_pat.pat_type;
+              ({
+                 name = Ident.create_local "param";
+                 debug_uid;
+                 layout;
+                 attributes = Lambda.default_param_attribute;
+                 mode = alloc_heap
+               }, sort, layout)) kinds pl
         in
-        let params = List.map (fun p -> p.name) tparams in
+        let params = List.map (fun (p, s, l) -> (p.name, s, l)) tparams in
+        let lparams = List.map (fun (p, _, _) -> p) tparams in
         let body =
           Matching.for_tupled_function ~scopes ~return_layout loc params
             (transl_tupled_cases ~scopes return_layout pats_expr_list) partial
@@ -2039,7 +2075,7 @@ and transl_tupled_function
         let region = region || not (may_allocate_in_region body) in
         add_type_shapes_of_cases cases;
         Some
-          ((Tupled, tparams, return_layout, region, return_mode), body)
+          ((Tupled, lparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None
@@ -2388,15 +2424,17 @@ and transl_function
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
-         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
+         then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
+                      partial = false }
          else Default_zero_alloc)
-    | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
+    | Check { strict; opt; arity = _; partial; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { strict; loc; custom_error_msg }
+      then Check { strict; loc; custom_error_msg; partial }
       else Default_zero_alloc
     | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
       Assume { strict; never_returns_normally; never_raises; loc }
@@ -2695,7 +2733,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             (* See Note [Constant all-value mixed records]. *)
             raise Not_constant
         | Record_mixed shape ->
-            if !Clflags.native_code then
+            if Clflags.target_is_native () then
               Lconst(Const_mixed_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -2873,7 +2911,7 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
   | Baccess_field (_id, lbl, repres) ->
-    let repres = Typeopt.transl_record_representation env loc repres in
+    let repres = Translrepr.transl_record_representation env loc repres in
     begin match repres with
     | Record_boxed
     | Record_float | Record_ufloat ->
@@ -3005,13 +3043,15 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
       assert (static_handlers = []);
       let mode = transl_typed_locality_mode_r locality_mode in
       let argl =
-        List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+        List.map (fun (_, a, s) ->
+          (a, Jkind.Sort.default_for_transl_and_get s)) argl
       in
       Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
         (transl_list_with_layout ~scopes argl) mode val_cases partial
     | {exp_desc = Texp_tuple (argl, locality_mode)}, _ :: _ ->
         let argl =
-          List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+          List.map (fun (_, a, s) ->
+            (a, Jkind.Sort.default_for_transl_and_get s)) argl
         in
         let val_ids, lvars =
           List.map

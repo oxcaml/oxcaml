@@ -158,7 +158,7 @@ let close_phrase lam =
    Returns [None] if the selected field is not a value, [Some field] otherwise.
    Copied from [Topcommon] *)
 let mod_field obj (module_repr : Lambda.module_representation) pos =
-  if not !Clflags.native_code then
+  if not (Clflags.target_is_native ()) then
     Some (Obj.field obj pos)
   else
   match module_repr with
@@ -377,7 +377,6 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
     { Lambda.
       code = lam;
       main_module_block_format = Mb_struct { mb_repr = repr };
-      arg_block_idx = None;
       compilation_unit;
       required_globals;
     }
@@ -951,7 +950,7 @@ let prepare ppf ?input:_ () =
   set_paths ();
   begin try
     initialize_toplevel_env ()
-  with Env.Error _ | Typetexp.Error _ as exn ->
+  with Env.Error.In_context _ | Typetexp.Error.In_context _ as exn ->
     Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
   try

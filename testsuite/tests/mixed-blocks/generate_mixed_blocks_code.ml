@@ -175,26 +175,41 @@ let enumeration_of_mixed_blocks_except_all_floats_mixed ~bytecode
       in
       not all_float_u_suffix || not all_float_prefix)
 
-type constructor =
-  | Cstr_tuple of
-      { cstr_prefix : value_element list;
-        cstr_suffix : flat_element Nonempty_list.t;
-      }
-  | Cstr_record of block
+(* Tuple elements (and constructor arguments) have no mutability. *)
+type tuple_prefix = value_element list
+type tuple_suffix = flat_element Nonempty_list.t
 
-type variant = constructor Nonempty_list.t
+type tuple =
+  { tuple_prefix : tuple_prefix
+  ; tuple_suffix : tuple_suffix
+  }
 
-let enumeration_of_cstr_tuples ~bytecode =
+let enumeration_of_tuples ~bytecode =
   let all_of_mutability = [ `Mutability_not_relevant ] in
   Seq.product
     (enumeration_of_prefix all_of_mutability)
     (enumeration_of_suffix_except_all_floats_mixed ~bytecode all_of_mutability)
   |> Seq.map (fun (prefix, suffix) ->
       let ignore_mut (x, `Mutability_not_relevant) = x in
-      Cstr_tuple
-        { cstr_prefix = List.map prefix ~f:ignore_mut;
-          cstr_suffix = Nonempty_list.map suffix ~f:ignore_mut;
-        })
+      { tuple_prefix = List.map prefix ~f:ignore_mut;
+        tuple_suffix = Nonempty_list.map suffix ~f:ignore_mut;
+      })
+
+let enumeration_of_mixed_tuples ~bytecode =
+  enumeration_of_tuples ~bytecode
+  |> Seq.filter (fun { tuple_prefix; tuple_suffix } ->
+      List.length tuple_prefix
+      + List.length (Nonempty_list.to_list tuple_suffix)
+      >= 2)
+
+type constructor =
+  | Cstr_tuple of tuple
+  | Cstr_record of block
+
+type variant = constructor Nonempty_list.t
+
+let enumeration_of_cstr_tuples ~bytecode =
+  enumeration_of_tuples ~bytecode |> Seq.map (fun tuple -> Cstr_tuple tuple)
 
 let enumeration_of_cstr_records ~bytecode =
   Seq.product
@@ -254,6 +269,18 @@ let type_to_string = function
   | Vec128 -> "int64x2#"
   | Vec256 -> "int64x4#"
 
+let type_to_field_name = function
+  | Imm -> "imm"
+  | Float -> "float"
+  | Float64 -> "float_u"
+  | Float32 -> "float32_u"
+  | Bits32 -> "i32_"
+  | Bits64 -> "i64_"
+  | Word -> "n"
+  | Str -> "str"
+  | Vec128 -> "int64x2_u"
+  | Vec256 -> "int64x4_u"
+
 let type_to_field_integrity_check type_ ~access1 ~access2 ~message =
   let checker, transformation =
     match type_ with
@@ -294,6 +321,13 @@ let flat_element_to_type : flat_element -> field_or_arg_type = function
   | Word -> Word
   | Vec128 -> Vec128
   | Vec256 -> Vec256
+
+let types_of_tuple { tuple_prefix; tuple_suffix } =
+  let prefix_types = List.map tuple_prefix ~f:value_element_to_type in
+  let suffix_types =
+    List.map (Nonempty_list.to_list tuple_suffix) ~f:flat_element_to_type
+  in
+  shuffle (prefix_types @ suffix_types)
 
 module Mixed_record = struct
   type field =
@@ -407,6 +441,98 @@ module Mixed_record = struct
   ;;
 end
 
+module Mixed_tuple = struct
+  type element =
+    | Labeled of string * field_or_arg_type
+    | Not_labeled of field_or_arg_type
+
+  type t =
+    { index : int
+    ; elements : element list
+    }
+
+  let of_block index tuple =
+    let elements =
+      List.mapi (types_of_tuple tuple) ~f:(fun i type_ ->
+        if Random.bool ()
+        then Labeled (sprintf "%s%i" (type_to_field_name type_) i, type_)
+        else Not_labeled type_)
+    in
+    { index; elements }
+  ;;
+
+  let type_ { index; _ } = sprintf "t%d" index
+  let value ?(base = "t") { index; _ } = sprintf "%s%d" base index
+
+  let element_type = function
+    | Not_labeled type_ | Labeled (_, type_) -> type_
+
+  let element_type_to_string = function
+    | Not_labeled type_ -> type_to_string type_
+    | Labeled (label, type_) -> sprintf "%s:%s" label (type_to_string type_)
+
+  let element_value = function
+    | Not_labeled type_ -> type_to_creation_function type_
+    | Labeled (label, type_) ->
+        sprintf "~%s:(%s)" label (type_to_creation_function type_)
+
+  let elements_to_type_decl elements =
+    String.concat ~sep:" * " (List.map elements ~f:element_type_to_string)
+
+  let tuple_value_of_elements elements =
+    let elems_str =
+      String.concat ~sep:", " (List.map elements ~f:element_value)
+    in
+    match elements with
+    | [] -> elems_str
+    | _ -> sprintf "(%s)" elems_str
+
+  let tuple_value t = tuple_value_of_elements t.elements
+
+  let type_decl t =
+    sprintf "type %s = %s" (type_ t) (elements_to_type_decl t.elements)
+
+  let element_var i ~base = sprintf "%s%i" base i
+
+  (* A pattern binding each element of the tuple to [<base><i>]. *)
+  let elements_pattern elements ~base =
+    let element_pattern i = function
+      | Not_labeled _ -> element_var i ~base
+      | Labeled (label, _) -> sprintf "~%s:%s" label (element_var i ~base)
+    in
+    sprintf "(%s)"
+      (String.concat ~sep:", " (List.mapi elements ~f:element_pattern))
+  ;;
+
+  (* Checks comparing the elements bound by [elements_pattern ~base:base1]
+     against those bound by [elements_pattern ~base:base2]. *)
+  let check_elements_integrity elements ~base1 ~base2 ~value =
+    let element_name i = function
+      | Not_labeled _ -> sprintf "%i" i
+      | Labeled (label, _) -> label
+    in
+    List.mapi elements ~f:(fun i elem ->
+      type_to_field_integrity_check
+        (element_type elem)
+        ~access1:(element_var i ~base:base1)
+        ~access2:(element_var i ~base:base2)
+        ~message:(sprintf "%s.%s" value (element_name i elem)))
+  ;;
+
+  let check_field_integrity t =
+    sprintf {|let () = match %s, %s with
+      | %s, %s -> %s
+    in|}
+      (value t)
+      (value t ~base:"t_orig")
+      (elements_pattern t.elements ~base:"a")
+      (elements_pattern t.elements ~base:"b")
+      (String.concat ~sep:"\n"
+         (check_elements_integrity t.elements ~base1:"a" ~base2:"b"
+            ~value:(value t)))
+  ;;
+end
+
 module Mixed_variant = struct
   type args =
     | Args_tuple of field_or_arg_type list
@@ -426,20 +552,17 @@ module Mixed_variant = struct
   let of_constructor name cstr index =
     let args =
       match cstr with
-      | Cstr_tuple { cstr_prefix; cstr_suffix } ->
-          let prefix_args = List.map cstr_prefix ~f:value_element_to_type in
-          let suffix_args =
-            List.map
-              (Nonempty_list.to_list cstr_suffix)
-              ~f:flat_element_to_type
-          in
-          Args_tuple (shuffle (prefix_args @ suffix_args))
+      | Cstr_tuple tuple -> Args_tuple (types_of_tuple tuple)
       | Cstr_record record ->
           let { fields; _ } : Mixed_record.t = Mixed_record.of_block index record in
           Args_record fields
     in
     { name; args; index }
   ;;
+
+  (* Constructor arguments can't be labeled. *)
+  let tuple_elements args =
+    List.map args ~f:(fun type_ -> Mixed_tuple.Not_labeled type_)
 
   let of_variant index cstrs =
     let constructors =
@@ -456,7 +579,7 @@ module Mixed_variant = struct
       cstr.name
       (match cstr.args with
        | Args_tuple args ->
-           String.concat ~sep:" * " (List.map args ~f:type_to_string)
+           Mixed_tuple.elements_to_type_decl (tuple_elements args)
        | Args_record fields ->
            sprintf "{ %s }" (Mixed_record.fields_to_type_decl fields))
   ;;
@@ -470,14 +593,7 @@ module Mixed_variant = struct
       (match args with
        | Args_record fields -> Mixed_record.record_value_of_fields fields
        | Args_tuple args ->
-           let args_str =
-             String.concat
-               ~sep:", "
-               (List.map args ~f:type_to_creation_function)
-           in
-           match args with
-           | [] -> args_str
-           | _ -> sprintf "(%s)" args_str)
+           Mixed_tuple.tuple_value_of_elements (tuple_elements args))
 
   let type_decl t =
     sprintf
@@ -488,15 +604,11 @@ module Mixed_variant = struct
 
   let check_field_integrity cstr ~index ~catchall =
     let value = value ~index in
-    let arg_var i ~base = sprintf "%s%i" base i in
     let arg_vars cstr ~base =
       match cstr.args with
       | Args_record _ -> base
       | Args_tuple args ->
-          sprintf "(%s)"
-            (String.concat ~sep:", "
-              (List.mapi args ~f:(fun i _ ->
-                  arg_var i ~base)))
+          Mixed_tuple.elements_pattern (tuple_elements args) ~base
     in
     sprintf {|let () = match %s, %s with
       | %s %s, %s %s -> %s
@@ -516,12 +628,8 @@ module Mixed_variant = struct
                   ~access2:(sprintf "b.%s" field.name)
                   ~message:(sprintf "%s.%s" (value cstr) field.name))
         | Args_tuple args ->
-            List.mapi args ~f:(fun i type_ ->
-                type_to_field_integrity_check
-                  type_
-                  ~access1:(arg_var i ~base:"a")
-                  ~access2:(arg_var i ~base:"b")
-                  ~message:(sprintf "%s.%i" (value cstr) i))))
+            Mixed_tuple.check_elements_integrity (tuple_elements args)
+              ~base1:"a" ~base2:"b" ~value:(value cstr)))
     (if catchall then "| _ -> assert false" else "")
   ;;
 end
@@ -529,30 +637,37 @@ end
 module Value = struct
   type t =
     | Record of Mixed_record.t
+    | Tuple of Mixed_tuple.t
     | Constructor of Mixed_variant.t * Mixed_variant.constructor
 
   let value ?base = function
     | Record x -> Mixed_record.value ?base x
+    | Tuple x -> Mixed_tuple.value ?base x
     | Constructor (v, c) -> Mixed_variant.value ?base c ~index:v.index
 
   let type_ = function
     | Record x -> Mixed_record.type_ x
+    | Tuple x -> Mixed_tuple.type_ x
     | Constructor (x, _) -> Mixed_variant.type_ x
 
   let construction = function
     | Record x -> Mixed_record.record_value x
+    | Tuple x -> Mixed_tuple.tuple_value x
     | Constructor (_, x) -> Mixed_variant.constructor_value x
 
   let is_all_floats = function
     | Record x -> Mixed_record.is_all_floats x
+    | Tuple _ -> false
     | Constructor _ -> false
 
   let index = function
     | Record x -> x.index
+    | Tuple x -> x.index
     | Constructor (x, _) -> x.index
 
   let check_field_integrity = function
     | Record x -> Mixed_record.check_field_integrity x
+    | Tuple x -> [ Mixed_tuple.check_field_integrity x ]
     | Constructor (v, c) ->
         [ Mixed_variant.check_field_integrity c ~index:v.index
             ~catchall:(List.length v.constructors > 1)
@@ -560,29 +675,37 @@ module Value = struct
 
   let tag = function
     | Record _ -> 0
+    | Tuple _ -> 0
     | Constructor (_, c) -> c.index
 end
 
 module Type = struct
   type t =
     | Record of Mixed_record.t
+    | Tuple of Mixed_tuple.t
     | Variant of Mixed_variant.t
 
   let type_decl = function
     | Record x -> Mixed_record.type_decl x
+    | Tuple x -> Mixed_tuple.type_decl x
     | Variant x -> Mixed_variant.type_decl x
 
   let index = function
     | Record x -> x.index
+    | Tuple x -> x.index
     | Variant x -> x.index
 
   let values : t -> Value.t list = function
     | Record x -> [ Record x ]
+    | Tuple x -> [ Tuple x ]
     | Variant x ->
         List.map x.constructors ~f:(fun cstr -> Value.Constructor (x, cstr))
 
   let record_of_block i block =
     Record (Mixed_record.of_block i block)
+
+  let tuple_of_block i block =
+    Tuple (Mixed_tuple.of_block i block)
 
   let variant_of_block i block =
     Variant (Mixed_variant.of_variant i block)
@@ -605,7 +728,12 @@ let main n ~bytecode =
     |> List.of_seq
     |> List.mapi ~f:(fun i x -> Type.variant_of_block (i+n) x)
   in
-  let types = records @ variants in
+  let tuples =
+    Seq.take n (enumeration_of_mixed_tuples ~bytecode)
+    |> List.of_seq
+    |> List.mapi ~f:(fun i x -> Type.tuple_of_block (i + 2*n) x)
+  in
+  let types = records @ variants @ tuples in
   let values = List.concat_map types ~f:Type.values in
   let line ?(indent = 0) fmt =
     Printf.ksprintf
@@ -810,7 +938,7 @@ let check_reachable_words expected actual message =
   seq_print_in_test "Copying values using [with] record update";
   per_value (fun t ->
     match t with
-    | Constructor _ ->
+    | Constructor _ | Tuple _ ->
         line
           "let %s = %s in"
           (Value.value t ~base:"t_orig")
@@ -862,7 +990,9 @@ let check_reachable_words expected actual message =
     seq_print_in_test "    - Checking [Obj.reachable_words]";
     per_value (fun t ->
       match t with
+      (* CR layouts: maybe we should check reachable words for these too...? *)
       | Constructor _ -> ()
+      | Tuple _ -> ()
       | Record t ->
         let is_all_floats = Mixed_record.is_all_floats t in
         line

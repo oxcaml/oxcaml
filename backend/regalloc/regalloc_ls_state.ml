@@ -172,7 +172,7 @@ let rec is_in_a_range ls_order (cell : Range.t DLL.cell option) : bool =
     || is_in_a_range ls_order (DLL.next cell)
 
 let[@inline] invariant_intervals state cfg_with_infos =
-  if debug && Lazy.force invariants
+  if debug && Param.get invariants
   then (
     (match DLL.hd_cell state.interval_dll with
     | None -> ()
@@ -241,7 +241,7 @@ let invariant_field_dll (reg_class : Regs.Reg_class.t) (field_name : string)
   | Some cell -> is (DLL.value cell) (DLL.next cell)
 
 let[@inline] invariant_active state =
-  if debug && Lazy.force invariants
+  if debug && Param.get invariants
   then
     Regs.Reg_class_tbl.iter state.active ~f:(fun reg_class intervals ->
         invariant_field_dll reg_class "fixed "

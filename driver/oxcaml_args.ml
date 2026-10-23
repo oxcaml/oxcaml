@@ -178,6 +178,28 @@ let mk_no_cfg_eliminate_dead_trap_handlers f =
     Arg.Unit f,
     " Do not eliminate dead trap handlers" )
 
+let mk_cfg_eliminate_dead_code_validate f =
+  ( "-cfg-eliminate-dead-code-validate",
+    Arg.Unit f,
+    " Validate the eliminate dead code pass" )
+
+let mk_no_cfg_eliminate_dead_code_validate f =
+  ( "-no-cfg-eliminate-dead-code-validate",
+    Arg.Unit f,
+    " Do not validate the eliminate dead code pass" )
+
+let mk_cfg_dominators_validate f =
+  ("-cfg-dominators-validate", Arg.Unit f, " Validate CFG dominators")
+
+let mk_no_cfg_dominators_validate f =
+  ("-no-cfg-dominators-validate", Arg.Unit f, " Do not validate CFG dominators")
+
+let mk_cfg_liveness_validate f =
+  ("-cfg-liveness-validate", Arg.Unit f, " Validate CFG liveness")
+
+let mk_no_cfg_liveness_validate f =
+  ("-no-cfg-liveness-validate", Arg.Unit f, " Do not validate CFG liveness")
+
 let mk_cfg_prologue_validate f =
   ("-cfg-prologue-validate", Arg.Unit f, " Validate prologues added to CFG")
 
@@ -255,6 +277,16 @@ let mk_no_cfg_value_propagation_flow f =
   ( "-no-cfg-value-propagation-flow",
     Arg.Unit f,
     " Do not propagate values across block to simplify CFG" )
+
+let mk_cfg_copy_propagation f =
+  ( "-cfg-copy-propagation",
+    Arg.Unit f,
+    " Enables copy propagation before register allocation" )
+
+let mk_no_cfg_copy_propagation f =
+  ( "-no-cfg-copy-propagation",
+    Arg.Unit f,
+    " Disables copy propagation before register allocation" )
 
 let mk_experimental_optimizations f =
   ( "-experimental-optimizations",
@@ -1377,6 +1409,12 @@ module type Oxcaml_options = sig
   val cfg_stack_checks_threshold : int -> unit
   val cfg_eliminate_dead_trap_handlers : unit -> unit
   val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_eliminate_dead_code_validate : unit -> unit
+  val no_cfg_eliminate_dead_code_validate : unit -> unit
+  val cfg_dominators_validate : unit -> unit
+  val no_cfg_dominators_validate : unit -> unit
+  val cfg_liveness_validate : unit -> unit
+  val no_cfg_liveness_validate : unit -> unit
   val cfg_prologue_validate : unit -> unit
   val no_cfg_prologue_validate : unit -> unit
   val cfg_prologue_shrink_wrap : unit -> unit
@@ -1394,6 +1432,8 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val cfg_copy_propagation : unit -> unit
+  val no_cfg_copy_propagation : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val module_entry_functions_section : unit -> unit
@@ -1583,6 +1623,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
       mk_no_cfg_eliminate_dead_trap_handlers
         F.no_cfg_eliminate_dead_trap_handlers;
+      mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
+      mk_no_cfg_eliminate_dead_code_validate
+        F.no_cfg_eliminate_dead_code_validate;
+      mk_cfg_dominators_validate F.cfg_dominators_validate;
+      mk_no_cfg_dominators_validate F.no_cfg_dominators_validate;
+      mk_cfg_liveness_validate F.cfg_liveness_validate;
+      mk_no_cfg_liveness_validate F.no_cfg_liveness_validate;
       mk_cfg_prologue_validate F.cfg_prologue_validate;
       mk_no_cfg_prologue_validate F.no_cfg_prologue_validate;
       mk_cfg_prologue_shrink_wrap F.cfg_prologue_shrink_wrap;
@@ -1600,6 +1647,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
       mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
       mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
+      mk_cfg_copy_propagation F.cfg_copy_propagation;
+      mk_no_cfg_copy_propagation F.no_cfg_copy_propagation;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1952,6 +2001,16 @@ module Oxcaml_options_impl = struct
   let no_cfg_eliminate_dead_trap_handlers =
     clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
 
+  let cfg_eliminate_dead_code_validate =
+    set' Oxcaml_flags.cfg_eliminate_dead_code_validate
+
+  let no_cfg_eliminate_dead_code_validate =
+    clear' Oxcaml_flags.cfg_eliminate_dead_code_validate
+
+  let cfg_dominators_validate = set' Oxcaml_flags.cfg_dominators_validate
+  let no_cfg_dominators_validate = clear' Oxcaml_flags.cfg_dominators_validate
+  let cfg_liveness_validate = set' Oxcaml_flags.cfg_liveness_validate
+  let no_cfg_liveness_validate = clear' Oxcaml_flags.cfg_liveness_validate
   let cfg_prologue_validate = set' Oxcaml_flags.cfg_prologue_validate
   let no_cfg_prologue_validate = clear' Oxcaml_flags.cfg_prologue_validate
   let cfg_prologue_shrink_wrap = set' Oxcaml_flags.cfg_prologue_shrink_wrap
@@ -1975,6 +2034,9 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
+
+  let cfg_copy_propagation = set' Oxcaml_flags.cfg_copy_propagation
+  let no_cfg_copy_propagation = clear' Oxcaml_flags.cfg_copy_propagation
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2551,6 +2613,10 @@ module Extra_params = struct
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
     | "cfg-eliminate-dead-trap-handlers" ->
         set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
+    | "cfg-eliminate-dead-code-validate" ->
+        set' Oxcaml_flags.cfg_eliminate_dead_code_validate
+    | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
+    | "cfg-liveness-validate" -> set' Oxcaml_flags.cfg_liveness_validate
     | "cfg-prologue-validate" -> set' Oxcaml_flags.cfg_prologue_validate
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
@@ -2561,6 +2627,7 @@ module Extra_params = struct
         set' Oxcaml_flags.cfg_value_propagation_float
     | "cfg-value-propagation-flow" ->
         set' Oxcaml_flags.cfg_value_propagation_flow
+    | "cfg-copy-propagation" -> set' Oxcaml_flags.cfg_copy_propagation
     | "experimental-optimizations" ->
         if Compenv.check_bool ppf name v then
           Oxcaml_options_impl.experimental_optimizations ();

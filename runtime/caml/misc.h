@@ -151,9 +151,7 @@ CAMLdeprecated_typedef(addr, char *);
 #endif
 
 #define CAMLexport
-#ifndef CAML_NO_DEFINE_CAMLprim
 #define CAMLprim
-#endif
 #define CAMLextern CAMLDLLIMPORT extern
 
 /* Weak function definitions that can be overridden by external libs */
@@ -880,6 +878,7 @@ CAMLextern int caml_snwprintf(wchar_t * buf,
 #define NSEC_PER_SEC  UINT64_C(1000000000)
 
 #include <time.h>
+#include <stdint.h>
 
 Caml_inline struct timespec caml_timespec_of_nsec(uint64_t nsec)
 {

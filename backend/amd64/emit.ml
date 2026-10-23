@@ -58,8 +58,6 @@ let asm_collected_for_expect_asm = ref []
 let expect_asm_whole_function = ref false
 
 let register_expect_asm_callback f =
-  (* Reset label counter to make assembly more predictable. *)
-  Label.reset ();
   expect_asm_callbacks := f :: !expect_asm_callbacks
 
 let invoke_expect_asm_callbacks () =
@@ -791,6 +789,41 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
          sc_save_simd = save_simd
        }
        :: !stack_realloc
+
+(* Probe the prospective stack frame at [Domainstate.stack_guard_stride]-byte
+   strides, descending, so that a frame big enough to step over the stack's
+   guard page faults in it instead; the SEGV handler raises [Stack_overflow].
+   Used instead of [emit_stack_check] when stack checks are disabled. The probes
+   touch but do not change memory. Since a shrink-wrapped prologue may already
+   have moved %rsp by up to a page, we start probing at offset zero. We unroll
+   up to four strides; beyond that we generate a loop. *)
+let emit_stack_probes ~size_in_bytes ~save_registers =
+  let stride = Domainstate.stack_guard_stride in
+  assert (stride > 0 && size_in_bytes >= stride);
+  let full_strides = size_in_bytes / stride in
+  let probe ofs = I.or_ (int 0) (mem64 QWORD (-ofs) (Scalar RSP)) in
+  let max_unrolled_strides = 4 in
+  if full_strides <= max_unrolled_strides
+  then (
+    probe 0;
+    for i = 1 to full_strides do
+      probe (i * stride)
+    done)
+  else (
+    (* [r10] may be live here unless this is the function's first instruction
+       (cf. [Proc.destroyed_at_basic]); the push doubles as the anchoring probe,
+       and [bias] keeps the probed addresses the same either way. *)
+    if save_registers then push r10 else probe 0;
+    let bias = if save_registers then 8 else 0 in
+    let lbl = L.create Text in
+    I.mov (int (-(stride - bias))) r10;
+    D.define_label lbl;
+    I.or_ (int 0) (mem64 QWORD ~base:RSP 0 (Scalar R10));
+    I.sub (int stride) r10;
+    I.cmp (int (-(full_strides * stride) + bias)) r10;
+    I.j GE (emit_asm_label_arg lbl);
+    if save_registers then pop r10);
+  if size_in_bytes mod stride <> 0 then probe size_in_bytes
 
 (* Record jump tables *)
 type jump_table =
@@ -2046,6 +2079,11 @@ let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
+let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
+  let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
+  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  D.define_label lbl
+
 (* Emit an instruction *)
 let emit_instr ~first ~last ~fallthrough i =
   let open Simd_instrs in
@@ -2680,10 +2718,10 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel lbl ->
-    let lbl = label_to_asm_label ~section:Text lbl in
-    if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
-    D.define_label lbl
+  | Llabel_for_jump_target label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label
+  | Llabel_for_dwarf label ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
@@ -2769,9 +2807,14 @@ let emit_instr ~first ~last ~fallthrough i =
       I.pop r11;
       I.jmp r11)
   | Lstackcheck { max_frame_size_bytes } ->
-    emit_stack_check ~size_in_bytes:max_frame_size_bytes
-      ~save_registers:(not first)
-      ~save_simd:(must_save_simd_regs i.live)
+    if Config.no_stack_checks
+    then
+      emit_stack_probes ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
+    else
+      emit_stack_check ~size_in_bytes:max_frame_size_bytes
+        ~save_registers:(not first)
+        ~save_simd:(must_save_simd_regs i.live)
 
 let emit_instr ~first ~last ~fallthrough i =
   try emit_instr ~first ~last ~fallthrough i with
@@ -3140,7 +3183,11 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
   (* Allocate stack space *)
-  if (not Config.no_stack_checks) && n >= Stack_check.stack_threshold_size
+  if Config.no_stack_checks
+  then (
+    if Domainstate.stack_guard_stride > 0 && n >= Domainstate.stack_guard_stride
+    then emit_stack_probes ~size_in_bytes:n ~save_registers:true)
+  else if n >= Stack_check.stack_threshold_size
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);

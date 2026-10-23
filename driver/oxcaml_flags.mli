@@ -43,6 +43,9 @@ val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
 
 val cfg_eliminate_dead_trap_handlers : bool ref
+val cfg_eliminate_dead_code_validate : bool ref
+val cfg_dominators_validate : bool ref
+val cfg_liveness_validate : bool ref
 
 val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
@@ -56,6 +59,8 @@ val cfg_block_layout : bool ref
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
+
+val cfg_copy_propagation : bool ref
 
 val reorder_blocks_random : int option ref
 val module_entry_functions_section : bool ref

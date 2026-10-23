@@ -66,7 +66,6 @@ let error e = raise (Error e)
 
 type unit_info = {
   ui_unit : CU.t;
-  ui_arg_descr : Lambda.arg_descr option;
   ui_format : Lambda.main_module_block_format;
 }
 
@@ -74,23 +73,30 @@ let instantiate
       ~src ~args targetcm ~expected_extension ~read_unit_info ~compile =
   let base_unit_info = read_unit_info src in
   let base_compilation_unit = base_unit_info.ui_unit in
+  (* CR-someday zqian: take argument module names in the CLI (instead of the
+     [.cmo]/[.cmx] file names), which means we won't need to load the
+     arguments' [.cmo]/[.cmx] at all; only their [.cmi]s. *)
   let arg_info_of_cm_path cm_path =
     let unit_info = read_unit_info cm_path in
-    match unit_info.ui_arg_descr with
+    let { Persistent_env.imp_arg_signature; imp_raw_sign; _ } =
+      Env.find_import ~chain:[] (CU.name unit_info.ui_unit)
+    in
+    match imp_arg_signature with
     | None ->
       error (Not_compiled_as_argument
                { compilation_unit = unit_info.ui_unit;
                  filename = cm_path;
                  base_unit = base_unit_info.ui_unit; })
-    | Some { arg_param; arg_block_idx } ->
-      let main_repr =
+    | Some { Types.arg_param; arg_block_idx } ->
+      begin
         match unit_info.ui_format with
-        | Mb_struct { mb_repr } -> mb_repr
+        | Mb_struct _ -> ()
         | Mb_instantiating_functor _ ->
           error (Argument_not_fully_instantiated
                    { compilation_unit = unit_info.ui_unit;
                      filename = cm_path; })
-      in
+      end;
+      let main_repr = Translmod.main_repr_of_argument_unit imp_raw_sign in
       arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
   in
   let arg_infos = List.map arg_info_of_cm_path args in
@@ -192,10 +198,9 @@ let instantiate
              Unit)
   in
   let output_prefix = output_filename_without_extension in
-  let arg_descr = base_unit_info.ui_arg_descr in
   compile
     ~source_file:src ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr;
+    ~main_module_block_repr;
   ()
 
 (* Error report *)

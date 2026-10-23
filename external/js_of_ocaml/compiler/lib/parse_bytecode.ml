@@ -626,7 +626,7 @@ end = struct
       then
         match ident_of_custom x with
         | ((Some name) [@if oxcaml]) when same_ident name ident_f32 ->
-            Float32 (Int64.bits_of_float ((Obj.magic x : float32) |> Float32.to_float))
+            Float32 (Int64.bits_of_float (Float32.to_float (Float32.of_boxed x)))
         | Some name when same_ident name ident_32 ->
             let i : int32 = Obj.magic x in
             Int32 i
@@ -3031,6 +3031,7 @@ and compile infos pc state (instrs : instr list) =
                  ( Extern ("%with_stack_preemptible", None)
                  , [ Pv valuec; Pv exnc; Pv effc; Pv tickc; Pv f; Pv arg ] ) )
           :: instrs)
+    | NEXT_RESERVED_BITS -> compile infos (pc + 2) state instrs
     | EVENT | BREAK | FIRST_UNIMPLEMENTED_OP -> assert false)
 
 (****)
@@ -3459,7 +3460,7 @@ module Reloc = struct
     ; primitives = String.Hashtbl.create 17
     }
 
-  let constant_of_const x = Ocaml_compiler.constant_of_const x
+  let constant_of_const x = Ocaml_compiler.Constant.of_const x
   [@@if ocaml_version < (5, 1, 0)]
 
   let constant_of_const x = Constants.parse x [@@if ocaml_version >= (5, 1, 0)]
@@ -3649,6 +3650,36 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
   let p = from_compilation_units ~includes ~include_cmis ~hints ~debug_data units in
   Code.invariant p.code;
   p
+
+type jsir_unit =
+  { name : string
+  ; program : Code.program
+  ; info : Unit_info.t
+  }
+
+let from_cmj ic =
+  let { Code.program; last_var; imported_compilation_units; exported_compilation_unit } =
+    (Marshal.from_channel ic : Code.cmj_body)
+  in
+  (* Each unit is compiled one at a time, so the variables might not be disjoint.
+     This means that it is enough for fresh variables to be larger than any
+     variable of any unit. *)
+  Code.Var.set_last last_var;
+  { name = exported_compilation_unit
+  ; program = Code.Marshalable_program.to_program program
+  ; info =
+      Unit_info.of_compilation_units
+        ~exported:exported_compilation_unit
+        ~imported:imported_compilation_units
+  }
+
+let from_cmja ic =
+  let toc_pos = input_binary_int ic in
+  seek_in ic toc_pos;
+  let lib = (input_value ic : Ocaml_compiler.Cmj_format.library) in
+  List.map (Ocaml_compiler.Cmj_format.units lib) ~f:(fun unit ->
+      seek_in ic (Ocaml_compiler.Cmj_format.unit_pos unit);
+      from_cmj ic)
 
 let from_channel ic =
   let format =

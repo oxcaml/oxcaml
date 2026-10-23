@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -58,6 +59,26 @@ set_b:
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
+  ret
+|}]
+
+(* Int record field updates in a single [addq] *)
+
+type counters = { mutable foo : int; mutable bar : int }
+
+let incr_foo (t : counters) = t.foo <- t.foo + 1
+[%%expect_asm X86_64{|
+incr_foo:
+  addq  $2, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let incr_bar (t : counters) = t.bar <- t.bar + 1
+[%%expect_asm X86_64{|
+incr_bar:
+  addq  $2, 8(%rax)
+  movl  $1, %eax
   ret
 |}]
 

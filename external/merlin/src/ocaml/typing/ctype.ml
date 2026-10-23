@@ -226,7 +226,7 @@ let mark_persistent_in_quotations env =
 let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   begin_def ();
   let level = !current_level in
-  let result, pool =
+  let result, pool, sort_pool =
     with_new_pool ~level:!current_level begin fun () ->
       let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
@@ -282,6 +282,18 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
           | _ -> ()
         end
   end pool;
+  List.iter begin fun s ->
+    let open Jkind_types.Sort in
+    (* In contrast to types, which can be generalised implicitly, sort variables
+       need to be explicitly generalized and instantiated in [Typecore].
+       Hence, we lower all non-generic variables like type variables
+       in [structure] mode. *)
+    iter_var s ~f:(fun v ->
+      let t = of_var v in
+      if get_level t = generic_level then () else
+      update_level !current_level t;
+      add_to_sort_pool ~level:(get_level t) t)
+  end sort_pool;
   result
 
 let with_local_level_generalize ~before_generalize f =
@@ -1011,7 +1023,11 @@ let duplicate_class_type ty =
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
-    iter_type_expr lower_all (Fun.const ()) ty
+    begin match get_desc ty with
+    | Tvar { jkind } -> Jkind.update_level !current_level jkind
+    | _ -> ()
+    end;
+    iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
   end
 
 (*
@@ -1070,10 +1086,12 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   let current_level = !current_level in
-  if level <> generic_level then begin
-    if is_Tvar ty && level > current_level then
-      set_level ty current_level
-    else if level > current_level then begin
+  if level <> generic_level && level > current_level then
+    match get_desc ty with
+    | Tvar { jkind } ->
+      set_level ty current_level;
+      Jkind.update_level current_level jkind
+    | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -1082,8 +1100,6 @@ let rec generalize_structure ty =
       set_level ty generic_level;
       let mgen m = Mode.With_locality.generalize_structure ~current_level m in
       iter_type_expr generalize_structure mgen ty
-    end
-  end
 
 let generalize_structure ty =
   simple_abbrevs := Mnil;
@@ -1293,6 +1309,9 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
+    | Tvar { jkind } ->
+      set_level ();
+      Jkind.update_level level jkind
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1331,7 +1350,11 @@ let rec lower_contravariant env var_level visited contra ty =
     Hashtbl.add visited (get_id ty) contra;
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
-      Tvar _ -> if contra then set_level ty var_level
+      Tvar { jkind } ->
+        if contra then begin
+          set_level ty var_level;
+          Jkind.update_level var_level jkind
+        end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
        let variance, maybe_expand =
@@ -2056,20 +2079,26 @@ let instance_label' copy_scope ~fixed lbl =
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope -> instance_label' copy_scope ~fixed lbl)
 
-let instance_labels ~fixed ~representative lbls =
-  (* Merlin-only: Merlin sometimes calls this function with an empty lbls (since lbl_all
-     is empty for dummy labels). In the compiler, this function assumes the array is
-     non-empty to get the result type. But in Merlin, we explicitly pass representative to
-     avoid an index-out-of-bounds exception. *)
+let instance_labels ~fixed ?representative lbls =
   For_copy.with_scope (fun copy_scope ->
     let vars_and_ty_args =
       Array.map
         (fun lbl -> instance_label_type' copy_scope ~fixed lbl.lbl_arg)
         lbls
     in
-    let ty_res = copy copy_scope representative.lbl_res in
+    let lbl =
+      (* Typing recovery calls this function with an empty lbls
+          (since lbl_all is empty for dummy labels). In the compiler,
+          this function assumes the array is non-empty to get the
+          result type. But in Typing Recovery, we explicitly pass
+          representative to avoid an index-out-of-bounds exception. *)
+      match representative with
+      | None -> lbls.(0)
+      | Some l -> l
+    in
+    let ty_res = copy copy_scope lbl.lbl_res in
     (vars_and_ty_args, ty_res)
-  )
+    )
 
 let instance_label_declarations ~fixed lds ~params =
   For_copy.with_scope (fun copy_scope ->
@@ -2216,6 +2245,22 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   (* Instantiate a jkind with layout
      [any <scannable axes> <addressability>] to one with
      ['s <scannable axes> <addressability>], where all ['s] are shared. *)
+  (* CR-someday layout-polymorphism: It's somewhat odd that this function
+     decides to instantiate variables for [any] and [any]-under-[addressable],
+     but not [any] under products or [box].
+
+     There is no obvious choice here, given that the design of [@layout_poly]
+     does not allow specifying *which* sort variables are equivalent. For
+     example, if we instantiated sort variables under products, then the
+     following hypothetical primitive would only support unboxed pairs whose
+     components have the same sorts.
+     {[
+       external usnd : ('a : any) ('b : any). #('a * 'b) -> 'b
+     ]}
+
+     We should probably instead just replace [@layout_poly] with "real" layout
+     polymorphism.
+  *)
   let instance_sort_var_for_lpoly_jkind jkind =
     let rec instance_layout
       : Jkind.Sort.t Jkind.Layout.t -> _ option = function
@@ -2224,7 +2269,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
         Option.map
           (fun l -> Jkind.Layout.Addressable l)
           (instance_layout layout)
-      | Sort _ | Product _ -> None
+      | Sort _ | Product _ | Box _ -> None
     in
     match Jkind.extract_layout env jkind with
     | Error _ -> None
@@ -2604,6 +2649,9 @@ let rec try_reduce_once env t =
     end
   | _ -> raise Cannot_expand
 
+(** Apply a reduction step on [<[t]> eval].
+    [copy_persistent] relies on this function to always return copies,
+    and to behave well on ill-staged types. *)
 and try_reduce_quote_eval env t =
   let path_must_be_persistent env path =
     if not (Env.path_is_persistent_in_quotations env path) then
@@ -2727,6 +2775,22 @@ let rec try_reduce env ty =
   try try_reduce env ty'
   with Cannot_expand -> ty'
 
+(** Deeply reduce all [Tquote_eval]s appearing in a type.
+    The resulting type does not contain any [Tquote_eval]s and has no sharing.
+    Raises [Cannot_expand] on failure. *)
+let rec try_full_reduce_quote_eval_desc env = function
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
+  | Tvariant row ->
+    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
+    Tvariant (
+      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
+  | t ->
+    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
+and try_full_reduce_quote_eval env t =
+  try_full_reduce_quote_eval_desc env (get_desc t)
+  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
+
 (* [Predef]'s [eval] and [box] are special -- we want to always expand it in
    [reduce_head], so we special-case its abbreviation expansion there. *)
 let expand_reducible_abbrevs env ty =
@@ -2821,7 +2885,17 @@ let rec extract_concrete_typedecl env ty =
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
-  | Tbox ty -> extract_concrete_typedecl env ty
+  | Tbox inner ->
+      begin match try_expand_head try_expand_safe env ty with
+      | ty -> extract_concrete_typedecl env ty
+      | exception Cannot_expand ->
+          match extract_concrete_typedecl env inner with
+          | May_have_typedecl -> May_have_typedecl
+          (* If [inner] has a concrete typedecl, [inner box] can never
+             expand further: types with concrete kinds cannot be refined
+             by GADT equations (see [is_instantiable]). *)
+          | Typedecl _ | Has_no_typedecl -> Has_no_typedecl
+      end
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -3094,21 +3168,21 @@ let type_jkind_purely_if_principal' =
 
 (* Helper functions for creating jkind contexts *)
 let mk_is_abstract env p =
-  let decl =
-    try Env.find_type p env
-    with Not_found ->
-      Misc.fatal_errorf_doc "mk_is_abstract: type %a not found in environment"
-        Path.print p
-  in
-  match decl.type_kind with
-  | Type_abstract _ ->
-    (* Check if it's truly abstract (no manifest) or just an abbreviation *)
-    begin match decl.type_manifest with
-    | None -> true  (* Truly abstract - no manifest *)
-    | Some _ -> false  (* Type abbreviation - has manifest *)
-    end
-  | Type_variant _ | Type_record _ | Type_open | Type_record_unboxed_product _
-  -> false
+  match Env.find_type p env with
+  | exception Not_found ->
+    (* [p]'s declaration is unavailable, most likely because its cmi is
+       missing. Treat [p] as abstract so normalization never skips it. *)
+    true
+  | decl ->
+    match decl.type_kind with
+    | Type_abstract _ ->
+      (* Check if it's truly abstract (no manifest) or just an abbreviation *)
+      begin match decl.type_manifest with
+      | None -> true  (* Truly abstract - no manifest *)
+      | Some _ -> false  (* Type abbreviation - has manifest *)
+      end
+    | Type_variant _ | Type_record _ | Type_open
+    | Type_record_unboxed_product _ -> false
 
 let mk_jkind_context env jkind_of_type =
   let lookup_type p =
@@ -3173,14 +3247,11 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
          [constrain_type_jkind].) *)
-      match Jkind.apply_or_null_r env jkind with
-      | Ok jkind -> jkind
-      | Error () ->
-        Misc.fatal_error "Ctype.apply_jkind_wrapping_r: nested or_nulls"
+      Jkind.apply_or_null_r env jkind
     else
-      jkind
+      Ok jkind
   end
-  |> Jkind.apply_modality_r modality
+  |> Result.map (Jkind.apply_modality_r modality)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3384,10 +3455,11 @@ let mk_jkind_context_always_principal env =
 
 (**** checking jkind relationships ****)
 
-(* The ~fixed argument controls what effects this may have on `ty`.  If false,
-   then we will update the jkind of type variables to make the check true, if
-   possible.  If true, we won't (but will still instantiate sort variables). *)
-let constrain_type_jkind ~fixed env ty jkind =
+(* The ~allow_mutation argument controls what effects this may have on `ty`. If
+   true, then we will update the jkind of type variables to make the check true,
+   if possible.  If false, we won't (but will still instantiate sort variables).
+ *)
+let constrain_type_jkind ~allow_mutation env ty jkind =
   (* The [expanded] argument says whether we've already tried [expand_head_opt].
 
      The "fuel" argument is used because we're duplicating the loop of
@@ -3424,8 +3496,8 @@ let constrain_type_jkind ~fixed env ty jkind =
     (* The [ty's_jkind] we get here is an **r** jkind, necessary for
        the call to [intersection_or_error]. And even if [ty] has unbound
        variables, [ty's_jkind] can't have any variables in it, so we're OK. *)
-    | Tvar { jkind = ty's_jkind } when not fixed ->
-       (* Unfixed tyvars are special in at least two ways:
+    | Tvar { jkind = ty's_jkind } when allow_mutation ->
+       (* Mutable tyvars are special in at least two ways:
 
           1) Suppose we're processing [type 'a t = 'a list]. The ['a] on the
           left will be born with an [Unannotated_type_parameter] history and a
@@ -3442,15 +3514,15 @@ let constrain_type_jkind ~fixed env ty jkind =
           error message should complain about the lack of intersection, not the
           lack of subjkinding.
 
-          Because of these reasons, we pull out the unfixed tyvar case and treat
+          Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-       let jkind_inter =
-         Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection env
-           ty's_jkind jkind
-       in
-       Result.map (set_var_jkind ty) jkind_inter
+        Jkind.intersection_or_error ~type_equal ~context
+          ~reason:Tyvar_refinement_intersection env
+          ty's_jkind jkind
+        |> Result.map (fun jkind ->
+          Jkind.update_level (get_level ty) jkind;
+          set_var_jkind ty jkind)
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
@@ -3561,9 +3633,13 @@ let constrain_type_jkind ~fixed env ty jkind =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
-                      let jkind =
-                        apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
-                      in
+                      match apply_jkind_wrapping_r ~env jkind ~unwrapped_ty with
+                      | Error () ->
+                        Error
+                          (Jkind.Violation.of_ ~context env
+                             (Not_a_subjkind
+                                (ty's_jkind, jkind, sub_failure_reasons)))
+                      | Ok jkind ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3680,8 +3756,19 @@ let constrain_type_jkind ~fixed env ty jkind =
                  We could still estimate the kind on the left better. *)
               error ()
           in
-          match get_desc ty with
-          | Tconstr _ ->
+          let requirements =
+            Ikind.type_var_requirements ~type_equal ~context ~allow_mutation
+              env ty ty's_jkind jkind
+          in
+          match requirements, get_desc ty with
+          | Ok requirements, _ ->
+            List.fold_left
+              (fun result (tvar, mod_bounds) ->
+                 Result.bind result (fun () ->
+                   loop ~fuel ~expanded:false env tvar ty's_jkind
+                     (Jkind.of_mod_bounds ~history:jkind.history mod_bounds)))
+              (Ok ()) requirements
+          | Error error, Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
@@ -3693,9 +3780,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
                | Final_result ->
-                 Error
-                   (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+                 Error error
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
                  estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
@@ -3705,16 +3790,14 @@ let constrain_type_jkind ~fixed env ty jkind =
                | Stepped_record_unboxed_product unwrapped_tys ->
                  product ~fuel:(fuel - 1) unwrapped_tys
                end
-          | Tunboxed_tuple ltys ->
+          | Error _, Tunboxed_tuple ltys ->
             (* Note: here we "duplicate" the fuel, which may seem like cheating.
                Fuel counts expansions, and its purpose is to guard against
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | _ ->
-            Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          | Error error, _ -> Error error
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
@@ -3734,21 +3817,21 @@ let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let () = Jkind.set_estimate_type_jkind estimate_type_jkind
 
-let type_jkind_and_sort ~why ~fixed env ty =
+let type_jkind_and_sort ~why ~allow_mutation env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
-  match constrain_type_jkind ~fixed env ty jkind with
+  match constrain_type_jkind ~allow_mutation env ty jkind with
   | Ok _ -> Ok (Jkind.allow_left jkind, sort)
   | Error _ as e -> e
 
-let type_sort ~why ~fixed env ty =
-  type_jkind_and_sort ~why ~fixed env ty
+let type_sort ~why ~allow_mutation env ty =
+  type_jkind_and_sort ~why ~allow_mutation env ty
   |> Result.map snd
 
 let check_type_jkind env ty jkind =
-  constrain_type_jkind ~fixed:true env ty jkind
+  constrain_type_jkind ~allow_mutation:false env ty jkind
 
 let constrain_type_jkind env ty jkind =
-  constrain_type_jkind ~fixed:false env ty jkind
+  constrain_type_jkind ~allow_mutation:true env ty jkind
 
 let () =
   Env.constrain_type_jkind := constrain_type_jkind
@@ -3777,35 +3860,9 @@ let check_type_separability env ty sep =
   | Ok () -> true
   | Error _ -> false
 
-let type_is_gc_ignorable_scannable env ty =
-  (* Checking against the upper bound [scannable non_pointer(64)] ensures that
-     whenever [ty]'s layout is not scannable, the check will be [false]. *)
-  (* CR layouts-scannable: Since we check against [scannable non_pointer(64)],
-     a type of kind [value non_pointer & value non_pointer] will fail to be
-     recognized as being always_gc_ignorable, even though it is. To avoid this,
-     [non_pointer(64)] should imply [external(64)]. *)
-  let scannable = Jkind.Builtin.scannable ~why:Dummy_jkind in
-  let l =
-    match scannable.jkind.base with
-    | Layout l -> l
-    | Kconstr _ ->
-      Misc.fatal_error "Ctype.type_is_gc_ignorable_scannable: abstract Kconstr"
-  in
-  let sep =
-    Jkind_axis.Separability.upper_bound_if_is_always_gc_ignorable ()
-  in
-  let upper_bound =
-    Jkind.set_layout scannable (Jkind.Layout.set_root_separability l sep)
-  in
-  match check_type_jkind env ty upper_bound with
-  | Ok () -> true
-  | Error _ -> false
-
 let is_always_gc_ignorable env ty =
-  (* CR layouts: calling [check_type_jkind] two times (indirectly) is sad. *)
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-  || type_is_gc_ignorable_scannable env ty
 
 let check_type_jkind_exn env texn ty jkind =
   match check_type_jkind env ty jkind with
@@ -4492,6 +4549,14 @@ let rec is_aliasable_ty env ty =
   | Tquote ty' -> is_aliasable_ty (incr_stage env) ty'
   | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
+
+let copy_persistent env ty =
+  try_full_reduce_quote_eval env (new_quote_eval_ty ty)
+
+let is_persistent_ty env ty =
+  match copy_persistent env ty with
+  | _ -> true
+  | exception Cannot_expand -> false
 
 let compatible_paths p1 p2 =
   let open Predef in
@@ -5224,9 +5289,13 @@ let rec unify uenv t1 t2 =
         unify2 uenv t1 t2
     end;
     reset_trace_gadt_instances reset_tracing;
-  with Unify_trace trace ->
+  with
+  | Unify_trace trace ->
     reset_trace_gadt_instances reset_tracing;
     raise_trace_for Unify (Diff {got = t1; expected = t2} :: trace)
+  | exn ->
+    reset_trace_gadt_instances reset_tracing;
+    raise exn
 
 and unify2 uenv t1 t2 = unify2_expand uenv t1 t1 t2 t2
 
@@ -5310,6 +5379,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tquote_eval t1, _) when is_persistent_ty (get_env uenv) t2' ->
+      let t2' = copy_persistent (get_env uenv) t2' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2')
+  | (_, Tquote_eval t2) when is_persistent_ty (get_env uenv) t1' ->
+      let t1' = copy_persistent (get_env uenv) t1' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1' t2)
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
@@ -5866,11 +5941,15 @@ let unify_var uenv t1 t2 =
         unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
-      with Unify_trace trace ->
+      with
+      | Unify_trace trace ->
         reset_trace_gadt_instances reset_tracing;
         raise (Unify (expand_to_unification_error
                         env
                         (Diff { got = t1; expected = t2 } :: trace)))
+      | exn ->
+        reset_trace_gadt_instances reset_tracing;
+        raise exn
       end
   | _ ->
       unify uenv t1 t2
@@ -5900,10 +5979,7 @@ let enforce_current_level env ty =
 (**** Special cases of unification ****)
 
 let expand_head_trace env t =
-  let reset_tracing = check_trace_gadt_instances env in
-  let t = expand_head_unif env t in
-  reset_trace_gadt_instances reset_tracing;
-  t
+  wrap_trace_gadt_instances env (expand_head_unif env) t
 
 (*
    Unify [t] and [l:'a -> 'b]. Return ['a] and ['b].
@@ -5943,10 +6019,8 @@ let filter_arrow env t l ~force_tpoly =
         let t1 =
           if is_optional l then
             newty2 ~level
-              (* CR layouts v5: Change the Jkind.Builtin.value when option can
-                 hold non-values. *)
               (Tconstr(Predef.path_option,
-                       [newvar2 level Predef.option_argument_jkind],
+                       [newvar2 level Predef.optional_argument_jkind],
                        ref Mnil))
           else if is_position l then
             newty2 ~level (Tconstr (Predef.path_lexing_position, [], ref Mnil))
@@ -6707,6 +6781,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when is_persistent_ty env t2' ->
+              let t2' = copy_persistent env t2' in
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
@@ -6934,13 +7012,13 @@ let moregeneral ~self_check env inst_nongen
         changed.
        *)
       let (subj_inst_sorts, subj_inst) =
-        Jkind_types.Sort.instance_with ~level:!current_level subj_sch_sorts
+        Jkind.Sort.instance_with ~level:!current_level subj_sch_sorts
           (fun () -> instance_aux ~instantiate_modes subj_sch)
       in
       let subj_inst' = duplicate_type subj_inst in
       (* Duplicate generic variables *)
       let (pat_inst_sorts, pat_inst) =
-        Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
+        Jkind.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       try
@@ -6952,8 +7030,7 @@ let moregeneral ~self_check env inst_nongen
       with Moregen_trace trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
-        ignore
-          (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
+        ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
     | _, Ok (subj_inst_sorts, pat_inst_sorts) ->
       (* After [moregen], [pat_inst_sorts] have been set to [subj_inst_sorts],

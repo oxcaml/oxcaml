@@ -43,6 +43,14 @@ let[@ocamlformat "disable"] print ppf
 let create ~return_continuation ~exn_continuation ~params ~my_closure
     ~my_alloc_mode ~my_depth =
   Bound_parameters.check_no_duplicates params;
+  (if Flambda_features.check_light_invariants ()
+   then
+     match Continuation.sort return_continuation with
+     | Return -> ()
+     | Normal_or_exn | Define_root_symbol | Toplevel_return ->
+       Misc.fatal_errorf
+         "Return continuation %a has wrong sort (must be [Return])"
+         Continuation.print return_continuation);
   (if Flambda_features.check_invariants ()
    then
      let params_set = Bound_parameters.var_set params in
@@ -242,3 +250,32 @@ let renaming
       ~first:renaming
   in
   Renaming.add_fresh_variable renaming my_depth1 ~guaranteed_fresh:my_depth2
+
+let import_and_rename
+    { return_continuation;
+      exn_continuation;
+      params;
+      my_closure;
+      my_alloc_mode;
+      my_depth
+    } renaming =
+  let renaming, return_continuation =
+    Renaming.bind_continuation renaming return_continuation
+  in
+  let renaming, exn_continuation =
+    Renaming.bind_continuation renaming exn_continuation
+  in
+  let renaming, params = Bound_parameters.import_and_rename params renaming in
+  let renaming, my_closure = Renaming.bind_variable renaming my_closure in
+  let renaming, my_alloc_mode =
+    Alloc_mode.For_applications.import_and_rename my_alloc_mode renaming
+  in
+  let renaming, my_depth = Renaming.bind_variable renaming my_depth in
+  ( renaming,
+    { return_continuation;
+      exn_continuation;
+      params;
+      my_closure;
+      my_alloc_mode;
+      my_depth
+    } )

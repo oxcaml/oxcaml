@@ -18,6 +18,7 @@
 #define CAML_NAME_SPACE
 #include "config.h"
 let stack_ctx_words = Stack_ctx_words
+let stack_guard_stride = Stack_guard_stride
 
 type t =
 #define DOMAIN_STATE(type, name) | Domain_##name

@@ -15,8 +15,6 @@ ocamldir = .
 toplevels_installed = top opttop
 
 CLEAN_DUNE_WORKSPACES = \
-  duneconf/boot.ws \
-  duneconf/runtime_stdlib.ws \
   duneconf/main.ws
 
 # These are getting rm -rf'd, so be careful with this.
@@ -71,6 +69,7 @@ DISTCLEAN_FILES = \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
+  external/ocaml-jit/lib/META \
   otherlibs/dynlink/dynlink_cmo_format.mli \
   otherlibs/dynlink/dynlink_cmxs_format.mli \
   otherlibs/dynlink/dynlink_config.ml \
@@ -142,6 +141,18 @@ ci-no-coverage: runtest runtest-upstream minimizer
 .PHONY: ci-coverage
 ci-coverage: boot-runtest coverage
 
+# Check an existing install at $(prefix); these targets do not install.
+# Both check compiler location, META paths/dependencies, native archive ownership,
+# Dune availability and native toplevel/JIT/eval consumers. The bundled target
+# also checks inventories and native consumers for the complete Nix library set.
+.PHONY: check-installed
+check-installed:
+	bash tools/ci/actions/check-installed.sh "$(prefix)"
+
+.PHONY: check-installed-bundled
+check-installed-bundled:
+	bash tools/ci/actions/check-installed.sh "$(prefix)" --bundled
+
 # CR mshinwell: build is broken
 # .PHONY: minimizer-upstream
 # minimizer-upstream:
@@ -154,7 +165,7 @@ boot-minimizer:
 	$(dune) build $(ws_boot) @chamelon/all
 
 .PHONY: minimizer
-minimizer: runtime-stdlib
+minimizer: boot-compiler
 	cp chamelon/compat/dune.ox chamelon/compat/dune
 	$(dune) build $(ws_main) @chamelon/all
 
@@ -170,7 +181,7 @@ hacking-runtest: _build/_bootinstall
 # Only needed for running the test tools by hand; runtest will take care of
 # building them using Dune
 .PHONY: test-tools
-test-tools: runtime-stdlib
+test-tools: boot-compiler
 	$(dune) build $(ws_main) @middle_end/flambda2/tests/tools/all
 
 ARCHES=amd64 arm64

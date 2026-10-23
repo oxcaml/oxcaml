@@ -250,16 +250,6 @@ function caml_array_make(len, init) {
   return b;
 }
 
-// Provides: caml_iarray_of_array const
-function caml_iarray_of_array(a) {
-  return a;
-}
-
-// Provides: caml_array_of_iarray const
-function caml_array_of_iarray(a) {
-  return a;
-}
-
 //Provides: caml_make_vect mutator (const, mutable)
 //Requires: caml_array_make
 function caml_make_vect(len, init) {
@@ -289,6 +279,19 @@ function caml_array_create_float(len) {
   return b;
 }
 
+//Provides: caml_array_create_float mutator (const)
+//Requires: caml_array_bound_error
+//Version: >= 5.2, < 5.3
+//If: oxcaml
+function caml_array_create_float(len) {
+  if (len >>> 0 >= ((0x7fffffff / 8) | 0)) caml_array_bound_error();
+  var len = (len + 1) | 0;
+  var b = new Array(len);
+  b[0] = 254;
+  for (var i = 1; i < len; i++) b[i] = 0;
+  return b;
+}
+
 //Provides: caml_floatarray_create mutator (const)
 //Requires: caml_array_bound_error
 //Alias: caml_floatarray_create_local
@@ -299,6 +302,42 @@ function caml_floatarray_create(len) {
   b[0] = 254;
   for (var i = 1; i < len; i++) b[i] = 0;
   return b;
+}
+
+//Provides: caml_make_unboxed_float64_vect_bytecode mutator (const)
+//Requires: caml_floatarray_create
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_unboxed_float64_vect_bytecode(len) {
+  return caml_floatarray_create(len);
+}
+
+//Provides: caml_make_unboxed_float32_vect_bytecode mutator (const)
+//Requires: caml_array_make
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_unboxed_float32_vect_bytecode(len) {
+  return caml_array_make(len, 0);
+}
+
+//Provides: caml_make_untagged_int_vect_bytecode mutator (const)
+//Requires: caml_array_make
+//Alias: caml_make_untagged_int8_vect_bytecode
+//Alias: caml_make_untagged_int16_vect_bytecode
+//Alias: caml_make_unboxed_int32_vect_bytecode
+//Alias: caml_make_unboxed_nativeint_vect_bytecode
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_untagged_int_vect_bytecode(len) {
+  return caml_array_make(len, 0);
+}
+
+//Provides: caml_make_unboxed_int64_vect_bytecode mutator (const)
+//Requires: caml_array_make, caml_int64_create_lo_mi_hi
+//Version: >= 5.2
+//If: oxcaml
+function caml_make_unboxed_int64_vect_bytecode(len) {
+  return caml_array_make(len, caml_int64_create_lo_mi_hi(0, 0, 0));
 }
 
 //Provides: caml_floatarray_make mutator (const)
@@ -349,4 +388,63 @@ function caml_uniform_array_make(len, init) {
 //If: oxcaml
 function caml_uniform_array_make_local(len, init) {
   return caml_uniform_array_make(len, init);
+}
+
+//Provides: caml_makearray_dynamic_unboxed_product_size
+//Requires: caml_invalid_argument
+//Version: >= 5.2
+//If: oxcaml
+function caml_makearray_dynamic_unboxed_product_size(
+  num_components,
+  non_unarized_length,
+) {
+  var size = num_components * non_unarized_length;
+  if (size !== 0 && num_components < 1)
+    caml_invalid_argument(
+      "%makearray_dynamic: the only array that can be initialized with nothing is a zero-length array",
+    );
+  var max_size = (0x7fffffff / 4) | 0;
+  if (size < 0 || size >= max_size)
+    caml_invalid_argument("%makearray_dynamic: array size too large");
+  return size;
+}
+
+//Provides: caml_makearray_dynamic_non_scannable_unboxed_product mutator (const, const, const)
+//Requires: caml_makearray_dynamic_unboxed_product_size
+//Version: >= 5.2
+//If: oxcaml
+function caml_makearray_dynamic_non_scannable_unboxed_product(
+  num_components,
+  _is_local,
+  non_unarized_length,
+) {
+  var size = caml_makearray_dynamic_unboxed_product_size(
+    num_components,
+    non_unarized_length,
+  );
+  var b = new Array(size + 1);
+  b[0] = 0;
+  for (var i = 1; i <= size; i++) b[i] = 0;
+  return b;
+}
+
+//Provides: caml_makearray_dynamic_scannable_unboxed_product mutator (mutable, const, const)
+//Requires: caml_makearray_dynamic_unboxed_product_size
+//Version: >= 5.2
+//If: oxcaml
+function caml_makearray_dynamic_scannable_unboxed_product(
+  init,
+  _is_local,
+  non_unarized_length,
+) {
+  // [init] is a block holding the unarized components of one element.
+  var num_components = init.length - 1;
+  var size = caml_makearray_dynamic_unboxed_product_size(
+    num_components,
+    non_unarized_length,
+  );
+  var b = new Array(size + 1);
+  b[0] = 0;
+  for (var i = 0; i < size; i++) b[i + 1] = init[1 + (i % num_components)];
+  return b;
 }

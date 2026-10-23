@@ -26,10 +26,8 @@ let [@ocamlformat "disable"] print ppf t =
         Bound_var.print)
       bound_vars
   | Static bound_static ->
-    Format.fprintf ppf "@[<hov 1>\
-        @[(bound_static@ %a)@]\
-        )@]"
-      Bound_static.print bound_static
+    let open! Misc.Sexp in
+    print ppf [a "bound_static" bound_static Bound_static.print]
 
 let free_names t =
   match t with
@@ -125,6 +123,23 @@ let renaming t1 ~guaranteed_fresh:t2 =
     Renaming.empty
   | (Singleton _ | Set_of_closures _ | Static _), _ ->
     Misc.fatal_errorf "Pattern mismatch:@ %a@ and@ %a" print t1 print t2
+
+let import_and_rename t renaming =
+  match t with
+  | Singleton bound_var ->
+    let renaming, bound_var = Bound_var.import_and_rename bound_var renaming in
+    renaming, Singleton bound_var
+  | Set_of_closures bound_vars ->
+    let renaming, bound_vars =
+      List.fold_left_map
+        (fun renaming bound_var ->
+          Bound_var.import_and_rename bound_var renaming)
+        renaming bound_vars
+    in
+    renaming, Set_of_closures bound_vars
+  | Static _ ->
+    (* We never permute symbols or code IDs. *)
+    renaming, t
 
 let singleton var = Singleton var
 

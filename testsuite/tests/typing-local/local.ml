@@ -398,7 +398,7 @@ val etajoin :
 
 let foo ?(local_ x) () = x;;
 [%%expect{|
-val foo : ?x:'a @ local -> unit -> 'a option @ local = <fun>
+val foo : ('a : any). ?x:'a @ local -> unit -> 'a option @ local = <fun>
 |}]
 
 let foo ?(local_ x = "hello") () = x;;

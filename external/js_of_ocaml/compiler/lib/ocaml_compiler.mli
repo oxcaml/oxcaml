@@ -16,7 +16,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-val constant_of_const : Lambda.structured_constant -> Code.constant
+module Constant : sig
+  val of_const : Lambda.structured_constant -> Code.constant
+end
+[@@if ocaml_version < (5, 1, 0)]
 
 type module_or_not =
   | Module
@@ -107,6 +110,18 @@ module Cmo_format : sig
   val hints_pos : t -> int
 
   val hints_size : t -> int
+end
+
+(** Table of contents of a [.cmj] file produced by the OxCaml JSIR
+    backend. *)
+module Cmj_format : sig
+  type compilation_unit_descr
+
+  type library
+
+  val unit_pos : compilation_unit_descr -> int
+
+  val units : library -> compilation_unit_descr list
 end
 
 module Hint : sig

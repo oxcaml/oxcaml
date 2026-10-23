@@ -24,7 +24,6 @@
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries
   ocamlfrontend
-  ocamlbytecomp
   ocamloptcomp
   oxcaml_common
   flambda2_ui

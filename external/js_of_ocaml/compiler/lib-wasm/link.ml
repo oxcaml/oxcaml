@@ -354,27 +354,6 @@ module Wasm_binary = struct
     close_in ch.ch;
     res
 
-  let function_start_offsets ~file =
-    let ch = open_in file in
-    let rec find_code_section () =
-      match next_section ch with
-      | None -> false
-      | Some s ->
-        s.id = 10 (* [10] is a code section *)
-          ||
-          (skip_section ch s;
-           find_code_section ())
-    in
-    let func ch =
-      let body_size = read_uint ch in
-      let start = pos_in ch in
-      seek_in ch (start + body_size);
-      start
-    in
-    let res = if find_code_section () then vec func ch.ch else [] in
-    close_in ch.ch;
-    res
-
   type interface =
     { imports : import list
     ; exports : string list
@@ -663,8 +642,9 @@ let build_runtime_arguments
   in
   let props =
     match Config.effects () with
-    | `Disabled -> ("disable_effects", Javascript.EBool true) :: props
-    | `Jspi | `Cps | `Native -> props
+    | `Jspi -> ("enable_jspi", Javascript.EBool true) :: props
+    | `Native -> ("native_effects", Javascript.EBool true) :: props
+    | `Disabled | `Cps -> props
     | `Double_translation -> assert false
   in
   let props =
@@ -959,14 +939,14 @@ let link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files =
       files
       ~init:(Global_name.Compunit_set.empty, StringSet.empty)
       ~f:(fun (file, (build_info, units)) (requires, files_to_link) ->
-        let cmo_file =
+        let cmo_or_cmj_file =
           match Build_info.kind build_info with
-          | `Cmo -> true
+          | `Cmo | `Cmj | `Cmja -> true
           | `Cma | `Exe | `Runtime | `Unknown -> false
         in
         if
           (not (Config.Flag.auto_link ()))
-          || cmo_file
+          || cmo_or_cmj_file
           || linkall
           || List.exists ~f:(fun { unit_info; _ } -> unit_info.force_link) units
           || List.exists
@@ -988,9 +968,9 @@ let link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files =
       files
       ~init:(Global_name.Compunit_set.empty, [])
       ~f:(fun (_file, (build_info, units)) acc ->
-        let cmo_file =
+        let cmo_or_cmj_file =
           match Build_info.kind build_info with
-          | `Cmo -> true
+          | `Cmo | `Cmj | `Cmja -> true
           | `Cma | `Exe | `Runtime | `Unknown -> false
         in
         List.fold_right
@@ -999,7 +979,7 @@ let link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files =
           ~f:(fun { unit_name; unit_info; _ } (requires, to_link) ->
             if
               (not (Config.Flag.auto_link ()))
-              || cmo_file
+              || cmo_or_cmj_file
               || linkall
               || unit_info.force_link
               || not
@@ -1151,7 +1131,7 @@ let make_library ~linkall ~output_file ~enable_source_maps ~files =
     List.map files ~f:(fun file ->
         let build_info, unit_data = Zip.with_open_in file read_info in
         (match Build_info.kind build_info with
-        | `Cmo -> ()
+        | `Cmo | `Cmj | `Cmja -> ()
         | `Runtime | `Cma | `Exe | `Unknown ->
             failwith (Printf.sprintf "File '%s' is not a .wasmo file." file));
         file, build_info, unit_data)

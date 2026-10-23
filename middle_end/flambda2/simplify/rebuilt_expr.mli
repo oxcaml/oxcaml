@@ -36,6 +36,10 @@ val to_expr : t -> Are_rebuilding_terms.t -> Expr.t
 
 val to_apply_cont : t -> Apply_cont.t option
 
+val is_cold : t -> bool
+
+val mark_as_cold : t -> t
+
 val can_be_removed_as_invalid : t -> Are_rebuilding_terms.t -> bool
 
 val term_not_rebuilt : t
@@ -50,11 +54,11 @@ val create_let :
   free_names_of_body:Name_occurrences.t ->
   t
 
-val create_apply : Are_rebuilding_terms.t -> Apply.t -> t
+val create_apply : Are_rebuilding_terms.t -> is_cold:bool -> Apply.t -> t
 
 (** [Apply_cont] expressions are always rebuilt to allow optimisations in
     [Simplify_switch_expr] and [Simplify_let_cont_expr]. *)
-val create_apply_cont : Apply_cont.t -> t
+val create_apply_cont : is_cold:bool -> Apply_cont.t -> t
 
 module Function_params_and_body : sig
   type t
@@ -95,14 +99,6 @@ module Continuation_handler : sig
     is_exn_handler:bool ->
     is_cold:bool ->
     t
-
-  val create' :
-    Are_rebuilding_terms.t ->
-    Bound_parameters.t ->
-    handler:rebuilt_expr ->
-    is_exn_handler:bool ->
-    is_cold:bool ->
-    t
 end
 
 val create_non_recursive_let_cont :
@@ -136,7 +132,7 @@ val create_recursive_let_cont :
   body:t ->
   t
 
-val create_switch : Are_rebuilding_terms.t -> Switch_expr.t -> t
+val create_switch : Are_rebuilding_terms.t -> is_cold:bool -> Switch_expr.t -> t
 
 val create_invalid : Invalid.t -> t
 
@@ -147,3 +143,31 @@ val bind_no_simplification :
   cost_metrics_of_body:Cost_metrics.t ->
   free_names_of_body:Name_occurrences.t ->
   t * Cost_metrics.t * Name_occurrences.t
+
+module Unique_continuation_handlers : sig
+  (* Uses the parameters and handler expression to avoid re-opening the name
+     abstraction *)
+
+  type 'a t
+
+  val empty : 'a t
+
+  val add :
+    Are_rebuilding_terms.t ->
+    Bound_parameters.t ->
+    rebuilt_expr ->
+    is_exn_handler:bool ->
+    free_names_without_params:Name_occurrences.t ->
+    'a ->
+    'a t ->
+    'a t
+
+  val find_opt :
+    Are_rebuilding_terms.t ->
+    Bound_parameters.t ->
+    rebuilt_expr ->
+    is_exn_handler:bool ->
+    free_names_without_params:Name_occurrences.t ->
+    'a t ->
+    ('a * Simple.t list) option
+end

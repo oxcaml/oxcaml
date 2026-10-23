@@ -24,14 +24,13 @@ let () =
     (* start ticking... *)
     let ticks = Atomic.make 0 in
     set_tick_hook (fun () -> Atomic.incr ticks);
-    let tick = Domain.Tick.acquire ~interval_usec:150 in
-    let start = Sys.time () in
-    while Atomic.get ticks < 1_000 do
-      if (Sys.time () -. start) > 5.0
-      then failwith "Timed out"
-      else poll ()
-    done;
-    Domain.Tick.release tick
+    Domain.Tick.with_ ~interval_usec:150 (fun () ->
+      let start = Sys.time () in
+      while Atomic.get ticks < 1_000 do
+        if (Sys.time () -. start) > 5.0
+        then failwith "Timed out"
+        else poll ()
+      done)
   | child_pid -> (* in parent *)
     (* SIGSTOP and SIGCONT the child many times, to try to catch it in the middle of a
        tick sleep *)

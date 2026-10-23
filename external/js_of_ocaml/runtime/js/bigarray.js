@@ -479,6 +479,16 @@ function caml_ba_get_generic(ba, i) {
   return ba.get(ofs);
 }
 
+// Flambda 2 computes the offset of bigarray accesses itself, so code produced
+// by the OxCaml JSIR backend uses these raw accessors that take the computed
+// offset.
+
+//Provides: caml_ba_get_raw_unsafe
+//If: oxcaml
+function caml_ba_get_raw_unsafe(ba, i) {
+  return ba.get(i);
+}
+
 //Provides: caml_ba_uint8_get16u
 //Version: >= 5.6
 function caml_ba_uint8_get16u(ba, i0) {
@@ -490,6 +500,8 @@ function caml_ba_uint8_get16u(ba, i0) {
 
 //Provides: caml_ba_uint8_geti8
 //Requires: caml_array_bound_error
+//Version: >= 5.2
+//If: oxcaml
 function caml_ba_uint8_geti8(ba, i0) {
   var ofs = ba.offset(i0);
   if (ofs >= ba.data.length) caml_array_bound_error();
@@ -498,6 +510,8 @@ function caml_ba_uint8_geti8(ba, i0) {
 
 //Provides: caml_ba_uint8_geti16
 //Requires: caml_ba_uint8_get16
+//Version: >= 5.2
+//If: oxcaml
 function caml_ba_uint8_geti16(ba, i0) {
   return (caml_ba_uint8_get16(ba, i0) << 16) >> 16;
 }
@@ -592,6 +606,13 @@ function caml_ba_set_generic(ba, i, v) {
   return 0;
 }
 
+//Provides: caml_ba_set_raw_unsafe
+//If: oxcaml
+function caml_ba_set_raw_unsafe(ba, i, v) {
+  ba.set(i, v);
+  return 0;
+}
+
 //Provides: caml_ba_uint8_set16u
 //Version: >= 5.6
 function caml_ba_uint8_set16u(ba, i0, v) {
@@ -603,6 +624,8 @@ function caml_ba_uint8_set16u(ba, i0, v) {
 
 //Provides: caml_ba_uint8_set8
 //Requires: caml_array_bound_error
+//Version: >= 5.2
+//If: oxcaml
 function caml_ba_uint8_set8(ba, i0, v) {
   var ofs = ba.offset(i0);
   if (ofs >= ba.data.length) caml_array_bound_error();

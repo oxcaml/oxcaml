@@ -26,8 +26,8 @@ let times = Debug.find "times"
 module Addr = struct
   type t = int
 
-  module Set = Set.Make (Int)
-  module Map = Map.Make (Int)
+  module Set = Int_set
+  module Map = Int_trie
   module Hashtbl = Int.Hashtbl
 
   let to_string = string_of_int
@@ -72,7 +72,11 @@ module Var : sig
 
   val reset : unit -> unit
 
-  module Set : Set.S with type elt = t
+  val set_last : int -> unit
+
+  val last : unit -> t
+
+  module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
 
@@ -220,6 +224,10 @@ end = struct
     last_var := 0;
     Name.reset ()
 
+  let set_last n = last_var := max !last_var n
+
+  let last () = !last_var
+
   let print f x =
     Format.fprintf
       f
@@ -259,7 +267,7 @@ end = struct
     propagate_name o n;
     n
 
-  module Set = Set.Make (T)
+  module Set = Int_set
   module Map = Map.Make (T)
 
   module Tbl = struct
@@ -524,6 +532,38 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
+  }
+
+module Marshalable_program = struct
+  type t =
+    { start : Addr.t
+    ; blocks : (Addr.t * block) list
+    ; free_pc : Addr.t
+    }
+
+  let of_program ({ start; blocks; free_pc } : program) : t =
+    { start; blocks = Addr.Map.bindings blocks; free_pc }
+
+  let to_program ({ start; blocks; free_pc } : t) : program =
+    let blocks =
+      List.fold_left blocks ~init:Addr.Map.empty ~f:(fun acc (pc, block) ->
+          Addr.Map.add pc block acc)
+    in
+    { start; blocks; free_pc }
+end
+
+type cmj_body =
+  { program : Marshalable_program.t
+  ; last_var : int
+        (** Highest variable index used in [program]. [Var] keeps this in mutable
+            state, so the OxCaml JSIR backend must communicate it to
+            [js_of_ocaml] to keep the two in sync. *)
+  ; imported_compilation_units : string list
+        (** Full paths of the compilation units whose symbols [program] fetches
+            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+  ; exported_compilation_unit : string
+        (** Full path of the compilation unit [program] defines. Needed to fill
+            in [Unit_info.t]. *)
   }
 
 let noloc = No
@@ -1034,10 +1074,8 @@ let do_compact { blocks; start; free_pc = _ } =
     { block with body; branch }
   in
   let blocks =
-    Addr.Map.fold
-      (fun pc b blocks -> Addr.Map.add remap.(pc) (rewrite remap b) blocks)
-      blocks
-      Addr.Map.empty
+    Addr.Map.of_seq
+      (Seq.map (fun (pc, b) -> remap.(pc), rewrite remap b) (Addr.Map.to_seq blocks))
   in
   let free_pc = (Addr.Map.max_binding blocks |> fst) + 1 in
   let start = remap.(start) in

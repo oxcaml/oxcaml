@@ -128,8 +128,14 @@ type error =
   | Non_value_let_binding of string * Jkind.sort
   | Nonoptional_call_pos_label of string
 
-exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
+
+module Error : sig
+  type exn += private In_context of Location.t * Env.t * error
+
+  val log_or_raise : Location.t -> Env.t -> error -> unit
+  val log_and_raise : Location.t -> Env.t -> error -> 'a
+end
 
 val report_error : Env.t -> Format.formatter -> error -> unit
 val report_error_doc : Env.t -> error Format_doc.printer

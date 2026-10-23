@@ -44,7 +44,7 @@
 
 //Provides: caml_get_idx_bytecode mutable (mutable, const)
 //Requires: caml_invalid_argument
-//Requires: caml_string_unsafe_get, caml_bytes_unsafe_get, caml_ba_get_1
+//Requires: caml_string_geti8, caml_bytes_geti8, caml_ba_uint8_geti8
 //Version: >= 5.2
 //If: oxcaml
 function caml_get_idx_bytecode(base, idx) {
@@ -59,12 +59,17 @@ function caml_get_idx_bytecode(base, idx) {
     }
     // The tag of a string-like index tells us how to index into the base
     // value (see the note on block indices above).
+
+    // These are bounds checked and sign extended. We could add
+    // [caml_string_geti8u]-like primitives (which already exist for the
+    // wider reads).
+
     case 2:
-      return caml_string_unsafe_get(base, idx[1]);
+      return caml_string_geti8(base, idx[1]);
     case 3:
-      return caml_bytes_unsafe_get(base, idx[1]);
+      return caml_bytes_geti8(base, idx[1]);
     case 4:
-      return caml_ba_get_1(base, idx[1]);
+      return caml_ba_uint8_geti8(base, idx[1]);
     default:
       caml_invalid_argument(
         "caml_get_idx_bytecode: attempted to read from an invalid index",
@@ -74,13 +79,21 @@ function caml_get_idx_bytecode(base, idx) {
 
 //Provides: caml_set_idx_bytecode (mutable, const, mutable)
 //Requires: caml_invalid_argument
-//Requires: caml_bytes_unsafe_set, caml_ba_set_1
+//Requires: caml_bytes_set8, caml_ba_uint8_set8
 //Version: >= 5.2
 //If: oxcaml
 function caml_set_idx_bytecode(base, idx, v) {
   switch (idx[0]) {
     case 0: {
       var depth = idx.length - 1;
+      // An empty index refers to an unboxed product that has been flattened
+      // into a singleton block: overwrite each of its fields, keeping its tag.
+      if (depth === 0) {
+        for (var j = 1; j < v.length; j++) {
+          base[j] = v[j];
+        }
+        return 0;
+      }
       var dst = base;
       for (var i = 1; i < depth; i++) {
         dst = dst[idx[i] + 1];
@@ -91,11 +104,16 @@ function caml_set_idx_bytecode(base, idx, v) {
     // The tag of a string-like index tells us how to index into the base
     // value (see the note on block indices above). Note that writing through
     // a tag-2 (string) index is invalid: strings are immutable.
+
+    // These are bounds checked. We could add a [caml_ba_uint8_set8u]-like
+    // primitive (which already exists for the wider writes). We don't use
+    // [caml_bytes_unsafe_set] for consistency.
+
     case 3:
-      caml_bytes_unsafe_set(base, idx[1], v);
+      caml_bytes_set8(base, idx[1], v);
       return 0;
     case 4:
-      caml_ba_set_1(base, idx[1], v);
+      caml_ba_uint8_set8(base, idx[1], v);
       return 0;
     default:
       caml_invalid_argument(
@@ -132,6 +150,123 @@ function caml_deepen_idx_bytecode(idx_prefix, idx_suffix) {
   return block;
 }
 
+///////////// Atomic block indices
+// We do not support nested atomic indices, so a valid atomic index is a tag-0
+// block with exactly one position.
+
+//Provides: caml_check_atomic_idx
+//Requires: caml_unimplemented_ext_ptr, caml_invalid_argument
+//Version: >= 5.2
+//If: oxcaml
+function caml_check_atomic_idx(base, idx) {
+  // A null base means [idx] is a raw address (an external ptr), which cannot
+  // be dereferenced here.
+  if (base === null) caml_unimplemented_ext_ptr();
+  if (idx[0] !== 0 || idx.length !== 2)
+    caml_invalid_argument(
+      "caml_check_atomic_idx: attempted to access an invalid index",
+    );
+}
+
+//Provides: caml_atomic_load_idx_bytecode (mutable, const)
+//Requires: caml_check_atomic_idx, caml_atomic_load_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_load_idx_bytecode(base, idx) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_load_field(base, idx[1]);
+}
+
+//Provides: caml_atomic_set_idx_bytecode (mutable, const, mutable)
+//Requires: caml_check_atomic_idx, caml_atomic_set_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_set_idx_bytecode(base, idx, v) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_set_field(base, idx[1], v);
+}
+
+//Provides: caml_atomic_exchange_idx_bytecode (mutable, const, mutable)
+//Requires: caml_check_atomic_idx, caml_atomic_exchange_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_exchange_idx_bytecode(base, idx, v) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_exchange_field(base, idx[1], v);
+}
+
+//Provides: caml_atomic_compare_exchange_idx_bytecode (mutable, const, const, mutable)
+//Requires: caml_check_atomic_idx, caml_atomic_compare_exchange_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_compare_exchange_idx_bytecode(base, idx, o, n) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_compare_exchange_field(base, idx[1], o, n);
+}
+
+//Provides: caml_atomic_cas_idx_bytecode (mutable, const, const, mutable)
+//Requires: caml_check_atomic_idx, caml_atomic_cas_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_cas_idx_bytecode(base, idx, o, n) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_cas_field(base, idx[1], o, n);
+}
+
+//Provides: caml_atomic_fetch_add_idx_bytecode (mutable, const, const)
+//Requires: caml_check_atomic_idx, caml_atomic_fetch_add_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_fetch_add_idx_bytecode(base, idx, i) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_fetch_add_field(base, idx[1], i);
+}
+
+//Provides: caml_atomic_add_idx_bytecode (mutable, const, const)
+//Requires: caml_check_atomic_idx, caml_atomic_add_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_add_idx_bytecode(base, idx, i) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_add_field(base, idx[1], i);
+}
+
+//Provides: caml_atomic_sub_idx_bytecode (mutable, const, const)
+//Requires: caml_check_atomic_idx, caml_atomic_sub_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_sub_idx_bytecode(base, idx, i) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_sub_field(base, idx[1], i);
+}
+
+//Provides: caml_atomic_land_idx_bytecode (mutable, const, const)
+//Requires: caml_check_atomic_idx, caml_atomic_land_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_land_idx_bytecode(base, idx, i) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_land_field(base, idx[1], i);
+}
+
+//Provides: caml_atomic_lor_idx_bytecode (mutable, const, const)
+//Requires: caml_check_atomic_idx, caml_atomic_lor_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_lor_idx_bytecode(base, idx, i) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_lor_field(base, idx[1], i);
+}
+
+//Provides: caml_atomic_lxor_idx_bytecode (mutable, const, const)
+//Requires: caml_check_atomic_idx, caml_atomic_lxor_field
+//Version: >= 5.2
+//If: oxcaml
+function caml_atomic_lxor_idx_bytecode(base, idx, i) {
+  caml_check_atomic_idx(base, idx);
+  return caml_atomic_lxor_field(base, idx[1], i);
+}
+
 // We are reasonably sure that only the [ptr] primitives below actually need
 // to check for the error cases currently handled in the [idx] primitives.
 // Checking only in the [ptr] primitives would improve the performance of the
@@ -143,38 +278,48 @@ function caml_deepen_idx_bytecode(idx_prefix, idx_suffix) {
 // index. Unboxed products are represented as blocks in bytecode, so a
 // pointer arrives as a single tag-0 block [0, base, idx], and
 // reading/writing through it is exactly reading/writing at the block index.
-// External pointers carry no base: they are represented as the block index
-// alone, and behave like pointers whose base is [Null] (represented as
-// [null] in JSOO).
+//
+// External pointers (and generic pointers with [null] bases) are unsupported
+// in bytecode and fail with an 'unimplemented' message.
 
-//Provides: caml_get_ptr_bytecode mutable (mutable)
-//Requires: caml_get_idx_bytecode
+//Provides: caml_unimplemented_ext_ptr
+//Requires: caml_failwith
+//Version: >= 5.2
+//If: oxcaml
+function caml_unimplemented_ext_ptr() {
+  caml_failwith("External ptrs are unimplemented on bytecode");
+}
+
+//Provides: caml_get_ptr_bytecode (mutable)
+//Requires: caml_get_idx_bytecode, caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
 function caml_get_ptr_bytecode(ptr) {
+  if (ptr[1] === null) caml_unimplemented_ext_ptr();
   return caml_get_idx_bytecode(ptr[1], ptr[2]);
 }
 
 //Provides: caml_set_ptr_bytecode (mutable, mutable)
-//Requires: caml_set_idx_bytecode
+//Requires: caml_set_idx_bytecode, caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
 function caml_set_ptr_bytecode(ptr, v) {
+  if (ptr[1] === null) caml_unimplemented_ext_ptr();
   return caml_set_idx_bytecode(ptr[1], ptr[2], v);
 }
 
-//Provides: caml_get_ext_ptr_bytecode mutable (mutable)
-//Requires: caml_get_idx_bytecode
+//Provides: caml_get_ext_ptr_bytecode (mutable)
+//Requires: caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
-function caml_get_ext_ptr_bytecode(idx) {
-  return caml_get_idx_bytecode(null, idx);
+function caml_get_ext_ptr_bytecode(_idx) {
+  return caml_unimplemented_ext_ptr();
 }
 
 //Provides: caml_set_ext_ptr_bytecode (mutable, mutable)
-//Requires: caml_set_idx_bytecode
+//Requires: caml_unimplemented_ext_ptr
 //Version: >= 5.2
 //If: oxcaml
-function caml_set_ext_ptr_bytecode(idx, v) {
-  return caml_set_idx_bytecode(null, idx, v);
+function caml_set_ext_ptr_bytecode(_idx, _v) {
+  return caml_unimplemented_ext_ptr();
 }

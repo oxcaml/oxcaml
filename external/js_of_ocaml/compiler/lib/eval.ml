@@ -140,6 +140,12 @@ let nativeint_shiftop (l : constant list) (f : Targetnativeint.t -> int -> Targe
 
 let quiet_nan n = Int64.logor n 0x00_08_00_00_00_00_00_00L
 
+(* The JavaScript runtime does not preserve NaN bits *)
+let can_fold_bits_of_float ~target f =
+  match target with
+  | `JavaScript -> not (Float.is_nan (Int64.float_of_bits f))
+  | `Wasm -> true
+
 let eval_prim ~target x =
   match x with
   | Not, [ Int i ] -> bool (Targetint.is_zero i)
@@ -230,7 +236,7 @@ let eval_prim ~target x =
       | "caml_ldexp_float", [ Float f; Int i ] ->
           Some (float (ldexp (Int64.float_of_bits f) (Targetint.to_int_exn i)))
       (* int32 *)
-      | "caml_int32_bits_of_float", [ Float f ] ->
+      | "caml_int32_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
           int32 (Int32.bits_of_float (Int64.float_of_bits f))
       | "caml_int32_float_of_bits", [ Int32 i ]
         when match target with
@@ -265,7 +271,7 @@ let eval_prim ~target x =
       | "caml_nativeint_of_int32", [ Int32 i ] -> Some (NativeInt (Targetnativeint.of_int32_truncate i))
       | "caml_nativeint_to_int32", [ NativeInt i ] -> Some (Int32 (Targetnativeint.to_int32 i))
       (* nativeint *)
-      | "caml_nativeint_bits_of_float", [ Float f ] ->
+      | "caml_nativeint_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
           nativeint (Targetnativeint.bits_of_float (Int64.float_of_bits f))
       | "caml_nativeint_float_of_bits", [ NativeInt i ]
         when match target with
@@ -310,15 +316,8 @@ let eval_prim ~target x =
           Some (Int (Targetint.of_int64_truncate i))
       | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetnativeint.of_int64_truncate (Targetint.to_int64 i))
       (* int64 *)
-      (* TODO: unboxed float option encodings represent [none] as a very
-         specific, sentinel NaN. This [js_of_ocaml] compile time eval would turn
-         that sentinel NaN into a canonical [NaN], making [is_none (none ())]
-         return false.
-
-         [none ()] calls [caml_int64_bits_of_float], so making this function
-         no longer available at comp-time eval stops the over-optimization that breaks [is_none].
-      *)
-      (* | "caml_int64_bits_of_float", [ Float f ] -> int64 f *)
+      | "caml_int64_bits_of_float", [ Float f ] when can_fold_bits_of_float ~target f ->
+          int64 f
       | "caml_int64_float_of_bits", [ Int64 i ]
         when match target with
              | `JavaScript ->
@@ -444,6 +443,10 @@ let the_tag_of info x get equal =
   | Pc (Tuple (j, _, _)) -> get j
   | _ -> None
 
+let is_direct_obj_tag = function
+  | "%direct_obj_tag" | "%direct_obj_tag_nullish" -> true
+  | _ -> false
+
 let the_cont_of info x (a : cont array) =
   (* The value of [x] might be meaningless when we're inside a dead code.
      The proper fix would be to remove the deadcode entirely.
@@ -454,7 +457,7 @@ let the_cont_of info x (a : cont array) =
     info
     (fun x ->
       match Flow.Info.def info x with
-      | Some (Prim (Extern ("%direct_obj_tag", _), [ b ])) ->
+      | Some (Prim (Extern (prim, _), [ b ])) when is_direct_obj_tag prim ->
           the_tag_of info b get cont_equal
       | Some (Constant (Int j)) -> get (Targetint.to_int_exn j)
       | None | Some _ -> None)
@@ -477,7 +480,7 @@ let rec int_predicate deep info pred x (i : Targetint.t) =
       info
       (fun x ->
         match Flow.Info.def info x with
-        | Some (Prim (Extern ("%direct_obj_tag", _), [ b ])) ->
+        | Some (Prim (Extern (prim, _), [ b ])) when is_direct_obj_tag prim ->
             the_tag_of info b (fun j -> Some (pred (Targetint.of_int_exn j) i)) Bool.equal
         | Some (Prim (Extern ("%int_sub", _), [ Pv a; Pc (Int b) ])) ->
             int_predicate (deep + 1) info (fun x y -> pred (Targetint.sub x b) y) a i
@@ -658,7 +661,7 @@ let eval_instr update_count inline_constant ~target info i =
           incr update_count;
           [ Let (x, c) ]
       | None -> [ i ])
-  | Let (x, Prim (Extern ("%direct_obj_tag", _), [ y ])) -> (
+  | Let (x, Prim (Extern (prim, _), [ y ])) when is_direct_obj_tag prim -> (
       match the_tag_of info y (fun x -> Some x) ( = ) with
       | Some tag ->
           let c = Constant (Int (Targetint.of_int_exn tag)) in

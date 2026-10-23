@@ -17,8 +17,6 @@
 
 /* Start-up code */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "caml/alloc.h"
 #include "caml/callback.h"
@@ -28,16 +26,13 @@
 #include "caml/runtime_events.h"
 #include "caml/fiber.h"
 #include "caml/fail.h"
-#include "caml/gc.h"
 #include "caml/gc_ctrl.h"
-#include "caml/intext.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/osdeps.h"
 #include "caml/printexc.h"
 #include "caml/signals.h"
-#include "caml/stack.h"
 #include "caml/startup_aux.h"
 #include "caml/sys.h"
 #include "caml/globroots.h"

@@ -41,6 +41,8 @@ val rename : t -> t
 
 val is_renamed_version_of : t -> t -> bool
 
+val import_and_rename : t -> Renaming.t -> Renaming.t * t
+
 include Container_types.S with type t := t
 
 include Contains_names.S with type t := t
