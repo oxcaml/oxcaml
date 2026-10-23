@@ -75,7 +75,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__catch_and_discard_exceptions_0_4_code",
+[("camlCmx_lib__catch_and_discard_exceptions_0_6_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments
@@ -99,7 +99,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__either_1_5_code",
+[("camlCmx_lib__either_1_7_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments
@@ -126,7 +126,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__iter_rec_2_6_code",
+[("camlCmx_lib__iter_rec_2_8_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -152,7 +152,7 @@ let _ =
      Zero_alloc_utils.Components.t)
     list
 =
-[("camlCmx_lib__iter_loop_3_7_code",
+[("camlCmx_lib__iter_loop_3_9_code",
   {Components.nor =
     Component.Top
      No_allocation_other_than_calling_arguments {argument #1 on normal paths};
@@ -164,4 +164,56 @@ let _ =
     Component.Top
      No_allocation_other_than_calling_arguments
       {argument #1 on normal/diverging paths}})]
+|}]
+
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__apply_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__apply_4_10_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on diverging paths}})]
+|}]
+
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__ylppa_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__ylppa_5_11_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on diverging paths}})]
 |}]
