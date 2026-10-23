@@ -32,8 +32,7 @@ let max_constructor_args = 3
 
 let max_match_count = 8
 
-(* Probabilities in percent, conditional on reaching each choice. These do not
-   need to sum to 100. *)
+(* Probabilities in percent, conditional on reaching each choice. *)
 let record_probability = 25
 
 let variant_probability = 25
