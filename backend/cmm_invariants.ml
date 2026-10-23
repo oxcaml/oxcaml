@@ -299,20 +299,9 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
     Args_then_any_number_of
       ([Exactly Cmm.typ_int (* header *)], machtype_for_all_fields)
   | Cstore (memory_chunk, _) ->
-    let payload_machtype =
-      match memory_chunk with
-      | Word_int ->
-        (* A raw word slot is not scanned, so it accepts any word in a
-           general-purpose register, including derived pointers. *)
-        Exactly Cmm.typ_addr
-      | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_val | Word_mask | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-      | Fivetwelve_aligned ->
-        Exactly (Cmm.machtype_of_memory_chunk memory_chunk)
-    in
-    Args [Exactly Cmm.typ_addr; payload_machtype]
+    Args
+      [ Exactly Cmm.typ_addr;
+        Exactly (Cmm.machtype_of_memory_chunk memory_chunk) ]
   | Caddi | Csubi | Cand | Cor | Cxor | Ccmpi _ ->
     Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_addr]
   | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cmuli64 _ ->
