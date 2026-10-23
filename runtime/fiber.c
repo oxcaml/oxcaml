@@ -1788,41 +1788,50 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
 void caml_stack_cache_flush_from_stw(void)
 {
   struct stack_cache* caches = Caml_state->stack_caches;
+  struct cached_stack* flushing[NUM_STACK_SIZE_CLASSES];
   uintnat cached = 0;
   uintnat demoted = 0;
 
-  /* Total the global cache before deciding what goes to the extra cache. */
+  /* Detach the local lists and do madvise calls without the lock
+     (all domains come here at once, so may contend for the lock). */
+  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    struct cached_stack* stk = atomic_exchange(&caches[i].head, NULL);
+    uintnat n = 0;
+    flushing[i] = stk;
+    while (stk != NULL) {
+#ifdef MADV_FREE
+      /* Let the OS know we don't care about anything above the guard
+         page; the first page holds the cached_stack. */
+      char* data = (char*)Stack_base(stk);
+      (void)madvise(data, ((char*)stk + stk->size) - data, MADV_FREE);
+#endif
+      stk->stamp = caml_major_cycles_completed;
+      ++ n;
+      stk = stk->next;
+    }
+    atomic_fetch_sub(&caches[i].len, n);
+    demoted += n;
+  }
+
+  /* Now with the lock: total the global cache, then push each stack
+     there (up to the bound) or onto the extra cache. Contention is
+     possible here but this loop should be quick. */
   caml_plat_lock_blocking(&stack_cache_global_lock);
   for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
     cached += atomic_load_relaxed(&stack_cache_global[i].len);
   }
   for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
-    /* We are in a stop-the-world section, so no mutator is pushing to
-       this domain's local caches; they can be emptied wholesale. */
-    struct cached_stack* stk = atomic_exchange(&caches[i].head, NULL);
-    uintnat n = 0;
+    struct cached_stack* stk = flushing[i];
     while (stk != NULL) {
       struct cached_stack* next = stk->next;
-#ifdef MADV_FREE
-      /* A demoted stack has gone a whole minor cycle unused: let the OS
-         reclaim its dirty pages (everything above the guard page; the
-         first page holds the cached-stack view). Best effort: on failure
-         the pages just stay resident. */
-      char* data = (char*)Stack_base(stk);
-      (void)madvise(data, ((char*)stk + stk->size) - data, MADV_FREE);
-#endif
-      stk->stamp = caml_major_cycles_completed;
       if (cached < caml_max_guarded_stacks) {
         cache_push_with_lock(&stack_cache_global[i], stk);
         ++ cached;
       } else {
         cache_push_with_lock(&stack_cache_extra[i], stk);
       }
-      ++ n;
       stk = next;
     }
-    atomic_fetch_sub(&caches[i].len, n);
-    demoted += n;
   }
   caml_plat_unlock(&stack_cache_global_lock);
   caml_atomic_counter_add_relaxed(Stack_stat(demoted), demoted);
