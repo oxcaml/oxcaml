@@ -3453,10 +3453,14 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
      are accommodated by changing [jkind], the expected jkind of the type.
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
-     more than necessary.  *)
-  let rec loop ~fuel ~expanded env ty ty's_jkind jkind =
+     more than necessary.
+
+     [operator] is applied to the kind of [ty] before comparing it with
+     [jkind]: a component of a product is made addressable. *)
+  let rec loop ~fuel ~expanded ~operator env ty ty's_jkind jkind =
     let type_equal = !type_equal' env in
     let context = mk_jkind_context_check_principal env in
+    let ty's_jkind = Jkind.apply_operator_l operator ty's_jkind in
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
     if fuel < 0 then
@@ -3489,9 +3493,25 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-        Jkind.intersection_or_error ~type_equal ~context
-          ~reason:Tyvar_refinement_intersection env
-          ty's_jkind jkind
+        let jkind =
+          (* A type variable made addressable may have either the plain kind or
+             the addressable one (e.g. [bits8] or [bits8 addressable]). Prefer
+             the plain one unless the variable is already addressable. *)
+          if Jkind.is_surely_addressable env ty's_jkind
+          then Ok jkind
+          else
+            match Jkind.apply_operator_r env operator jkind with
+            | Ok jkind -> Ok jkind
+            | Error () ->
+              Error (Jkind.Violation.of_ ~context env
+                       (Not_a_subjkind
+                          (Jkind.apply_operator_l operator ty's_jkind, jkind,
+                           [Layout_disagreement])))
+        in
+        Result.bind jkind (fun jkind ->
+          Jkind.intersection_or_error ~type_equal ~context
+            ~reason:Tyvar_refinement_intersection env
+            ty's_jkind jkind)
         |> Result.map (fun jkind ->
           Jkind.update_level (get_level ty) jkind;
           set_var_jkind ty jkind)
@@ -3506,17 +3526,17 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
 
          But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
          must do so here. Internal ticket 5746. *)
-      loop ~fuel ~expanded:false env t ty's_jkind jkind
+      loop ~fuel ~expanded:false ~operator env t ty's_jkind jkind
 
     (* CR metaprogramming jbachurski: These should update the stage, which
        means this function should pass the context explicitly. *)
     (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
     | Tquote ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fuel ~expanded ~operator (incr_stage env) ty ty's_jkind jkind
     | Tsplice ty ->
-      loop ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
+      loop ~fuel ~expanded ~operator (decr_stage env) ty ty's_jkind jkind
     | Tquote_eval ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fuel ~expanded ~operator (incr_stage env) ty ty's_jkind jkind
 
     | _ ->
        if !Clflags.ikinds_debug
@@ -3601,6 +3621,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel unwrapped_tys =
              let num_components = List.length unwrapped_tys in
+             (* The components of a product are made addressable *)
+             let operator = Jkind_types.Kind_operator.Addressable in
              let recur ty's_jkinds jkinds =
                let results =
                  Misc.Stdlib.List.map3
@@ -3612,8 +3634,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                              (Not_a_subjkind
                                 (ty's_jkind, jkind, sub_failure_reasons)))
                       | Ok jkind ->
-                      match Jkind.extract_layout env ty's_jkind with
-                      | Ok (Any _) ->
+                      if Jkind.has_layout_any env ty's_jkind
+                      then
                         (* We re-estimate in this case rather than reuse the
                            components of [ty's_jkind] because an unboxed record
                            with an [any] field has a product-of-[any]s kind on
@@ -3623,16 +3645,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env
-                          unwrapped_ty.ty jkind
-                      | _ ->
+                        estimate_jkind_and_loop ~fuel ~expanded:false ~operator
+                          env unwrapped_ty.ty jkind
+                      else
                         (* In this case, there's nothing to gain by
                            re-estimating: either it's already a product and we
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
-                          ty's_jkind jkind)
+                        loop ~fuel ~expanded:false ~operator env
+                          unwrapped_ty.ty ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -3712,7 +3734,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             with
             | Ok jkind ->
               (match
-                estimate_jkind_and_loop ~fuel ~expanded:false env ty jkind
+                estimate_jkind_and_loop ~fuel ~expanded:false ~operator env ty
+                  jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
@@ -3737,14 +3760,16 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             List.fold_left
               (fun result (tvar, mod_bounds) ->
                  Result.bind result (fun () ->
-                   loop ~fuel ~expanded:false env tvar ty's_jkind
+                   loop ~fuel ~expanded:false
+                     ~operator:Jkind_types.Kind_operator.Id env tvar ty's_jkind
                      (Jkind.of_mod_bounds ~history:jkind.history mod_bounds)))
               (Ok ()) requirements
           | Error error, Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
+               estimate_jkind_and_loop ~fuel ~expanded:true ~operator env ty
+                 jkind
              else
                begin match unbox_once env (mk_unwrapped_type_expr ty) with
                | Missing path ->
@@ -3755,8 +3780,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                  Error error
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
-                    jkind
+                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false
+                   ~operator env ty jkind
                | Stepped { ty; modality; or_null = Some _ } ->
                  or_null ~fuel:(fuel - 1) ty modality
                | Stepped_record_unboxed_product unwrapped_tys ->
@@ -3770,7 +3795,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
           | Error error, _ -> Error error
-  and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
+  and estimate_jkind_and_loop ~fuel ~expanded ~operator env ty jkind
+    : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
        constrain layouts. So we still continue, but we avoid performing any
@@ -3780,9 +3806,10 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
     let jkind = Jkind.fully_expand_aliases env jkind in
     let ignore_mod_bounds = Jkind.mod_bounds_are_obviously_max jkind in
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
-    loop ~fuel ~expanded env ty ty's_jkind jkind
+    loop ~fuel ~expanded ~operator env ty ty's_jkind jkind
   in
-  estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
+  estimate_jkind_and_loop ~fuel:100 ~expanded:false
+    ~operator:Jkind_types.Kind_operator.Id env ty
     (Jkind.disallow_left jkind)
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
