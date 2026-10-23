@@ -4,7 +4,7 @@ open Regalloc_split_utils
 
 type destructions_at_end = (destruction_kind * Reg.Set.t) Label.Map.t
 
-type definitions_at_beginning = Reg.Set.t Label.Map.t
+type definitions_at_beginning = definition_kind Reg.Map.t Label.Map.t
 
 type phi_at_beginning = Reg.Set.t Label.Map.t
 

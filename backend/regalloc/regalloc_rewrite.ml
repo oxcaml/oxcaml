@@ -391,11 +391,19 @@ let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
                 critical_edges)
           successor_labels critical_edges)
 
+type prelude_result =
+  { cfg_with_infos : Cfg_with_infos.t;
+    cfg_infos : cfg_infos;
+    stack_slots : Regalloc_stack_slots.t;
+    affinity : Regalloc_affinity.t;
+    rematerializations : Regalloc_rematerializations.t
+  }
+
 let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
     Cfg_with_infos.t ->
-    cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t =
+    prelude_result =
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
@@ -450,22 +458,38 @@ let prelude :
     Reg.Set.cardinal cfg_infos.arg
   in
   if debug then Utils.log "#temporaries(before):%d" num_temporaries;
-  let cfg_infos, stack_slots, phi_moves =
+  let cfg_infos, stack_slots, phi_moves, rematerializations =
     if
       num_temporaries >= threshold_split_live_ranges
       || Flambda2_ui.Flambda_features.classic_mode ()
-    then cfg_infos, Regalloc_stack_slots.make (), []
+    then
+      ( cfg_infos,
+        Regalloc_stack_slots.make (),
+        [],
+        Regalloc_rematerializations.create () )
     else if Param.get Regalloc_split_utils.split_live_ranges
     then
-      let { Regalloc_split.stack_slots; phi_moves } =
+      let { Regalloc_split.stack_slots; phi_moves; rematerializations } =
         Profile.record ~accumulate:true "split"
           (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
           ()
       in
-      collect_cfg_infos cfg_with_layout, stack_slots, phi_moves
-    else cfg_infos, Regalloc_stack_slots.make (), []
+      ( collect_cfg_infos cfg_with_layout,
+        stack_slots,
+        phi_moves,
+        rematerializations )
+    else
+      ( cfg_infos,
+        Regalloc_stack_slots.make (),
+        [],
+        Regalloc_rematerializations.create () )
   in
-  cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos phi_moves
+  { cfg_with_infos;
+    cfg_infos;
+    stack_slots;
+    affinity = Regalloc_affinity.compute cfg_with_infos phi_moves;
+    rematerializations
+  }
 
 let postlude : type s.
     (module State with type t = s) ->

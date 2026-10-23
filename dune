@@ -721,6 +721,7 @@
   regalloc_ls
   regalloc_ls_state
   regalloc_ls_utils
+  regalloc_rematerializations
   regalloc_rewrite
   regalloc_split
   regalloc_split_state
