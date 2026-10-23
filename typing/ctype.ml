@@ -2932,7 +2932,8 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : unwrapped_or_null option;
+  ; or_null : unwrapped_or_null option
+  ; operator : Jkind_types.Kind_operator.t
   }
 
 and unwrapped_or_null =
@@ -2942,7 +2943,7 @@ and unwrapped_or_null =
   }
 
 let mk_unwrapped_type_expr ty =
-  { ty; modality = Mode.Modality.Const.id; or_null = None }
+  { ty; modality = Mode.Modality.Const.id; or_null = None; operator = Id }
 
 type unbox_result =
   (* unboxing process made a step: either an unboxing, a removal of a [Tpoly],
@@ -2974,7 +2975,7 @@ let unbox_once env ty =
         apply env (extra_params @ decl.type_params) ty2 (extra_args @ args)
       in
       begin match find_unboxed_type decl with
-      | Some (ty2, modality) ->
+      | Some (ty2, modality, operator) ->
         let extra_substs =
           match Env.find_type_descrs p env with
           | Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) ->
@@ -2995,7 +2996,8 @@ let unbox_once env ty =
             (* but we found it earlier! *)
             Misc.fatal_error "Ctype.unbox_once: expected to find [p] in [env]"
         in
-        Stepped { ty = apply ty2 ~extra_substs; modality; or_null = None }
+        Stepped
+          { ty = apply ty2 ~extra_substs; modality; or_null = None; operator }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], _, _) ->
           (* [find_unboxed_type] would have returned [Some] *)
@@ -3005,7 +3007,9 @@ let unbox_once env ty =
           Stepped_record_unboxed_product
             (List.map (fun ld -> { ty = apply ld.ld_type ~extra_substs:[];
                                    modality = ld.ld_modalities;
-                                   or_null = None }) lbls)
+                                   or_null = None;
+                                   (* [&] makes the fields addressable *)
+                                   operator = Addressable }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
         | Type_variant (cstrs, Variant_with_null, _) ->
@@ -3022,7 +3026,8 @@ let unbox_once env ty =
             Stepped
               { ty = apply ca_type ~extra_substs;
                 modality;
-                or_null = Some { decl; args; prev = ty } }
+                or_null = Some { decl; args; prev = ty };
+                operator = Id }
           | None ->
             Misc.fatal_error "Invalid constructor for Variant_with_null"
           end
@@ -3032,12 +3037,8 @@ let unbox_once env ty =
       end
     end
   | Tpoly (ty, univars) ->
-    Stepped
-      { ty = instance_poly_for_jkind univars ty
-      ; modality = Mode.Modality.Const.id
-      ; or_null = None }
-  | Tmod (ty, _) ->
-    Stepped { ty; modality = Mode.Modality.Const.id; or_null = None }
+    Stepped (mk_unwrapped_type_expr (instance_poly_for_jkind univars ty))
+  | Tmod (ty, _) -> Stepped (mk_unwrapped_type_expr ty)
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -3075,7 +3076,7 @@ let contained_without_boxing env ty =
         cstrs
     | _ | exception Not_found ->
       begin match unbox_once env (mk_unwrapped_type_expr ty) with
-      | Stepped { ty; modality = _; or_null = _ } -> [ty]
+      | Stepped { ty; modality = _; or_null = _; operator = _ } -> [ty]
       | Stepped_record_unboxed_product tys ->
         List.map (fun { ty; _ } -> ty) tys
       | Final_result | Missing _ -> []
@@ -3093,7 +3094,8 @@ let contained_without_boxing env ty =
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
-let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
+let rec get_unboxed_type_representation ~modality ~or_null ~operator env
+          ty_prev ty fuel =
   match get_desc ty with
   | Tmod (ty, _) ->
     (* Mode bounds do not affect the runtime representation, so [Tmod]
@@ -3102,31 +3104,35 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
        it may not become [ty_prev] (the missing-cmi fallback, whose kind could
        then only be estimated as [any]), and representation-oriented consumers
        such as [Typeopt.classify] expect never to see one. *)
-    get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel
+    get_unboxed_type_representation ~modality ~or_null ~operator env ty_prev ty
+      fuel
   | _ ->
-  if fuel < 0 then Error { ty; modality; or_null }
+  if fuel < 0 then Error { ty; modality; or_null; operator }
   else
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
-    match unbox_once env { ty; modality; or_null } with
-    | Stepped { ty = ty2; modality = modality2; or_null = or_null2 } ->
+    match unbox_once env { ty; modality; or_null; operator } with
+    | Stepped { ty = ty2; modality = modality2; or_null = or_null2;
+                operator = operator2 } ->
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
+      let operator = Jkind_types.Kind_operator.compose operator operator2 in
       begin match or_null, or_null2 with
       | None, or_null | or_null, None ->
-        get_unboxed_type_representation ~modality ~or_null env ty ty2 (fuel - 1)
+        get_unboxed_type_representation ~modality ~or_null ~operator env ty ty2
+          (fuel - 1)
       | Some _, Some _ ->
         (* Nested or-nulls are possible as a result of [Typecore.type_approx] *)
-        Ok { ty = ty_prev; modality; or_null }
+        Ok { ty = ty_prev; modality; or_null; operator }
       end
     | Stepped_record_unboxed_product _ | Final_result ->
-      Ok { ty; modality; or_null }
-    | Missing _ -> Ok { ty = ty_prev; modality; or_null }
+      Ok { ty; modality; or_null; operator }
+    | Missing _ -> Ok { ty = ty_prev; modality; or_null; operator }
 
 let get_unboxed_type_representation env ty =
   (* Do not give too much fuel: PR#7424 *)
   get_unboxed_type_representation ~modality:Mode.Modality.Const.id
-    ~or_null:None env ty ty 100
+    ~or_null:None ~operator:Id env ty ty 100
 
 let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
@@ -3168,12 +3174,15 @@ let mk_jkind_context env jkind_of_type =
   }
 
 let apply_layout_wrapping_l ~env
-      ~unwrapped_ty:{ ty = _; or_null; modality = _ }
+      ~unwrapped_ty:{ ty = _; or_null; modality = _; operator }
       jkind : (_, unwrapped_type_expr) Result.t =
   let get_layout jkind =
-    match Jkind.extract_layout env jkind with
-    | Ok l -> l
-    | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
+    let layout =
+      match Jkind.extract_layout env jkind with
+      | Ok l -> l
+      | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
+    in
+    Jkind_types.Layout.apply_operator layout operator
   in
   match or_null with
   | Some { prev; _ } ->
@@ -3189,17 +3198,16 @@ let apply_layout_wrapping_l ~env
     Ok (get_layout jkind)
 
 let apply_jkind_wrapping_l ~env ~level
-          ~unwrapped_ty:{ ty; or_null; modality } jkind =
+          ~unwrapped_ty:
+            ({ ty = _; or_null; modality; operator } as unwrapped_ty)
+          jkind =
   begin
     match or_null with
     | Some { decl; args; _ } ->
       (* The declaration supplies the mode crossing behavior of the
          [or_null]-like type. The stored arguments instantiate that behavior
          for the wrapper that was unwrapped. *)
-      begin match
-        apply_layout_wrapping_l ~env
-          ~unwrapped_ty:{ ty; modality; or_null } jkind
-      with
+      begin match apply_layout_wrapping_l ~env ~unwrapped_ty jkind with
       | Ok layout ->
         let instance_jkind =
           jkind_subst env level decl.type_params args decl.type_jkind
@@ -3207,12 +3215,13 @@ let apply_jkind_wrapping_l ~env ~level
         Ok (Jkind.set_layout instance_jkind layout)
       | Error _ as e -> e
       end
-    | None -> Ok jkind
+    | None -> Ok (Jkind.apply_operator_l operator jkind)
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
-let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
-      jkind =
+(* The operator is applied on the left, by [constrain_type_jkind]. *)
+let apply_jkind_wrapping_r ~env
+      ~unwrapped_ty:{ ty = _; modality; or_null; operator = _ } jkind =
   begin
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
@@ -3263,7 +3272,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   | Tunboxed_tuple ltys ->
       let tys = List.map snd ltys in
       estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds env
-        tys ~why:Jkind_intf.History.Unboxed_tuple
+        tys ~why:Jkind_intf.History.Unboxed_tuple ~component_layouts:Fun.id
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind =
@@ -3290,6 +3299,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
           let tys = Array.map snd label_params_and_tys |> Array.to_list in
           estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
             env tys ~why:Jkind_intf.History.Unboxed_record
+            ~component_layouts:(Jkind.unboxed_record_layouts lbls)
         | _ -> type_decl.type_jkind
       in
       (* Checking [has_with_bounds] here is needed for correctness, because
@@ -3364,7 +3374,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 and estimate_unboxed_product_jkind
-      ~expand_components ~ignore_mod_bounds ~why env tys =
+      ~expand_components ~ignore_mod_bounds ~why ~component_layouts env tys =
   let tys_modalities, layouts =
     List.map
       (fun ty ->
@@ -3373,7 +3383,7 @@ and estimate_unboxed_product_jkind
       tys
     |> List.split
   in
-  Jkind.Builtin.product ~why tys_modalities layouts
+  Jkind.Builtin.product ~why tys_modalities (component_layouts layouts)
 
 let rec estimate_type_jkind_unwrapped
       level ~expand_components env ~unwrapped_ty =
@@ -3469,10 +3479,10 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Not_a_subjkind (ty's_jkind, jkind, [Constrain_ran_out_of_fuel])))
     else
     match get_desc ty with
-    (* The [ty's_jkind] we get here is an **r** jkind, necessary for
+    (* The [var_jkind] we get here is an **r** jkind, necessary for
        the call to [intersection_or_error]. And even if [ty] has unbound
-       variables, [ty's_jkind] can't have any variables in it, so we're OK. *)
-    | Tvar { jkind = ty's_jkind } when allow_mutation ->
+       variables, [var_jkind] can't have any variables in it, so we're OK. *)
+    | Tvar { jkind = var_jkind } when allow_mutation ->
        (* Mutable tyvars are special in at least two ways:
 
           1) Suppose we're processing [type 'a t = 'a list]. The ['a] on the
@@ -3497,7 +3507,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           (* A type variable made addressable may have either the plain kind or
              the addressable one (e.g. [bits8] or [bits8 addressable]). Prefer
              the plain one unless the variable is already addressable. *)
-          if Jkind.is_surely_addressable env ty's_jkind
+          if Jkind.is_surely_addressable env var_jkind
           then Ok jkind
           else
             match Jkind.apply_operator_r env operator jkind with
@@ -3505,13 +3515,13 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             | Error () ->
               Error (Jkind.Violation.of_ ~context env
                        (Not_a_subjkind
-                          (Jkind.apply_operator_l operator ty's_jkind, jkind,
+                          (Jkind.apply_operator_l operator var_jkind, jkind,
                            [Layout_disagreement])))
         in
         Result.bind jkind (fun jkind ->
           Jkind.intersection_or_error ~type_equal ~context
             ~reason:Tyvar_refinement_intersection env
-            ty's_jkind jkind)
+            var_jkind jkind)
         |> Result.map (fun jkind ->
           Jkind.update_level (get_level ty) jkind;
           set_var_jkind ty jkind)
@@ -3621,12 +3631,14 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel unwrapped_tys =
              let num_components = List.length unwrapped_tys in
-             (* The components of a product are made addressable *)
-             let operator = Jkind_types.Kind_operator.Addressable in
              let recur ty's_jkinds jkinds =
                let results =
                  Misc.Stdlib.List.map3
                    (fun unwrapped_ty ty's_jkind jkind ->
+                      let operator =
+                        Jkind_types.Kind_operator.compose operator
+                          unwrapped_ty.operator
+                      in
                       match apply_jkind_wrapping_r ~env jkind ~unwrapped_ty with
                       | Error () ->
                         Error
@@ -3723,7 +3735,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                   (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
              end
           in
-          let or_null ~fuel ty modality =
+          let or_null ~fuel ~operator ty modality =
             let error () =
               Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
@@ -3778,12 +3790,18 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                                            sub_failure_reasons)))
                | Final_result ->
                  Error error
-               | Stepped { ty; modality; or_null = None } ->
-                 let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false
-                   ~operator env ty jkind
-               | Stepped { ty; modality; or_null = Some _ } ->
-                 or_null ~fuel:(fuel - 1) ty modality
+               | Stepped { ty; modality; or_null = step_or_null;
+                           operator = step_operator } ->
+                 let operator =
+                   Jkind_types.Kind_operator.compose operator step_operator
+                 in
+                 begin match step_or_null with
+                 | None ->
+                   let jkind = Jkind.apply_modality_r modality jkind in
+                   estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false
+                     ~operator env ty jkind
+                 | Some _ -> or_null ~fuel:(fuel - 1) ~operator ty modality
+                 end
                | Stepped_record_unboxed_product unwrapped_tys ->
                  product ~fuel:(fuel - 1) unwrapped_tys
                end
@@ -3793,7 +3811,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
-              mk_unwrapped_type_expr ty) ltys)
+              (* [&] makes the components addressable *)
+              { (mk_unwrapped_type_expr ty) with operator = Addressable }) ltys)
           | Error error, _ -> Error error
   and estimate_jkind_and_loop ~fuel ~expanded ~operator env ty jkind
     : _ result =
@@ -9054,8 +9073,9 @@ let check_decl_jkind env decl jkind =
            but it should be fine here. This will all get fixed up later with
            the above CRs. *)
         match find_unboxed_type decl with
-        | Some (inner_ty, modality) ->
+        | Some (inner_ty, modality, operator) ->
           Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
+          |> Jkind.apply_operator_l operator
         | None -> decl.type_jkind
       end
     | _ -> decl.type_jkind

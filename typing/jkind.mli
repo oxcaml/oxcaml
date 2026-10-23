@@ -498,6 +498,11 @@ val of_type_decl_overapproximate_unknown :
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
+(** The component layouts of an unboxed record, given the layouts of its fields.
+*)
+val unboxed_record_layouts :
+  Types.label_declaration list -> Sort.t Layout.t list -> Sort.t Layout.t list
+
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record :
   (Types.label_declaration * Sort.t Layout.t) list -> Types.jkind_l
@@ -695,8 +700,8 @@ val apply_operator_l :
 (** Given some kind [k], try to produce some kind [k'] such that [t : k']
     implies [t addressable : k] (or [t : k], for [Id]). Not every such [t] has
     kind [k']: if [k] is [k0 addressable], then [t] may have kind [k0] or
-    [k0 addressable], and [k'] is [k0]. Fails if no addressable kind is below
-    [k]. *)
+    [k0 addressable], and [k'] is [k0]. Fails when there is no such [k'] (e.g.
+    [k] is [bits8], or an abstract kind). *)
 val apply_operator_r :
   Env.t ->
   Jkind_types.Kind_operator.t ->
