@@ -131,7 +131,7 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
-let phrase_static_data : Slambdaeval.CU_data.t Compilation_unit.Tbl.t =
+let phrase_static_data : Slambda.CU_data.t Compilation_unit.Tbl.t =
   Compilation_unit.Tbl.create 16
 
 let cu_static_data cu =
@@ -360,10 +360,7 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let (static_data, rawlam) =
-    Slambda.eval ~cu_static_data
-      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
-  in
+  let (static_data, rawlam) = Slambda.eval ~cu_static_data tlam in
   Compilation_unit.Tbl.replace phrase_static_data compilation_unit static_data;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =

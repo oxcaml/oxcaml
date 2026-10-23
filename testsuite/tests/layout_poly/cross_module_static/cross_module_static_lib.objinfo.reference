@@ -16,29 +16,42 @@ Apply functions:
 Send functions:
 Force link: no
 Static data:
-  Cross_module_static_lib/body/0[
+  Cross_module_static_lib/main_module_block/0[
     Cross_module_static_lib/id/0;
     Cross_module_static_lib/pair/1;
     (missing);
     Cross_module_static_lib/counted_id/2;
+    Cross_module_static_lib/Stamper/3;
   ]
   (Cross_module_static_lib/counted_id/2
-    (closure ⟨env⟩ layout_16 ->
-      { c = (missing)
-      ; r =
-        ⟪(function {nlocal = 0} closure/335 x/326[$layout_16] : $layout_16
-           (let (calls/332 =a (mixedfield 0  (*) closure/335))
-             (seq (+:=1 calls/332) x/326)))⟫ }))
+    (closure ⟨env⟩
+      (ktemplate {} layout_16
+        (function {nlocal = 0} x/326[$layout_16] : $layout_16
+          (seq (+:=1 calls/354) x/326)))))
   (Cross_module_static_lib/id/0
-    (closure ⟨env⟩ layout_2 ->
-      { c = (missing)
-      ; r =
-        ⟪(function {nlocal = 0} closure/333 x/318[$layout_2] : $layout_2
-           x/318)⟫ }))
+    (closure ⟨env⟩
+      (ktemplate {} layout_2
+        (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))))
+  (Cross_module_static_lib/Stamper/3
+    (closure ⟨env⟩
+      (template {} {nlocal = 0} X/352 is_a_functor never_inline never_loop
+        (let
+          (X/329 =a X/352
+           *match*/351 =[value<int>] (+:=1 calls/353)
+           initial/330 =[value<int>] (field_int 0 (field_imm 1 X/329))
+           with_stamp/331 =
+             (ktemplate {X/348=X/329;calls/349=calls/353;} layout_27
+               (function {nlocal = 0} x/333[$layout_27] never_inline
+                 : #(?, $layout_27)
+                 (seq (+:=1 calls/349) (+:=1 (field_imm 1 X/348))
+                   (make_unboxed_product #(value<int>, $layout_27)
+                     (%int_add (field_imm 0 X/348)
+                       (field_int 0 (field_imm 1 X/348)))
+                     x/333)))))
+          (makeblock 0 initial/330 with_stamp/331)))))
   (Cross_module_static_lib/pair/1
-    (closure ⟨env⟩ layout_5 layout_7 ->
-      { c = (missing)
-      ; r =
-        ⟪(function {nlocal = 0} closure/334 x/321[$layout_5] y/322[$layout_7]
-           : #($layout_5, $layout_7)
-           (make_unboxed_product #($layout_5, $layout_7) x/321 y/322))⟫ }))
+    (closure ⟨env⟩
+      (ktemplate {} layout_5 layout_7
+        (function {nlocal = 0} x/321[$layout_5] y/322[$layout_7]
+          : #($layout_5, $layout_7)
+          (make_unboxed_product #($layout_5, $layout_7) x/321 y/322)))))

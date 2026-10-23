@@ -3,3 +3,8 @@ id again: 1 2 3.0
 pair: left 7 8.0 9
 calls: 3
 relay: 5 6.0
+A initial: 0
+A stamps: 7@11 3.5@12
+B initial: 100
+B stamps: 8@121 4.5@122
+calls: 9
