@@ -95,7 +95,7 @@ struct stack_info {
      guarded stack the data last occupied, used to relocate
      stack-internal pointers when the stack is woken. Last, so that the
      assembly code's field offsets are unaffected. */
-  void* idled_from;
+  void* idled_from_high;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -359,25 +359,26 @@ void caml_disable_stack_caches(struct stack_cache*);
 void caml_free_stack_caches(struct stack_cache*);
 
 #ifdef STACK_GUARD_PAGES
-/* Idle the stacks of promoted continuation [cont]: copy them into
-   malloced buffers, recycling their guarded stacks. Called during minor
-   collection; returns the new head of the stack chain (also stored in
-   the continuation). */
-struct stack_info* caml_cont_idle_stacks(value cont);
+/* Idle the stacks of continuation [cont], which is being promoted by
+   the current minor collection: copy them into malloced buffers,
+   recycling their guarded stacks and updating the continuation's
+   fiber fields. Returns the new head of the stack chain, for the
+   caller to scan. Stacks can only move inside a stop-the-world
+   section, when nothing can be running on them. */
+struct stack_info* caml_cont_idle_stacks_from_stw(value cont);
 
 /* Demote guarded stacks cached since before the previous minor
    collection from the current domain's local caches to the global cache.
    Called by each domain at the start of a minor collection. */
-void caml_stack_cache_flush_local(void);
+void caml_stack_cache_flush_from_stw(void);
 
-/* Unmap all globally-cached guarded stacks.. Called by one domain
- * during compaction. */
-void caml_stack_cache_free_unused(void);
+/* Unmap all globally-cached guarded stacks. Called during
+   compaction. */
+void caml_stack_cache_compact_from_stw_single(void);
 
-/* Unmap over-bound cached stacks and global-cache stacks unused for a
-   whole major cycle. Called by one domain at the end of each major
-   cycle. */
-void caml_stack_cache_trim(void);
+/* Unmap excess cached stacks, and global-cache stacks unused for a
+   whole major cycle. Called at the end of each major cycle. */
+void caml_stack_cache_trim_from_stw_single(void);
 #endif
 
 /* Report the stack counters via CAML_GC_MESSAGE (STATS category). */
@@ -437,6 +438,17 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
                              struct stack_info *new_stack);
 #endif
 
+/* The fields of a continuation object (a [Cont_tag] block; the
+   assembly ports define the same names as byte offsets). [Cont_fiber]
+   is the head of the captured stack chain, as a tagged pointer
+   ([Val_ptr]; NULL once the continuation has been taken).
+   [Cont_last_fiber] is the chain's tail, kept for reperform to append
+   to. [Cont_gc_regs], present only in three-field continuations
+   (preemptions), is the suspended register buffer. */
+#define Cont_fiber(cont)      Field(cont, 0)
+#define Cont_last_fiber(cont) Field(cont, 1)
+#define Cont_gc_regs(cont)    Field(cont, 2)
+
 /* Consume a continuation, returning Val_ptr(stack)
 
    Once a continuation object has been made visible to the GC, it *must* be
@@ -445,15 +457,18 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
 
    The stacks of the result are ready to run: if the continuation had
    been idled (see fiber.c), its stacks are woken onto fresh guarded
-   stacks by this call.
+   stacks by this call. (Equivalent to [caml_continuation_take_noexc]
+   followed by waking.)
  */
 value caml_continuation_use_noexc (value cont);
 value caml_continuation_use (value cont);
 
-/* As [caml_continuation_use_noexc], but never wakes idle stacks: the
-   result may not be run, only inspected or updated and then given back
-   with [caml_continuation_replace]. */
-value caml_continuation_use_raw_noexc (value cont);
+/* Take the stack chain out of a continuation without waking idle
+   stacks. Not an accessor: like [caml_continuation_use_noexc], this
+   consumes the continuation. The result may not be run, only
+   inspected or updated, and must be given back with
+   [caml_continuation_replace]. */
+value caml_continuation_take_noexc (value cont);
 
 /* Wake the stacks of an idled continuation in place, leaving them
    captured in [cont]: used by caml_reperform (amd64.S), whose raw

@@ -133,7 +133,7 @@ G(name):
 #define Stack_local_top          72
 #define Stack_local_limit        80
 #define Stack_tls_state          88
-#define Stack_idled_from        112
+#define Stack_idled_from_high   112
 
 /* struct stack_handler */
 #define Handler_value(REG)       0(REG)
@@ -1498,17 +1498,20 @@ CFI_STARTPROC
     /*  %rax: effect to reperform
         %rbx: continuation
         %rdi: last_fiber */
-    /* If a minor collection idled the continuation's stacks during this
-       perform (moving them), %rdi is stale: wake the stacks in place
-       and reload the last fiber from the continuation. An
-       already-consumed continuation (NULL stack) is left for the
-       unhandled path to report, as before. */
+
+     /* An already-consumed continuation (NULL stack) is left for the
+        unhandled path to report. */
         movq    Cont_fiber(%rbx), %r10
         subq    $1, %r10             /* %r10 := Ptr_val(fiber) */
         testq   %r10, %r10
         jz      1f
-        cmpq    $0, Stack_idled_from(%r10)
+
+     /* If a minor collection idled the continuation's stacks during this
+        perform (moving them), %rdi is stale: wake the stacks in place
+        and reload the last fiber from the continuation. */
+        cmpq    $0, Stack_idled_from_high(%r10)
         je      1f
+
         movq    %rbx, C_ARG_1
         SWITCH_OCAML_TO_C
     /* Save %rax (the effect) across the C call. Reserve 16 bytes to

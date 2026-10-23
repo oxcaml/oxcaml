@@ -223,7 +223,7 @@ G(name):
  */
 #define Cont_fiber(reg)      [reg]
 #define Cont_last_fiber(reg) [reg, #8]
-#define Stack_idled_from_high(reg) [reg, #112]
+#define Stack_idled_from_high(reg) [reg, #104]
 #define Cont_gc_regs(reg)    [reg, #16]
 
 .macro WOSIZE_BLOCK_VAL dst, src
@@ -1368,16 +1368,19 @@ FUNCTION(caml_reperform)
     /*  x0: effect to reperform
         x1: continuation
         x2: last_fiber */
-    /* If a minor collection idled the continuation's stacks during this
-       perform (moving them), x2 is stale: wake the stacks in place and
-       reload the last fiber from the continuation. An already-consumed
-       continuation (NULL stack) is left for the unhandled path to
-       report, as on amd64. */
+
+     /* An already-consumed continuation (NULL stack) is left for the
+        unhandled path to report. */
         ldr     TMP, Cont_fiber(x1)
         sub     TMP, TMP, 1                   /* TMP := Ptr_val(fiber) */
         cbz     TMP, 1f
-        ldr     TMP2, Stack_idled_from(TMP)
+
+     /* If a minor collection idled the continuation's stacks during this
+        perform (moving them), x2 is stale: wake the stacks in place
+        and reload the last fiber from the continuation. */
+        ldr     TMP2, Stack_idled_from_high(TMP)
         cbz     TMP2, 1f
+
         mov     x19, x0                       /* save the effect */
         mov     x20, x1                       /* save the continuation */
         mov     x21, x30                      /* [bl] below clobbers the
