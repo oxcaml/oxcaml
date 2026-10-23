@@ -114,7 +114,6 @@ let _ =
       {argument #1 on diverging paths; argument #2 on diverging paths}})]
 |}]
 
-(* CR wsturgeon: fix (work for the next PR) *)
 let _ =
   read_cmx
     "cmx_lib.cmx"
@@ -126,7 +125,19 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
+=
+[("camlCmx_lib__iter_rec_2_8_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/diverging paths}})]
 |}]
 
 let _ =
@@ -181,7 +192,6 @@ let _ =
       {argument #1 on diverging paths}})]
 |}]
 
-(* CR wsturgeon: fix (work for the next PR) *)
 let _ =
   read_cmx
     "cmx_lib.cmx"
@@ -193,5 +203,17 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
+=
+[("camlCmx_lib__ylppa_5_11_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on diverging paths}})]
 |}]
