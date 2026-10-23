@@ -22,6 +22,7 @@ module Mode_info = struct
     (* Exhaustively match so that we pick up new modes. *)
     let ({ areality;
            portability;
+           externality = _;
            contention;
            visibility;
            statefulness;
