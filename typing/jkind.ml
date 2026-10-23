@@ -3570,6 +3570,8 @@ module Format_history = struct
       fprintf ppf "it's the type of an item in a module being projected from"
     | Module_coercion ->
       fprintf ppf "it's the type of an item in a module being coerced"
+    | Module_inclusion ->
+      fprintf ppf "it's the type of an item in a module being included"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4791,6 +4793,7 @@ module Debug_printers = struct
     | Typing_recovery -> fprintf ppf "Typing_recovery"
     | Module_projection -> fprintf ppf "Module_projection"
     | Module_coercion -> fprintf ppf "Module_coercion"
+    | Module_inclusion -> fprintf ppf "Module_inclusion"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function

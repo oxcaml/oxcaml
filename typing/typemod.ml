@@ -103,6 +103,7 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Unrepresentable_include of Env.unrepresentable_item
 
 
 exception Error_forward of Location.error
@@ -3938,10 +3939,19 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
     in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
+    let incl_repr =
+      match
+        Env.sorts_of_signature_items ~why:Module_inclusion new_env
+          (List.map Subst.Lazy.of_signature_item sg)
+      with
+      | Ok repr -> repr
+      | Error unrep ->
+        Error.log_and_raise loc new_env (Unrepresentable_include unrep)
+    in
     let incl =
       { incl_mod = modl;
         incl_type = sg;
-        incl_repr = expect_fixed_representation sg;
+        incl_repr;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;
@@ -5348,7 +5358,17 @@ let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
     | Extension_constructor | Class | Class_type ) ->
     "type"
 
-let report_error ~loc _env = function
+let unrepresentable_item_msg env
+      ({ item; item_desc; item_type; violation } : Env.unrepresentable_item) =
+  Location.msg ~loc:item_desc.Subst.Lazy.val_loc
+    "%a is not representable.@ %a"
+    Style.inline_code (Ident.name item)
+    (Jkind.Violation.report_with_offender
+       ~offender:(fun ppf -> type_expr ppf item_type)
+       env)
+    violation
+
+let report_error ~loc env = function
     Cannot_apply mty ->
       Location.errorf ~loc
         "@[This module is not a functor; it has type@ %a@]"
@@ -5658,6 +5678,9 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Unrepresentable_include unrep ->
+      Location.errorf ~loc ~sub:[unrepresentable_item_msg env unrep]
+        "This module contains unrepresentable items, so it cannot be included."
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

@@ -277,9 +277,18 @@ module F(M : S) = struct
   include M
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 2-11:
+2 |   include M
+      ^^^^^^^^^
+Error: This module contains unrepresentable items, so it cannot be included.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being included.
 |}]
 
 module F
@@ -288,9 +297,10 @@ module F
   include M
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig type t = V.t val x : t val y : int end
 |}]
 
 (* Regression test: templates can close over included values that were originally
