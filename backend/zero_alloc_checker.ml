@@ -1334,8 +1334,10 @@ end = struct
   (* At a call site e.g. [g x = f x] where [f] is [[@zero_alloc conditional]],
      figure out what this means for the allocation sources of [g]. *)
   let transfer_allocation_sources_from_callee_to_caller
+      ~(caller_witnesses : Witnesses.t)
       ~(callee_contract :
-         Zero_alloc_utils.Relevant_components_by_argument_index.t) : t =
+         Zero_alloc_utils.Relevant_components_by_argument_index.t)
+      ~(arguments_passed : Cmm.callee option array) : t =
     let open Zero_alloc_utils in
     (* We're analyzing e.g. [g x = f x], so we have a *caller* ([g]) and a
        *callee* ([f]). The callee ([f]) has a conditional contract, or else we
@@ -1347,25 +1349,34 @@ end = struct
        (see the last line of this function). *)
     let fold
         (callee_argument_index : int)
-        (relevant_components : bool Components.t)
-        (acc : t) : t =
-      ignore callee_argument_index;
-      ignore relevant_components;
-      ignore acc;
-      top ~allocation_sources:Allocation_other_than_calling_arguments
-        ~witnesses:Witnesses.empty
+        (_relevant_components : bool Components.t)
+        (_acc : t) : t =
+      let argument_passed : Cmm.callee option =
+        try arguments_passed.(callee_argument_index) with Invalid_argument _ ->
+        Misc.fatal_error "(* CR wsturgeon for wsturgeon: under-application *)"
+      in
+      match argument_passed with
+      | None ->
+        (* We don't statically know what's passed here, so it could allocate. *)
+        top ~allocation_sources:Allocation_other_than_calling_arguments
+          ~witnesses:caller_witnesses
+      | Some (_ : Cmm.callee) ->
+        Misc.fatal_error "(* CR wsturgeon for wsturgeon: callee-to-caller *)"
     in
     Numbers.Int.Map.fold fold callee_contract bot
 
-  let attribute_to_call_site ~caller_witnesses ~callee_contract =
+  let attribute_to_call_site
+      ~(caller_witnesses : Witnesses.t)
+      ~(callee_contract : t)
+      ~(arguments_passed : Cmm.callee option array) =
     match callee_contract with
     | Resolved (Top { allocation_sources; witnesses = _ }) ->
       begin match allocation_sources with
       | Allocation_other_than_calling_arguments ->
         Resolved (Top { allocation_sources; witnesses = caller_witnesses })
       | No_allocation_other_than_calling_arguments callee_contract ->
-        transfer_allocation_sources_from_callee_to_caller
-          ~callee_contract
+        transfer_allocation_sources_from_callee_to_caller ~caller_witnesses
+          ~callee_contract ~arguments_passed
       end
     | Resolved (Bot | Safe) -> callee_contract
     | Var _ | Transform _ | Join _ ->
