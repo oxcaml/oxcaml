@@ -1,36 +1,38 @@
 function_ids.raw.fl:
-  "Function_ids.apply":0
-  "Function_ids.twice":0
-  "Function_ids.a.(fun)@x,int_add,1":0
-  "Function_ids.b.(fun)@y,int_mul,2":0
-  "Function_ids.inner.(fun)@x,int_sub,n":0
-  "Function_ids.inner.(fun)@x,int_sub,n":1
-  "Function_ids.inner.(fun)@y,int_add,n":0
-  "Function_ids.inner.(fun)@y,x,int_add,n,p":0
-  "Function_ids.inner":0
-  "Function_ids.shadowing.f":0
-  "Function_ids.shadowing.f":1
-  "Function_ids.shadowing.f":2
-  "Function_ids.shadowing":0
-  "Function_ids.shadowing":1
+  "Function_ids.apply":0 body_hash:873ca727
+  "Function_ids.twice":0 body_hash:57c12a6b
+  "Function_ids.a.(fun)@x,int_add,1":0 body_hash:e094b150
+  "Function_ids.b.(fun)@y,int_mul,2":0 body_hash:f62a54d0
+  "Function_ids.inner.(fun)@x,int_sub,n":0 body_hash:f0d5163d
+  "Function_ids.inner.(fun)@x,int_sub,n":1 body_hash:f0d5163d
+  "Function_ids.inner.(fun)@y,int_add,n":0 body_hash:98a68b63
+  "Function_ids.inner.(fun)@y,x,int_add,n,p":0 body_hash:b2a4f618
+  "Function_ids.inner":0 body_hash:81905d58
+  "Function_ids.shadowing.f":0 body_hash:dc68d357
+  "Function_ids.shadowing.f":1 body_hash:928156ca
+  "Function_ids.shadowing.f":2 body_hash:a53721c2
+  "Function_ids.shadowing":0 body_hash:58aaa195
+  "Function_ids.shadowing":1 body_hash:8375873f
 function_ids.edited.raw.fl:
-  "Function_ids.apply":0
-  "Function_ids.twice":0
-  "Function_ids.a0.(fun)@z":0
-  "Function_ids.a.(fun)@x,int_add,1":0
-  "Function_ids.b.(fun)@y,int_mul,2":0
-  "Function_ids.inner.(fun)@z,int_mul,n":0
-  "Function_ids.inner.(fun)@x,int_sub,n":0
-  "Function_ids.inner.(fun)@x,int_sub,n":1
-  "Function_ids.inner.(fun)@y,int_add,n":0
-  "Function_ids.inner.(fun)@y,x,int_add,n,p":0
-  "Function_ids.inner":0
-  "Function_ids.shadowing.f":0
-  "Function_ids.shadowing.f":1
-  "Function_ids.shadowing.f":2
-  "Function_ids.shadowing":0
+  "Function_ids.apply":0 body_hash:873ca727
+  "Function_ids.twice":0 body_hash:57c12a6b
+  "Function_ids.a0.(fun)@z":0 body_hash:927996b1
+  "Function_ids.a.(fun)@x,int_add,1":0 body_hash:e094b150
+  "Function_ids.b.(fun)@y,int_mul,2":0 body_hash:f62a54d0
+  "Function_ids.inner.(fun)@z,int_mul,n":0 body_hash:394375b6
+  "Function_ids.inner.(fun)@x,int_sub,n":0 body_hash:f0d5163d
+  "Function_ids.inner.(fun)@x,int_sub,n":1 body_hash:f0d5163d
+  "Function_ids.inner.(fun)@y,int_add,n":0 body_hash:98a68b63
+  "Function_ids.inner.(fun)@y,x,int_add,n,p":0 body_hash:b2a4f618
+  "Function_ids.inner":0 body_hash:de1c69df
+  "Function_ids.shadowing.f":0 body_hash:dc68d357
+  "Function_ids.shadowing.f":1 body_hash:928156ca
+  "Function_ids.shadowing.f":2 body_hash:a53721c2
+  "Function_ids.shadowing":0 body_hash:58aaa195
 only in function_ids.raw.fl:
-  "Function_ids.shadowing":1
+  "Function_ids.inner":0 body_hash:81905d58
+  "Function_ids.shadowing":1 body_hash:8375873f
 only in function_ids.edited.raw.fl:
-  "Function_ids.a0.(fun)@z":0
-  "Function_ids.inner.(fun)@z,int_mul,n":0
+  "Function_ids.a0.(fun)@z":0 body_hash:927996b1
+  "Function_ids.inner.(fun)@z,int_mul,n":0 body_hash:394375b6
+  "Function_ids.inner":0 body_hash:de1c69df

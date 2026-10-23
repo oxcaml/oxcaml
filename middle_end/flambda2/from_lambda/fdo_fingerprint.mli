@@ -35,7 +35,16 @@
     Functions with no (stable) names (like anonymous functions, wrappers, or
     lazy bodies) instead use the enclosing path and the first few tokens
     (parameters, identifiers, primitives, and constants). For example, like:
-    ["Foo.(fun)@x,acc,+"]. *)
+    ["Foo.(fun)@x,acc,+"].
+
+    The body hash tells apart function bodies whose differences are likely to
+    change code layout decisions. In particular, it leaves out what varies
+    between compilations of the same code (like source positions, identifier
+    stamps, debug uids, static handler numbers) and the layouts, modes, kinds
+    and shapes of terms and primitives.
+
+    Counters inside the body are only comparable between builds with the same
+    body hash, which requires the same compiler version. *)
 
 (** What naming a function depends on besides its own definition. Used in
     [Lambda_to_flambda_env] while translating from Lambda. Contains the path of
@@ -54,10 +63,14 @@ type t
     the functions defined in its body. *)
 val of_function : Naming_context.t -> Lambda.lfunction -> t * Naming_context.t
 
+val of_toplevel : Compilation_unit.t -> Lambda.lambda -> t
+
 val definition_id : t -> Fdo_counter.Definition_id.t
 
-(** The counters of the function's entry edge: its entry counter. *)
-val entry_annotation : t -> Fdo_annotation.t
+val body_hash : t -> Fdo_counter.Function_body_hash.t
+
+(** The counters of the function's entry edge + its body hash *)
+val entry_annotation : t -> Fdo_annotation.With_body_hash.t
 
 (** The first [limit] (5 by default) distinct tokens of a function. Only
     parameter and body identifiers, primitives, and constants are considered, in

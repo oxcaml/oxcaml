@@ -40,8 +40,41 @@ let combine t1 t2 = Fdo_counter.add_all t1 t2
 
 let equal t1 t2 = List.equal Fdo_counter.equal t1 t2
 
-let print ppf t =
-  Format.fprintf ppf "@[<hov 1>(%a)@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf counter ->
-         Format.pp_print_string ppf (Fdo_counter.to_string counter)))
-    t
+let print_raw =
+  Format.pp_print_list ~pp_sep:Format.pp_print_space (fun ppf counter ->
+      Format.pp_print_string ppf (Fdo_counter.to_string counter))
+
+let print ppf t = Format.fprintf ppf "@[<hov 1>(%a)@]" print_raw t
+
+module With_body_hash = struct
+  type annotation = t
+
+  type t =
+    { annotation : annotation;
+      body_hash : Fdo_counter.Function_body_hash.t option
+    }
+
+  let create ~annotation ~body_hash = { annotation; body_hash }
+
+  let annotation { annotation; _ } = annotation
+
+  let body_hash { body_hash; _ } = body_hash
+
+  let with_annotation t annotation = { t with annotation }
+
+  let with_body_hash t body_hash = { t with body_hash = Some body_hash }
+
+  let empty = { annotation = empty; body_hash = None }
+
+  let is_empty { annotation; body_hash } =
+    is_empty annotation && Option.is_none body_hash
+
+  let print ppf { annotation; body_hash } =
+    Format.fprintf ppf "@[<hov 1>(%a%a)@]" print_raw annotation
+      (Format.pp_print_option
+         ~none:(fun _ () -> ())
+         (fun ppf body_hash ->
+           Format.fprintf ppf " body_hash:%a"
+             Fdo_counter.Function_body_hash.print body_hash))
+      body_hash
+end
