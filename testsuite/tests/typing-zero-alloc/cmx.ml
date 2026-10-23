@@ -207,7 +207,19 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
+=
+[("camlCmx_lib__ylppa_5_20_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on diverging paths}})]
 |}]
 
 (* Across compilation units: *)
@@ -222,7 +234,19 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
+=
+[("camlCmx_lib__iter_flipped_6_21_code",
+  {Components.nor =
+    Component.Top
+     No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #2 on normal/diverging paths}})]
 |}]
 
 (* Mutual recursion: *)
@@ -237,7 +261,17 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
+=
+[("camlCmx_lib__ping_7_22_code",
+  {Components.nor = Component.Bot;
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/diverging paths}})]
 |}]
 
 (* Mutual recursion: *)
@@ -252,9 +286,20 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-= []
+=
+[("camlCmx_lib__pong_8_23_code",
+  {Components.nor = Component.Bot;
+   exn =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/exceptional paths};
+   div =
+    Component.Top
+     No_allocation_other_than_calling_arguments
+      {argument #1 on normal/diverging paths}})]
 |}]
 
+(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
 (* [caml_apply]: *)
 let _ =
   read_cmx
@@ -267,21 +312,10 @@ let _ =
      Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
      Zero_alloc_utils.Components.t)
     list
-=
-[("camlCmx_lib__apply2_4_10_code",
-  {Components.nor =
-    Component.Top
-     No_allocation_other_than_calling_arguments {argument #1 on normal paths};
-   exn =
-    Component.Top
-     No_allocation_other_than_calling_arguments
-      {argument #1 on exceptional paths};
-   div =
-    Component.Top
-     No_allocation_other_than_calling_arguments
-      {argument #1 on diverging paths}})]
+= []
 |}]
 
+(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
 (* [caml_apply]: *)
 let _ =
   read_cmx
