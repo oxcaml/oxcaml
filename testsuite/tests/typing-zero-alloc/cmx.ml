@@ -1,6 +1,6 @@
 (* TEST
    readonly_files = "cmx_lib.ml";
-   flags = "-I +compiler-libs -I ocamlopt.opt";
+   flags = "-g -I +compiler-libs -I ocamlopt.opt";
    setup-ocamlopt.opt-build-env;
    module = "cmx_lib.ml";
    ocamlopt.opt;
@@ -291,6 +291,73 @@ let _ =
   read_cmx
     "cmx_lib.cmx"
     "camlCmx_lib__ylppa2_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[]
+|}]
+
+(* Always exit with [raise Fail]: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__fail_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__fail_11_26_code",
+  {Components.nor = Component.Bot; exn = Component.Safe; div = Component.Bot}
+|}]
+
+(* Always diverge with [while true ...]: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__diverge_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[("camlCmx_lib__diverge_12_27_code",
+  {Components.nor = Component.Bot; exn = Component.Bot; div = Component.Bot})
+|}]
+(* CR-someday wsturgeon for wsturgeon: the above [div = Bot] is a known bug *)
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__iter_fail_"
+;;
+[%%expect{|
+- : (string *
+     Zero_alloc_utils.Relevant_components_by_argument_index.t
+     Zero_alloc_utils.Allocation_sources.t Zero_alloc_utils.Component.t
+     Zero_alloc_utils.Components.t)
+    list
+=
+[]
+|}]
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+let _ =
+  read_cmx
+    "cmx_lib.cmx"
+    "camlCmx_lib__iter_diverge_"
 ;;
 [%%expect{|
 - : (string *

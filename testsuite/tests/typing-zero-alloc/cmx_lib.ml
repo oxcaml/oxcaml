@@ -30,3 +30,9 @@ and[@inline never] pong f = ping f
 (* [caml_apply]: *)
 let[@inline never] apply2 f x y = f x y
 let[@inline never] ylppa2 y x f = apply2 f x y
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+let[@inline never] fail () = raise Exit
+let[@inline never] diverge () = while true do () done
+let[@inline never] iter_fail xs = iter_rec ~f:fail xs
+let[@inline never] iter_diverge xs = iter_rec ~f:diverge xs
