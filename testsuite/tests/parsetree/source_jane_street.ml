@@ -1285,12 +1285,14 @@ type 'a with_idx : value & immediate =
 let idx #{ data = _ ; i } = i
 let #{ data = payload; _ } = #{ data = "payload" ; i = 0 }
 let inc r = #{ r with i = r.#i + 1 }
+type inherited : float64 = #{ inherit f : float# }
 [%%expect{|
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
 val idx : 'a with_idx -> int = <fun>
 val payload : string = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
+type inherited = #{ inherit f : float#; }
 |}]
 
 (*****************)
