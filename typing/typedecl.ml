@@ -4547,15 +4547,20 @@ let make_native_repr
           (Cannot_unbox_or_untag_type kind)
     | Some repr -> repr
     end
-  | Native_repr_attr_present Unboxed, Sort (Univar _) ->
+  | Native_repr_attr_present Unboxed, Sort (Univar _ | Addressable (Univar _))
+    ->
     Misc.fatal_error "typedecl: Univar in concrete type"
-  | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
+  | Native_repr_attr_present Unboxed, Sort (Genvar _ | Addressable (Genvar _))
+    ->
     Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_present Unboxed,
-    (Sort (Product _ | Base Void | Addressable _)) ->
+    (Sort (Product _ | Base Void
+          | Addressable (Base Void | Product _ | Addressable _))) ->
     Error.log_and_raise core_type.ptyp_loc
       (Cannot_unbox_or_untag_type Unboxed)
-  | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
+  | Native_repr_attr_present Unboxed,
+    (Sort ((Base sort | Addressable (Base sort)) as c)) ->
+    (* Addressability does not change the unboxed representation *)
     (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
        upstream-compatibility, we want the code to still work when all the
        layout annotations and unboxed types get erased.
