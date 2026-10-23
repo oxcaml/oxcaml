@@ -132,3 +132,17 @@ labelled primitive, partially applied, float#: 56.5
 labelled primitive, partially applied, float#: Fail bk
 immediately applied, bound, float#: 57.5
 immediately applied, bound, float#: Fail bl caught
+Stdlib.failwith, float#: 57.5
+Stdlib.failwith, float#: Failure ca
+Stdlib.invalid_arg, product: 58, 58.5
+Stdlib.invalid_arg, product: Invalid_argument cb
+Stdlib.failwith, not inlined, void: void
+Stdlib.failwith, not inlined, void: Failure cc
+Stdlib.invalid_arg, indirect, int64_u: 59
+Stdlib.invalid_arg, indirect, int64_u: Invalid_argument cd
+Stdlib.raise, float#: 60.5
+Stdlib.raise, float#: Fail ce
+Stdlib.raise_notrace, product: 61, 61.5
+Stdlib.raise_notrace, product: Fail cf
+Printexc.raise_with_backtrace, int64_u: 62
+Printexc.raise_with_backtrace, int64_u: Fail cg

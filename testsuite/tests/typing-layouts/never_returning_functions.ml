@@ -210,11 +210,11 @@ let refuted_cases : void -> _ = function _ -> .
 val refuted_cases : ('a : any). void -> 'a = <fun>
 |}]
 
-(* [Stdlib.raise] has a result of layout [value_or_null], which stays. *)
+(* [Stdlib.raise] has a result of layout [any]. *)
 
 let stdlib_raise () = raise Exit
 [%%expect{|
-val stdlib_raise : unit -> 'a = <fun>
+val stdlib_raise : ('a : any). unit -> 'a = <fun>
 |}]
 
 (* Return positions are found through bindings, sequences, conditionals,
@@ -417,14 +417,7 @@ Error: Function arguments and returns must be representable.
 
 let univar_stdlib_raise : ('a : any). unit -> 'a = fun () -> raise Exit
 [%%expect{|
-Line 1, characters 51-71:
-1 | let univar_stdlib_raise : ('a : any). unit -> 'a = fun () -> raise Exit
-                                                       ^^^^^^^^^^^^^^^^^^^^
-Error: This definition has type "unit -> 'b" which is less general than
-         "('a : any). unit -> 'a"
-       The layout of 'a is any
-         because of the annotation on the universal variable 'a.
-       But the layout of 'a must be a value layout.
+val univar_stdlib_raise : ('a : any). unit -> 'a = <fun>
 |}]
 
 (* Such functions can be used where any result is expected. *)
@@ -462,24 +455,7 @@ end = struct
   let f () = raise Exit
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let f () = raise Exit
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : unit -> 'a end
-       is not included in
-         sig val f : ('a : any). unit -> 'a end
-       Values do not match:
-         val f : unit -> 'a
-       is not included in
-         val f : ('a : any). unit -> 'a
-       The type "unit -> 'a" is not compatible with the type "unit -> 'b"
-       The layout of 'a is any
-         because of the definition of f at line 2, characters 2-32.
-       But the layout of 'a must be a value layout
-         because of the definition of f at line 4, characters 8-23.
+module M_stdlib_raise : sig val f : ('a : any). unit -> 'a end
 |}]
 
 (* Methods. *)

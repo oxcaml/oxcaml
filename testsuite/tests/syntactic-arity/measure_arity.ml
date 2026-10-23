@@ -359,7 +359,7 @@ let measure_arity f =
 
 [%%expect{|
 exception Return of int
-val return : int -> 'a = <fun>
+val return : ('a : any). int -> 'a = <fun>
 type t = { mutable x : int; }
 type nothing = |
 val measure_arity : (t -> t -> t -> t -> t -> nothing) -> int = <fun>
