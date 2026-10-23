@@ -27,6 +27,106 @@
    Perhaps we should translate "strict" and "never_returns_normally" directly
    into (nor,exn,div) *)
 
+module Component = struct
+  type 'top t =
+    | Top of 'top
+    | Safe
+    | Bot
+
+  let map ~f = function Top top -> Top (f top) | Safe -> Safe | Bot -> Bot
+
+  let print ~print_top ppf = function
+    | Bot -> Format.fprintf ppf "bot"
+    | Safe -> Format.fprintf ppf "safe"
+    | Top top -> print_top ppf top
+
+  let compare ~compare_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> 0
+    | Bot, _ -> -1
+    | _, Bot -> 1
+    | Safe, Safe -> 0
+    | Safe, _ -> -1
+    | _, Safe -> 1
+    | Top t1, Top t2 -> compare_top t1 t2
+
+  let join ~join_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> Bot
+    | Safe, Safe -> Safe
+    | Top t1, Top t2 -> Top (join_top t1 t2)
+    | Safe, Bot | Bot, Safe -> Safe
+    | Top _, Bot | Top _, Safe -> c1
+    | Bot, Top _ | Safe, Top _ -> c2
+
+  let meet ~meet_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> Bot
+    | Safe, Safe -> Safe
+    | Top t1, Top t2 -> Top (meet_top t1 t2)
+    | Safe, Bot | Bot, Safe -> Bot
+    | Top _, Bot | Bot, Top _ -> Bot
+    | Top _, Safe | Safe, Top _ -> Safe
+
+  let lessequal ~lessequal_top c1 c2 =
+    match c1, c2 with
+    | Bot, Bot -> true
+    | Safe, Safe -> true
+    | Top t1, Top t2 -> lessequal_top t1 t2
+    | Bot, Safe -> true
+    | Bot, Top _ -> true
+    | Safe, Top _ -> true
+    | Top _, (Bot | Safe) -> false
+    | Safe, Bot -> false
+end
+
+module Tag = struct
+  type t =
+    | N
+    | E
+    | D
+
+  let compare = Stdlib.compare
+
+  let print = function N -> "nor" | E -> "exn" | D -> "div"
+end
+
+module Components = struct
+  type 'component t =
+    { nor : 'component;
+      exn : 'component;
+      div : 'component
+    }
+
+  let create f = { nor = f Tag.N; exn = f Tag.E; div = f Tag.D }
+
+  let iter ~f { nor; exn; div } =
+    f Tag.N nor;
+    f Tag.E exn;
+    f Tag.D div
+
+  let map ~f { nor; exn; div } =
+    { nor = f Tag.N nor; exn = f Tag.E exn; div = f Tag.D div }
+
+  let map2 ~f lhs rhs =
+    { nor = f Tag.N lhs.nor rhs.nor;
+      exn = f Tag.E lhs.exn rhs.exn;
+      div = f Tag.D lhs.div rhs.div
+    }
+
+  let lessequal f lhs rhs =
+    f lhs.nor rhs.nor && f lhs.exn rhs.exn && f lhs.div rhs.div
+
+  let compare f { nor = n1; exn = e1; div = d1 }
+      { nor = n2; exn = e2; div = d2 } =
+    let c = f n1 n2 in
+    if c <> 0
+    then c
+    else
+      let c = f e1 e2 in
+      if c <> 0 then c else f d1 d2
+end
+
 module type WS = sig
   type t
 
@@ -67,61 +167,28 @@ end
 
 module Make_component (Witnesses : WS) = struct
   (* keep in sync with "resolved" values in Checkmach. *)
-  type t =
-    | Top of Witnesses.t
-    | Safe
-    | Bot
+  type t = Witnesses.t Component.t
 
-  let bot = Bot
+  let bot = Component.Bot
 
-  let top w = Top w
+  let top w = Component.Top w
 
-  let safe = Safe
+  let safe = Component.Safe
 
-  let join c1 c2 =
-    match c1, c2 with
-    | Bot, Bot -> Bot
-    | Safe, Safe -> Safe
-    | Top w1, Top w2 -> Top (Witnesses.join w1 w2)
-    | Safe, Bot | Bot, Safe -> Safe
-    | Top w1, Bot | Top w1, Safe | Bot, Top w1 | Safe, Top w1 -> Top w1
+  let join = Component.join ~join_top:Witnesses.join
 
-  let meet c1 c2 =
-    match c1, c2 with
-    | Bot, Bot -> Bot
-    | Safe, Safe -> Safe
-    | Top w1, Top w2 -> Top (Witnesses.meet w1 w2)
-    | Safe, Bot | Bot, Safe -> Bot
-    | Top _, Bot | Bot, Top _ -> Bot
-    | Top _, Safe | Safe, Top _ -> Safe
+  let meet = Component.meet ~meet_top:Witnesses.meet
 
-  let lessequal v1 v2 =
-    match v1, v2 with
-    | Bot, Bot -> true
-    | Safe, Safe -> true
-    | Top w1, Top w2 -> Witnesses.lessequal w1 w2
-    | Bot, Safe -> true
-    | Bot, Top _ -> true
-    | Safe, Top _ -> true
-    | Top _, (Bot | Safe) -> false
-    | Safe, Bot -> false
+  let lessequal = Component.lessequal ~lessequal_top:Witnesses.lessequal
 
-  let compare t1 t2 =
-    match t1, t2 with
-    | Bot, Bot -> 0
-    | Safe, Safe -> 0
-    | Top w1, Top w2 -> Witnesses.compare w1 w2
-    | Bot, (Safe | Top _) -> -1
-    | (Safe | Top _), Bot -> 1
-    | Safe, Top _ -> -1
-    | Top _, Safe -> 1
+  let compare = Component.compare ~compare_top:Witnesses.compare
 
-  let print ~witnesses ppf = function
-    | Bot -> Format.fprintf ppf "bot"
-    | Top w ->
+  let print ~witnesses =
+    let print_top ppf w =
       Format.fprintf ppf "top";
       if witnesses then Format.fprintf ppf " (%a)" Witnesses.print w
-    | Safe -> Format.fprintf ppf "safe"
+    in
+    Component.print ~print_top
 end
 
 module Make_value
@@ -129,29 +196,15 @@ module Make_value
     (V : Component with type witnesses := Witnesses.t) =
 struct
   (** Lifts V to triples *)
-  type t =
-    { nor : V.t;
-      exn : V.t;
-      div : V.t
-    }
+  type t = V.t Components.t
 
-  let bot = { nor = V.bot; exn = V.bot; div = V.bot }
+  let bot = Components.create (fun _ignore_tag -> V.bot)
 
-  let lessequal v1 v2 =
-    V.lessequal v1.nor v2.nor && V.lessequal v1.exn v2.exn
-    && V.lessequal v1.div v2.div
+  let lessequal = Components.lessequal V.lessequal
 
-  let join v1 v2 =
-    { nor = V.join v1.nor v2.nor;
-      exn = V.join v1.exn v2.exn;
-      div = V.join v1.div v2.div
-    }
+  let join = Components.map2 ~f:(fun _ignore_tag -> V.join)
 
-  let meet v1 v2 =
-    { nor = V.meet v1.nor v2.nor;
-      exn = V.meet v1.exn v2.exn;
-      div = V.meet v1.div v2.div
-    }
+  let meet = Components.map2 ~f:(fun _ignore_tag -> V.meet)
 
   let normal_return = { bot with nor = V.safe }
 
@@ -159,29 +212,22 @@ struct
 
   let diverges = { bot with div = V.safe }
 
-  let safe = { nor = V.safe; exn = V.safe; div = V.safe }
+  let safe = Components.create (fun _ignore_tag -> V.safe)
 
-  let top w = { nor = V.top w; exn = V.top w; div = V.top w }
+  let top w = Components.create (fun _ignore_tag -> V.top w)
 
-  let relaxed w = { nor = V.safe; exn = V.top w; div = V.top w }
+  let relaxed w : t = { nor = V.safe; exn = V.top w; div = V.top w }
 
   let of_annotation ~strict ~never_returns_normally ~never_raises =
     let res = if strict then safe else relaxed Witnesses.empty in
     let res = if never_raises then { res with exn = V.bot } else res in
     if never_returns_normally then { res with nor = V.bot } else res
 
-  let print ~witnesses ppf { nor; exn; div } =
+  let print ~witnesses ppf ({ nor; exn; div } : t) =
     let pp = V.print ~witnesses in
     Format.fprintf ppf "{ nor=%a;@ exn=%a;@ div=%a }@," pp nor pp exn pp div
 
-  let compare { nor = n1; exn = e1; div = d1 } { nor = n2; exn = e2; div = d2 }
-      =
-    let c = V.compare n1 n2 in
-    if c <> 0
-    then c
-    else
-      let c = V.compare e1 e2 in
-      if c <> 0 then c else V.compare d1 d2
+  let compare = Components.compare V.compare
 end
 
 module Assume_info = struct
