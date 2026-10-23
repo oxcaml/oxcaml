@@ -38,6 +38,9 @@ type direction_flag = Upto | Downto
 (* Order matters, used in polymorphic comparison *)
 type private_flag = Private | Public
 
+(* Whether a record field is [inherit]. *)
+type inherit_flag = Not_inherited | Inherited
+
 type mutable_flag = Immutable | Mutable
 
 type atomic_flag = Nonatomic | Atomic
