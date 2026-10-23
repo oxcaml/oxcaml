@@ -493,6 +493,12 @@
  (action
   (write-file %{target} "")))
 
+(rule
+ (target ox_ldflags.txt)
+ (mode fallback)
+ (action
+   (write-file %{target} "")))
+
 (install
  (files ocamlyacc)
  (section bin)

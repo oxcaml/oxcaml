@@ -1,4 +1,4 @@
-(lang dune 2.8)
+(lang dune 3.0)
 ; This is the context for the 'boot' build, when compiling oxcaml with the system compiler
 ; We need to call the boot context "default" so that dune selects it for merlin
 (context (default
@@ -6,6 +6,7 @@
   (profile dev)
   (env (_
     (flags (:standard -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
+    (link_flags (:standard %{read-lines:ox_ldflags.txt}))
     (env-vars
       ("OCAMLPARAM" "")
 
