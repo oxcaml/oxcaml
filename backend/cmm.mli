@@ -445,7 +445,7 @@ type operation =
         callees : callee list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized version of one these callees. *)
-        known_arguments : callee option array
+        known_arguments : callee option list
             (* Statically known arguments passed here, for the [zero_alloc]
                backend to analyze as callbacks that may allocate. *)
       }

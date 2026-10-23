@@ -2653,7 +2653,8 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
     ( Capply
         { result_type = Extended_machtype.to_machtype result;
           region = apos;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       (* See the cases for caml_apply regarding [change_tagged_int_to_val]. *)
       Cconst_symbol (sym, dbg) :: obj :: tag :: cache :: pos :: args,
@@ -3691,7 +3692,13 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
     let sym = apply_function_sym extended_args_type extended_ty mode in
     let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
     Cop
-      ( Capply { result_type = ty; region = pos; callees = Some [Symbol sym] },
+      ( Capply
+          { result_type = ty;
+            region = pos;
+            callees = Some [Symbol sym];
+            (* CR wsturgeon for wsturgeon: propagate known arguments *)
+            known_arguments = []
+          },
         cargs,
         dbg )
   in
@@ -3719,7 +3726,14 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
                 dbg,
                 Branch_annotations.default,
                 Cop
-                  ( Capply { result_type = ty; region = pos; callees = None },
+                  ( Capply
+                      { result_type = ty;
+                        region = pos;
+                        callees = None;
+                        (* CR wsturgeon for wsturgeon: propagate known
+                           arguments *)
+                        known_arguments = []
+                      },
                     (get_field_codepointer mut clos 2 dbg :: args) @ [clos],
                     dbg ),
                 dbg,
@@ -3754,7 +3768,9 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg ~callees =
           ( Capply
               { result_type = Extended_machtype.to_machtype result;
                 region = pos;
-                callees
+                callees;
+                (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                known_arguments = []
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
@@ -3977,7 +3993,13 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
     | [arg] -> (
       let app =
         Cop
-          ( Capply { result_type = result; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = result;
+                region = Rc_normal;
+                callees = None;
+                (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                known_arguments = []
+              },
             (* The code pointer and closure info of a closure are write-once;
                reading them immutably is correct and lets the debugger describe
                the call target (and closure projections) for call sites. *)
@@ -4000,7 +4022,12 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
         ( VP.create newclos,
           Cop
             ( Capply
-                { result_type = typ_val; region = Rc_normal; callees = None },
+                { result_type = typ_val;
+                  region = Rc_normal;
+                  callees = None;
+                  (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                  known_arguments = []
+                },
               [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
@@ -4032,7 +4059,13 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
           dbg (),
           Branch_annotations.default,
           Cop
-            ( Capply { result_type = result; region = Rc_normal; callees = None },
+            ( Capply
+                { result_type = result;
+                  region = Rc_normal;
+                  callees = None;
+                  (* CR wsturgeon for wsturgeon: propagate known arguments *)
+                  known_arguments = []
+                },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
@@ -4166,7 +4199,12 @@ let tuplify_function arity return =
       fun_args = [VP.create arg, typ_val; VP.create clos, typ_val];
       fun_body =
         Cop
-          ( Capply { result_type = return; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = return;
+                region = Rc_normal;
+                callees = None;
+                known_arguments = []
+              },
             (* The closure code pointer is write-once; see
                [apply_function_body]. *)
             get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
@@ -4319,7 +4357,12 @@ let rec make_curry_apply result narity args_type args clos n =
   match args_type with
   | [] ->
     Cop
-      ( Capply { result_type = result; region = Rc_normal; callees = None },
+      ( Capply
+          { result_type = result;
+            region = Rc_normal;
+            callees = None;
+            known_arguments = []
+          },
         (* Code pointer and chain links of a partial-application closure are
            write-once; reading them immutably lets the debugger describe the
            call target and the recovered arguments as closure projections. *)
@@ -4823,7 +4866,12 @@ let entry_point namelist =
     in
     Csequence
       ( Cop
-          ( Capply { result_type = typ_void; region = Rc_normal; callees = None },
+          ( Capply
+              { result_type = typ_void;
+                region = Rc_normal;
+                callees = None;
+                known_arguments = []
+              },
             [Cop (mk_load_immut Word_int, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
@@ -5334,7 +5382,12 @@ let load ~dbg memory_chunk mutability ~addr =
 let direct_call ~dbg ty pos f_code_sym args =
   Cop
     ( Capply
-        { result_type = ty; region = pos; callees = Some [Symbol f_code_sym] },
+        { result_type = ty;
+          region = pos;
+          callees = Some [Symbol f_code_sym];
+          (* CR wsturgeon for wsturgeon: propagate known arguments *)
+          known_arguments = []
+        },
       Cconst_symbol (f_code_sym, dbg) :: args,
       dbg )
 
@@ -5363,7 +5416,9 @@ let indirect_full_call ~dbg ty pos f ~callees args_type args =
          ( Capply
              { result_type = Extended_machtype.to_machtype ty;
                region = pos;
-               callees
+               callees;
+               (* CR wsturgeon for wsturgeon: propagate known arguments *)
+               known_arguments = []
              },
            (fun_ptr :: args) @ [Cvar v],
            dbg ))
@@ -5707,7 +5762,8 @@ let perform ~dbg eff =
     ( Capply
         { result_type = typ_val;
           region = Rc_nontail;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
@@ -5718,7 +5774,8 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
     ( Capply
         { result_type = typ_val;
           region = Rc_normal;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
@@ -5744,7 +5801,8 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
     ( Capply
         { result_type = typ_val;
           region = Rc_normal;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
@@ -5775,7 +5833,8 @@ let continue ~dbg ~cont ~value =
     ( Capply
         { result_type = typ_val;
           region = Rc_normal;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [Cconst_symbol (sym, dbg); cont; value],
       dbg )
@@ -5786,7 +5845,8 @@ let discontinue ~dbg ~cont ~exn =
     ( Capply
         { result_type = typ_val;
           region = Rc_normal;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
@@ -5797,7 +5857,8 @@ let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
     ( Capply
         { result_type = typ_val;
           region = Rc_normal;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
@@ -5810,7 +5871,8 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
     ( Capply
         { result_type = typ_val;
           region = Rc_normal;
-          callees = Some [Symbol sym]
+          callees = Some [Symbol sym];
+          known_arguments = []
         },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
       dbg )

@@ -306,6 +306,7 @@ module V : sig
   val attribute_to_call_site :
     caller_witnesses:Witnesses.t ->
     callee_contract:t ->
+    arguments_passed:Cmm.callee option list ->
     t
 
   val diff_witnesses : expected:t -> actual:t -> Witnesses.t
@@ -1337,7 +1338,7 @@ end = struct
       ~(caller_witnesses : Witnesses.t)
       ~(callee_contract :
          Zero_alloc_utils.Relevant_components_by_argument_index.t)
-      ~(arguments_passed : Cmm.callee option array) : t =
+      ~(arguments_passed : Cmm.callee option list) : t =
     let open Zero_alloc_utils in
     (* We're analyzing e.g. [g x = f x], so we have a *caller* ([g]) and a
        *callee* ([f]). The callee ([f]) has a conditional contract, or else we
@@ -1351,16 +1352,17 @@ end = struct
         (callee_argument_index : int)
         (_relevant_components : bool Components.t)
         (_acc : t) : t =
-      let argument_passed : Cmm.callee option =
-        try arguments_passed.(callee_argument_index) with Invalid_argument _ ->
-        Misc.fatal_error "(* CR wsturgeon for wsturgeon: under-application *)"
-      in
-      match argument_passed with
+      match List.nth_opt arguments_passed callee_argument_index with
       | None ->
+        (* This is a partial application, and there is no nth argument. *)
+        Misc.fatal_error "(* CR wsturgeon for wsturgeon: partial application *)"
+      | Some None ->
         (* We don't statically know what's passed here, so it could allocate. *)
         top ~allocation_sources:Allocation_other_than_calling_arguments
           ~witnesses:caller_witnesses
-      | Some (_ : Cmm.callee) ->
+      | Some (Some (_ : Cmm.callee)) ->
+        (* We know statically what's passed here, so we can combine its
+           zero-alloc summary with the callee's. *)
         Misc.fatal_error "(* CR wsturgeon for wsturgeon: callee-to-caller *)"
     in
     Numbers.Int.Map.fold fold callee_contract bot
@@ -1368,7 +1370,7 @@ end = struct
   let attribute_to_call_site
       ~(caller_witnesses : Witnesses.t)
       ~(callee_contract : t)
-      ~(arguments_passed : Cmm.callee option array) =
+      ~(arguments_passed : Cmm.callee option list) =
     match callee_contract with
     | Resolved (Top { allocation_sources; witnesses = _ }) ->
       begin match allocation_sources with
@@ -1415,6 +1417,7 @@ end = struct
       | None -> unresolved w var
       | Some callee_contract ->
         attribute_to_call_site ~caller_witnesses:w ~callee_contract
+          ~arguments_passed:(Misc.fatal_error "(* CR wsturgeon: TODO *)")
     in
     let contains_any env vars =
       Vars.exists (fun var _w -> Option.is_some (env var)) vars
@@ -1429,7 +1432,8 @@ end = struct
         match env var with
         | None -> t
         | Some callee_contract ->
-          attribute_to_call_site ~caller_witnesses:witnesses ~callee_contract)
+          attribute_to_call_site ~caller_witnesses:witnesses ~callee_contract
+            ~arguments_passed:(Misc.fatal_error "(* CR wsturgeon: TODO *)"))
       | Transform tr ->
         let vars = Transform.get_vars tr in
         if not (contains_any env vars)
@@ -1502,6 +1506,7 @@ module Value : sig
   val attribute_to_call_site :
     caller_witnesses:Witnesses.t ->
     callee_contract:t ->
+    arguments_passed:Cmm.callee option list ->
     t
 
   val get_unresolved_names : t -> String.Set.t
@@ -1547,10 +1552,12 @@ end = struct
     Zero_alloc_utils.Components.map ~f:(fun _ignore_tag ->
         V.replace_witnesses w)
 
-  let attribute_to_call_site ~caller_witnesses ~callee_contract =
+  let attribute_to_call_site ~caller_witnesses ~callee_contract
+        ~arguments_passed =
     Zero_alloc_utils.Components.map
       ~f:(fun _ignore_tag callee_contract ->
-        V.attribute_to_call_site ~caller_witnesses ~callee_contract)
+        V.attribute_to_call_site ~caller_witnesses ~callee_contract
+          ~arguments_passed)
       callee_contract
 
   let diff_witnesses ~expected ~actual =
@@ -2390,6 +2397,7 @@ end = struct
          by [find_callee]. *)
       let caller_witnesses = create_witnesses t k dbg in
       Value.attribute_to_call_site ~caller_witnesses ~callee_contract
+        ~arguments_passed:(Misc.fatal_error "(* CR wsturgeon: TODO *)")
     in
     let return_top hint reason =
       let witnesses = create_witnesses t ~hint k dbg in
