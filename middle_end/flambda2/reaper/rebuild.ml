@@ -2178,7 +2178,8 @@ and rebuild_function_params_and_body env res code_metadata
          ~stub:(Code_metadata.stub code_metadata)
          ~cost_metrics
          ~is_a_functor:(Code_metadata.is_a_functor code_metadata)
-         ~recursive:(Code_metadata.recursive code_metadata))
+         ~recursive:(Code_metadata.recursive code_metadata)
+         ~free_names_of_code:body.free_names)
       (Code_metadata.with_cost_metrics cost_metrics code_metadata)
   in
   match updating_calling_convention with
