@@ -49,7 +49,7 @@ let fresh_index state =
   state.next_index <- index + 1;
   index
 
-(* The edge counters of a switch go onto its arms, one per scrutinee value. *)
+(* Insert annotations to each arm *)
 let switch_arms_with_counters ({ function_; body_hash; _ } as state)
     (switch : Switch_expr.t) =
   let arms = Switch_expr.arms switch in
@@ -69,17 +69,27 @@ let switch_arms_with_counters ({ function_; body_hash; _ } as state)
     arms
 
 (* [Some path] if [dbg] corresponds to a call that binds a module-level result
-   with scope path [path]. See [Fdo_counter_identity]. *)
+   with scope path [path] (see [Fdo_counter_identity]). A named module binding,
+   [module M = F (X)], gives the path of [M]. A call in an anonymous module (a
+   toplevel [include F (X)] or [module _ = F (X)], a [let module _ = F (X) in],
+   or any other code directly in a structure) gives the path of the enclosing
+   module with [.(module)] appended. *)
 let module_level_call dbg =
-  let rec path (scopes : Debuginfo.Scoped_location.scopes) =
+  let path (scopes : Debuginfo.Scoped_location.scopes) =
     match scopes with
-    | Cons { item = Sc_module_definition; name = ""; prev; _ } -> path prev
-    | Cons { item = Sc_module_definition; prev = Cons _; _ } ->
-      Some
-        (Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
-           scopes)
+    | Cons { item = Sc_module_definition; name; prev; _ } ->
+      let path =
+        Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+          scopes
+      in
+      (* The compilation unit's scope has no [prev]; like a module with no name,
+         it is not a binding of its own. *)
+      let anonymous =
+        String.equal name ""
+        || match prev with Empty -> true | Cons _ -> false
+      in
+      Some (if anonymous then path ^ ".(module)" else path)
     | Empty
-    | Cons { item = Sc_module_definition; prev = Empty; _ }
     | Cons
         { item =
             ( Sc_anonymous_function | Sc_value_definition | Sc_class_definition
@@ -89,30 +99,38 @@ let module_level_call dbg =
       None
   in
   match Debuginfo.to_items dbg with
-  | item :: _ -> path item.dinfo_scopes
   | [] -> None
+  | [item] -> path item.dinfo_scopes
+  | _ :: _ :: _ ->
+    (* Only inlining adds items, and this pass runs before Simplify. *)
+    Misc.fatal_errorf
+      "Fdo_instrumentation: unexpected inlined debuginfo %a before Simplify"
+      Debuginfo.print_compact dbg
 
-(* The counter of a call site; C calls and effect operations are not calls of
-   the call graph. *)
-let callsite_position state (apply : Apply_expr.t) =
+(* Create the [Fdo_counter.Position.t] corresponding to a callsite.
+
+   Calls evaluated directly in a module (functor applications above all) are
+   module-level calls, named by the binding's path (see [module_level_call]) and
+   numbered within it, since several calls can share a path (as the two calls of
+   [module M = F (G (X))] do). Unlike an interior position, this does not depend
+   on the body or the numbering of the enclosing code, so the specializations
+   made at the call keep their names when unrelated code is edited. *)
+let callsite_position
+    ({ function_; body_hash; module_call_indices; _ } as state)
+    (apply : Apply_expr.t) =
   match Apply_expr.call_kind apply with
   | Function _ | Method _ ->
     let index = fresh_index state in
     let position =
       match module_level_call (Apply_expr.dbg apply) with
-      | None ->
-        FC.Position.create_call ~function_:state.function_
-          ~body_hash:state.body_hash ~index
+      | None -> FC.Position.create_call ~function_ ~body_hash ~index
       | Some path ->
         let index =
-          Option.value
-            (String.Tbl.find_opt state.module_call_indices path)
-            ~default:0
+          Option.value (String.Tbl.find_opt module_call_indices path) ~default:0
         in
-        String.Tbl.replace state.module_call_indices path (index + 1);
+        String.Tbl.replace module_call_indices path (index + 1);
         let binder = FC.Name.create ~name_str:path ~discriminator:0 in
-        FC.Position.create_module_level_call ~function_:state.function_ ~binder
-          ~index
+        FC.Position.create_module_level_call ~function_ ~binder ~index
     in
     Some position
   | C_call _ | Effect _ -> None
@@ -165,7 +183,6 @@ let rec expr state (e : Expr.t) : Expr.t =
       (Switch.create
          ~condition_dbg:(Switch_expr.condition_dbg switch)
          ~scrutinee:(Switch_expr.scrutinee switch)
-           (* CR yusumez: add counter here *)
          ~arms:(switch_arms_with_counters state switch))
   | Apply_cont _ | Invalid _ -> e
 
@@ -187,10 +204,9 @@ and named (n : Named.t) : Named.t =
   | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ -> n
 
 and code (c : Code.t) : Code.t =
-  (* CR yusumez: check entry counters + recurse on body *)
   let entry_annotation = Code.fdo_entry_annotation c in
   match Fdo_annotation.With_body_hash.body_hash entry_annotation with
-  | None -> c (* Skip the body of this function *)
+  | None -> c (* Skip *)
   | Some body_hash -> (
     let entry_annotation =
       Fdo_annotation.With_body_hash.annotation entry_annotation
@@ -216,7 +232,6 @@ and code (c : Code.t) : Code.t =
               ~exn_continuation params ~body:(expr state body)
               ~free_names_of_body:Unknown ~my_closure ~my_alloc_mode ~my_depth)
       in
-      (* Counters change no names, so the free names and cost are unchanged. *)
       Code.with_params_and_body ~params_and_body
         ~free_names_of_params_and_body:(Code.free_names_of_params_and_body c)
         ~cost_metrics:(Code.cost_metrics c) c
