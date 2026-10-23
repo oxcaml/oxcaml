@@ -33,11 +33,7 @@ dep.cmi into the shared cache.
   $ build 'val x : string' 2
   $ errors b.ml
 
-FIXME a.ml must not keep using the old dep.cmi.
+a.ml must not keep using the old dep.cmi.
   $ errors a.ml
-  1:17 The value Dep.x has type int but an expression was expected of type string
-BUG: the cache entry for dep.cmi now matches the file on disk, and the
-consistency check only compares module names structurally, so a.ml's typer
-state is not invalidated.
 
   $ $MERLIN server stop-server
