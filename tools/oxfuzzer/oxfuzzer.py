@@ -49,6 +49,8 @@ class Toolchain:
     def ocamlopt(self) -> Path:
         return self.build_root / "main/oxcaml_main_native.exe"
 
+    # The runtime and stdlib are built by the boot (`default`) context; this is
+    # also the OCAMLLIB the `main` context uses (see Makefile.common-ox).
     @property
     def ocamllib(self) -> Path:
         return self.build_root / "default/stdlib/build"
