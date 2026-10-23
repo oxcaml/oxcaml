@@ -4602,6 +4602,7 @@ let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
   | Some Global -> Prim_global
   | Some Local -> Prim_local
+  | None when Mode.Locality.check_generic m -> Prim_mode_poly
   | None -> assert false
 
 let rec parse_native_repr_attributes env core_type ty rmode
@@ -4818,7 +4819,9 @@ let transl_value_decl env loc ~modal ~why valdecl =
     if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
   in
   let lpoly, cty =
-    Typetexp.transl_type_scheme env curry_mode valdecl.pval_type lpoly_flag
+    Typetexp.transl_type_scheme env
+      ~primitive:(not (List.is_empty valdecl.pval_prim))
+      curry_mode valdecl.pval_type lpoly_flag
   in
   let sort =
     match Ctype.type_sort ~why ~allow_mutation:true env cty.ctyp_type with

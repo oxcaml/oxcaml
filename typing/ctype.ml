@@ -2100,7 +2100,7 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.global, None
   | Primitive.Prim_local, _ ->
     Locality.allow_right Locality.local, None
-  | Primitive.Prim_poly, _ ->
+  | (Primitive.Prim_poly | Primitive.Prim_mode_poly), _ ->
     match mvars with
     | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
     | None -> assert false
@@ -2163,34 +2163,44 @@ let curry_mode_const alloc arg : With_locality.Const.t =
 
 module Curry_mode = struct
   type t =
-    | Const of With_locality.Const.t
+    | Const of { mode : With_locality.Const.t; pin_areality : bool }
     | Variable of
         { comonadic : With_locality.Comonadic.l;
-          areality : Locality.Const.t }
+          areality : Locality.Const.t option }
+
+  let const mode = Const { mode; pin_areality = true }
+
+  let legacy = const With_locality.Const.legacy
+
+  let primitive mode = Const { mode; pin_areality = false }
 
   let comonadic = function
-    | Const c ->
-      With_locality.Comonadic.of_const (With_locality.Const.partial_apply c)
+    | Const { mode; _ } ->
+      With_locality.Comonadic.of_const (With_locality.Const.partial_apply mode)
     | Variable { comonadic; _ } -> comonadic
 
   let areality = function
-    | Const c -> c.areality
+    | Const { mode; pin_areality } ->
+      if pin_areality then Some mode.areality else None
     | Variable { areality; _ } -> areality
 
   let add_arg t marg ~upper_areality =
-    let areality = Locality.Const.join (areality t) upper_areality in
-    let pinned =
-      With_locality.Comonadic.of_const
-        { With_locality.Comonadic.Const.min with areality }
-    in
-    Variable
-      { comonadic =
-          With_locality.Comonadic.join [curry_mode (comonadic t) marg; pinned];
-        areality }
+    let comonadic = curry_mode (comonadic t) marg in
+    match areality t with
+    | None -> Variable { comonadic; areality = None }
+    | Some areality ->
+      let areality = Locality.Const.join areality upper_areality in
+      let pinned =
+        With_locality.Comonadic.of_const
+          { With_locality.Comonadic.Const.min with areality }
+      in
+      Variable
+        { comonadic = With_locality.Comonadic.join [comonadic; pinned];
+          areality = Some areality }
 
   let add_const_arg t (arg : With_locality.Const.t) =
     match t with
-    | Const c -> Const (curry_mode_const c arg)
+    | Const c -> Const { c with mode = curry_mode_const c.mode arg }
     | Variable _ ->
       add_arg t (With_locality.of_const arg) ~upper_areality:arg.areality
 end
