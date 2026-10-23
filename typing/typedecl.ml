@@ -104,6 +104,7 @@ type error =
     }
   | Null_arity_external
   | Missing_native_external
+  | Local_opt_with_mode_variable
   | Unbound_type_var of type_expr * type_declaration
   | Cannot_extend_private_type of Path.t
   | Not_extensible_type of Path.t
@@ -4447,6 +4448,23 @@ let error_if_has_deep_native_repr_attributes core_type =
   in
   default_iterator.typ this_iterator core_type
 
+let has_mode_variables core_type =
+  let open Ast_iterator in
+  let found = ref false in
+  let this_iterator =
+    { default_iterator with typ = fun iterator core_type ->
+      begin match core_type.ptyp_desc with
+      | Ptyp_arrow (_, _, _, marg, mret)
+        when Typemode.has_mode_variables marg
+          || Typemode.has_mode_variables mret ->
+        found := true
+      | _ -> ()
+      end;
+      default_iterator.typ iterator core_type }
+  in
+  this_iterator.typ this_iterator core_type;
+  !found
+
 (* Note that [typ] is guaranteed not to contain sort variables because it was
    produced by [type_scheme], which defaults them.
 
@@ -4910,6 +4928,11 @@ let transl_value_decl env loc ~modal ~why valdecl =
         parse_native_repr_attributes
           env valdecl.pval_type ty Prim_global ~global_repr ~is_layout_poly
       in
+      let is_local_opt = function Prim_poly, _ -> true | _ -> false in
+      if List.exists is_local_opt (native_repr_res :: native_repr_args)
+      && has_mode_variables valdecl.pval_type then
+        Error.log_and_raise valdecl.pval_type.ptyp_loc
+          Local_opt_with_mode_variable;
       let prim =
         Primitive.parse_declaration valdecl
           ~native_repr_args
@@ -5787,6 +5810,10 @@ let report_error ~loc = function
         "An external function with more than 5 arguments \
          requires a second stub function@
          for native-code compilation"
+  | Local_opt_with_mode_variable ->
+      Location.errorf ~loc
+        "%a cannot be combined with mode variables."
+        Style.inline_code "[@local_opt]"
   | Unbound_type_var (ty, decl) ->
       Location.errorf ~loc
         "A type variable is unbound in this type declaration%t"

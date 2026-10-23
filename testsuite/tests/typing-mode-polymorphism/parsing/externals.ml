@@ -354,85 +354,109 @@ Error: This value is "local" to the parent region but is expected to be "global"
 external add_opt : (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
-external add_opt : (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
-  = "%int32_add"
+Line 1, characters 19-75:
+1 | external add_opt : (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external add_opt_res :
   int32 @ [< 'm] -> int32 @ [< 'm] -> (int32 [@local_opt]) = "%int32_add"
 [%%expect{|
-external add_opt_res : int32 @ 'n -> int32 @ 'm -> (int32 [@local_opt])
-  = "%int32_add"
+Line 2, characters 2-58:
+2 |   int32 @ [< 'm] -> int32 @ [< 'm] -> (int32 [@local_opt]) = "%int32_add"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
 [%%expect{|
-external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
+Line 1, characters 23-57:
+1 | external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_res_var : int32 -> (int32 [@local_opt]) @ [> 'm] = "%int32_neg"
 [%%expect{|
-external opt_res_var : int32 -> (int32 [@local_opt]) @ 'm = "%int32_neg"
+Line 1, characters 23-61:
+1 | external opt_res_var : int32 -> (int32 [@local_opt]) @ [> 'm] = "%int32_neg"
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_global_var :
   (int32 [@local_opt]) -> int32 @ [< 'm & global] -> (int32 [@local_opt])
   = "%int32_add"
 [%%expect{|
-external opt_global_var :
-  (int32 [@local_opt]) -> int32 @ [< global] -> (int32 [@local_opt])
-  = "%int32_add"
+Line 2, characters 2-73:
+2 |   (int32 [@local_opt]) -> int32 @ [< 'm & global] -> (int32 [@local_opt])
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_callback_arg :
   ('a [@local_opt]) -> ('a @ [< 'm] -> 'b) -> 'b = "%revapply"
 [%%expect{|
-external opt_callback_arg : ('a [@local_opt]) -> ('a @ 'm -> 'b) -> 'b
-  = "%revapply"
+Line 2, characters 2-48:
+2 |   ('a [@local_opt]) -> ('a @ [< 'm] -> 'b) -> 'b = "%revapply"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_callback_res :
   ('a [@local_opt]) -> ('a -> 'b @ [> 'm]) -> 'b = "%revapply"
 [%%expect{|
-external opt_callback_res : ('a [@local_opt]) -> ('a -> 'b @ 'm) -> 'b
-  = "%revapply"
+Line 2, characters 2-48:
+2 |   ('a [@local_opt]) -> ('a -> 'b @ [> 'm]) -> 'b = "%revapply"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_variant :
   ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit = "caml_opt_variant"
 [%%expect{|
-external opt_variant : ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit
-  = "caml_opt_variant"
+Line 2, characters 2-56:
+2 |   ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit = "caml_opt_variant"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_object :
   ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit = "caml_opt_object"
 [%%expect{|
-external opt_object : ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit
-  = "caml_opt_object"
+Line 2, characters 2-54:
+2 |   ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit = "caml_opt_object"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_polytype :
   ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit = "caml_opt_polytype"
 [%%expect{|
-external opt_polytype : ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit
-  = "caml_opt_polytype"
+Line 2, characters 2-52:
+2 |   ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit = "caml_opt_polytype"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_constr_arg :
   ('a [@local_opt]) -> ('a @ [< 'm] -> unit) list -> unit = "caml_opt_list"
 [%%expect{|
-external opt_constr_arg : ('a [@local_opt]) -> ('a @ 'm -> unit) list -> unit
-  = "caml_opt_list"
+Line 2, characters 2-57:
+2 |   ('a [@local_opt]) -> ('a @ [< 'm] -> unit) list -> unit = "caml_opt_list"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_returned_closure :
   (int32 [@local_opt]) -> (int32 @ [< 'm] -> int32 @ [> 'm])
   = "caml_opt_closure"
 [%%expect{|
-external opt_returned_closure :
-  (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
-  = "caml_opt_closure"
+Line 2, characters 2-60:
+2 |   (int32 [@local_opt]) -> (int32 @ [< 'm] -> int32 @ [> 'm])
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: "[@local_opt]" cannot be combined with mode variables.
 |}];;
 
 external opt_only :
