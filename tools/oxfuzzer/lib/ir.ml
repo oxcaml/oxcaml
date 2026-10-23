@@ -452,7 +452,7 @@ module Expr = struct
              (fun (name, _) -> None, ident (Name.to_string name))
              components)
       in
-      (* CR-soon xclerc for xclerc: here to, we may want to not let-bind. *)
+      (* CR-soon xclerc for xclerc: here too, we may want to not let-bind. *)
       (* As with constructor payloads, sequence effectful components
          explicitly. *)
       List.fold_right
