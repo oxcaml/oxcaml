@@ -976,6 +976,12 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
 
+let singleton_product_shape_for_bytecode
+    (shape : 'a mixed_block_element array) =
+  match shape with
+  | [| Product elements |] -> Some elements
+  | _ -> None
+
 let equal_layout x y =
   match x, y with
   | Pvalue x, Pvalue y -> equal_value_kind x y
@@ -1657,6 +1663,7 @@ let split_vectors =
 let layout_unit = non_null_value Pintval
 let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})
 let layout_unboxed_unit = Pvoid
+let layout_void = Pvoid
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
 let layout_array kind = non_null_value (Parrayval kind)
@@ -3391,7 +3398,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Base Mask -> layout_unboxed_mask
-  | Base Void -> layout_unboxed_unit
+  | Base Void -> layout_void
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Addressable sort ->
@@ -3530,7 +3537,7 @@ let rec layout_of_mixed_block_element element =
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
   | Mask -> layout_unboxed_mask
-  | Void -> layout_unboxed_unit
+  | Void -> layout_void
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))

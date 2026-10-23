@@ -40,6 +40,47 @@ let get_and_clear_output ({ contents } as t) =
   t.contents <- Or_null.null;
   contents
 
+type stats_ref =
+  { mutable time : float;
+    mutable num_outputs : int;
+    mutable num_iterations : int
+  }
+
+let create_stats () = { time = 0.; num_outputs = 0; num_iterations = 0 }
+
+type stats =
+  { total_time : float;
+    num_outputs : int;
+    num_iterations : int
+  }
+
+let get_and_clear_stats
+    ({ time; num_outputs; num_iterations } as stats_ref : stats_ref) =
+  stats_ref.time <- 0.;
+  stats_ref.num_iterations <- 0;
+  stats_ref.num_outputs <- 0;
+  { total_time = time; num_outputs; num_iterations }
+
+let print_stats ppf { total_time; num_outputs; num_iterations } =
+  if num_iterations = 0
+  then Format.fprintf ppf "---"
+  else
+    Format.fprintf ppf
+      "%d iteration(s) (total: %f, mean: %f), producing %d output(s) (average: \
+       %f, average time: %f)"
+      num_iterations total_time
+      (total_time /. float num_iterations)
+      num_outputs
+      (float num_outputs /. float num_iterations)
+      (total_time /. float num_outputs)
+
+type timer = { mutable start_time : float }
+
+type metrics_code =
+  | Timer_start of timer
+  | Timer_stop of timer
+  | Increase_outputs_count
+
 type bindings_ref =
   | Bindings_ref_innermost_first :
       ('k columns * 'k Or_null_receiver.hlist with_names)
@@ -114,6 +155,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * string list
         * label
         -> code
+    | If_let :
+        'v Or_null_sender.t
+        * string
+        * ('k Constant.hlist -> 'v Or_null.t)
+        * string
+        * 'k Or_null_receiver.hlist
+        * string list
+        * label
+        -> code
     | Call_with_bindings :
         (bindings_ref -> 'b Constant.hlist -> unit)
         * string
@@ -132,16 +182,18 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * ('s, _, 'v) Column.hlist
         * 'v Table.result_repr
         -> code
+    | Metrics : metrics_code * stats_ref -> code
 
   let labels = function
-    | Exit () | Union _ | Call_with_bindings _ -> []
+    | Exit () | Union _ | Call_with_bindings _ | Metrics _ -> []
     | Goto lab
     | Init (_, _, _, _, lab)
     | Advance (_, _, _, _, lab)
     | Absent (_, _, _, _, _, lab)
     | Distinct (_, _, _, _, _, lab)
     | Seek (_, _, _, _, lab)
-    | Filter (_, _, _, _, lab) ->
+    | Filter (_, _, _, _, lab)
+    | If_let (_, _, _, _, _, _, lab) ->
       [lab]
 
   let print_list =
@@ -172,11 +224,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Filter (_, name, _, names, if_false) ->
       Format.fprintf ppf "filter@ %s,@ [@[%a]@],@ %a" name print_list names
         (print_label digits) if_false
+    | If_let (_, name, _, fn, _, names, if_null) ->
+      Format.fprintf ppf "call@ %s,@ %s,@ [@[%a]@],@ %a" name fn print_list
+        names (print_label digits) if_null
     | Call_with_bindings (_, name, _, _, names) ->
       Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
     | Union (_, _, name, _, names, _, value_name, _, _) ->
       Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
         print_list names value_name
+    | Metrics (Timer_start _timer, _stats) -> Format.fprintf ppf "timer.start"
+    | Metrics (Timer_stop _timer, _stats) -> Format.fprintf ppf "timer.stop"
+    | Metrics (Increase_outputs_count, _stats) -> Format.fprintf ppf "count++"
 
   let print_code_iarray ppf code =
     let length = Iarray.length code in
@@ -229,26 +287,44 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
      The [late] type below is used to represent as closures the instructions
      with unresolved labels emitted during the first iteration. The closure
-     takes as argument the resolved offsets for the labels. *)
+     takes as argument the resolved offsets for the labels.
 
-  type 'a late = Late of (label iarray -> 'a) [@@unboxed]
-
-  let run_late (Late f) len = f len
+     Unconditional jumps ([goto]) are explicitly represented in the [state] type
+     in order to simplify code when a jump is either followed immediately by its
+     label or by an instruction insn without label (which becomes
+     unreachable). *)
 
   type label_id = Label_id of int [@@unboxed]
 
-  (** [code] and [labels] are accumulated across the whole code; [bindings] and
-      [loops] are used to implement structured primitives and depend on the
-      context only. *)
+  type late = Late of (label iarray -> code)
+
+  (** [code] and [labels] are accumulated across the whole code; [bindings] are
+      used to implement structured primitives and depend on the context only. *)
   type state =
-    { code : code late Dynarray.t;
-      mutable labels : int Dynarray.t;
+    { code : late Dynarray.t;
+      pending_jump : (label_id * fused_labels:label_id list) option ref;
+          (** Pending [goto] instruction not yet added to the [code] array.
+
+              The [fused_labels] are placed after the goto, i.e. a
+              [pending_jump] of [l, ~fused_labels:[l1, ..., ln]] represents a
+              trail of:
+
+              goto l; label l1, ..., ln:
+
+              This is used to optimise the case where a [goto] is immediately
+              followed by its label: in this case, we can replace:
+
+              goto l; label l1, ..., ln, l:
+
+              with just:
+
+              label l1, ..., ln, l: *)
+      labels : int Dynarray.t;
           (** Map from label ids to their resolved offset. -1 for unresolved
               labels. *)
-      bindings : bindings_ref;
+      bindings : bindings_ref
           (** Used to implement [Callback_with_bindings]; contains the variables
               in the current scope. *)
-      after_loops : label_id list  (** Used to implement [break]. *)
     }
 
   type assembler = state -> unit
@@ -265,27 +341,65 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let get_label offsets (Label_id label) = Iarray.get offsets label
 
+  let record_labels labels st =
+    List.iter
+      (fun (Label_id label) ->
+        Dynarray.set st.labels label (Dynarray.length st.code))
+      labels
+
+  let flush_pending_jump st =
+    match !(st.pending_jump) with
+    | None -> ()
+    | Some (target, ~fused_labels) ->
+      st.pending_jump := None;
+      Dynarray.add_last st.code
+        (Late (fun offsets -> Goto (get_label offsets target)));
+      record_labels fused_labels st
+
+  let run_late (Late f) offsets = f offsets
+
   let here (Label_id label) st =
     if Dynarray.get st.labels label >= 0
     then Misc.fatal_error "here: label already defined";
-    Dynarray.set st.labels label (Dynarray.length st.code)
+    match !(st.pending_jump) with
+    | None -> Dynarray.set st.labels label (Dynarray.length st.code)
+    | Some (Label_id pending_jump, ~fused_labels) when pending_jump = label ->
+      st.pending_jump := None;
+      record_labels (Label_id label :: fused_labels) st
+    | Some ((Label_id _ as jump_target), ~fused_labels) ->
+      st.pending_jump
+        := Some (jump_target, ~fused_labels:(Label_id label :: fused_labels))
 
-  let emit insn st = Dynarray.add_last st.code (Late (fun _ -> insn))
+  let is_dead st =
+    (* If we have seen an unconditional jump and no labels since that jump,
+       nobody can reach us -- no need to emit anything. *)
+    match !(st.pending_jump) with
+    | Some (_, ~fused_labels:[]) -> true
+    | None | Some _ -> false
 
-  let emit_with_label label f st =
-    Dynarray.add_last st.code (Late (fun len -> f (get_label len label)))
+  let emit0 insn st =
+    if not (is_dead st)
+    then (
+      flush_pending_jump st;
+      Dynarray.add_last st.code (Late insn))
 
-  (* Note: [break 0] doesn't break out of any loops *)
-  let break n st =
-    if n > 0
-    then
-      match List.nth st.after_loops (n - 1) with
-      | lab -> emit_with_label lab (fun lab -> Goto lab) st
-      | exception Not_found -> Misc.fatal_error "cannot break"
+  let emit insn st = emit0 (fun _ -> insn) st
+
+  let emit_with_label f label st =
+    emit0 (fun offsets -> f (get_label offsets label)) st
+
+  let goto lab st =
+    if not (is_dead st)
+    then (
+      flush_pending_jump st;
+      st.pending_jump := Some (lab, ~fused_labels:[]))
+
+  let nop _ = ()
 
   let with_binding repr receiver body st =
     let (Bindings_ref_innermost_first (reprs, receivers)) = st.bindings in
-    body receiver
+    body
+      { value = receiver; name = repr.name }
       { st with
         bindings =
           Bindings_ref_innermost_first
@@ -295,30 +409,30 @@ module Make (Iterator : Leapfrog.Iterator) = struct
               } )
       }
 
-  let init receiver iterator label =
-    emit_with_label label (fun label ->
+  let init receiver iterator =
+    emit_with_label (fun label ->
         Init
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let advance receiver iterator label =
-    emit_with_label label (fun label ->
+  let advance receiver iterator =
+    emit_with_label (fun label ->
         Advance
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
-  let absent columns { value = trie; name } { values = args; names } label =
-    emit_with_label label (fun label ->
+  let absent columns { value = trie; name } { values = args; names } =
+    emit_with_label (fun label ->
         Absent (columns, trie, name, args, names, label))
 
-  let distinct column key1 key2 label =
-    emit_with_label label (fun label ->
+  let distinct column key1 key2 =
+    emit_with_label (fun label ->
         Distinct (column, key1.value, key1.name, key2.value, key2.name, label))
 
-  let seek iterator { value = receiver; name } label =
-    emit_with_label label (fun label ->
+  let seek iterator { value = receiver; name } =
+    emit_with_label (fun label ->
         Seek (iterator.values, iterator.names, receiver, name, label))
 
-  let filter { value = fn; name } { values = args; names } label =
-    emit_with_label label (fun label -> Filter (fn, name, args, names, label))
+  let filter { value = fn; name } { values = args; names } =
+    emit_with_label (fun label -> Filter (fn, name, args, names, label))
 
   let ( ++ ) fn1 fn2 code =
     fn1 code;
@@ -326,8 +440,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let list xs st = List.iter (fun x -> x st) xs
 
-  let with_loop lab body st =
-    body { st with after_loops = lab :: st.after_loops }
+  let exists cond body =
+    let* after = lab in
+    list [cond ~accept:(body ++ goto after); here after]
 
   let for_in repr iterators body =
     let iterator =
@@ -340,7 +455,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         list
           [ init { repr with value = sender } iterator after_loop;
             here start_of_body;
-            with_loop after_loop (body receiver);
+            body receiver;
             advance { repr with value = sender } iterator start_of_body;
             here after_loop ])
 
@@ -362,6 +477,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let if_ fn args body = if_template (filter fn args) body
 
+  let if_let name fn args body st =
+    let sender, receiver = Channel.create_or_null Or_null.null in
+    let receiver = { value = receiver; name } in
+    if_template
+      (emit_with_label (fun label ->
+           If_let
+             (sender, name, fn.value, fn.name, args.values, args.names, label)))
+      (body receiver) st
+
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
 
@@ -378,6 +502,15 @@ module Make (Iterator : Leapfrog.Iterator) = struct
            value_name,
            inner_columns,
            repr ))
+
+  let with_timer ~stats body st =
+    let timer = { start_time = 0. } in
+    emit (Metrics (Timer_start timer, stats)) st;
+    body st;
+    emit (Metrics (Timer_stop timer, stats)) st
+
+  let increase_count ~stats st =
+    emit (Metrics (Increase_outputs_count, stats)) st
 
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
@@ -414,7 +547,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let labels = Dynarray.create () in
     let st =
       { code = delayed;
-        after_loops = [];
+        pending_jump = ref None;
         bindings =
           Bindings_ref_innermost_first (Nil, { values = []; names = [] });
         labels
@@ -424,12 +557,13 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     (* The last instruction is always an [Exit], which means we can use
        [unsafe_get] in [exec] after incrementing the program counter. *)
     emit (Exit ()) st;
+    assert (Option.is_none !(st.pending_jump));
     let len = Dynarray.length delayed in
     let labels =
       Iarray.init (Dynarray.length labels) (fun i ->
           let offset = Dynarray.get labels i in
           if not (0 <= offset && offset < len)
-          then Misc.fatal_error "out-of-range (unresolved) label";
+          then Misc.fatal_errorf "out-of-range (unresolved) label (at %d)" i;
           Label offset)
     in
     Dynarray.unsafe_to_iarray ~capacity:len (fun code ->
@@ -522,6 +656,12 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       else next ()
     | Filter (func, _name, args, _names, if_false) ->
       if func (read_hlist args) then next () else goto if_false
+    | If_let (sender, _name, fn, _fn_name, args, _names, if_null) -> (
+      match fn (read_hlist args) with
+      | Null -> goto if_null
+      | This value ->
+        write sender value;
+        next ())
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
       next ()
@@ -537,6 +677,17 @@ module Make (Iterator : Leapfrog.Iterator) = struct
             contents entry
         in
         table.contents <- Or_null.this contents);
+      next ()
+    | Metrics (Timer_start timer, stats) ->
+      stats.num_iterations <- stats.num_iterations + 1;
+      timer.start_time <- Sys.time ();
+      next ()
+    | Metrics (Timer_stop timer, stats) ->
+      let time = Sys.time () in
+      stats.time <- stats.time +. (time -. timer.start_time);
+      next ()
+    | Metrics (Increase_outputs_count, stats) ->
+      stats.num_outputs <- stats.num_outputs + 1;
       next ()
 
   let run t =
