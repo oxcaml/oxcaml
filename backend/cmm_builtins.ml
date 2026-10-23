@@ -1006,7 +1006,10 @@ let transl_builtin name args dbg typ_res =
   (* Native_pointer: handled as unboxed nativeint *)
   | "caml_ext_pointer_as_native_pointer" ->
     Some
-      (lsl_int (untag_int (one_arg name args) dbg) (Cconst_int (1, dbg)) dbg)
+      (add_int
+         (tagged_int_as_int64 ~dbg (one_arg name args))
+         (Cconst_int (-1, dbg))
+         dbg)
   | "caml_native_pointer_of_value" ->
     Some (value_as_int64 ~dbg (one_arg name args))
   | "caml_native_pointer_to_value" ->

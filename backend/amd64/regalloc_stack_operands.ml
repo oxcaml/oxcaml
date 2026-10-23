@@ -276,7 +276,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
         )
   | Op
       (Reinterpret_cast
-         (Int64_of_value | Value_of_int64 | Mask_of_int64 | Int64_of_mask))
+         ( Int64_of_value | Value_of_int64 | Int64_of_tagged_int
+         | Tagged_int_of_int64 | Mask_of_int64 | Int64_of_mask ))
   | Op
       (Specific
          ( Isextend32 | Izextend32 | Ineg | Ilea _

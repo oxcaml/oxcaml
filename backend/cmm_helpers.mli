@@ -947,6 +947,10 @@ val int64_as_value : dbg:Debuginfo.t -> expression -> expression
 
 val value_as_int64 : dbg:Debuginfo.t -> expression -> expression
 
+val tagged_int_as_int64 : dbg:Debuginfo.t -> expression -> expression
+
+val int64_as_tagged_int : dbg:Debuginfo.t -> expression -> expression
+
 val int64_as_float : dbg:Debuginfo.t -> expression -> expression
 
 val float_as_int64 : dbg:Debuginfo.t -> expression -> expression

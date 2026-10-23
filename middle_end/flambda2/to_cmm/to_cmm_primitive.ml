@@ -1036,32 +1036,32 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
     | Asr -> C.asr_int_caml_raw x y ~dbg)
   | kind ->
     let kind = integral_of_standard_int kind in
-    let f, (signedness : Scalar.Signedness.t) =
-      (* Shifts operate on register-width integers, so we widen [x] and truncate
-         the result back down to [kind]. Right shifts must widen with the
-         signedness of the shift; for [Lsl] the choice is irrelevant since the
-         widened bits never reach the low bits of the result. *)
+    let nativeint = C.Scalar_type.Integer.nativeint in
+    let f, (signedness : Scalar.Signedness.t), result_kind =
       match op with
-      | Asr -> C.asr_int, Signed
-      | Lsr -> C.lsr_int, Unsigned
-      | Lsl -> C.lsl_int, Signed
+      | Asr -> C.asr_int, Signed, kind
+      | Lsr -> C.lsr_int, Unsigned, nativeint
+      | Lsl -> C.lsl_int, Signed, nativeint
     in
     let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
-    C.Scalar_type.Integer.conjugate ~outer:kind
-      ~inner:C.Scalar_type.Integer.nativeint ~dbg ~signedness
-      ~f:(fun x ->
-        (* [kind] only applies to [x], the [y] argument is always a bare
-           register-sized integer *)
-        f x y dbg)
-      x
+    let x =
+      C.Scalar_type.Integer.static_cast ~src:kind ~dst:nativeint ~dbg
+        ~signedness x
+    in
+    C.Scalar_type.Integer.static_cast ~src:result_kind ~dst:kind ~dbg
+      ~signedness (f x y dbg)
+
+let widen_integer_for_comparison ~dbg (kind : C.Scalar_type.Integer.t) arg =
+  match kind with
+  | Tagged_int -> C.tagged_int_as_int64 ~dbg arg
+  | Naked_int _ ->
+    C.Scalar_type.Integer.static_cast arg ~dbg ~src:kind
+      ~dst:C.Scalar_type.Integer.nativeint ~signedness:Signed
 
 let binary_int_comp_primitive _env dbg kind cmp x y =
   let int_type = integral_of_standard_int kind in
-  let x, y =
-    match int_type with
-    | Tagged_int -> C.value_as_int64 ~dbg x, C.value_as_int64 ~dbg y
-    | Naked_int _ -> x, y
-  in
+  let widen = widen_integer_for_comparison ~dbg int_type in
+  let x, y = widen x, widen y in
   match int_type, (cmp : P.signed_or_unsigned P.comparison) with
   (* [x] and [y] are expressions yielding well-formed tagged immediates, that is
      to say, their least significant bit (LSB) is 1. However when comparing
@@ -1084,25 +1084,21 @@ let binary_int_comp_primitive _env dbg kind cmp x y =
   | Tagged_int, Eq -> C.eq ~dbg x y
   | Tagged_int, Neq -> C.neq ~dbg x y
   (* Naked integers. *)
-  | (Naked_int _ as kind), cmp ->
-    let f, (signedness : Scalar.Signedness.t) =
+  | Naked_int _, cmp ->
+    let f =
       match cmp with
-      | Lt Signed -> C.lt, Signed
-      | Le Signed -> C.le, Signed
-      | Gt Signed -> C.gt, Signed
-      | Ge Signed -> C.ge, Signed
-      | Lt Unsigned -> C.ult, Unsigned
-      | Le Unsigned -> C.ule, Unsigned
-      | Gt Unsigned -> C.ugt, Unsigned
-      | Ge Unsigned -> C.uge, Unsigned
-      | Eq -> C.eq, Signed
-      | Neq -> C.neq, Signed
+      | Lt Signed -> C.lt
+      | Le Signed -> C.le
+      | Gt Signed -> C.gt
+      | Ge Signed -> C.ge
+      | Lt Unsigned -> C.ult
+      | Le Unsigned -> C.ule
+      | Gt Unsigned -> C.ugt
+      | Ge Unsigned -> C.uge
+      | Eq -> C.eq
+      | Neq -> C.neq
     in
-    let widen exp =
-      C.Scalar_type.Integer.static_cast exp ~dbg ~src:kind
-        ~dst:C.Scalar_type.Integer.nativeint ~signedness
-    in
-    f ~dbg (widen x) (widen y)
+    f ~dbg x y
 
 let binary_int_comp_primitive_yielding_int _env dbg kind
     (signed : P.signed_or_unsigned) x y =
@@ -1110,15 +1106,7 @@ let binary_int_comp_primitive_yielding_int _env dbg kind
      first. Tagged immediates can be compared directly since tagging is
      monotone. *)
   let widen =
-    match integral_of_standard_int kind with
-    | Tagged_int -> C.value_as_int64 ~dbg
-    | Naked_int _ as kind ->
-      let signedness : Scalar.Signedness.t =
-        match signed with Signed -> Signed | Unsigned -> Unsigned
-      in
-      fun exp ->
-        C.Scalar_type.Integer.static_cast exp ~dbg ~src:kind
-          ~dst:C.Scalar_type.Integer.nativeint ~signedness
+    widen_integer_for_comparison ~dbg (integral_of_standard_int kind)
   in
   match signed with
   | Signed -> C.mk_compare_ints_untagged dbg (widen x) (widen y)
@@ -1242,9 +1230,9 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Reinterpret_64_bit_word reinterpret ->
     let cmm =
       match reinterpret with
-      | Tagged_int63_as_unboxed_int64 -> C.value_as_int64 ~dbg arg
+      | Tagged_int63_as_unboxed_int64 -> C.tagged_int_as_int64 ~dbg arg
       | Unboxed_int64_as_tagged_int63 ->
-        C.int64_as_value ~dbg (C.or_int (C.int 1 ~dbg) arg dbg)
+        C.int64_as_tagged_int ~dbg (C.or_int (C.int 1 ~dbg) arg dbg)
       | Unboxed_int64_as_unboxed_float64 -> C.int64_as_float ~dbg arg
       | Unboxed_float64_as_unboxed_int64 -> C.float_as_int64 ~dbg arg
     in

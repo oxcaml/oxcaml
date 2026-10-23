@@ -40,6 +40,8 @@ type static_handler =
     label : Label.t
   }
 
+val normalize_int_constant : Cmm.expression -> Cmm.expression
+
 type environment =
   { vars :
       (Reg.t array * V.Provenance.t option * Asttypes.mutable_flag) V.Map.t;

@@ -576,6 +576,8 @@ let add_const = check_equal_3 "add_const" add_const ~engine:add_const'
 
 let incr_int c dbg = add_const c 1 dbg
 
+let decr_int c dbg = add_const c (-1) dbg
+
 let rec add_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
@@ -1103,39 +1105,102 @@ let store ~dbg memory_chunk init ~addr ~new_value =
 
 let int64_as_value ~dbg arg = Cop (Creinterpret_cast Value_of_int64, [arg], dbg)
 
-let value_as_int64 ~dbg arg = Cop (Creinterpret_cast Int64_of_value, [arg], dbg)
+let value_as_int64 ~dbg arg =
+  map_tail1 arg ~f:(function
+    | Cconst_tagged_int (n, _) ->
+      natint_const_untagged dbg (encode_tagged_int n)
+    | arg -> Cop (Creinterpret_cast Int64_of_value, [arg], dbg))
+
+let tagged_int_as_int64 ~dbg arg =
+  map_tail1 arg ~f:(function
+    | Cconst_tagged_int (n, _) ->
+      natint_const_untagged dbg (encode_tagged_int n)
+    | Cop (Creinterpret_cast Tagged_int_of_int64, [arg], _) -> arg
+    | arg -> Cop (Creinterpret_cast Int64_of_tagged_int, [arg], dbg))
+
+let int64_as_tagged_int ~dbg arg =
+  map_tail1 arg ~f:(function
+    | (Cconst_int _ | Cconst_natint _) as arg ->
+      let n = const_exn arg in
+      if Nativeint.logand n 1n <> 1n
+      then Misc.fatal_error "int64_as_tagged_int: expected an odd integer";
+      int_const dbg (Nativeint.to_int (Nativeint.shift_right n 1))
+    | Cop (Creinterpret_cast Int64_of_tagged_int, [arg], _) -> arg
+    | arg -> Cop (Creinterpret_cast Tagged_int_of_int64, [arg], dbg))
 
 let tag_int i dbg =
-  match low_bits i ~bits:(arch_bits - 1) ~dbg with
-  | Cconst_int (n, _) -> int_const dbg n
-  | Cconst_natint (n, _) -> int_const dbg (Nativeint.to_int n)
-  | i -> Cop (Cstatic_cast Tagged_int_of_int64, [i], dbg)
+  int64_as_tagged_int ~dbg
+    (map_tail1
+       (low_bits i ~bits:(arch_bits - 1) ~dbg)
+       ~f:(function
+         | Cconst_int (n, _) -> natint_const_untagged dbg (encode_tagged_int n)
+         | Cconst_natint (n, _) ->
+           natint_const_untagged dbg (encode_tagged_int (Nativeint.to_int n))
+         | Cop (Casr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+           or_const (asr_const e (right - 1) dbg_op) 1n dbg
+         | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op) when right > 0 ->
+           or_const (lsr_const e (right - 1) dbg_op) 1n dbg
+         | c -> incr_int (lsl_const c 1 dbg) dbg))
 
-let untag_int i dbg =
-  match i with
-  | Cconst_tagged_int (n, _) -> Cconst_int (n, dbg)
-  | i ->
-    Cop (Cstatic_cast (Int64_of_tagged_int { signedness = Signed }), [i], dbg)
+let untag_int_bits i dbg =
+  map_tail1 i ~f:(function
+    | Cconst_int (n, _) -> Cconst_int (n asr 1, dbg)
+    | Cop (Cor, [Cop (Casr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
+      when n > 0 && is_defined_shift (n + 1) ->
+      asr_const c (n + 1) dbg
+    | Cop (Cor, [Cop (Clsr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
+      when n > 0 && is_defined_shift (n + 1) ->
+      lsr_const c (n + 1) dbg
+    | c -> asr_const c 1 dbg)
 
-let unsigned_untag_int i dbg =
-  match i with
-  | Cconst_tagged_int (n, _) ->
-    natint_const_untagged dbg
-      (Nativeint.shift_right_logical (encode_tagged_int n) 1)
-  | i ->
-    Cop (Cstatic_cast (Int64_of_tagged_int { signedness = Unsigned }), [i], dbg)
+let untag_int i dbg = untag_int_bits (tagged_int_as_int64 ~dbg i) dbg
 
-let mk_not dbg cmm = tag_int (xor_const (untag_int cmm dbg) 1n dbg) dbg
+let unsigned_untag_int i dbg = lsr_const (tagged_int_as_int64 ~dbg i) 1 dbg
+
+let mk_not dbg cmm =
+  map_tail1 (tagged_int_as_int64 ~dbg cmm) ~f:(function
+    | Cop
+        ( (Caddi | Cor),
+          [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+          dbg' ) -> (
+      match c with
+      | Cop (Ccmpi cmp, args, dbg'') ->
+        tag_int (Cop (Ccmpi (negate_integer_comparison cmp), args, dbg'')) dbg'
+      | Cop (Ccmpf (w, cmp), args, dbg'') ->
+        tag_int (Cop (Ccmpf (w, negate_float_comparison cmp), args, dbg'')) dbg'
+      | _ ->
+        int64_as_tagged_int ~dbg
+          (Cop
+             ( Cxor,
+               [Cconst_int (3, dbg); Cop (Clsl, [c; Cconst_int (1, dbg)], dbg)],
+               dbg )))
+    | c -> int64_as_tagged_int ~dbg (xor_const c 2n dbg))
 
 (** Whether two expressions are known to denote the same machine word. Only
     variables and constants are recognised, so that evaluating one of the two
     expressions instead of both is equivalent. *)
-let same_simple_value (e1 : expression) (e2 : expression) =
+let rec same_simple_value (e1 : expression) (e2 : expression) =
   match e1, e2 with
+  | ( Cop
+        ( Creinterpret_cast
+            ( Int64_of_value | Value_of_int64 | Int64_of_tagged_int
+            | Tagged_int_of_int64 ),
+          [e1],
+          _ ),
+      e2 ) ->
+    same_simple_value e1 e2
+  | ( e1,
+      Cop
+        ( Creinterpret_cast
+            ( Int64_of_value | Value_of_int64 | Int64_of_tagged_int
+            | Tagged_int_of_int64 ),
+          [e2],
+          _ ) ) ->
+    same_simple_value e1 e2
   | Cvar v1, Cvar v2 -> V.same v1 v2
-  | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
-  | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
-  | Cconst_tagged_int (n1, _), Cconst_tagged_int (n2, _) -> Int.equal n1 n2
+  | ( (Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _),
+      (Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _) ) ->
+    Nativeint.equal (const_exn e1) (const_exn e2)
   | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
     String.equal s1.sym_name s2.sym_name
   | _ -> false
@@ -1649,7 +1714,16 @@ let unsigned_mod_int c1 c2 dbg =
 
 (* Bool *)
 
-let test_bool dbg cmm = untag_int cmm dbg
+let test_bool dbg cmm =
+  map_tail1 (tagged_int_as_int64 ~dbg cmm) ~f:(function
+    | Cop
+        ( (Caddi | Cor),
+          [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+          _ ) ->
+      c
+    | Cconst_int (n, dbg) ->
+      if n = 1 then Cconst_int (0, dbg) else Cconst_int (1, dbg)
+    | c -> Cop (Ccmpi Cne, [c; Cconst_int (1, dbg)], dbg))
 
 (* Float *)
 
@@ -1852,8 +1926,7 @@ let get_field_gen_given_memory_chunk memory_chunk mutability ptr n dbg =
 let get_field_gen mut ptr n dbg =
   get_field_gen_given_memory_chunk Word_val mut ptr n dbg
 
-let get_field_codepointer mut ptr n dbg =
-  int64_as_value ~dbg (get_field_gen_given_memory_chunk Word_int mut ptr n dbg)
+let get_field_codepointer = get_field_gen
 
 let set_field ptr n newval init dbg =
   Cop (Cstore (Word_val, init), [field_address ptr n dbg; newval], dbg)
@@ -1913,9 +1986,38 @@ let array_indexing ?typ log2size ptr ofs dbg =
     | Some Naked_int -> Caddi
     | _ -> assert false
   in
-  match untag_int ofs dbg with
-  | Cconst_int (0, _) -> ptr
-  | ofs -> Cop (add, [ptr; lsl_const ofs log2size dbg], dbg)
+  let ofs = tagged_int_as_int64 ~dbg ofs in
+  match ofs with
+  | Cconst_int (n, _) ->
+    let i = n asr 1 in
+    if i = 0
+    then ptr
+    else Cop (add, [ptr; Cconst_int (i lsl log2size, dbg)], dbg)
+  | Cop
+      ( (Caddi | Cor),
+        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+        dbg' ) ->
+    if log2size = 0
+    then Cop (add, [ptr; untag_int_bits ofs dbg], dbg')
+    else Cop (add, [ptr; lsl_const c log2size dbg], dbg')
+  | Cop (Caddi, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
+    Cop
+      ( add,
+        [Cop (add, [ptr; untag_int_bits c dbg], dbg); Cconst_int (n asr 1, dbg)],
+        dbg' )
+  | Cop (Caddi, [c; Cconst_int (n, _)], _) ->
+    Cop
+      ( add,
+        [ Cop (add, [ptr; lsl_const c (log2size - 1) dbg], dbg);
+          Cconst_int ((n - 1) lsl (log2size - 1), dbg) ],
+        dbg )
+  | _ when log2size = 0 -> Cop (add, [ptr; untag_int_bits ofs dbg], dbg)
+  | _ ->
+    Cop
+      ( add,
+        [ Cop (add, [ptr; lsl_const ofs (log2size - 1) dbg], dbg);
+          Cconst_int (-1 lsl (log2size - 1), dbg) ],
+        dbg )
 
 (* CR Gbury: this conversion int -> nativeint is potentially unsafe when
    cross-compiling for 64-bit on a 32-bit host *)
@@ -4400,8 +4502,7 @@ let curry_function (kind, arity, return) =
 
 type unary_primitive = expression -> Debuginfo.t -> expression
 
-let int_as_pointer arg dbg =
-  int64_as_value ~dbg (lsl_const (untag_int arg dbg) 1 dbg)
+let int_as_pointer arg dbg = Cop (Caddv, [arg; Cconst_int (-1, dbg)], dbg)
 (* always a pointer outside the heap *)
 
 let raise_prim raise_kind ~extra_args arg dbg =
@@ -4409,7 +4510,9 @@ let raise_prim raise_kind ~extra_args arg dbg =
   then Cop (Craise raise_kind, arg :: extra_args, dbg)
   else Cop (Craise Lambda.Raise_notrace, arg :: extra_args, dbg)
 
-let negint arg dbg = tag_int (neg_int (untag_int arg dbg) dbg) dbg
+let negint arg dbg =
+  int64_as_tagged_int ~dbg
+    (sub_int (Cconst_int (2, dbg)) (tagged_int_as_int64 ~dbg arg) dbg)
 
 let addr_array_length arg dbg = tag_int (get_size arg dbg) dbg
 
@@ -4495,13 +4598,32 @@ let setfield n ptr init arg1 arg2 dbg =
   | Simple init -> return_unit dbg (set_field arg1 n arg2 init dbg)
 
 let add_int_caml arg1 arg2 dbg =
-  tag_int (add_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
+  int64_as_tagged_int ~dbg
+    (decr_int
+       (add_int
+          (tagged_int_as_int64 ~dbg arg1)
+          (tagged_int_as_int64 ~dbg arg2)
+          dbg)
+       dbg)
 
 let sub_int_caml arg1 arg2 dbg =
-  tag_int (sub_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
+  int64_as_tagged_int ~dbg
+    (incr_int
+       (sub_int
+          (tagged_int_as_int64 ~dbg arg1)
+          (tagged_int_as_int64 ~dbg arg2)
+          dbg)
+       dbg)
 
 let mul_int_caml arg1 arg2 dbg =
-  tag_int (mul_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
+  let arg1 = tagged_int_as_int64 ~dbg arg1 in
+  let arg2 = tagged_int_as_int64 ~dbg arg2 in
+  int64_as_tagged_int ~dbg
+    (match arg1, arg2 with
+    | (Cconst_int _ as c1), c2 ->
+      incr_int (mul_int (untag_int_bits c1 dbg) (decr_int c2 dbg) dbg) dbg
+    | c1, c2 ->
+      incr_int (mul_int (decr_int c1 dbg) (untag_int_bits c2 dbg) dbg) dbg)
 
 let div_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
@@ -4546,13 +4668,24 @@ let unsigned_mod_int_caml arg1 arg2 dbg =
     dbg
 
 let and_int_caml arg1 arg2 dbg =
-  tag_int (and_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
+  int64_as_tagged_int ~dbg
+    (and_int
+       (tagged_int_as_int64 ~dbg arg1)
+       (tagged_int_as_int64 ~dbg arg2)
+       dbg)
 
 let or_int_caml arg1 arg2 dbg =
-  tag_int (or_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
+  int64_as_tagged_int ~dbg
+    (or_int (tagged_int_as_int64 ~dbg arg1) (tagged_int_as_int64 ~dbg arg2) dbg)
 
 let xor_int_caml arg1 arg2 dbg =
-  tag_int (xor_int (untag_int arg1 dbg) (untag_int arg2 dbg) dbg) dbg
+  int64_as_tagged_int ~dbg
+    (or_const
+       (xor_int
+          (ignore_low_bit_int (tagged_int_as_int64 ~dbg arg1))
+          (ignore_low_bit_int (tagged_int_as_int64 ~dbg arg2))
+          dbg)
+       1n dbg)
 
 type ternary_primitive =
   expression -> expression -> expression -> Debuginfo.t -> expression
@@ -5095,13 +5228,18 @@ let float32_of_float = unary (Cstatic_cast Float32_of_float)
 let float_of_float32 = unary (Cstatic_cast Float_of_float32)
 
 let lsl_int_caml_raw ~dbg arg1 arg2 =
-  tag_int (lsl_int (untag_int arg1 dbg) arg2 dbg) dbg
+  int64_as_tagged_int ~dbg
+    (incr_int
+       (lsl_int (decr_int (tagged_int_as_int64 ~dbg arg1) dbg) arg2 dbg)
+       dbg)
 
 let lsr_int_caml_raw ~dbg arg1 arg2 =
-  tag_int (lsr_int (unsigned_untag_int arg1 dbg) arg2 dbg) dbg
+  int64_as_tagged_int ~dbg
+    (or_const (lsr_int (tagged_int_as_int64 ~dbg arg1) arg2 dbg) 1n dbg)
 
 let asr_int_caml_raw ~dbg arg1 arg2 =
-  tag_int (asr_int (untag_int arg1 dbg) arg2 dbg) dbg
+  int64_as_tagged_int ~dbg
+    (or_const (asr_int (tagged_int_as_int64 ~dbg arg1) arg2 dbg) 1n dbg)
 
 let eq ~dbg x y =
   match x, y with
@@ -5385,6 +5523,9 @@ let cmm_arith_size (e : Cmm.expression) =
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)
+    | Cop (Creinterpret_cast (Int64_of_tagged_int | Tagged_int_of_int64), l, _)
+      ->
+      List.fold_left ( + ) 0 (List.map cmm_arith_size0 l)
     | _ -> 0
   in
   match e with
@@ -5778,21 +5919,24 @@ module Scalar_type = struct
       | Tagged_int -> Format.fprintf ppf "tagged_int"
 
     let int_conv ~dbg ~src ~dst ~signedness exp =
-      (* An equal-width conversion is a no-op: it neither changes the meaningful
-         low bits nor which bits are meaningful. *)
-      if equal_int_width src dst
-      then exp
-      else unary (Cstatic_cast (Int_conv { src; dst; signedness })) ~dbg exp
+      match class_of_int_conv { src; dst; signedness } with
+      | Identity -> exp
+      | Sign_extend width ->
+        sign_extend ~bits:(bits_of_int_width width) ~dbg exp
+      | Zero_extend width ->
+        zero_extend ~bits:(bits_of_int_width width) ~dbg exp
 
     let static_cast ~dbg ~src ~dst ~signedness exp =
       match src, dst with
       | Naked_int src, Naked_int dst -> int_conv ~dbg ~src ~dst ~signedness exp
       | Tagged_int, Tagged_int -> exp
       | Naked_int src, Tagged_int ->
-        int_conv ~dbg ~src ~dst:Int64 ~signedness exp
-        |> unary (Cstatic_cast Tagged_int_of_int64) ~dbg
+        int_conv ~dbg ~src ~dst:Int64 ~signedness exp |> fun exp ->
+        tag_int exp dbg
       | Tagged_int, Naked_int dst ->
-        unary (Cstatic_cast (Int64_of_tagged_int { signedness })) ~dbg exp
+        (match (signedness : Scalar.Signedness.t) with
+          | Signed -> untag_int exp dbg
+          | Unsigned -> unsigned_untag_int exp dbg)
         |> int_conv ~dbg ~src:Int64 ~dst ~signedness
 
     let[@inline] conjugate ~outer ~inner ~dbg ~signedness ~f x =
@@ -5937,7 +6081,7 @@ let atomic_arith ~dbg ~op ~untag ~ext_name block offset i =
   bind "atomic_arg" i (fun i ->
       let i =
         if untag
-        then lsl_const (untag_int i dbg) 1 dbg
+        then decr_int (tagged_int_as_int64 ~dbg i) dbg
         else value_as_int64 ~dbg i
       in
       let atomic_op = Catomic { op; size = Word } in

@@ -210,6 +210,8 @@ let machtype_of_vec512_scalar : Cmm.vec512_type -> Cmm.machtype = function
 let reinterpret_cast_arg_type : Cmm.reinterpret_cast -> Cmm.machtype = function
   | Int64_of_value -> Cmm.typ_val
   | Value_of_int64 -> Cmm.typ_naked_int
+  | Int64_of_tagged_int -> Cmm.typ_tagged_int
+  | Tagged_int_of_int64 -> Cmm.typ_naked_int
   | Float_of_float32 -> Cmm.typ_float32
   | Float32_of_float -> Cmm.typ_float
   | Float_of_int64 -> Cmm.typ_naked_int
@@ -398,9 +400,7 @@ let check_machtype ~dbg ~(what : unit -> string) ~(expected : Cmm.machtype)
     in
     if not compatible
     then
-      (*= Misc.fatal_errorf *)
-      (* XXX jrayman: Change back *)
-      Format.eprintf
+      Misc.fatal_errorf
         "Cmm machtype check failed%s:\n  %s has machtype %a but %a was expected"
         (dbg_suffix dbg) (what ()) Printcmm.machtype actual Printcmm.machtype
         expected
@@ -421,13 +421,10 @@ let join_inferred_machtypes ~dbg ty1 ty2 : inferred_machtype =
       with
       | Some lub -> Machtype lub
       | None ->
-        (*= Misc.fatal_errorf *)
-        (* XXX jrayman: Change back *)
-        Format.eprintf
+        Misc.fatal_errorf
           "Cmm machtype check failed%s: join of incomparable machtype %a and \
            machtype %a"
-          (dbg_suffix dbg) Printcmm.machtype ty1 Printcmm.machtype ty2;
-        Never_returns
+          (dbg_suffix dbg) Printcmm.machtype ty1 Printcmm.machtype ty2
 
 let join_inferred_machtype_list ~dbg tys : inferred_machtype =
   List.fold_left (join_inferred_machtypes ~dbg) Never_returns tys

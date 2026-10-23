@@ -353,9 +353,10 @@ let is_pure = function
   | Floatop _ -> true
   | Csel _ -> true
   | Reinterpret_cast
-      ( V128_of_vec _ | V256_of_vec _ | V512_of_vec _ | Float32_of_float
-      | Float32_of_int32 | Float_of_float32 | Float_of_int64 | Int64_of_float
-      | Int32_of_float32 | Mask_of_int64 | Int64_of_mask ) ->
+      ( Int64_of_tagged_int | Tagged_int_of_int64 | V128_of_vec _
+      | V256_of_vec _ | V512_of_vec _ | Float32_of_float | Float32_of_int32
+      | Float_of_float32 | Float_of_int64 | Int64_of_float | Int32_of_float32
+      | Mask_of_int64 | Int64_of_mask ) ->
     true
   | Static_cast _ -> true
   (* Conservative to ensure valueofint/intofvalue are not eliminated before

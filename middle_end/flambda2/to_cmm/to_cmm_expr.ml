@@ -1295,7 +1295,7 @@ and switch env res switch =
           Option.value (C.cmm_arith_size tagged_scrutinee_cmm) ~default:max_int
         in
         if size_tagged < size_untagged
-        then C.value_as_int64 ~dbg tagged_scrutinee_cmm, true
+        then C.tagged_int_as_int64 ~dbg tagged_scrutinee_cmm, true
         else untagged_scrutinee_cmm, false)
     | _ -> untagged_scrutinee_cmm, false
   in

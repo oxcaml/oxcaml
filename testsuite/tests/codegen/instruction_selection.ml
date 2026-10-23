@@ -165,15 +165,15 @@ let int_compare x y =
   | r -> r
 [%%expect_asm X86_64{|
 int_compare:
-  movq  %rax, %rsi
-  cmpq  %rbx, %rsi
+  cmpq  %rbx, %rax
   je    .L0
-  movq  $-1, %rdi
+  movq  %rax, %rdi
+  movq  $-1, %rsi
   xorl  %eax, %eax
-  cmpq  %rbx, %rsi
+  cmpq  %rbx, %rdi
   setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 .L0:
   movl  $1, %eax

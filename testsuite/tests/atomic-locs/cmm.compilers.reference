@@ -121,7 +121,7 @@
    res
      (atomic compare_set (value as int64 old_value)
        (value as int64 new_value) (+a r idx))
-   (int64->tagged_int res)) )
+   (int64 as tagged_int (+ (<< res 1) 1))) )
 
 (function camlCmm__idx_compare_exchange_11_24_code
      (r: val idx: naked_int old_value: tagged_int
@@ -132,7 +132,7 @@
 
 (function camlCmm__idx_fetch_and_add_12_25_code
      (r: val idx: naked_int value: tagged_int) : tagged_int
- (int64 as value (atomic xadd (<< (tagged_int->int64 value) 1) (+a r idx))) )
+ (int64 as value (atomic xadd (+ (tagged_int as int64 value) -1) (+a r idx))) )
 
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
  (catch (exit 32 G:"camlCmm") with(32 *ret*: val) 0:tagged) )

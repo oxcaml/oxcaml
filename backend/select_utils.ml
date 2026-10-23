@@ -26,6 +26,20 @@ module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
 
+let rec normalize_int_constant (expr : Cmm.expression) : Cmm.expression =
+  match expr with
+  | Cconst_tagged_int (n, dbg) ->
+    normalize_int_constant (Cconst_natint (Cmm.encode_tagged_int n, dbg))
+  | Cconst_natint (n, dbg)
+    when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
+    Cconst_int (Nativeint.to_int n, dbg)
+  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+  | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+  | Cexit _ | Cinvalid _ ->
+    expr
+
 module Or_never_returns = struct
   type 'a t =
     | Ok of 'a
@@ -245,6 +259,8 @@ let oper_result_type = function
   | Cpackf32 -> typ_float
   | Ccsel ty -> ty
   | Creinterpret_cast Value_of_int64 -> typ_val
+  | Creinterpret_cast Tagged_int_of_int64 -> typ_tagged_int
+  | Creinterpret_cast Int64_of_tagged_int -> typ_naked_int
   | Creinterpret_cast (V128_of_vec _) -> typ_vec128
   | Creinterpret_cast (V256_of_vec _) -> typ_vec256
   | Creinterpret_cast (V512_of_vec _) -> typ_vec512

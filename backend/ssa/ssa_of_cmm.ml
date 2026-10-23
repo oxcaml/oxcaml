@@ -207,7 +207,8 @@ and emit_stores env c dbg (args : Cmm.expression list) regs_addr =
   let for_one_arg arg =
     let original_arg = arg in
     let select_store_result =
-      Cfg_selection.select_store ~is_assign:false !addressing_mode arg
+      Cfg_selection.select_store ~is_assign:false !addressing_mode
+        (SU.normalize_int_constant arg)
     in
     let arg : Cmm.expression =
       match select_store_result with

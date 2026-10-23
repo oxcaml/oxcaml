@@ -223,35 +223,49 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   (* Turn integer constants that fit in an OCaml integer into [Cconst_int], so
      that the [Cconst_int] patterns below suffice to recognize all constants
      that may be used as immediate arguments. *)
-  let normalize_int_constant (expr : Cmm.expression) : Cmm.expression =
-    match expr with
-    | Cconst_natint (n, dbg)
-      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
-      Cconst_int (Nativeint.to_int n, dbg)
-    | Cconst_int _ | Cconst_natint _ | Cconst_tagged_int _ | Cconst_float32 _
-    | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _
-    | Cname_for_debugger _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-    | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
-      expr
+  let normalize_int_constant = SU.normalize_int_constant
 
   (* Instruction selection for conditionals *)
 
+  let rec select_integer_argument (arg : Cmm.expression) : Cmm.expression =
+    match[@ocaml.warning "-fragile-match"] arg with
+    | Cop
+        (Creinterpret_cast (Int64_of_tagged_int | Tagged_int_of_int64), [arg], _)
+      ->
+      select_integer_argument arg
+    | Cop
+        ( (( Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+           | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda )
+           as op),
+          args,
+          dbg ) ->
+      Cop (op, List.map select_integer_argument args, dbg)
+    | _ -> arg
+
+  let select_value_argument (arg : Cmm.expression) : Cmm.expression =
+    match[@ocaml.warning "-fragile-match"] arg with
+    | Cop (Creinterpret_cast Int64_of_value, [arg], _) -> arg
+    | _ -> arg
+
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
-    match[@ocaml.warning "-fragile-match"] arg with
-    | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
-      match normalize_int_constant arg1, normalize_int_constant arg2 with
-      | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
-        Iinttest_imm (cmp, n), arg1
-      | Cconst_int (n, _), arg2
-        when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
-        Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
-      | arg1, arg2 -> Iinttest cmp, Ctuple [arg1; arg2])
-    | Cop (Ccmpi cmp, args, _) -> Iinttest cmp, Ctuple args
-    | Cop (Ccmpf (width, cmp), args, _) -> Ifloattest (width, cmp), Ctuple args
-    | Cop (Cand, [arg1; Cconst_int (1, _)], _) -> Ioddtest, arg1
-    | _ -> Itruetest, arg
+    let ((test, arg) : Operation.test * Cmm.expression) =
+      match[@ocaml.warning "-fragile-match"] select_integer_argument arg with
+      | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
+        match normalize_int_constant arg1, normalize_int_constant arg2 with
+        | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
+          Iinttest_imm (cmp, n), arg1
+        | Cconst_int (n, _), arg2
+          when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
+          Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+        | arg1, arg2 -> Iinttest cmp, Ctuple [arg1; arg2])
+      | Cop (Ccmpi cmp, args, _) -> Iinttest cmp, Ctuple args
+      | Cop (Ccmpf (width, cmp), args, _) ->
+        Ifloattest (width, cmp), Ctuple args
+      | Cop (Cand, [arg1; Cconst_int (1, _)], _) -> Ioddtest, arg1
+      | _ -> Itruetest, arg
+    in
+    test, select_value_argument arg
 
   let is_store (op : Operation.t) =
     match op with
@@ -411,7 +425,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         let op, newarg2 =
           match Target.is_store_out_of_range chunk ~byte_offset:0 with
           | Within_range -> (
-            match Target.select_store ~is_assign addr arg2 with
+            match
+              Target.select_store ~is_assign addr (normalize_int_constant arg2)
+            with
             | Rewritten (op, arg) -> op, arg
             | Use_default | Maybe_out_of_range ->
               Operation.Store (chunk, addr, is_assign), arg2)
@@ -469,7 +485,17 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csubf w -> SU.basic_op (Floatop (w, Isubf)), args
     | Cmulf w -> SU.basic_op (Floatop (w, Imulf)), args
     | Cdivf w -> SU.basic_op (Floatop (w, Idivf)), args
-    | Creinterpret_cast cast -> SU.basic_op (Reinterpret_cast cast), args
+    | Creinterpret_cast cast ->
+      let op : Operation.t =
+        match cast with
+        | Int64_of_tagged_int | Tagged_int_of_int64 -> Move
+        | Int64_of_value | Value_of_int64 | Float_of_float32 | Float32_of_float
+        | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
+        | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
+        | V512_of_vec _ ->
+          Reinterpret_cast cast
+      in
+      SU.basic_op op, args
     | Cstatic_cast cast -> SU.basic_op (Static_cast cast), args
     | Catomic { op; size } -> (
       match op with
@@ -510,19 +536,37 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
       (dbg : Debuginfo.t) ~label_after :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match
-      Target.select_operation ~generic_select_condition:select_condition op args
-        dbg ~label_after
-    with
-    | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
-    | Select_operation_then_rewrite (op, args, dbg, rewriter) -> (
-      let basic_or_terminator, args =
-        select_operation op args dbg ~label_after
-      in
-      match rewriter basic_or_terminator ~args with
+    let args = List.map select_integer_argument args in
+    let default () =
+      match
+        Target.select_operation ~generic_select_condition:select_condition op
+          args dbg ~label_after
+      with
       | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
-      | Use_default -> basic_or_terminator, args)
-    | Use_default -> select_operation0 op args dbg ~label_after
+      | Select_operation_then_rewrite (op, args, dbg, rewriter) -> (
+        let basic_or_terminator, args =
+          select_operation op args dbg ~label_after
+        in
+        match rewriter basic_or_terminator ~args with
+        | Rewritten (basic_or_terminator, args) -> basic_or_terminator, args
+        | Use_default -> basic_or_terminator, args)
+      | Use_default -> select_operation0 op args dbg ~label_after
+    in
+    let op, args =
+      match[@ocaml.warning "-fragile-match"] op, args with
+      | ( Creinterpret_cast (Int64_of_tagged_int | Tagged_int_of_int64),
+          [Cop (Ctuple_field _, _, _)] ) ->
+        default ()
+      | ( Creinterpret_cast (Int64_of_tagged_int | Tagged_int_of_int64),
+          [Cop (inner_op, inner_args, inner_dbg)] ) -> (
+        match select_operation inner_op inner_args inner_dbg ~label_after with
+        | (Basic (Op _) as op), args -> op, args
+        | _ -> default ())
+      | _ -> default ()
+    in
+    match[@ocaml.warning "-fragile-match"] op, args with
+    | Basic (Op (Intop_imm _)), [arg] -> op, [select_value_argument arg]
+    | _ -> op, args
 
   let insert_return env sub_cfg (r : _ Or_never_returns.t)
       (traps : Cmm.trap_action list) =
@@ -763,7 +807,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let for_one_arg arg =
       let original_arg = arg in
       let select_store_result =
-        Target.select_store ~is_assign:false !addressing_mode arg
+        Target.select_store ~is_assign:false !addressing_mode
+          (normalize_int_constant arg)
       in
       let arg : Cmm.expression =
         match select_store_result with

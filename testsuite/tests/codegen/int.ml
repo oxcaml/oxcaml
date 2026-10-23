@@ -97,8 +97,7 @@ div_2:
   movq  %rax, %rbx
   shrq  $63, %rbx
   addq  %rbx, %rax
-  sarq  $1, %rax
-  leaq  1(%rax,%rax), %rax
+  orq   $1, %rax
   ret
 |}]
 
@@ -266,13 +265,13 @@ shift_right_logical:
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rsi
-  movq  $-1, %rdi
+  movq  %rax, %rdi
+  movq  $-1, %rsi
   xorl  %eax, %eax
-  cmpq  %rbx, %rsi
+  cmpq  %rbx, %rdi
   setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
+  cmovge %rax, %rsi
+  leaq  1(%rsi,%rsi), %rax
   ret
 |}]
 
@@ -368,8 +367,8 @@ collatz:
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi
   jne   .L2
-  sarq  $1, %rdx
-  leaq  1(%rdx,%rdx), %rbx
+  movq  %rdx, %rbx
+  orq   $1, %rbx
   cmpq  $3, %rbx
   jg    .L1
   jmp   .L0
