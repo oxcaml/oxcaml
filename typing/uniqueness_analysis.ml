@@ -1055,8 +1055,9 @@ module Projection : sig
     | Construct_field of string * int
     | Variant_field of label
     | Array_index of int
-    | Address_load
     | Memory_address (* this is rendered as clubsuit in the ICFP'24 paper *)
+    | Alloc
+  (* a child of [Memory_address] that guarantees the block is still allocated *)
 
   module Map : Map.S with type key = t
 
@@ -1073,8 +1074,8 @@ end = struct
       | Construct_field of string * int
       | Variant_field of label
       | Array_index of int
-      | Address_load
       | Memory_address
+      | Alloc
 
     let compare t1 t2 =
       match t1, t2 with
@@ -1086,45 +1087,44 @@ end = struct
         match String.compare l1 l2 with 0 -> Int.compare i j | i -> i)
       | Variant_field l1, Variant_field l2 -> String.compare l1 l2
       | Array_index i, Array_index j -> Int.compare i j
-      | Address_load, Address_load -> 0
       | Memory_address, Memory_address -> 0
+      | Alloc, Alloc -> 0
       | ( Tuple_field _,
           ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Address_load | Memory_address ) )
-        ->
+          | Variant_field _ | Array_index _ | Memory_address | Alloc ) ) ->
         -1
       | ( ( Record_field _ | Record_unboxed_product_field _ | Construct_field _
-          | Variant_field _ | Array_index _ | Address_load | Memory_address ),
+          | Variant_field _ | Array_index _ | Memory_address | Alloc ),
           Tuple_field _ ) ->
         1
       | ( Record_field _,
           ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Address_load | Memory_address ) ) ->
+          | Array_index _ | Memory_address | Alloc ) ) ->
         -1
       | ( ( Record_unboxed_product_field _ | Construct_field _ | Variant_field _
-          | Array_index _ | Address_load | Memory_address ),
+          | Array_index _ | Memory_address | Alloc ),
           Record_field _ ) ->
         1
       | ( Record_unboxed_product_field _,
-          ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
-          | Memory_address ) ) ->
+          ( Construct_field _ | Variant_field _ | Array_index _ | Memory_address
+          | Alloc ) ) ->
         -1
-      | ( ( Construct_field _ | Variant_field _ | Array_index _ | Address_load
-          | Memory_address ),
+      | ( ( Construct_field _ | Variant_field _ | Array_index _ | Memory_address
+          | Alloc ),
           Record_unboxed_product_field _ ) ->
         1
       | ( Construct_field _,
-          (Variant_field _ | Array_index _ | Address_load | Memory_address) ) ->
+          (Variant_field _ | Array_index _ | Memory_address | Alloc) ) ->
         -1
-      | ( (Variant_field _ | Array_index _ | Address_load | Memory_address),
+      | ( (Variant_field _ | Array_index _ | Memory_address | Alloc),
           Construct_field _ ) ->
         1
-      | Variant_field _, (Array_index _ | Address_load | Memory_address) -> -1
-      | (Array_index _ | Address_load | Memory_address), Variant_field _ -> 1
-      | Array_index _, (Address_load | Memory_address) -> -1
-      | (Address_load | Memory_address), Array_index _ -> 1
-      | Address_load, Memory_address -> -1
-      | Memory_address, Address_load -> 1
+      | Variant_field _, (Array_index _ | Memory_address | Alloc) -> -1
+      | (Array_index _ | Memory_address | Alloc), Variant_field _ -> 1
+      | Array_index _, (Memory_address | Alloc) -> -1
+      | (Memory_address | Alloc), Array_index _ -> 1
+      | Memory_address, Alloc -> -1
+      | Alloc, Memory_address -> 1
   end
 
   include T
@@ -1140,8 +1140,8 @@ end = struct
     | Construct_field (s, n) -> fprintf ppf "Construct_field(%s,%d)" s n
     | Variant_field l -> fprintf ppf "Variant_field(%s)" l
     | Array_index n -> fprintf ppf "Array_index(%d)" n
-    | Address_load -> fprintf ppf "Address_load"
     | Memory_address -> fprintf ppf "Memory_address"
+    | Alloc -> fprintf ppf "Alloc"
 
   let print_map print_value ppf map =
     let module M = Print_utils.Map (Map) in
@@ -1652,8 +1652,8 @@ module Paths : sig
       where [gf] is the appropriate modality for mutability [mut]. *)
   val array_index : Types.mutability -> int -> t -> t
 
-  (** [address_load mut t] is [modal_child gf Projection.Address_load t] where
-      [gf] is the appropriate modality for mutability [mut]. *)
+  (** [address_load mut t] are the paths of the value loaded from an address
+      with paths [t] and mutability [mut]. *)
   val address_load : Types.mutability -> t -> t
 
   (** [memory_address t] is [child Projection.Memory_address t]. *)
@@ -1665,8 +1665,10 @@ module Paths : sig
 
   val choose : t -> t -> t
 
+  (** Marks [memory_address t] (or only the part of it storing [field]) as
+      implicitly borrowed *)
   val mark_implicit_borrow_memory_address :
-    Occurrence.t -> Maybe_aliased.access -> t -> UF.t
+    ?field:Projection.t -> Occurrence.t -> Maybe_aliased.access -> t -> UF.t
 
   val mark_aliased : Occurrence.t -> Aliased.reason -> t -> UF.t
 
@@ -1690,14 +1692,17 @@ end = struct
 
   let child proj t = List.map (UF.Path.child proj) t
 
-  let modal_child modalities proj t =
+  let tracked_under modalities =
     (* CR zqian: Instead of just ignoring such children, we should add modality
        to [Projection.t] and add corresponding logic in [UsageTree]. *)
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Join_const Aliased, Meet_const Many -> untracked
-    | _ -> child proj t
+    | Join_const Aliased, Meet_const Many -> false
+    | _ -> true
+
+  let modal_child modalities proj t =
+    if tracked_under modalities then child proj t else untracked
 
   let tuple_field i t = child (Projection.Tuple_field i) t
 
@@ -1717,7 +1722,7 @@ end = struct
 
   let address_load mut t =
     let modality = Typemode.address_modalities mut in
-    modal_child modality Projection.Address_load t
+    if tracked_under modality then t else untracked
 
   let memory_address t = child Projection.Memory_address t
 
@@ -1726,10 +1731,15 @@ end = struct
 
   let fresh () = [UF.Path.fresh_root ()]
 
-  let mark_implicit_borrow_memory_address occ access paths =
+  let mark_implicit_borrow_memory_address ?field occ access paths =
+    let memory =
+      match field with
+      | None -> memory_address paths
+      | Some field -> child field (memory_address paths)
+    in
     mark
       (Maybe_aliased (Maybe_aliased.singleton occ access))
-      Learned_tags.empty Overwrites.empty (memory_address paths)
+      Learned_tags.empty Overwrites.empty memory
 
   let mark_aliased occ reason paths =
     mark (Usage.aliased occ reason) Learned_tags.empty Overwrites.empty paths
@@ -1800,9 +1810,10 @@ module Value : sig
   (** Mark the value's memory address as aliased_or_unique *)
   val mark_consumed_memory_address : t -> UF.t
 
-  (** Mark the memory_address of the value as implicitly borrowed
-      (borrow_or_aliased). *)
-  val mark_implicit_borrow_memory_address : Maybe_aliased.access -> t -> UF.t
+  (** Mark the memory_address of the value (or only the part of it storing
+      [field]) as implicitly borrowed (borrow_or_aliased). *)
+  val mark_implicit_borrow_memory_address :
+    ?field:Projection.t -> Maybe_aliased.access -> t -> UF.t
 
   val mark_aliased : reason:boundary_reason -> t -> UF.t
 
@@ -1845,10 +1856,10 @@ end = struct
       let paths = Paths.record_unboxed_product_field gf s paths in
       Existing { paths; occ; unique_use }
 
-  let mark_implicit_borrow_memory_address access = function
+  let mark_implicit_borrow_memory_address ?field access = function
     | Fresh -> UF.unused
     | Existing { paths; occ; _ } ->
-      Paths.mark_implicit_borrow_memory_address occ access paths
+      Paths.mark_implicit_borrow_memory_address ?field occ access paths
 
   let mark_maybe_unique = function
     | Fresh -> UF.unused
@@ -2000,6 +2011,73 @@ let conjuncts_pattern_match l =
   let exts, ufs = List.split l in
   Ienv.Extension.conjuncts exts, UF.pars ufs
 
+let unboxed_access_projection : deref unboxed_access -> Projection.t = function
+  | Uaccess_unboxed_field (_, l, _) -> Record_unboxed_product_field l.lbl_name
+  | Uaccess_unboxed_tuple_element i -> Tuple_field i
+  | Uaccess_unboxed_record_field (_, l, _) -> Record_field l.lbl_name
+
+(* The paths of the position reached by an unboxed access from a position with
+   paths [paths]. *)
+let unboxed_access_paths paths ua =
+  Paths.child (unboxed_access_projection ua) paths
+
+(* The projection to the part of the memory storing the field [l], if [l] is
+   stored in a block. *)
+let field_memory_projection (l : label_description) : Projection.t option =
+  match l.lbl_repres with
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+  | Record_inlined _ | Record_undetermined | Record_variable _ ->
+    Some (Record_field l.lbl_name)
+  | Record_unboxed | Record_dummy _ -> None
+
+(* An address ['a addr] owns both:
+
+   1. the value ['a] itself, and
+   2. the memory ['a] is stored at.
+
+   These are different. Say we have
+   {[
+     val x : { foo : string } @ unique
+     let y : string addr_imm @ unique = match x with { foo = deref_ y } -> y
+   ]}
+   Then [y] owns both the memory the [string] is stored in, as well as one word
+   of memory, initially owned by [x], that stores the address of the string.
+   Hence, during uniqueness checking, [y] needs to be associated with both the
+   value [string] and part of the memory of [x]:
+   {[
+     let _ =
+       match x with
+       | { foo = deref_ y as z } -> ...
+                                    ^^^
+   ]}
+   In this position, consuming the string z (i.e. [x.foo], or [Paths.child proj
+   paths] below) or the address y ([Paths.child proj (Paths.memory_address
+   paths)] below) should consume x, too.
+
+   So the paths of an address are the paths of the value it points to, together
+   with the paths of that part of the memory. Loading from an address
+   ([Paths.address_load]) returns the address' paths unchanged: the loaded
+   value keeps the memory paths of the address. This is imprecise but sound.
+   For example, this is rejected:
+   {[
+     match x with
+     | { foo = deref_ y } ->
+       let addr_imm_ s = y in
+       consume s;
+       match x with { foo = _ } -> ()
+   ]}
+   Consuming [s] uses [x.<memory>.foo], and the second match reads the memory
+   of [x], although [s] is just the string [x.foo] and does not own any of
+   [x]'s memory. With [{ foo = s }] instead of [deref_ y], it is accepted.
+
+   The memory of a block is tracked per field (see [field_memory_projection]):
+   [y] owns the part of [x]'s memory storing [foo], [x.<memory>.foo]. If [x]
+   had other fields, consuming [y] would not conflict with reading them, but
+   it would conflict with reading [foo] again or overwriting [x]. *)
+let deref_base_paths proj paths =
+  Paths.choose (Paths.child proj paths)
+    (Paths.child proj (Paths.memory_address paths))
+
 let rec pattern_match_tuple pat values =
   match pat.pat_desc with
   | Tpat_or (pat0, pat1, _) ->
@@ -2008,7 +2086,20 @@ let rec pattern_match_tuple pat values =
     let ext1, uf1 = pattern_match_tuple pat1 values in
     Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
   | Tpat_tuple pats ->
-    (* No read: the tuple does not exist in memory *)
+    (* We're in a top-level tuple destruct pattern on a syntactic tuple that
+       doesn't keep a reference to the overall tuple. (Indeed, the tuple might
+       not even be allocated.) We treat this as a special case: since the
+       overall tuple allocation cannot be accessed, we can ignore it for the
+       purpose of the uniqueness analysis and treat all subpatterns as accessing
+       the values directly.
+
+       A [deref_] pattern, however, might actually refer to the tuple's
+       allocation: the address owns both the value and the part of the
+       allocation storing it. Fortunately, that part of the allocation can only
+       be accessed through [deref_] patterns, and only to read the value, since
+       tuple elements are immutable. Hence, we identify the address with the
+       value itself ([~base_paths:paths]), and don't need any additional special
+       casing for [deref_] patterns. *)
     Unique_barrier.enable pat.pat_unique_barrier;
     List.map2
       (fun (_, pat) value ->
@@ -2017,9 +2108,12 @@ let rec pattern_match_tuple pat values =
           | None -> Paths.fresh ()
           | Some paths -> paths
         in
-        pattern_match_single pat paths)
+        pattern_match_single ~base_paths:paths pat paths)
       pats values
     |> conjuncts_pattern_match
+  | Tpat_any ->
+    (* The tuple is not used. *)
+    pattern_match_single pat (Paths.fresh ())
   | _ ->
     (* Mark all values in the tuple as used, because we are binding the tuple
        to a variable *)
@@ -2056,9 +2150,18 @@ and pattern_match_barrier pat paths : UF.t =
     ignore (Unique_barrier.resolve pat.pat_unique_barrier);
     UF.unused
   in
-  let borrow_memory_address () =
-    Paths.mark_implicit_borrow_memory_address occ (Read pat.pat_unique_barrier)
-      paths
+  let borrow_memory_address ?field () =
+    Paths.mark_implicit_borrow_memory_address ?field occ
+      (Read pat.pat_unique_barrier) paths
+  in
+  let borrow_fields_memory_address fields =
+    match fields with
+    | [] -> no_memory_access ()
+    | _ :: _ ->
+      UF.pars (List.map (fun field -> borrow_memory_address ~field ()) fields)
+  in
+  let is_wildcard (p : pattern) =
+    match p.pat_desc with Tpat_any -> true | _ -> false
   in
   let consume_memory_address reason =
     ignore (Unique_barrier.resolve pat.pat_unique_barrier);
@@ -2079,7 +2182,12 @@ and pattern_match_barrier pat paths : UF.t =
     consume_memory_address Constant
   | Tpat_construct _ -> borrow_memory_address ()
   | Tpat_variant _ -> borrow_memory_address ()
-  | Tpat_record _ -> borrow_memory_address ()
+  | Tpat_record (pats, _, _) ->
+    borrow_fields_memory_address
+      (List.filter_map
+         (fun (_, l, p) ->
+           if is_wildcard p then None else field_memory_projection l)
+         pats)
   | Tpat_array _ ->
     (* This is necessary since we do not yet guarantee that
        the reads of arrays in the pattern-matching code
@@ -2092,7 +2200,16 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
-  | Tpat_tuple _ -> borrow_memory_address ()
+  | Tpat_deref _ ->
+    (* taking the address of a position does not read it *)
+    no_memory_access ()
+  | Tpat_tuple pats ->
+    borrow_fields_memory_address
+      (List.concat
+         (List.mapi
+            (fun i (_, p) ->
+              if is_wildcard p then [] else [Projection.Tuple_field i])
+            pats))
   | Tpat_unboxed_unit ->
     (* unboxed units are not allocations *)
     no_memory_access ()
@@ -2106,7 +2223,11 @@ and pattern_match_barrier pat paths : UF.t =
     (* unboxed records are not allocations *)
     no_memory_access ()
 
-and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
+(* [base_paths] are the paths of the boxed position a [deref_] pattern at this
+   position would consume: the value stored there and the part of the memory
+   storing it (see [deref_base_paths]). Unboxed accesses below that position are
+   added in [Tpat_deref]. *)
+and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
   let uf_read = pattern_match_barrier pat paths in
   let ext, uf_pats =
     match pat.pat_desc with
@@ -2119,7 +2240,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
     | Tpat_fun_layout { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
     | Tpat_alias { pattern = pat'; id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
-      let ext1, uf = pattern_match_single pat' paths in
+      let ext1, uf = pattern_match_single ?base_paths pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf
     | Tpat_constant _ -> Ienv.Extension.empty, UF.unused
     | Tpat_unboxed_unit -> Ienv.Extension.empty, UF.unused
@@ -2145,11 +2266,19 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, _, _) ->
+    | Tpat_record (pats, rep, _) ->
       List.map
         (fun (_, l, pat) ->
+          let base_paths =
+            match rep with
+            | Record_unboxed -> base_paths
+            | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
+            | Record_mixed _ | Record_dummy _ | Record_undetermined
+            | Record_variable _ ->
+              Some (deref_base_paths (Projection.Record_field l.lbl_name) paths)
+          in
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
-          pattern_match_single pat paths)
+          pattern_match_single ?base_paths pat paths)
         pats
       |> conjuncts_pattern_match
     | Tpat_record_unboxed_product (pats, _, _) ->
@@ -2158,7 +2287,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
           let paths =
             Paths.record_unboxed_product_field l.lbl_modalities l.lbl_name paths
           in
-          pattern_match_single pat paths)
+          pattern_match_single ?base_paths pat paths)
         pats
       |> conjuncts_pattern_match
     | Tpat_array (mut, _, pats) ->
@@ -2176,13 +2305,27 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
     | Tpat_addr (mut, _, arg) ->
+      (* CR address-patterns: this is slightly imprecise. See also the comment
+         on [deref_base_paths]. *)
+      let base_paths = Paths.choose paths (Paths.memory_address paths) in
       let paths = Paths.address_load mut paths in
+      pattern_match_single ~base_paths arg paths
+    | Tpat_deref (_, _, uas, arg) ->
+      let paths =
+        match base_paths with
+        | None ->
+          Misc.fatal_error
+            "Uniqueness_analysis.pattern_match_single: dereference pattern \
+             without base paths"
+        | Some base_paths -> List.fold_left unboxed_access_paths base_paths uas
+      in
       pattern_match_single arg paths
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg) ->
+          let base_paths = deref_base_paths (Projection.Tuple_field i) paths in
           let paths = Paths.tuple_field i paths in
-          pattern_match_single arg paths)
+          pattern_match_single ~base_paths arg paths)
         args
       |> conjuncts_pattern_match
     | Tpat_unboxed_tuple args ->
@@ -2190,7 +2333,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       List.mapi
         (fun i (_, arg, _) ->
           let paths = Paths.tuple_field i paths in
-          pattern_match_single arg paths)
+          pattern_match_single ?base_paths arg paths)
         args
       |> conjuncts_pattern_match
   in
@@ -2495,21 +2638,34 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       | Some (exp, _, _, unique_barrier) ->
         let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
         Unique_barrier.enable unique_barrier;
-        let uf_read =
-          Value.mark_implicit_borrow_memory_address (Read unique_barrier) value
+        (* The block must still be allocated, even if no field is kept: large
+           records are updated by copying the whole block. *)
+        let uf_alloc =
+          Value.mark_implicit_borrow_memory_address ~field:Projection.Alloc
+            (Read unique_barrier) value
         in
-        value, UF.par uf_exp uf_read
+        value, UF.par uf_exp uf_alloc
     in
     let uf_fields =
       Array.map
         (fun field ->
           match field with
           | l, _, Kept (_, _, unique_use) ->
-            let value =
+            (* Only the kept fields are read, borrowing the part of the memory
+               storing them. *)
+            let uf_read =
+              match extended_expression with
+              | None -> UF.unused
+              | Some (_, _, _, unique_barrier) ->
+                Value.mark_implicit_borrow_memory_address
+                  ?field:(field_memory_projection l)
+                  (Read unique_barrier) value
+            in
+            let field_value =
               Value.implicit_record_field l.lbl_modalities l.lbl_name value
                 unique_use
             in
-            Value.mark_maybe_unique value
+            UF.par uf_read (Value.mark_maybe_unique field_value)
           | l, _, Overridden (_, e) ->
             check_uniqueness_exp
               ~overwrite:
@@ -2545,7 +2701,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_unboxed_field _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
-  | Texp_setfield { record = rcd; newval = arg; _ } ->
+  | Texp_setfield { record = rcd; label; newval = arg; _ } ->
     (* Ideally, we should treat this as creating a new alias of [arg], and
        further usages of the field should be directed at the alias, instead of
        the old value. However, this would require some big changes to the
@@ -2566,7 +2722,11 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
        on [r.x] can be skipped. *)
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf_arg = check_uniqueness_exp ~overwrite:None ienv arg in
-    let uf_write = Value.mark_implicit_borrow_memory_address Write value in
+    let uf_write =
+      Value.mark_implicit_borrow_memory_address
+        ?field:(field_memory_projection label)
+        Write value
+    in
     let uf_tag = Value.invalidate_tag value in
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
   | Texp_atomic_loc { record = rcd; _ } ->
@@ -2582,7 +2742,9 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     in
     (* All unboxed accesses are unused, but we include the below match in case
        we add new unboxed access types *)
-    let _unboxed_access = function Uaccess_unboxed_field _ -> UF.unused in
+    let _unboxed_access : index unboxed_access -> _ = function
+      | Uaccess_unboxed_field _ -> UF.unused
+    in
     block_access ba
   | Texp_ifthenelse (if_, then_, else_opt) ->
     (* if' is only borrowed, not used; but probably doesn't matter because of
@@ -2744,11 +2906,14 @@ and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
       Unique_barrier.enable unique_barrier;
       Value.fresh, uf
     | Some paths ->
-      (* accessing the field meaning borrowing the parent record's mem
-         block. Note that the field itself is not borrowed or used *)
+      (* accessing the field meaning borrowing the part of the parent
+         record's mem block storing the field. Note that the field itself is
+         not borrowed or used *)
       Unique_barrier.enable unique_barrier;
       let uf_read =
-        Value.mark_implicit_borrow_memory_address (Read unique_barrier) value
+        Value.mark_implicit_borrow_memory_address
+          ?field:(field_memory_projection l)
+          (Read unique_barrier) value
       in
       let uf_boxing, value =
         let occ = Occurrence.mk loc in
@@ -3018,11 +3183,36 @@ let report_multi_use inner first_is_of_second =
         (* there comes first in source, so show occ (later) as main error *)
         there_occ, there_usage, occ, here_usage, "is also being", true
   in
+  (* Ensure that reads and writes of a value's memory are reported as uses of
+     the value itself. *)
+  let is_own_memory ~descendant_is_there (projs : Projection.t list) =
+    let descendant_is_access =
+      descendant_is_there
+      &&
+      match there with
+      | Usage.Maybe_aliased _ -> true
+      | Usage.Aliased t -> (
+        match Aliased.reason t with
+        | Lifted _ -> true
+        | Forced | Lazy | Array | Constant | Lifted_borrowed | In_borrowing ->
+          false)
+      | _ -> false
+    in
+    match projs with
+    | [Memory_address] -> true
+    | [(Record_field _ | Tuple_field _ | Alloc)]
+    | [(Record_field _ | Tuple_field _ | Alloc); Memory_address] ->
+      descendant_is_access
+    | _ -> false
+  in
   let first_is_of_second =
     match first_is_of_second with
-    | Self
-    | Ancestor [Projection.Memory_address]
-    | Descendant [Projection.Memory_address] ->
+    | Self -> "it"
+    | Descendant projs
+      when is_own_memory ~descendant_is_there:second_is_occ projs ->
+      "it"
+    | Ancestor projs
+      when is_own_memory ~descendant_is_there:(not second_is_occ) projs ->
       "it"
     | Descendant _ -> "part of it"
     | Ancestor _ -> "it is part of a value that"

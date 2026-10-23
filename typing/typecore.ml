@@ -96,8 +96,7 @@ let record_form_to_wrong_kind_sort
   | Unboxed_product -> Record_unboxed_product
 
 type type_block_access_result =
-  { ba : block_access; base_ty: type_expr; el_ty: type_expr;
-    modality : Modality.Const.t }
+  { ba : index block_access; base_ty: type_expr; el_ty: type_expr }
 
 type contains_gadt =
   | Contains_gadt
@@ -169,6 +168,19 @@ type layout_poly_inst_restriction =
   | Binding_op
 
 type mode_mismatch_kind = Parameter | Return
+
+type block_reference_kind =
+  | Block_index
+  | Deref_pattern
+
+type block_reference_bad_type =
+  | Flatten_floats_record
+  | Float_record
+  | Float_array_record
+  | Unboxed_record
+  | Inlined_record
+  | Atomic_field
+  | Private_declaration
 
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
@@ -255,6 +267,8 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
+  | Deref_pattern_bad_position
+  | Deref_pattern_bad_argument
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -303,10 +317,12 @@ type error =
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_bad_record of string
-  | Block_index_modality_mismatch of
-      { mut : bool; err : Modality.equate_error }
-  | Mutable_block_index_polymorphic_field of Longident.t
+  | Block_reference_bad_type of block_reference_kind * block_reference_bad_type
+  | Block_reference_modality_mismatch of
+      { reference : block_reference_kind; mutability : Types.mutability;
+        err : Modality.equate_error }
+  | Block_reference_polymorphic_field of
+      block_reference_kind * Longident.t
   | Submode_failed of With_regionality.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -870,6 +886,28 @@ type expected_pat_mode =
 
 let simple_pat_mode mode =
   { mode = With_regionality.disallow_right mode; tuple_modes = None }
+
+(* While type checking patterns, we track some information about the boxed value
+   a deref pattern [deref_ x] would refer to in the current pattern. *)
+type deref_position =
+  { position_mutability : Types.mutability;
+    (* mutability of the position *)
+
+    container_mode : With_regionality.l;
+    (* mode of the boxed value *)
+
+    container_loc : Location.t;
+    (* location of the pattern matching the boxed value *)
+
+    base : deref block_access;
+    (* the access into the boxed value *)
+
+    rev_unboxed : deref unboxed_access list;
+    (* the unboxed accesses from the boxed value to here, in reverse order *)
+  }
+
+let deref_position_push_unboxed_access ua pos =
+  { pos with rev_unboxed = ua :: pos.rev_unboxed }
 
 let tuple_pat_mode mode tuple_modes =
   let mode = With_regionality.disallow_right mode in
@@ -1518,21 +1556,107 @@ let check_atomic_loc ~loc ~env label lid =
   | Ok () -> ()
   | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid))
 
-(* Mutable indices to polymorphic fields cannot be taken, as they would allow
-   writing non-polymorphic values. *)
-let check_index_not_to_poly_field ~env ba uas =
-  let check lid lbl_arg =
-    if is_poly_Tpoly lbl_arg then
-      raise
-        (Error (lid.loc, env, Mutable_block_index_polymorphic_field lid.txt))
+
+(* Block indices and dereference patterns are only valid on certain accessors.
+   Checks a path consisting of one [block_access] and a list of
+   [unboxed_access]'s to a position with mutability [mutability], raising an
+   error if the access is invalid. *)
+let check_block_reference_path
+  : type k. loc:Location.t -> env:Env.t -> block_reference_kind ->
+      mutability:Types.mutability -> k block_access -> k unboxed_access list ->
+      unit
+  = fun ~loc ~env reference ~mutability ba uas ->
+  let error (lid : Longident.t loc) err = raise (Error (lid.loc, env, err)) in
+  (* The expected modality of the overall access. The composition of the
+     modalities along the path must be exactly this modality. *)
+  let expected_modality =
+    Typemode.block_reference_expected_modalities mutability
   in
-  begin match ba with
-  | Baccess_field (lid, label, _) -> check lid label.lbl_arg
-  | Baccess_block _ -> ()
-  end;
-  List.iter
-    (fun (Uaccess_unboxed_field (lid, label, _)) -> check lid label.lbl_arg)
-    uas
+  (* Checks an access to [lid] into a value of a type with privacy
+     [private_flag], to a field or argument of type [arg_type]. *)
+  let check_access lid ~private_flag ~arg_type =
+    (* Mutable references through private types would allow writing into
+       them, but reading from them is fine. *)
+    (* CR address-patterns: mutable [deref_] patterns through private types
+       should be allowed, too, by binding an address that is at most [read]. *)
+    (match private_flag with
+     | Private when Types.is_mutable mutability ->
+       error lid (Block_reference_bad_type (reference, Private_declaration))
+     | Private | Public -> ());
+    (* Mutable references to polymorphic fields would allow writing
+       non-polymorphic values. Dereference patterns are not supported on
+       polymorphic fields at all: we don't want polymorphic types to be the
+       type of the value at an address. *)
+    let supported =
+      match reference with
+      | Block_index -> not (Types.is_mutable mutability)
+      | Deref_pattern -> false
+    in
+    if (not supported) && is_poly_Tpoly arg_type then
+      error lid (Block_reference_polymorphic_field (reference, lid.txt))
+  in
+  let check_label_access lid (label : _ gen_label_description) =
+    check_access lid ~private_flag:label.lbl_private ~arg_type:label.lbl_arg
+  in
+  let check_boxed_access : k block_access -> unit = function
+    | Baccess_field (lid, label, _) ->
+      let bad_type reason =
+        error lid (Block_reference_bad_type (reference, reason))
+      in
+      begin match label.lbl_repres with
+      | Record_boxed | Record_undetermined | Record_variable _ -> ()
+      | Record_mixed shape ->
+        if Array.exists (function Float_boxed -> true | _ -> false) shape then
+          bad_type Flatten_floats_record
+      | Record_float -> bad_type Float_record
+      | Record_ufloat -> bad_type Float_array_record
+      | Record_unboxed -> bad_type Unboxed_record
+      | Record_inlined _ -> bad_type Inlined_record
+      | Record_dummy _ ->
+        Misc.fatal_error
+          "Typecore.check_block_reference_path: dummy representation"
+      end;
+      (* CR address-patterns: add atomic addresses for atomic fields *)
+      begin match reference with
+      | Deref_pattern when Types.is_atomic label.lbl_mut ->
+        bad_type Atomic_field
+      | Deref_pattern | Block_index -> ()
+      end;
+      check_label_access lid label
+    | Baccess_block _ | Baccess_tuple_element _ | Baccess_address _ -> ()
+  in
+  let check_unboxed_access : k unboxed_access -> unit = function
+    | Uaccess_unboxed_field (lid, label, _) -> check_label_access lid label
+    | Uaccess_unboxed_record_field (lid, label, _) ->
+      check_label_access lid label
+    | Uaccess_unboxed_tuple_element _ -> ()
+  in
+  let boxed_modality : k block_access -> Modality.Const.t = function
+    | Baccess_field (_, label, _) -> label.lbl_modalities
+    (* These bases have no modalities of their own to check: tuple elements
+       carry none, and an index or address already points to a position whose
+       modalities were checked when it was built. *)
+    | Baccess_block _ | Baccess_tuple_element _ | Baccess_address _ ->
+      expected_modality
+  in
+  let unboxed_modality : k unboxed_access -> Modality.Const.t = function
+    | Uaccess_unboxed_field (_, label, _) -> label.lbl_modalities
+    | Uaccess_unboxed_record_field (_, label, _) -> label.lbl_modalities
+    | Uaccess_unboxed_tuple_element _ -> Modality.Const.id
+  in
+  check_boxed_access ba;
+  List.iter check_unboxed_access uas;
+  let modality =
+    List.fold_left
+      (fun modality ua ->
+         Modality.Const.concat modality ~then_:(unboxed_modality ua))
+      (boxed_modality ba) uas
+  in
+  match Modality.Const.equate modality expected_modality with
+  | Ok () -> ()
+  | Error err ->
+    raise (Error (loc, env,
+      Block_reference_modality_mismatch { reference; mutability; err }))
 
 let check_disambiguation_principality ~loc ~name ty =
   if not (is_principal ty) then
@@ -2133,7 +2257,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_addr _ | Tpat_deref _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -2586,6 +2710,14 @@ let solve_Ppat_addr loc env (mutability : mutable_flag) expected_ty =
   unify_pat_types_penv loc env (addr_type ty_arg)
     (generic_instance expected_ty);
   ty_arg, arg_sort
+
+let solve_Ppat_deref env (mutability : Types.mutability) expected_ty =
+  let addr_type =
+    if Types.is_mutable mutability
+    then Predef.type_addr (generic_instance expected_ty)
+    else Predef.type_addr_imm (generic_instance expected_ty)
+  in
+  addr_type, Jkind.sort_of_jkind env (Ctype.type_jkind env addr_type)
 
 let solve_Ppat_constraint tps loc env mode sty expected_ty =
   let cty, ty, force =
@@ -3419,6 +3551,7 @@ let rec has_literal_pattern p =
   | Ppat_constraint (p, _, _)
   | Ppat_alias (p, _)
   | Ppat_addr (_, p)
+  | Ppat_deref p
   | Ppat_lazy p
   | Ppat_open (_, p) ->
      has_literal_pattern p
@@ -3514,25 +3647,30 @@ let rec type_pat
   : type k . type_pat_state -> k pattern_category ->
       no_existentials: existential_restriction option ->
       pat_mode:expected_pat_mode -> mutable_flag:_ ->
+      pat_addr:deref_position option ->
       penv: Pattern_env.t -> Parsetree.pattern -> type_expr ->
       Jkind.Sort.t -> k general_pattern
-  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
-      expected_ty sort ->
+  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~pat_addr ~penv
+      sp expected_ty sort ->
   Builtin_attributes.warning_scope sp.ppat_attributes
     (fun () ->
        type_pat_aux tps category ~no_existentials
-         ~pat_mode ~mutable_flag ~penv sp expected_ty sort
+         ~pat_mode ~mutable_flag ~pat_addr ~penv sp expected_ty sort
     )
 
+(* [pat_addr] is [Some pos] if a [deref_] pattern is valid at the current
+   pattern's position *)
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
          pat_mode:expected_pat_mode -> mutable_flag:mutable_flag ->
+         pat_addr:deref_position option ->
          penv:Pattern_env.t -> _ -> _ -> _ -> k general_pattern
-  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
-        expected_ty sort ->
+  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~pat_addr ~penv
+        sp expected_ty sort ->
   assert (penv.in_counterexample = false);
-  let type_pat tps category ?(pat_mode=pat_mode) ?(penv=penv) =
-    type_pat tps category ~no_existentials ~pat_mode ~mutable_flag ~penv
+  let type_pat tps category ?(pat_mode=pat_mode) ?(penv=penv) ?pat_addr =
+    type_pat tps category ~no_existentials ~pat_mode ~mutable_flag ~pat_addr
+      ~penv
   in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =
@@ -3569,12 +3707,20 @@ and type_pat_aux
     let expected_tys =
       solve_Ppat_tuple ~pat_mode loc penv args expected_ty
     in
+    let container_mode = pat_mode.mode in
     let pl =
-      List.map2 (fun (lbl, t, pat_mode) (_, p) ->
+      List.mapi (fun i ((lbl, t, pat_mode), (_, p)) ->
+        let pat_addr =
+          { position_mutability = Immutable;
+            container_mode;
+            container_loc = loc;
+            base = Baccess_tuple_element i;
+            rev_unboxed = [] }
+        in
         lbl,
-        type_pat tps Value ~pat_mode p t
+        type_pat tps Value ~pat_mode ~pat_addr p t
           Jkind.Sort.(of_const Const.for_tuple_element))
-        expected_tys args
+        (List.combine expected_tys args)
     in
     rvp {
       pat_desc = Tpat_tuple pl;
@@ -3606,9 +3752,15 @@ and type_pat_aux
       solve_Ppat_unboxed_tuple ~pat_mode loc penv args expected_ty
     in
     let pl =
-      List.map2 (fun (lbl, t, pat_mode, sort) (_, p) ->
-        lbl, type_pat tps Value ~pat_mode p t sort, sort)
-        expected_tys args
+      List.mapi (fun i ((lbl, t, pat_mode, sort), (_, p)) ->
+        let pat_addr =
+          Option.map
+            (deref_position_push_unboxed_access
+               (Uaccess_unboxed_tuple_element i))
+            pat_addr
+        in
+        lbl, type_pat tps Value ~pat_mode ?pat_addr p t sort, sort)
+        (List.combine expected_tys args)
     in
     let ty =
       newty (Tunboxed_tuple (List.map (fun (lbl, p, _) -> lbl, p.pat_type) pl))
@@ -3642,6 +3794,29 @@ and type_pat_aux
           let error = Wrong_expected_kind(wks, Pattern, expected_ty) in
           raise (Error (loc, !!penv, error))
       in
+      let deref_position_through_label ~container_mode (rep : rep) lid
+            (label : rep gen_label_description) pos =
+        (* Unboxed fields extend the current position, if there is one. Boxed
+           fields start a new position. *)
+        match pos, record_form, rep with
+        | None, Unboxed_product, _ -> None
+        | None, Legacy, Record_unboxed -> None
+        | Some pos, Unboxed_product, _ ->
+          Some
+            (deref_position_push_unboxed_access
+               (Uaccess_unboxed_field (lid, label, rep)) pos)
+        | Some pos, Legacy, Record_unboxed ->
+          Some
+            (deref_position_push_unboxed_access
+               (Uaccess_unboxed_record_field (lid, label, rep)) pos)
+        | _, Legacy,
+          ( Record_inlined _ | Record_boxed | Record_float | Record_ufloat
+          | Record_mixed _ | Record_dummy _ | Record_undetermined
+          | Record_variable _ ) ->
+          Some { position_mutability = label.lbl_mut; container_mode;
+                 container_loc = loc; base = Baccess_field (lid, label, rep);
+                 rev_unboxed = [] }
+      in
       let type_label_pat rep (label_lid, (label : rep gen_label_description),
                               sarg) =
         let ty_arg =
@@ -3658,9 +3833,15 @@ and type_pat_aux
           apply_left_is_contained_by is_contained_by
             ~modalities:label.lbl_modalities pat_mode.mode
         in
+        let container_mode = pat_mode.mode in
         let pat_mode = simple_pat_mode mode in
         let ty_sort = label_sort record_form label rep ~record_sort in
-        (label_lid, label, type_pat tps Value ~pat_mode sarg ty_arg ty_sort)
+        let pat_addr =
+          deref_position_through_label ~container_mode rep label_lid label
+            pat_addr
+        in
+        (label_lid, label,
+         type_pat tps Value ~pat_mode ?pat_addr sarg ty_arg ty_sort)
       in
       let make_record_pat
             (rep : rep)
@@ -3803,7 +3984,7 @@ and type_pat_aux
             pat_unique_barrier = Unique_barrier.not_computed () }
       end
   | Ppat_alias(sq, name) ->
-      let q = type_pat tps Value sq expected_ty sort in
+      let q = type_pat tps Value ?pat_addr sq expected_ty sort in
       let ty_var, mode = solve_Ppat_alias ~mode:pat_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
@@ -4006,6 +4187,8 @@ and type_pat_aux
                | Some s ->
                  Jkind.Sort.of_const s, None
              in
+             (* CR address-patterns: in principle, immutable addresses could
+                point into constructor arguments *)
              type_pat ~pat_mode tps Value p arg.ca_type sort, jkind_to_check)
           sargs args
         |> List.split
@@ -4046,6 +4229,8 @@ and type_pat_aux
             pat_env = !!penv;
             pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_variant(tag, sarg) ->
+      (* CR address-patterns: in principle, immutable addresses could point into
+         variants *)
       assert (tag <> Parmatch.some_private_tag);
       let constant = (sarg = None) in
       let arg_type, row, pat_type =
@@ -4124,6 +4309,7 @@ and type_pat_aux
         with_local_level begin fun () ->
           let type_pat_rec tps penv sp =
             let pat_mode = dynamic_pat_mode pat_mode in
+            (* CR address-patterns: allow deref_ in or patterns *)
             type_pat ~pat_mode tps category sp expected_ty sort ~penv
           in
           let penv1 =
@@ -4205,8 +4391,15 @@ and type_pat_aux
       let mode =
         apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
       in
+      let container_mode = pat_mode.mode in
       let pat_mode = simple_pat_mode mode in
-      let p1 = type_pat ~pat_mode tps Value sp1 ty_arg arg_sort in
+      let pat_addr =
+        { position_mutability = mutability; container_mode;
+          container_loc = loc; base = Baccess_address arg_sort;
+          rev_unboxed = [] }
+      in
+      let p1 = type_pat ~pat_mode ~pat_addr tps Value sp1 ty_arg arg_sort
+      in
       rvp {
         pat_desc = Tpat_addr (mutability, arg_sort, p1);
         pat_loc = loc; pat_extra=[];
@@ -4229,7 +4422,8 @@ and type_pat_aux
           None, None, expected_ty
       in
       let p =
-        type_pat ~pat_mode tps category sp_constrained expected_ty sort
+        type_pat ~pat_mode ?pat_addr tps category sp_constrained expected_ty
+          sort
       in
       let pat_type = match ty with Some ty -> ty | None -> p.pat_type in
       let extra =
@@ -4247,7 +4441,7 @@ and type_pat_aux
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
-      let p = type_pat tps category ~penv p expected_ty sort in
+      let p = type_pat tps category ~penv ?pat_addr p expected_ty sort in
       let new_env = !!penv in
       begin match Env.remove_last_open path new_env with
       | None -> assert false
@@ -4272,11 +4466,51 @@ and type_pat_aux
       }
   | Ppat_effect _ ->
       raise (Error (loc, !!penv, Effect_pattern_below_toplevel))
+  | Ppat_deref sp1 ->
+      (* CR address-patterns: [deref_] should be allowed while deepening an
+         [addr_] at [write] and [immutable], too. Currently, this is only
+         accepted if the ['a addr] is at least read. Similarly, [deref_] on
+         a mutable field should be allowed in records at [write], [immutable]
+         or [contended]. *)
+      (* CR address-patterns: support [as deref_ x], which lifts the
+         restriction below; then, print a more informative error when
+         the argument is a pattern that [as deref_ x] would accept. *)
+      (match sp1.ppat_desc with
+       | Ppat_any | Ppat_var _ -> ()
+       | _ ->
+         raise (Error (sp1.ppat_loc, !!penv, Deref_pattern_bad_argument)));
+      let { position_mutability; container_mode; container_loc; base;
+            rev_unboxed } =
+        match pat_addr with
+        | Some pos -> pos
+        | None -> raise (Error (loc, !!penv, Deref_pattern_bad_position))
+      in
+      let unboxed = List.rev rev_unboxed in
+      check_block_reference_path ~loc ~env:!!penv Deref_pattern
+        ~mutability:position_mutability base unboxed;
+      let ty_addr, addr_sort =
+        solve_Ppat_deref !!penv position_mutability expected_ty
+      in
+      let is_contained_by : Mode.Hint.is_contained_by =
+        { containing = Derived_address; container = (container_loc, Pattern) }
+      in
+      let mode = apply_left_is_contained_by is_contained_by container_mode in
+      let p1 =
+        type_pat ~pat_mode:(simple_pat_mode mode) tps Value sp1 ty_addr
+          addr_sort
+      in
+      rvp {
+        pat_desc = Tpat_deref (position_mutability, base, unboxed, p1);
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
 let type_pat tps category ?no_existentials ~mutable_flag penv =
-  type_pat tps category ~no_existentials ~mutable_flag ~penv
+  type_pat tps category ~no_existentials ~mutable_flag ~pat_addr:None ~penv
 
 let type_pattern
     category ~lev ~pat_mode env spat expected_ty ?cont sort allow_modules
@@ -4432,8 +4666,8 @@ let rec pat_tuple_arity spat =
   | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
-  | Ppat_addr _ | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _
-  | Ppat_effect _ ->
+  | Ppat_addr _ | Ppat_deref _ | Ppat_lazy _ | Ppat_unpack _
+  | Ppat_extension _ | Ppat_effect _ ->
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
       combine_pat_tuple_arity (pat_tuple_arity sp1) (pat_tuple_arity sp2)
@@ -4809,6 +5043,10 @@ let rec check_counter_example_pat
         Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
+  | Tpat_deref (mutability, ba, uas, tp1) ->
+      let ty_addr, _ = solve_Ppat_deref !!penv mutability expected_ty in
+      check_rec tp1 ty_addr
+        (fun p1 -> mkp k (Tpat_deref (mutability, ba, uas, p1)))
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -5532,7 +5770,9 @@ let rec is_nonexpansive exp =
       in
       (* All unboxed accesses are nonexpansive, but we include the below match
          in case we add new unboxed access types *)
-      let _unboxed_access = function Uaccess_unboxed_field _ -> true in
+      let _unboxed_access : index unboxed_access -> _ = function
+        | Uaccess_unboxed_field _ -> true
+      in
       block_access ba
   | Texp_ifthenelse(_cond, ifso, ifnot) ->
       is_nonexpansive ifso && is_nonexpansive_opt ifnot
@@ -6256,7 +6496,7 @@ let shallow_iter_ppat f p =
   | Ppat_exception p | Ppat_alias (p,_)
   | Ppat_open (_,p)
   | Ppat_constraint (p,_,_)
-  | Ppat_addr (_, p) | Ppat_lazy p -> f p
+  | Ppat_addr (_, p) | Ppat_deref p | Ppat_lazy p -> f p
   | Ppat_record (args, _flag) | Ppat_record_unboxed_product (args, _flag) ->
     List.iter (fun (_,p) -> f p) args
 
@@ -6463,7 +6703,7 @@ let may_lower_contravariant env exp =
   if maybe_expansive exp then lower_contravariant env exp.exp_type
 
 let generalize_structure_type_block_access_result
-      { ba; base_ty; el_ty; modality = _ } =
+      { ba; base_ty; el_ty } =
   generalize_structure base_ty;
   generalize_structure el_ty;
   match ba with
@@ -6472,7 +6712,7 @@ let generalize_structure_type_block_access_result
     generalize_structure_exp idx
 
 let generalize_structure_type_unboxed_access_result
-      (el_ty, Uaccess_unboxed_field _) =
+      (el_ty, (Uaccess_unboxed_field _ : index unboxed_access)) =
   generalize_structure el_ty
 
 let unique_use ~loc ~env mode_l mode_r  =
@@ -8213,7 +8453,7 @@ and type_expect_
     in
     let expected_base_ty = expected_base_ty ty_expected in
     let principal = is_principal ty_expected in
-    let { ba; base_ty; el_ty; modality } =
+    let { ba; base_ty; el_ty } =
       with_local_level_generalize_structure_if_principal
         ~before_generalize:generalize_structure_type_block_access_result
         (fun () ->
@@ -8248,39 +8488,18 @@ and type_expect_
         Mutable { mode = Mode.With_regionality.Comonadic.legacy;
                   atomic = Atomic }
     in
-    let (el_ty, modality), uas =
+    let el_ty, uas =
       List.fold_left_map
-        (fun (el_ty, modality) ua ->
+        (fun el_ty ua ->
            (* Generalize after each step, otherwise we'll have more
               "non-principal" warnings than desired. *)
            with_local_level_generalize_structure_if_principal
-             ~before_generalize:(fun ((t, _), ua) ->
-               generalize_structure_type_unboxed_access_result (t, ua))
-             (fun () ->
-                let (el_ty, ua_modality), ua =
-                  type_unboxed_access env loc el_ty ua
-                in
-                let modality =
-                  Modality.Const.concat modality ~then_:ua_modality in
-                (el_ty, modality), ua
-             ))
-        (el_ty, modality)
+             ~before_generalize:generalize_structure_type_unboxed_access_result
+             (fun () -> type_unboxed_access env loc el_ty ua))
+        el_ty
         uas
     in
-    let is_mutable = Types.is_mutable mut in
-    if is_mutable then check_index_not_to_poly_field ~env ba uas;
-    let expected_modality =
-      Typemode.idx_expected_modalities ~mut:is_mutable
-    in
-    begin
-      match Modality.Const.equate modality expected_modality with
-      | Ok () -> ()
-      | Error err ->
-        raise (Error(
-          loc, env,
-          Block_index_modality_mismatch { mut = is_mutable; err }
-        ))
-    end;
+    check_block_reference_path ~loc ~env Block_index ~mutability:mut ba uas;
     let ty = match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
       | Mutable { atomic = Nonatomic; mode = _ } ->
@@ -9321,28 +9540,7 @@ and type_block_access env expected_base_ty principal
         ~containing_type:expected_base_ty
     in
     let ba = Baccess_field (lid, label, rep) in
-    let bad_record_error reason =
-      raise (Error (lid.loc, env, Block_access_bad_record reason))
-    in
-    (match label.lbl_repres with
-     | Record_boxed | Record_undetermined | Record_variable _ -> ()
-     | Record_mixed shape ->
-       if Array.exists (function Float_boxed -> true | _ -> false) shape then
-         bad_record_error "[@@flatten_floats]"
-       else
-         ()
-     | Record_float -> bad_record_error "float"
-     | Record_ufloat -> bad_record_error "[@@represent_as_float_array]"
-     | Record_unboxed -> bad_record_error "[@@unboxed]"
-     | Record_inlined _ ->
-       Misc.fatal_error "Typecore.type_block_access: inlined record"
-     | Record_dummy _ ->
-       Misc.fatal_error "Typecore.type_block_access: dummy representation");
-    (match label.lbl_private with
-     | Public -> ()
-     | Private -> bad_record_error "private");
-    let modality = label.lbl_modalities in
-    { ba; base_ty = ty_res; el_ty = ty_arg; modality }
+    { ba; base_ty = ty_res; el_ty = ty_arg }
   | Baccess_block (mut, idx) ->
     let base_ty = newvar (Jkind.Builtin.value_or_null ~why:Idx_base) in
     let el_ty =
@@ -9359,13 +9557,7 @@ and type_block_access env expected_base_ty principal
     let idx =
       type_expect env mode_legacy idx (mk_expected idx_type_expected) in
     let ba = Baccess_block (mut, idx) in
-    let mut =
-      match mut with
-      | Immutable_access -> false
-      | Mutable_access | Atomic_access -> true
-    in
-    let modality = Typemode.idx_expected_modalities ~mut in
-    { ba; base_ty; el_ty; modality }
+    { ba; base_ty; el_ty }
 
 and type_unboxed_access env loc el_ty ua =
   match ua with
@@ -9400,7 +9592,7 @@ and type_unboxed_access env loc el_ty ua =
         ~why:Field_in_indexed_record
         ~containing_type:el_ty
     in
-    (ty_arg, label.lbl_modalities), Uaccess_unboxed_field (lid, label, rep)
+    ty_arg, Uaccess_unboxed_field (lid, label, rep)
 
 and expression_constraint pexp =
   { type_without_constraint = (fun env expected_mode ->
@@ -13379,6 +13571,10 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
 
 let msg = Fmt.doc_printf
 
+let block_reference_name = function
+  | Block_index -> "Block indices"
+  | Deref_pattern -> "Dereference patterns"
+
 let report_error ~loc env =
   function
   | Constructor_arity_mismatch(lid, expected, provided) ->
@@ -13818,6 +14014,14 @@ let report_error ~loc env =
   | Effect_pattern_below_toplevel ->
       Location.errorf ~loc
         "@[Effect patterns must be at the top level of a match case.@]"
+  | Deref_pattern_bad_position ->
+      Location.errorf ~loc
+        "@[Dereference patterns must match a value stored in a record,@ \
+         a tuple or at an address.@]"
+  | Deref_pattern_bad_argument ->
+      Location.errorf ~loc
+        "@[Dereference patterns must bind a variable,@ as in %a.@]"
+        Style.inline_code "deref_ x"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"
@@ -14055,10 +14259,20 @@ let report_error ~loc env =
           (Style.as_inline_code Printtyp.type_expr) prev_el_type
           quoted_longident lid
       end
-  | Block_access_bad_record kind ->
+  | Block_reference_bad_type (reference, reason) ->
+    let what =
+      match reason with
+      | Flatten_floats_record -> "[@@flatten_floats] records"
+      | Float_record -> "float records"
+      | Float_array_record -> "[@@represent_as_float_array] records"
+      | Unboxed_record -> "[@@unboxed] records"
+      | Inlined_record -> "inlined records"
+      | Atomic_field -> "atomic fields"
+      | Private_declaration -> "private types in mutable positions"
+    in
     Location.errorf ~loc
-      "Block indices do not support %s records." kind
-  | Block_index_modality_mismatch { mut; err } ->
+      "%s do not support %s." (block_reference_name reference) what
+  | Block_reference_modality_mismatch { reference; mutability; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality_doc id =
       Printtyp.modality ~id:(fun ppf () -> Format_doc.pp_print_string ppf id) ax
@@ -14067,24 +14281,33 @@ let report_error ~loc env =
       | Left_le_right -> right, left
       | Right_le_left -> left, right
     in
-    let what_element_must_do =
-      if Modality.Per_axis.is_id ax expected then
-        "have the identity modality"
-      else
-        Format.asprintf "be %a"
-          (Format_doc.compat (print_modality_doc "")) expected
+    (* On an axis where [actual] is the identity, print the identity mode *)
+    let identity =
+      Format_doc.asprintf "%a" (Modality.Per_axis.print ax) actual
+    in
+    let elements =
+      if Types.is_mutable mutability then "mutable" else "immutable"
+    in
+    let what_elements_must_do =
+      if Modality.Per_axis.is_id ax expected then "have the identity modality"
+      else Format_doc.asprintf "be %a" (print_modality_doc "") expected
     in
     Location.errorf ~loc
-      "Block indices do not yet support non-default modalities. In \
+      "%s do not yet support non-default modalities. In \
        particular,@ %s elements must %s, but this is %a."
-      (if mut then "mutable" else "immutable")
-      what_element_must_do
-      (print_modality_doc "not") actual
-  | Mutable_block_index_polymorphic_field lid ->
+      (block_reference_name reference) elements what_elements_must_do
+      (print_modality_doc identity) actual
+  | Block_reference_polymorphic_field (Block_index, lid) ->
+    (* Block indices only reject polymorphic fields in mutable positions, so
+       they keep their own message. *)
     Location.errorf ~loc
       "Mutable block indices to polymorphic record fields@ (here %a) are \
        forbidden."
       quoted_longident lid
+  | Block_reference_polymorphic_field ((Deref_pattern as reference), lid) ->
+    Location.errorf ~loc
+      "%s do not support polymorphic record fields@ (here %a)."
+      (block_reference_name reference) quoted_longident lid
   | Submode_failed(e, submode_reason) ->
     let Mode.With_regionality.Error (ax, _) =
       Mode.With_regionality.to_simple_error

@@ -179,6 +179,25 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
+let raise_unsupported_pattern loc msg =
+  let sloc =
+    Scoped_location.of_location ~scopes:Scoped_location.empty_scopes loc
+  in
+  let slot =
+    transl_extension_path sloc
+      (Lazy.force Env.initial) Predef.path_invalid_argument
+  in
+  Lprim
+    ( Praise Raise_regular,
+      [ Lprim
+          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+            [ slot;
+              Lconst (Const_base (Const_string (msg, loc, None)))
+            ],
+            sloc )
+      ],
+      sloc )
+
 let fatal_var_lpoly lpoly =
   let n = List.length (Types.Lpoly.get_exn lpoly) in
   Misc.fatal_errorf
@@ -280,6 +299,11 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
+      | `Deref _ ->
+          (* CR address-patterns: compile dereference patterns. *)
+          (({ p with pat_desc = `Any }, patl),
+           raise_unsupported_pattern p.pat_loc
+             "dereference patterns are not supported yet")
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
         | `Lazy _ )
@@ -381,6 +405,12 @@ end = struct
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
       | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+      | `Deref _ ->
+          (* CR address-patterns: compile dereference patterns *)
+          ({ p with pat_desc = `Any },
+           raise_unsupported_pattern p.pat_loc
+             "dereference patterns are not supported yet")
+          :: rem
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -633,7 +663,8 @@ end = struct
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
-          | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
+          | `Var _ | `Deref _ ->
+              filter_rec ((left, Patterns.omega, right) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -776,7 +807,7 @@ end = struct
           let p = General.view p in
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
-          | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
+          | `Var _ | `Deref _ -> filter_rec ((Patterns.omega, ps) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (

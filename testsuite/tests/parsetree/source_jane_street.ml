@@ -1942,3 +1942,11 @@ let f a = let addr_imm_ x = a in x
 [%%expect{|
 val f : 'a addr_imm -> 'a = <fun>
 |}]
+
+(************************)
+(* Dereference patterns *)
+
+let f (deref_ a, deref_ b) = #(a, b)
+[%%expect{|
+val f : 'a * 'b -> #('a addr_imm * 'b addr_imm) = <fun>
+|}]

@@ -317,7 +317,10 @@ let pat
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
-  | Tpat_addr (_, _, p) | Tpat_lazy p -> sub.pat sub p
+  (* The accesses of [Tpat_deref] duplicate the labels of the surrounding
+     patterns, which are visited there. *)
+  | Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p ->
+      sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
   | Tpat_or (p1, p2, _) ->
@@ -382,11 +385,11 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       | _, _, Overridden (lid, exp) -> iter_loc_lid sub lid; sub.expr sub exp)
       fields
   in
-  let iter_block_access sub = function
+  let iter_block_access sub : index block_access -> _ = function
     | Baccess_field (lid, _, _) -> iter_loc sub lid
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
-  let iter_unboxed_access sub = function
+  let iter_unboxed_access sub : index unboxed_access -> _ = function
     | Uaccess_unboxed_field (lid, _, _) -> iter_loc sub lid
   in
   match exp_desc with

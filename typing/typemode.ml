@@ -369,26 +369,26 @@ let address_modalities mut =
 let mutable_implied_modalities ~for_mutable_variable mut =
   modality_of_atoms (mutable_implied_modalities ~for_mutable_variable mut)
 
-let idx_expected_modalities ~(mut : bool) =
-  (* There are two design constraints on what modalities we allow in an index
-     creation to contain. Because these are coupled, this function checks that
-     they are equal.
+let block_reference_expected_modalities mutability =
+  (* There are two design constraints on what modalities we allow a block
+     reference (a block index or the address bound by a dereference pattern)
+     to point to. Because these are coupled, this function checks that they
+     are equal.
       1. The default modalities (id for non-mutable fields, global many aliased
          forkable unyielding for mutable fields) should work.
       2. It should also be safe wrt to type signatures given to block index
-         primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
-  let modality_of_list l =
-    List.fold_left
-      (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
-      Modality.Const.id l
-  in
+         and address primitives (see [idx_imm.mli], [idx_mut.mli], [addr.mli]
+         and [addr_imm.mli] in [Stdlib_stable]). *)
+  let mut = Types.is_mutable mutability in
   let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
   let expected2 =
     if mut
     then
-      (* If this list is updated, the external bindings in the [Idx_imm] and
-         [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
-      modality_of_list
+      (* If this list is updated, the external bindings in the [Idx_imm],
+         [Idx_mut], [Addr] and [Addr_imm] modules in [Stdlib_stable] may also
+         have to be updated. *)
+      (* CR address-patterns: This should be related to [address_modalities] *)
+      modality_of_atoms
         [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
           Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
           Atom (Comonadic Forkable, Meet_const Forkable.Const.legacy);
@@ -404,8 +404,8 @@ let idx_expected_modalities ~(mut : bool) =
   | Ok () -> expected1
   | Error _ ->
     Misc.fatal_error
-      "Typemode.idx_expected_modalities: mismatch with mutable implied \
-       modalities"
+      "Typemode.block_reference_expected_modalities: mismatch with mutable \
+       implied modalities"
 
 let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
   let baseline =

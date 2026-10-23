@@ -1282,3 +1282,191 @@ Alert Translcore: Overwrite not implemented.
 Uncaught exception: Misc.Fatal_error
 
 |}]
+
+(* An address owns the part of the memory it points into, so the block can't
+   be overwritten while it is in use. For a mutable field, this is not implied
+   by the address owning the value at the position, which is aliased. *)
+type deref_mut = { mutable dm : string }
+let consume_addr : ('a : any). 'a addr @ unique -> unit = fun _ -> ()
+let overwrite_after_consume_addr (r : deref_mut @ unique) =
+  match r with
+  | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
+[%%expect{|
+type deref_mut = { mutable dm : string; }
+val consume_addr : ('a : any). 'a addr @ unique -> unit = <fun>
+Line 5, characters 52-53:
+5 |   | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
+                                                        ^
+Error: This value is used here,
+       but part of it has already been used as unique at:
+Line 5, characters 38-39:
+5 |   | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
+                                          ^
+
+|}]
+
+type ow = { f : string; g : string }
+let consume_addr_imm : ('a : any). 'a addr_imm @ unique -> unit = fun _ -> ()
+let use_addr_imm : ('a : any). 'a addr_imm -> unit = fun _ -> ()
+[%%expect{|
+type ow = { f : string; g : string; }
+val consume_addr_imm : ('a : any). 'a addr_imm @ unique -> unit = <fun>
+val use_addr_imm : ('a : any). 'a addr_imm -> unit = <fun>
+|}]
+
+(* Taking an address doesn't use the block *)
+let overwrite_unused_addr (r : ow @ unique) =
+  match r with { f = deref_ _a; _ } -> overwrite_ r with { f = "x" }
+[%%expect{|
+Line 2, characters 39-68:
+2 |   match r with { f = deref_ _a; _ } -> overwrite_ r with { f = "x" }
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Alert Translcore: Overwrite not implemented.
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* After an overwrite, the address would see the new contents *)
+let use_addr_after_overwrite (r : ow @ unique) =
+  match r with
+  | { f = deref_ a; _ } ->
+    let r = overwrite_ r with { f = "x" } in
+    use_addr_imm a;
+    r
+[%%expect{|
+Line 5, characters 17-18:
+5 |     use_addr_imm a;
+                     ^
+Error: This value is used here,
+       but it is part of a value that has already been used as unique at:
+Line 4, characters 23-24:
+4 |     let r = overwrite_ r with { f = "x" } in
+                           ^
+
+|}]
+
+(* The address may still be in use when the block is overwritten *)
+let overwrite_after_use_addr (r : ow @ unique) =
+  match r with
+  | { f = deref_ a; _ } -> use_addr_imm a; overwrite_ r with { f = "x" }
+[%%expect{|
+Line 3, characters 54-55:
+3 |   | { f = deref_ a; _ } -> use_addr_imm a; overwrite_ r with { f = "x" }
+                                                          ^
+Error: This value is used here as unique,
+       but part of it has already been used at:
+Line 3, characters 40-41:
+3 |   | { f = deref_ a; _ } -> use_addr_imm a; overwrite_ r with { f = "x" }
+                                            ^
+
+|}]
+
+(* Overwriting a block uses all of its memory, including the parts not owned by
+   the address *)
+let overwrite_other_field_after_consume_addr (r : ow @ unique) =
+  match r with
+  | { f = deref_ a; _ } -> consume_addr_imm a; overwrite_ r with { g = "x" }
+[%%expect{|
+Line 3, characters 58-59:
+3 |   | { f = deref_ a; _ } -> consume_addr_imm a; overwrite_ r with { g = "x" }
+                                                              ^
+Error: This value is used here,
+       but part of it has already been used as unique at:
+Line 3, characters 44-45:
+3 |   | { f = deref_ a; _ } -> consume_addr_imm a; overwrite_ r with { g = "x" }
+                                                ^
+
+|}]
+
+let overwrite_tuple_after_consume_addr (t : (string * string) @ unique) =
+  match t with
+  | (deref_ a, _) -> consume_addr_imm a; overwrite_ t with (_, "y")
+[%%expect{|
+Line 3, characters 52-53:
+3 |   | (deref_ a, _) -> consume_addr_imm a; overwrite_ t with (_, "y")
+                                                        ^
+Error: This value is used here,
+       but part of it has already been used as unique at:
+Line 3, characters 38-39:
+3 |   | (deref_ a, _) -> consume_addr_imm a; overwrite_ t with (_, "y")
+                                          ^
+
+|}]
+
+(* An address into a boxed record stored in an immutable field points into the
+   memory of the inner record *)
+type inner_boxed = { i : string }
+type outer_boxed = { ob : inner_boxed; og : string }
+let overwrite_outer_boxed (r : outer_boxed @ unique) =
+  match r with
+  | { ob = { i = deref_ a }; _ } ->
+    let r = overwrite_ r with { ob = { i = "x" } } in
+    consume_addr_imm a;
+    r
+[%%expect{|
+type inner_boxed = { i : string; }
+type outer_boxed = { ob : inner_boxed; og : string; }
+Line 6, characters 12-50:
+6 |     let r = overwrite_ r with { ob = { i = "x" } } in
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Alert Translcore: Overwrite not implemented.
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* An unboxed record is stored in the memory of the outer record *)
+type inner_unboxed = #{ iu : string; iu' : string }
+type outer_unboxed = { ou : inner_unboxed; og' : string }
+let overwrite_outer_unboxed (r : outer_unboxed @ unique) =
+  match r with
+  | { ou = #{ iu = deref_ a; _ }; _ } ->
+    let r = overwrite_ r with { ou = #{ iu = "x"; iu' = "y" } } in
+    consume_addr_imm a;
+    r
+[%%expect{|
+type inner_unboxed = #{ iu : string; iu' : string; }
+type outer_unboxed = { ou : inner_unboxed; og' : string; }
+Line 7, characters 21-22:
+7 |     consume_addr_imm a;
+                         ^
+Error: This value is used here,
+       but it is part of a value that has already been used as unique at:
+Line 6, characters 23-24:
+6 |     let r = overwrite_ r with { ou = #{ iu = "x"; iu' = "y" } } in
+                           ^
+
+|}]
+
+(* The value loaded from an address keeps the memory paths of the address (see
+   [deref_base_paths] in [Uniqueness_analysis]), so this is rejected... *)
+let overwrite_with_loaded_value (r : ow @ unique) =
+  match r with
+  | { f = deref_ a; _ } ->
+    let addr_imm_ s = a in
+    overwrite_ r with { f = s }
+[%%expect{|
+Line 5, characters 15-16:
+5 |     overwrite_ r with { f = s }
+                   ^
+Error: This value is used here as unique,
+       but part of it has already been used at:
+Line 5, characters 28-29:
+5 |     overwrite_ r with { f = s }
+                                ^
+
+|}]
+
+(* ...although it is equivalent to this, which is accepted *)
+let overwrite_with_bound_value (r : ow @ unique) =
+  match r with { f = s; _ } -> overwrite_ r with { f = s }
+[%%expect{|
+Line 2, characters 31-58:
+2 |   match r with { f = s; _ } -> overwrite_ r with { f = s }
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Alert Translcore: Overwrite not implemented.
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
