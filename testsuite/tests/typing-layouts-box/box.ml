@@ -263,15 +263,7 @@ type r32 = { i32 : int32_u }
 let test_bits32 (u : r32#) (b : r32) = check_bits32 u b;;
 [%%expect{|
 type r32 = { i32 : int32_u; }
-Line 2, characters 52-53:
-2 | let test_bits32 (u : r32#) (b : r32) = check_bits32 u b;;
-                                                        ^
-Error: The value "u" has type "r32#" but an expression was expected of type
-         "('a : bits32 addressable)"
-       The layout of r32# is bits32
-         because it is an unboxed record.
-       But the layout of r32# must be a sublayout of bits32 addressable
-         because of the definition of check_bits32 at line 1, characters 4-16.
+val test_bits32 : r32# -> r32 -> unit = <fun>
 |}]
 
 let check_bits64 : type (a : bits64). a -> a box -> unit =
