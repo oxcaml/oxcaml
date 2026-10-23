@@ -326,9 +326,16 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
+      let arguments =
+        List.map2
+          (fun expression simple ->
+            { Cmm.expression; callee = check_known_argument env res simple })
+          args
+          (Apply.args apply)
+      in
       ( C.direct_call ~dbg
           (C.Extended_machtype.to_machtype return_ty)
-          pos code_sym args,
+          pos code_sym arguments,
         free_vars,
         env,
         res,

@@ -725,6 +725,11 @@ and expression =
         symbol : symbol
       }
 
+type argument =
+  { expression : expression;
+    callee : callee option
+  }
+
 type codegen_option =
   | Reduce_code_size
   | No_CSE

@@ -5385,10 +5385,10 @@ let direct_call ~dbg ty pos f_code_sym args =
         { result_type = ty;
           region = pos;
           callees = Some [Symbol f_code_sym];
-          (* CR wsturgeon for wsturgeon: propagate known arguments *)
-          known_arguments = []
+          known_arguments = List.map (fun { callee; _ } -> callee) args
         },
-      Cconst_symbol (f_code_sym, dbg) :: args,
+      Cconst_symbol (f_code_sym, dbg)
+        :: List.map (fun { expression; _ } -> expression) args,
       dbg )
 
 let indirect_call ~dbg ty pos alloc_mode f args_type args ~callees =

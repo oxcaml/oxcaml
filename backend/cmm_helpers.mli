@@ -1091,7 +1091,7 @@ val direct_call :
   machtype ->
   Lambda.region_close ->
   symbol ->
-  expression list ->
+  argument list ->
   expression
 
 (** Same as {!direct_call} but for an indirect call. *)
