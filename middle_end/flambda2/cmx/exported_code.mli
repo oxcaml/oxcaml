@@ -57,6 +57,13 @@ val iter_code : t -> f:(Code.t -> unit) -> unit
 
 val from_raw : sections:File_sections.t -> raw -> t
 
-val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+val to_raw : sections:File_sections.Builder.t -> t -> raw
 
-val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw
+(* CR ncourant: we would like not to expose the type stored inside the
+   file_sections. For that, we would need a polymorphic parameter here, which
+   only comes with OCaml 5.5. *)
+val map_raw_index :
+  ((Flambda.function_params_and_body * Name_occurrences.t) File_sections.Idx.t ->
+  (Flambda.function_params_and_body * Name_occurrences.t) File_sections.Idx.t) ->
+  raw ->
+  raw
