@@ -2688,11 +2688,25 @@ type typvariant_repr = {
   tags : string list option
 }
 
-let rec tree_of_modal_typexp mode modal ty =
+let local_opt_occurrence ~arg m =
+  let snap = Btype.snapshot () in
+  let c = With_locality.zap_to_legacy_force ~arg m in
+  Btype.backtrack snap;
+  Curry_mode.const c
+
+let occurrence ~local_opt ~arg m =
+  if local_opt && With_locality.check_generic m
+  then local_opt_occurrence ~arg m
+  else curry_mode_of_occurrence ~arg m
+
+let rec tree_of_modal_typexp ?(local_opt = []) mode modal ty =
+  let local_opt_ret =
+    match local_opt with [ret] -> ret | _ -> false
+  in
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
-        let acc = curry_mode_of_occurrence ~arg:false mode in
+        let acc = occurrence ~local_opt:local_opt_ret ~arg:false mode in
         Otyp_ret (Orm_any (tree_of_modes mode acc), tree)
     | Other _ -> tree
   in
@@ -2722,7 +2736,12 @@ let rec tree_of_modal_typexp mode modal ty =
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
-        let arg_acc = curry_mode_of_occurrence ~arg:true marg in
+        let local_opt_arg, local_opt =
+          match local_opt with
+          | arg :: rest -> arg, rest
+          | [] -> false, []
+        in
+        let arg_acc = occurrence ~local_opt:local_opt_arg ~arg:true marg in
         let t1 =
           if is_optional l then
             match
@@ -2737,7 +2756,7 @@ let rec tree_of_modal_typexp mode modal ty =
         in
         let acc_mode = curry_acc acc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
-        let t2 = tree_of_modal_typexp mode modal ty2 in
+        let t2 = tree_of_modal_typexp ~local_opt mode modal ty2 in
         Otyp_arrow (lab, tree_of_modes marg arg_acc, t1, t2)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
@@ -2901,13 +2920,15 @@ let rec tree_of_modal_typexp mode modal ty =
   else
     match modal with
     | Arrow_return {acc; mode} ->
-        let rm, acc_mode = tree_of_ret_typ_mutating acc mode ty in
+        let rm, acc_mode =
+          tree_of_ret_typ_mutating ~local_opt:local_opt_ret acc mode ty
+        in
         let ty = pr_typ acc_mode in
         Otyp_ret (rm, ty)
     | Other acc_mode -> pr_typ acc_mode
 
-and tree_of_acc_typexp mode acc_mode ty =
-  tree_of_modal_typexp mode (Other acc_mode) ty
+and tree_of_acc_typexp ?local_opt mode acc_mode ty =
+  tree_of_modal_typexp ?local_opt mode (Other acc_mode) ty
 
 and tree_of_typexp mode mode_with_locality ty =
   tree_of_acc_typexp mode (Curry_mode.const mode_with_locality) ty
@@ -2986,7 +3007,7 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating (acc_mode : Curry_mode.t) m ty=
+and tree_of_ret_typ_mutating ~local_opt (acc_mode : Curry_mode.t) m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
@@ -3001,7 +3022,7 @@ and tree_of_ret_typ_mutating (acc_mode : Curry_mode.t) m ty=
       end
     end
   | _ ->
-    let acc_mode = curry_mode_of_occurrence ~arg:false m in
+    let acc_mode = occurrence ~local_opt ~arg:false m in
     (Orm_any (tree_of_modes m acc_mode), acc_mode)
 
 and tree_of_typobject_repr fi =
@@ -3058,11 +3079,11 @@ and tree_of_package mode {pack_path; pack_cstrs} =
             tree_of_typexp mode With_locality.Const.legacy ty))
         pack_cstrs }
 
-let tree_of_acc_typexp ~base mode ty =
+let tree_of_acc_typexp ?local_opt ~base mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_acc_typexp mode base ty)
+  wrap_mutation (fun () -> tree_of_acc_typexp ?local_opt mode base ty)
 
-let tree_of_acc_typexp ~base mode ty =
+let tree_of_acc_typexp ?local_opt ~base mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
@@ -3070,9 +3091,9 @@ let tree_of_acc_typexp ~base mode ty =
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)
-      (fun () -> tree_of_acc_typexp ~base mode ty)
+      (fun () -> tree_of_acc_typexp ?local_opt ~base mode ty)
   else
-    tree_of_acc_typexp ~base mode ty
+    tree_of_acc_typexp ?local_opt ~base mode ty
 
 let tree_of_typexp ~base mode ty =
   tree_of_acc_typexp ~base:(Curry_mode.const base) mode ty
@@ -3605,14 +3626,17 @@ let tree_of_value_description id decl =
     Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
     |> Mode.Const.value_to_alloc_r2l
   in
-  let base =
+  let base, local_opt =
     match decl.val_kind with
-    | Val_prim _ -> Curry_mode.primitive base
+    | Val_prim p ->
+      let is_poly = function Primitive.Prim_poly, _ -> true | _ -> false in
+      Curry_mode.primitive base,
+      List.map is_poly (p.prim_native_repr_args @ [p.prim_native_repr_res])
     | Val_reg _ | Val_mut _ | Val_ivar _ | Val_self _ | Val_anc _ ->
-      Curry_mode.const base
+      Curry_mode.const base, []
   in
   let () = prepare_for_printing_acc ~base [decl.val_type] in
-  let ty = tree_of_acc_typexp ~base Type_scheme decl.val_type in
+  let ty = tree_of_acc_typexp ~local_opt ~base Type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
   let oval_poly, qsvs, qtvs =

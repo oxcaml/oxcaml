@@ -239,9 +239,7 @@ external add_old :
   = "%int32_add"
 [%%expect{|
 external add_old :
-  (int32 [@local_opt]) @ 'm ->
-  (int32 [@local_opt]) @ 'm ->
-  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+  (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
   = "%int32_add"
 |}];;
 
@@ -359,29 +357,25 @@ Error: This value is "local" to the parent region but is expected to be "global"
 external add_opt : (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
   = "%int32_add"
 [%%expect{|
-external add_opt :
-  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  int32 @ [< 'm] -> int32 @ [> 'm] = "%int32_add"
+external add_opt : (int32 [@local_opt]) -> int32 @ [< 'm] -> int32 @ [> 'm]
+  = "%int32_add"
 |}];;
 
 external add_opt_res :
   int32 @ [< 'm] -> int32 @ [< 'm] -> (int32 [@local_opt]) = "%int32_add"
 [%%expect{|
-external add_opt_res :
-  int32 @ 'n ->
-  int32 @ 'm ->
-  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]
+external add_opt_res : int32 @ 'n -> int32 @ 'm -> (int32 [@local_opt])
   = "%int32_add"
 |}];;
 
 external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
 [%%expect{|
-external opt_arg_var : (int32 [@local_opt]) @ 'm -> int32 = "%int32_neg"
+external opt_arg_var : (int32 [@local_opt]) -> int32 = "%int32_neg"
 |}];;
 
 external opt_res_var : int32 -> (int32 [@local_opt]) @ [> 'm] = "%int32_neg"
 [%%expect{|
-external opt_res_var : int32 -> (int32 [@local_opt]) @ 'm = "%int32_neg"
+external opt_res_var : int32 -> (int32 [@local_opt]) = "%int32_neg"
 |}];;
 
 external opt_global_var :
@@ -389,58 +383,50 @@ external opt_global_var :
   = "%int32_add"
 [%%expect{|
 external opt_global_var :
-  (int32 [@local_opt]) @ 'm ->
-  int32 @ [< global] ->
-  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+  (int32 [@local_opt]) -> int32 @ [< global] -> (int32 [@local_opt])
   = "%int32_add"
 |}];;
 
 external opt_callback_arg :
   ('a [@local_opt]) -> ('a @ [< 'm] -> 'b) -> 'b = "%revapply"
 [%%expect{|
-external opt_callback_arg :
-  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  ('a @ 'm -> 'b) -> 'b = "%revapply"
+external opt_callback_arg : ('a [@local_opt]) -> ('a @ 'm -> 'b) -> 'b
+  = "%revapply"
 |}];;
 
 external opt_callback_res :
   ('a [@local_opt]) -> ('a -> 'b @ [> 'm]) -> 'b = "%revapply"
 [%%expect{|
-external opt_callback_res :
-  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  ('a -> 'b @ 'm) -> 'b = "%revapply"
+external opt_callback_res : ('a [@local_opt]) -> ('a -> 'b @ 'm) -> 'b
+  = "%revapply"
 |}];;
 
 external opt_variant :
   ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit = "caml_opt_variant"
 [%%expect{|
-external opt_variant :
-  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  [ `A of 'a @ 'm -> unit ] -> unit = "caml_opt_variant"
+external opt_variant : ('a [@local_opt]) -> [ `A of 'a @ 'm -> unit ] -> unit
+  = "caml_opt_variant"
 |}];;
 
 external opt_object :
   ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit = "caml_opt_object"
 [%%expect{|
-external opt_object :
-  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  < f : 'a @ 'm -> unit > -> unit = "caml_opt_object"
+external opt_object : ('a [@local_opt]) -> < f : 'a @ 'm -> unit > -> unit
+  = "caml_opt_object"
 |}];;
 
 external opt_polytype :
   ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit = "caml_opt_polytype"
 [%%expect{|
-external opt_polytype :
-  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  ('b. 'b @ 'm -> unit) -> unit = "caml_opt_polytype"
+external opt_polytype : ('a [@local_opt]) -> ('b. 'b @ 'm -> unit) -> unit
+  = "caml_opt_polytype"
 |}];;
 
 external opt_constr_arg :
   ('a [@local_opt]) -> ('a @ [< 'm] -> unit) list -> unit = "caml_opt_list"
 [%%expect{|
-external opt_constr_arg :
-  ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  ('a @ 'm -> unit) list -> unit = "caml_opt_list"
+external opt_constr_arg : ('a [@local_opt]) -> ('a @ 'm -> unit) list -> unit
+  = "caml_opt_list"
 |}];;
 
 external opt_returned_closure :
@@ -448,8 +434,8 @@ external opt_returned_closure :
   = "caml_opt_closure"
 [%%expect{|
 external opt_returned_closure :
-  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic] ->
-  (int32 @ [< 'm] -> int32 @ [> 'm]) = "caml_opt_closure"
+  (int32 [@local_opt]) -> (int32 @ [< 'm] -> int32 @ [> 'm])
+  = "caml_opt_closure"
 |}];;
 
 external opt_only :
@@ -457,9 +443,7 @@ external opt_only :
   = "%int32_add"
 [%%expect{|
 external opt_only :
-  (int32 [@local_opt]) @ 'm ->
-  (int32 [@local_opt]) @ 'm ->
-  (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+  (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
   = "%int32_add"
 |}];;
 
@@ -800,9 +784,7 @@ end
 module Ext_local_opt :
   sig
     external add :
-      (int32 [@local_opt]) @ 'm ->
-      (int32 [@local_opt]) @ 'm ->
-      (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
+      (int32 [@local_opt]) -> (int32 [@local_opt]) -> (int32 [@local_opt])
       = "%int32_add"
   end
 |}];;
@@ -814,12 +796,7 @@ end = struct
 end
 [%%expect{|
 module Id_local_opt :
-  sig
-    external id :
-      ('a [@local_opt]) @ 'm ->
-      ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-      = "%identity"
-  end
+  sig external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity" end
 |}];;
 
 (* The implementation is *less* general than the interface *)
@@ -844,18 +821,12 @@ Error: Signature mismatch:
          end
        is not included in
          sig
-           external id :
-             ('a [@local_opt]) @ 'm ->
-             ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-             = "%identity"
+           external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
          end
        Values do not match:
          external id : 'a @ [< 'm & unyielding] -> 'a @ [> 'm] = "%identity"
        is not included in
-         external id :
-           ('a [@local_opt]) @ 'm ->
-           ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-           = "%identity"
+         external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
        The type "'a @ [< 'm & unyielding] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ 'n ->
@@ -881,18 +852,12 @@ Error: Signature mismatch:
          end
        is not included in
          sig
-           external id :
-             ('a [@local_opt]) @ 'm ->
-             ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-             = "%identity"
+           external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
          end
        Values do not match:
          external id : 'a @ [< 'm & forkable] -> 'a @ [> 'm] = "%identity"
        is not included in
-         external id :
-           ('a [@local_opt]) @ 'm ->
-           ('a [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-           = "%identity"
+         external id : ('a [@local_opt]) -> ('a [@local_opt]) = "%identity"
        The type "'a @ [< 'm & forkable] -> 'a @ [> 'm]"
        is not compatible with the type
          "'a @ 'n ->
@@ -954,10 +919,8 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            external add :
-             (int32 [@local_opt]) @ 'm ->
-             (int32 [@local_opt]) @ 'm ->
-             (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-             = "%int32_add"
+             (int32 [@local_opt]) ->
+             (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
          end
        is not included in
          sig
@@ -967,10 +930,8 @@ Error: Signature mismatch:
          end
        Values do not match:
          external add :
-           (int32 [@local_opt]) @ 'm ->
-           (int32 [@local_opt]) @ 'm ->
-           (int32 [@local_opt]) @ [< many uncontended read_write > aliased nonportable stateful dynamic]as 'm
-           = "%int32_add"
+           (int32 [@local_opt]) ->
+           (int32 [@local_opt]) -> (int32 [@local_opt]) = "%int32_add"
        is not included in
          external add :
            int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
