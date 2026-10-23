@@ -261,9 +261,7 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
       (List.map
          (fun (ty_arg : Cmm.exttype) ->
            match ty_arg with
-           | XInt ->
-             (* [XInt] is used for values as well as word-sized integers. *)
-             Exactly Cmm.typ_val
+           | XInt -> Exactly Cmm.typ_val
            | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat32 | XFloat
            | XVec128 | XVec256 | XVec512 ->
              Exactly (Cmm.machtype_of_exttype ty_arg))
@@ -317,11 +315,9 @@ let oper_arg_types : Cmm.operation -> expected_arg_types = function
   | Cprefetch _ -> Args [Exactly Cmm.typ_addr]
   | Catomic
       { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange; _ } ->
-    Args [Exactly Cmm.typ_int; Exactly Cmm.typ_addr (* address *)]
+    Args [Exactly Cmm.typ_int; Exactly Cmm.typ_addr]
   | Catomic { op = Compare_set | Compare_exchange; _ } ->
-    Args
-      [ Exactly Cmm.typ_int; Exactly Cmm.typ_int;
-        Exactly Cmm.typ_addr (* address *) ]
+    Args [ Exactly Cmm.typ_int; Exactly Cmm.typ_int; Exactly Cmm.typ_addr ]
   | Caddv -> Args [Exactly Cmm.typ_val; Exactly Cmm.typ_int]
   | Cadda -> Args [Exactly Cmm.typ_addr; Exactly Cmm.typ_int]
   | Cnegf width | Cabsf width -> Args [Exactly (machtype_of_float_width width)]
