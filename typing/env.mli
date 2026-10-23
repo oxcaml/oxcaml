@@ -676,9 +676,10 @@ val save_signature:
 val save_signature_with_imports:
   alerts:alerts -> signature * Mode.Staticity.Const.t
   -> Compilation_unit.Name.t -> Cmi_format.kind
-  -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
+  -> Unit_info.Artifact.t -> Compilation_unit.Name.t array
+  -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,
-           file name, imported units with their CRCs. *)
+           file name, names of the imported units. *)
 
 (** See [Persistent_env.find_import]. *)
 val find_import:
@@ -690,11 +691,11 @@ val register_parameter: Global_module.Parameter_name.t -> unit
 (* Return the CRC of the interface of the given compilation unit *)
 val crc_of_unit: Compilation_unit.Name.t -> Digest.t
 
-(* Return the set of compilation units imported, with their CRC *)
+(* Return the set of compilation units imported directly, with their CRC *)
 val imports: unit -> Import_info.t list
 
-(* may raise Persistent_env.Consistbl.Inconsistency *)
-val import_crcs: source:string -> Import_info.t array -> unit
+(* Return the names of all the compilation units imported, directly or not *)
+val import_names: unit -> Compilation_unit.Name.t list
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
