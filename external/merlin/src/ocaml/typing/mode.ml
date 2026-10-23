@@ -4804,6 +4804,9 @@ module Report = struct
 
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"
+    | Try_body -> print_article_noun Consonant "try-with region"
+    | Match_with_exception ->
+      print_article_noun Consonant "match-with-exception region"
 
   let print_region : capitalize:_ -> region -> _ =
    fun ~capitalize (loc, desc) ->

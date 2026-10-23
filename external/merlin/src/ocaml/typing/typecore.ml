@@ -837,7 +837,7 @@ let mode_region ?region mode =
 
 let enter_region_if cond ?region env expected_mode =
   if cond then
-    Env.add_region_lock env,
+    Env.add_region_lock ?region env,
     mode_region ?region (as_single_mode expected_mode),
     [(Texp_ghost_region, Location.none, [])]
   else
@@ -919,8 +919,17 @@ let mode_partial_application expected_mode =
        |> with_locality_as_regionality ~allocation)
     expected_mode
 
-let mode_trywith expected_mode =
-  { expected_mode with position = RNontail }
+(** The [expected_mode] of the body of a [try], or of the scrutinee of a
+    [match] with exception cases. For environment lookups it is a region, but
+    it is not closed on the normal path (see [Lambda_to_flambda]), so its value
+    is allowed to be local; and it has no tail, so [exclave_] is not allowed
+    in it. *)
+let mode_try_body expected_mode =
+  expected_mode
+  |> as_single_mode
+  |> with_regionality_to_locality_r2g
+  |> with_locality_as_regionality
+  |> mode_default
 
 (* Effect syntax lowers each handled computation and handler RHS into a
    generated function body wrapped with [maybe_region_layout]. Type those
@@ -6402,6 +6411,13 @@ let exists_ppat f p =
   | exception Found -> true
   | () -> false
 
+let has_exception_pattern p =
+  exists_ppat
+    (fun p -> match p.ppat_desc with
+       | Ppat_exception _ -> true
+       | _ -> false)
+    p
+
 let contains_polymorphic_variant p =
   exists_ppat
     (function
@@ -8040,11 +8056,19 @@ and type_expect_
         | _ :: _ ->
           effect_handler_modes (loc, Effect_match) env expected_mode
       in
+      let arg_env, arg_expected_mode =
+        if List.exists (fun c -> has_exception_pattern c.pc_lhs) val_caselist
+        then
+          Env.add_region_lock ~region:(loc, Match_with_exception) env,
+          mode_try_body arg_expected_mode
+        else env, arg_expected_mode
+      in
       let arg, sort =
         with_local_level_generalize begin fun () ->
           let expected_ty, sort = new_rep_var ~why:Match () in
           let arg =
-            type_expect env arg_expected_mode sarg (mk_expected expected_ty)
+            type_expect arg_env arg_expected_mode sarg
+              (mk_expected expected_ty)
           in
           arg, sort
         end ~before_generalize:(fun (arg, _) ->
@@ -8085,23 +8109,24 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
-      let env, arg_mode, body_mode, expected_mode =
+      let env, body_env, arg_mode, body_mode, expected_mode =
         match eff_caselist with
         | [] ->
           env,
+          Env.add_region_lock ~region:(loc, Try_body) env,
           simple_pat_mode
             With_regionality.legacy,
-          mode_trywith
+          mode_try_body
             expected_mode,
           expected_mode
         | _ :: _ ->
           let env, arg_mode, _, expected_mode =
             effect_handler_modes (loc, Effect_try) env expected_mode
           in
-          env, arg_mode, expected_mode, expected_mode
+          env, env, arg_mode, expected_mode, expected_mode
       in
       let body =
-        type_expect env body_mode sbody ty_expected_explained
+        type_expect body_env body_mode sbody ty_expected_explained
       in
       let exn_cases, _ =
         type_cases Value env arg_mode expected_mode

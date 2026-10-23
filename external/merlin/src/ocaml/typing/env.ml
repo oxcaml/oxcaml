@@ -188,7 +188,7 @@ type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.With_regionality.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.With_regionality.Comonadic.r
-  | Region_lock
+  | Region_lock of Mode.Hint.region option
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
@@ -3296,7 +3296,7 @@ let add_closure_lock closure_context comonadic env =
   in
   add_lock lock env
 
-let add_region_lock env = add_lock Region_lock env
+let add_region_lock ?region env = add_lock (Region_lock region) env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
@@ -3999,7 +3999,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
     (fun vmode lock ->
       try match lock with
-      | Region_lock -> region_mode vmode
+      | Region_lock _ -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
           const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
@@ -4047,7 +4047,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
   List.fold_left
     (fun (mode : Mode.With_regionality.r) lock ->
       match lock with
-      | Region_lock ->
+      | Region_lock region ->
           (* CR zqian: once we have finer regionality, remove this branch *)
           (* First map [regional] to [global], then cap [local] to [regional] *)
           let mode =
@@ -4055,10 +4055,13 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
             |> Mode.with_regionality_to_locality_r2g
             |> Mode.with_locality_as_regionality
           in
+          let hint_comonadic =
+            Option.map (fun r -> Mode.Hint.Escape_region r) region
+          in
           Mode.With_regionality.meet
             [mode;
-             Mode.With_regionality.max_with_comonadic Areality
-                                 (Mode.Regionality.regional)]
+             Mode.With_regionality.of_const ?hint_comonadic
+               { Mode.With_regionality.Const.max with areality = Regional }]
       | Exclave_lock ->
           (* If [m0] is [global], then inside the exclave we require new values
           to be [global]. If [m0] is [regional], then we require the new values
