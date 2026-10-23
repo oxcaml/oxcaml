@@ -50,12 +50,13 @@ let rec env_from_summary ~allow_missing_modules sum subst =
           Env.add_extension ~check:false ~rebind:false id
             (Subst.extension_constructor subst desc)
             (env_from_summary ~allow_missing_modules s subst)
-      | Env_module(s, id, pres, desc, mode, locks) ->
+      | Env_module(s, id, pres, desc, vis, mode, locks) ->
           let desc =
             Subst.Lazy.module_decl Keep subst (Subst.Lazy.of_module_decl desc)
           in
-          Env.add_module_declaration_lazy ~update_summary:true id pres desc
-            ~mode ~locks (env_from_summary ~allow_missing_modules s subst)
+          Env.add_module_declaration_lazy ~update_summary:true ~vis id
+            pres desc ~mode ~locks
+            (env_from_summary ~allow_missing_modules s subst)
       | Env_modtype(s, id, desc) ->
           let desc =
             Subst.Lazy.modtype_decl Keep subst (Subst.Lazy.of_modtype_decl desc)
@@ -77,13 +78,13 @@ let rec env_from_summary ~allow_missing_modules sum subst =
           else
             (try Env.open_signature_by_path path' env with
             | Not_found -> raise (Error (Module_not_found path')))
-      | Env_functor_arg(Env_module(s, id, pres, desc, mode, locks), id')
+      | Env_functor_arg(Env_module(s, id, pres, desc, vis, mode, locks), id')
             when Ident.same id id' ->
           let desc =
             Subst.Lazy.module_decl Keep subst (Subst.Lazy.of_module_decl desc)
           in
-          Env.add_module_declaration_lazy ~update_summary:true id pres desc
-            ~mode ~locks
+          Env.add_module_declaration_lazy ~update_summary:true ~vis id
+            pres desc ~mode ~locks
             ~arg:true (env_from_summary ~allow_missing_modules s subst)
       | Env_functor_arg _ -> assert false
       | Env_constraints(s, map) ->

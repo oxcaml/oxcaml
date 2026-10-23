@@ -656,6 +656,7 @@ type class_type_declaration =
 
 type visibility =
   | Exported
+  | Unmentionable
   | Hidden
 
 type rec_status =
