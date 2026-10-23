@@ -1,6 +1,7 @@
 (* TEST
  readonly_files = "mainarith.c asan_report_wrappers.c";
  arguments = "mainarith.c asan_report_wrappers.c";
+ flags = "-dcmm-no-check-machtypes";
  asmgen;
 *)
 
