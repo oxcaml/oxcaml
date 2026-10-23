@@ -240,26 +240,29 @@ let gen_non_variant_type (st : State.t) =
   then Ty.Record (random_element st st.record_types)
   else gen_scalar_or_array_type st
 
+let gen_constructor_type (st : State.t) constructor_index =
+  let args =
+    List.init (random_int_in_range st ~min:0 ~max:Config.max_constructor_args)
+      (fun _ -> gen_non_variant_type st)
+  in
+  { Ty.constructor_index; args }
+
+let gen_variant_type (st : State.t) variant_id =
+  let constructors =
+    List.init
+      (random_int_in_range st ~min:2 ~max:Config.max_variant_constructors)
+      (gen_constructor_type st)
+  in
+  { Ty.variant_id; constructors }
+
 (* CR xclerc for xclerc: randomly add [@@unboxed] if legal. *)
 let gen_variant_types (st : State.t) =
   if not st.swarm.variants
   then []
   else
-    List.init (random_int_in_range st ~min:1 ~max:Config.max_variant_types)
-      (fun variant_id ->
-        let constructors =
-          List.init
-            (random_int_in_range st ~min:2 ~max:Config.max_variant_constructors)
-            (fun constructor_index ->
-              let args =
-                List.init
-                  (random_int_in_range st ~min:0
-                     ~max:Config.max_constructor_args) (fun _ ->
-                    gen_non_variant_type st)
-              in
-              { Ty.constructor_index; args })
-        in
-        { Ty.variant_id; constructors })
+    List.init
+      (random_int_in_range st ~min:1 ~max:Config.max_variant_types)
+      (gen_variant_type st)
 
 (* CR-soon hwasilewski: Add boolean variable generation. *)
 let gen_type (st : State.t) =
