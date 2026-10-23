@@ -263,8 +263,5 @@ let r : int r @ portable =
     a = 42 }
 [%%expect{|
 type 'a r = { f : string -> string; mutable a : 'a; }
-Lines 6-7, characters 2-12:
-6 | ..{ f = (fun x -> x);
-7 |     a = 42 }
-Error: This value is "nonportable" but is expected to be "portable".
+val r : int r = {f = <fun>; a = 42}
 |}]
