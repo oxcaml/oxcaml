@@ -1,0 +1,24 @@
+interior counters depend on the body: ok
+instantiated entry has no body hash: ok
+inlining context: ok
+nested inlining context: ok
+call site itself has typed inlining context: ok
+specialization changes only outermost function identity: ok
+specialization of a position without context: ok
+entry inlining preserves function identity: ok
+entry specialization changes function identity structurally: ok
+inlined calls follow the edge's counters: ok
+inlined calls are deduplicated: ok
+function hash: 4903469f
+position hash: 41fc5da4
+specialized function hash: 1db13a83
+entry hash agrees with function hash: ok
+only entries carry the entry bit: ok
+hash conversion preserves all bits: ok
+body-hash conversion preserves all bits: ok
+hash ordering is unsigned: ok
+specialization recomputes cached hashes: ok
+switch case and later AST position have distinct hashes: ok
+switch case and later AST position have distinct hashes: ok
+switch case and later AST position have distinct hashes: ok
+incoming counters are deduplicated in first-occurrence order: ok
