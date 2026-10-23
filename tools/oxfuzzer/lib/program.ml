@@ -253,25 +253,23 @@ let record_declarations records =
   in
   List.map declaration records
 
+let constructor_declaration variant (constructor : Ty.constructor) =
+  let args =
+    List.map (fun ty -> Type.constructor_arg (Ty.to_code ty)) constructor.args
+  in
+  Type.constructor ~args:(Parsetree.Pcstr_tuple args)
+    (loc (Ty.constructor_name variant constructor))
+
 let variant_declarations variants =
-  List.map
-    (fun (variant : Ty.variant) ->
-      let constructors =
-        List.map
-          (fun (constructor : Ty.constructor) ->
-            let args =
-              List.map
-                (fun ty -> Type.constructor_arg (Ty.to_code ty))
-                constructor.args
-            in
-            Type.constructor ~args:(Parsetree.Pcstr_tuple args)
-              (loc (Ty.constructor_name variant constructor)))
-          variant.constructors
-      in
-      Str.type_ Nonrecursive
-        [ Type.mk ~kind:(Parsetree.Ptype_variant constructors)
-            (loc (Ty.variant_name variant)) ])
-    variants
+  let declaration (variant : Ty.variant) =
+    let constructors =
+      List.map (constructor_declaration variant) variant.constructors
+    in
+    Str.type_ Nonrecursive
+      [ Type.mk ~kind:(Parsetree.Ptype_variant constructors)
+          (loc (Ty.variant_name variant)) ]
+  in
+  List.map declaration variants
 
 let rec print_value path ty expr =
   match ty with
