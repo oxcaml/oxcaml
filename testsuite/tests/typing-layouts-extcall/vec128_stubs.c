@@ -131,8 +131,6 @@ int64x2_t make_i64x2_native(int64_t a, int64_t b) {
   return vld1q_s64(elts);
 }
 
-typedef struct { int64x2_t a; int64x2_t b; } i64x2_pair_struct;
-
 static double i64x2_lanes(int64x2_t v) {
   int64_t elts[2];
   vst1q_s64(elts, v);
