@@ -332,7 +332,7 @@ let modality_of_atoms l =
    mutability, except on the axes implied by locality. This is to preserve
    compatibility with:
    {[
-     val of_imm_local : addr_imm @ local -> addr @ local
+     val of_imm_local : 'a addr_imm @ local -> 'a addr @ local read
    ]}
 
    Ideally, we would drop exactly the axes that [[@local_opt]] varies together

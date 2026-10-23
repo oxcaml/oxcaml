@@ -2,13 +2,6 @@
    expect;
 *)
 
-type 'a t1 : value_or_null & bits64 = 'a addr
-type 'a t2 : value_or_null & bits64 = 'a addr_imm
-[%%expect{|
-type 'a t1 = 'a addr
-type 'a t2 = 'a addr_imm
-|}]
-
 (* Variance *)
 
 type ab = [ `A | `B ]
@@ -55,6 +48,120 @@ Error: Type "ab addr_imm" is not a subtype of "a addr_imm"
        The second variant type does not allow tag(s) "`B"
 |}]
 
+(*****************)
+(* Mode crossing *)
+
+(* The error messages give the precise kinds. *)
+type 'a t : value_or_null & bits64 mod everything = 'a addr
+[%%expect{|
+Line 1, characters 0-59:
+1 | type 'a t : value_or_null & bits64 mod everything = 'a addr
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a addr" is
+           value_or_null
+             mod forkable unyielding many stateless
+             with 'a @@ many
+           & bits64 mod forkable unyielding many stateless with 'a @@ many
+         because it is the primitive type addr.
+       But the kind of type "'a addr" must be a subkind of
+           value_or_null mod everything & bits64 mod everything
+         because of the definition of t at line 1, characters 0-59.
+
+       The first mode-crosses less than the second along:
+         locality: mod local ≰ mod global
+         uniqueness: mod unique ≰ mod aliased
+         contention: mod uncontended ≰ mod contended
+         portability: mod portable with 'a ≰ mod portable
+         forkable: mod forkable with 'a ≰ mod forkable
+         yielding: mod unyielding with 'a ≰ mod unyielding
+         statefulness: mod stateless with 'a ≰ mod stateless
+         visibility: mod read_write ≰ mod immutable
+         externality: mod internal ≰ mod external_
+|}]
+
+type 'a t : value_or_null & bits64 mod everything = 'a addr_imm
+[%%expect{|
+Line 1, characters 0-63:
+1 | type 'a t : value_or_null & bits64 mod everything = 'a addr_imm
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a addr_imm" is
+           value_or_null
+             mod forkable unyielding many stateless immutable
+             with 'a
+           & bits64 mod forkable unyielding many stateless immutable with 'a
+         because it is the primitive type addr_imm.
+       But the kind of type "'a addr_imm" must be a subkind of
+           value_or_null mod everything & bits64 mod everything
+         because of the definition of t at line 1, characters 0-63.
+|}]
+
+(* Upper and lower bounds using an abstract type *)
+type 'a addr_kind :
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+type 'a addr_upper :
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+  = 'a addr
+type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
+  'a addr_kind
+[%%expect{|
+type 'a addr_kind
+  : value_or_null mod forkable unyielding many stateless with 'a @@ many
+    & bits64 mod forkable unyielding many stateless with 'a @@ many
+type 'a addr_upper = 'a addr
+type 'a addr_lower = 'a addr_kind
+|}]
+
+type 'a addr_imm_kind :
+  value_or_null & bits64 mod forkable unyielding many stateless immutable
+  with 'a
+type 'a addr_imm_upper :
+  value_or_null & bits64 mod forkable unyielding many stateless immutable
+  with 'a
+  = 'a addr_imm
+type 'a addr_imm_lower :
+  value_or_null & bits64 mod everything with 'a addr_imm = 'a addr_imm_kind
+[%%expect{|
+type 'a addr_imm_kind
+  : value_or_null mod forkable unyielding many stateless immutable with 'a
+    & bits64 mod forkable unyielding many stateless immutable with 'a
+type 'a addr_imm_upper = 'a addr_imm
+type 'a addr_imm_lower = 'a addr_imm_kind
+|}]
+
+(* Upper and lower bounds, phrased in terms of records *)
+(* See [Typemode.address_modalities] for why we have @@ local here. *)
+type 'a mut = { mutable contents : 'a @@ local }
+type 'a imm = { contents : 'a }
+[%%expect{|
+type 'a mut = { mutable contents : 'a @@ local; }
+type 'a imm = { contents : 'a; }
+|}]
+
+type 'a addr_kind : value_or_null & bits64 mod everything with 'a mut
+type 'a addr_upper : value_or_null & bits64 mod everything with 'a mut = 'a addr
+type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
+  'a addr_kind
+[%%expect{|
+type 'a addr_kind
+  : value_or_null mod forkable unyielding many stateless with 'a @@ many
+    & bits64 mod forkable unyielding many stateless with 'a @@ many
+type 'a addr_upper = 'a addr
+type 'a addr_lower = 'a addr_kind
+|}]
+
+type 'a addr_imm_kind : value_or_null & bits64 mod everything with 'a imm
+type 'a addr_imm_upper : value_or_null & bits64 mod everything with 'a imm
+  = 'a addr_imm
+type 'a addr_imm_lower :
+  value_or_null & bits64 mod everything with 'a addr_imm = 'a addr_imm_kind
+[%%expect{|
+type 'a addr_imm_kind
+  : value_or_null mod forkable unyielding many stateless immutable with 'a
+    & bits64 mod forkable unyielding many stateless immutable with 'a
+type 'a addr_imm_upper = 'a addr_imm
+type 'a addr_imm_lower = 'a addr_imm_kind
+|}]
+
 (******************************************)
 (* Basic typechecking of address patterns *)
 
@@ -97,8 +204,9 @@ let or_around_imm = function addr_imm_ (Some x) | addr_imm_ (None as x) -> x
 [%%expect{|
 val or_inside : [< `A of 'a | `B of 'a ] addr -> 'a = <fun>
 val or_inside_imm : [< `A of 'a | `B of 'a ] addr_imm -> 'a = <fun>
-val or_around : 'a option option addr -> 'a option = <fun>
-val or_around_imm : 'a option option addr_imm -> 'a option = <fun>
+val or_around : ('a : any). 'a option option addr -> 'a option = <fun>
+val or_around_imm : ('a : any). 'a option option addr_imm -> 'a option =
+  <fun>
 |}]
 
 (* Type annotations inside and around address patterns *)

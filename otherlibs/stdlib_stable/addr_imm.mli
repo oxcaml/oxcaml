@@ -12,7 +12,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type ('a : any) t : value_or_null & bits64 = 'a addr_imm
+type ('a : any) t :
+  value_or_null & bits64 mod forkable unyielding many stateless immutable
+  with 'a
+  = 'a addr_imm
 
 val of_idx
   : ('a : value) ('b : any).
