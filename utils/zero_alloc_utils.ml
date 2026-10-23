@@ -140,7 +140,7 @@ module Relevant_components_by_argument_index = struct
 
   let join =
     Numbers.Int.Map.union (fun _ c1 c2 ->
-      Some (Components.map2 ~f:(fun _ r1 r2 -> r1 || r2) c1 c2))
+        Some (Components.map2 ~f:(fun _ r1 r2 -> r1 || r2) c1 c2))
 
   let meet t1 t2 =
     Numbers.Int.Map.merge
@@ -196,11 +196,14 @@ module Allocation_sources = struct
   let compare ~compare_args_only t1 t2 =
     match t1, t2 with
     | ( Allocation_other_than_calling_arguments,
-        Allocation_other_than_calling_arguments ) -> 0
+        Allocation_other_than_calling_arguments ) ->
+      0
     | ( No_allocation_other_than_calling_arguments _,
-        Allocation_other_than_calling_arguments ) -> -1
+        Allocation_other_than_calling_arguments ) ->
+      -1
     | ( Allocation_other_than_calling_arguments,
-        No_allocation_other_than_calling_arguments _ ) -> 1
+        No_allocation_other_than_calling_arguments _ ) ->
+      1
     | ( No_allocation_other_than_calling_arguments a1,
         No_allocation_other_than_calling_arguments a2 ) ->
       compare_args_only a1 a2
@@ -279,10 +282,7 @@ module type Component = sig
 
   type witnesses
 
-  val top :
-    allocation_sources:allocation_sources ->
-    witnesses:witnesses ->
-    t
+  val top : allocation_sources:allocation_sources -> witnesses:witnesses -> t
 
   val safe : t
 
@@ -328,7 +328,10 @@ end
 module Make_value
     (Allocation_sources : Allocation_sources)
     (Witnesses : WS)
-    (V : Component with type allocation_sources := Allocation_sources.t and type witnesses := Witnesses.t) =
+    (V :
+      Component
+        with type allocation_sources := Allocation_sources.t
+         and type witnesses := Witnesses.t) =
 struct
   (** Lifts V to triples *)
   type t = V.t Components.t
@@ -370,7 +373,7 @@ struct
   let compare = Components.compare V.compare
 end
 
-module No_allocation_sources : (Allocation_sources with type t = unit) = struct
+module No_allocation_sources : Allocation_sources with type t = unit = struct
   type t = unit
 
   let top = ()

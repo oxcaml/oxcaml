@@ -247,47 +247,41 @@ module Top = struct
   type t =
     { allocation_sources :
         Zero_alloc_utils.Relevant_components_by_argument_index.t
-          Zero_alloc_utils.Allocation_sources.t;
-      witnesses : Witnesses.t;
+        Zero_alloc_utils.Allocation_sources.t;
+      witnesses : Witnesses.t
     }
 
-  let compare
-      { allocation_sources = a1; witnesses = w1 }
+  let compare { allocation_sources = a1; witnesses = w1 }
       { allocation_sources = a2; witnesses = w2 } =
     let c =
       Zero_alloc_utils.Allocation_sources.compare
         ~compare_args_only:
-          Zero_alloc_utils.Relevant_components_by_argument_index.compare
-        a1 a2
+          Zero_alloc_utils.Relevant_components_by_argument_index.compare a1 a2
     in
     if c <> 0 then c else Witnesses.compare w1 w2
 
-  let lessequal
-      { allocation_sources = a1; witnesses = w1 }
+  let lessequal { allocation_sources = a1; witnesses = w1 }
       { allocation_sources = a2; witnesses = w2 } =
     Zero_alloc_utils.Allocation_sources.lessequal
       ~lessequal_args_only:
-        Zero_alloc_utils.Relevant_components_by_argument_index.lessequal
-      a1 a2
+        Zero_alloc_utils.Relevant_components_by_argument_index.lessequal a1 a2
     && Witnesses.lessequal w1 w2
 
-  let join
-      { allocation_sources = a1; witnesses = w1 }
+  let join { allocation_sources = a1; witnesses = w1 }
       { allocation_sources = a2; witnesses = w2 } =
     { allocation_sources =
         Zero_alloc_utils.Allocation_sources.join
-          ~join_args_only:Zero_alloc_utils.Relevant_components_by_argument_index.join
-          a1 a2;
+          ~join_args_only:
+            Zero_alloc_utils.Relevant_components_by_argument_index.join a1 a2;
       witnesses = Witnesses.join w1 w2
     }
 
-  let meet
-      { allocation_sources = a1; witnesses = w1 }
+  let meet { allocation_sources = a1; witnesses = w1 }
       { allocation_sources = a2; witnesses = w2 } =
     { allocation_sources =
         Zero_alloc_utils.Allocation_sources.meet
-          ~meet_args_only:Zero_alloc_utils.Relevant_components_by_argument_index.meet
-          a1 a2;
+          ~meet_args_only:
+            Zero_alloc_utils.Relevant_components_by_argument_index.meet a1 a2;
       witnesses = Witnesses.meet w1 w2
     }
 
@@ -330,8 +324,9 @@ module V : sig
   val safe : t
 
   val top :
-    allocation_sources:Zero_alloc_utils.(
-      Relevant_components_by_argument_index.t Allocation_sources.t) ->
+    allocation_sources:
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t) ->
     witnesses:Witnesses.t ->
     t
 
@@ -535,7 +530,9 @@ end = struct
       | Args vars1, Args vars2 -> Args (Vars.join vars1 vars2)
 
     let get_top t =
-      match t with Args_with_top { top; vars = _ } -> Some top | Args _ -> None
+      match t with
+      | Args_with_top { top; vars = _ } -> Some top
+      | Args _ -> None
 
     let get_vars t =
       match t with Args_with_top { top = _; vars } | Args vars -> vars
@@ -1099,8 +1096,8 @@ end = struct
       | Args_with_safe args ->
         Format.fprintf ppf "(join:@.Safe@.%a)@." (Args.print ~witnesses) args
       | Args_with_top { top; args } ->
-        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses)
-          top.witnesses (Args.print ~witnesses) args
+        Format.fprintf ppf "(join:@.%a@.%a)@." (pp_top ~witnesses) top.witnesses
+          (Args.print ~witnesses) args
       | Args args ->
         Format.fprintf ppf "(join:@.%a)@." (Args.print ~witnesses) args
   end
@@ -1188,7 +1185,8 @@ end = struct
       Resolved
         (Zero_alloc_utils.Component.Top
            { witnesses;
-             allocation_sources = Allocation_other_than_calling_arguments })
+             allocation_sources = Allocation_other_than_calling_arguments
+           })
 
   (* Keep [join] and [lessequal] in sync. *)
   let join t1 t2 =
@@ -1262,8 +1260,7 @@ end = struct
   let lessequal t1 t2 =
     match t1, t2 with
     | Resolved c1, Resolved c2 ->
-      Zero_alloc_utils.Component.lessequal ~lessequal_top:Top.lessequal c1
-        c2
+      Zero_alloc_utils.Component.lessequal ~lessequal_top:Top.lessequal c1 c2
     | Resolved Bot, (Var _ | Transform _ | Join _) -> true
     | (Var _ | Transform _ | Join _), Resolved Bot -> false
     | (Resolved Safe | Resolved (Top _) | Var _ | Transform _ | Join _), _ ->
@@ -1287,8 +1284,7 @@ end = struct
     match t, t' with
     | Resolved Bot, _ | _, Resolved Bot -> Resolved Bot
     | Resolved Safe, t | t, Resolved Safe -> t
-    | Resolved (Top w), Resolved (Top w') ->
-      Resolved (Top (Top.join w w'))
+    | Resolved (Top w), Resolved (Top w') -> Resolved (Top (Top.join w w'))
     | Resolved (Top w), Transform tr | Transform tr, Resolved (Top w) ->
       Transform (Transform.add_top tr w)
     | Resolved (Top w), Var { var; witnesses }
@@ -1434,12 +1430,13 @@ end = struct
 end
 
 module Allocation_sources :
-  Zero_alloc_utils.Allocation_sources with type t =
+  Zero_alloc_utils.Allocation_sources
+    with type t =
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t) = struct
+  type t =
     Zero_alloc_utils.(
       Relevant_components_by_argument_index.t Allocation_sources.t)
-= struct
-  type t = Zero_alloc_utils.(
-    Relevant_components_by_argument_index.t Allocation_sources.t)
 
   let top =
     Zero_alloc_utils.Allocation_sources.Allocation_other_than_calling_arguments
@@ -2158,9 +2155,10 @@ end = struct
      encoded as None (i.e., not stored). *)
   let encode (v : V.t) =
     V.match_with v
-      ~resolved:Zero_alloc_utils.(
-        Component.map
-          ~f:(fun ({ allocation_sources; _ } : Top.t) -> allocation_sources))
+      ~resolved:
+        Zero_alloc_utils.(
+          Component.map ~f:(fun ({ allocation_sources; _ } : Top.t) ->
+              allocation_sources))
       ~unresolved:(fun () ->
         Misc.fatal_errorf
           "Zero_alloc_checker.encode: unexpected unresolved value %a"
@@ -2183,21 +2181,19 @@ end = struct
 
   let encode components =
     let encoded =
-      Zero_alloc_info.Encoded.Components.encode
-        ~encode_component:encode
+      Zero_alloc_info.Encoded.Components.encode ~encode_component:encode
         components
     in
-    (* Artifact-size optimization: if this summary is all [Top] (the most
-        common case), then leave it out, and let readers infer that a missing
-        summary is all [Top]. *)
+    (* Artifact-size optimization: if this summary is all [Top] (the most common
+       case), then leave it out, and let readers infer that a missing summary is
+       all [Top]. *)
     if[@ocaml.warning "-44"]
       Zero_alloc_info.Encoded.Components.(encoded = all_top)
     then None
     else Some encoded
 
   let decode i =
-    if[@ocaml.warning "-44"]
-      Zero_alloc_info.Encoded.Components.(i = all_top)
+    if[@ocaml.warning "-44"] Zero_alloc_info.Encoded.Components.(i = all_top)
     then Misc.fatal_error "Zero_alloc_checker: unexpected all-Top encoding"
     else Zero_alloc_info.Encoded.Components.decode ~decode_component:decode i
 
@@ -2718,10 +2714,10 @@ end = struct
                 | Symbol { sym_name; _ } -> find_callee t sym_name ~desc dbg k
                 | Argument { argument_index } ->
                   Zero_alloc_utils.Components.create (fun tag ->
-                    V.top
-                      ~allocation_sources:(
-                        Allocation_sources.argument ~argument_index ~tag)
-                      ~witnesses)
+                      V.top
+                        ~allocation_sources:
+                          (Allocation_sources.argument ~argument_index ~tag)
+                        ~witnesses)
               in
               let effect_ =
                 match Metadata.assume_value dbg ~can_raise:true witnesses with

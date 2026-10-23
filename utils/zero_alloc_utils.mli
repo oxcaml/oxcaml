@@ -165,10 +165,7 @@ module type Component = sig
   type witnesses
 
   (** Property may not hold on some paths. *)
-  val top :
-    allocation_sources:allocation_sources ->
-    witnesses:witnesses ->
-    t
+  val top : allocation_sources:allocation_sources -> witnesses:witnesses -> t
 
   (** Property holds on all paths. *)
   val safe : t
@@ -194,16 +191,20 @@ end
 module Make_component (Witnesses : WS) : sig
   type t = Witnesses.t Component.t
 
-  include Component with
-    type allocation_sources := unit and
-    type witnesses := Witnesses.t and
-    type t := t
+  include
+    Component
+      with type allocation_sources := unit
+       and type witnesses := Witnesses.t
+       and type t := t
 end
 
 module Make_value
     (Allocation_sources : Allocation_sources)
     (Witnesses : WS)
-    (V : Component with type allocation_sources := Allocation_sources.t and type witnesses := Witnesses.t) : sig
+    (V :
+      Component
+        with type allocation_sources := Allocation_sources.t
+         and type witnesses := Witnesses.t) : sig
   (** Abstract value associated with each program location in a function. *)
   type t = V.t Components.t
 
@@ -214,9 +215,7 @@ module Make_value
   val meet : t -> t -> t
 
   val top :
-    allocation_sources:Allocation_sources.t ->
-    witnesses:Witnesses.t ->
-    t
+    allocation_sources:Allocation_sources.t -> witnesses:Witnesses.t -> t
 
   val bot : t
 
@@ -315,7 +314,7 @@ module Assume_info : sig
   module V : module type of Make_component (Witnesses)
 
   module Value :
-    module type of Make_value (No_allocation_sources) (Witnesses) (V)
+      module type of Make_value (No_allocation_sources) (Witnesses) (V)
 
   val get_value : t -> Value.t option
 end

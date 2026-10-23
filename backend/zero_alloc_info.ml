@@ -102,8 +102,8 @@ module Encoded = struct
       let encoded : Component.t Components.t =
         match t with
         | Unconditional tags ->
-          Components.map (unpack ~bits_per_component:2 tags)
-            ~f:(fun _tag -> component_of_unconditional_tag)
+          Components.map (unpack ~bits_per_component:2 tags) ~f:(fun _tag ->
+              component_of_unconditional_tag)
         | Conditional encoded -> encoded
       in
       Components.map encoded ~f:(fun _tag component ->
