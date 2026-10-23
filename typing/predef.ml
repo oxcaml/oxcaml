@@ -1007,7 +1007,13 @@ let decl_of_type_constr type_constr =
            position = 1;
            arity = 1;
          }))
-       ~jkind:(builtin1 Jkind.Const.Builtin.kind_of_addr)
+       ~jkind:(fun param ->
+         builtin Jkind.Const.Builtin.kind_of_addr |>
+         Jkind.add_with_bounds
+           ~modality:(Typemode.address_modalities (Mutable {
+             mode = Mode.With_regionality.Comonadic.legacy;
+             atomic = Nonatomic }))
+           ~type_expr:param)
        ()
   | `Addr_imm ->
     decl1 ~variance:Variance.covariant
@@ -1017,7 +1023,11 @@ let decl_of_type_constr type_constr =
            position = 1;
            arity = 1;
          }))
-       ~jkind:(builtin1 Jkind.Const.Builtin.kind_of_addr)
+       ~jkind:(fun param ->
+         builtin Jkind.Const.Builtin.kind_of_addr_imm |>
+         Jkind.add_with_bounds
+           ~modality:(Typemode.address_modalities Immutable)
+           ~type_expr:param)
        ()
   | `Lexing_position ->
     decl0
