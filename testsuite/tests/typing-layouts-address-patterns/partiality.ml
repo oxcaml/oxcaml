@@ -58,7 +58,9 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
                (if *match*/2 (exit 2) -1)))
           with (2)
            (if
-             (seq ((set_ptr value<(consts (0)) (non_consts ([0: ?]))>) a/0 0)
+             (seq
+               ((set_ptr value<(consts (0)) (non_consts ([0: value<int>]))>)
+                 a/0 0)
                0)
              1
              (let
