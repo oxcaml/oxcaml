@@ -368,6 +368,7 @@ val machtype_of_memory_chunk : memory_chunk -> machtype
 type reinterpret_cast =
   | Int64_of_value
   | Value_of_int64
+  | Addr_of_int64
   | Int64_of_tagged_int
   | Tagged_int_of_int64
   | Float_of_float32

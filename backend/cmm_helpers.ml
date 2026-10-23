@@ -635,6 +635,9 @@ let rec sub_int' arg1 arg2 dbg =
 
 let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 
+let int64_as_addr ~dbg arg =
+  map_tail1 arg ~f:(fun arg -> Cop (Creinterpret_cast Addr_of_int64, [arg], dbg))
+
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
 let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
@@ -644,7 +647,7 @@ let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
 
      For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
   if ptr_out_of_heap
-  then add_int c1 c2 dbg
+  then int64_as_addr ~dbg (add_int c1 c2 dbg)
   else
     match c1, c2 with
     | Cconst_int (0, _), c | c, Cconst_int (0, _) -> c
@@ -2145,7 +2148,7 @@ let caml_modify_local ~dbg addr i newval =
           returns = true;
           effects = Arbitrary_effects;
           coeffects = Has_coeffects;
-          ty_args = []
+          ty_args = [XInt; XInt64; XInt]
         },
       [addr; i; newval],
       dbg )
@@ -2165,7 +2168,7 @@ let addr_array_set (mode : Lambda.modify_mode) arr ofs newval dbg =
 
 let int_array_set arr ofs newval dbg =
   Cop
-    ( Cstore (Word_int, Assignment),
+    ( Cstore (Word_tagged_int, Assignment),
       [array_indexing log2_size_addr arr ofs dbg; newval],
       dbg )
 
@@ -2389,7 +2392,10 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
-              int_array_set arr index new_value dbg)))
+              Cop
+                ( Cstore (Word_int, Assignment),
+                  [array_indexing log2_size_addr arr index dbg; new_value],
+                  dbg ))))
 
 let unboxed_mask_array_set arr ~index ~new_value dbg =
   bind "arr" arr (fun arr ->
@@ -2765,7 +2771,7 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
                 returns = true;
                 effects = Arbitrary_effects;
                 coeffects = Has_coeffects;
-                ty_args = []
+                ty_args = List.map (fun _ -> XInt64) caml_alloc_args
               },
             List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
             dbg ),
@@ -3046,11 +3052,8 @@ let unaligned_load_16 ~ptr_out_of_heap ptr idx dbg =
     let v2 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          (* CR mshinwell/gbury: Refactor this to compute [idx + 1] using
-             [add_int], then use [add_int_ptr] on that. *)
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 1) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 1) dbg) dbg ],
           dbg )
     in
     let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
@@ -3075,9 +3078,8 @@ let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
           ~new_value:b1,
         store ~dbg Byte_unsigned Assignment
           ~addr:
-            (add_int_ptr ~ptr_out_of_heap
-               (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-               (cconst_int 1) dbg)
+            (add_int_ptr ~ptr_out_of_heap ptr
+               (add_int idx (cconst_int 1) dbg) dbg)
           ~new_value:b2 )
 
 let unaligned_load_32 ~ptr_out_of_heap ptr idx dbg =
@@ -3098,25 +3100,22 @@ let unaligned_load_32 ~ptr_out_of_heap ptr idx dbg =
     let v2 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 1) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 1) dbg) dbg ],
           dbg )
     in
     let v3 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 2) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 2) dbg) dbg ],
           dbg )
     in
     let v4 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 3) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 3) dbg) dbg ],
           dbg )
     in
     let b1, b2, b3, b4 =
@@ -3162,24 +3161,21 @@ let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
                 dbg ),
             Cop
               ( Cstore (Byte_unsigned, Assignment),
-                [ add_int_ptr ~ptr_out_of_heap
-                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                    (cconst_int 1) dbg;
+                [ add_int_ptr ~ptr_out_of_heap ptr
+                    (add_int idx (cconst_int 1) dbg) dbg;
                   b2 ],
                 dbg ) ),
         Csequence
           ( Cop
               ( Cstore (Byte_unsigned, Assignment),
-                [ add_int_ptr ~ptr_out_of_heap
-                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                    (cconst_int 2) dbg;
+                [ add_int_ptr ~ptr_out_of_heap ptr
+                    (add_int idx (cconst_int 2) dbg) dbg;
                   b3 ],
                 dbg ),
             Cop
               ( Cstore (Byte_unsigned, Assignment),
-                [ add_int_ptr ~ptr_out_of_heap
-                    (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                    (cconst_int 3) dbg;
+                [ add_int_ptr ~ptr_out_of_heap ptr
+                    (add_int idx (cconst_int 3) dbg) dbg;
                   b4 ],
                 dbg ) ) )
 
@@ -3198,57 +3194,50 @@ let unaligned_load_64 ~ptr_out_of_heap ptr idx dbg =
     let v2 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 1) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 1) dbg) dbg ],
           dbg )
     in
     let v3 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 2) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 2) dbg) dbg ],
           dbg )
     in
     let v4 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 3) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 3) dbg) dbg ],
           dbg )
     in
     let v5 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 4) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 4) dbg) dbg ],
           dbg )
     in
     let v6 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 5) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 5) dbg) dbg ],
           dbg )
     in
     let v7 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 6) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 6) dbg) dbg ],
           dbg )
     in
     let v8 =
       Cop
         ( mk_load_mut Byte_unsigned,
-          [ add_int_ptr ~ptr_out_of_heap
-              (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-              (cconst_int 7) dbg ],
+          [ add_int_ptr ~ptr_out_of_heap ptr
+              (add_int idx (cconst_int 7) dbg) dbg ],
           dbg )
     in
     let b1, b2, b3, b4, b5, b6, b7, b8 =
@@ -3345,55 +3334,48 @@ let unaligned_set_64 ~ptr_out_of_heap ptr idx newval dbg =
                     dbg ),
                 Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 1) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 1) dbg) dbg;
                       b2 ],
                     dbg ) ),
             Csequence
               ( Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 2) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 2) dbg) dbg;
                       b3 ],
                     dbg ),
                 Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 3) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 3) dbg) dbg;
                       b4 ],
                     dbg ) ) ),
         Csequence
           ( Csequence
               ( Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 4) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 4) dbg) dbg;
                       b5 ],
                     dbg ),
                 Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 5) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 5) dbg) dbg;
                       b6 ],
                     dbg ) ),
             Csequence
               ( Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 6) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 6) dbg) dbg;
                       b7 ],
                     dbg ),
                 Cop
                   ( Cstore (Byte_unsigned, Assignment),
-                    [ add_int_ptr ~ptr_out_of_heap
-                        (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                        (cconst_int 7) dbg;
+                    [ add_int_ptr ~ptr_out_of_heap ptr
+                        (add_int idx (cconst_int 7) dbg) dbg;
                       b8 ],
                     dbg ) ) ) )
 
@@ -3854,7 +3836,8 @@ let cache_public_method meths tag cache dbg =
              (log2_size_addr - 1) dbg)
           dbg,
         Csequence
-          ( Cop (Cstore (Word_int, Assignment), [cache; Cvar result], dbg),
+          ( Cop
+              (Cstore (Word_tagged_int, Assignment), [cache; Cvar result], dbg),
             value_as_int64 ~dbg (Cvar result) ) )
   in
   let loop_cont = Lambda.next_raise_count () in
@@ -5419,11 +5402,12 @@ let bigarray_load ~dbg ~elt_kind ~elt_size ~elt_chunk ~bigarray ~index =
   let ba_data_f = field_address bigarray 1 dbg in
   let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
   let addr =
-    array_indexing ~typ:Naked_int (Misc.log2 elt_size) ba_data_p index dbg
+    int64_as_addr ~dbg
+      (array_indexing ~typ:Naked_int (Misc.log2 elt_size) ba_data_p index dbg)
   in
   match (elt_kind : Lambda.bigarray_kind) with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = add_int addr (int ~dbg (elt_size / 2)) dbg in
+    let addr' = add_int_addr addr (int ~dbg (elt_size / 2)) dbg in
     box_complex dbg
       (load ~dbg elt_chunk Mutable ~addr)
       (load ~dbg elt_chunk Mutable ~addr:addr')
@@ -5441,11 +5425,12 @@ let bigarray_store ~dbg ~(elt_kind : Lambda.bigarray_kind) ~elt_size ~elt_chunk
   let ba_data_f = field_address bigarray 1 dbg in
   let ba_data_p = load ~dbg Word_int Mutable ~addr:ba_data_f in
   let addr =
-    array_indexing ~typ:Naked_int (Misc.log2 elt_size) ba_data_p index dbg
+    int64_as_addr ~dbg
+      (array_indexing ~typ:Naked_int (Misc.log2 elt_size) ba_data_p index dbg)
   in
   match elt_kind with
   | Pbigarray_complex32 | Pbigarray_complex64 ->
-    let addr' = add_int addr (int ~dbg (elt_size / 2)) dbg in
+    let addr' = add_int_addr addr (int ~dbg (elt_size / 2)) dbg in
     return_unit dbg
       (sequence
          (store ~dbg elt_chunk Assignment ~addr
@@ -6105,7 +6090,7 @@ let atomic_arith ~dbg ~op ~untag ~ext_name block offset i =
                 effects = Arbitrary_effects;
                 coeffects = Has_coeffects;
                 ty = typ_tagged_int;
-                ty_args = [];
+                ty_args = [XInt; XInt; XInt64];
                 alloc = false
               },
             [block; atomic_field_index_for_extcall offset dbg; i],

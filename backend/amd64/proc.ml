@@ -764,7 +764,7 @@ let operation_supported = function
   | Cdomain_index
   | Cpoll
   | Cpause
-  | Creinterpret_cast (Int64_of_value | Value_of_int64 |
+  | Creinterpret_cast (Int64_of_value | Value_of_int64 | Addr_of_int64 |
                        Int64_of_tagged_int | Tagged_int_of_int64 |
                        Int64_of_float | Float_of_int64 |
                        Float32_of_float | Float_of_float32 |

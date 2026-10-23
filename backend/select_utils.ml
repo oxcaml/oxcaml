@@ -259,6 +259,7 @@ let oper_result_type = function
   | Cpackf32 -> typ_float
   | Ccsel ty -> ty
   | Creinterpret_cast Value_of_int64 -> typ_val
+  | Creinterpret_cast Addr_of_int64 -> typ_addr
   | Creinterpret_cast Tagged_int_of_int64 -> typ_tagged_int
   | Creinterpret_cast Int64_of_tagged_int -> typ_naked_int
   | Creinterpret_cast (V128_of_vec _) -> typ_vec128

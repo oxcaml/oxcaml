@@ -413,7 +413,7 @@ module Dynamic = Make_layout_filler (struct
   let infix_header ~dbg ~function_slot_offset =
     C.alloc_infix_header function_slot_offset dbg
 
-  let term_of_symbol ~dbg sym = C.symbol ~dbg sym
+  let term_of_symbol ~dbg sym = C.value_as_int64 ~dbg (C.symbol ~dbg sym)
 
   let define_symbol _ = assert false
 end)

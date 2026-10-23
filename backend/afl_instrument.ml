@@ -42,6 +42,9 @@ let rec with_afl_logging b dbg =
     let cur_pos = V.create_local "pos" in
     let afl_area = V.create_local "shared_mem" in
     let op oper args = Cop (oper, args, dbg) in
+    let cur_addr =
+      op (Creinterpret_cast Addr_of_int64)
+        [op Caddi [Cvar afl_area; Cvar cur_pos]] in
     Clet(VP.create afl_area,
          op (Cload ({memory_chunk=Word_int;
                      mutability=Asttypes.Mutable;
@@ -52,11 +55,11 @@ let rec with_afl_logging b dbg =
         [afl_prev_loc dbg]; Cconst_int (cur_location, dbg)],
       Csequence(
         op (Cstore(Byte_unsigned, Assignment))
-          [op Caddi [Cvar afl_area; Cvar cur_pos];
+          [cur_addr;
            op Caddi [op (Cload {memory_chunk=Byte_unsigned;
                                 mutability=Asttypes.Mutable;
                                 is_atomic=false})
-                        [op Caddi [Cvar afl_area; Cvar cur_pos]];
+                        [cur_addr];
                       Cconst_int (1, dbg)]],
         op (Cstore(Word_int, Assignment))
           [afl_prev_loc dbg; Cconst_int (cur_location lsr 1, dbg)]))) in
@@ -120,7 +123,7 @@ let instrument_initialiser c dbg =
                      returns = true;
                      effects = Arbitrary_effects;
                      coeffects = Has_coeffects;
-                     ty = typ_naked_int; alloc = false; ty_args = []; },
+                     ty = typ_naked_int; alloc = false; ty_args = [XInt64]; },
           [Cconst_int (0, dbg ())],
           dbg ()),
      with_afl_logging c (dbg ()))

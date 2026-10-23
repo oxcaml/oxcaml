@@ -1043,8 +1043,7 @@ let ext_fetch_add_int (p : Builtins.ext_pointer) v =
 [%%expect_asm X86_64{|
 ext_fetch_add_int:
   sarq  $1, %rbx
-  decq  %rax
-  lock xaddq %rbx, (%rax)
+  lock xaddq %rbx, -1(%rax)
   leaq  1(%rbx,%rbx), %rax
   ret
 |}]
@@ -1053,11 +1052,11 @@ let ext_cas_int (p : Builtins.ext_pointer) old_v new_v =
   Builtins.ext_pointer_cas_int p old_v new_v
 [%%expect_asm X86_64{|
 ext_cas_int:
+  movq  %rax, %rsi
   sarq  $1, %rdi
-  sarq  $1, %rbx
-  leaq  -1(%rax), %rsi
   movq  %rbx, %rax
-  lock cmpxchgq %rdi, (%rsi)
+  sarq  $1, %rax
+  lock cmpxchgq %rdi, -1(%rsi)
   sete  %al
   movzbq %al, %rax
   salq  $1, %rax
@@ -1072,9 +1071,8 @@ let ext_fetch_add_int64
        p (Int64_u.to_int64 v))
 [%%expect_asm X86_64{|
 ext_fetch_add_int64:
-  leaq  -1(%rax), %rdi
+  lock xaddq %rbx, -1(%rax)
   movq  %rbx, %rax
-  lock xaddq %rax, (%rdi)
   ret
 |}]
 
@@ -1085,8 +1083,7 @@ let ext_fetch_add_int32
        p (Int32_u.to_int32 v))
 [%%expect_asm X86_64{|
 ext_fetch_add_int32:
-  decq  %rax
-  lock xaddl %ebx, (%rax)
+  lock xaddl %ebx, -1(%rax)
   movslq %ebx, %rax
   ret
 |}]
@@ -1098,9 +1095,8 @@ let ext_fetch_add_nativeint
        p (Nativeint_u.to_nativeint v))
 [%%expect_asm X86_64{|
 ext_fetch_add_nativeint:
-  leaq  -1(%rax), %rdi
+  lock xaddq %rbx, -1(%rax)
   movq  %rbx, %rax
-  lock xaddq %rax, (%rdi)
   ret
 |}]
 

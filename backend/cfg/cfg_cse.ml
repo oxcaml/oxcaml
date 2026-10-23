@@ -334,7 +334,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
-    | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _ -> Op_pure
+    | Floatop _ | Csel _ | Static_cast _ -> Op_pure
+    | Reinterpret_cast _ as op ->
+      if Operation.is_pure op then Op_pure else Op_other
     | Specific _ -> Op_other
     | Name_for_debugger _ -> Op_other
     | Probe_is_enabled _ -> Op_other

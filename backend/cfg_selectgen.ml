@@ -233,14 +233,27 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Creinterpret_cast (Int64_of_tagged_int | Tagged_int_of_int64), [arg], _)
       ->
       select_integer_argument arg
+    | Cop ((Cload _ as op), [addr], dbg) ->
+      Cop (op, [select_address_argument addr], dbg)
     | Cop
-        ( (( Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-           | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda )
+        ( (( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
+           | Cxor | Clsl | Clsr | Casr | Ccmpi _ | Caddv | Cadda )
            as op),
           args,
           dbg ) ->
       Cop (op, List.map select_integer_argument args, dbg)
     | _ -> arg
+
+  and select_address_argument (arg : Cmm.expression) : Cmm.expression =
+    match[@ocaml.warning "-fragile-match"] arg with
+    | Cop (Creinterpret_cast Addr_of_int64, [arg], _) ->
+      select_integer_argument arg
+    | Cop (((Cadda | Caddv) as op), [base; offset], dbg) ->
+      Cop
+        ( op,
+          [select_address_argument base; select_integer_argument offset],
+          dbg )
+    | arg -> select_integer_argument arg
 
   let select_value_argument (arg : Cmm.expression) : Cmm.expression =
     match[@ocaml.warning "-fragile-match"] arg with
@@ -489,7 +502,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let op : Operation.t =
         match cast with
         | Int64_of_tagged_int | Tagged_int_of_int64 -> Move
-        | Int64_of_value | Value_of_int64 | Float_of_float32 | Float32_of_float
+        | Int64_of_value | Value_of_int64 | Addr_of_int64 | Float_of_float32
+        | Float32_of_float
         | Float_of_int64 | Int64_of_float | Float32_of_int32 | Int32_of_float32
         | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
         | V512_of_vec _ ->
@@ -537,6 +551,15 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       (dbg : Debuginfo.t) ~label_after :
       Cfg.basic_or_terminator * Cmm.expression list =
     let args = List.map select_integer_argument args in
+    let args =
+      match[@ocaml.warning "-fragile-match"] op, args with
+      | (Cload _ | Cprefetch _), [addr] -> [select_address_argument addr]
+      | Cstore _, [addr; value] -> [select_address_argument addr; value]
+      | Catomic _, [value; addr] -> [value; select_address_argument addr]
+      | Catomic _, [old_value; new_value; addr] ->
+        [old_value; new_value; select_address_argument addr]
+      | _ -> args
+    in
     let default () =
       match
         Target.select_operation ~generic_select_condition:select_condition op
@@ -633,7 +656,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                  mutability = Mutable;
                  is_atomic = false
                },
-             [Cconst_int (0, Debuginfo.none)],
+             [ Cop
+                 ( Creinterpret_cast Addr_of_int64,
+                   [Cconst_int (0, Debuginfo.none)],
+                   Debuginfo.none ) ],
              Debuginfo.none )
        in
        let dummy_raise : Cmm.expression =

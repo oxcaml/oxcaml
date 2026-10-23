@@ -1322,7 +1322,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
       K.Standard_int_or_float.to_kind_with_subkind kind
       |> C.memory_chunk_of_kind
     in
-    None, res, C.load ~dbg memory_chunk Mutable ~addr:arg
+    None, res,
+    C.load ~dbg memory_chunk Mutable ~addr:(C.int64_as_addr ~dbg arg)
   | Make_lazy { lazy_tag; alloc_region = _ } ->
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
@@ -1362,7 +1363,8 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
       K.Standard_int_or_float.to_kind_with_subkind kind
       |> C.memory_chunk_of_kind
     in
-    C.store ~dbg memory_chunk Assignment ~addr:x ~new_value:y
+    C.store ~dbg memory_chunk Assignment ~addr:(C.int64_as_addr ~dbg x)
+      ~new_value:y
     |> C.return_unit dbg
   | Read_offset (kind, mut) ->
     let addr = C.add_int_addr x y dbg in
@@ -1430,7 +1432,9 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
             C.eq ~dbg (C.value_as_int64 ~dbg x) (C.nativeint ~dbg 0n)
           in
           C.ite ~dbg base_is_null
-            ~then_:(C.store ~dbg memory_chunk Assignment ~addr:y ~new_value:z)
+            ~then_:
+              (C.store ~dbg memory_chunk Assignment
+                 ~addr:(C.int64_as_addr ~dbg y) ~new_value:z)
             ~else_:write_into_block ~then_dbg:dbg ~else_dbg:dbg
       else
         let addr = C.add_int_addr x y dbg in

@@ -128,13 +128,29 @@ let mulhi bi ~signed args dbg =
   let op = Cmulhi { signed } in
   if_operation_supported_bi bi op ~f:(fun () -> Cop (op, args, dbg))
 
+let native_pointer_load chunk name args dbg =
+  let addr = int64_as_addr ~dbg (one_arg name args) in
+  Some (Cop (mk_load_mut chunk, [addr], dbg))
+
+let native_pointer_store chunk name args dbg =
+  let addr, new_value = two_args name args in
+  Some
+    (return_unit dbg
+       (Cop
+          ( Cstore (chunk, Assignment),
+            [int64_as_addr ~dbg addr; new_value],
+            dbg )))
+
+let ext_pointer_address arg dbg =
+  add_int_addr arg (Cconst_int (-1, dbg)) dbg
+
 let ext_pointer_load chunk name args dbg =
-  let p = int_as_pointer (one_arg name args) dbg in
+  let p = ext_pointer_address (one_arg name args) dbg in
   Some (Cop (mk_load_mut chunk, [p], dbg))
 
 let ext_pointer_store chunk name args dbg =
   let arg1, arg2 = two_args name args in
-  let p = int_as_pointer arg1 dbg in
+  let p = ext_pointer_address arg1 dbg in
   Some (return_unit dbg (Cop (Cstore (chunk, Assignment), [p; arg2], dbg)))
 
 let bigstring_prefetch ~is_write locality args dbg =
@@ -150,32 +166,52 @@ let bigstring_prefetch ~is_write locality args dbg =
                   (* pointer to element "idx" of "ba" of type (char,
                      int8_unsigned_elt, c_layout) Bigarray.Array1.t is simply
                      offset "idx" from "ba_data" *)
-                  return_unit dbg (Cop (op, [add_int ba_data idx dbg], dbg))))))
+                  return_unit dbg
+                    (Cop
+                       ( op,
+                         [int64_as_addr ~dbg (add_int ba_data idx dbg)],
+                         dbg ))))))
 
-let prefetch ~is_write locality arg dbg =
+let prefetch_address ~is_write locality arg dbg =
   let op = Cprefetch { is_write; locality } in
   if_operation_supported op ~f:(fun () ->
       return_unit dbg (Cop (op, [arg], dbg)))
+
+let prefetch ~is_write locality ~ty_args arg dbg =
+  let arg =
+    match ty_args with
+    | [ty] when equal_exttype ty XInt64 -> int64_as_addr ~dbg arg
+    | _ -> arg
+  in
+  prefetch_address ~is_write locality arg dbg
 
 let prefetch_offset ~is_write locality (arg1, arg2) dbg =
   (* [arg2], the index, is already untagged. *)
   let op = Cprefetch { is_write; locality } in
   if_operation_supported op ~f:(fun () ->
-      return_unit dbg (Cop (op, [add_int arg1 arg2 dbg], dbg)))
+      return_unit dbg (Cop (op, [add_int_addr arg1 arg2 dbg], dbg)))
 
 let ext_pointer_prefetch ~is_write locality arg dbg =
-  prefetch ~is_write locality (int_as_pointer arg dbg) dbg
+  prefetch_address ~is_write locality (ext_pointer_address arg dbg) dbg
 
-let native_pointer_cas size (arg1, arg2, arg3) dbg =
+let pointer_cas size ~address_of_pointer (arg1, arg2, arg3) dbg =
   let op = Catomic { op = Compare_set; size } in
   if_operation_supported op ~f:(fun () ->
       bind "set_to" arg3 (fun set_to ->
           bind "compare_with" arg2 (fun compare_with ->
               bind "dst" arg1 (fun dst ->
-                  tag_int (Cop (op, [compare_with; set_to; dst], dbg)) dbg))))
+                  tag_int
+                    (Cop
+                       (op, [compare_with; set_to; address_of_pointer dst], dbg))
+                    dbg))))
 
-let ext_pointer_cas size (arg1, arg2, arg3) dbg =
-  native_pointer_cas size (int_as_pointer arg1 dbg, arg2, arg3) dbg
+let native_pointer_cas size args dbg =
+  pointer_cas size ~address_of_pointer:(int64_as_addr ~dbg) args dbg
+
+let ext_pointer_cas size args dbg =
+  pointer_cas size
+    ~address_of_pointer:(fun arg -> ext_pointer_address arg dbg)
+    args dbg
 
 let bigstring_cas size (arg1, arg2, arg3, arg4) dbg =
   let op = Catomic { op = Compare_set; size } in
@@ -190,23 +226,34 @@ let bigstring_cas size (arg1, arg2, arg3, arg4) dbg =
                         (fun bs_data ->
                           bind "dst" (add_int bs_data idx dbg) (fun dst ->
                               tag_int
-                                (Cop (op, [compare_with; set_to; dst], dbg))
+                                (Cop
+                                   ( op,
+                                     [ compare_with;
+                                       set_to;
+                                       int64_as_addr ~dbg dst ],
+                                     dbg ))
                                 dbg)))))))
 
-let native_pointer_atomic_add size (arg1, arg2) dbg =
+let pointer_atomic_add size ~address_of_pointer (arg1, arg2) dbg =
   let op = Catomic { op = Fetch_and_add; size } in
   if_operation_supported op ~f:(fun () ->
       bind "src" arg2 (fun src ->
-          bind "dst" arg1 (fun dst -> Cop (op, [src; dst], dbg))))
+          bind "dst" arg1 (fun dst ->
+              Cop (op, [src; address_of_pointer dst], dbg))))
+
+let native_pointer_atomic_add size args dbg =
+  pointer_atomic_add size ~address_of_pointer:(int64_as_addr ~dbg) args dbg
 
 let native_pointer_atomic_sub size (arg1, arg2) dbg =
   native_pointer_atomic_add size (arg1, neg_int arg2 dbg) dbg
 
-let ext_pointer_atomic_add size (arg1, arg2) dbg =
-  native_pointer_atomic_add size (int_as_pointer arg1 dbg, arg2) dbg
+let ext_pointer_atomic_add size args dbg =
+  pointer_atomic_add size
+    ~address_of_pointer:(fun arg -> ext_pointer_address arg dbg)
+    args dbg
 
 let ext_pointer_atomic_sub size (arg1, arg2) dbg =
-  native_pointer_atomic_add size (int_as_pointer arg1 dbg, neg_int arg2 dbg) dbg
+  ext_pointer_atomic_add size (arg1, neg_int arg2 dbg) dbg
 
 let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
   let op = Catomic { op = Fetch_and_add; size } in
@@ -218,7 +265,7 @@ let bigstring_atomic_add size (arg1, arg2, arg3) dbg =
                     (Cop (mk_load_mut Word_int, [field_address bs 1 dbg], dbg))
                     (fun bs_data ->
                       bind "dst" (add_int bs_data idx dbg) (fun dst ->
-                          Cop (op, [src; dst], dbg)))))))
+                          Cop (op, [src; int64_as_addr ~dbg dst], dbg)))))))
 
 let bigstring_atomic_sub size (arg1, arg2, arg3) dbg =
   bigstring_atomic_add size (arg1, arg2, neg_int arg3 dbg) dbg
@@ -834,7 +881,7 @@ let transl_vec_builtin name args dbg _typ_res =
     For situations such as where the Cmm code below returns e.g. an untagged
     integer, we exploit the generic mechanism on "external" to deal with the
     tagging before the result is returned to the user. *)
-let transl_builtin name args dbg typ_res =
+let transl_builtin name args dbg typ_res ~ty_args =
   match name with
   | "caml_int128_add" ->
     let op = Caddi128 in
@@ -1015,53 +1062,47 @@ let transl_builtin name args dbg typ_res =
   | "caml_native_pointer_to_value" ->
     Some (int64_as_value ~dbg (one_arg name args))
   | "caml_native_pointer_load_immediate" ->
-    Some (Cop (mk_load_mut Word_tagged_int, args, dbg))
+    native_pointer_load Word_tagged_int name args dbg
   | "caml_native_pointer_load_unboxed_nativeint" ->
-    Some (Cop (mk_load_mut Word_int, args, dbg))
+    native_pointer_load Word_int name args dbg
   | "caml_native_pointer_store_immediate" ->
-    Some
-      (return_unit dbg (Cop (Cstore (Word_tagged_int, Assignment), args, dbg)))
+    native_pointer_store Word_tagged_int name args dbg
   | "caml_native_pointer_store_unboxed_nativeint" ->
-    Some (return_unit dbg (Cop (Cstore (Word_int, Assignment), args, dbg)))
+    native_pointer_store Word_int name args dbg
   | "caml_native_pointer_load_unboxed_int64" when size_int = 8 ->
-    Some (Cop (mk_load_mut Word_int, args, dbg))
+    native_pointer_load Word_int name args dbg
   | "caml_native_pointer_store_unboxed_int64" when size_int = 8 ->
-    Some (return_unit dbg (Cop (Cstore (Word_int, Assignment), args, dbg)))
+    native_pointer_store Word_int name args dbg
   | "caml_native_pointer_load_signed_int32"
   | "caml_native_pointer_load_unboxed_int32" ->
-    Some (Cop (mk_load_mut Thirtytwo_signed, args, dbg))
+    native_pointer_load Thirtytwo_signed name args dbg
   | "caml_native_pointer_store_signed_int32"
   | "caml_native_pointer_store_unboxed_int32" ->
-    Some
-      (return_unit dbg (Cop (Cstore (Thirtytwo_signed, Assignment), args, dbg)))
+    native_pointer_store Thirtytwo_signed name args dbg
   | "caml_native_pointer_load_unsigned_int32" ->
-    Some (Cop (mk_load_mut Thirtytwo_unsigned, args, dbg))
+    native_pointer_load Thirtytwo_unsigned name args dbg
   | "caml_native_pointer_store_unsigned_int32" ->
-    Some
-      (return_unit dbg
-         (Cop (Cstore (Thirtytwo_unsigned, Assignment), args, dbg)))
+    native_pointer_store Thirtytwo_unsigned name args dbg
   | "caml_native_pointer_load_unboxed_float" ->
-    Some (Cop (mk_load_mut Double, args, dbg))
+    native_pointer_load Double name args dbg
   | "caml_native_pointer_store_unboxed_float" ->
-    Some (return_unit dbg (Cop (Cstore (Double, Assignment), args, dbg)))
+    native_pointer_store Double name args dbg
   | "caml_native_pointer_load_unsigned_int8" ->
-    Some (Cop (mk_load_mut Byte_unsigned, args, dbg))
+    native_pointer_load Byte_unsigned name args dbg
   | "caml_native_pointer_load_signed_int8" ->
-    Some (Cop (mk_load_mut Byte_signed, args, dbg))
+    native_pointer_load Byte_signed name args dbg
   | "caml_native_pointer_load_unsigned_int16" ->
-    Some (Cop (mk_load_mut Sixteen_unsigned, args, dbg))
+    native_pointer_load Sixteen_unsigned name args dbg
   | "caml_native_pointer_load_signed_int16" ->
-    Some (Cop (mk_load_mut Sixteen_signed, args, dbg))
+    native_pointer_load Sixteen_signed name args dbg
   | "caml_native_pointer_store_unsigned_int8" ->
-    Some (return_unit dbg (Cop (Cstore (Byte_unsigned, Assignment), args, dbg)))
+    native_pointer_store Byte_unsigned name args dbg
   | "caml_native_pointer_store_signed_int8" ->
-    Some (return_unit dbg (Cop (Cstore (Byte_signed, Assignment), args, dbg)))
+    native_pointer_store Byte_signed name args dbg
   | "caml_native_pointer_store_unsigned_int16" ->
-    Some
-      (return_unit dbg (Cop (Cstore (Sixteen_unsigned, Assignment), args, dbg)))
+    native_pointer_store Sixteen_unsigned name args dbg
   | "caml_native_pointer_store_signed_int16" ->
-    Some
-      (return_unit dbg (Cop (Cstore (Sixteen_signed, Assignment), args, dbg)))
+    native_pointer_store Sixteen_signed name args dbg
   (* Ext_pointer: handled as tagged int *)
   | "caml_ext_pointer_load_immediate" ->
     ext_pointer_load Word_tagged_int name args dbg
@@ -1141,21 +1182,21 @@ let transl_builtin name args dbg typ_res =
     ext_pointer_prefetch ~is_write:false Low (one_arg name args) dbg
   (* Value and unboxed Native_pointer prefetch *)
   | "caml_prefetch_write_high" ->
-    prefetch ~is_write:true High (one_arg name args) dbg
+    prefetch ~is_write:true High ~ty_args (one_arg name args) dbg
   | "caml_prefetch_write_moderate" ->
-    prefetch ~is_write:true Moderate (one_arg name args) dbg
+    prefetch ~is_write:true Moderate ~ty_args (one_arg name args) dbg
   | "caml_prefetch_write_low" ->
-    prefetch ~is_write:true Low (one_arg name args) dbg
+    prefetch ~is_write:true Low ~ty_args (one_arg name args) dbg
   | "caml_prefetch_write_none" ->
-    prefetch ~is_write:true Nonlocal (one_arg name args) dbg
+    prefetch ~is_write:true Nonlocal ~ty_args (one_arg name args) dbg
   | "caml_prefetch_read_none" ->
-    prefetch ~is_write:false Nonlocal (one_arg name args) dbg
+    prefetch ~is_write:false Nonlocal ~ty_args (one_arg name args) dbg
   | "caml_prefetch_read_high" ->
-    prefetch ~is_write:false High (one_arg name args) dbg
+    prefetch ~is_write:false High ~ty_args (one_arg name args) dbg
   | "caml_prefetch_read_moderate" ->
-    prefetch ~is_write:false Moderate (one_arg name args) dbg
+    prefetch ~is_write:false Moderate ~ty_args (one_arg name args) dbg
   | "caml_prefetch_read_low" ->
-    prefetch ~is_write:false Low (one_arg name args) dbg
+    prefetch ~is_write:false Low ~ty_args (one_arg name args) dbg
   (* Prefetch value with offset *)
   | "caml_prefetch_write_high_val_offset_untagged" ->
     prefetch_offset ~is_write:true High (two_args name args) dbg
@@ -1290,7 +1331,7 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
   in
   if is_c_builtin || builtin_even_if_not_annotated name
   then
-    match transl_builtin name args dbg typ_res with
+    match transl_builtin name args dbg typ_res ~ty_args with
     | Some op ->
       { extcall = op; builtin_sign_extends = builtin_sign_extends name }
     | None -> { extcall = default; builtin_sign_extends = false }
