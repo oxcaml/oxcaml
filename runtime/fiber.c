@@ -605,10 +605,11 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
     struct stack_cache* cache = &caches[cache_bucket];
     bool alloc = false;
     do {
-      struct cached_stack* cached = cache->head;
+      /* Acquire pairs with the CAS used to push to [head] (see
+         [stack_release_memory]). Other domains may push to this cache, but
+         only the owner pops. */
+      struct cached_stack* cached = atomic_load_acquire(&cache->head);
       if (cached) {
-        // Other domains may push to the cache, but not pop, so it's safe
-        // to read the cache link.
         struct cached_stack* top = cached->next;
         alloc = atomic_compare_exchange_weak(&cache->head, &cached, top);
         if(alloc) {
