@@ -164,12 +164,12 @@ let ordered_list_with x y =
   else if x > y then [y;x]
 
 [%%expect{|
-Line 3, characters 22-26:
+Line 3, characters 21-26:
 3 |   else if x > y then [y;x]
-                          ^^^^
-Error: This variant expression is expected to have type "unit"
+                         ^^^^^
+Error: This constructor has type "'a list"
+       but an expression was expected of type "unit"
        because it is in the result of a conditional with no else branch
-       There is no constructor "::" within type "unit"
 |}];;
 
 (function
@@ -188,10 +188,10 @@ Error: This expression has type "int" but an expression was expected of type
 (* #10106 *)
 if false then (match () with () -> true);;
 [%%expect{|
-Line 1, characters 35-39:
+Line 1, characters 14-40:
 1 | if false then (match () with () -> true);;
-                                       ^^^^
-Error: This variant expression is expected to have type "unit"
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This "match" expression has type "bool"
+       but an expression was expected of type "unit"
        because it is in the result of a conditional with no else branch
-       There is no constructor "true" within type "unit"
 |}]
