@@ -290,6 +290,25 @@ let
   # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
+  # Dune builds the indexes that ocaml-lsp's find-references reads with
+  # ocaml-index. nixpkgs doesn't package it, so build it from the source of the
+  # merlin-lib that ocaml-lsp links: the reader rejects indexes written by any
+  # other Merlin version. The external/merlin one won't do either, since it
+  # reads OxCaml cmts and the boot build's are upstream OCaml's.
+  ocamlIndex =
+    let
+      ocamlPackages = pkgs.ocaml-ng.ocamlPackages_5_4;
+    in
+    ocamlPackages.buildDunePackage {
+      pname = "ocaml-index";
+      inherit (ocamlPackages.merlin-lib) version src;
+      buildInputs = [ ocamlPackages.merlin-lib ];
+      meta = ocamlPackages.merlin-lib.meta // {
+        description = "Merlin's indexer for project-wide occurrences";
+        mainProgram = "ocaml-index";
+      };
+    };
+
   ppxDeriversSrc =
     let
       version = "1.2.1";
@@ -795,6 +814,7 @@ stdenv.mkDerivation {
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     pkgs.ocaml-ng.ocamlPackages_5_4.merlin
     pkgs.ocaml-ng.ocamlPackages_5_4.dot-merlin-reader
+    ocamlIndex
     dune
     pkgs.pkg-config
     pkgs.rsync
