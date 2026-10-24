@@ -1367,6 +1367,19 @@ let mk_jsoo_opt f =
         doc phase ^ " (with -target js_of_ocaml)" ))
     Clflags.Jsoo_phase.all
 
+let mk_jsoo_effects f =
+  let assoc_list =
+    List.map
+      (fun effects -> (Clflags.Jsoo_effects.to_string effects, effects))
+      Clflags.Jsoo_effects.all
+  in
+  ( "-jsoo-effects",
+    Arg.Symbol (List.map fst assoc_list, fun s -> f (List.assoc s assoc_list)),
+    Printf.sprintf
+      " Effect handlers backend for js_of_ocaml. (default: %s) (with -target \
+       js_of_ocaml)"
+      (Clflags.Jsoo_effects.to_string !Clflags.jsoo_effects) )
+
 let mk_djsir f =
   ("-djsir", Arg.Unit f, " Print the Js_of_ocaml IR (with -target js_of_ocaml)")
 
@@ -1597,6 +1610,7 @@ module type Oxcaml_options = sig
   val cached_generic_functions_path : string -> unit
   val target : Clflags.Target.t -> unit
   val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val jsoo_effects : Clflags.Jsoo_effects.t -> unit
   val djsir : unit -> unit
   val x : string -> unit
 end
@@ -1845,6 +1859,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
       mk_target F.target;
+      mk_jsoo_effects F.jsoo_effects;
       mk_djsir F.djsir;
       mk_x F.x;
     ]
@@ -2439,6 +2454,7 @@ module Oxcaml_options_impl = struct
 
   let target = Clflags.set_target
   let jsoo_opt = Compenv.add_first_jsoo_opt
+  let jsoo_effects effects = Clflags.jsoo_effects := effects
   let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
@@ -2925,6 +2941,17 @@ module Extra_params = struct
         | _ ->
             Printf.ksprintf Compenv.fatal
               "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml)" v)
+    | "jsoo-effects" -> (
+        match Clflags.Jsoo_effects.of_string v with
+        | Some effects ->
+            Clflags.jsoo_effects := effects;
+            true
+        | None ->
+            Printf.ksprintf Compenv.fatal
+              "OCAMLPARAM: unknown jsoo-effects %S (possible values: %s)" v
+              (String.concat ", "
+                 (List.map Clflags.Jsoo_effects.to_string
+                    Clflags.Jsoo_effects.all)))
     | "reaper" -> set Flambda2.enable_reaper
     | "reaper-preserve-direct-calls" ->
         (match String.lowercase_ascii v with

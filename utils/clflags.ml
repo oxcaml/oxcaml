@@ -289,6 +289,21 @@ let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
     | Runtime -> runtime
     | Link -> link
 
+module Jsoo_effects = struct
+  type t = Disabled | Cps | Double_translation
+
+  let all = [Disabled; Cps; Double_translation]
+
+  let to_string = function
+    | Disabled -> "disabled"
+    | Cps -> "cps"
+    | Double_translation -> "double-translation"
+
+  let of_string s = List.find_opt (fun t -> String.equal (to_string t) s) all
+end
+
+let jsoo_effects = ref Jsoo_effects.Double_translation (* -jsoo-effects *)
+
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
 let cmm_invariants =

@@ -224,6 +224,7 @@ module type Oxcaml_options = sig
   val cached_generic_functions_path : string -> unit
   val target : Clflags.Target.t -> unit
   val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val jsoo_effects : Clflags.Jsoo_effects.t -> unit
   val djsir : unit -> unit
   val x : string -> unit
 end
