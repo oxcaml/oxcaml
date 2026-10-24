@@ -381,7 +381,18 @@ let loc_external_arguments ty_args =
     then win64_loc_external_arguments arg
     else unix_loc_external_arguments arg
   in
-  Array.map (fun reg -> [|reg|]) loc, stack_ofs, align
+  let loc =
+    List.mapi (fun i ty_arg ->
+        match Cmm.is_phantom_exttype ty_arg, (loc.(i) : Reg.t).loc with
+        | false, _ -> [| loc.(i) |]
+        | true, Reg _ -> [||]
+        | true, (Stack _ | Unknown) ->
+          Misc.fatal_error
+            "Proc.loc_external_arguments: no register left for a phantom")
+      ty_args
+    |> Array.of_list
+  in
+  loc, stack_ofs, align
 
 let loc_exn_bucket = rax
 

@@ -182,7 +182,7 @@ let loc_results_return res =
      remaining args on stack.
    macOS/iOS peculiarities: scalars passed on stack occupy only their size in
    bytes, while the AAPCS64 pads them to 8 bytes.
-   Return values in r0...r1 or d0. *)
+   Return values in r0...r1 or d0...d3. *)
 
 let external_calling_conventions
     int_registers float_registers make_stack ty_args =
@@ -202,12 +202,18 @@ let external_calling_conventions
       | XVec128 -> Vec128, float_registers, 1, size_vec128
       | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
+      | XPhantom_int -> Int, int_registers, 1, size_int
+      | XPhantom_float -> Float, float_registers, 1, size_float
     in
     match !registers with
     | reg :: regs ->
       registers := regs;
-      loc.(i) <- [| phys_reg ty reg |]
+      loc.(i) <- (if Cmm.is_phantom_exttype ty_arg then [||]
+                  else [| phys_reg ty reg |])
     | [] ->
+      if Cmm.is_phantom_exttype ty_arg then
+        Misc.fatal_error
+          "Proc.loc_external_arguments: no register left for a phantom";
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;
       loc.(i) <- [| stack_slot (make_stack !ofs) ty |];
@@ -222,7 +228,9 @@ let loc_external_arguments ty_args =
      outgoing ty_args
 
 let loc_external_results res =
-  let (loc, _) = calling_conventions [X0; X1] [D0; D1] not_supported 0 res in
+  let (loc, _) =
+    calling_conventions [X0; X1] [D0; D1; D2; D3] not_supported 0 res
+  in
   loc
 
 let loc_exn_bucket = phys_reg Int X0

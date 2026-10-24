@@ -72,9 +72,7 @@ type description = native_repr description_gen
    is added, then errors will always be unique and de-duping will no longer be
    necessary. *)
 type wrong_repr_error =
-  | Product_arg
   | Expected_value_prim
-  | Product_return
   | Unpacked_product_return
   | Unextended_return
   | Small_int_arg
@@ -546,13 +544,6 @@ module Repr_check = struct
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_bits8 |
       Unextended_bits16 -> false
 
-  let rec sort_is_product : Jkind_types.Sort.Const.t -> bool = function
-    | Product _ -> true
-    | Base _ -> false
-    | Addressable s -> sort_is_product s
-    | Univar _ -> Misc.fatal_error "sort_is_product: univar"
-    | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
-
   let rec sort_contains_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
     function
     | Product sorts -> List.exists sort_contains_bits8_or_bits16 sorts
@@ -562,12 +553,25 @@ module Repr_check = struct
     | Univar _ -> Misc.fatal_error "sort_contains_bits8_or_bits16: univar"
     | Genvar _ -> Misc.fatal_error "sort_contains_bits8_or_bits16: genvar"
 
+  let rec sort_is_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
+    function
+    | Base (Bits8 | Bits16) -> true
+    | Base _ | Product _ -> false
+    | Addressable sort -> sort_is_bits8_or_bits16 sort
+    | Univar _ -> Misc.fatal_error "sort_is_bits8_or_bits16: univar"
+    | Genvar _ -> Misc.fatal_error "sort_is_bits8_or_bits16: genvar"
+
+  (* Arguments of layout bits8 or bits16 are passed to C in registers whose
+     upper bits are unspecified, so they are rejected unless the stub is a
+     builtin or the argument is annotated with [@unsafe_unextended]. This
+     applies to the components of [@unpacked] products (separate C arguments)
+     but not of ordinary unboxed products (C struct members). See
+     [Extcall_abi.Component] for more details. *)
   let c_stub_arg_errors ~builtin = function
     | Same_as_ocaml_repr s ->
-      (if sort_is_product s then [Product_arg] else []) @
-      (if not builtin && sort_contains_bits8_or_bits16 s
-       then [Small_int_arg]
-       else [])
+      if not builtin && sort_is_bits8_or_bits16 s
+      then [Small_int_arg]
+      else []
     | Unpacked_product s ->
       if not builtin && sort_contains_bits8_or_bits16 s
       then [Small_int_arg]
@@ -577,23 +581,17 @@ module Repr_check = struct
     | Unboxed_mask | Repr_poly -> []
 
   let rec c_stub_return_errors = function
-    | Same_as_ocaml_repr (Base _)
+    | Same_as_ocaml_repr (Base _ | Product _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
-    | Unpacked_product _ -> [Unpacked_product_return]
-    | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
-    | Same_as_ocaml_repr (Product [s1; s2]) ->
-      if (sort_is_product s1) ||
-         (sort_is_product s2)
-      then [Product_return]
-      else []
-    | Same_as_ocaml_repr (Product _) -> [Product_return]
     | Same_as_ocaml_repr (Addressable s) ->
       c_stub_return_errors (Same_as_ocaml_repr s)
     | Same_as_ocaml_repr (Univar _) ->
       Misc.fatal_error "c_stub_return_errors: univar"
     | Same_as_ocaml_repr (Genvar _) ->
       Misc.fatal_error "c_stub_return_errors: genvar"
+    | Unpacked_product _ -> [Unpacked_product_return]
+    | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
@@ -634,12 +632,13 @@ module Repr_check = struct
       prim
 
   let check_c_stub ~builtin prim =
-    (* C externals are allowed to return a tuple, but may not take products as
-       arguments or return products with more than two elements. *)
+    (* CR mshinwell: it would be better to reject non-compilable shapes here
+       rather than in the backend. However, it is unclear how to do this since
+       the check is target- and backend-dependent, so the elaboration of
+       [external] declarations would become backend-dependent.  *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
-      (List.init arity
-         (fun _ -> c_stub_arg_errors ~builtin))
+      (List.init arity (fun _ -> c_stub_arg_errors ~builtin))
       @ [c_stub_return_errors]
     in
     check checks prim
@@ -1379,21 +1378,11 @@ let report_error ppf err =
     let errors = List.sort_uniq compare_wrong_repr_error errors in
     List.iter
       (function
-      | Product_arg ->
-        Format_doc.fprintf ppf
-          "@.@{<hint>Hint@}: @[<v>\
-           Types with product layouts in C stub arguments require the@ \
-           %a attribute.@]"
-          Style.inline_code "[@unpacked]"
       | Expected_value_prim ->
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
            This was expected to be a value-only primitive. You might've@ \
            misspelled the primitive name.@]"
-      | Product_return ->
-        Format_doc.fprintf ppf
-          "@.@{<hint>Hint@}: @[<v>\
-           Unboxed products in C stub returns must be a pair of non-products.@]"
       | Unpacked_product_return ->
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
