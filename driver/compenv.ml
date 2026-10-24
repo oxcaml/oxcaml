@@ -48,6 +48,17 @@ let extract_output = function
   | None ->
       fatal "Please specify the name of the output file, using option -o"
 
+let warn_once =
+  let seen = Hashtbl.create 7 in
+  fun message ->
+    if not (Hashtbl.mem seen message) then begin
+      Hashtbl.add seen message ();
+      if !Clflags.verbose then prerr_endline ("Warning: " ^ message)
+    end
+
+let warn_jsir_ignore what =
+  warn_once ("ignoring " ^ what ^ " when targeting js_of_ocaml")
+
 let default_output = function
   | Some s -> s
   | None -> Config.default_executable_name
@@ -56,6 +67,14 @@ let first_include_dirs = ref []
 let last_include_dirs = ref []
 let first_ccopts = ref []
 let last_ccopts = ref []
+let jsoo_opts =
+  List.map (fun phase -> phase, (ref [], ref []))
+    Clflags.Jsoo_phase.all
+let first_jsoo_opts phase = fst (List.assoc phase jsoo_opts)
+let last_jsoo_opts phase = snd (List.assoc phase jsoo_opts)
+let add_first_jsoo_opt phase v =
+  let r = first_jsoo_opts phase in
+  r := v :: !r
 let first_ppx = ref []
 let last_ppx = ref []
 let first_objfiles = ref []
@@ -515,6 +534,24 @@ let read_one_param ppf position name v =
         first_ccopts := v :: !first_ccopts
     end
 
+  | "jsoo-opt" | "jsoo-opt-compile" | "jsoo-opt-archive" | "jsoo-opt-runtime"
+  | "jsoo-opt-link" ->
+    let phase : Clflags.Jsoo_phase.t =
+      match name with
+      | "jsoo-opt" -> All
+      | "jsoo-opt-compile" -> Compile
+      | "jsoo-opt-archive" -> Archive
+      | "jsoo-opt-runtime" -> Runtime
+      | _ -> Link
+    in
+    begin
+      match position with
+      | Before_link | Before_compile _ ->
+        let r = last_jsoo_opts phase in
+        r := v :: !r
+      | Before_args -> add_first_jsoo_opt phase v
+    end
+
   | "ppx" ->
     begin
       match position with
@@ -714,11 +751,31 @@ let apply_config_file ppf position =
 let readenv ppf position =
   last_include_dirs := [];
   last_ccopts := [];
+  List.iter (fun phase -> last_jsoo_opts phase := []) Clflags.Jsoo_phase.all;
   last_ppx := [];
   last_objfiles := [];
   apply_config_file ppf position;
   read_OCAMLPARAM ppf position;
   all_ccopts := !last_ccopts @ !first_ccopts;
+  List.iter (fun phase ->
+      Clflags.jsoo_opts phase :=
+        !(last_jsoo_opts phase) @ !(first_jsoo_opts phase))
+    Clflags.Jsoo_phase.all;
+  (* [-target] is only known once the arguments have been parsed, so these
+     checks are meaningful from [Before_compile] and [Before_link] on. *)
+  (match position with
+   | Before_args -> ()
+   | Before_compile _ | Before_link ->
+     if Clflags.target_is_jsir () && !all_ccopts <> [] then begin
+       warn_jsir_ignore "-ccopt";
+       all_ccopts := []
+     end;
+     if not (Clflags.target_is_jsir ()) then
+       List.iter (fun phase ->
+           if !(Clflags.jsoo_opts phase) <> [] then
+             warn_once ("ignoring " ^ Clflags.Jsoo_phase.flag phase
+                        ^ ", which is only used when targeting js_of_ocaml"))
+         Clflags.Jsoo_phase.all);
   all_ppx := !last_ppx @ !first_ppx
 
 let get_objfiles ~with_ocamlparam =
@@ -764,16 +821,23 @@ let process_action
       if !make_package then objfiles := (opref ^ ".cmi") :: !objfiles
   | ProcessCFile name ->
       readenv ppf (Before_compile name);
-      Location.input_name := name;
-      let obj_name = match !output_name with
-        | None -> c_object_of_filename name
-        | Some n -> n
-      in
-      if Ccomp.compile_file ?output:!output_name name <> 0
-      then raise (Exit_with_status 2);
-      ccobjs := obj_name :: !ccobjs
+      if Clflags.target_is_jsir () then
+        warn_jsir_ignore ("C source file " ^ name)
+      else begin
+        Location.input_name := name;
+        let obj_name = match !output_name with
+          | None -> c_object_of_filename name
+          | Some n -> n
+        in
+        if Ccomp.compile_file ?output:!output_name name <> 0
+        then raise (Exit_with_status 2);
+        ccobjs := obj_name :: !ccobjs
+      end
   | ProcessObjects names ->
-      ccobjs := names @ !ccobjs
+      if Clflags.target_is_jsir () then
+        List.iter (fun name -> warn_jsir_ignore ("-cclib " ^ name)) names
+      else
+        ccobjs := names @ !ccobjs
   | ProcessDLLs names ->
       dllibs := names @ !dllibs
   | ProcessOtherFile name ->
@@ -785,10 +849,19 @@ let process_action
         objfiles := name :: !objfiles
       else if Filename.check_suffix name ".cmi" && !make_package then
         objfiles := name :: !objfiles
-      else if Filename.check_suffix name Config.ext_obj
-           || Filename.check_suffix name Config.ext_lib then begin
+      else if Clflags.target_is_jsir () && Filename.check_suffix name ".js"
+      then begin
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
+      end
+      else if Filename.check_suffix name Config.ext_obj
+           || Filename.check_suffix name Config.ext_lib then begin
+        if Clflags.target_is_jsir () then
+          warn_jsir_ignore ("object file " ^ name)
+        else begin
+          has_linker_inputs := true;
+          ccobjs := name :: !ccobjs
+        end
       end
       else if not (target_is_native ())
            && Filename.check_suffix name Config.ext_dll then

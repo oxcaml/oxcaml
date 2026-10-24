@@ -264,6 +264,31 @@ let[@inline] target_is_jsir () =
   | Js_of_ocaml -> true
   | Bytecode | Native -> false
 
+module Jsoo_phase = struct
+  type t = All | Compile | Archive | Runtime | Link
+
+  let all = [All; Compile; Archive; Runtime; Link]
+
+  let flag = function
+    | All -> "-jsoo-opt"
+    | Compile -> "-jsoo-opt-compile"
+    | Archive -> "-jsoo-opt-archive"
+    | Runtime -> "-jsoo-opt-runtime"
+    | Link -> "-jsoo-opt-link"
+end
+
+let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
+  let all = ref ([] : string list) in
+  let compile = ref [] and archive = ref [] in
+  let runtime = ref [] and link = ref [] in
+  fun (phase : Jsoo_phase.t) ->
+    match phase with
+    | All -> all
+    | Compile -> compile
+    | Archive -> archive
+    | Runtime -> runtime
+    | Link -> link
+
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
 let cmm_invariants =
