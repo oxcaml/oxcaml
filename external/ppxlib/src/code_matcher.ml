@@ -119,6 +119,16 @@ struct
              }
            | _ -> expr)
         | _ -> expr
+
+      (* The parser produces a single [Pjk_operator] for [k op1 op2], but a ppx can build
+         [Pjk_operator (Pjk_operator (k, [op1]), [op2])]. Flatten to the former so that we
+         don't fail the round-trip check below. *)
+      method! jkind_annotation jkind =
+        let jkind = super#jkind_annotation jkind in
+        match jkind.pjka_desc with
+        | Pjk_operator ({ pjka_desc = Pjk_operator (base, ops1); _ }, ops2) ->
+          { jkind with pjka_desc = Pjk_operator (base, ops1 @ ops2) }
+        | _ -> jkind
     end
 
   module M_map = M.Transform (struct
