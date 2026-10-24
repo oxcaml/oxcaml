@@ -554,7 +554,7 @@ let equal_alloc_dbginfo left right =
 
 type operation =
   | Capply of
-      { result_type : machtype;
+      { result_type : machtype option;
         region : Lambda.region_close;
         callees : symbol list option
       }

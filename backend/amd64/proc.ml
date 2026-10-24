@@ -614,7 +614,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if fp then [| rbp |] else [||]
   | Switch _ ->
     destroyed_rax_rdx
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+  | Call_no_return_ext { func_symbol = _; alloc; ty_res = _; ty_args = _;
                      stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
@@ -627,7 +627,8 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
     if stack_ofs > 0
     then Lazy.force all_phys_regs
     else Lazy.force destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
+  | Call {op = Indirect _ | Direct _; _}
+  | Call_no_return_func _ -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -646,7 +647,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+  | Call_no_return_ext { func_symbol = _; alloc; ty_res = _; ty_args = _;
                      stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
@@ -657,6 +658,11 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Invalid _ -> more_destruction_points
   | Call {op = Indirect _ | Direct _; _} ->
     true
+  | Call_no_return_func _ ->
+    (* XXX/note: it is probably ok to return `true`, but returning `false` makes
+       it obvious that we will not spill before the call (unless there is an exception).
+       the only drawback is the sync with the set of destroyed registers *)
+    false
 
 (* Layout of the stack frame *)
 
