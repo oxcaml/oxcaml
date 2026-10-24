@@ -573,7 +573,7 @@ module Datalog : sig
   val deduce : deduction -> (nil, rule) program
 
   module Schema : sig
-    module type S = sig
+    module type S0 = sig
       type keys
 
       type value
@@ -583,6 +583,10 @@ module Datalog : sig
       val columns : (t, keys, value) Column.hlist
 
       val result_repr : value Table.result_repr
+    end
+
+    module type S = sig
+      include S0
 
       val create : name:string -> (t, keys, value) table
 
@@ -597,7 +601,9 @@ module Datalog : sig
       val find_opt : keys Constant.hlist -> t -> value option
     end
 
-    module Cons (C : Column.S) (S : S) :
+    module Nil : S0 with type keys = nil and type value = unit and type t = unit
+
+    module Cons (C : Column.S) (S : S0) :
       S
         with type keys = C.t -> S.keys
          and type t = S.t C.Map.t
