@@ -2909,6 +2909,32 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
+let unboxed_label_mutability : Types.mutability -> Axis_lattice.t = function
+  | Immutable -> Axis_lattice.bot
+  | Mutable { atomic = Nonatomic; _ } -> Axis_lattice.mutable_unboxed_label
+  | Mutable { atomic = Atomic; _ } ->
+    Misc.fatal_error
+      "Jkind.unboxed_label_mutability: atomic label in an unboxed record"
+
+let unboxed_record_mutability lbls =
+  List.fold_left
+    (fun acc ({ ld_mutable; _ } : Types.label_declaration) ->
+      Axis_lattice.join acc (unboxed_label_mutability ld_mutable))
+    Axis_lattice.bot lbls
+
+let add_mod_bounds bounds (t : _ jkind) =
+  if Axis_lattice.equal bounds Axis_lattice.bot
+  then t
+  else
+    { t with
+      jkind =
+        { t.jkind with
+          mod_bounds =
+            Mod_bounds.join t.jkind.mod_bounds
+              (Mod_bounds.of_axis_lattice bounds)
+        }
+    }
+
 let for_unboxed_record lbls =
   let open Types in
   let tys_modalities =
@@ -2918,6 +2944,7 @@ let for_unboxed_record lbls =
   in
   let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
+  |> add_mod_bounds (unboxed_record_mutability (List.map fst lbls))
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)

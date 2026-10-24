@@ -277,7 +277,191 @@ type r = { i : int ; mutable s : string }
 type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many dynamic; }
+Line 2, characters 0-81:
+2 | type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type "r#"
+       Fields do not match:
+         "mutable s : string;"
+       is not the same as:
+         "s : string @@ global many dynamic;"
+       The original is mutable and this is not.
+|}]
+
+type u = r# = #{ i : int ; mutable s : string }
+[%%expect{|
+type u = r# = #{ i : int; mutable s : string; }
+|}]
+
+(* Unboxed versions of records with mutable fields are invariant, and don't
+   cross contention or visibility. They still cross locality. *)
+type 'a r = { mutable x : 'a; y : int }
+type +'a t = 'a r#
+[%%expect{|
+type 'a r = { mutable x : 'a; y : int; }
+Line 2, characters 0-18:
+2 | type +'a t = 'a r#
+    ^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type -'a t = 'a r#
+[%%expect{|
+Line 1, characters 0-18:
+1 | type -'a t = 'a r#
+    ^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be contravariant,
+       but it is injective invariant.
+|}]
+
+type !'a t = 'a r#
+[%%expect{|
+type 'a t = 'a r#
+|}]
+
+(* As for boxed records, only parameters in mutable fields are invariant *)
+type 'a r = { mutable x : int; y : 'a }
+type +'a t = 'a r
+type +'a t = 'a r#
+[%%expect{|
+type 'a r = { mutable x : int; y : 'a; }
+type 'a t = 'a r
+type 'a t = 'a r#
+|}]
+
+type 'a r = { x : 'a; y : int }
+type +'a t = 'a r#
+[%%expect{|
+type 'a r = { x : 'a; y : int; }
+type 'a t = 'a r#
+|}]
+
+type r = { mutable s : int; t : int }
+type r1 = { mutable s1 : int }
+[%%expect{|
+type r = { mutable s : int; t : int; }
+type r1 = { mutable s1 : int; }
+|}]
+
+let con (x : r# @ contended) : r# @ uncontended = x
+[%%expect{|
+Line 1, characters 50-51:
+1 | let con (x : r# @ contended) : r# @ uncontended = x
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let vis (x : r# @ immutable) : r# @ read_write = x
+[%%expect{|
+Line 1, characters 49-50:
+1 | let vis (x : r# @ immutable) : r# @ read_write = x
+                                                     ^
+Error: This value is "immutable" but is expected to be "read_write".
+|}]
+
+let loc (x : r# @ local) : r# = x
+let loc1 (x : r1# @ local) : r1# = x
+[%%expect{|
+val loc : r# @ local -> r# = <fun>
+val loc1 : r1# @ local -> r1# = <fun>
+|}]
+
+type u : mutable_data & mutable_data = r#
+[%%expect{|
+type u = r#
+|}]
+
+type u : immutable_data & immutable_data = r#
+[%%expect{|
+Line 1, characters 0-45:
+1 | type u : immutable_data & immutable_data = r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "r#" is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "r#" must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of u at line 1, characters 0-45.
+|}]
+
+type u1 : immutable_data = r1#
+[%%expect{|
+Line 1, characters 0-30:
+1 | type u1 : immutable_data = r1#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "r1#" is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "r1#" must be a subkind of immutable_data
+         because of the definition of u1 at line 1, characters 0-30.
+|}]
+
+type ('a : immutable_data & immutable_data) p = P
+type x = r# p
+[%%expect{|
+type ('a : immutable_data & immutable_data) p = P
+Line 2, characters 9-11:
+2 | type x = r# p
+             ^^
+Error: This type "r#" should be an instance of type
+         "('a : immutable_data & immutable_data)"
+       The kind of r# is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of r# must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of p at line 1, characters 0-49.
+|}]
+
+let f (type a : immutable_data & immutable_data) (x : a) = x
+let g (y : r#) = f y
+[%%expect{|
+val f : ('a : immutable_data & immutable_data). 'a -> 'a = <fun>
+Line 2, characters 19-20:
+2 | let g (y : r#) = f y
+                       ^
+Error: The value "y" has type "r#" but an expression was expected of type
+         "('a : immutable_data & immutable_data)"
+       The kind of r# is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of r# must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of f at line 1, characters 6-60.
+|}]
+
+module M : sig
+  type u : immutable_data & immutable_data
+end = struct
+  type u = r#
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type u = r#
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type u = r# end
+       is not included in
+         sig type u : immutable_data & immutable_data end
+       Type declarations do not match:
+         type u = r#
+       is not included in
+         type u : immutable_data & immutable_data
+       The kind of the first is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed record.
+       But the kind of the first must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of u at line 2, characters 2-42.
 |}]
 
 (*******************)

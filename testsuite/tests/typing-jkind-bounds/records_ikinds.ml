@@ -989,3 +989,131 @@ type ('a : immutable_data) t = { x : 'a option; }
 type ('a : immutable_data) t = { x : 'a; }
 type ('a : immutable_data) t = 'a list
 |}]
+
+(****************************************)
+(* Unboxed versions of records with mutable fields *)
+
+(* A mutable field restricts only contention and visibility: joining
+   [immutable_data] with the kind of [t#] gives the kind of [t]. *)
+type t = { mutable x : int }
+type cell
+type c = { mutable c : cell }
+type w = #{ mutable w : int }
+[%%expect{|
+type t = { mutable x : int; }
+type cell
+type c = { mutable c : cell; }
+type w = #{ mutable w : int; }
+|}]
+
+let f (x : t# @ local) = use_global x
+let f (x : t# @ aliased) = use_unique x
+let f (x : t# @ nonportable) = use_portable x
+let f (x : t# @ once) = use_many x
+let f (x : t#) = cross_external x
+type k = t# require_external
+[%%expect{|
+val f : t# @ local -> unit = <fun>
+val f : t# -> unit = <fun>
+val f : t# -> unit = <fun>
+val f : t# @ once -> unit = <fun>
+val f : t# -> unit = <fun>
+type k = t# require_external
+|}]
+
+let f (x : t# @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 45-46:
+1 | let f (x : t# @ contended) = use_uncontended x
+                                                 ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let f (x : t# @ immutable) : t# @ read_write = x
+[%%expect{|
+Line 1, characters 47-48:
+1 | let f (x : t# @ immutable) : t# @ read_write = x
+                                                   ^
+Error: This value is "immutable" but is expected to be "read_write".
+|}]
+
+type k = t# require_contended
+[%%expect{|
+Line 1, characters 9-11:
+1 | type k = t# require_contended
+             ^^
+Error: This type "t#" should be an instance of type "('a : value mod contended)"
+       The kind of t# is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is an unboxed record.
+       But the kind of t# must be a subkind of value mod contended
+         because of the definition of require_contended at line 17, characters 0-49.
+|}]
+
+type k : immutable_data = t#
+[%%expect{|
+Line 1, characters 0-28:
+1 | type k : immutable_data = t#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t#" is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is an unboxed record.
+       But the kind of type "t#" must be a subkind of immutable_data
+         because of the definition of k at line 1, characters 0-28.
+|}]
+
+type k : mutable_data = t#
+type k : mutable_data = t
+[%%expect{|
+type k = t#
+type k = t
+|}]
+
+(* The modalities implied by [mutable] still apply *)
+let f (x : c# @ local) = use_global x
+let f (x : c# @ aliased) = use_unique x
+let f (x : c# @ once) = use_many x
+[%%expect{|
+val f : c# @ local -> unit = <fun>
+val f : c# -> unit = <fun>
+val f : c# @ once -> unit = <fun>
+|}]
+
+let f (x : c# @ nonportable) = use_portable x
+[%%expect{|
+Line 1, characters 44-45:
+1 | let f (x : c# @ nonportable) = use_portable x
+                                                ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(* The same holds for unboxed records declared with mutable fields *)
+let f (x : w @ local) = use_global x
+[%%expect{|
+val f : w @ local -> unit = <fun>
+|}]
+
+let f (x : w @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 44-45:
+1 | let f (x : w @ contended) = use_uncontended x
+                                                ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* Looking through a singleton unboxed record doesn't lose the mutability of
+   one nested inside it *)
+type n = #{ n : t# }
+let f (x : n @ local) = use_global x
+[%%expect{|
+type n = #{ n : t#; }
+val f : n @ local -> unit = <fun>
+|}]
+
+let f (x : n @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 44-45:
+1 | let f (x : n @ contended) = use_uncontended x
+                                                ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]

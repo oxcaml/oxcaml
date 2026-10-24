@@ -2932,6 +2932,11 @@ let is_principal ty =
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
+  ; under_mutable_label : Mode.Modality.Const.t option
+    (* CR zeisbach: Consider representing the states of [under_mutable_label]
+       differently, to avoid [Some Mode.Modality.Const.id] in the result of a
+       single step: e.g. a 3-constructor variant, or a separate type for step
+       results that just records whether the label is mutable. *)
   ; or_null : unwrapped_or_null option;
   }
 
@@ -2942,7 +2947,25 @@ and unwrapped_or_null =
   }
 
 let mk_unwrapped_type_expr ty =
-  { ty; modality = Mode.Modality.Const.id; or_null = None }
+  { ty; modality = Mode.Modality.Const.id; under_mutable_label = None;
+    or_null = None }
+
+(* The [under_mutable_label] of a single step through the label [lbl].
+   [unbox_once] can't see the labels above this step, so relative to the step
+   nothing is above the label: [Some Mode.Modality.Const.id] means a mutable
+   label with nothing above it, as everywhere else. Its callers account for
+   the modalities above it. *)
+let under_mutable_label_of_step lbl =
+  if Types.is_mutable lbl.ld_mutable then Some Mode.Modality.Const.id else None
+
+(* What having stepped through a mutable label adds to the kind of the
+   original type: the bounds of a mutable label, masked by the modality above
+   it. *)
+let mutable_label_bounds = function
+  | None -> Axis_lattice.bot
+  | Some modality_above ->
+    Axis_lattice.meet (Axis_lattice.mask_of_modality modality_above)
+      Axis_lattice.mutable_unboxed_label
 
 type unbox_result =
   (* unboxing process made a step: either an unboxing, a removal of a [Tpoly],
@@ -2995,7 +3018,21 @@ let unbox_once env ty =
             (* but we found it earlier! *)
             Misc.fatal_error "Ctype.unbox_once: expected to find [p] in [env]"
         in
-        Stepped { ty = apply ty2 ~extra_substs; modality; or_null = None }
+        let under_mutable_label =
+          match decl.type_kind with
+          | Type_record_unboxed_product ([lbl], _, _) ->
+            under_mutable_label_of_step lbl
+          | Type_record_unboxed_product (([] | _ :: _ :: _), _, _) ->
+            (* [find_unboxed_type] would have returned [None] *)
+            Misc.fatal_error "Ctype.unbox_once: not just one label"
+          | Type_abstract _ | Type_record _ | Type_variant _ | Type_open ->
+            (* [verify_unboxed_attr] rejects mutable labels in [@@unboxed]
+               records and constructors *)
+            None
+        in
+        Stepped
+          { ty = apply ty2 ~extra_substs; modality; under_mutable_label;
+            or_null = None }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], _, _) ->
           (* [find_unboxed_type] would have returned [Some] *)
@@ -3003,9 +3040,11 @@ let unbox_once env ty =
         | Type_record_unboxed_product
             ((_::_::_ as lbls), _, _) ->
           Stepped_record_unboxed_product
-            (List.map (fun ld -> { ty = apply ld.ld_type ~extra_substs:[];
-                                   modality = ld.ld_modalities;
-                                   or_null = None }) lbls)
+            (List.map (fun ld ->
+                 { ty = apply ld.ld_type ~extra_substs:[];
+                   modality = ld.ld_modalities;
+                   under_mutable_label = under_mutable_label_of_step ld;
+                   or_null = None }) lbls)
         | Type_record_unboxed_product ([], _, _) ->
           Misc.fatal_error "Ctype.unboxed_once: fieldless record"
         | Type_variant (cstrs, Variant_with_null, _) ->
@@ -3022,6 +3061,7 @@ let unbox_once env ty =
             Stepped
               { ty = apply ca_type ~extra_substs;
                 modality;
+                under_mutable_label = None;
                 or_null = Some { decl; args; prev = ty } }
           | None ->
             Misc.fatal_error "Invalid constructor for Variant_with_null"
@@ -3035,9 +3075,9 @@ let unbox_once env ty =
     Stepped
       { ty = instance_poly_for_jkind univars ty
       ; modality = Mode.Modality.Const.id
+      ; under_mutable_label = None
       ; or_null = None }
-  | Tmod (ty, _) ->
-    Stepped { ty; modality = Mode.Modality.Const.id; or_null = None }
+  | Tmod (ty, _) -> Stepped (mk_unwrapped_type_expr ty)
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -3093,7 +3133,8 @@ let contained_without_boxing env ty =
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
-let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
+let rec get_unboxed_type_representation ~modality ~under_mutable_label ~or_null
+    env ty_prev ty fuel =
   match get_desc ty with
   | Tmod (ty, _) ->
     (* Mode bounds do not affect the runtime representation, so [Tmod]
@@ -3102,31 +3143,50 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
        it may not become [ty_prev] (the missing-cmi fallback, whose kind could
        then only be estimated as [any]), and representation-oriented consumers
        such as [Typeopt.classify] expect never to see one. *)
-    get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel
+    get_unboxed_type_representation ~modality ~under_mutable_label ~or_null env
+      ty_prev ty fuel
   | _ ->
-  if fuel < 0 then Error { ty; modality; or_null }
+  if fuel < 0 then Error { ty; modality; under_mutable_label; or_null }
   else
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
-    match unbox_once env { ty; modality; or_null } with
-    | Stepped { ty = ty2; modality = modality2; or_null = or_null2 } ->
+    match unbox_once env { ty; modality; under_mutable_label; or_null } with
+    | Stepped { ty = ty2; modality = modality2;
+                under_mutable_label = under_mutable_label2;
+                or_null = or_null2 } ->
+      (* Only the outermost mutable label matters: see the comment on
+         [under_mutable_label] in ctype.mli. [under_mutable_label2] is
+         relative to this step, so we place it below the modality accumulated
+         so far, but not below this step's own [modality2], which only
+         applies to the label's contents. *)
+      (* CR zeisbach: maybe extract into a helper? *)
+      let under_mutable_label =
+        match under_mutable_label with
+        | Some _ -> under_mutable_label
+        | None ->
+          Option.map
+            (fun modality_above ->
+               Mode.Modality.Const.concat modality ~then_:modality_above)
+            under_mutable_label2
+      in
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
       begin match or_null, or_null2 with
       | None, or_null | or_null, None ->
-        get_unboxed_type_representation ~modality ~or_null env ty ty2 (fuel - 1)
+        get_unboxed_type_representation ~modality ~under_mutable_label
+          ~or_null env ty ty2 (fuel - 1)
       | Some _, Some _ ->
         (* Nested or-nulls are possible as a result of [Typecore.type_approx] *)
-        Ok { ty = ty_prev; modality; or_null }
+        Ok { ty = ty_prev; modality; under_mutable_label; or_null }
       end
     | Stepped_record_unboxed_product _ | Final_result ->
-      Ok { ty; modality; or_null }
-    | Missing _ -> Ok { ty = ty_prev; modality; or_null }
+      Ok { ty; modality; under_mutable_label; or_null }
+    | Missing _ -> Ok { ty = ty_prev; modality; under_mutable_label; or_null }
 
 let get_unboxed_type_representation env ty =
   (* Do not give too much fuel: PR#7424 *)
   get_unboxed_type_representation ~modality:Mode.Modality.Const.id
-    ~or_null:None env ty ty 100
+    ~under_mutable_label:None ~or_null:None env ty ty 100
 
 let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
@@ -3189,7 +3249,7 @@ let apply_layout_wrapping_l ~env
     Ok (get_layout jkind)
 
 let apply_jkind_wrapping_l ~env ~level
-          ~unwrapped_ty:{ ty; or_null; modality } jkind =
+          ~unwrapped_ty:{ ty; or_null; modality; under_mutable_label } jkind =
   begin
     match or_null with
     | Some { decl; args; _ } ->
@@ -3198,7 +3258,7 @@ let apply_jkind_wrapping_l ~env ~level
          for the wrapper that was unwrapped. *)
       begin match
         apply_layout_wrapping_l ~env
-          ~unwrapped_ty:{ ty; modality; or_null } jkind
+          ~unwrapped_ty:{ ty; modality; under_mutable_label; or_null } jkind
       with
       | Ok layout ->
         let instance_jkind =
@@ -3209,12 +3269,20 @@ let apply_jkind_wrapping_l ~env ~level
       end
     | None -> Ok jkind
   end
-  |> Result.map (Jkind.apply_modality_l modality)
+  |> Result.map (fun jkind ->
+    Jkind.apply_modality_l modality jkind
+    |> Jkind.add_mod_bounds (mutable_label_bounds under_mutable_label))
 
-let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
-      jkind =
+(* [unwrapped_ty] is the result of a single step, and [jkind] has already
+   been adjusted for the modalities above that step, so the step-relative
+   [under_mutable_label] is all we need. *)
+let apply_jkind_wrapping_r ~env
+      ~unwrapped_ty:{ ty = _; modality; under_mutable_label; or_null } jkind =
   begin
-    if Option.is_some or_null then
+    if not (Axis_lattice.leq (mutable_label_bounds under_mutable_label)
+              (Jkind0.Mod_bounds.to_axis_lattice jkind.jkind.mod_bounds))
+    then Error ()
+    else if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
          [assert false]. But we don't have a principled reason why (one likely
          exists by thinking sufficiently hard about the sole callsite in
@@ -3251,7 +3319,9 @@ let rec compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
       unwrapped_ty.ty
   in
   match apply_layout_wrapping_l ~env ~unwrapped_ty jkind with
-  | Ok layout -> (unwrapped_ty.ty, unwrapped_ty.modality), layout
+  | Ok layout ->
+    (unwrapped_ty.ty, unwrapped_ty.modality), layout,
+    mutable_label_bounds unwrapped_ty.under_mutable_label
   | Error prev_unwrapped_ty ->
     compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
       prev_unwrapped_ty
@@ -3290,6 +3360,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
           let tys = Array.map snd label_params_and_tys |> Array.to_list in
           estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
             env tys ~why:Jkind_intf.History.Unboxed_record
+          |> Jkind.add_mod_bounds (Jkind.unboxed_record_mutability lbls)
         | _ -> type_decl.type_jkind
       in
       (* Checking [has_with_bounds] here is needed for correctness, because
@@ -3365,15 +3436,19 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 and estimate_unboxed_product_jkind
       ~expand_components ~ignore_mod_bounds ~why env tys =
-  let tys_modalities, layouts =
-    List.map
-      (fun ty ->
-         compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
-           (maybe_expand_component env ty ~expand_components))
-      tys
-    |> List.split
+  let tys_modalities, layouts, mutable_bounds =
+    List.fold_right
+      (fun ty (tys_modalities, layouts, mutable_bounds) ->
+         let ty_modality, layout, ty_mutable_bounds =
+           compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
+             (maybe_expand_component env ty ~expand_components)
+         in
+         ty_modality :: tys_modalities, layout :: layouts,
+         Axis_lattice.join mutable_bounds ty_mutable_bounds)
+      tys ([], [], Axis_lattice.bot)
   in
   Jkind.Builtin.product ~why tys_modalities layouts
+  |> Jkind.add_mod_bounds mutable_bounds
 
 let rec estimate_type_jkind_unwrapped
       level ~expand_components env ~unwrapped_ty =
@@ -3665,9 +3740,17 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                    | Some layouts ->
                      (* This [why] might be wrong but we're about to correct
                         it *)
+                     let mutable_bounds =
+                       List.fold_left
+                         (fun acc { under_mutable_label; _ } ->
+                            Axis_lattice.join acc
+                              (mutable_label_bounds under_mutable_label))
+                         Axis_lattice.bot unwrapped_tys
+                     in
                      let jkind =
                        Jkind.Builtin.product ~why:Unboxed_record
                          tys_and_modalities layouts
+                       |> Jkind.add_mod_bounds mutable_bounds
                      in
                      (* This is a bit gross but we don't want to lose history *)
                      { jkind with history = ty's_jkind.history }
@@ -3753,10 +3836,15 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                                            sub_failure_reasons)))
                | Final_result ->
                  Error error
-               | Stepped { ty; modality; or_null = None } ->
-                 let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
-                    jkind
+               | Stepped ({ ty; or_null = None; _ } as unwrapped_ty) ->
+                 begin match
+                   apply_jkind_wrapping_r ~env ~unwrapped_ty jkind
+                 with
+                 | Ok jkind ->
+                   estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env
+                     ty jkind
+                 | Error () -> Error error
+                 end
                | Stepped { ty; modality; or_null = Some _ } ->
                  or_null ~fuel:(fuel - 1) ty modality
                | Stepped_record_unboxed_product unwrapped_tys ->
@@ -9023,11 +9111,14 @@ let check_decl_jkind env decl jkind =
        (not rule FIND_ABBREV, as documented with [Jkind.for_abbreviation]), but
        they should be fine here. This will all get fixed up later with the
        above CRs. *)
+    | Type_record_unboxed_product ([{ ld_type = inner_ty;
+                                      ld_modalities = modality;
+                                      ld_mutable }], _, None), _ ->
+      Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
+      |> Jkind.add_mod_bounds (Jkind.unboxed_label_mutability ld_mutable)
     | Type_record (
         [{ ld_type = inner_ty; ld_modalities = modality }],
         Record_unboxed, None), _
-    | Type_record_unboxed_product ([{ ld_type = inner_ty;
-                                      ld_modalities = modality }], _, None), _
     | Type_variant (
         [{ cd_args =
              (Cstr_tuple [{ ca_type = inner_ty;

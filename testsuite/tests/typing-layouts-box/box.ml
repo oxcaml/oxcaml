@@ -655,7 +655,7 @@ Error: The constant "42l" has type "int32" but an expression was expected of typ
          "'a box"
 |}]
 
-(* Test 26: Subtyping with polymorphic variants and box *)
+(* Test 26: Subtyping through [box]: it is covariant *)
 
 type ab = [ `A | `B ]
 type a  = [ `A ];;
@@ -664,17 +664,16 @@ type ab = [ `A | `B ]
 type a = [ `A ]
 |}]
 
-let coerce_box (x : a box) : ab box = (x :> ab box);;
+let widen_box (x : a box) : ab box = (x :> ab box);;
 [%%expect{|
-val coerce_box : a box -> ab box = <fun>
+val widen_box : a box -> ab box = <fun>
 |}]
 
-(* Also test the other direction fails *)
-let coerce_box_fail (x : ab box) : a box = (x :> a box);;
+let narrow_box (x : ab box) : a box = (x :> a box);;
 [%%expect{|
-Line 1, characters 43-55:
-1 | let coerce_box_fail (x : ab box) : a box = (x :> a box);;
-                                               ^^^^^^^^^^^^
+Line 1, characters 38-50:
+1 | let narrow_box (x : ab box) : a box = (x :> a box);;
+                                          ^^^^^^^^^^^^
 Error: Type "ab box" = "[ `A | `B ] box" is not a subtype of "a box" = "[ `A ] box"
        Type "ab" = "[ `A | `B ]" is not a subtype of "a" = "[ `A ]"
        The second variant type does not allow tag(s) "`B"
@@ -1546,6 +1545,16 @@ end
 module M : sig val unbox : #(int * string) -> int * string end
 |}]
 
+(* Modes under [box] in signature inclusion *)
+module M : sig
+  val f : (string -> unit) box
+end = struct
+  let f : (local_ string -> unit) box = Obj.magic ()
+end
+[%%expect{|
+module M : sig val f : (string -> unit) box end
+|}]
+
 (* Test 43: Type equality checks with [box] *)
 
 (* trivial *)
@@ -1593,4 +1602,53 @@ Lines 10-12, characters 11-4:
 12 | end)
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
+|}]
+
+(* Test 45: [box] of a mutable type's unboxed version. See oxcaml/oxcaml#7137 *)
+
+type 'a t = { mutable a : 'a }
+type +'a bad = 'a t# box;;
+[%%expect{|
+type 'a t = { mutable a : 'a; }
+Line 2, characters 0-24:
+2 | type +'a bad = 'a t# box;;
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type base = < m : int >
+type derived = < m : int; n : int >
+let leak (x : derived t# box) = (x :> base t# box);;
+[%%expect{|
+type base = < m : int >
+type derived = < m : int; n : int >
+Line 3, characters 32-50:
+3 | let leak (x : derived t# box) = (x :> base t# box);;
+                                    ^^^^^^^^^^^^^^^^^^
+Error: Type "derived t# box" = "derived t" is not a subtype of
+         "base t# box" = "base t"
+       The second object type has no method "n"
+|}]
+
+(* Test 46: [box] of an immutable type's unboxed version *)
+
+type 'a imm = { a : 'a }
+type +'a imm_box = 'a imm# box;;
+[%%expect{|
+type 'a imm = { a : 'a; }
+type 'a imm_box = 'a imm
+|}]
+
+let widen_imm (x : derived imm# box) = (x :> base imm# box);;
+[%%expect{|
+val widen_imm : derived imm -> base imm = <fun>
+|}]
+
+(* The same coercion, after reducing [imm# box] to [imm] *)
+let widen_imm_reduced (x : derived imm# box) : base imm# box =
+  ((x : derived imm) :> base imm);;
+[%%expect{|
+val widen_imm_reduced : derived imm -> base imm = <fun>
 |}]

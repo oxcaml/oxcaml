@@ -502,6 +502,18 @@ val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 val for_unboxed_record :
   (Types.label_declaration * Sort.t Layout.t) list -> Types.jkind_l
 
+(** How much a label of an unboxed record with the given mutability adds to the
+    record's kind, on top of the kind of its field. *)
+val unboxed_label_mutability : Types.mutability -> Axis_lattice.t
+
+(** The join of [unboxed_label_mutability] over the labels of an unboxed record.
+*)
+val unboxed_record_mutability : Types.label_declaration list -> Axis_lattice.t
+
+(** Join the given bounds into the mod-bounds of a jkind. *)
+val add_mod_bounds :
+  Axis_lattice.t -> ('l * 'r) Types.jkind -> ('l * 'r) Types.jkind
+
 (** Choose an appropriate jkind for a boxed variant type.
 
     [decl_params] is the parameters in the head of the type declaration.

@@ -184,14 +184,481 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Mutable fields are not allowed *)
+(* Fields can be declared mutable, which affects variance and kind, but can't
+   be mutated *)
 
-type mut = #{ mutable i : int }
+type mut = #{ mutable i : int; j : int }
 [%%expect{|
-Line 1, characters 14-29:
-1 | type mut = #{ mutable i : int }
-                  ^^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+type mut = #{ mutable i : int; j : int; }
+|}]
+
+type atomic = #{ mutable i : int [@atomic] }
+[%%expect{|
+Line 1, characters 17-42:
+1 | type atomic = #{ mutable i : int [@atomic] }
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be atomic
+|}]
+
+let set (r : mut) = r.i <- 1
+[%%expect{|
+Line 1, characters 20-21:
+1 | let set (r : mut) = r.i <- 1
+                        ^
+Error: This expression has type "mut",
+       which is an unboxed record rather than a boxed one.
+|}]
+
+type b = { f : mut }
+let idx_imm (_ : b) = (.f.#i)
+[%%expect{|
+type b = { f : mut; }
+Line 2, characters 22-29:
+2 | let idx_imm (_ : b) = (.f.#i)
+                          ^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* An index through a mutable boxed field is mutable, as it is for immutable
+   unboxed fields *)
+type c = { mutable g : mut }
+let idx_mut = (.g.#i)
+[%%expect{|
+type c = { mutable g : mut; }
+val idx_mut : (c, int) idx_mut = <abstr>
+|}]
+
+module M : sig
+  type t = #{ mutable i : int }
+end = struct
+  type t = #{ i : int }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ i : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ i : int; } end
+       is not included in
+         sig type t = #{ mutable i : int; } end
+       Type declarations do not match:
+         type t = #{ i : int; }
+       is not included in
+         type t = #{ mutable i : int; }
+       Fields do not match:
+         "i : int;"
+       is not the same as:
+         "mutable i : int;"
+       The second is mutable and the first is not.
+|}]
+
+module M : sig
+  type t = #{ i : int }
+end = struct
+  type t = #{ mutable i : int }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ mutable i : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ mutable i : int; } end
+       is not included in
+         sig type t = #{ i : int; } end
+       Type declarations do not match:
+         type t = #{ mutable i : int; }
+       is not included in
+         type t = #{ i : int; }
+       Fields do not match:
+         "mutable i : int;"
+       is not the same as:
+         "i : int;"
+       The first is mutable and the second is not.
+|}]
+
+(* Otherwise, mutable fields behave like immutable ones *)
+let project (x : mut @ contended) = match x with #{ i; _ } -> i, x.#j
+[%%expect{|
+val project : mut @ contended -> int * int = <fun>
+|}]
+
+let update (x : mut) = #{ x with i = 1 }
+[%%expect{|
+val update : mut -> mut = <fun>
+|}]
+
+type 'a mut_poly = #{ mutable l : 'a list; k : int }
+let generalized = #{ l = []; k = 0 }
+[%%expect{|
+type 'a mut_poly = #{ mutable l : 'a list; k : int; }
+val generalized : 'a mut_poly = #{l = []; k = 0}
+|}]
+
+type +'a covariant = 'a mut_poly
+[%%expect{|
+Line 1, characters 0-32:
+1 | type +'a covariant = 'a mut_poly
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type not_immutable : immutable_data & immutable_data = int mut_poly
+[%%expect{|
+Line 1, characters 0-67:
+1 | type not_immutable : immutable_data & immutable_data = int mut_poly
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "int mut_poly" is
+           mutable_data mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because of the definition of mut_poly at line 1, characters 0-52.
+       But the kind of type "int mut_poly" must be a subkind of
+           immutable_data & immutable_data
+         because of the definition of not_immutable at line 1, characters 0-67.
+|}]
+
+(* Single-field unboxed records are looked through when computing kinds, but a
+   mutable label must still prevent crossing contention and visibility *)
+type mut1 = #{ mutable x : int }
+type 'a mut1_poly = #{ mutable x : 'a }
+[%%expect{|
+type mut1 = #{ mutable x : int; }
+type 'a mut1_poly = #{ mutable x : 'a; }
+|}]
+
+let f (x : mut1) : (_ : immediate mod contended) = x
+[%%expect{|
+Line 1, characters 51-52:
+1 | let f (x : mut1) : (_ : immediate mod contended) = x
+                                                       ^
+Error: The value "x" has type "mut1" but an expression was expected of type
+         "('a : immediate)"
+       The kind of mut1 is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because of the definition of mut1 at line 1, characters 0-32.
+       But the kind of mut1 must be a subkind of immediate
+         because of the annotation on the wildcard _ at line 1, characters 19-48.
+|}]
+
+let f (x : int mut1_poly) : (_ : value mod contended) = x
+[%%expect{|
+Line 1, characters 56-57:
+1 | let f (x : int mut1_poly) : (_ : value mod contended) = x
+                                                            ^
+Error: The value "x" has type "int mut1_poly"
+       but an expression was expected of type "('a : value mod contended)"
+       The kind of int mut1_poly is
+           value mod global many stateless dynamic external_
+         because of the definition of mut1_poly at line 2, characters 0-39.
+       But the kind of int mut1_poly must be a subkind of value mod contended
+         because of the annotation on the wildcard _ at line 1, characters 28-53.
+|}, Principal{|
+Line 1, characters 56-57:
+1 | let f (x : int mut1_poly) : (_ : value mod contended) = x
+                                                            ^
+Error: The value "x" has type "int mut1_poly"
+       but an expression was expected of type "('a : value mod contended)"
+       The kind of int mut1_poly is
+           value
+             mod global many stateless dynamic external_
+             with int @@ global many dynamic
+         because of the definition of mut1_poly at line 2, characters 0-39.
+       But the kind of int mut1_poly must be a subkind of value mod contended
+         because of the annotation on the wildcard _ at line 1, characters 28-53.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+let f (x : int mut1_poly) : (_ : value mod portable) = x
+[%%expect{|
+val f : int mut1_poly -> int mut1_poly = <fun>
+|}]
+
+module M : sig type t : value mod contended end = struct
+  type t = #{ mutable x : int }
+end
+[%%expect{|
+Lines 1-3, characters 50-3:
+1 | ..................................................struct
+2 |   type t = #{ mutable x : int }
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ mutable x : int; } end
+       is not included in
+         sig type t : value mod contended end
+       Type declarations do not match:
+         type t = #{ mutable x : int; }
+       is not included in
+         type t : value mod contended
+       The kind of the first is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is the expansion of a type abbreviation.
+       But the kind of the first must be a subkind of value mod contended
+         because of the definition of t at line 1, characters 15-43.
+|}]
+
+module M : sig type t : value mod contended end = struct
+  type t = int mut1_poly
+end
+[%%expect{|
+Lines 1-3, characters 50-3:
+1 | ..................................................struct
+2 |   type t = int mut1_poly
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = int mut1_poly end
+       is not included in
+         sig type t : value mod contended end
+       Type declarations do not match:
+         type t = int mut1_poly
+       is not included in
+         type t : value mod contended
+       The kind of the first is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is the primitive type int.
+       But the kind of the first must be a subkind of value mod contended
+         because of the definition of t at line 1, characters 15-43.
+|}]
+
+type nested = #{ n : int mut1_poly }
+let f (x : nested) : (_ : value mod contended) = x
+[%%expect{|
+type nested = #{ n : int mut1_poly; }
+Line 2, characters 49-50:
+2 | let f (x : nested) : (_ : value mod contended) = x
+                                                     ^
+Error: The value "x" has type "nested" but an expression was expected of type
+         "('a : value mod contended)"
+       The kind of nested is
+           value mod global many stateless dynamic external_
+         because of the definition of mut1_poly at line 2, characters 0-39.
+       But the kind of nested must be a subkind of value mod contended
+         because of the annotation on the wildcard _ at line 2, characters 21-46.
+|}]
+
+let f (x : #(int mut1_poly * int))
+  : (_ : value mod contended & value mod contended) = x
+[%%expect{|
+Line 2, characters 54-55:
+2 |   : (_ : value mod contended & value mod contended) = x
+                                                          ^
+Error: The value "x" has type "#(int mut1_poly * int)"
+       but an expression was expected of type
+         "('a : value mod contended & value mod contended)"
+       The kind of #(int mut1_poly * int) is
+           mutable_data non_pointer mod global unforkable yielding
+           & mutable_data non_pointer mod global unforkable yielding
+         because it is an unboxed tuple.
+       But the kind of #(int mut1_poly * int) must be a subkind of
+           value mod contended & value mod contended
+         because of the annotation on the wildcard _ at line 2, characters 4-51.
+|}, Principal{|
+Line 2, characters 54-55:
+2 |   : (_ : value mod contended & value mod contended) = x
+                                                          ^
+Error: The value "x" has type "#(int mut1_poly * int)"
+       but an expression was expected of type
+         "('a : value mod contended & value mod contended)"
+       The kind of #(int mut1_poly * int) is
+           immediate mod dynamic with int with int mut1_poly
+           & immediate mod dynamic with int with int mut1_poly
+         because it is an unboxed tuple.
+       But the kind of #(int mut1_poly * int) must be a subkind of
+           value mod contended & value mod contended
+         because of the annotation on the wildcard _ at line 2, characters 4-51.
+|}]
+
+type ('a : any) mut1_any = #{ mutable x : 'a }
+let f (x : float# mut1_any) : (_ : float64) = x
+[%%expect{|
+type ('a : any) mut1_any = #{ mutable x : 'a; }
+val f : float# mut1_any -> float# mut1_any = <fun>
+|}]
+
+let f (x : float# mut1_any) : (_ : float64 mod contended) = x
+[%%expect{|
+Line 1, characters 60-61:
+1 | let f (x : float# mut1_any) : (_ : float64 mod contended) = x
+                                                                ^
+Error: The value "x" has type "float# mut1_any"
+       but an expression was expected of type "('a : float64 mod contended)"
+       The layout of float# mut1_any is any
+         because of the definition of mut1_any at line 1, characters 0-46.
+       But the layout of float# mut1_any must be a sublayout of float64
+         because of the annotation on the wildcard _ at line 1, characters 30-57.
+|}]
+
+(* A [contended] modality above a mutable label hides its mutability *)
+type masked = #{ m : int mut1_poly @@ contended }
+let f (x : masked) : (_ : value mod contended) = x
+[%%expect{|
+type masked = #{ m : int mut1_poly @@ contended; }
+val f : masked -> masked = <fun>
+|}]
+
+module M : sig type t : value mod contended end = struct type t = masked end
+[%%expect{|
+module M : sig type t : value mod contended end
+|}]
+
+(* ...but one below it does not *)
+type contended_int = #{ c : int @@ contended }
+type unmasked = #{ mutable u : contended_int }
+let f (x : unmasked) : (_ : value mod contended) = x
+[%%expect{|
+type contended_int = #{ c : int @@ contended; }
+type unmasked = #{ mutable u : contended_int; }
+Line 3, characters 51-52:
+3 | let f (x : unmasked) : (_ : value mod contended) = x
+                                                       ^
+Error: The value "x" has type "unmasked" but an expression was expected of type
+         "('a : value mod contended)"
+       The kind of unmasked is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because of the definition of unmasked at line 2, characters 0-46.
+       But the kind of unmasked must be a subkind of value mod contended
+         because of the annotation on the wildcard _ at line 3, characters 23-48.
+|}]
+
+module M : sig type t : value mod contended end = struct type t = unmasked end
+[%%expect{|
+Line 1, characters 50-78:
+1 | module M : sig type t : value mod contended end = struct type t = unmasked end
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = unmasked end
+       is not included in
+         sig type t : value mod contended end
+       Type declarations do not match:
+         type t = unmasked
+       is not included in
+         type t : value mod contended
+       The kind of the first is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is the primitive type int.
+       But the kind of the first must be a subkind of value mod contended
+         because of the definition of t at line 1, characters 15-43.
+|}]
+
+(* A [shared] modality above a mutable label hides its mutability only partly:
+   [shared_masked] crosses contention from shared, but not from contended *)
+type shared_masked = #{ sm : int mut1_poly @@ shared }
+let use_uncontended (_ : 'a @ uncontended) = ()
+let f (x : shared_masked @ shared) = use_uncontended x
+[%%expect{|
+type shared_masked = #{ sm : int mut1_poly @@ shared; }
+val use_uncontended : 'a -> unit = <fun>
+val f : shared_masked @ shared -> unit = <fun>
+|}]
+
+let f (x : shared_masked @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 56-57:
+1 | let f (x : shared_masked @ contended) = use_uncontended x
+                                                            ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "uncontended".
+|}]
+
+module M : sig type t : value mod shared end = struct
+  type t = shared_masked
+end
+[%%expect{|
+module M : sig type t : value mod shared end
+|}]
+
+module M : sig type t : value mod contended end = struct
+  type t = shared_masked
+end
+[%%expect{|
+Lines 1-3, characters 50-3:
+1 | ..................................................struct
+2 |   type t = shared_masked
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = shared_masked end
+       is not included in
+         sig type t : value mod contended end
+       Type declarations do not match:
+         type t = shared_masked
+       is not included in
+         type t : value mod contended
+       The kind of the first is
+           mutable_data non_pointer
+             mod global shared dynamic unforkable yielding
+         because it is the primitive type int.
+       But the kind of the first must be a subkind of value mod contended
+         because of the definition of t at line 1, characters 15-43.
+|}]
+
+(* Only the outermost mutable label matters: [a] isn't below the [contended]
+   modality, so it still stops [two_mutable] from crossing contention *)
+type two_mutable = #{ mutable a : int mut1_poly @@ contended }
+module M : sig type t : value mod contended end = struct
+  type t = two_mutable
+end
+[%%expect{|
+type two_mutable = #{ mutable a : int mut1_poly @@ contended; }
+Lines 2-4, characters 50-3:
+2 | ..................................................struct
+3 |   type t = two_mutable
+4 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = two_mutable end
+       is not included in
+         sig type t : value mod contended end
+       Type declarations do not match:
+         type t = two_mutable
+       is not included in
+         type t : value mod contended
+       The kind of the first is
+           mutable_data non_pointer mod global dynamic unforkable yielding
+         because it is the primitive type int.
+       But the kind of the first must be a subkind of value mod contended
+         because of the definition of t at line 2, characters 15-43.
+|}]
+
+(* Looking through still refines the layout *)
+let f (x : int mut1_poly) : (_ : value non_pointer) = x
+[%%expect{|
+val f : int mut1_poly -> int mut1_poly = <fun>
+|}]
+
+type ('a : value non_pointer) require_non_pointer
+type t = int mut1_poly require_non_pointer
+[%%expect{|
+type ('a : value non_pointer) require_non_pointer
+type t = int mut1_poly require_non_pointer
+|}]
+
+(* Including for the kind of a type abbreviation *)
+module M : sig type t : value non_pointer end = struct
+  type t = int mut1_poly
+end
+[%%expect{|
+module M : sig type t : value non_pointer end
+|}]
+
+(* No "never mutated" warning, as unboxed record fields can't be mutated *)
+module M : sig end = struct
+  type t = #{ mutable read : int }
+  let read t = t.#read
+end [@warning "+69"]
+[%%expect{|
+module M : sig end
 |}]
 
 (*********************************)

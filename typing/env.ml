@@ -132,6 +132,14 @@ let label_usage_complaint priv mut lu
       | true, false, _ -> Some Not_mutated
     end
 
+(* Unboxed record labels can't be mutated, so don't complain that a [mutable]
+   one never is. *)
+let label_usage_mutability (type rep) (record_form : rep record_form)
+    (lbl : rep gen_label_description) : Types.mutability =
+  match record_form with
+  | Legacy -> lbl.lbl_mut
+  | Unboxed_product -> Immutable
+
 let used_labels : label_usage usage_tbl ref =
   s_table Types.Uid.Tbl.create 16
 
@@ -2691,7 +2699,7 @@ and store_label
     let priv = type_decl.type_private in
     let name = lbl.lbl_name in
     let loc = lbl.lbl_loc in
-    let mut = lbl.lbl_mut in
+    let mut = label_usage_mutability record_form lbl in
     let k = lbl.lbl_uid in
     match k with
     | Unboxed_version k_boxed ->
