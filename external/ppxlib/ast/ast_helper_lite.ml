@@ -519,6 +519,7 @@ module Type = struct
         name typ =
     {
       pld_name = name;
+      pld_inherit = Not_inherited;
       pld_mutable = mut;
       pld_modalities = [];
       pld_type = typ;

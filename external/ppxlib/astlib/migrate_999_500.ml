@@ -1611,6 +1611,7 @@ and copy_label_declaration :
     Ast_999.Parsetree.label_declaration -> Ast_500.Parsetree.label_declaration =
  fun {
        Ast_999.Parsetree.pld_name;
+       Ast_999.Parsetree.pld_inherit;
        Ast_999.Parsetree.pld_mutable;
        Ast_999.Parsetree.pld_modalities;
        Ast_999.Parsetree.pld_type;
@@ -1619,6 +1620,7 @@ and copy_label_declaration :
      } ->
   {
     Ast_500.Parsetree.pld_name = copy_loc (fun x -> x) pld_name;
+    Ast_500.Parsetree.pld_inherit = copy_inherit_flag pld_inherit;
     Ast_500.Parsetree.pld_mutable = copy_mutable_flag pld_mutable;
     Ast_500.Parsetree.pld_modalities = copy_modalities pld_modalities;
     Ast_500.Parsetree.pld_type = copy_core_type pld_type;
@@ -1630,6 +1632,11 @@ and copy_mutable_flag :
     Ast_999.Asttypes.mutable_flag -> Ast_500.Asttypes.mutable_flag = function
   | Ast_999.Asttypes.Immutable -> Ast_500.Asttypes.Immutable
   | Ast_999.Asttypes.Mutable -> Ast_500.Asttypes.Mutable
+
+and copy_inherit_flag :
+    Ast_999.Asttypes.inherit_flag -> Ast_500.Asttypes.inherit_flag = function
+  | Ast_999.Asttypes.Not_inherited -> Ast_500.Asttypes.Not_inherited
+  | Ast_999.Asttypes.Inherited -> Ast_500.Asttypes.Inherited
 
 and copy_access_flag :
     Ast_999.Asttypes.access_flag -> Ast_500.Asttypes.access_flag = function
