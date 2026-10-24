@@ -1103,6 +1103,7 @@ val indirect_call :
   expression ->
   Extended_machtype.t list ->
   expression list ->
+  callees:callee list option ->
   expression
 
 (** Same as {!direct_call} but for an indirect call that is know to be a full
@@ -1112,7 +1113,7 @@ val indirect_full_call :
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
-  callees:symbol list option ->
+  callees:callee list option ->
   Extended_machtype.t list ->
   expression list ->
   expression
