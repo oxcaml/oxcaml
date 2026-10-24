@@ -389,13 +389,18 @@ tail_call:
         CAMLassert(infix_offset == 0);
         CAMLassert(sz == 2 || sz == 3);
         struct stack_info* stk = Ptr_val(field0);
-        Field(result, 0) = field0;
-        Field(result, 1) = Field(v, 1);
+        Field(result, 0) = field0;        /* Cont_fiber */
+        Field(result, 1) = Field(v, 1);   /* Cont_last_fiber */
         if (sz == 3) {
-          Field(result, 2) = Field(v, 2);
+          Field(result, 2) = Field(v, 2); /* Cont_gc_regs */
           gc_regs = (value *)(Field(result, 2));
         }
         if (stk != NULL) {
+#ifdef STACK_GUARD_PAGES
+          /* The continuation is moving to the major heap: idle its
+             stacks, recycling their guarded stacks. */
+          stk = caml_cont_idle_stacks_from_stw(result);
+#endif
           caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
                           stk, gc_regs);
         }
@@ -616,6 +621,12 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   st.domain_alone = caml_domain_alone();
   st.status = caml_allocation_status();
   st.fast_data = caml_shared_fast_data(domain->shared_heap);
+
+#ifdef STACK_GUARD_PAGES
+  /* Stacks still in the local caches have gone a whole minor cycle
+     without reuse: demote them to the global cache. */
+  caml_stack_cache_flush_from_stw();
+#endif
 
   prev_alloc_words = domain->allocated_words;
 
