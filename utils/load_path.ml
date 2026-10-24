@@ -65,16 +65,17 @@ module Dune_manifests_reader : sig
       val root_override : string option ref
     end
 
-    module Load_root_relative : sig
-      type t
-
-      val of_string : string -> t
-    end
-
     module Cwd_relative : sig
       type t
 
       val to_string : t -> string
+    end
+
+    module Load_root_relative : sig
+      type t
+
+      val of_string : string -> t
+      val to_cwd_relative : t -> Cwd_relative.t
     end
   end
 
@@ -564,6 +565,18 @@ let init ~auto_include ~visible ~hidden =
   hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
   Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
     List.iter Path_cache.prepend_add !hidden_dirs);
+  Profile.record_call ~accumulate:true "load_hidden_files" (fun () ->
+    List.iter
+      (fun ({ visible_path; actual_path; cmx_guaranteed }
+             : Clflags.hidden_include_file) ->
+        let actual_path =
+          Dune_manifests_reader.Path.Load_root_relative.of_string actual_path
+          |> Dune_manifests_reader.Path.Load_root_relative.to_cwd_relative
+          |> Dune_manifests_reader.Path.Cwd_relative.to_string
+        in
+        Path_cache.prepend_add_single ~hidden:true ~cmx_guaranteed
+          (Filename.basename visible_path) actual_path)
+      !Clflags.hidden_include_files);
   Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
     List.iter Path_cache.prepend_add !visible_dirs);
   init_manifests ();
