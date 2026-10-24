@@ -511,6 +511,13 @@ and apply_cont0 ~env ~res apply_cont =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
   let continuation = Apply_cont.continuation apply_cont in
+  (* The return continuation of a function does not always have sort [Return]:
+     for example, [Closure_conversion.make_unboxed_function_wrapper] creates it
+     with [Continuation.create ()] and jumps to it with an [Apply_cont] after
+     boxing the result. *)
+  let is_return_continuation =
+    Continuation.equal continuation (To_jsir_env.return_continuation env)
+  in
   let get_last ~raise_kind_and_exn_handler : Jsir.last * To_jsir_result.t =
     match Continuation.sort continuation with
     | (Toplevel_return | Define_root_symbol) as sort ->
@@ -546,7 +553,7 @@ and apply_cont0 ~env ~res apply_cont =
                    ] ) ))
       in
       Stop, res
-    | Return ->
+    | (Return | Normal_or_exn) when is_return_continuation ->
       let arg, res =
         match args with
         | [arg] -> arg, res
@@ -564,6 +571,11 @@ and apply_cont0 ~env ~res apply_cont =
           arg, To_jsir_result.add_instr_exn res (Let (arg, block))
       in
       Return arg, res
+    | Return ->
+      Misc.fatal_errorf
+        "Apply_cont to %a, which has sort [Return] but is not the return \
+         continuation of the function being translated"
+        Continuation.print continuation
     | Normal_or_exn -> (
       match raise_kind_and_exn_handler with
       | None ->
