@@ -55,10 +55,11 @@ let create_let_prim ~env ~res fvar prim =
 
 (** Apply the function pointed to by the variable in [f] with [args], bind the
     return value to a variable, and return the variable and the result. *)
-let apply_fn ~res ~f ~args ~exact =
-  (* CR-soon selee: carry the unyielding information from Flambda 2 through to
-     JSIR rather than always using the sound default. *)
-  let apply : Jsir.expr = Apply { f; args; exact; yielding = May_yield } in
+let apply_fn ~res ~f ~args ~exact ~(yielding : Apply_expr.Yielding.t) =
+  let yielding : Jsir.yielding_kind =
+    match yielding with May_yield -> May_yield | Unyielding -> Unyielding
+  in
+  let apply : Jsir.expr = Apply { f; args; exact; yielding } in
   let var = Jsir.Var.fresh () in
   let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
   var, res
@@ -342,6 +343,7 @@ and apply_expr ~env ~res e =
       extra_args
   in
   let args = Apply_expr.args e in
+  let yielding = Apply_expr.yielding e in
   let return_var, res =
     match Apply_expr.callee e, Apply_expr.call_kind e with
     | Some _, Effect _ ->
@@ -359,14 +361,14 @@ and apply_expr ~env ~res e =
       (* Setting [exact = false] here is ok - it's more general, and the JSOO
          simplifier also knows how to change this to [true] if it knows that the
          argument numbers match up *)
-      apply_fn ~res ~f ~args ~exact:false
+      apply_fn ~res ~f ~args ~exact:false ~yielding
     | None, Function { function_call = Direct code_id } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
       let ({ closure; addr = _; params = _; closure_bound_with_code = _ }
             : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
-      apply_fn ~res ~f:closure ~args ~exact:false
+      apply_fn ~res ~f:closure ~args ~exact:false ~yielding
     | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
@@ -459,7 +461,7 @@ and apply_expr ~env ~res e =
           Misc.fatal_errorf "Found cached method invocation for Apply_expr %a"
             Apply_expr.print e
       in
-      apply_fn ~res ~f ~args:(obj :: args) ~exact:false
+      apply_fn ~res ~f ~args:(obj :: args) ~exact:false ~yielding
     | Some callee, C_call _ ->
       let symbol =
         match Simple.must_be_symbol callee with
