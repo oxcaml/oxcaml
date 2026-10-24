@@ -46,10 +46,10 @@ let name_type_params_in_td_res (td : type_declaration) :
   in
   let name_param i (tp, variance) =
     (match tp.ptyp_desc with
-      | Ptyp_any -> Ok (Ptyp_var (gen_symbol ~prefix:(prefix_string i) ()))
-      | Ptyp_var _ as v -> Ok v
-      | _ ->
-          Error (Location.Error.createf ~loc:tp.ptyp_loc "not a type parameter"))
+    | Ptyp_any jkind -> Ok (Ptyp_var (gen_symbol ~prefix:(prefix_string i) (), jkind))
+    | Ptyp_var _ as v -> Ok v
+    | _ ->
+        Error (Location.Error.createf ~loc:tp.ptyp_loc "not a type parameter"))
     >>| fun ptyp_desc -> ({ tp with ptyp_desc }, variance)
   in
   let ptype_params, errors =
@@ -85,7 +85,7 @@ let string_of_core_type ct =
 let get_type_param_name_res (ty, _) =
   let loc = ty.ptyp_loc in
   match ty.ptyp_desc with
-  | Ptyp_var name -> Ok (Located.mk ~loc name)
+  | Ptyp_var (name, _) -> Ok (Located.mk ~loc name)
   | _ -> Error (Location.Error.createf ~loc "not a type parameter", [])
 
 let get_type_param_name t =
@@ -112,7 +112,7 @@ class type_is_recursive rec_flag tds =
     method! constructor_declaration cd =
       (* Don't recurse through cd.pcd_res *)
       match cd.pcd_args with
-      | Pcstr_tuple args -> List.iter args ~f:self#core_type
+      | Pcstr_tuple args -> List.iter args ~f:self#constructor_argument
       | Pcstr_record fields -> List.iter fields ~f:self#label_declaration
 
     method! attributes _ =
@@ -135,8 +135,7 @@ let loc_of_name_and_payload name payload =
   match payload with
   | PStr [] -> name.loc
   | PStr (x :: l) -> { x.pstr_loc with loc_end = (last x l).pstr_loc.loc_end }
-  | PSig [] -> name.loc
-  | PSig (x :: l) -> { x.psig_loc with loc_end = (last x l).psig_loc.loc_end }
+  | PSig t -> t.psg_loc
   | PTyp t -> t.ptyp_loc
   | PPat (x, None) -> x.ppat_loc
   | PPat (x, Some e) -> { x.ppat_loc with loc_end = e.pexp_loc.loc_end }
@@ -211,7 +210,7 @@ let attribute_of_warning loc s =
 let is_polymorphic_variant =
   let rec check = function
     | { ptyp_desc = Ptyp_variant _; _ } -> `Definitely
-    | { ptyp_desc = Ptyp_alias (typ, _); _ } -> check typ
+    | { ptyp_desc = Ptyp_alias (typ, _, _); _ } -> check typ
     | { ptyp_desc = Ptyp_constr _; _ } -> `Maybe
     | _ -> `Surely_not
     (* Type vars go here even though they could be polymorphic
@@ -220,11 +219,22 @@ let is_polymorphic_variant =
   in
   fun td ~sig_ ->
     match td.ptype_kind with
-    | Ptype_variant _ | Ptype_record _ | Ptype_open -> `Surely_not
+    | Ptype_variant _ | Ptype_record _ | Ptype_record_unboxed_product _ | Ptype_open -> `Surely_not
     | Ptype_abstract -> (
         match td.ptype_manifest with
         | None -> if sig_ then `Maybe else `Surely_not
         | Some typ -> check typ)
+
+let parameter_may_be_non_value params =
+  List.exists params ~f:(fun (ty, _) ->
+      match ty.ptyp_desc with
+      | Ptyp_var (_, Some jkind) -> begin
+         match jkind.pjka_desc with
+         | Pjk_default
+         | Pjk_abbreviation { txt = Lident "value"; _ } -> false
+         | _ -> true
+        end
+      | _ -> false)
 
 let mk_named_sig ~loc ~sg_name ~handle_polymorphic_variant = function
   | [ td ]
@@ -236,6 +246,7 @@ let mk_named_sig ~loc ~sg_name ~handle_polymorphic_variant = function
       else
         let arity = List.length td.ptype_params in
         if arity >= 4 then None
+        else if parameter_may_be_non_value td.ptype_params then None
         else
           let mty =
             if arity = 0 then sg_name else Printf.sprintf "%s%d" sg_name arity

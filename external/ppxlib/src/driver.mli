@@ -80,7 +80,7 @@ val register_transformation :
   ?extensions:Extension.t list (* deprecated, use ~rules instead *) ->
   ?rules:Context_free.Rule.t list ->
   ?enclose_impl:(Location.t option -> structure * structure) ->
-  ?enclose_intf:(Location.t option -> signature * signature) ->
+  ?enclose_intf:(Location.t option -> signature_item list * signature_item list) ->
   ?impl:(structure -> structure) ->
   ?intf:(signature -> signature) ->
   ?lint_impl:(structure -> Lint_error.t list) ->
@@ -173,7 +173,7 @@ module V2 : sig
     ?enclose_impl:
       (Expansion_context.Base.t -> Location.t option -> structure * structure) ->
     ?enclose_intf:
-      (Expansion_context.Base.t -> Location.t option -> signature * signature) ->
+      (Expansion_context.Base.t -> Location.t option -> signature_item list * signature_item list) ->
     ?impl:(Expansion_context.Base.t -> structure -> structure) ->
     ?intf:(Expansion_context.Base.t -> signature -> signature) ->
     ?lint_impl:(Expansion_context.Base.t -> structure -> Lint_error.t list) ->
@@ -217,11 +217,14 @@ end
 
     In the future we could also use this to directly compute the dependencies
     and pass them here, to avoid calling ocamldep separately. *)
-module Create_file_property
-    (Name : sig
-      val name : string
-    end)
-    (T : Sexpable.S) : sig
+module Create_file_property (Name : sig
+  val name : string
+end)
+    (T : sig
+       type t
+
+       include Sexpable.S with type t := t
+    end) : sig
   val set : T.t -> unit
 end
 [@@ocaml.warning "-67"]
@@ -239,6 +242,9 @@ val pretty : unit -> bool
 (** If [true], code transformations should avoid generating code that is not
     strictly necessary, such as extra type annotations. *)
 
+val as_merlin : unit -> bool
+(** If [true], then the PPX is being run by Merlin. *)
+
 (**/**)
 
 val map_structure : structure -> structure
@@ -247,6 +253,10 @@ val enable_checks : unit -> unit
 val enable_location_check : unit -> unit
 val disable_location_check : unit -> unit
 
+(** Passes additional flags to the driver to process as if they'd been passed on the
+    command line. This can be used to programmatically parse PPX flags when using the
+    driver as a library (e.g., in toplevel_expect_test). *)
+val parse_additional_flags : prog:string -> flags:string list -> unit
 val load_input :
   kind:Utils.Kind.t ->
   input_name:string ->
