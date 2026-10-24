@@ -629,12 +629,13 @@ and core_type1 ctxt f x =
           | _ -> false in
         let type_variant_helper f x =
           match x.prf_desc with
-          | Rtag (l, _, ctl) ->
+          | Rtag (l, const, ctl) ->
               pp f "@[<2>%a%a@;%a@]" (iter_loc string_quot) l
                 (fun f l -> match l with
                    |[] -> ()
-                   | _ -> pp f "@;of@;%a"
-                            (list (core_type ctxt) ~sep:"&")  ctl) ctl
+                   | _ -> pp f "@;of@;%a%a"
+                            (fun f const -> if const then pp f "&@;") const
+                            (list (core_type ctxt) ~sep:"@;&@;")  ctl) ctl
                 (attributes ctxt) x.prf_attributes
           | Rinherit ct -> core_type ctxt f ct in
         pp f "@[<2>[%a%a]@]"
@@ -720,7 +721,14 @@ and return_type ctxt f (x, m) =
   let is_curry, ptyp_attributes = split_out_curry_attr x.ptyp_attributes in
   let x = {x with ptyp_attributes} in
   if is_curry then core_type1_with_optional_modes core_type1 ctxt f (x, m)
-  else core_type1_with_optional_modes core_type ctxt f (x, m)
+  else
+    (* [a -> b as 'c] is [(a -> b) as 'c] *)
+    let print_type =
+      match x.ptyp_desc with
+      | Ptyp_alias _ -> core_type1
+      | _ -> core_type
+    in
+    core_type1_with_optional_modes print_type ctxt f (x, m)
 
 and core_type2_with_optional_modes  ctxt f (ty, modes) =
   match modes with
@@ -846,8 +854,9 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_constant (c) -> pp f "%a" constant c
     | Ppat_interval (c1, c2) -> pp f "%a..%a" constant c1 constant c2
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
-    | Ppat_constraint (p, ct, _) ->
-        pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
+    | Ppat_constraint (p, Some ct, []) ->
+        pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) ct
+    | Ppat_constraint _ -> pp f "(%a)" (pattern2 ctxt) x
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->
@@ -986,7 +995,8 @@ and sugar_expr ctxt f e =
                   i1 :: i2 :: i3 :: rest ->
             print ".{" "," "}" (simple_expr ctxt) [i1; i2; i3] rest
           | Ldot ({txt=Lident "Bigarray";_}, {txt="Genarray";_}),
-            {pexp_desc = Pexp_array (_, indexes); pexp_attributes = []} :: rest ->
+            {pexp_desc = Pexp_array (_, (_ :: _ as indexes));
+             pexp_attributes = []} :: rest ->
               print ".{" "," "}" (simple_expr ctxt) indexes rest
           | _ -> false
         end
@@ -1244,7 +1254,14 @@ and simple_expr ctxt f x =
          | `btrue -> pp f "true"
          | `bfalse -> pp f "false"
          | `list xs ->
-             pp f "@[<hv0>[%a]@]"
+             (* "[<" is a single token *)
+             let space =
+               match xs with
+               | { pexp_desc = Pexp_quote _; pexp_attributes = [] } :: _ ->
+                   " "
+               | _ -> ""
+             in
+             pp f "@[<hv0>[%s%a]@]" space
                (list (expression (under_semi ctxt)) ~sep:";@;") xs
          | `simple x -> constr f x
          | _ -> assert false)
@@ -1372,6 +1389,21 @@ and class_signature ctxt f { pcsig_self = ct; pcsig_fields = l ;_} =
        | ct -> pp f " (%a)" (core_type ctxt) ct) ct
     (list (class_type_field ctxt) ~sep:"@;") l
 
+and class_type_args ctxt f l =
+  (* "[<" and "[>" are single tokens *)
+  let rec starts_with_object ty =
+    ty.ptyp_attributes = []
+    && match ty.ptyp_desc with
+       | Ptyp_object _ -> true
+       | Ptyp_alias (ty, _, _) -> starts_with_object ty
+       | _ -> false
+  in
+  match l with
+  | [] -> ()
+  | ty :: _ ->
+      pp f "[%s%a]@ " (if starts_with_object ty then " " else "")
+        (list (core_type ctxt) ~sep:",") l
+
 (* call [class_signature] called by [class_signature] *)
 and class_type ctxt f x =
   match x.pcty_desc with
@@ -1380,9 +1412,7 @@ and class_type ctxt f x =
       attributes ctxt f x.pcty_attributes
   | Pcty_constr (li, l) ->
       pp f "%a%a%a"
-        (fun f l -> match l with
-           | [] -> ()
-           | _  -> pp f "[%a]@ " (list (core_type ctxt) ~sep:"," ) l) l
+        (class_type_args ctxt) l
         (with_loc type_longident) li
         (attributes ctxt) x.pcty_attributes
   | Pcty_arrow (l, co, cl) ->
@@ -1513,9 +1543,7 @@ and class_expr ctxt f x =
           (list (label_x_expression_param ctxt)) l
     | Pcl_constr (li, l) ->
         pp f "%a%a"
-          (fun f l-> if l <>[] then
-              pp f "[%a]@ "
-                (list (core_type ctxt) ~sep:",") l) l
+          (class_type_args ctxt) l
           (with_loc type_longident) li
     | Pcl_constraint (ce, ct) ->
         pp f "(%a@ :@ %a)"
@@ -1819,8 +1847,13 @@ and pp_print_pexp_newtype ctxt sep f x =
   else
     match x.pexp_desc with
     | Pexp_newtype (str, jkind, e) ->
-      pp f "(type@ %a)@ %a" name_jkind (str.txt, jkind)
-        (pp_print_pexp_newtype ctxt sep) e
+      (* A function with both a return type and return modes can only be
+         printed with [=], so keep printing its parameters there. *)
+      let rest =
+        if String.equal sep "=" then pp_print_params_then_equals ctxt
+        else pp_print_pexp_newtype ctxt sep
+      in
+      pp f "(type@ %a)@ %a" name_jkind (str.txt, jkind) rest e
     | _ ->
        pp f "%s@;%a" sep (expression ctxt) x
 
@@ -1845,7 +1878,8 @@ and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
       optional_at_modes modes
 
 (* transform [f = fun g h -> ..] to [f g h = ... ] could be improved *)
-and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = modes; _} =
+and binding ?(mf = Immutable) ctxt f
+    {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = modes; _} =
   (* .pvb_attributes have already been printed by the caller, #bindings *)
   match ct with
   | Some (Pvc_constraint { locally_abstract_univars = []; typ }) ->
@@ -1914,18 +1948,29 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
       | _ ->
         begin match p with
         | {ppat_desc=Ppat_var _; ppat_attributes=[]} ->
+          let params_then_equals ctxt f x =
+            match mf with
+            | Immutable -> pp_print_params_then_equals ctxt f x
+            (* [let mutable f x = ...] is rejected by the parser *)
+            | Mutable -> pp f "=@;%a" (expression ctxt) x
+          in
           begin match modes with
           | [] ->
             pp f "%a@ %a"
               (simple_pattern ctxt) p
-              (pp_print_params_then_equals ctxt) x
+              (params_then_equals ctxt) x
           | _ ->
             pp f "(%a%a)@ %a"
               (simple_pattern ctxt) p
               optional_at_modes modes
-              (pp_print_params_then_equals ctxt) x
+              (params_then_equals ctxt) x
           end
         | _ ->
+          let pattern =
+            match modes with
+            | [] -> pattern
+            | _ :: _ -> simple_pattern
+          in
           pp f "%a%a@;=@;%a"
             (pattern ctxt) p
             optional_at_modes modes
@@ -1938,8 +1983,8 @@ and bindings ctxt f (mf,rf,l) =
   let binding kwd mf rf f x =
     (* The other modes are printed inside [binding] *)
     let poly_str = if x.pvb_is_poly then "poly_ " else "" in
-    pp f "@[<2>%s %a%s%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
-      (binding ctxt) x
+    pp f "@[<2>%s %a%a%s%a@]%a" kwd mutable_flag mf rec_flag rf poly_str
+      (binding ~mf ctxt) x
       (item_attributes ctxt) x.pvb_attributes
   in
   match l with
@@ -2370,7 +2415,7 @@ and comprehension ctxt f ~open_ ~close cexp =
   let { pcomp_body = body; pcomp_clauses = clauses } = cexp in
   pp f "@[<hv0>@[<hv2>%s%a@ @[<hv2>%a@]%s@]@]"
     open_
-    (expression ctxt) body
+    (expression (under_semi ctxt)) body
     (list ~sep:"@ " (comprehension_clause ctxt)) clauses
     close
 
@@ -2379,7 +2424,7 @@ and comprehension_clause ctxt f x =
   | Pcomp_for bindings ->
       pp f "@[for %a@]" (list ~sep:"@]@ @[and " (comprehension_binding ctxt)) bindings
   | Pcomp_when cond ->
-      pp f "@[when %a@]" (expression ctxt) cond
+      pp f "@[when %a@]" (expression (under_semi ctxt)) cond
 
 and comprehension_binding ctxt f x =
   let { pcomp_cb_pattern = pat;
@@ -2394,11 +2439,11 @@ and comprehension_iterator ctxt f x =
   match x with
   | Pcomp_range { start; stop; direction } ->
       pp f "=@ %a %a%a"
-        (expression ctxt) start
+        (expression (under_semi ctxt)) start
         direction_flag direction
-        (expression ctxt) stop
+        (expression (under_semi ctxt)) stop
   | Pcomp_in seq ->
-      pp f "in %a" (expression ctxt) seq
+      pp f "in %a" (expression (under_semi ctxt)) seq
 
 and function_param ctxt f { pparam_desc; pparam_loc = _ } =
   match pparam_desc with
