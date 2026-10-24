@@ -40,7 +40,7 @@ type t =
   | In_memory of Obj.t array
 
 module Idx = struct
-  type t = int
+  type 'a t = int
 end
 
 let create section_toc file channel ~first_section_offset =
@@ -86,7 +86,7 @@ let get t index =
     Misc.fatal_errorf
       "File_sections.get index out of bounds: index is %d, but length is %d"
       index len;
-  unsafe_get t index
+  Obj.obj (unsafe_get t index)
 
 let unsafe_blit_to_array t dest start_index =
   match t with
@@ -131,7 +131,7 @@ module Builder = struct
 
   let add t section =
     let idx = Dynarray.length t in
-    Dynarray.add_last t section;
+    Dynarray.add_last t (Obj.repr section);
     idx
 
   let build t = In_memory (Dynarray.to_array t)
