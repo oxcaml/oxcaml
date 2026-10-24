@@ -37,9 +37,14 @@ include With_backtracking.Make (Change)
 let create () = { jobs = Queue.create () }
 
 let add t job =
-  let job = Job.With_skip.create job in
-  log (Add job);
-  Queue.add job t.jobs
+  if
+    Language_extension.(
+      is_at_least Omnidirectionality Omnidirectionality.Scheduler_policy.Delayed)
+  then (
+    let job = Job.With_skip.create job in
+    log (Add job);
+    Queue.add job t.jobs)
+  else job ()
 
 let take t =
   let next_job = Queue.take t.jobs in

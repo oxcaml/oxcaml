@@ -53,6 +53,28 @@ module Maturity = struct
     | Alpha -> "_alpha"
 end
 
+module Omnidirectionality = struct
+  module Scheduler_policy = struct
+    type t = scheduler_policy =
+      | Eager
+      | Delayed
+
+    let compare t1 t2 =
+      let rank = function Eager -> 1 | Delayed -> 2 in
+      compare (rank t1) (rank t2)
+
+    let max t1 t2 = if compare t1 t2 >= 0 then t1 else t2
+
+    let max_value = Delayed
+
+    let all = [Eager; Delayed]
+
+    let to_command_line_suffix = function Eager -> "" | Delayed -> "_delayed"
+
+    let to_string = function Eager -> "eager" | Delayed -> "delayed"
+  end
+end
+
 let maturity_to_string = function
   | Alpha -> "alpha"
   | Beta -> "beta"
@@ -77,6 +99,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Let_mutable -> (module Unit)
   | Layout_poly -> (module Maturity)
   | Runtime_metaprogramming -> (module Unit)
+  | Omnidirectionality -> (module Omnidirectionality.Scheduler_policy)
 
 (* We'll do this in a more principled way later. *)
 (* CR layouts: Note that layouts is only "mostly" erasable, because of annoying
@@ -92,7 +115,7 @@ let is_erasable : type a. a t -> bool = function
     true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Small_numbers | Instances | Let_mutable
-  | Runtime_metaprogramming ->
+  | Runtime_metaprogramming | Omnidirectionality ->
     false
 
 let maturity_of_unique_for_drf = Stable
@@ -120,6 +143,7 @@ module Exist_pair = struct
     | Pair (Let_mutable, ()) -> Some Stable
     | Pair (Layout_poly, m) -> Some m
     | Pair (Runtime_metaprogramming, ()) -> Some Beta
+    | Pair (Omnidirectionality, _scheduler_policy) -> Some Alpha
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
@@ -134,6 +158,10 @@ module Exist_pair = struct
       to_string Layout_poly ^ "_" ^ maturity_to_string m
     | Pair (Mode_polymorphism, m) ->
       to_string Mode_polymorphism ^ "_" ^ maturity_to_string m
+    | Pair (Omnidirectionality, scheduler_policy) ->
+      to_string Omnidirectionality
+      ^ "_"
+      ^ Omnidirectionality.Scheduler_policy.to_string scheduler_policy
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Instances | Overwriting
@@ -179,6 +207,9 @@ module Exist_pair = struct
     | "layout_poly_alpha" -> Some (Pair (Layout_poly, Alpha))
     | "layout_poly_beta" -> Some (Pair (Layout_poly, Beta))
     | "runtime_metaprogramming" -> Some (Pair (Runtime_metaprogramming, ()))
+    | "omnidirectionality" -> Some (Pair (Omnidirectionality, Eager))
+    | "omnidirectionality_eager" -> Some (Pair (Omnidirectionality, Eager))
+    | "omnidirectionality_delayed" -> Some (Pair (Omnidirectionality, Delayed))
     | _ -> None
 end
 
@@ -203,7 +234,8 @@ let all_extensions =
     Pack Instances;
     Pack Let_mutable;
     Pack Layout_poly;
-    Pack Runtime_metaprogramming ]
+    Pack Runtime_metaprogramming;
+    Pack Omnidirectionality ]
 
 (**********************************)
 (* string conversions *)
@@ -246,11 +278,12 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Let_mutable, Let_mutable -> Some Refl
   | Layout_poly, Layout_poly -> Some Refl
   | Runtime_metaprogramming, Runtime_metaprogramming -> Some Refl
+  | Omnidirectionality, Omnidirectionality -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Small_numbers | Instances | Let_mutable | Layout_poly
       | Runtime_metaprogramming | Mode_polymorphism | Mode_polymorphism_printing
-        ),
+      | Omnidirectionality ),
       _ ) ->
     None
 

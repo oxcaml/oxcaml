@@ -21,13 +21,26 @@ module Cell = struct
 
   let empty = Empty []
 
-  let merge t1 t2 ~f ~scheduler =
+  module After_merge = struct
+    type 'a t =
+      | Noop
+      | Schedule of 'a * 'a Callback.t list
+
+    let run t ~scheduler =
+      match t with
+      | Noop -> ()
+      | Schedule (value, callbacks) ->
+        List.iter (Callback.schedule_run ~value ~scheduler) callbacks
+  end
+
+  let merge (t1 : 'a t) (t2 : 'a t) ~(f : 'a -> 'a -> 'a) :
+      'a t * 'a After_merge.t =
     match t1, t2 with
-    | Empty callbacks1, Empty callbacks2 -> Empty (callbacks2 @ callbacks1)
+    | Empty callbacks1, Empty callbacks2 ->
+      Empty (callbacks2 @ callbacks1), Noop
     | Empty callbacks, (Full value as t) | (Full value as t), Empty callbacks ->
-      List.iter (Callback.schedule_run ~value ~scheduler) callbacks;
-      t
-    | Full value1, Full value2 -> Full (f value1 value2)
+      t, Schedule (value, callbacks)
+    | Full value1, Full value2 -> Full (f value1 value2), Noop
 end
 
 type 'a t = 'a Cell.t Union_find.t
@@ -97,9 +110,10 @@ let cancel_all t ~scheduler =
 let merge t1 t2 ~f ~scheduler =
   if not (Union_find.same t1 t2)
   then (
-    let cell = Cell.merge (cell t1) (cell t2) ~f ~scheduler in
+    let cell, after = Cell.merge (cell t1) (cell t2) ~f in
     Union_find.union t1 t2;
-    set_cell t1 cell)
+    set_cell t1 cell;
+    Cell.After_merge.run after ~scheduler)
 
 module Global_pool = struct
   let add t =
