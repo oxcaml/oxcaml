@@ -869,6 +869,7 @@ let rename_decl_ident s id =
 let label_declaration copy_scope s l =
   {
     ld_id = rename_decl_ident s l.ld_id;
+    ld_inherit = l.ld_inherit;
     ld_mutable = l.ld_mutable;
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;

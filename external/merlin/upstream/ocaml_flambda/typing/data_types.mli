@@ -59,6 +59,7 @@ type 'a gen_label_description =
   { lbl_name: string;                   (* Short name *)
     lbl_res: type_expr;                 (* Type of the result *)
     lbl_arg: type_expr;                 (* Type of the argument *)
+    lbl_inherit: inherit_flag;          (* Is this an [inherit] field? *)
     lbl_mut: mutability;                (* Is this a mutable field? *)
     lbl_modalities: Mode.Modality.Const.t;
                                         (* Modalities on the field *)

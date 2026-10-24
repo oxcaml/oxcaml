@@ -5,9 +5,9 @@ module Int8_u = Stdlib_stable.Int8_u
 
 type t8 : bits8 addressable
 
-type tp : (bits64 & bits8) addressable
+type tp : bits64 & bits8
 
-(* Kinds like [bits8 addressable] aren't yet inhabited, so we use magic. *)
+(* [t8] and [tp] are abstract, so we inhabit them with magic. *)
 external magic_make_addressable : ('a : any) ('b : any addressable). 'a -> 'b
   = "%identity"
   [@@layout_poly]
