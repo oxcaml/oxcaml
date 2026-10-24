@@ -168,6 +168,7 @@ module T = struct
     | Pjk_with of jkind_annotation * core_type * Modalities.t
     | Pjk_kind_of of core_type
     | Pjk_product of jkind_annotation list
+    | Pjk_inherit of jkind_annotation
 
   and jkind_annotation =
     { pjka_loc : Location.t
@@ -1170,6 +1171,7 @@ module Ast_traverse = struct
       | Pjk_with of jkind_annotation * core_type * modalities
       | Pjk_kind_of of core_type
       | Pjk_product of jkind_annotation list
+      | Pjk_inherit of jkind_annotation
 
     and jkind_annotation = T.jkind_annotation =
       { pjka_loc : location
@@ -1264,6 +1266,9 @@ module Ast_traverse = struct
             | Pjk_product a ->
               let a = self#list self#jkind_annotation a in
               Pjk_product a
+            | Pjk_inherit a ->
+              let a = self#jkind_annotation a in
+              Pjk_inherit a
 
         method jkind_annotation : jkind_annotation -> jkind_annotation =
           fun { pjka_loc; pjka_desc } ->
@@ -1377,6 +1382,7 @@ module Ast_traverse = struct
               self#modalities c
             | Pjk_kind_of a -> self#core_type a
             | Pjk_product a -> self#list self#jkind_annotation a
+            | Pjk_inherit a -> self#jkind_annotation a
 
         method jkind_annotation : jkind_annotation -> unit =
           fun { pjka_loc; pjka_desc } ->
@@ -1471,6 +1477,7 @@ module Ast_traverse = struct
               acc
             | Pjk_kind_of a -> self#core_type a acc
             | Pjk_product a -> self#list self#jkind_annotation a acc
+            | Pjk_inherit a -> self#jkind_annotation a acc
 
         method jkind_annotation : jkind_annotation -> 'acc -> 'acc =
           fun { pjka_loc; pjka_desc } acc ->
@@ -1592,6 +1599,9 @@ module Ast_traverse = struct
             | Pjk_product a ->
               let a, acc = self#list self#jkind_annotation a acc in
               Pjk_product a, acc
+            | Pjk_inherit a ->
+              let a, acc = self#jkind_annotation a acc in
+              Pjk_inherit a, acc
 
         method jkind_annotation : jkind_annotation -> 'acc -> jkind_annotation * 'acc =
           fun { pjka_loc; pjka_desc } acc ->
@@ -1720,6 +1730,9 @@ module Ast_traverse = struct
             | Pjk_product a ->
               let a = self#list self#jkind_annotation ctx a in
               Pjk_product a
+            | Pjk_inherit a ->
+              let a = self#jkind_annotation ctx a in
+              Pjk_inherit a
 
         method jkind_annotation : 'ctx -> jkind_annotation -> jkind_annotation =
           fun ctx { pjka_loc; pjka_desc } ->
@@ -1846,6 +1859,9 @@ module Ast_traverse = struct
             | Pjk_product a ->
               let a = self#list self#jkind_annotation a in
               self#constr "Pjk_product" [ a ]
+            | Pjk_inherit a ->
+              let a = self#jkind_annotation a in
+              self#constr "Pjk_inherit" [ a ]
 
         method jkind_annotation : jkind_annotation -> 'res =
           fun { pjka_loc; pjka_desc } ->
@@ -1993,6 +2009,9 @@ module Ast_traverse = struct
             | Pjk_product a ->
               let a = self#list self#jkind_annotation ctx a in
               Pjk_product (Stdlib.fst a), self#constr ctx "Pjk_product" [ Stdlib.snd a ]
+            | Pjk_inherit a ->
+              let a = self#jkind_annotation ctx a in
+              Pjk_inherit (Stdlib.fst a), self#constr ctx "Pjk_inherit" [ Stdlib.snd a ]
 
         method jkind_annotation : 'ctx -> jkind_annotation -> jkind_annotation * 'res =
           fun ctx { pjka_loc; pjka_desc } ->

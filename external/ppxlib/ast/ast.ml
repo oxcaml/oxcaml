@@ -130,6 +130,7 @@ and direction_flag = Asttypes.direction_flag = Upto | Downto
 (* Order matters, used in polymorphic comparison *)
 and private_flag = Asttypes.private_flag = Private | Public
 and mutable_flag = Asttypes.mutable_flag = Immutable | Mutable
+and inherit_flag = Asttypes.inherit_flag = Not_inherited | Inherited
 and atomic_flag = Asttypes.atomic_flag = Nonatomic | Atomic
 and access_flag = Asttypes.access_flag =
   | Immutable_access
@@ -844,6 +845,7 @@ and type_kind = Parsetree.type_kind =
 
 and label_declaration = Parsetree.label_declaration = {
   pld_name : string loc;
+  pld_inherit : inherit_flag;
   pld_mutable : mutable_flag;
   pld_modalities : modalities;
   pld_type : core_type;
@@ -853,7 +855,9 @@ and label_declaration = Parsetree.label_declaration = {
 (** - [{ ...; l: T; ... }] when {{!label_declaration.pld_mutable} [pld_mutable]}
       is {{!Asttypes.mutable_flag.Immutable} [Immutable]},
     - [{ ...; mutable l: T; ... }] when {{!label_declaration.pld_mutable}
-      [pld_mutable]} is {{!Asttypes.mutable_flag.Mutable} [Mutable]}.
+      [pld_mutable]} is {{!Asttypes.mutable_flag.Mutable} [Mutable]},
+    - [#{ inherit l: T }] when {{!label_declaration.pld_inherit} [pld_inherit]}
+      is {{!Asttypes.inherit_flag.Inherited} [Inherited]}.
 
     Note: [T] can be a {{!core_type_desc.Ptyp_poly} [Ptyp_poly]}. *)
 
@@ -1383,6 +1387,7 @@ and jkind_annotation_desc = Parsetree.jkind_annotation_desc =
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
+  | Pjk_inherit of jkind_annotation
 
 and jkind_annotation = Parsetree.jkind_annotation =
   { pjka_loc : location
@@ -1495,6 +1500,7 @@ class virtual map =
     method private_flag : private_flag -> private_flag= fun x -> x
     method mutable_flag : mutable_flag -> mutable_flag= fun x -> x
     method atomic_flag : atomic_flag -> atomic_flag= fun x -> x
+    method inherit_flag : inherit_flag -> inherit_flag= fun x -> x
     method access_flag : access_flag -> access_flag= fun x -> x
     method virtual_flag : virtual_flag -> virtual_flag= fun x -> x
     method override_flag : override_flag -> override_flag= fun x -> x
@@ -2084,10 +2090,11 @@ class virtual map =
         | Ptype_open -> Ptype_open
     method label_declaration : label_declaration -> label_declaration=
       fun
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         ->
         let pld_name = self#loc self#string pld_name in
+        let pld_inherit = self#inherit_flag pld_inherit in
         let pld_mutable = self#mutable_flag pld_mutable in
         let pld_modalities = self#modalities pld_modalities in
         let pld_type = self#core_type pld_type in
@@ -2095,6 +2102,7 @@ class virtual map =
         let pld_attributes = self#attributes pld_attributes in
         {
           pld_name;
+          pld_inherit;
           pld_mutable;
           pld_modalities;
           pld_type;
@@ -2640,6 +2648,7 @@ class virtual map =
         | Pjk_kind_of a -> let a = self#core_type a in Pjk_kind_of a
         | Pjk_product a ->
             let a = self#list self#jkind_annotation a in Pjk_product a
+        | Pjk_inherit a -> let a = self#jkind_annotation a in Pjk_inherit a
     method jkind_annotation : jkind_annotation -> jkind_annotation=
       fun { pjka_loc; pjka_desc } ->
         let pjka_loc = self#location pjka_loc in
@@ -2738,6 +2747,7 @@ class virtual iter =
     method private_flag : private_flag -> unit= fun _ -> ()
     method mutable_flag : mutable_flag -> unit= fun _ -> ()
     method atomic_flag : atomic_flag -> unit= fun _ -> ()
+    method inherit_flag : inherit_flag -> unit= fun _ -> ()
     method access_flag : access_flag -> unit= fun _ -> ()
     method virtual_flag : virtual_flag -> unit= fun _ -> ()
     method override_flag : override_flag -> unit= fun _ -> ()
@@ -3134,10 +3144,11 @@ class virtual iter =
         | Ptype_open -> ()
     method label_declaration : label_declaration -> unit=
       fun
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         ->
         self#loc self#string pld_name;
+        self#inherit_flag pld_inherit;
         self#mutable_flag pld_mutable;
         self#modalities pld_modalities;
         self#core_type pld_type;
@@ -3526,6 +3537,7 @@ class virtual iter =
             (self#jkind_annotation a; self#core_type b; self#modalities c)
         | Pjk_kind_of a -> self#core_type a
         | Pjk_product a -> self#list self#jkind_annotation a
+        | Pjk_inherit a -> self#jkind_annotation a
     method jkind_annotation : jkind_annotation -> unit=
       fun { pjka_loc; pjka_desc } ->
         self#location pjka_loc; self#jkind_annotation_desc pjka_desc
@@ -3630,6 +3642,7 @@ class virtual ['acc] fold =
     method private_flag : private_flag -> 'acc -> 'acc= fun _ acc -> acc
     method mutable_flag : mutable_flag -> 'acc -> 'acc= fun _ acc -> acc
     method atomic_flag : atomic_flag -> 'acc -> 'acc= fun _ acc -> acc
+    method inherit_flag : inherit_flag -> 'acc -> 'acc= fun _ acc -> acc
     method access_flag : access_flag -> 'acc -> 'acc= fun _ acc -> acc
     method virtual_flag : virtual_flag -> 'acc -> 'acc= fun _ acc -> acc
     method override_flag : override_flag -> 'acc -> 'acc= fun _ acc -> acc
@@ -4159,10 +4172,11 @@ class virtual ['acc] fold =
         | Ptype_open -> acc
     method label_declaration : label_declaration -> 'acc -> 'acc=
       fun
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         acc ->
         let acc = self#loc self#string pld_name acc in
+        let acc = self#inherit_flag pld_inherit acc in
         let acc = self#mutable_flag pld_mutable acc in
         let acc = self#modalities pld_modalities acc in
         let acc = self#core_type pld_type acc in
@@ -4635,6 +4649,7 @@ class virtual ['acc] fold =
             let acc = self#modalities c acc in acc
         | Pjk_kind_of a -> self#core_type a acc
         | Pjk_product a -> self#list self#jkind_annotation a acc
+        | Pjk_inherit a -> self#jkind_annotation a acc
     method jkind_annotation : jkind_annotation -> 'acc -> 'acc=
       fun { pjka_loc; pjka_desc } acc ->
         let acc = self#location pjka_loc acc in
@@ -4762,6 +4777,8 @@ class virtual ['acc] fold_map =
     method mutable_flag : mutable_flag -> 'acc -> (mutable_flag * 'acc)=
       fun x acc -> (x, acc)
     method atomic_flag : atomic_flag -> 'acc -> (atomic_flag * 'acc)=
+      fun x acc -> (x, acc)
+    method inherit_flag : inherit_flag -> 'acc -> (inherit_flag * 'acc)=
       fun x acc -> (x, acc)
     method access_flag : access_flag -> 'acc -> (access_flag * 'acc)=
       fun x acc -> (x, acc)
@@ -5486,10 +5503,11 @@ class virtual ['acc] fold_map =
     method label_declaration :
       label_declaration -> 'acc -> (label_declaration * 'acc)=
       fun
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         acc ->
         let (pld_name, acc) = self#loc self#string pld_name acc in
+        let (pld_inherit, acc) = self#inherit_flag pld_inherit acc in
         let (pld_mutable, acc) = self#mutable_flag pld_mutable acc in
         let (pld_modalities, acc) = self#modalities pld_modalities acc in
         let (pld_type, acc) = self#core_type pld_type acc in
@@ -5497,6 +5515,7 @@ class virtual ['acc] fold_map =
         let (pld_attributes, acc) = self#attributes pld_attributes acc in
         ({
            pld_name;
+           pld_inherit;
            pld_mutable;
            pld_modalities;
            pld_type;
@@ -6188,6 +6207,8 @@ class virtual ['acc] fold_map =
         | Pjk_product a ->
             let (a, acc) = self#list self#jkind_annotation a acc in
             ((Pjk_product a), acc)
+        | Pjk_inherit a ->
+            let (a, acc) = self#jkind_annotation a acc in ((Pjk_inherit a), acc)
     method jkind_annotation :
       jkind_annotation -> 'acc -> (jkind_annotation * 'acc)=
       fun { pjka_loc; pjka_desc } acc ->
@@ -6322,6 +6343,8 @@ class virtual ['ctx] map_with_context =
     method mutable_flag : 'ctx -> mutable_flag -> mutable_flag=
       fun _ctx x -> x
     method atomic_flag : 'ctx -> atomic_flag -> atomic_flag= fun _ctx x -> x
+    method inherit_flag : 'ctx -> inherit_flag -> inherit_flag=
+      fun _ctx x -> x
     method access_flag : 'ctx -> access_flag -> access_flag= fun _ctx x -> x
     method virtual_flag : 'ctx -> virtual_flag -> virtual_flag=
       fun _ctx x -> x
@@ -6940,10 +6963,11 @@ class virtual ['ctx] map_with_context =
     method label_declaration :
       'ctx -> label_declaration -> label_declaration=
       fun ctx
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         ->
         let pld_name = self#loc self#string ctx pld_name in
+        let pld_inherit = self#inherit_flag ctx pld_inherit in
         let pld_mutable = self#mutable_flag ctx pld_mutable in
         let pld_modalities = self#modalities ctx pld_modalities in
         let pld_type = self#core_type ctx pld_type in
@@ -6951,6 +6975,7 @@ class virtual ['ctx] map_with_context =
         let pld_attributes = self#attributes ctx pld_attributes in
         {
           pld_name;
+          pld_inherit;
           pld_mutable;
           pld_modalities;
           pld_type;
@@ -7530,6 +7555,8 @@ class virtual ['ctx] map_with_context =
         | Pjk_kind_of a -> let a = self#core_type ctx a in Pjk_kind_of a
         | Pjk_product a ->
             let a = self#list self#jkind_annotation ctx a in Pjk_product a
+        | Pjk_inherit a ->
+            let a = self#jkind_annotation ctx a in Pjk_inherit a
     method jkind_annotation : 'ctx -> jkind_annotation -> jkind_annotation=
       fun ctx { pjka_loc; pjka_desc } ->
         let pjka_loc = self#location ctx pjka_loc in
@@ -7681,6 +7708,11 @@ class virtual ['res] lift =
         match x with
         | Nonatomic -> self#constr "Nonatomic" []
         | Atomic -> self#constr "Atomic" []
+    method inherit_flag : inherit_flag -> 'res=
+      fun x ->
+        match x with
+        | Not_inherited -> self#constr "Not_inherited" []
+        | Inherited -> self#constr "Inherited" []
     method access_flag : access_flag -> 'res=
       fun x ->
         match x with
@@ -8399,10 +8431,11 @@ class virtual ['res] lift =
         | Ptype_open -> self#constr "Ptype_open" []
     method label_declaration : label_declaration -> 'res=
       fun
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         ->
         let pld_name = self#loc self#string pld_name in
+        let pld_inherit = self#inherit_flag pld_inherit in
         let pld_mutable = self#mutable_flag pld_mutable in
         let pld_modalities = self#modalities pld_modalities in
         let pld_type = self#core_type pld_type in
@@ -8410,6 +8443,7 @@ class virtual ['res] lift =
         let pld_attributes = self#attributes pld_attributes in
         self#record
           [("pld_name", pld_name);
+          ("pld_inherit", pld_inherit);
           ("pld_mutable", pld_mutable);
           ("pld_modalities", pld_modalities);
           ("pld_type", pld_type);
@@ -9089,6 +9123,8 @@ class virtual ['res] lift =
         | Pjk_product a ->
             let a = self#list self#jkind_annotation a in
             self#constr "Pjk_product" [a]
+        | Pjk_inherit a ->
+            let a = self#jkind_annotation a in self#constr "Pjk_inherit" [a]
     method jkind_annotation : jkind_annotation -> 'res=
       fun { pjka_loc; pjka_desc } ->
         let pjka_loc = self#location pjka_loc in
@@ -9267,6 +9303,8 @@ class virtual ['ctx,'res] lift_map_with_context =
     method mutable_flag : 'ctx -> mutable_flag -> (mutable_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method atomic_flag : 'ctx -> atomic_flag -> (atomic_flag * 'res)=
+      fun ctx x -> (x, (self#other ctx x))
+    method inherit_flag : 'ctx -> inherit_flag -> (inherit_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method access_flag : 'ctx -> access_flag -> (access_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
@@ -10365,10 +10403,11 @@ class virtual ['ctx,'res] lift_map_with_context =
     method label_declaration :
       'ctx -> label_declaration -> (label_declaration * 'res)=
       fun ctx
-        { pld_name; pld_mutable; pld_modalities; pld_type; pld_loc;
+        { pld_name; pld_inherit; pld_mutable; pld_modalities; pld_type; pld_loc;
           pld_attributes }
         ->
         let pld_name = self#loc self#string ctx pld_name in
+        let pld_inherit = self#inherit_flag ctx pld_inherit in
         let pld_mutable = self#mutable_flag ctx pld_mutable in
         let pld_modalities = self#modalities ctx pld_modalities in
         let pld_type = self#core_type ctx pld_type in
@@ -10376,6 +10415,7 @@ class virtual ['ctx,'res] lift_map_with_context =
         let pld_attributes = self#attributes ctx pld_attributes in
         ({
            pld_name = (Stdlib.fst pld_name);
+           pld_inherit = (Stdlib.fst pld_inherit);
            pld_mutable = (Stdlib.fst pld_mutable);
            pld_modalities = (Stdlib.fst pld_modalities);
            pld_type = (Stdlib.fst pld_type);
@@ -10384,6 +10424,7 @@ class virtual ['ctx,'res] lift_map_with_context =
          },
           (self#record ctx
              [("pld_name", (Stdlib.snd pld_name));
+             ("pld_inherit", (Stdlib.snd pld_inherit));
              ("pld_mutable", (Stdlib.snd pld_mutable));
              ("pld_modalities", (Stdlib.snd pld_modalities));
              ("pld_type", (Stdlib.snd pld_type));
@@ -11469,6 +11510,10 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#list self#jkind_annotation ctx a in
             ((Pjk_product (Stdlib.fst a)),
               (self#constr ctx "Pjk_product" [Stdlib.snd a]))
+        | Pjk_inherit a ->
+            let a = self#jkind_annotation ctx a in
+            ((Pjk_inherit (Stdlib.fst a)),
+              (self#constr ctx "Pjk_inherit" [Stdlib.snd a]))
     method jkind_annotation :
       'ctx -> jkind_annotation -> (jkind_annotation * 'res)=
       fun ctx { pjka_loc; pjka_desc } ->
