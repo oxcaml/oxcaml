@@ -1063,6 +1063,7 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
+    ld_inherit: inherit_flag;
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
@@ -1096,9 +1097,15 @@ and constructor_arguments =
 
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
-(* Returns the inner type and its modalities, if unboxed. *)
+(** The kind operator an unboxed record applies to the kind of a field: a
+    field is made addressable unless it is [inherit]. *)
+val unboxed_record_field_operator :
+  label_declaration -> Jkind_types.Kind_operator.t
+
+(** The type of the single unboxed field of a declaration, with the modality
+    and kind operator the declaration applies to it. *)
 val find_unboxed_type : type_declaration ->
-  (type_expr * Mode.Modality.Const.t) option
+  (type_expr * Mode.Modality.Const.t * Jkind_types.Kind_operator.t) option
 
 type extension_constructor =
   {

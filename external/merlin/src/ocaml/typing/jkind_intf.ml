@@ -71,8 +71,8 @@ module type Sort = sig
        The core properties of [addressable] are reflected in
        [Sort.constrain_addressable]. We also provide the following notes:
        - Some base sorts are inherently addressable.
-       - If all the components of a product are addressable, then so is the
-         product.
+       - Products are addressable: [&] makes its components addressable, so
+         [k1 & k2] is [k1 addressable & k2 addressable].
        - Addressability is idempotent: [k] is addressable iff
          [k addressable = k].
        - The addressable kinds are all subkinds of [any addressable].

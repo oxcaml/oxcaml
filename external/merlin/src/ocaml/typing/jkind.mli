@@ -496,6 +496,11 @@ val of_type_decl_overapproximate_unknown :
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
+(** The component layouts of an unboxed record, given the layouts of its fields.
+*)
+val unboxed_record_layouts :
+  Types.label_declaration list -> Sort.t Layout.t list -> Sort.t Layout.t list
+
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record :
   (Types.label_declaration * Sort.t Layout.t) list -> Types.jkind_l
@@ -682,6 +687,24 @@ val apply_modality_l :
     original expectation. With-bounds are unchanged. *)
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
+
+(** Given the kind [k] of a type, the kind of that type made addressable (or
+    left as is, for [Id]). *)
+val apply_operator_l :
+  Jkind_types.Kind_operator.t -> ('l * 'r) Types.jkind -> ('l * 'r) Types.jkind
+
+(** Given some kind [k], try to produce some kind [k'] such that [t : k']
+    implies [t addressable : k] (or [t : k], for [Id]). Not every such [t] has
+    kind [k']: if [k] is [k0 addressable], then [t] may have kind [k0] or
+    [k0 addressable], and [k'] is [k0]. Fails when there is no such [k'] (e.g.
+    [k] is [bits8], or an abstract kind). *)
+val apply_operator_r :
+  Env.t ->
+  Jkind_types.Kind_operator.t ->
+  Types.jkind_r ->
+  (Types.jkind_r, unit) result
+
+val is_surely_addressable : Env.t -> 'd Types.jkind -> bool
 
 (** Given a kind [k], returns the kind of [(_ : k) or_null]. Fails if [or_null]
     cannot be applied to types of kind [k]. *)
@@ -943,7 +966,7 @@ val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 val fully_expand_aliases : Env.t -> 'd Types.jkind -> 'd Types.jkind
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
-val has_layout_any : Env.t -> ('l * allowed) Types.jkind -> bool
+val has_layout_any : Env.t -> 'd Types.jkind -> bool
 
 (** Checks whether a jkind is [value]. This really should require a [jkind_lr],
     but it works on any [jkind], because it's used in printing and is somewhat

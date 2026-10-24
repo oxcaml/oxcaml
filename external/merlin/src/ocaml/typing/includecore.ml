@@ -425,6 +425,7 @@ type kind_mismatch = type_kind * type_kind
 
 type label_mismatch =
   | Type of Errortrace.equality_error
+  | Inherit of position
   | Mutability of position
   | Atomicity of position
   | Modality of Modality.equate_error
@@ -612,6 +613,10 @@ let report_label_mismatch first second env ppf err =
   match (err : label_mismatch) with
   | Type err ->
       report_type_inequality env ppf err
+  | Inherit ord ->
+      Format_doc.fprintf ppf "%s is inherit and %s is not."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second)
   | Mutability ord ->
       Format_doc.fprintf ppf "%s is mutable and %s is not."
         (String.capitalize_ascii (choose ord first second))
@@ -954,6 +959,10 @@ module Record_diffing = struct
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
         let err =
+          match ld1.ld_inherit, ld2.ld_inherit with
+          | Inherited, Not_inherited -> Some (Inherit First)
+          | Not_inherited, Inherited -> Some (Inherit Second)
+          | Inherited, Inherited | Not_inherited, Not_inherited ->
           match ld1.ld_mutable, ld2.ld_mutable with
           | Immutable, Immutable -> None
           | Mutable _, Immutable -> Some (Mutability First)
