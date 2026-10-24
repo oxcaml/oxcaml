@@ -4060,9 +4060,13 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     Misc.fatal_error
       "Lambda.count_initializers_array_kind: Punspecializedarray"
 
-(* CR mshinwell: This function might need revisiting for JSIR and any
-   Flambda 2 -> WASM backend *)
 let array_element_size_in_bytes (array_kind : array_kind) =
+  if Clflags.target_is_jsir () then
+    (* JSIR arrays have one slot per unarised element, and block index
+       arithmetic counts every slot as 8 bytes. In particular, arrays of small
+       scalars are not packed. *)
+    8 * count_initializers_array_kind array_kind
+  else
   match array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     8
