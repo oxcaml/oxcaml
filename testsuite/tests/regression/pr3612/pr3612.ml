@@ -1,5 +1,10 @@
 (* TEST
  modules = "custom_finalize.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 type t

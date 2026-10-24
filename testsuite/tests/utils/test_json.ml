@@ -1,5 +1,10 @@
 (* TEST
  include ocamlcommon;
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Test that various json values are serialized correctly. *)

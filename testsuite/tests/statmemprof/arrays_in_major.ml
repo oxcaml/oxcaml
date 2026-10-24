@@ -1,4 +1,10 @@
-(* TEST *)
+(* TEST
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
 
 module MP = Gc.Memprof
 

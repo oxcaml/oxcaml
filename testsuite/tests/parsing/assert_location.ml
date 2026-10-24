@@ -8,4 +8,5 @@ let () = (
 
 (* TEST
  exit_status = "2";
+ ocamlrunparam = "b=0";
 *)

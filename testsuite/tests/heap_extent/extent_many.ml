@@ -1,5 +1,10 @@
 (* TEST
  modules = "extent_stubs.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 (* Thousands of extents: registration, sweeping and freeing must scale
