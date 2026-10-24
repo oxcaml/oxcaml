@@ -12323,7 +12323,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     match sexp.pexp_desc with
     | Pexp_function _ -> true
     | Pexp_constraint (e, _, _)
-    | Pexp_newtype (_, _, e) -> sexp_is_fun e
+    | Pexp_newtype (_, _, e)
+    | Pexp_stack e -> sexp_is_fun e
     | _ -> false
   in
   let vb_is_fun { pvb_expr = sexp; _ } = sexp_is_fun sexp in
