@@ -1,4 +1,0 @@
-(library
- (name ppx_warning_flags_testing_enable)
- (preprocess
-  (pps ppx_warning_flags_testing -unused-code-warnings=true)))
