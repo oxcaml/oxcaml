@@ -92,6 +92,7 @@ module Label_declaration = struct
 
   let create ~loc ~name ~mutable_ ~modalities ~type_ =
     { pld_loc = loc
+    ; pld_inherit = Not_inherited
     ; pld_modalities = modalities
     ; pld_name = name
     ; pld_type = type_
