@@ -178,7 +178,7 @@ type lock =
       Mode.With_regionality.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.With_regionality.Comonadic.r
   | Region_lock
-  | Exclave_lock
+  | Exclave_lock of Location.t  (** The location of the [exclave_] *)
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -3151,7 +3151,7 @@ let add_closure_lock closure_context comonadic env =
 
 let add_region_lock env = add_lock Region_lock env
 
-let add_exclave_lock env = add_lock Exclave_lock env
+let add_exclave_lock ~loc env = add_lock (Exclave_lock loc) env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
@@ -3798,7 +3798,7 @@ let const_closure_mode pp {Mode.monadic; comonadic}
   in
   {Mode.monadic; comonadic}
 
-let exclave_mode ~errors ~env ~pp vmode =
+let exclave_mode ~errors ~env ~pp ~exclave_loc vmode =
   match
   Mode.Regionality.submode
     (Mode.With_regionality.proj_comonadic Areality vmode)
@@ -3806,8 +3806,8 @@ let exclave_mode ~errors ~env ~pp vmode =
 with
 | Ok () ->
     vmode
-    |> Mode.with_regionality_to_locality_r2l
-    |> Mode.with_locality_as_regionality
+    |> Mode.with_regionality_to_locality_r2l ~hint:(Exclave exclave_loc)
+    |> Mode.with_locality_as_regionality ~hint:(Exclave exclave_loc)
 | Error _ ->
     may_lookup_error errors (fst pp) env
       (Local_value_used_in_exclave (snd pp))
@@ -3853,8 +3853,8 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
           closure_mode pp vmode closure_context comonadic
-      | Exclave_lock ->
-          exclave_mode ~errors ~env ~pp vmode
+      | Exclave_lock exclave_loc ->
+          exclave_mode ~errors ~env ~pp ~exclave_loc vmode
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
@@ -3905,7 +3905,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
             [mode;
              Mode.With_regionality.max_with_comonadic Areality
                                  (Mode.Regionality.regional)]
-      | Exclave_lock ->
+      | Exclave_lock _ ->
           (* If [m0] is [global], then inside the exclave we require new values
           to be [global]. If [m0] is [regional], then we require the new values
           to be [local]. If [m0] is [local], that would trigger type error

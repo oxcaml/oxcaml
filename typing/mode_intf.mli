@@ -1115,9 +1115,11 @@ module type S = sig
   (** Inject locality into regionality *)
   val locality_as_regionality : Locality.l -> Regionality.l
 
-  (** Similar to [locality_as_regionality], behaves as identity on other axes *)
+  (** Similar to [locality_as_regionality], behaves as identity on other axes.
+      At most one of [allocation] and [hint] may be given. *)
   val with_locality_as_regionality :
     ?allocation:Hint.allocation ->
+    ?hint:('l * 'r) Hint.morph ->
     ('l * 'r) With_locality.t ->
     ('l * 'r) With_regionality.t
 
@@ -1127,7 +1129,9 @@ module type S = sig
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val with_regionality_to_locality_r2l :
-    ('l * 'r) With_regionality.t -> ('l * 'r) With_locality.t
+    ?hint:('l * 'r) Hint.morph ->
+    ('l * 'r) With_regionality.t ->
+    ('l * 'r) With_locality.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val with_regionality_to_locality_r2g :

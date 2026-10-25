@@ -7558,7 +7558,7 @@ and type_expect_
           (* mode' is RNontail, because currently our language cannot construct
              region in the tail of another region.*)
           let mode' = mode_exclave expected_mode in
-          let new_env = Env.add_exclave_lock env in
+          let new_env = Env.add_exclave_lock ~loc env in
           let exp =
             type_expect ~recarg new_env mode' sbody ty_expected_explained
           in

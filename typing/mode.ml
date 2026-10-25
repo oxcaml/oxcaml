@@ -46,6 +46,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_closed_by (Monadic, co) -> co.closure, Close_over (Monadic, co)
       | Is_closed_by (Comonadic, co) -> co.closure, Close_over (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Exclave loc -> pp, Exclave loc
       | Parameter_to_argument (Comonadic, { parameter; callee }) ->
         callee, Argument_to_parameter (Comonadic, { parameter; argument = pp })
       | Argument_to_parameter (Monadic, { parameter; argument }) ->
@@ -78,6 +79,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
       | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Exclave loc -> pp, Exclave loc
       | Parameter_to_argument (Monadic, { parameter; callee }) ->
         callee, Argument_to_parameter (Monadic, { parameter; argument = pp })
       | Argument_to_parameter (Comonadic, { parameter; argument }) ->
@@ -111,6 +113,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Close_over (Monadic, x) -> Close_over (Monadic, x)
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
         | Crossing -> Crossing
+        | Exclave loc -> Exclave loc
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Application_to_functor loc -> Application_to_functor loc
@@ -133,6 +136,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Exclave loc -> Exclave loc
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Parameter_to_argument (Comonadic, x) ->
@@ -157,6 +161,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Exclave loc -> Exclave loc
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Parameter_to_argument (Comonadic, x) ->
@@ -189,6 +194,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Exclave loc -> Exclave loc
         | Parameter_to_argument (Comonadic, x) ->
           Parameter_to_argument (Comonadic, x)
         | Parameter_to_argument (Monadic, x) ->
@@ -5069,6 +5075,13 @@ module Report = struct
               (print_pp ~definite:true ~capitalize:false),
             pp ))
     | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
+    | Exclave loc ->
+      Some
+        ( Fmt.dprintf "is used inside the %a at %a" Misc.Style.inline_code
+            "exclave_"
+            (Location.Doc.loc ~capitalize_first:false)
+            loc,
+          pp )
     | Functor_to_parameter loc ->
       let funct_pp = loc, Functor in
       print_pinpoint funct_pp
@@ -5233,6 +5246,15 @@ module Report = struct
     | Skip | Crossing ->
       (* We only skip when the morphism changes the mode *)
       ~is_skip:fixpoint, ~fixpoint
+    | Exclave _ ->
+      (* The morphisms through an [exclave_] move between regionality and
+         locality. We skip them unless they change the mode, viewing locality
+         as regionality. *)
+      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality src
+                    obj a b
+                 || implements_locality_to_regionality Locality_as_regionality
+                      obj src b a),
+        ~fixpoint )
     | Allocation_r _ ->
       (* We check that the morphism is with_regionality_to_locality_r2g *)
       if not (implements_regionality_to_locality Regional_to_global src obj a b)
@@ -7734,8 +7756,15 @@ let locality_as_regionality m =
   S.apply C.Regionality
     (Simple (Core (Locality_restricted Locality_as_regionality))) m
 
-let with_locality_as_regionality ?allocation { comonadic; monadic } =
-  let hint = Option.map (fun a -> Hint.Allocation a) allocation in
+let with_locality_as_regionality ?allocation ?hint { comonadic; monadic } =
+  let hint =
+    match allocation, hint with
+    | None, hint -> hint
+    | Some a, None -> Some (Hint.Allocation a)
+    | Some _, Some _ ->
+      Misc.fatal_error
+        "Mode.with_locality_as_regionality: both allocation and hint given"
+  in
   { comonadic =
       S.apply With_regionality.Comonadic.Obj.obj ?hint
         (Simple (Core (Locality_full Locality_as_regionality))) comonadic;
@@ -7759,9 +7788,9 @@ let with_regionality_to_locality_r2g ?allocation m =
     monadic = With_locality.Monadic.apply_hint Skip monadic
   }
 
-let with_regionality_to_locality_r2l { comonadic; monadic } =
+let with_regionality_to_locality_r2l ?hint { comonadic; monadic } =
   { comonadic =
-      S.apply With_locality.Comonadic.Obj.obj
+      S.apply With_locality.Comonadic.Obj.obj ?hint
         (Simple (Core (Locality_full Regional_to_local))) comonadic;
     monadic = With_locality.Monadic.apply_hint Skip monadic
   }

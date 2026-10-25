@@ -14,7 +14,9 @@ Line 2, characters 31-32:
 2 | let foo (local_ s) = exclave_ {s}
                                    ^
 Error: This value is "local"
-       but is expected to be "global"
+         because it is used inside the "exclave_" at line 2, characters 21-33
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global"
          because it is the field "s" (with some modality) of the record at line 2, characters 30-33.
 |}]
 
@@ -117,7 +119,9 @@ Line 1, characters 32-34:
 1 | let foo (local_ s') = exclave_ {s'}
                                     ^^
 Error: This value is "local"
-       but is expected to be "global"
+         because it is used inside the "exclave_" at line 1, characters 22-35
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global"
          because it is the field "s'" (with some modality) of the record at line 1, characters 31-35.
 |}]
 

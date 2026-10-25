@@ -202,6 +202,9 @@ type 'd morph =
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
   | Crossing : ('l * 'r) morph
+  | Exclave : Location.t -> ('l * 'r) morph
+      (** Connects the mode of a value outside an [exclave_] to its mode inside
+          it. Carries the location of the [exclave_]. *)
   | Functor_to_parameter : Location.t -> ('l * 'r) morph
       (** The identity morphism connecting a functor's staticity to its
           parameter's. Carries the functor's location. *)

@@ -2820,7 +2820,9 @@ Line 1, characters 40-41:
 1 | let f (local_ x : string) = exclave_ [| x |]
                                             ^
 Error: This value is "local"
-       but is expected to be "global"
+         because it is used inside the "exclave_" at line 1, characters 28-44
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global"
          because it is an element (with some modality) of the array at line 1, characters 37-44.
 |}]
 

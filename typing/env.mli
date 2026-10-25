@@ -634,7 +634,7 @@ val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
   Mode.With_regionality.Comonadic.Const.t -> t -> t
 
 val add_region_lock : t -> t
-val add_exclave_lock : t -> t
+val add_exclave_lock : loc:Location.t -> t -> t
 val add_unboxed_lock : t -> t
 val enter_quote : t -> t
 val enter_splice : loc:Location.t -> t -> t
