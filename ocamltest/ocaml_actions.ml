@@ -368,6 +368,12 @@ let setup_tool_build_env (tool : Ocaml_tools.tool) log env =
   let tool_reference_file =
     Tool.reference_file env tool_reference_prefix
   in
+  let extra_deps =
+    let reason = "Dependency of " ^ Tool.name in
+    Actions.Task (List.map
+      (fun filename -> Actions.Check_file_exists { filename; reason })
+      Tool.extra_dependencies)
+  in
   let env =
     Environments.add_if_undefined
       tool_reference_variable
@@ -396,7 +402,10 @@ let setup_tool_build_env (tool : Ocaml_tools.tool) log env =
   in
   let env =
     Environments.add Builtin_variables.test_build_directory build_dir env in
-  Actions_helpers.setup_build_env false ~remove:[tool_output_file] source_modules log env
+  let task, env =
+    Actions_helpers.setup_build_env false ~remove:[tool_output_file] source_modules log env
+  in
+  Actions.seq [extra_deps; task], env
 
 let setup_compiler_build_env (compiler : Ocaml_compilers.compiler) log env =
   let (module Compiler) = compiler in
@@ -1178,6 +1187,7 @@ let config_variables _log env =
   [
     Ocaml_variables.arch, Ocamltest_config.arch;
     Ocaml_variables.ocamlrun, Ocaml_files.ocamlrun;
+    Ocaml_variables.ocamlrun_sys, Ocaml_files.ocamlrun_sys;
     Ocaml_variables.ocamlc_byte, Ocaml_files.ocamlc;
     Ocaml_variables.ocamlopt_byte, Ocaml_files.ocamlopt;
     Ocaml_variables.runtime, Ocaml_directories.runtime;

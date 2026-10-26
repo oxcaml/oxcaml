@@ -3,8 +3,8 @@
  set sources = "A.ml B.ml C.ml D.ml";
  set links = "LibA.ml LibB.ml LibC.ml LibD.ml";
  set stdlib_args = "-nostdlib -I ${stdlib}";
- set OCAMLC = "${ocamlrun} ${ocamlc_byte} ${stdlib_args}";
- set OCAMLOPT = "${ocamlrun} ${ocamlopt_byte} ${stdlib_args}";
+ set OCAMLC = "${ocamlrun_sys} ${ocamlc_byte} ${stdlib_args}";
+ set OCAMLOPT = "${ocamlrun_sys} ${ocamlopt_byte} ${stdlib_args}";
  {
    compiler_directory_suffix = ".depend.mk";
    compiler_output = "${test_build_directory}/depend.mk";
@@ -27,7 +27,7 @@
    commandline = "-depend -as-map lib.ml lib.mli";
    ocamlc.byte;
    commandline = "-depend -map lib.ml -open Lib ${links}";
-   ocamlc.byte;
+   ocamlopt.byte;
    compiler_reference = "${test_source_directory}/depend.mk.reference";
    check-ocamlc.byte-output;
    hasunix;
