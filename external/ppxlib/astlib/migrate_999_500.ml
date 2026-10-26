@@ -1714,6 +1714,31 @@ and copy_mode :
   Ast_500.Parsetree.mode =
   function
   | Ast_999.Parsetree.Mode m -> Ast_500.Parsetree.Mode m
+  | Ast_999.Parsetree.Mode_var v -> Ast_500.Parsetree.Mode_var v
+  | Ast_999.Parsetree.Mode_var_with_constraints b ->
+      Ast_500.Parsetree.Mode_var_with_constraints (copy_mode_bounds b)
+
+and copy_mode_bounds :
+  Ast_999.Parsetree.mode_bounds ->
+  Ast_500.Parsetree.mode_bounds =
+  fun { Ast_999.Parsetree.upper; lower } ->
+  { Ast_500.Parsetree.upper = copy_mode_bound upper;
+    lower = copy_mode_bound lower;
+  }
+
+and copy_mode_bound :
+  Ast_999.Parsetree.mode_bound ->
+  Ast_500.Parsetree.mode_bound =
+  fun { Ast_999.Parsetree.bound_vars; bound_const } ->
+  { Ast_500.Parsetree.bound_vars = List.map copy_mode_bound_elem bound_vars;
+    bound_const;
+  }
+
+and copy_mode_bound_elem :
+  Ast_999.Parsetree.mode_bound_elem ->
+  Ast_500.Parsetree.mode_bound_elem =
+  fun { Ast_999.Parsetree.elem_morph; elem_var; elem_mod } ->
+  { Ast_500.Parsetree.elem_morph; elem_var; elem_mod }
 
 and copy_modes :
   Ast_999.Parsetree.modes ->
