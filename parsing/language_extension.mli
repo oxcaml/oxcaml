@@ -153,11 +153,11 @@ val is_at_least : 'a t -> 'a -> bool
     body of the function argument will also be rolled back when the function
     finishes, but this behavior may change; nest multiple [with_*] functions
     instead. *)
-val with_set : unit t -> enabled:bool -> (unit -> unit) -> unit
+val with_set : unit t -> enabled:bool -> (unit -> 'a) -> 'a
 
-val with_enabled : 'a t -> 'a -> (unit -> unit) -> unit
+val with_enabled : 'a t -> 'a -> (unit -> 'b) -> 'b
 
-val with_disabled : 'a t -> (unit -> unit) -> unit
+val with_disabled : 'a t -> (unit -> 'b) -> 'b
 
 (** Check if the allowable extensions are restricted to only those that are
     "erasable". This is true when the universe is set to [No_extensions] or

@@ -1046,7 +1046,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       let rec find = function
       | [] -> raise Not_found
       | (_name, Simple (sch, printer)) :: remainder ->
-          if Ctype.is_moregeneral env false sch ty
+          (* Printing runs outside of type checking, so needs its own monitor
+             root. [is_moregeneral] runs the jobs it registers before it
+             returns. *)
+          if Scheduler.Monitor.root (fun () ->
+               Ctype.is_moregeneral env false sch ty)
           then printer
           else find remainder
       | (_name, Generic (path, fn)) :: remainder ->

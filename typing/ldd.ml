@@ -43,6 +43,9 @@ module Make (V : Ordered) = struct
 
   and var =
     { id : int;
+          (** For a non-rigid var, a stamp (see {!With_backtracking.Stamp}), so
+              that solving it is only logged if a snapshot was taken since it
+              was created. Rigid vars are never solved. *)
       mutable state : var_state;
       mutable var_node : node
           (** [var_node] is the node representing just this var (⊥ ⊔ (v ⊓ ⊤)).
@@ -53,6 +56,26 @@ module Make (V : Ordered) = struct
     | Unsolved
     | Solved of node
     | Rigid of V.t
+
+  module Change = struct
+    type t = Solve_var of var * var_state
+
+    let undo = function
+      | Solve_var (var, old_var_state) -> var.state <- old_var_state
+  end
+
+  include With_backtracking.Make (Change)
+
+  (* Safety: [var] is non-rigid. *)
+  let solve_var var node =
+    match var.state with
+    | Solved node' when node == node' -> ()
+    | _ ->
+      if With_backtracking.Stamp.needs_log var.id
+      then log (Solve_var (var, var.state));
+      var.state <- Solved node
+
+  let var_id var = var.id
 
   let compare_var_full (a : var) (b : var) : int =
     match a.state, b.state with
@@ -116,11 +139,10 @@ module Make (V : Ordered) = struct
   module Var = struct
     type t = var
 
-    (* Id scheme: non-rigid vars are numbered sequentially. Rigid vars get
-       a stable hash-based id so they are consistent across compilation
-       units; collisions are handled by storing a bucket and comparing
-       names. *)
-    let prev_non_rigid_id = ref (-1)
+    (* Id scheme: non-rigid vars are numbered by stamps, so increasingly.
+       Rigid vars get a stable hash-based id so they are consistent across
+       compilation units; collisions are handled by storing a bucket and
+       comparing names. *)
 
     let rigid_tbl : (int, t list) Hashtbl.t = Hashtbl.create 97
 
@@ -129,9 +151,12 @@ module Make (V : Ordered) = struct
     (* Keep rigid ids strictly above any non-rigid ids. We choose the top half
        of the *positive* int range, so rigid ids stay positive and satisfy the
        invariant used by [inline_solved_vars] to avoid descending under
-       rigids. 
-       We use 29 here rather than 61 in order to support 32 bit platforms. *)
-    let rigid_var_start = 1 lsl 29
+       rigids.
+
+       Non-rigid ids are [With_backtracking.Stamp]s, which every type node also
+       consumes, so the range must be large: 2^61 on 64-bit, where it cannot run
+       out in practice, and 2^29 on 32-bit. *)
+    let rigid_var_start = 1 lsl (Sys.int_size - 2)
 
     let[@inline] rigid_id (name : V.t) : int =
       let h = stable_hash name land (rigid_var_start - 1) in
@@ -140,10 +165,9 @@ module Make (V : Ordered) = struct
       rigid_var_start lor (h lor 1)
 
     let make_var () =
-      let next = !prev_non_rigid_id + 1 in
+      let next = With_backtracking.Stamp.fresh () in
       if next >= rigid_var_start
       then invalid_arg "Ldd: exhausted non-rigid id range";
-      prev_non_rigid_id := next;
       let v = { id = next; state = Unsolved; var_node = bot } in
       (* [var_node] is the node representing the variable itself:
          ⊥ ⊔ (v ⊓ ⊤). *)
@@ -458,7 +482,7 @@ module Make (V : Ordered) = struct
         let lo' = inline_solved_vars block.lo in
         let hi' = inline_solved_vars block.hi in
         let d' = inline_solved_vars d in
-        block.v.state <- Solved d';
+        solve_var block.v d';
         join lo' (meet hi' d')
       | Unsolved ->
         let lo' = inline_solved_vars block.lo in
@@ -483,7 +507,7 @@ module Make (V : Ordered) = struct
         let lo' = assign_bot_inline ~var block.lo in
         let hi' = assign_bot_inline ~var block.hi in
         let d_forced = inline_solved_vars d in
-        block.v.state <- Solved d_forced;
+        solve_var block.v d_forced;
         let d' = assign_bot ~var d_forced in
         join lo' (meet hi' d')
       | Unsolved ->
@@ -515,7 +539,7 @@ module Make (V : Ordered) = struct
     | Unsolved ->
       (* For efficiency, we use assign_bot_inline to
          simultaneously inline solved vars and assign bot. *)
-      var.state <- Solved (assign_bot_inline ~var rhs_raw)
+      solve_var var (assign_bot_inline ~var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
     (* Solve the greatest fixpoint equation var := rhs_raw.
@@ -531,7 +555,7 @@ module Make (V : Ordered) = struct
       (* gfp's are less performance critical, so we use two
          separate steps to inline solved vars and assign top. *)
       let rhs_forced = inline_solved_vars rhs_raw in
-      var.state <- Solved (assign_top ~var rhs_forced)
+      solve_var var (assign_top ~var rhs_forced)
 
   let gfp_pending : (var * node) list ref = ref []
 
@@ -701,6 +725,29 @@ module Make (V : Ordered) = struct
 
   let map_rigid (f : V.t -> node) (node : node) : node =
     map_rigid_rec f (inline_solved_vars node)
+
+  let iter_unsolved_vars f node =
+    let visited : (int, unit) Hashtbl.t = Hashtbl.create 16 in
+    let rec visit node =
+      if is_leaf node
+      then ()
+      else
+        let block = Unsafe.node_block node in
+        let var = block.v in
+        match var.state with
+        | Rigid _ ->
+          (* Rigid vars have larger ids than all non-rigids, so nothing under
+             [node] is unsolved. *)
+          ()
+        | Unsolved | Solved _ ->
+          if not (Hashtbl.mem visited var.id)
+          then (
+            Hashtbl.add visited var.id ();
+            f var);
+          visit block.lo;
+          visit block.hi
+    in
+    visit (inline_solved_vars node)
 
   (* --------- structural debug printer --------- *)
   let pp_debug (node : node) : string =

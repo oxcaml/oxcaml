@@ -17,7 +17,8 @@ module Monitor : sig
   (** The current monitor. Inside a job, it starts from the job's monitor.
       Captured by {!Scheduler.add} and {!Ivar.upon}.
 
-      Safety: Only defined under a monitor {!root}. *)
+      Safety: Only defined under a monitor {!root}, unless omnidirectionality is
+      disabled. *)
   val current : unit -> t
 
   (** [root body] runs [body] in a fresh, empty monitor. An exception escaping a
