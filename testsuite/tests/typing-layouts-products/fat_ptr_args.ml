@@ -98,3 +98,43 @@ let () =
   let p = box_nativeint (ptr_id #(b, unbox_int64 off)) in
   Printf.printf "ptr-id: %b\n"
     (p = Nativeint.add base (Int64.to_nativeint off))
+
+(* GC safety: argument expressions may themselves allocate ([To_cmm] inlines
+   a single-use immutable allocation into the argument list of the call), and
+   evaluating one argument must not invalidate another argument's
+   already-computed raw pointer.  Each fat-pointer base here is a freshly
+   allocated 128-element immutable array: together the two allocations exceed
+   the size up to which [Cfg_comballoc] would merge them (which would leave a
+   single, harmless, GC point before either raw pointer is computed).  With
+   offset 8, each raw pointer addresses the array's second element. *)
+
+external sum_seconds
+  :  (#(int iarray * int64_u)[@fat_ptr])
+  -> (#(int iarray * int64_u)[@fat_ptr])
+  -> (int[@untagged])
+  = "test_sum_seconds_bytecode" "test_sum_seconds_native"
+  [@@noalloc]
+
+let[@inline never] sum_fresh a b =
+  sum_seconds
+    #([: a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a;
+       a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a;
+       a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a;
+       a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a;
+       a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a; a;
+       a; a; a; a; a; a; a; a :],
+      #8L)
+    #([: b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b;
+       b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b;
+       b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b;
+       b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b;
+       b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b; b;
+       b; b; b; b; b; b; b; b :],
+      #8L)
+
+let () =
+  let bad = ref 0 in
+  for i = 1 to 10_000 do
+    if sum_fresh i (2 * i) <> 3 * i then incr bad
+  done;
+  Printf.printf "gc-fresh-args: %d bad\n" !bad
