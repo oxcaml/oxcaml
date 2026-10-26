@@ -376,6 +376,46 @@ let test_reperform_idle () =
   ignore (Sys.opaque_identity !sink);
   Printf.printf "reperform_idle: %d\n" !total
 
+
+(* Re-handling a shallow continuation whose stacks have been idled.
+   [Effect.Shallow.continue_with] installs fresh handlers on the
+   continuation's innermost fiber, which it must find by walking the
+   fiber chain, as idling can invalidate the last-fiber field. *)
+let test_shallow_rehandle () =
+  let saved : (int, int) Effect.Shallow.continuation option ref = ref None in
+  let fib = Effect.Shallow.fiber (fun () -> perform (E 1) + 10) in
+  let parked =
+    Effect.Shallow.continue_with fib ()
+      { Effect.Shallow.retc = (fun v -> v);
+        exnc = raise;
+        effc =
+          (fun (type a) (e : a Effect.t) ->
+             match e with
+             | E _ ->
+               (* Force promotion (and hence idling) of the continuation before
+                  it is re-handled. *)
+               churn 100_000;
+               Gc.minor ();
+               Some
+                 (fun (k : (a, int) Effect.Shallow.continuation) ->
+                    saved := Some k;
+                    0)
+             | _ -> None) }
+  in
+  assert (parked = 0);
+  match !saved with
+  | Some k ->
+    (* The fiber computes 5 + 10 and must return through *this* value
+       handler, multiplying by 100. *)
+    let v =
+      Effect.Shallow.continue_with k 5
+        { Effect.Shallow.retc = (fun v -> v * 100);
+          exnc = raise;
+          effc = (fun (type a) (_ : a Effect.t) -> None) }
+    in
+    Printf.printf "shallow_rehandle: %d\n" v
+  | None -> assert false
+
 let () =
   test_mass ();
   test_discontinue ();
@@ -388,4 +428,5 @@ let () =
   test_live_nest_gc_count ();
   test_reperform_gc ~gc_inner:true ~gc_outer:true "reperform_gc_both";
   test_reperform_gc ~gc_inner:false ~gc_outer:true "reperform_gc_outer";
-  test_reperform_idle ()
+  test_reperform_idle ();
+  test_shallow_rehandle ()
