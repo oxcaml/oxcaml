@@ -2,7 +2,8 @@
  flags = "-nopervasives";
  setup-ocamlc.byte-build-env;
  ocamlc.byte;
- run;
+ script = "${ocamlrun} ${ocamlsrcdir}/tools/dumpobj -nobanners ${program}";
+ script;
  check-program-output;
 *)
 let x = 42L
