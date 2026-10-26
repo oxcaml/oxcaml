@@ -277,7 +277,7 @@ let oattr_unboxed = { oattr_name = "unboxed" }
 let oattr_untagged = { oattr_name = "untagged" }
 let oattr_unpacked = { oattr_name = "unpacked" }
 let oattr_unsafe_unextended = { oattr_name = "unsafe_unextended" }
-let oattr_ox_ptr = { oattr_name = "ox_ptr" }
+let oattr_fat_ptr = { oattr_name = "fat_ptr" }
 let oattr_noalloc = { oattr_name = "noalloc" }
 let oattr_builtin = { oattr_name = "builtin" }
 let oattr_no_effects = { oattr_name = "no_effects" }
@@ -383,7 +383,7 @@ let print p osig_val_decl =
        if all_untagged then [] else [oattr_untagged]
      | Unpacked_product _ -> [oattr_unpacked]
      | Unextended_bits8 | Unextended_bits16 -> [oattr_unsafe_unextended]
-     | Raw_pointer -> [oattr_ox_ptr]
+     | Raw_pointer -> [oattr_fat_ptr]
      | Same_as_ocaml_repr _->
        if all_unboxed || not (needs_unboxed_attribute (m, repr))
        then []
@@ -1396,7 +1396,7 @@ let report_error ppf err =
   | Raw_pointer_requires_noalloc ->
     Format_doc.fprintf ppf
       "The %a attribute may only be used on %a primitives."
-      Style.inline_code "[@ox_ptr]"
+      Style.inline_code "[@fat_ptr]"
       Style.inline_code "[@@noalloc]"
   | Invalid_representation_polymorphic_attribute ->
     Format_doc.fprintf ppf "Attribute %a can only be used \
@@ -1449,7 +1449,7 @@ let report_error ppf err =
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
            The %a attribute is not allowed on C stub returns.@]"
-          Style.inline_code "[@ox_ptr]"
+          Style.inline_code "[@fat_ptr]"
       | Repr_mismatch -> ()
         (* The error message already says "wrong layout", so a hint here would
            be redundant. *))
