@@ -54,6 +54,12 @@ type constructor =
         name : string
       }
 
+(** A label is identified by the path of its type and its name. *)
+type label =
+  { type_path : Path.t;
+    name : string
+  }
+
 type expression =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
@@ -67,12 +73,32 @@ type expression =
   | Sexp_unboxed_bool of bool
   | Sexp_construct of constructor * (sort * expression) list
   | Sexp_variant of string * expression option
+  | Sexp_record of record
+  | Sexp_record_unboxed_product of record
+  | Sexp_field of field
+  | Sexp_unboxed_field of field
+
+and record =
+  { fields : (label * sort * field_definition) list;
+        (** All the fields of the record type, in declaration order *)
+    extended_expression : (expression * sort) option
+  }
+
+and field_definition =
+  | Kept
+  | Overridden of expression
+
+and field =
+  { record : expression;
+    sort : sort;  (** The sort of the record *)
+    label : label
+  }
 
 (** {1 Traversals} *)
 
 (** [map_paths ~value_path ~type_path e] applies [value_path] to the paths of
     the globals of [e] and [type_path] to the paths of the types of its
-    constructors. *)
+    constructors and labels. *)
 val map_paths :
   value_path:(Path.t -> Path.t) ->
   type_path:(Path.t -> Path.t) ->
@@ -80,7 +106,7 @@ val map_paths :
   expression
 
 (** The namespaces of the global paths of an expression: values and the types of
-    constructors. *)
+    constructors and labels. *)
 type namespace =
   | Value
   | Type

@@ -1050,6 +1050,46 @@ and spec_expression i ppf x =
   | Stexp_variant (l, eo) ->
       line i ppf "Stexp_variant \"%s\"\n" l;
       option i spec_expression ppf (Option.map fst eo)
+  | Stexp_record { fields; representation; extended_expression; _ } ->
+      line i ppf "Stexp_record\n";
+      let i = i+1 in
+      line i ppf "fields =\n";
+      array (i+1) spec_record_field ppf fields;
+      line i ppf "representation =\n";
+      record_representation (i+1) ppf representation;
+      line i ppf "extended_expression =\n";
+      option (i+1) spec_expression ppf
+        (Option.map Misc.fst4 extended_expression)
+  | Stexp_record_unboxed_product
+      { fields; representation; extended_expression } ->
+      line i ppf "Stexp_record_unboxed_product\n";
+      let i = i+1 in
+      line i ppf "fields =\n";
+      array (i+1) spec_record_field ppf fields;
+      line i ppf "representation =\n";
+      record_unboxed_product_representation (i+1) ppf representation;
+      line i ppf "extended_expression =\n";
+      option (i+1) spec_expression ppf (Option.map fst extended_expression)
+  | Stexp_field { record; lid; record_sort; _ } ->
+      line i ppf "Stexp_field\n";
+      spec_expression i ppf record;
+      sort i ppf record_sort;
+      longident i ppf lid
+  | Stexp_unboxed_field { record; lid; record_sort; _ } ->
+      line i ppf "Stexp_unboxed_field\n";
+      spec_expression i ppf record;
+      sort i ppf record_sort;
+      longident i ppf lid
+
+and spec_record_field
+    : 'a. _ -> _ -> 'a * _ * _ -> _
+  = fun i ppf (_, _, definition) ->
+  match definition with
+  | Soverridden (li, e) ->
+      line i ppf "%a\n" fmt_longident li;
+      spec_expression (i+1) ppf e
+  | Skept _ ->
+      line i ppf "<kept>"
 
 and spec_labelled i ppf (l, e, s) =
   line i ppf "<tuple component>\n";

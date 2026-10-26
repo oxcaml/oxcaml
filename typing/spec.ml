@@ -46,6 +46,11 @@ type constructor =
         name : string
       }
 
+type label =
+  { type_path : Path.t;
+    name : string
+  }
+
 type expression =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
@@ -57,6 +62,25 @@ type expression =
   | Sexp_unboxed_bool of bool
   | Sexp_construct of constructor * (sort * expression) list
   | Sexp_variant of string * expression option
+  | Sexp_record of record
+  | Sexp_record_unboxed_product of record
+  | Sexp_field of field
+  | Sexp_unboxed_field of field
+
+and record =
+  { fields : (label * sort * field_definition) list;
+    extended_expression : (expression * sort) option
+  }
+
+and field_definition =
+  | Kept
+  | Overridden of expression
+
+and field =
+  { record : expression;
+    sort : sort;
+    label : label
+  }
 
 (* Traversals *)
 
@@ -78,6 +102,34 @@ let rec map_paths ~value_path ~type_path e =
       ( map_constructor ~type_path cstr,
         List.map (fun (sort, e) -> sort, map e) args )
   | Sexp_variant (lbl, arg) -> Sexp_variant (lbl, Option.map map arg)
+  | Sexp_record r -> Sexp_record (map_record ~value_path ~type_path r)
+  | Sexp_record_unboxed_product r ->
+    Sexp_record_unboxed_product (map_record ~value_path ~type_path r)
+  | Sexp_field f -> Sexp_field (map_field ~value_path ~type_path f)
+  | Sexp_unboxed_field f ->
+    Sexp_unboxed_field (map_field ~value_path ~type_path f)
+
+and map_label ~type_path { type_path = p; name } =
+  { type_path = type_path p; name }
+
+and map_record ~value_path ~type_path { fields; extended_expression } =
+  let map e = map_paths ~value_path ~type_path e in
+  let field (lbl, sort, def) =
+    let def =
+      match def with Kept -> Kept | Overridden e -> Overridden (map e)
+    in
+    map_label ~type_path lbl, sort, def
+  in
+  { fields = List.map field fields;
+    extended_expression =
+      Option.map (fun (e, s) -> map e, s) extended_expression
+  }
+
+and map_field ~value_path ~type_path { record; sort; label } =
+  { record = map_paths ~value_path ~type_path record;
+    sort;
+    label = map_label ~type_path label
+  }
 
 type namespace =
   | Value
@@ -101,6 +153,24 @@ let rec paths_rev acc = function
       (constructor_path cstr :: acc)
       args
   | Sexp_variant (_, arg) -> Option.fold ~none:acc ~some:(paths_rev acc) arg
+  | Sexp_record { fields; extended_expression }
+  | Sexp_record_unboxed_product { fields; extended_expression } ->
+    let acc =
+      match fields with
+      | ({ type_path; _ }, _, _) :: _ -> (Type, type_path) :: acc
+      | [] -> acc
+    in
+    let acc =
+      Option.fold ~none:acc
+        ~some:(fun (e, _) -> paths_rev acc e)
+        extended_expression
+    in
+    List.fold_left
+      (fun acc (_, _, def) ->
+        match def with Kept -> acc | Overridden e -> paths_rev acc e)
+      acc fields
+  | Sexp_field { record; label; _ } | Sexp_unboxed_field { record; label; _ } ->
+    (Type, label.type_path) :: paths_rev acc record
 
 let paths e = List.rev (paths_rev [] e)
 
@@ -140,6 +210,9 @@ let same_sort = Jkind_types.Sort.Const.equal
 let same_constructor ~same_path (Constructor c1) (Constructor c2) =
   String.equal c1.name c2.name && same_path Type c1.type_path c2.type_path
 
+let same_label ~same_path l1 l2 =
+  String.equal l1.name l2.name && same_path Type l1.type_path l2.type_path
+
 let rec alpha_equal ~same_path ~vars e1 e2 =
   let equal e1 e2 = alpha_equal ~same_path ~vars e1 e2 in
   let equal_labelled (l1, e1, s1) (l2, e2, s2) =
@@ -167,8 +240,28 @@ let rec alpha_equal ~same_path ~vars e1 e2 =
          args1 args2
   | Sexp_variant (l1, a1), Sexp_variant (l2, a2) ->
     String.equal l1 l2 && Option.equal equal a1 a2
+  | Sexp_record r1, Sexp_record r2
+  | Sexp_record_unboxed_product r1, Sexp_record_unboxed_product r2 ->
+    let same_def d1 d2 =
+      match d1, d2 with
+      | Kept, Kept -> true
+      | Overridden e1, Overridden e2 -> equal e1 e2
+      | (Kept | Overridden _), _ -> false
+    in
+    List.equal
+      (fun (l1, s1, d1) (l2, s2, d2) ->
+        same_label ~same_path l1 l2 && same_sort s1 s2 && same_def d1 d2)
+      r1.fields r2.fields
+    && Option.equal
+         (fun (e1, s1) (e2, s2) -> equal e1 e2 && same_sort s1 s2)
+         r1.extended_expression r2.extended_expression
+  | Sexp_field f1, Sexp_field f2 | Sexp_unboxed_field f1, Sexp_unboxed_field f2
+    ->
+    equal f1.record f2.record && same_sort f1.sort f2.sort
+    && same_label ~same_path f1.label f2.label
   | ( ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
       | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
-      | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ ),
+      | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ | Sexp_record _
+      | Sexp_record_unboxed_product _ | Sexp_field _ | Sexp_unboxed_field _ ),
       _ ) ->
     false

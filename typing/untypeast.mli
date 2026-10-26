@@ -49,6 +49,9 @@ type mapper = {
   include_description:
     mapper -> Typedtree.include_description -> include_description;
   jkind_declaration: mapper -> Typedtree.jkind_declaration -> jkind_declaration;
+  label:
+    'a. mapper -> 'a Data_types.gen_label_description ->
+    Longident.t Location.loc -> Longident.t Location.loc;
   label_declaration:
     mapper -> Typedtree.label_declaration -> label_declaration;
   law_declaration: mapper -> Typedtree.law_declaration -> law_declaration;

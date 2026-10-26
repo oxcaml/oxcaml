@@ -279,6 +279,11 @@ and out_spec =
   | Ospec_construct of out_ident * out_spec list
   | Ospec_variant of string * out_spec option
   | Ospec_constraint of out_spec * out_type
+  | Ospec_record of
+      { fields : (out_ident * out_spec) list;
+        extended : out_spec option;
+        unboxed : bool }
+  | Ospec_field of { record : out_spec; label : out_ident; unboxed : bool }
 
 
 type out_phrase =

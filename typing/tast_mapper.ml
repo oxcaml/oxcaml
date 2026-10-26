@@ -340,6 +340,11 @@ let spec_extra sub = function
 
 let spec_labelled sub (lbl, e, sort) = (lbl, sub.spec_expression sub e, sort)
 
+let spec_label_definition sub = function
+  | Skept _ as d -> d
+  | Soverridden (lid, e) ->
+      Soverridden (map_loc_lid sub lid, sub.spec_expression sub e)
+
 let spec_expression sub
       {stexp_desc; stexp_loc; stexp_extra; stexp_type; stexp_env} =
   let stexp_desc =
@@ -371,6 +376,35 @@ let spec_expression sub
         Stexp_variant
           (lbl, Option.map (fun (e, mode) -> (sub.spec_expression sub e, mode))
                   arg)
+    | Stexp_record r ->
+        let fields =
+          Array.map (fun (lbl, sort, def) ->
+              (lbl, sort, spec_label_definition sub def)) r.fields
+        in
+        let extended_expression =
+          Option.map (fun (e, sort, repr, barrier) ->
+              (sub.spec_expression sub e, sort, repr, barrier))
+            r.extended_expression
+        in
+        Stexp_record { r with fields; extended_expression }
+    | Stexp_record_unboxed_product r ->
+        let fields =
+          Array.map (fun (lbl, sort, def) ->
+              (lbl, sort, spec_label_definition sub def)) r.fields
+        in
+        let extended_expression =
+          Option.map (fun (e, sort) -> (sub.spec_expression sub e, sort))
+            r.extended_expression
+        in
+        Stexp_record_unboxed_product { r with fields; extended_expression }
+    | Stexp_field r ->
+        Stexp_field
+          { r with record = sub.spec_expression sub r.record;
+                   lid = map_loc_lid sub r.lid }
+    | Stexp_unboxed_field r ->
+        Stexp_unboxed_field
+          { r with record = sub.spec_expression sub r.record;
+                   lid = map_loc_lid sub r.lid }
   in
   let stexp_extra =
     List.map

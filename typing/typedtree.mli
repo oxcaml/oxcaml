@@ -1662,6 +1662,43 @@ and spec_expression_desc =
         mode: locality_mode_r option;
       }
   | Stexp_variant of label * (spec_expression * locality_mode_r) option
+  | Stexp_record of {
+      fields :
+        (Data_types.label_description * Jkind.sort * spec_label_definition)
+          array;
+      representation : Types.record_representation;
+      extended_expression :
+        (spec_expression * Jkind.sort * Types.record_representation
+         * Unique_barrier.t) option;
+      locality_mode : locality_mode_r option
+    }
+  | Stexp_record_unboxed_product of {
+      fields : ( Data_types.unboxed_label_description * Jkind.sort *
+                 spec_label_definition ) array;
+      representation : Types.record_unboxed_product_representation;
+      extended_expression : (spec_expression * Jkind.sort) option;
+    }
+  | Stexp_field of {
+      record : spec_expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+  | Stexp_unboxed_field of {
+      record : spec_expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_unboxed_product_representation;
+      lid : Longident.t loc;
+      label : Data_types.unboxed_label_description;
+      unique_use : unique_use;
+    }
+
+and spec_label_definition =
+  | Skept of Types.type_expr * Types.mutability * unique_use
+  | Soverridden of Longident.t loc * spec_expression
 
 (* The fields of [Texp_ident] other than the path, the name and the kind *)
 and spec_ident =

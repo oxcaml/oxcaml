@@ -11,7 +11,8 @@ type 'a each =
   assumption: 'a ;
   constants: 'a ;
   constructors: 'a ;
-  tuples: 'a }
+  tuples: 'a ;
+  records: 'a }
 let names =
   {
     poly = "poly";
@@ -22,7 +23,8 @@ let names =
     assumption = "assumption";
     constants = "constants";
     constructors = "constructors";
-    tuples = "tuples"
+    tuples = "tuples";
+    records = "records"
   }
 let locations =
   {
@@ -97,11 +99,19 @@ let locations =
         start_col = 0;
         end_line = 50;
         end_col = 66
+      };
+    records =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 54;
+        start_col = 0;
+        end_line = 55;
+        end_col = 74
       }
   }
 let map
   { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
-    tuples }
+    tuples; records }
   ~f =
   {
     poly = (f poly);
@@ -112,11 +122,12 @@ let map
     assumption = (f assumption);
     constants = (f constants);
     constructors = (f constructors);
-    tuples = (f tuples)
+    tuples = (f tuples);
+    records = (f records)
   }
 let to_list
   { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
-    tuples }
+    tuples; records }
   =
   [poly;
   modes;
@@ -126,7 +137,8 @@ let to_list
   assumption;
   constants;
   constructors;
-  tuples]
+  tuples;
+  records]
 type poly_input =
   | Poly_input: 'a 'b . {
   xs: 'a list ;
@@ -156,6 +168,9 @@ type tuples_input =
   | Tuples_input: {
   x: int ;
   y: string } -> tuples_input 
+type records_input =
+  | Records_input: {
+  p: Laws_gen_Gen_flat.point } -> records_input 
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
@@ -170,6 +185,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         val constants : constants_input Choice.t
         val constructors : constructors_input Choice.t
         val tuples : tuples_input Choice.t
+        val records : records_input Choice.t
       end
     let poly ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -423,6 +439,33 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 66
                    }
                }))
+    let records ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.records),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.records;
+                 predicate =
+                   (fun ((Records_input { p }) : records_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=)
+                            (({ y = ((p : Laws_gen_Gen_flat.point).y); x = 0.
+                              } : Laws_gen_Gen_flat.point) : Laws_gen_Gen_flat.point)
+                            ({ p with x = 0. } : Laws_gen_Gen_flat.point))
+                         (Laws_gen_Stdlib.(>=)
+                            ((p : Laws_gen_Gen_flat.point) : Laws_gen_Gen_flat.point).x
+                            0.) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 55;
+                     start_col = 2;
+                     end_line = 55;
+                     end_col = 74
+                   }
+               }))
     let laws choices =
       {
         poly = (poly choices);
@@ -433,6 +476,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         assumption = (assumption choices);
         constants = (constants choices);
         constructors = (constructors choices);
-        tuples = (tuples choices)
+        tuples = (tuples choices);
+        records = (records choices)
       }
   end

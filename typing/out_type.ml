@@ -3885,21 +3885,59 @@ let rec tree_of_spec (e : Spec.expression) : out_spec =
             List.map (fun (_, e) -> tree_of_spec e) args))
   | Spec.Sexp_variant (lbl, arg) ->
       Ospec_variant (lbl, Option.map tree_of_spec arg)
+  | Spec.Sexp_record r -> tree_of_spec_record ~unboxed:false r
+  | Spec.Sexp_record_unboxed_product r -> tree_of_spec_record ~unboxed:true r
+  | Spec.Sexp_field { record; label; _ } ->
+      Ospec_field
+        { record = annotate label.type_path (tree_of_spec record);
+          label = tree_of_spec_label label; unboxed = false }
+  | Spec.Sexp_unboxed_field { record; label; _ } ->
+      Ospec_field
+        { record = annotate label.type_path (tree_of_spec record);
+          label = tree_of_spec_label label; unboxed = true }
+
+(* The overridden fields, which are all the fields without an extended
+   expression *)
+and tree_of_spec_record ~unboxed ({ fields; extended_expression } : Spec.record)
+    =
+  let overridden =
+    List.filter_map
+      (fun (label, _, (def : Spec.field_definition)) ->
+         match def with
+         | Kept -> None
+         | Overridden e -> Some (tree_of_spec_label label, tree_of_spec e))
+      fields
+  in
+  let extended =
+    Option.map (fun (e, _) -> tree_of_spec e) extended_expression
+  in
+  let e = Ospec_record { fields = overridden; extended; unboxed } in
+  match fields with
+  | ((label : Spec.label), _, _) :: _ -> annotate label.type_path e
+  | [] -> e
+
+and tree_of_spec_label ({ name; _ } : Spec.label) =
+  Oide_ident { printed_name = name }
 
 and tree_of_spec_labelled (lbl, e, _) = (lbl, tree_of_spec e)
 
-(* Constructors are printed unqualified and annotated with their type,
+(* Constructors and labels are printed unqualified, and the constructors,
+   records and records of field accesses are annotated with their type,
    [(C : _ t)], so that the printed clause types again with the same
-   constructors. *)
+   constructors and labels. The types of inline records have no syntax, but
+   their constructor determines them. *)
 and annotate (type_path : Path.t) e =
-  match Env.find_type type_path !printing_env with
-  | decl ->
-      let params = List.map (fun _ -> Otyp_stuff "_") decl.type_params in
-      Ospec_constraint
-        (e, Otyp_constr (tree_of_path (Some Type) type_path, params))
-  | exception Not_found ->
-      Misc.fatal_errorf "Out_type.annotate: unbound type %s"
-        (Path.name type_path)
+  match type_path with
+  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> e
+  | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, Punboxed_ty) -> (
+      match Env.find_type type_path !printing_env with
+      | decl ->
+          let params = List.map (fun _ -> Otyp_stuff "_") decl.type_params in
+          Ospec_constraint
+            (e, Otyp_constr (tree_of_path (Some Type) type_path, params))
+      | exception Not_found ->
+          Misc.fatal_errorf "Out_type.annotate: unbound type %s"
+            (Path.name type_path))
 
 and tree_of_spec_constructor (Constructor { name; _ } : Spec.constructor) =
   Oide_ident { printed_name = name }

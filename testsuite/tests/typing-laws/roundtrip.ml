@@ -37,6 +37,11 @@ let first #(x, _) = x
 law? tuples (x : int) : (x, "s") = (x, "s") && first #(x, true) = x
 law? variants (x : int) : `A x <> `B
 
+type point = { x : float; y : float }
+type other_point = { x : int }
+law? records (p : point) :
+  ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.
+
 (* Laws in a submodule and in a module type. *)
 
 module Nested = struct

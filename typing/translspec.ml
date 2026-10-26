@@ -45,7 +45,6 @@ type unsupported =
   | Exception_handlers
   | Exclave
   | Extension_constructors
-  | Field_accesses
   | First_class_modules
   | Functions
   | Layout_polymorphism
@@ -68,7 +67,6 @@ type unsupported =
   | Primitive of primitive_kind
   | Probes
   | Quotations
-  | Records
   | Refutation_cases
   | Sequences
   | Source_positions
@@ -196,9 +194,38 @@ and spectree_desc bound loc desc : spec_expression_desc =
     Stexp_construct { lid; constructor; repr; args; mode }
   | Texp_variant (lbl, arg) ->
     Stexp_variant (lbl, Option.map (fun (e, mode) -> spectree bound e, mode) arg)
-  | Texp_record _ | Texp_record_unboxed_product _ -> unsupported loc Records
+  | Texp_record { fields; representation; extended_expression; locality_mode }
+    ->
+    let fields =
+      Array.map (fun (lbl, sort, def) -> lbl, sort, definition bound def) fields
+    in
+    let extended_expression =
+      Option.map
+        (fun (e, sort, repr, barrier) -> spectree bound e, sort, repr, barrier)
+        extended_expression
+    in
+    Stexp_record { fields; representation; extended_expression; locality_mode }
+  | Texp_record_unboxed_product { fields; representation; extended_expression }
+    ->
+    let fields =
+      Array.map (fun (lbl, sort, def) -> lbl, sort, definition bound def) fields
+    in
+    let extended_expression =
+      Option.map (fun (e, sort) -> spectree bound e, sort) extended_expression
+    in
+    Stexp_record_unboxed_product { fields; representation; extended_expression }
   | Texp_atomic_loc _ -> unsupported loc Atomic_fields
-  | Texp_field _ | Texp_unboxed_field _ -> unsupported loc Field_accesses
+  | Texp_field
+      { record; record_sort; record_repres; lid; label; boxing; unique_barrier }
+    ->
+    let record = spectree bound record in
+    Stexp_field
+      { record; record_sort; record_repres; lid; label; boxing; unique_barrier }
+  | Texp_unboxed_field
+      { record; record_sort; record_repres; lid; label; unique_use } ->
+    let record = spectree bound record in
+    Stexp_unboxed_field
+      { record; record_sort; record_repres; lid; label; unique_use }
   | Texp_setfield _ -> unsupported loc Mutation
   | Texp_array _ -> unsupported loc Arrays
   | Texp_idx _ -> unsupported loc Block_indices
@@ -246,6 +273,11 @@ and ident_desc bound loc path (lid : Longident.t Location.loc)
 
 and labelled bound (lbl, e, sort) = lbl, spectree bound e, sort
 
+and definition bound : record_label_definition -> spec_label_definition =
+  function
+  | Kept (ty, mut, unique_use) -> Skept (ty, mut, unique_use)
+  | Overridden (lid, e) -> Soverridden (lid, spectree bound e)
+
 and argument bound loc (lbl, (arg : apply_arg)) =
   match arg with
   | Omitted _ -> unsupported loc Omitted_arguments
@@ -285,6 +317,9 @@ let constructor (cstr : Data_types.constructor_description) : Spec.constructor =
       { type_path = Data_types.cstr_res_type_path cstr; name = cstr.cstr_name }
   | Extension _ -> Misc.fatal_error "Translspec.spec: extension constructor"
 
+let label (lbl : _ Data_types.gen_label_description) : Spec.label =
+  { type_path = Data_types.gen_lbl_res_type_path lbl; name = lbl.lbl_name }
+
 let sort = Jkind.Sort.default_for_transl_and_get
 
 let rec spec (e : spec_expression) : Spec.expression =
@@ -305,6 +340,34 @@ let rec spec (e : spec_expression) : Spec.expression =
       (constructor cstr, List.map (fun (s, e) -> sort s, spec e) args)
   | Stexp_variant (lbl, arg) ->
     Sexp_variant (lbl, Option.map (fun (e, _) -> spec e) arg)
+  | Stexp_record { fields; extended_expression; _ } ->
+    Sexp_record
+      { fields = Array.to_list (Array.map field_definition fields);
+        extended_expression =
+          Option.map (fun (e, s, _, _) -> spec e, sort s) extended_expression
+      }
+  | Stexp_record_unboxed_product { fields; extended_expression; _ } ->
+    Sexp_record_unboxed_product
+      { fields = Array.to_list (Array.map field_definition fields);
+        extended_expression =
+          Option.map (fun (e, s) -> spec e, sort s) extended_expression
+      }
+  | Stexp_field { record; record_sort; label = lbl; _ } ->
+    Sexp_field
+      { record = spec record; sort = sort record_sort; label = label lbl }
+  | Stexp_unboxed_field { record; record_sort; label = lbl; _ } ->
+    Sexp_unboxed_field
+      { record = spec record; sort = sort record_sort; label = label lbl }
+
+and field_definition :
+    'a.
+    'a Data_types.gen_label_description * Jkind.sort * spec_label_definition ->
+    Spec.label * Spec.sort * Spec.field_definition =
+ fun (lbl, s, def) ->
+  let def : Spec.field_definition =
+    match def with Skept _ -> Kept | Soverridden (_, e) -> Overridden (spec e)
+  in
+  label lbl, sort s, def
 
 (* Typed expressions *)
 
@@ -388,8 +451,59 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
         mode )
   | Stexp_variant (lbl, arg) ->
     Texp_variant (lbl, Option.map (fun (e, mode) -> typedtree e, mode) arg)
+  | Stexp_record { fields; representation; extended_expression; locality_mode }
+    ->
+    let fields =
+      Array.map
+        (fun (lbl, sort, def) -> lbl, sort, typedtree_definition def)
+        fields
+    in
+    let extended_expression =
+      Option.map
+        (fun (e, sort, repr, barrier) -> typedtree e, sort, repr, barrier)
+        extended_expression
+    in
+    Texp_record { fields; representation; extended_expression; locality_mode }
+  | Stexp_record_unboxed_product { fields; representation; extended_expression }
+    ->
+    let fields =
+      Array.map
+        (fun (lbl, sort, def) -> lbl, sort, typedtree_definition def)
+        fields
+    in
+    let extended_expression =
+      Option.map (fun (e, sort) -> typedtree e, sort) extended_expression
+    in
+    Texp_record_unboxed_product { fields; representation; extended_expression }
+  | Stexp_field
+      { record; record_sort; record_repres; lid; label; boxing; unique_barrier }
+    ->
+    Texp_field
+      { record = typedtree record;
+        record_sort;
+        record_repres;
+        lid;
+        label;
+        boxing;
+        unique_barrier
+      }
+  | Stexp_unboxed_field
+      { record; record_sort; record_repres; lid; label; unique_use } ->
+    Texp_unboxed_field
+      { record = typedtree record;
+        record_sort;
+        record_repres;
+        lid;
+        label;
+        unique_use
+      }
 
 and typedtree_labelled (lbl, e, sort) = lbl, typedtree e, sort
+
+and typedtree_definition : spec_label_definition -> record_label_definition =
+  function
+  | Skept (ty, mut, unique_use) -> Kept (ty, mut, unique_use)
+  | Soverridden (lid, e) -> Overridden (lid, typedtree e)
 
 and typedtree_argument (lbl, e, sort) =
   typedtree_arg_label lbl, Arg (typedtree e, sort)
@@ -412,7 +526,6 @@ let describe = function
   | Exception_handlers -> "exception handlers"
   | Exclave -> "exclave_"
   | Extension_constructors -> "extension constructors"
-  | Field_accesses -> "field accesses"
   | First_class_modules -> "first-class modules"
   | Functions -> "functions"
   | Layout_polymorphism -> "layout-polymorphic bindings"
@@ -435,7 +548,6 @@ let describe = function
   | Primitive kind -> describe_primitive kind
   | Probes -> "probes"
   | Quotations -> "quotations"
-  | Records -> "records"
   | Refutation_cases -> "refutation cases"
   | Sequences -> "sequences"
   | Source_positions -> "source positions"

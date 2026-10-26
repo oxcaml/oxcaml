@@ -48,3 +48,8 @@ type other = Circle of int
 law? constructors (s : shape) :
   s = (Circle 1. : shape) ===> s <> Square 1. && Some s <> None
 law? tuples (x : int) (y : string) : (x, y) = (x, y) && `A x <> `B
+
+type point = { x : float; y : float }
+type other_point = { x : int }
+law? records (p : point) :
+  ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.

@@ -164,3 +164,40 @@ module type Applied =
   end
 module Printed : Applied
 |}]
+
+(* So are records and the records of field accesses, for their labels. *)
+
+module type Disambiguated_record = sig
+  type r = { x : int; y : int }
+  type r2 = { x : float }
+  law? record (r : r) : ({ x = 1; y = 2 } : r) = r && (r : r).x = 1
+  law? update (r : r) : ({ r with x = 1 } : r) <> r
+end
+[%%expect {|
+module type Disambiguated_record =
+  sig
+    type r = { x : int; y : int; }
+    type r2 = { x : float; }
+    law? record (r : r) :
+      (({ x = (1); y = (2) } : r) = r) && (((r : r).x) = (1))
+    law? update (r : r) : ({ r with x = (1) } : r) <> r
+  end
+|}]
+
+(* Unboxed records and their fields. *)
+
+module type Unboxed_record = sig
+  type u = #{ a : int; b : int }
+  val sum : u -> int
+  law? unboxed (u : u) : sum #{ a = 1; b = 2 } = 3 && u.#a = u.#a
+end
+[%%expect {|
+module type Unboxed_record =
+  sig
+    type u = #{ a : int; b : int; }
+    val sum : u -> int
+    law? unboxed (u : u) :
+      ((sum (#{ a = (1); b = (2) } : u)) = (3)) &&
+        (((u : u).#a) = ((u : u).#a))
+  end
+|}]

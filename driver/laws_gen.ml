@@ -697,21 +697,44 @@ let lident : Path.t -> Longident.t = function
 
 (* The syntax of typed trees, with the paths written by [print] *)
 
-(* Constructors are written unqualified and annotated with their type,
+(* Constructors and labels are written unqualified, and the constructors,
+   records and records of field accesses are annotated with their type,
    [(C : _ t)], so that the generated clause types with the same
-   constructors. Extension constructors are written by their paths. *)
-let with_type print ty pe =
+   constructors and labels. The types of inline records have no syntax, but
+   their constructor determines them. Extension constructors are written by
+   their paths. *)
+let annotation print ty =
   match get_desc ty with
+  | Tconstr (Pextra_ty (_, (Pcstr_ty _ | Pext_ty)), _, _) -> None
   | Tconstr (p, args, _) ->
-      P.Exp.constraint_ pe
-        (P.Typ.constr (print p) (List.map (fun _ -> P.Typ.any) args))
-  | _ -> Misc.fatal_error "Laws_gen.with_type: not a type constructor"
+      Some (P.Typ.constr (print p) (List.map (fun _ -> P.Typ.any) args))
+  | _ -> Misc.fatal_error "Laws_gen.annotation: not a type constructor"
+
+let with_type print ty pe =
+  Option.fold ~none:pe ~some:(P.Exp.constraint_ pe) (annotation print ty)
 
 let annotate print (e : Typedtree.expression) (pe : Parsetree.expression) =
-  match e.exp_desc with
-  | Texp_construct (_, { cstr_tag = Ordinary _ | Null; cstr_res; _ }, _, _, _)
-    ->
+  match (e.exp_desc, pe.pexp_desc) with
+  | ( Texp_construct (_, { cstr_tag = Ordinary _ | Null; cstr_res; _ }, _, _, _),
+      _ ) ->
       with_type print cstr_res pe
+  | Texp_record { fields; _ }, _ when Array.length fields > 0 ->
+      let lbl, _, _ = fields.(0) in
+      with_type print lbl.lbl_res pe
+  | Texp_record_unboxed_product { fields; _ }, _ when Array.length fields > 0 ->
+      let lbl, _, _ = fields.(0) in
+      with_type print lbl.lbl_res pe
+  | Texp_field { label; _ }, Pexp_field (record, lid) ->
+      {
+        pe with
+        pexp_desc = Pexp_field (with_type print label.lbl_res record, lid);
+      }
+  | Texp_unboxed_field { label; _ }, Pexp_unboxed_field (record, lid) ->
+      {
+        pe with
+        pexp_desc =
+          Pexp_unboxed_field (with_type print label.lbl_res record, lid);
+      }
   | _ -> pe
 
 let constructor_lid print (cstr : Data_types.constructor_description) :
@@ -727,6 +750,7 @@ let mapper print =
     ident = (fun _ path lid -> { lid with txt = print path });
     constructor =
       (fun _ cstr lid -> { lid with txt = constructor_lid print cstr });
+    label = (fun _ lbl lid -> { lid with txt = Lident lbl.lbl_name });
   }
 
 let core_type print cty =
@@ -1223,8 +1247,8 @@ let implementation names items =
          @ List.map (law_binding names.print) laws
          @ [ laws_binding laws ]))
   in
-  (* Unused parameters of laws in clauses, and constructors that their type
-     annotation selects (see [with_type]) *)
+  (* Unused parameters of laws in clauses, and constructors and labels that
+     their type annotation selects (see [annotation]) *)
   (P.Str.warning "-27-40" :: alias_bindings names)
   @ (P.Str.type_ (each laws) :: each_values laws)
   @ List.map

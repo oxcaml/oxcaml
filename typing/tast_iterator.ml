@@ -280,7 +280,7 @@ let spec_extra sub = function
   | Stexp_constraint cty -> sub.typ sub cty
   | Stexp_inspected_type _ -> ()
 
-let[@warning "+9"] spec_expression sub
+let[@warning "+9"] rec spec_expression sub
       {stexp_desc; stexp_loc; stexp_extra; stexp_type = _; stexp_env} =
   sub.location sub stexp_loc;
   List.iter
@@ -301,6 +301,20 @@ let[@warning "+9"] spec_expression sub
       List.iter (fun (_, e) -> sub.spec_expression sub e) args
   | Stexp_variant (_, arg) ->
       Option.iter (fun (e, _) -> sub.spec_expression sub e) arg
+  | Stexp_record {fields; extended_expression; _} ->
+      Array.iter (fun (_, _, def) -> spec_label_definition sub def) fields;
+      Option.iter
+        (fun (e, _, _, _) -> sub.spec_expression sub e) extended_expression
+  | Stexp_record_unboxed_product {fields; extended_expression; _} ->
+      Array.iter (fun (_, _, def) -> spec_label_definition sub def) fields;
+      Option.iter (fun (e, _) -> sub.spec_expression sub e) extended_expression
+  | Stexp_field {record; lid; _} | Stexp_unboxed_field {record; lid; _} ->
+      sub.spec_expression sub record;
+      iter_loc_lid sub lid
+
+and spec_label_definition sub = function
+  | Skept _ -> ()
+  | Soverridden (lid, e) -> iter_loc_lid sub lid; sub.spec_expression sub e
 
 let[@warning "+9"] law_declaration sub
       ({law_id = _; law_name; law_law = _; law_params; law_assumptions;

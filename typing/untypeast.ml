@@ -50,6 +50,9 @@ type mapper = {
   include_declaration: mapper -> T.include_declaration -> include_declaration;
   include_description: mapper -> T.include_description -> include_description;
   jkind_declaration: mapper -> T.jkind_declaration -> jkind_declaration;
+  label:
+    'a. mapper -> 'a Data_types.gen_label_description ->
+    Longident.t Location.loc -> Longident.t Location.loc;
   label_declaration: mapper -> T.label_declaration -> label_declaration;
   law_declaration: mapper -> T.law_declaration -> law_declaration;
   location: mapper -> Location.t -> Location.t;
@@ -448,11 +451,11 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_variant (label, pato, _) ->
         Ppat_variant (label, Option.map (sub.pat sub) pato)
     | Tpat_record (list, _, closed) ->
-        Ppat_record (List.map (fun (lid, _, pat) ->
-            map_loc sub lid, sub.pat sub pat) list, closed)
+        Ppat_record (List.map (fun (lid, lbl, pat) ->
+            map_loc sub (sub.label sub lbl lid), sub.pat sub pat) list, closed)
     | Tpat_record_unboxed_product (list, _, closed) ->
-        Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
-            map_loc sub lid, sub.pat sub pat) list, closed)
+        Ppat_record_unboxed_product (List.map (fun (lid, lbl, pat) ->
+            map_loc sub (sub.label sub lbl lid), sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
@@ -714,7 +717,8 @@ let expression sub exp =
     | Texp_record { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function
             | _, _, Kept _ -> l
-            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
+            | lbl, _, Overridden (lid, exp) ->
+                (sub.label sub lbl lid, sub.expr sub exp) :: l)
             [] fields
         in
         Pexp_record (list, Option.map (fun (exp, _, _, _) -> sub.expr sub exp)
@@ -722,7 +726,8 @@ let expression sub exp =
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
         let list = Array.fold_left (fun l -> function
             | _, _, Kept _ -> l
-            | _, _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
+            | lbl, _, Overridden (lid, exp) ->
+                (sub.label sub lbl lid, sub.expr sub exp) :: l)
             [] fields
         in
         Pexp_record_unboxed_product
@@ -735,12 +740,13 @@ let expression sub exp =
                                     (sub.expr sub exp)
                                     (map_loc sub lid))
                              ])
-    | Texp_field { record = exp; lid; _ } ->
-        Pexp_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_unboxed_field { record = exp; lid; _ } ->
-        Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
-    | Texp_setfield { record = exp1; lid; newval = exp2 } ->
-        Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
+    | Texp_field { record = exp; lid; label; _ } ->
+        Pexp_field (sub.expr sub exp, map_loc sub (sub.label sub label lid))
+    | Texp_unboxed_field { record = exp; lid; label; _ } ->
+        Pexp_unboxed_field
+          (sub.expr sub exp, map_loc sub (sub.label sub label lid))
+    | Texp_setfield { record = exp1; lid; label; newval = exp2 } ->
+        Pexp_setfield (sub.expr sub exp1, map_loc sub (sub.label sub label lid),
           sub.expr sub exp2)
     | Texp_array (amut, _, list, _) ->
         Pexp_array (mutable_ amut, List.map (sub.expr sub) list)
@@ -1271,6 +1277,8 @@ let ident _sub _path lid = lid
 
 let constructor _sub _cstr lid = lid
 
+let label _sub _lbl lid = lid
+
 let default_mapper =
   {
     attribute = attribute;
@@ -1300,6 +1308,7 @@ let default_mapper =
     extension_constructor = extension_constructor;
     ident = ident;
     constructor = constructor;
+    label = label;
     value_description = value_description;
     pat = pattern;
     expr = expression;

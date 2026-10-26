@@ -190,6 +190,12 @@ let iter_on_occurrences
       | Overridden (lid, _) -> add_label ~namespace exp_env lid label_descr
       | Kept _ -> ()) fields
   in
+  let iter_spec_fields ~namespace env fields =
+    Array.iter (fun (label_descr, _, definition) ->
+      match definition with
+      | Soverridden (lid, _) -> add_label ~namespace env lid label_descr
+      | Skept _ -> ()) fields
+  in
   let iter_field_pats ~namespace pat_env fields =
     List.iter (fun (lid, label_descr, pat) ->
       let lid =
@@ -284,6 +290,14 @@ let iter_on_occurrences
           f ~namespace:Value stexp_env path lid
       | Stexp_construct { lid; constructor; _ } ->
           add_constructor_description stexp_env lid constructor
+      | Stexp_record { fields; _ } ->
+          iter_spec_fields ~namespace:Label stexp_env fields
+      | Stexp_record_unboxed_product { fields; _ } ->
+          iter_spec_fields ~namespace:Unboxed_label stexp_env fields
+      | Stexp_field { lid; label; _ } ->
+          add_label ~namespace:Label stexp_env lid label
+      | Stexp_unboxed_field { lid; label; _ } ->
+          add_label ~namespace:Unboxed_label stexp_env lid label
       | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
       | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _ -> ());
       default_iterator.spec_expression sub e);
