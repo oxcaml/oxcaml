@@ -2536,7 +2536,7 @@ let quote_modes loc modes =
   Typemode.untransl_mode modes
   |> List.map (function
     | { loc = _; txt = Parsetree.Mode m } -> m
-    | { loc = _; txt = Parsetree.(Mode_var _ | Mode_bounds _) } ->
+    | { loc = _; txt = Parsetree.(Mode_var _ | Mode_var_with_constraints _) } ->
       fatal_error "Translquote.quote_modes: non-constant mode")
   |> Modes.of_string_list loc |> Modes.wrap
 

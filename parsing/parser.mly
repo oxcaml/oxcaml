@@ -4807,7 +4807,7 @@ mode_bounds:
 %inline mode:
   | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
   | v = mode_var { mkloc (Mode_var v.txt) v.loc }
-  | b = mode_bounds { mkloc (Mode_bounds b) (make_loc $sloc) }
+  | b = mode_bounds { mkloc (Mode_var_with_constraints b) (make_loc $sloc) }
 ;
 
 %inline mode_expr:

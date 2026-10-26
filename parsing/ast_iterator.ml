@@ -877,7 +877,7 @@ let default_iterator =
     mode = (fun this { txt; loc } ->
       (match txt with
        | Mode _ | Mode_var _ -> ()
-       | Mode_bounds { upper; lower } ->
+       | Mode_var_with_constraints { upper; lower } ->
          this.mode_bound this upper;
          this.mode_bound this lower);
       this.location this loc

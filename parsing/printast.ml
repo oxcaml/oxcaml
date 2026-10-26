@@ -171,9 +171,9 @@ let mode i ppf (mode : mode loc) =
   | Mode_var v ->
     line i ppf "mode %a\n" fmt_location mode.loc;
     line (i+1) ppf "Mode_var \"%s\"\n" v
-  | Mode_bounds { upper; lower } ->
+  | Mode_var_with_constraints { upper; lower } ->
     line i ppf "mode %a\n" fmt_location mode.loc;
-    line (i+1) ppf "Mode_bounds\n";
+    line (i+1) ppf "Mode_var_with_constraints\n";
     line (i+2) ppf "upper\n";
     mode_bound (i+3) ppf upper;
     line (i+2) ppf "lower\n";

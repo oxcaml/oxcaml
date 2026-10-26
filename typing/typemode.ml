@@ -255,7 +255,7 @@ let mode_consts_of_modes annots =
     (fun { txt; loc } ->
       match (txt : Parsetree.mode) with
       | Mode txt -> { txt; loc }
-      | Mode_var _ | Mode_bounds _ -> mode_variable_error ~loc)
+      | Mode_var _ | Mode_var_with_constraints _ -> mode_variable_error ~loc)
     annots
 
 let transl_mode_annots annots =

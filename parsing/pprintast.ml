@@ -454,15 +454,17 @@ let mode f { txt; _ } =
   match txt with
   | Mode s -> pp_print_string f s
   | Mode_var v -> pp f "'%s" v
-  | Mode_bounds
+  | Mode_var_with_constraints
       { upper = { bound_vars = []; bound_const = [] };
         lower = { bound_vars = []; bound_const = [] } } ->
       pp f "[]"
-  | Mode_bounds { upper; lower = { bound_vars = []; bound_const = [] } } ->
+  | Mode_var_with_constraints
+      { upper; lower = { bound_vars = []; bound_const = [] } } ->
       pp f "[< %a]" (mode_bound " & ") upper
-  | Mode_bounds { upper = { bound_vars = []; bound_const = [] }; lower } ->
+  | Mode_var_with_constraints
+      { upper = { bound_vars = []; bound_const = [] }; lower } ->
       pp f "[> %a]" (mode_bound " | ") lower
-  | Mode_bounds { upper; lower } ->
+  | Mode_var_with_constraints { upper; lower } ->
       pp f "[< %a > %a]" (mode_bound " & ") upper (mode_bound " | ") lower
 
 let modes f m =

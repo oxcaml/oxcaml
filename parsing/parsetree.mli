@@ -74,7 +74,7 @@ type mode_morph = string
 type mode =
   | Mode of mode_const
   | Mode_var of mode_var
-  | Mode_bounds of mode_bounds
+  | Mode_var_with_constraints of mode_bounds
 
 and mode_bounds =
   { upper : mode_bound;
