@@ -1612,7 +1612,12 @@ type 'a t = { mutable a : 'a }
 type +'a bad = 'a t# box;;
 [%%expect{|
 type 'a t = { mutable a : 'a; }
-type 'a bad = 'a t
+Line 2, characters 0-24:
+2 | type +'a bad = 'a t# box;;
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 type base = < m : int >
@@ -1621,7 +1626,12 @@ let leak_must_be_rejected (x : derived t# box) = (x :> base t# box);;
 [%%expect{|
 type base = < m : int >
 type derived = < m : int; n : int >
-val leak_must_be_rejected : derived t -> base t = <fun>
+Line 3, characters 49-67:
+3 | let leak_must_be_rejected (x : derived t# box) = (x :> base t# box);;
+                                                     ^^^^^^^^^^^^^^^^^^
+Error: Type "derived t# box" = "derived t" is not a subtype of
+         "base t# box" = "base t"
+       The second object type has no method "n"
 |}]
 
 (* Immutable records are covariant when boxed. *)

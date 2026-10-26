@@ -272,12 +272,19 @@ Line 3, characters 34-35:
 Error: The value "x" has type "r#" but an expression was expected of type "r2#"
 |}]
 
-(* Mutable fields imply modalities *)
+(* Mutable fields imply modalities, which the unboxed version inherits *)
 type r = { i : int ; mutable s : string }
-type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+type u = r# = #{ i : int ; mutable s : string @@ global many aliased unyielding dynamic }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many dynamic; }
+type u = r# = #{ i : int; mutable s : string; }
+|}]
+
+(* [mutable] on an unboxed record label implies the same modalities, so they
+   agree with those of the unboxed version and needn't be written *)
+type u = r# = #{ i : int ; mutable s : string }
+[%%expect{|
+type u = r# = #{ i : int; mutable s : string; }
 |}]
 
 (* Unboxed versions of records with mutable fields are invariant *)
@@ -285,7 +292,12 @@ type 'a r = { mutable x : 'a; y : int }
 type +'a t_bad_co = 'a r#
 [%%expect{|
 type 'a r = { mutable x : 'a; y : int; }
-type 'a t_bad_co = 'a r#
+Line 2, characters 0-25:
+2 | type +'a t_bad_co = 'a r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 type -'a t_bad_contra = 'a r#
@@ -295,7 +307,7 @@ Line 1, characters 0-29:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this definition, expected parameter variances are not satisfied.
        The 1st type parameter was expected to be contravariant,
-       but it is injective covariant.
+       but it is injective invariant.
 |}]
 
 type !'a t_inv = 'a r#

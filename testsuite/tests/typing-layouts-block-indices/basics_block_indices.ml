@@ -920,6 +920,55 @@ let ok () = (.mut.#mut_not_global.#item)
 val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
 |}]
 
+(* Block indices can't start at an unboxed record. Mutable block indices can be
+   made into stored unboxed records, regardless of their mutability. *)
+type mut = #{ mutable i : int; j : int }
+type mut_ref = { mutable m : mut }
+let idx_to_mutable_field = (.m.#i)
+let idx_to_immutable_field = (.m.#j)
+[%%expect{|
+type mut = #{ mutable i : int; j : int; }
+type mut_ref = { mutable m : mut; }
+val idx_to_mutable_field : (mut_ref, int) idx_mut = <abstr>
+val idx_to_immutable_field : (mut_ref, int) idx_mut = <abstr>
+|}]
+
+(* Through an immutable boxed field, the index can't point to a [mutable]
+   unboxed label because of its implied modalities. *)
+type mut_box = { m : mut }
+let idx_bad = (.m.#i)
+[%%expect{|
+type mut_box = { m : mut; }
+Line 2, characters 14-21:
+2 | let idx_bad = (.m.#i)
+                  ^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* Same for implicit unboxed records *)
+type mut_implicit = { mutable mi : int; mj : int }
+type mut_implicit_ref = { mutable m : mut_implicit# }
+let idx_to_mutable_field = (.m.#mi)
+let idx_to_immutable_field = (.m.#mj)
+[%%expect{|
+type mut_implicit = { mutable mi : int; mj : int; }
+type mut_implicit_ref = { mutable m : mut_implicit#; }
+val idx_to_mutable_field : (mut_implicit_ref, int) idx_mut = <abstr>
+val idx_to_immutable_field : (mut_implicit_ref, int) idx_mut = <abstr>
+|}]
+
+type mut_implicit_box = { m : mut_implicit# }
+let idx_bad = (.m.#mi)
+[%%expect{|
+type mut_implicit_box = { m : mut_implicit#; }
+Line 2, characters 14-22:
+2 | let idx_bad = (.m.#mi)
+                  ^^^^^^^^
+Error: Block indices do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
 (******************************************************)
 (* Cannot take an index to float/non-separable arrays *)
 
