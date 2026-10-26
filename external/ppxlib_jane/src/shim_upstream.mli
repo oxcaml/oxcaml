@@ -22,7 +22,26 @@ end
 
 module Mode : sig
   (** The modes that can go on function arguments or return types *)
-  type t = Mode of string [@@unboxed]
+  type t =
+    | Mode of string
+    | Mode_var of string
+    | Mode_var_with_constraints of bounds
+
+  and bounds =
+    { upper : bound
+    ; lower : bound
+    }
+
+  and bound =
+    { bound_vars : bound_elem list
+    ; bound_const : string loc list
+    }
+
+  and bound_elem =
+    { elem_morph : string loc option
+    ; elem_var : string loc
+    ; elem_mod : string loc list
+    }
 end
 
 module Modes : sig
@@ -525,7 +544,13 @@ module Ast_traverse : sig
       method function_body : function_body T.t
       method function_constraint : Pexp_function.Function_constraint.t T.t
       method type_constraint : type_constraint T.t
+      method mode_const : string T.t
+      method mode_var : string T.t
+      method mode_morph : string T.t
       method mode : Mode.t T.t
+      method mode_bounds : Mode.bounds T.t
+      method mode_bound : Mode.bound T.t
+      method mode_bound_elem : Mode.bound_elem T.t
       method modes : Modes.t T.t
       method modality : Modality.t T.t
       method modalities : Modalities.t T.t
@@ -543,7 +568,13 @@ module Ast_traverse : sig
       method function_body : ('ctx, function_body) T.t
       method function_constraint : ('ctx, Pexp_function.Function_constraint.t) T.t
       method type_constraint : ('ctx, type_constraint) T.t
+      method mode_const : ('ctx, string) T.t
+      method mode_var : ('ctx, string) T.t
+      method mode_morph : ('ctx, string) T.t
       method mode : ('ctx, Mode.t) T.t
+      method mode_bounds : ('ctx, Mode.bounds) T.t
+      method mode_bound : ('ctx, Mode.bound) T.t
+      method mode_bound_elem : ('ctx, Mode.bound_elem) T.t
       method modes : ('ctx, Modes.t) T.t
       method modality : ('ctx, Modality.t) T.t
       method modalities : ('ctx, Modalities.t) T.t
@@ -561,7 +592,13 @@ module Ast_traverse : sig
       method function_body : (function_body, 'a) T.t
       method function_constraint : (Pexp_function.Function_constraint.t, 'a) T.t
       method type_constraint : (type_constraint, 'a) T.t
+      method mode_const : (string, 'a) T.t
+      method mode_var : (string, 'a) T.t
+      method mode_morph : (string, 'a) T.t
       method mode : (Mode.t, 'a) T.t
+      method mode_bounds : (Mode.bounds, 'a) T.t
+      method mode_bound : (Mode.bound, 'a) T.t
+      method mode_bound_elem : (Mode.bound_elem, 'a) T.t
       method modes : (Modes.t, 'a) T.t
       method modality : (Modality.t, 'a) T.t
       method modalities : (Modalities.t, 'a) T.t
@@ -579,7 +616,13 @@ module Ast_traverse : sig
       method function_body : ('ctx, function_body, 'res) T.t
       method function_constraint : ('ctx, Pexp_function.Function_constraint.t, 'res) T.t
       method type_constraint : ('ctx, type_constraint, 'res) T.t
+      method mode_const : ('ctx, string, 'res) T.t
+      method mode_var : ('ctx, string, 'res) T.t
+      method mode_morph : ('ctx, string, 'res) T.t
       method mode : ('ctx, Mode.t, 'res) T.t
+      method mode_bounds : ('ctx, Mode.bounds, 'res) T.t
+      method mode_bound : ('ctx, Mode.bound, 'res) T.t
+      method mode_bound_elem : ('ctx, Mode.bound_elem, 'res) T.t
       method modes : ('ctx, Modes.t, 'res) T.t
       method modality : ('ctx, Modality.t, 'res) T.t
       method modalities : ('ctx, Modalities.t, 'res) T.t
