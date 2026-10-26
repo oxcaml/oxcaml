@@ -26,14 +26,14 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-module Edge = Fdo_counter_identity.Edge
-module Hash = Fdo_counter_identity.Hash
-module Function_body_hash = Fdo_counter_identity.Function_body_hash
-module Definition_id = Fdo_counter_identity.Definition_id
+module Position_hash = Fdo_counter_identity.Position_hash
+module Body_hash = Fdo_counter_identity.Body_hash
+module Name = Fdo_counter_identity.Name
+module Function = Fdo_counter_identity.Function
 module Position = Fdo_counter_identity.Position
 
 module Hashed = struct
-  type t = Hash.t list
+  type t = Position_hash.t list
 end
 
 type t =
@@ -50,31 +50,29 @@ let equal a b =
   Position.equal a.position b.position
   && List.equal Position.equal a.inlining_stack b.inlining_stack
 
+(* Only the outermost position belongs to the copied function. Inner positions
+   belong to callees inlined into it and keep their identities. *)
 let specialize t ~at =
   let specialize_position position =
     Position.specialize position ~at:(at.position :: at.inlining_stack)
   in
-  (* Only the outermost position belongs to the copied function. Inner positions
-     belong to callees inlined into it and retain their own identities. *)
-  let rec outermost = function
-    | [] -> []
-    | [p] -> [specialize_position p]
-    | p :: rest -> p :: outermost rest
-  in
-  match t.inlining_stack with
+  match List.rev t.inlining_stack with
   | [] -> { t with position = specialize_position t.position }
-  | stack -> { t with inlining_stack = outermost stack }
+  | outermost :: inner ->
+    { t with
+      inlining_stack = List.rev (specialize_position outermost :: inner)
+    }
 
 let to_string { position; inlining_stack } =
-  String.concat " <- "
-    (List.map Position.to_string (position :: inlining_stack))
+  position :: inlining_stack
+  |> List.map Position.to_string
+  |> String.concat " <- "
 
 let hash { position; inlining_stack } =
   List.map Position.hash (position :: inlining_stack)
 
 let add_all existing counters =
-  List.rev
-    (List.fold_left
-       (fun acc counter ->
-         if List.exists (equal counter) acc then acc else counter :: acc)
-       (List.rev existing) counters)
+  List.fold_left
+    (fun acc counter ->
+      if List.exists (equal counter) acc then acc else acc @ [counter])
+    existing counters

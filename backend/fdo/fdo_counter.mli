@@ -26,40 +26,42 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Pseudo-instrumentation counters for feedback-directed optimization.
+(** Pseudo-instrumentation counters for feedback-directed optimization (FDO).
 
     A counter marks a point in the control flow of the source program: a
-    function entry, a branch edge or a call site. Counters are attached to the
-    code early, carried through every optimization, and emitted as metadata
-    rather than as instructions, so an instrumented binary runs the same code as
-    an uninstrumented one. Branch samples from a run are mapped back to
-    counters, giving the profile: an execution count per counter. A later build
-    of the same program regenerates the same counters and looks up their counts,
-    to guide decisions such as block layout and function ordering.
+    function entry, a branch edge, or a call site. Counters are attached to the
+    code early, carried through every optimization, and emitted only as
+    metadata. The resulting binary then contains no "actual" counters, just a
+    list of labels for every address containing a branch.
 
-    A counter is a {!Position.t} together with its inlining stack: the call
-    sites, innermost first, that its code was inlined through. Counts are kept
+    We then collect counts on how many times branches are taken within
+    particular dynamic calling contexts from the profile of a run. These are
+    then mapped back to counters, giving an execution count per counter. A later
+    build of the same program regenerates the same counters and looks up their
+    counts to guide decisions such as block layout and function ordering.
+
+    A counter is a {!Position.t} together with its inlining stack (the call
+    sites (innermost first) that its code was inlined through). Counts are kept
     per inlining context, so code inlined at different call sites is profiled
     separately. As code is transformed, counters are rewritten by:
     - {!inline}: the counters of an inlined body get the call site as context;
     - {!specialize}: when inlining a call copies a function defined in the
-      callee (e.g. by an inlined functor application), the counters of the copy
-      are renamed after it.
+      callee (e.g. by an inlined functor application), the call site and its
+      inlining context are appended to the copy context of the copy's counters.
 
     Profiles must match across builds, so identities come from source scopes and
-    numbering, never from symbols (see {!Fdo_counter_identity}). Function
-    entries and named module instantiations survive edits of the bodies;
-    interior positions do not. *)
+    numbering (see {!Fdo_counter_identity}). Function entries and module-level
+    calls survive edits of function bodies, while interior positions do not. *)
 
-module Edge = Fdo_counter_identity.Edge
-module Hash = Fdo_counter_identity.Hash
-module Function_body_hash = Fdo_counter_identity.Function_body_hash
-module Definition_id = Fdo_counter_identity.Definition_id
+module Position_hash = Fdo_counter_identity.Position_hash
+module Body_hash = Fdo_counter_identity.Body_hash
+module Name = Fdo_counter_identity.Name
+module Function = Fdo_counter_identity.Function
 module Position = Fdo_counter_identity.Position
 
 module Hashed : sig
   (** Position hashes, innermost first. *)
-  type t = Hash.t list
+  type t = Position_hash.t list
 end
 
 type t =
@@ -73,11 +75,10 @@ type t =
 val inline : t -> at:t -> t
 
 (** [t], in a copy of its function made when the call at [at] was inlined. Only
-    the outermost position, the one in the copied function, is renamed; the
-    inlining stack keeps its length. *)
+    the outermost position, the one in the copied function, gets [at] in its
+    copy context. The inlining stack keeps its length. *)
 val specialize : t -> at:t -> t
 
-(** Compare counters structurally. *)
 val equal : t -> t -> bool
 
 (** Canonical string representation for metadata and dumps. *)
