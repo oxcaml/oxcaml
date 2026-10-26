@@ -85,3 +85,16 @@ However, when **unboxed products** are involved (as arguments or return type), w
 - Suppose an `external` takes an unboxed product, e.g. `[#(int * int)]`. In bytecode, this is passed as a single argument, containing a pointer to a pair; however, in JSIR, this will be passed as two arguments, in the same way as for native compilation.
 - If the return type for an external is a nested unboxed product such as `[#(#(int * int) * int)]`, bytecode stubs need to return a nested tuple, while JSIR stubs need to return a single flat (i.e. non-nested) tuple containing the unarised arguments. Unlike the parameter passing case above, this is different from native code compilation, where multiple return values are supported to some extent.
 - `[@untagged]` and `[@unboxed]` on externals are irrelevant for what JS stubs should look like, since there is no tagging in JSIR and naked integers look just like boxed ones.
+
+## Optimisation hints
+The bytecode compiler (from OCaml 5.6) records optimisation hints alongside the bytecode, which JSOO reads in `parse_bytecode.ml` and uses to specialise the generated code: on external calls (`Extern`), closures, array lengths (`Vectlength`) and block allocations (`mutability`).
+The JSIR pass attaches the same hints, computed from Flambda instead (see [`Optimization_hint`](../../../external/js_of_ocaml/compiler/lib/optimization_hint.mli)):
+
+| Hint | Attached to |
+|------|-------------|
+| `Vectlength` kind | `Array_length`: `Float` for flat float arrays, `Value` for every other array (an ordinary block in JSIR), `Generic` when Flambda does not know. |
+| Closure hints | Every `Closure`, from the metadata of its code: the representation of its parameters and result (from the arities), its `inline` attribute (`Available_inline` is `Hint_inline`) and whether it is a functor. |
+| `Hint_unsafe` | String, bytes and bigstring accesses of 16 bits or more (`String_or_bigstring_load`, `Bytes_or_bigstring_set`). Flambda inserts the bounds checks itself, so these accesses are always unsafe and call the unchecked runtime primitives (`caml_string_get16u`, ...), as `js_of_ocaml` does for bytecode accesses with this hint. Signed accesses load the unsigned value and sign-extend it. The runtime only provides the unchecked 16- and 64-bit bigstring accessors for OCaml >= 5.6, so those still call the checked ones. |
+| `Hint_bigarray` | `Bigarray_load`, `Bigarray_set` and byte accesses to bigstrings (`caml_ba_get_raw_unsafe`, `caml_ba_set_raw_unsafe`), giving the kind and layout of the bigarray. |
+| `Hint_int` | Comparisons of unboxed `int32`s, `nativeint`s and `int64`s, which bytecode is able to use to emit different comparison primitives. |
+| `Hint_primitive` | Not emitted yet. Bytecode attaches it to the calls of externals whose native name differs from the bytecode one, with that name and the representations of its arguments and result. Flambda does not keep the native name right now, and JSOO does not use this hint yet, so we defer this until later. |

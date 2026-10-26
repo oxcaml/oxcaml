@@ -123,6 +123,59 @@ let bound_parameters ~env bound_params =
     (Bound_parameters.to_list bound_params)
     ([], env)
 
+let repr_of_kind (kind : Flambda_kind.t) : Optimization_hint.repr option =
+  match kind with
+  | Value -> Some Value
+  | Naked_number Naked_immediate -> Some Int
+  | Naked_number Naked_float -> Some Float
+  | Naked_number Naked_int32 -> Some Int32
+  | Naked_number Naked_int64 -> Some Int64
+  | Naked_number Naked_nativeint -> Some Nativeint
+  | Naked_number
+      ( Naked_float32 | Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
+      | Naked_vec512 | Naked_mask )
+  | Region | Rec_info ->
+    None
+
+let reprs_of_arity arity =
+  Flambda_arity.unarize arity
+  |> Misc.Stdlib.List.map_option (fun kind ->
+      repr_of_kind (Flambda_kind.With_subkind.kind kind))
+
+let return_repr_of_arity arity : Optimization_hint.repr option =
+  match reprs_of_arity arity with
+  | None -> None
+  | Some [repr] -> Some repr
+  | Some ([] | _ :: _ :: _) ->
+    (* Several unarised results are returned as a block. *)
+    Some Value
+
+let closure_hint code_metadata ~params : Optimization_hint.closure_hint option
+    =
+  match
+    ( reprs_of_arity (Code_metadata.params_arity code_metadata),
+      return_repr_of_arity (Code_metadata.result_arity code_metadata) )
+  with
+  | Some param_reprs, Some return
+    when List.compare_lengths param_reprs params = 0 ->
+    let inline : Optimization_hint.inline_attribute =
+      match Code_metadata.inline code_metadata with
+      | Always_inline -> Always_inline
+      | Available_inline -> Hint_inline
+      | Never_inline -> Never_inline
+      | Unroll n -> Unroll n
+      | Default_inline -> Default_inline
+    in
+    Some
+      { params = param_reprs;
+        return;
+        inline;
+        (* Flambda 2 has no specialise attribute *)
+        specialise = Default_specialise;
+        is_a_functor = Code_metadata.is_a_functor code_metadata
+      }
+  | (Some _ | None), (Some _ | None) -> None
+
 let block ~env ~res ~tag ~mut ~fields :
     Jsir.expr * To_jsir_env.t * To_jsir_result.t =
   let tag = Tag.to_int tag in

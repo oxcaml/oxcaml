@@ -66,6 +66,50 @@ let with_float_suffix ~(bitwidth : Flambda_primitive.float_bitwidth) op =
   in
   "caml_" ^ op ^ suffix
 
+let bigarray_hint ~(kind : Flambda_primitive.Bigarray_kind.t)
+    ~(layout : Flambda_primitive.Bigarray_layout.t) : Optimization_hint.ccall =
+  let kind : Optimization_hint.Bigarray.kind =
+    match kind with
+    | Float16 -> Float16
+    | Float32 -> Float32
+    | Float32_t -> Float32_t
+    | Float64 -> Float64
+    | Sint8 -> Int8_signed
+    | Uint8 -> Int8_unsigned
+    | Sint16 -> Int16_signed
+    | Uint16 -> Int16_unsigned
+    | Int32 -> Int32
+    | Int64 -> Int64
+    | Int_width_int -> Int
+    | Targetint_width_int -> Nativeint
+    | Complex32 -> Complex32
+    | Complex64 -> Complex64
+  in
+  let layout : Optimization_hint.Bigarray.layout =
+    match layout with C -> C | Fortran -> Fortran
+  in
+  (* Flambda inserts the bounds checks itself (see
+     [Lambda_to_flambda_primitives.bigarray_access]) *)
+  Hint_bigarray { unsafe = true; kind; layout }
+
+let bigstring_hint = bigarray_hint ~kind:Uint8 ~layout:C
+
+(* The unchecked variant ([u] suffix) of a string, bytes or bigstring access
+   primitive of at least 16 bits, e.g. [caml_string_get16u]. *)
+let unsafe_string_like_access (value : Flambda_primitive.string_like_value)
+    op_name =
+  match value with
+  | String -> "caml_string_" ^ op_name ^ "u"
+  | Bytes -> "caml_bytes_" ^ op_name ^ "u"
+  | Bigstring -> (
+    match op_name with
+    | "get16" | "get64" | "set16" | "set64" ->
+      (* The js_of_ocaml runtime only provides these unchecked variants for
+         OCaml >= 5.6 (bytecode only started asking for them then), so the
+         checked ones are used until OxCaml catches up. *)
+      "caml_ba_uint8_" ^ op_name
+    | _ -> "caml_ba_uint8_" ^ op_name ^ "u")
+
 let no_op ~env ~res = None, env, res
 
 let identity ~env ~res x =
@@ -263,7 +307,24 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Get_tag ->
     let var, env, res = get_tag ~env ~res x in
     Some var, env, res
-  | Array_length _ -> use_prim' (Vectlength Generic)
+  | Array_length kind ->
+    let kind : Optimization_hint.array_kind =
+      match kind with
+      | Float_array_opt_dynamic -> Generic
+      | Array_kind Naked_floats -> Float
+      | Array_kind
+          ( Immediates | Gc_ignorable_values | Values | Naked_float32s
+          | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+          | Naked_int64s | Naked_nativeints | Naked_masks | Unboxed_product _ )
+        ->
+        (* Every array other than a flat float array is an ordinary block in
+           JSIR (see [Make_array]) *)
+        Value
+      | Array_kind (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
+        (* No SIMD *)
+        raise Primitive_not_supported
+    in
+    use_prim' (Vectlength kind)
   | Bigarray_length { dimension } ->
     let x, res = prim_arg ~env ~res x in
     use_prim ~env ~res
@@ -473,36 +534,37 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
       (* No SIMD *)
       raise Primitive_not_supported)
-  | String_or_bigstring_load (value, width) ->
-    let op_name =
-      match width with
-      | Eight -> "unsafe_get"
-      | Eight_signed -> "geti8"
-      | Sixteen -> "get16"
-      | Sixteen_signed -> "geti16"
-      | Thirty_two -> "get32"
-      | Single -> "getf32"
-      | Sixty_four -> "get64"
-      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ | Mask ->
-        raise Primitive_not_supported
-    in
-    let extern_name =
+  | String_or_bigstring_load (value, width) -> (
+    (* Flambda inserts the bounds checks itself, so these loads can always use
+       the unchecked primitives. *)
+    let byte_load : Jsir.prim =
       match value with
-      | String -> "caml_string_" ^ op_name
-      | Bytes -> "caml_bytes_" ^ op_name
-      | Bigstring -> (
-        match width with
-        | Eight -> "caml_ba_get_1"
-        | Eight_signed | Sixteen | Sixteen_signed | Thirty_two | Single
-        | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _
-        | Mask ->
-          "caml_ba_uint8_" ^ op_name)
+      | String -> Extern ("caml_string_unsafe_get", None)
+      | Bytes -> Extern ("caml_bytes_unsafe_get", None)
+      | Bigstring -> Extern ("caml_ba_get_raw_unsafe", Some bigstring_hint)
     in
-    use_prim' (Extern (extern_name, None))
-  | Bigarray_load (_dims, _kind, _layout) ->
-    (* The index calculation is already done in Flambda, so we are free to
-       ignore the parameters. *)
-    use_prim' (Extern ("caml_ba_get_raw_unsafe", None))
+    let wide_load op_name : Jsir.prim =
+      Extern (unsafe_string_like_access value op_name, Some Hint_unsafe)
+    in
+    match width with
+    | Eight -> use_prim' byte_load
+    | Eight_signed ->
+      let var, env, res = use_prim0' ~env ~res byte_load [x; y] in
+      sign_extend ~env ~res ~bits:8 (Pv var)
+    | Sixteen -> use_prim' (wide_load "get16")
+    | Sixteen_signed ->
+      let var, env, res = use_prim0' ~env ~res (wide_load "get16") [x; y] in
+      sign_extend ~env ~res ~bits:16 (Pv var)
+    | Thirty_two -> use_prim' (wide_load "get32")
+    | Single -> use_prim' (wide_load "getf32")
+    | Sixty_four -> use_prim' (wide_load "get64")
+    | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ | Mask ->
+      raise Primitive_not_supported)
+  | Bigarray_load (_dims, kind, layout) ->
+    (* The index calculation is already done in Flambda, so the raw accessor
+       only needs the resulting offset. *)
+    use_prim'
+      (Extern ("caml_ba_get_raw_unsafe", Some (bigarray_hint ~kind ~layout)))
   | Phys_equal comparison ->
     let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
     use_prim' prim
@@ -575,18 +637,31 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     | Yielding_bool comparison -> (
       let eq, neq, lt, ult, le =
         let open Jsir in
+        let specialised (int_kind : Optimization_hint.boxed_integer) =
+          let polymorphic name (prim : prim) : prim =
+            match int_kind with
+            | Int32 | Nativeint -> prim
+            | Int64 -> Extern (name, Some (Hint_int int_kind))
+          in
+          let ult : prim =
+            match int_kind with
+            | Int32 | Nativeint -> Ult
+            | Int64 -> Extern ("caml_int64_ult", None)
+          in
+          ( polymorphic "caml_equal" Eq,
+            polymorphic "caml_notequal" Neq,
+            polymorphic "caml_lessthan" Lt,
+            ult,
+            polymorphic "caml_lessequal" Le )
+        in
         match kind with
-        | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
-        | Naked_int32 | Naked_nativeint ->
+        | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16 ->
           (* Sign extension preserves both signed and unsigned ordering, so
              smallints can be compared directly *)
           Eq, Neq, Lt, Ult, Le
-        | Naked_int64 ->
-          ( Extern ("caml_equal", None),
-            Extern ("caml_notequal", None),
-            Extern ("caml_lessthan", None),
-            Extern ("caml_int64_ult", None),
-            Extern ("caml_lessequal", None) )
+        | Naked_int32 -> specialised Int32
+        | Naked_nativeint -> specialised Nativeint
+        | Naked_int64 -> specialised Int64
       in
       let unsigned_le x y =
         let var_ule = Jsir.Var.fresh () in
@@ -716,28 +791,34 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       (* No SIMD *)
       raise Primitive_not_supported)
   | Bytes_or_bigstring_set (value, width) ->
-    let extern_name =
+    (* As for [String_or_bigstring_load], these stores are always unsafe. *)
+    let string_like_value : Flambda_primitive.string_like_value =
+      match value with Bytes -> Bytes | Bigstring -> Bigstring
+    in
+    let wide_store op_name : Jsir.prim =
+      Extern
+        (unsafe_string_like_access string_like_value op_name, Some Hint_unsafe)
+    in
+    let prim : Jsir.prim =
       match value, width with
       | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ | _, Mask
         ->
         (* No SIMD *)
         raise Primitive_not_supported
-      | Bytes, (Eight | Eight_signed) -> "caml_bytes_unsafe_set"
-      | Bytes, (Sixteen | Sixteen_signed) -> "caml_bytes_set16"
-      | Bytes, Thirty_two -> "caml_bytes_set32"
-      | Bytes, Single -> "caml_bytes_setf32"
-      | Bytes, Sixty_four -> "caml_bytes_set64"
-      | Bigstring, (Eight | Eight_signed) -> "caml_ba_set_1"
-      | Bigstring, (Sixteen | Sixteen_signed) -> "caml_ba_uint8_set16"
-      | Bigstring, Thirty_two -> "caml_ba_uint8_set32"
-      | Bigstring, Single -> "caml_ba_uint8_setf32"
-      | Bigstring, Sixty_four -> "caml_ba_uint8_set64"
+      | Bytes, (Eight | Eight_signed) -> Extern ("caml_bytes_unsafe_set", None)
+      | Bigstring, (Eight | Eight_signed) ->
+        Extern ("caml_ba_set_raw_unsafe", Some bigstring_hint)
+      | _, (Sixteen | Sixteen_signed) -> wide_store "set16"
+      | _, Thirty_two -> wide_store "set32"
+      | _, Single -> wide_store "setf32"
+      | _, Sixty_four -> wide_store "set64"
     in
-    use_prim' (Extern (extern_name, None))
-  | Bigarray_set (_dims, _kind, _layout) ->
-    (* The index calculation is already done in Flambda, so we are free to
-       ignore the parameters. *)
-    use_prim' (Extern ("caml_ba_set_raw_unsafe", None))
+    use_prim' prim
+  | Bigarray_set (_dims, kind, layout) ->
+    (* The index calculation is already done in Flambda, so the raw accessor
+       only needs the resulting offset. *)
+    use_prim'
+      (Extern ("caml_ba_set_raw_unsafe", Some (bigarray_hint ~kind ~layout)))
   | Atomic_int_arith (offset_units, op) ->
     let extern_name =
       match op with
@@ -849,6 +930,11 @@ let primitive ~env ~res (prim : Flambda_primitive.t) =
 let extern ~env ~res symbol args =
   let args, res = prim_args ~env ~res args in
   let name = Symbol.linkage_name_as_string symbol in
+  (* CR-someday selee: Bytecode attaches [Hint_primitive] to the calls of
+     externals whose native name differs from the bytecode one, recording the
+     name and the representations of the arguments and result. Flambda doesn't
+     keep the native name so we don't emit the hint. This should eventually be
+     threaded through. *)
   let var = Jsir.Var.fresh () in
   ( var,
     To_jsir_result.add_instr_exn res

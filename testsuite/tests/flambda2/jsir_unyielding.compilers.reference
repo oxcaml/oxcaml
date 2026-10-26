@@ -1,36 +1,36 @@
 Entry point: 0
 
 ==== 0 () ====
-  v8 = fun(v7){2 ()}
+  v8 = fun(v7){2 ()} [hint:(value)->value never_inline]
   (assign) v10 = v8
   v11 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__f_1"j, v10) 
-  v13 = fun(v12){3 ()}
+  v13 = fun(v12){3 ()} [hint:(value)->value never_inline]
   (assign) v18 = v13
   v19 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__call_unyielding_2"j, v18) 
-  v21 = fun(v20){5 ()}
+  v21 = fun(v20){5 ()} [hint:(value)->value never_inline]
   (assign) v26 = v21
   v27 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__call_yielding_3"j, v26) 
-  v29 = fun(v28){7 ()}
+  v29 = fun(v28){7 ()} [hint:(value)->value]
   (assign) v31 = v29
   v32 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__fn[jsir_unyielding.ml:25,63--76]_5"j, v31) 
-  v34 = fun(v33){8 ()}
+  v34 = fun(v33){8 ()} [hint:(value)->value never_inline]
   (assign) v36 = v34
   v37 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__call_with_unyielding_arg_4"j, v36) 
-  v44 = fun(v43){10 ()}
+  v44 = fun(v43){10 ()} [hint:(value)->value never_inline]
   (assign) v45 = v44
   v46 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__curried_6"j, v45) 
-  v48 = fun(v47){11 ()}
+  v48 = fun(v47){11 ()} [hint:(value)->value never_inline]
   (assign) v54 = v48
   v55 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__over_app_7"j, v54) 
-  v58 = fun(v56, v57){13 ()}
+  v58 = fun(v56, v57){13 ()} [hint:(value,value)->value never_inline]
   (assign) v60 = v58
   v61 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__add_8"j, v60) 
   (assign) v4 = v60
-  v2 = fun(v1){1 ()}
+  v2 = fun(v1){1 ()} [hint:(value)->value]
   (assign) v3 = v2
   (assign) v62 = v2
   v63 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__partial_add_9"j, v62) 
-  v65 = fun(v64){14 ()}
+  v65 = fun(v64){14 ()} [hint:(value)->value never_inline]
   (assign) v68 = v65
   v69 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__partial_app_10"j, v68) 
   v71 = CONST{0}
@@ -88,7 +88,7 @@ Entry point: 0
   event jsir_unyielding.ml:30:10
   event jsir_unyielding.ml:30:18
   (assign) v41 = v43
-  v39 = fun(v38){9 ()}
+  v39 = fun(v38){9 ()} [hint:(value)->value]
   (assign) v40 = v39
   return v39
 
@@ -123,7 +123,7 @@ Entry point: 0
 ==== 16 (v73) ====
   event jsir_unyielding.ml:45:10
   event jsir_unyielding.ml:45:46
-  v78 = fun(v77){18 ()}
+  v78 = fun(v77){18 ()} [hint:(value)->value]
   (assign) v80 = v78
   v81 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__fn[jsir_unyielding.ml:46,33--46]_11"j, v80) 
   v82 = v26~(v80)
