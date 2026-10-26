@@ -145,7 +145,13 @@ end
 let random_element (st : State.t) list =
   List.nth list (Random.State.int st.random_state (List.length list))
 
-let random_number_ty (st : State.t) = random_element st st.number_types
+let random_number_ty ?(value_only = false) (st : State.t) =
+  let number_types =
+    if value_only
+    then List.filter (fun (nty : NumberTy.t) -> not nty.unboxed) st.number_types
+    else st.number_types
+  in
+  random_element st number_types
 
 let random_exceptions (st : State.t) exceptions ~count =
   let rec pick chosen remaining count =
@@ -206,12 +212,13 @@ let gen_array_dimensions (st : State.t) =
   in
   sizes dimensions Config.max_array_elements
 
-let gen_scalar_or_array_type (st : State.t) =
-  let nty = random_number_ty st in
+(* With [value_only], only types of layout value are generated. Arrays are
+   values whatever their element type. *)
+let gen_scalar_or_array_type ?(value_only = false) (st : State.t) =
   if
     st.swarm.arrays && with_probability st ~probability:Config.array_probability
-  then Ty.Array (nty, gen_array_dimensions st)
-  else Ty.Number nty
+  then Ty.Array (random_number_ty st, gen_array_dimensions st)
+  else Ty.Number (random_number_ty ~value_only st)
 
 let gen_record_types (st : State.t) =
   let representations =
@@ -258,26 +265,20 @@ let gen_record_types (st : State.t) =
   in
   gen 0 []
 
-let gen_value_type (st : State.t) =
-  (* Exception payloads must be values, so unboxed numbers and unboxed records
-     are excluded. *)
-  let boxed_records =
-    List.filter (fun (record : Ty.record) -> not record.unboxed) st.record_types
+let gen_non_variant_type ?(value_only = false) (st : State.t) =
+  let record_types =
+    if value_only
+    then
+      List.filter
+        (fun (record : Ty.record) -> not record.unboxed)
+        st.record_types
+    else st.record_types
   in
   if
-    (not (List.is_empty boxed_records))
+    (not (List.is_empty record_types))
     && with_probability st ~probability:Config.record_probability
-  then Ty.Record (random_element st boxed_records)
-  else
-    let boxed_numbers =
-      List.filter (fun (nty : NumberTy.t) -> not nty.unboxed) st.number_types
-    in
-    let nty = random_element st boxed_numbers in
-    if
-      st.swarm.arrays
-      && with_probability st ~probability:Config.array_probability
-    then Ty.Array (nty, gen_array_dimensions st)
-    else Ty.Number nty
+  then Ty.Record (random_element st record_types)
+  else gen_scalar_or_array_type ~value_only st
 
 let gen_exceptions (st : State.t) =
   if not st.swarm.exceptions
@@ -287,19 +288,13 @@ let gen_exceptions (st : State.t) =
       (fun id ->
         { Exn.id;
           payload =
+            (* [raise] only accepts values, so the payload must be one too. *)
             (if
                with_probability st
                  ~probability:Config.exception_payload_probability
-             then Some (gen_value_type st)
+             then Some (gen_non_variant_type ~value_only:true st)
              else None)
         })
-
-let gen_non_variant_type (st : State.t) =
-  if
-    (not (List.is_empty st.record_types))
-    && with_probability st ~probability:Config.record_probability
-  then Ty.Record (random_element st st.record_types)
-  else gen_scalar_or_array_type st
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
