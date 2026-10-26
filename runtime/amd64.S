@@ -1488,7 +1488,7 @@ LBL(preemption_unhandled):
 LBL(113):
         ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0)
-        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
+        LEA_VAR(caml_raise_resume_failure, %rax)
         jmp     LBL(caml_c_call)
 CFI_ENDPROC
 END_FUNCTION(caml_perform)
@@ -1519,9 +1519,14 @@ CFI_STARTPROC
         subq    $16, %rsp; CFI_ADJUST(16)
         movq    %rax, 0(%rsp)
         C_call  (GCALL(caml_cont_wake_stacks))
+    /* %r10 := zero if the stacks could not be woken, in which case the
+       last fiber is still stale and must not be used. */
+        movq    %rax, %r10
         movq    0(%rsp), %rax
         addq    $16, %rsp; CFI_ADJUST(-16)
         SWITCH_C_TO_OCAML
+        testq   %r10, %r10
+        jz      LBL(113)                 /* could not wake: raise */
         movq    Cont_last_fiber(%rbx), %rdi
 1:      movq    Caml_state(current_stack), %rsi  /* %rsi := old stack */
         movq    (Stack_handler-1)(%rdi), %r10
@@ -1690,7 +1695,7 @@ LBL(continuation_already_resumed):
         ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller in the TSan
                                   backtrace */
-        LEA_VAR(caml_raise_continuation_already_resumed, %rax)
+        LEA_VAR(caml_raise_resume_failure, %rax)
         jmp LBL(caml_c_call)
 CFI_ENDPROC
 END_FUNCTION(caml_continue)
