@@ -594,9 +594,10 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
        all_labels := String.Set.add name !all_labels)
     lbls;
   let inherit_allowed =
-    match record_form with
-    | Legacy -> false
-    | Unboxed_product -> List.compare_length_with lbls 1 = 0
+    match record_form, kloc with
+    | Unboxed_product, _ | Legacy, Record { unboxed = true } ->
+      List.compare_length_with lbls 1 = 0
+    | Legacy, _ -> false
   in
   let mk {pld_name=name;pld_inherit=inherit_;pld_mutable=mut;
           pld_modalities=modalities;pld_type=arg;pld_loc=loc;
@@ -2444,6 +2445,9 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
          in-memory representation is always exactly the underlying value). *)
       if Option.is_none sort then assert_any_args_support loc;
       Record_unboxed
+    in
+    let jkind =
+      Jkind.apply_operator_l (Types.unboxed_record_field_operator lbl) jkind
     in
     [{ lbl with ld_sort }], rep, jkind
   | Legacy, _, Record_dummy _
@@ -5708,8 +5712,9 @@ let report_error ~loc = function
       Location.errorf ~loc "Unboxed record labels cannot be mutable"
   | Inherit_unsupported ->
       Location.errorf ~loc
-        "%a is only supported on the sole field of an unboxed record"
-        Style.inline_code "inherit"
+        "%a is only supported on the sole field of an unboxed record@ \
+         or of a record declared %a"
+        Style.inline_code "inherit" Style.inline_code "[@@unboxed]"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->

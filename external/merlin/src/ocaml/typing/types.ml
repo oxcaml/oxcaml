@@ -1097,8 +1097,9 @@ let find_unboxed_type decl =
        (Record_unboxed_product | Record_unboxed_product_undetermined), _) ->
     Some (arg, ms, unboxed_record_field_operator ld)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _}],
-       Record_unboxed, _)
+      ([{ld_type = arg; ld_modalities = ms; _} as ld],
+       Record_unboxed, _) ->
+    Some (arg, ms, unboxed_record_field_operator ld)
   | Type_record
       ([{ld_type = arg; ld_modalities = ms; _ }],
        Record_inlined (_, _, Variant_unboxed), _)
