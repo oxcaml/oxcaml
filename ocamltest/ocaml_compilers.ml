@@ -46,6 +46,7 @@ let compiler
   ~exit_status_variable:exit_status_variable
   ~reference_variable:reference_variable
   ~output_variable:output_variable
+  ~extra_dependencies:[Ocaml_directories.stdlib]
   )
 
   let host = host

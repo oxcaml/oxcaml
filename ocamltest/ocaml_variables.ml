@@ -170,6 +170,9 @@ let ocamlopt_byte = make ("ocamlopt_byte",
 let ocamlrun = make ("ocamlrun",
   "Path of the ocamlrun executable")
 
+let ocamlrun_sys = make ("ocamlrun_sys",
+  "Path of the system ocamlrun executable")
+
 let stdlib = make ("stdlib",
   "Path of the stdlib")
 
