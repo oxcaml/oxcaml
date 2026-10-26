@@ -235,6 +235,7 @@ Line 1, characters 12-30:
 1 | type t = #{ inherit a : int8#; b : int }
                 ^^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
 |}]
 
 type t = #{ a : int; inherit b : int8# }
@@ -243,6 +244,7 @@ Line 1, characters 21-38:
 1 | type t = #{ a : int; inherit b : int8# }
                          ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
 |}]
 
 type t = { inherit a : int8# }
@@ -251,14 +253,12 @@ Line 1, characters 11-28:
 1 | type t = { inherit a : int8# }
                ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
 |}]
 
 type t = { inherit a : int8# } [@@unboxed]
 [%%expect{|
-Line 1, characters 11-28:
-1 | type t = { inherit a : int8# } [@@unboxed]
-               ^^^^^^^^^^^^^^^^^
-Error: "inherit" is only supported on the sole field of an unboxed record
+type t = { inherit a : int8#; } [@@unboxed]
 |}]
 
 type t = A of { inherit a : int8# }
@@ -267,6 +267,7 @@ Line 1, characters 16-33:
 1 | type t = A of { inherit a : int8# }
                     ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
 |}]
 
 type t = A of { inherit a : int8# } [@@unboxed]
@@ -275,6 +276,7 @@ Line 1, characters 16-33:
 1 | type t = A of { inherit a : int8# } [@@unboxed]
                     ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
 |}]
 
 type t = ..
@@ -285,6 +287,7 @@ Line 2, characters 17-34:
 2 | type t += A of { inherit a : int8# }
                      ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
 |}]
 
 (* Unboxed records cannot have mutable fields, so an [inherit] field cannot be
