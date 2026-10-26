@@ -54,9 +54,10 @@ type t
     the functions defined in its body. *)
 val of_function : Naming_context.t -> Lambda.lfunction -> t * Naming_context.t
 
-val definition_id : t -> Fdo_counter.Definition_id.t
+(** The FDO function id. *)
+val function_ : t -> Fdo_counter.Function.t
 
-(** The counters of the function's entry edge: its entry counter. *)
+(** The counters of the function's entry edge. *)
 val entry_annotation : t -> Fdo_annotation.t
 
 (** The first [limit] (5 by default) distinct tokens of a function. Only
