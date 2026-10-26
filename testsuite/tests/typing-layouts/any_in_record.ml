@@ -252,11 +252,11 @@ type t = { t : a; } [@@unboxed]
 Line 3, characters 6-11:
 3 | let f { t } = t
           ^^^^^
-Error: This expression has type "('a : '_representable_layout_1)"
+Error: This expression has type "('a : '_representable_layout_1 addressable)"
        but an expression was expected of type "t"
-       The layout of t is any
+       The layout of t is any addressable
          because of the definition of a at line 1, characters 0-12.
-       But the layout of t must be representable
+       But the layout of t must be addressable
          because it's the record type used in a projection.
 |}]
 

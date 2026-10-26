@@ -556,7 +556,7 @@ Line 2, characters 54-78:
                                                           ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
-       The layout of void_unboxed_record is void
+       The layout of void_unboxed_record is void addressable
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
          because it instantiates an unannotated type parameter of t,
