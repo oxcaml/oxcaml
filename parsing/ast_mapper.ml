@@ -1049,8 +1049,8 @@ let default_mapper =
       let txt =
         match txt with
         | (Mode _ | Mode_var _) as mode -> mode
-        | Mode_bounds { upper; lower } ->
-          Mode_bounds
+        | Mode_var_with_constraints { upper; lower } ->
+          Mode_var_with_constraints
             { upper = this.mode_bound this upper;
               lower = this.mode_bound this lower
             }
