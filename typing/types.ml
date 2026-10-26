@@ -570,6 +570,7 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
+    ld_inherit: inherit_flag;
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
@@ -1083,20 +1084,26 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
+let unboxed_record_field_operator ld : Jkind_types.Kind_operator.t =
+  match ld.ld_inherit with
+  | Not_inherited -> Addressable
+  | Inherited -> Id
+
 let find_unboxed_type decl =
   match decl.type_kind with
-    Type_record
+  | Type_record_unboxed_product
+      ([{ld_type = arg; ld_modalities = ms; _ } as ld],
+       (Record_unboxed_product | Record_unboxed_product_undetermined), _) ->
+    Some (arg, ms, unboxed_record_field_operator ld)
+  | Type_record
       ([{ld_type = arg; ld_modalities = ms; _}],
        Record_unboxed, _)
   | Type_record
       ([{ld_type = arg; ld_modalities = ms; _ }],
        Record_inlined (_, _, Variant_unboxed), _)
-  | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }],
-       (Record_unboxed_product | Record_unboxed_product_undetermined), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
-    Some (arg, ms)
+    Some (arg, ms, Jkind_types.Kind_operator.Id)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined

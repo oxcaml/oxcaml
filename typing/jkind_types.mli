@@ -252,5 +252,11 @@ module Layout : sig
 
   val product : 'a t list -> 'a t
 
-  val apply_operator : 'a t -> Kind_operator.t -> 'a t
+  val is_surely_addressable : Sort.t t -> bool
+
+  (** [addressable t] is [t] made addressable, without a redundant [Addressable]
+      when [t] is already known to be addressable. *)
+  val addressable : Sort.t t -> Sort.t t
+
+  val apply_operator : Sort.t t -> Kind_operator.t -> Sort.t t
 end

@@ -213,8 +213,9 @@ and constructor_argument { ca_type; ca_loc; ca_modalities; ca_sort = _ } =
   }
 
 and label_declaration
-    { ld_id; ld_mutable; ld_type; ld_attributes; ld_modalities; _ } =
-  Ast_helper.Type.field ~attrs:ld_attributes
+    { ld_id; ld_inherit; ld_mutable; ld_type; ld_attributes; ld_modalities; _ }
+    =
+  Ast_helper.Type.field ~attrs:ld_attributes ~inherit_:ld_inherit
     ~mut:
       (match ld_mutable with
       | Mutable _ -> Mutable

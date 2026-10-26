@@ -994,6 +994,7 @@ and label_declaration =
      ld_id: Ident.t;
      ld_name: string loc;
      ld_uid: Uid.t;
+     ld_inherit: inherit_flag;
      ld_mutable: mutability;
      ld_modalities: modalities;
      ld_type: core_type;
