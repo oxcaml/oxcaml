@@ -1088,7 +1088,7 @@ module Variable_names : sig
   val new_var_name : non_gen:bool -> type_expr -> unit -> string
 
   val name_of_type : (unit -> string) -> transient_expr -> string
-  val name_of_mode : With_locality.lr -> string
+  val name_of_modes : With_locality.lr -> string
 
   (** Whether the edges on the curry mode [m] are exactly the
       [past]/[close] edges from [acc], i.e. implied by the currying
@@ -1236,20 +1236,17 @@ end = struct
       | Monadic :
           (With_locality.Monadic.Const.t,
            With_locality.Monadic.Const.t) table
-          (* CR zeisbach: perhaps this description could be tweaked to make
-             it clear what is specific to [Monadic] and what is the general
-             definition of path (since this comment is referred to by both
-             [Comonadic] and [Closing_over] as well) *)
           (** Tracks all paths from a visible monadic mode
-          variable to another. A path is defined as follows:
-            let [(v, f)] and [(u, h)] be two visible monadic
-            morphvars, such that [v] can reach [u] by following
-            vlowers. Let [g] be one such composition of vlower
-            functions. By
-            transitivity, we know the following to be true: [g u <= v].
+          variable to another.
 
-            A path from [(v, f)] to [(u, h)] is defined as: [f ∘ g ∘ h'],
-            where [h'] is the left adjoint of [h] *)
+          A path from one mode variable to another is defined as follows:
+          let [(v, f)] and [(u, h)] be two visible morphvars,
+          such that [v] can reach [u] by following vlowers.
+          Let [g] be one such composition of vlower functions. By
+          transitivity, we know the following to be true: [g u <= v].
+
+          A path from [(v, f)] to [(u, h)] is defined as: [f ∘ g ∘ h'],
+          where [h'] is the left adjoint of [h] *)
       | Comonadic :
           (With_locality.Comonadic.Const.t,
            With_locality.Comonadic.Const.t) table
@@ -1316,16 +1313,9 @@ end = struct
       | Closing_over -> Closing_over_paths.find key t.closing_over
   end
 
-  (* CR zeisbach: not a super actionable comment, but IMO it's pretty
-     unfortunate that this is the existing style used by this module. so much
-     implicit state is tricky... seems like changing it might substantially
-     diverge from the upstream organization of this code, so i'm not actually
-     suggesting it. *)
   (** Tracks the mapping of monadic and comonadic mode
   descriptions visible in the type *)
   let visible_pairs = ref ([] : visible_pair list)
-  let aliased_visible_pairs = ref ([] : visible_pair list)
-  let printed_aliased_visible_pairs = ref ([] : (visible_pair * string) list)
 
   (** Tracks all mode variables that may occur in the above
   list (for fast visibility checking) *)
@@ -1400,19 +1390,12 @@ end = struct
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
         add_visible With_locality.obj_monadic monadic;
         add_visible With_locality.obj_comonadic comonadic;
-        if List.exists (eq_pair pair) !visible_pairs then
-          (* CR zeisbach: as discussed, maybe this should be ripped out for
-             now? *)
-          aliased_visible_pairs := pair :: !aliased_visible_pairs
-        else
+        if not (List.exists (eq_pair pair) !visible_pairs) then
           visible_pairs := pair :: !visible_pairs
       end
 
-  (* CR zeisbach: I think that this function deserves a purpose statement at
-     least clarifying what we can expect has been mutably accumulated by the end
-     of the traversal. (perhaps a slightly more descriptive name as well, which
-     we can get away with since it's only called twice.) The description in the
-     mode printing doc seems like a good place to start :-) *)
+  (** [register_visible_modes] iterates over the type and registers every visible
+      mode variable. *)
   let rec register_visible_modes ty =
     let px = proxy ty in
     if not (List.memq px !visited_for_named_modevars) then begin
@@ -2092,8 +2075,6 @@ end = struct
     visited_for_named_vars := [];
     visited_for_named_modevars := [];
     visible_pairs := [];
-    aliased_visible_pairs := [];
-    printed_aliased_visible_pairs := [];
     modenames := [];
     edge_table := [];
     suppressed_curry_heads := [];
@@ -2137,8 +2118,6 @@ end = struct
     let pair = pair_of_mode m in
     let implied =
       bounds_implied
-      (* an aliased mode is printed at every occurrence *)
-      && (not (List.exists (eq_pair pair) !aliased_visible_pairs))
       &&
       let { lower; upper } = find_edges pair in
       let acc_heads = acc_heads acc in
@@ -2218,50 +2197,16 @@ end = struct
         edges_lower
     end
 
-  let find_mode_already_printed pair =
-    let find (pair_alias, m) =
-      if eq_pair pair pair_alias then Some m else None
-    in
-    List.find_map find !printed_aliased_visible_pairs
-
-  let mode_print_alias ppf pair =
-    if List.exists (eq_pair pair)
-         !aliased_visible_pairs
-    then begin
-      let cnt = !modename_counter in
-      modename_counter := cnt + 1;
-      let m = pick_name cnt in
-      printed_aliased_visible_pairs :=
-        (pair,m) :: !printed_aliased_visible_pairs;
-      Fmt.fprintf ppf "as %s" m
-    end
-
-  (* CR zeisbach: nit: callers (and the parameter name) seem to use the
-     convention of calling [With_locality.lr] "modes", not "mode" (which the
-     name of this function uses). *)
-  let name_of_mode (modes : With_locality.lr) =
+  let name_of_modes (modes : With_locality.lr) =
     let pair = pair_of_mode modes in
-    (* CR zeisbach: It could be a good idea to check some invariants that we
-       expect to hold here. For instance, if the [pair] we are trying to print
-       is not in [visible_pairs], then something in [reserve] has gone wrong,
-       and we could fatal error.
-
-       Similarly, we could check whether any of the [heads_of_mode] for these
-       [modes] are in [suppressed_curry_heads], as that would indicate we are
-       printing something that we should not. Such an assertion would have
-       caught some of the bugs that I found.
-
-       Though TBF, I think there aren't a ton of places in the front-end with
-       similar assertions, unless it's particularly important. It could be even
-       nicer to instead try to structure the code to avoid these cases as
-       possibilities, but I don't yet have suggestions for how to do so. *)
-    match find_mode_already_printed pair with
-    | Some m -> Fmt.asprintf "%s" m
-    | None ->
-        let bounds = construct_raw_bounds pair in
-        Fmt.asprintf "%a%a"
-          (print_raw_constraints bounds) pair
-          mode_print_alias pair
+    if not (List.exists (eq_pair pair) !visible_pairs) then
+      fatal_error "Out_type.name_of_modes: modes not registered by reserve";
+    if List.exists (fun (H v) -> mem_head !suppressed_curry_heads v)
+         (heads_of_mode modes)
+    then
+      fatal_error "Out_type.name_of_modes: printing an elided curry mode";
+    let bounds = construct_raw_bounds pair in
+    Fmt.asprintf "%a" (print_raw_constraints bounds) pair
 
   let substitute ty =
     match List.assq ty !name_subst with
@@ -2593,7 +2538,7 @@ let tree_of_modes : With_locality.lr -> const_or_generic -> string list =
     match acc with
     | Generic _ ->
       [ (Fmt.asprintf "%s"
-            (Variable_names.name_of_mode modes))]
+            (Variable_names.name_of_modes modes))]
     | Const c -> tree_of_modes_const c
 
 (** The modal context on a type when printing it. This is to reproduce the mode
