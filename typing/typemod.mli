@@ -207,6 +207,7 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Unrepresentable_include of Env.unrepresentable_item
+  | Unrepresentable_open of Env.unrepresentable_item
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

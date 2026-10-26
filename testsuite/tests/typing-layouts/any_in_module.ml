@@ -385,36 +385,52 @@ module F (M : S) = struct
   open (M : S)
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 2-14:
+2 |   open (M : S)
+      ^^^^^^^^^^^^
+Error: This module contains unrepresentable items, so it cannot be opened.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being opened.
 |}]
 
 module F (V : Value_witness) (M : S with type t = V.t) = struct
   open (M : S with type t = V.t)
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) -> sig end
 |}]
 
 let f (m : (module S)) =
   let open (val m) in
   ()
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 6-18:
+2 |   let open (val m) in
+          ^^^^^^^^^^^^
+Error: This module contains unrepresentable items, so it cannot be opened.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being opened.
 |}]
 
 let f (type a : value) (m : (module S with type t = a)) =
   let open (val m) in
   ()
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+val f : (module S with type t = 'a) -> unit = <fun>
 |}]
 
 module G (X : sig end) : S = struct
@@ -430,9 +446,18 @@ module F (X : sig end) = struct
   open G(X)
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+Line 2, characters 2-11:
+2 |   open G(X)
+      ^^^^^^^^^
+Error: This module contains unrepresentable items, so it cannot be opened.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being opened.
 |}]
 
 (* Opens in signatures only take paths and bind nothing at runtime, so they

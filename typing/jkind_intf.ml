@@ -394,6 +394,7 @@ module History = struct
     | Module_projection
     | Module_coercion
     | Module_inclusion
+    | Module_open
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)

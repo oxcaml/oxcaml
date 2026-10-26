@@ -104,6 +104,7 @@ type error =
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
   | Unrepresentable_include of Env.unrepresentable_item
+  | Unrepresentable_open of Env.unrepresentable_item
 
 
 exception Error_forward of Location.error
@@ -3930,10 +3931,19 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
         | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
       ) sg
     in
+    let open_items_repr =
+      match
+        Env.sorts_of_signature_items ~why:Module_open newenv
+          (List.map Subst.Lazy.of_signature_item sg)
+      with
+      | Ok repr -> repr
+      | Error unrep ->
+        Error.log_and_raise loc newenv (Unrepresentable_open unrep)
+    in
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_items_repr = expect_fixed_representation sg;
+      open_items_repr;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -5719,6 +5729,9 @@ let report_error ~loc env = function
   | Unrepresentable_include unrep ->
       Location.errorf ~loc ~sub:[unrepresentable_item_msg env unrep]
         "This module contains unrepresentable items, so it cannot be included."
+  | Unrepresentable_open unrep ->
+      Location.errorf ~loc ~sub:[unrepresentable_item_msg env unrep]
+        "This module contains unrepresentable items, so it cannot be opened."
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
