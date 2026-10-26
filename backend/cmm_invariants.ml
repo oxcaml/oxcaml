@@ -24,21 +24,30 @@ module Env : sig
 
   val init : unit -> t
 
-  val handler : t -> cont:Static_label.t -> arg_num:int -> t
+  val register_width_of_variable :
+    t ->
+    Backend_var.With_provenance.t ->
+    width:int ->
+    t
 
-  val jump : t -> exit_label:Cmm.exit_label -> arg_num:int -> unit
+  val width_of_variable_if_known : t -> Backend_var.t -> int option
+
+  val handler : t -> cont:Static_label.t -> width:int -> t
+
+  val jump : t -> exit_label:Cmm.exit_label -> width_opt:int option -> unit
 
   val report : Format.formatter -> bool
 end = struct
   type t = {
     bound_handlers : int Static_label.Map.t;
+    known_widths_of_variables : int Backend_var.Map.t;
   }
 
   type error =
     | Unbound_handler of { cont: Static_label.t }
     | Multiple_handlers of { cont: Static_label.t; }
-    | Wrong_arguments_number of
-        { cont: Static_label.t; handler_args: int; jump_args: int; }
+    | Wrong_width of
+        { cont: Static_label.t; handler_width: int; jump_width: int; }
 
   module Error = struct
     type t = error
@@ -67,30 +76,41 @@ end = struct
   let multiple_handler cont =
     record_error (Multiple_handlers { cont; })
 
-  let wrong_arguments cont handler_args jump_args =
-    record_error (Wrong_arguments_number { cont; handler_args; jump_args; })
+  let wrong_width cont ~handler_width ~jump_width =
+    record_error (Wrong_width { cont; handler_width; jump_width; })
 
   let init () =
     state.all_handlers <- Static_label.Set.empty;
     state.errors <- ErrorSet.empty;
-    {
-      bound_handlers = Static_label.Map.empty;
+    { bound_handlers = Static_label.Map.empty;
+      known_widths_of_variables = Backend_var.Map.empty;
     }
 
-  let handler t ~cont ~arg_num =
+  let register_width_of_variable t var ~width =
+    { t with
+      known_widths_of_variables =
+        let var = Backend_var.With_provenance.var var in
+        Backend_var.Map.add var width t.known_widths_of_variables;
+    }
+
+  let width_of_variable_if_known t var =
+    Backend_var.Map.find_opt var t.known_widths_of_variables
+
+  let handler t ~cont ~width =
     if Static_label.Set.mem cont state.all_handlers then multiple_handler cont;
     state.all_handlers <- Static_label.Set.add cont state.all_handlers;
-    let bound_handlers = Static_label.Map.add cont arg_num t.bound_handlers in
-    { bound_handlers; }
+    let bound_handlers = Static_label.Map.add cont width t.bound_handlers in
+    { t with bound_handlers }
 
-  let jump t ~exit_label ~arg_num =
+  let jump t ~exit_label ~width_opt =
     match (exit_label : Cmm.exit_label) with
     | Return_lbl -> ()
     | Lbl cont ->
-      match Static_label.Map.find cont t.bound_handlers with
-      | handler_args ->
-        if arg_num <> handler_args then
-          wrong_arguments cont handler_args arg_num
+      match Static_label.Map.find cont t.bound_handlers, width_opt with
+      | handler_width, Some jump_width ->
+        if handler_width <> jump_width then
+          wrong_width cont ~handler_width ~jump_width
+      | _, None -> ()
       | exception Not_found -> unbound_handler cont
 
   let print_error ppf error =
@@ -108,12 +128,12 @@ end = struct
       Format.fprintf ppf
         "Continuation %a was declared in more than one handler"
         Static_label.format cont
-    | Wrong_arguments_number { cont; handler_args; jump_args } ->
+    | Wrong_width { cont; handler_width; jump_width } ->
       Format.fprintf ppf
-        "Continuation %a was declared with %d arguments but called with %d"
+        "Continuation %a was declared with %d components but called with %d"
         Static_label.format cont
-        handler_args
-        jump_args
+        handler_width
+        jump_width
 
   let print_error_newline ppf error =
     Format.fprintf ppf "%a@." print_error error
@@ -126,15 +146,71 @@ end = struct
     end
 end
 
+let rec syntactic_width env (expr : Cmm.expression) : int option =
+  match expr with
+  | Cconst_float _
+  | Cconst_float32 _
+  | Cconst_int _
+  | Cconst_mask _
+  | Cconst_natint _
+  | Cconst_symbol _
+  | Cconst_vec128 _
+  | Cconst_vec256 _
+  | Cconst_vec512 _
+    -> Some 1
+  | Ccatch _
+  | Cexit _
+  | Cifthenelse _
+  | Cinvalid _
+  | Cswitch _
+    -> None
+  | Cname_for_debugger (_, body)
+  | Cphantom_let (_, _, body)
+  | Csequence (_, body)
+    -> syntactic_width env body
+  | Clet (var, defining_expr, body)
+    -> syntactic_width
+         (register_syntactic_width_of_assignment env var defining_expr)
+         body
+  | Ctuple exprs (* This is an *unboxed* tuple. *)
+    -> syntactic_width_of_unboxed_product env exprs
+  | Cvar var
+    -> Env.width_of_variable_if_known env var
+  | Cop (op, _, _)
+    -> Some (Array.length (Select_utils.oper_result_type op))
+
+and syntactic_width_of_unboxed_product env =
+  List.fold_left
+    (fun acc expr ->
+      match acc, syntactic_width env expr with
+      | Some acc, Some width -> Some (acc + width)
+      | None, _ | _, None -> None)
+    (Some 0)
+
+and register_syntactic_width_of_assignment env var expr =
+  match syntactic_width env expr with
+  | Some width -> Env.register_width_of_variable env var ~width
+  | None -> env
+
+let register_syntactic_width_of_params env :
+    (_ * Cmx_format.machtype_component array) list -> Env.t =
+  List.fold_left
+    (fun acc (var, machtypes) ->
+      Env.register_width_of_variable acc var ~width:(Array.length machtypes))
+    env
+
+let width_of_params : (_ * Cmx_format.machtype_component array) list -> int =
+  List.fold_left (fun acc (_, machtypes) -> acc + Array.length machtypes) 0
+
 let rec check env (expr : Cmm.expression) =
   match expr with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Cconst_mask _ | Cvar _ | Cinvalid _ ->
     ()
-  | Clet (_, expr, body) ->
+  | Clet (var, expr, body) ->
     check env expr;
-    check env body
+    check (register_syntactic_width_of_assignment env var expr) body
   | Cphantom_let (_, _, expr) ->
     check env expr
   | Cname_for_debugger (_, expr) ->
@@ -156,8 +232,8 @@ let rec check env (expr : Cmm.expression) =
   | Ccatch (flag, handlers, body) ->
     let env_extended =
       List.fold_left
-        (fun env Cmm.{label = cont; params = args; _} ->
-           Env.handler env ~cont:cont ~arg_num:(List.length args))
+        (fun env Cmm.{label = cont; params; _} ->
+           Env.handler env ~cont ~width:(width_of_params params))
         env
         handlers
     in
@@ -167,9 +243,13 @@ let rec check env (expr : Cmm.expression) =
       | Recursive -> env_extended
       | Normal | Exn_handler -> env
     in
-    List.iter (fun Cmm.{body = handler; _} -> check env_handler handler) handlers
+    List.iter
+      (fun Cmm.{body = handler; params; _} ->
+        check (register_syntactic_width_of_params env_handler params) handler)
+      handlers
   | Cexit (exit_label, args, _trap_actions) ->
-    Env.jump env ~exit_label ~arg_num:(List.length args)
+    Env.jump env ~exit_label
+      ~width_opt:(syntactic_width_of_unboxed_product env args)
 
 let run ppf (fundecl : Cmm.fundecl) =
   let env = Env.init () in
