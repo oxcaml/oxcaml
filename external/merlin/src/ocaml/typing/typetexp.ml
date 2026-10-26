@@ -1844,7 +1844,7 @@ let transl_type_scheme_lmono env mode styp =
 
 let transl_type_scheme_poly_val env mode styp =
   let cty, sort_vars =
-    Jkind_types.Sort.generalize_with (fun () ->
+    Jkind.Sort.generalize_with (fun () ->
       transl_type_scheme_lmono env mode styp)
   in
   if List.is_empty sort_vars then

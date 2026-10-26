@@ -1069,7 +1069,6 @@
   .ocamlfrontend.objs/cctx.ocaml-index
   .ocamlbytecomp.objs/cctx.ocaml-index
   .ocamloptcomp.objs/cctx.ocaml-index
-  .ocamljcomp.objs/cctx.ocaml-index
   .oxcaml_common.objs/cctx.ocaml-index
   (alias_rec middle_end/ocaml-index)
   (alias_rec backend/ocaml-index)
