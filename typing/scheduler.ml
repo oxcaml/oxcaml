@@ -1,15 +1,57 @@
+module Monitor = struct
+  (* Decorators, innermost first. *)
+  type t = (exn -> exn) list
+
+  let stack : t ref = Local_store.s_ref []
+
+  let current () = !stack
+
+  let run_in t body ~decorate =
+    let saved = !stack in
+    stack := t;
+    match body () with
+    | v ->
+      stack := saved;
+      v
+    | exception e ->
+      stack := saved;
+      raise (decorate e)
+
+  let try_ body ~with_ =
+    if not (Language_extension.is_enabled Omnidirectionality)
+    then try body () with e -> raise (with_ e)
+    else run_in (with_ :: current ()) body ~decorate:with_
+
+  (* Decorators of [t] still on the stack see the result again, and pass it
+     through by the contract on [try_]. *)
+  let run_job t job =
+    run_in t job ~decorate:(fun e ->
+        List.fold_left (fun e decorate -> decorate e) e t)
+end
+
 module Job = struct
   type t = unit -> unit
 
-  module With_skip = struct
+  module With_monitor = struct
     type nonrec t =
       { job : t;
+        monitor : Monitor.t
+      }
+
+    let create job ~monitor = { job; monitor }
+
+    let run { monitor; job } = Monitor.run_job monitor job
+  end
+
+  module With_skip = struct
+    type t =
+      { job : With_monitor.t;
         mutable skip : bool
       }
 
     let create job = { job; skip = false }
 
-    let run t = if not t.skip then t.job ()
+    let run t = if not t.skip then With_monitor.run t.job
   end
 end
 
@@ -36,15 +78,15 @@ include With_backtracking.Make (Change)
 
 let create () = { jobs = Queue.create () }
 
-let add t job =
+let add ?(monitor = Monitor.current ()) t job =
   if
     Language_extension.(
       is_at_least Omnidirectionality Omnidirectionality.Scheduler_policy.Delayed)
   then (
-    let job = Job.With_skip.create job in
+    let job = Job.(job |> With_monitor.create ~monitor |> With_skip.create) in
     log (Add job);
     Queue.add job t.jobs)
-  else job ()
+  else Monitor.run_job monitor job
 
 let take t =
   let next_job = Queue.take t.jobs in
