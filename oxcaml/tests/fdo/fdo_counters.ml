@@ -30,8 +30,10 @@ let call function_ body_hash index =
 let module_level_call function_ binder index =
   F.Position.create_module_level_call ~function_ ~binder ~index
 
-let counter ?(inlined_at = []) position : F.t =
-  { position; inlining_stack = inlined_at }
+let counter ?(inlined_at = []) position =
+  List.fold_left
+    (fun counter at -> F.inline counter ~at:(F.of_position at))
+    (F.of_position position) inlined_at
 
 (* a.ml:
 
@@ -94,15 +96,14 @@ let () =
   print_counter "inlined into g" inlined;
   print_counter "then into h" twice;
   check "context is innermost first"
-    (F.equal twice (counter f_then ~inlined_at:[g_call; h_call]));
-  check "inlining a call site keeps its position"
-    (F.equal
-       (F.inline (counter g_call) ~at:(counter h_call))
-       (counter g_call ~inlined_at:[h_call]));
-  check "inlining an entry keeps the function identity"
-    (F.equal
-       (F.inline (counter f_entry) ~at:(counter g_call))
-       (counter f_entry ~inlined_at:[g_call]))
+    (List.equal F.Position.equal (F.inlining_stack twice) [g_call; h_call]);
+  check "inlining keeps the position"
+    (List.for_all
+       (fun position ->
+         F.Position.equal
+           (F.position (F.inline (counter position) ~at:(counter g_call)))
+           position)
+       [f_entry; f_then; h_call])
 
 (* a.ml:
 
@@ -124,6 +125,8 @@ let fn_entry = entry fn
 
 let fn_then = branch fn (body 0xf) 0 1
 
+let fn_call = call fn (body 0xf) 1
+
 let add3_call = module_level_call c_toplevel (name "C.add3") 0
 
 let m_call = module_level_call c_toplevel (name "C.M") 0
@@ -140,7 +143,7 @@ let () =
     (not (F.equal specialized (counter fn_entry)));
   check "copies share the original's name"
     (F.Name.equal
-       (F.Function.name (F.Position.function_ specialized.position))
+       (F.Function.name (F.Position.function_ (F.position specialized)))
        (F.Function.name fn))
 
 (* As above, but [make] was itself inlined into [g] first, so the call that
@@ -152,7 +155,7 @@ let () =
   print_counter "copy made at an inlined call"
     (F.specialize (counter fn_entry) ~at:site);
   print_counter "counter inlined into the copy"
-    (F.specialize (counter f_then ~inlined_at:[fn_then]) ~at:site)
+    (F.specialize (counter f_then ~inlined_at:[fn_call]) ~at:site)
 
 (* a.ml:
 
@@ -222,11 +225,31 @@ let () =
           [counter f_else; counter f_else; counter f_then])
        [counter f_then; counter f_else])
 
+(* Counters can be ordered, and used as keys. *)
+let () =
+  let counters =
+    [counter f_then; counter f_then ~inlined_at:[g_call]; counter f_else]
+  in
+  check "compare agrees with equal"
+    (List.for_all
+       (fun a ->
+         List.for_all
+           (fun b -> Bool.equal (F.equal a b) (Int.equal (F.compare a b) 0))
+           counters)
+       counters);
+  let table = F.Tbl.create 3 in
+  List.iteri (fun i counter -> F.Tbl.replace table counter i) counters;
+  check "counters are keys"
+    (Int.equal (F.Tbl.length table) 3
+    && Option.equal Int.equal
+         (F.Tbl.find_opt table (counter f_then ~inlined_at:[g_call]))
+         (Some 1))
+
 (* Hashes are what metadata and profiles store. *)
 let () =
   let specialized =
     F.Position.function_
-      (F.specialize (counter f_entry) ~at:(counter add3_call)).position
+      (F.position (F.specialize (counter f_entry) ~at:(counter add3_call)))
   in
   print_hash "entry hash" (F.Position.hash f_entry);
   print_hash "branch hash" (F.Position.hash f_then);

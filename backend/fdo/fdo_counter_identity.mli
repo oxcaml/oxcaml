@@ -75,6 +75,8 @@ module Name : sig
 
   val equal : t -> t -> bool
 
+  val compare : t -> t -> int
+
   val to_string : t -> string
 end
 
@@ -92,6 +94,8 @@ module Function : sig
   val entry_position_hash : t -> Position_hash.t
 
   val equal : t -> t -> bool
+
+  val compare : t -> t -> int
 
   val to_string : t -> string
 end
@@ -128,9 +132,13 @@ module Position : sig
 
   val is_function_entry : t -> bool
 
+  val is_call : t -> bool
+
   val hash : t -> Position_hash.t
 
   val equal : t -> t -> bool
+
+  val compare : t -> t -> int
 
   val to_string : t -> string
 

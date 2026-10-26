@@ -41,14 +41,27 @@ type t =
     inlining_stack : Position.t list
   }
 
+let of_position position = { position; inlining_stack = [] }
+
+let position t = t.position
+
+let inlining_stack t = t.inlining_stack
+
 let inline t ~at =
+  if not (Position.is_call at.position)
+  then
+    Misc.fatal_errorf "Fdo_counter.inline: %s is not a call site"
+      (Position.to_string at.position);
   { t with
     inlining_stack = t.inlining_stack @ (at.position :: at.inlining_stack)
   }
 
-let equal a b =
-  Position.equal a.position b.position
-  && List.equal Position.equal a.inlining_stack b.inlining_stack
+let compare a b =
+  match Position.compare a.position b.position with
+  | 0 -> List.compare Position.compare a.inlining_stack b.inlining_stack
+  | c -> c
+
+let equal a b = Int.equal (compare a b) 0
 
 (* Only the outermost position belongs to the copied function. Inner positions
    belong to callees inlined into it and keep their identities. *)
@@ -70,6 +83,14 @@ let to_string { position; inlining_stack } =
 
 let hash { position; inlining_stack } =
   List.map Position.hash (position :: inlining_stack)
+
+module Tbl = Hashtbl.Make (struct
+  type nonrec t = t
+
+  let equal = equal
+
+  let hash counter = Hashtbl.hash (hash counter)
+end)
 
 let add_all existing counters =
   List.fold_left

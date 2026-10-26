@@ -66,6 +66,8 @@ module Body_hash = struct
 
   let equal = Int32.equal
 
+  let compare = Int32.compare
+
   let to_string t = Printf.sprintf "%08lx" t
 
   let prehash t = Fdo_prehash.of_int (Int32.to_int t)
@@ -105,9 +107,12 @@ module Name = struct
     in
     { name_str; discriminator; prehash }
 
-  let equal a b =
-    String.equal a.name_str b.name_str
-    && Int.equal a.discriminator b.discriminator
+  let compare a b =
+    match String.compare a.name_str b.name_str with
+    | 0 -> Int.compare a.discriminator b.discriminator
+    | c -> c
+
+  let equal a b = Int.equal (compare a b) 0
 
   let to_string { name_str; discriminator; prehash = _ } =
     Printf.sprintf "%S:%d" name_str discriminator
@@ -120,8 +125,10 @@ module Interior_position = struct
       index : int
     }
 
-  let equal a b =
-    Body_hash.equal a.body_hash b.body_hash && Int.equal a.index b.index
+  let compare a b =
+    match Body_hash.compare a.body_hash b.body_hash with
+    | 0 -> Int.compare a.index b.index
+    | c -> c
 
   let prehash { body_hash; index } =
     Fdo_prehash.combine (Body_hash.prehash body_hash) (Fdo_prehash.of_int index)
@@ -142,12 +149,15 @@ module Call_position = struct
           index : int
         }
 
-  let equal a b =
+  let compare a b =
     match a, b with
-    | Interior a, Interior b -> Interior_position.equal a b
-    | Module_level a, Module_level b ->
-      Name.equal a.binder b.binder && Int.equal a.index b.index
-    | (Interior _ | Module_level _), _ -> false
+    | Interior a, Interior b -> Interior_position.compare a b
+    | Module_level a, Module_level b -> (
+      match Name.compare a.binder b.binder with
+      | 0 -> Int.compare a.index b.index
+      | c -> c)
+    | Interior _, Module_level _ -> -1
+    | Module_level _, Interior _ -> 1
 
   let prehash ~function_ = function
     | Interior position ->
@@ -175,13 +185,17 @@ module Edge = struct
         }
     | Call of Call_position.t
 
-  let equal a b =
+  let rank = function Entry -> 0 | Branch _ -> 1 | Call _ -> 2
+
+  let compare a b =
     match a, b with
-    | Entry, Entry -> true
-    | Branch a, Branch b ->
-      Interior_position.equal a.position b.position && Int.equal a.arm b.arm
-    | Call a, Call b -> Call_position.equal a b
-    | (Entry | Branch _ | Call _), _ -> false
+    | Entry, Entry -> 0
+    | Branch a, Branch b -> (
+      match Interior_position.compare a.position b.position with
+      | 0 -> Int.compare a.arm b.arm
+      | c -> c)
+    | Call a, Call b -> Call_position.compare a b
+    | (Entry | Branch _ | Call _), _ -> Int.compare (rank a) (rank b)
 
   let prehash ~function_ = function
     | Entry -> function_
@@ -210,8 +224,10 @@ module Function = struct
         call : Call_position.t
       }
 
-    let equal a b =
-      Name.equal a.caller b.caller && Call_position.equal a.call b.call
+    let compare a b =
+      match Name.compare a.caller b.caller with
+      | 0 -> Call_position.compare a.call b.call
+      | c -> c
 
     let prehash { caller; call } =
       Call_position.prehash ~function_:caller.prehash call
@@ -246,9 +262,12 @@ module Function = struct
   let entry_position_hash t =
     Position_hash.of_prehash ~is_function_entry:true t.prehash
 
-  let equal a b =
-    Name.equal a.name b.name
-    && List.equal Callsite.equal a.copied_at b.copied_at
+  let compare a b =
+    match Name.compare a.name b.name with
+    | 0 -> List.compare Callsite.compare a.copied_at b.copied_at
+    | c -> c
+
+  let equal a b = Int.equal (compare a b) 0
 
   let to_string { name; copied_at; prehash = _ } =
     let specializations =
@@ -294,11 +313,17 @@ module Position = struct
   let is_function_entry t =
     match t.edge with Entry -> true | Branch _ | Call _ -> false
 
+  let is_call t = match t.edge with Call _ -> true | Entry | Branch _ -> false
+
   let hash t =
     Position_hash.of_prehash ~is_function_entry:(is_function_entry t) t.prehash
 
-  let equal a b =
-    Function.equal a.function_ b.function_ && Edge.equal a.edge b.edge
+  let compare a b =
+    match Function.compare a.function_ b.function_ with
+    | 0 -> Edge.compare a.edge b.edge
+    | c -> c
+
+  let equal a b = Int.equal (compare a b) 0
 
   let to_string t =
     Edge.to_string ~function_:(Function.to_string t.function_) t.edge
