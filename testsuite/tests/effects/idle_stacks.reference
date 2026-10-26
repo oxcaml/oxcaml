@@ -10,3 +10,4 @@ live_nest: 5000 ok
 reperform_gc_both: 888
 reperform_gc_outer: 888
 reperform_idle: 200010000
+shallow_rehandle: 1500
