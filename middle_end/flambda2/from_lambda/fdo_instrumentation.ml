@@ -50,9 +50,7 @@ let fresh_index state =
   index
 
 (* Insert annotations to each arm *)
-let switch_arms_with_counters ({ function_; body_hash; _ } as state)
-    (switch : Switch_expr.t) =
-  let arms = Switch_expr.arms switch in
+let switch_arms_with_counters ({ function_; body_hash; _ } as state) arms =
   let index = fresh_index state in
   Target_ocaml_int.Map.mapi
     (fun value arm ->
@@ -69,12 +67,8 @@ let switch_arms_with_counters ({ function_; body_hash; _ } as state)
     arms
 
 (* [Some path] if [dbg] corresponds to a call that binds a module-level result
-   with scope path [path] (see [Fdo_counter_identity]). A named module binding,
-   [module M = F (X)], gives the path of [M]. A call in an anonymous module (a
-   toplevel [include F (X)] or [module _ = F (X)], a [let module _ = F (X) in],
-   or any other code directly in a structure) gives the path of the enclosing
-   module with [.(module)] appended. *)
-let module_level_call dbg =
+   with scope path [path] (see [Fdo_counter_identity] for why we care). *)
+let module_level_call_binding dbg =
   let path (scopes : Debuginfo.Scoped_location.scopes) =
     match scopes with
     | Cons { item = Sc_module_definition; name; prev; _ } ->
@@ -82,12 +76,13 @@ let module_level_call dbg =
         Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           scopes
       in
-      (* The compilation unit's scope has no [prev]; like a module with no name,
-         it is not a binding of its own. *)
-      let anonymous =
-        String.equal name ""
-        || match prev with Empty -> true | Cons _ -> false
+      let is_compilation_unit =
+        match prev with Empty -> true | Cons _ -> false
       in
+      let anonymous = String.equal name "" || is_compilation_unit in
+      (* If a call has no binding of its own, append ".(module)" to its path.
+         This can happen, for instance, in a toplevel [include F (X)] or [module
+         _ = F (X)]. *)
       Some (if anonymous then path ^ ".(module)" else path)
     | Empty
     | Cons
@@ -107,14 +102,6 @@ let module_level_call dbg =
       "Fdo_instrumentation: unexpected inlined debuginfo %a before Simplify"
       Debuginfo.print_compact dbg
 
-(* Create the [Fdo_counter.Position.t] corresponding to a callsite.
-
-   Calls evaluated directly in a module (functor applications above all) are
-   module-level calls, named by the binding's path (see [module_level_call]) and
-   numbered within it, since several calls can share a path (as the two calls of
-   [module M = F (G (X))] do). Unlike an interior position, this does not depend
-   on the body or the numbering of the enclosing code, so the specializations
-   made at the call keep their names when unrelated code is edited. *)
 let callsite_position
     ({ function_; body_hash; module_call_indices; _ } as state)
     (apply : Apply_expr.t) =
@@ -122,9 +109,11 @@ let callsite_position
   | Function _ | Method _ ->
     let index = fresh_index state in
     let position =
-      match module_level_call (Apply_expr.dbg apply) with
+      match module_level_call_binding (Apply_expr.dbg apply) with
       | None -> FC.Position.create_call ~function_ ~body_hash ~index
       | Some path ->
+        (* Multiple calls can have the same binder, e.g. [module M = F (G
+           (X))] *)
         let index =
           Option.value (String.Tbl.find_opt module_call_indices path) ~default:0
         in
@@ -179,11 +168,11 @@ let rec expr state (e : Expr.t) : Expr.t =
         (Apply_expr.with_callsite_counter apply
            (Some (FC.of_position position))))
   | Switch switch ->
+    let arms = switch_arms_with_counters state (Switch.arms switch) in
     Expr.create_switch
       (Switch.create
-         ~condition_dbg:(Switch_expr.condition_dbg switch)
-         ~scrutinee:(Switch_expr.scrutinee switch)
-         ~arms:(switch_arms_with_counters state switch))
+         ~condition_dbg:(Switch.condition_dbg switch)
+         ~scrutinee:(Switch.scrutinee switch) ~arms)
   | Apply_cont _ | Invalid _ -> e
 
 and continuation_handler state handler =

@@ -26,5 +26,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(** Inserts FDO counters to a given [Flambda_unit.t]. *)
+
 val add_to_unit :
   toplevel_fingerprint:Fdo_fingerprint.t -> Flambda_unit.t -> Flambda_unit.t
