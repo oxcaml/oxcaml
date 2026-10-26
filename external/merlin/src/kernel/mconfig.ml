@@ -697,6 +697,8 @@ let ocaml_ignored_flags =
     "-no-cfg-value-propagation-flow";
     "-cfg-copy-propagation";
     "-no-cfg-copy-propagation";
+    "-align-loops";
+    "-no-align-loops";
     "-use-ssa";
     "-no-use-ssa";
     "-ssa-simplify";

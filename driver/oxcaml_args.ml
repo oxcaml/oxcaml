@@ -301,6 +301,14 @@ let mk_reorder_blocks_random f =
       "<seed> Randomly reorder basic blocks in every function, using the \
        provided seed (intended for testing, off by default)." )
 
+let mk_align_loops f =
+  ( "-align-loops",
+    Arg.Unit f,
+    " Align loop headers to a 16-byte boundary (amd64 only)" )
+
+let mk_no_align_loops f =
+  ("-no-align-loops", Arg.Unit f, " Do not align loop headers (default)")
+
 let mk_module_entry_functions_section f =
   if Config.function_sections then
     ( "-module-entry-functions-section",
@@ -1420,6 +1428,8 @@ module type Oxcaml_options = sig
   val no_cfg_copy_propagation : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
+  val align_loops : unit -> unit
+  val no_align_loops : unit -> unit
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
@@ -1634,6 +1644,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_copy_propagation F.no_cfg_copy_propagation;
       mk_experimental_optimizations F.experimental_optimizations;
       mk_reorder_blocks_random F.reorder_blocks_random;
+      mk_align_loops F.align_loops;
+      mk_no_align_loops F.no_align_loops;
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
@@ -2019,6 +2031,8 @@ module Oxcaml_options_impl = struct
 
   let cfg_copy_propagation = set' Oxcaml_flags.cfg_copy_propagation
   let no_cfg_copy_propagation = clear' Oxcaml_flags.cfg_copy_propagation
+  let align_loops = set' Oxcaml_flags.align_loops
+  let no_align_loops = clear' Oxcaml_flags.align_loops
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2410,7 +2424,8 @@ module Oxcaml_options_impl = struct
     cfg_merge_blocks ();
     cfg_eliminate_dead_trap_handlers ();
     cfg_value_propagation_flow ();
-    use_ssa ()
+    use_ssa ();
+    align_loops ()
 end
 
 module type Debugging_options = sig
@@ -2626,6 +2641,7 @@ module Extra_params = struct
         true
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
+    | "align-loops" -> set' Oxcaml_flags.align_loops
     | "module-entry-functions-section" ->
         set' Oxcaml_flags.module_entry_functions_section
     | "heap-reduction-threshold" ->

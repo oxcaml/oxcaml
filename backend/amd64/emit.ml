@@ -2063,9 +2063,19 @@ let prologue_stack_offset () =
   assert !frame_required;
   frame_size () - 8 - if fp then 8 else 0
 
-let emit_linear_label ~fallthrough ~is_dwarf_only_label label =
+let emit_linear_label ~fallthrough ~is_dwarf_only_label ~is_loop_header label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+  (* Aligning loop headers to 16 bytes makes it less likely that a small loop
+     body straddles a 64-byte cache line boundary. AMD Zen 4 can only fetch from
+     a single 64-byte cache line per cycle, so a short loop crossing a cache
+     line boundary has a 1-cycle frontend penalty on every iteration. 16 bytes
+     matches what GCC and Clang emit for -falign-loops. Padding before a loop
+     header that is entered by fallthrough from outside the loop is executed (as
+     nops) only once per loop entry. *)
+  if is_loop_header && !Oxcaml_flags.align_loops && !fastcode_flag
+  then D.align ~fill:Nop ~bytes:16
+  else if (not fallthrough) && !fastcode_flag
+  then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
 (* Emit an instruction *)
@@ -2702,10 +2712,12 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel_for_jump_target label ->
-    emit_linear_label ~fallthrough ~is_dwarf_only_label:false label
+  | Llabel_for_jump_target { label; is_loop_header } ->
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:false ~is_loop_header
+      label
   | Llabel_for_dwarf label ->
-    emit_linear_label ~fallthrough ~is_dwarf_only_label:true label
+    emit_linear_label ~fallthrough ~is_dwarf_only_label:true
+      ~is_loop_header:false label
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))

@@ -1972,7 +1972,8 @@ let emit_instr env i =
         A.ins4 CSEL res_x (H.reg_x i.arg.(1)) (H.reg_x i.arg.(2)) (O.cond EQ))
   | Lreloadretaddr -> ()
   | Lreturn -> A.ins0 RET
-  | Llabel_for_jump_target lbl | Llabel_for_dwarf lbl ->
+  | Llabel_for_jump_target { label = lbl; is_loop_header = _ }
+  | Llabel_for_dwarf lbl ->
     let lbl = label_to_asm_label ~section:Text lbl in
     D.define_label lbl
   | Lbranch lbl -> emit_branch lbl
