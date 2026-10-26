@@ -563,7 +563,7 @@ module With_shorthand = struct
         Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
     | Named p ->
         let mty = match mty with
-          | Types.Mty_strengthen (mty,q,_) when Path.same p q -> mty
+          | Types.Mty_strengthen (mty,q,_,_) when Path.same p q -> mty
           | _ -> mty
         in
         let mty = modtype { ua with item = mty } in

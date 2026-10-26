@@ -4884,6 +4884,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
         val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+        val_alias = None;
       }
   | [] ->
       Error.log_and_raise valdecl.pval_loc Val_in_structure
@@ -4935,6 +4936,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+        val_alias = None;
       }
   in
   let (id, newenv) =

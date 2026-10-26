@@ -548,7 +548,7 @@ let type_iterators_without_type_expr =
         it.it_functor_param it p;
         it.it_module_type it mt;
         it.it_mode_expr mm
-    | Mty_strengthen (mty, p, _) ->
+    | Mty_strengthen (mty, p, _, _) ->
         it.it_module_type it mty;
         it.it_path p
   and it_class_type it = function

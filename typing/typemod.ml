@@ -715,7 +715,7 @@ and find_law_modtype f = function
       | None -> find_law_modtype f res
       end
   | Mty_functor (Unit, res, _) -> find_law_modtype f res
-  | Mty_strengthen (mty, _, _) -> find_law_modtype f mty
+  | Mty_strengthen (mty, _, _, _) -> find_law_modtype f mty
   | Mty_ident _ | Mty_alias _ -> None
 
 (* After substitution one also needs to re-check the well-foundedness
@@ -879,12 +879,12 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
       remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
     in
     Mty_functor (param, mty, mm)
-  | Mty_strengthen (mty, path, alias) ->
+  | Mty_strengthen (mty, path, alias, value_equations) ->
       let mty =
         remove_modality_and_zero_alloc_variables_mty env
           ~zap_modality:Mode.Modality.to_const_exn mty
       in
-      Mty_strengthen (mty, path, alias)
+      Mty_strengthen (mty, path, alias, value_equations)
 
 
 module Merge = struct
@@ -1237,7 +1237,9 @@ module Merge = struct
             let modalities = Modality.(Const.id |> of_const) in
             let md'' = { md' with md_type = mty; md_modalities = modalities} in
             let newmd =
-              Mtype.strengthen_decl ~aliasable:false md'' path in
+              Mtype.strengthen_decl ~aliasable:false
+                ~value_equations:Not_recorded md'' path
+            in
             (* Inclusion check with the original signature *)
             let _ = if (not approx) then
                ignore (Includemod.modtypes ~mark:true ~loc sig_env
@@ -1498,11 +1500,11 @@ and apply_modalities_module_type env modalities = function
       | None -> Mty_ident p, modalities
       | Some mty -> apply_modalities_module_type env modalities mty
       end
-  | Mty_strengthen (mty, p, alias) ->
+  | Mty_strengthen (mty, p, alias, value_equations) ->
       let mty', modalities' =
         apply_modalities_module_type env modalities mty
       in
-      Mty_strengthen (mty', p, alias), modalities'
+      Mty_strengthen (mty', p, alias, value_equations), modalities'
   | Mty_signature sg ->
       let sg = apply_modalities_signature ~recursive:true env modalities sg in
       Mty_signature sg, Mode.Modality.Const.id
@@ -1626,7 +1628,7 @@ let rec approx_modtype env smty =
           ~loc:mod_id.loc mod_id.txt env
       in
       let aliasable = (not (Env.is_functor_arg path env)) in
-      Mty_strengthen (mty, path, Aliasability.aliasable aliasable)
+      Mty_strengthen (mty, path, Aliasability.aliasable aliasable, Not_recorded)
 
 and approx_module_declaration env pmd =
   {
@@ -2205,7 +2207,7 @@ let rec first_law_in_signature env sg =
 and first_law_in_module_type env mty =
   match Mtype.scrape env mty with
   | Mty_signature sg -> first_law_in_signature env sg
-  | Mty_functor (_, res, _) | Mty_strengthen (res, _, _) ->
+  | Mty_functor (_, res, _) | Mty_strengthen (res, _, _, _) ->
       first_law_in_module_type env res
   | Mty_ident _ | Mty_alias _ -> None
 
@@ -2324,7 +2326,8 @@ let transl_law env (ld : Parsetree.law_declaration)
                    val_attributes = [];
                    val_zero_alloc = Zero_alloc.default;
                    val_loc = lp_name.loc;
-                   val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
+                   val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+                   val_alias = None }
                in
                let check s =
                  Warnings.Unused_var_strict { name = s; mutated = false }
@@ -2485,7 +2488,8 @@ and transl_modtype_aux md_mode env smty =
         mkmty
           (Tmty_strengthen (tmty, path, mod_id))
           (Mty_strengthen
-            (tmty.mty_type, path, Aliasability.aliasable aliasable))
+             (tmty.mty_type, path, Aliasability.aliasable aliasable,
+              Not_recorded))
           env
           loc
           []
@@ -3171,7 +3175,7 @@ let rec nongen_modtype env f g = function
             Env.add_module ~arg:true id Mp_present param ~mode env
       in
       nongen_modtype env f g body
-  | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g mty
+  | Mty_strengthen (mty,_ ,_,_) -> nongen_modtype env f g mty
 
 (** Recursively iterate a signature, and:
 - call [f] on all value description types, which potentailly contain
@@ -3304,7 +3308,8 @@ let check_recmodule_inclusion env bindings =
     match id with
     | None -> mty
     | Some id ->
-        Mtype.strengthen ~aliasable:false mty (Subst.module_path s (Pident id))
+        Mtype.strengthen ~aliasable:false ~value_equations:Recorded mty
+          (Subst.module_path s (Pident id))
   in
 
   let rec check_incl first_time n env s =
@@ -3464,7 +3469,7 @@ and package_constraints env loc mty constrs =
     | mty ->
       let rec ident = function
           Mty_ident p -> p
-        | Mty_strengthen (mty,_,_) -> ident mty
+        | Mty_strengthen (mty,_,_,_) -> ident mty
         | Mty_functor _ | Mty_alias _ | Mty_signature _ -> assert false
       in
       Error.log_and_raise loc env
@@ -3859,8 +3864,9 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
     if alias && aliasable then
       (Env.add_required_global path env; md)
     else begin
-      let mty = Mtype.find_type_of_module
-          ~strengthen ~aliasable env path
+      let mty =
+        Mtype.find_type_of_module ~strengthen ~aliasable
+          ~value_equations:Recorded env path
       in
       match mty with
       | Mty_alias p1 when not alias ->
@@ -4742,7 +4748,7 @@ let rec normalize_modtype = function
   | Mty_alias _ -> ()
   | Mty_signature sg -> normalize_signature sg
   | Mty_functor(_param, body, _) -> normalize_modtype body
-  | Mty_strengthen (mty,_,_) -> normalize_modtype mty
+  | Mty_strengthen (mty,_,_,_) -> normalize_modtype mty
 
 and normalize_signature sg = List.iter normalize_signature_item sg
 

@@ -131,7 +131,8 @@ let value_description (desc : Types.value_description) : spec_value_description
     sval_loc = desc.val_loc;
     sval_zero_alloc = desc.val_zero_alloc;
     sval_attributes = desc.val_attributes;
-    sval_uid = desc.val_uid
+    sval_uid = desc.val_uid;
+    sval_alias = desc.val_alias
   }
 
 (* Expressions. [bound] contains the local variables in scope. *)
@@ -292,7 +293,8 @@ let typedtree_value_description (desc : spec_value_description) val_kind :
     val_loc = desc.sval_loc;
     val_zero_alloc = desc.sval_zero_alloc;
     val_attributes = desc.sval_attributes;
-    val_uid = desc.sval_uid
+    val_uid = desc.sval_uid;
+    val_alias = desc.sval_alias
   }
 
 let typedtree_ident path lid val_kind kind (ident : spec_ident) :

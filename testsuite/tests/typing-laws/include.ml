@@ -6,7 +6,8 @@
 (* The laws of an included module refer to its values by name, as its
    signature binds them, and so become laws about the items of the
    structure that rebinds them. The structure matches a signature stating
-   them through its own items, but [Included.f] is not known to be [I.f]. *)
+   them through its own items, and also through [I], since including [I]
+   records that [Included.f] is [I.f]. *)
 
 module type Id = sig
   val f : int -> int
@@ -32,19 +33,8 @@ module Included_checked'' : sig
   law? id (x : int) : I.f x = x
 end = Included
 [%%expect {|
-Line 4, characters 6-14:
-4 | end = Included
-          ^^^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val f : int -> int law? id (x : int) : (f x) = x end
-       is not included in
-         sig val f : int -> int law? id (x : int) : (I.f x) = x end
-       Laws do not match:
-         law? id (x : int) : (f x) = x
-       is not included in
-         law? id (x : int) : (I.f x) = x
-       The clauses of the two laws differ.
+module Included_checked'' :
+  sig val f : int -> int law? id (x : int) : (I.f x) = x end
 |}]
 
 (* Shadowing an included value that an included law refers to is an

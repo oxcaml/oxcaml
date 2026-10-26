@@ -508,7 +508,6 @@ type law_mismatch =
   | Law_arity of int * int
   | Law_parameter_types of string option * Errortrace.moregen_error
   | Law_clauses
-  | Law_module_path of { path : Path.t; name : string }
   | Law_applied_path of Path.t
 
 module Printtyp = Printtyp.Doc
@@ -950,12 +949,6 @@ let report_law_mismatch env ppf err =
         (msg "but it is expected to have type")
   | Law_clauses ->
       pr "The clauses of the two laws differ."
-  | Law_module_path { path = p; name } ->
-      pr "@[<hov>The@ first@ law@ refers@ to@ %a,@ but@ the@ second@ law@ \
-          refers@ to@ %a.@ The@ two@ are@ not@ known@ to@ be@ the@ same@ \
-          value.@]@ @[<2>Hint:@ consider@ referring@ to@ %a@ in@ the@ \
-          second@ one.@]"
-        path p Style.inline_code name path p
   | Law_applied_path p ->
       let rec application : Path.t -> _ = function
         | Papply (functor_, arg) -> Some (functor_, arg)
@@ -1957,6 +1950,24 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
 
 (* Inclusion between laws *)
 
+(* [normalize_value_path] normalizes the module aliases of a value path, as
+   [Env.normalize_value_path] does, and then follows the alias of the value
+   (see [Types.val_alias]). For example, when [M] is strengthened with the
+   path [P], the value [M.f] is [P.f]. The expansion stops at paths that are
+   not in the environment, at cycles, and at aliases through a functor
+   application, because these do not identify one value. *)
+let normalize_value_path env p =
+  let rec normalize seen p =
+    let p = Env.normalize_value_path None env p in
+    match (Env.find_value p env).val_alias with
+    | Some q
+      when not (List.exists (Path.same q) seen || Path.contains_apply q) ->
+        normalize (p :: seen) q
+    | Some _ | None -> p
+    | exception Not_found -> p
+  in
+  normalize [] p
+
 let law_paths (decl : Types.law_declaration) =
   List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
 
@@ -2011,82 +2022,19 @@ let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
     let x, err = Option.value culprit ~default:(None, err_all) in
     Some (Law_parameter_types (x, err))
 
-(* [law_module_path] improves the error message when [law_clauses] fails.
-   It detects one common cause of a mismatch. Consider
-
-   {[
-     module M = struct
-       let f x = x
-       module N = struct law? l (x : int) : f x = x end
-     end
-     module type S = sig
-       val f : int -> int
-       module N : sig law? l (x : int) : f x = x end
-     end
-     module M' : S = M
-   ]}
-
-   This example fails type checking. The type of the module expression [M] is
-   the strengthened signature
-   [sig val f : 'a -> 'a module N = M.N end]. To compare the two [N],
-   module inclusion expands the alias [M.N]. The expansion replaces the
-   idents of the components of [M] by paths through [M] (see
-   [Env.prefix_idents]). Thus, the law of [M.N] is [M.f x = x]. The law
-   of [N] in [S] is [f x = x], where [f] is the ident of [val f] in [S].
-   Module inclusion maps this ident to the ident of [val f] in [M]. It
-   does not map the ident to the path [M.f]. Thus, [law_clauses] rejects
-   the two laws. In contrast, the following is accepted
-
-   {[
-     module type S' = sig
-       val f : int -> int
-       module N : sig law? l (x : int) : M.f x = x end
-     end
-     module M' : S' = M
-   ]}
-
-   because the law of [N] in [S'] refers to [f] through the path [M.f],
-   which is the path in the law of [M.N].
-
-   In situations such as the above, [law_module_path] returns
-   [Law_module_path { path; name }] for the first path [path] of the
-   implementation that ends in a name [name] to which the interface
-   refers by an ident. The names can agree by coincidence. Thus, the function
-   must run only after [law_clauses] has failed. *)
-let law_module_path (decl_impl : Types.law_declaration)
-      (decl_intf : Types.law_declaration) =
-  let names =
-    List.filter_map
-      (fun ((ns : Spec.namespace), (path : Path.t)) ->
-         match ns, path with
-         | Value, Pident id -> Some (ns, Ident.name id)
-         | Value, (Pdot _ | Papply _ | Pextra_ty _) -> None)
-      (law_paths decl_intf)
-  in
-  List.find_map
-    (fun (ns, (path : Path.t)) ->
-       match path with
-       | Pdot (_, name) when List.mem (ns, name) names ->
-           Some (Law_module_path { path; name })
-       | Pdot _ | Pident _ | Papply _ | Pextra_ty _ -> None)
-    (law_paths decl_impl)
-
 (* The clauses of the two laws must be the same expressions up to two
    things. First, the names of the parameters: [vars] pairs them by
-   position. Second, module aliases in the paths of values: [Alias.f] is
-   [Outer.f] when [module Alias = Outer]. All other paths must be
-   identical. This is how [Ctype.equal] compares the paths of types. *)
-(* CR sspies: Strengthening a signature with a path [M] gives its type [t]
-   the manifest [M.t], but records nothing about its value [f]. Thus, the
-   comparison cannot relate the ident [f] to the path [M.f] (see
-   [law_module_path]). A follow-up PR should record that [f] is [M.f] in the
-   same way and compares the clauses up to these equations. *)
+   position. Second, the aliases in the paths of values (see
+   [normalize_value_path]): [Alias.f] is [Outer.f] when
+   [module Alias = Outer], and [f] is [M.f] in a signature strengthened with
+   [M]. All other paths must be identical. This is how [Ctype.equal]
+   compares the paths of types. *)
 let law_clauses env (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
   let same_path (ns : Spec.namespace) p1 p2 =
     let normalize =
       match ns with
-      | Value -> Env.normalize_value_path None env
+      | Value -> normalize_value_path env
     in
     Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
   in
@@ -2101,9 +2049,7 @@ let law_clauses env (decl_impl : Types.law_declaration)
      && List.for_all2 equal assumptions_impl assumptions_intf
      && equal decl_impl.law_conclusion decl_intf.law_conclusion
   then None
-  else
-    Some (Option.value (law_module_path decl_impl decl_intf)
-            ~default:Law_clauses)
+  else Some Law_clauses
 
 let law_declarations ~self_check ~loc env name
       (decl_impl : Types.law_declaration)

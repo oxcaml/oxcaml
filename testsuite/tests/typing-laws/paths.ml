@@ -82,9 +82,9 @@ Error: Signature mismatch:
 
 (* Once a module is in the environment, the clauses of its laws refer to its
    values through its path: the law of [M.N], looked up through [M], refers to
-   [M.f], whereas the law of a signature refers to [f] by name. When nothing
-   relates the two (e.g., no outer signature), the laws of a submodule that
-   refer to the values of the enclosing module fail typechecking. *)
+   [M.f], whereas the law of a signature refers to [f] by name. Strengthening
+   the signature of [M] with [M] records that its [f] is [M.f], so the two
+   laws match. *)
 
 module M = struct
   let f x = x
@@ -93,48 +93,8 @@ module M = struct
   end
 end
 [%%expect {|
-Line 1:
-Error: In module "M":
-       Modules do not match:
-         sig val f : 'a -> 'a module N = M.N end
-       is not included in
-         sig
-           val f : 'a -> 'a
-           module N : sig law? l (x : int) : (f x) = x end
-         end
-       In module "M.N":
-       Modules do not match:
-         sig law? l (x : int) : (M.f x) = x end
-       is not included in
-         sig law? l (x : int) : (f x) = x end
-       In module "M.N":
-       Laws do not match:
-         law? l (x : int) : (M.f x) = x
-       is not included in
-         law? l (x : int) : (f x) = x
-       The first law refers to "M.f", but the second law refers to "f". The two
-       are not known to be the same value.
-       Hint: consider referring to "M.f" in the second one.
-|}]
-
-(* A signature suffices to locate [f] as far as [l] is concerned. *)
-
-module type T = sig
-  val f : int -> int
-  module N : sig
-    law? l (x : int) : f x = x
-  end
-end
-module M7 : T = struct
-  let f x = x
-  module N = struct
-    law? l (x : int) : f x = x
-  end
-end
-[%%expect {|
-module type T =
-  sig val f : int -> int module N : sig law? l (x : int) : (f x) = x end end
-module M7 : T
+module M :
+  sig val f : 'a -> 'a module N : sig law? l (x : int) : (f x) = x end end
 |}]
 
 (* The laws of a module that is compared as a whole refer to its values by
@@ -192,7 +152,5 @@ Error: Signature mismatch:
          law? idem (x : int) : (Other.f (Other.f x)) = (Other.f x)
        is not included in
          law? idem (x : int) : (f (f x)) = (f x)
-       The first law refers to "Other.f", but the second law refers to "f". The
-       two are not known to be the same value.
-       Hint: consider referring to "Other.f" in the second one.
+       The clauses of the two laws differ.
 |}]

@@ -1666,6 +1666,7 @@ and spec_value_description =
     sval_zero_alloc: Zero_alloc.t;
     sval_attributes: attributes;
     sval_uid: Shape.Uid.t;
+    sval_alias: Path.t option;
   }
 
 and spec_extra =
