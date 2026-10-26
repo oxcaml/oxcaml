@@ -38,7 +38,26 @@ module Modalities = struct
 end
 
 module Mode = struct
-  type t = mode = Mode of string [@@unboxed]
+  type t = mode =
+    | Mode of string
+    | Mode_var of string
+    | Mode_var_with_constraints of bounds
+
+  and bounds = mode_bounds =
+    { upper : bound
+    ; lower : bound
+    }
+
+  and bound = mode_bound =
+    { bound_vars : bound_elem list
+    ; bound_const : string loc list
+    }
+
+  and bound_elem = mode_bound_elem =
+    { elem_morph : string loc option
+    ; elem_var : string loc
+    ; elem_mod : string loc list
+    }
 end
 
 module Modes = struct
