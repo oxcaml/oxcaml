@@ -355,8 +355,147 @@ end
 module M : sig type r : immutable_data end
 |}]
 
-(* [@@unboxed] types do not (yet) make their contents addressable *)
+(**** [@@unboxed] records ****)
+
+(* An [@@unboxed] record makes its field addressable, like a singleton unboxed
+   record *)
+type u : bits8 addressable = { a : int8# } [@@unboxed]
+[%%expect{|
+Line 1, characters 0-54:
+1 | type u : bits8 addressable = { a : int8# } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "u" is bits8
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "u" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type u.
+|}]
+
 type u : bits8 = { a : int8# } [@@unboxed]
 [%%expect{|
 type u = { a : int8#; } [@@unboxed]
+|}]
+
+type u : float64 = { f : float# } [@@unboxed]
+[%%expect{|
+type u = { f : float#; } [@@unboxed]
+|}]
+
+(* Already-addressable fields are unchanged *)
+type u : bits64 = { i : int64_u } [@@unboxed]
+type u : value = { s : string } [@@unboxed]
+[%%expect{|
+type u = { i : int64_u; } [@@unboxed]
+type u = { s : string; } [@@unboxed]
+|}]
+
+(* Parameters *)
+type ('a : bits8) u : bits8 addressable = { a : 'a } [@@unboxed]
+[%%expect{|
+Line 1, characters 0-64:
+1 | type ('a : bits8) u : bits8 addressable = { a : 'a } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "u" is bits8
+         because of the annotation on 'a in the declaration of the type u.
+       But the layout of type "u" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type u.
+|}]
+
+type ('a : bits8) u : bits8 = { a : 'a } [@@unboxed]
+[%%expect{|
+type ('a : bits8) u = { a : 'a; } [@@unboxed]
+|}]
+
+(* Making addressable is idempotent *)
+type u = { a : int8# } [@@unboxed]
+type v : bits8 addressable = { u : u } [@@unboxed]
+[%%expect{|
+type u = { a : int8#; } [@@unboxed]
+Line 2, characters 0-50:
+2 | type v : bits8 addressable = { u : u } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "v" is bits8
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "v" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type v.
+|}]
+
+(* [inherit] opts out *)
+type u : bits8 = { inherit a : int8# } [@@unboxed]
+[%%expect{|
+Line 1, characters 19-36:
+1 | type u : bits8 = { inherit a : int8# } [@@unboxed]
+                       ^^^^^^^^^^^^^^^^^
+Error: "inherit" is only supported on the sole field of an unboxed record
+|}]
+
+(* Expressions *)
+type u = { a : int8# } [@@unboxed]
+let f (x : u) : ('b : bits8 addressable) = x
+[%%expect{|
+type u = { a : int8#; } [@@unboxed]
+Line 2, characters 43-44:
+2 | let f (x : u) : ('b : bits8 addressable) = x
+                                               ^
+Error: The value "x" has type "u" but an expression was expected of type
+         "('b : bits8 addressable)"
+       The layout of u is bits8
+         because of the definition of u at line 1, characters 0-34.
+       But the layout of u must be a sublayout of bits8 addressable
+         because of the annotation on the type variable 'b.
+|}]
+
+let f (x : u) : ('b : bits8) = x
+[%%expect{|
+val f : u -> u = <fun>
+|}]
+
+let f (x : u) : ('b : bits8) = x.a
+[%%expect{|
+val f : u -> int8# = <fun>
+|}]
+
+let f (x : int8#) : u = { a = x }
+[%%expect{|
+val f : int8# -> u = <fun>
+|}]
+
+let f (x : u) = id_addressable x
+[%%expect{|
+Line 1, characters 31-32:
+1 | let f (x : u) = id_addressable x
+                                   ^
+Error: The value "x" has type "u" but an expression was expected of type
+         "('a : '_representable_layout_1 addressable)"
+       The layout of u is bits8
+         because of the definition of u at line 1, characters 0-34.
+       But the layout of u must be addressable
+         because we must know concretely how to return a function result.
+|}, Principal{|
+Line 1, characters 31-32:
+1 | let f (x : u) = id_addressable x
+                                   ^
+Error: The value "x" has type "u" but an expression was expected of type
+         "('a : '_representable_layout_1 addressable)"
+       The layout of u is bits8
+         because of the definition of u at line 1, characters 0-34.
+       But the layout of u must be addressable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+(* Externals *)
+type u = { f : float# } [@@unboxed]
+external f : (u [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
+[%%expect{|
+type u = { f : float#; } [@@unboxed]
+external f : u -> (float [@unboxed]) = "foo" "bar"
+|}]
+
+(* [@@unboxed] constructors are unchanged *)
+type c : bits8 = A of int8# [@@unboxed]
+type c : bits8 = A of { a : int8# } [@@unboxed]
+[%%expect{|
+type c = A of int8# [@@unboxed]
+type c = A of { a : int8#; } [@@unboxed]
 |}]
