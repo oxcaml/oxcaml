@@ -64,7 +64,8 @@ The JS runtime primitive `caml_check_idx_base` raises `Failure` when such an acc
 The effects backend of `js_of_ocaml` (`--effects`) must be the same for every unit of a program (including the standard library) and for its runtime,
 as `js_of_ocaml link` fails otherwise.
 The backend can be chosen with `-jsoo-effects {disabled|cps|double-translation}` (`jsoo-effects=` in `OCAMLPARAM`), which the compiler passes to `js_of_ocaml compile` and `js_of_ocaml build-runtime`.
-The default is `double-translation`, which is what the standard library is built with.
+The default is `double-translation`, which is what the installed standard library is built with. Selecting another effects backend thus requires a standard
+library built with the same backend.
 With `-jsoo-effects disabled`, performing an effect or installing a handler fails at runtime with `Failure "Effect handlers are not supported"`.
 
 ## Known limitations
