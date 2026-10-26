@@ -1204,7 +1204,7 @@ external ref : ('a : any) . 'a -> ('a ref[@local_opt]) = "%makemutable"
 [@@layout_poly]
 (** Return a fresh reference containing the given value. *)
 
-external ( ! ) : ('a : any) . ('a ref[@local_opt]) -> 'a = "%field0_of_1"
+external ( ! ) : ('a : any) . ('a ref[@local_opt]) -> 'a = "%field0_singleton"
 [@@layout_poly]
 (** [!r] returns the current contents of reference [r].
    Equivalent to [fun r -> r.contents].
@@ -1212,7 +1212,7 @@ external ( ! ) : ('a : any) . ('a ref[@local_opt]) -> 'a = "%field0_of_1"
 *)
 
 external ( := ) : ('a : any) . ('a ref[@local_opt]) -> 'a -> unit =
-  "%setfield0_of_1"
+  "%setfield0_singleton"
 [@@layout_poly]
 (** [r := a] stores the value of [a] in reference [r].
    Equivalent to [fun r v -> r.contents <- v].

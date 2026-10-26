@@ -701,7 +701,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | None -> All_value
     | Some shape -> Shape shape
   in
-  let field0_of_1 sem =
+  let field0_singleton sem =
     let mixed_block_shape =
       (* Since this primitive only works for a block with one field, we can get
          the whole block shape from the layout of the result. *)
@@ -714,7 +714,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     in
     Primitive (prim, 1)
   in
-  let setfield0_of_1 () =
+  let setfield0_singleton () =
     let mixed_block_shape =
       (* Since this primitive only works for a block with one field, we can get
          the whole block shape from the layout of the second argument (the new
@@ -745,17 +745,17 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
     | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
     | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
-    | "%field0_of_1" -> field0_of_1 Reads_vary
+    | "%field0_singleton" -> field0_singleton Reads_vary
     | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
     | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
-    | "%field0_of_1_immut" -> field0_of_1 Reads_agree
+    | "%field0_singleton_immut" -> field0_singleton Reads_agree
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
-    | "%setfield0_of_1" -> setfield0_of_1 ()
+    | "%setfield0_singleton" -> setfield0_singleton ()
     | "%makeblock" ->
        Primitive ((Pmakeblock(0, Immutable, get_shape_of_all_args (), mode)), 1)
     | "%makemutable" ->

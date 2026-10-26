@@ -252,10 +252,10 @@ external ref : ('a : any) . 'a -> ('a ref[@local_opt]) @@ portable =
   "%makemutable"
 [@@layout_poly]
 external ( ! ) : ('a : any) . ('a ref[@local_opt]) -> 'a @@ portable =
-  "%field0_of_1"
+  "%field0_singleton"
 [@@layout_poly]
 external ( := ) : ('a : any) . ('a ref[@local_opt]) -> 'a -> unit @@ portable =
-  "%setfield0_of_1"
+  "%setfield0_singleton"
 [@@layout_poly]
 external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
 external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"

@@ -760,7 +760,7 @@ let () =
     (fun () -> f t #{ x = 3; y = "b" };
                ignore (Sys.opaque_identity t))
 
-(* References: [:=] goes through [%setfield0_of_1], which is a
+(* References: [:=] goes through [%setfield0_singleton], which is a
    layout-polymorphic primitive, not record modification as already tested
 *)
 

@@ -19,7 +19,7 @@ module Monomorphic_immutable = struct
   type t = { a : field } [@@boxed]
 
   external make : field -> t = "%makeblock"
-  external field0 : t -> field = "%field0_of_1_immut"
+  external field0 : t -> field = "%field0_singleton_immut"
 
   let print a =
     pr (Float_u.to_string a)
@@ -44,8 +44,8 @@ module Monomorphic_mutable = struct
   type t = { mutable a : field } [@@boxed]
 
   external make : field -> t = "%makemutable"
-  external field0 : t -> field = "%field0_of_1"
-  external setfield0 : t -> field -> unit = "%setfield0_of_1"
+  external field0 : t -> field = "%field0_singleton"
+  external setfield0 : t -> field -> unit = "%setfield0_singleton"
 
   let print #(a1, a2) =
     pr ("#(" ^ Float32_u.to_string a1 ^ ", " ^ Int32_u.to_string a2 ^ ")")
@@ -79,7 +79,7 @@ module Polymorphic_immutable = struct
   type ('a : any) t = { a : 'a; } [@@boxed]
 
   external make : ('a : any). 'a -> 'a t = "%makeblock" [@@layout_poly]
-  external field0 : ('a : any). 'a t -> 'a = "%field0_of_1_immut"
+  external field0 : ('a : any). 'a t -> 'a = "%field0_singleton_immut"
   [@@layout_poly]
 
   type field = int64_u
@@ -106,8 +106,8 @@ module Polymorphic_mutable = struct
   type ('a : any) t = { mutable a : 'a; } [@@boxed]
 
   external make : ('a : any). 'a -> 'a t = "%makemutable" [@@layout_poly]
-  external field0 : ('a : any). 'a t -> 'a = "%field0_of_1" [@@layout_poly]
-  external setfield0 : ('a : any). 'a t -> 'a -> unit = "%setfield0_of_1"
+  external field0 : ('a : any). 'a t -> 'a = "%field0_singleton" [@@layout_poly]
+  external setfield0 : ('a : any). 'a t -> 'a -> unit = "%setfield0_singleton"
   [@@layout_poly]
 
   type field = #(int8# * unit# * string)

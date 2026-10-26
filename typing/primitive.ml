@@ -1267,10 +1267,10 @@ let prim_has_valid_reprs ~loc prim =
       check [any; (is (Same_as_ocaml_repr C.scannable))]
     | "%makemutable" ->
       check [any; (is (Same_as_ocaml_repr C.scannable))]
-    | "%field0_of_1"
-    | "%field0_of_1_immut" ->
+    | "%field0_singleton"
+    | "%field0_singleton_immut" ->
       check [is (Same_as_ocaml_repr C.scannable); any]
-    | "%setfield0_of_1" ->
+    | "%setfield0_singleton" ->
       check [
         is (Same_as_ocaml_repr C.scannable);
         any;
