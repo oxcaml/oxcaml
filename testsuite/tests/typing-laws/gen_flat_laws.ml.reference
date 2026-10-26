@@ -1,0 +1,266 @@
+[@@@ocaml.warning "-27"]
+module Laws_gen_Stdlib = Stdlib
+module Laws_gen_Gen_flat = Gen_flat
+type 'a each =
+  {
+  poly: 'a ;
+  modes: 'a ;
+  unboxed: 'a ;
+  \#type: 'a ;
+  alias: 'a ;
+  assumption: 'a }
+let names =
+  {
+    poly = "poly";
+    modes = "modes";
+    unboxed = "unboxed";
+    \#type = "type";
+    alias = "alias";
+    assumption = "assumption"
+  }
+let locations =
+  {
+    poly =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 37;
+        start_col = 0;
+        end_line = 38;
+        end_col = 46
+      };
+    modes =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 39;
+        start_col = 0;
+        end_line = 39;
+        end_col = 54
+      };
+    unboxed =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 40;
+        start_col = 0;
+        end_line = 40;
+        end_col = 55
+      };
+    \#type =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 41;
+        start_col = 0;
+        end_line = 41;
+        end_col = 50
+      };
+    alias =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 42;
+        start_col = 0;
+        end_line = 42;
+        end_col = 36
+      };
+    assumption =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 43;
+        start_col = 0;
+        end_line = 43;
+        end_col = 45
+      }
+  }
+let map { poly; modes; unboxed; \#type; alias; assumption } ~f =
+  {
+    poly = (f poly);
+    modes = (f modes);
+    unboxed = (f unboxed);
+    \#type = (f \#type);
+    alias = (f alias);
+    assumption = (f assumption)
+  }
+let to_list { poly; modes; unboxed; \#type; alias; assumption } =
+  [poly; modes; unboxed; \#type; alias; assumption]
+type poly_input =
+  | Poly_input: 'a 'b . {
+  xs: 'a list ;
+  f: 'a -> 'b } -> poly_input 
+type modes_input =
+  | Modes_input: {
+  g: int @ local -> int } -> modes_input 
+type unboxed_input =
+  | Unboxed_input: {
+  x: float# } -> unboxed_input 
+type type_input =
+  | Type_input: {
+  \#method: int } -> type_input 
+type alias_input =
+  | Alias_input: {
+  x: int as 'a } -> alias_input 
+type assumption_input =
+  | Assumption_input: {
+  x: int } -> assumption_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  =
+      sig
+        val poly : poly_input Choice.t
+        val modes : modes_input Choice.t
+        val unboxed : unboxed_input Choice.t
+        val \#type : type_input Choice.t
+        val alias : alias_input Choice.t
+        val assumption : assumption_input Choice.t
+      end
+    let poly ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.poly),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.poly;
+                 predicate =
+                   (fun ((Poly_input { xs; f }) : poly_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Stdlib.List.length
+                            (Laws_gen_Stdlib.List.map f xs))
+                         (Laws_gen_Stdlib.List.length xs) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 38;
+                     start_col = 2;
+                     end_line = 38;
+                     end_col = 46
+                   }
+               }))
+    let modes ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.modes),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.modes;
+                 predicate =
+                   (fun ((Modes_input { g }) : modes_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.apply g)
+                         (Laws_gen_Gen_flat.apply g) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 39;
+                     start_col = 37;
+                     end_line = 39;
+                     end_col = 54
+                   }
+               }))
+    let unboxed ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.unboxed),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.unboxed;
+                 predicate =
+                   (fun ((Unboxed_input { x }) : unboxed_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.of_unboxed x)
+                         (Laws_gen_Gen_flat.of_unboxed x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 40;
+                     start_col = 28;
+                     end_line = 40;
+                     end_col = 55
+                   }
+               }))
+    let \#type ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.\#type),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.\#type;
+                 predicate =
+                   (fun ((Type_input { \#method }) : type_input) ->
+                      (Laws_gen_Stdlib.(=) \#method \#method : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 41;
+                     start_col = 31;
+                     end_line = 41;
+                     end_col = 50
+                   }
+               }))
+    let alias ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.alias),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.alias;
+                 predicate =
+                   (fun ((Alias_input { x }) : alias_input) ->
+                      (Laws_gen_Stdlib.(=) x x : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 42;
+                     start_col = 31;
+                     end_line = 42;
+                     end_col = 36
+                   }
+               }))
+    let assumption ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.assumption),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.assumption;
+                     predicate =
+                       (fun ((Assumption_input { x }) : assumption_input) ->
+                          (Laws_gen_Stdlib.(>) x 0 : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "gen_flat.ml";
+                         start_line = 43;
+                         start_col = 28;
+                         end_line = 43;
+                         end_col = 33
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.assumption;
+                        predicate =
+                          (fun ((Assumption_input { x }) : assumption_input)
+                             -> (Laws_gen_Stdlib.(<>) x 0 : bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "gen_flat.ml";
+                            start_line = 43;
+                            start_col = 39;
+                            end_line = 43;
+                            end_col = 45
+                          }
+                      }))))
+    let laws choices =
+      {
+        poly = (poly choices);
+        modes = (modes choices);
+        unboxed = (unboxed choices);
+        \#type = (\#type choices);
+        alias = (alias choices);
+        assumption = (assumption choices)
+      }
+  end

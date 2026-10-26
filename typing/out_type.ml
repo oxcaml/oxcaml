@@ -3921,6 +3921,13 @@ let rec annotate_first_occurrence kinds (ty : out_type) =
   | Otyp_of_kind _ ->
       kinds, ty
 
+(* Unlike [tree_of_qtvs], nullability is kept: the kind of a type variable
+   of a law declares the inputs of the law, which [value_or_null] parameters
+   must admit. *)
+let tree_of_type_jkind ty =
+  out_jkind_option_of_jkind ~ignore_null:false !printing_env
+    (Ctype.estimate_type_jkind !printing_env ty)
+
 let tree_of_law_params params =
   let tys = List.map snd params in
   let base = With_locality.Const.legacy in

@@ -32,6 +32,9 @@
 
 type t
 
+(** The laws file of a unit, as syntax to print. *)
+val of_syntax : Parsetree.structure -> t
+
 (** The object files that are not compiled from a unit, such as packs,
     record no laws file. *)
 val none : t

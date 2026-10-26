@@ -30,6 +30,8 @@
    back does not depend on the version of the syntax tree. *)
 type t = string option
 
+let of_syntax items = Some (Format.asprintf "%a@." Pprintast.structure items)
+
 let none = None
 
 type error = No_laws_file of Misc.filepath

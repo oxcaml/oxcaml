@@ -81,6 +81,11 @@ val modtype_of_package:
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
+(** The named type variables of the types [tys], in order of appearance.
+    For the types of the parameters of a law, these are the variables of
+    their annotations. *)
+val law_type_variables : type_expr list -> (string * type_expr) list
+
 val save_signature:
   Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->
   Env.t -> Cmi_format.cmi_infos_lazy -> unit

@@ -42,6 +42,8 @@ type mapper = {
   expr: mapper -> T.expression -> expression;
   extension_constructor: mapper -> T.extension_constructor
                          -> extension_constructor;
+  ident:
+    mapper -> Path.t -> Longident.t Location.loc -> Longident.t Location.loc;
   include_declaration: mapper -> T.include_declaration -> include_declaration;
   include_description: mapper -> T.include_description -> include_description;
   jkind_declaration: mapper -> T.jkind_declaration -> jkind_declaration;
@@ -372,8 +374,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra=[Tpat_unpack, _, _attrs];
         pat_desc = Tpat_var { name; _ }; _ } ->
         Ppat_unpack { name with txt = Some name.txt }
-    | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
-        Ppat_type (map_loc sub lid)
+    | { pat_extra=[Tpat_type (path, lid), _, _attrs]; _ } ->
+        Ppat_type (map_loc sub (sub.ident sub path lid))
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
         let modes = Typemode.untransl_mode modes in
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
@@ -562,7 +564,8 @@ let expression sub exp =
   let attrs = sub.attributes sub exp.exp_attributes in
   let desc =
     match exp.exp_desc with
-      Texp_ident { lid; _ } -> Pexp_ident (map_loc sub lid)
+      Texp_ident { path; lid; _ } ->
+        Pexp_ident (map_loc sub (sub.ident sub path lid))
     | Texp_apply_layout (exp, _) -> (sub.expr sub exp).pexp_desc
     | Texp_constant cst -> Pexp_constant (constant cst)
     | Texp_let (rec_flag, list, exp) ->
@@ -763,7 +766,8 @@ let expression sub exp =
             Tmeth_name name -> mkloc name loc
           | Tmeth_val id -> mkloc (Ident.name id) loc
           | Tmeth_ancestor(id, _) -> mkloc (Ident.name id) loc)
-    | Texp_new (_path, lid, _, _) -> Pexp_new (map_loc sub lid)
+    | Texp_new (path, lid, _, _) ->
+        Pexp_new (map_loc sub (sub.ident sub path lid))
     | Texp_instvar (_, path, name) ->
       Pexp_ident ({loc = sub.location sub name.loc ; txt = lident_of_path path})
     | Texp_mutvar id ->
@@ -872,7 +876,7 @@ let binding_op sub bop pat =
   {pbop_op; pbop_pat; pbop_exp; pbop_loc}
 
 let package_type sub pack =
-  { ppt_path = map_loc sub pack.tpt_txt;
+  { ppt_path = map_loc sub (sub.ident sub pack.tpt_path pack.tpt_txt);
     ppt_cstrs = List.map (fun (s, ct) -> (s, sub.typ sub ct)) pack.tpt_cstrs;
     ppt_attrs = [];
     ppt_loc = sub.location sub pack.tpt_txt.loc }
@@ -982,10 +986,10 @@ let module_type (sub : mapper) mty =
   let loc = sub.location sub mty.mty_loc in
   let attrs = sub.attributes sub mty.mty_attributes in
   match mty.mty_desc with
-    Tmty_ident (_path, lid) ->
-      Mty.mk ~loc ~attrs (Pmty_ident (map_loc sub lid))
-  | Tmty_alias (_path, lid) ->
-      Mty.mk ~loc ~attrs (Pmty_alias (map_loc sub lid))
+    Tmty_ident (path, lid) ->
+      Mty.mk ~loc ~attrs (Pmty_ident (map_loc sub (sub.ident sub path lid)))
+  | Tmty_alias (path, lid) ->
+      Mty.mk ~loc ~attrs (Pmty_alias (map_loc sub (sub.ident sub path lid)))
   | Tmty_signature sg ->
       Mty.mk ~loc ~attrs (Pmty_signature (sub.signature sub sg))
   | Tmty_functor (arg, mtype2, mmode2) ->
@@ -999,9 +1003,10 @@ let module_type (sub : mapper) mty =
           List.map (sub.with_constraint sub) list))
   | Tmty_typeof mexpr ->
     Mty.mk ~loc ~attrs (Pmty_typeof (sub.module_expr sub mexpr))
-  | Tmty_strengthen (mtype, _path, lid) ->
+  | Tmty_strengthen (mtype, path, lid) ->
       Mty.mk ~loc ~attrs
-        (Pmty_strengthen (sub.module_type sub mtype, map_loc sub lid))
+        (Pmty_strengthen
+           (sub.module_type sub mtype, map_loc sub (sub.ident sub path lid)))
 
 let with_constraint sub (_path, lid, cstr) =
   match cstr with
@@ -1032,7 +1037,8 @@ let module_expr (sub : mapper) mexpr =
         sub.module_expr sub m
     | _ ->
         let desc = match mexpr.mod_desc with
-            Tmod_ident (_p, lid) -> Pmod_ident (map_loc sub lid)
+            Tmod_ident (p, lid) ->
+              Pmod_ident (map_loc sub (sub.ident sub p lid))
           | Tmod_structure st -> Pmod_structure (sub.structure sub st)
           | Tmod_functor (arg, mexpr, _) ->
               Pmod_functor
@@ -1058,9 +1064,9 @@ let class_expr sub cexpr =
   let loc = sub.location sub cexpr.cl_loc in
   let attrs = sub.attributes sub cexpr.cl_attributes in
   let desc = match cexpr.cl_desc with
-    | Tcl_constraint ( { cl_desc = Tcl_ident (_path, lid, tyl); _ },
+    | Tcl_constraint ( { cl_desc = Tcl_ident (path, lid, tyl); _ },
                        None, _, _, _ ) ->
-        Pcl_constr (map_loc sub lid,
+        Pcl_constr (map_loc sub (sub.ident sub path lid),
           List.map (sub.typ sub) tyl)
     | Tcl_structure clstr -> Pcl_structure (sub.class_structure sub clstr)
 
@@ -1097,8 +1103,9 @@ let class_type sub ct =
   let attrs = sub.attributes sub ct.cltyp_attributes in
   let desc = match ct.cltyp_desc with
       Tcty_signature csg -> Pcty_signature (sub.class_signature sub csg)
-    | Tcty_constr (_path, lid, list) ->
-        Pcty_constr (map_loc sub lid, List.map (sub.typ sub) list)
+    | Tcty_constr (path, lid, list) ->
+        Pcty_constr (map_loc sub (sub.ident sub path lid),
+                     List.map (sub.typ sub) list)
     | Tcty_arrow (arg_label, ct, cl) ->
         Pcty_arrow (label arg_label, sub.typ sub ct, sub.class_type sub cl)
     | Tcty_open (od, e) ->
@@ -1143,14 +1150,15 @@ let core_type sub ct =
     | Ttyp_unboxed_tuple list ->
         Ptyp_unboxed_tuple
           (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
-    | Ttyp_constr (_path, lid, list) ->
-        Ptyp_constr (map_loc sub lid,
+    | Ttyp_constr (path, lid, list) ->
+        Ptyp_constr (map_loc sub (sub.ident sub path lid),
           List.map (sub.typ sub) list)
     | Ttyp_object (list, o) ->
         Ptyp_object
           (List.map (sub.object_field sub) list, o)
-    | Ttyp_class (_path, lid, list) ->
-        Ptyp_class (map_loc sub lid, List.map (sub.typ sub) list)
+    | Ttyp_class (path, lid, list) ->
+        Ptyp_class (map_loc sub (sub.ident sub path lid),
+                    List.map (sub.typ sub) list)
     | Ttyp_alias (_, None, None) ->
         Misc.fatal_error "anonymous alias without layout annotation in Untypeast"
     | Ttyp_alias (ct, s, jkind) ->
@@ -1256,6 +1264,8 @@ let class_field sub cf =
 
 let location _sub l = l
 
+let ident _sub _path lid = lid
+
 let default_mapper =
   {
     attribute = attribute;
@@ -1283,6 +1293,7 @@ let default_mapper =
     type_extension = type_extension;
     type_exception = type_exception;
     extension_constructor = extension_constructor;
+    ident = ident;
     value_description = value_description;
     pat = pattern;
     expr = expression;
