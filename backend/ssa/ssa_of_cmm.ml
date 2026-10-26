@@ -379,12 +379,13 @@ and emit_invalid env c message symbol =
 and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     result =
   let may_raise = Cfg.can_raise_terminator new_op in
-  let call_returning_to op (ty : Cmm.machtype) : result =
+  let call_returning_to op ~known_arguments (ty : Cmm.machtype) : result =
     let cont_block = new_block env ~params:ty in
     finish_block env c ~dbg
       (Call
          { op;
            args = arg_instrs;
+           known_arguments;
            continuation = Goto cont_block;
            may_raise;
            nontail
@@ -393,18 +394,22 @@ and emit_call env c ~ty ~nontail (new_op : Cfg.terminator) arg_instrs dbg :
     Ok (Block.params cont_block)
   in
   match new_op with
-  | Call { op = Direct sym; _ } -> call_returning_to (Direct sym) ty
-  | Call { op = Indirect candidates; _ } ->
-    call_returning_to (Indirect candidates) ty
+  | Call { op = { desc = Direct sym; known_arguments }; _ } ->
+    call_returning_to (Direct sym) ~known_arguments ty
+  | Call { op = { desc = Indirect candidates; known_arguments }; _ } ->
+    call_returning_to (Indirect candidates) ~known_arguments ty
   | Prim { op = External ({ ty_res; _ } as ext_call); _ } ->
-    call_returning_to (External ext_call) ty_res
+    call_returning_to (External ext_call) ~known_arguments:[] ty_res
   | Prim { op = Probe { name; handler_code_sym; enabled_at_init }; _ } ->
-    call_returning_to (Probe { name; handler_code_sym; enabled_at_init }) ty
+    call_returning_to
+      (Probe { name; handler_code_sym; enabled_at_init })
+      ~known_arguments:[] ty
   | Call_no_return ext_call ->
     finish_block env c ~dbg
       (Call
          { op = External ext_call;
            args = arg_instrs;
+           known_arguments = [];
            continuation = Unreachable;
            may_raise;
            nontail

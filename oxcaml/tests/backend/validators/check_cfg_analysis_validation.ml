@@ -160,7 +160,8 @@ let test_tailcall_self () =
     [ block entry_label
         (terminator
            ~arg:[| int.(0); int.(1) |]
-           (Tailcall_self { destination = entry_label })) ]
+           (Tailcall_self { destination = entry_label; known_arguments = [] }))
+    ]
   |> validate_liveness
 
 let () =

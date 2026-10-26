@@ -258,6 +258,7 @@ module Terminator : sig
     | Call of
         { op : call_op;
           args : 'g Value.t array;
+          known_arguments : Cmm.callee option list;
           continuation : 'g continuation;
               (** [Goto b]: a normal call returning its results as [b]'s block
                   params. [Return]: a tail call. [Unreachable]: an [External]

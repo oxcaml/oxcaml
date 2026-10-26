@@ -170,7 +170,7 @@ let mem_block t label = Label.Tbl.mem t.blocks label
 
 let successor_labels_normal ti =
   match ti.desc with
-  | Tailcall_self { destination } -> Label.Set.singleton destination
+  | Tailcall_self { destination; _ } -> Label.Set.singleton destination
   | Switch labels -> Array.to_seq labels |> Label.Set.of_seq
   | Return | Raise _ | Tailcall_func _ -> Label.Set.empty
   | Call_no_return _ -> Label.Set.empty
@@ -232,10 +232,10 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Float_test { width; lt; eq; gt; uo } ->
         Float_test { width; lt = f lt; eq = f eq; gt = f gt; uo = f uo }
       | Switch labels -> Switch (Array.map f labels)
-      | Tailcall_self { destination } ->
-        Tailcall_self { destination = f destination }
-      | Tailcall_func (Indirect _)
-      | Tailcall_func (Direct _)
+      | Tailcall_self { destination; known_arguments } ->
+        Tailcall_self { destination = f destination; known_arguments }
+      | Tailcall_func { desc = Indirect _; _ }
+      | Tailcall_func { desc = Direct _; _ }
       | Return | Raise _ | Call_no_return _
       | Invalid { label_after = None; _ } ->
         block.terminator.desc
@@ -806,12 +806,21 @@ let equal_float_test
   && Label.equal left_gt right_gt
   && Label.equal left_uo right_uo
 
-let equal_func_call_operation left right =
+let equal_func_call_desc left right =
   match left, right with
   | Indirect left_callees, Indirect right_callees ->
     Option.equal (List.equal Cmm.equal_callee) left_callees right_callees
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
   | (Indirect _ | Direct _), _ -> false
+
+let equal_known_arguments left right =
+  List.equal (Option.equal Cmm.equal_callee) left right
+
+let equal_func_call_operation
+    { desc = left_desc; known_arguments = left_known_arguments }
+    { desc = right_desc; known_arguments = right_known_arguments } =
+  equal_func_call_desc left_desc right_desc
+  && equal_known_arguments left_known_arguments right_known_arguments
 
 let equal_external_call_operation
     { func_symbol = left_func_symbol;
@@ -879,9 +888,13 @@ let equal_terminator left right =
   | Return, Return -> true
   | Raise left_kind, Raise right_kind ->
     Lambda.equal_raise_kind left_kind right_kind
-  | ( Tailcall_self { destination = left_dest },
-      Tailcall_self { destination = right_dest } ) ->
+  | ( Tailcall_self
+        { destination = left_dest; known_arguments = left_known_arguments },
+      Tailcall_self
+        { destination = right_dest; known_arguments = right_known_arguments } )
+    ->
     Label.equal left_dest right_dest
+    && equal_known_arguments left_known_arguments right_known_arguments
   | Tailcall_func left_op, Tailcall_func right_op ->
     equal_func_call_operation left_op right_op
   | Call_no_return left_op, Call_no_return right_op ->

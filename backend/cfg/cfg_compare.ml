@@ -389,8 +389,8 @@ let terminator_structure_match ~map_label (old_term : Cfg.terminator)
   | Return, Return -> true
   | Raise old_raise_kind, Raise new_raise_kind ->
     Lambda.equal_raise_kind old_raise_kind new_raise_kind
-  | ( Tailcall_self { destination = old_destination },
-      Tailcall_self { destination = new_destination } ) ->
+  | ( Tailcall_self { destination = old_destination; _ },
+      Tailcall_self { destination = new_destination; _ } ) ->
     map_label old_destination new_destination;
     true
   | Tailcall_func old_op, Tailcall_func new_op ->

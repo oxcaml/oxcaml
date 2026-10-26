@@ -93,6 +93,8 @@ module Allocation_sources : sig
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
 
+  val bind : f:('a -> 'b t) -> 'a t -> 'b t
+
   val compare :
     compare_args_only:('args_only -> 'args_only -> int) ->
     'args_only t ->

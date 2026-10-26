@@ -228,7 +228,8 @@ expr:
                 { Cop(Capply {
                         result_type = $6;
                         region = Lambda.Rc_normal;
-                        callees = None
+                        callees = None;
+                        known_arguments = []
                       },
                       $4 :: List.rev $5, debuginfo ?loc:$3 ()) }
   | LPAREN EXTCALL STRING exprlist machtype RPAREN

@@ -1,6 +1,6 @@
 (* TEST
    readonly_files = "cmx_lib.ml";
-   flags = "-I +compiler-libs -I ocamlopt.opt";
+   flags = "-g -I +compiler-libs -I ocamlopt.opt";
    setup-ocamlopt.opt-build-env;
    module = "cmx_lib.ml";
    ocamlopt.opt;
@@ -106,12 +106,24 @@ read_cmx_lib "either"
     {argument #1 on diverging paths; argument #2 on diverging paths}}
 |}];;
 
-(* CR wsturgeon: fix (work for the next PR) *)
+(* Tail-recursive, *not* optimized into a loop: *)
 read_cmx_lib "iter_rec"
 [%%expect{|
-Exception: Failure "no such summary found".
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
 |}];;
 
+(* Tail-recursive, optimized into a loop: *)
 read_cmx_lib "iter_loop"
 [%%expect{|
 - : summary =
@@ -128,6 +140,7 @@ read_cmx_lib "iter_loop"
     {argument #1 on normal/diverging paths}}
 |}];;
 
+(* Call sites: *)
 read_cmx_lib "apply"
 [%%expect{|
 - : summary =
@@ -144,8 +157,107 @@ read_cmx_lib "apply"
     {argument #1 on diverging paths}}
 |}];;
 
-(* CR wsturgeon: fix (work for the next PR) *)
+(* Call sites, flipping argument order: *)
 read_cmx_lib "ylppa"
+[%%expect{|
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #2 on exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #2 on diverging paths}}
+|}];;
+
+(* Across compilation units: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_flipped_"
+[%%expect{|
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #2 on normal/exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #2 on normal/diverging paths}}
+|}];;
+
+(* Mutual recursion: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__ping_"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot;
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
+|}];;
+
+(* Mutual recursion: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__pong_"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot;
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
+|}];;
+
+(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
+(* [caml_apply]: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__apply2_"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
+(* [caml_apply]: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__ylppa2_"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* Always exit with [raise Fail]: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__fail_"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot; exn = Component.Safe; div = Component.Bot}
+|}];;
+
+(* Always diverge with [while true ...]: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__diverge_"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot; exn = Component.Bot; div = Component.Bot}
+|}];;
+(* CR-someday wsturgeon for wsturgeon: the above [div = Bot] is a known bug *)
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_fail_"
+[%%expect{|
+Exception: Failure "no such summary found".
+|}];;
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_diverge_"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;
