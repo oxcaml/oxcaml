@@ -166,13 +166,7 @@ type f = { f : unit -> f }
 let rec r = { f = (fun () -> r) };;
 [%%expect{|
 type f = { f : unit -> f; }
-Line 2, characters 18-31:
-2 | let rec r = { f = (fun () -> r) };;
-                      ^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "r", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val r : f = {f = <fun>}
 |}];;
 
 type g = { g : unit -> int; mutable self : g }
@@ -180,13 +174,8 @@ let rec gr = { g = h; self = gr }
 and h () = 1;;
 [%%expect{|
 type g = { g : unit -> int; mutable self : g; }
-Line 2, characters 19-20:
-2 | let rec gr = { g = h; self = gr }
-                       ^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "h", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val gr : g = {g = <fun>; self = <cycle>}
+val h : unit -> int = <fun>
 |}];;
 
 let rec e = { next = e; v = e.v };;
@@ -196,8 +185,8 @@ Line 1, characters 28-31:
                                 ^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "e", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* A mutable field may not read through the group. *)
@@ -209,8 +198,8 @@ Line 1, characters 21-27:
                          ^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "y", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec z = { next = id z; v = 0 }
@@ -221,8 +210,8 @@ Line 1, characters 21-25:
                          ^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "id", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec w = { next = (if true then w else w); v = 0 };;
@@ -232,8 +221,8 @@ Line 1, characters 21-44:
                          ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "w", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec w = { next = (let n = w in n); v = 0 };;
@@ -243,8 +232,8 @@ Line 1, characters 21-37:
                          ^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "w", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec w = { next = { w with v = 1 }; v = 0 };;
@@ -254,8 +243,8 @@ Line 1, characters 21-37:
                          ^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "w", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* Functional update is not a record literal. *)
@@ -267,8 +256,8 @@ Line 1, characters 12-31:
                 ^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "u", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* Unboxed records are not blocks. *)
@@ -284,8 +273,8 @@ Line 3, characters 22-47:
                           ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "hd", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* Reference cells are records with a single mutable field. *)
@@ -332,8 +321,8 @@ Line 1, characters 18-28:
                       ^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "bad", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let my_ref x = ref x
@@ -345,6 +334,6 @@ Line 2, characters 14-40:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "bad", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;

@@ -19,14 +19,26 @@
 (** Static checking of recursive declarations. See the implementation for
     the rules. *)
 
-(** [classify_recursive_binding ids e] checks the right-hand side [e] of a
-    binding in a [let rec] group binding [ids]. Returns [Error (loc, id)] if
-    the subexpression at [loc] refers to the recursively bound [id] where it
-    may not. *)
-val classify_recursive_binding :
-  Ident.t list ->
-  Typedtree.expression ->
-  (Value_rec_types.recursive_binding_kind, Location.t * Ident.t) result
+type error =
+  | Illegal_reference of Location.t * Ident.t
+    (** The subexpression at the location refers to the recursively bound
+        name where it may not. *)
+  | Illegal_cycle of Location.t * Ident.t list
+    (** The given names form a cycle of blocks that does not go through a
+        function, a lazy value or a mutable field. The location is that of
+        the reference that closes the cycle. *)
+
+(** [classify_recursive_bindings bindings] checks the right-hand sides of
+    the bindings [(x1, e1); ...; (xn, en)] of a [let rec] group, and returns
+    how each of them is compiled. *)
+val classify_recursive_bindings :
+  (Ident.t * Typedtree.expression) list ->
+  (Value_rec_types.recursive_binding_kind list, error) result
+
+(** [split_preamble e] is [Some body] if [e] is an item of the preamble of
+    a recursive definition ([let ... in body], [let open ... in body],
+    [let module ... in body], [let exception ... in body] or [e1; body]). *)
+val split_preamble : Typedtree.expression -> Typedtree.expression option
 
 (** [check_class_expr ids ce] checks the definition [ce] of a class in a
     recursive group of classes [ids]. Returns [Error id] if a let-binding in

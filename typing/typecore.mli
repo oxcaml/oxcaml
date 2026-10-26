@@ -361,6 +361,7 @@ type error =
   | Untagged_char_literal of char
   | Illegal_letrec_pat
   | Illegal_letrec_expr of Ident.t
+  | Illegal_letrec_cycle of Ident.t list
   | Illegal_mutable_pat
   | Mixed_poly_nonpoly_bindings
   | Illegal_class_expr of Ident.t

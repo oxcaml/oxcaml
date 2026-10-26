@@ -1,0 +1,9 @@
+f: preamble
+x
+g: preamble
+f 3 = 8
+a
+b
+count = 6, 6
+test = 11
+0 2 2 4 4

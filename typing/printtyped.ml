@@ -1504,17 +1504,39 @@ and case
   end;
   expression (i+1) ppf c_rhs;
 
+and recursive_binding_kind ppf (kind : Value_rec_types.recursive_binding_kind) =
+  let definition ppf (definition : Value_rec_types.definition) =
+    Format.pp_print_string ppf
+      (match definition with
+       | Function -> "function"
+       | Construction -> "construction"
+       | Lazy -> "lazy"
+       | Value -> "value")
+  in
+  let preamble_item ppf (item : Value_rec_types.preamble_item) =
+    match item with
+    | Hoisted -> Format.pp_print_string ppf "hoisted"
+    | Members kinds ->
+      Format.fprintf ppf "(members %a)"
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+           recursive_binding_kind) kinds
+  in
+  match kind with
+  | Not_recursive -> Format.pp_print_string ppf "nonrec"
+  | Recursive { preamble = []; definition = d } -> definition ppf d
+  | Recursive { preamble; definition = d } ->
+    Format.fprintf ppf "(%a %a)"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space preamble_item)
+      preamble definition d
+
 and value_binding rec_flag i ppf x =
   begin match rec_flag, x.vb_rec_kind with
   | Nonrecursive, _ -> line i ppf "<def>\n"
-  | Recursive, Recursive_function -> line i ppf "<def_rec>\n"
+  | Recursive, Recursive { preamble = []; definition = Function } ->
+    line i ppf "<def_rec>\n"
   | Recursive, Not_recursive -> line i ppf "<def_rec_nonrec>\n"
-  | Recursive, Recursive_record patched ->
-    line i ppf "<def_rec_record %a>\n"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
-      patched
-  | Recursive, Recursive_lazy -> line i ppf "<def_rec_lazy>\n"
-  | Recursive, Recursive_ref -> line i ppf "<def_rec_ref>\n"
+  | Recursive, kind ->
+    line i ppf "<def_rec %a>\n" recursive_binding_kind kind
   end;
   attributes (i+1) ppf x.vb_attributes;
   pattern (i+1) ppf x.vb_pat;

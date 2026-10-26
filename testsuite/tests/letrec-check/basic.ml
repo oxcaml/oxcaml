@@ -56,13 +56,13 @@ val f : '_weak1 -> 'a = <fun>
 let rec f = fun x -> x
 and g = let h = f in fun x -> h x;;
 [%%expect{|
-Line 2, characters 8-33:
+Line 2, characters 16-17:
 2 | and g = let h = f in fun x -> h x;;
-            ^^^^^^^^^^^^^^^^^^^^^^^^^
+                    ^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* Non-function bindings may not refer to the recursive group: no cyclic
@@ -70,65 +70,47 @@ Error: This kind of expression is not allowed as right-hand side of "let rec".
 
 let rec x = 1 :: x;;
 [%%expect{|
-Line 1, characters 12-18:
+Line 1, characters 17-18:
 1 | let rec x = 1 :: x;;
-                ^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+                     ^
+Error: This "let rec" creates the cycle "x" -> "x", which goes through
+       neither a function, nor a lazy value, nor a mutable field.
 |}];;
 
 type tup = T of tup * int
 let rec x = T (x, 0);;
 [%%expect{|
 type tup = T of tup * int
-Line 2, characters 12-20:
+Line 2, characters 15-16:
 2 | let rec x = T (x, 0);;
-                ^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+                   ^
+Error: This "let rec" creates the cycle "x" -> "x", which goes through
+       neither a function, nor a lazy value, nor a mutable field.
 |}];;
 
 type 'a stream = Cons of 'a * 'a stream
 let rec s = Cons (1, s);;
 [%%expect{|
 type 'a stream = Cons of 'a * 'a stream
-Line 2, characters 12-23:
+Line 2, characters 21-22:
 2 | let rec s = Cons (1, s);;
-                ^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "s", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+                         ^
+Error: This "let rec" creates the cycle "s" -> "s", which goes through
+       neither a function, nor a lazy value, nor a mutable field.
 |}];;
 
 type tree = Node of tree array
 let rec t = Node [| t |];;
 [%%expect{|
 type tree = Node of tree array
-Line 2, characters 12-24:
-2 | let rec t = Node [| t |];;
-                ^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "t", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val t : tree = Node [|<cycle>|]
 |}];;
 
 type t = { f : unit -> t }
 let rec r = { f = (fun () -> r) };;
 [%%expect{|
 type t = { f : unit -> t; }
-Line 2, characters 18-31:
-2 | let rec r = { f = (fun () -> r) };;
-                      ^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "r", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val r : t = {f = <fun>}
 |}];;
 
 (* Lazy values are accepted: their bodies are only evaluated when forced. *)
@@ -178,59 +160,47 @@ type stream = Cons of int * stream Lazy.t
 let rec s = Cons (1, lazy s);;
 [%%expect{|
 type stream = Cons of int * stream Lazy.t
-Line 2, characters 12-28:
-2 | let rec s = Cons (1, lazy s);;
-                ^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "s", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val s : stream = Cons (1, <cycle>)
 |}];;
 
 let rec x = (x; ());;
 [%%expect{|
-Line 1, characters 12-19:
+Line 1, characters 13-14:
 1 | let rec x = (x; ());;
-                ^^^^^^^
+                 ^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec x = let _ = x in 0;;
 [%%expect{|
-Line 1, characters 12-26:
+Line 1, characters 20-21:
 1 | let rec x = let _ = x in 0;;
-                ^^^^^^^^^^^^^^
+                        ^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 type cell = C of cell ref
 let rec c = C (ref c);;
 [%%expect{|
 type cell = C of cell ref
-Line 2, characters 12-21:
-2 | let rec c = C (ref c);;
-                ^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "c", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val c : cell = C {contents = <cycle>}
 |}];;
 
 let rec x = let module M = struct let y = x end in M.y;;
 [%%expect{|
-Line 1, characters 12-54:
+Line 1, characters 27-47:
 1 | let rec x = let module M = struct let y = x end in M.y;;
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                               ^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 module type S = sig val y : int end
@@ -242,8 +212,8 @@ Line 2, characters 12-55:
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 type a = A of b * int
@@ -253,13 +223,11 @@ and y = B (x, 1);;
 [%%expect{|
 type a = A of b * int
 and b = B of a * int
-Line 3, characters 12-20:
+Line 3, characters 15-16:
 3 | let rec x = A (y, 0)
-                ^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "y", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+                   ^
+Error: This "let rec" creates the cycle "y" -> "x" -> "y", which goes through
+       neither a function, nor a lazy value, nor a mutable field.
 |}];;
 
 let rec x = object method m = x end;;
@@ -269,32 +237,26 @@ Line 1, characters 12-35:
                 ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* Functions that are not syntactically functions are rejected too. *)
 
 let rec f = let g x = f x in g;;
 [%%expect{|
-Line 1, characters 12-30:
+Line 1, characters 29-30:
 1 | let rec f = let g x = f x in g;;
-                ^^^^^^^^^^^^^^^^^^
+                                 ^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       It refers to "g", but the names bound by a "let rec" may only be used
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec f = let count = ref 0 in fun x -> incr count; f x;;
 [%%expect{|
-Line 1, characters 12-57:
-1 | let rec f = let count = ref 0 in fun x -> incr count; f x;;
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+val f : '_weak2 -> 'a = <fun>
 |}];;
 
 let rec f x = x
@@ -305,8 +267,8 @@ Line 2, characters 8-9:
             ^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec f = fun x -> x
@@ -317,8 +279,8 @@ Line 2, characters 8-11:
             ^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec f = Fun.id (fun x -> f x);;
@@ -328,13 +290,13 @@ Line 1, characters 12-33:
                 ^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec f = (fun x -> x) |> fun g -> g;;
 [%%expect{|
-val f : '_weak2 -> '_weak2 = <fun>
+val f : '_weak3 -> '_weak3 = <fun>
 |}];;
 
 (* Binding operators count as references. *)
@@ -348,8 +310,8 @@ Line 2, characters 12-44:
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 let rec ( let* ) x f = f x
@@ -360,8 +322,8 @@ Line 2, characters 8-23:
             ^^^^^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec".
        It refers to "let*", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+       by the functions and lazy values it binds, and in the fields
+       of the constructors, tuples, records and references it binds.
 |}];;
 
 (* Recursive bindings in classes. *)
@@ -373,11 +335,9 @@ class c : object method m : int end
 
 class c = let rec x = 1 :: x in object method m = x end;;
 [%%expect{|
-Line 1, characters 22-28:
+Line 1, characters 27-28:
 1 | class c = let rec x = 1 :: x in object method m = x end;;
-                          ^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+                               ^
+Error: This "let rec" creates the cycle "x" -> "x", which goes through
+       neither a function, nor a lazy value, nor a mutable field.
 |}];;

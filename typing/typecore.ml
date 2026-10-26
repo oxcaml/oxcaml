@@ -280,6 +280,7 @@ type error =
   | Untagged_char_literal of char
   | Illegal_letrec_pat
   | Illegal_letrec_expr of Ident.t
+  | Illegal_letrec_cycle of Ident.t list
   | Illegal_mutable_pat
   | Mixed_poly_nonpoly_bindings
   | Illegal_class_expr of Ident.t
@@ -5866,17 +5867,26 @@ let rec maybe_computation exp =
     -> true
 
 let annotate_recursive_bindings env valbinds =
-  let ids = let_bound_idents valbinds in
-  List.map
-    (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort;
-           vb_attributes; vb_loc} as vb) ->
-      match Value_rec_check.classify_recursive_binding ids vb_expr with
-      | Error (loc, id) ->
-          Error.log_or_raise loc env (Illegal_letrec_expr id);
-          vb
-      | Ok vb_rec_kind ->
-          { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
-    valbinds
+  let bindings =
+    List.map
+      (fun vb ->
+         let id =
+           match pat_bound_idents vb.vb_pat with
+           | id :: _ -> id
+           | [] -> Ident.create_local "_"
+         in
+         id, vb.vb_expr)
+      valbinds
+  in
+  match Value_rec_check.classify_recursive_bindings bindings with
+  | Error (Illegal_reference (loc, id)) ->
+      Error.log_or_raise loc env (Illegal_letrec_expr id);
+      valbinds
+  | Error (Illegal_cycle (loc, ids)) ->
+      Error.log_or_raise loc env (Illegal_letrec_cycle ids);
+      valbinds
+  | Ok kinds ->
+      List.map2 (fun vb vb_rec_kind -> { vb with vb_rec_kind }) valbinds kinds
 
 let check_recursive_class_bindings env ids exprs =
   List.iter
@@ -14261,12 +14271,20 @@ let report_error ~loc env =
       Location.errorf ~loc
         "This kind of expression is not allowed as right-hand side of %a.@ \
          It refers to %a,@ but the names bound by a %a@ may only be used@ \
-         by the functions@ and lazy values it binds@ or, through \
-         constructors,@ in the mutable fields@ of the records and references \
-         it binds."
+         by the functions@ and lazy values it binds,@ and in the fields@ \
+         of the constructors,@ tuples, records@ and references it binds."
         Style.inline_code "let rec"
         Style.inline_code (Ident.name id)
         Style.inline_code "let rec"
+  | Illegal_letrec_cycle ids ->
+      Location.errorf ~loc
+        "This %a creates the cycle@ %a,@ which goes through@ neither a \
+         function,@ nor a lazy value,@ nor a mutable field."
+        Style.inline_code "let rec"
+        (pp_print_list
+           ~pp_sep:(fun ppf () -> fprintf ppf " ->@ ")
+           (fun ppf id -> Style.inline_code ppf (Ident.name id)))
+        ids
   | Illegal_class_expr id ->
       Location.errorf ~loc
         "This kind of recursive class expression is not allowed.@ \

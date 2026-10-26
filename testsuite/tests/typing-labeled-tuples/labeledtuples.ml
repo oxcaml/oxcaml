@@ -156,13 +156,11 @@ Error: The value "a" has type "int * lbl:(int * lbl:'a)"
 
 let rec l = ~lbl: 5, ~lbl2: 10 :: l
 [%%expect{|
-Line 1, characters 12-35:
+Line 1, characters 34-35:
 1 | let rec l = ~lbl: 5, ~lbl2: 10 :: l
-                ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "l", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds or, through constructors,
-       in the mutable fields of the records and references it binds.
+                                      ^
+Error: This "let rec" creates the cycle "l" -> "l", which goes through
+       neither a function, nor a lazy value, nor a mutable field.
 |}]
 
 (* Tuple containing labeled tuples *)
