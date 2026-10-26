@@ -336,14 +336,13 @@ module Description : sig
       indexed by ID; their original block labels are recorded for the cycle and
       dominance checks on rematerializations.
 
-      The validator allows deletion of pure basic instructions with dead
-      results and insertion of spills, reloads, moves, checked
-      rematerializations, and [Always] terminators for edge splitting. It checks
-      surviving instruction order and requires [fun_args] to retain their
-      preassigned locations.
+      The validator allows deletion of pure basic instructions with dead results
+      and insertion of spills, reloads, moves, checked rematerializations, and
+      [Always] terminators for edge splitting. It checks surviving instruction
+      order and requires [fun_args] to retain their preassigned locations.
 
-      It assumes surviving instructions remain in their original blocks and
-      CFG changes only subdivide edges. *)
+      It assumes surviving instructions remain in their original blocks and CFG
+      changes only subdivide edges. *)
   type t
 
   (** Returns the snapshot of a basic instruction, or [None] if it was added
@@ -654,13 +653,13 @@ end = struct
      chain).
 
      The equations check the source's arguments at [instr], but do not prove
-     that the source has already executed: the copy itself discharges the
-     result equation. For loads we separately require the source's original
-     block to strictly dominate the copy's block. Split inserts copies at block
-     entry, so their sources must be in earlier blocks. Using the description's
-     source block also covers sources subsequently deleted as dead code. Since
-     basic instructions cannot raise, the source executed before every exit
-     from that block in the original CFG, making the copy non-speculative.
+     that the source has already executed: the copy itself discharges the result
+     equation. For loads we separately require the source's original block to
+     strictly dominate the copy's block. Split inserts copies at block entry, so
+     their sources must be in earlier blocks. Using the description's source
+     block also covers sources subsequently deleted as dead code. Since basic
+     instructions cannot raise, the source executed before every exit from that
+     block in the original CFG, making the copy non-speculative.
      [Regalloc_split_utils.is_rematerializable_shape] then ensures the same
      arguments produce the same value (immutable non-atomic loads, constants,
      pure arithmetic). *)
@@ -769,7 +768,8 @@ end = struct
       if
         not
           (Cfg_dominators.is_strictly_dominating
-             (Lazy.force ctx.dominators) source_label label)
+             (Lazy.force ctx.dominators)
+             source_label label)
       then
         fail
           "source load no. %a in block %a does not strictly dominate block %a"
