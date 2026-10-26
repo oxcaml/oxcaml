@@ -3,15 +3,18 @@ module Union_find = Union_find.Make ()
 module Callback = struct
   type 'a t =
     { run : 'a -> unit;
-      cancel : unit -> unit
+      cancel : unit -> unit;
+      monitor : Scheduler.Monitor.t
     }
 
-  let create ~run ~cancel = { run; cancel }
+  let create ~run ~cancel =
+    { run; cancel; monitor = Scheduler.Monitor.current () }
 
   let schedule_run t ~value ~scheduler =
-    Scheduler.add scheduler (fun () -> t.run value)
+    Scheduler.add ~monitor:t.monitor scheduler (fun () -> t.run value)
 
-  let schedule_cancel t ~scheduler = Scheduler.add scheduler t.cancel
+  let schedule_cancel t ~scheduler =
+    Scheduler.add ~monitor:t.monitor scheduler t.cancel
 end
 
 module Cell = struct
