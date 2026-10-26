@@ -1,0 +1,7 @@
+File "included_argument.ml", line 1:
+Error: This module cannot be used as an argument for parameter Unrepresentable_param,
+       because its signature contains values whose layouts are not known.
+File "included_argument.ml", line 5, characters 2-11:
+5 |   val x : t
+      ^^^^^^^^^
+  x has an unknown layout.

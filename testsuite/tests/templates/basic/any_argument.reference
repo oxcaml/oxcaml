@@ -1,2 +1,7 @@
->> Fatal error: bound_value_identifiers_and_sorts: unrepresentable signature item
-Fatal error: exception Misc.Fatal_error
+File "any_argument.mli", line 1:
+Error: This module cannot be used as an argument for parameter Unrepresentable_param,
+       because its signature contains values whose layouts are not known.
+File "any_argument.mli", line 6, characters 0-9:
+6 | val x : t
+    ^^^^^^^^^
+  x has an unknown layout.
