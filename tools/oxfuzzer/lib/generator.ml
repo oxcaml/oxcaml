@@ -1,8 +1,10 @@
 (* Random generation of the IR, configurable through [Config]. *)
 module Bin_op = Ir.Bin_op
 module Binding = Ir.Binding
+module Exn = Ir.Exn
 module Expr = Ir.Expr
 module Function = Ir.Function
+module Handler = Ir.Handler
 module Inline = Ir.Inline
 module Name = Ir.Name
 module Number = Ir.Number
@@ -20,8 +22,10 @@ module State = struct
       function_names : Fresh.t;
       mutable top_level_functions : Function.t list;
       mutable record_types : Ty.record list;
+      mutable exceptions : Exn.t list;
       mutable variant_types : Ty.variant list;
-      mutable matches_remaining : int
+      mutable matches_remaining : int;
+      mutable tries_remaining : int
     }
 
   let create random_state =
@@ -33,8 +37,10 @@ module State = struct
       function_names = Fresh.create ~prefix:"f";
       top_level_functions = [];
       record_types = [];
+      exceptions = [];
       variant_types = [];
-      matches_remaining = Config.max_match_count
+      matches_remaining = Config.max_match_count;
+      tries_remaining = Config.max_try_count
     }
 
   let fresh t = Fresh.next t.names
@@ -55,10 +61,17 @@ end
 module Env = struct
   type t =
     { bindings : Binding.t list;
-      loop_variables : Loop_variable.t list
+      loop_variables : Loop_variable.t list;
+      catchable_exceptions : Exn.t list
     }
 
-  let empty = { bindings = []; loop_variables = [] }
+  let empty = { bindings = []; loop_variables = []; catchable_exceptions = [] }
+
+  let can_raise t exn = List.exists (Exn.equal exn) t.catchable_exceptions
+
+  let extend_catchable_exceptions t exns =
+    let new_exns = List.filter (fun exn -> not (can_raise t exn)) exns in
+    { t with catchable_exceptions = new_exns @ t.catchable_exceptions }
 
   let extend t binding = { t with bindings = binding :: t.bindings }
 
@@ -133,6 +146,18 @@ let random_element (st : State.t) list =
   List.nth list (Random.State.int st.random_state (List.length list))
 
 let random_number_ty (st : State.t) = random_element st st.number_types
+
+let random_exceptions (st : State.t) exceptions ~count =
+  let rec pick chosen remaining count =
+    if count = 0 || List.is_empty remaining
+    then List.rev chosen
+    else
+      let exn = random_element st remaining in
+      pick (exn :: chosen)
+        (List.filter (fun other -> not (Exn.equal exn other)) remaining)
+        (count - 1)
+  in
+  pick [] exceptions count
 
 let random_int_in_range (st : State.t) ~min ~max =
   Random.State.int_in_range st.random_state ~min ~max
@@ -232,6 +257,42 @@ let gen_record_types (st : State.t) =
       gen (id + 1) (List.rev_append variants records)
   in
   gen 0 []
+
+let gen_value_type (st : State.t) =
+  (* Exception payloads must be values, so unboxed numbers and unboxed records
+     are excluded. *)
+  let boxed_records =
+    List.filter (fun (record : Ty.record) -> not record.unboxed) st.record_types
+  in
+  if
+    (not (List.is_empty boxed_records))
+    && with_probability st ~probability:Config.record_probability
+  then Ty.Record (random_element st boxed_records)
+  else
+    let boxed_numbers =
+      List.filter (fun (nty : NumberTy.t) -> not nty.unboxed) st.number_types
+    in
+    let nty = random_element st boxed_numbers in
+    if
+      st.swarm.arrays
+      && with_probability st ~probability:Config.array_probability
+    then Ty.Array (nty, gen_array_dimensions st)
+    else Ty.Number nty
+
+let gen_exceptions (st : State.t) =
+  if not st.swarm.exceptions
+  then []
+  else
+    List.init (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
+      (fun id ->
+        { Exn.id;
+          payload =
+            (if
+               with_probability st
+                 ~probability:Config.exception_payload_probability
+             then Some (gen_value_type st)
+             else None)
+        })
 
 let gen_non_variant_type (st : State.t) =
   if
@@ -503,6 +564,43 @@ let gen_array st env nty dimensions =
     in
     Expr.Array_make { dimensions; init_name = State.fresh st; init }
 
+let can_gen_try (st : State.t) =
+  st.swarm.exceptions && st.tries_remaining > 0
+  && not (List.is_empty st.exceptions)
+
+let gen_handler (st : State.t) (env : Env.t) ~gen_body (exn : Exn.t) =
+  let payload =
+    match exn.payload with
+    | Some ty
+      when with_probability st ~probability:Config.payload_binding_probability
+      ->
+      Some { Binding.name = State.fresh st; ty; is_mutable = false }
+    | Some _ | None -> None
+  in
+  let env = Option.fold payload ~none:env ~some:(Env.extend env) in
+  { Handler.pattern = Exn { exn; payload }; body = gen_body env }
+
+let gen_handlers (st : State.t) (env : Env.t) ~gen_body =
+  let count =
+    random_int_in_range st ~min:1
+      ~max:(min Config.max_handler_count (List.length st.exceptions))
+  in
+  let exceptions = random_exceptions st st.exceptions ~count in
+  let catch_all =
+    with_probability st ~probability:Config.catch_all_probability
+  in
+  let body_env =
+    Env.extend_catchable_exceptions env
+      (if catch_all then st.exceptions else exceptions)
+  in
+  let handlers = List.map (gen_handler st env ~gen_body) exceptions in
+  let handlers =
+    if catch_all
+    then handlers @ [{ Handler.pattern = Catch_all; body = gen_body env }]
+    else handlers
+  in
+  body_env, handlers
+
 let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   let gen_ty nty =
     Gen.run_exn
@@ -545,6 +643,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
        [ 5, leaf;
          3, gen_binop nty;
          1, gen_fun_call st env (Ty.Number nty);
+         1, gen_try_expr st env (Ty.Number nty);
          1, gen_match st env (Ty.Number nty) ])
 
 (* CR-someday hwasilewski: These function calls can have side effects, because
@@ -559,7 +658,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
    been generated, we do not allow calls to existing functions as well. This
    serves to limit the exponential blowup of nesting loops and functions and
    follows the design of CSmith. *)
-and gen_fun_call (st : State.t) caller_env return_ty =
+and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
   if
     (not st.swarm.function_calls)
     || not (State.can_create_function st ~max:Config.max_function_count)
@@ -573,7 +672,8 @@ and gen_fun_call (st : State.t) caller_env return_ty =
     let functions =
       List.filter
         (fun (function_ : Function.t) ->
-          can_convert st function_.return_ty return_ty)
+          can_convert st function_.return_ty return_ty
+          && List.for_all (Env.can_raise caller_env) function_.raises)
         st.top_level_functions
     in
     let existing_function =
@@ -600,7 +700,18 @@ and gen_fun_call (st : State.t) caller_env return_ty =
                          ~probability:Config.mutable_binding_probability
                 })
           in
-          let callee_env = List.fold_left Env.extend Env.empty params in
+          let raises =
+            List.filter
+              (fun _ ->
+                with_probability st
+                  ~probability:Config.callee_raises_probability)
+              caller_env.catchable_exceptions
+          in
+          let callee_env =
+            List.fold_left Env.extend
+              { Env.empty with catchable_exceptions = raises }
+              params
+          in
           let inline : Inline.t =
             let open Inline in
             Gen.run_exn
@@ -621,7 +732,7 @@ and gen_fun_call (st : State.t) caller_env return_ty =
             | None -> gen_value st callee_env return_ty
           in
           let function_ =
-            { Function.name; params; inline; body; return_ty; result }
+            { Function.name; params; inline; body; return_ty; result; raises }
           in
           (* Creating a function after its full body was successfully generated
              ensures that all the functions called by [function_] were already
@@ -650,7 +761,40 @@ and gen_bool (st : State.t) env =
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or;
+         1, gen_try_expr st env Ty.Bool;
          1, gen_match st env Ty.Bool ])
+
+and gen_raise (st : State.t) (env : Env.t) : Expr.raise =
+  let exn = random_element st env.catchable_exceptions in
+  let payload = Option.map (fun ty -> gen_value st env ty) exn.payload in
+  let notrace =
+    with_probability st ~probability:Config.raise_notrace_probability
+  in
+  { exn; payload; notrace }
+
+and gen_raise_expr (st : State.t) (env : Env.t) ty =
+  (* [raise] can only be given a value type. *)
+  let is_value =
+    match ty with
+    | Ty.Number { unboxed; _ } | Ty.Record { unboxed; _ } -> not unboxed
+    | Ty.Array _ | Ty.Bool | Ty.Variant _ -> true
+  in
+  Gen.when_
+    (is_value && not (List.is_empty env.catchable_exceptions))
+    (fun () -> Expr.Raise (gen_raise st env))
+
+and gen_try_expr (st : State.t) (env : Env.t) ty =
+  Gen.when_ (can_gen_try st) (fun () ->
+      st.tries_remaining <- st.tries_remaining - 1;
+      let gen_body env =
+        Gen.run_exn
+          (Gen.weighted st.random_state
+             [ 4, Gen.create (fun () -> gen_value st env ty);
+               1, gen_raise_expr st env ty ])
+      in
+      let body_env, handlers = gen_handlers st env ~gen_body in
+      let body = gen_body body_env in
+      Expr.Try { ty; body; handlers })
 
 and gen_value (st : State.t) env ty =
   match ty with
@@ -662,6 +806,7 @@ and gen_value (st : State.t) env ty =
          [ 3, gen_existing st env ty;
            2, Gen.create (fun () -> gen_array st env nty dimensions);
            1, gen_fun_call st env ty;
+           1, gen_try_expr st env ty;
            1, gen_match st env ty ])
   | Ty.Record record ->
     let existing = gen_existing st env ty in
@@ -685,6 +830,7 @@ and gen_value (st : State.t) env ty =
            2, construct;
            1, update;
            1, gen_fun_call st env ty;
+           1, gen_try_expr st env ty;
            1, gen_match st env ty ])
   | Ty.Variant variant ->
     Gen.run_exn
@@ -782,7 +928,7 @@ and gen_decl (st : State.t) env =
 
 and gen_fun_body (st : State.t) (env : Env.t) depth =
   let stmt_count = 1 + Random.State.int st.random_state 4 in
-  let rec gen env remaining =
+  let rec gen (env : Env.t) remaining =
     if remaining = 0
     then env, Statement.Seq []
     else
@@ -858,13 +1004,34 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
                    body = inner
                  }))
       in
+      let gen_try_stmt =
+        Gen.when_ (can_gen_try st) (fun () ->
+            st.tries_remaining <- st.tries_remaining - 1;
+            let gen_body env = snd (gen_fun_body st env (depth + 1)) in
+            let body_env, handlers = gen_handlers st env ~gen_body in
+            let body = gen_body body_env in
+            continue env (Statement.Try { body; handlers }))
+      in
+      (* A [raise] ends the block, as any statement after it would be dead
+         code. *)
+      let gen_raise_stmt =
+        Gen.when_
+          (not (List.is_empty env.catchable_exceptions))
+          (fun () -> env, Statement.Raise (gen_raise st env))
+      in
       let gen_empty =
         Gen.when_ (List.is_empty targets) (fun () -> env, Statement.Seq [])
       in
       let allowed =
         if depth >= Config.max_block_depth
-        then [1, gen_assign; 1, gen_empty]
-        else [4, gen_assign; 1, gen_if; 1, gen_bounded_loop; 1, gen_local_decl]
+        then [4, gen_assign; 4, gen_empty; 1, gen_raise_stmt]
+        else
+          [ 4, gen_assign;
+            1, gen_if;
+            1, gen_bounded_loop;
+            1, gen_local_decl;
+            1, gen_try_stmt;
+            1, gen_raise_stmt ]
       in
       match Gen.weighted st.random_state allowed with
       | Some generate -> generate ()
@@ -884,12 +1051,13 @@ let gen_program (st : State.t) env =
   let env, toplevel_decls = gen_vars env Config.toplevel_var_count in
   let _env, toplevel_statement = gen_fun_body st env 0 in
   Program.create ~swarm:st.swarm ~record_types:st.record_types
-    ~variant_types:st.variant_types
+    ~exceptions:st.exceptions ~variant_types:st.variant_types
     ~functions:(List.rev st.top_level_functions)
     ~toplevel_decls ~toplevel_statement
 
 let generate random =
   let state = State.create random in
   state.record_types <- gen_record_types state;
+  state.exceptions <- gen_exceptions state;
   state.variant_types <- gen_variant_types state;
   gen_program state Env.empty

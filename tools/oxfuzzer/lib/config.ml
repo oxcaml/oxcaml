@@ -24,6 +24,12 @@ let max_record_types = 3
 
 let max_record_fields = 4
 
+let max_exception_count = 3
+
+let max_handler_count = 2
+
+let max_try_count = 8
+
 let max_variant_types = 3
 
 let max_variant_constructors = 4
@@ -57,6 +63,16 @@ let opaque_leaf_probability = 5
 
 let opaque_loop_bound_probability = 50
 
+let exception_payload_probability = 50
+
+let payload_binding_probability = 75
+
+let catch_all_probability = 25
+
+let raise_notrace_probability = 50
+
+let callee_raises_probability = 50
+
 module Swarm = struct
   type t =
     { floats : bool;
@@ -80,7 +96,8 @@ module Swarm = struct
       bitwise_operations : bool;
       opaque_initializers : bool;
       opaque_leaves : bool;
-      opaque_loop_bounds : bool
+      opaque_loop_bounds : bool;
+      exceptions : bool
     }
 
   let create random_state =
@@ -105,7 +122,8 @@ module Swarm = struct
       bitwise_operations = Random.State.bool random_state;
       opaque_initializers = Random.State.bool random_state;
       opaque_leaves = Random.State.bool random_state;
-      opaque_loop_bounds = Random.State.bool random_state
+      opaque_loop_bounds = Random.State.bool random_state;
+      exceptions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -130,7 +148,8 @@ module Swarm = struct
       "bitwise_operations", t.bitwise_operations;
       "opaque_initializers", t.opaque_initializers;
       "opaque_leaves", t.opaque_leaves;
-      "opaque_loop_bounds", t.opaque_loop_bounds ]
+      "opaque_loop_bounds", t.opaque_loop_bounds;
+      "exceptions", t.exceptions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> String.concat "\n"
 
