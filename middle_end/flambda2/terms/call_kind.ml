@@ -299,7 +299,7 @@ type t =
         is_c_builtin : bool;
         effects : Effects.t;
         coeffects : Coeffects.t;
-        ox_ptr_arg_starts : int list
+        fat_ptr_arg_starts : int list
       }
   | Effect of Effect.t
 
@@ -318,13 +318,13 @@ let [@ocamlformat "disable"] print ppf t =
       Simple.print obj
       Method_kind.print kind
   | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects;
-             ox_ptr_arg_starts } ->
+             fat_ptr_arg_starts } ->
     fprintf ppf "@[<hov 1>(C@ \
         @[<hov 1>(needs_caml_c_call@ %b)@]@ \
         @[<hov 1>(is_c_builtin@ %b)@]@ \
         @[<hov 1>(effects@ %a)@]@ \
         @[<hov 1>(coeffects@ %a)@]@ \
-        @[<hov 1>(ox_ptr_arg_starts@ (%a))@]\
+        @[<hov 1>(fat_ptr_arg_starts@ (%a))@]\
         )@]"
       needs_caml_c_call
       is_c_builtin
@@ -332,7 +332,7 @@ let [@ocamlformat "disable"] print ppf t =
       Coeffects.print coeffects
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
          Format.pp_print_int)
-      ox_ptr_arg_starts
+      fat_ptr_arg_starts
   | Effect effect_op -> Effect.print ppf effect_op
 
 let direct_function_call code_id = Function { function_call = Direct code_id }
@@ -346,9 +346,9 @@ let indirect_function_call_known_arity ~code_ids =
 let method_call kind ~obj = Method { kind; obj }
 
 let c_call ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects
-    ~ox_ptr_arg_starts =
+    ~fat_ptr_arg_starts =
   C_call
-    { needs_caml_c_call; is_c_builtin; effects; coeffects; ox_ptr_arg_starts }
+    { needs_caml_c_call; is_c_builtin; effects; coeffects; fat_ptr_arg_starts }
 
 let effect_ eff = Effect eff
 
@@ -369,7 +369,7 @@ let free_names t =
         is_c_builtin = _;
         effects = _;
         coeffects = _;
-        ox_ptr_arg_starts = _
+        fat_ptr_arg_starts = _
       } ->
     Name_occurrences.empty
   | Method { kind = _; obj } -> Simple.free_names obj
@@ -398,7 +398,7 @@ let apply_renaming t renaming =
         is_c_builtin = _;
         effects = _;
         coeffects = _;
-        ox_ptr_arg_starts = _
+        fat_ptr_arg_starts = _
       } ->
     t
   | Method { kind; obj } ->
@@ -425,7 +425,7 @@ let ids_for_export t =
         is_c_builtin = _;
         effects = _;
         coeffects = _;
-        ox_ptr_arg_starts = _
+        fat_ptr_arg_starts = _
       } ->
     Ids_for_export.empty
   | Method { kind = _; obj } -> Ids_for_export.from_simple obj

@@ -1,6 +1,6 @@
 (* TEST
- modules = "ox_ptr_args_c.c";
- reference = "${test_source_directory}/ox_ptr_args.reference";
+ modules = "fat_ptr_args_c.c";
+ reference = "${test_source_directory}/fat_ptr_args.reference";
  flambda2;
  {
    native;
@@ -10,7 +10,7 @@
  }
 *)
 
-(* Tests for the [@ox_ptr] attribute on external arguments: a fat pointer
+(* Tests for the [@fat_ptr] attribute on external arguments: a fat pointer
    (unboxed pair of a [value] base and a [bits64] byte offset) is passed to
    C as a single raw pointer, base + offset.  The offset must be a plain byte
    offset (a non-mixed pointee); it is added verbatim, with no gap-bit
@@ -21,7 +21,7 @@ external unbox_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
 (* Our own C stubs *)
 
 external fill
-  :  (#(bytes * int64_u)[@ox_ptr])
+  :  (#(bytes * int64_u)[@fat_ptr])
   -> (int[@untagged])
   -> (int[@untagged])
   -> unit
@@ -29,8 +29,8 @@ external fill
   [@@noalloc]
 
 external cmp
-  :  (#(bytes * int64_u)[@ox_ptr])
-  -> (#(bytes * int64_u)[@ox_ptr])
+  :  (#(bytes * int64_u)[@fat_ptr])
+  -> (#(bytes * int64_u)[@fat_ptr])
   -> (int[@untagged])
   -> (int[@untagged])
   = "test_cmp_bytecode" "test_cmp_native"
@@ -41,7 +41,7 @@ external cmp
    which would treat the returned raw pointer as a [value]. *)
 
 external memset
-  :  (#(bytes * int64_u)[@ox_ptr])
+  :  (#(bytes * int64_u)[@fat_ptr])
   -> (int[@untagged])
   -> (int[@untagged])
   -> nativeint_u
@@ -49,8 +49,8 @@ external memset
   [@@noalloc]
 
 external memmove
-  :  (#(bytes * int64_u)[@ox_ptr])
-  -> (#(bytes * int64_u)[@ox_ptr])
+  :  (#(bytes * int64_u)[@fat_ptr])
+  -> (#(bytes * int64_u)[@fat_ptr])
   -> (int[@untagged])
   -> nativeint_u
   = "test_memmove_bytecode" "memmove"
@@ -87,7 +87,7 @@ let () =
 external box_nativeint : nativeint_u -> (nativeint[@local_opt])
   = "%box_nativeint"
 
-external ptr_id : (#(bytes * int64_u)[@ox_ptr]) -> nativeint_u
+external ptr_id : (#(bytes * int64_u)[@fat_ptr]) -> nativeint_u
   = "test_ptr_id_bytecode" "test_ptr_id"
   [@@noalloc]
 

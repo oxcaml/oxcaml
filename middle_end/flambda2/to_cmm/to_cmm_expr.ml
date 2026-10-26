@@ -85,7 +85,7 @@ let fail_if_probe apply =
 
 let translate_external_call env res ~free_vars apply ~callee_simple ~args
     ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-    ~coeffects ~ox_ptr_arg_starts =
+    ~coeffects ~fat_ptr_arg_starts =
   fail_if_probe apply;
   let callee =
     match callee_simple with
@@ -121,13 +121,13 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
      [Cadda] gives the result machtype [Addr], which prevents CSE from keeping
      the derived pointer live across an allocation or poll point.
 
-     The offset is added verbatim: [@ox_ptr] requires a plain byte offset (a
+     The offset is added verbatim: [@fat_ptr] requires a plain byte offset (a
      non-mixed pointee), so there are no mixed-block "gap" bits to strip. This
      is the caller's contract; masking them here would be wrong for pointees
      whose offset legitimately uses the full word (e.g. external pointers under
      5-level paging). *)
   let args, ty_args =
-    match ox_ptr_arg_starts with
+    match fat_ptr_arg_starts with
     | [] -> args, ty_args
     | _ :: _ ->
       let rec fuse index args ty_args starts =
@@ -143,9 +143,10 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
           arg :: args'', ty :: ty_args''
         | _ :: _, _, _ ->
           Misc.fatal_errorf
-            "translate_external_call: malformed ox_ptr_arg_starts for %s" callee
+            "translate_external_call: malformed fat_ptr_arg_starts for %s"
+            callee
       in
-      fuse 0 args ty_args ox_ptr_arg_starts
+      fuse 0 args ty_args fat_ptr_arg_starts
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
@@ -407,11 +408,15 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         res,
         Ece.all )
   | C_call
-      { needs_caml_c_call; is_c_builtin; effects; coeffects; ox_ptr_arg_starts }
-    ->
+      { needs_caml_c_call;
+        is_c_builtin;
+        effects;
+        coeffects;
+        fat_ptr_arg_starts
+      } ->
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-      ~coeffects ~ox_ptr_arg_starts
+      ~coeffects ~fat_ptr_arg_starts
   | Method { kind; obj } ->
     fail_if_probe apply;
     let callee =

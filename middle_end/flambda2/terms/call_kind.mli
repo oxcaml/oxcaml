@@ -136,7 +136,7 @@ type t = private
         is_c_builtin : bool;
         effects : Effects.t;
         coeffects : Coeffects.t;
-        ox_ptr_arg_starts : int list
+        fat_ptr_arg_starts : int list
             (** Indices into unarized argument list at which fat-pointer pairs
                 (base, byte offset) begin; each pair is passed to C as a single
                 raw pointer (base + offset), computed at the call site. *)
@@ -161,7 +161,7 @@ val c_call :
   is_c_builtin:bool ->
   effects:Effects.t ->
   coeffects:Coeffects.t ->
-  ox_ptr_arg_starts:int list ->
+  fat_ptr_arg_starts:int list ->
   t
 
 val effect_ : Effect.t -> t

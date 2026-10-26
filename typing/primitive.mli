@@ -52,7 +52,7 @@ type native_repr =
   | Raw_pointer
   (** A fat-pointer argument: an unboxed pair of a [value] base and a
       [bits64] byte offset, passed to C as a single raw pointer
-      (base + offset).  Written [[@ox_ptr]].  Only allowed on arguments
+      (base + offset).  Written [[@fat_ptr]].  Only allowed on arguments
       of [@@noalloc] externals. *)
 (* CR mshinwell/ccasinghino: should we actually use
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an

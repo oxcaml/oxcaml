@@ -803,7 +803,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   | Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _ | Unboxed_mask
   | Unboxed_or_untagged_integer _ ->
     ());
-  let ox_ptr_arg_starts =
+  let fat_ptr_arg_starts =
     let _, starts =
       List.fold_left
         (fun (index, starts) (_, repr) ->
@@ -865,7 +865,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =
     Call_kind.c_call ~needs_caml_c_call:prim_alloc ~is_c_builtin:prim_c_builtin
-      ~effects ~coeffects ~ox_ptr_arg_starts
+      ~effects ~coeffects ~fat_ptr_arg_starts
   in
   let call_symbol =
     let prim_name =

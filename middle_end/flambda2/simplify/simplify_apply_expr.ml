@@ -1529,7 +1529,7 @@ let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
           is_c_builtin = _;
           effects = _;
           coeffects = _;
-          ox_ptr_arg_starts = _
+          fat_ptr_arg_starts = _
         } ->
       let callee_ty =
         match callee_ty with
