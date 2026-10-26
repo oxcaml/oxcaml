@@ -1082,58 +1082,6 @@ let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
     else
       With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
 
-(* CR zeisbach: it's a little suspicious to me that we have implication logic
-   spread through the compiler / seemingly duplicated some times (like in
-   Typemode, too). Maybe there is a way to have a single source of truth here?
-   Like there is for modality implications (IIUC). *)
-let erase_implied_axes (modes : Mode.With_locality.Const.t) :
-    Mode.With_locality.Const.Option.t =
-  (* [forkable] has implied defaults depending on [areality]: *)
-  let forkable =
-    match modes.areality, modes.forkable with
-    | Local, Unforkable | Global, Forkable -> None
-    | _, _ -> Some modes.forkable
-  in
-
-  (* [yielding] has implied defaults depending on [areality]: *)
-  let yielding =
-    match modes.areality, modes.yielding with
-    | Local, Yielding | Global, Unyielding -> None
-    | _, _ -> Some modes.yielding
-  in
-
-  (* [contention] has implied defaults based on [visibility]: *)
-  let contention =
-    match modes.visibility, modes.contention with
-    | Immutable, Contended
-    | Read, Shared
-    | Write, Corrupted
-    | Read_write, Uncontended -> None
-    | _, _ -> Some modes.contention
-  in
-
-  (* [portability] has implied defaults based on [statefulness]: *)
-  let portability =
-    match modes.statefulness, modes.portability with
-    | Stateless, Portable
-    | Reading, Shareable
-    | Writing, Corruptible
-    | Stateful, Nonportable -> None
-    | _, _ -> Some modes.portability
-  in
-
-  { areality = Some modes.areality;
-    linearity = Some modes.linearity;
-    uniqueness = Some modes.uniqueness;
-    portability;
-    contention;
-    forkable;
-    yielding;
-    statefulness = Some modes.statefulness;
-    visibility = Some modes.visibility;
-    staticity = Some modes.staticity
-  }
-
 module Variable_names : sig
   val reset_names : unit -> unit
 
@@ -2093,7 +2041,7 @@ end = struct
   let construct_raw_bounds { monadic; comonadic } :
       string interval =
     let bound_diff bound trivial =
-      erase_implied_axes bound
+      Mode.Const.erase_implications bound
       |> With_locality.Const.Option.value ~default:trivial
       |> fun bound -> With_locality.Const.diff bound trivial
     in
@@ -2685,7 +2633,7 @@ let out_modalities_of_mod_bounds mod_bounds =
 let tree_of_modes_const (modes : Mode.With_locality.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
-    let implied = erase_implied_axes modes in
+    let implied = Mode.Const.erase_implications modes in
     let diff =
       Mode.With_locality.Const.diff
         modes

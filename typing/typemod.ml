@@ -2793,7 +2793,7 @@ and transl_recmodule_modtypes env ~sig_modalities ~md_mode sdecls =
             let tmmode = Typemode.transl_mode_annots smmode in
             let mmode =
               tmmode.mode_modes
-              |> Typemode.apply_mode_implications
+              |> Mode.Const.apply_implications
               (* CR zqian: mode annotations on rec modules default to legacy for
               now. We can remove this workaround once [module type of] doesn't
               require zapping. *)

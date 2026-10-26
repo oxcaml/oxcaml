@@ -4789,7 +4789,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modes = Typemode.transl_mode_annots modes in
         let mode =
           modes.mode_modes
-          |> Typemode.apply_mode_implications
+          |> Mode.Const.apply_implications
           |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Const.with_locality_as_regionality
