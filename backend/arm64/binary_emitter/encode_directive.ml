@@ -114,6 +114,7 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
       let current_section_supports_cross_section_reference =
         Asm_section.equal current_section Asm_section.Data
         || Asm_section.equal current_section Asm_section.Read_only_data
+        || Asm_section.equal current_section Asm_section.Frametables
       in
       (* On ELF (not JIT) with function sections, check individual sections
          first. The assembler emits R_AARCH64_PREL32 with section symbol and

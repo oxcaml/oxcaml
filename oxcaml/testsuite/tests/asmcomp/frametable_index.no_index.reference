@@ -1,0 +1,5 @@
+Frame index: absent.
+Frame descriptor hash table: N descriptors, capacity N (N bytes).
+check ok
+caml_frame_index PROGBITS A
+header only
