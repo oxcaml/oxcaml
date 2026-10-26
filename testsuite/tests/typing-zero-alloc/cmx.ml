@@ -175,7 +175,7 @@ read_cmx_lib "ylppa"
 |}];;
 
 (* Across compilation units: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_flipped_"
+read_cmx_lib "iter_flipped"
 [%%expect{|
 - : summary =
 {Components.nor =
@@ -192,7 +192,20 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_flipped_"
 |}];;
 
 (* Mutual recursion: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__ping_"
+read_cmx_lib "ping"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot;
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
+|}];;
+read_cmx_lib "pong"
 [%%expect{|
 - : summary =
 {Components.nor = Component.Bot;
@@ -206,8 +219,21 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__ping_"
     {argument #1 on normal/diverging paths}}
 |}];;
 
-(* Mutual recursion: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__pong_"
+(* Mutual recursion through [apply]: *)
+read_cmx_lib "aping"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot;
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on normal/diverging paths}}
+|}];;
+read_cmx_lib "apong"
 [%%expect{|
 - : summary =
 {Components.nor = Component.Bot;
@@ -223,27 +249,84 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__pong_"
 
 (* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
 (* [caml_apply]: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__apply2_"
+read_cmx_lib "apply2"
+[%%expect{|
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #1 on diverging paths}}
+|}];;
+read_cmx_lib "ylppa2"
+[%%expect{|
+- : summary =
+{Components.nor =
+  Component.Top
+   No_allocation_other_than_calling_arguments {argument #3 on normal paths};
+ exn =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #3 on exceptional paths};
+ div =
+  Component.Top
+   No_allocation_other_than_calling_arguments
+    {argument #3 on diverging paths}}
+|}];;
+read_cmx_lib "over"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;
-
-(* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)
-(* [caml_apply]: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__ylppa2_"
+read_cmx_lib "over2"
 [%%expect{|
 Exception: Failure "no such summary found".
+|}];;
+read_cmx_lib "partial"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Top Allocation_other_than_calling_arguments;
+ exn = Component.Bot; div = Component.Bot}
+|}];;
+
+read_cmx_lib "arity_1_expected_1"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Safe; exn = Component.Safe; div = Component.Safe}
+|}];;
+
+read_cmx_lib "arity_2_expected_1"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Top Allocation_other_than_calling_arguments;
+ exn = Component.Safe; div = Component.Safe}
+|}];;
+
+read_cmx_lib "arity_2_expected_2"
+[%%expect{|
+Exception: Failure "multiple such summaries found".
+|}];;
+read_cmx_lib "arity_2_expected_2_partial"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Top Allocation_other_than_calling_arguments;
+ exn = Component.Bot; div = Component.Bot}
 |}];;
 
 (* Always exit with [raise Fail]: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__fail_"
+read_cmx_lib "fail"
 [%%expect{|
 - : summary =
 {Components.nor = Component.Bot; exn = Component.Safe; div = Component.Bot}
 |}];;
 
 (* Always diverge with [while true ...]: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__diverge_"
+read_cmx_lib "diverge"
 [%%expect{|
 - : summary =
 {Components.nor = Component.Bot; exn = Component.Bot; div = Component.Bot}
@@ -251,13 +334,54 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__diverge_"
 (* CR-someday wsturgeon for wsturgeon: the above [div = Bot] is a known bug *)
 
 (* Passing constant symbols to conditionally zero-alloc functions: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_fail_"
+read_cmx_lib "iter_fail"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Safe; exn = Component.Safe; div = Component.Safe}
+|}];;
+
+(* Passing constant symbols to conditionally zero-alloc functions: *)
+read_cmx_lib "iter_diverge"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Safe; exn = Component.Safe; div = Component.Safe}
+|}];;
+
+(* Closure symbols, code symbols, and builtins are all distinct: *)
+read_cmx_lib "iter_ignore"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Safe; exn = Component.Safe; div = Component.Safe}
+|}];;
+read_cmx_lib "iter_noop"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Safe; exn = Component.Safe; div = Component.Safe}
+|}];;
+read_cmx_lib "iter_alloc"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;
 
-(* Passing constant symbols to conditionally zero-alloc functions: *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_diverge_"
+(* Closure symbols to code symbols across compilation units: *)
+read_cmx_lib "exists_some"
 [%%expect{|
-Exception: Failure "no such summary found".
+- : summary =
+{Components.nor = Component.Safe; exn = Component.Safe; div = Component.Safe}
+|}];;
+
+(* Closure symbols to code symbols across compilation units in recursive
+   functions: *)
+read_cmx_lib "self_cross"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot; exn = Component.Safe; div = Component.Safe}
+|}];;
+
+(* Closure symbols to code symbols across compilation units in mutually
+   recursive functions: *)
+read_cmx_lib "cycle_a"
+[%%expect{|
+- : summary =
+{Components.nor = Component.Bot; exn = Component.Safe; div = Component.Safe}
 |}];;
