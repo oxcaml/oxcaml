@@ -11,10 +11,10 @@
   (pps js_of_ocaml-ppx)))
 
 (rule
- (target main_jsir.js)
+ (targets main_jsir.js main_jsir.cmi main_jsir.cmjx main_jsir.cmjo)
  (deps main_jsir.ml)
  (action
-  (run %{ocamlopt} -target js_of_ocaml -o %{target} %{deps})))
+  (run %{ocamlopt} -target js_of_ocaml -o main_jsir.js %{deps})))
 
 (rule
  (alias runtest)
