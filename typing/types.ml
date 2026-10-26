@@ -1697,13 +1697,10 @@ let match_row_field ~present ~absent ~either (f : row_field) =
 
 (**** Some type creators ****)
 
-let new_id = Local_store.s_ref (-1)
-
 let create_expr = Transient_expr.create
 
 let proto_newty3 ~level ~scope desc  =
-  incr new_id;
-  create_expr desc ~level ~scope ~id:!new_id
+  create_expr desc ~level ~scope ~id:(With_backtracking.Stamp.fresh ())
 
                   (**********************************)
                   (*  Utilities for backtracking    *)
@@ -1725,11 +1722,13 @@ let undo_change = function
   | Cscheduler c -> Scheduler.Change.undo c
   | Civar c -> Ivar.Change.undo c
 
-type snapshot = changes ref * int
-let last_snapshot = Local_store.s_ref 0
+type snapshot = changes ref * With_backtracking.Snapshot.t
+
+let needs_log ty = With_backtracking.Stamp.needs_log ty.id
 
 let log_type ty =
-  if ty.id <= !last_snapshot then log_change (Ctype (ty, ty.desc))
+  if needs_log ty then log_change (Ctype (ty, ty.desc))
+
 let link_type ty ty' =
   let ty = repr ty in
   let ty' = repr ty' in
@@ -1772,7 +1771,7 @@ let set_type_desc ty td =
 let set_level ty level =
   let ty = repr ty in
   if level <> ty.level then begin
-    if ty.id <= !last_snapshot then log_change (Clevel (ty, ty.level));
+    if needs_log ty then log_change (Clevel (ty, ty.level));
     Transient_expr.set_level ty level
   end
 
@@ -1781,7 +1780,7 @@ let set_scope ty scope =
   let ty = repr ty in
   let prev_scope = ty.scope land scope_mask in
   if scope <> prev_scope then begin
-    if ty.id <= !last_snapshot then log_change (Cscope (ty, prev_scope));
+    if needs_log ty then log_change (Cscope (ty, prev_scope));
     Transient_expr.set_scope ty scope
   end
 let set_var_jkind ty jkind =
@@ -1834,10 +1833,7 @@ let rec link_commu ~(inside : commutable) (c : commutable) =
 
 let set_commu_ok c = link_commu ~inside:c Cok
 
-let snapshot () =
-  let old = !last_snapshot in
-  last_snapshot := !new_id;
-  (!trail, old)
+let snapshot () = (!trail, With_backtracking.Snapshot.take ())
 
 let rec rev_log accu = function
     Unchanged -> accu
@@ -1849,14 +1845,14 @@ let rec rev_log accu = function
 
 let backtrack ~cleanup_abbrev (changes, old) =
   match !changes with
-    Unchanged -> last_snapshot := old
+    Unchanged -> With_backtracking.Snapshot.restore old
   | Invalid -> failwith "Types.backtrack"
   | Change _ as change ->
       cleanup_abbrev ();
       let backlog = rev_log [] change in
       List.iter undo_change backlog;
       changes := Unchanged;
-      last_snapshot := old;
+      With_backtracking.Snapshot.restore old;
       trail := changes
 
 let undo_first_change_after (changes, _) =
