@@ -41,6 +41,9 @@ val switch_to_section_raw :
   is_delayed:bool ->
   unit
 
+(** The section that subsequent directives are emitted to. *)
+val current_section : unit -> Asm_section.t
+
 (** Abbreviation for [switch_to_section Text]. *)
 val text : unit -> unit
 

@@ -1299,10 +1299,11 @@ let emit_named_text_section func_name =
   then (
     (* CR sspies: Clean this up and add proper support for function sections in
        the new asm directives. *)
-    let name = ".text.caml." ^ S.encode (S.create_global func_name) in
+    let link_symbol = S.encode (S.create_global func_name) in
+    let name = ".text.caml." ^ link_symbol in
     D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
       ~is_delayed:false;
-    Emitaux.enter_code_section name;
+    Emitaux.enter_code_section ~link_symbol name;
     (* Warning: We set the internal section ref to Text here, because it
        currently does not supported named text sections. In the rest of this
        file, we pretend the section is called Text rather than the function
@@ -2365,6 +2366,9 @@ let end_assembly () =
   in
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
   emit_frames ~debug_strings_section
+    ~code_begin:
+      (S.encode (S.create_global (Cmm_helpers.make_symbol "code_begin")))
+    ~code_end:(S.encode code_end_sym)
     { efa_code_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:Text lbl in
@@ -2385,7 +2389,7 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:Read_only_data lbl in
+          let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
       efa_label_delta =
@@ -2396,7 +2400,7 @@ let end_assembly () =
           D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun lbl ->
-          let lbl = label_to_asm_label ~section:Read_only_data lbl in
+          let lbl = label_to_asm_label ~section:(D.current_section ()) lbl in
           D.define_label lbl)
     };
   D.type_symbol ~ty:Object frametable_sym;

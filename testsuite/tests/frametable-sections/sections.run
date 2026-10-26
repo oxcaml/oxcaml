@@ -1,0 +1,53 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# First, run the program to make sure it works.
+${program}
+
+asm=${test_build_directory}/sections.s
+obj=${test_build_directory}/sections.o
+
+piece='\.section[[:space:]]+\.caml_frametable,"ao",[@%]progbits,'
+
+count () {
+  grep -c -E "$1" "$asm"
+}
+
+# Pieces linked to the unit's functions.
+n=$(count "${piece}camlSections__.*_code\$")
+if [ "$n" -ge 1 ]; then echo "function pieces: some"; \
+  else echo "function pieces: NONE"; fi
+
+# No plain (non link-order) piece: the linker would place it outside every
+# unit's range, where the runtime would never find it.
+plain=$(grep -E '^[[:space:]]*\.section[[:space:]]+\.caml_frametable' "$asm" \
+  | grep -vc '"ao"')
+echo "plain pieces: $plain"
+
+# Exactly one begin and one end marker piece.
+echo "begin marker pieces: $(count "${piece}camlSections__code_begin\$")"
+echo "end marker pieces: $(count "${piece}camlSections__code_end\$")"
+
+# The unit's frametable symbol names a header starting with the -1 tag.
+n=$(awk '
+  prev && $NF == "-1" { n++ }
+  { prev = /^camlSections__frametable:/ }
+  END { print n + 0 }' "$asm")
+echo "tagged headers: $n"
+
+# In the object file, every .caml_frametable section is link-order (flag L)
+# and linked to a function's text section.
+readelf -S -W "$obj" | sed 's/\[ */[/' | awk '
+  $1 ~ /^\[[0-9]+\]$/ {
+    idx = substr($1, 2, length($1) - 2)
+    name[idx] = $2
+    if ($2 == ".caml_frametable") { n++; flags[n] = $8; link[n] = $9 }
+  }
+  END {
+    bad = 0
+    for (i = 1; i <= n; i++)
+      if (flags[i] !~ /L/ || name[link[i]] !~ /^\.text\.caml\./) bad++
+    print "object pieces: " (n > 0 ? "some" : "NONE")
+    print "unlinked object pieces: " bad
+  }'

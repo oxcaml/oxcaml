@@ -443,6 +443,7 @@ AC_SUBST([align_double])
 AC_SUBST([align_int64])
 AC_SUBST([flat_float_array])
 AC_SUBST([function_sections])
+AC_SUBST([frametable_sections])
 AC_SUBST([oxcaml_dwarf_flags_for_compiler])
 AC_SUBST([assembly_flag_for_compiler])
 AC_SUBST([probes])
@@ -3048,6 +3049,14 @@ AS_IF([$native_compiler],
     OCAML_AS_COMPRESSION_SUPPORT
     OCAML_CC_COMPRESSION_SUPPORT
     OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
+
+## Is -frametable-sections supported (needs ELF link-order sections)
+frametable_sections=false
+AS_IF([$native_compiler],
+  [AS_CASE([$arch,$system],
+    [amd64,linux|amd64,freebsd|amd64,netbsd|amd64,openbsd|amd64,gnu \
+      |arm64,linux|arm64,freebsd|arm64,netbsd|arm64,openbsd],
+    [OCAML_AS_HAS_LINK_ORDER_SECTIONS])])
 
 dnl Prefer llvm-objcopy. If llvm-objcopy is not found, use objcopy.
 dnl GNU objcopy 2.35.2 sometimes modifies .relro_padding and .init_array
