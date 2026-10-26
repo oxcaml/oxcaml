@@ -2629,9 +2629,9 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_arrow
             ( arg_label,
               go ty,
-              Typemode.transl_mode_with_locality [],
+              Typemode.legacy_modes,
               go ty',
-              Typemode.transl_mode_with_locality [] )
+              Typemode.legacy_modes )
         | Tpoly (ty, tyl) -> (
           let cty = go ty in
           match List.filter_map unwrap_univar tyl with
@@ -3415,9 +3415,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
                     | None -> newcorevar env loc),
-                    Typemode.transl_mode_with_locality [],
+                    Typemode.legacy_modes,
                     spine,
-                    Typemode.transl_mode_with_locality [] );
+                    Typemode.legacy_modes );
               ctyp_type = newvar ();
               ctyp_env = env;
               ctyp_loc = to_location loc;
