@@ -256,6 +256,39 @@ let r12 =
 val r12 : int = 11
 |}]
 
+(* [include functor] of a static functor: the enclosing structure is the
+   argument, and the application is a template instantiation. *)
+let (r13i, r13f) =
+  let module F (M : Id @ static) = struct
+    let i = M.id 12
+    let f = to_float (M.id #12.0)
+  end in
+  let module R = struct
+    let poly_ id x = x
+    include functor F
+  end in
+  (R.i, R.f)
+[%%expect{|
+val r13i : int = 12
+val r13f : float = 12.
+|}]
+
+(* The same with a generative static functor: instantiate, then apply to unit. *)
+let (r13gi, r13gf) =
+  let module F (M : Id @ static) () = struct
+    let i = M.id 13
+    let f = to_float (M.id #13.0)
+  end in
+  let module R = struct
+    let poly_ id x = x
+    include functor F
+  end in
+  (R.i, R.f)
+[%%expect{|
+val r13gi : int = 13
+val r13gf : float = 13.
+|}]
+
 (* Captured values of several layouts at once. *)
 let (k1i, k1f, k1s, k1l) =
   let ci = 17 in
