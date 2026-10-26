@@ -38,6 +38,14 @@ let read_cmx load_path prefix : summary =
 val read_cmx : string -> string -> summary = <fun>
 |}]
 
+let read_cmx_lib prefix : summary =
+  "camlCmx_lib__" ^ prefix ^ "_"
+  |> read_cmx "cmx_lib.cmx"
+;;
+[%%expect{|
+val read_cmx_lib : string -> summary = <fun>
+|}]
+
 let print_allocation_sources =
   Allocation_sources.print Relevant_components_by_argument_index.print
 ;;
@@ -67,7 +75,7 @@ read_cmx "stdlib__List.cmx" "camlStdlib__List__iter_"
     {argument #1 on normal/diverging paths}}
 |}];;
 
-read_cmx "cmx_lib.cmx" "camlCmx_lib__catch_and_discard_exceptions_"
+read_cmx_lib "catch_and_discard_exceptions"
 [%%expect{|
 - : summary =
 {Components.nor =
@@ -81,7 +89,7 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__catch_and_discard_exceptions_"
     {argument #1 on diverging paths}}
 |}];;
 
-read_cmx "cmx_lib.cmx" "camlCmx_lib__either_"
+read_cmx_lib "either"
 [%%expect{|
 - : summary =
 {Components.nor =
@@ -99,12 +107,12 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__either_"
 |}];;
 
 (* CR wsturgeon: fix (work for the next PR) *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_rec_"
+read_cmx_lib "iter_rec"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;
 
-read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_loop_"
+read_cmx_lib "iter_loop"
 [%%expect{|
 - : summary =
 {Components.nor =
@@ -120,7 +128,7 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_loop_"
     {argument #1 on normal/diverging paths}}
 |}];;
 
-read_cmx "cmx_lib.cmx" "camlCmx_lib__apply_"
+read_cmx_lib "apply"
 [%%expect{|
 - : summary =
 {Components.nor =
@@ -137,7 +145,7 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__apply_"
 |}];;
 
 (* CR wsturgeon: fix (work for the next PR) *)
-read_cmx "cmx_lib.cmx" "camlCmx_lib__ylppa_"
+read_cmx_lib "ylppa"
 [%%expect{|
 Exception: Failure "no such summary found".
 |}];;
