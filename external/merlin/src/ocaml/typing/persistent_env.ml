@@ -114,11 +114,13 @@ type import = {
   imp_flags : Cmi_format.pers_flags list;
 }
 
-(* If a .cmi file is missing (or invalid), we
-   store it as Missing in the cache. *)
+(* If a .cmi file is missing (or failed to load), we store it as Missing in the
+   cache. We use Invalid when a .cmi is present, readable, but is inconsistent.
+   *)
 type import_info =
   | Missing of { hidden_were_allowed : bool }
   | Found of import
+  | Invalid of import
 
 (* Data relating to a global name (possibly with arguments) but not necessarily
    a value in scope. For example, if we've encountered a module only by seeing
@@ -217,7 +219,7 @@ let clear_missing {imports; _} =
     Hashtbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
-       | Found _ -> acc)
+       | Found _ | Invalid _ -> acc)
       imports []
   in
   List.iter (Hashtbl.remove imports) missing_entries
@@ -239,7 +241,7 @@ let register_import_as_opaque {imported_opaque_units; _} s =
 let find_import_info_in_cache {imports; _} import =
   match Hashtbl.find imports import with
   | exception Not_found -> None
-  | Missing _ -> None
+  | Missing _ | Invalid _ -> None
   | Found imp -> Some imp
 
 let find_info_in_cache {persistent_structures; _} name =
@@ -386,26 +388,6 @@ let acknowledge_import penv ~check modname pers_sig =
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
-  if not (CU.Name.equal modname found_name) then
-    error (Illegal_renaming(modname, found_name, filename));
-  List.iter
-    (function
-        | Rectypes ->
-            if not !Clflags.recursive_types then
-              error (Need_recursive_types(modname))
-        | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
-  begin match kind, Current_unit.get_cu () with
-  | Normal { cmi_impl = imported_unit }, Some current_unit ->
-      let access_allowed =
-        CU.can_access_by_name imported_unit ~accessed_by:current_unit
-      in
-      if not access_allowed then
-        let prefix = CU.for_pack_prefix current_unit in
-        error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
-  | _, _ -> ()
-  end;
   let is_param =
     match kind with
     | Normal _ -> false
@@ -442,7 +424,34 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_flags = flags;
     }
   in
-  if check then check_consistency penv import;
+  begin try
+  if not (CU.Name.equal modname found_name) then
+    error (Illegal_renaming(modname, found_name, filename));
+  List.iter
+    (function
+        | Rectypes ->
+            if not !Clflags.recursive_types then
+              error (Need_recursive_types(modname))
+        | Alerts _ -> ()
+        | Opaque -> register_import_as_opaque penv modname)
+    flags;
+  begin match kind, Current_unit.get_cu () with
+  | Normal { cmi_impl = imported_unit }, Some current_unit ->
+      let access_allowed =
+        CU.can_access_by_name imported_unit ~accessed_by:current_unit
+      in
+      if not access_allowed then
+        let prefix = CU.for_pack_prefix current_unit in
+        error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
+  | _, _ -> ()
+  end;
+  if check then check_consistency penv import
+  with Error _ as exn ->
+    (* Merlin needs to know that a module was found even if it is invalid to
+       properly invalidate the cache. *)
+    Hashtbl.replace imports modname (Invalid import);
+    raise exn
+  end;
   Hashtbl.add imports modname (Found import);
   import
 
@@ -468,7 +477,7 @@ let find_import ~allow_hidden penv ~check modname =
   | Found imp -> check_visibility ~allow_hidden imp; imp
   | Missing { hidden_were_allowed = true } -> raise Not_found
   | Missing { hidden_were_allowed = false }
-  | exception Not_found ->
+  | Invalid _ | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> raise Not_found
       | Can_load_cmis ->
@@ -1387,11 +1396,13 @@ let with_cmis penv f x =
           [R (penv.can_load_cmis, Can_load_cmis)]
           (fun () -> f x))
 
-let forall ~found ~missing t =
+let forall ~found ~invalid ~missing t =
   Std.Hashtbl.forall t.imports (fun name -> function
       | Missing _ -> missing name
       | Found import ->
         found name import.imp_filename name
+      | Invalid import ->
+        invalid name import.imp_filename name
     )
 
 let report_error = Format_doc.compat report_error_doc

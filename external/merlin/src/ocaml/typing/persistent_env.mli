@@ -265,5 +265,6 @@ val with_cmis : 'a t -> ('b -> 'c) -> 'b -> 'c
 
 val forall :
   found:(Compilation_unit.Name.t -> filepath -> Compilation_unit.Name.t -> bool) ->
+  invalid:(Compilation_unit.Name.t -> filepath -> Compilation_unit.Name.t -> bool) ->
   missing:(Compilation_unit.Name.t -> bool) ->
   'a t -> bool
