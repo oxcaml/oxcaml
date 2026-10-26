@@ -27,7 +27,8 @@
  ******************************************************************************)
 
 (* The laws file of a unit [U] has the following shape, where [l1], ...,
-   [ln] are the laws of [U], qualified by their modules:
+   [ln] are the laws of [U], qualified by their modules, and [F] is an
+   applicative functor of [U] with laws:
    {[
      [@@@ocaml.warning "-27"]
      module Laws_gen_U = U
@@ -40,9 +41,11 @@
      ...
      module Instantiate (Choice : CamlinternalLaw.Choice) = struct
        module Law = CamlinternalLaw.Make (Choice)
+       module type F_choices = sig ... end
        module type Choices = sig
          val l1 : l1_input Choice.t
          ...
+         val f : (module F_choices) Choice.t
        end
        let l1 ((module C) : (module Choices)) : unit Law.t = ...
        ...
@@ -88,6 +91,7 @@ module P : sig
     (** [fun_ ~return params body] is [fun params : return -> body]. *)
 
     val constraint_ : expression -> core_type -> expression
+    val letmodule : string -> module_expr -> expression -> expression
   end
 
   module Pat : sig
@@ -161,6 +165,9 @@ module P : sig
 
   module Sig : sig
     val value : string -> core_type -> signature_item
+    val type_ : type_declaration -> signature_item
+    val module_ : string -> module_type -> signature_item
+    val modtype : string -> module_type -> signature_item
   end
 
   module Str : sig
@@ -229,6 +236,7 @@ end = struct
       H.Exp.function_ params constraint_ (Pfunction_body body)
 
     let constraint_ e ty = H.Exp.constraint_ e (Some ty) []
+    let letmodule m me body = H.Exp.letmodule (mknoloc (Some m)) me body
   end
 
   module Pat = struct
@@ -304,6 +312,9 @@ end = struct
 
   module Sig = struct
     let value x ty = H.Sig.value (H.Val.mk (mknoloc x) ty)
+    let type_ decl = H.Sig.type_ Recursive [ decl ]
+    let module_ m mty = H.Sig.module_ (H.Md.mk (mknoloc (Some m)) mty)
+    let modtype s mty = H.Sig.modtype (H.Mtd.mk ~typ:mty (mknoloc s))
   end
 
   module Str = struct
@@ -319,7 +330,7 @@ end = struct
   end
 end
 
-(* Laws *)
+(* Laws and scopes *)
 
 (* The paths that the idents of a context stand for *)
 type paths = Path.t Ident.Map.t
@@ -334,15 +345,51 @@ let rec reroot (paths : paths) (p : Path.t) : Path.t =
 type law = {
   (* The field of [each], qualified by the modules of the law. *)
   l_field : string;
+  (* The name of the law in its scope. *)
+  l_local : string;
   (* The path of the law, for messages. *)
   l_display : string;
   l_loc : Location.t;
+  (* The scopes of the law, outermost first. *)
+  l_frames : frame list;
   l_params : Typedtree.law_param list;
   l_assumptions : Typedtree.expression list;
   l_conclusion : Typedtree.expression;
   (* The paths of the idents of the law, in types *)
   l_paths : paths;
 }
+
+(* An applicative functor whose laws are generated: a scope. Its parameters
+   are the fields of the choice module type [M] of the scope, and its result
+   is its application [F (X1) ... (Xn)] in types and the module [I] in
+   values. *)
+and frame = {
+  (* The name of its choice in the enclosing scope. *)
+  f_local : string;
+  (* The path of the functor, for messages. *)
+  f_display : string;
+  f_loc : Location.t;
+  f_functor : Path.t;
+  f_params : (Ident.t * Typedtree.module_type) list;
+  (* The paths of the idents of the parameters, in types *)
+  f_paths : paths;
+  f_application : Path.t;
+  f_choices : Ident.t;
+  f_instance : Ident.t;
+}
+
+type item = Law of law | Scope of frame * item list
+
+let rec laws_of_items items =
+  List.concat_map
+    (function Law law -> [ law ] | Scope (_, items) -> laws_of_items items)
+    items
+
+let rec frames_of_items items =
+  List.concat_map
+    (function
+      | Law _ -> [] | Scope (frame, items) -> frame :: frames_of_items items)
+    items
 
 let error ~loc fmt = Location.raise_errorf ~loc fmt
 
@@ -360,7 +407,8 @@ let fresh used base =
 
 (* The laws of a unit are the ones written in it. The laws of a module
    that the unit refers to, applies or unpacks are generated where they
-   are written. *)
+   are written, and the ones of a functor are tested under the backend's
+   choice of its parameters rather than at each application. *)
 
 (* The walk of a unit. [path] below is the path of the current module. *)
 type context = {
@@ -370,8 +418,12 @@ type context = {
   paths : paths;
   (* The module path from the top, for the fields of [each]. *)
   qualifier : string list;
+  (* The module path from the scope. *)
+  relative : string list;
   (* The module path, for messages. *)
   display : string list;
+  (* The enclosing scopes, innermost first. *)
+  frames : frame list;
 }
 
 let add_items paths prefix sg =
@@ -387,6 +439,7 @@ let enter ctx name =
   {
     ctx with
     qualifier = ctx.qualifier @ [ String.uncapitalize_ascii name ];
+    relative = ctx.relative @ [ String.uncapitalize_ascii name ];
     display = ctx.display @ [ name ];
   }
 
@@ -433,24 +486,15 @@ let law ctx (ld : Typedtree.law_declaration) =
   check_exported ctx ~loc:ld.law_loc display ld.law_law;
   {
     l_field = qualify ctx.qualifier name;
+    l_local = qualify ctx.relative name;
     l_display = display;
     l_loc = ld.law_loc;
+    l_frames = List.rev ctx.frames;
     l_params = ld.law_params;
     l_assumptions = List.map Translspec.typedtree ld.law_assumptions;
     l_conclusion = Translspec.typedtree ld.law_conclusion;
     l_paths = ctx.paths;
   }
-
-(* The first law of a module expression *)
-let first_law (me : Typedtree.module_expr) =
-  let exception Found of Location.t in
-  let structure_item it (item : Typedtree.structure_item) =
-    match item.str_desc with
-    | Tstr_law ld -> raise (Found ld.law_loc)
-    | _ -> Tast_iterator.default_iterator.structure_item it item
-  in
-  let it = { Tast_iterator.default_iterator with structure_item } in
-  match it.module_expr it me with () -> None | exception Found loc -> Some loc
 
 let rec walk_structure ctx ~path (str : Typedtree.structure) =
   let ctx = { ctx with paths = add_items ctx.paths path str.str_type } in
@@ -458,7 +502,7 @@ let rec walk_structure ctx ~path (str : Typedtree.structure) =
 
 and walk_structure_item ctx ~path (item : Typedtree.structure_item) =
   match item.str_desc with
-  | Tstr_law ld -> [ law ctx ld ]
+  | Tstr_law ld -> [ Law (law ctx ld) ]
   | Tstr_module mb -> walk_module_binding ctx ~path mb
   | Tstr_recmodule mbs -> List.concat_map (walk_module_binding ctx ~path) mbs
   | Tstr_include { incl_kind = Tincl_structure; incl_mod; _ } ->
@@ -484,21 +528,87 @@ and walk_module_expr ctx ~path (me : Typedtree.module_expr) =
   match me.mod_desc with
   | Tmod_structure str -> walk_structure ctx ~path str
   | Tmod_constraint (me, _, _, _) -> walk_module_expr ctx ~path me
-  | Tmod_functor _ -> (
-      match first_law me with
-      | None -> []
-      | Some loc ->
-          error ~loc "Laws in functors are not supported in the laws file yet.")
+  | Tmod_functor _ -> walk_functor ctx ~path me
   | Tmod_ident _ | Tmod_apply _ | Tmod_apply_unit _ | Tmod_unpack _ -> []
+
+(* An applicative functor, maybe with several parameters, is a scope.
+   Generative functors have no laws, see [Typemod]. *)
+and walk_functor ctx ~path (me : Typedtree.module_expr) =
+  let rec parameters acc (me : Typedtree.module_expr) =
+    match me.mod_desc with
+    | Tmod_functor (Named (id, _, mty, _), body, _) ->
+        parameters ((id, mty) :: acc) body
+    | Tmod_functor (Unit, _, _) -> None
+    | Tmod_ident _ | Tmod_structure _ | Tmod_apply _ | Tmod_apply_unit _
+    | Tmod_constraint _ | Tmod_unpack _ ->
+        Some (List.rev acc, me)
+  in
+  match parameters [] me with
+  | None -> []
+  | Some (params, body) -> (
+      let ctx, frame = scope ctx ~path ~loc:me.mod_loc params in
+      match walk_module_expr ctx ~path:frame.f_application body with
+      | [] -> []
+      | items -> [ Scope (frame, items) ])
+
+(* A parameter with the name of a parameter of an enclosing functor, which
+   is a field of an enclosing choice module type, is renamed. *)
+and scope ctx ~path ~loc params =
+  let used =
+    ref
+      (String.Set.of_list
+         (List.concat_map
+            (fun frame ->
+              List.map (fun (id, _) -> Ident.name id) frame.f_params)
+            ctx.frames))
+  in
+  let ctx, params =
+    List.fold_left_map
+      (fun ctx (id, (mty : Typedtree.module_type)) ->
+        let id =
+          match id with Some id -> id | None -> Ident.create_local "Arg"
+        in
+        let name = fresh used (Ident.name id) in
+        let field =
+          if String.equal name (Ident.name id) then id
+          else Ident.create_local name
+        in
+        let exported =
+          Env.add_module ~arg:true field Mp_present mty.mty_type ctx.exported
+        in
+        let paths = Ident.Map.add id (Path.Pident field) ctx.paths in
+        ({ ctx with exported; paths }, (field, mty)))
+      ctx params
+  in
+  let depth = List.length ctx.frames in
+  let numbered name = if depth = 0 then name else name ^ Int.to_string depth in
+  let frame =
+    {
+      f_local = String.concat "_" ctx.relative;
+      f_display = String.concat "." ctx.display;
+      f_loc = loc;
+      f_functor = path;
+      f_params = params;
+      f_paths = ctx.paths;
+      f_application =
+        List.fold_left
+          (fun f (field, _) -> Path.Papply (f, Pident field))
+          path params;
+      f_choices = Ident.create_local (numbered "M");
+      f_instance = Ident.create_local (numbered "I");
+    }
+  in
+  ({ ctx with relative = []; frames = frame :: ctx.frames }, frame)
 
 (* Names *)
 
-let input_type law = law.l_field ^ "_input"
+let input_type law = law.l_local ^ "_input"
 
 (* The constructor of the input type of a law. It does not capture the
    predefined constructors, which clauses refer to without
    qualification. *)
 let constructor law = String.capitalize_ascii (input_type law)
+let module_type_name frame = String.capitalize_ascii frame.f_local ^ "_choices"
 
 let check_names laws =
   let rec duplicates seen = function
@@ -524,10 +634,54 @@ let check_names laws =
           law.l_display c)
     laws
 
+(* The choices of a scope are its laws and the scopes in it. *)
+let rec check_choices items =
+  let name = function
+    | Law law -> (law.l_local, law.l_display, law.l_loc)
+    | Scope (frame, _) -> (frame.f_local, frame.f_display, frame.f_loc)
+  in
+  let rec duplicates seen = function
+    | [] -> ()
+    | item :: rest -> (
+        let local, display, loc = name item in
+        match List.assoc_opt local seen with
+        | Some by ->
+            error ~loc
+              "The choices for %s and %s of the generated laws file have the \
+               same name %s."
+              by display local
+        | None -> duplicates ((local, display) :: seen) rest)
+  in
+  duplicates [] items;
+  List.iter
+    (function Law _ -> () | Scope (_, items) -> check_choices items)
+    items
+
 (* Paths *)
 
 (* The paths of the laws are rooted at the unit: the items of the unit are
    qualified by the unit. *)
+
+(* In a scope, the items of the result of the functor are qualified by its
+   application to the fields of the choice module type of the scope. In the
+   clauses, which are values, the application is the instance [I] of the
+   scope and the fields are the ones of the first-class module [M] of its
+   choices. *)
+let rec in_scope frames (p : Path.t) : Path.t =
+  match List.find_opt (fun f -> Path.same f.f_application p) frames with
+  | Some frame -> Pident frame.f_instance
+  | None -> (
+      match p with
+      | Pident id -> (
+          let is_param f =
+            List.exists (fun (field, _) -> Ident.same field id) f.f_params
+          in
+          match List.find_opt is_param frames with
+          | Some frame -> Pdot (Pident frame.f_choices, Ident.name id)
+          | None -> p)
+      | Pdot (q, s) -> Pdot (in_scope frames q, s)
+      | Papply (f, arg) -> Papply (in_scope frames f, in_scope frames arg)
+      | Pextra_ty (q, extra) -> Pextra_ty (in_scope frames q, extra))
 
 (* [t#] is the constructor ["t#"], see [Parser.unboxed_type]. *)
 let lident : Path.t -> Longident.t = function
@@ -548,11 +702,18 @@ let core_type print cty =
   let m = mapper print in
   m.typ m cty
 
+let module_type print mty =
+  let m = mapper print in
+  m.module_type m mty
+
 let expression print e =
   let m = mapper print in
   m.expr m e
 
 let law_print print law p = print (reroot law.l_paths p)
+
+let clause_print print law p =
+  print (in_scope law.l_frames (reroot law.l_paths p))
 
 (* Kinds *)
 
@@ -613,6 +774,7 @@ let variable laws base =
 
 type names = {
   aliases : (Ident.t * Ident.t) list; (* root, alias *)
+  choice : string; (* the parameter of [Instantiate] *)
   print : Path.t -> Longident.t;
 }
 
@@ -722,34 +884,95 @@ let input_declaration print law =
 
 (* Choices *)
 
-(** The choices of the laws:
+(** The choice of a law, or of a scope [F]:
     {[
-      module type Choices = sig
-        val l1 : l1_input Choice.t
+    val l : l_input Choice.t
+    val f : (module F_choices) Choice.t
+    ]} *)
+let choice_declaration names item =
+  let choice ty = P.Typ.constr (ldot names.choice "t") [ ty ] in
+  match item with
+  | Law law -> P.Sig.value law.l_local (choice (tconstr (input_type law) []))
+  | Scope (frame, _) ->
+      P.Sig.value frame.f_local
+        (choice (P.Typ.package (lid (module_type_name frame))))
+
+(** The parameters of a scope, as written:
+    {[
+      module X1 : S1
+      ...
+    ]} *)
+let frame_parameters print frame =
+  List.map
+    (fun (id, mty) ->
+      P.Sig.module_ (Ident.name id)
+        (module_type (fun p -> print (reroot frame.f_paths p)) mty))
+    frame.f_params
+
+(** The choice module type of a scope [F], with its parameters, the input types
+    of its laws, the choice module types of its scopes, and their choices:
+    {[
+      module type F_choices = sig
+        module X1 : S1
         ...
+        type l_input = ...
+        module type G_choices = sig ... end
+        val l : l_input Choice.t
+        val g : (module G_choices) Choice.t
       end
     ]} *)
-let choices laws =
-  P.Mty.signature
-    (List.map
-       (fun law ->
-         P.Sig.value law.l_field
-           (P.Typ.constr (ldot "Choice" "t") [ tconstr (input_type law) [] ]))
-       laws)
+let rec scope_module_type names (frame, items) =
+  let inputs =
+    List.map
+      (function
+        | Law law -> P.Sig.type_ (input_declaration names.print law)
+        | Scope (frame, items) ->
+            let name, mty = scope_module_type names (frame, items) in
+            P.Sig.modtype name mty)
+      items
+  in
+  let choices = List.map (choice_declaration names) items in
+  ( module_type_name frame,
+    P.Mty.signature (frame_parameters names.print frame @ inputs @ choices) )
+
+(** The choice module types of the scopes at the top, and [Choices]:
+    {[
+      module type F_choices = sig ... end
+      ...
+      module type Choices = sig
+        val l : l_input Choice.t
+        val f : (module F_choices) Choice.t
+      end
+    ]} *)
+let module_types names items =
+  List.filter_map
+    (function
+      | Law _ -> None
+      | Scope (frame, items) -> Some (scope_module_type names (frame, items)))
+    items
+  @ [ ("Choices", P.Mty.signature (List.map (choice_declaration names) items)) ]
 
 (* Law bindings *)
 
+(* The names in the binding of a law, in a scope: the choices [M] of the
+   scope, which qualify the input types of its laws, and the input. *)
+type law_names = { choices : string; qualifier : string option; input : string }
+
+let qualified n name =
+  match n.qualifier with None -> lid name | Some m -> ldot m name
+
 let law_constructor name arg = P.Exp.construct (ldot "Law" name) (Some arg)
 
-(** A clause of a law [l], an [Assumption] or an [Assertion]:
+(** A clause of a law [l] in a scope with choices [M], an [Assumption] or an
+    [Assertion]:
     {[
       Law.Assertion
-        { value = input; source = C.l;
-          predicate = (fun (L_input { x1; ...; xn } : l_input) ->
+        { value = input; source = M.l;
+          predicate = (fun (M.L_input { x1; ...; xn } : M.l_input) ->
             (clause : bool));
           location = { CamlinternalLaw.file = ...; ... } }
     ]} *)
-let clause_check ~check print law ~input (clause : Typedtree.expression) =
+let clause_check ~check print law n (clause : Typedtree.expression) =
   let fields =
     match law.l_params with
     | [] -> None
@@ -762,18 +985,18 @@ let clause_check ~check print law ~input (clause : Typedtree.expression) =
   in
   let pattern =
     P.Pat.constraint_
-      (P.Pat.construct (lid (constructor law)) fields)
-      (tconstr (input_type law) [])
+      (P.Pat.construct (qualified n (constructor law)) fields)
+      (P.Typ.constr (qualified n (input_type law)) [])
   in
-  let body = expression (law_print print law) clause in
+  let body = expression (clause_print print law) clause in
   let predicate =
     P.Exp.fun_ [ param pattern ] (P.Exp.constraint_ body (tconstr "bool" []))
   in
   law_constructor check
     (P.Exp.record
        [
-         (lid "value", P.Exp.var input);
-         (lid "source", P.Exp.ident (ldot "C" law.l_field));
+         (lid "value", P.Exp.var n.input);
+         (lid "source", P.Exp.ident (ldot n.choices law.l_local));
          (lid "predicate", predicate);
          (lid "location", location clause.exp_loc);
        ])
@@ -783,23 +1006,27 @@ let clause_check ~check print law ~input (clause : Typedtree.expression) =
       Law.Bind (Law.Assumption { ... }, fun () -> ...
         Law.Assertion { ... })
     ]} *)
-let clauses print law ~input =
+let clauses print law n =
   let rec bind = function
-    | [] -> clause_check ~check:"Assertion" print law ~input law.l_conclusion
+    | [] -> clause_check ~check:"Assertion" print law n law.l_conclusion
     | assumption :: rest ->
         law_constructor "Bind"
           (P.Exp.tuple
              [
-               clause_check ~check:"Assumption" print law ~input assumption;
+               clause_check ~check:"Assumption" print law n assumption;
                P.Exp.fun_ [ param P.Pat.unit ] (bind rest);
              ])
   in
   bind law.l_assumptions
 
-(** The binding of a law [l], which chooses its input:
+(** The binding of a law [l], which chooses the scopes of the law, applies their
+    functors, and then chooses the input of the law:
     {[
-    let l ((module C) : (module Choices)) : unit Law.t =
-      Law.Bind (Law.Choose C.l, fun input -> clauses)
+      let f_l ((module C) : (module Choices)) : unit Law.t =
+        Law.Bind (Law.Choose C.f, fun ((module M) : (module F_choices)) ->
+          let module I = Laws_gen_U.F (M.X1) ... (M.Xn) in
+          ...
+          Law.Bind (Law.Choose M.l, fun input -> clauses))
     ]} *)
 let law_binding print law =
   let input =
@@ -816,12 +1043,32 @@ let law_binding print law =
       (P.Exp.tuple
          [ law_constructor "Choose" (P.Exp.ident (ldot choices name)); k ])
   in
+  let rec scopes n = function
+    | [] ->
+        bind n.choices law.l_local
+          (P.Exp.fun_ [ param (P.Pat.var input) ] (clauses print law n))
+    | frame :: frames ->
+        let m = Ident.name frame.f_choices in
+        let instance =
+          List.fold_left
+            (fun f (id, _) ->
+              P.Mod.apply f (P.Mod.ident (ldot m (Ident.name id))))
+            (P.Mod.ident (print (in_scope law.l_frames frame.f_functor)))
+            frame.f_params
+        in
+        bind n.choices frame.f_local
+          (P.Exp.fun_
+             [ param (P.Pat.unpack m (qualified n (module_type_name frame))) ]
+             (P.Exp.letmodule
+                (Ident.name frame.f_instance)
+                instance
+                (scopes { n with choices = m; qualifier = Some m } frames)))
+  in
   P.Str.value law.l_field
     (P.Exp.fun_
        ~return:(P.Typ.constr (ldot "Law" "t") [ tconstr "unit" [] ])
        [ param (P.Pat.unpack "C" (lid "Choices")) ]
-       (bind "C" law.l_field
-          (P.Exp.fun_ [ param (P.Pat.var input) ] (clauses print law ~input))))
+       (scopes { choices = "C"; qualifier = None; input } law.l_frames))
 
 let laws_type =
   tconstr "each" [ P.Typ.constr (ldot "Law" "t") [ tconstr "unit" [] ] ]
@@ -857,7 +1104,7 @@ let laws_binding laws =
 
 (* The global modules and the unit that the generated file refers to. The
    file is built once with a [print] that records them. *)
-let global_roots ~unit laws =
+let global_roots ~unit items =
   let roots = ref Ident.Set.empty in
   let print p =
     List.iter
@@ -871,15 +1118,27 @@ let global_roots ~unit laws =
     (fun law ->
       ignore (input_declaration print law);
       List.iter
-        (fun clause -> ignore (expression (law_print print law) clause))
-        (law.l_conclusion :: law.l_assumptions))
-    laws;
+        (fun clause -> ignore (expression (clause_print print law) clause))
+        (law.l_conclusion :: law.l_assumptions);
+      List.iter
+        (fun frame -> ignore (print (in_scope law.l_frames frame.f_functor)))
+        law.l_frames)
+    (laws_of_items items);
+  List.iter
+    (fun frame -> ignore (frame_parameters print frame))
+    (frames_of_items items);
   Ident.Set.elements !roots
 
-(* The aliases of the roots are fresh among the roots. *)
-let choose_names ~unit laws =
-  let roots = global_roots ~unit laws in
-  let used = ref (String.Set.of_list (List.map Ident.name roots)) in
+(* The aliases of the roots are fresh among the roots and the parameters
+   of functors, which are fields of the choice module types. *)
+let choose_names ~unit items =
+  let params =
+    List.concat_map
+      (fun frame -> List.map (fun (id, _) -> Ident.name id) frame.f_params)
+      (frames_of_items items)
+  in
+  let roots = global_roots ~unit items in
+  let used = ref (String.Set.of_list (List.map Ident.name roots @ params)) in
   let aliases =
     List.map
       (fun id ->
@@ -893,7 +1152,10 @@ let choose_names ~unit laws =
       Ident.Map.empty aliases
   in
   let print p = lident (reroot alias_paths p) in
-  { aliases; print }
+  (* The fields for the parameters of functors in the choice module types
+     must not shadow the parameter of [Instantiate]. *)
+  let choice = fresh (ref (String.Set.of_list params)) "Choice" in
+  { aliases; choice; print }
 
 (** {[
       module Laws_gen_U = U
@@ -907,26 +1169,35 @@ let alias_bindings names =
 
 (* The file *)
 
+let top_laws items =
+  List.filter_map (function Law law -> Some law | Scope _ -> None) items
+
 (* The laws file, of the shape above *)
-let implementation names laws =
+let implementation names items =
+  let laws = laws_of_items items in
   let law_module =
     P.Str.module_ "Law"
       (P.Mod.apply
          (P.Mod.ident (ldot "CamlinternalLaw" "Make"))
-         (P.Mod.ident (lid "Choice")))
+         (P.Mod.ident (lid names.choice)))
   in
   let instantiate =
-    P.Mod.functor_ "Choice"
+    P.Mod.functor_ names.choice
       (P.Mty.ident (ldot "CamlinternalLaw" "Choice"))
       (P.Mod.structure
-         ((law_module :: [ P.Str.modtype "Choices" (choices laws) ])
+         (law_module
+          :: List.map
+               (fun (name, mty) -> P.Str.modtype name mty)
+               (module_types names items)
          @ List.map (law_binding names.print) laws
          @ [ laws_binding laws ]))
   in
   (* Unused parameters of laws in clauses *)
   (P.Str.warning "-27" :: alias_bindings names)
   @ (P.Str.type_ (each laws) :: each_values laws)
-  @ List.map (fun law -> P.Str.type_ (input_declaration names.print law)) laws
+  @ List.map
+      (fun law -> P.Str.type_ (input_declaration names.print law))
+      (top_laws items)
   @ [ P.Str.module_ "Instantiate" instantiate ]
 
 let generate ~unit (impl : Typedtree.implementation) =
@@ -943,9 +1214,17 @@ let generate ~unit (impl : Typedtree.implementation) =
       str.str_final_env
   in
   let ctx =
-    { exported; paths = Ident.Map.empty; qualifier = []; display = [] }
+    {
+      exported;
+      paths = Ident.Map.empty;
+      qualifier = [];
+      relative = [];
+      display = [];
+      frames = [];
+    }
   in
-  let laws = walk_structure ctx ~path:(Path.Pident unit) str in
-  check_names laws;
-  let names = choose_names ~unit laws in
-  Laws_file.of_syntax (implementation names laws)
+  let items = walk_structure ctx ~path:(Path.Pident unit) str in
+  check_names (laws_of_items items);
+  check_choices items;
+  let names = choose_names ~unit items in
+  Laws_file.of_syntax (implementation names items)

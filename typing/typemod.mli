@@ -217,6 +217,7 @@ type error =
   | Law_unannotated_parameter of string
   | Law_wildcard_in_parameter
   | Law_instantiated_type_variable of string * type_expr
+  | Law_in_generative_functor
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

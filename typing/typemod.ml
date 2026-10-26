@@ -108,6 +108,7 @@ type error =
   | Law_unannotated_parameter of string
   | Law_wildcard_in_parameter
   | Law_instantiated_type_variable of string * type_expr
+  | Law_in_generative_functor
 
 
 exception Error_forward of Location.error
@@ -2187,6 +2188,53 @@ let mksig desc env loc =
 (* The type variables of a law are shared between its parameters and its
    clauses, and generalized at the end. *)
 
+(* The laws file of a unit names the types of the result of a functor
+   through an application to the choices of a backend, which a generative
+   functor does not permit. Thus, laws in generative functors are rejected,
+   in structures and in signatures. *)
+let rec first_law_in_signature env sg =
+  List.find_map
+    (function
+      | Sig_law (_, ld, _) -> Some ld.law_loc
+      | Sig_module (_, _, md, _, _) -> first_law_in_module_type env md.md_type
+      | Sig_value _ | Sig_type _ | Sig_typext _ | Sig_modtype _ | Sig_class _
+      | Sig_class_type _ | Sig_jkind _ ->
+          None)
+    sg
+
+and first_law_in_module_type env mty =
+  match Mtype.scrape env mty with
+  | Mty_signature sg -> first_law_in_signature env sg
+  | Mty_functor (_, res, _) | Mty_strengthen (res, _, _) ->
+      first_law_in_module_type env res
+  | Mty_ident _ | Mty_alias _ -> None
+
+let rec first_law_in_module_expr (me : Typedtree.module_expr) =
+  match me.mod_desc with
+  | Tmod_structure str ->
+      List.find_map first_law_in_structure_item str.str_items
+  | Tmod_constraint (me, _, _, _) | Tmod_functor (_, me, _) ->
+      first_law_in_module_expr me
+  | Tmod_ident _ | Tmod_apply _ | Tmod_apply_unit _ | Tmod_unpack _ ->
+      first_law_in_module_type me.mod_env me.mod_type
+
+and first_law_in_structure_item (item : Typedtree.structure_item) =
+  match item.str_desc with
+  | Tstr_law ld -> Some ld.law_loc
+  | Tstr_module mb -> first_law_in_module_expr mb.mb_expr
+  | Tstr_recmodule mbs ->
+      List.find_map (fun mb -> first_law_in_module_expr mb.mb_expr) mbs
+  | Tstr_include incl ->
+      first_law_in_signature incl.incl_mod.mod_env incl.incl_type
+  | Tstr_eval _ | Tstr_value _ | Tstr_primitive _ | Tstr_type _
+  | Tstr_typext _ | Tstr_exception _ | Tstr_modtype _ | Tstr_open _
+  | Tstr_class _ | Tstr_class_type _ | Tstr_attribute _ | Tstr_jkind _ ->
+      None
+
+let check_no_law_in_generative_functor env = function
+  | Some loc -> Error.log_and_raise loc env Law_in_generative_functor
+  | None -> ()
+
 let law_type_variables tys =
   List.filter_map
     (fun ty ->
@@ -2397,6 +2445,11 @@ and transl_modtype_aux md_mode env smty =
           newenv
       in
       let res = transl_modtype newenv sres in
+      (match ty_arg with
+       | Unit ->
+           check_no_law_in_generative_functor newenv
+             (first_law_in_module_type newenv res.mty_type)
+       | Named _ -> ());
       mkmty (Tmty_functor (t_arg, res, tmres))
         (Mty_functor(ty_arg, res.mty_type, mres)) env loc
         smty.pmty_attributes
@@ -3651,6 +3704,11 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       let body, body_shape =
         type_module ~strengthen:true ~funct_body None newenv sbody
       in
+      (match ty_arg with
+       | Unit ->
+           check_no_law_in_generative_functor newenv
+             (first_law_in_module_expr body)
+       | Named _ -> ());
       let body_mode = mode_without_locks_exn body.mod_mode in
       let ret_mode = With_locality.newvar 0 in
       With_regionality.submode_exn
@@ -5965,6 +6023,9 @@ let report_error ~loc env = function
          Write that type in the annotation instead.@]"
         Style.inline_code ("'" ^ name)
         (Style.as_inline_code Printtyp.Doc.type_expr) ty
+  | Law_in_generative_functor ->
+      Location.errorf ~loc
+        "Laws in the body of a generative functor are not supported."
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

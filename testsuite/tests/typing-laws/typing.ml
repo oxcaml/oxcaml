@@ -240,3 +240,40 @@ Line 4, characters 4-30:
   outside of this module.
 |}]
 
+(* Laws in generative functors are rejected: the laws file names the types
+   of the result of a functor through an application to the choices of a
+   backend, which a generative functor does not permit. *)
+
+module Gen () = struct
+  let x = 1
+  law? p : x = x
+end
+[%%expect {|
+Line 3, characters 2-16:
+3 |   law? p : x = x
+      ^^^^^^^^^^^^^^
+Error: Laws in the body of a generative functor are not supported.
+|}]
+
+module type Gen = functor () -> sig
+  val x : int
+  law? p : x = x
+end
+[%%expect {|
+Line 3, characters 2-16:
+3 |   law? p : x = x
+      ^^^^^^^^^^^^^^
+Error: Laws in the body of a generative functor are not supported.
+|}]
+
+module Nested () = struct
+  module M = struct
+    law? p : 1 = 1
+  end
+end
+[%%expect {|
+Line 3, characters 4-18:
+3 |     law? p : 1 = 1
+        ^^^^^^^^^^^^^^
+Error: Laws in the body of a generative functor are not supported.
+|}]
