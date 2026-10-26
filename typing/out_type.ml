@@ -1932,18 +1932,26 @@ end = struct
       List.concat_map (fun pair1 -> construct_edges_between pair0 pair1)
         !visible_pairs
 
-  (* CR zeisbach: We might want to use [name_is_already_used] to avoid printing
-     mode names that clash with user-written type variable names? I believe they
-     are in different namespaces, but something like ['m @ [< 'm] -> ...] could
-     be confusing. *)
+  let name_is_already_used name =
+    List.mem name !named_vars
+    || List.exists (fun (_, name') -> name = name') !names
+    || String.Set.mem name !named_weak_vars
+    || List.exists (fun (_, name') -> name = name') !modenames
+
   let pick_name : int -> string = fun i ->
     match i with
-    | 0 -> "'m"
-    | 1 -> "'n"
-    | 2 -> "'o"
-    | 3 -> "'p"
-    | 4 -> "'q"
-    | _ -> Fmt.asprintf "'mm%d" (i - 5)
+    | 0 -> "m"
+    | 1 -> "n"
+    | 2 -> "o"
+    | 3 -> "p"
+    | 4 -> "q"
+    | _ -> Fmt.asprintf "mm%d" (i - 5)
+
+  let rec new_mode_name () =
+    let cnt = !modename_counter in
+    modename_counter := cnt + 1;
+    let m = pick_name cnt in
+    if name_is_already_used m then new_mode_name () else m
 
   let add_named_modevar name =
     let mopt =
@@ -1952,13 +1960,11 @@ end = struct
         !modenames
     in
     match mopt with
-    | Some (_, m) -> m
+    | Some (_, m) -> "'" ^ m
     | None ->
-      let cnt = !modename_counter in
-      modename_counter := cnt + 1;
-      let m = pick_name cnt in
+      let m = new_mode_name () in
       modenames := (name, m) :: !modenames;
-      m
+      "'" ^ m
 
   type 'a interval = { lo: 'a; hi: 'a }
   let construct_raw_bounds { monadic; comonadic } :
@@ -2218,11 +2224,6 @@ end = struct
       List.map (fun (t1,t2) -> Transient_expr.repr t1, Transient_expr.repr t2)
         subst
       @ !name_subst
-
-  let name_is_already_used name =
-    List.mem name !named_vars
-    || List.exists (fun (_, name') -> name = name') !names
-    || String.Set.mem name !named_weak_vars
 
   let rec new_name () =
     let name = Misc.letter_of_int !name_counter in
