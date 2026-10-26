@@ -1,0 +1,16 @@
+init_length
+  law? init_length (n : int) (f : int -> ('a : value)) :
+    n >= 0 ===> length (init n ~f) = n
+  passed 3, discarded 1
+length_nonneg
+  law? length_nonneg (xs : ('a : value) list) : length xs >= 0
+  passed 5, discarded 0
+trivial
+  law? trivial : 1 = 1
+  passed 1, discarded 0
+init_length
+  law? init_length (n : int) (f : int -> ('a : value)) :
+    n >= 0 ===> length (init n ~f) = n
+  FAILED, raised Failure("boom")
+  length (init n ~f) = n
+  counterexample: 7
