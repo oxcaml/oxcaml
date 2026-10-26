@@ -422,6 +422,14 @@ let script = make
   ~does_something:true
   Actions_helpers.run_script
 
+let config_script = make
+  ~name:"config_script"
+  ~description:"Run the script specified by the script variable once, when \
+                checking test dependencies. The script may result in TEST_SKIP \
+                but does not have build artifacts available."
+  ~does_something:true
+  Actions_helpers.run_config_script
+
 let check_program_output = make
   ~name:"check-program-output"
   ~description:"Compare the output of the program with its reference"
@@ -537,6 +545,7 @@ let init () =
     setup_simple_build_env;
     run;
     script;
+    config_script;
     check_program_output;
     arch_arm;
     arch_arm64;
