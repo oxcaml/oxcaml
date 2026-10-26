@@ -7,25 +7,47 @@ module Encoded : sig
   module Component : sig
     type t
 
-    val encode : unit Zero_alloc_utils.Component.t -> t
+    val encode :
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t Component.t) ->
+      t
 
-    val decode : t -> unit Zero_alloc_utils.Component.t
+    val decode :
+      t ->
+      Zero_alloc_utils.(
+        Relevant_components_by_argument_index.t Allocation_sources.t Component.t)
   end
 
   module Components : sig
     type t
 
-    val encode_or_elide :
+    val encode :
       encode_component:('a -> Component.t) ->
       'a Zero_alloc_utils.Components.t ->
-      t option
+      t
 
-    val decode_maybe_elided :
+    val decode :
       decode_component:(Component.t -> 'a) ->
       t ->
       'a Zero_alloc_utils.Components.t
+
+    val all_top : t
+
+    val ( = ) : t -> t -> bool
   end
 end
+
+val encode :
+  Zero_alloc_utils.(
+    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+    Components.t) ->
+  Encoded.Components.t
+
+val decode :
+  Encoded.Components.t ->
+  Zero_alloc_utils.(
+    Relevant_components_by_argument_index.t Allocation_sources.t Component.t
+    Components.t)
 
 type t
 

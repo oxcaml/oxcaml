@@ -157,7 +157,8 @@ let sub_const_const_exn za1 za2 =
   (* abstract domain check *)
   let abstract_value za =
     match za with
-    | Default_zero_alloc | Ignore_assert_all -> ZA.Assume_info.Value.top ()
+    | Default_zero_alloc | Ignore_assert_all ->
+      ZA.Assume_info.Value.top ~allocation_sources:() ~witnesses:()
     | Check { strict; _ } ->
       ZA.Assume_info.Value.of_annotation ~strict ~never_returns_normally:false
         ~never_raises:false
