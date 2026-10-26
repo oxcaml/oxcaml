@@ -2080,7 +2080,9 @@ CAMLprim value caml_continuation_update_handler_noexc
     /* The continuation has already been taken */
     return cont;
   }
-  stk = Ptr_val(Cont_last_fiber(cont));
+  /* [Cont_last_fiber] cannot be trusted here, as it can be invalidated by
+     stack idling during minor GC. So walk the chain instead. */
+  while (Stack_parent(stk) != NULL) stk = Stack_parent(stk);
   check_preemptable(stk, htick);
   Stack_handle_value(stk) = hval;
   Stack_handle_exception(stk) = hexn;

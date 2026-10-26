@@ -443,7 +443,10 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
    is the head of the captured stack chain, as a tagged pointer
    ([Val_ptr]; NULL once the continuation has been taken).
    [Cont_last_fiber] is the chain's tail, kept for reperform to append
-   to. [Cont_gc_regs], present only in three-field continuations
+   to; treat it as a cache. effect.ml's preemptible handlers store a
+   raw pointer there ([cont_set_last_fiber]) which idling the stacks
+   invalidates, so it is only sound to read immediately after a
+   wake. [Cont_gc_regs], present only in three-field continuations
    (preemptions), is the suspended register buffer. */
 #define Cont_fiber(cont)      Field(cont, 0)
 #define Cont_last_fiber(cont) Field(cont, 1)
