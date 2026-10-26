@@ -21,6 +21,7 @@ open Instruct
 val to_file: out_channel -> Compilation_unit.t -> Unit_info.Artifact.t ->
   required_globals:Compilation_unit.Set.t ->
   main_module_block_format:Lambda.main_module_block_format ->
+  laws:Laws_file.t ->
   instruction list -> unit
         (* Arguments:
              channel on output file

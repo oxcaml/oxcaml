@@ -223,6 +223,7 @@ end) : S = struct
               union (List.map (fun info -> info.ui_generic_fns.send_fun) units)
           };
         ui_force_link = List.exists (fun info -> info.ui_force_link) units;
+        ui_laws = Laws_file.none;
         ui_requires_metaprogramming =
           List.exists (fun info -> info.ui_requires_metaprogramming) units;
         ui_export_info;

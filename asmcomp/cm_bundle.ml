@@ -87,6 +87,7 @@ let cmx_bundle ~quoted_cmx =
           uir_export_info = info.ui_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
+          uir_laws = info.ui_laws;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;
           uir_sections_length = total_length;

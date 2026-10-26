@@ -192,6 +192,7 @@
   typedtree
   outcometree
   cmo_format
+  laws_file
   cmxs_format
   cmt_format
   debug_event
@@ -311,6 +312,8 @@
 (copy_files ../../parsing/ast_iterator.ml)
 
 (copy_files ../../parsing/ast_helper.ml)
+
+(copy_files ../../file_formats/laws_file.ml)
 
 (copy_files ../../parsing/ast_mapper.ml)
 
@@ -684,6 +687,8 @@
 (copy_files ../../typing/outcometree.mli)
 
 (copy_files ../../file_formats/cmo_format.mli)
+
+(copy_files ../../file_formats/laws_file.mli)
 
 (copy_files ../../file_formats/cmxs_format.mli)
 

@@ -322,6 +322,7 @@ let package_object_files ~ppf_dump files target coercion =
         cu_primitives = List.rev state.primitives;
         cu_required_compunits = CU.Set.elements required_compunits;
         cu_force_link = force_link;
+        cu_laws = Laws_file.none;
         cu_debug = if pos_final > pos_debug then pos_debug else 0;
         cu_debugsize = pos_final - pos_debug } in
     Emitcode.marshal_to_channel_with_possibly_32bit_compat

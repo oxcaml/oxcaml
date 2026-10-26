@@ -225,6 +225,11 @@ let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
   \    paths to the list of \"hidden\" files (see -H for more details)"
 
+let mk_generate_laws_implementation f =
+  "-generate-laws-implementation", Arg.Unit f,
+  " Print the laws file of the given compiled unit (.cmo or .cmx) to the\
+  \n     file given by -o, or standard output"
+
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
 
@@ -1283,6 +1288,7 @@ module type Compiler_options = sig
   val _g : unit -> unit
   val _no_g : unit -> unit
   val _stop_after : string -> unit
+  val _generate_laws_implementation : unit -> unit
   val _i : unit -> unit
   val _i_variance : unit -> unit
   val _impl : string -> unit
@@ -1522,6 +1528,7 @@ struct
     mk_no_g F._no_g;
     mk_g_no_ocamldebug_types F._g_no_ocamldebug_types;
     mk_stop_after ~native:false F._stop_after;
+    mk_generate_laws_implementation F._generate_laws_implementation;
     mk_i F._i;
     mk_i_variance F._i_variance;
     mk_I F._I;
@@ -1804,6 +1811,7 @@ struct
     mk_no_probes F._no_probes;
     mk_probes_optimized F._probes_optimized;
     mk_no_probes_optimized F._no_probes_optimized;
+    mk_generate_laws_implementation F._generate_laws_implementation;
     mk_i F._i;
     mk_i_variance F._i_variance;
     mk_I F._I;
@@ -2474,6 +2482,7 @@ module Default = struct
     let _for_pack s = for_package := (Some (String.capitalize_ascii s))
     let _g = set debug
     let _no_g = clear debug
+    let _generate_laws_implementation = set generate_laws
     let _i = set print_types
     let _impl = Compenv.impl
     let _instantiate = set instantiate

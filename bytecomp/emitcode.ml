@@ -424,7 +424,7 @@ let rec emit = function
 (* Emission to a file *)
 
 let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
-          code =
+          ~laws code =
   init();
   Fun.protect ~finally:clear (fun () ->
   output_string outchan cmo_magic_number;
@@ -464,6 +464,7 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
                                !Translmod.primitive_declarations;
       cu_required_compunits = Compilation_unit.Set.elements required_globals;
       cu_force_link = !Clflags.link_everything;
+      cu_laws = laws;
       cu_debug = pos_debug;
       cu_debugsize = size_debug } in
   let pos_compunit = pos_out outchan in

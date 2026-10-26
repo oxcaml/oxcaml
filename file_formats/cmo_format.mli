@@ -47,6 +47,7 @@ type compilation_unit_descr =
                                            must occur before this one. *)
     cu_primitives: string list;         (* Primitives declared inside *)
     mutable cu_force_link: bool;        (* Must be linked even if unref'ed *)
+    cu_laws: Laws_file.t;               (* Laws file of the unit *)
     mutable cu_debug: int;              (* Position of debugging info, or 0 *)
     cu_debugsize: int }                 (* Length of debugging info *)
 
