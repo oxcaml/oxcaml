@@ -280,21 +280,22 @@ let gen_non_variant_type ?(value_only = false) (st : State.t) =
   then Ty.Record (random_element st record_types)
   else gen_scalar_or_array_type ~value_only st
 
+let gen_exception (st : State.t) id =
+  let payload =
+    (* [raise] only accepts values, so the payload must be one too. *)
+    if with_probability st ~probability:Config.exception_payload_probability
+    then Some (gen_non_variant_type ~value_only:true st)
+    else None
+  in
+  { Exn.id; payload }
+
 let gen_exceptions (st : State.t) =
   if not st.swarm.exceptions
   then []
   else
-    List.init (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
-      (fun id ->
-        { Exn.id;
-          payload =
-            (* [raise] only accepts values, so the payload must be one too. *)
-            (if
-               with_probability st
-                 ~probability:Config.exception_payload_probability
-             then Some (gen_non_variant_type ~value_only:true st)
-             else None)
-        })
+    List.init
+      (random_int_in_range st ~min:1 ~max:Config.max_exception_count)
+      (gen_exception st)
 
 let gen_constructor_type (st : State.t) constructor_index =
   let args =
