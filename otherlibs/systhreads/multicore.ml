@@ -97,7 +97,7 @@ let wait_spawn_result req =
   let sender_domain = get req.sender_domain in
   Mutex.lock sender_domain.mutex;
   let rec loop () =
-    match req.spawn_result with
+    match Atomic.Loc.get [%atomic.loc req.spawn_result] with
     | This result ->
       Mutex.unlock sender_domain.mutex;
       magic_unique__contended_portable result.portended
@@ -157,7 +157,8 @@ let rec manager_loop t =
           Atomic.Loc.decr [%atomic.loc t.threads];
           Failed (req.argument, exn, bt)
       in
-      req.spawn_result <- This { portended = spawn_result };
+      Atomic.Loc.set [%atomic.loc req.spawn_result]
+        (This { Modes.Portended.portended = spawn_result });
       wakeup_spawn_result req)
       requests;
     manager_loop t
