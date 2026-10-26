@@ -83,8 +83,7 @@ val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
     variable names and marking cycles. Any type variables that are shared
     between multiple types in the input list will be given the same name when
     printed with {!prepared_type_expr}. *)
-val prepare_for_printing:
-  base:Mode.With_locality.Const.t -> type_expr list -> unit
+val prepare_for_printing: type_expr list -> unit
 
 (** [add_type_to_preparation ty] extend a previous type expression preparation
     to the type expression [ty]
@@ -283,7 +282,7 @@ module Variable_names: sig
   (** Add external type equalities*)
   val add_subst: (type_expr * type_expr) list -> unit
 
-  (** [reserve ~base ty] registers the variable names appearing in [ty] *)
+  (** [reserve ty] registers the variable names appearing in [ty] *)
   (* CR zeisbach: [reserve] now does a lot more interesting stuff. The doc
      comment here deserves to be updated. Perhaps the signature in [out_type.ml]
      could be too/instead (based on the extent to which you believe
@@ -291,7 +290,7 @@ module Variable_names: sig
 
      In particular, the (persistent!) side-effects that this function performs
      should be made clear in its purpose statement. *)
-  val reserve: base:Mode.With_locality.Const.t -> type_expr -> unit
+  val reserve: type_expr -> unit
 end
 
 (** Register internal typechecker names ([$0],[$a]) appearing in the

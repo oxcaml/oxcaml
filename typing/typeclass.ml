@@ -2412,7 +2412,7 @@ let report_error_doc env ppf =
   | Abbrev_type_clash (abbrev, actual, expected) ->
       (* XXX Afficher une trace ? | Print a trace? *)
       let base = Mode.With_locality.Const.legacy in
-      Out_type.prepare_for_printing ~base [abbrev; actual; expected];
+      Out_type.prepare_for_printing [abbrev; actual; expected];
       fprintf ppf "@[The abbreviation@ %a@ expands to type@ %a@ \
        but is used with type@ %a@]"
         out_type (Out_type.tree_of_typexp ~base Type abbrev)
@@ -2455,8 +2455,7 @@ let report_error_doc env ppf =
         (msg  "The type parameter")
         (msg "does not meet its constraint: it should be")
   | Bad_parameters (id, params, cstrs) ->
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-        (params @ cstrs);
+      Out_type.prepare_for_printing (params @ cstrs);
       fprintf ppf
         "@[The abbreviation %a@ is used with parameter(s)@ %a@ \
            which are incompatible with constraint(s)@ %a@]"
@@ -2465,8 +2464,7 @@ let report_error_doc env ppf =
         pp_args cstrs
   | Bad_class_type_parameters (id, params, cstrs) ->
       let pp_hash ppf id = fprintf ppf "#%a" Printtyp.ident id in
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-        (params @ cstrs);
+      Out_type.prepare_for_printing (params @ cstrs);
       fprintf ppf
         "@[The class type %a@ is used with parameter(s)@ %a,@ \
            whereas the class type definition@ constrains@ \
@@ -2504,8 +2502,7 @@ let report_error_doc env ppf =
        pp_doc msg print_reason reason
   | Non_generalizable_class {id;  clty; nongen_vars } ->
       let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2] in
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-        nongen_vars;
+      Out_type.prepare_for_printing nongen_vars;
       fprintf ppf
         "@[The type of this class,@ %a,@ \
          contains the non-generalizable type variable(s): %a.@ %a@]"

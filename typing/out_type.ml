@@ -1066,10 +1066,7 @@ let const_or_generic_of_mode :
     with the constant (a [Generic] contains generic variables and cannot
     be equated with directly); otherwise a pure bounds check.
 
-    [equate_with_const] additionally checks [m]'s edges;
-    [Variable_names.equate_curry] calls this function alone, so that the
-    mutations happen during preprocessing, before bounds and edges are
-    computed. *)
+    [equate_with_const] additionally checks [m]'s edges. *)
 let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
   fun m acc_mode ->
     if not (With_locality.check_generic m)
@@ -1104,7 +1101,7 @@ module Variable_names : sig
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
-  val reserve: base:With_locality.Const.t -> type_expr -> unit
+  val reserve: type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -1130,7 +1127,6 @@ end = struct
   let name_counter = ref 0
   let named_vars = ref ([] : string list)
   let visited_for_named_vars = ref ([] : transient_expr list)
-  let visited_for_modes = ref ([] : transient_expr list)
   let visited_for_named_modevars = ref ([] : transient_expr list)
 
   module Desc = With_locality.Desc
@@ -1364,60 +1360,6 @@ end = struct
           printer_iter_type_expr add_named_vars (Fun.const ()) ty
     end
 
-  (* The following preprocessing step zaps non-generic
-    modes to legacy, while equating a derived curry mode
-    with the inferred non-generic return modes. This step
-    should exactly mirror the mutations performed by
-    [tree_of_modal_typexp]. It is needed so we get the
-    correct precise bounds of mode descriptions
-  *)
-  (* CR zeisbach: this comment is a red flag to me: it seems pretty brittle to
-     rely on these two otherwise unrelated functions matching in their side
-     effects. (Especially since there is only a comment on one of the two paired
-     functions!).
-
-     It would be nice if there were a common helper called by both of these
-     functions, but my instinct is that such a refactor would be pretty tricky.
-     Maybe some small bit of functionality could be pulled out (like the arrow
-     case, perhaps? though that doesn't buy you _too_ much...)
-     I would at least recommend adding a comment to [tree_of_modal_typexp]. *)
-  let rec zap_non_generic_modes : const_or_generic -> type_expr -> unit =
-    fun acc_mode ty ->
-    let px = proxy ty in
-    if List.memq px !visited_for_modes then () else begin
-      visited_for_modes := px :: !visited_for_modes;
-      (* CR zeisbach: comparing this to [tree_of_modal_typexp], here we do not
-         call [Ctype.reduce_head]. i'm just noting this discrepency, since I
-         think there are stage-related subtelties to mirroring this call *)
-      let tty = Transient_expr.repr ty in
-      match tty.desc with
-      | Tarrow ((_l, marg, mret), ty1, ty2, _) ->
-        (* CR zeisbach: this does not mirror [tree_of_modal_typexp] for optional
-           arguments. This can lead to more verbose printing of curry modes.
-           (META: this is the type of bug that a refactoring could potentially
-           make impossible by construction. again, unsure of the feasibility) *)
-        zap_non_generic_modes (const_or_generic_of_mode ~arg:true marg) ty1;
-        let acc_mode = curry_acc acc_mode marg in
-        equate_curry acc_mode mret ty2
-      | Tpoly (ty, []) | Trepr (ty, []) ->
-        zap_non_generic_modes acc_mode ty
-      | _ ->
-        printer_iter_type_expr
-          (zap_non_generic_modes (Const With_locality.Const.legacy))
-          (Fun.const ()) ty
-    end
-
-  and equate_curry : const_or_generic -> With_locality.lr -> type_expr -> unit =
-    fun acc_mode mret ty ->
-      match get_desc ty with
-      | Tarrow _ when equate_with_curry_bounds mret acc_mode ->
-          zap_non_generic_modes acc_mode ty
-      | _ ->
-        zap_non_generic_modes (const_or_generic_of_mode ~arg:false mret) ty
-
-  let zap_non_generic_modes base ty =
-    zap_non_generic_modes (Const base) ty
-
   let eq_pair :
       visible_pair
       -> visible_pair
@@ -1452,7 +1394,7 @@ end = struct
     let comonadic = With_locality.get_comonadic_desc comonadic in
     { monadic; comonadic }
 
-  let add_named_modevar : With_locality.lr -> unit =
+  let register_visible_mode : With_locality.lr -> unit =
     fun mode ->
       if With_locality.check_generic mode then begin
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
@@ -1471,11 +1413,11 @@ end = struct
      of the traversal. (perhaps a slightly more descriptive name as well, which
      we can get away with since it's only called twice.) The description in the
      mode printing doc seems like a good place to start :-) *)
-  let rec add_named_modevars ty =
+  let rec register_visible_modes ty =
     let px = proxy ty in
     if not (List.memq px !visited_for_named_modevars) then begin
       visited_for_named_modevars := px :: !visited_for_named_modevars;
-      printer_iter_type_expr add_named_modevars add_named_modevar ty
+      printer_iter_type_expr register_visible_modes register_visible_mode ty
     end
 
   (* The next preprocessing step registers all direct
@@ -2020,8 +1962,6 @@ end = struct
     | 4 -> "'q"
     | _ -> Fmt.asprintf "'mm%d" (i - 5)
 
-  (* CR zeisbach: this shadows the [add_named_modevar] used by [reserve], but
-     I think it probably shouldn't. *)
   let add_named_modevar name =
     let mopt =
       List.find_opt
@@ -2150,7 +2090,6 @@ end = struct
     name_counter := 0;
     named_vars := [];
     visited_for_named_vars := [];
-    visited_for_modes := [];
     visited_for_named_modevars := [];
     visible_pairs := [];
     aliased_visible_pairs := [];
@@ -2421,16 +2360,13 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve ~base ty =
+  let reserve ty =
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
-      let snap = Btype.snapshot () in
-      zap_non_generic_modes base ty;
-      add_named_modevars ty;
+      register_visible_modes ty;
       add_visible_paths ();
-      add_visible_edges ();
-      Btype.backtrack snap
+      add_visible_edges ()
     end
 end
 
@@ -2523,11 +2459,9 @@ module Aliases = struct
 
 end
 
-let prepare_type_with_base base ty =
-  Variable_names.reserve ~base ty;
+let prepare_type ty =
+  Variable_names.reserve ty;
   Aliases.mark_loops ty
-
-let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
 
 
 let reset_except_conflicts () =
@@ -2537,9 +2471,9 @@ let reset () =
   Ident_conflicts.reset ();
   reset_except_conflicts ()
 
-let prepare_for_printing ~base tyl =
+let prepare_for_printing tyl =
   reset_except_conflicts ();
-  List.iter (prepare_type_with_base base) tyl
+  List.iter prepare_type tyl
 
 let add_type_to_preparation = prepare_type
 
@@ -3100,7 +3034,7 @@ let type_expr_with_reserved_names ppf ty =
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
 let tree_of_type_scheme ty =
-  prepare_for_printing ~base:With_locality.Const.legacy [ty];
+  prepare_for_printing [ty];
   tree_of_typexp ~base:With_locality.Const.legacy Type_scheme ty
 
 (* Print one type declaration *)
@@ -3613,7 +3547,7 @@ let tree_of_value_description id decl =
     Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
     |> Mode.Const.value_to_alloc_r2l
   in
-  let () = prepare_for_printing ~base [decl.val_type] in
+  let () = prepare_for_printing [decl.val_type] in
   let ty = tree_of_typexp ~base Type_scheme decl.val_type in
   (* Important: process the fvs *after* the type; tree_of_type_scheme
      resets the naming context *)
@@ -4262,9 +4196,9 @@ let hide_variant_name t =
 
 let prepare_expansion Errortrace.{ty; expanded} =
   let expanded = hide_variant_name expanded in
-  Variable_names.reserve ~base:With_locality.Const.legacy ty;
+  Variable_names.reserve ty;
   if not (same_path ty expanded) then
-    Variable_names.reserve ~base:With_locality.Const.legacy expanded;
+    Variable_names.reserve expanded;
   Errortrace.{ty; expanded}
 
 (* Adapt functions to exposed interface *)
