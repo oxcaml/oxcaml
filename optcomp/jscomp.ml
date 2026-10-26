@@ -74,17 +74,6 @@ let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
 
 let debuginfo_args () = if !Clflags.debug then ["--debuginfo"] else []
 
-(* Stubs are stored in [.cmjxa] files as they were given on the command line
-   when the library was created, so a bare file name may refer to a file
-   installed next to the library. *)
-let find_stub name =
-  match Load_path.find name with
-  | path -> path
-  | exception Not_found ->
-    if Sys.file_exists name
-    then name
-    else raise (Linkenv.Error (Linkenv.File_not_found name))
-
 let write_cmj ~filename ~compilation_unit ~required_globals
     ({ program; imported_compilation_units } : Optcomp_intf.jsir_program) =
   let imported_compilation_units =
@@ -146,20 +135,23 @@ let make
              (fun ppf ({ program; _ } : Optcomp_intf.jsir_program) ->
                Jsoo_imports.Code.Print.program ppf (fun _ _ -> "") program)
       in
-      let cmj = prefixname ^ ".cmj" in
-      let cmjo = prefixname ^ ext_obj in
-      write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit
-        ~required_globals:program.required_globals jsir;
-      let remove_cmj () =
-        if not !Clflags.keep_asm_file then Misc.remove_file cmj
-      in
-      Misc.try_finally
-        ~exceptionally:(fun () -> Misc.remove_file cmjo)
-        (fun () ->
-          Profile.record_call "js_of_ocaml" (fun () ->
-              run_js_of_ocaml "compile" ~phase:Compile ~input_left_in:cmj
-                (debuginfo_args () @ ["-o"; cmjo; cmj]));
-          remove_cmj ())
+      if Clflags.(should_stop_after Compiler_pass.Middle_end)
+      then ()
+      else
+        let cmj = prefixname ^ ".cmj" in
+        let cmjo = prefixname ^ ext_obj in
+        write_cmj ~filename:cmj ~compilation_unit:program.compilation_unit
+          ~required_globals:program.required_globals jsir;
+        let remove_cmj () =
+          if not !Clflags.keep_asm_file then Misc.remove_file cmj
+        in
+        Misc.try_finally
+          ~exceptionally:(fun () -> Misc.remove_file cmjo)
+          (fun () ->
+            Profile.record_call "js_of_ocaml" (fun () ->
+                run_js_of_ocaml "compile" ~phase:Compile ~input_left_in:cmj
+                  (debuginfo_args () @ ["-o"; cmjo; cmj]));
+            remove_cmj ())
 
     let create_archive archive_name objfiles =
       let linkall = if !Clflags.link_everything then ["--linkall"] else [] in
@@ -172,11 +164,12 @@ let make
     let link _linkenv (objfiles : Linkenv.objfile_to_link list) output_name
         ~cached_genfns_imports:_ ~genfns:_ ~units_tolink:_ ~uses_eval:_
         ~quoted_cmi:_ ~quoted_cmx:_ ~ppf_dump:_ =
-      (* Several libraries may record the same stub file; js_of_ocaml accepts
-         duplicates but there is no point in passing them. The first occurrence
-         is kept. *)
+      (* As with C stubs, stub names are passed on exactly as they were recorded
+         in the [.cmjxa] files or given on the command line. Several libraries
+         may record the same stub file; js_of_ocaml accepts duplicates but there
+         is no point in passing them. The first occurrence is kept. *)
       let stubs =
-        List.rev_map find_stub !Clflags.ccobjs
+        List.rev !Clflags.ccobjs
         |> List.fold_left
              (fun (seen, acc) stub ->
                if Misc.Stdlib.String.Set.mem stub seen

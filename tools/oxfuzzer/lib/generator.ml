@@ -19,7 +19,9 @@ module State = struct
       names : Fresh.t;
       function_names : Fresh.t;
       mutable top_level_functions : Function.t list;
-      mutable record_types : Ty.record list
+      mutable record_types : Ty.record list;
+      mutable variant_types : Ty.variant list;
+      mutable matches_remaining : int
     }
 
   let create random_state =
@@ -30,7 +32,9 @@ module State = struct
       names = Fresh.create ~prefix:"x";
       function_names = Fresh.create ~prefix:"f";
       top_level_functions = [];
-      record_types = []
+      record_types = [];
+      variant_types = [];
+      matches_remaining = Config.max_match_count
     }
 
   let fresh t = Fresh.next t.names
@@ -229,13 +233,44 @@ let gen_record_types (st : State.t) =
   in
   gen 0 []
 
-(* CR-soon hwasilewski: Add boolean variable generation. *)
-let gen_type (st : State.t) =
+let gen_non_variant_type (st : State.t) =
   if
     (not (List.is_empty st.record_types))
     && with_probability st ~probability:Config.record_probability
   then Ty.Record (random_element st st.record_types)
   else gen_scalar_or_array_type st
+
+let gen_constructor_type (st : State.t) constructor_index =
+  let args =
+    List.init (random_int_in_range st ~min:0 ~max:Config.max_constructor_args)
+      (fun _ -> gen_non_variant_type st)
+  in
+  { Ty.constructor_index; args }
+
+let gen_variant_type (st : State.t) variant_id =
+  let constructors =
+    List.init
+      (random_int_in_range st ~min:1 ~max:Config.max_variant_constructors)
+      (gen_constructor_type st)
+  in
+  { Ty.variant_id; constructors }
+
+(* CR xclerc for xclerc: randomly add [@@unboxed] if legal. *)
+let gen_variant_types (st : State.t) =
+  if not st.swarm.variants
+  then []
+  else
+    List.init
+      (random_int_in_range st ~min:1 ~max:Config.max_variant_types)
+      (gen_variant_type st)
+
+(* CR-soon hwasilewski: Add boolean variable generation. *)
+let gen_type (st : State.t) =
+  if
+    (not (List.is_empty st.variant_types))
+    && with_probability st ~probability:Config.variant_probability
+  then Ty.Variant (random_element st st.variant_types)
+  else gen_non_variant_type st
 
 let can_convert (st : State.t) from to_ =
   match from, to_ with
@@ -307,7 +342,7 @@ let places (st : State.t) (env : Env.t) ~for_write =
               fun () ->
                 Place.Element (make (), gen_array_indices st env dimensions) )
           ]
-      | Ty.Number _ | Ty.Bool -> []
+      | Ty.Number _ | Ty.Bool | Ty.Variant _ -> []
     in
     here @ children
   in
@@ -507,7 +542,10 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env (Ty.Number nty)])
+       [ 5, leaf;
+         3, gen_binop nty;
+         1, gen_fun_call st env (Ty.Number nty);
+         1, gen_match st env (Ty.Number nty) ])
 
 (* CR-someday hwasilewski: These function calls can have side effects, because
    of mutable records. Currently we rely on a de facto right-to-left evaluation
@@ -611,7 +649,8 @@ and gen_bool (st : State.t) env =
        [ 5, gen_binop comparison (Ty.Number nty) gen_number_arg;
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
-         1, gen_bool_binop Bin_op.Or ])
+         1, gen_bool_binop Bin_op.Or;
+         1, gen_match st env Ty.Bool ])
 
 and gen_value (st : State.t) env ty =
   match ty with
@@ -622,7 +661,8 @@ and gen_value (st : State.t) env ty =
       (Gen.weighted st.random_state
          [ 3, gen_existing st env ty;
            2, Gen.create (fun () -> gen_array st env nty dimensions);
-           1, gen_fun_call st env ty ])
+           1, gen_fun_call st env ty;
+           1, gen_match st env ty ])
   | Ty.Record record ->
     let existing = gen_existing st env ty in
     let construct =
@@ -641,7 +681,88 @@ and gen_value (st : State.t) env ty =
     in
     Gen.run_exn
       (Gen.weighted st.random_state
-         [3, existing; 2, construct; 1, update; 1, gen_fun_call st env ty])
+         [ 3, existing;
+           2, construct;
+           1, update;
+           1, gen_fun_call st env ty;
+           1, gen_match st env ty ])
+  | Ty.Variant variant ->
+    Gen.run_exn
+      (Gen.weighted st.random_state
+         [ 5, Gen.create (fun () -> gen_variant st env variant);
+           1, gen_match st env ty ])
+
+and gen_constructor st env variant (constructor : Ty.constructor) =
+  let args =
+    List.map
+      (fun ty ->
+        let name = State.fresh st in
+        name, gen_value st env ty)
+      constructor.args
+  in
+  Expr.Construct { variant; constructor; args }
+
+and gen_variant (st : State.t) env (variant : Ty.variant) =
+  let ty = Ty.Variant variant in
+  Gen.run_exn
+    (Gen.weighted st.random_state
+       [ 3, gen_existing st env ty;
+         ( 2,
+           Gen.create (fun () ->
+               gen_constructor st env variant
+                 (random_element st variant.constructors)) );
+         1, gen_fun_call st env ty ])
+
+and gen_match_expr st env (variant : Ty.variant) scrutinee ~branch =
+  let cases =
+    List.map
+      (fun (constructor : Ty.constructor) ->
+        let bindings =
+          List.map
+            (fun ty ->
+              { Binding.name = State.fresh st; ty; is_mutable = false })
+            constructor.args
+        in
+        let branch_env = List.fold_left Env.extend env bindings in
+        { Expr.constructor; bindings; body = branch branch_env constructor })
+      variant.constructors
+  in
+  Expr.Match { variant; scrutinee; cases }
+
+and gen_match (st : State.t) env result_ty =
+  Gen.when_
+    (st.swarm.matches && st.matches_remaining > 0
+    && not (List.is_empty st.variant_types))
+    (fun () ->
+      (* A global budget bounds the extra branching added to expression
+         generation. *)
+      st.matches_remaining <- st.matches_remaining - 1;
+      let variant = random_element st st.variant_types in
+      let nested =
+        st.matches_remaining > 0
+        && with_probability st ~probability:Config.match_in_match_probability
+      in
+      let scrutinee =
+        if nested
+        then (
+          st.matches_remaining <- st.matches_remaining - 1;
+          let input_variant = random_element st st.variant_types in
+          let count = List.length variant.constructors in
+          let offset = Random.State.int st.random_state count in
+          let input = Expr.Opaque (gen_variant st env input_variant) in
+          (* Hide the input tag, but preserve the produced tags so that the
+             outer match can be specialized at the producer's branch exits. *)
+          gen_match_expr st env input_variant input
+            ~branch:(fun env (input_constructor : Ty.constructor) ->
+              let constructor =
+                List.nth variant.constructors
+                  ((input_constructor.constructor_index + offset) mod count)
+              in
+              gen_constructor st env variant constructor))
+        else Expr.Opaque (gen_variant st env variant)
+      in
+      gen_match_expr st env variant scrutinee ~branch:(fun env _ ->
+          gen_value st env result_ty))
 
 and gen_decl (st : State.t) env =
   let binding =
@@ -763,10 +884,12 @@ let gen_program (st : State.t) env =
   let env, toplevel_decls = gen_vars env Config.toplevel_var_count in
   let _env, toplevel_statement = gen_fun_body st env 0 in
   Program.create ~swarm:st.swarm ~record_types:st.record_types
+    ~variant_types:st.variant_types
     ~functions:(List.rev st.top_level_functions)
     ~toplevel_decls ~toplevel_statement
 
 let generate random =
   let state = State.create random in
   state.record_types <- gen_record_types state;
+  state.variant_types <- gen_variant_types state;
   gen_program state Env.empty
