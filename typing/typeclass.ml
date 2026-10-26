@@ -2151,10 +2151,12 @@ let check_coercions env { id; id_loc; clty; ty_id; cltydef; obj_id; obj_abbr;
             cl_ty, obj_ty
         | _ -> assert false
       in
-      begin try Ctype.subtype env cl_ty obj_ty ()
-      with Ctype.Subtype err ->
-        Typecore.Error.log_and_raise loc env (Typecore.Not_subtype err)
-      end;
+      (* A monitor frame, so that it also reports delayed mode crossings. *)
+      Typecore.Error.monitor loc env
+        (fun () -> Ctype.subtype env cl_ty obj_ty ())
+        ~with_:(function
+          | Ctype.Subtype err -> Some (Typecore.Not_subtype err)
+          | _ -> None);
       if not (Ctype.opened_object cl_ty) then
         Error.log_and_raise loc env (Cannot_coerce_self obj_ty)
   end;
