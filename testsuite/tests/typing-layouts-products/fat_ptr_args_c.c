@@ -60,3 +60,15 @@ value test_ptr_id_bytecode(value pair)
 {
   return caml_copy_nativeint((intnat)decode_fat_pointer(pair));
 }
+
+intnat test_sum_seconds_native(value *p, value *q)
+{
+  return Long_val(*p) + Long_val(*q);
+}
+
+value test_sum_seconds_bytecode(value fp1, value fp2)
+{
+  value *p = (value *)decode_fat_pointer(fp1);
+  value *q = (value *)decode_fat_pointer(fp2);
+  return Val_long(Long_val(*p) + Long_val(*q));
+}

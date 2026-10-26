@@ -6,3 +6,4 @@ cmp-lt: -1
 cmp-gt: 1
 cmp-self: -1
 ptr-id: true
+gc-fresh-args: 0 bad
