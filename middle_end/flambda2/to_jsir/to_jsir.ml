@@ -369,6 +369,8 @@ and apply_expr ~env ~res e =
     | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
+      (* A continuation is the block [{ stack; last_fiber }], but JSOO's effect
+         primitives take the two parts separately. *)
       let use_continuation ~res cont =
         let open Jsir in
         let cont, res = To_jsir_shared.simple ~env ~res cont in
