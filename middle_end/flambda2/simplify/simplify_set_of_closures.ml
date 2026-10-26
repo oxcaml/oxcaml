@@ -379,6 +379,7 @@ type simplify_function_result =
 
 let simplify_function0 context ~outer_dacc function_slot_opt code_id code
     ~closure_bound_names_inside_function =
+  let original_outer_dacc = outer_dacc in
   let denv_prior_to_sets = C.dacc_prior_to_sets context |> DA.denv in
   let inlining_arguments_from_denv =
     denv_prior_to_sets |> DE.inlining_arguments
@@ -535,7 +536,38 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       assert (Are_rebuilding_terms.do_rebuild_terms are_rebuilding);
       Rebuilding new_code
   in
-  { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
+  let old_code_was_simplified =
+    (* Simplifying records some crucial information so we can't really use an
+       unsimplified version *)
+    not (Code_id.Set.mem old_code_id (DA.code_ids_never_simplified outer_dacc))
+  in
+  let zero_improvements =
+    let removed_ops = Cost_metrics.removed cost_metrics in
+    Removed_operations.(equal zero removed_ops)
+  in
+  if
+    old_code_was_simplified && (not should_resimplify)
+    && C.single_set_of_size_one context
+    && zero_improvements
+  then
+    (* If there are no improvements to the specialisation, we keep the old
+       version.
+
+       We can't do that if the function was never specialised at least once. *)
+    (* If there is any potential use of the new code id (here the variable [code_id])
+       it must be defined. Keeping the old version would prevent that.
+       Those uses could exist in functions from the same set of closures being
+       simplified with the same context. So this is valid only whene there are no such functions.
+    *)
+    (* CR pchambart: we should lift that restriction to single set of size one,
+       maybe by creating let aliases of symbols, that are currently not possible *)
+    { code_id = old_code_id;
+      code = None;
+      outer_dacc = original_outer_dacc;
+      should_resimplify
+    }
+  else
+    { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
 
 let introduce_code dacc code_id code_const =
   let code = LC.create_code code_id code_const in
@@ -845,6 +877,10 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
   let closure_bound_names =
     Function_slot.Map.map Bound_name.create_var closure_bound_vars
   in
+  let function_declarations_in_order =
+    Function_declarations.funs_in_order
+      (Set_of_closures.function_decls set_of_closures)
+  in
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures:
@@ -897,8 +933,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
                       Code_metadata.function_slot_size code_metadata;
                     dbg = Code_metadata.dbg code_metadata
                   })
-            (Function_declarations.funs_in_order
-               (Set_of_closures.function_decls set_of_closures))
+            function_declarations_in_order
         in
         Set_of_closures.create ~value_slots
           (Function_declarations.create function_decls)

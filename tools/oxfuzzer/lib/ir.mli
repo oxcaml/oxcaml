@@ -73,6 +73,7 @@ module Ty : sig
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
     | Record of record
+    | Variant of variant
     | Bool
 
   and record =
@@ -87,7 +88,24 @@ module Ty : sig
       is_mutable : bool
     }
 
+  and variant =
+    { variant_id : int;
+      constructors : constructor list
+    }
+
+  and constructor =
+    { constructor_index : int;
+      args : t list
+    }
+
   val equal : t -> t -> bool
+
+  val variant_name : variant -> string
+
+  val constructor_name : variant -> constructor -> string
+
+  val constructor_pattern :
+    variant -> constructor -> Name.t list -> Parsetree.pattern
 
   val record_name : record -> string
 
@@ -151,6 +169,16 @@ module Expr : sig
           source_name : Name.t;
           expr : t
         }
+    | Construct of
+        { variant : Ty.variant;
+          constructor : Ty.constructor;
+          args : (Name.t * t) list
+        }
+    | Match of
+        { variant : Ty.variant;
+          scrutinee : t;
+          cases : case list
+        }
     | Opaque of t
     | Bin_op of
         { ty : Ty.t;
@@ -167,6 +195,12 @@ module Expr : sig
         { fun_name : Name.t;
           args : t list
         }
+
+  and case =
+    { constructor : Ty.constructor;
+      bindings : Binding.t list;
+      body : t
+    }
 
   and place =
     | Variable of Name.t

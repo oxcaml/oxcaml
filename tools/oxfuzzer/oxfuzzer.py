@@ -51,11 +51,11 @@ class Toolchain:
 
     @property
     def ocamllib(self) -> Path:
-        return self.build_root / "runtime_stdlib_install/lib/ocaml_runtime_stdlib"
+        return self.build_root / "default/stdlib/build"
 
     @property
     def ocamlrun(self) -> Path:
-        return self.build_root / "runtime_stdlib_install/bin/ocamlrun"
+        return self.build_root / "default/runtime/ocamlrun"
 
     @property
     def otherlibs(self) -> Path:
