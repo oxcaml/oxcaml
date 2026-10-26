@@ -1097,8 +1097,9 @@ and constructor_arguments =
 
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
-(** The kind operator an unboxed record applies to the kind of a field: a
-    field is made addressable unless it is [inherit]. *)
+(** The kind operator an unboxed record, or a record declared [@@unboxed],
+    applies to the kind of a field: a field is made addressable unless it is
+    [inherit]. *)
 val unboxed_record_field_operator :
   label_declaration -> Jkind_types.Kind_operator.t
 
