@@ -62,3 +62,5 @@ val function_decl_type :
   Function_type.t Or_unknown.t
 
 val stub_can_be_simplified : DE.t -> bool
+
+val single_set_of_size_one : t -> bool

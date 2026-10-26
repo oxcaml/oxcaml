@@ -158,6 +158,7 @@ module Ty = struct
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
     | Record of record
+    | Variant of variant
     | Bool
 
   and record =
@@ -172,14 +173,46 @@ module Ty = struct
       is_mutable : bool
     }
 
+  and variant =
+    { variant_id : int;
+      constructors : constructor list
+    }
+
+  and constructor =
+    { constructor_index : int;
+      args : t list
+    }
+
   let equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
     | Array (l, ls), Array (r, rs) ->
       NumberTy.equal l r && List.equal Int.equal ls rs
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
+    | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
     | Bool, Bool -> true
-    | (Number _ | Array _ | Record _ | Bool), _ -> false
+    | (Number _ | Array _ | Record _ | Variant _ | Bool), _ -> false
+
+  let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
+
+  let constructor_name variant constructor =
+    Format.sprintf "Variant_%d_C%d" variant.variant_id
+      constructor.constructor_index
+
+  let constructor_pattern variant constructor names =
+    if List.length names <> List.length constructor.args
+    then Misc.fatal_errorf "Constructor pattern: incorrect number of arguments";
+    let patterns =
+      List.map (fun name -> Pat.var (loc (Name.to_string name))) names
+    in
+    let arg =
+      match patterns with
+      | [] -> None
+      | [pattern] -> Some ([], pattern)
+      | patterns ->
+        Some ([], Pat.tuple (List.map (fun p -> None, p) patterns) Closed)
+    in
+    Pat.construct (lid (constructor_name variant constructor)) arg
 
   let record_name { id; unboxed; _ } =
     Format.sprintf "record_%d_%s" id (if unboxed then "u" else "b")
@@ -194,6 +227,7 @@ module Ty = struct
         (fun ty _ -> Typ.constr (lid "array") [ty])
         (NumberTy.to_code nty) dimensions
     | Record record -> Typ.constr (lid (record_name record)) []
+    | Variant variant -> Typ.constr (lid (variant_name variant)) []
     | Bool -> Typ.constr (lid "bool") []
 end
 
@@ -237,7 +271,7 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Record _ ->
+    | Bool | Array _ | Record _ | Variant _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -245,7 +279,7 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ | Ty.Record _ ->
+      | Ty.Array _ | Ty.Record _ | Ty.Variant _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -290,6 +324,16 @@ module Expr = struct
           source_name : Name.t;
           expr : t
         }
+    | Construct of
+        { variant : Ty.variant;
+          constructor : Ty.constructor;
+          args : (Name.t * t) list
+        }
+    | Match of
+        { variant : Ty.variant;
+          scrutinee : t;
+          cases : case list
+        }
     | Opaque of t
     | Bin_op of
         { ty : Ty.t;
@@ -307,6 +351,12 @@ module Expr = struct
           args : t list
         }
 
+  and case =
+    { constructor : Ty.constructor;
+      bindings : Binding.t list;
+      body : t
+    }
+
   and place =
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
@@ -323,6 +373,11 @@ module Expr = struct
       [Vb.mk (Pat.var (loc name)) expr]
       (body (ident name))
 
+  (* CR-soon xclerc for xclerc: the constraint always sends the expression
+     through the type checker's expected-type path. Consider sometimes omitting
+     it, e.g. under a swarm flag, so that plain inference is exercised too;
+     generated constructor and field names are unique, so disambiguation does
+     not require it. *)
   let constrain ty expr = Exp.constraint_ expr (Some (Ty.to_code ty)) []
 
   let field_code (record : Ty.record) field receiver =
@@ -377,6 +432,40 @@ module Expr = struct
               from.fields
           in
           record_code target fields None)
+    | Construct { variant; constructor; args } ->
+      if List.length args <> List.length constructor.args
+      then Misc.fatal_errorf "Constructor: incorrect number of arguments";
+      let values =
+        List.map (fun (name, _) -> ident (Name.to_string name)) args
+      in
+      let arg =
+        match values with
+        | [] -> None
+        | [value] -> Some value
+        | values ->
+          Some (Exp.tuple (List.map (fun value -> None, value) values))
+      in
+      let body =
+        Exp.construct (lid (Ty.constructor_name variant constructor)) arg
+      in
+      (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
+      (* Payload expressions can have effects: explicitly sequence their
+         evaluation. *)
+      List.fold_right
+        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
+        args body
+    | Match { variant; scrutinee; cases } ->
+      Exp.match_
+        (constrain (Ty.Variant variant) (to_code scrutinee))
+        (List.map
+           (fun { constructor; bindings; body } ->
+             let names =
+               List.map (fun (binding : Binding.t) -> binding.name) bindings
+             in
+             Exp.case
+               (Ty.constructor_pattern variant constructor names)
+               (to_code body))
+           cases)
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->

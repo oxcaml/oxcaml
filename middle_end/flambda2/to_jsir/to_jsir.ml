@@ -372,6 +372,8 @@ and apply_expr ~env ~res e =
     | None, Effect effect_ ->
       if List.length args <> 0
       then Misc.fatal_error "Found non-empty argument list for effects";
+      (* A continuation is the block [{ stack; last_fiber }], but JSOO's effect
+         primitives take the two parts separately. *)
       let use_continuation ~res cont =
         let open Jsir in
         let cont, res = To_jsir_shared.simple ~env ~res cont in
@@ -514,10 +516,10 @@ and apply_cont0 ~env ~res apply_cont =
     To_jsir_shared.simples ~env ~res (Apply_cont.args apply_cont)
   in
   let continuation = Apply_cont.continuation apply_cont in
-  (* The return continuation of a function does not always have sort [Return]:
-     for example, [Closure_conversion.make_unboxed_function_wrapper] creates it
-     with [Continuation.create ()] and jumps to it with an [Apply_cont] after
-     boxing the result. *)
+  (* Continuations might not always have the correct sort, as Flambda doesn't
+     use it very much. Checking against the environment should be much more
+     robust, and guards us against Flambda bugs. (It's also what [To_cmm]
+     does.) *)
   let is_return_continuation =
     Continuation.equal continuation (To_jsir_env.return_continuation env)
   in
