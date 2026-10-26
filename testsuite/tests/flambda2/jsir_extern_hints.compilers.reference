@@ -12,1138 +12,1561 @@ Entry point: 0
   v9 = CONST{"jsir_extern_hints.ml"}
   v10 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__immstring_3"j, v9) 
   v12 = CONST{2}
-  v13 = CONST{71}
+  v13 = CONST{89}
   v11 = imm{tag=0; 0 = v9; 1 = v13; 2 = v12}
   v14 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_4"j, v11) 
   v16 = "caml_js_get"(v6, "predef:Assert_failure"j)
   v15 = imm{tag=0; 0 = v16; 1 = v11}
   v17 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_5"j, v15) 
   v19 = CONST{2}
-  v20 = CONST{72}
+  v20 = CONST{90}
   v18 = imm{tag=0; 0 = v9; 1 = v20; 2 = v19}
   v21 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_6"j, v18) 
   v23 = "caml_js_get"(v6, "predef:Assert_failure"j)
   v22 = imm{tag=0; 0 = v23; 1 = v18}
   v24 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_7"j, v22) 
   v26 = CONST{2}
-  v27 = CONST{73}
+  v27 = CONST{91}
   v25 = imm{tag=0; 0 = v9; 1 = v27; 2 = v26}
   v28 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_8"j, v25) 
   v30 = "caml_js_get"(v6, "predef:Assert_failure"j)
   v29 = imm{tag=0; 0 = v30; 1 = v25}
   v31 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_9"j, v29) 
   v33 = CONST{2}
-  v34 = CONST{74}
+  v34 = CONST{92}
   v32 = imm{tag=0; 0 = v9; 1 = v34; 2 = v33}
   v35 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_11"j, v32) 
   v37 = "caml_js_get"(v6, "predef:Assert_failure"j)
   v36 = imm{tag=0; 0 = v37; 1 = v32}
   v38 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_12"j, v36) 
   v40 = CONST{2}
-  v41 = CONST{75}
+  v41 = CONST{93}
   v39 = imm{tag=0; 0 = v9; 1 = v41; 2 = v40}
   v42 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_14"j, v39) 
   v44 = "caml_js_get"(v6, "predef:Assert_failure"j)
   v43 = imm{tag=0; 0 = v44; 1 = v39}
   v45 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_15"j, v43) 
-  v47 = CONST{2}
-  v48 = CONST{80}
-  v46 = imm{tag=0; 0 = v9; 1 = v48; 2 = v47}
-  v49 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_16"j, v46) 
-  v51 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v50 = imm{tag=0; 0 = v51; 1 = v46}
-  v52 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_17"j, v50) 
-  v54 = CONST{2}
-  v55 = CONST{82}
-  v53 = imm{tag=0; 0 = v9; 1 = v55; 2 = v54}
-  v56 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_18"j, v53) 
-  v58 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v57 = imm{tag=0; 0 = v58; 1 = v53}
-  v59 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_19"j, v57) 
-  v61 = CONST{2}
-  v62 = CONST{83}
-  v60 = imm{tag=0; 0 = v9; 1 = v62; 2 = v61}
-  v63 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_20"j, v60) 
-  v65 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v64 = imm{tag=0; 0 = v65; 1 = v60}
-  v66 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_21"j, v64) 
-  v68 = CONST{2}
-  v69 = CONST{85}
-  v67 = imm{tag=0; 0 = v9; 1 = v69; 2 = v68}
-  v70 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_23"j, v67) 
-  v72 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v71 = imm{tag=0; 0 = v72; 1 = v67}
-  v73 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_24"j, v71) 
-  v75 = CONST{2}
-  v76 = CONST{87}
-  v74 = imm{tag=0; 0 = v9; 1 = v76; 2 = v75}
-  v77 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_26"j, v74) 
-  v79 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v78 = imm{tag=0; 0 = v79; 1 = v74}
-  v80 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_27"j, v78) 
-  v82 = CONST{2}
-  v83 = CONST{93}
-  v81 = imm{tag=0; 0 = v9; 1 = v83; 2 = v82}
-  v84 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_28"j, v81) 
-  v86 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v85 = imm{tag=0; 0 = v86; 1 = v81}
-  v87 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_29"j, v85) 
-  v89 = CONST{2}
-  v90 = CONST{95}
-  v88 = imm{tag=0; 0 = v9; 1 = v90; 2 = v89}
-  v91 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_30"j, v88) 
-  v93 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v92 = imm{tag=0; 0 = v93; 1 = v88}
-  v94 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_31"j, v92) 
-  v96 = CONST{2}
-  v97 = CONST{96}
-  v95 = imm{tag=0; 0 = v9; 1 = v97; 2 = v96}
-  v98 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_32"j, v95) 
-  v100 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v99 = imm{tag=0; 0 = v100; 1 = v95}
-  v101 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_33"j, v99) 
-  v103 = CONST{2}
-  v104 = CONST{98}
-  v102 = imm{tag=0; 0 = v9; 1 = v104; 2 = v103}
-  v105 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_34"j, v102) 
-  v107 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v106 = imm{tag=0; 0 = v107; 1 = v102}
-  v108 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_35"j, v106) 
-  v110 = CONST{2}
-  v111 = CONST{100}
-  v109 = imm{tag=0; 0 = v9; 1 = v111; 2 = v110}
-  v112 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_36"j, v109) 
-  v114 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v113 = imm{tag=0; 0 = v114; 1 = v109}
-  v115 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_37"j, v113) 
-  v117 = CONST{2}
-  v118 = CONST{106}
-  v116 = imm{tag=0; 0 = v9; 1 = v118; 2 = v117}
-  v119 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_39"j, v116) 
-  v121 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v120 = imm{tag=0; 0 = v121; 1 = v116}
-  v122 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_40"j, v120) 
-  v123 = CONST{5L}
-  v124 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__int64_41"j, v123) 
-  v125 = CONST{7L}
-  v126 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__int64_42"j, v125) 
-  v128 = CONST{2}
-  v129 = CONST{111}
-  v127 = imm{tag=0; 0 = v9; 1 = v129; 2 = v128}
-  v130 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_43"j, v127) 
-  v132 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v131 = imm{tag=0; 0 = v132; 1 = v127}
-  v133 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_44"j, v131) 
-  v135 = CONST{2}
-  v136 = CONST{112}
-  v134 = imm{tag=0; 0 = v9; 1 = v136; 2 = v135}
-  v137 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_45"j, v134) 
-  v139 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v138 = imm{tag=0; 0 = v139; 1 = v134}
-  v140 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_46"j, v138) 
-  v141 = CONST{16}
-  v142 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__float_47"j, v141) 
-  v144 = CONST{2}
-  v145 = CONST{115}
-  v143 = imm{tag=0; 0 = v9; 1 = v145; 2 = v144}
-  v146 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_49"j, v143) 
-  v148 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v147 = imm{tag=0; 0 = v148; 1 = v143}
-  v149 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_50"j, v147) 
-  v150 = CONST{3.7}
-  v151 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__float_51"j, v150) 
-  v153 = CONST{2}
-  v154 = CONST{116}
-  v152 = imm{tag=0; 0 = v9; 1 = v154; 2 = v153}
-  v155 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_53"j, v152) 
-  v157 = "caml_js_get"(v6, "predef:Assert_failure"j)
-  v156 = imm{tag=0; 0 = v157; 1 = v152}
-  v158 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_54"j, v156) 
-  v160 = fun(v159){1 ()} [hint:(value)->value never_inline]
-  (assign) v201 = v160
-  v202 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__string_loads_55"j, v201) 
-  v204 = fun(v203){22 ()} [hint:(value)->value never_inline]
-  (assign) v264 = v204
-  v265 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__bytes_accesses_56"j, v264) 
-  v267 = fun(v266){52 ()} [hint:(value)->value never_inline]
-  (assign) v367 = v267
-  v368 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__bigstring_accesses_57"j, v367) 
-  v370 = fun(v369){82 ()} [hint:(value)->value never_inline]
-  (assign) v385 = v370
-  v386 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__bigarray_accesses_58"j, v385) 
-  v388 = fun(v387){90 ()} [hint:(value)->value never_inline]
-  (assign) v392 = v388
-  v393 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__int64_comparisons_59"j, v392) 
-  v395 = fun(v394){95 ()} [hint:(value)->value never_inline]
-  (assign) v403 = v395
-  v404 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__unboxed_externals_60"j, v403) 
-  v406 = CONST{0}
-  v407 = v201(v406)
-  branch 104 (v407)
+  v46 = CONST{"\000\000\128?"}
+  v47 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__immstring_16"j, v46) 
+  v49 = CONST{2}
+  v50 = CONST{96}
+  v48 = imm{tag=0; 0 = v9; 1 = v50; 2 = v49}
+  v51 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_18"j, v48) 
+  v53 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v52 = imm{tag=0; 0 = v53; 1 = v48}
+  v54 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_19"j, v52) 
+  v56 = CONST{2}
+  v57 = CONST{101}
+  v55 = imm{tag=0; 0 = v9; 1 = v57; 2 = v56}
+  v58 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_20"j, v55) 
+  v60 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v59 = imm{tag=0; 0 = v60; 1 = v55}
+  v61 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_21"j, v59) 
+  v63 = CONST{2}
+  v64 = CONST{103}
+  v62 = imm{tag=0; 0 = v9; 1 = v64; 2 = v63}
+  v65 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_22"j, v62) 
+  v67 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v66 = imm{tag=0; 0 = v67; 1 = v62}
+  v68 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_23"j, v66) 
+  v70 = CONST{2}
+  v71 = CONST{104}
+  v69 = imm{tag=0; 0 = v9; 1 = v71; 2 = v70}
+  v72 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_24"j, v69) 
+  v74 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v73 = imm{tag=0; 0 = v74; 1 = v69}
+  v75 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_25"j, v73) 
+  v77 = CONST{2}
+  v78 = CONST{106}
+  v76 = imm{tag=0; 0 = v9; 1 = v78; 2 = v77}
+  v79 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_27"j, v76) 
+  v81 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v80 = imm{tag=0; 0 = v81; 1 = v76}
+  v82 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_28"j, v80) 
+  v84 = CONST{2}
+  v85 = CONST{108}
+  v83 = imm{tag=0; 0 = v9; 1 = v85; 2 = v84}
+  v86 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_31"j, v83) 
+  v88 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v87 = imm{tag=0; 0 = v88; 1 = v83}
+  v89 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_32"j, v87) 
+  v91 = CONST{2}
+  v92 = CONST{110}
+  v90 = imm{tag=0; 0 = v9; 1 = v92; 2 = v91}
+  v93 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_34"j, v90) 
+  v95 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v94 = imm{tag=0; 0 = v95; 1 = v90}
+  v96 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_35"j, v94) 
+  v98 = CONST{2}
+  v99 = CONST{116}
+  v97 = imm{tag=0; 0 = v9; 1 = v99; 2 = v98}
+  v100 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_36"j, v97) 
+  v102 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v101 = imm{tag=0; 0 = v102; 1 = v97}
+  v103 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_37"j, v101) 
+  v105 = CONST{2}
+  v106 = CONST{118}
+  v104 = imm{tag=0; 0 = v9; 1 = v106; 2 = v105}
+  v107 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_38"j, v104) 
+  v109 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v108 = imm{tag=0; 0 = v109; 1 = v104}
+  v110 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_39"j, v108) 
+  v112 = CONST{2}
+  v113 = CONST{119}
+  v111 = imm{tag=0; 0 = v9; 1 = v113; 2 = v112}
+  v114 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_40"j, v111) 
+  v116 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v115 = imm{tag=0; 0 = v116; 1 = v111}
+  v117 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_41"j, v115) 
+  v119 = CONST{2}
+  v120 = CONST{121}
+  v118 = imm{tag=0; 0 = v9; 1 = v120; 2 = v119}
+  v121 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_42"j, v118) 
+  v123 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v122 = imm{tag=0; 0 = v123; 1 = v118}
+  v124 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_43"j, v122) 
+  v126 = CONST{2}
+  v127 = CONST{123}
+  v125 = imm{tag=0; 0 = v9; 1 = v127; 2 = v126}
+  v128 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_44"j, v125) 
+  v130 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v129 = imm{tag=0; 0 = v130; 1 = v125}
+  v131 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_45"j, v129) 
+  v133 = CONST{2}
+  v134 = CONST{125}
+  v132 = imm{tag=0; 0 = v9; 1 = v134; 2 = v133}
+  v135 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_46"j, v132) 
+  v137 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v136 = imm{tag=0; 0 = v137; 1 = v132}
+  v138 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_47"j, v136) 
+  v140 = CONST{2}
+  v141 = CONST{131}
+  v139 = imm{tag=0; 0 = v9; 1 = v141; 2 = v140}
+  v142 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_49"j, v139) 
+  v144 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v143 = imm{tag=0; 0 = v144; 1 = v139}
+  v145 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_50"j, v143) 
+  v147 = CONST{2}
+  v148 = CONST{135}
+  v146 = imm{tag=0; 0 = v9; 1 = v148; 2 = v147}
+  v149 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_52"j, v146) 
+  v151 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v150 = imm{tag=0; 0 = v151; 1 = v146}
+  v152 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_53"j, v150) 
+  v153 = CONST{5L}
+  v154 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__int64_54"j, v153) 
+  v155 = CONST{7L}
+  v156 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__int64_55"j, v155) 
+  v158 = CONST{2}
+  v159 = CONST{140}
+  v157 = imm{tag=0; 0 = v9; 1 = v159; 2 = v158}
+  v160 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_56"j, v157) 
+  v162 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v161 = imm{tag=0; 0 = v162; 1 = v157}
+  v163 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_57"j, v161) 
+  v165 = CONST{2}
+  v166 = CONST{141}
+  v164 = imm{tag=0; 0 = v9; 1 = v166; 2 = v165}
+  v167 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_58"j, v164) 
+  v169 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v168 = imm{tag=0; 0 = v169; 1 = v164}
+  v170 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_59"j, v168) 
+  v172 = CONST{2}
+  v173 = CONST{142}
+  v171 = imm{tag=0; 0 = v9; 1 = v173; 2 = v172}
+  v174 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_60"j, v171) 
+  v176 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v175 = imm{tag=0; 0 = v176; 1 = v171}
+  v177 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_61"j, v175) 
+  v179 = CONST{2}
+  v180 = CONST{143}
+  v178 = imm{tag=0; 0 = v9; 1 = v180; 2 = v179}
+  v181 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_62"j, v178) 
+  v183 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v182 = imm{tag=0; 0 = v183; 1 = v178}
+  v184 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_63"j, v182) 
+  v186 = CONST{2}
+  v187 = CONST{144}
+  v185 = imm{tag=0; 0 = v9; 1 = v187; 2 = v186}
+  v188 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_64"j, v185) 
+  v190 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v189 = imm{tag=0; 0 = v190; 1 = v185}
+  v191 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_65"j, v189) 
+  v193 = CONST{2}
+  v194 = CONST{145}
+  v192 = imm{tag=0; 0 = v9; 1 = v194; 2 = v193}
+  v195 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_66"j, v192) 
+  v197 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v196 = imm{tag=0; 0 = v197; 1 = v192}
+  v198 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_67"j, v196) 
+  v200 = CONST{2}
+  v201 = CONST{152}
+  v199 = imm{tag=0; 0 = v9; 1 = v201; 2 = v200}
+  v202 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_69"j, v199) 
+  v204 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v203 = imm{tag=0; 0 = v204; 1 = v199}
+  v205 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_70"j, v203) 
+  v207 = CONST{2}
+  v208 = CONST{153}
+  v206 = imm{tag=0; 0 = v9; 1 = v208; 2 = v207}
+  v209 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_71"j, v206) 
+  v211 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v210 = imm{tag=0; 0 = v211; 1 = v206}
+  v212 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_72"j, v210) 
+  v214 = CONST{2}
+  v215 = CONST{154}
+  v213 = imm{tag=0; 0 = v9; 1 = v215; 2 = v214}
+  v216 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_73"j, v213) 
+  v218 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v217 = imm{tag=0; 0 = v218; 1 = v213}
+  v219 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_74"j, v217) 
+  v220 = CONST{16}
+  v221 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__float_75"j, v220) 
+  v223 = CONST{2}
+  v224 = CONST{157}
+  v222 = imm{tag=0; 0 = v9; 1 = v224; 2 = v223}
+  v225 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_77"j, v222) 
+  v227 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v226 = imm{tag=0; 0 = v227; 1 = v222}
+  v228 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_78"j, v226) 
+  v229 = CONST{3.7}
+  v230 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__float_79"j, v229) 
+  v232 = CONST{2}
+  v233 = CONST{158}
+  v231 = imm{tag=0; 0 = v9; 1 = v233; 2 = v232}
+  v234 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__const_block_81"j, v231) 
+  v236 = "caml_js_get"(v6, "predef:Assert_failure"j)
+  v235 = imm{tag=0; 0 = v236; 1 = v231}
+  v237 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__Pmakeblock_82"j, v235) 
+  v239 = fun(v238){1 ()} [hint:(int)->int never_inline]
+  (assign) v290 = v239
+  v291 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__string_loads_83"j, v290) 
+  v293 = fun(v292){26 ()} [hint:(int)->int never_inline]
+  (assign) v360 = v293
+  v361 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__bytes_accesses_84"j, v360) 
+  v363 = fun(v362){60 ()} [hint:(int)->int never_inline]
+  (assign) v487 = v363
+  v488 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__bigstring_accesses_85"j, v487) 
+  v490 = fun(v489){96 ()} [hint:(int)->int never_inline]
+  (assign) v518 = v490
+  v519 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__bigarray_accesses_86"j, v518) 
+  v521 = fun(v520){111 ()} [hint:(int)->int never_inline]
+  (assign) v529 = v521
+  v530 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__int64_comparisons_87"j, v529) 
+  v532 = fun(v531){124 ()} [hint:(value)->int never_inline]
+  (assign) v534 = v532
+  v535 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__generic_length_88"j, v534) 
+  v537 = fun(v536){125 ()} [hint:(int)->int never_inline]
+  (assign) v553 = v537
+  v554 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__array_lengths_89"j, v553) 
+  v556 = fun(v555){133 ()} [hint:(int)->int never_inline]
+  (assign) v564 = v556
+  v565 = "caml_register_symbol"("Jsir_extern_hints"j, "camlJsir_extern_hints__unboxed_externals_90"j, v564) 
+  v567 = CONST{0}
+  v568 = v290(v567)
+  branch 142 (v568)
 
 ==== 1 () ====
-  event jsir_extern_hints.ml:70:10
-  event jsir_extern_hints.ml:70:59
-  event jsir_extern_hints.ml:71:10
-  v163 = "caml_ml_string_length"(v1) 
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  v164 = "caml_nativeint_of_int"(v163) 
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  v165 = "caml_nativeint_sub"(v164, 1l)
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  v166 = "caml_nativeint_shift_right"(v165, 31)
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  v167 = "caml_nativeint_xor"(v166, -1l)
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  v168 = "caml_nativeint_and"(v167, v165)
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  v169 = 0l <= v168
-  event jsir_extern_hints.ml:71:26
-  if v169 then 4 (v164) else 3 ()
+  event jsir_extern_hints.ml:88:10
+  event jsir_extern_hints.ml:88:59
+  event jsir_extern_hints.ml:89:10
+  v242 = "caml_ml_string_length"(v1) 
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  v243 = "caml_nativeint_of_int"(v242) 
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  v244 = "caml_nativeint_sub"(v243, 1l)
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  v245 = "caml_nativeint_shift_right"(v244, 31)
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  v246 = "caml_nativeint_xor"(v245, -1l)
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  v247 = "caml_nativeint_and"(v246, v244)
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  v248 = 0l <= v247
+  event jsir_extern_hints.ml:89:26
+  if v248 then 4 (v243) else 3 ()
 
-==== 2 (v161) ====
-  event jsir_extern_hints.ml:72:10
-  v172 = 8l <= v161
-  event jsir_extern_hints.ml:72:26
-  if v172 then 8 () else 7 ()
+==== 2 (v240) ====
+  event jsir_extern_hints.ml:90:10
+  v251 = 8l <= v240
+  event jsir_extern_hints.ml:90:26
+  if v251 then 8 () else 7 ()
 
 ==== 3 () ====
   raise v5
 
-==== 4 (v162) ====
-  event jsir_extern_hints.ml:71:10
-  v170 = "caml_string_get16u"(v1, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:10
-  event jsir_extern_hints.ml:71:26
-  event jsir_extern_hints.ml:71:9
-  v171 = v170 === 513
-  event jsir_extern_hints.ml:71:36
-  if v171 then 2 (v162) else 5 ()
+==== 4 (v241) ====
+  event jsir_extern_hints.ml:89:10
+  v249 = "caml_string_get16u"(v1, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:10
+  event jsir_extern_hints.ml:89:26
+  event jsir_extern_hints.ml:89:9
+  v250 = v249 === 513
+  event jsir_extern_hints.ml:89:36
+  if v250 then 2 (v241) else 5 ()
 
 ==== 5 () ====
   raise v15
 
 ==== 6 () ====
-  event jsir_extern_hints.ml:73:10
-  v177 = "caml_nativeint_sub"(v161, 1l)
-  event jsir_extern_hints.ml:73:27
-  event jsir_extern_hints.ml:73:10
-  v178 = "caml_nativeint_shift_right"(v177, 31)
-  event jsir_extern_hints.ml:73:27
-  event jsir_extern_hints.ml:73:10
-  v179 = "caml_nativeint_xor"(v178, -1l)
-  event jsir_extern_hints.ml:73:27
-  event jsir_extern_hints.ml:73:10
-  v180 = "caml_nativeint_and"(v179, v177)
-  event jsir_extern_hints.ml:73:27
-  event jsir_extern_hints.ml:73:10
-  v181 = 8l <= v180
-  event jsir_extern_hints.ml:73:27
-  if v181 then 12 () else 11 ()
+  event jsir_extern_hints.ml:91:10
+  v256 = "caml_nativeint_sub"(v240, 1l)
+  event jsir_extern_hints.ml:91:27
+  event jsir_extern_hints.ml:91:10
+  v257 = "caml_nativeint_shift_right"(v256, 31)
+  event jsir_extern_hints.ml:91:27
+  event jsir_extern_hints.ml:91:10
+  v258 = "caml_nativeint_xor"(v257, -1l)
+  event jsir_extern_hints.ml:91:27
+  event jsir_extern_hints.ml:91:10
+  v259 = "caml_nativeint_and"(v258, v256)
+  event jsir_extern_hints.ml:91:27
+  event jsir_extern_hints.ml:91:10
+  v260 = 8l <= v259
+  event jsir_extern_hints.ml:91:27
+  if v260 then 12 () else 11 ()
 
 ==== 7 () ====
   raise v5
 
 ==== 8 () ====
-  event jsir_extern_hints.ml:72:10
-  v173 = "caml_string_unsafe_get"(v1, 8l)
-  v174 = v173 << 24
-  v175 = v174 >> 24
-  event jsir_extern_hints.ml:72:26
-  event jsir_extern_hints.ml:72:10
-  event jsir_extern_hints.ml:72:26
-  event jsir_extern_hints.ml:72:9
-  v176 = v175 === -128
-  event jsir_extern_hints.ml:72:34
-  if v176 then 6 () else 9 ()
+  event jsir_extern_hints.ml:90:10
+  v252 = "caml_string_unsafe_get"(v1, 8l)
+  v253 = v252 << 24
+  v254 = v253 >> 24
+  event jsir_extern_hints.ml:90:26
+  event jsir_extern_hints.ml:90:10
+  event jsir_extern_hints.ml:90:26
+  event jsir_extern_hints.ml:90:9
+  v255 = v254 === -128
+  event jsir_extern_hints.ml:90:34
+  if v255 then 6 () else 9 ()
 
 ==== 9 () ====
   raise v22
 
 ==== 10 () ====
-  event jsir_extern_hints.ml:74:10
-  v186 = "caml_nativeint_sub"(v161, 3l)
-  event jsir_extern_hints.ml:74:26
-  event jsir_extern_hints.ml:74:10
-  v187 = "caml_nativeint_shift_right"(v186, 31)
-  event jsir_extern_hints.ml:74:26
-  event jsir_extern_hints.ml:74:10
-  v188 = "caml_nativeint_xor"(v187, -1l)
-  event jsir_extern_hints.ml:74:26
-  event jsir_extern_hints.ml:74:10
-  v189 = "caml_nativeint_and"(v188, v186)
-  event jsir_extern_hints.ml:74:26
-  event jsir_extern_hints.ml:74:10
-  v190 = 0l <= v189
-  event jsir_extern_hints.ml:74:26
-  if v190 then 16 () else 15 ()
+  event jsir_extern_hints.ml:92:10
+  v265 = "caml_nativeint_sub"(v240, 3l)
+  event jsir_extern_hints.ml:92:26
+  event jsir_extern_hints.ml:92:10
+  v266 = "caml_nativeint_shift_right"(v265, 31)
+  event jsir_extern_hints.ml:92:26
+  event jsir_extern_hints.ml:92:10
+  v267 = "caml_nativeint_xor"(v266, -1l)
+  event jsir_extern_hints.ml:92:26
+  event jsir_extern_hints.ml:92:10
+  v268 = "caml_nativeint_and"(v267, v265)
+  event jsir_extern_hints.ml:92:26
+  event jsir_extern_hints.ml:92:10
+  v269 = 0l <= v268
+  event jsir_extern_hints.ml:92:26
+  if v269 then 16 () else 15 ()
 
 ==== 11 () ====
   raise v5
 
 ==== 12 () ====
-  event jsir_extern_hints.ml:73:10
-  v182 = "caml_string_get16u"(v1, 8l) [hint:unsafe]
-  v183 = v182 << 16
-  v184 = v183 >> 16
-  event jsir_extern_hints.ml:73:27
-  event jsir_extern_hints.ml:73:10
-  event jsir_extern_hints.ml:73:27
-  event jsir_extern_hints.ml:73:9
-  v185 = v184 === -128
-  event jsir_extern_hints.ml:73:35
-  if v185 then 10 () else 13 ()
+  event jsir_extern_hints.ml:91:10
+  v261 = "caml_string_get16u"(v1, 8l) [hint:unsafe]
+  v262 = v261 << 16
+  v263 = v262 >> 16
+  event jsir_extern_hints.ml:91:27
+  event jsir_extern_hints.ml:91:10
+  event jsir_extern_hints.ml:91:27
+  event jsir_extern_hints.ml:91:9
+  v264 = v263 === -128
+  event jsir_extern_hints.ml:91:35
+  if v264 then 10 () else 13 ()
 
 ==== 13 () ====
   raise v29
 
 ==== 14 () ====
-  event jsir_extern_hints.ml:75:10
-  v193 = "caml_nativeint_sub"(v161, 7l)
-  event jsir_extern_hints.ml:75:26
-  event jsir_extern_hints.ml:75:10
-  v194 = "caml_nativeint_shift_right"(v193, 31)
-  event jsir_extern_hints.ml:75:26
-  event jsir_extern_hints.ml:75:10
-  v195 = "caml_nativeint_xor"(v194, -1l)
-  event jsir_extern_hints.ml:75:26
-  event jsir_extern_hints.ml:75:10
-  v196 = "caml_nativeint_and"(v195, v193)
-  event jsir_extern_hints.ml:75:26
-  event jsir_extern_hints.ml:75:10
-  v197 = 0l <= v196
-  event jsir_extern_hints.ml:75:26
-  if v197 then 19 () else 18 ()
+  event jsir_extern_hints.ml:93:10
+  v272 = "caml_nativeint_sub"(v240, 7l)
+  event jsir_extern_hints.ml:93:26
+  event jsir_extern_hints.ml:93:10
+  v273 = "caml_nativeint_shift_right"(v272, 31)
+  event jsir_extern_hints.ml:93:26
+  event jsir_extern_hints.ml:93:10
+  v274 = "caml_nativeint_xor"(v273, -1l)
+  event jsir_extern_hints.ml:93:26
+  event jsir_extern_hints.ml:93:10
+  v275 = "caml_nativeint_and"(v274, v272)
+  event jsir_extern_hints.ml:93:26
+  event jsir_extern_hints.ml:93:10
+  v276 = 0l <= v275
+  event jsir_extern_hints.ml:93:26
+  if v276 then 20 () else 19 ()
 
 ==== 15 () ====
   raise v5
 
 ==== 16 () ====
-  event jsir_extern_hints.ml:74:10
-  v191 = "caml_string_get32u"(v1, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:74:26
-  event jsir_extern_hints.ml:74:9
-  v192 = v191 === 67305985l
-  event jsir_extern_hints.ml:74:41
-  if v192 then 14 () else 17 ()
+  event jsir_extern_hints.ml:92:10
+  v270 = "caml_string_get32u"(v1, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:92:26
+  event jsir_extern_hints.ml:92:9
+  v271 = v270 === 67305985l
+  event jsir_extern_hints.ml:92:41
+  if v271 then 14 () else 17 ()
 
 ==== 17 () ====
   raise v36
 
 ==== 18 () ====
-  raise v5
+  event jsir_extern_hints.ml:95:10
+  event jsir_extern_hints.ml:95:35
+  event jsir_extern_hints.ml:96:27
+  v279 = "caml_ml_string_length"(v46) 
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:27
+  v280 = "caml_nativeint_of_int"(v279) 
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:27
+  v281 = "caml_nativeint_sub"(v280, 3l)
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:27
+  v282 = "caml_nativeint_shift_right"(v281, 31)
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:27
+  v283 = "caml_nativeint_xor"(v282, -1l)
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:27
+  v284 = "caml_nativeint_and"(v283, v281)
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:27
+  v285 = 0l <= v284
+  event jsir_extern_hints.ml:96:46
+  if v285 then 23 () else 22 ()
 
 ==== 19 () ====
-  event jsir_extern_hints.ml:75:10
-  v198 = "caml_string_get64u"(v1, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:75:26
-  event jsir_extern_hints.ml:75:9
-  v199 = "caml_equal"(v198, 578437695752307201L) [hint:int64]
-  event jsir_extern_hints.ml:75:49
-  v200 = CONST{0}
-  if v199 then 21 () else 20 ()
+  raise v5
 
 ==== 20 () ====
-  raise v43
+  event jsir_extern_hints.ml:93:10
+  v277 = "caml_string_get64u"(v1, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:93:26
+  event jsir_extern_hints.ml:93:9
+  v278 = "caml_equal"(v277, 578437695752307201L) [hint:int64]
+  event jsir_extern_hints.ml:93:49
+  if v278 then 18 () else 21 ()
 
 ==== 21 () ====
-  return v200
+  raise v43
 
 ==== 22 () ====
-  v206 = "caml_create_bytes"(8) 
-  branch 23 (v206)
+  raise v5
 
-==== 23 (v205) ====
-  event jsir_extern_hints.ml:78:10
-  event jsir_extern_hints.ml:78:33
-  event jsir_extern_hints.ml:79:2
-  v208 = "caml_ml_string_length"(v205) 
-  event jsir_extern_hints.ml:79:21
-  event jsir_extern_hints.ml:79:2
-  v209 = "caml_nativeint_of_int"(v208) 
-  event jsir_extern_hints.ml:79:21
-  event jsir_extern_hints.ml:79:2
-  v210 = 0l <= v209
-  event jsir_extern_hints.ml:79:21
-  if v210 then 25 (v209) else 24 ()
+==== 23 () ====
+  event jsir_extern_hints.ml:96:27
+  v286 = "caml_string_getf32u"(v46, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:10
+  v287 = "caml_float_of_float32"(v286) 
+  event jsir_extern_hints.ml:96:46
+  event jsir_extern_hints.ml:96:9
+  v288 = "caml_eq_float"(v287, 1)
+  event jsir_extern_hints.ml:96:52
+  v289 = CONST{0}
+  if v288 then 25 () else 24 ()
 
 ==== 24 () ====
-  raise v5
+  raise v52
 
-==== 25 (v207) ====
-  event jsir_extern_hints.ml:79:2
-  v211 = "caml_bytes_unsafe_set"(v205, 0l, -16) 
-  event jsir_extern_hints.ml:79:21
-  event jsir_extern_hints.ml:80:10
-  v212 = 0l <= v207
-  event jsir_extern_hints.ml:80:25
-  if v212 then 28 () else 27 ()
+==== 25 () ====
+  return v289
 
 ==== 26 () ====
-  event jsir_extern_hints.ml:81:2
-  v219 = "caml_nativeint_sub"(v207, 1l)
-  event jsir_extern_hints.ml:81:22
-  event jsir_extern_hints.ml:81:2
-  v220 = "caml_nativeint_shift_right"(v219, 31)
-  event jsir_extern_hints.ml:81:22
-  event jsir_extern_hints.ml:81:2
-  v221 = "caml_nativeint_xor"(v220, -1l)
-  event jsir_extern_hints.ml:81:22
-  event jsir_extern_hints.ml:81:2
-  v222 = "caml_nativeint_and"(v221, v219)
-  event jsir_extern_hints.ml:81:22
-  event jsir_extern_hints.ml:81:2
-  v223 = 0l <= v222
-  event jsir_extern_hints.ml:81:22
-  if v223 then 31 (v219, v220) else 30 ()
+  v295 = "caml_create_bytes"(8) 
+  branch 27 (v295)
 
-==== 27 () ====
-  raise v5
+==== 27 (v294) ====
+  event jsir_extern_hints.ml:99:10
+  event jsir_extern_hints.ml:99:33
+  event jsir_extern_hints.ml:100:2
+  v297 = "caml_ml_string_length"(v294) 
+  event jsir_extern_hints.ml:100:21
+  event jsir_extern_hints.ml:100:2
+  v298 = "caml_nativeint_of_int"(v297) 
+  event jsir_extern_hints.ml:100:21
+  event jsir_extern_hints.ml:100:2
+  v299 = 0l <= v298
+  event jsir_extern_hints.ml:100:21
+  if v299 then 29 (v298) else 28 ()
 
 ==== 28 () ====
-  event jsir_extern_hints.ml:80:10
-  v213 = "caml_bytes_unsafe_get"(v205, 0l)
-  v214 = v213 << 24
-  v215 = v214 >> 24
-  event jsir_extern_hints.ml:80:25
-  event jsir_extern_hints.ml:80:10
-  event jsir_extern_hints.ml:80:25
-  event jsir_extern_hints.ml:80:9
-  v216 = v215 === -16
-  event jsir_extern_hints.ml:80:32
-  if v216 then 26 () else 29 ()
+  raise v5
 
-==== 29 () ====
-  raise v50
+==== 29 (v296) ====
+  event jsir_extern_hints.ml:100:2
+  v300 = "caml_bytes_unsafe_set"(v294, 0l, -16) 
+  event jsir_extern_hints.ml:100:21
+  event jsir_extern_hints.ml:101:10
+  v301 = 0l <= v296
+  event jsir_extern_hints.ml:101:25
+  if v301 then 32 () else 31 ()
 
 ==== 30 () ====
+  event jsir_extern_hints.ml:102:2
+  v308 = "caml_nativeint_sub"(v296, 1l)
+  event jsir_extern_hints.ml:102:22
+  event jsir_extern_hints.ml:102:2
+  v309 = "caml_nativeint_shift_right"(v308, 31)
+  event jsir_extern_hints.ml:102:22
+  event jsir_extern_hints.ml:102:2
+  v310 = "caml_nativeint_xor"(v309, -1l)
+  event jsir_extern_hints.ml:102:22
+  event jsir_extern_hints.ml:102:2
+  v311 = "caml_nativeint_and"(v310, v308)
+  event jsir_extern_hints.ml:102:22
+  event jsir_extern_hints.ml:102:2
+  v312 = 0l <= v311
+  event jsir_extern_hints.ml:102:22
+  if v312 then 35 (v308, v309) else 34 ()
+
+==== 31 () ====
   raise v5
 
-==== 31 (v218, v217) ====
-  event jsir_extern_hints.ml:81:2
-  v224 = "caml_bytes_set16u"(v205, 0l, -2)  [hint:unsafe]
-  event jsir_extern_hints.ml:81:22
-  event jsir_extern_hints.ml:82:10
-  v227 = "caml_nativeint_xor"(v217, -1l)
-  event jsir_extern_hints.ml:82:25
-  event jsir_extern_hints.ml:82:10
-  v228 = "caml_nativeint_and"(v227, v218)
-  event jsir_extern_hints.ml:82:25
-  event jsir_extern_hints.ml:82:10
-  v229 = 0l <= v228
-  event jsir_extern_hints.ml:82:25
-  if v229 then 34 (v228) else 33 ()
-
-==== 32 (v225) ====
-  event jsir_extern_hints.ml:83:10
-  v232 = 0l <= v225
-  event jsir_extern_hints.ml:83:26
-  if v232 then 38 () else 37 ()
+==== 32 () ====
+  event jsir_extern_hints.ml:101:10
+  v302 = "caml_bytes_unsafe_get"(v294, 0l)
+  v303 = v302 << 24
+  v304 = v303 >> 24
+  event jsir_extern_hints.ml:101:25
+  event jsir_extern_hints.ml:101:10
+  event jsir_extern_hints.ml:101:25
+  event jsir_extern_hints.ml:101:9
+  v305 = v304 === -16
+  event jsir_extern_hints.ml:101:32
+  if v305 then 30 () else 33 ()
 
 ==== 33 () ====
+  raise v59
+
+==== 34 () ====
   raise v5
 
-==== 34 (v226) ====
-  event jsir_extern_hints.ml:82:10
-  v230 = "caml_bytes_get16u"(v205, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:82:25
-  event jsir_extern_hints.ml:82:10
-  event jsir_extern_hints.ml:82:25
-  event jsir_extern_hints.ml:82:9
-  v231 = v230 === 65534
-  event jsir_extern_hints.ml:82:35
-  if v231 then 32 (v226) else 35 ()
+==== 35 (v307, v306) ====
+  event jsir_extern_hints.ml:102:2
+  v313 = "caml_bytes_set16u"(v294, 0l, -2)  [hint:unsafe]
+  event jsir_extern_hints.ml:102:22
+  event jsir_extern_hints.ml:103:10
+  v316 = "caml_nativeint_xor"(v306, -1l)
+  event jsir_extern_hints.ml:103:25
+  event jsir_extern_hints.ml:103:10
+  v317 = "caml_nativeint_and"(v316, v307)
+  event jsir_extern_hints.ml:103:25
+  event jsir_extern_hints.ml:103:10
+  v318 = 0l <= v317
+  event jsir_extern_hints.ml:103:25
+  if v318 then 38 (v317) else 37 ()
 
-==== 35 () ====
-  raise v57
-
-==== 36 () ====
-  event jsir_extern_hints.ml:84:2
-  v239 = "caml_nativeint_sub"(v207, 3l)
-  event jsir_extern_hints.ml:84:29
-  event jsir_extern_hints.ml:84:2
-  v240 = "caml_nativeint_shift_right"(v239, 31)
-  event jsir_extern_hints.ml:84:29
-  event jsir_extern_hints.ml:84:2
-  v241 = "caml_nativeint_xor"(v240, -1l)
-  event jsir_extern_hints.ml:84:29
-  event jsir_extern_hints.ml:84:2
-  v242 = "caml_nativeint_and"(v241, v239)
-  event jsir_extern_hints.ml:84:29
-  event jsir_extern_hints.ml:84:2
-  v243 = 0l <= v242
-  event jsir_extern_hints.ml:84:29
-  if v243 then 41 (v239, v240) else 40 ()
+==== 36 (v314) ====
+  event jsir_extern_hints.ml:104:10
+  v321 = 0l <= v314
+  event jsir_extern_hints.ml:104:26
+  if v321 then 42 () else 41 ()
 
 ==== 37 () ====
   raise v5
 
-==== 38 () ====
-  event jsir_extern_hints.ml:83:10
-  v233 = "caml_bytes_get16u"(v205, 0l) [hint:unsafe]
-  v234 = v233 << 16
-  v235 = v234 >> 16
-  event jsir_extern_hints.ml:83:26
-  event jsir_extern_hints.ml:83:10
-  event jsir_extern_hints.ml:83:26
-  event jsir_extern_hints.ml:83:9
-  v236 = v235 === -2
-  event jsir_extern_hints.ml:83:32
-  if v236 then 36 () else 39 ()
+==== 38 (v315) ====
+  event jsir_extern_hints.ml:103:10
+  v319 = "caml_bytes_get16u"(v294, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:103:25
+  event jsir_extern_hints.ml:103:10
+  event jsir_extern_hints.ml:103:25
+  event jsir_extern_hints.ml:103:9
+  v320 = v319 === 65534
+  event jsir_extern_hints.ml:103:35
+  if v320 then 36 (v315) else 39 ()
 
 ==== 39 () ====
-  raise v64
+  raise v66
 
 ==== 40 () ====
-  raise v5
+  event jsir_extern_hints.ml:105:2
+  v328 = "caml_nativeint_sub"(v296, 3l)
+  event jsir_extern_hints.ml:105:29
+  event jsir_extern_hints.ml:105:2
+  v329 = "caml_nativeint_shift_right"(v328, 31)
+  event jsir_extern_hints.ml:105:29
+  event jsir_extern_hints.ml:105:2
+  v330 = "caml_nativeint_xor"(v329, -1l)
+  event jsir_extern_hints.ml:105:29
+  event jsir_extern_hints.ml:105:2
+  v331 = "caml_nativeint_and"(v330, v328)
+  event jsir_extern_hints.ml:105:29
+  event jsir_extern_hints.ml:105:2
+  v332 = 0l <= v331
+  event jsir_extern_hints.ml:105:29
+  if v332 then 45 (v328, v329) else 44 ()
 
-==== 41 (v238, v237) ====
-  event jsir_extern_hints.ml:84:2
-  v244 = "caml_bytes_set32u"(v205, 0l, 305419896l)  [hint:unsafe]
-  event jsir_extern_hints.ml:84:29
-  event jsir_extern_hints.ml:85:10
-  v245 = "caml_nativeint_xor"(v237, -1l)
-  event jsir_extern_hints.ml:85:25
-  event jsir_extern_hints.ml:85:10
-  v246 = "caml_nativeint_and"(v245, v238)
-  event jsir_extern_hints.ml:85:25
-  event jsir_extern_hints.ml:85:10
-  v247 = 0l <= v246
-  event jsir_extern_hints.ml:85:25
-  if v247 then 44 () else 43 ()
+==== 41 () ====
+  raise v5
 
 ==== 42 () ====
-  event jsir_extern_hints.ml:86:2
-  v252 = "caml_nativeint_sub"(v207, 7l)
-  event jsir_extern_hints.ml:86:37
-  event jsir_extern_hints.ml:86:2
-  v253 = "caml_nativeint_shift_right"(v252, 31)
-  event jsir_extern_hints.ml:86:37
-  event jsir_extern_hints.ml:86:2
-  v254 = "caml_nativeint_xor"(v253, -1l)
-  event jsir_extern_hints.ml:86:37
-  event jsir_extern_hints.ml:86:2
-  v255 = "caml_nativeint_and"(v254, v252)
-  event jsir_extern_hints.ml:86:37
-  event jsir_extern_hints.ml:86:2
-  v256 = 0l <= v255
-  event jsir_extern_hints.ml:86:37
-  if v256 then 47 (v252, v253) else 46 ()
+  event jsir_extern_hints.ml:104:10
+  v322 = "caml_bytes_get16u"(v294, 0l) [hint:unsafe]
+  v323 = v322 << 16
+  v324 = v323 >> 16
+  event jsir_extern_hints.ml:104:26
+  event jsir_extern_hints.ml:104:10
+  event jsir_extern_hints.ml:104:26
+  event jsir_extern_hints.ml:104:9
+  v325 = v324 === -2
+  event jsir_extern_hints.ml:104:32
+  if v325 then 40 () else 43 ()
 
 ==== 43 () ====
-  raise v5
+  raise v73
 
 ==== 44 () ====
-  event jsir_extern_hints.ml:85:10
-  v248 = "caml_bytes_get32u"(v205, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:85:25
-  event jsir_extern_hints.ml:85:9
-  v249 = v248 === 305419896l
-  event jsir_extern_hints.ml:85:40
-  if v249 then 42 () else 45 ()
-
-==== 45 () ====
-  raise v71
-
-==== 46 () ====
   raise v5
 
-==== 47 (v251, v250) ====
-  event jsir_extern_hints.ml:86:2
-  v257 = "caml_bytes_set64u"(v205, 0l, 72623859790382856L)  [hint:unsafe]
-  event jsir_extern_hints.ml:86:37
-  event jsir_extern_hints.ml:87:10
-  v258 = "caml_nativeint_xor"(v250, -1l)
-  event jsir_extern_hints.ml:87:25
-  event jsir_extern_hints.ml:87:10
-  v259 = "caml_nativeint_and"(v258, v251)
-  event jsir_extern_hints.ml:87:25
-  event jsir_extern_hints.ml:87:10
-  v260 = 0l <= v259
-  event jsir_extern_hints.ml:87:25
-  if v260 then 49 () else 48 ()
+==== 45 (v327, v326) ====
+  event jsir_extern_hints.ml:105:2
+  v333 = "caml_bytes_set32u"(v294, 0l, 305419896l)  [hint:unsafe]
+  event jsir_extern_hints.ml:105:29
+  event jsir_extern_hints.ml:106:10
+  v336 = "caml_nativeint_xor"(v326, -1l)
+  event jsir_extern_hints.ml:106:25
+  event jsir_extern_hints.ml:106:10
+  v337 = "caml_nativeint_and"(v336, v327)
+  event jsir_extern_hints.ml:106:25
+  event jsir_extern_hints.ml:106:10
+  v338 = 0l <= v337
+  event jsir_extern_hints.ml:106:25
+  if v338 then 48 (v337) else 47 ()
 
-==== 48 () ====
+==== 46 (v334) ====
+  event jsir_extern_hints.ml:107:2
+  v341 = 0l <= v334
+  event jsir_extern_hints.ml:107:23
+  if v341 then 51 () else 50 ()
+
+==== 47 () ====
   raise v5
+
+==== 48 (v335) ====
+  event jsir_extern_hints.ml:106:10
+  v339 = "caml_bytes_get32u"(v294, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:106:25
+  event jsir_extern_hints.ml:106:9
+  v340 = v339 === 305419896l
+  event jsir_extern_hints.ml:106:40
+  if v340 then 46 (v335) else 49 ()
 
 ==== 49 () ====
-  event jsir_extern_hints.ml:87:10
-  v261 = "caml_bytes_get64u"(v205, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:87:25
-  event jsir_extern_hints.ml:87:9
-  v262 = "caml_equal"(v261, 72623859790382856L) [hint:int64]
-  event jsir_extern_hints.ml:87:48
-  v263 = CONST{0}
-  if v262 then 51 () else 50 ()
+  raise v80
 
 ==== 50 () ====
-  raise v78
+  raise v5
 
 ==== 51 () ====
-  return v263
+  event jsir_extern_hints.ml:107:2
+  v342 = "caml_bytes_setf32u"(v294, 0l, 1.5)  [hint:unsafe]
+  event jsir_extern_hints.ml:107:23
+  event jsir_extern_hints.ml:108:27
+  v343 = "caml_bytes_getf32u"(v294, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:108:45
+  event jsir_extern_hints.ml:108:10
+  v344 = "caml_float_of_float32"(v343) 
+  event jsir_extern_hints.ml:108:45
+  event jsir_extern_hints.ml:108:9
+  v345 = "caml_eq_float"(v344, 1.5)
+  event jsir_extern_hints.ml:108:52
+  if v345 then 52 () else 53 ()
 
 ==== 52 () ====
-  event jsir_extern_hints.ml:91:45
-  v268 = CONST{8}
-  v269 = {tag=0; 0 = v268}
-  event jsir_extern_hints.ml:91:52
-  v271 = "caml_ba_create"(12, 0, v269) 
-  branch 53 (v271)
+  event jsir_extern_hints.ml:109:2
+  v348 = "caml_nativeint_sub"(v296, 7l)
+  event jsir_extern_hints.ml:109:37
+  event jsir_extern_hints.ml:109:2
+  v349 = "caml_nativeint_shift_right"(v348, 31)
+  event jsir_extern_hints.ml:109:37
+  event jsir_extern_hints.ml:109:2
+  v350 = "caml_nativeint_xor"(v349, -1l)
+  event jsir_extern_hints.ml:109:37
+  event jsir_extern_hints.ml:109:2
+  v351 = "caml_nativeint_and"(v350, v348)
+  event jsir_extern_hints.ml:109:37
+  event jsir_extern_hints.ml:109:2
+  v352 = 0l <= v351
+  event jsir_extern_hints.ml:109:37
+  if v352 then 55 (v348, v349) else 54 ()
 
-==== 53 (v270) ====
-  event jsir_extern_hints.ml:91:22
-  event jsir_extern_hints.ml:91:53
-  event jsir_extern_hints.ml:92:2
-  v272 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:92:25
-  event jsir_extern_hints.ml:92:2
-  v273 = "caml_nativeint_of_int"(v272) 
-  event jsir_extern_hints.ml:92:25
-  event jsir_extern_hints.ml:92:2
-  v274 = 0l <= v273
-  event jsir_extern_hints.ml:92:25
-  if v274 then 55 () else 54 ()
+==== 53 () ====
+  raise v87
 
 ==== 54 () ====
   raise v5
 
-==== 55 () ====
-  event jsir_extern_hints.ml:92:2
-  v275 = "caml_ba_set_raw_unsafe"(v270, 0l, -16)  [hint:unsafe/uint8/C]
-  event jsir_extern_hints.ml:92:25
-  event jsir_extern_hints.ml:93:10
-  v276 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:93:29
-  event jsir_extern_hints.ml:93:10
-  v277 = "caml_nativeint_of_int"(v276) 
-  event jsir_extern_hints.ml:93:29
-  event jsir_extern_hints.ml:93:10
-  v278 = 0l <= v277
-  event jsir_extern_hints.ml:93:29
-  if v278 then 58 () else 57 ()
+==== 55 (v347, v346) ====
+  event jsir_extern_hints.ml:109:2
+  v353 = "caml_bytes_set64u"(v294, 0l, 72623859790382856L)  [hint:unsafe]
+  event jsir_extern_hints.ml:109:37
+  event jsir_extern_hints.ml:110:10
+  v354 = "caml_nativeint_xor"(v346, -1l)
+  event jsir_extern_hints.ml:110:25
+  event jsir_extern_hints.ml:110:10
+  v355 = "caml_nativeint_and"(v354, v347)
+  event jsir_extern_hints.ml:110:25
+  event jsir_extern_hints.ml:110:10
+  v356 = 0l <= v355
+  event jsir_extern_hints.ml:110:25
+  if v356 then 57 () else 56 ()
 
 ==== 56 () ====
-  event jsir_extern_hints.ml:94:2
-  v283 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v284 = "caml_nativeint_of_int"(v283) 
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v285 = "caml_nativeint_sub"(v284, 1l)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v286 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v287 = "caml_nativeint_of_int"(v286) 
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v288 = "caml_nativeint_sub"(v287, 1l)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v289 = "caml_nativeint_shift_right"(v288, 31)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v290 = "caml_nativeint_xor"(v289, -1l)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v291 = "caml_nativeint_and"(v290, v285)
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:94:2
-  v292 = 0l <= v291
-  event jsir_extern_hints.ml:94:26
-  if v292 then 61 () else 60 ()
+  raise v5
 
 ==== 57 () ====
-  raise v5
+  event jsir_extern_hints.ml:110:10
+  v357 = "caml_bytes_get64u"(v294, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:110:25
+  event jsir_extern_hints.ml:110:9
+  v358 = "caml_equal"(v357, 72623859790382856L) [hint:int64]
+  event jsir_extern_hints.ml:110:48
+  v359 = CONST{0}
+  if v358 then 59 () else 58 ()
 
 ==== 58 () ====
-  event jsir_extern_hints.ml:93:10
-  v279 = "caml_ba_get_raw_unsafe"(v270, 0l) [hint:unsafe/uint8/C]
-  v280 = v279 << 24
-  v281 = v280 >> 24
-  event jsir_extern_hints.ml:93:29
-  event jsir_extern_hints.ml:93:10
-  event jsir_extern_hints.ml:93:29
-  event jsir_extern_hints.ml:93:9
-  v282 = v281 === -16
-  event jsir_extern_hints.ml:93:36
-  if v282 then 56 () else 59 ()
+  raise v94
 
 ==== 59 () ====
-  raise v85
+  return v359
 
 ==== 60 () ====
-  raise v5
+  event jsir_extern_hints.ml:114:45
+  v364 = CONST{8}
+  v365 = {tag=0; 0 = v364}
+  event jsir_extern_hints.ml:114:52
+  v367 = "caml_ba_create"(12, 0, v365) 
+  branch 61 (v367)
 
-==== 61 () ====
-  event jsir_extern_hints.ml:94:2
-  v293 = "caml_ba_uint8_set16"(v270, 0l, -2)  [hint:unsafe]
-  event jsir_extern_hints.ml:94:26
-  event jsir_extern_hints.ml:95:10
-  v294 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v295 = "caml_nativeint_of_int"(v294) 
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v296 = "caml_nativeint_sub"(v295, 1l)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v297 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v298 = "caml_nativeint_of_int"(v297) 
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v299 = "caml_nativeint_sub"(v298, 1l)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v300 = "caml_nativeint_shift_right"(v299, 31)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v301 = "caml_nativeint_xor"(v300, -1l)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v302 = "caml_nativeint_and"(v301, v296)
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  v303 = 0l <= v302
-  event jsir_extern_hints.ml:95:29
-  if v303 then 64 () else 63 ()
+==== 61 (v366) ====
+  event jsir_extern_hints.ml:114:22
+  event jsir_extern_hints.ml:114:53
+  event jsir_extern_hints.ml:115:2
+  v368 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:115:25
+  event jsir_extern_hints.ml:115:2
+  v369 = "caml_nativeint_of_int"(v368) 
+  event jsir_extern_hints.ml:115:25
+  event jsir_extern_hints.ml:115:2
+  v370 = 0l <= v369
+  event jsir_extern_hints.ml:115:25
+  if v370 then 63 () else 62 ()
 
 ==== 62 () ====
-  event jsir_extern_hints.ml:96:10
-  v306 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v307 = "caml_nativeint_of_int"(v306) 
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v308 = "caml_nativeint_sub"(v307, 1l)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v309 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v310 = "caml_nativeint_of_int"(v309) 
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v311 = "caml_nativeint_sub"(v310, 1l)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v312 = "caml_nativeint_shift_right"(v311, 31)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v313 = "caml_nativeint_xor"(v312, -1l)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v314 = "caml_nativeint_and"(v313, v308)
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  v315 = 0l <= v314
-  event jsir_extern_hints.ml:96:30
-  if v315 then 68 () else 67 ()
+  raise v5
 
 ==== 63 () ====
-  raise v5
+  event jsir_extern_hints.ml:115:2
+  v371 = "caml_ba_set_raw_unsafe"(v366, 0l, -16)  [hint:unsafe/uint8/C]
+  event jsir_extern_hints.ml:115:25
+  event jsir_extern_hints.ml:116:10
+  v372 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:116:29
+  event jsir_extern_hints.ml:116:10
+  v373 = "caml_nativeint_of_int"(v372) 
+  event jsir_extern_hints.ml:116:29
+  event jsir_extern_hints.ml:116:10
+  v374 = 0l <= v373
+  event jsir_extern_hints.ml:116:29
+  if v374 then 66 () else 65 ()
 
 ==== 64 () ====
-  event jsir_extern_hints.ml:95:10
-  v304 = "caml_ba_uint8_get16"(v270, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:10
-  event jsir_extern_hints.ml:95:29
-  event jsir_extern_hints.ml:95:9
-  v305 = v304 === 65534
-  event jsir_extern_hints.ml:95:39
-  if v305 then 62 () else 65 ()
+  event jsir_extern_hints.ml:117:2
+  v379 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v380 = "caml_nativeint_of_int"(v379) 
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v381 = "caml_nativeint_sub"(v380, 1l)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v382 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v383 = "caml_nativeint_of_int"(v382) 
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v384 = "caml_nativeint_sub"(v383, 1l)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v385 = "caml_nativeint_shift_right"(v384, 31)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v386 = "caml_nativeint_xor"(v385, -1l)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v387 = "caml_nativeint_and"(v386, v381)
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:117:2
+  v388 = 0l <= v387
+  event jsir_extern_hints.ml:117:26
+  if v388 then 69 () else 68 ()
 
 ==== 65 () ====
-  raise v92
+  raise v5
 
 ==== 66 () ====
-  event jsir_extern_hints.ml:97:2
-  v320 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v321 = "caml_nativeint_of_int"(v320) 
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v322 = "caml_nativeint_sub"(v321, 3l)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v323 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v324 = "caml_nativeint_of_int"(v323) 
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v325 = "caml_nativeint_sub"(v324, 3l)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v326 = "caml_nativeint_shift_right"(v325, 31)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v327 = "caml_nativeint_xor"(v326, -1l)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v328 = "caml_nativeint_and"(v327, v322)
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:97:2
-  v329 = 0l <= v328
-  event jsir_extern_hints.ml:97:33
-  if v329 then 71 () else 70 ()
+  event jsir_extern_hints.ml:116:10
+  v375 = "caml_ba_get_raw_unsafe"(v366, 0l) [hint:unsafe/uint8/C]
+  v376 = v375 << 24
+  v377 = v376 >> 24
+  event jsir_extern_hints.ml:116:29
+  event jsir_extern_hints.ml:116:10
+  event jsir_extern_hints.ml:116:29
+  event jsir_extern_hints.ml:116:9
+  v378 = v377 === -16
+  event jsir_extern_hints.ml:116:36
+  if v378 then 64 () else 67 ()
 
 ==== 67 () ====
-  raise v5
+  raise v101
 
 ==== 68 () ====
-  event jsir_extern_hints.ml:96:10
-  v316 = "caml_ba_uint8_get16"(v270, 0l) [hint:unsafe]
-  v317 = v316 << 16
-  v318 = v317 >> 16
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:10
-  event jsir_extern_hints.ml:96:30
-  event jsir_extern_hints.ml:96:9
-  v319 = v318 === -2
-  event jsir_extern_hints.ml:96:36
-  if v319 then 66 () else 69 ()
+  raise v5
 
 ==== 69 () ====
-  raise v99
+  event jsir_extern_hints.ml:117:2
+  v389 = "caml_ba_uint8_set16"(v366, 0l, -2) 
+  event jsir_extern_hints.ml:117:26
+  event jsir_extern_hints.ml:118:10
+  v390 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v391 = "caml_nativeint_of_int"(v390) 
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v392 = "caml_nativeint_sub"(v391, 1l)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v393 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v394 = "caml_nativeint_of_int"(v393) 
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v395 = "caml_nativeint_sub"(v394, 1l)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v396 = "caml_nativeint_shift_right"(v395, 31)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v397 = "caml_nativeint_xor"(v396, -1l)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v398 = "caml_nativeint_and"(v397, v392)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  v399 = 0l <= v398
+  event jsir_extern_hints.ml:118:29
+  if v399 then 72 () else 71 ()
 
 ==== 70 () ====
-  raise v5
+  event jsir_extern_hints.ml:119:10
+  v402 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v403 = "caml_nativeint_of_int"(v402) 
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v404 = "caml_nativeint_sub"(v403, 1l)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v405 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v406 = "caml_nativeint_of_int"(v405) 
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v407 = "caml_nativeint_sub"(v406, 1l)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v408 = "caml_nativeint_shift_right"(v407, 31)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v409 = "caml_nativeint_xor"(v408, -1l)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v410 = "caml_nativeint_and"(v409, v404)
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  v411 = 0l <= v410
+  event jsir_extern_hints.ml:119:30
+  if v411 then 76 () else 75 ()
 
 ==== 71 () ====
-  event jsir_extern_hints.ml:97:2
-  v330 = "caml_ba_uint8_set32u"(v270, 0l, 305419896l)  [hint:unsafe]
-  event jsir_extern_hints.ml:97:33
-  event jsir_extern_hints.ml:98:10
-  v331 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v332 = "caml_nativeint_of_int"(v331) 
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v333 = "caml_nativeint_sub"(v332, 3l)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v334 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v335 = "caml_nativeint_of_int"(v334) 
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v336 = "caml_nativeint_sub"(v335, 3l)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v337 = "caml_nativeint_shift_right"(v336, 31)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v338 = "caml_nativeint_xor"(v337, -1l)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v339 = "caml_nativeint_and"(v338, v333)
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:10
-  v340 = 0l <= v339
-  event jsir_extern_hints.ml:98:29
-  if v340 then 74 () else 73 ()
+  raise v5
 
 ==== 72 () ====
-  event jsir_extern_hints.ml:99:2
-  v343 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v344 = "caml_nativeint_of_int"(v343) 
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v345 = "caml_nativeint_sub"(v344, 7l)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v346 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v347 = "caml_nativeint_of_int"(v346) 
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v348 = "caml_nativeint_sub"(v347, 7l)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v349 = "caml_nativeint_shift_right"(v348, 31)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v350 = "caml_nativeint_xor"(v349, -1l)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v351 = "caml_nativeint_and"(v350, v345)
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:99:2
-  v352 = 0l <= v351
-  event jsir_extern_hints.ml:99:41
-  if v352 then 77 () else 76 ()
+  event jsir_extern_hints.ml:118:10
+  v400 = "caml_ba_uint8_get16"(v366, 0l)
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:10
+  event jsir_extern_hints.ml:118:29
+  event jsir_extern_hints.ml:118:9
+  v401 = v400 === 65534
+  event jsir_extern_hints.ml:118:39
+  if v401 then 70 () else 73 ()
 
 ==== 73 () ====
-  raise v5
+  raise v108
 
 ==== 74 () ====
-  event jsir_extern_hints.ml:98:10
-  v341 = "caml_ba_uint8_get32u"(v270, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:98:29
-  event jsir_extern_hints.ml:98:9
-  v342 = v341 === 305419896l
-  event jsir_extern_hints.ml:98:44
-  if v342 then 72 () else 75 ()
+  event jsir_extern_hints.ml:120:2
+  v416 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v417 = "caml_nativeint_of_int"(v416) 
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v418 = "caml_nativeint_sub"(v417, 3l)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v419 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v420 = "caml_nativeint_of_int"(v419) 
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v421 = "caml_nativeint_sub"(v420, 3l)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v422 = "caml_nativeint_shift_right"(v421, 31)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v423 = "caml_nativeint_xor"(v422, -1l)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v424 = "caml_nativeint_and"(v423, v418)
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:120:2
+  v425 = 0l <= v424
+  event jsir_extern_hints.ml:120:33
+  if v425 then 79 () else 78 ()
 
 ==== 75 () ====
-  raise v106
-
-==== 76 () ====
   raise v5
 
+==== 76 () ====
+  event jsir_extern_hints.ml:119:10
+  v412 = "caml_ba_uint8_get16"(v366, 0l)
+  v413 = v412 << 16
+  v414 = v413 >> 16
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:10
+  event jsir_extern_hints.ml:119:30
+  event jsir_extern_hints.ml:119:9
+  v415 = v414 === -2
+  event jsir_extern_hints.ml:119:36
+  if v415 then 74 () else 77 ()
+
 ==== 77 () ====
-  event jsir_extern_hints.ml:99:2
-  v353 = "caml_ba_uint8_set64"(v270, 0l, 72623859790382856L)  [hint:unsafe]
-  event jsir_extern_hints.ml:99:41
-  event jsir_extern_hints.ml:100:10
-  v354 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v355 = "caml_nativeint_of_int"(v354) 
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v356 = "caml_nativeint_sub"(v355, 7l)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v357 = "caml_ba_dim"(v270, 0)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v358 = "caml_nativeint_of_int"(v357) 
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v359 = "caml_nativeint_sub"(v358, 7l)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v360 = "caml_nativeint_shift_right"(v359, 31)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v361 = "caml_nativeint_xor"(v360, -1l)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v362 = "caml_nativeint_and"(v361, v356)
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:10
-  v363 = 0l <= v362
-  event jsir_extern_hints.ml:100:29
-  if v363 then 79 () else 78 ()
+  raise v115
 
 ==== 78 () ====
   raise v5
 
 ==== 79 () ====
-  event jsir_extern_hints.ml:100:10
-  v364 = "caml_ba_uint8_get64"(v270, 0l) [hint:unsafe]
-  event jsir_extern_hints.ml:100:29
-  event jsir_extern_hints.ml:100:9
-  v365 = "caml_equal"(v364, 72623859790382856L) [hint:int64]
-  event jsir_extern_hints.ml:100:52
-  v366 = CONST{0}
-  if v365 then 81 () else 80 ()
+  event jsir_extern_hints.ml:120:2
+  v426 = "caml_ba_uint8_set32u"(v366, 0l, 305419896l)  [hint:unsafe]
+  event jsir_extern_hints.ml:120:33
+  event jsir_extern_hints.ml:121:10
+  v427 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v428 = "caml_nativeint_of_int"(v427) 
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v429 = "caml_nativeint_sub"(v428, 3l)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v430 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v431 = "caml_nativeint_of_int"(v430) 
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v432 = "caml_nativeint_sub"(v431, 3l)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v433 = "caml_nativeint_shift_right"(v432, 31)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v434 = "caml_nativeint_xor"(v433, -1l)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v435 = "caml_nativeint_and"(v434, v429)
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:10
+  v436 = 0l <= v435
+  event jsir_extern_hints.ml:121:29
+  if v436 then 82 () else 81 ()
 
 ==== 80 () ====
-  raise v113
+  event jsir_extern_hints.ml:122:2
+  v439 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v440 = "caml_nativeint_of_int"(v439) 
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v441 = "caml_nativeint_sub"(v440, 3l)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v442 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v443 = "caml_nativeint_of_int"(v442) 
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v444 = "caml_nativeint_sub"(v443, 3l)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v445 = "caml_nativeint_shift_right"(v444, 31)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v446 = "caml_nativeint_xor"(v445, -1l)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v447 = "caml_nativeint_and"(v446, v441)
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:122:2
+  v448 = 0l <= v447
+  event jsir_extern_hints.ml:122:27
+  if v448 then 85 () else 84 ()
 
 ==== 81 () ====
-  return v366
+  raise v5
 
 ==== 82 () ====
-  event jsir_extern_hints.ml:104:46
-  v371 = CONST{4}
-  v372 = {tag=0; 0 = v371}
-  event jsir_extern_hints.ml:104:53
-  v374 = "caml_ba_create"(1, 0, v372) 
-  branch 83 (v374)
+  event jsir_extern_hints.ml:121:10
+  v437 = "caml_ba_uint8_get32u"(v366, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:121:29
+  event jsir_extern_hints.ml:121:9
+  v438 = v437 === 305419896l
+  event jsir_extern_hints.ml:121:44
+  if v438 then 80 () else 83 ()
 
-==== 83 (v373) ====
-  event jsir_extern_hints.ml:104:24
-  event jsir_extern_hints.ml:104:54
-  event jsir_extern_hints.ml:105:2
-  v375 = "caml_ba_dim"(v373, 0)
-  event jsir_extern_hints.ml:105:25
-  event jsir_extern_hints.ml:105:2
-  v376 = "caml_nativeint_of_int"(v375) 
-  event jsir_extern_hints.ml:105:25
-  event jsir_extern_hints.ml:105:2
-  v377 = 2l <= v376
-  event jsir_extern_hints.ml:105:25
-  if v377 then 85 () else 84 ()
+==== 83 () ====
+  raise v122
 
 ==== 84 () ====
   raise v5
 
 ==== 85 () ====
-  event jsir_extern_hints.ml:105:2
-  v378 = "caml_ba_set_raw_unsafe"(v373, 2, 3.5)  [hint:unsafe/float64/C]
-  event jsir_extern_hints.ml:105:25
-  event jsir_extern_hints.ml:106:10
-  v379 = "caml_ba_dim"(v373, 0)
-  event jsir_extern_hints.ml:106:29
-  event jsir_extern_hints.ml:106:10
-  v380 = "caml_nativeint_of_int"(v379) 
-  event jsir_extern_hints.ml:106:29
-  event jsir_extern_hints.ml:106:10
-  v381 = 2l <= v380
-  event jsir_extern_hints.ml:106:29
-  if v381 then 87 () else 86 ()
+  event jsir_extern_hints.ml:122:2
+  v449 = "caml_ba_uint8_setf32u"(v366, 0l, 1.5)  [hint:unsafe]
+  event jsir_extern_hints.ml:122:27
+  event jsir_extern_hints.ml:123:27
+  v450 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v451 = "caml_nativeint_of_int"(v450) 
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v452 = "caml_nativeint_sub"(v451, 3l)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v453 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v454 = "caml_nativeint_of_int"(v453) 
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v455 = "caml_nativeint_sub"(v454, 3l)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v456 = "caml_nativeint_shift_right"(v455, 31)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v457 = "caml_nativeint_xor"(v456, -1l)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v458 = "caml_nativeint_and"(v457, v452)
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:27
+  v459 = 0l <= v458
+  event jsir_extern_hints.ml:123:49
+  if v459 then 88 () else 87 ()
 
 ==== 86 () ====
-  raise v5
+  event jsir_extern_hints.ml:124:2
+  v463 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v464 = "caml_nativeint_of_int"(v463) 
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v465 = "caml_nativeint_sub"(v464, 7l)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v466 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v467 = "caml_nativeint_of_int"(v466) 
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v468 = "caml_nativeint_sub"(v467, 7l)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v469 = "caml_nativeint_shift_right"(v468, 31)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v470 = "caml_nativeint_xor"(v469, -1l)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v471 = "caml_nativeint_and"(v470, v465)
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:124:2
+  v472 = 0l <= v471
+  event jsir_extern_hints.ml:124:41
+  if v472 then 91 () else 90 ()
 
 ==== 87 () ====
-  event jsir_extern_hints.ml:106:10
-  v382 = "caml_ba_get_raw_unsafe"(v373, 2) [hint:unsafe/float64/C]
-  event jsir_extern_hints.ml:106:29
-  event jsir_extern_hints.ml:106:9
-  v383 = "caml_eq_float"(v382, 3.5)
-  event jsir_extern_hints.ml:106:36
-  v384 = CONST{0}
-  if v383 then 89 () else 88 ()
+  raise v5
 
 ==== 88 () ====
-  raise v120
+  event jsir_extern_hints.ml:123:27
+  v460 = "caml_ba_uint8_getf32u"(v366, 0l) [hint:unsafe]
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:10
+  v461 = "caml_float_of_float32"(v460) 
+  event jsir_extern_hints.ml:123:49
+  event jsir_extern_hints.ml:123:9
+  v462 = "caml_eq_float"(v461, 1.5)
+  event jsir_extern_hints.ml:123:56
+  if v462 then 86 () else 89 ()
 
 ==== 89 () ====
-  return v384
+  raise v129
 
 ==== 90 () ====
-  event jsir_extern_hints.ml:109:10
-  event jsir_extern_hints.ml:109:19
-  event jsir_extern_hints.ml:110:10
-  event jsir_extern_hints.ml:110:19
-  event jsir_extern_hints.ml:111:9
-  event jsir_extern_hints.ml:111:16
-  event jsir_extern_hints.ml:111:9
-  event jsir_extern_hints.ml:111:16
-  event jsir_extern_hints.ml:111:9
-  v389 = "caml_lessthan"(v123, v125) [hint:int64]
-  event jsir_extern_hints.ml:111:16
-  if v389 then 91 () else 92 ()
+  raise v5
 
 ==== 91 () ====
-  event jsir_extern_hints.ml:112:14
-  event jsir_extern_hints.ml:112:21
-  event jsir_extern_hints.ml:112:14
-  event jsir_extern_hints.ml:112:21
-  event jsir_extern_hints.ml:112:14
-  v390 = "caml_equal"(v123, v125) [hint:int64]
-  event jsir_extern_hints.ml:112:21
-  v391 = CONST{0}
-  if v390 then 94 () else 93 ()
+  event jsir_extern_hints.ml:124:2
+  v473 = "caml_ba_uint8_set64"(v366, 0l, 72623859790382856L) 
+  event jsir_extern_hints.ml:124:41
+  event jsir_extern_hints.ml:125:10
+  v474 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v475 = "caml_nativeint_of_int"(v474) 
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v476 = "caml_nativeint_sub"(v475, 7l)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v477 = "caml_ba_dim"(v366, 0)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v478 = "caml_nativeint_of_int"(v477) 
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v479 = "caml_nativeint_sub"(v478, 7l)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v480 = "caml_nativeint_shift_right"(v479, 31)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v481 = "caml_nativeint_xor"(v480, -1l)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v482 = "caml_nativeint_and"(v481, v476)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:10
+  v483 = 0l <= v482
+  event jsir_extern_hints.ml:125:29
+  if v483 then 93 () else 92 ()
 
 ==== 92 () ====
-  raise v131
+  raise v5
 
 ==== 93 () ====
-  return v391
+  event jsir_extern_hints.ml:125:10
+  v484 = "caml_ba_uint8_get64"(v366, 0l)
+  event jsir_extern_hints.ml:125:29
+  event jsir_extern_hints.ml:125:9
+  v485 = "caml_equal"(v484, 72623859790382856L) [hint:int64]
+  event jsir_extern_hints.ml:125:52
+  v486 = CONST{0}
+  if v485 then 95 () else 94 ()
 
 ==== 94 () ====
-  raise v138
+  raise v136
 
 ==== 95 () ====
-  event jsir_extern_hints.ml:115:15
-  event jsir_extern_hints.ml:115:27
-  event jsir_extern_hints.ml:115:10
-  event jsir_extern_hints.ml:115:27
-  v397 = "caml_sqrt_float"(v141) 
-  branch 97 (v397)
+  return v486
 
 ==== 96 () ====
-  event jsir_extern_hints.ml:116:25
-  event jsir_extern_hints.ml:116:37
-  event jsir_extern_hints.ml:116:10
-  event jsir_extern_hints.ml:116:37
-  v400 = "caml_int32_of_float"(v150) 
-  branch 99 (v400)
+  event jsir_extern_hints.ml:129:46
+  v491 = CONST{4}
+  v492 = {tag=0; 0 = v491}
+  event jsir_extern_hints.ml:129:53
+  v494 = "caml_ba_create"(1, 0, v492) 
+  branch 97 (v494)
 
-==== 97 (v396) ====
-  event jsir_extern_hints.ml:115:9
-  v398 = "caml_eq_float"(v396, 4)
-  event jsir_extern_hints.ml:115:33
-  if v398 then 96 () else 98 ()
+==== 97 (v493) ====
+  event jsir_extern_hints.ml:129:24
+  event jsir_extern_hints.ml:129:54
+  event jsir_extern_hints.ml:130:2
+  v495 = "caml_ba_dim"(v493, 0)
+  event jsir_extern_hints.ml:130:25
+  event jsir_extern_hints.ml:130:2
+  v496 = "caml_nativeint_of_int"(v495) 
+  event jsir_extern_hints.ml:130:25
+  event jsir_extern_hints.ml:130:2
+  v497 = 2l <= v496
+  event jsir_extern_hints.ml:130:25
+  if v497 then 99 () else 98 ()
 
 ==== 98 () ====
-  raise v147
+  raise v5
 
-==== 99 (v399) ====
-  event jsir_extern_hints.ml:116:9
-  v401 = v399 === 3l
-  event jsir_extern_hints.ml:116:43
-  v402 = CONST{0}
-  if v401 then 101 () else 100 ()
+==== 99 () ====
+  event jsir_extern_hints.ml:130:2
+  v498 = "caml_ba_set_raw_unsafe"(v493, 2, 3.5)  [hint:unsafe/float64/C]
+  event jsir_extern_hints.ml:130:25
+  event jsir_extern_hints.ml:131:10
+  v499 = "caml_ba_dim"(v493, 0)
+  event jsir_extern_hints.ml:131:29
+  event jsir_extern_hints.ml:131:10
+  v500 = "caml_nativeint_of_int"(v499) 
+  event jsir_extern_hints.ml:131:29
+  event jsir_extern_hints.ml:131:10
+  v501 = 2l <= v500
+  event jsir_extern_hints.ml:131:29
+  if v501 then 102 () else 101 ()
 
 ==== 100 () ====
-  raise v156
+  event jsir_extern_hints.ml:133:54
+  v504 = CONST{4}
+  v505 = {tag=0; 0 = v504}
+  event jsir_extern_hints.ml:133:61
+  v507 = "caml_ba_create"(6, 1, v505) 
+  branch 104 (v507)
 
 ==== 101 () ====
-  return v402
+  raise v5
 
 ==== 102 () ====
-  v423 = imm{tag=0; 0 = v201; 1 = v264; 2 = v367; 3 = v385; 4 = v392; 5 = v403}
-  v424 = "caml_register_global"(v423, "Jsir_extern_hints"j)
-  stop
+  event jsir_extern_hints.ml:131:10
+  v502 = "caml_ba_get_raw_unsafe"(v493, 2) [hint:unsafe/float64/C]
+  event jsir_extern_hints.ml:131:29
+  event jsir_extern_hints.ml:131:9
+  v503 = "caml_eq_float"(v502, 3.5)
+  event jsir_extern_hints.ml:131:36
+  if v503 then 100 () else 103 ()
 
 ==== 103 () ====
-  v409 = CONST{0}
-  v410 = v264(v409)
-  branch 106 (v410)
+  raise v143
 
-==== 104 (v405) ====
-  branch 103 ()
+==== 104 (v506) ====
+  event jsir_extern_hints.ml:133:32
+  event jsir_extern_hints.ml:133:62
+  event jsir_extern_hints.ml:134:2
+  v508 = "caml_ba_dim"(v506, 0)
+  event jsir_extern_hints.ml:134:27
+  event jsir_extern_hints.ml:134:2
+  v509 = "caml_nativeint_of_int"(v508) 
+  event jsir_extern_hints.ml:134:27
+  event jsir_extern_hints.ml:134:2
+  v510 = 0l <= v509
+  event jsir_extern_hints.ml:134:27
+  if v510 then 106 () else 105 ()
 
 ==== 105 () ====
-  v412 = CONST{0}
-  v413 = v367(v412)
-  branch 108 (v413)
+  raise v5
 
-==== 106 (v408) ====
-  branch 105 ()
+==== 106 () ====
+  event jsir_extern_hints.ml:134:2
+  v511 = "caml_ba_set_raw_unsafe"(v506, 0, 42l)  [hint:unsafe/int32/Fortran]
+  event jsir_extern_hints.ml:134:27
+  event jsir_extern_hints.ml:135:10
+  v512 = "caml_ba_dim"(v506, 0)
+  event jsir_extern_hints.ml:135:31
+  event jsir_extern_hints.ml:135:10
+  v513 = "caml_nativeint_of_int"(v512) 
+  event jsir_extern_hints.ml:135:31
+  event jsir_extern_hints.ml:135:10
+  v514 = 0l <= v513
+  event jsir_extern_hints.ml:135:31
+  if v514 then 108 () else 107 ()
 
 ==== 107 () ====
-  v415 = CONST{0}
-  v416 = v385(v415)
-  branch 110 (v416)
+  raise v5
 
-==== 108 (v411) ====
-  branch 107 ()
+==== 108 () ====
+  event jsir_extern_hints.ml:135:10
+  v515 = "caml_ba_get_raw_unsafe"(v506, 0) [hint:unsafe/int32/Fortran]
+  event jsir_extern_hints.ml:135:31
+  event jsir_extern_hints.ml:135:9
+  v516 = v515 === 42l
+  event jsir_extern_hints.ml:135:38
+  v517 = CONST{0}
+  if v516 then 110 () else 109 ()
 
 ==== 109 () ====
-  v418 = CONST{0}
-  v419 = v392(v418)
-  branch 112 (v419)
+  raise v150
 
-==== 110 (v414) ====
-  branch 109 ()
+==== 110 () ====
+  return v517
 
 ==== 111 () ====
-  v421 = CONST{0}
-  v422 = v403(v421)
-  branch 113 (v422)
+  event jsir_extern_hints.ml:138:10
+  event jsir_extern_hints.ml:138:19
+  event jsir_extern_hints.ml:139:10
+  event jsir_extern_hints.ml:139:19
+  event jsir_extern_hints.ml:140:9
+  event jsir_extern_hints.ml:140:16
+  event jsir_extern_hints.ml:140:9
+  event jsir_extern_hints.ml:140:16
+  event jsir_extern_hints.ml:140:9
+  v522 = "caml_lessthan"(v153, v155) [hint:int64]
+  event jsir_extern_hints.ml:140:16
+  if v522 then 112 () else 113 ()
 
-==== 112 (v417) ====
-  branch 111 ()
+==== 112 () ====
+  event jsir_extern_hints.ml:141:9
+  event jsir_extern_hints.ml:141:17
+  event jsir_extern_hints.ml:141:9
+  event jsir_extern_hints.ml:141:17
+  event jsir_extern_hints.ml:141:9
+  v523 = "caml_lessequal"(v153, v155) [hint:int64]
+  event jsir_extern_hints.ml:141:17
+  if v523 then 114 () else 115 ()
 
-==== 113 (v420) ====
-  branch 102 ()
+==== 113 () ====
+  raise v161
+
+==== 114 () ====
+  event jsir_extern_hints.ml:142:9
+  event jsir_extern_hints.ml:142:16
+  event jsir_extern_hints.ml:142:9
+  event jsir_extern_hints.ml:142:16
+  event jsir_extern_hints.ml:142:9
+  v524 = "caml_lessthan"(v153, v155) [hint:int64]
+  event jsir_extern_hints.ml:142:16
+  if v524 then 116 () else 117 ()
+
+==== 115 () ====
+  raise v168
+
+==== 116 () ====
+  event jsir_extern_hints.ml:143:9
+  event jsir_extern_hints.ml:143:17
+  event jsir_extern_hints.ml:143:9
+  event jsir_extern_hints.ml:143:17
+  event jsir_extern_hints.ml:143:9
+  v525 = "caml_lessequal"(v153, v155) [hint:int64]
+  event jsir_extern_hints.ml:143:17
+  if v525 then 118 () else 119 ()
+
+==== 117 () ====
+  raise v175
+
+==== 118 () ====
+  event jsir_extern_hints.ml:144:14
+  event jsir_extern_hints.ml:144:21
+  event jsir_extern_hints.ml:144:14
+  event jsir_extern_hints.ml:144:21
+  event jsir_extern_hints.ml:144:14
+  v526 = "caml_equal"(v153, v155) [hint:int64]
+  event jsir_extern_hints.ml:144:21
+  if v526 then 121 () else 120 ()
+
+==== 119 () ====
+  raise v182
+
+==== 120 () ====
+  event jsir_extern_hints.ml:145:9
+  event jsir_extern_hints.ml:145:17
+  event jsir_extern_hints.ml:145:9
+  event jsir_extern_hints.ml:145:17
+  event jsir_extern_hints.ml:145:9
+  v527 = "caml_notequal"(v153, v155) [hint:int64]
+  event jsir_extern_hints.ml:145:17
+  v528 = CONST{0}
+  if v527 then 123 () else 122 ()
+
+==== 121 () ====
+  raise v189
+
+==== 122 () ====
+  raise v196
+
+==== 123 () ====
+  return v528
+
+==== 124 () ====
+  event jsir_extern_hints.ml:147:51
+  v533 = v531.length [hint:generic]
+  event jsir_extern_hints.ml:147:65
+  return v533
+
+==== 125 () ====
+  event jsir_extern_hints.ml:150:36
+  v538 = CONST{2}
+  v539 = CONST{1}
+  v540 = {tag=254; 0 = v539; 1 = v538}
+  event jsir_extern_hints.ml:150:48
+  event jsir_extern_hints.ml:150:29
+  event jsir_extern_hints.ml:150:48
+  event jsir_extern_hints.ml:151:32
+  v541 = CONST{3}
+  v542 = CONST{2}
+  v543 = CONST{1}
+  v544 = {tag=0; 0 = v543; 1 = v542; 2 = v541}
+  event jsir_extern_hints.ml:151:45
+  event jsir_extern_hints.ml:151:25
+  event jsir_extern_hints.ml:151:45
+  event jsir_extern_hints.ml:152:10
+  v545 = v540.length [hint:float]
+  event jsir_extern_hints.ml:152:29
+  event jsir_extern_hints.ml:152:9
+  v546 = v545 === 2
+  event jsir_extern_hints.ml:152:34
+  if v546 then 126 () else 127 ()
+
+==== 126 () ====
+  event jsir_extern_hints.ml:153:10
+  v547 = v544.length [hint:value]
+  event jsir_extern_hints.ml:153:27
+  event jsir_extern_hints.ml:153:9
+  v548 = v547 === 3
+  event jsir_extern_hints.ml:153:32
+  if v548 then 128 () else 129 ()
+
+==== 127 () ====
+  raise v203
+
+==== 128 () ====
+  v550 = v534(v544)
+  branch 130 (v550)
+
+==== 129 () ====
+  raise v210
+
+==== 130 (v549) ====
+  event jsir_extern_hints.ml:154:9
+  v551 = v549 === 3
+  event jsir_extern_hints.ml:154:34
+  v552 = CONST{0}
+  if v551 then 132 () else 131 ()
+
+==== 131 () ====
+  raise v217
+
+==== 132 () ====
+  return v552
+
+==== 133 () ====
+  event jsir_extern_hints.ml:157:15
+  event jsir_extern_hints.ml:157:27
+  event jsir_extern_hints.ml:157:10
+  event jsir_extern_hints.ml:157:27
+  v558 = "caml_sqrt_float"(v220) 
+  branch 135 (v558)
+
+==== 134 () ====
+  event jsir_extern_hints.ml:158:25
+  event jsir_extern_hints.ml:158:37
+  event jsir_extern_hints.ml:158:10
+  event jsir_extern_hints.ml:158:37
+  v561 = "caml_int32_of_float"(v229) 
+  branch 137 (v561)
+
+==== 135 (v557) ====
+  event jsir_extern_hints.ml:157:9
+  v559 = "caml_eq_float"(v557, 4)
+  event jsir_extern_hints.ml:157:33
+  if v559 then 134 () else 136 ()
+
+==== 136 () ====
+  raise v226
+
+==== 137 (v560) ====
+  event jsir_extern_hints.ml:158:9
+  v562 = v560 === 3l
+  event jsir_extern_hints.ml:158:43
+  v563 = CONST{0}
+  if v562 then 139 () else 138 ()
+
+==== 138 () ====
+  raise v235
+
+==== 139 () ====
+  return v563
+
+==== 140 () ====
+  v587 = imm{tag=0; 0 = v290; 1 = v360; 2 = v487; 3 = v518; 4 = v529; 5 = v534; 6 = v553; 7 = v564}
+  v588 = "caml_register_global"(v587, "Jsir_extern_hints"j)
+  stop
+
+==== 141 () ====
+  v570 = CONST{0}
+  v571 = v360(v570)
+  branch 144 (v571)
+
+==== 142 (v566) ====
+  branch 141 ()
+
+==== 143 () ====
+  v573 = CONST{0}
+  v574 = v487(v573)
+  branch 146 (v574)
+
+==== 144 (v569) ====
+  branch 143 ()
+
+==== 145 () ====
+  v576 = CONST{0}
+  v577 = v518(v576)
+  branch 148 (v577)
+
+==== 146 (v572) ====
+  branch 145 ()
+
+==== 147 () ====
+  v579 = CONST{0}
+  v580 = v529(v579)
+  branch 150 (v580)
+
+==== 148 (v575) ====
+  branch 147 ()
+
+==== 149 () ====
+  v582 = CONST{0}
+  v583 = v553(v582)
+  branch 152 (v583)
+
+==== 150 (v578) ====
+  branch 149 ()
+
+==== 151 () ====
+  v585 = CONST{0}
+  v586 = v564(v585)
+  branch 153 (v586)
+
+==== 152 (v581) ====
+  branch 151 ()
+
+==== 153 (v584) ====
+  branch 140 ()
 
 

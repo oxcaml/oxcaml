@@ -123,9 +123,34 @@ let bound_parameters ~env bound_params =
     (Bound_parameters.to_list bound_params)
     ([], env)
 
-let repr_of_kind (kind : Flambda_kind.t) : Optimization_hint.repr option =
-  match kind with
-  | Value -> Some Value
+let repr_of_value_subkind
+    (subkind : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
+    Optimization_hint.repr =
+  match subkind with
+  | Boxed_float -> Float
+  | Boxed_int32 -> Int32
+  | Boxed_int64 -> Int64
+  | Boxed_nativeint -> Nativeint
+  | Tagged_immediate -> Int
+  | Anything | Boxed_float32 | Boxed_vec128 | Boxed_vec256 | Boxed_vec512
+  | Boxed_mask | Variant _ | Float_block _ | Float_array | Immediate_array
+  | Value_array | Generic_array | Unboxed_float32_array | Untagged_int_array
+  | Untagged_int8_array | Untagged_int16_array | Unboxed_int32_array
+  | Unboxed_int64_array | Unboxed_nativeint_array | Unboxed_vec128_array
+  | Unboxed_vec256_array | Unboxed_vec512_array | Unboxed_mask_array
+  | Unboxed_product_array ->
+    Value
+
+let repr_of_kind (kind : Flambda_kind.With_subkind.t) :
+    Optimization_hint.repr option =
+  match Flambda_kind.With_subkind.kind kind with
+  | Value -> (
+    match Flambda_kind.With_subkind.nullable kind with
+    | Nullable -> Some Value
+    | Non_nullable ->
+      Some
+        (repr_of_value_subkind
+           (Flambda_kind.With_subkind.non_null_value_subkind kind)))
   | Naked_number Naked_immediate -> Some Int
   | Naked_number Naked_float -> Some Float
   | Naked_number Naked_int32 -> Some Int32
@@ -138,9 +163,7 @@ let repr_of_kind (kind : Flambda_kind.t) : Optimization_hint.repr option =
     None
 
 let reprs_of_arity arity =
-  Flambda_arity.unarize arity
-  |> Misc.Stdlib.List.map_option (fun kind ->
-      repr_of_kind (Flambda_kind.With_subkind.kind kind))
+  Flambda_arity.unarize arity |> Misc.Stdlib.List.map_option repr_of_kind
 
 let return_repr_of_arity arity : Optimization_hint.repr option =
   match reprs_of_arity arity with
@@ -151,12 +174,19 @@ let return_repr_of_arity arity : Optimization_hint.repr option =
     Some Value
 
 let closure_hint code_metadata ~params : Optimization_hint.closure_hint option =
+  let params_arity = Code_metadata.params_arity code_metadata in
+  if
+    List.compare_length_with params
+      (Flambda_arity.cardinal_unarized params_arity)
+    <> 0
+  then
+    Misc.fatal_errorf "%d closure parameters do not match the arity %a"
+      (List.length params) Flambda_arity.print params_arity;
   match
-    ( reprs_of_arity (Code_metadata.params_arity code_metadata),
+    ( reprs_of_arity params_arity,
       return_repr_of_arity (Code_metadata.result_arity code_metadata) )
   with
-  | Some param_reprs, Some return
-    when List.compare_lengths param_reprs params = 0 ->
+  | Some param_reprs, Some return ->
     let inline : Optimization_hint.inline_attribute =
       match Code_metadata.inline code_metadata with
       | Always_inline -> Always_inline

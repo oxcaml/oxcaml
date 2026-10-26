@@ -95,20 +95,44 @@ let bigarray_hint ~(kind : Flambda_primitive.Bigarray_kind.t)
 let bigstring_hint = bigarray_hint ~kind:Uint8 ~layout:C
 
 (* The unchecked variant ([u] suffix) of a string, bytes or bigstring access
-   primitive of at least 16 bits, e.g. [caml_string_get16u]. *)
+   primitive of at least 16 bits, e.g. [caml_string_get16u], with
+   [Hint_unsafe]. *)
+type wide_access =
+  | Get16
+  | Get32
+  | Getf32
+  | Get64
+  | Set16
+  | Set32
+  | Setf32
+  | Set64
+
 let unsafe_string_like_access (value : Flambda_primitive.string_like_value)
-    op_name =
+    (access : wide_access) : Jsir.prim =
+  let op_name =
+    match access with
+    | Get16 -> "get16"
+    | Get32 -> "get32"
+    | Getf32 -> "getf32"
+    | Get64 -> "get64"
+    | Set16 -> "set16"
+    | Set32 -> "set32"
+    | Setf32 -> "setf32"
+    | Set64 -> "set64"
+  in
+  let unchecked prefix : Jsir.prim =
+    Extern (prefix ^ op_name ^ "u", Some Hint_unsafe)
+  in
   match value with
-  | String -> "caml_string_" ^ op_name ^ "u"
-  | Bytes -> "caml_bytes_" ^ op_name ^ "u"
+  | String -> unchecked "caml_string_"
+  | Bytes -> unchecked "caml_bytes_"
   | Bigstring -> (
-    match op_name with
-    | "get16" | "get64" | "set16" | "set64" ->
+    match access with
+    | Get16 | Get64 | Set16 | Set64 ->
       (* The js_of_ocaml runtime only provides these unchecked variants for
-         OCaml >= 5.6 (bytecode only started asking for them then), so the
-         checked ones are used until OxCaml catches up. *)
-      "caml_ba_uint8_" ^ op_name
-    | _ -> "caml_ba_uint8_" ^ op_name ^ "u")
+         OCaml >= 5.6. *)
+      Extern ("caml_ba_uint8_" ^ op_name, None)
+    | Get32 | Getf32 | Set32 | Setf32 -> unchecked "caml_ba_uint8_")
 
 let no_op ~env ~res = None, env, res
 
@@ -543,21 +567,19 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Bytes -> Extern ("caml_bytes_unsafe_get", None)
       | Bigstring -> Extern ("caml_ba_get_raw_unsafe", Some bigstring_hint)
     in
-    let wide_load op_name : Jsir.prim =
-      Extern (unsafe_string_like_access value op_name, Some Hint_unsafe)
-    in
+    let wide_load access = unsafe_string_like_access value access in
     match width with
     | Eight -> use_prim' byte_load
     | Eight_signed ->
       let var, env, res = use_prim0' ~env ~res byte_load [x; y] in
       sign_extend ~env ~res ~bits:8 (Pv var)
-    | Sixteen -> use_prim' (wide_load "get16")
+    | Sixteen -> use_prim' (wide_load Get16)
     | Sixteen_signed ->
-      let var, env, res = use_prim0' ~env ~res (wide_load "get16") [x; y] in
+      let var, env, res = use_prim0' ~env ~res (wide_load Get16) [x; y] in
       sign_extend ~env ~res ~bits:16 (Pv var)
-    | Thirty_two -> use_prim' (wide_load "get32")
-    | Single -> use_prim' (wide_load "getf32")
-    | Sixty_four -> use_prim' (wide_load "get64")
+    | Thirty_two -> use_prim' (wide_load Get32)
+    | Single -> use_prim' (wide_load Getf32)
+    | Sixty_four -> use_prim' (wide_load Get64)
     | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ | Mask ->
       raise Primitive_not_supported)
   | Bigarray_load (_dims, kind, layout) ->
@@ -637,31 +659,20 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     | Yielding_bool comparison -> (
       let eq, neq, lt, ult, le =
         let open Jsir in
-        let specialised (int_kind : Optimization_hint.boxed_integer) =
-          let polymorphic name (prim : prim) : prim =
-            match int_kind with
-            | Int32 | Nativeint -> prim
-            | Int64 -> Extern (name, Some (Hint_int int_kind))
-          in
-          let ult : prim =
-            match int_kind with
-            | Int32 | Nativeint -> Ult
-            | Int64 -> Extern ("caml_int64_ult", None)
-          in
-          ( polymorphic "caml_equal" Eq,
-            polymorphic "caml_notequal" Neq,
-            polymorphic "caml_lessthan" Lt,
-            ult,
-            polymorphic "caml_lessequal" Le )
-        in
         match kind with
-        | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16 ->
+        | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
+        | Naked_int32 | Naked_nativeint ->
           (* Sign extension preserves both signed and unsigned ordering, so
-             smallints can be compared directly *)
+             smallints can be compared directly. 32-bit integers are plain JS
+             numbers, so they don't need any hints either. *)
           Eq, Neq, Lt, Ult, Le
-        | Naked_int32 -> specialised Int32
-        | Naked_nativeint -> specialised Nativeint
-        | Naked_int64 -> specialised Int64
+        | Naked_int64 ->
+          let hint : Optimization_hint.ccall option = Some (Hint_int Int64) in
+          ( Extern ("caml_equal", hint),
+            Extern ("caml_notequal", hint),
+            Extern ("caml_lessthan", hint),
+            Extern ("caml_int64_ult", None),
+            Extern ("caml_lessequal", hint) )
       in
       let unsigned_le x y =
         let var_ule = Jsir.Var.fresh () in
@@ -795,9 +806,8 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     let string_like_value : Flambda_primitive.string_like_value =
       match value with Bytes -> Bytes | Bigstring -> Bigstring
     in
-    let wide_store op_name : Jsir.prim =
-      Extern
-        (unsafe_string_like_access string_like_value op_name, Some Hint_unsafe)
+    let wide_store access =
+      unsafe_string_like_access string_like_value access
     in
     let prim : Jsir.prim =
       match value, width with
@@ -808,10 +818,10 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Bytes, (Eight | Eight_signed) -> Extern ("caml_bytes_unsafe_set", None)
       | Bigstring, (Eight | Eight_signed) ->
         Extern ("caml_ba_set_raw_unsafe", Some bigstring_hint)
-      | _, (Sixteen | Sixteen_signed) -> wide_store "set16"
-      | _, Thirty_two -> wide_store "set32"
-      | _, Single -> wide_store "setf32"
-      | _, Sixty_four -> wide_store "set64"
+      | _, (Sixteen | Sixteen_signed) -> wide_store Set16
+      | _, Thirty_two -> wide_store Set32
+      | _, Single -> wide_store Setf32
+      | _, Sixty_four -> wide_store Set64
     in
     use_prim' prim
   | Bigarray_set (_dims, kind, layout) ->
