@@ -27,6 +27,7 @@
  ******************************************************************************)
 
 module L = Lambda
+module FC = Fdo_counter
 
 (* CR yusumez: We need to check whether this is a good way to identify
    functions *)
@@ -119,7 +120,7 @@ module Naming_context = struct
     index
 end
 
-type t = { definition_id : Fdo_counter.Definition_id.t }
+type t = { function_ : FC.Function.t }
 
 let of_function (context : Naming_context.t) (fn : L.lfunction) =
   let { L.loc; params; body; _ } = fn in
@@ -155,20 +156,19 @@ let of_function (context : Naming_context.t) (fn : L.lfunction) =
       ^ String.concat "," (Leading_tokens.leading_tokens ~params body)
     else path
   in
-  let discriminator = Naming_context.fresh_discriminator context ~path in
-  ( { definition_id =
-        Fdo_counter.Definition_id.create_original ~demangled_name:path
-          ~discriminator
-    },
-    { context with enclosing_path = path } )
+  let function_ =
+    let discriminator = Naming_context.fresh_discriminator context ~path in
+    let name = FC.Name.create ~name_str:path ~discriminator in
+    FC.Function.create_original name
+  in
+  { function_ }, { context with enclosing_path = path }
 
-let definition_id t = t.definition_id
+let function_ t = t.function_
 
 let leading_tokens = Leading_tokens.leading_tokens
 
 let entry_annotation t =
-  Fdo_annotation.of_list
-    [ { Fdo_counter.position =
-          Fdo_counter.Position.create_function_entry t.definition_id;
-        inlining_stack = []
-      } ]
+  let counter =
+    t.function_ |> FC.Position.create_function_entry |> FC.of_position
+  in
+  Fdo_annotation.of_list [counter]
