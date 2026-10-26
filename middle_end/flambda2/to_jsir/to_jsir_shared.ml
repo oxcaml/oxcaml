@@ -150,8 +150,7 @@ let return_repr_of_arity arity : Optimization_hint.repr option =
     (* Several unarised results are returned as a block. *)
     Some Value
 
-let closure_hint code_metadata ~params : Optimization_hint.closure_hint option
-    =
+let closure_hint code_metadata ~params : Optimization_hint.closure_hint option =
   match
     ( reprs_of_arity (Code_metadata.params_arity code_metadata),
       return_repr_of_arity (Code_metadata.result_arity code_metadata) )
