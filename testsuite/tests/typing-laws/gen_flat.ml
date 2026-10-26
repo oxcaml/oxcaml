@@ -58,5 +58,8 @@ law? control (x : int) :
 law? binding (s : shape) :
   let a = (match s with Circle r -> r | Square w -> w) in
   (try a >= 0. with Not_found -> false) || a < 0.
+law? functions (xs : int list) :
+  (fun ?(min = 0) x -> x >= min) 1 && List.for_all (fun x -> x >= 0) xs
+  || List.exists (function 0 -> true | _ -> false) xs
 law? records (p : point) :
   ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.

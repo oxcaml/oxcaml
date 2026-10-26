@@ -43,7 +43,6 @@ type unsupported =
   | Effect_handlers
   | Exclave
   | First_class_modules
-  | Functions
   | Layout_polymorphism
   | Local_exceptions
   | Local_modules
@@ -187,11 +186,9 @@ let rec spectree_pattern : type k. k general_pattern -> k spec_general_pattern =
     stpat_unique_barrier = p.pat_unique_barrier
   }
 
-let extra (extra, loc, attrs) : spec_extra * Location.t =
-  check_attributes loc attrs;
-  match extra with
-  | Texp_constraint cty -> Stexp_constraint cty, loc
-  | Texp_inspected_type inspection -> Stexp_inspected_type inspection, loc
+let spec_extra loc : exp_extra -> spec_extra = function
+  | Texp_constraint cty -> Stexp_constraint cty
+  | Texp_inspected_type inspection -> Stexp_inspected_type inspection
   | Texp_mode _ -> unsupported loc Mode_annotations
   | Texp_poly _ -> unsupported loc Polymorphic_annotations
   | Texp_coerce _ -> unsupported loc Coercions
@@ -199,10 +196,14 @@ let extra (extra, loc, attrs) : spec_extra * Location.t =
   | Texp_stack -> unsupported loc Stack_allocation
   | Texp_borrowed | Texp_ghost_region -> unsupported loc Borrow
 
-let check_position loc (position : apply_position) =
-  match position with
-  | Default -> ()
-  | Tail | Nontail -> unsupported loc Attributes
+let extra (extra, loc, attrs) : spec_extra * Location.t =
+  check_attributes loc attrs;
+  spec_extra loc extra, loc
+
+let check_modes loc (modes : _ modes) =
+  match modes.mode_desc with
+  | [] -> ()
+  | _ :: _ -> unsupported loc Mode_annotations
 
 let check_zero_alloc loc (zero_alloc : Zero_alloc.assume option) =
   match zero_alloc with None -> () | Some _ -> unsupported loc Attributes
@@ -234,11 +235,10 @@ and spectree_desc bound loc desc : spec_expression_desc =
     Misc.fatal_error "Translspec.spectree: application without arguments"
   | Texp_apply
       (funct, (_ :: _ as args), position, ret_mode, yielding, zero_alloc) ->
-    check_position loc position;
     check_zero_alloc loc zero_alloc;
     let funct = spectree bound funct in
     let args = List.map (argument bound loc) args in
-    Stexp_apply { funct; args; ret_mode; yielding }
+    Stexp_apply { funct; args; position; ret_mode; yielding }
   | Texp_apply_layout _ -> unsupported loc Layout_polymorphism
   | Texp_let (rec_flag, vbs, body) ->
     let inner = add_bound bound (let_bound_idents vbs) in
@@ -248,7 +248,18 @@ and spectree_desc bound loc desc : spec_expression_desc =
     let vbs = List.map (value_binding in_exprs) vbs in
     Stexp_let (rec_flag, vbs, spectree inner body)
   | Texp_letmutable _ -> unsupported loc Mutable_variables
-  | Texp_function _ -> unsupported loc Functions
+  | Texp_function
+      { params; body; ret_mode; ret_sort; locality_mode; yielding; zero_alloc }
+    ->
+    check_modes loc ret_mode;
+    let bound, params = List.fold_left_map function_param bound params in
+    let body =
+      match body with
+      | Tfunction_body e -> Stfunction_body (spectree bound e)
+      | Tfunction_cases fc -> Stfunction_cases (function_cases bound fc)
+    in
+    Stexp_function
+      { params; body; ret_mode; ret_sort; locality_mode; yielding; zero_alloc }
   | Texp_match (e, sort, cases, [], partial) ->
     let e = spectree bound e in
     Stexp_match (e, sort, List.map (case bound) cases, partial)
@@ -349,6 +360,48 @@ and ident_desc bound loc path (lid : Longident.t Location.loc)
     Misc.fatal_error "Translspec.spectree: bad Texp_ident"
 
 and labelled bound (lbl, e, sort) = lbl, spectree bound e, sort
+
+(* A parameter scopes over the parameters that follow it and over the
+   body. *)
+and function_param bound (fp : Typedtree.function_param) =
+  (match fp.fp_newtypes with
+  | [] -> ()
+  | _ :: _ -> unsupported fp.fp_loc Locally_abstract_types);
+  check_modes fp.fp_loc fp.fp_mode;
+  ignore (arg_label fp.fp_loc fp.fp_arg_label);
+  let kind, pat =
+    match fp.fp_kind with
+    | Tparam_pat p -> Stparam_pat (spectree_pattern p), p
+    | Tparam_optional_default (p, e, sort) ->
+      Stparam_optional_default (spectree_pattern p, spectree bound e, sort), p
+  in
+  let bound = add_bound bound (fp.fp_param :: pat_bound_idents pat) in
+  ( bound,
+    { sfp_arg_label = fp.fp_arg_label;
+      sfp_param = fp.fp_param;
+      sfp_param_debug_uid = fp.fp_param_debug_uid;
+      sfp_partial = fp.fp_partial;
+      sfp_kind = kind;
+      sfp_sort = fp.fp_sort;
+      sfp_mode = fp.fp_mode;
+      sfp_curry = fp.fp_curry;
+      sfp_loc = fp.fp_loc
+    } )
+
+and function_cases bound (fc : Typedtree.function_cases) : spec_function_cases =
+  check_attributes fc.fc_loc fc.fc_attributes;
+  let bound = Ident.Set.add fc.fc_param bound in
+  { sfc_cases = List.map (case bound) fc.fc_cases;
+    sfc_env = fc.fc_env;
+    sfc_arg_mode = fc.fc_arg_mode;
+    sfc_arg_sort = fc.fc_arg_sort;
+    sfc_ret_type = fc.fc_ret_type;
+    sfc_partial = fc.fc_partial;
+    sfc_param = fc.fc_param;
+    sfc_param_debug_uid = fc.fc_param_debug_uid;
+    sfc_loc = fc.fc_loc;
+    sfc_exp_extra = List.map (spec_extra fc.fc_loc) fc.fc_exp_extra
+  }
 
 and value_binding bound (vb : Typedtree.value_binding) : spec_value_binding =
   check_attributes vb.vb_loc vb.vb_attributes;
@@ -501,6 +554,25 @@ let rec spec (e : spec_expression) : Spec.expression =
   | Stexp_match (e, s, cases, _) ->
     Sexp_match (spec e, sort s, List.map spec_case cases)
   | Stexp_try (e, cases) -> Sexp_try (spec e, List.map spec_case cases)
+  | Stexp_function { params; body; _ } ->
+    let param (p : spec_function_param) : Spec.function_param =
+      let fp_kind : Spec.function_param_kind =
+        match p.sfp_kind with
+        | Stparam_pat q -> Sparam_pat (pattern q)
+        | Stparam_optional_default (q, e, s) ->
+          Sparam_optional_default (pattern q, spec e, sort s)
+      in
+      { fp_label = arg_label p.sfp_loc p.sfp_arg_label;
+        fp_kind;
+        fp_sort = sort p.sfp_sort
+      }
+    in
+    let body : Spec.function_body =
+      match body with
+      | Stfunction_body e -> Sfunction_body (spec e)
+      | Stfunction_cases fc -> Sfunction_cases (List.map spec_case fc.sfc_cases)
+    in
+    Sexp_function (List.map param params, body)
 
 and spec_case : type k. k spec_case -> Spec.case =
  fun c ->
@@ -629,11 +701,11 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
       (Id_prim (locality, sort, yielding))
       ident
   | Stexp_constant c -> Texp_constant c
-  | Stexp_apply { funct; args; ret_mode; yielding } ->
+  | Stexp_apply { funct; args; position; ret_mode; yielding } ->
     Texp_apply
       ( typedtree funct,
         List.map typedtree_argument args,
-        Default,
+        position,
         ret_mode,
         yielding,
         None )
@@ -720,6 +792,55 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
     Texp_match (typedtree e, sort, List.map typedtree_case cases, [], partial)
   | Stexp_try (e, cases) ->
     Texp_try (typedtree e, List.map typedtree_case cases, [])
+  | Stexp_function
+      { params; body; ret_mode; ret_sort; locality_mode; yielding; zero_alloc }
+    ->
+    let param (p : spec_function_param) : Typedtree.function_param =
+      let fp_kind =
+        match p.sfp_kind with
+        | Stparam_pat q -> Tparam_pat (typedtree_pattern q)
+        | Stparam_optional_default (q, e, s) ->
+          Tparam_optional_default (typedtree_pattern q, typedtree e, s)
+      in
+      { fp_arg_label = p.sfp_arg_label;
+        fp_param = p.sfp_param;
+        fp_param_debug_uid = p.sfp_param_debug_uid;
+        fp_partial = p.sfp_partial;
+        fp_kind;
+        fp_sort = p.sfp_sort;
+        fp_mode = p.sfp_mode;
+        fp_curry = p.sfp_curry;
+        fp_newtypes = [];
+        fp_loc = p.sfp_loc
+      }
+    in
+    let body =
+      match body with
+      | Stfunction_body e -> Tfunction_body (typedtree e)
+      | Stfunction_cases fc ->
+        Tfunction_cases
+          { fc_cases = List.map typedtree_case fc.sfc_cases;
+            fc_env = fc.sfc_env;
+            fc_arg_mode = fc.sfc_arg_mode;
+            fc_arg_sort = fc.sfc_arg_sort;
+            fc_ret_type = fc.sfc_ret_type;
+            fc_partial = fc.sfc_partial;
+            fc_param = fc.sfc_param;
+            fc_param_debug_uid = fc.sfc_param_debug_uid;
+            fc_loc = fc.sfc_loc;
+            fc_exp_extra = List.map typedtree_extra fc.sfc_exp_extra;
+            fc_attributes = []
+          }
+    in
+    Texp_function
+      { params = List.map param params;
+        body;
+        ret_mode;
+        ret_sort;
+        locality_mode;
+        yielding;
+        zero_alloc
+      }
 
 and typedtree_case : type k. k spec_case -> k Typedtree.case =
  fun c ->
@@ -755,7 +876,6 @@ let describe = function
   | Effect_handlers -> "effect handlers"
   | Exclave -> "exclave_"
   | First_class_modules -> "first-class modules"
-  | Functions -> "functions"
   | Layout_polymorphism -> "layout-polymorphic bindings"
   | Local_exceptions -> "local exceptions"
   | Local_modules -> "local modules"

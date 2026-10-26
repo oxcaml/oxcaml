@@ -275,10 +275,12 @@ module Renamed : sig
   type t = A | B of int
   val f : t -> int
   law? p (x : int) : (match B x with A -> 0 | B y -> y) = f (B x)
+  law? q (x : int) : (let rec g y = if y > 0 then g (y - 1) else y in g x) = 0
 end = struct
   type t = A | B of int
   let f = function A -> 0 | B n -> n
   law? p (n : int) : (match B n with A -> 0 | B m -> m) = f (B n)
+  law? q (n : int) : (let rec h m = if m > 0 then h (m - 1) else m in h n) = 0
 end
 [%%expect {|
 module Renamed :
@@ -288,6 +290,9 @@ module Renamed :
     law? p (x : int) :
       (match (B x : t) with | (A : t) -> (0) | (B y : t) -> y) =
         (f (B x : t))
+    law? q (x : int) :
+      (let rec g = fun y -> if y > (0) then (g (y - (1))) else y in g x) =
+        (0)
   end
 |}]
 

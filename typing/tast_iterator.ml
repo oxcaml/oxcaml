@@ -373,6 +373,25 @@ let[@warning "+9"] rec spec_expression sub
   | Stexp_try (e, cases) ->
       sub.spec_expression sub e;
       List.iter (spec_case sub) cases
+  | Stexp_function {params; body; _} -> spec_function sub params body
+
+and spec_function sub params body =
+  List.iter
+    (fun {sfp_kind; sfp_loc; _} ->
+       sub.location sub sfp_loc;
+       match sfp_kind with
+       | Stparam_pat p -> sub.spec_pattern sub p
+       | Stparam_optional_default (p, e, _) ->
+           sub.spec_pattern sub p;
+           sub.spec_expression sub e)
+    params;
+  match body with
+  | Stfunction_body e -> sub.spec_expression sub e
+  | Stfunction_cases {sfc_cases; sfc_env; sfc_loc; sfc_exp_extra; _} ->
+      sub.location sub sfc_loc;
+      sub.env sub sfc_env;
+      List.iter (spec_extra sub) sfc_exp_extra;
+      List.iter (spec_case sub) sfc_cases
 
 and spec_case : 'k. iterator -> 'k spec_case -> unit =
   fun sub {sc_lhs; sc_guard; sc_rhs} ->

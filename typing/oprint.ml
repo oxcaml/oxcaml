@@ -1224,6 +1224,27 @@ and print_out_spec ppf = function
   | Ospec_try (e, cases) ->
       fprintf ppf "@[<hv>@[<2>try@ %a@ with@]%a@]" print_out_spec e
         print_out_spec_cases cases
+  | Ospec_function ([], Ospec_cases cases) ->
+      fprintf ppf "@[<hv>function%a@]" print_out_spec_cases cases
+  | Ospec_function (params, body) ->
+      let param ppf ((label : arg_label), p, default) =
+        match label, default with
+        | Nolabel, _ -> print_simple_out_spec_pattern ppf p
+        | (Labelled l | Position l), _ ->
+            fprintf ppf "~%s:%a" l print_simple_out_spec_pattern p
+        | Optional l, None ->
+            fprintf ppf "?%s:%a" l print_simple_out_spec_pattern p
+        | Optional l, Some e ->
+            fprintf ppf "?%s:(%a =@ %a)" l print_out_spec_pattern p
+              print_out_spec e
+      in
+      let print_body ppf = function
+        | Ospec_body e -> print_out_spec ppf e
+        | Ospec_cases cases ->
+            fprintf ppf "@[<hv>function%a@]" print_out_spec_cases cases
+      in
+      fprintf ppf "@[<hv 2>fun %a ->@ %a@]"
+        (print_list param (fun ppf -> fprintf ppf "@ ")) params print_body body
   | Ospec_field { record; label; unboxed } ->
       fprintf ppf "@[<2>%a.%s%a@]" print_simple_out_spec record
         (if unboxed then "#" else "") print_constructor label
@@ -1266,7 +1287,7 @@ and print_simple_out_spec ppf = function
         (print_list field (fun ppf -> fprintf ppf ";@ ")) fields
   | Ospec_apply _ | Ospec_construct (_, _ :: _) | Ospec_variant (_, Some _)
   | Ospec_field _ | Ospec_ifthenelse _ | Ospec_assert _ | Ospec_lazy _
-  | Ospec_let _ | Ospec_match _ | Ospec_try _ as spec ->
+  | Ospec_let _ | Ospec_match _ | Ospec_try _ | Ospec_function _ as spec ->
       fprintf ppf "(%a)" print_out_spec spec
 
 (* The right-hand side of a case is parenthesized, so that it cannot capture

@@ -17,3 +17,6 @@ law? unzip_zip (xs : int list) (ys : int list) :
   length xs = length ys ===>
   let xs', ys' = unzip (zip (xs, ys)) in
   eq Int.equal xs' xs && eq Int.equal ys' ys
+
+law? zip_unzip (zs : (int * int) list) :
+  eq (fun (a, b) (c, d) -> Int.equal a c && Int.equal b d) (zip (unzip zs)) zs

@@ -3922,6 +3922,22 @@ let rec tree_of_spec (e : Spec.expression) : out_spec =
       Ospec_match (tree_of_spec e, List.map tree_of_spec_case cases)
   | Spec.Sexp_try (e, cases) ->
       Ospec_try (tree_of_spec e, List.map tree_of_spec_case cases)
+  | Spec.Sexp_function (params, body) ->
+      let param (p : Spec.function_param) =
+        match p.fp_kind with
+        | Sparam_pat q ->
+            (label_of_spec p.fp_label, tree_of_spec_pattern q, None)
+        | Sparam_optional_default (q, e, _) ->
+            (label_of_spec p.fp_label, tree_of_spec_pattern q,
+             Some (tree_of_spec e))
+      in
+      let body =
+        match body with
+        | Sfunction_body e -> Ospec_body (tree_of_spec e)
+        | Sfunction_cases cases ->
+            Ospec_cases (List.map tree_of_spec_case cases)
+      in
+      Ospec_function (List.map param params, body)
 
 and tree_of_spec_case (c : Spec.case) =
   (tree_of_spec_pattern c.c_lhs, Option.map tree_of_spec c.c_guard,

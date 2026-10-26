@@ -293,6 +293,11 @@ and out_spec =
       (** [Ospec_let (rec, bindings, body)] *)
   | Ospec_match of out_spec * out_spec_case list
   | Ospec_try of out_spec * out_spec_case list
+  | Ospec_function of out_spec_param list * out_spec_function_body
+and out_spec_param = arg_label * out_spec_pattern * out_spec option
+and out_spec_function_body =
+  | Ospec_body of out_spec
+  | Ospec_cases of out_spec_case list
 and out_spec_case = out_spec_pattern * out_spec option * out_spec
 and out_spec_pattern =
   | Ospat_any

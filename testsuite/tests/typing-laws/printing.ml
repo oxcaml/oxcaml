@@ -253,3 +253,24 @@ module type Binding =
       try (area s) >= (0.) with | Division_by_zero -> (true : bool)
   end
 |}]
+
+(* Functions, with labelled and optional parameters, and with cases. *)
+
+module type Functions = sig
+  val apply : (x:int -> ?y:int -> int -> int) -> int
+  val all : (int -> bool) -> int list -> bool
+  law? labelled : apply (fun ~x ?(y = 0) z -> x + y + z) = 1
+  law? cases (xs : int list) :
+    all (function 0 -> true | n -> n > 0) xs ===> List.for_all (fun x -> x >= 0) xs
+end
+[%%expect {|
+module type Functions =
+  sig
+    val apply : (x:int -> ?y:int -> int -> int) -> int
+    val all : (int -> bool) -> int list -> bool
+    law? labelled : (apply (fun ~x:x ?y:(y = (0)) z -> (x + y) + z)) = (1)
+    law? cases (xs : int list) :
+      all (function | (0) -> (true : bool) | n -> (n > (0))) xs ===>
+      List.for_all (fun x -> x >= (0)) xs
+  end
+|}]

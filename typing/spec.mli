@@ -105,6 +105,21 @@ type expression =
   | Sexp_let of Asttypes.rec_flag * value_binding list * expression
   | Sexp_match of expression * sort * case list
   | Sexp_try of expression * case list
+  | Sexp_function of function_param list * function_body
+
+and function_param =
+  { fp_label : arg_label;
+    fp_kind : function_param_kind;
+    fp_sort : sort
+  }
+
+and function_param_kind =
+  | Sparam_pat of pattern
+  | Sparam_optional_default of pattern * expression * sort  (** [?l:(p = e)] *)
+
+and function_body =
+  | Sfunction_body of expression
+  | Sfunction_cases of case list
 
 and value_binding =
   { vb_pat : pattern;

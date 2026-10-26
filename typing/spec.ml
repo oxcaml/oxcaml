@@ -92,6 +92,21 @@ type expression =
   | Sexp_let of Asttypes.rec_flag * value_binding list * expression
   | Sexp_match of expression * sort * case list
   | Sexp_try of expression * case list
+  | Sexp_function of function_param list * function_body
+
+and function_param =
+  { fp_label : arg_label;
+    fp_kind : function_param_kind;
+    fp_sort : sort
+  }
+
+and function_param_kind =
+  | Sparam_pat of pattern
+  | Sparam_optional_default of pattern * expression * sort
+
+and function_body =
+  | Sfunction_body of expression
+  | Sfunction_cases of case list
 
 and value_binding =
   { vb_pat : pattern;
@@ -164,6 +179,23 @@ let rec map_paths ~value_path ~type_path e =
     Sexp_match (map e, sort, List.map (map_case ~value_path ~type_path) cases)
   | Sexp_try (e, cases) ->
     Sexp_try (map e, List.map (map_case ~value_path ~type_path) cases)
+  | Sexp_function (params, body) ->
+    let param { fp_label; fp_kind; fp_sort } =
+      let fp_kind =
+        match fp_kind with
+        | Sparam_pat p -> Sparam_pat (map_pattern ~type_path p)
+        | Sparam_optional_default (p, e, s) ->
+          Sparam_optional_default (map_pattern ~type_path p, map e, s)
+      in
+      { fp_label; fp_kind; fp_sort }
+    in
+    let body =
+      match body with
+      | Sfunction_body e -> Sfunction_body (map e)
+      | Sfunction_cases cases ->
+        Sfunction_cases (List.map (map_case ~value_path ~type_path) cases)
+    in
+    Sexp_function (List.map param params, body)
 
 and map_case ~value_path ~type_path { c_lhs; c_guard; c_rhs } =
   let map e = map_paths ~value_path ~type_path e in
@@ -277,6 +309,19 @@ let rec paths_rev acc = function
     paths_rev acc body
   | Sexp_match (e, _, cases) | Sexp_try (e, cases) ->
     List.fold_left case_paths_rev (paths_rev acc e) cases
+  | Sexp_function (params, body) -> (
+    let acc =
+      List.fold_left
+        (fun acc { fp_kind; _ } ->
+          match fp_kind with
+          | Sparam_pat p -> pattern_paths_rev acc p
+          | Sparam_optional_default (p, e, _) ->
+            paths_rev (pattern_paths_rev acc p) e)
+        acc params
+    in
+    match body with
+    | Sfunction_body e -> paths_rev acc e
+    | Sfunction_cases cases -> List.fold_left case_paths_rev acc cases)
 
 and case_paths_rev acc { c_lhs; c_guard; c_rhs } =
   let acc = pattern_paths_rev acc c_lhs in
@@ -508,13 +553,48 @@ let rec alpha_equal ~same_path ~vars e1 e2 =
     equal e1 e2 && same_sort s1 s2 && same_cases ~same_path ~vars cases1 cases2
   | Sexp_try (e1, cases1), Sexp_try (e2, cases2) ->
     equal e1 e2 && same_cases ~same_path ~vars cases1 cases2
+  | Sexp_function (params1, body1), Sexp_function (params2, body2) -> (
+    (* A parameter scopes over the parameters that follow it and over the
+       body. *)
+    let rec params vars ps1 ps2 =
+      match ps1, ps2 with
+      | [], [] -> Some vars
+      | p1 :: ps1, p2 :: ps2 ->
+        if
+          same_arg_label p1.fp_label p2.fp_label
+          && same_sort p1.fp_sort p2.fp_sort
+        then
+          let vars =
+            match p1.fp_kind, p2.fp_kind with
+            | Sparam_pat q1, Sparam_pat q2 ->
+              alpha_pattern ~same_path vars q1 q2
+            | ( Sparam_optional_default (q1, e1, s1),
+                Sparam_optional_default (q2, e2, s2) ) ->
+              if same_sort s1 s2 && alpha_equal ~same_path ~vars e1 e2
+              then alpha_pattern ~same_path vars q1 q2
+              else None
+            | (Sparam_pat _ | Sparam_optional_default _), _ -> None
+          in
+          Option.bind vars (fun vars -> params vars ps1 ps2)
+        else None
+      | [], _ :: _ | _ :: _, [] -> None
+    in
+    match params vars params1 params2 with
+    | None -> false
+    | Some vars -> (
+      match body1, body2 with
+      | Sfunction_body e1, Sfunction_body e2 ->
+        alpha_equal ~same_path ~vars e1 e2
+      | Sfunction_cases cases1, Sfunction_cases cases2 ->
+        same_cases ~same_path ~vars cases1 cases2
+      | (Sfunction_body _ | Sfunction_cases _), _ -> false))
   | ( ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
       | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
       | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _
       | Sexp_extension_constructor _ | Sexp_record _
       | Sexp_record_unboxed_product _ | Sexp_field _ | Sexp_unboxed_field _
       | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _
-      | Sexp_let _ | Sexp_match _ | Sexp_try _ ),
+      | Sexp_let _ | Sexp_match _ | Sexp_try _ | Sexp_function _ ),
       _ ) ->
     false
 

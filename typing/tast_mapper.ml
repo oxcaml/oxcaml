@@ -407,14 +407,14 @@ let spec_expression sub
     | Stexp_primitive r ->
         Stexp_primitive { r with lid = map_loc_lid sub r.lid }
     | Stexp_constant _ as d -> d
-    | Stexp_apply {funct; args; ret_mode; yielding} ->
+    | Stexp_apply {funct; args; position; ret_mode; yielding} ->
         let funct = sub.spec_expression sub funct in
         let args =
           List.map
             (fun (lbl, e, sort) -> (lbl, sub.spec_expression sub e, sort))
             args
         in
-        Stexp_apply {funct; args; ret_mode; yielding}
+        Stexp_apply {funct; args; position; ret_mode; yielding}
     | Stexp_tuple (es, mode) ->
         Stexp_tuple (List.map (spec_labelled sub) es, mode)
     | Stexp_unboxed_tuple es ->
@@ -483,6 +483,29 @@ let spec_expression sub
            partial)
     | Stexp_try (e, cases) ->
         Stexp_try (sub.spec_expression sub e, List.map (spec_case sub) cases)
+    | Stexp_function r ->
+        let param p =
+          let sfp_kind =
+            match p.sfp_kind with
+            | Stparam_pat q -> Stparam_pat (sub.spec_pattern sub q)
+            | Stparam_optional_default (q, e, s) ->
+                Stparam_optional_default
+                  (sub.spec_pattern sub q, sub.spec_expression sub e, s)
+          in
+          { p with sfp_kind; sfp_loc = sub.location sub p.sfp_loc }
+        in
+        let body =
+          match r.body with
+          | Stfunction_body e -> Stfunction_body (sub.spec_expression sub e)
+          | Stfunction_cases fc ->
+              Stfunction_cases
+                { fc with sfc_cases = List.map (spec_case sub) fc.sfc_cases;
+                          sfc_env = sub.env sub fc.sfc_env;
+                          sfc_loc = sub.location sub fc.sfc_loc;
+                          sfc_exp_extra =
+                            List.map (spec_extra sub) fc.sfc_exp_extra }
+        in
+        Stexp_function { r with params = List.map param r.params; body }
   in
   let stexp_extra =
     List.map

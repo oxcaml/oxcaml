@@ -53,6 +53,10 @@ law? binding (s : shape) :
   let a = (match s with Circle r -> r | Square w -> w) in
   (try a >= 0. with Not_found -> false) || a < 0.
 
+law? functions (xs : int list) :
+  (fun ?(min = 0) x -> x >= min) 1 && List.for_all (fun x -> x >= 0) xs
+  || List.exists (function 0 -> true | _ -> false) xs
+
 (* Laws in a submodule and in a module type. *)
 
 module Nested = struct

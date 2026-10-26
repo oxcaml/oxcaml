@@ -1646,6 +1646,7 @@ and spec_expression_desc =
   | Stexp_apply of
       { funct: spec_expression;
         args: (Spec.arg_label * spec_expression * Jkind.sort) list;
+        position: apply_position;
         ret_mode: return_mode;
         yielding: Mode.Yielding.l;
       }
@@ -1705,6 +1706,51 @@ and spec_expression_desc =
   | Stexp_match of
       spec_expression * Jkind.sort * computation spec_case list * partial
   | Stexp_try of spec_expression * value spec_case list
+  | Stexp_function of
+      { params : spec_function_param list;
+        body : spec_function_body;
+        ret_mode : return_mode modes;
+        ret_sort : Jkind.sort;
+        locality_mode : locality_mode_r;
+        yielding : Mode.Yielding.l;
+        zero_alloc : Zero_alloc.t;
+      }
+
+(* A [function_param] without newtypes *)
+and spec_function_param =
+  { sfp_arg_label: arg_label;
+    sfp_param: Ident.t;
+    sfp_param_debug_uid: Shape.Uid.t;
+    sfp_partial: partial;
+    sfp_kind: spec_function_param_kind;
+    sfp_sort: Jkind.sort;
+    sfp_mode: locality_mode_l modes;
+    sfp_curry: function_curry;
+    sfp_loc: Location.t;
+  }
+
+and spec_function_param_kind =
+  | Stparam_pat of spec_pattern
+  | Stparam_optional_default of spec_pattern * spec_expression * Jkind.sort
+
+and spec_function_body =
+  | Stfunction_body of spec_expression
+  | Stfunction_cases of spec_function_cases
+
+(* [function_cases] without attributes, with the extras of a specification
+   expression *)
+and spec_function_cases =
+  { sfc_cases: value spec_case list;
+    sfc_env : Env.t;
+    sfc_arg_mode: locality_mode_l;
+    sfc_arg_sort: Jkind.sort;
+    sfc_ret_type : Types.type_expr;
+    sfc_partial: partial;
+    sfc_param: Ident.t;
+    sfc_param_debug_uid : Shape.Uid.t;
+    sfc_loc: Location.t;
+    sfc_exp_extra: spec_extra list;
+  }
 
 (* A [value_binding] without attributes *)
 and spec_value_binding =

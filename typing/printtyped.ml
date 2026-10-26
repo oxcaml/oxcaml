@@ -1117,6 +1117,24 @@ and spec_expression i ppf x =
       line i ppf "Stexp_try\n";
       spec_expression i ppf e;
       list i spec_case ppf cases
+  | Stexp_function {params; body; ret_sort; _} ->
+      line i ppf "Stexp_function\n";
+      line i ppf "%a\n" fmt_sort ret_sort;
+      list i spec_function_param ppf params;
+      begin match body with
+      | Stfunction_body e -> spec_expression i ppf e
+      | Stfunction_cases {sfc_cases; _} -> list i spec_case ppf sfc_cases
+      end
+
+and spec_function_param i ppf {sfp_arg_label; sfp_kind; sfp_sort; _} =
+  line i ppf "<param>\n";
+  arg_label (i+1) ppf sfp_arg_label;
+  line (i+1) ppf "%a\n" fmt_sort sfp_sort;
+  match sfp_kind with
+  | Stparam_pat p -> spec_pattern (i+1) ppf p
+  | Stparam_optional_default (p, e, _) ->
+      spec_pattern (i+1) ppf p;
+      spec_expression (i+1) ppf e
 
 and spec_case : type k. _ -> _ -> k spec_case -> unit =
   fun i ppf {sc_lhs; sc_guard; sc_rhs} ->

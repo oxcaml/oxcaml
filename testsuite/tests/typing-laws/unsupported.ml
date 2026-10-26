@@ -35,3 +35,13 @@ Line 2, characters 23-27:
                            ^^^^
 Error: Laws do not support location primitives.
 |}]
+
+(* A locally abstract type. *)
+
+law? newtype (x : int) : (fun (type a) (y : a) -> true) x
+[%%expect {|
+Line 1, characters 36-37:
+1 | law? newtype (x : int) : (fun (type a) (y : a) -> true) x
+                                        ^
+Error: Laws do not support locally abstract types.
+|}]

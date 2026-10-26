@@ -14,6 +14,10 @@ unzip_zip
     let xs', ys' = unzip (zip (xs, ys)) in
     eq Int.equal xs' xs && eq Int.equal ys' ys
   passed 4, discarded 12
+zip_unzip
+  law? zip_unzip (zs : (int * int) list) :
+    eq (fun (a, b) (c, d) -> Int.equal a c && Int.equal b d) (zip (unzip zs)) zs
+  passed 4, discarded 0
 init_length
   law? init_length (n : int) (f : int -> ('a : value)) :
     n >= 0 ===> length (init n ~f) = n

@@ -53,6 +53,11 @@ module Choices = struct
       (List.concat_map
          (fun xs -> List.map (fun ys -> Unzip_zip_input { xs; ys }) lists)
          lists)
+
+  let zip_unzip =
+    Minicheck.choice
+      (List.map (fun xs -> Zip_unzip_input { zs = List.map (fun x -> x, -x) xs })
+         lists)
 end
 
 let check choices =
