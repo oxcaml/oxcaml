@@ -512,9 +512,10 @@ static struct stack_stats stack_stats_sum(void)
 }
 
 #ifdef STACK_GUARD_PAGES
-/* The guarded-stack population when [minor_gc_request_hysteresis] last
-   requested a collection. */
-static atomic_uintnat stack_gc_requested_at = 0;
+/* The baseline from which [minor_gc_request_hysteresis] measures
+   regrowth of the guarded-stack population: the population at the last
+   request or minor collection, whichever was later. */
+static atomic_uintnat stack_gc_request_baseline = 0;
 
 /* As [caml_minor_gc_request], with geometric hysteresis: only request once
    the population has grown 50% beyond the last request (collections
@@ -525,15 +526,15 @@ static void minor_gc_request_hysteresis(void)
 {
   if (caml_no_idle_stacks) return; /* a collection would not idle stacks */
   uintnat count = atomic_load_relaxed(&stack_count);
-  uintnat prev = atomic_load_relaxed(&stack_gc_requested_at);
+  uintnat prev = atomic_load_relaxed(&stack_gc_request_baseline);
   for (;;) {
     if (count < prev) {
       /* Shrunk: follow it down without requesting. */
-      if (atomic_compare_exchange_weak(&stack_gc_requested_at,
+      if (atomic_compare_exchange_weak(&stack_gc_request_baseline,
                                        &prev, count))
         return;
     } else if (count - prev >= prev / 2) {
-      if (atomic_compare_exchange_weak(&stack_gc_requested_at,
+      if (atomic_compare_exchange_weak(&stack_gc_request_baseline,
                                        &prev, count)) {
         caml_minor_gc_request();
         return;
@@ -1792,6 +1793,14 @@ void caml_stack_cache_flush_from_stw(void)
   struct cached_stack* flushing[NUM_STACK_SIZE_CLASSES];
   uintnat cached = 0;
   uintnat demoted = 0;
+
+  /* Re-arm the GC-request threshold: regrowth is measured from the
+     population at the last collection, so a population that shrinks
+     and regrows requests again at the bound (see
+     [minor_gc_request_hysteresis]). Racing domains store
+     near-identical values; any will do. */
+  atomic_store_relaxed(&stack_gc_request_baseline,
+                       atomic_load_relaxed(&stack_count));
 
   /* Detach the local lists and do madvise calls without the lock
      (all domains come here at once, so may contend for the lock). */
