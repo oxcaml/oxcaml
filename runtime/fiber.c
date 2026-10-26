@@ -1639,29 +1639,58 @@ struct stack_reloc {
   ptrdiff_t delta;
 };
 
-/* The inverse of [stack_idle]: copy idle stack [idle] onto a guarded
-   stack, relocate its stack-internal pointers, and free the idle copy.
-   Fills [*reloc] with the data's movement, for the relocation of any
-   cross-stack links into this stack. Cannot raise: aborts if no guarded
-   stack can be obtained, since the callers sit on the stack-switching
-   path where raising is impossible. */
-static struct stack_info* stack_wake(struct stack_info* idle,
-                                     struct stack_reloc* reloc)
+/* Acquire a guarded stack for each stack of the idle chain starting at
+   [idle], linked in the same order with [Stack_parent], and return the
+   head of that chain. Returns NULL, having released any stacks already
+   acquired, if one could not be obtained; nothing has been woken in
+   that case. */
+static struct stack_info* wake_acquire_stacks(struct stack_info* idle)
 {
-  int bucket = idle->cache_bucket;
+  struct stack_info* head = NULL;
+  struct stack_info* prev = NULL;
 
+  while (idle != NULL) {
+    int bucket = idle->cache_bucket;
+
+    CAMLassert(idle->idled_from_high != NULL);
+    CAMLassert(idle->magic == 42);
+    /* Only fibers are ever captured in continuations, and fibers are
+       always of the first (smallest) pooled size class. */
+    CAMLassert(bucket >= 0 && bucket < NUM_STACK_SIZE_CLASSES);
+
+    struct stack_info* stack =
+      alloc_size_class_stack_noexc(caml_fiber_wsz << bucket, bucket, Val_unit,
+                                   Val_unit, Val_unit, Val_null,
+                                   Stack_is_preemptible(idle), idle->id);
+    if (stack == NULL) {
+      /* [alloc_size_class_stack_noexc] leaves the last link NULL. */
+      while (head != NULL) {
+        struct stack_info* next = Stack_parent(head);
+        stack_release_memory(head);
+        head = next;
+      }
+      return NULL;
+    }
+    if (prev == NULL)
+      head = stack;
+    else
+      Stack_parent(prev) = stack;
+    prev = stack;
+    idle = Stack_parent(idle);
+  }
+  return head;
+}
+
+/* The inverse of [stack_idle]: copy idle stack [idle] onto the acquired
+   guarded stack [stack], relocate its stack-internal pointers, and free
+   the idle copy. Fills [*reloc] with the data's movement, for the
+   relocation of any cross-stack links into this stack. Cannot fail: the
+   stack it needs has already been acquired. */
+static void stack_wake(struct stack_info* idle, struct stack_info* stack,
+                       struct stack_reloc* reloc)
+{
   CAMLassert(idle->idled_from_high != NULL);
   CAMLassert(idle->magic == 42);
-  /* Only fibers are ever captured in continuations, and fibers are
-     always of the first (smallest) pooled size class. */
-  CAMLassert(bucket >= 0 && bucket < NUM_STACK_SIZE_CLASSES);
-
-  struct stack_info* stack =
-    alloc_size_class_stack_noexc(caml_fiber_wsz << bucket, bucket, Val_unit,
-                                 Val_unit, Val_unit, Val_null,
-                                 Stack_is_preemptible(idle), idle->id);
-  if (stack == NULL)
-    caml_fatal_error("Fatal error: out of memory waking a fiber stack");
 
   size_t data_bytes = (char*)idle->handler - (char*)idle->sp;
   char* new_sp = (char*)stack->handler - data_bytes;
@@ -1719,7 +1748,6 @@ static struct stack_info* stack_wake(struct stack_info* idle,
   CAML_EV_COUNTER(EV_C_STACK_WOKEN,
                   data_bytes + sizeof(struct stack_handler));
   caml_stat_free(idle);
-  return stack;
 }
 
 struct stack_info* caml_cont_idle_stacks_from_stw(value cont)
@@ -1755,17 +1783,26 @@ struct stack_info* caml_cont_idle_stacks_from_stw(value cont)
    Updates the last-fiber field of [cont] and returns the new head. */
 static value continuation_wake_stacks(value cont, struct stack_info* idle)
 {
-  struct stack_info* head = NULL;
   struct stack_info* prev = NULL;
   CAMLnoalloc;
 
+  CAMLassert(idle != NULL);
+
+  /* Acquire a stack for every link before waking any of them, so that
+     running out cannot leave the chain partly woken. */
+  struct stack_info* head = wake_acquire_stacks(idle);
+  if (head == NULL)
+    caml_fatal_error("Fatal error: out of memory waking a fiber stack");
+
+  struct stack_info* stack = head;
   while (idle != NULL) {
     struct stack_info* next = Stack_parent(idle);
+    /* [stack_wake] copies the idle stack's handler, and hence its parent
+       link, over this stack's own: read the next one first. */
+    struct stack_info* next_stack = Stack_parent(stack);
     struct stack_reloc reloc;
-    struct stack_info* stack = stack_wake(idle, &reloc);
-    if (prev == NULL) {
-      head = stack;
-    } else {
+    stack_wake(idle, stack, &reloc);
+    if (prev != NULL) {
       Stack_parent(prev) = stack;
 #ifdef WITH_FRAME_POINTERS
       /* The oldest frame pointer saved on [prev] (pushed by the first
@@ -1782,6 +1819,7 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
     }
     prev = stack;
     idle = next;
+    stack = next_stack;
   }
   Cont_last_fiber(cont) = Val_ptr(prev);
   return Val_ptr(head);
