@@ -1479,11 +1479,8 @@ L(resume_preemption): /* x25 -> gc_regs */
         b       L(resume_from_preempt)
 L(continuation_already_resumed):
     /* Pop the frame pushed by DO_RESUME_SWITCH, which the normal path pops
-       before switching stacks.  This restores x30 (clobbered by the call to
-       caml_continuation_use_noexc) as well as sp, so that caml_c_call builds
-       its frame where the OCaml caller's frame is expected: the raise polls
-       for pending actions, and another domain's stop-the-world minor GC may
-       scan this stack. */
+       before switching stacks.  This restores x30 as well as sp, which
+       caml_c_call records as the return address for use during scanning. */
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
         ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
