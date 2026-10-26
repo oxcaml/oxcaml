@@ -900,7 +900,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let params_arity = arity params_arity in
           let return_arity = arity ret_arity in
           ( Call_kind.c_call ~needs_caml_c_call ~is_c_builtin:false
-              ~ox_ptr_arg_starts:[] ~effects:Arbitrary_effects
+              ~fat_ptr_arg_starts:[] ~effects:Arbitrary_effects
               ~coeffects:Has_coeffects,
             params_arity,
             return_arity )
