@@ -643,7 +643,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         else match check_depth depth obj ty with
           | Some x -> x
           | None ->
-              let rec tree_of_conses tree_list rep depth obj ty_arg =
+              let rec tree_of_conses tree_list rep depth obj list_ty =
                 if !printer_steps < 0 || depth < 0 then
                   Oval_ellipsis :: tree_list
                 else if is_real_block obj then
@@ -656,14 +656,15 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   in
                   nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
                     (tree_of_conses (tree :: tree_list) rep)
-                    depth next_obj ty_arg
+                    depth next_obj list_ty
                 else tree_list
               in
-              let field_types () = [ty_arg; Predef.type_list ty_arg] in
+              let list_ty = Predef.type_list ty_arg in
+              let field_types () = [ty_arg; list_ty] in
               match outval_rep_of_field_types env field_types with
               | None -> Oval_stuff "<abstr>"
               | Some rep ->
-                  Oval_list (List.rev (tree_of_conses [] rep depth obj ty_arg))
+                  Oval_list (List.rev (tree_of_conses [] rep depth obj list_ty))
 
       and tree_of_generic_array am depth obj ty_arg =
         let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
