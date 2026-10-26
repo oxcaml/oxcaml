@@ -1,4 +1,7 @@
 (* TEST
+   set BUILD_PATH_PREFIX_MAP = "";
+   file = "${test_source_directory}/sanitize.awk";
+   file-exists;
    native-compiler;
    no-tsan; (* Skip, TSan inserts extra frames into backtraces *)
    no-address-sanitizer; (* Same reason *)
