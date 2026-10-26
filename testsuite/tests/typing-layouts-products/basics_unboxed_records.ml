@@ -184,14 +184,123 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Mutable fields are not allowed *)
+(* Fields can be declared mutable, which affects variance, but can't be
+   mutated *)
 
-type mut = #{ mutable i : int }
+type accepted = #{ mutable i : int }
 [%%expect{|
-Line 1, characters 14-29:
-1 | type mut = #{ mutable i : int }
-                  ^^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+type accepted = #{ mutable i : int; }
+|}]
+
+type atomic_bad = #{ mutable a : int [@atomic] }
+[%%expect{|
+Line 1, characters 21-46:
+1 | type atomic_bad = #{ mutable a : int [@atomic] }
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be atomic
+|}]
+
+module M : sig
+  type t = #{ mutable i : int }
+end = struct
+  type t = #{ i : int }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ i : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ i : int; } end
+       is not included in
+         sig type t = #{ mutable i : int; } end
+       Type declarations do not match:
+         type t = #{ i : int; }
+       is not included in
+         type t = #{ mutable i : int; }
+       Fields do not match:
+         "i : int;"
+       is not the same as:
+         "mutable i : int;"
+       The second is mutable and the first is not.
+|}]
+
+(* Unboxed records with mutable fields are invariant *)
+type +'a covariant_bad = #{ mutable x : 'a; y : int }
+[%%expect{|
+Line 1, characters 0-53:
+1 | type +'a covariant_bad = #{ mutable x : 'a; y : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type -'a contravariant_bad = #{ mutable x : 'a; y : int }
+[%%expect{|
+Line 1, characters 0-57:
+1 | type -'a contravariant_bad = #{ mutable x : 'a; y : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be contravariant,
+       but it is injective invariant.
+|}]
+
+type !'a injective_invariant = #{ mutable x : 'a; y : int }
+[%%expect{|
+type 'a injective_invariant = #{ mutable x : 'a; y : int; }
+|}]
+
+(* As for boxed records, only parameters in mutable fields are invariant *)
+type +'a mut_isn't_param = #{ mutable x : int; y : 'a }
+[%%expect{|
+type 'a mut_isn't_param = #{ mutable x : int; y : 'a; }
+|}]
+
+type +'a param_isn't_mut = #{ x : 'a; y : int }
+[%%expect{|
+type 'a param_isn't_mut = #{ x : 'a; y : int; }
+|}]
+
+(* Unboxed "mutable" records can't be mutated in place yet, but for forward
+   compatibility, reading their [mutable] fields still requires [shared]. *)
+type doesn't_cross_contention = #{ mutable r : int ref; k : int }
+let project (x : doesn't_cross_contention @ contended) =
+  match x with #{ r = _; k } -> k
+[%%expect{|
+type doesn't_cross_contention = #{ mutable r : int ref; k : int; }
+Line 3, characters 15-28:
+3 |   match x with #{ r = _; k } -> k
+                   ^^^^^^^^^^^^^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "r" is being read.
+|}]
+
+let update (x : doesn't_cross_contention @ contended) = #{ x with k = 1 }
+[%%expect{|
+Line 1, characters 59-60:
+1 | let update (x : doesn't_cross_contention @ contended) = #{ x with k = 1 }
+                                                               ^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "r" is being read.
+|}]
+
+(* [mutable] fields of unboxed records can't be mutated yet, but for forward
+   compatibility, they still prevent generalization. *)
+type 'a mut_poly = #{ mutable l : 'a list; k : int }
+type ('a : value & value) container = { contents : 'a }
+let not_generalized : _ mut_poly = #{ l = []; k = 0 }
+let also_not_generalized : _ mut_poly container =
+  { contents = #{ l = []; k = 0 } }
+[%%expect{|
+type 'a mut_poly = #{ mutable l : 'a list; k : int; }
+type ('a : value & value) container = { contents : 'a; }
+val not_generalized : '_weak1 mut_poly = #{l = []; k = 0}
+val also_not_generalized : '_weak2 mut_poly container =
+  {contents = #{l = []; k = 0}}
 |}]
 
 (*********************************)
