@@ -476,9 +476,12 @@ value caml_continuation_take_noexc (value cont);
 /* Wake the stacks of an idled continuation in place, leaving them
    captured in [cont]: used by caml_reperform (amd64.S), whose raw
    last-fiber argument went stale when a minor collection idled [cont]
-   mid-perform; the assembly reloads it from [cont] afterwards. Cannot
-   raise; does not allocate on the OCaml heap. */
-void caml_cont_wake_stacks (value cont);
+   mid-perform; the assembly reloads it from [cont] afterwards. Returns 0,
+   leaving [cont] as it was, if the stacks could not be obtained (or if
+   [cont] has already been taken): the caller must then raise through
+   [caml_raise_resume_failure] rather than use the stale last fiber.
+   Cannot raise; does not allocate on the OCaml heap. */
+intnat caml_cont_wake_stacks (value cont);
 
 /* Replace the stack of a continuation that was previously removed
    with caml_continuation_use. The GC must not be allowed to run
@@ -497,6 +500,12 @@ value* caml_continuation_gc_regs(value cont);
 caml_result caml_tick_fiber_res(struct stack_info* stack);
 
 CAMLnoret CAMLextern void caml_raise_continuation_already_resumed (void);
+
+/* Raise the exception for a resume that found no stack: [Out_of_fibers]
+   if waking the continuation ran out of guarded stacks, and
+   [Continuation_already_resumed] otherwise. The resume paths in the
+   assembly raise through here. */
+CAMLnoret CAMLextern void caml_raise_resume_failure (void);
 
 CAMLnoret CAMLextern void caml_raise_unhandled_effect (value effect);
 

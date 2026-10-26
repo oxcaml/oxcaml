@@ -1781,6 +1781,14 @@ struct stack_info* caml_cont_idle_stacks_from_stw(value cont)
 /* Wake the whole stack chain of [cont], whose (idle) head is [idle];
    the chain has just been taken from the continuation, so we own it.
    Updates the last-fiber field of [cont] and returns the new head. */
+/* Set when [continuation_wake_stacks] cannot obtain the guarded stacks a
+   chain needs, and consumed by [caml_raise_resume_failure]: resuming such
+   a continuation must raise [Out_of_fibers], not the
+   [Continuation_already_resumed] that the NULL it returns otherwise
+   means. Thread-local, as it is set and consumed by the same thread with
+   no stack switch in between. */
+static CAMLthread_local bool wake_failed = false;
+
 static value continuation_wake_stacks(value cont, struct stack_info* idle)
 {
   struct stack_info* prev = NULL;
@@ -1791,8 +1799,13 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
   /* Acquire a stack for every link before waking any of them, so that
      running out cannot leave the chain partly woken. */
   struct stack_info* head = wake_acquire_stacks(idle);
-  if (head == NULL)
-    caml_fatal_error("Fatal error: out of memory waking a fiber stack");
+  if (head == NULL) {
+    /* Nothing has been woken, so put the chain back as it was and let the
+       resume path raise. */
+    caml_continuation_replace(cont, idle);
+    wake_failed = true;
+    return Val_ptr(NULL);
+  }
 
   struct stack_info* stack = head;
   while (idle != NULL) {
@@ -2062,15 +2075,16 @@ CAMLprim value caml_continuation_use (value cont)
 {
   value v = caml_continuation_use_noexc(cont);
   if (v == Val_ptr(NULL))
-    caml_raise_continuation_already_resumed();
+    caml_raise_resume_failure();
   return v;
 }
 
-void caml_cont_wake_stacks (value cont)
+intnat caml_cont_wake_stacks (value cont)
 {
   value stk = caml_continuation_use_noexc(cont);
-  CAMLassert(Ptr_val(stk) != NULL);
+  if (Ptr_val(stk) == NULL) return 0;
   caml_continuation_replace(cont, Ptr_val(stk));
+  return 1;
 }
 
 bool caml_continuation_is_preemption(value cont) {
@@ -2174,6 +2188,17 @@ static const value * cache_named_exception(const value * _Atomic * cache,
     atomic_store_release(cache, exn);
   }
   return exn;
+}
+
+CAMLexport void caml_raise_resume_failure(void)
+{
+#ifdef STACK_GUARD_PAGES
+  if (wake_failed) {
+    wake_failed = false;
+    caml_raise_out_of_fibers();
+  }
+#endif
+  caml_raise_continuation_already_resumed();
 }
 
 CAMLexport void caml_raise_continuation_already_resumed(void)

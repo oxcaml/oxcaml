@@ -1358,7 +1358,9 @@ L(preemption_unhandled):
        redoing the interrupted allocation, restoring registers, and
        returning to user code. */
         b       L(resume_preemption)
-2:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+2:
+L(raise_resume_failure):
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_resume_failure)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
@@ -1390,10 +1392,14 @@ FUNCTION(caml_reperform)
         mov     C_ARG_1, x1
         SWITCH_OCAML_TO_C
         bl      G(caml_cont_wake_stacks)
+    /* TMP2 := zero if the stacks could not be woken, in which case the
+       last fiber is still stale and must not be used. */
+        mov     TMP2, x0
         SWITCH_C_TO_OCAML
         mov     x30, x21
         mov     x0, x19
         mov     x1, x20
+        cbz     TMP2, L(raise_resume_failure) /* could not wake: raise */
         ldr     x2, Cont_last_fiber(x1)       /* the woken last fiber */
 1:
         ldr     TMP, Stack_handler_from_cont(x2)
@@ -1510,7 +1516,7 @@ L(resume_preemption): /* x25 -> gc_regs */
        registers and `ret` to resume */
         b       L(resume_from_preempt)
 L(continuation_already_resumed):
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_resume_failure)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_continue)
