@@ -280,6 +280,44 @@ type r = { i : int; mutable s : string; }
 type u = r# = #{ i : int; s : string @@ global many dynamic; }
 |}]
 
+(* Unboxed versions of records with mutable fields are invariant *)
+type 'a r = { mutable x : 'a; y : int }
+type +'a t_bad_co = 'a r#
+[%%expect{|
+type 'a r = { mutable x : 'a; y : int; }
+type 'a t_bad_co = 'a r#
+|}]
+
+type -'a t_bad_contra = 'a r#
+[%%expect{|
+Line 1, characters 0-29:
+1 | type -'a t_bad_contra = 'a r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be contravariant,
+       but it is injective covariant.
+|}]
+
+type !'a t_inv = 'a r#
+[%%expect{|
+type 'a t_inv = 'a r#
+|}]
+
+(* As for boxed records, only parameters in mutable fields are invariant *)
+type 'a mut_isn't_param = { mutable x : int; y : 'a }
+type +'a t_ok_co = 'a mut_isn't_param#
+[%%expect{|
+type 'a mut_isn't_param = { mutable x : int; y : 'a; }
+type 'a t_ok_co = 'a mut_isn't_param#
+|}]
+
+type 'a param_isn't_mut = { x : 'a; y : int }
+type +'a t = 'a param_isn't_mut#
+[%%expect{|
+type 'a param_isn't_mut = { x : 'a; y : int; }
+type 'a t = 'a param_isn't_mut#
+|}]
+
 (*******************)
 (* Type parameters *)
 

@@ -1546,6 +1546,16 @@ end
 module M : sig val unbox : #(int * string) -> int * string end
 |}]
 
+(* Modes under [box] in signature inclusion *)
+module M : sig
+  val f : (string -> unit) box
+end = struct
+  let f : (local_ string -> unit) box = Obj.magic ()
+end
+[%%expect{|
+module M : sig val f : (string -> unit) box end
+|}]
+
 (* Test 43: Type equality checks with [box] *)
 
 (* trivial *)
@@ -1593,4 +1603,42 @@ Lines 10-12, characters 11-4:
 12 | end)
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
+|}]
+
+(* Test 45: [box]ed unboxed versions of records have variance based on the
+   record's mutability. *)
+
+type 'a t = { mutable a : 'a }
+type +'a bad = 'a t# box;;
+[%%expect{|
+type 'a t = { mutable a : 'a; }
+type 'a bad = 'a t
+|}]
+
+type base = < m : int >
+type derived = < m : int; n : int >
+let leak_must_be_rejected (x : derived t# box) = (x :> base t# box);;
+[%%expect{|
+type base = < m : int >
+type derived = < m : int; n : int >
+val leak_must_be_rejected : derived t -> base t = <fun>
+|}]
+
+(* Immutable records are covariant when boxed. *)
+
+type 'a imm = { a : 'a }
+type +'a imm_box = 'a imm# box;;
+[%%expect{|
+type 'a imm = { a : 'a; }
+type 'a imm_box = 'a imm
+|}]
+
+let not_a_leak (x : derived imm# box) : base imm# box =
+  ((x : derived imm) :> base imm);;
+
+(* Unlike above, [imm# box] is _not_ reduced to [imm] *)
+let not_a_leak_unreduced (x : derived imm# box) = (x :> base imm# box)
+[%%expect{|
+val not_a_leak : derived imm -> base imm = <fun>
+val not_a_leak_unreduced : derived imm -> base imm = <fun>
 |}]
