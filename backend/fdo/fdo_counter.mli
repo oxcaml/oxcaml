@@ -64,14 +64,21 @@ module Hashed : sig
   type t = Position_hash.t list
 end
 
-type t =
-  { position : Position.t;
-    inlining_stack : Position.t list  (** Call sites, innermost first. *)
-  }
+type t
+
+(** A counter at the given position, with no inlining context. *)
+val of_position : Position.t -> t
+
+(** The innermost position: where the counter is in the source program. *)
+val position : t -> Position.t
+
+(** The call sites, innermost first, that the counter's code was inlined
+    through. *)
+val inlining_stack : t -> Position.t list
 
 (** [t], inlined at the call site [at]. [at] is a counter rather than a position
     because the call site may itself be in inlined code: its inlining context is
-    appended too. *)
+    appended too. A counter [at] that is not at a call is a fatal error. *)
 val inline : t -> at:t -> t
 
 (** [t], in a copy of its function made when the call at [at] was inlined. Only
@@ -81,11 +88,15 @@ val specialize : t -> at:t -> t
 
 val equal : t -> t -> bool
 
+val compare : t -> t -> int
+
 (** Canonical string representation for metadata and dumps. *)
 val to_string : t -> string
 
 (** Hash the position and each inlining level, innermost first. *)
 val hash : t -> Hashed.t
+
+module Tbl : Hashtbl.S with type key = t
 
 (** Append counters not already present, preserving first-occurrence order. *)
 val add_all : t list -> t list -> t list
