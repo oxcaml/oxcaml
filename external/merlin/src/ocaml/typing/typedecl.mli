@@ -126,7 +126,7 @@ val compute_block_shape :
     [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
 type native_repr_kind =
-  Unboxed | Untagged | Unpacked | Unsafe_unextended | Ox_ptr
+  Unboxed | Untagged | Unpacked | Unsafe_unextended | Fat_ptr
 
 (* Records reason for a jkind representability requirement in errors. *)
 type jkind_sort_loc =
@@ -211,7 +211,7 @@ type error =
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
   | Multiple_native_repr_attributes
-  | Cannot_unbox_or_untag_type of native_repr_kind
+  | Bad_native_repr_attr of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
   | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
