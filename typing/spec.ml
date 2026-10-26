@@ -66,6 +66,10 @@ type expression =
   | Sexp_record_unboxed_product of record
   | Sexp_field of field
   | Sexp_unboxed_field of field
+  | Sexp_ifthenelse of expression * expression * expression option
+  | Sexp_sequence of expression * sort * expression
+  | Sexp_assert of expression
+  | Sexp_lazy of expression
 
 and record =
   { fields : (label * sort * field_definition) list;
@@ -108,6 +112,11 @@ let rec map_paths ~value_path ~type_path e =
   | Sexp_field f -> Sexp_field (map_field ~value_path ~type_path f)
   | Sexp_unboxed_field f ->
     Sexp_unboxed_field (map_field ~value_path ~type_path f)
+  | Sexp_ifthenelse (c, e1, e2) ->
+    Sexp_ifthenelse (map c, map e1, Option.map map e2)
+  | Sexp_sequence (e1, sort, e2) -> Sexp_sequence (map e1, sort, map e2)
+  | Sexp_assert e -> Sexp_assert (map e)
+  | Sexp_lazy e -> Sexp_lazy (map e)
 
 and map_label ~type_path { type_path = p; name } =
   { type_path = type_path p; name }
@@ -171,6 +180,11 @@ let rec paths_rev acc = function
       acc fields
   | Sexp_field { record; label; _ } | Sexp_unboxed_field { record; label; _ } ->
     (Type, label.type_path) :: paths_rev acc record
+  | Sexp_ifthenelse (c, e1, e2) ->
+    let acc = paths_rev (paths_rev acc c) e1 in
+    Option.fold ~none:acc ~some:(paths_rev acc) e2
+  | Sexp_sequence (e1, _, e2) -> paths_rev (paths_rev acc e1) e2
+  | Sexp_assert e | Sexp_lazy e -> paths_rev acc e
 
 let paths e = List.rev (paths_rev [] e)
 
@@ -259,9 +273,15 @@ let rec alpha_equal ~same_path ~vars e1 e2 =
     ->
     equal f1.record f2.record && same_sort f1.sort f2.sort
     && same_label ~same_path f1.label f2.label
+  | Sexp_ifthenelse (c1, t1, e1), Sexp_ifthenelse (c2, t2, e2) ->
+    equal c1 c2 && equal t1 t2 && Option.equal equal e1 e2
+  | Sexp_sequence (a1, s1, b1), Sexp_sequence (a2, s2, b2) ->
+    equal a1 a2 && same_sort s1 s2 && equal b1 b2
+  | Sexp_assert e1, Sexp_assert e2 | Sexp_lazy e1, Sexp_lazy e2 -> equal e1 e2
   | ( ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
       | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
       | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ | Sexp_record _
-      | Sexp_record_unboxed_product _ | Sexp_field _ | Sexp_unboxed_field _ ),
+      | Sexp_record_unboxed_product _ | Sexp_field _ | Sexp_unboxed_field _
+      | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _ ),
       _ ) ->
     false

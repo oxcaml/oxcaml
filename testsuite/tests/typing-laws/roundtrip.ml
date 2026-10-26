@@ -42,6 +42,11 @@ type other_point = { x : int }
 law? records (p : point) :
   ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.
 
+let skip () = ()
+law? control (x : int) :
+  (if x > 0 then f x else 0) >= 0 && (skip (); f x) = f x
+  && Lazy.force (lazy (f x)) = f x && (assert (x = x); true)
+
 (* Laws in a submodule and in a module type. *)
 
 module Nested = struct

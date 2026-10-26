@@ -284,6 +284,10 @@ and out_spec =
         extended : out_spec option;
         unboxed : bool }
   | Ospec_field of { record : out_spec; label : out_ident; unboxed : bool }
+  | Ospec_ifthenelse of out_spec * out_spec * out_spec option
+  | Ospec_sequence of out_spec * out_spec
+  | Ospec_assert of out_spec
+  | Ospec_lazy of out_spec
 
 
 type out_phrase =

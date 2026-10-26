@@ -405,6 +405,16 @@ let spec_expression sub
         Stexp_unboxed_field
           { r with record = sub.spec_expression sub r.record;
                    lid = map_loc_lid sub r.lid }
+    | Stexp_ifthenelse (c, e1, e2) ->
+        Stexp_ifthenelse
+          (sub.spec_expression sub c, sub.spec_expression sub e1,
+           Option.map (sub.spec_expression sub) e2)
+    | Stexp_sequence (e1, sort, e2) ->
+        Stexp_sequence
+          (sub.spec_expression sub e1, sort, sub.spec_expression sub e2)
+    | Stexp_assert (e, loc) ->
+        Stexp_assert (sub.spec_expression sub e, sub.location sub loc)
+    | Stexp_lazy e -> Stexp_lazy (sub.spec_expression sub e)
   in
   let stexp_extra =
     List.map

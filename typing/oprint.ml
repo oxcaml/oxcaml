@@ -1200,13 +1200,22 @@ and print_out_spec ppf = function
         (print_list print_out_spec (fun ppf -> fprintf ppf ",@ ")) args
   | Ospec_variant (lbl, Some arg) ->
       fprintf ppf "@[<2>`%a@ %a@]" print_lident lbl print_simple_out_spec arg
+  | Ospec_ifthenelse (c, e1, e2) ->
+      fprintf ppf "@[<hv>@[<2>if@ %a@]@ @[<2>then@ %a@]%a@]"
+        print_out_spec c print_simple_out_spec e1
+        (fun ppf -> function
+           | None -> ()
+           | Some e -> fprintf ppf "@ @[<2>else@ %a@]" print_simple_out_spec e)
+        e2
+  | Ospec_assert e -> fprintf ppf "@[<2>assert@ %a@]" print_simple_out_spec e
+  | Ospec_lazy e -> fprintf ppf "@[<2>lazy@ %a@]" print_simple_out_spec e
   | Ospec_field { record; label; unboxed } ->
       fprintf ppf "@[<2>%a.%s%a@]" print_simple_out_spec record
         (if unboxed then "#" else "") print_constructor label
   | Ospec_var _ | Ospec_global _ | Ospec_constant _ | Ospec_tuple _
   | Ospec_unboxed_tuple _ | Ospec_unboxed_unit | Ospec_unboxed_bool _
   | Ospec_construct (_, []) | Ospec_variant (_, None)
-  | Ospec_constraint _ | Ospec_record _ as spec ->
+  | Ospec_constraint _ | Ospec_record _ | Ospec_sequence _ as spec ->
       print_simple_out_spec ppf spec
 
 and print_simple_out_spec ppf = function
@@ -1222,6 +1231,9 @@ and print_simple_out_spec ppf = function
   | Ospec_variant (lbl, None) -> fprintf ppf "`%a" print_lident lbl
   | Ospec_constraint (e, ty) ->
       fprintf ppf "@[<1>(%a :@ %a)@]" print_out_spec e !out_type ty
+  | Ospec_sequence (e1, e2) ->
+      fprintf ppf "@[<hv 1>(%a;@ %a)@]" print_simple_out_spec e1
+        print_simple_out_spec e2
   | Ospec_record { fields; extended; unboxed } ->
       let field ppf (label, e) =
         fprintf ppf "@[<2>%a =@ %a@]" print_constructor label
@@ -1235,7 +1247,8 @@ and print_simple_out_spec ppf = function
         print_extended extended
         (print_list field (fun ppf -> fprintf ppf ";@ ")) fields
   | Ospec_apply _ | Ospec_construct (_, _ :: _) | Ospec_variant (_, Some _)
-  | Ospec_field _ as spec ->
+  | Ospec_field _ | Ospec_ifthenelse _ | Ospec_assert _ | Ospec_lazy _
+    as spec ->
       fprintf ppf "(%a)" print_out_spec spec
 
 and print_spec_components ppf es =

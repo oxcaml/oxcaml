@@ -1080,6 +1080,22 @@ and spec_expression i ppf x =
       spec_expression i ppf record;
       sort i ppf record_sort;
       longident i ppf lid
+  | Stexp_ifthenelse (e1, e2, eo) ->
+      line i ppf "Stexp_ifthenelse\n";
+      spec_expression i ppf e1;
+      spec_expression i ppf e2;
+      option i spec_expression ppf eo
+  | Stexp_sequence (e1, s, e2) ->
+      line i ppf "Stexp_sequence\n";
+      spec_expression i ppf e1;
+      line i ppf "%a\n" fmt_sort s;
+      spec_expression i ppf e2
+  | Stexp_assert (e, _) ->
+      line i ppf "Stexp_assert\n";
+      spec_expression i ppf e
+  | Stexp_lazy e ->
+      line i ppf "Stexp_lazy\n";
+      spec_expression i ppf e
 
 and spec_record_field
     : 'a. _ -> _ -> 'a * _ * _ -> _

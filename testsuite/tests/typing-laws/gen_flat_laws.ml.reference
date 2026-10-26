@@ -12,6 +12,7 @@ type 'a each =
   constants: 'a ;
   constructors: 'a ;
   tuples: 'a ;
+  control: 'a ;
   records: 'a }
 let names =
   {
@@ -24,6 +25,7 @@ let names =
     constants = "constants";
     constructors = "constructors";
     tuples = "tuples";
+    control = "control";
     records = "records"
   }
 let locations =
@@ -100,18 +102,26 @@ let locations =
         end_line = 50;
         end_col = 66
       };
+    control =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 55;
+        start_col = 0;
+        end_line = 57;
+        end_col = 54
+      };
     records =
       {
         CamlinternalLaw.file = "gen_flat.ml";
-        start_line = 54;
+        start_line = 58;
         start_col = 0;
-        end_line = 55;
+        end_line = 59;
         end_col = 74
       }
   }
 let map
   { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
-    tuples; records }
+    tuples; control; records }
   ~f =
   {
     poly = (f poly);
@@ -123,11 +133,12 @@ let map
     constants = (f constants);
     constructors = (f constructors);
     tuples = (f tuples);
+    control = (f control);
     records = (f records)
   }
 let to_list
   { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
-    tuples; records }
+    tuples; control; records }
   =
   [poly;
   modes;
@@ -138,6 +149,7 @@ let to_list
   constants;
   constructors;
   tuples;
+  control;
   records]
 type poly_input =
   | Poly_input: 'a 'b . {
@@ -168,6 +180,9 @@ type tuples_input =
   | Tuples_input: {
   x: int ;
   y: string } -> tuples_input 
+type control_input =
+  | Control_input: {
+  x: int } -> control_input 
 type records_input =
   | Records_input: {
   p: Laws_gen_Gen_flat.point } -> records_input 
@@ -185,6 +200,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         val constants : constants_input Choice.t
         val constructors : constructors_input Choice.t
         val tuples : tuples_input Choice.t
+        val control : control_input Choice.t
         val records : records_input Choice.t
       end
     let poly ((module C)  : (module Choices))  : unit Law.t =
@@ -439,6 +455,36 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 66
                    }
                }))
+    let control ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.control),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.control;
+                 predicate =
+                   (fun ((Control_input { x }) : control_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(>=)
+                            (if Laws_gen_Stdlib.(>) x 0 then x else 0) 0)
+                         (Laws_gen_Stdlib.(&&)
+                            (Laws_gen_Stdlib.(=)
+                               (Laws_gen_Gen_flat.g (() : unit); x) x)
+                            (Laws_gen_Stdlib.(&&)
+                               (Laws_gen_Stdlib.(=)
+                                  (Laws_gen_Stdlib.Lazy.force (lazy x)) x)
+                               (assert (Laws_gen_Stdlib.(=) x x);
+                                (true : bool)))) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 56;
+                     start_col = 2;
+                     end_line = 57;
+                     end_col = 54
+                   }
+               }))
     let records ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
         ((Law.Choose C.records),
@@ -460,9 +506,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "gen_flat.ml";
-                     start_line = 55;
+                     start_line = 59;
                      start_col = 2;
-                     end_line = 55;
+                     end_line = 59;
                      end_col = 74
                    }
                }))
@@ -477,6 +523,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         constants = (constants choices);
         constructors = (constructors choices);
         tuples = (tuples choices);
+        control = (control choices);
         records = (records choices)
       }
   end

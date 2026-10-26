@@ -33,7 +33,6 @@ type primitive_kind = Location
 
 type unsupported =
   | Arrays
-  | Assertions
   | Atomic_fields
   | Attributes
   | Binding_operators
@@ -41,14 +40,12 @@ type unsupported =
   | Borrow
   | Coercions
   | Comprehensions
-  | Conditionals
   | Exception_handlers
   | Exclave
   | Extension_constructors
   | First_class_modules
   | Functions
   | Layout_polymorphism
-  | Lazy_values
   | Let_bindings
   | Local_exceptions
   | Local_modules
@@ -68,7 +65,6 @@ type unsupported =
   | Probes
   | Quotations
   | Refutation_cases
-  | Sequences
   | Source_positions
   | Stack_allocation
   | Values_through_applications
@@ -231,8 +227,11 @@ and spectree_desc bound loc desc : spec_expression_desc =
   | Texp_idx _ -> unsupported loc Block_indices
   | Texp_list_comprehension _ | Texp_array_comprehension _ ->
     unsupported loc Comprehensions
-  | Texp_ifthenelse _ -> unsupported loc Conditionals
-  | Texp_sequence _ -> unsupported loc Sequences
+  | Texp_ifthenelse (c, e1, e2) ->
+    Stexp_ifthenelse
+      (spectree bound c, spectree bound e1, Option.map (spectree bound) e2)
+  | Texp_sequence (e1, sort, e2) ->
+    Stexp_sequence (spectree bound e1, sort, spectree bound e2)
   | Texp_while _ | Texp_for _ -> unsupported loc Loops
   | Texp_send _ | Texp_new _ | Texp_instvar _ | Texp_setinstvar _
   | Texp_override _ | Texp_object _ ->
@@ -240,8 +239,8 @@ and spectree_desc bound loc desc : spec_expression_desc =
   | Texp_mutvar _ | Texp_setmutvar _ -> unsupported loc Mutable_variables
   | Texp_letmodule _ -> unsupported loc Local_modules
   | Texp_letexception _ -> unsupported loc Local_exceptions
-  | Texp_assert _ -> unsupported loc Assertions
-  | Texp_lazy _ -> unsupported loc Lazy_values
+  | Texp_assert (e, loc) -> Stexp_assert (spectree bound e, loc)
+  | Texp_lazy e -> Stexp_lazy (spectree bound e)
   | Texp_pack _ -> unsupported loc First_class_modules
   | Texp_letop _ -> unsupported loc Binding_operators
   | Texp_unreachable -> unsupported loc Refutation_cases
@@ -358,6 +357,11 @@ let rec spec (e : spec_expression) : Spec.expression =
   | Stexp_unboxed_field { record; record_sort; label = lbl; _ } ->
     Sexp_unboxed_field
       { record = spec record; sort = sort record_sort; label = label lbl }
+  | Stexp_ifthenelse (c, e1, e2) ->
+    Sexp_ifthenelse (spec c, spec e1, Option.map spec e2)
+  | Stexp_sequence (e1, s, e2) -> Sexp_sequence (spec e1, sort s, spec e2)
+  | Stexp_assert (e, _) -> Sexp_assert (spec e)
+  | Stexp_lazy e -> Sexp_lazy (spec e)
 
 and field_definition :
     'a.
@@ -497,6 +501,12 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
         label;
         unique_use
       }
+  | Stexp_ifthenelse (c, e1, e2) ->
+    Texp_ifthenelse (typedtree c, typedtree e1, Option.map typedtree e2)
+  | Stexp_sequence (e1, sort, e2) ->
+    Texp_sequence (typedtree e1, sort, typedtree e2)
+  | Stexp_assert (e, loc) -> Texp_assert (typedtree e, loc)
+  | Stexp_lazy e -> Texp_lazy (typedtree e)
 
 and typedtree_labelled (lbl, e, sort) = lbl, typedtree e, sort
 
@@ -514,7 +524,6 @@ let describe_primitive = function Location -> "location primitives"
 
 let describe = function
   | Arrays -> "arrays"
-  | Assertions -> "assertions"
   | Atomic_fields -> "atomic fields"
   | Attributes -> "attributes"
   | Binding_operators -> "binding operators"
@@ -522,14 +531,12 @@ let describe = function
   | Borrow -> "borrow_"
   | Coercions -> "coercions"
   | Comprehensions -> "comprehensions"
-  | Conditionals -> "conditionals"
   | Exception_handlers -> "exception handlers"
   | Exclave -> "exclave_"
   | Extension_constructors -> "extension constructors"
   | First_class_modules -> "first-class modules"
   | Functions -> "functions"
   | Layout_polymorphism -> "layout-polymorphic bindings"
-  | Lazy_values -> "lazy values"
   | Let_bindings -> "let-bindings"
   | Local_exceptions -> "local exceptions"
   | Local_modules -> "local modules"
@@ -549,7 +556,6 @@ let describe = function
   | Probes -> "probes"
   | Quotations -> "quotations"
   | Refutation_cases -> "refutation cases"
-  | Sequences -> "sequences"
   | Source_positions -> "source positions"
   | Stack_allocation -> "stack_"
   | Values_through_applications -> "values through functor applications"

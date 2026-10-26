@@ -1695,6 +1695,11 @@ and spec_expression_desc =
       label : Data_types.unboxed_label_description;
       unique_use : unique_use;
     }
+  | Stexp_ifthenelse of
+      spec_expression * spec_expression * spec_expression option
+  | Stexp_sequence of spec_expression * Jkind.sort * spec_expression
+  | Stexp_assert of spec_expression * Location.t
+  | Stexp_lazy of spec_expression
 
 and spec_label_definition =
   | Skept of Types.type_expr * Types.mutability * unique_use

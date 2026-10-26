@@ -77,6 +77,10 @@ type expression =
   | Sexp_record_unboxed_product of record
   | Sexp_field of field
   | Sexp_unboxed_field of field
+  | Sexp_ifthenelse of expression * expression * expression option
+  | Sexp_sequence of expression * sort * expression
+  | Sexp_assert of expression
+  | Sexp_lazy of expression
 
 and record =
   { fields : (label * sort * field_definition) list;

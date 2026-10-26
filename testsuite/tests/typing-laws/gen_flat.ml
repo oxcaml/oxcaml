@@ -51,5 +51,9 @@ law? tuples (x : int) (y : string) : (x, y) = (x, y) && `A x <> `B
 
 type point = { x : float; y : float }
 type other_point = { x : int }
+let g () = ()
+law? control (x : int) :
+  (if x > 0 then x else 0) >= 0 && (g (); x) = x
+  && Lazy.force (lazy x) = x && (assert (x = x); true)
 law? records (p : point) :
   ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.

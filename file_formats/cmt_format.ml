@@ -299,7 +299,9 @@ let iter_on_occurrences
       | Stexp_unboxed_field { lid; label; _ } ->
           add_label ~namespace:Unboxed_label stexp_env lid label
       | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
-      | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _ -> ());
+      | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _
+      | Stexp_ifthenelse _ | Stexp_sequence _ | Stexp_assert _ | Stexp_lazy _ ->
+          ());
       default_iterator.spec_expression sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are

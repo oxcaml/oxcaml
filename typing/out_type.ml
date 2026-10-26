@@ -3895,6 +3895,13 @@ let rec tree_of_spec (e : Spec.expression) : out_spec =
       Ospec_field
         { record = annotate label.type_path (tree_of_spec record);
           label = tree_of_spec_label label; unboxed = true }
+  | Spec.Sexp_ifthenelse (c, e1, e2) ->
+      Ospec_ifthenelse
+        (tree_of_spec c, tree_of_spec e1, Option.map tree_of_spec e2)
+  | Spec.Sexp_sequence (e1, _, e2) ->
+      Ospec_sequence (tree_of_spec e1, tree_of_spec e2)
+  | Spec.Sexp_assert e -> Ospec_assert (tree_of_spec e)
+  | Spec.Sexp_lazy e -> Ospec_lazy (tree_of_spec e)
 
 (* The overridden fields, which are all the fields without an extended
    expression *)

@@ -201,3 +201,25 @@ module type Unboxed_record =
         (((u : u).#a) = ((u : u).#a))
   end
 |}]
+
+(* Conditionals, sequences, assertions and lazy values. *)
+
+module type Control = sig
+  val f : int -> int
+  val g : unit -> unit
+  law? conditional (x : int) : (if x > 0 then f x else 0) >= 0
+  law? sequence (x : int) : (g (); f x) = f x
+  law? asserted (x : int) : (assert (x = x); true)
+  law? lazy_value (x : int) : Lazy.force (lazy (f x)) = f x
+end
+[%%expect {|
+module type Control =
+  sig
+    val f : int -> int
+    val g : unit -> unit
+    law? conditional (x : int) : (if x > (0) then (f x) else (0)) >= (0)
+    law? sequence (x : int) : ((g (() : unit)); (f x)) = (f x)
+    law? asserted (x : int) : ((assert (x = x)); (true : bool))
+    law? lazy_value (x : int) : (Lazy.force (lazy (f x))) = (f x)
+  end
+|}]

@@ -311,6 +311,15 @@ let[@warning "+9"] rec spec_expression sub
   | Stexp_field {record; lid; _} | Stexp_unboxed_field {record; lid; _} ->
       sub.spec_expression sub record;
       iter_loc_lid sub lid
+  | Stexp_ifthenelse (c, e1, e2) ->
+      sub.spec_expression sub c;
+      sub.spec_expression sub e1;
+      Option.iter (sub.spec_expression sub) e2
+  | Stexp_sequence (e1, _, e2) ->
+      sub.spec_expression sub e1;
+      sub.spec_expression sub e2
+  | Stexp_assert (e, loc) -> sub.spec_expression sub e; sub.location sub loc
+  | Stexp_lazy e -> sub.spec_expression sub e
 
 and spec_label_definition sub = function
   | Skept _ -> ()
