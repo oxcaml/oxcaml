@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension laws";
+ flags = "-extension laws -extension small_numbers";
  expect;
 *)
 
@@ -55,5 +55,27 @@ module type Raw_names =
     val \#method : int -> int
     law? \#type (\#method : int) : \#method = \#method
     law? \#end : (\#method (1)) = (\#method (1))
+  end
+|}]
+
+(* Constants are printed as written. *)
+
+module type Constants = sig
+  val boxed : char -> string -> float -> bool
+  val sized : int8 -> int16 -> int32 -> int64 -> nativeint -> bool
+  val unboxed : float# -> bool
+  law? boxed : boxed 'a' {|b|} (-0.)
+  law? sized : sized 1s 2S 3l (-4L) 5n
+  law? unboxed : unboxed (-#1.5)
+end
+[%%expect {|
+module type Constants =
+  sig
+    val boxed : char -> string -> float -> bool
+    val sized : int8 -> int16 -> int32 -> int64 -> nativeint -> bool
+    val unboxed : float# -> bool
+    law? boxed : boxed ('a') ("b") (-0.)
+    law? sized : sized (1s) (2S) (3l) (-4L) (5n)
+    law? unboxed : unboxed (-#1.5)
   end
 |}]

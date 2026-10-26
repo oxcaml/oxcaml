@@ -1641,7 +1641,7 @@ and spec_expression_desc =
         ident: spec_ident;
       }
         (** [locality], [sort] and [yielding] as in [Id_prim]. *)
-  | Stexp_constant of Spec.constant
+  | Stexp_constant of constant
   | Stexp_apply of
       { funct: spec_expression;
         args: (Spec.arg_label * spec_expression * Jkind.sort) list;

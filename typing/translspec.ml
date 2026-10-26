@@ -60,7 +60,6 @@ type unsupported =
   | Mode_annotations
   | Mutable_variables
   | Mutation
-  | Non_integer_constants
   | Objects
   | Omitted_arguments
   | Overwrite
@@ -84,19 +83,6 @@ type error = Unsupported of unsupported
 exception Error of Location.t * error
 
 let unsupported loc what = raise (Error (loc, Unsupported what))
-
-(* Constants *)
-
-let constant loc (c : Typedtree.constant) : Spec.constant =
-  match c with
-  | Const_int n -> Const_int n
-  | Const_char _ | Const_untagged_char _ | Const_string _ | Const_float _
-  | Const_float32 _ | Const_unboxed_float _ | Const_unboxed_float32 _
-  | Const_int8 _ | Const_int16 _ | Const_int32 _ | Const_int64 _
-  | Const_nativeint _ | Const_untagged_int _ | Const_untagged_int8 _
-  | Const_untagged_int16 _ | Const_unboxed_int32 _ | Const_unboxed_int64 _
-  | Const_unboxed_nativeint _ ->
-    unsupported loc Non_integer_constants
 
 (* Labels *)
 
@@ -182,7 +168,7 @@ and spectree_desc bound loc desc : spec_expression_desc =
       }
     in
     ident_desc bound loc path lid desc.val_kind kind ident
-  | Texp_constant c -> Stexp_constant (constant loc c)
+  | Texp_constant c -> Stexp_constant c
   | Texp_apply (_, [], _, _, _, _) ->
     Misc.fatal_error "Translspec.spectree: application without arguments"
   | Texp_apply
@@ -260,11 +246,33 @@ let spectree ~bound e = spectree bound e
 (* Specification expressions. Sort variables are defaulted as in the other
    items of a signature. *)
 
+let constant (c : Typedtree.constant) : Spec.constant =
+  match c with
+  | Const_int n -> Const_int n
+  | Const_char c -> Const_char c
+  | Const_untagged_char c -> Const_untagged_char c
+  | Const_string (s, _, _) -> Const_string s
+  | Const_float f -> Const_float f
+  | Const_float32 f -> Const_float32 f
+  | Const_unboxed_float f -> Const_unboxed_float f
+  | Const_unboxed_float32 f -> Const_unboxed_float32 f
+  | Const_int8 n -> Const_int8 n
+  | Const_int16 n -> Const_int16 n
+  | Const_int32 n -> Const_int32 n
+  | Const_int64 n -> Const_int64 n
+  | Const_nativeint n -> Const_nativeint n
+  | Const_untagged_int n -> Const_untagged_int n
+  | Const_untagged_int8 n -> Const_untagged_int8 n
+  | Const_untagged_int16 n -> Const_untagged_int16 n
+  | Const_unboxed_int32 n -> Const_unboxed_int32 n
+  | Const_unboxed_int64 n -> Const_unboxed_int64 n
+  | Const_unboxed_nativeint n -> Const_unboxed_nativeint n
+
 let rec spec (e : spec_expression) : Spec.expression =
   match e.stexp_desc with
   | Stexp_var { id; _ } -> Sexp_var id
   | Stexp_global { path; _ } | Stexp_primitive { path; _ } -> Sexp_global path
-  | Stexp_constant c -> Sexp_constant c
+  | Stexp_constant c -> Sexp_constant (constant c)
   | Stexp_apply { funct; args; _ } ->
     Sexp_apply
       ( spec funct,
@@ -332,7 +340,7 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
     typedtree_ident path lid (Types.Val_prim prim)
       (Id_prim (locality, sort, yielding))
       ident
-  | Stexp_constant (Const_int n) -> Texp_constant (Typedtree.Const_int n)
+  | Stexp_constant c -> Texp_constant c
   | Stexp_apply { funct; args; ret_mode; yielding } ->
     Texp_apply
       ( typedtree funct,
@@ -378,7 +386,6 @@ let describe = function
   | Mode_annotations -> "mode annotations"
   | Mutable_variables -> "mutable variables"
   | Mutation -> "mutation"
-  | Non_integer_constants -> "constants other than integers"
   | Objects -> "objects"
   | Omitted_arguments -> "applications with omitted arguments"
   | Overwrite -> "overwrite_"

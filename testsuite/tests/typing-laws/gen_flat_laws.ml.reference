@@ -8,7 +8,8 @@ type 'a each =
   unboxed: 'a ;
   \#type: 'a ;
   alias: 'a ;
-  assumption: 'a }
+  assumption: 'a ;
+  constants: 'a }
 let names =
   {
     poly = "poly";
@@ -16,7 +17,8 @@ let names =
     unboxed = "unboxed";
     \#type = "type";
     alias = "alias";
-    assumption = "assumption"
+    assumption = "assumption";
+    constants = "constants"
   }
 let locations =
   {
@@ -67,19 +69,28 @@ let locations =
         start_col = 0;
         end_line = 43;
         end_col = 45
+      };
+    constants =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 44;
+        start_col = 0;
+        end_line = 44;
+        end_col = 68
       }
   }
-let map { poly; modes; unboxed; \#type; alias; assumption } ~f =
+let map { poly; modes; unboxed; \#type; alias; assumption; constants } ~f =
   {
     poly = (f poly);
     modes = (f modes);
     unboxed = (f unboxed);
     \#type = (f \#type);
     alias = (f alias);
-    assumption = (f assumption)
+    assumption = (f assumption);
+    constants = (f constants)
   }
-let to_list { poly; modes; unboxed; \#type; alias; assumption } =
-  [poly; modes; unboxed; \#type; alias; assumption]
+let to_list { poly; modes; unboxed; \#type; alias; assumption; constants } =
+  [poly; modes; unboxed; \#type; alias; assumption; constants]
 type poly_input =
   | Poly_input: 'a 'b . {
   xs: 'a list ;
@@ -99,6 +110,9 @@ type alias_input =
 type assumption_input =
   | Assumption_input: {
   x: int } -> assumption_input 
+type constants_input =
+  | Constants_input: {
+  c: char } -> constants_input 
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
@@ -110,6 +124,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         val \#type : type_input Choice.t
         val alias : alias_input Choice.t
         val assumption : assumption_input Choice.t
+        val constants : constants_input Choice.t
       end
     let poly ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -254,6 +269,46 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             end_col = 45
                           }
                       }))))
+    let constants ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.constants),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.constants;
+                     predicate =
+                       (fun ((Constants_input { c }) : constants_input) ->
+                          (Laws_gen_Stdlib.(=) c 'a' : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "gen_flat.ml";
+                         start_line = 44;
+                         start_col = 28;
+                         end_line = 44;
+                         end_col = 35
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.constants;
+                        predicate =
+                          (fun ((Constants_input { c }) : constants_input) ->
+                             (Laws_gen_Stdlib.(&&)
+                                (Laws_gen_Stdlib.(>=) 1.5 (-0.5))
+                                (Laws_gen_Stdlib.(<>) {|s|} "t") : bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "gen_flat.ml";
+                            start_line = 44;
+                            start_col = 41;
+                            end_line = 44;
+                            end_col = 68
+                          }
+                      }))))
     let laws choices =
       {
         poly = (poly choices);
@@ -261,6 +316,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         unboxed = (unboxed choices);
         \#type = (\#type choices);
         alias = (alias choices);
-        assumption = (assumption choices)
+        assumption = (assumption choices);
+        constants = (constants choices)
       }
   end

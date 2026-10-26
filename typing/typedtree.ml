@@ -1173,7 +1173,7 @@ and spec_expression_desc =
         yielding: Mode.Yielding.l;
         ident: spec_ident;
       }
-  | Stexp_constant of Spec.constant
+  | Stexp_constant of constant
   | Stexp_apply of
       { funct: spec_expression;
         args: (Spec.arg_label * spec_expression * Jkind.sort) list;

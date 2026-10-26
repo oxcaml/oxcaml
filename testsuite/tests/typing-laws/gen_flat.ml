@@ -41,3 +41,4 @@ law? unboxed (x : float#) : of_unboxed x = of_unboxed x
 law? \#type (\#method : int) : \#method = \#method
 law? alias (x : (int as 'a)) : x = x
 law? assumption (x : int) : x > 0 ===> x <> 0
+law? constants (c : char) : c = 'a' ===> 1.5 >= -0.5 && {|s|} <> "t"

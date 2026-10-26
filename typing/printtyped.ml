@@ -1028,8 +1028,7 @@ and spec_expression i ppf x =
   | Stexp_global {path; _} -> line i ppf "Stexp_global %a\n" fmt_path path
   | Stexp_primitive {path; _} ->
       line i ppf "Stexp_primitive %a\n" fmt_path path
-  | Stexp_constant (Spec.Const_int n) ->
-      line i ppf "Stexp_constant Const_int %d\n" n
+  | Stexp_constant c -> line i ppf "Stexp_constant %a\n" fmt_constant c
   | Stexp_apply {funct; args; _} ->
       line i ppf "Stexp_apply\n";
       spec_expression i ppf funct;

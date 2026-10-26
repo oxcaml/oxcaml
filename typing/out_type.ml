@@ -3839,11 +3839,37 @@ let tree_of_cltype_declaration id cl rs =
      tree_of_rec rs)
 
 (* Clauses of laws *)
+let unboxed_integer n suffix =
+  Oval_stuff (Printf.sprintf "%s%c" (Misc.format_as_unboxed_literal n) suffix)
+
+(* Constants are printed as written. *)
+let tree_of_spec_constant : Spec.constant -> out_value = function
+  | Const_int n -> Oval_int n
+  | Const_char c -> Oval_char c
+  | Const_string s -> Oval_string (s, max_int, Ostr_string)
+  | Const_int32 n -> Oval_int32 n
+  | Const_int64 n -> Oval_int64 n
+  | Const_nativeint n -> Oval_nativeint n
+  | Const_int8 n -> Oval_int8 n
+  | Const_int16 n -> Oval_int16 n
+  | Const_float f -> Oval_stuff f
+  | Const_float32 f -> Oval_stuff (f ^ "s")
+  | Const_untagged_char c -> Oval_stuff (Printf.sprintf "#%C" (Char.chr c))
+  | Const_unboxed_float f -> Oval_stuff (Misc.format_as_unboxed_literal f)
+  | Const_unboxed_float32 f ->
+      Oval_stuff (Misc.format_as_unboxed_literal f ^ "s")
+  | Const_untagged_int n -> unboxed_integer (Int.to_string n) 'm'
+  | Const_untagged_int8 n -> unboxed_integer (Int.to_string n) 's'
+  | Const_untagged_int16 n -> unboxed_integer (Int.to_string n) 'S'
+  | Const_unboxed_int32 n -> unboxed_integer (Int32.to_string n) 'l'
+  | Const_unboxed_int64 n -> unboxed_integer (Int64.to_string n) 'L'
+  | Const_unboxed_nativeint n -> unboxed_integer (Nativeint.to_string n) 'n'
+
 let rec tree_of_spec (e : Spec.expression) : out_spec =
   match e with
   | Spec.Sexp_var id -> Ospec_var (Ident.name id)
   | Spec.Sexp_global path -> Ospec_global (tree_of_path (Some Value) path)
-  | Spec.Sexp_constant (Spec.Const_int n) -> Ospec_constant (Oval_int n)
+  | Spec.Sexp_constant c -> Ospec_constant (tree_of_spec_constant c)
   | Spec.Sexp_apply (funct, args) ->
       let arg (lbl, e, _) = (label_of_spec lbl, tree_of_spec e) in
       Ospec_apply (tree_of_spec funct, List.map arg args)

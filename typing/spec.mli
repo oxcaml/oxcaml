@@ -17,7 +17,28 @@
     paths. The main operation is equality up to the renaming of local variables.
 *)
 
-type constant = Const_int of int
+(** Constants, as in [Typedtree], with floats as written and strings without
+    their delimiters. *)
+type constant =
+  | Const_int of int
+  | Const_char of char
+  | Const_untagged_char of int
+  | Const_string of string
+  | Const_float of string
+  | Const_float32 of string
+  | Const_unboxed_float of string
+  | Const_unboxed_float32 of string
+  | Const_int8 of int
+  | Const_int16 of int
+  | Const_int32 of int32
+  | Const_int64 of int64
+  | Const_nativeint of nativeint
+  | Const_untagged_int of int
+  | Const_untagged_int8 of int
+  | Const_untagged_int16 of int
+  | Const_unboxed_int32 of int32
+  | Const_unboxed_int64 of int64
+  | Const_unboxed_nativeint of nativeint
 
 type arg_label =
   | Nolabel
