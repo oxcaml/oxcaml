@@ -147,7 +147,7 @@ end = struct
 end
 
 let rec syntactic_width env (expr : Cmm.expression) : int option =
-  match expr with
+  match[@warning "-4"] expr with
   | Cconst_float _
   | Cconst_float32 _
   | Cconst_int _
@@ -162,6 +162,7 @@ let rec syntactic_width env (expr : Cmm.expression) : int option =
   | Cexit _
   | Cifthenelse _
   | Cinvalid _
+  | Cop (Craise _, _, _)
   | Cswitch _
     -> None
   | Cname_for_debugger (_, body)
@@ -172,6 +173,7 @@ let rec syntactic_width env (expr : Cmm.expression) : int option =
     -> syntactic_width
          (register_syntactic_width_of_assignment env var defining_expr)
          body
+  | Cop (Copaque, exprs, _)
   | Ctuple exprs (* This is an *unboxed* tuple. *)
     -> syntactic_width_of_unboxed_product env exprs
   | Cvar var
@@ -252,6 +254,6 @@ let rec check env (expr : Cmm.expression) =
       ~width_opt:(syntactic_width_of_unboxed_product env args)
 
 let run ppf (fundecl : Cmm.fundecl) =
-  let env = Env.init () in
+  let env = register_syntactic_width_of_params (Env.init ()) fundecl.fun_args in
   check env fundecl.fun_body;
   Env.report ppf
