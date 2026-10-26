@@ -1414,7 +1414,7 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
       end in
       (typed_vars, new_univars, cty)
     end
-      ~before_generalize:(fun (_,_,cty) -> generalize_ctyp cty)
+      ~generalize:(fun (_,_,cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
@@ -1433,7 +1433,7 @@ and transl_type_repr env ~policy ~row_context mode loc vars st =
       end in
       (sort_vars, new_univars, cty)
     end
-    ~before_generalize:(fun (_, _, cty) -> generalize_ctyp cty)
+    ~generalize:(fun (_, _, cty) -> generalize_ctyp cty)
   in
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
@@ -1492,7 +1492,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
       with Not_found ->
         let t, ty, jkind_annot =
           with_local_level_generalize_structure_if_principal
-            ~before_generalize:(fun (t, _, _) -> generalize_structure t)
+            ~generalize:(fun (t, _, _) -> generalize_structure t)
             begin fun () ->
             let jkind, rigid =
               jkind_for_fresh_var env alias alias_loc attrs jkind_annot_opt
@@ -1728,7 +1728,7 @@ let transl_simple_type_univars env styp =
         TyVarEnv.globalize_used_variables policy env ();
         typ
       end
-      ~before_generalize:generalize_ctyp
+      ~generalize:generalize_ctyp
   end in
   make_fixed_univars typ.ctyp_type;
     { typ with ctyp_type =
@@ -1748,7 +1748,7 @@ let transl_simple_type_delayed env mode styp =
       (typ, force)
     end
     (* Generalize everything except the variables that were just globalized. *)
-    ~before_generalize:(fun (typ,_) -> generalize_ctyp typ)
+    ~generalize:(fun (typ,_) -> generalize_ctyp typ)
   in
   (typ, instance typ.ctyp_type, force)
 
@@ -1763,7 +1763,7 @@ let transl_type_scheme_mono env styp =
         With_locality.Const.legacy
         styp
     end
-    ~before_generalize:generalize_ctyp
+    ~generalize:generalize_ctyp
   in
   (* This next line is very important: it stops [val] and [external]
      declarations from having undefaulted jkind variables. Without
@@ -1791,7 +1791,7 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       in
       (typed_vars, univars, typ)
     end
-    ~before_generalize:(fun (_,_,typ) -> generalize_ctyp typ)
+    ~generalize:(fun (_,_,typ) -> generalize_ctyp typ)
   in
   let _ : _ list = TyVarEnv.instance_poly_univars env loc univars in
   With_locality.with_zap_scope (fun ~zap_scope ->

@@ -737,7 +737,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
         (fun () ->
            let cty =
              Ctype.with_local_level_generalize_structure_if_principal
-               ~before_generalize:(fun cty ->
+               ~generalize:(fun cty ->
                  Ctype.generalize_structure cty.ctyp_type)
                (fun () -> Typetexp.transl_simple_type ~new_var_jkind:Any val_env
                             ~closed:false With_locality.Const.legacy styp)
@@ -787,7 +787,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
            end;
            let definition =
              Ctype.with_local_level_generalize_structure_if_principal
-               ~before_generalize:Typecore.generalize_structure_exp
+               ~generalize:Typecore.generalize_structure_exp
                (fun () -> Typecore.type_exp val_env sdefinition)
            in
            begin
@@ -1323,7 +1323,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         raise(Error(spat.ppat_loc, val_env, Polymorphic_class_parameter));
       let (pat, pv, val_env', met_env) =
         Ctype.with_local_level_generalize_structure_if_principal
-          ~before_generalize:begin fun (pat, _, _, _) ->
+          ~generalize:begin fun (pat, _, _, _) ->
             let gen {pat_type = ty} = Ctype.generalize_structure ty in
             iter_pattern gen pat
           end
@@ -1393,7 +1393,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       assert (sargs <> []);
       let cl =
         Ctype.with_local_level_generalize_structure_if_principal
-          ~before_generalize:(fun cl ->
+          ~generalize:(fun cl ->
             Ctype.generalize_class_type_structure cl.cl_type)
           (fun () -> class_expr cl_num val_env met_env virt self_scope scl')
       in
@@ -1571,7 +1571,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              let ty =
                Ctype.with_local_level_generalize
                  (fun () -> Ctype.instance vd.val_type)
-                 ~before_generalize:Ctype.generalize
+                 ~generalize:Ctype.generalize
              in
              let expr =
                {exp_desc =
@@ -1773,7 +1773,7 @@ let initial_env define_class approx
   (* Temporary type for the class constructor *)
   let constr_type =
     Ctype.with_local_level_generalize_structure_if_principal
-      ~before_generalize:Ctype.generalize_structure
+      ~generalize:Ctype.generalize_structure
       (fun () -> approx cl.pci_expr)
   in
   let dummy_cty = Cty_signature (Ctype.new_class_signature ()) in
@@ -2180,7 +2180,7 @@ let type_classes define_class approx kind env cls =
 
        rtjoa: agreed, but will just leave this here until the testsuite passes
     *)
-    ~before_generalize:ignore
+    ~generalize:ignore
   in
   let res = List.rev_map (final_decl env define_class) res in
   let decls = List.fold_right extract_type_decls res [] in

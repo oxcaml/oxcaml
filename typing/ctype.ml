@@ -236,23 +236,16 @@ let mark_persistent_in_quotations env =
 
 (* [with_local_level_gen] handles both the scoping structure of levels
    and automatic generalization through pools (cf. btype.ml) *)
-let with_local_level_gen ~begin_def ~structure ?before_generalize f =
+let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
+    =
   begin_def ();
   let level = !current_level in
   let result, pool =
     with_new_pool ~level:!current_level begin fun () ->
-      let result =
-        wrap_end_def (fun () ->
-            let result = f () in
-            (* Before exiting the current pool, we must run all
-               pending ivar handlers. If any ivars are pending
-               after running the scheduler, we default them and
-               loop *)
-            if not structure then
-            run_scheduler_and_default_ivars ();
-            result)
-      in
+      let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
+      if not structure then run_scheduler_and_default_ivars ();
+      generalize result;
       result
     end
   in
@@ -310,23 +303,29 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   end pool;
   result
 
-let with_local_level_generalize ~before_generalize f =
-  with_local_level_gen ~begin_def ~structure:false ~before_generalize f
-let with_local_level_generalize_if cond ~before_generalize f =
-  if cond then with_local_level_generalize ~before_generalize f else f ()
-let with_local_level_generalize_structure ~before_generalize f =
-  with_local_level_gen ~begin_def ~structure:true ~before_generalize f
-let with_local_level_generalize_structure_if cond ~before_generalize f =
-  if cond then
-    with_local_level_generalize_structure ~before_generalize f
+let with_local_level_generalize ?before_generalize ~generalize f =
+  with_local_level_gen ~begin_def ~structure:false ?before_generalize
+    ~generalize f
+let with_local_level_generalize_if cond ?before_generalize ~generalize f =
+  if cond
+  then with_local_level_generalize ?before_generalize ~generalize f
   else f ()
-let with_local_level_generalize_structure_if_principal ~before_generalize f =
+let with_local_level_generalize_structure ?before_generalize ~generalize f =
+  with_local_level_gen ~begin_def ~structure:true ?before_generalize ~generalize
+    f
+let with_local_level_generalize_structure_if cond ?before_generalize ~generalize
+    f =
+  if cond
+  then with_local_level_generalize_structure ?before_generalize ~generalize f
+  else f ()
+let with_local_level_generalize_structure_if_principal ?before_generalize
+    ~generalize f =
   if !Clflags.principal then
-    with_local_level_generalize_structure ~before_generalize f
+    with_local_level_generalize_structure ?before_generalize ~generalize f
   else f ()
-let with_local_level_generalize_for_class ~before_generalize f =
+let with_local_level_generalize_for_class ?before_generalize ~generalize f =
   with_local_level_gen
-    ~begin_def:begin_class_def ~structure:false ~before_generalize f
+    ~begin_def:begin_class_def ~structure:false ?before_generalize ~generalize f
 
 let with_local_level ?post f =
   begin_def ();
@@ -7298,7 +7297,7 @@ let moregeneral ~self_check env inst_nongen
         | Moregen_trace trace -> Moregen (expand_to_moregen_error env trace)
         | e -> e)
     end
-      ~before_generalize:(fun (subj_inst, _) ->
+      ~generalize:(fun (subj_inst, _) ->
         ignore
           (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
@@ -7944,7 +7943,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
          pending ivar, so no check is left to fail after
          [match_class_types] returns. *)
         match
-        with_local_level_generalize ~before_generalize:ignore begin fun () ->
+        with_local_level_generalize ~generalize:ignore begin fun () ->
           assert (!current_level = subject_level);
           (*
             Generic variables are first duplicated with [instance].  So,

@@ -3397,7 +3397,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       let mode = With_regionality.newvar 0 in
       let exp =
         Ctype.with_local_level_generalize_structure_if_principal
-          ~before_generalize:Typecore.generalize_structure_exp
+          ~generalize:Typecore.generalize_structure_exp
           (fun () -> Typecore.type_exp env sexp
             ~mode:(With_regionality.disallow_left mode))
       in
