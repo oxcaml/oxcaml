@@ -5,9 +5,8 @@
 let prefix = "fdo_entry_annotation("
 
 (* Each entry is [prefix], a quoted name (with escapes), and the rest of the
-   counter up to the closing parenthesis.
-
-   CR yusumez: This is done to not dump the entire fexpr. I still find this a
+   counter up to the closing parenthesis. *)
+(* CR yusumez: This is done to not dump the entire fexpr. I still find this a
    bit sad. *)
 let entries file =
   let dump = In_channel.with_open_text file In_channel.input_all in
