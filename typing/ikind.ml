@@ -145,6 +145,11 @@ module Solver = struct
   type mode =
     | Normal
     | Round_up
+    | Round_up_except_vars of (Types.type_expr -> Ldd.node)
+        (** Like [Round_up], but the kind of a non-generic type variable is
+            given by the callback (capped by its jkind), so that it can stand
+            for the kind of whatever the variable is solved to. Used for
+            omnidirectional mode crossing. *)
 
   let rec uid_is_reliable_identity = function
     | Types.Uid.Internal -> false
@@ -240,8 +245,9 @@ module Solver = struct
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
     match ctx.mode, name with
-    | Normal, _ | Round_up, Provenance _ -> Ldd.node_of_var (Ldd.rigid name)
-    | Round_up, _ -> Ldd.const Axis_lattice.top
+    | Normal, _ | (Round_up | Round_up_except_vars _), Provenance _ ->
+      Ldd.node_of_var (Ldd.rigid name)
+    | (Round_up | Round_up_except_vars _), _ -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
@@ -562,6 +568,13 @@ module Solver = struct
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
       (ty : Types.type_expr) : Ldd.node =
+    let check_principality =
+      match ctx.mode with
+      | Normal | Round_up -> check_principality
+      | Round_up_except_vars _ ->
+        (* Principality is not checked when using omnidirectionality. *)
+        false
+    in
     if check_principality && not (is_principal_type ty)
     then Ldd.const Axis_lattice.top
     else
@@ -615,7 +628,17 @@ module Solver = struct
     in
     match desc with
     | Types.Tvar { name = _name; jkind }
-    | Types.Tivar { name = _name; jkind; ivar = _ }
+    | Types.Tivar { name = _name; jkind; ivar = _ } ->
+      (* Keep a rigid param (or a placeholder, for a non-generic variable in
+         [Round_up_except_vars]), but cap it by its annotated jkind. *)
+      let param =
+        match ctx.mode with
+        | Round_up_except_vars kind_of_var
+          when Types.get_level ty <> Btype.generic_level ->
+          kind_of_var ty
+        | Normal | Round_up | Round_up_except_vars _ -> rigid ctx ty
+      in
+      self_provenance (Ldd.meet param (ckind_of_jkind child_ctx jkind))
     | Types.Tunivar { name = _name; jkind } ->
       (* Keep a rigid param, but cap it by its annotated jkind. *)
       self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
@@ -1733,13 +1756,146 @@ let crossing_of_jkind ~(context : Jkind.jkind_context) env
       let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
       Axis_lattice.to_mode_crossing lat
 
-let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
+let rounded_up_kind env ty =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-  Solver.round_up (Solver.kind ~use_tables:false ctx ty)
+  Solver.normalize (Solver.kind ~use_tables:false ctx ty)
+
+let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
+  Solver.round_up (rounded_up_kind env ty)
 
 let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
   let lat = round_up_type env ty in
   Axis_lattice.to_mode_crossing lat
+
+let upon_shape_later = Defined_later.Fun.create ~name:"Ctype.upon_shape"
+
+let upon_shape env ty ~run ~default =
+  Defined_later.Fun.get upon_shape_later env ty ~run ~default
+
+let scheduler_later = Defined_later.Fun.create ~name:"Ctype.scheduler"
+
+let scheduler () = Defined_later.Fun.get scheduler_later ()
+
+module Placeholder = struct
+  (** A solver variable that stands for the kind of a type variable, until it is
+      linked to a non-variable type or defaulted. *)
+  type t =
+    { type_var : Types.type_expr;
+      ldd_var : Ldd.var;
+      resolved : unit Ivar.t
+          (** Filled once [ldd_var] is solved *and* every placeholder it depends
+              on is resolved. *)
+    }
+
+  let create type_var =
+    { type_var;
+      ldd_var = Ldd.new_var ();
+      resolved = Ivar.create ~in_global_pool:false ()
+    }
+
+  let upon_resolved t ~run =
+    Ivar.upon t.resolved ~scheduler:(scheduler ()) ~run ~cancel:(fun () ->
+        Misc.fatal_error "Ikind.Placeholder.upon_resolved: cancelled")
+
+  let upon_resolved_all ts ~run =
+    let rec loop ts =
+      match ts with
+      | [] -> run ()
+      | t :: ts -> upon_resolved t ~run:(fun () -> loop ts)
+    in
+    loop ts
+
+  module Ctx = struct
+    (** The placeholders of one [upon_crossing_of_type], by solver variable.
+        Only reachable from pending handlers, so collected once the crossing is
+        known.
+
+        Not backtracked: an entry only says which placeholder a solver variable
+        belongs to, which stays true. A placeholder created in a backtracked
+        snapshot becomes unreachable from any kind, so its entry is never looked
+        up again. *)
+    type nonrec t = { by_ldd_var_tbl : (int, t) Hashtbl.t }
+
+    let create () = { by_ldd_var_tbl = Hashtbl.create 8 }
+
+    let add t p = Hashtbl.add t.by_ldd_var_tbl (Ldd.var_id p.ldd_var) p
+
+    let find_by_ldd_var t ldd_var =
+      match Hashtbl.find_opt t.by_ldd_var_tbl (Ldd.var_id ldd_var) with
+      | Some t -> t
+      | None -> Misc.fatal_error "Ikind.Placeholder.Ctx.find_by_ldd_var"
+
+    let dependencies_of_kind t kind =
+      let deps = ref [] in
+      kind
+      |> Ldd.iter_unsolved_vars (fun var ->
+          deps := find_by_ldd_var t var :: !deps);
+      !deps
+  end
+
+  let solve t kind ~deps =
+    Ldd.solve_lfp t.ldd_var kind;
+    upon_resolved_all deps ~run:(fun () ->
+        match Ivar.fill t.resolved () ~scheduler:(scheduler ()) with
+        | Ok -> ()
+        | Already_full () ->
+          Misc.fatal_error "Ikind.Placeholder.solve: resolved twice")
+end
+
+(* [kind_with_placeholders env pctx ty] is [(kind, deps)]: [ty]'s kind with
+   each unsolved type variable's kind replaced by a placeholder, and the
+   placeholders (of this or nested calls, registered in [pctx]) that [kind]
+   still mentions. The crossing is known once all of [deps] are resolved. *)
+let rec kind_with_placeholders env pctx (ty : Types.type_expr) =
+  (* Placeholders created by [kind]. They are not reused by other calls:
+     this call may run in a snapshot that is later backtracked. Throwing
+     away the placeholders avoids the complexity of undo operations on [pctx]. *)
+  let created = Btype.TypeHash.create 4 in
+  let kind_of_var type_var =
+    let p : Placeholder.t =
+      match Btype.TypeHash.find_opt created type_var with
+      | Some p -> p
+      | None ->
+        let p = Placeholder.create type_var in
+        Placeholder.Ctx.add pctx p;
+        Btype.TypeHash.add created type_var p;
+        p
+    in
+    Ldd.node_of_var p.ldd_var
+  in
+  let ctx =
+    create_ctx ~mode:(Solver.Round_up_except_vars kind_of_var) ~env:(Some env)
+  in
+  let kind = Solver.normalize (Solver.kind ~use_tables:false ctx ty) in
+  (* Only solve new placeholders once [kind] is computed: solving turns
+     their type variables into [Tivar]s, and a handler may run immediately and
+     re-enter the solver. Dependencies are computed afterwards, as such a
+     handler may already have solved some placeholders. *)
+  Btype.TypeHash.iter (fun _ p -> solve_placeholder env pctx p) created;
+  kind, Placeholder.Ctx.dependencies_of_kind pctx kind
+
+and solve_placeholder env pctx (p : Placeholder.t) =
+  let type_var = p.type_var in
+  let run _ =
+    let kind, deps = kind_with_placeholders env pctx type_var in
+    Placeholder.solve p kind ~deps
+  in
+  let default () =
+    let kind = rounded_up_kind env type_var in
+    Placeholder.solve p kind ~deps:[]
+  in
+  upon_shape env type_var ~run ~default
+
+let upon_crossing_of_type env (ty : Types.type_expr) ~cross ~later =
+  let crossing kind = Axis_lattice.to_mode_crossing (Ldd.round_up kind) in
+  let pctx = Placeholder.Ctx.create () in
+  match kind_with_placeholders env pctx ty with
+  | kind, [] -> cross (crossing kind)
+  | kind, deps ->
+    let result, ~run = later () in
+    Placeholder.upon_resolved_all deps ~run:(fun () ->
+        run (cross (crossing kind)));
+    result
 
 type sub_or_intersect = Jkind.sub_or_intersect
 

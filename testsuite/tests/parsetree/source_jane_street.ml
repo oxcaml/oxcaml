@@ -263,21 +263,21 @@ let nums = [| x for x = 0 to 100 |];;
 let nums = [  x for x = 0 to 100   ];;
 
 [%%expect{|
-val nums : int iarray =
+val nums : int iarray @@ stateless =
   [:0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
     21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
     39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
     57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
     75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
     93; 94; 95; 96; 97; 98; 99; 100:]
-val nums : int array =
+val nums : int array @@ stateless =
   [|0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
     21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
     39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
     57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
     75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
     93; 94; 95; 96; 97; 98; 99; 100|]
-val nums : int list =
+val nums : int list @@ stateless =
   [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
    21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
    39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
@@ -292,9 +292,9 @@ let nums = [| x for x in [| 1; 2; 3 |] |];;
 let nums = [  x for x in [  1; 2; 3  ]  ];;
 
 [%%expect{|
-val nums : int iarray = [:1; 2; 3:]
-val nums : int array = [|1; 2; 3|]
-val nums : int list = [1; 2; 3]
+val nums : int iarray @@ stateless = [:1; 2; 3:]
+val nums : int array @@ stateless = [|1; 2; 3|]
+val nums : int list @@ stateless = [1; 2; 3]
 |}]
 
 (* complex comprehension *)
@@ -636,9 +636,7 @@ let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 Line 1, characters 48-49:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
                                                     ^
-Error: This value is "local"
-       but is expected to be "global"
-         because it is the field "x" (with some modality) of the record at line 1, characters 46-54.
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -954,18 +952,18 @@ let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
 let ~x:(T x), T y = ~x:(T 5), T 10
 
 [%%expect{|
-val z : int = 4
-val punned : int = 5
+val z : int @@ stateless = 4
+val punned : int @@ stateless = 5
 val x_must_be_even : 'a -> 'b = <fun>
 exception Odd
 type 'a t = T of 'a
-val x : x:int * y:int = (~x:1, ~y:2)
-val x : x:int * y:int = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
-val x : int = 5
-val y : int = 10
+val x : int @@ stateless = 5
+val y : int @@ stateless = 10
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
@@ -1011,9 +1009,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
 val x : int @@ stateless = 1
-val y : int = 2
+val y : int @@ stateless = 2
 val x : int @@ stateless = 1
-val y : int = 2
+val y : int @@ stateless = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
 |}]
@@ -1033,7 +1031,7 @@ let matches =
 
 [%%expect{|
 type xy = x:int * y:int
-val lt : x:int * y:int * x2:int * int = (~x:1, ~y:2, ~x2:3, 4)
+val lt : x:int * y:int * x2:int * int @@ stateless = (~x:1, ~y:2, ~x2:3, 4)
 val matches : int = 1
 val matches : int * int = (1, 2)
 |}]
@@ -1124,63 +1122,63 @@ let x = test_char "untagged char" (#'c')
 
 [%%expect{|
 e: 2.718282
-val x : unit = ()
+val x : unit @@ stateless = ()
 negative_one_half: -0.500000
-val x : unit = ()
+val x : unit @@ stateless = ()
 negative_one_half: -0.500000
-val x : unit = ()
+val x : unit @@ stateless = ()
 negative_one_half: -0.500000
-val x : unit = ()
+val x : unit @@ stateless = ()
 negative_one_half: -0.500000
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one_dot: 1.000000
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one_dot: 1.000000
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one_dot: 1.000000
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one_dot: 1.000000
-val x : unit = ()
+val x : unit @@ stateless = ()
 one_billion: 1000000000.000000
-val x : unit = ()
+val x : unit @@ stateless = ()
 one_twenty_seven_point_two_five_in_floating_hex: 127.250000
-val x : unit = ()
+val x : unit @@ stateless = ()
 five_point_three_seven_five_in_floating_hexponent: 5.375000
-val x : unit = ()
+val x : unit @@ stateless = ()
 zero: 0
-val x : unit = ()
+val x : unit @@ stateless = ()
 zero: 0
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one: 1
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one: 1
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one: 1
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one: 1
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one: 1
-val x : unit = ()
+val x : unit @@ stateless = ()
 positive_one: 1
-val x : unit = ()
+val x : unit @@ stateless = ()
 negative_one: -1
-val x : unit = ()
+val x : unit @@ stateless = ()
 negative_one: -1
-val x : unit = ()
+val x : unit @@ stateless = ()
 two_fifty_five_in_hex: 255
-val x : unit = ()
+val x : unit @@ stateless = ()
 ten_in_binary: 10
-val x : unit = ()
+val x : unit @@ stateless = ()
 one_hundred_in_octal: 100
-val x : unit = ()
+val x : unit @@ stateless = ()
 two_hundred_in_hex: 200
-val x : unit = ()
+val x : unit @@ stateless = ()
 twenty_five_in_octal: 25
-val x : unit = ()
+val x : unit @@ stateless = ()
 forty_two_in_binary: 42
-val x : unit = ()
+val x : unit @@ stateless = ()
 untagged char: 'c'
-val x : unit = ()
+val x : unit @@ stateless = ()
 |}]
 
 (* Patterns *)
@@ -1289,7 +1287,7 @@ let inc r = #{ r with i = r.#i + 1 }
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
 val idx : 'a with_idx -> int = <fun>
-val payload : string = "payload"
+val payload : string @@ stateless = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
 |}]
 
@@ -1313,18 +1311,18 @@ let idx_b = (.b)
 let idx_c = (.c)
 [%%expect{|
 type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
-val idx_a : ('a s, 'a) idx_imm = <abstr>
-val idx_b : ('a s, 'a) idx_mut = <abstr>
-val idx_c : ('a s, 'a) idx_atomic = <abstr>
+val idx_a : ('a s, 'a) idx_imm @@ stateless = <abstr>
+val idx_b : ('a s, 'a) idx_mut @@ stateless = <abstr>
+val idx_c : ('a s, 'a) idx_atomic @@ stateless = <abstr>
 |}]
 
 let idx_a' = (.idx_imm(idx_a).#foo)
 let idx_b' = (.idx_mut(idx_b).#foo)
 let idx_c' = (.idx_atomic(idx_c).#foo)
 [%%expect{|
-val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
-val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
-val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
+val idx_a' : ('a r# s, 'a) idx_imm @@ stateless = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut @@ stateless = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic @@ stateless = <abstr>
 |}]
 
 module Borrow = struct
@@ -1484,11 +1482,11 @@ type t3 = int8
 type t4 = int8#
 type t5 = int16
 type t6 = int16#
-val x : float32 = 3.1400001s
+val x : float32 @@ stateless = 3.1400001s
 val x : unit -> float32_u = <fun>
-val y : int8 = 42s
+val y : int8 @@ stateless = 42s
 val y : unit -> int8# = <fun>
-val z : int16 = 42S
+val z : int16 @@ stateless = 42S
 val z : unit -> int16# = <fun>
 |}]
 
