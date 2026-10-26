@@ -8,7 +8,7 @@
    linux;
    arch_amd64;
    script = "sh ${test_source_directory}/has_gdb.sh";
-   script;
+   config_script;
    readonly_files = "meander.ml meander_c.c gdb_test.py";
    setup-ocamlopt.byte-build-env;
    program = "${test_build_directory}/meander";
