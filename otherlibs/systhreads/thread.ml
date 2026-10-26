@@ -25,6 +25,10 @@ type t : value mod contended portable
 external thread_initialize : unit -> unit = "caml_thread_initialize"
 external thread_cleanup : unit -> unit @@ portable = "caml_thread_cleanup"
 external thread_new : (unit -> unit) @ once -> t @@ portable = "caml_thread_new"
+(* The new thread acquires a tick once it is running on the domain, and passes
+   it to the closure. *)
+external thread_new_on : int -> (int -> unit) @ once portable -> t @@ portable
+  = "caml_thread_new_on"
 external thread_uncaught_exception : exn -> unit @@ portable =
             "caml_thread_uncaught_exception"
 
@@ -59,41 +63,41 @@ external acquire_tick : interval_usec:int -> int @@ portable
   = "caml_thread_acquire_tick"
 external release_tick : int -> unit @@ portable = "caml_thread_release_tick"
 
+(* The body of a new thread, which releases [tick] when [fn] finishes. *)
+let run tick tls_keys (fn @ once) =
+  Domain.Safe.TLS.Private.init ();
+  Domain.Safe.TLS.Private.set_initial_keys tls_keys;
+  try
+    fn ();
+    release_tick tick;
+    ignore (Sys.opaque_identity (check_memprof_cb ()))
+  with
+  | Exit ->
+    release_tick tick;
+    ignore (Sys.opaque_identity (check_memprof_cb ()))
+  | exn ->
+    let raw_backtrace = Printexc.get_raw_backtrace () in
+    release_tick tick;
+    flush stdout; flush stderr;
+    try
+      (Atomic.get uncaught_exception_handler).portable exn
+    with
+    | Exit -> ()
+    | exn' ->
+      Printf.eprintf
+        "Thread %d killed on uncaught exception %s\n"
+        (id (self ())) (Printexc.to_string exn);
+      Printexc.print_raw_backtrace stderr raw_backtrace;
+      Printf.eprintf
+        "Thread %d uncaught exception handler raised %s\n"
+        (id (self ())) (Printexc.to_string exn');
+      Printexc.print_backtrace stdout;
+      flush stderr
+
 let create (fn @ once) arg =
   let tls_keys = Domain.Safe.TLS.Private.get_initial_keys () in
   let tick = acquire_tick ~interval_usec in
-  match
-    thread_new
-      (fun () ->
-        Domain.Safe.TLS.Private.init ();
-        Domain.Safe.TLS.Private.set_initial_keys tls_keys;
-        try
-          fn arg;
-          release_tick tick;
-          ignore (Sys.opaque_identity (check_memprof_cb ()))
-        with
-        | Exit ->
-          release_tick tick;
-          ignore (Sys.opaque_identity (check_memprof_cb ()))
-        | exn ->
-          let raw_backtrace = Printexc.get_raw_backtrace () in
-          release_tick tick;
-          flush stdout; flush stderr;
-          try
-            (Atomic.get uncaught_exception_handler).portable exn
-          with
-          | Exit -> ()
-          | exn' ->
-            Printf.eprintf
-              "Thread %d killed on uncaught exception %s\n"
-              (id (self ())) (Printexc.to_string exn);
-            Printexc.print_raw_backtrace stderr raw_backtrace;
-            Printf.eprintf
-              "Thread %d uncaught exception handler raised %s\n"
-              (id (self ())) (Printexc.to_string exn');
-            Printexc.print_backtrace stdout;
-            flush stderr)
-  with
+  match thread_new (fun () -> run tick tls_keys (fun () -> fn arg)) with
   | t -> t
   | exception exn ->
     (* If [thread_new] itself raises (e.g. [pthread_create] fails) the thread
@@ -104,6 +108,30 @@ let create (fn @ once) arg =
 module Portable = struct
   let create (fn @ once portable) arg = create fn arg
 end
+
+let create_on ~domain (fn @ once portable) arg =
+  if domain = Domain.self_index ()
+  then create (fun () -> fn arg) ()
+  else (
+    (* SAFETY: [keys] is immutable and built from portable values;
+       [Domain.Safe.spawn] also passes it to another domain. *)
+    let tls_keys =
+      Obj.magic_portable (Domain.Safe.TLS.Private.get_initial_keys ())
+    in
+    (* Until the new thread is running on [domain], this tick keeps whichever
+       thread holds [domain]'s lock preemptible, so that the new thread can
+       take it. *)
+    let tick = acquire_tick ~interval_usec in
+    match
+      thread_new_on domain (fun tick ->
+        run tick (Obj.magic_uncontended tls_keys) (fun () -> fn arg))
+    with
+    | t ->
+      release_tick tick;
+      t
+    | exception exn ->
+      release_tick tick;
+      raise exn)
 
 let create (fn @ many) arg = create fn arg
 

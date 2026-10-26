@@ -198,10 +198,9 @@ static struct caml_thread_table* thread_table;
 #define Default_lock(dom_id) (&thread_table[dom_id].default_lock)
 #define Default_locking_scheme(dom_id) (&thread_table[dom_id].default_locking_scheme)
 
-static void thread_lock_acquire(void)
+static void thread_lock_acquire_on(int dom_id)
 {
   struct caml_locking_scheme* s;
-  int dom_id = Caml_state->id;
 
   /* The locking scheme may be changed by the thread that currently
      holds it. This means that it may change while we're waiting to
@@ -218,13 +217,23 @@ static void thread_lock_acquire(void)
   }
 }
 
-static void thread_lock_release(void)
+static void thread_lock_acquire(void)
+{
+  thread_lock_acquire_on(Caml_state->id);
+}
+
+static void thread_lock_release_on(int dom_id)
 {
   /* There is no tricky case here like in acquire, as only the holder
      of the lock can change it. (Here, that's us) */
   struct caml_locking_scheme *s;
-  s = atomic_load(&Locking_scheme(Caml_state->id));
+  s = atomic_load(&Locking_scheme(dom_id));
   s->unlock(s->context);
+}
+
+static void thread_lock_release(void)
+{
+  thread_lock_release_on(Caml_state->id);
 }
 
 /* The remaining fields are accessed while holding the domain lock */
@@ -838,12 +847,22 @@ CAMLprim value caml_thread_release_tick(value tick)
 
 /* Create a thread */
 
+/* Run the current thread's start closure on [arg], then detach the thread
+   from the runtime. */
+static void thread_run_and_detach(value arg)
+{
+  value clos = Start_closure(Active_thread->descr);
+  caml_modify(&(Start_closure(Active_thread->descr)), Val_unit);
+  caml_callback_exn(clos, arg);
+
+  thread_detach_from_runtime();
+}
+
 /* the thread lock is not held when entering */
 static void * caml_thread_start(void * v)
 {
   caml_thread_t th = (caml_thread_t) v;
   int dom_id = th->domain_id;
-  value clos;
 
   /* Acquire lock of domain */
   caml_init_domain_self(dom_id);
@@ -855,12 +874,8 @@ static void * caml_thread_start(void * v)
   caml_acquire_domain_lock();
 
   thread_init_current(th);
+  thread_run_and_detach(Val_unit);
 
-  clos = Start_closure(Active_thread->descr);
-  caml_modify(&(Start_closure(Active_thread->descr)), Val_unit);
-  caml_callback_exn(clos, Val_unit);
-
-  thread_detach_from_runtime();
   s = atomic_load(&Locking_scheme(dom_id));
   if (s->thread_stop != NULL)
     s->thread_stop(s->context, Thread_type_caml);
@@ -897,6 +912,154 @@ CAMLprim value caml_thread_new(value clos)
   }
 
   CAMLreturn(th->descr);
+}
+
+/* Create a thread on another domain. Its creator does not hold that domain's
+   lock, so the new thread adds itself to the domain and reports back. */
+
+enum thread_start_on_status {
+  Start_pending,
+  Start_running,
+  Start_domain_not_running,
+  Start_out_of_memory,
+  Start_raised,
+};
+
+/* Shared between [caml_thread_new_on] and the thread it creates. The creator
+   waits until [status] is no longer [Start_pending]; until then, the new
+   thread may use [descr] and [exn], which are the creator's roots. */
+struct thread_start_on {
+  int domain_id;
+  value *descr;
+  value *exn; /* set when [status] is [Start_raised] */
+  enum thread_start_on_status status;
+  pthread_mutex_t lock;
+  custom_condvar status_changed;
+};
+
+/* Add the current thread to [p->domain_id]. On success, the thread holds the
+   domain lock, is set up to run, and owns [*tick]. */
+static enum thread_start_on_status thread_add_to_domain(
+  struct thread_start_on *p, value *tick)
+{
+  int dom_id = p->domain_id;
+
+  thread_lock_acquire_on(dom_id);
+  /* [active_thread] is non-NULL exactly while the domain is running: it is
+     set and cleared with the domain lock held, by
+     [caml_thread_domain_initialize_hook] and [caml_thread_domain_stop_hook]. */
+  if (thread_table[dom_id].active_thread == NULL) {
+    thread_lock_release_on(dom_id);
+    return Start_domain_not_running;
+  }
+  caml_init_domain_self(dom_id);
+
+  caml_thread_t th = thread_alloc_and_add();
+  if (th == NULL) {
+    caml_release_domain_lock();
+    return Start_out_of_memory;
+  }
+  /* No GC can run while we hold the domain lock without polling, so it is
+     safe to read the creator's roots. */
+  th->descr = *p->descr;
+  thread_init_current(th);
+
+  /* Take this thread's own tick before the creator releases its tick, which
+     kept the previous holder of this domain's lock preemptible so that we
+     could take it. Ticks must be released on the domain that acquired them. */
+  const value * acquire_tick =
+    cached_named_value(&acquire_tick_cache, "Domain.Tick.acquire");
+  *tick = caml_callback_exn(*acquire_tick, Val_long(Thread_timeout_usec));
+  if (Is_exception_result(*tick)) {
+    *p->exn = Extract_exception(*tick);
+    thread_detach_from_runtime();
+    return Start_raised;
+  }
+  return Start_running;
+}
+
+/* the thread lock is not held when entering */
+static void * caml_thread_start_on(void * v)
+{
+  struct thread_start_on *p = v;
+  int dom_id = p->domain_id;
+  value tick;
+
+  struct caml_locking_scheme *s = atomic_load(&Locking_scheme(dom_id));
+  if (s->thread_start != NULL)
+    s->thread_start(s->context, Thread_type_caml);
+
+  enum thread_start_on_status status = thread_add_to_domain(p, &tick);
+
+  pthread_mutex_lock(&p->lock);
+  p->status = status;
+  custom_condvar_signal(&p->status_changed);
+  pthread_mutex_unlock(&p->lock);
+  /* Cannot access [p] below here. */
+
+  if (status == Start_running)
+    thread_run_and_detach(tick);
+
+  s = atomic_load(&Locking_scheme(dom_id));
+  if (s->thread_stop != NULL)
+    s->thread_stop(s->context, Thread_type_caml);
+
+  return 0;
+}
+
+CAMLprim value caml_thread_new_on(value domain, value clos)
+{
+  CAMLparam2(domain, clos);
+  CAMLlocal2(descr, exn);
+  intnat dom_id = Long_val(domain);
+  int rc;
+
+  if (dom_id < 0 || dom_id >= caml_params->max_domains)
+    caml_invalid_argument("Thread.create_on: invalid domain index");
+
+#ifndef NATIVE_CODE
+  if (caml_debugger_in_use)
+    caml_fatal_error("ocamldebug does not support multithreaded programs");
+#endif
+
+  descr = caml_thread_new_descriptor(clos);
+
+  struct thread_start_on p = {
+    .domain_id = dom_id,
+    .descr = &descr,
+    .exn = &exn,
+    .status = Start_pending,
+  };
+  rc = pthread_mutex_init(&p.lock, NULL);
+  caml_check_error(rc, "Thread.create_on");
+  rc = custom_condvar_init(&p.status_changed);
+  if (rc != 0) {
+    pthread_mutex_destroy(&p.lock);
+    caml_check_error(rc, "Thread.create_on");
+  }
+
+  rc = st_thread_create(NULL, caml_thread_start_on, (void *) &p);
+  if (rc == 0) {
+    /* Don't run signal handlers here: they could raise while the new thread
+       is still using [p]. */
+    caml_enter_blocking_section_no_pending();
+    pthread_mutex_lock(&p.lock);
+    while (p.status == Start_pending)
+      custom_condvar_wait(&p.status_changed, &p.lock);
+    pthread_mutex_unlock(&p.lock);
+    caml_leave_blocking_section();
+  }
+  custom_condvar_destroy(&p.status_changed);
+  pthread_mutex_destroy(&p.lock);
+  caml_check_error(rc, "Thread.create_on");
+
+  if (p.status == Start_domain_not_running)
+    caml_invalid_argument("Thread.create_on: domain is not running");
+  if (p.status == Start_out_of_memory)
+    caml_raise_out_of_memory();
+  if (p.status == Start_raised)
+    caml_raise(exn);
+  CAMLreturn(descr);
 }
 
 /* Register a thread already created from C */

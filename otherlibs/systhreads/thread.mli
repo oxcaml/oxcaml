@@ -58,6 +58,19 @@ val create : ('a -> 'b) -> 'a -> t @@ nonportable
    See also {!Domain.spawn} if you want parallel execution instead.
    *)
 
+val create_on
+  :  domain:int
+  -> ('a @ contended -> 'b) @ once portable
+  -> 'a @ contended portable
+  -> t
+(** [Thread.create_on ~domain funct arg] is like {!Thread.Portable.create},
+    but the new thread runs on the domain whose index (see
+    {!Domain.self_index}) is [domain], rather than on the current domain.
+
+    This returns once the new thread has been added to [domain].
+
+    @raise Invalid_argument if no domain with index [domain] is running. *)
+
 val self : unit -> t
 (** Return the handle for the thread currently executing. *)
 

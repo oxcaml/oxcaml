@@ -1,0 +1,6 @@
+current domain: ran on 0
+negative index: Invalid_argument "Thread.create_on: invalid domain index"
+index too large: Invalid_argument "Thread.create_on: invalid domain index"
+not yet spawned: Invalid_argument "Thread.create_on: domain is not running"
+busy domain: ran on 1
+terminated: Invalid_argument "Thread.create_on: domain is not running"
