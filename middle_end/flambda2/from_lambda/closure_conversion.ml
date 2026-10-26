@@ -1418,7 +1418,8 @@ type simplified_block_load =
   | Block_but_cannot_simplify of Code_or_metadata.t Value_approximation.t
   | Field_contents of Simple.t
 
-let simplify_block_load acc body_env ~block ~field : simplified_block_load =
+let simplify_block_load acc body_env ~block ~field ~result_kind :
+    simplified_block_load =
   match find_value_approximation_through_symbol acc body_env block with
   | Unknown _ -> Unknown
   | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
@@ -1427,9 +1428,18 @@ let simplify_block_load acc body_env ~block ~field : simplified_block_load =
       let i = Target_ocaml_int.to_int field in
       if i >= Array.length approx then None else Some approx.(i)
     in
+    (* An unreachable match arm may project a different constructor's layout, so
+       the field may not have the kind the load expects. As for an out-of-bounds
+       field, such a load is treated as [Not_a_block] rather than propagating
+       contents of the wrong kind. *)
+    let field_contents simple ~kind =
+      if K.equal kind result_kind then Field_contents simple else Not_a_block
+    in
     match approx with
-    | Some (Value_symbol sym) -> Field_contents (Simple.symbol sym)
-    | Some (Value_const c) -> Field_contents (Simple.const c)
+    | Some (Value_symbol sym) ->
+      field_contents (Simple.symbol sym) ~kind:K.value
+    | Some (Value_const c) ->
+      field_contents (Simple.const c) ~kind:(Reg_width_const.kind c)
     | Some approx -> Block_but_cannot_simplify approx
     | None -> Not_a_block)
 
@@ -1708,7 +1718,10 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                (Bound_static.create [Bound_static.Pattern.block_like symbol]))
             defining_expr ~body
         | Prim (Unary (Block_load { field; _ }, block), _) -> (
-          match simplify_block_load acc body_env ~block ~field with
+          match
+            simplify_block_load acc body_env ~block ~field
+              ~result_kind:(K.With_subkind.kind kind)
+          with
           | Unknown -> bind acc body_env
           | Not_a_block ->
             if Flambda_features.kind_checks ()
@@ -4173,7 +4186,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
           let pos_str = string_of_int pos in
           let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
           let block = module_block_simple in
-          match simplify_block_load acc env ~block ~field with
+          match
+            simplify_block_load acc env ~block ~field
+              ~result_kind:(kind_of_field pos)
+          with
           | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
             Let_bound
               ( Variable.create ("field_" ^ pos_str) (kind_of_field pos),
