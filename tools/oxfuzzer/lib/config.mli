@@ -22,8 +22,20 @@ val max_record_types : int
 
 val max_record_fields : int
 
+val max_variant_types : int
+
+val max_variant_constructors : int
+
+val max_constructor_args : int
+
+val max_match_count : int
+
 (* Percentages. *)
 val record_probability : int
+
+val variant_probability : int
+
+val match_in_match_probability : int
 
 val nested_record_probability : int
 
@@ -51,6 +63,8 @@ module Swarm : sig
       multidimensional_arrays : bool;
       boxed_records : bool;
       unboxed_records : bool;
+      variants : bool;
+      matches : bool;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
