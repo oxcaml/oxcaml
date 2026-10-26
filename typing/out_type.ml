@@ -1631,18 +1631,21 @@ end = struct
         corresponds to the name of [cls_edge]. *)
     }
 
-  type edge =
-  | Simple of simple_edge
-      (** a constraint between two alloc modes *)
-  | Comonadic of comonadic_edge
-      (** a constraint between the comonadic parts
+  type edge_as_lower =
+  | Lower_simple of simple_edge
+      (** a lower bound constraint between two alloc modes *)
+  | Lower_comonadic of comonadic_edge
+      (** a lower bound constraint between the comonadic parts
       of two alloc modes *)
-  (* CR zeisbach: (style nit) [Closing_over] ? That seems to match the style for
-     naming constructors elsewhere in the compiler. Might be more noise than
-     it's worth but your call; I'd prefer renaming. *)
-  | ClosingOver of closing_over_edge
-      (** a constraint between the monadic part
+  | Lower_closing_over_to of closing_over_edge
+      (** a lower bound constraint between the monadic part
       of one mode and the comonadic part of another *)
+
+  type edge_as_upper =
+  | Upper_simple of simple_edge
+      (** an upper bound constraint between two alloc modes *)
+  | Upper_comonadic of comonadic_edge
+      (** an upper bound constraint between the comonadic parts *)
 
    let dupper_lr : type a. a C.obj -> (a, (allowed * allowed)) Desc.t -> a =
     fun dst descr ->
@@ -1828,7 +1831,7 @@ end = struct
     then
       List.map (fun com_morph ->
         let c_name = construct_comonadic_name pair0 com_morph pair1 in
-        Comonadic { c_via = com_morph; c_name })
+        { c_via = com_morph; c_name })
         com_morphs
     else []
 
@@ -1903,33 +1906,38 @@ end = struct
         !visible_pairs)
       !visible_pairs
     in
-    List.map (fun e -> ClosingOver e) (dedup_closing_over edges)
+    List.map (fun e -> Lower_closing_over_to e) (dedup_closing_over edges)
 
   let construct_edges_between pair0 pair1 =
-    if not (construct_edge_condition pair0 pair1) then []
-    else begin
+    if not (construct_edge_condition pair0 pair1) then [], []
+    else
       let simple = construct_simple_between pair0 pair1 in
       let comonadic = construct_comonadic_between pair0 pair1 in
-      List.map (fun edge -> Simple edge) simple @ comonadic
-    end
+      simple, comonadic
 
   (* CR zeisbach: it is not immediately obvious to me why we call
      [construct_closing_over_to] exactly here and not in the from function
      below. Perhaps a comment here or on [construct_closing_over_to] could
      be useful? *)
   let construct_edges_to :
-      visible_pair -> edge list =
+      visible_pair -> edge_as_lower list =
     fun pair1 ->
       let edges =
-        List.concat_map (fun pair0 -> construct_edges_between pair0 pair1)
+        List.concat_map (fun pair0 ->
+          let simple, comonadic = construct_edges_between pair0 pair1 in
+          List.map (fun e -> Lower_simple e) simple
+          @ List.map (fun e -> Lower_comonadic e) comonadic)
           !visible_pairs
       in
       construct_closing_over_to pair1 @ edges
 
   let construct_edges_from :
-      visible_pair -> edge list =
+      visible_pair -> edge_as_upper list =
     fun pair0 ->
-      List.concat_map (fun pair1 -> construct_edges_between pair0 pair1)
+      List.concat_map (fun pair1 ->
+        let simple, comonadic = construct_edges_between pair0 pair1 in
+        List.map (fun e -> Upper_simple e) simple
+        @ List.map (fun e -> Upper_comonadic e) comonadic)
         !visible_pairs
 
   let name_is_already_used name =
@@ -1993,15 +2001,6 @@ end = struct
       hi = Fmt.asprintf "%a"
              With_locality.Const.Option.partial_print upper}
 
-  type edge_as_lower =
-  | Lower_simple : simple_edge -> edge_as_lower
-  | Lower_comonadic : comonadic_edge -> edge_as_lower
-  | Lower_closing_over_to : closing_over_edge -> edge_as_lower
-
-  type edge_as_upper =
-  | Upper_simple : simple_edge -> edge_as_upper
-  | Upper_comonadic : comonadic_edge -> edge_as_upper
-
   let print_raw_upper_bound ppf edge =
     match edge with
     | Upper_simple { via; name } ->
@@ -2031,25 +2030,6 @@ end = struct
         (fun ppf s -> Fmt.fprintf ppf "%s" s)
         m ppf
         (C.compose With_locality.obj_comonadic cls_src cls_target)
-
-  let partition_edges_into_bounds :
-      edges_from:edge list ->
-      edges_to:edge list ->
-      edge_as_lower list * edge_as_upper list =
-    fun ~edges_from ~edges_to ->
-    let into_lower_from = function
-      | ClosingOver _ -> assert false
-      | Simple e -> Upper_simple e
-      | Comonadic e -> Upper_comonadic e
-    in
-    let into_lower_to = function
-      | ClosingOver e -> Lower_closing_over_to e
-      | Simple e -> Lower_simple e
-      | Comonadic e -> Lower_comonadic e
-    in
-    let upper = List.map into_lower_from edges_from in
-    let lower = List.map into_lower_to edges_to in
-    lower, upper
 
   type edges =
     { lower : edge_as_lower list;
@@ -2092,11 +2072,8 @@ end = struct
     suppressed_curry_heads := [];
     edge_table :=
       List.map (fun pair ->
-        let lower, upper =
-          partition_edges_into_bounds
-            ~edges_from:(construct_edges_from pair)
-            ~edges_to:(construct_edges_to pair)
-        in
+        let lower = construct_edges_to pair in
+        let upper = construct_edges_from pair in
         pair, { lower; upper })
         !visible_pairs
 
