@@ -664,3 +664,58 @@ external f : (c [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
 type c = A of float# [@@unboxed]
 external f : c -> (float [@unboxed]) = "foo" "bar"
 |}]
+
+(**** Recursive declarations ****)
+
+(* Within a recursive group, the kind of a field's type comes from that
+   type's annotation; making it addressable must see through the kind
+   abbreviation. *)
+type u : immutable_data = { more : v } [@@unboxed]
+and v : immutable_data = { x : int }
+[%%expect{|
+Line 1, characters 0-50:
+1 | type u : immutable_data = { more : v } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "u" is immutable_data
+         because of the annotation on the declaration of the type v.
+       But the kind of type "u" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type u.
+|}]
+
+type u : immutable_data = A of v [@@unboxed]
+and v : immutable_data = { x : int }
+[%%expect{|
+Line 1, characters 0-44:
+1 | type u : immutable_data = A of v [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "u" is immutable_data
+         because of the annotation on the declaration of the type v.
+       But the kind of type "u" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type u.
+|}]
+
+type u : immutable_data = #{ more : v }
+and v : immutable_data = { x : int }
+[%%expect{|
+type u = #{ more : v; }
+and v = { x : int; }
+|}]
+
+type u : bits8 addressable = { more : v } [@@unboxed]
+and v : bits8 = #{ inherit a : int8# }
+[%%expect{|
+type u = { more : v; } [@@unboxed]
+and v = #{ inherit a : int8#; }
+|}]
+
+type u : bits8 = { more : v } [@@unboxed]
+and v : bits8 = #{ inherit a : int8# }
+[%%expect{|
+Line 1, characters 0-41:
+1 | type u : bits8 = { more : v } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "u" is bits8 addressable
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "u" must be a sublayout of bits8
+         because of the annotation on the declaration of the type u.
+|}]
