@@ -113,3 +113,33 @@ let destruction_point_at_end : Cfg.basic_block -> destruction_kind option =
     if Label.Set.is_empty (Cfg.successor_labels block ~normal:true ~exn:false)
     then Some Destruction_on_all_paths
     else Some Destruction_only_on_exceptional_path)
+
+(* Centralized predicate: an instruction is a legitimate rematerialization
+   source iff it is pure, cheap, doesn't read mutable state, and doesn't destroy
+   hardware registers in ways that change the surrounding allocation. This
+   predicate is shared between [Uses.compute] (which classifies sources) and the
+   regalloc validator (which recognizes the rematerialized instruction in the
+   post-allocation CFG). *)
+let is_rematerializable_shape : Cfg.basic -> bool =
+ fun desc ->
+  match[@ocaml.warning "-fragile-match"] desc with
+  | Op (Load { mutability = Immutable; is_atomic = false; _ })
+  (* Result arity is not checked here (this predicate only sees the [desc]):
+     [Uses.classify_source] only classifies single-result instructions as
+     sources, so every rematerialized instruction has exactly one result. *)
+  | Op
+      ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ )
+  (* CR-soon xclerc for xclerc: also handle [Stackoffset]. *)
+  | Op
+      (Intop_imm
+         ( ( Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr
+           | Ipopcnt | Iclz | Ictz ),
+           _ )) ->
+    (* [Icomp _] may clobber [%rax] on amd64, unlike on arm64. Neither backend
+       selects [Idiv _], [Imod _] or [Imulh _] as [Intop_imm]. Their
+       non-immediate amd64 forms use fixed registers: [%rax]/[%rdx] for
+       division/modulo, and [%rax] with the result in [%rdx] for
+       multiply-high. *)
+    true
+  | _ -> false
