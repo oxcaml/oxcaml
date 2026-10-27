@@ -47,6 +47,10 @@ law? control (x : int) :
   (if x > 0 then f x else 0) >= 0 && (skip (); f x) = f x
   && Lazy.force (lazy (f x)) = f x && (assert (x = x); true)
 
+law? binding (s : shape) :
+  let a = (match s with Circle r -> r | Square w -> w) in
+  a >= 0. || a < 0.
+
 (* Laws in a submodule and in a module type. *)
 
 module Nested = struct

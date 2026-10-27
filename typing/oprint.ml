@@ -1209,6 +1209,18 @@ and print_out_spec ppf = function
         e2
   | Ospec_assert e -> fprintf ppf "@[<2>assert@ %a@]" print_simple_out_spec e
   | Ospec_lazy e -> fprintf ppf "@[<2>lazy@ %a@]" print_simple_out_spec e
+  | Ospec_let (rec_, bindings, body) ->
+      let binding ppf (p, e) =
+        fprintf ppf "@[<2>%a =@ %a@]" print_out_spec_pattern p
+          print_out_spec e
+      in
+      fprintf ppf "@[<hv>@[<hv 2>let%s %a@ in@]@ %a@]"
+        (if rec_ then " rec" else "")
+        (print_list binding (fun ppf -> fprintf ppf "@ and "))
+        bindings print_out_spec body
+  | Ospec_match (e, cases) ->
+      fprintf ppf "@[<hv>@[<2>match@ %a@ with@]%a@]" print_out_spec e
+        print_out_spec_cases cases
   | Ospec_field { record; label; unboxed } ->
       fprintf ppf "@[<2>%a.%s%a@]" print_simple_out_spec record
         (if unboxed then "#" else "") print_constructor label
@@ -1248,8 +1260,77 @@ and print_simple_out_spec ppf = function
         (print_list field (fun ppf -> fprintf ppf ";@ ")) fields
   | Ospec_apply _ | Ospec_construct (_, _ :: _) | Ospec_variant (_, Some _)
   | Ospec_field _ | Ospec_ifthenelse _ | Ospec_assert _ | Ospec_lazy _
-    as spec ->
+  | Ospec_let _ | Ospec_match _ as spec ->
       fprintf ppf "(%a)" print_out_spec spec
+
+(* The right-hand side of a case is parenthesized, so that it cannot capture
+   the cases that follow. *)
+and print_out_spec_cases ppf cases =
+  let case ppf (p, guard, e) =
+    fprintf ppf "@ @[<2>| %a%a ->@ %a@]" print_out_spec_pattern p
+      (fun ppf -> function
+         | None -> ()
+         | Some g -> fprintf ppf "@ when@ %a" print_simple_out_spec g)
+      guard print_simple_out_spec e
+  in
+  List.iter (case ppf) cases
+
+and print_out_spec_pattern ppf = function
+  | Ospat_alias (p, x) ->
+      fprintf ppf "@[<2>%a@ as@ %a@]" print_simple_out_spec_pattern p
+        value_ident x
+  | Ospat_construct (c, [arg]) ->
+      fprintf ppf "@[<2>%a@ %a@]" print_constructor c
+        print_simple_out_spec_pattern arg
+  | Ospat_construct (c, (_ :: _ :: _ as args)) ->
+      fprintf ppf "@[<2>%a@ (%a)@]" print_constructor c
+        (print_list print_out_spec_pattern (fun ppf -> fprintf ppf ",@ "))
+        args
+  | Ospat_variant (lbl, Some arg) ->
+      fprintf ppf "@[<2>`%a@ %a@]" print_lident lbl
+        print_simple_out_spec_pattern arg
+  | Ospat_or (p1, p2) ->
+      fprintf ppf "@[<hv>%a@ | %a@]" print_out_spec_pattern p1
+        print_out_spec_pattern p2
+  | Ospat_lazy p ->
+      fprintf ppf "@[<2>lazy@ %a@]" print_simple_out_spec_pattern p
+  | Ospat_any | Ospat_var _ | Ospat_constant _ | Ospat_tuple _
+  | Ospat_unboxed_tuple _ | Ospat_unboxed_unit | Ospat_unboxed_bool _
+  | Ospat_construct (_, []) | Ospat_variant (_, None) | Ospat_record _
+  | Ospat_constraint _ as p ->
+      print_simple_out_spec_pattern ppf p
+
+and print_simple_out_spec_pattern ppf = function
+  | Ospat_any -> fprintf ppf "_"
+  | Ospat_var x -> value_ident ppf x
+  | Ospat_constant v -> fprintf ppf "(%a)" print_out_value v
+  | Ospat_tuple ps -> fprintf ppf "@[<1>(%a)@]" print_spec_pattern_components ps
+  | Ospat_unboxed_tuple ps ->
+      fprintf ppf "@[<1>#(%a)@]" print_spec_pattern_components ps
+  | Ospat_unboxed_unit -> fprintf ppf "#()"
+  | Ospat_unboxed_bool b -> fprintf ppf "#%b" b
+  | Ospat_construct (c, []) -> print_constructor ppf c
+  | Ospat_variant (lbl, None) -> fprintf ppf "`%a" print_lident lbl
+  | Ospat_record { fields; closed; unboxed } ->
+      let field ppf (label, p) =
+        fprintf ppf "@[<2>%a =@ %a@]" print_constructor label
+          print_out_spec_pattern p
+      in
+      fprintf ppf "@[<hv 2>%s{ %a%s }@]" (if unboxed then "#" else "")
+        (print_list field (fun ppf -> fprintf ppf ";@ ")) fields
+        (if closed then "" else "; _")
+  | Ospat_constraint (p, ty) ->
+      fprintf ppf "@[<1>(%a :@ %a)@]" print_out_spec_pattern p !out_type ty
+  | Ospat_alias _ | Ospat_construct (_, _ :: _) | Ospat_variant (_, Some _)
+  | Ospat_or _ | Ospat_lazy _ as p ->
+      fprintf ppf "(%a)" print_out_spec_pattern p
+
+and print_spec_pattern_components ppf ps =
+  let component ppf = function
+    | None, p -> print_out_spec_pattern ppf p
+    | Some l, p -> fprintf ppf "~%s:%a" l print_simple_out_spec_pattern p
+  in
+  print_list component (fun ppf -> fprintf ppf ",@ ") ppf ps
 
 and print_spec_components ppf es =
   let component ppf = function

@@ -62,6 +62,8 @@ type mapper =
     signature: mapper -> signature -> signature;
     signature_item: mapper -> signature_item -> signature_item;
     spec_expression: mapper -> spec_expression -> spec_expression;
+    spec_pattern:
+      'k . mapper -> 'k spec_general_pattern -> 'k spec_general_pattern;
     structure: mapper -> structure -> structure;
     structure_item: mapper -> structure_item -> structure_item;
     typ: mapper -> core_type -> core_type;

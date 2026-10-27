@@ -3902,6 +3902,62 @@ let rec tree_of_spec (e : Spec.expression) : out_spec =
       Ospec_sequence (tree_of_spec e1, tree_of_spec e2)
   | Spec.Sexp_assert e -> Ospec_assert (tree_of_spec e)
   | Spec.Sexp_lazy e -> Ospec_lazy (tree_of_spec e)
+  | Spec.Sexp_let (rec_flag, vbs, body) ->
+      let binding (vb : Spec.value_binding) =
+        (tree_of_spec_pattern vb.vb_pat, tree_of_spec vb.vb_expr)
+      in
+      let rec_ =
+        match rec_flag with Recursive -> true | Nonrecursive -> false
+      in
+      Ospec_let (rec_, List.map binding vbs, tree_of_spec body)
+  | Spec.Sexp_match (e, _, cases) ->
+      Ospec_match (tree_of_spec e, List.map tree_of_spec_case cases)
+
+and tree_of_spec_case (c : Spec.case) =
+  (tree_of_spec_pattern c.c_lhs, Option.map tree_of_spec c.c_guard,
+   tree_of_spec c.c_rhs)
+
+(* Constructors and records in patterns are annotated like in expressions
+   (see [annotate]). *)
+and tree_of_spec_pattern (p : Spec.pattern) : out_spec_pattern =
+  let labelled (lbl, p, _) = (lbl, tree_of_spec_pattern p) in
+  let field ((label : Spec.label), p) =
+    (tree_of_spec_label label, tree_of_spec_pattern p)
+  in
+  let record ~unboxed fields closed =
+    let p =
+      Ospat_record
+        { fields = List.map field fields;
+          closed = (match (closed : Asttypes.closed_flag) with
+              | Closed -> true | Open -> false);
+          unboxed }
+    in
+    match fields with
+    | ((label : Spec.label), _) :: _ -> annotate_pattern label.type_path p
+    | [] -> p
+  in
+  match p with
+  | Spat_any -> Ospat_any
+  | Spat_var (id, _) -> Ospat_var (Ident.name id)
+  | Spat_alias (p, id, _) -> Ospat_alias (tree_of_spec_pattern p, Ident.name id)
+  | Spat_constant c -> Ospat_constant (tree_of_spec_constant c)
+  | Spat_tuple ps -> Ospat_tuple (List.map labelled ps)
+  | Spat_unboxed_tuple ps -> Ospat_unboxed_tuple (List.map labelled ps)
+  | Spat_unboxed_unit -> Ospat_unboxed_unit
+  | Spat_unboxed_bool b -> Ospat_unboxed_bool b
+  | Spat_construct ((Constructor { type_path; _ } as cstr), args) ->
+      annotate_pattern type_path
+        (Ospat_construct
+           (tree_of_spec_constructor cstr,
+            List.map (fun (_, p) -> tree_of_spec_pattern p) args))
+  | Spat_variant (lbl, arg) ->
+      Ospat_variant (lbl, Option.map tree_of_spec_pattern arg)
+  | Spat_record (fields, closed) -> record ~unboxed:false fields closed
+  | Spat_record_unboxed_product (fields, closed) ->
+      record ~unboxed:true fields closed
+  | Spat_or (p1, p2) ->
+      Ospat_or (tree_of_spec_pattern p1, tree_of_spec_pattern p2)
+  | Spat_lazy p -> Ospat_lazy (tree_of_spec_pattern p)
 
 (* The overridden fields, which are all the fields without an extended
    expression *)
@@ -3934,16 +3990,25 @@ and tree_of_spec_labelled (lbl, e, _) = (lbl, tree_of_spec e)
    constructors and labels. The types of inline records have no syntax, but
    their constructor determines them. *)
 and annotate (type_path : Path.t) e =
+  match type_annotation type_path with
+  | Some ty -> Ospec_constraint (e, ty)
+  | None -> e
+
+and annotate_pattern (type_path : Path.t) p =
+  match type_annotation type_path with
+  | Some ty -> Ospat_constraint (p, ty)
+  | None -> p
+
+and type_annotation (type_path : Path.t) =
   match type_path with
-  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> e
+  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> None
   | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, Punboxed_ty) -> (
       match Env.find_type type_path !printing_env with
       | decl ->
           let params = List.map (fun _ -> Otyp_stuff "_") decl.type_params in
-          Ospec_constraint
-            (e, Otyp_constr (tree_of_path (Some Type) type_path, params))
+          Some (Otyp_constr (tree_of_path (Some Type) type_path, params))
       | exception Not_found ->
-          Misc.fatal_errorf "Out_type.annotate: unbound type %s"
+          Misc.fatal_errorf "Out_type.type_annotation: unbound type %s"
             (Path.name type_path))
 
 and tree_of_spec_constructor (Constructor { name; _ } : Spec.constructor) =

@@ -1096,6 +1096,93 @@ and spec_expression i ppf x =
   | Stexp_lazy e ->
       line i ppf "Stexp_lazy\n";
       spec_expression i ppf e
+  | Stexp_let (rf, vbs, body) ->
+      line i ppf "Stexp_let %a\n" fmt_rec_flag rf;
+      List.iter
+        (fun {svb_pat; svb_expr; svb_sort; _} ->
+           line (i+1) ppf "<def>\n";
+           spec_pattern (i+2) ppf svb_pat;
+           line (i+2) ppf "%a\n" fmt_sort svb_sort;
+           spec_expression (i+2) ppf svb_expr)
+        vbs;
+      spec_expression i ppf body
+  | Stexp_match (e, sort, cases, _) ->
+      line i ppf "Stexp_match\n";
+      spec_expression i ppf e;
+      line i ppf "%a\n" fmt_sort sort;
+      list i spec_case ppf cases
+
+and spec_case : type k. _ -> _ -> k spec_case -> unit =
+  fun i ppf {sc_lhs; sc_guard; sc_rhs} ->
+  line i ppf "<case>\n";
+  spec_pattern (i+1) ppf sc_lhs;
+  option (i+1) spec_expression ppf sc_guard;
+  spec_expression (i+1) ppf sc_rhs
+
+and spec_pattern : type k. _ -> _ -> k spec_general_pattern -> unit =
+  fun i ppf x ->
+  line i ppf "spec_pattern %a\n" fmt_location x.stpat_loc;
+  let i = i+1 in
+  List.iter (spec_pat_extra i ppf) x.stpat_extra;
+  let labelled i ppf (label, p, sort) =
+    tuple_component_label i ppf label;
+    spec_pattern i ppf p;
+    line i ppf "%a\n" fmt_sort sort
+  in
+  let field i ppf (li, _, p) =
+    line i ppf "%a\n" fmt_longident li;
+    spec_pattern (i+1) ppf p
+  in
+  match x.stpat_desc with
+  | Stpat_any -> line i ppf "Stpat_any\n"
+  | Stpat_var { id; sort; mode; _ } ->
+      line i ppf "Stpat_var \"%a\"\n" fmt_ident id;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf mode
+  | Stpat_alias { pattern = p; id; sort; mode; _ } ->
+      line i ppf "Stpat_alias \"%a\"\n" fmt_ident id;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf mode;
+      spec_pattern i ppf p
+  | Stpat_constant c -> line i ppf "Stpat_constant %a\n" fmt_constant c
+  | Stpat_unboxed_unit -> line i ppf "Stpat_unboxed_unit\n"
+  | Stpat_unboxed_bool b -> line i ppf "Stpat_unboxed_bool %a\n" fmt_bool b
+  | Stpat_tuple l ->
+      line i ppf "Stpat_tuple\n";
+      list i labelled ppf l
+  | Stpat_unboxed_tuple l ->
+      line i ppf "Stpat_unboxed_tuple\n";
+      list i labelled ppf l
+  | Stpat_construct (li, _, _, args) ->
+      line i ppf "Stpat_construct %a\n" fmt_longident li;
+      list i spec_pattern ppf (List.map snd args)
+  | Stpat_variant (l, po, _) ->
+      line i ppf "Stpat_variant \"%s\"\n" l;
+      option i spec_pattern ppf po
+  | Stpat_record (l, _, _) ->
+      line i ppf "Stpat_record\n";
+      list i field ppf l
+  | Stpat_record_unboxed_product (l, _, _) ->
+      line i ppf "Stpat_record_unboxed_product\n";
+      list i field ppf l
+  | Stpat_lazy p ->
+      line i ppf "Stpat_lazy\n";
+      spec_pattern i ppf p
+  | Stpat_value p ->
+      line i ppf "Stpat_value\n";
+      spec_pattern i ppf p
+  | Stpat_or (p1, p2) ->
+      line i ppf "Stpat_or\n";
+      spec_pattern i ppf p1;
+      spec_pattern i ppf p2
+
+and spec_pat_extra i ppf (extra, loc) =
+  match extra with
+  | Stpat_constraint ct ->
+      line i ppf "Stpat_constraint %a\n" fmt_location loc;
+      core_type (i+1) ppf ct
+  | Stpat_inspected_type _ ->
+      line i ppf "Stpat_inspected_type %a\n" fmt_location loc
 
 and spec_record_field
     : 'a. _ -> _ -> 'a * _ * _ -> _

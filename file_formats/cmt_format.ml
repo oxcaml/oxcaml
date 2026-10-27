@@ -196,15 +196,16 @@ let iter_on_occurrences
       | Soverridden (lid, _) -> add_label ~namespace env lid label_descr
       | Skept _ -> ()) fields
   in
-  let iter_field_pats ~namespace pat_env fields =
+  let iter_field_pats ~namespace ~pat_loc pat_env fields =
     List.iter (fun (lid, label_descr, pat) ->
       let lid =
         let open Location in
+        let pat_loc = pat_loc pat in
         (* In the presence of punning we want to index the label
             even if it is ghosted *)
-        if (not pat.pat_loc.loc_ghost
-          && lid.loc.loc_start = pat.pat_loc.loc_start
-          && lid.loc.loc_end = pat.pat_loc.loc_end)
+        if (not pat_loc.loc_ghost
+          && lid.loc.loc_start = pat_loc.loc_start
+          && lid.loc.loc_end = pat_loc.loc_end)
         then {lid with loc = {lid.loc with loc_ghost = false}}
         else lid
       in
@@ -300,7 +301,8 @@ let iter_on_occurrences
           add_label ~namespace:Unboxed_label stexp_env lid label
       | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
       | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _
-      | Stexp_ifthenelse _ | Stexp_sequence _ | Stexp_assert _ | Stexp_lazy _ ->
+      | Stexp_ifthenelse _ | Stexp_sequence _ | Stexp_assert _ | Stexp_lazy _
+      | Stexp_let _ | Stexp_match _ ->
           ());
       default_iterator.spec_expression sub e);
 
@@ -333,9 +335,11 @@ let iter_on_occurrences
       | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
       | Tpat_record (fields, _, _) ->
-        iter_field_pats ~namespace:Label pat_env fields
+        iter_field_pats ~namespace:Label ~pat_loc:(fun p -> p.pat_loc) pat_env
+          fields
       | Tpat_record_unboxed_product (fields, _, _) ->
-        iter_field_pats ~namespace:Unboxed_label pat_env fields
+        iter_field_pats ~namespace:Unboxed_label ~pat_loc:(fun p -> p.pat_loc)
+          pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_fun_layout _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _
@@ -350,6 +354,23 @@ let iter_on_occurrences
         | Tpat_constraint _ | Tpat_unpack | Tpat_inspected_type _ -> ())
         pat_extra;
       default_iterator.pat sub pat);
+
+  spec_pattern =
+    (fun (type a) sub
+      ({ stpat_desc; stpat_env; _ } as pat : a spec_general_pattern) ->
+      let pat_loc p = p.stpat_loc in
+      (match stpat_desc with
+      | Stpat_construct (lid, constr_desc, _, _) ->
+          add_constructor_description stpat_env lid constr_desc
+      | Stpat_record (fields, _, _) ->
+        iter_field_pats ~namespace:Label ~pat_loc stpat_env fields
+      | Stpat_record_unboxed_product (fields, _, _) ->
+        iter_field_pats ~namespace:Unboxed_label ~pat_loc stpat_env fields
+      | Stpat_any | Stpat_var _ | Stpat_alias _ | Stpat_constant _
+      | Stpat_tuple _ | Stpat_unboxed_unit | Stpat_unboxed_bool _
+      | Stpat_unboxed_tuple _ | Stpat_variant _ | Stpat_lazy _
+      | Stpat_value _ | Stpat_or _ -> ());
+      default_iterator.spec_pattern sub pat);
 
   binding_op = (fun sub ({bop_op_path; bop_op_name; bop_exp; _} as bop) ->
     let lid = { bop_op_name with txt = Longident.Lident bop_op_name.txt } in

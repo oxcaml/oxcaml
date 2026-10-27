@@ -47,6 +47,12 @@ module Choices = struct
        :: List.map (fun xs -> Length_nonneg_input { xs }) lists)
 
   let trivial = Minicheck.choice [ Trivial_input ]
+
+  let unzip_zip =
+    Minicheck.choice
+      (List.concat_map
+         (fun xs -> List.map (fun ys -> Unzip_zip_input { xs; ys }) lists)
+         lists)
 end
 
 let check choices =

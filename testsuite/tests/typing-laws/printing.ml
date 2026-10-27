@@ -223,3 +223,29 @@ module type Control =
     law? lazy_value (x : int) : (Lazy.force (lazy (f x))) = (f x)
   end
 |}]
+
+(* Let-bindings and pattern matching. *)
+
+type shape = Circle of float | Rect of { w : float; h : float }
+module type Binding = sig
+  val area : shape -> float
+  law? let_ (s : shape) : let a = area s and b = area s in a = b
+  law? match_ (s : shape) :
+    (match s with
+     | Circle r when r > 0. -> area s > 0.
+     | Circle _ | Rect { w = 0.; _ } -> true
+     | Rect { w; h } as r -> area r = w *. h)
+end
+[%%expect {|
+type shape = Circle of float | Rect of { w : float; h : float; }
+module type Binding =
+  sig
+    val area : shape -> float
+    law? let_ (s : shape) : let a = area s and b = area s in a = b
+    law? match_ (s : shape) :
+      match s with
+      | (Circle r : shape) when (r > (0.)) -> ((area s) > (0.))
+      | (Circle _ : shape) | (Rect { w = (0.); _ } : shape) -> (true : bool)
+      | (Rect { w = w; h = h } : shape) as r -> ((area r) = (w *. h))
+  end
+|}]

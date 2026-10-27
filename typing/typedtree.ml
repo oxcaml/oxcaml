@@ -1231,6 +1231,99 @@ and spec_expression_desc =
   | Stexp_sequence of spec_expression * Jkind.sort * spec_expression
   | Stexp_assert of spec_expression * Location.t
   | Stexp_lazy of spec_expression
+  | Stexp_let of rec_flag * spec_value_binding list * spec_expression
+  | Stexp_match of
+      spec_expression * Jkind.sort * computation spec_case list * partial
+
+(* A [value_binding] without attributes *)
+and spec_value_binding =
+  { svb_pat: spec_pattern;
+    svb_expr: spec_expression;
+    svb_rec_kind: Value_rec_types.recursive_binding_kind;
+    svb_sort: Jkind.sort;
+    svb_loc: Location.t;
+  }
+
+(* A [case] without a continuation, which only effect handlers bind *)
+and 'k spec_case =
+  { sc_lhs: 'k spec_general_pattern;
+    sc_guard: spec_expression option;
+    sc_rhs: spec_expression;
+  }
+
+(* Patterns, which are a subset of the typedtree patterns like spectree
+   expressions *)
+and 'k spec_general_pattern = 'k spec_pattern_desc spec_pattern_data
+
+and spec_pattern = value spec_general_pattern
+
+(* [pattern_data] without attributes *)
+and 'a spec_pattern_data =
+  { stpat_desc: 'a;
+    stpat_loc: Location.t;
+    stpat_extra: (spec_pat_extra * Location.t) list;
+    stpat_type: Types.type_expr;
+    stpat_env: Env.t;
+    stpat_unique_barrier: Unique_barrier.t;
+  }
+
+and spec_pat_extra =
+  | Stpat_constraint of core_type
+      (** [P : T], with no modes *)
+  | Stpat_inspected_type of [ `pat ] type_inspection
+
+and 'k spec_pattern_desc =
+  | Stpat_any : value spec_pattern_desc
+  | Stpat_var : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+    } -> value spec_pattern_desc
+  | Stpat_alias : {
+      pattern: spec_pattern;
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    } -> value spec_pattern_desc
+  | Stpat_constant : constant -> value spec_pattern_desc
+  | Stpat_unboxed_unit : value spec_pattern_desc
+  | Stpat_unboxed_bool : bool -> value spec_pattern_desc
+  | Stpat_tuple :
+      (string option * spec_pattern * Jkind.sort) list ->
+      value spec_pattern_desc
+  | Stpat_unboxed_tuple :
+      (string option * spec_pattern * Jkind.sort) list ->
+      value spec_pattern_desc
+  | Stpat_construct :
+      Longident.t loc * Data_types.constructor_description *
+        Types.constructor_representation * (Jkind.sort * spec_pattern) list ->
+      value spec_pattern_desc
+        (** A [Tpat_construct] without type annotations of its arguments *)
+  | Stpat_variant :
+      label * spec_pattern option * Types.row_desc ref ->
+      value spec_pattern_desc
+  | Stpat_record :
+      (Longident.t loc * Data_types.label_description * spec_pattern) list *
+        Types.record_representation * closed_flag ->
+      value spec_pattern_desc
+  | Stpat_record_unboxed_product :
+      (Longident.t loc * Data_types.unboxed_label_description * spec_pattern)
+        list *
+        Types.record_unboxed_product_representation * closed_flag ->
+      value spec_pattern_desc
+  | Stpat_lazy : spec_pattern -> value spec_pattern_desc
+  | Stpat_value : spec_pattern -> computation spec_pattern_desc
+      (** As [Tpat_value], the data of the pattern is that of its argument
+          (see [as_computation_pattern]). *)
+  | Stpat_or :
+      'k spec_general_pattern * 'k spec_general_pattern ->
+      'k spec_pattern_desc
+        (** A [Tpat_or] that is not of a type pattern *)
 
 and spec_label_definition =
   | Skept of Types.type_expr * Types.mutability * unique_use

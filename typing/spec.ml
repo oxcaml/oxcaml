@@ -51,6 +51,22 @@ type label =
     name : string
   }
 
+type pattern =
+  | Spat_any
+  | Spat_var of Ident.t * sort
+  | Spat_alias of pattern * Ident.t * sort
+  | Spat_constant of constant
+  | Spat_tuple of (string option * pattern * sort) list
+  | Spat_unboxed_tuple of (string option * pattern * sort) list
+  | Spat_unboxed_unit
+  | Spat_unboxed_bool of bool
+  | Spat_construct of constructor * (sort * pattern) list
+  | Spat_variant of string * pattern option
+  | Spat_record of (label * pattern) list * Asttypes.closed_flag
+  | Spat_record_unboxed_product of (label * pattern) list * Asttypes.closed_flag
+  | Spat_or of pattern * pattern
+  | Spat_lazy of pattern
+
 type expression =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
@@ -70,6 +86,20 @@ type expression =
   | Sexp_sequence of expression * sort * expression
   | Sexp_assert of expression
   | Sexp_lazy of expression
+  | Sexp_let of Asttypes.rec_flag * value_binding list * expression
+  | Sexp_match of expression * sort * case list
+
+and value_binding =
+  { vb_pat : pattern;
+    vb_expr : expression;
+    vb_sort : sort
+  }
+
+and case =
+  { c_lhs : pattern;
+    c_guard : expression option;
+    c_rhs : expression
+  }
 
 and record =
   { fields : (label * sort * field_definition) list;
@@ -117,6 +147,43 @@ let rec map_paths ~value_path ~type_path e =
   | Sexp_sequence (e1, sort, e2) -> Sexp_sequence (map e1, sort, map e2)
   | Sexp_assert e -> Sexp_assert (map e)
   | Sexp_lazy e -> Sexp_lazy (map e)
+  | Sexp_let (rf, vbs, body) ->
+    let vb { vb_pat; vb_expr; vb_sort } =
+      { vb_pat = map_pattern ~type_path vb_pat; vb_expr = map vb_expr; vb_sort }
+    in
+    Sexp_let (rf, List.map vb vbs, map body)
+  | Sexp_match (e, sort, cases) ->
+    Sexp_match (map e, sort, List.map (map_case ~value_path ~type_path) cases)
+
+and map_case ~value_path ~type_path { c_lhs; c_guard; c_rhs } =
+  let map e = map_paths ~value_path ~type_path e in
+  { c_lhs = map_pattern ~type_path c_lhs;
+    c_guard = Option.map map c_guard;
+    c_rhs = map c_rhs
+  }
+
+and map_pattern ~type_path p =
+  let map p = map_pattern ~type_path p in
+  let map_labelled (lbl, p, sort) = lbl, map p, sort in
+  let map_field (lbl, p) = map_label ~type_path lbl, map p in
+  match p with
+  | Spat_any | Spat_var _ | Spat_constant _ | Spat_unboxed_unit
+  | Spat_unboxed_bool _ ->
+    p
+  | Spat_alias (p, id, sort) -> Spat_alias (map p, id, sort)
+  | Spat_tuple ps -> Spat_tuple (List.map map_labelled ps)
+  | Spat_unboxed_tuple ps -> Spat_unboxed_tuple (List.map map_labelled ps)
+  | Spat_construct (cstr, args) ->
+    Spat_construct
+      ( map_constructor ~type_path cstr,
+        List.map (fun (sort, p) -> sort, map p) args )
+  | Spat_variant (lbl, arg) -> Spat_variant (lbl, Option.map map arg)
+  | Spat_record (fields, closed) ->
+    Spat_record (List.map map_field fields, closed)
+  | Spat_record_unboxed_product (fields, closed) ->
+    Spat_record_unboxed_product (List.map map_field fields, closed)
+  | Spat_or (p1, p2) -> Spat_or (map p1, map p2)
+  | Spat_lazy p -> Spat_lazy (map p)
 
 and map_label ~type_path { type_path = p; name } =
   { type_path = type_path p; name }
@@ -185,6 +252,42 @@ let rec paths_rev acc = function
     Option.fold ~none:acc ~some:(paths_rev acc) e2
   | Sexp_sequence (e1, _, e2) -> paths_rev (paths_rev acc e1) e2
   | Sexp_assert e | Sexp_lazy e -> paths_rev acc e
+  | Sexp_let (_, vbs, body) ->
+    let acc =
+      List.fold_left
+        (fun acc { vb_pat; vb_expr; _ } ->
+          paths_rev (pattern_paths_rev acc vb_pat) vb_expr)
+        acc vbs
+    in
+    paths_rev acc body
+  | Sexp_match (e, _, cases) ->
+    List.fold_left case_paths_rev (paths_rev acc e) cases
+
+and case_paths_rev acc { c_lhs; c_guard; c_rhs } =
+  let acc = pattern_paths_rev acc c_lhs in
+  let acc = Option.fold ~none:acc ~some:(paths_rev acc) c_guard in
+  paths_rev acc c_rhs
+
+and pattern_paths_rev acc = function
+  | Spat_any | Spat_var _ | Spat_constant _ | Spat_unboxed_unit
+  | Spat_unboxed_bool _ ->
+    acc
+  | Spat_alias (p, _, _) | Spat_lazy p -> pattern_paths_rev acc p
+  | Spat_tuple ps | Spat_unboxed_tuple ps ->
+    List.fold_left (fun acc (_, p, _) -> pattern_paths_rev acc p) acc ps
+  | Spat_construct (cstr, args) ->
+    List.fold_left
+      (fun acc (_, p) -> pattern_paths_rev acc p)
+      (constructor_path cstr :: acc)
+      args
+  | Spat_variant (_, arg) ->
+    Option.fold ~none:acc ~some:(pattern_paths_rev acc) arg
+  | Spat_record (fields, _) | Spat_record_unboxed_product (fields, _) ->
+    List.fold_left
+      (fun acc ((lbl : label), p) ->
+        pattern_paths_rev ((Type, lbl.type_path) :: acc) p)
+      acc fields
+  | Spat_or (p1, p2) -> pattern_paths_rev (pattern_paths_rev acc p1) p2
 
 let paths e = List.rev (paths_rev [] e)
 
@@ -226,6 +329,79 @@ let same_constructor ~same_path (Constructor c1) (Constructor c2) =
 
 let same_label ~same_path l1 l2 =
   String.equal l1.name l2.name && same_path Type l1.type_path l2.type_path
+
+(* [alpha_pattern ~same_path vars p1 p2] is [vars] extended with the pairs of
+   the variables that [p1] and [p2] bind at the same positions, if the two
+   patterns are the same up to their names. *)
+let rec alpha_pattern ~same_path vars p1 p2 =
+  let ( let* ) = Option.bind in
+  let pattern vars p1 p2 = alpha_pattern ~same_path vars p1 p2 in
+  let rec all vars f l1 l2 =
+    match l1, l2 with
+    | [], [] -> Some vars
+    | x1 :: l1, x2 :: l2 ->
+      let* vars = f vars x1 x2 in
+      all vars f l1 l2
+    | [], _ :: _ | _ :: _, [] -> None
+  in
+  let labelled vars (l1, p1, s1) (l2, p2, s2) =
+    if Option.equal String.equal l1 l2 && same_sort s1 s2
+    then pattern vars p1 p2
+    else None
+  in
+  let field vars (l1, p1) (l2, p2) =
+    if same_label ~same_path l1 l2 then pattern vars p1 p2 else None
+  in
+  match p1, p2 with
+  | Spat_any, Spat_any | Spat_unboxed_unit, Spat_unboxed_unit -> Some vars
+  | Spat_var (x1, s1), Spat_var (x2, s2) ->
+    if same_sort s1 s2 then Some ((x1, x2) :: vars) else None
+  | Spat_alias (p1, x1, s1), Spat_alias (p2, x2, s2) ->
+    if same_sort s1 s2
+    then Option.map (fun vars -> (x1, x2) :: vars) (pattern vars p1 p2)
+    else None
+  | Spat_constant c1, Spat_constant c2 ->
+    if same_constant c1 c2 then Some vars else None
+  | Spat_unboxed_bool b1, Spat_unboxed_bool b2 ->
+    if Bool.equal b1 b2 then Some vars else None
+  | Spat_tuple ps1, Spat_tuple ps2
+  | Spat_unboxed_tuple ps1, Spat_unboxed_tuple ps2 ->
+    all vars labelled ps1 ps2
+  | Spat_construct (c1, args1), Spat_construct (c2, args2) ->
+    if same_constructor ~same_path c1 c2
+    then
+      all vars
+        (fun vars (s1, p1) (s2, p2) ->
+          if same_sort s1 s2 then pattern vars p1 p2 else None)
+        args1 args2
+    else None
+  | Spat_variant (l1, a1), Spat_variant (l2, a2) -> (
+    if not (String.equal l1 l2)
+    then None
+    else
+      match a1, a2 with
+      | None, None -> Some vars
+      | Some p1, Some p2 -> pattern vars p1 p2
+      | None, Some _ | Some _, None -> None)
+  | Spat_record (fs1, c1), Spat_record (fs2, c2)
+  | Spat_record_unboxed_product (fs1, c1), Spat_record_unboxed_product (fs2, c2)
+    ->
+    if c1 = c2 then all vars field fs1 fs2 else None
+  | Spat_or (l1, r1), Spat_or (l2, r2) ->
+    (* Both sides bind the same variables. *)
+    let* left = pattern vars l1 l2 in
+    let* right = pattern vars r1 r2 in
+    let same (x1, x2) (y1, y2) = Ident.same x1 y1 && Ident.same x2 y2 in
+    if List.for_all (fun pair -> List.exists (same pair) left) right
+    then Some left
+    else None
+  | Spat_lazy p1, Spat_lazy p2 -> pattern vars p1 p2
+  | ( ( Spat_any | Spat_var _ | Spat_alias _ | Spat_constant _ | Spat_tuple _
+      | Spat_unboxed_tuple _ | Spat_unboxed_unit | Spat_unboxed_bool _
+      | Spat_construct _ | Spat_variant _ | Spat_record _
+      | Spat_record_unboxed_product _ | Spat_or _ | Spat_lazy _ ),
+      _ ) ->
+    None
 
 let rec alpha_equal ~same_path ~vars e1 e2 =
   let equal e1 e2 = alpha_equal ~same_path ~vars e1 e2 in
@@ -278,10 +454,48 @@ let rec alpha_equal ~same_path ~vars e1 e2 =
   | Sexp_sequence (a1, s1, b1), Sexp_sequence (a2, s2, b2) ->
     equal a1 a2 && same_sort s1 s2 && equal b1 b2
   | Sexp_assert e1, Sexp_assert e2 | Sexp_lazy e1, Sexp_lazy e2 -> equal e1 e2
+  | Sexp_let (rf1, vbs1, body1), Sexp_let (rf2, vbs2, body2) -> (
+    rf1 = rf2
+    && List.compare_lengths vbs1 vbs2 = 0
+    &&
+    (* The patterns of a recursive let scope over the bound expressions. *)
+    let bound =
+      List.fold_left2
+        (fun bound vb1 vb2 ->
+          Option.bind bound (fun bound ->
+              if same_sort vb1.vb_sort vb2.vb_sort
+              then alpha_pattern ~same_path bound vb1.vb_pat vb2.vb_pat
+              else None))
+        (Some vars) vbs1 vbs2
+    in
+    match bound with
+    | None -> false
+    | Some bound ->
+      let in_exprs =
+        match rf1 with Recursive -> bound | Nonrecursive -> vars
+      in
+      List.for_all2
+        (fun vb1 vb2 ->
+          alpha_equal ~same_path ~vars:in_exprs vb1.vb_expr vb2.vb_expr)
+        vbs1 vbs2
+      && alpha_equal ~same_path ~vars:bound body1 body2)
+  | Sexp_match (e1, s1, cases1), Sexp_match (e2, s2, cases2) ->
+    equal e1 e2 && same_sort s1 s2 && same_cases ~same_path ~vars cases1 cases2
   | ( ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
       | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
       | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ | Sexp_record _
       | Sexp_record_unboxed_product _ | Sexp_field _ | Sexp_unboxed_field _
-      | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _ ),
+      | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _
+      | Sexp_let _ | Sexp_match _ ),
       _ ) ->
     false
+
+and same_cases ~same_path ~vars cases1 cases2 =
+  List.equal
+    (fun c1 c2 ->
+      match alpha_pattern ~same_path vars c1.c_lhs c2.c_lhs with
+      | None -> false
+      | Some vars ->
+        Option.equal (alpha_equal ~same_path ~vars) c1.c_guard c2.c_guard
+        && alpha_equal ~same_path ~vars c1.c_rhs c2.c_rhs)
+    cases1 cases2

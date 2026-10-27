@@ -40,17 +40,18 @@ type unsupported =
   | Borrow
   | Coercions
   | Comprehensions
+  | Effect_handlers
   | Exception_handlers
   | Exclave
   | Extension_constructors
   | First_class_modules
   | Functions
   | Layout_polymorphism
-  | Let_bindings
   | Local_exceptions
   | Local_modules
   | Local_opens
   | Locally_abstract_types
+  | Type_patterns
   | Loops
   | Mode_annotations
   | Mutable_variables
@@ -58,7 +59,6 @@ type unsupported =
   | Objects
   | Omitted_arguments
   | Overwrite
-  | Pattern_matching
   | Polymorphic_annotations
   | Position_arguments
   | Primitive of primitive_kind
@@ -122,6 +122,73 @@ let value_description (desc : Types.value_description) : spec_value_description
 let check_attributes loc (attrs : Parsetree.attributes) =
   match attrs with [] -> () | _ :: _ -> unsupported loc Attributes
 
+(* Patterns *)
+
+let add_bound bound ids =
+  List.fold_left (fun s id -> Ident.Set.add id s) bound ids
+
+let pat_extra (extra, loc, attrs) : spec_pat_extra * Location.t =
+  check_attributes loc attrs;
+  match (extra : pat_extra) with
+  | Tpat_constraint (Some { ctyp_desc = Ttyp_poly _; _ }, _) ->
+    unsupported loc Polymorphic_annotations
+  | Tpat_constraint (Some cty, { mode_desc = []; _ }) ->
+    Stpat_constraint cty, loc
+  | Tpat_constraint _ -> unsupported loc Mode_annotations
+  | Tpat_inspected_type inspection -> Stpat_inspected_type inspection, loc
+  | Tpat_type _ -> unsupported loc Type_patterns
+  | Tpat_open _ -> unsupported loc Local_opens
+  | Tpat_unpack -> unsupported loc First_class_modules
+
+let rec spectree_pattern : type k. k general_pattern -> k spec_general_pattern =
+ fun p ->
+  let loc = p.pat_loc in
+  check_attributes loc p.pat_attributes;
+  let stpat_extra = List.map pat_extra p.pat_extra in
+  let labelled (lbl, p, sort) = lbl, spectree_pattern p, sort in
+  let field (lid, lbl, p) = lid, lbl, spectree_pattern p in
+  let stpat_desc : k spec_pattern_desc =
+    match p.pat_desc with
+    | Tpat_any -> Stpat_any
+    | Tpat_var { id; name; uid; sort; mode } ->
+      Stpat_var { id; name; uid; sort; mode }
+    | Tpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
+      let pattern = spectree_pattern pattern in
+      Stpat_alias { pattern; id; name; uid; sort; mode; type_expr }
+    | Tpat_constant c -> Stpat_constant c
+    | Tpat_unboxed_unit -> Stpat_unboxed_unit
+    | Tpat_unboxed_bool b -> Stpat_unboxed_bool b
+    | Tpat_tuple ps -> Stpat_tuple (List.map labelled ps)
+    | Tpat_unboxed_tuple ps -> Stpat_unboxed_tuple (List.map labelled ps)
+    | Tpat_construct (lid, cstr, repr, args, None) ->
+      check_constructor loc cstr;
+      let args = List.map (fun (sort, p) -> sort, spectree_pattern p) args in
+      Stpat_construct (lid, cstr, repr, args)
+    | Tpat_construct (_, _, _, _, Some _) ->
+      unsupported loc Locally_abstract_types
+    | Tpat_variant (lbl, arg, row) ->
+      Stpat_variant (lbl, Option.map spectree_pattern arg, row)
+    | Tpat_record (fields, repr, closed) ->
+      Stpat_record (List.map field fields, repr, closed)
+    | Tpat_record_unboxed_product (fields, repr, closed) ->
+      Stpat_record_unboxed_product (List.map field fields, repr, closed)
+    | Tpat_array _ -> unsupported loc Arrays
+    | Tpat_fun_layout _ -> unsupported loc Layout_polymorphism
+    | Tpat_lazy p -> Stpat_lazy (spectree_pattern p)
+    | Tpat_value p -> Stpat_value (spectree_pattern (p :> Typedtree.pattern))
+    | Tpat_exception _ -> unsupported loc Exception_handlers
+    | Tpat_or (p1, p2, None) ->
+      Stpat_or (spectree_pattern p1, spectree_pattern p2)
+    | Tpat_or (_, _, Some _) -> unsupported loc Type_patterns
+  in
+  { stpat_desc;
+    stpat_loc = loc;
+    stpat_extra;
+    stpat_type = p.pat_type;
+    stpat_env = p.pat_env;
+    stpat_unique_barrier = p.pat_unique_barrier
+  }
+
 let extra (extra, loc, attrs) : spec_extra * Location.t =
   check_attributes loc attrs;
   match extra with
@@ -175,10 +242,19 @@ and spectree_desc bound loc desc : spec_expression_desc =
     let args = List.map (argument bound loc) args in
     Stexp_apply { funct; args; ret_mode; yielding }
   | Texp_apply_layout _ -> unsupported loc Layout_polymorphism
-  | Texp_let _ -> unsupported loc Let_bindings
+  | Texp_let (rec_flag, vbs, body) ->
+    let inner = add_bound bound (let_bound_idents vbs) in
+    let in_exprs =
+      match rec_flag with Recursive -> inner | Nonrecursive -> bound
+    in
+    let vbs = List.map (value_binding in_exprs) vbs in
+    Stexp_let (rec_flag, vbs, spectree inner body)
   | Texp_letmutable _ -> unsupported loc Mutable_variables
   | Texp_function _ -> unsupported loc Functions
-  | Texp_match _ -> unsupported loc Pattern_matching
+  | Texp_match (e, sort, cases, [], partial) ->
+    let e = spectree bound e in
+    Stexp_match (e, sort, List.map (case bound) cases, partial)
+  | Texp_match (_, _, _, _ :: _, _) -> unsupported loc Effect_handlers
   | Texp_try _ -> unsupported loc Exception_handlers
   | Texp_tuple (es, mode) -> Stexp_tuple (List.map (labelled bound) es, mode)
   | Texp_unboxed_tuple es -> Stexp_unboxed_tuple (List.map (labelled bound) es)
@@ -272,6 +348,28 @@ and ident_desc bound loc path (lid : Longident.t Location.loc)
 
 and labelled bound (lbl, e, sort) = lbl, spectree bound e, sort
 
+and value_binding bound (vb : Typedtree.value_binding) : spec_value_binding =
+  check_attributes vb.vb_loc vb.vb_attributes;
+  let svb_pat = spectree_pattern vb.vb_pat in
+  { svb_pat;
+    svb_expr = spectree bound vb.vb_expr;
+    svb_rec_kind = vb.vb_rec_kind;
+    svb_sort = vb.vb_sort;
+    svb_loc = vb.vb_loc
+  }
+
+and case : type k. Ident.Set.t -> k Typedtree.case -> k spec_case =
+ fun bound c ->
+  let sc_lhs = spectree_pattern c.c_lhs in
+  (match c.c_cont with
+  | None -> ()
+  | Some _ -> unsupported c.c_lhs.pat_loc Effect_handlers);
+  let bound = add_bound bound (pat_bound_idents c.c_lhs) in
+  { sc_lhs;
+    sc_guard = Option.map (spectree bound) c.c_guard;
+    sc_rhs = spectree bound c.c_rhs
+  }
+
 and definition bound : record_label_definition -> spec_label_definition =
   function
   | Kept (ty, mut, unique_use) -> Skept (ty, mut, unique_use)
@@ -321,6 +419,32 @@ let label (lbl : _ Data_types.gen_label_description) : Spec.label =
 
 let sort = Jkind.Sort.default_for_transl_and_get
 
+let rec pattern : type k. k spec_general_pattern -> Spec.pattern =
+ fun p ->
+  let labelled (lbl, p, s) = lbl, pattern p, sort s in
+  let field (_, lbl, p) = label lbl, pattern p in
+  match p.stpat_desc with
+  | Stpat_any -> Spat_any
+  | Stpat_var { id; sort = s; _ } -> Spat_var (id, sort s)
+  | Stpat_alias { pattern = p; id; sort = s; _ } ->
+    Spat_alias (pattern p, id, sort s)
+  | Stpat_constant c -> Spat_constant (constant c)
+  | Stpat_unboxed_unit -> Spat_unboxed_unit
+  | Stpat_unboxed_bool b -> Spat_unboxed_bool b
+  | Stpat_tuple ps -> Spat_tuple (List.map labelled ps)
+  | Stpat_unboxed_tuple ps -> Spat_unboxed_tuple (List.map labelled ps)
+  | Stpat_construct (_, cstr, _, args) ->
+    Spat_construct
+      (constructor cstr, List.map (fun (s, p) -> sort s, pattern p) args)
+  | Stpat_variant (lbl, arg, _) -> Spat_variant (lbl, Option.map pattern arg)
+  | Stpat_record (fields, _, closed) ->
+    Spat_record (List.map field fields, closed)
+  | Stpat_record_unboxed_product (fields, _, closed) ->
+    Spat_record_unboxed_product (List.map field fields, closed)
+  | Stpat_lazy p -> Spat_lazy (pattern p)
+  | Stpat_value p -> pattern p
+  | Stpat_or (p1, p2) -> Spat_or (pattern p1, pattern p2)
+
 let rec spec (e : spec_expression) : Spec.expression =
   let labelled (lbl, e, s) = lbl, spec e, sort s in
   match e.stexp_desc with
@@ -362,6 +486,23 @@ let rec spec (e : spec_expression) : Spec.expression =
   | Stexp_sequence (e1, s, e2) -> Sexp_sequence (spec e1, sort s, spec e2)
   | Stexp_assert (e, _) -> Sexp_assert (spec e)
   | Stexp_lazy e -> Sexp_lazy (spec e)
+  | Stexp_let (rec_flag, vbs, body) ->
+    let vb (vb : spec_value_binding) : Spec.value_binding =
+      { vb_pat = pattern vb.svb_pat;
+        vb_expr = spec vb.svb_expr;
+        vb_sort = sort vb.svb_sort
+      }
+    in
+    Sexp_let (rec_flag, List.map vb vbs, spec body)
+  | Stexp_match (e, s, cases, _) ->
+    Sexp_match (spec e, sort s, List.map spec_case cases)
+
+and spec_case : type k. k spec_case -> Spec.case =
+ fun c ->
+  { c_lhs = pattern c.sc_lhs;
+    c_guard = Option.map spec c.sc_guard;
+    c_rhs = spec c.sc_rhs
+  }
 
 and field_definition :
     'a.
@@ -383,6 +524,55 @@ let typedtree_arg_label : Spec.arg_label -> Types.arg_label = function
 let typedtree_extra : spec_extra -> exp_extra = function
   | Stexp_constraint cty -> Texp_constraint cty
   | Stexp_inspected_type inspection -> Texp_inspected_type inspection
+
+let typedtree_pat_extra : spec_pat_extra -> pat_extra = function
+  | Stpat_constraint cty ->
+    Tpat_constraint (Some cty, Typemode.transl_mode_with_locality [])
+  | Stpat_inspected_type inspection -> Tpat_inspected_type inspection
+
+let rec typedtree_pattern : type k. k spec_general_pattern -> k general_pattern
+    =
+ fun p ->
+  let data (pat_desc : k pattern_desc) : k general_pattern =
+    { pat_desc;
+      pat_loc = p.stpat_loc;
+      pat_extra =
+        List.map
+          (fun (extra, loc) -> typedtree_pat_extra extra, loc, [])
+          p.stpat_extra;
+      pat_type = p.stpat_type;
+      pat_env = p.stpat_env;
+      pat_attributes = [];
+      pat_unique_barrier = p.stpat_unique_barrier
+    }
+  in
+  let labelled (lbl, p, sort) = lbl, typedtree_pattern p, sort in
+  let field (lid, lbl, p) = lid, lbl, typedtree_pattern p in
+  match p.stpat_desc with
+  | Stpat_any -> data Tpat_any
+  | Stpat_var { id; name; uid; sort; mode } ->
+    data (Tpat_var { id; name; uid; sort; mode })
+  | Stpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
+    let pattern = typedtree_pattern pattern in
+    data (Tpat_alias { pattern; id; name; uid; sort; mode; type_expr })
+  | Stpat_constant c -> data (Tpat_constant c)
+  | Stpat_unboxed_unit -> data Tpat_unboxed_unit
+  | Stpat_unboxed_bool b -> data (Tpat_unboxed_bool b)
+  | Stpat_tuple ps -> data (Tpat_tuple (List.map labelled ps))
+  | Stpat_unboxed_tuple ps -> data (Tpat_unboxed_tuple (List.map labelled ps))
+  | Stpat_construct (lid, cstr, repr, args) ->
+    let args = List.map (fun (sort, p) -> sort, typedtree_pattern p) args in
+    data (Tpat_construct (lid, cstr, repr, args, None))
+  | Stpat_variant (lbl, arg, row) ->
+    data (Tpat_variant (lbl, Option.map typedtree_pattern arg, row))
+  | Stpat_record (fields, repr, closed) ->
+    data (Tpat_record (List.map field fields, repr, closed))
+  | Stpat_record_unboxed_product (fields, repr, closed) ->
+    data (Tpat_record_unboxed_product (List.map field fields, repr, closed))
+  | Stpat_lazy p -> data (Tpat_lazy (typedtree_pattern p))
+  | Stpat_value p -> as_computation_pattern (typedtree_pattern p)
+  | Stpat_or (p1, p2) ->
+    data (Tpat_or (typedtree_pattern p1, typedtree_pattern p2, None))
 
 let typedtree_value_description (desc : spec_value_description) val_kind :
     Types.value_description =
@@ -507,6 +697,27 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
     Texp_sequence (typedtree e1, sort, typedtree e2)
   | Stexp_assert (e, loc) -> Texp_assert (typedtree e, loc)
   | Stexp_lazy e -> Texp_lazy (typedtree e)
+  | Stexp_let (rec_flag, vbs, body) ->
+    let vb (vb : spec_value_binding) : Typedtree.value_binding =
+      { vb_pat = typedtree_pattern vb.svb_pat;
+        vb_expr = typedtree vb.svb_expr;
+        vb_rec_kind = vb.svb_rec_kind;
+        vb_sort = vb.svb_sort;
+        vb_attributes = [];
+        vb_loc = vb.svb_loc
+      }
+    in
+    Texp_let (rec_flag, List.map vb vbs, typedtree body)
+  | Stexp_match (e, sort, cases, partial) ->
+    Texp_match (typedtree e, sort, List.map typedtree_case cases, [], partial)
+
+and typedtree_case : type k. k spec_case -> k Typedtree.case =
+ fun c ->
+  { c_lhs = typedtree_pattern c.sc_lhs;
+    c_cont = None;
+    c_guard = Option.map typedtree c.sc_guard;
+    c_rhs = typedtree c.sc_rhs
+  }
 
 and typedtree_labelled (lbl, e, sort) = lbl, typedtree e, sort
 
@@ -531,17 +742,18 @@ let describe = function
   | Borrow -> "borrow_"
   | Coercions -> "coercions"
   | Comprehensions -> "comprehensions"
+  | Effect_handlers -> "effect handlers"
   | Exception_handlers -> "exception handlers"
   | Exclave -> "exclave_"
   | Extension_constructors -> "extension constructors"
   | First_class_modules -> "first-class modules"
   | Functions -> "functions"
   | Layout_polymorphism -> "layout-polymorphic bindings"
-  | Let_bindings -> "let-bindings"
   | Local_exceptions -> "local exceptions"
   | Local_modules -> "local modules"
   | Local_opens -> "local opens"
   | Locally_abstract_types -> "locally abstract types"
+  | Type_patterns -> "type patterns"
   | Loops -> "loops"
   | Mode_annotations -> "mode annotations"
   | Mutable_variables -> "mutable variables"
@@ -549,7 +761,6 @@ let describe = function
   | Objects -> "objects"
   | Omitted_arguments -> "applications with omitted arguments"
   | Overwrite -> "overwrite_"
-  | Pattern_matching -> "pattern matching"
   | Polymorphic_annotations -> "polymorphic type annotations"
   | Position_arguments -> "source position arguments"
   | Primitive kind -> describe_primitive kind

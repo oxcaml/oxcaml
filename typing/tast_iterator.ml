@@ -58,6 +58,7 @@ type iterator =
     signature: iterator -> signature -> unit;
     signature_item: iterator -> signature_item -> unit;
     spec_expression: iterator -> spec_expression -> unit;
+    spec_pattern: 'k . iterator -> 'k spec_general_pattern -> unit;
     structure: iterator -> structure -> unit;
     structure_item: iterator -> structure_item -> unit;
     typ: iterator -> core_type -> unit;
@@ -280,6 +281,42 @@ let spec_extra sub = function
   | Stexp_constraint cty -> sub.typ sub cty
   | Stexp_inspected_type _ -> ()
 
+let spec_pat_extra sub = function
+  | Stpat_constraint cty -> sub.typ sub cty
+  | Stpat_inspected_type _ -> ()
+
+let spec_pattern
+  : type k . iterator -> k spec_general_pattern -> unit
+  = fun sub {stpat_desc; stpat_loc; stpat_extra; stpat_env; _} ->
+  sub.location sub stpat_loc;
+  sub.env sub stpat_env;
+  List.iter
+    (fun (e, loc) -> spec_pat_extra sub e; sub.location sub loc) stpat_extra;
+  match stpat_desc with
+  | Stpat_any | Stpat_constant _ | Stpat_unboxed_unit | Stpat_unboxed_bool _ ->
+      ()
+  | Stpat_var {name; _} -> iter_loc sub name
+  | Stpat_alias {pattern; name; _} ->
+      sub.spec_pattern sub pattern;
+      iter_loc sub name
+  | Stpat_tuple l | Stpat_unboxed_tuple l ->
+      List.iter (fun (_, p, _) -> sub.spec_pattern sub p) l
+  | Stpat_construct (lid, _, _, l) ->
+      iter_loc_lid sub lid;
+      List.iter (fun (_, p) -> sub.spec_pattern sub p) l
+  | Stpat_variant (_, po, _) -> Option.iter (sub.spec_pattern sub) po
+  | Stpat_record (l, _, _) ->
+      List.iter
+        (fun (lid, _, p) -> iter_loc_lid sub lid; sub.spec_pattern sub p) l
+  | Stpat_record_unboxed_product (l, _, _) ->
+      List.iter
+        (fun (lid, _, p) -> iter_loc_lid sub lid; sub.spec_pattern sub p) l
+  | Stpat_lazy p -> sub.spec_pattern sub p
+  | Stpat_value p -> sub.spec_pattern sub p
+  | Stpat_or (p1, p2) ->
+      sub.spec_pattern sub p1;
+      sub.spec_pattern sub p2
+
 let[@warning "+9"] rec spec_expression sub
       {stexp_desc; stexp_loc; stexp_extra; stexp_type = _; stexp_env} =
   sub.location sub stexp_loc;
@@ -320,6 +357,23 @@ let[@warning "+9"] rec spec_expression sub
       sub.spec_expression sub e2
   | Stexp_assert (e, loc) -> sub.spec_expression sub e; sub.location sub loc
   | Stexp_lazy e -> sub.spec_expression sub e
+  | Stexp_let (_, vbs, body) ->
+      List.iter
+        (fun {svb_pat; svb_expr; svb_loc; _} ->
+           sub.location sub svb_loc;
+           sub.spec_pattern sub svb_pat;
+           sub.spec_expression sub svb_expr)
+        vbs;
+      sub.spec_expression sub body
+  | Stexp_match (e, _, cases, _) ->
+      sub.spec_expression sub e;
+      List.iter (spec_case sub) cases
+
+and spec_case : 'k. iterator -> 'k spec_case -> unit =
+  fun sub {sc_lhs; sc_guard; sc_rhs} ->
+  sub.spec_pattern sub sc_lhs;
+  Option.iter (sub.spec_expression sub) sc_guard;
+  sub.spec_expression sub sc_rhs
 
 and spec_label_definition sub = function
   | Skept _ -> ()
@@ -955,6 +1009,7 @@ let default_iterator =
     signature;
     signature_item;
     spec_expression;
+    spec_pattern;
     structure;
     structure_item;
     typ;

@@ -288,6 +288,28 @@ and out_spec =
   | Ospec_sequence of out_spec * out_spec
   | Ospec_assert of out_spec
   | Ospec_lazy of out_spec
+  | Ospec_let of bool * (out_spec_pattern * out_spec) list * out_spec
+      (** [Ospec_let (rec, bindings, body)] *)
+  | Ospec_match of out_spec * out_spec_case list
+and out_spec_case = out_spec_pattern * out_spec option * out_spec
+and out_spec_pattern =
+  | Ospat_any
+  | Ospat_var of string
+  | Ospat_alias of out_spec_pattern * string
+  | Ospat_constant of out_value
+  | Ospat_tuple of (string option * out_spec_pattern) list
+  | Ospat_unboxed_tuple of (string option * out_spec_pattern) list
+  | Ospat_unboxed_unit
+  | Ospat_unboxed_bool of bool
+  | Ospat_construct of out_ident * out_spec_pattern list
+  | Ospat_variant of string * out_spec_pattern option
+  | Ospat_record of
+      { fields : (out_ident * out_spec_pattern) list;
+        closed : bool;
+        unboxed : bool }
+  | Ospat_or of out_spec_pattern * out_spec_pattern
+  | Ospat_lazy of out_spec_pattern
+  | Ospat_constraint of out_spec_pattern * out_type
 
 
 type out_phrase =

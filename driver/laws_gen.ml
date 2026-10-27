@@ -713,6 +713,9 @@ let annotation print ty =
 let with_type print ty pe =
   Option.fold ~none:pe ~some:(P.Exp.constraint_ pe) (annotation print ty)
 
+let with_type_pattern print ty pp =
+  Option.fold ~none:pp ~some:(P.Pat.constraint_ pp) (annotation print ty)
+
 let annotate print (e : Typedtree.expression) (pe : Parsetree.expression) =
   match (e.exp_desc, pe.pexp_desc) with
   | ( Texp_construct (_, { cstr_tag = Ordinary _ | Null; cstr_res; _ }, _, _, _),
@@ -737,6 +740,18 @@ let annotate print (e : Typedtree.expression) (pe : Parsetree.expression) =
       }
   | _ -> pe
 
+let annotate_pattern (type k) print (p : k Typedtree.general_pattern)
+    (pp : Parsetree.pattern) =
+  match p.pat_desc with
+  | Tpat_construct (_, { cstr_tag = Ordinary _ | Null; cstr_res; _ }, _, _, _)
+    ->
+      with_type_pattern print cstr_res pp
+  | Tpat_record ((_, lbl, _) :: _, _, _) ->
+      with_type_pattern print lbl.lbl_res pp
+  | Tpat_record_unboxed_product ((_, lbl, _) :: _, _, _) ->
+      with_type_pattern print lbl.lbl_res pp
+  | _ -> pp
+
 let constructor_lid print (cstr : Data_types.constructor_description) :
     Longident.t =
   match cstr.cstr_tag with
@@ -747,6 +762,9 @@ let mapper print =
   {
     Untypeast.default_mapper with
     expr = (fun sub e -> annotate print e (Untypeast.default_mapper.expr sub e));
+    pat =
+      (fun (type k) sub (p : k Typedtree.general_pattern) ->
+        annotate_pattern print p (Untypeast.default_mapper.pat sub p));
     ident = (fun _ path lid -> { lid with txt = print path });
     constructor =
       (fun _ cstr lid -> { lid with txt = constructor_lid print cstr });

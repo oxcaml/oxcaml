@@ -60,6 +60,23 @@ type label =
     name : string
   }
 
+(** Patterns *)
+type pattern =
+  | Spat_any
+  | Spat_var of Ident.t * sort
+  | Spat_alias of pattern * Ident.t * sort
+  | Spat_constant of constant
+  | Spat_tuple of (string option * pattern * sort) list
+  | Spat_unboxed_tuple of (string option * pattern * sort) list
+  | Spat_unboxed_unit
+  | Spat_unboxed_bool of bool
+  | Spat_construct of constructor * (sort * pattern) list
+  | Spat_variant of string * pattern option
+  | Spat_record of (label * pattern) list * Asttypes.closed_flag
+  | Spat_record_unboxed_product of (label * pattern) list * Asttypes.closed_flag
+  | Spat_or of pattern * pattern
+  | Spat_lazy of pattern
+
 type expression =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
@@ -81,6 +98,20 @@ type expression =
   | Sexp_sequence of expression * sort * expression
   | Sexp_assert of expression
   | Sexp_lazy of expression
+  | Sexp_let of Asttypes.rec_flag * value_binding list * expression
+  | Sexp_match of expression * sort * case list
+
+and value_binding =
+  { vb_pat : pattern;
+    vb_expr : expression;
+    vb_sort : sort
+  }
+
+and case =
+  { c_lhs : pattern;
+    c_guard : expression option;
+    c_rhs : expression
+  }
 
 and record =
   { fields : (label * sort * field_definition) list;

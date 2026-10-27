@@ -60,6 +60,7 @@ type iterator =
     signature: iterator -> signature -> unit;
     signature_item: iterator -> signature_item -> unit;
     spec_expression: iterator -> spec_expression -> unit;
+    spec_pattern: 'k . iterator -> 'k spec_general_pattern -> unit;
     structure: iterator -> structure -> unit;
     structure_item: iterator -> structure_item -> unit;
     typ: iterator -> core_type -> unit;

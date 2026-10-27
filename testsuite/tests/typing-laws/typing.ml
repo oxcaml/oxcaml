@@ -240,6 +240,17 @@ Line 4, characters 4-30:
   outside of this module.
 |}]
 
+(* Each clause is scoped on its own: a variable bound by a [let] in an
+   assumption is not in scope in the conclusion. *)
+
+law? scoping (n : int) : let m = n + 1 in m > n ===> m = n + 1
+[%%expect {|
+Line 1, characters 53-54:
+1 | law? scoping (n : int) : let m = n + 1 in m > n ===> m = n + 1
+                                                         ^
+Error: Unbound value "m"
+|}]
+
 (* Laws in generative functors are rejected: the laws file names the types
    of the result of a functor through an application to the choices of a
    backend, which a generative functor does not permit. *)

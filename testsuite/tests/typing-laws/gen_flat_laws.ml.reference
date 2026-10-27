@@ -13,6 +13,7 @@ type 'a each =
   constructors: 'a ;
   tuples: 'a ;
   control: 'a ;
+  binding: 'a ;
   records: 'a }
 let names =
   {
@@ -26,6 +27,7 @@ let names =
     constructors = "constructors";
     tuples = "tuples";
     control = "control";
+    binding = "binding";
     records = "records"
   }
 let locations =
@@ -110,18 +112,26 @@ let locations =
         end_line = 57;
         end_col = 54
       };
-    records =
+    binding =
       {
         CamlinternalLaw.file = "gen_flat.ml";
         start_line = 58;
         start_col = 0;
-        end_line = 59;
+        end_line = 60;
+        end_col = 19
+      };
+    records =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 61;
+        start_col = 0;
+        end_line = 62;
         end_col = 74
       }
   }
 let map
   { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
-    tuples; control; records }
+    tuples; control; binding; records }
   ~f =
   {
     poly = (f poly);
@@ -134,11 +144,12 @@ let map
     constructors = (f constructors);
     tuples = (f tuples);
     control = (f control);
+    binding = (f binding);
     records = (f records)
   }
 let to_list
   { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
-    tuples; control; records }
+    tuples; control; binding; records }
   =
   [poly;
   modes;
@@ -150,6 +161,7 @@ let to_list
   constructors;
   tuples;
   control;
+  binding;
   records]
 type poly_input =
   | Poly_input: 'a 'b . {
@@ -183,6 +195,9 @@ type tuples_input =
 type control_input =
   | Control_input: {
   x: int } -> control_input 
+type binding_input =
+  | Binding_input: {
+  s: Laws_gen_Gen_flat.shape } -> binding_input 
 type records_input =
   | Records_input: {
   p: Laws_gen_Gen_flat.point } -> records_input 
@@ -201,6 +216,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         val constructors : constructors_input Choice.t
         val tuples : tuples_input Choice.t
         val control : control_input Choice.t
+        val binding : binding_input Choice.t
         val records : records_input Choice.t
       end
     let poly ((module C)  : (module Choices))  : unit Law.t =
@@ -485,6 +501,31 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 54
                    }
                }))
+    let binding ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.binding),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.binding;
+                 predicate =
+                   (fun ((Binding_input { s }) : binding_input) ->
+                      (let a =
+                         match s with
+                         | (Circle r : Laws_gen_Gen_flat.shape) -> r
+                         | (Square w : Laws_gen_Gen_flat.shape) -> w in
+                       Laws_gen_Stdlib.(||) (Laws_gen_Stdlib.(>=) a 0.)
+                         (Laws_gen_Stdlib.(<) a 0.) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 59;
+                     start_col = 2;
+                     end_line = 60;
+                     end_col = 19
+                   }
+               }))
     let records ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
         ((Law.Choose C.records),
@@ -506,9 +547,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "gen_flat.ml";
-                     start_line = 59;
+                     start_line = 62;
                      start_col = 2;
-                     end_line = 59;
+                     end_line = 62;
                      end_col = 74
                    }
                }))
@@ -524,6 +565,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         constructors = (constructors choices);
         tuples = (tuples choices);
         control = (control choices);
+        binding = (binding choices);
         records = (records choices)
       }
   end
