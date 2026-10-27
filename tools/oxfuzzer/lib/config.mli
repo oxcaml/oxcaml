@@ -36,10 +36,18 @@ val max_constructor_args : int
 
 val max_match_count : int
 
+val max_unboxed_tuple_arity : int
+
+val max_unboxed_tuple_depth : int
+
 (* Percentages. *)
 val record_probability : int
 
 val variant_probability : int
+
+val or_null_probability : int
+
+val unboxed_tuple_probability : int
 
 val match_in_match_probability : int
 
@@ -79,7 +87,9 @@ module Swarm : sig
       multidimensional_arrays : bool;
       boxed_records : bool;
       unboxed_records : bool;
+      unboxed_tuples : bool;
       variants : bool;
+      or_null : bool;
       matches : bool;
       record_updates : bool;
       record_representation_conversions : bool;
