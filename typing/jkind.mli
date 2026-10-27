@@ -689,9 +689,11 @@ val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
 (** Given the kind [k] of a type, the kind of that type made addressable (or
-    left as is, for [Id]). *)
+    left as is, for [Id]). Kind abbreviations are expanded so that an already
+    addressable kind is unchanged. *)
 val apply_operator_l :
-  Jkind_types.Kind_operator.t -> ('l * 'r) Types.jkind -> ('l * 'r) Types.jkind
+  Env.t -> Jkind_types.Kind_operator.t -> ('l * 'r) Types.jkind ->
+  ('l * 'r) Types.jkind
 
 (** Given some kind [k], try to produce some kind [k'] such that [t : k']
     implies [t addressable : k] (or [t : k], for [Id]). Not every such [t] has

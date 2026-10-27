@@ -2458,7 +2458,8 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       Record_unboxed
     in
     let jkind =
-      Jkind.apply_operator_l (Types.unboxed_record_field_operator lbl) jkind
+      Jkind.apply_operator_l env
+        (Types.unboxed_record_field_operator lbl) jkind
     in
     [{ lbl with ld_sort }], rep, jkind
   | Legacy, _, Record_dummy _
@@ -2715,7 +2716,7 @@ let rec update_decl_jkind env dpath decl =
             in
             if Option.is_none sort then assert_any_args_support loc;
             let jkind =
-              Jkind.apply_operator_l
+              Jkind.apply_operator_l env
                 (Types.unboxed_constructor_argument_operator arg) jkind
             in
             [{ cstr with Types.cd_args =
@@ -2730,7 +2731,7 @@ let rec update_decl_jkind env dpath decl =
             in
             if Option.is_none sort then assert_any_args_support loc;
             let jkind =
-              Jkind.apply_operator_l
+              Jkind.apply_operator_l env
                 (Types.unboxed_record_field_operator lbl) jkind
             in
             [{ cstr with Types.cd_args =
