@@ -9,10 +9,7 @@
    - unit names follow dune's wrapping convention: unit Lib__Foo comes from
      foo.ml compiled with -open Lib__, and the alias module Lib__ (which has no
      source) is regenerated as dune generates it;
-   - dependencies between units come from ocamldep.
-
-   The rules are meant to be included with (dynamic_include) from the
-   directory given by --rules-dir. *)
+   - dependencies between units come from ocamldep. *)
 
 module StrSet = Set.Make (String)
 module StrMap = Map.Make (String)
@@ -26,8 +23,6 @@ let src = ref ""
 let cmxa = ref ""
 
 let installed_subdir = ref None
-
-let rules_dir = ref ""
 
 let flags = ref ""
 
@@ -46,9 +41,6 @@ let speclist =
       Arg.String (fun s -> installed_subdir := Some s),
       "DIR  Subdirectory of the standard library directory the library is \
        installed in (default: NAME)" );
-    ( "--rules-dir",
-      Arg.Set_string rules_dir,
-      "DIR  Directory the generated rules are included from" );
     ( "--flags",
       Arg.Set_string flags,
       "FLAGS  Extra flags for compiling the units (e.g. -extension-universe \
@@ -57,7 +49,7 @@ let speclist =
       Arg.String (fun s -> deps := s :: !deps),
       "LIB  Another library built with these rules that this one depends on" ) ]
 
-let usage = "gen_jsir_lib --name NAME --src DIR --cmxa FILE --rules-dir DIR ..."
+let usage = "gen_jsir_lib --name NAME --src DIR --cmxa FILE ..."
 
 let fail fmt = Printf.ksprintf (fun s -> prerr_endline s; exit 2) fmt
 
@@ -81,19 +73,6 @@ let split_key_value line =
       String.trim (String.sub line (i + 1) (String.length line - i - 1))
     in
     Some (key, value)
-
-(* Path from [rules_dir] to [path], both being relative to the current
-   directory. *)
-let from_rules_dir path =
-  if not (Filename.is_relative path)
-  then path
-  else
-    let depth =
-      String.split_on_char '/' !rules_dir
-      |> List.filter (fun s -> s <> "" && s <> ".")
-      |> List.length
-    in
-    String.concat "" (List.init depth (fun _ -> "../")) ^ path
 
 (* Units of the installed archive, in link order, and whether it was built
    with -linkall. *)
@@ -131,6 +110,9 @@ type unit_info =
     source : string option (* [None] for the alias module [Lib__] *) }
 
 let classify units =
+  let wrapped =
+    List.exists (fun u -> String.starts_with u ~prefix:(lib_prefix ())) units
+  in
   List.map
     (fun unit_name ->
       match module_name unit_name with
@@ -139,7 +121,7 @@ let classify units =
         let file = String.uncapitalize_ascii modname ^ ".ml" in
         if Sys.file_exists (Filename.concat !src file)
         then { unit_name; source = Some file }
-        else if unit_name = String.capitalize_ascii !name
+        else if wrapped && unit_name = String.capitalize_ascii !name
         then
           (* dune names the alias module after the library when the library
              has no module of that name. *)
@@ -236,9 +218,9 @@ let include_dirs () =
     !deps
   @ ["-I"; ".."; "-I"; installed_dir (); "-I"; "%{ocaml_where}"]
 
-let dep_archives () =
-  List.map (fun dep -> Printf.sprintf "../%s/%s.cmjxa" dep dep) !deps
-  @ ["../stdlib.cmjxa"]
+let dep_cmjx () =
+  List.map (fun dep -> Printf.sprintf "(glob_files ../%s/*.cmjx)" dep) !deps
+  @ ["(glob_files ../*.cmjx)"]
 
 let rule ~ppf ~targets ~deps ~action =
   Printf.fprintf ppf "(rule\n  (targets %s)\n  (deps %s)\n  (action %s))\n\n"
@@ -248,8 +230,7 @@ let () =
   Arg.parse speclist (fun s -> fail "Unexpected argument %s" s) usage;
   List.iter
     (fun (v, flag) -> if !v = "" then fail "%s is required" flag)
-    [ ocaml_bin, "--ocaml-bin"; name, "--name"; src, "--src"; cmxa, "--cmxa";
-      rules_dir, "--rules-dir" ];
+    [ocaml_bin, "--ocaml-bin"; name, "--name"; src, "--src"; cmxa, "--cmxa"];
   let unit_names, force_link = read_cmxa () in
   if unit_names = [] then fail "No units found in %s" !cmxa;
   let units = classify unit_names in
@@ -273,7 +254,7 @@ let () =
         ((Printf.sprintf "(:src %s)" src_path :: cmi
           :: List.map (fun d -> installed d ".cmi") cmi_deps)
         @ List.map (fun d -> file_of_unit d ".cmjx") cmjx_deps
-        @ dep_archives ())
+        @ dep_cmjx ())
       ~action:
         (run_ocamlopt
            (common_flags @ flags @ include_dirs ()
@@ -323,7 +304,7 @@ let () =
           | Some alias -> [alias], ["-open"; alias]
         in
         compile_rule ~unit_name:u.unit_name
-          ~src_path:(from_rules_dir (Filename.concat !src file))
+          ~src_path:(Filename.concat !src file)
           ~cmi_deps:deps ~cmjx_deps:(alias_deps @ deps)
           ~flags:(extra_flags @ alias_flags))
     units;

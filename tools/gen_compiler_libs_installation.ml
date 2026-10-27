@@ -17,6 +17,11 @@ let () =
       | "symbol_utils", ".mli"
       | "optmaindriver", ".cmx" ->
         None
+      | ( "boot_ocamlopt" | "main" | "main_native" | "optmain" | "oxcaml_main"
+        | "oxcaml_main_native" ), ".ml" ->
+        None
+      | "parser", ".ml" -> None
+      | "parser.pp", ".ml" -> Some "parser"
       | "zero_alloc_checker", ".mli" -> Some "mach_checks"
       | "cSE", (".cmi" | ".cmt" | ".cmx") -> Some "CSE"
       | "cSEgen", (".cmi" | ".cmt" | ".cmti" | ".cmx") -> Some "CSEgen"

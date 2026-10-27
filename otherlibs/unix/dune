@@ -155,6 +155,8 @@
     (unix.cmxs as unix/unix.cmxs)
     (unix.mli as unix/unix.mli)
     (unixLabels.mli as unix/unixLabels.mli)
+    (unix.ml as unix/unix.ml)
+    (unixLabels.ml as unix/unixLabels.ml)
     (libunix_stubs.a as unix/libunix_stubs.a)
     (libunix_stubs.a as libunix_stubs_native.a) ; for special_dune compat
     (dllunix_stubs.so as stublibs/dllunix_stubs.so)
