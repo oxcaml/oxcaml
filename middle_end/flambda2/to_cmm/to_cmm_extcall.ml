@@ -53,8 +53,8 @@ module Cmm_arg = struct
 
   let dummy (reg_class : Abi.Reg_class.t) : t =
     match reg_class with
-    | Int_regs -> Ctuple [], XPhantom_int
-    | Float_regs -> Ctuple [], XPhantom_float
+    | Int_regs -> Ctuple [], XDummy_int
+    | Float_regs -> Ctuple [], XDummy_float
 
   let padding ~dbg : t = Cconst_int (0, dbg), XInt64
 end
@@ -118,8 +118,8 @@ module Pack = struct
       | Some _, [(_, expr)] -> expr
       | None, [] ->
         Cconst_int (0, dbg)
-        (* This is a dummy value. [Abi.Unit.exttype] assigns a phantom exttype,
-           so no move occurs. *)
+        (* This is a dummy value. [Abi.Unit.exttype] assigns a dummy exttype, so
+           no move occurs. *)
       | None, first :: rest -> int_bits ~dbg (first :: rest)
       | Some _, ([] | _ :: _ :: _) ->
         Misc.fatal_error "To_cmm_extcall.Pack.unit: single component mismatch"

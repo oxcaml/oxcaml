@@ -284,8 +284,7 @@ let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
   let ty_arg_is_small_int =
     match ty_arg with
     | XInt32 | XInt16 | XInt8 -> true
-    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XPhantom_int
-    | XPhantom_float ->
+    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XDummy_int | XDummy_float ->
       false
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
   in

@@ -75,7 +75,7 @@ let () =
   (* 10 + 2 * 0x5a *)
   eqi (box_int64 (sum_i64_mask #(#10L, mask 0x5aL))) 190L
 
-(* Spilled products, with a register left for a phantom. *)
+(* Spilled products, with a register left for a dummy argument. *)
 
 external i64x5_mask_i64 :
   int64_u -> int64_u -> int64_u -> int64_u -> int64_u -> #(mask# * int64_u)

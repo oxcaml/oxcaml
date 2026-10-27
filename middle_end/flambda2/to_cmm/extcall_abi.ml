@@ -174,8 +174,8 @@ module Reg_class = struct
 
   let of_exttype (exttype : Cmm.exttype) : t =
     match exttype with
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XPhantom_int -> Int_regs
-    | XFloat | XFloat32 | XVec128 | XVec256 | XVec512 | XPhantom_float ->
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XDummy_int -> Int_regs
+    | XFloat | XFloat32 | XVec128 | XVec256 | XVec512 | XDummy_float ->
       Float_regs
 end
 
@@ -283,8 +283,8 @@ module Component = struct
     | XVec128 -> Float_regs, 16
     | XVec256 -> Float_regs, 32
     | XVec512 -> Float_regs, 64
-    | XPhantom_int | XPhantom_float ->
-      Misc.fatal_error "Extcall_abi.Component.reg_class_and_size: phantom"
+    | XDummy_int | XDummy_float ->
+      Misc.fatal_error "Extcall_abi.Component.reg_class_and_size: dummy"
 
   let exttype t = To_cmm_shared.exttype_of_kind (K.With_subkind.kind t.kind)
 
@@ -731,8 +731,8 @@ module Slot = struct
   let exttype (args : Arg.t array) t : Cmm.exttype =
     match t with
     | Arg { arg; slot } -> List.nth (Arg.exttypes args.(arg)) slot
-    | Dummy Int_regs -> XPhantom_int
-    | Dummy Float_regs -> XPhantom_float
+    | Dummy Int_regs -> XDummy_int
+    | Dummy Float_regs -> XDummy_float
     | Padding -> XInt64
 
   let reg_class args t = Reg_class.of_exttype (exttype args t)
@@ -745,8 +745,8 @@ module Slot = struct
     | XVec128 -> 16
     | XVec256 -> 32
     | XVec512 -> 64
-    | XPhantom_int | XPhantom_float ->
-      Misc.fatal_error "Extcall_abi.Slot.amd64_stack_size: phantom"
+    | XDummy_int | XDummy_float ->
+      Misc.fatal_error "Extcall_abi.Slot.amd64_stack_size: dummy"
 end
 
 (* The slots of the stack-bound arguments, in order.
