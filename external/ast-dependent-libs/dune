@@ -6,9 +6,11 @@
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
 
-; smoke is a separate project, built against the installed compiler package
-; (see mkJsooSmokeTest in default.nix).
-(data_only_dirs smoke stdlib)
+; ; smoke is a separate project, built against the installed compiler package
+; (see mkJsooSmokeTest in default.nix). stdlib and otherlibs link to the
+; compiler's own sources, which stdlib-jsir compiles for JSIR.
+
+(data_only_dirs smoke stdlib otherlibs)
 
 ; Each alias depends on the .install files of its packages, which builds
 ; everything they install. Keep in sync with PPXLIB_PACKAGES, JSOO_PACKAGES

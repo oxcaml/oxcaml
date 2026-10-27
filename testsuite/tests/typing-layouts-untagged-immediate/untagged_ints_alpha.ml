@@ -6,6 +6,9 @@
    native;
  }{
    flags = "-extension-universe alpha";
+   jsir;
+ }{
+   flags = "-extension-universe alpha";
    bytecode;
  }
 *)
