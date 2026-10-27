@@ -48,13 +48,25 @@ struct stack_handler {
  *  - handling a freelist of OCaml stacks in a stack_cache
  */
 struct stack_info {
+  union {
+    /* While the stack is in use. */
+    struct {
 #ifdef NATIVE_CODE
-  void* sp;            /* stack pointer of the OCaml stack when suspended */
-  void* exception_ptr; /* exception pointer of OCaml stack when suspended */
+      void* sp;            /* stack pointer of the OCaml stack when suspended */
+      void* exception_ptr; /* exception pointer of OCaml stack when suspended */
 #else
-  value* sp;
-  value* exception_ptr;
+      value* sp;
+      value* exception_ptr;
 #endif
+    };
+    /* While the stack is in a stack cache. */
+    struct {
+      /* The major-cycle count when this stack was demoted, used to free
+         long-unused stacks (global and extra caches only). */
+      uintnat cache_stamp;
+      struct stack_info* cache_next; /* the next stack in this cache */
+    };
+  };
   struct stack_handler* handler; /* effect handling state for the fiber */
 
   /* [cache_bucket] is an index into the [Caml_state->stack_cache] array if
@@ -329,27 +341,8 @@ enum tick_outcome {
   TICK_RESULT_CONTINUE = 1
 };
 
-/* A stack in one of the stack caches: the same memory as a [struct
-   stack_info], viewed through a different type while it has no
-   execution state. Mirrors the leading layout of [struct stack_info],
-   repurposing the first two words. The remaining [struct stack_info]
-   fields are dead while cached, and are reinitialized when the stack is
-   reused. */
-struct cached_stack {
-  /* Overlays [sp]: the major-cycle count when this stack was demoted,
-     used to free long-unused stacks (global and extra caches only). */
-  uintnat stamp;
-  /* Overlays [exception_ptr]: the next stack in this cache. */
-  struct cached_stack* next;
-  /* The address at which the handler will be rebuilt on reuse. */
-  struct stack_handler* handler_space;
-  int cache_bucket; /* as in struct stack_info */
-  size_t size;      /* as in struct stack_info */
-  uintnat magic;    /* as in struct stack_info */
-};
-
 struct stack_cache {
-  _Atomic(struct cached_stack*) head;
+  _Atomic(struct stack_info*) head;
   _Atomic(uintnat) len;
 };
 
