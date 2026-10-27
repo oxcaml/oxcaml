@@ -75,6 +75,7 @@ let main() =
      "-g", Arg.Set Clflags.debug, "";
      "-dcfg", Arg.Set Oxcaml_flags.dump_cfg, "";
      "-dcmm", Arg.Set dump_cmm, "";
+     "-dcmm-invariants", Arg.Set Clflags.cmm_invariants, "";
      "-dcse", Arg.Set dump_cse, "";
      "-dlinear", Arg.Set dump_linear, "";
      "-dtimings", Arg.Unit (fun () -> profile_columns := [ `Time ]), "";

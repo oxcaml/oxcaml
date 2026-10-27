@@ -1,0 +1,11 @@
+(* TEST
+ native-compiler;
+ setup-simple-build-env;
+ flags = "-dcmm-invariants";
+ codegen;
+*)
+
+(function "exit_with_tuple_call" (x:val)
+  (catch
+    (exit pair (app "make_pair" x val*val))
+   with (pair a:val b:val) a))

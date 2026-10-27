@@ -1,6 +1,7 @@
 (* TEST
  native-compiler;
  setup-simple-build-env;
+ flags = "-dcmm-invariants";
  codegen_exit_status = "2";
  codegen;
 *)
@@ -19,6 +20,10 @@ correctly catch broken Cmm programs.
   (catch
     (exit cont 0)
    with (cont y:int) y)
+  (* Multiple [val]s passed expecting a single [val] *)
+  (catch
+    (exit pair (app "make_pair" x val*val))
+   with (pair y:val) y)
   (* Exit out of scope of its handler *)
   (exit cont 0)
 )
