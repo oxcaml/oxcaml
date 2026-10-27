@@ -69,7 +69,7 @@ let make_module_modifier unit_name directory =
 
 let compiler_subdir subdir =
   (* CR mshinwell: upstream this change *)
-  Filename.make_path (Ocaml_directories.srcdir :: subdir)
+  Ocaml_directories.srcdir_path subdir
 
 let config =
 [

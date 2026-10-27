@@ -20,7 +20,7 @@ open Ocamltest_stdlib
 let fail_with_reason reason =
   let code _log env =
     let result = Result.fail_with_reason reason in
-    (result, env)
+    (Actions.Static result, env)
   in
   Actions.make ~name:"fail" ~description:"Make the test fail"
     ~does_something:true
@@ -29,7 +29,7 @@ let fail_with_reason reason =
 let skip_with_reason reason =
   let code _log env =
     let result = Result.skip_with_reason reason in
-    (result, env)
+    (Actions.Static result, env)
   in
   Actions.make ~name:"skip" ~description:"Skip the test"
     ~does_something:true
@@ -44,7 +44,7 @@ let predicate test pass_reason _skip_reason _log env =
     if test
     then predicate_satisfied_with_reason pass_reason
     else predicate_not_satisfied_with_reason pass_reason in
-  (result, env)
+  (Actions.Static result, env)
 
 let mkreason what commandline exitcode =
   Printf.sprintf "%s: command\n%s\nfailed with exit code %d"
@@ -108,7 +108,8 @@ let setup_subdirectories source_directory build_directory subdirs =
   in
   List.iter cp_dir subdirs
 
-let setup_build_env add_testfile additional_files (_log : out_channel) env =
+let setup_build_env add_testfile ?(remove=[]) additional_files
+      (_log : out_channel) env =
   let source_dir = (test_source_directory env) in
   let build_dir = (test_build_directory env) in
   let some_files = additional_files @ (readonly_files env) in
@@ -116,11 +117,17 @@ let setup_build_env add_testfile additional_files (_log : out_channel) env =
     if add_testfile
     then (testfile env) :: some_files
     else some_files in
-  setup_symlinks source_dir build_dir files;
   let subdirs = subdirectories env in
+  Actions.Task [Setup_build_env { source_dir; build_dir;
+                                  remove; files; subdirs }],
+  env
+
+let do_setup_build_env ~source_dir ~build_dir ~remove ~files ~subdirs =
+  setup_symlinks source_dir build_dir files;
   setup_subdirectories source_dir build_dir subdirs;
+  List.iter Sys.force_remove remove;
   Sys.chdir build_dir;
-  (Result.pass, env)
+  Result.pass
 
 let setup_simple_build_env add_testfile additional_files log env =
   let build_env = Environments.add
@@ -136,6 +143,8 @@ let run_cmd
     ?(stderr_variable=Builtin_variables.stderr)
     ?(append=false)
     ?timeout
+    ?(exits=[0,Result.pass])
+    ~what
     log env original_cmd
   =
   let log_redirection std filename =
@@ -187,8 +196,8 @@ let run_cmd
         Option.value ~default:0
           (Environments.lookup_as_int Builtin_variables.timeout env)
   in
-  let n =
-    Run_command.run {
+  let settings =
+    {
       Run_command.progname = progname;
       Run_command.argv = arguments;
       Run_command.envp = systemenv;
@@ -200,6 +209,13 @@ let run_cmd
       Run_command.log = log
     }
   in
+  let message =
+    Printf.sprintf "%s: command\n%s" what (String.concat " " original_cmd)
+  in
+  Actions.Task [Run_cmd { settings; message; exits }]
+
+let do_run_cmd ~(settings : Run_command.settings) ~message ~exits log =
+  let n = Run_command.run settings in
   let dump_file s fn =
     if not (Sys.file_is_empty fn) then begin
       Printf.fprintf log "### begin %s ###\n" s;
@@ -207,15 +223,19 @@ let run_cmd
       Printf.fprintf log "### end %s ###\n" s
     end
   in
-  dump_file "stdout" stdout_filename;
-  if stdout_filename <> stderr_filename then dump_file "stderr" stderr_filename;
-  n
+  dump_file "stdout" settings.stdout_filename;
+  if settings.stdout_filename <> settings.stderr_filename then
+    dump_file "stderr" settings.stderr_filename;
+  try List.assoc n exits
+  with Not_found ->
+    let reason = Printf.sprintf "%s\nfailed with exit code %d" message n in
+    Result.fail_with_reason reason
 
 let run
     ~full_environment
+    ?exits
     (log_message : string)
     (redirect_output : bool)
-    (can_skip : bool)
     (prog_variable : Variables.t)
     (args_variable : Variables.t option)
     (log : out_channel)
@@ -225,7 +245,7 @@ let run
   | None ->
     let msg = Printf.sprintf "%s: variable %s is undefined"
       log_message (Variables.name_of_variable prog_variable) in
-    (Result.fail_with_reason msg, env)
+    (Actions.Static (Result.fail_with_reason msg), env)
   | Some program ->
     let arguments = match args_variable with
       | None -> ""
@@ -247,19 +267,11 @@ let run
       end else None, None
     in
     let expected_exit_status =
-      exit_status_of_variable env Builtin_variables.exit_status
+      exit_status_of_variable env Builtin_variables.exit_status, Result.pass
     in
-    let exit_status =
-      run_cmd ~full_environment ?stdout_variable ?stderr_variable
-        log env commandline in
-    if exit_status=expected_exit_status
-    then (Result.pass, env)
-    else begin
-      let reason = mkreason what (String.concat " " commandline) exit_status in
-      if exit_status = 125 && can_skip
-      then (Result.skip_with_reason reason, env)
-      else (Result.fail_with_reason reason, env)
-    end
+    let exits = Option.value exits ~default:[expected_exit_status] in
+    run_cmd ~full_environment ?stdout_variable ?stderr_variable
+      ~exits ~what log env commandline, env
 
 let run_cmd = run_cmd ~full_environment:false
 
@@ -282,25 +294,28 @@ let run_program log env =
     ~full_environment:false
     "Running program"
     true
-    false
     Builtin_variables.program
     (Some Builtin_variables.arguments)
     log env
 
 let run_script log env =
-  let response_file = Filename.temp_file "ocamltest-" ".response" in
+  let response_file = "ocamltest-" ^ testfile env ^ ".response" in
   Printf.fprintf log "Script should write its response to %s\n%!"
     response_file;
   let scriptenv = Environments.add
     Builtin_variables.ocamltest_response response_file env in
-  let (result, newenv) = run
+  let (task, newenv) = run
     ~full_environment:true
     "Running script"
-    true
     true
     Builtin_variables.script
     None
     log scriptenv in
+  Actions.seq [task; Task [Check_file_absent { filename = response_file }]],
+  newenv
+(*
+ * Support for reading modifiers from ocamltest_response is disabled in oxcaml
+ *
   let final_value =
     if Result.is_pass result then begin
       result, newenv
@@ -311,11 +326,39 @@ let run_script log env =
     end
   in
   Sys.force_remove response_file;
-  final_value
+  final_value *)
+
+let run_config_script log env =
+  let response_file = Filename.temp_file "ocamltest" ".response" in
+  let scriptenv = Environments.add
+    Builtin_variables.ocamltest_response response_file env in
+  let (task, newenv) = run
+    ~full_environment:true
+    ~exits:[0, Result.pass; 125, Result.skip]
+    "Running script"
+    true
+    Builtin_variables.script
+    None
+    log scriptenv in
+  (* This command is run immediately, during setup. *)
+  let r =
+    match[@ocaml.warning "-fragile-match"] task with
+    | Task [Run_cmd {settings;message;exits}] ->
+       do_run_cmd ~settings ~message ~exits log
+    | _ -> assert false
+  in
+  let task =
+    if Result.is_pass r then task
+    else
+      let reason = String.trim (Sys.string_of_file response_file) in
+      Actions.Static { r with reason = Some reason }
+  in
+  Sys.remove response_file;
+  task, newenv
 
 let run_hook hook_name log input_env =
   Printf.fprintf log "Entering run_hook for hook %s\n%!" hook_name;
-  let response_file = Filename.temp_file "ocamltest-" ".response" in
+  let response_file = "ocamltest-" ^ testfile input_env ^ ".response" in
   Printf.fprintf log "Hook should write its response to %s\n%!"
     response_file;
   let hookenv = Environments.add
@@ -336,7 +379,15 @@ let run_hook hook_name log input_env =
     append = false;
     timeout = timeout;
     log = log;
-  } in let exit_status = run settings in
+  } in
+  let exits = [0, Result.pass] in
+  Actions.Task [
+    Run_cmd { settings; message = "hook " ^ hook_name; exits };
+    Check_file_absent { filename = response_file } ],
+  input_env
+(*
+ * Support for reading modifiers from ocamltest_response is disabled in oxcaml
+ *
   let final_value = match exit_status with
     | 0 ->
       Result.pass, hookenv
@@ -349,6 +400,7 @@ let run_hook hook_name log input_env =
   in
   Sys.force_remove response_file;
   final_value
+ *)
 
 let compare_files kind_of_output output_filename reference_filename log
     env =
@@ -365,14 +417,20 @@ let compare_files kind_of_output output_filename reference_filename log
     Filecompare.reference_filename = reference_filename;
     Filecompare.output_filename = output_filename
   } in
+  let reference_exists = Sys.file_exists reference_filename in
   let ignore_header_conf = {
       Filecompare.lines = skip_lines;
       Filecompare.bytes = skip_bytes;
     } in
+  let promote = Environments.lookup_as_bool Builtin_variables.promote env = Some true in
   let tool =
     Filecompare.make_cmp_tool ~ignore:ignore_header_conf in
+  Actions.Task [Compare_files {kind_of_output; files; tool; reference_exists; promote;}], env
+
+let do_compare_files ~kind_of_output ~files ~tool ~promote log =
+  let Filecompare.{filetype=_; reference_filename; output_filename} = files in
   match Filecompare.check_file ~tool files with
-    | Filecompare.Same -> (Result.pass, env)
+    | Filecompare.Same -> Result.pass
     | Filecompare.Different ->
       let diff = Filecompare.diff files in
       let diffstr = match diff with
@@ -381,13 +439,18 @@ let compare_files kind_of_output output_filename reference_filename log
       let reason =
         Printf.sprintf "%s output %s differs from reference %s: \n%s\n"
         kind_of_output output_filename reference_filename diffstr in
-      if Environments.lookup_as_bool Builtin_variables.promote env = Some true
+      if promote
       then begin
         Printf.fprintf log "Promoting %s output %s to reference %s\n%!"
           kind_of_output output_filename reference_filename;
+        let ignore_header_conf : Filecompare.ignore =
+          match tool with
+          | Filecompare.Internal ign -> ign
+          | Filecompare.External _ -> { bytes = 0; lines = 0 }
+        in
         Filecompare.promote files ignore_header_conf;
       end;
-      (Result.fail_with_reason reason, env)
+      Result.fail_with_reason reason
     | Filecompare.Unexpected_output ->
       let banner = String.make 40 '=' in
       let unexpected_output = Sys.string_of_file output_filename in
@@ -397,11 +460,11 @@ let compare_files kind_of_output output_filename reference_filename log
         "The file %s was expected to be empty because there is no \
           reference file %s but it is not:\n%s\n"
         output_filename reference_filename unexpected_output_with_banners in
-      (Result.fail_with_reason reason, env)
+      Result.fail_with_reason reason
     | Filecompare.Error (commandline, exitcode) ->
       let reason = Printf.sprintf "The command %s failed with status %d"
         commandline exitcode in
-      (Result.fail_with_reason reason, env)
+      Result.fail_with_reason reason
 
 let check_output kind_of_output output_variable reference_variable log
     env =

@@ -78,22 +78,16 @@ let debug debugger_type log env =
     | Bytecode -> Debugger_variables.debugger_script
   in
   let expected_exit_status = 0 in
-  let exit_status =
-    Actions_helpers.run_cmd
-      ~environment:systemenv
-      ~stdin_variable:stdin_variable
-      ~stdout_variable:Builtin_variables.output
-      ~stderr_variable:Builtin_variables.output
-      ~append:true
-      log (env_with_lib_unix env) commandline in
-  if exit_status=expected_exit_status
-  then (Result.pass, env)
-  else begin
-    let reason =
-      (Actions_helpers.mkreason
-         what (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env)
-  end
+  Actions_helpers.run_cmd
+    ~environment:systemenv
+    ~stdin_variable:stdin_variable
+    ~stdout_variable:Builtin_variables.output
+    ~stderr_variable:Builtin_variables.output
+    ~append:true
+    ~exits:[expected_exit_status, Result.pass]
+    ~what
+    log (env_with_lib_unix env) commandline,
+  env
 
 let lldb =
   Actions.make ~name:"lldb"
