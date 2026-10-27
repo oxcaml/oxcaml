@@ -14268,18 +14268,35 @@ let report_error ~loc env =
         Style.inline_code "let"
         Style.inline_code "poly_" Style.inline_code "poly_"
   | Illegal_letrec_expr id ->
-      Location.errorf ~loc
-        "This kind of expression is not allowed as right-hand side of %a.@ \
-         It refers to %a,@ but the names bound by a %a@ may only be used@ \
-         by the functions@ and lazy values it binds,@ and in the fields@ \
-         of the constructors,@ tuples, records@ and references it binds."
-        Style.inline_code "let rec"
+      let hint =
+        Location.msg
+          "@[<v 2>Hint: Each right-hand side of a %a must have the form r:@,\
+          \  @[<v>right-hand side r ::= \
+           b | fun ... -> e | lazy e | let x = r in r@,\
+           block           b ::= \
+           C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v@,\
+           value           v ::= \
+           x | c | b | fun ... -> e | lazy e | [| v; ... |]@]@,\
+           Here x is a variable, c a constant, C a constructor and e any@,\
+           expression. Expressions that do not mention the names defined by \
+           the@,\
+           %a are also allowed.@]"
+          Style.inline_code "let rec"
+          Style.inline_code "let rec"
+      in
+      Location.errorf ~loc ~sub:[ hint ]
+        "This expression may use %a@ before the %a has defined it."
         Style.inline_code (Ident.name id)
         Style.inline_code "let rec"
   | Illegal_letrec_cycle ids ->
-      Location.errorf ~loc
-        "This %a creates the cycle@ %a,@ which goes through@ neither a \
-         function,@ nor a lazy value,@ nor a mutable field."
+      let hint =
+        Location.msg
+          "@[Hint: A cycle must go through a function, a %a value or a \
+           mutable field.@]"
+          Style.inline_code "lazy"
+      in
+      Location.errorf ~loc ~sub:[ hint ]
+        "This %a would create a cycle of immutable values:@ %a."
         Style.inline_code "let rec"
         (pp_print_list
            ~pp_sep:(fun ppf () -> fprintf ppf " ->@ ")

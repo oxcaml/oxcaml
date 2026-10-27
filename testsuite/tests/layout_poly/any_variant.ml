@@ -465,10 +465,14 @@ let poly_ cycle payload =
 Line 2, characters 17-41:
 2 |   let rec node = { payload; next = node } in
                      ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "node", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "node" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 type ('a : any) pair = #('a * 'a)

@@ -67,10 +67,14 @@ let rec f = let h = f in fun x -> h x;;
 Line 1, characters 20-21:
 1 | let rec f = let h = f in fun x -> h x;;
                         ^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 let rec f = (ignore (f 0); fun x -> x + 1);;
@@ -78,10 +82,14 @@ let rec f = (ignore (f 0); fun x -> x + 1);;
 Line 1, characters 13-25:
 1 | let rec f = (ignore (f 0); fun x -> x + 1);;
                  ^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 let rec f = let (h, _) = (fun x -> f x), 0 in fun x -> h x;;
@@ -89,10 +97,14 @@ let rec f = let (h, _) = (fun x -> f x), 0 in fun x -> h x;;
 Line 1, characters 25-42:
 1 | let rec f = let (h, _) = (fun x -> f x), 0 in fun x -> h x;;
                              ^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 (* Calling a function is not a construction. *)
@@ -102,10 +114,14 @@ let rec f = (fun () -> f) ();;
 Line 1, characters 12-28:
 1 | let rec f = (fun () -> f) ();;
                 ^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "f", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "f" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 let rec xs = (fun () -> 1 :: xs) ();;
@@ -113,10 +129,14 @@ let rec xs = (fun () -> 1 :: xs) ();;
 Line 1, characters 13-35:
 1 | let rec xs = (fun () -> 1 :: xs) ();;
                  ^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "xs", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "xs" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 (* Immutable blocks may refer to the group in their fields, as long as every
@@ -191,8 +211,8 @@ let rec xs = 1 :: xs;;
 Line 1, characters 18-20:
 1 | let rec xs = 1 :: xs;;
                       ^^
-Error: This "let rec" creates the cycle "xs" -> "xs", which goes through
-       neither a function, nor a lazy value, nor a mutable field.
+Error: This "let rec" would create a cycle of immutable values: "xs" -> "xs".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
 
 type c = C of c
@@ -202,8 +222,8 @@ type c = C of c
 Line 2, characters 14-15:
 2 | let rec a = C b and b = C a;;
                   ^
-Error: This "let rec" creates the cycle "b" -> "a" -> "b", which goes through
-       neither a function, nor a lazy value, nor a mutable field.
+Error: This "let rec" would create a cycle of immutable values: "b" -> "a" -> "b".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
 
 type d = D of d list * d Lazy.t
@@ -214,8 +234,8 @@ type d = D of d list * d Lazy.t
 Line 3, characters 12-13:
 3 | and d = D ([e], lazy d) and e = D ([d], lazy a);;
                 ^
-Error: This "let rec" creates the cycle "e" -> "d" -> "e", which goes through
-       neither a function, nor a lazy value, nor a mutable field.
+Error: This "let rec" would create a cycle of immutable values: "e" -> "d" -> "e".
+Hint: A cycle must go through a function, a "lazy" value or a mutable field.
 |}];;
 
 let rec x = { f = (fun () -> 0); x = (fun () -> 1) () } and y = Some x;;
@@ -231,10 +251,14 @@ let rec x = Some (List.length [x]);;
 Line 1, characters 17-34:
 1 | let rec x = Some (List.length [x]);;
                      ^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 let rec x = { f = (fun () -> 0); x = x.x };;
@@ -242,8 +266,12 @@ let rec x = { f = (fun () -> 0); x = x.x };;
 Line 1, characters 37-40:
 1 | let rec x = { f = (fun () -> 0); x = x.x };;
                                          ^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;

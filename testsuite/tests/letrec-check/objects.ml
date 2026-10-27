@@ -83,10 +83,14 @@ class c : 'a -> object  end
 Line 2, characters 12-19:
 2 | let rec x = new c x;;
                 ^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "x", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "x" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;
 
 let rec x = y#m and y = object method m = () end;;
@@ -94,8 +98,12 @@ let rec x = y#m and y = object method m = () end;;
 Line 1, characters 12-15:
 1 | let rec x = y#m and y = object method m = () end;;
                 ^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "y", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "y" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}];;

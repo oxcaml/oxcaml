@@ -479,10 +479,14 @@ Lines 7-9, characters 2-10:
 7 | ..(module functor (X : sig end @ static) -> struct
 8 |     let f () = ignore p13; 1
 9 |   end : F)
-Error: This kind of expression is not allowed as right-hand side of "let rec".
-       It refers to "p13", but the names bound by a "let rec" may only be used
-       by the functions and lazy values it binds, and in the fields
-       of the constructors, tuples, records and references it binds.
+Error: This expression may use "p13" before the "let rec" has defined it.
+Hint: Each right-hand side of a "let rec" must have the form r:
+    right-hand side r ::= b | fun ... -> e | lazy e | let x = r in r
+    block           b ::= C (v, ...) | (v, ...) | { l = v; ... } | `C v | ref v
+    value           v ::= x | c | b | fun ... -> e | lazy e | [| v; ... |]
+  Here x is a variable, c a constant, C a constructor and e any
+  expression. Expressions that do not mention the names defined by the
+  "let rec" are also allowed.
 |}]
 
 (* A static functor taking another static functor as its argument *)
