@@ -42,6 +42,9 @@ against that package.
 Downstream packaging change: `lib/runtime` is its own package,
 `js_of_ocaml-runtime`, instead of upstream's `js_of_ocaml-compiler.runtime`,
 so that the `js_of_ocaml` library installs without the compiler library.
+`js_of_ocaml-compiler` still provides `js_of_ocaml-compiler.runtime`
+(`lib/runtime-compat`), an empty library that re-exports
+`js_of_ocaml-runtime`, so that code using upstream's name keeps working.
 
 ## Test
 
