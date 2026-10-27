@@ -37,6 +37,7 @@ let keyword_table =
     "available", KWD_AVAILABLE;
     "boxed", KWD_BOXED;
     "ccall", KWD_CCALL;
+    "fat_ptr", KWD_FAT_PTR;
     "mcall", KWD_MCALL;
     "self", KWD_SELF;
     "public", KWD_PUBLIC;

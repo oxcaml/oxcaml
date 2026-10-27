@@ -200,6 +200,10 @@ let external_calling_conventions
       | XFloat -> Float, float_registers, 1, size_float
       | XFloat32 -> Float32, float_registers, 2, size_float
       | XVec128 -> Vec128, float_registers, 1, size_vec128
+      (* fat pointer: base in the slot's real C argument register;
+         offset assigned below, from the leftover argument registers.
+         Addition [base + offset] emitted as part of the call itself. *)
+      | XFat_pointer -> Val, int_registers, 1, size_int
       | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
     in
@@ -208,10 +212,38 @@ let external_calling_conventions
       registers := regs;
       loc.(i) <- [| phys_reg ty reg |]
     | [] ->
+      (match ty_arg with
+       | XFat_pointer ->
+         Misc.fatal_error
+           "Fat-pointer external arguments passed on the stack are not \
+            supported (too many integer arguments)"
+       | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+       | XVec128 | XVec256 | XVec512 -> ());
       let size = if macosx then size / divisor else size in
       ofs := Misc.align !ofs size;
       loc.(i) <- [| stack_slot (make_stack !ofs) ty |];
       ofs := !ofs + size)
+    ty_args;
+  (* Second pass: offsets of fat-pointer arguments, from the integer argument
+     registers the real signature left unused. *)
+  List.iteri (fun i (ty_arg : Cmm.exttype) ->
+    match ty_arg with
+    | XFat_pointer ->
+      let offset_loc =
+        match !int_registers with
+        | reg :: regs ->
+          int_registers := regs;
+          phys_reg Int reg
+        | [] ->
+          (* offset on stack after the real stack arguments. *)
+          ofs := Misc.align !ofs size_int;
+          let slot = stack_slot (make_stack !ofs) Int in
+          ofs := !ofs + size_int;
+          slot
+      in
+      loc.(i) <- [| loc.(i).(0); offset_loc |]
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
+    | XVec256 | XVec512 -> ())
     ty_args;
   (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 

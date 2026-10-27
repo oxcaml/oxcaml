@@ -102,6 +102,14 @@ type exttype =
   | XVec128  (**r 128-bit vector *)
   | XVec256  (**r 256-bit vector *)
   | XVec512  (**r 512-bit vector *)
+  | XFat_pointer
+      (**r A fat pointer, passed to C as a single raw pointer. Occupies one
+         argument slot of the C calling convention but corresponds to two Cmm
+         arguments: a [Val] base and an [Int] byte offset. The addition
+         [base + offset] is performed when the call itself is emitted, so that
+         no GC safepoint (in particular none inserted by later passes such as
+         polling insertion) can separate it from the call while the base may
+         still move. *)
 
 val machtype_of_exttype : exttype -> machtype
 

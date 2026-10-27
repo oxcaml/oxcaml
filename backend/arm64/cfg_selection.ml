@@ -292,7 +292,7 @@ let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     | XInt8 -> Rewritten (Op (Specific Imove8), src, dst)
     | XInt16 -> Rewritten (Op (Specific Imove16), src, dst)
     | XInt32 -> Rewritten (Op (Specific Imove32), src, dst)
-    | XInt | XInt64 | XFloat32 | XFloat | XVec128 -> Use_default
+    | XInt | XInt64 | XFloat32 | XFloat | XVec128 | XFat_pointer -> Use_default
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
 
 exception Use_default_exn

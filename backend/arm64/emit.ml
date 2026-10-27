@@ -1593,7 +1593,32 @@ let emit_instr env i =
       | None -> Misc.fatal_error "jump to missing tailrec entry point"
       | Some tailrec_entry_point -> A.ins1 B (local_label tailrec_entry_point)
     else A.ins1 B (symbol (Needs_reloc JUMP26) (symbol_of_cmm_symbol func))
-  | Lcall_op (Lextcall { func; alloc; stack_ofs; _ }) ->
+  | Lcall_op (Lextcall { func; alloc; stack_ofs; ty_args; _ }) ->
+    (* Fuse each fat-pointer argument, adding its offset register into its base
+       register, as part of emitting the call itself: no GC safepoint can
+       separate the addition from the call. *)
+    let (_ : int) =
+      List.fold_left
+        (fun k (ty_arg : Cmm.exttype) ->
+          match ty_arg with
+          | XFat_pointer ->
+            let rd = H.reg_x i.arg.(k) in
+            let offset = i.arg.(k + 1) in
+            (match offset.loc with
+            | Reg _ ->
+              A.ins4 ADD_shifted_register rd rd (H.reg_x offset) O.optional_none
+            | Stack _ ->
+              emit_stack_ldr env reg_x_tmp1 offset;
+              A.ins4 ADD_shifted_register rd rd reg_x_tmp1 O.optional_none
+            | Unknown ->
+              Misc.fatal_error
+                "Lextcall: fat-pointer offset has unknown location");
+            k + 2
+          | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 ->
+            k + 1)
+        0 ty_args
+    in
     if stack_ofs > 0
     then (
       A.ins_mov_from_sp ~dst:reg_stack_arg_begin;
