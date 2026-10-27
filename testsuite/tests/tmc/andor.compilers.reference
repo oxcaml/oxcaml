@@ -1,0 +1,68 @@
+File "andor.ml", line 10, characters 10-14:
+10 |   true && g ()
+               ^^^^
+Warning 72 [tmc-breaks-tailcall]: This call is in tail-modulo-cons position
+  in a TMC function, but the function called is not itself specialized for
+  TMC, so the call will not be transformed into a tail call.
+  Please either mark the called function with the [@tail_mod_cons] attribute,
+  or mark this call with the [@tailcall false] attribute to make its
+  non-tailness explicit.
+
+File "andor.ml", lines 8-10, characters 22-14:
+ 8 | ......................g =
+ 9 |   let local_ _r = ref () in
+10 |   true && g ()
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "andor.ml", line 15, characters 11-15:
+15 |   false || g ()
+                ^^^^
+Warning 72 [tmc-breaks-tailcall]: This call is in tail-modulo-cons position
+  in a TMC function, but the function called is not itself specialized for
+  TMC, so the call will not be transformed into a tail call.
+  Please either mark the called function with the [@tail_mod_cons] attribute,
+  or mark this call with the [@tailcall false] attribute to make its
+  non-tailness explicit.
+
+File "andor.ml", lines 13-15, characters 25-15:
+13 | .........................g =
+14 |   let local_ _r = ref () in
+15 |   false || g ()
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+
+File "andor.ml", lines 18-20, characters 27-5:
+18 | ...........................o =
+19 |   let local_ _r = ref () in
+20 |   o#m
+Warning 71 [unused-tmc-attribute]: This function is marked @tail_mod_cons
+  but is never applied in TMC position.
+(let
+  (f =
+     (function {nlocal = 0} g tail_mod_cons : int
+       (region (let (_r =mut[value<int>] 0) (if 1 (applytail g 0) 0))))
+   f_dps =
+     (function {nlocal = 0} dst offset[value<int>] g tail_mod_cons : int
+       (region
+         (let (_r =mut[value<int>] 0)
+           (if 1 (setfield_ptr(heap-init)_computed dst offset (apply g 0))
+             (setfield_ptr(heap-init)_computed dst offset 0)))))
+   f_or =
+     (function {nlocal = 0} g tail_mod_cons : int
+       (region (let (_r =mut[value<int>] 0) (if 0 1 (applytail g 0)))))
+   f_or_dps =
+     (function {nlocal = 0} dst offset[value<int>] g tail_mod_cons : int
+       (region
+         (let (_r =mut[value<int>] 0)
+           (if 0 (setfield_ptr(heap-init)_computed dst offset 1)
+             (setfield_ptr(heap-init)_computed dst offset (apply g 0))))))
+   f_send =
+     (function {nlocal = 0} o tail_mod_cons
+       (region (let (_r =mut[value<int>] 0) (sendtail o 109))))
+   f_send_dps =
+     (function {nlocal = 0} dst offset[value<int>] o tail_mod_cons
+       (region
+         (let (_r =mut[value<int>] 0)
+           (setfield_ptr(heap-init)_computed dst offset (send o 109))))))
+  (makeblock 0 f f_or f_send))
