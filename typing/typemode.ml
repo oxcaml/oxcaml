@@ -328,42 +328,18 @@ let modality_of_atoms l =
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
 
-(* The contents of an address get the same modalities as a field of the same
-   mutability, except on the axes implied by locality. This is to preserve
-   compatibility with:
+(* The contents of an address get the same monadic modalities as a field of the
+   same mutability. We don't apply comonadic modalities to ensure ['a addr_imm]
+   can be converted to an ['a addr @ read] at all modes, like:
    {[
      val of_imm_local : 'a addr_imm @ local -> 'a addr @ local read
    ]}
-
-   Ideally, we would drop exactly the axes that [[@local_opt]] varies together
-   with locality. These are hard-coded in [Ctype.prim_mode'] rather than
-   exposed as a list, so we approximate them by the comonadic modalities that
-   [local] implies (see [implied_modalities]), which mirror the modes implied by
-   [@ local].
-
-   Only comonadic atoms are dropped: dropping one only restricts the contents
-   further, which is always sound. *)
-(* CR address-patterns: The address modalities should be the same as the
-   mutable implied modalities when [@@ global] is no longer implied. *)
+   This does mean that the modal kind ['a addr] is slightly worse than that of
+   ['a ref] because the with-bound [with 'a] applies no comonadic modality. This
+   will no longer be the case when [mutable] doesn't imply [global] and [many].
+*)
 let address_modalities mut =
-  let local =
-    Modality.Atom
-      ( Comonadic Areality,
-        Modality.Comonadic.Atom.Meet_const Regionality.Const.Local )
-  in
-  let dropped_axes =
-    List.filter_map
-      (fun (Modality.Atom (ax, _)) ->
-        match ax with
-        | Comonadic _ -> Some (Modality.Axis.P ax)
-        | Monadic _ -> None)
-      (local :: implied_modalities local)
-  in
-  let should_drop (Modality.Atom (ax, _)) =
-    List.exists (fun p -> Modality.Axis.compare p (P ax) = 0) dropped_axes
-  in
-  mutable_implied_modalities ~for_mutable_variable:false (Types.is_mutable mut)
-  |> List.filter (fun atom -> not (should_drop atom))
+  mutable_implied_modalities ~for_mutable_variable:true (Types.is_mutable mut)
   |> modality_of_atoms
 
 let mutable_implied_modalities ~for_mutable_variable mut =
