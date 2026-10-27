@@ -19,36 +19,8 @@
    Instruction data was originally derived from the Intel SDM Vol 2. *)
 
 open Amd64_simd_defs
+open Simdgen_types
 open Printf
-
-type evex_rnd =
-  | Rnd_none
-  | Rnd_er
-  | Rnd_sae
-
-type evex_bcst =
-  | Bcst_none
-  | Bcst_32
-  | Bcst_64
-
-type evex_flags =
-  { mutable z : bool; (* Supports zeroing *)
-    mutable b : evex_bcst; (* Supports broadcasting *)
-    mutable r : evex_rnd; (* Supports rounding *)
-    mutable k : bool (* Expects write mask *)
-  }
-
-type instr_emit =
-  { ext : ext array; (* Multiple extensions may be required. *)
-    args : arg array;
-    res : res;
-    imm : imm;
-    mnemonic : string;
-    enc : enc;
-    flags : evex_flags
-  }
-
-exception Unsupported
 
 let all_mnemonics = Hashtbl.create 1024
 
@@ -595,13 +567,71 @@ let print_one bind instr =
       args
     |> Array.to_list |> String.concat ";"
   in
+  let print_register_args args =
+    Array.map
+      (fun ({ loc; _ } as arg : arg) ->
+        match loc with
+        | Pin _ -> arg
+        | Temp temps ->
+          let temps =
+            Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+          in
+          if Array.length temps = 0 then failwith instr.mnemonic;
+          { arg with loc = Temp temps })
+      args
+    |> print_args
+  in
+  (* A result written straight to its spill slot must overwrite the whole slot:
+     the register form of e.g. [vpmovqb xmm1/m64, zmm2] zeroes the upper lanes
+     of [xmm1], but the memory form writes only 64 bits, leaving the rest of a
+     128-bit slot stale. Drop memory from result locations whose memory width is
+     narrower than the register (GPR results zero-extend to 64 bits). *)
+  let print_result_args args =
+    let reg_width = function
+      | R8 | R16 | R32 | R64 | MM | K -> 64
+      | XMM -> 128
+      | YMM -> 256
+      | ZMM -> 512
+      | M8 | M16 | M32 | M64 | M128 | M256 | M512 | VM32X | VM32Y | VM32Z
+      | VM64X | VM64Y | VM64Z ->
+        0
+    in
+    let mem_width = function
+      | M8 -> 8
+      | M16 -> 16
+      | M32 -> 32
+      | M64 -> 64
+      | M128 -> 128
+      | M256 -> 256
+      | M512 -> 512
+      | R8 | R16 | R32 | R64 | MM | K | XMM | YMM | ZMM | VM32X | VM32Y | VM32Z
+      | VM64X | VM64Y | VM64Z ->
+        max_int
+    in
+    Array.map
+      (fun ({ loc; _ } as arg : arg) ->
+        match loc with
+        | Pin _ -> arg
+        | Temp temps ->
+          let reg = Array.fold_left (fun w t -> max w (reg_width t)) 0 temps in
+          let mem =
+            Array.fold_left (fun w t -> min w (mem_width t)) max_int temps
+          in
+          if mem < reg
+          then
+            let regs = List.filter temp_is_reg (Array.to_list temps) in
+            { arg with loc = Temp (Array.of_list regs) }
+          else arg)
+      args
+    |> print_args
+  in
   let print_idxs idxs =
     Array.map Int.to_string idxs |> Array.to_list |> String.concat ";"
   in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
     | Arg rr -> sprintf "Arg [|%s|]" (print_idxs rr)
-    | Res rr -> sprintf "Res [|%s|]" (print_args rr)
+    | Res rr -> sprintf "Res [|%s|]" (print_result_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
     | Prx_none -> "Prx_none"
@@ -682,14 +712,20 @@ let print_one bind instr =
   in
   let args, res =
     match instr.res with
-    | Res rr when instr.flags.z ->
+    | Res rr when instr.flags.z && merge_reads_dst instr.mnemonic ->
       (* Without zeroing, masked-off lanes of the destination are preserved, so
-         the destination must also be an input operand. *)
+         the destination must also be an input operand (restricted like a
+         result, see [print_result_args]). With zeroing, the destination must be
+         a register because EVEX.z is invalid with a memory destination. *)
       let args = print_args instr.args in
-      let res_args = print_args rr in
+      let res_args = print_result_args rr in
+      let zeroing_res_args = print_register_args rr in
       let idxs = print_idxs (Array.init (Array.length rr) (fun i -> i)) in
       ( sprintf "(if z then [|%s|] else [|%s;%s|])" args res_args args,
-        sprintf "(if z then Res [|%s|] else Arg [|%s|])" res_args idxs )
+        sprintf "(if z then Res [|%s|] else Arg [|%s|])" zeroing_res_args idxs )
+    | Res rr when instr.flags.z ->
+      ( sprintf "[|%s|]" (print_args instr.args),
+        sprintf "Res [|%s|]" (print_register_args rr) )
     | (Res_none | Arg _ | Res _) as res ->
       sprintf "[|%s|]" (print_args instr.args), print_res res
   in
@@ -719,25 +755,29 @@ let %s = {
 }|}
     fun_ constructor ext args res imm instr.mnemonic enc
 
+module Bind_map = Map.Make (String)
+
+let all_bindings () =
+  Hashtbl.to_seq_keys all_instructions
+  |> Seq.fold_left
+       (fun acc instr ->
+         Bind_map.update (binding instr)
+           (function
+             (* Prefer VEX over EVEX upon collisions. *)
+             | Some other when is_evex instr && not (is_evex other) ->
+               Some other
+             | Some _ | None -> Some instr)
+           acc)
+       Bind_map.empty
+
 let print_all () =
-  let module Map = Map.Make (String) in
-  let all =
-    Hashtbl.to_seq_keys all_instructions
-    |> Seq.fold_left
-         (fun acc instr ->
-           Map.update (binding instr)
-             (function
-               (* Prefer VEX over EVEX upon collisions. *)
-               | Some other when is_evex instr && not (is_evex other) ->
-                 Some other
-               | Some _ | None -> Some instr)
-             acc)
-         Map.empty
-  in
+  let all = all_bindings () in
   print_endline "type id = ";
-  Map.iter (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind)) all;
+  Bind_map.iter
+    (fun bind _ -> printf "  | %s\n" (String.capitalize_ascii bind))
+    all;
   print_endline "\ntype nonrec instr = id instr";
-  Map.iter (fun bind instr -> print_one bind instr) all
+  Bind_map.iter (fun bind instr -> print_one bind instr) all
 
 let parse_ext = function
   | "SSE" -> Some SSE
@@ -831,16 +871,30 @@ let expand_modifiers instr =
     match instr.flags.r with
     | Rnd_none -> [instr]
     | Rnd_er | Rnd_sae ->
-      if Array.exists (fun (arg : arg) -> loc_allows_mem arg.loc) instr.args
+      let allows_mem =
+        Array.exists (fun (arg : arg) -> loc_allows_mem arg.loc)
+      in
+      let res_allows_mem =
+        match instr.res with
+        | Res rr -> allows_mem rr
+        | Arg _ | Res_none -> false
+      in
+      if allows_mem instr.args || res_allows_mem
       then
+        let res =
+          match instr.res with
+          | Res rr -> Res (drop_mem rr)
+          | (Arg _ | Res_none) as res -> res
+        in
         [ { instr with flags = { instr.flags with r = Rnd_none } };
-          { instr with args = drop_mem instr.args } ]
+          { instr with args = drop_mem instr.args; res } ]
       else [instr]
   in
   let expand_mask instr =
     if not instr.flags.k
     then [instr]
     else
+      let k_index = Array.length instr.args in
       let masked =
         { instr with
           args =
@@ -848,7 +902,20 @@ let expand_modifiers instr =
         }
       in
       if Array.exists arg_is_vm instr.args
-      then [masked]
+      then
+        (* Gathers/scatters use the mask as a completion mask and zero it as
+           elements finish; model the clobber as a modified argument so the
+           register allocator does not reuse the stale value. *)
+        let res =
+          match masked.res with
+          | Arg rr -> Arg (Array.append rr [| k_index |])
+          | Res_none -> Arg [| k_index |]
+          | Res _ ->
+            failwith
+              (instr.mnemonic
+             ^ ": gather/scatter with a non-argument result operand")
+        in
+        [{ masked with res }]
       else [masked; { instr with flags = { instr.flags with z = false } }]
   in
   [instr]
@@ -856,7 +923,7 @@ let expand_modifiers instr =
   |> List.concat_map expand_rounding
   |> List.concat_map expand_mask
 
-let amd64 () =
+let load_amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
   let lines =
     csv
@@ -879,15 +946,36 @@ let amd64 () =
         with Unsupported -> [])
       | _ -> [])
   in
+  List.iter register lines
+
+let amd64 () =
+  load_amd64 ();
   print_endline "(* Generated by tools/simdgen/simdgen.ml *)\n";
   print_endline "open Amd64_simd_defs\n";
-  List.iter register lines;
   print_all ()
 
+(* [(binding_name, instr_emit)] for every registered instruction, using the same
+   binding/mangling as [print_all] so the intrinsics generator cannot drift from
+   the emitted descriptors. *)
+let bindings_assoc () = all_bindings () |> Bind_map.bindings
+
 let arm64 () = print_endline "(* Generated by tools/simdgen/simdgen.ml *)\n"
+
+let intrins subcommand =
+  load_amd64 ();
+  let bindings = bindings_assoc () in
+  let intrinsics = Simdgen_intrins.parse_intrinsics "x86-intel.xml" in
+  match subcommand with
+  | "skipped" -> Simdgen_intrins.print_skipped ~bindings intrinsics
+  | "selection" -> Simdgen_intrins.print_selection ~bindings intrinsics
+  | "tests-ml" -> Simdgen_intrins.tests_ml ~memory:false ~bindings intrinsics
+  | "tests-mem-ml" -> Simdgen_intrins.tests_ml ~memory:true ~bindings intrinsics
+  | "tests-c" -> Simdgen_intrins.tests_c ~bindings intrinsics
+  | other -> failwith ("unknown intrins subcommand: " ^ other)
 
 let () =
   match Sys.argv.(1) with
   | "amd64" -> amd64 ()
   | "arm64" -> arm64 ()
+  | "intrins" -> intrins Sys.argv.(2)
   | _ -> assert false
