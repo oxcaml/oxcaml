@@ -91,7 +91,7 @@ let instantiate
     let lexbuf = Lexing.from_string unit_name in
     Location.init lexbuf
       (Printf.sprintf "command line argument: -instantiate %S" unit_name);
-    arg_info (Parse.compilation_unit lexbuf)
+    arg_info (Parse.unprefixed_compilation_unit lexbuf)
   in
   let arg_info_of_arg arg =
     if Filename.check_suffix arg expected_extension

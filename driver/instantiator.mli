@@ -33,8 +33,8 @@ type unit_info = {
 
 (** Each of [args] is either the path of an argument's [.cmo]/[.cmx] file (if
     it ends with [expected_extension]) or the name of an argument's
-    compilation unit, which may be an instance such as [Arg(P)(P_arg)] (see
-    [Parse.compilation_unit]). *)
+    compilation unit, which may be an instance such as [Arg[P:P_arg]] (see
+    [Parse.unprefixed_compilation_unit]). *)
 (* CR-soon zqian: stop accepting file paths in [args]; only accept compilation
    unit names. *)
 val instantiate

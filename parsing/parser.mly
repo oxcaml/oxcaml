@@ -895,7 +895,7 @@ let package_type_of_module_type pmty =
 (* There's no dedicated syntax for module instances. Functor application
    syntax is translated into a module instance expression.
 *)
-let instance_of_module_expr : module_expr -> module_instance =
+let pmod_instance : module_expr -> module_expr_desc =
   let raise_malformed_instance loc =
     raise (Syntaxerr.Error (Malformed_instance_identifier loc))
   in
@@ -930,24 +930,8 @@ let instance_of_module_expr : module_expr -> module_instance =
   and instances_of_arg_pair (n, v) =
     string_of_module_expr n, instance_of_module_expr v
   in
-  instance_of_module_expr
+  fun mexpr -> Pmod_instance (instance_of_module_expr mexpr)
 ;;
-
-let pmod_instance mexpr = Pmod_instance (instance_of_module_expr mexpr)
-
-(* Compilation unit names use the syntax of module instances. Pack prefixes are
-   not supported. *)
-let compilation_unit_of_module_expr mexpr =
-  let module CU = Compilation_unit in
-  let rec of_instance { pmod_instance_head; pmod_instance_args } =
-    CU.create_instance
-      (CU.create CU.Prefix.empty (CU.Name.of_string pmod_instance_head))
-      (List.map
-         (fun (param, value) : CU.argument ->
-            { param = CU.Name.of_string param; value = of_instance value })
-         pmod_instance_args)
-  in
-  of_instance (instance_of_module_expr mexpr)
 
 let mk_directive_arg ~loc k =
   { pdira_desc = k;
@@ -1287,8 +1271,8 @@ The precedences must be listed from low to high.
 %type <Longident.t> parse_mod_longident
 %start parse_any_longident
 %type <Longident.t> parse_any_longident
-%start parse_compilation_unit
-%type <Compilation_unit.t> parse_compilation_unit
+%start parse_unprefixed_compilation_unit
+%type <Compilation_unit.t> parse_unprefixed_compilation_unit
 /* END AVOID */
 
 %%
@@ -1695,9 +1679,22 @@ parse_any_longident:
     { $1 }
 ;
 
-parse_compilation_unit:
-  module_expr EOF
-    { compilation_unit_of_module_expr $1 }
+parse_unprefixed_compilation_unit:
+  unprefixed_compilation_unit EOF
+    { $1 }
+;
+
+unprefixed_compilation_unit:
+  head = UIDENT args = list(unprefixed_compilation_unit_arg)
+    { let module CU = Compilation_unit in
+      CU.create_instance (CU.create CU.Prefix.empty (CU.Name.of_string head))
+        args }
+;
+
+unprefixed_compilation_unit_arg:
+  LBRACKET param = UIDENT COLON value = unprefixed_compilation_unit RBRACKET
+    { let module CU = Compilation_unit in
+      ({ param = CU.Name.of_string param; value } : CU.argument) }
 ;
 /* END AVOID */
 

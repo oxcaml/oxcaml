@@ -465,7 +465,7 @@
            (* Arguments can be given as compilation unit names *)
            module = "";
            flags = "-instantiate monoid_utils.cmo \
-             Monoid_of_semigroup(Semigroup)(String_semigroup)";
+             Monoid_of_semigroup[Semigroup:String_semigroup]";
            program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmo";
            all_modules = "";
            ocamlc.byte;
@@ -975,7 +975,7 @@
            (* Arguments can be given as compilation unit names *)
            module = "";
            flags = "-instantiate monoid_utils.cmx \
-             Monoid_of_semigroup(Semigroup)(String_semigroup)";
+             Monoid_of_semigroup[Semigroup:String_semigroup]";
            program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmx";
            all_modules = "";
            ocamlopt.byte;
