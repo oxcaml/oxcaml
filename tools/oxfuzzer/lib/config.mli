@@ -22,6 +22,12 @@ val max_record_types : int
 
 val max_record_fields : int
 
+val max_exception_count : int
+
+val max_handler_count : int
+
+val max_try_count : int
+
 val max_variant_types : int
 
 val max_variant_constructors : int
@@ -63,6 +69,16 @@ val opaque_leaf_probability : int
 
 val opaque_loop_bound_probability : int
 
+val exception_payload_probability : int
+
+val payload_binding_probability : int
+
+val catch_all_probability : int
+
+val raise_notrace_probability : int
+
+val callee_raises_probability : int
+
 module Swarm : sig
   type t =
     { floats : bool;
@@ -88,7 +104,8 @@ module Swarm : sig
       bitwise_operations : bool;
       opaque_initializers : bool;
       opaque_leaves : bool;
-      opaque_loop_bounds : bool
+      opaque_loop_bounds : bool;
+      exceptions : bool
     }
 
   val create : Random.State.t -> t
