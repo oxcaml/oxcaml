@@ -68,7 +68,8 @@ let unboxed_constructor_sort cd_args =
   | Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _) ->
     Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
 
-let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep =
+let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep
+      ~variant_jkind =
   let tyl, existentials = constructor_existentials cd_args cd_res in
   match cd_args with
   | Cstr_tuple l -> existentials, l, None
@@ -84,7 +85,15 @@ let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep =
          jkinds that are cheaper to deal with later. But doing so runs into some
          confusing mutual recursion that's non-trivial to debug. Reinvestigate
          later. Internal ticket 5102.  *)
-      let jkind = Jkind.for_boxed_record lbls in
+      let jkind, ca_sort =
+        match (vrep : variant_representation) with
+        | Variant_unboxed ->
+          (* An [@@unboxed] constructor has the same representation as the
+             variant itself *)
+          variant_jkind, unboxed_constructor_sort cd_args
+        | Variant_boxed _ | Variant_extensible | Variant_with_null ->
+          Jkind.for_boxed_record lbls, Jkind_types.Sort.Const.(some scannable)
+      in
       let tdecl =
         {
           type_params;
@@ -110,8 +119,7 @@ let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort =
-            Jkind_types.Sort.Const.(some scannable);
+          ca_sort;
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
@@ -244,6 +252,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     let cstr_existentials, cstr_args, cstr_inlined =
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) cstr_tag cstr_shape rep
+        ~variant_jkind:decl.type_jkind
     in
     let cstr =
       { cstr_name;
@@ -280,6 +289,7 @@ let extension_descr ~current_unit path_ext ext =
     constructor_args ~current_unit ext.ext_private ext.ext_args ext.ext_ret_type
       Path.(Pextra_ty (path_ext, Pext_ty)) cstr_tag ext.ext_shape
       Variant_extensible
+      ~variant_jkind:(Jkind.for_non_float ~why:Extensible_variant)
   in
     { cstr_name = Path.last path_ext;
       cstr_res = ty_res;
