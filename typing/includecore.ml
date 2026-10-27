@@ -1968,6 +1968,19 @@ let normalize_value_path env p =
   in
   normalize [] p
 
+(* The path of a type, once its abbreviations are expanded, for the types of
+   constructors: [M.t] is [N.t] when [type t = N.t = A | B]. *)
+let normalize_type_path env p =
+  let p = Env.normalize_type_path None env p in
+  match Env.find_type p env with
+  | decl ->
+      let ty = Ctype.expand_head env (Ctype.newconstr p decl.type_params) in
+      begin match get_desc ty with
+      | Tconstr (p', _, _) -> Env.normalize_type_path None env p'
+      | _ -> p
+      end
+  | exception Not_found -> p
+
 let law_paths (decl : Types.law_declaration) =
   List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
 
@@ -2024,10 +2037,11 @@ let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
 
 (* The clauses of the two laws must be the same expressions up to two
    things. First, the names of the parameters: [vars] pairs them by
-   position. Second, the module aliases in the paths, and the aliases of
-   values (see [normalize_value_path]): [Alias.f] is [Outer.f] when
-   [module Alias = Outer], and [f] is [M.f] in a signature strengthened with
-   [M]. All other paths must be identical. This is how [Ctype.equal]
+   position. Second, the aliases in the paths (see [normalize_value_path]
+   and [normalize_type_path]): [Alias.f] is [Outer.f] when
+   [module Alias = Outer], [f] is [M.f] in a signature strengthened with
+   [M], and the type of a constructor is compared once its abbreviations are
+   expanded. All other paths must be identical. This is how [Ctype.equal]
    compares the paths of types. *)
 let law_clauses env (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
@@ -2035,7 +2049,7 @@ let law_clauses env (decl_impl : Types.law_declaration)
     let normalize =
       match ns with
       | Value -> normalize_value_path env
-      | Type -> Env.normalize_type_path None env
+      | Type -> normalize_type_path env
     in
     Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
   in

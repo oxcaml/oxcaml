@@ -121,10 +121,10 @@ module Applied : sig end
 |}]
 
 
-(* The types of the constructors of a clause are compared by their paths.
-   Strengthening gives [t] the manifest [P.t], but the clauses are not
-   compared up to manifests: the law of [P.N], looked up through [P], refers
-   to [P.t], whereas the law of the signature refers to [t]. *)
+(* The types of the constructors of a clause are compared once their
+   abbreviations are expanded. Strengthening gives [t] the manifest [P.t]:
+   the law of [P.N], looked up through [P], refers to [P.t], and the law of
+   the signature refers to [t], which is [P.t]. *)
 
 module P = struct
   type t = A | B
@@ -136,26 +136,11 @@ module type P_sig = sig
 end
 module P' : P_sig = P
 [%%expect {|
-Line 1:
-Error: In module "P":
-       Modules do not match:
-         sig type t = P.t = A | B module N = P.N end
-       is not included in
-         sig
-           type t = A | B
-           module N : sig law? l : (A : t) <> (B : t) end
-         end
-       In module "P.N":
-       Modules do not match:
-         sig law? l : (A : P.t) <> (B : P.t) end
-       is not included in
-         sig law? l : (A : t) <> (B : t) end
-       In module "P.N":
-       Laws do not match:
-         law? l : (A : P.t) <> (B : P.t)
-       is not included in
-         law? l : (A : t) <> (B : t)
-       The clauses of the two laws differ.
+module P :
+  sig type t = A | B module N : sig law? l : (A : t) <> (B : t) end end
+module type P_sig =
+  sig type t = A | B module N : sig law? l : (A : t) <> (B : t) end end
+module P' : P_sig
 |}]
 
 (* A law about the [f] of another module is not the law of the signature,
