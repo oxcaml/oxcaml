@@ -469,10 +469,150 @@ type u = { f : float#; } [@@unboxed]
 external f : u -> (float [@unboxed]) = "foo" "bar"
 |}]
 
-(* [@@unboxed] constructors are unchanged *)
+(**** [@@unboxed] constructors ****)
+
+(* An [@@unboxed] constructor makes its argument addressable *)
+type c : bits8 addressable = A of int8# [@@unboxed]
+[%%expect{|
+Line 1, characters 0-51:
+1 | type c : bits8 addressable = A of int8# [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "c" is bits8
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "c" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type c.
+|}]
+
 type c : bits8 = A of int8# [@@unboxed]
-type c : bits8 = A of { a : int8# } [@@unboxed]
 [%%expect{|
 type c = A of int8# [@@unboxed]
+|}]
+
+type c : bits8 addressable = A of { a : int8# } [@@unboxed]
+[%%expect{|
+Line 1, characters 0-59:
+1 | type c : bits8 addressable = A of { a : int8# } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "c" is bits8
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "c" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type c.
+|}]
+
+type c : bits8 = A of { a : int8# } [@@unboxed]
+[%%expect{|
 type c = A of { a : int8#; } [@@unboxed]
+|}]
+
+type ('a : bits8) c : bits8 addressable = A of 'a [@@unboxed]
+[%%expect{|
+Line 1, characters 0-61:
+1 | type ('a : bits8) c : bits8 addressable = A of 'a [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "c" is bits8
+         because of the annotation on 'a in the declaration of the type c.
+       But the layout of type "c" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type c.
+|}]
+
+type _ g : bits8 addressable = A : int8# -> int g [@@unboxed]
+[%%expect{|
+Line 1, characters 0-61:
+1 | type _ g : bits8 addressable = A : int8# -> int g [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "g" is bits8
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "g" must be a sublayout of bits8 addressable
+         because of the annotation on the declaration of the type g.
+|}]
+
+(* Already-addressable arguments are unchanged *)
+type c : bits64 = A of int64_u [@@unboxed]
+type c : value = A of string [@@unboxed]
+type c : value = A of { s : string } [@@unboxed]
+[%%expect{|
+type c = A of int64_u [@@unboxed]
+type c = A of string [@@unboxed]
+type c = A of { s : string; } [@@unboxed]
+|}]
+
+(* [inherit] opts out for an inline record *)
+type c : bits8 = A of { inherit a : int8# } [@@unboxed]
+[%%expect{|
+Line 1, characters 24-41:
+1 | type c : bits8 = A of { inherit a : int8# } [@@unboxed]
+                            ^^^^^^^^^^^^^^^^^
+Error: "inherit" is only supported on the sole field of an unboxed record
+       or of a record declared "[@@unboxed]"
+|}]
+
+(* Expressions *)
+type c = A of int8# [@@unboxed]
+let f (x : c) : ('b : bits8 addressable) = x
+[%%expect{|
+type c = A of int8# [@@unboxed]
+Line 2, characters 43-44:
+2 | let f (x : c) : ('b : bits8 addressable) = x
+                                               ^
+Error: The value "x" has type "c" but an expression was expected of type
+         "('b : bits8 addressable)"
+       The layout of c is bits8
+         because of the definition of c at line 1, characters 0-31.
+       But the layout of c must be a sublayout of bits8 addressable
+         because of the annotation on the type variable 'b.
+|}]
+
+let f (x : c) : ('b : bits8) = x
+[%%expect{|
+val f : c -> c = <fun>
+|}]
+
+let f (A a : c) : ('b : bits8) = a
+[%%expect{|
+val f : c -> int8# = <fun>
+|}]
+
+let f (x : int8#) : c = A x
+[%%expect{|
+val f : int8# -> c = <fun>
+|}]
+
+let f (x : c) = id_addressable x
+[%%expect{|
+Line 1, characters 31-32:
+1 | let f (x : c) = id_addressable x
+                                   ^
+Error: The value "x" has type "c" but an expression was expected of type
+         "('a : '_representable_layout_1 addressable)"
+       The layout of c is bits8
+         because of the definition of c at line 1, characters 0-31.
+       But the layout of c must be addressable
+         because we must know concretely how to return a function result.
+|}, Principal{|
+Line 1, characters 31-32:
+1 | let f (x : c) = id_addressable x
+                                   ^
+Error: The value "x" has type "c" but an expression was expected of type
+         "('a : '_representable_layout_1 addressable)"
+       The layout of c is bits8
+         because of the definition of c at line 1, characters 0-31.
+       But the layout of c must be addressable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+type c = A of { a : int8# } [@@unboxed]
+let f (x : int8#) : c = A { a = x }
+[%%expect{|
+type c = A of { a : int8#; } [@@unboxed]
+val f : int8# -> c = <fun>
+|}]
+
+(* Externals *)
+type c = A of float# [@@unboxed]
+external f : (c [@unboxed]) -> (float [@unboxed]) = "foo" "bar"
+[%%expect{|
+type c = A of float# [@@unboxed]
+external f : c -> (float [@unboxed]) = "foo" "bar"
 |}]
