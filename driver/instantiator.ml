@@ -41,7 +41,10 @@ type error =
       compilation_unit : CU.t;
       filename : Misc.filepath;
     }
-  | Missing_argument of { param : Global_module.Parameter_name.t }
+  | Missing_argument of {
+      imported : Global_module.Name.t;
+      param : Global_module.Parameter_name.t;
+    }
   | No_such_parameter of {
       base_unit : CU.t;
       available_params : Global_module.Parameter_name.t list;
@@ -137,7 +140,7 @@ let instantiate
       Env.global_of_instance_compilation_unit compilation_unit
     with
     | Persistent_env.Error (Imported_module_has_unset_parameter e) ->
-      error (Missing_argument { param = e.parameter })
+      error (Missing_argument { imported = e.imported; param = e.parameter })
     | Persistent_env.Error (Imported_module_has_no_such_parameter e) ->
       begin
         match e.valid_parameters with
@@ -244,9 +247,10 @@ let report_error ppf = function
          @[<hov>Compile %a@ with @{<inline_code>-parameter@}.@]@]"
       CU.print_as_inline_code compilation_unit
       (Style.as_inline_code Location.Doc.filename) filename
-  | Missing_argument { param } ->
-    fprintf ppf "No argument given for parameter %a"
+  | Missing_argument { imported; param } ->
+    fprintf ppf "@[<hov>No argument given for parameter %a@ of %a@]"
       (Style.as_inline_code Global_module.Parameter_name.print) param
+      (Style.as_inline_code Global_module.Name.print) imported
   | No_such_parameter { base_unit; available_params; param; arg } ->
     fprintf ppf
       "@[<hov>Module %a@ is an argument for parameter %a,@ \
