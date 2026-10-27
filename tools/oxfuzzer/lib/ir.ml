@@ -325,7 +325,8 @@ module Handler = struct
           then Misc.fatal_errorf "Handler: payload type mismatch";
           Some
             ( [],
-              (* CR-soon selee for xclerc: see below comment about constraints *)
+              (* CR-soon selee for xclerc: see below comment about
+                 constraints *)
               Ast_helper.Pat.constraint_
                 (Ast_helper.Pat.var (loc (Name.to_string binding.name)))
                 (Some (Ty.to_code ty))
