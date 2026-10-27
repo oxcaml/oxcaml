@@ -53,6 +53,8 @@ let unboxed_tuple_probability = 25
 
 let match_in_match_probability = 50
 
+let assert_false_probability = 1
+
 let nested_record_probability = 15
 
 let mutable_binding_probability = 75
@@ -127,9 +129,11 @@ module Swarm = struct
       variants = Random.State.bool random_state;
       or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
-      (* Reachable assertion generation is not enabled yet. *)
       assertions =
-        (if Random.State.bool random_state then Unreachable_only else Disabled);
+        (match Random.State.int random_state 3 with
+        | 0 -> Disabled
+        | 1 -> Unreachable_only
+        | _ -> May_raise);
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;

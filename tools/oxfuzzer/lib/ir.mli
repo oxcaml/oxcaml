@@ -197,6 +197,11 @@ module Expr : sig
     | Const of Number.t
     | Assert_false
         (** Non-returning expression, valid at any result type or layout. *)
+    | Let of
+        { name : Name.t;
+          expr : t;
+          body : t
+        }  (** Immutable binding. *)
     | Read of place
     | Array_literal of t list
     | Array_make of
