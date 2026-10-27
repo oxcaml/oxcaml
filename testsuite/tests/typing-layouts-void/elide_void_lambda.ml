@@ -97,8 +97,8 @@ val blit_local : ('a : value non_float). 'a array -> 'a array @ local -> unit =
   <fun>
 |}]
 
-(* Specialize [%peek] based on the true result type ([int64_u]) and not the
-   e.g. the arrow [w -> int64_u]. *)
+(* Specialize [%peek] based on the true result type ([int64_u]) and not,
+   e.g., the arrow [w -> int64_u]. *)
 
 external peek :
   (w [@elide_void]) -> nativeint_u -> (w [@elide_void]) -> int64_u
