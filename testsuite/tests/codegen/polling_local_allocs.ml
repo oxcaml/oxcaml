@@ -1,5 +1,6 @@
 (* TEST
  poll-insertion;
+ no-faulting-polls;
  no-stack-checks;
  no-frame_pointers;
  no-address-sanitizer;
@@ -104,19 +105,19 @@ local_alloc_loop:
   sarq  $1, %rax
   xorl  %ebx, %ebx
 .L0:
-  movq  64(%r14), %rdi
+  movq  72(%r14), %rdi
   leaq  1(%rbx,%rbx), %rsi
-  movq  64(%r14), %rdx
+  movq  72(%r14), %rdx
   subq  $16, %rdx
-  movq  %rdx, 64(%r14)
-  cmpq  80(%r14), %rdx
+  movq  %rdx, 72(%r14)
+  cmpq  88(%r14), %rdx
   jl    .L7
 .L1:
-  addq  72(%r14), %rdx
+  addq  80(%r14), %rdx
   addq  $8, %rdx
   movq  $1792, -8(%rdx)
   movq  %rsi, (%rdx)
-  movq  %rdi, 64(%r14)
+  movq  %rdi, 72(%r14)
   incq  %rbx
   cmpq  %rax, %rbx
   jg    .L3
