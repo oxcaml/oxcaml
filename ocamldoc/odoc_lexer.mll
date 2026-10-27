@@ -28,7 +28,7 @@ let string_buffer = Buffer.create 32
 let reset_string_buffer () = Buffer.reset string_buffer
 
 (** Add a character to the buffer *)
-let add_char_string = Buffer.add_char string_buffer
+let add_char_string c = Buffer.add_char string_buffer c
 
 (** Add a string to the buffer. *)
 let add_string s = Buffer.add_string string_buffer s
