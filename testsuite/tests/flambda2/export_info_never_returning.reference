@@ -6,7 +6,7 @@ Globals defined:
 Interfaces imported:
 	00000000000000000000000000000000	Stdlib
 	00000000000000000000000000000000	Export_info_never_returning
-	00000000000000000000000000000000	CamlinternalFormatBasics
+	--------------------------------	CamlinternalFormatBasics
 Implementations imported:
 	00000000000000000000000000000000	Stdlib
 Interfaces used in quotations:

@@ -2,14 +2,14 @@ File main.cmo
 Unit name: Main
 Interfaces imported:
 	00000000000000000000000000000000	String_semigroup
-	00000000000000000000000000000000	Stdlib__Seq
+	--------------------------------	Stdlib__Seq
 	00000000000000000000000000000000	Stdlib__List
-	00000000000000000000000000000000	Stdlib__Either
+	--------------------------------	Stdlib__Either
 	00000000000000000000000000000000	Stdlib
 	00000000000000000000000000000000	Semigroup
 	00000000000000000000000000000000	Monoid_utils
 	00000000000000000000000000000000	Monoid_of_semigroup
-	00000000000000000000000000000000	Monoid
+	--------------------------------	Monoid
 	00000000000000000000000000000000	Main
 	00000000000000000000000000000000	List_monoid
 	00000000000000000000000000000000	List_element
@@ -17,9 +17,9 @@ Interfaces imported:
 	00000000000000000000000000000000	Chain
 	00000000000000000000000000000000	Category_utils
 	00000000000000000000000000000000	Category_of_monoid
-	00000000000000000000000000000000	Category_intf
-	00000000000000000000000000000000	Category
-	00000000000000000000000000000000	CamlinternalFormatBasics
+	--------------------------------	Category_intf
+	--------------------------------	Category
+	--------------------------------	CamlinternalFormatBasics
 Runtime parameters:
 	Category_utils[Category:Category_of_monoid[Monoid:List_monoid]]
 	Chain[Category:Category_of_monoid[Monoid:List_monoid]]

@@ -5,11 +5,11 @@ Parameters:
 Interfaces imported:
 	00000000000000000000000000000000	Main_basic__
 	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	CamlinternalFormatBasics
 	--------------------------------	P_string
 	--------------------------------	P_int
 	--------------------------------	P
 	--------------------------------	Main_basic
-	00000000000000000000000000000000	CamlinternalFormatBasics
 	--------------------------------	Basic
 Globals in scope:
 File main_basic/main_basic__.cmx
@@ -24,7 +24,7 @@ Interfaces imported:
 	--------------------------------	P
 	00000000000000000000000000000000	Main_basic__
 	--------------------------------	Main_basic
-	00000000000000000000000000000000	CamlinternalFormatBasics
+	--------------------------------	CamlinternalFormatBasics
 	--------------------------------	Basic
 Implementations imported:
 Interfaces used in quotations:

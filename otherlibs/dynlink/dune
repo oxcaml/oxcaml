@@ -92,7 +92,6 @@
   language_extension_kernel
   language_extension
   profile
-  consistbl
   terminfo
   warnings
   load_path
@@ -260,8 +259,6 @@
 (copy_files ../../utils/profile.ml)
 
 (copy_files ../../utils/profile_counters_functions.ml)
-
-(copy_files ../../utils/consistbl.ml)
 
 (copy_files ../../utils/terminfo.ml)
 
@@ -469,8 +466,6 @@
 (copy_files ../../utils/profile.mli)
 
 (copy_files ../../utils/profile_counters_functions.mli)
-
-(copy_files ../../utils/consistbl.mli)
 
 (copy_files ../../utils/terminfo.mli)
 
@@ -803,7 +798,6 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmi_format.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debuginfo.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Consistbl.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Data_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Datarepr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
@@ -946,7 +940,6 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmi_format.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debuginfo.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Consistbl.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Data_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Datarepr.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx

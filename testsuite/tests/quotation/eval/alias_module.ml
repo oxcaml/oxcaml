@@ -9,7 +9,7 @@
 
 (* [alias_lib] declares [module Aliased = Alias_target] but no
    [alias_target.cmi] exists. The alias is recorded in [alias_lib.cmi]'s
-   cmi_crcs as an alias-only entry. *)
+   alias-only imports. *)
 
 let () =
   Printf.printf "Test alias to missing cmi\n";

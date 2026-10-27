@@ -5,7 +5,7 @@ Interfaces imported:
 	00000000000000000000000000000000	Ref_indirect
 	00000000000000000000000000000000	Monoid_utils
 	00000000000000000000000000000000	Monoid
-	00000000000000000000000000000000	CamlinternalFormatBasics
+	--------------------------------	CamlinternalFormatBasics
 Runtime parameters:
 	Monoid
 	Monoid_utils

@@ -19,10 +19,13 @@
  cd;
  flags = "-for-pack Pack -I subdir";
  module = "main.ml";
- ocamlopt_byte_exit_status = "2";
  ocamlopt.byte;
  check-ocamlopt.byte-output;
 *)
 
+(* [Member] is loaded as the packed [Pack.Member] while [Use_member_directly]
+   was built against the unpacked [Member] in [subdir]. The conflict between
+   the two views is no longer detected at compile time; see the sibling
+   [inconsistent-value] test. *)
 module _ = Member
 module _ = Use_member_directly
