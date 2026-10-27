@@ -2214,29 +2214,41 @@ static bool should_run_phase_two = false;
   very specific conditions the compaction algorithm expects.
 */
 
-/* TCMalloc's entry point for returning free memory to the OS. weak,
-   so NULL unless linked with TCMalloc (weakness is ELF only). */
+/* An entry point to a patched TCMalloc that returns free memory to
+   the OS without breaking up any hugepage. Weak, so NULL unless
+   linked against a TCMalloc providing it (weakness is ELF only).
+
+   We deliberately do not use TCMalloc's unrestricted release call
+   (ReleaseMemoryToSystem): that one unmaps the free tails of
+   partially-used hugepages, which splits them, so the memory still
+   live on those hugepages loses its TLB coverage. */
 #if defined(__GNUC__) && defined(__ELF__)
 #define MAYBE_HAS_TCMALLOC
-extern void TCMalloc_MallocExtension_ReleaseMemoryToSystem(size_t num_bytes)
+extern size_t
+MallocExtension_Internal_ReleaseMemoryToSystemWithoutBreakingHugepages(void)
   CAMLweakdef;
 #endif
 
-/* After compaction, tell the C allocator to release memory to the OS:
- * TCMalloc via its release call if linked, otherwise glibc via
- * malloc_trim. */
+/* After compaction, ask the C allocator to return free memory to the OS.
+ * Where TCMalloc offers the call above, use it. Otherwise fall back to
+ * malloc_trim, which both glibc and TCMalloc implement, and which in
+ * TCMalloc's case releases only entirely free hugepages. */
 static void compact_release_malloc_memory(void)
 {
 #ifdef MAYBE_HAS_TCMALLOC
-  if (TCMalloc_MallocExtension_ReleaseMemoryToSystem != NULL) {
-    TCMalloc_MallocExtension_ReleaseMemoryToSystem(SIZE_MAX);
-    CAML_GC_MESSAGE(COMPACT, "Released TCMalloc free memory to the OS.\n");
+  if (MallocExtension_Internal_ReleaseMemoryToSystemWithoutBreakingHugepages
+      != NULL) {
+    size_t released =
+      MallocExtension_Internal_ReleaseMemoryToSystemWithoutBreakingHugepages();
+    CAML_GC_MESSAGE(COMPACT,
+                    "Released %zu bytes of TCMalloc memory to the OS.\n",
+                    released);
     return;
   }
 #endif
 #ifdef HAS_MALLOC_TRIM
-  if (malloc_trim(0))
-    CAML_GC_MESSAGE(COMPACT, "Released malloc free memory to the OS.\n");
+  /* TCMalloc's malloc_trim always returns zero. */
+  malloc_trim(0);
 #endif
 }
 
