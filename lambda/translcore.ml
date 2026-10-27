@@ -2463,9 +2463,24 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
          these fields are assigned. *)
       let before = ref [] and functions = ref [] and patches = ref [] in
       let group = ref (List.map fst idlist) in
+      let renaming = ref Ident.Map.empty in
+      let fresh_member_ident id =
+        let taken name =
+          List.exists (fun id -> String.equal (Ident.name id) name) !group
+        in
+        if not (taken (Ident.name id)) then id
+        else begin
+          let rec fresh i =
+            let name = Printf.sprintf "%s_%d" (Ident.name id) i in
+            if taken name then fresh (i + 1) else name
+          in
+          let id' = Ident.create_local (fresh 1) in
+          renaming := Ident.Map.add id id' !renaming;
+          id'
+        end
+      in
       let bind_before id id_duid layout def =
-        before := (fun body -> Llet (Strict, layout, id, id_duid, def, body))
-                  :: !before
+        before := `Bind (id, id_duid, layout, def) :: !before
       in
       let rec transl_member ~scopes ~in_structure (id, id_duid)
             {vb_expr=expr; vb_sort; vb_attributes; vb_loc; vb_pat; _}
@@ -2493,8 +2508,9 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
               begin match (item : Value_rec_types.preamble_item) with
               | Hoisted ->
                 before :=
-                  transl_preamble_item ~scopes:preamble_scopes ~return_layout
-                    expr
+                  `Hoisted
+                    (transl_preamble_item ~scopes:preamble_scopes
+                       ~return_layout expr)
                   :: !before
               | Members kinds ->
                 let vbs =
@@ -2504,8 +2520,15 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                     Misc.fatal_error
                       "Translcore.transl_let: preamble members are not a let"
                 in
-                let ids = List.map recursive_binding_ident vbs in
-                group := List.map fst ids @ !group;
+                let ids =
+                  List.map
+                    (fun vb ->
+                       let id, duid = recursive_binding_ident vb in
+                       let id' = fresh_member_ident id in
+                       group := id :: id' :: !group;
+                       id, duid)
+                    vbs
+                in
                 List.iter2
                   (fun (vb, id) kind ->
                      transl_member ~scopes:preamble_scopes ~in_structure:false
@@ -2558,9 +2581,43 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       List.iter2
         (fun vb id -> transl_member ~scopes ~in_structure id vb vb.vb_rec_kind)
         pat_expr_list idlist;
-      let before = List.rev !before
-      and functions = List.rev !functions
-      and patches = List.rev !patches in
+      let renaming = !renaming in
+      let rename_id id =
+        match Ident.Map.find_opt id renaming with
+        | Some id -> id
+        | None -> id
+      in
+      let rename lam =
+        if Ident.Map.is_empty renaming then lam else Lambda.rename renaming lam
+      in
+      let before =
+        List.rev_map
+          (function
+            | `Hoisted wrap -> `Hoisted wrap
+            | `Bind (id, id_duid, layout, def) ->
+              `Bind (rename_id id, id_duid, layout, rename def))
+          !before
+      and functions =
+        List.rev_map
+          (fun (wrap, { id; debug_uid; def }) ->
+             let def =
+               if Ident.Map.is_empty renaming then def
+               else Lambda.rename_lfun renaming def
+             in
+             wrap, { id = rename_id id; debug_uid; def })
+          !functions
+      and patches = List.rev_map rename !patches in
+      (* The preambles that do not refer to the group were originally
+         evaluated inside the region of their binding, if any, so their local
+         allocations need a region. *)
+      let needs_region =
+        add_regions && Config.stack_allocation
+        && List.exists
+             (function
+               | `Hoisted wrap -> may_allocate_in_region (wrap lambda_unit)
+               | `Bind _ -> false)
+             before
+      in
       fun body ->
         let body =
           List.fold_right (fun patch body -> Lsequence (patch, body))
@@ -2574,7 +2631,16 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
               (Lletrec (List.map snd functions, body))
               functions
         in
-        List.fold_right (fun bind body -> bind body) before body
+        let lam =
+          List.fold_right
+            (fun item body ->
+               match item with
+               | `Hoisted wrap -> wrap body
+               | `Bind (id, id_duid, layout, def) ->
+                 Llet (Strict, layout, id, id_duid, def, body))
+            before body
+        in
+        if needs_region then Lregion (lam, return_layout) else lam
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =

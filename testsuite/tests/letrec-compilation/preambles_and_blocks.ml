@@ -63,3 +63,19 @@ let rec take n (Cons (x, tl)) =
 let () =
   print_endline
     (String.concat " " (List.map string_of_int (take 5 evens)))
+
+(* Preambles may allocate locally: they are evaluated in a region. *)
+
+let rec countdown =
+  let _must_type_check = fun (x : int) -> x + 1 in
+  fun y -> if y > 0 then countdown (y - 1) else 0
+
+let () = Printf.printf "countdown = %d\n" (countdown 3)
+
+(* Members of preambles may have the same name as members of the group. *)
+
+let rec eval =
+  let eval n = if n <= 0 then 0 else n + eval (n - 1) in
+  fun n -> eval n
+
+let () = Printf.printf "eval = %d\n" (eval 4)
