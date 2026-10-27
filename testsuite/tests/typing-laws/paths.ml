@@ -8,17 +8,24 @@
 
 module Outer = struct
   let f x = x
+  exception E of int
 end
 module Alias = Outer
 module Through_alias : sig
   law? l (x : int) : Outer.f x = x
+  law? e (x : int) : Outer.E x = Outer.E x
 end = struct
   law? l (x : int) : Alias.f x = x
+  law? e (x : int) : Alias.E x = Alias.E x
 end
 [%%expect {|
-module Outer : sig val f : 'a -> 'a end
+module Outer : sig val f : 'a -> 'a exception E of int end
 module Alias = Outer
-module Through_alias : sig law? l (x : int) : (Outer.f x) = x end
+module Through_alias :
+  sig
+    law? l (x : int) : (Outer.f x) = x
+    law? e (x : int) : (Outer.E x) = (Outer.E x)
+  end
 |}]
 
 (* A law is about particular values, not about their types: [A] and [B]
@@ -122,24 +129,35 @@ module Applied : sig end
 
 
 (* The types of the constructors of a clause are compared once their
-   abbreviations are expanded. Strengthening gives [t] the manifest [P.t]:
-   the law of [P.N], looked up through [P], refers to [P.t], and the law of
-   the signature refers to [t], which is [P.t]. *)
+   abbreviations are expanded, and its extension constructors up to the
+   equations of strengthening. Strengthening gives [t] the manifest [P.t]
+   and records that [E] is [P.E]: the law of [P.N], looked up through [P],
+   refers to [P.t] and [P.E], and the law of the signature to [t] and [E]. *)
 
 module P = struct
   type t = A | B
-  module N = struct law? l : A <> B end
+  exception E
+  module N = struct law? l : A <> B && E = E end
 end
 module type P_sig = sig
   type t = A | B
-  module N : sig law? l : A <> B end
+  exception E
+  module N : sig law? l : A <> B && E = E end
 end
 module P' : P_sig = P
 [%%expect {|
 module P :
-  sig type t = A | B module N : sig law? l : (A : t) <> (B : t) end end
+  sig
+    type t = A | B
+    exception E
+    module N : sig law? l : ((A : t) <> (B : t)) && (E = E) end
+  end
 module type P_sig =
-  sig type t = A | B module N : sig law? l : (A : t) <> (B : t) end end
+  sig
+    type t = A | B
+    exception E
+    module N : sig law? l : ((A : t) <> (B : t)) && (E = E) end
+  end
 module P' : P_sig
 |}]
 

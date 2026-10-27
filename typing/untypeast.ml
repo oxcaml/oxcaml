@@ -814,10 +814,12 @@ let expression sub exp =
         Pexp_letop {let_; ands; body }
     | Texp_unreachable ->
         Pexp_unreachable
-    | Texp_extension_constructor (lid, _) ->
+    | Texp_extension_constructor (lid, path) ->
         Pexp_extension ({ txt = "ocaml.extension_constructor"; loc },
                         PStr [ Str.eval ~loc
-                                 (Exp.construct ~loc (map_loc sub lid) None)
+                                 (Exp.construct ~loc
+                                    (map_loc sub (sub.ident sub path lid))
+                                    None)
                              ])
     | Texp_open (od, exp) ->
       Pexp_open (sub.open_declaration sub od, sub.expr sub exp)

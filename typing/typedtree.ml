@@ -1193,6 +1193,7 @@ and spec_expression_desc =
         mode: locality_mode_r option;
       }
   | Stexp_variant of label * (spec_expression * locality_mode_r) option
+  | Stexp_extension_constructor of Longident.t loc * Path.t
   | Stexp_record of {
       fields :
         (Data_types.label_description * Jkind.sort * spec_label_definition)
@@ -1234,6 +1235,7 @@ and spec_expression_desc =
   | Stexp_let of rec_flag * spec_value_binding list * spec_expression
   | Stexp_match of
       spec_expression * Jkind.sort * computation spec_case list * partial
+  | Stexp_try of spec_expression * value spec_case list
 
 (* A [value_binding] without attributes *)
 and spec_value_binding =
@@ -1320,6 +1322,7 @@ and 'k spec_pattern_desc =
   | Stpat_value : spec_pattern -> computation spec_pattern_desc
       (** As [Tpat_value], the data of the pattern is that of its argument
           (see [as_computation_pattern]). *)
+  | Stpat_exception : spec_pattern -> computation spec_pattern_desc
   | Stpat_or :
       'k spec_general_pattern * 'k spec_general_pattern ->
       'k spec_pattern_desc

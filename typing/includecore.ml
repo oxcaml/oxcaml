@@ -1950,23 +1950,33 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
 
 (* Inclusion between laws *)
 
-(* [normalize_value_path] normalizes the module aliases of a value path, as
-   [Env.normalize_value_path] does, and then follows the alias of the value
-   (see [Types.val_alias]). For example, when [M] is strengthened with the
-   path [P], the value [M.f] is [P.f]. The expansion stops at paths that are
-   not in the environment, at cycles, and at aliases through a functor
-   application, because these do not identify one value. *)
-let normalize_value_path env p =
-  let rec normalize seen p =
-    let p = Env.normalize_value_path None env p in
-    match (Env.find_value p env).val_alias with
+(* [normalize_alias_path ~normalize ~alias env p] normalizes the module
+   aliases of [p] with [normalize] and then follows the alias of its
+   declaration, [alias] (see [Types.val_alias] and [Types.ext_alias]). For
+   example, when [M] is strengthened with the path [P], the value [M.f] is
+   [P.f]. The expansion stops at paths that are not in the environment, at
+   cycles, and at aliases through a functor application, because these do
+   not identify one item. *)
+let normalize_alias_path ~normalize ~alias env p =
+  let rec loop seen p =
+    let p = normalize None env p in
+    match alias p with
     | Some q
       when not (List.exists (Path.same q) seen || Path.contains_apply q) ->
-        normalize (p :: seen) q
+        loop (p :: seen) q
     | Some _ | None -> p
     | exception Not_found -> p
   in
-  normalize [] p
+  loop [] p
+
+let normalize_value_path env p =
+  normalize_alias_path ~normalize:Env.normalize_value_path
+    ~alias:(fun p -> (Env.find_value p env).val_alias) env p
+
+(* Extension constructors are named like types (see [Env.prefix_idents]). *)
+let normalize_extension_path env p =
+  normalize_alias_path ~normalize:Env.normalize_type_path
+    ~alias:(fun p -> Env.find_extension_alias p env) env p
 
 (* The path of a type, once its abbreviations are expanded, for the types of
    constructors: [M.t] is [N.t] when [type t = N.t = A | B]. *)
@@ -1984,19 +1994,20 @@ let normalize_type_path env p =
 let law_paths (decl : Types.law_declaration) =
   List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
 
-(* [law_applied_path] rejects a law that refers to a value through a
-   functor application, for example [F(A).x]. Each application of [F] to
-   [A] creates a new module with new values. Thus, the path [F(A).x] does
-   not identify one value. The type checker rejects a clause that is
-   written with such a path. Here, the path is the result of a
-   substitution, for example of [module M := F (A)] in a signature whose
+(* [law_applied_path] rejects a law that refers to a value or an extension
+   constructor through a functor application, for example [F(A).x]. Each
+   application of [F] to [A] creates a new module with new values. Thus, the
+   path [F(A).x] does not identify one value. The type checker rejects a
+   clause that is written with such a path. Here, the path is the result of
+   a substitution, for example of [module M := F (A)] in a signature whose
    law refers to [M.x]. *)
 let law_applied_path decl_impl decl_intf =
   List.find_map
     (fun ((ns : Spec.namespace), path) ->
        match ns with
-       | Value when Path.contains_apply path -> Some (Law_applied_path path)
-       | Value | Type -> None)
+       | (Value | Extension) when Path.contains_apply path ->
+           Some (Law_applied_path path)
+       | Value | Extension | Type -> None)
     (law_paths decl_impl @ law_paths decl_intf)
 
 (* The checks below pair the parameters of the two laws by position.
@@ -2037,18 +2048,18 @@ let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
 
 (* The clauses of the two laws must be the same expressions up to two
    things. First, the names of the parameters: [vars] pairs them by
-   position. Second, the aliases in the paths (see [normalize_value_path]
-   and [normalize_type_path]): [Alias.f] is [Outer.f] when
-   [module Alias = Outer], [f] is [M.f] in a signature strengthened with
-   [M], and the type of a constructor is compared once its abbreviations are
-   expanded. All other paths must be identical. This is how [Ctype.equal]
-   compares the paths of types. *)
+   position. Second, the aliases in the paths (see [normalize_alias_path]):
+   [Alias.f] is [Outer.f] when [module Alias = Outer], [f] is [M.f] in a
+   signature strengthened with [M], and the type of a constructor is
+   compared once its abbreviations are expanded. All other paths must be
+   identical. This is how [Ctype.equal] compares the paths of types. *)
 let law_clauses env (decl_impl : Types.law_declaration)
       (decl_intf : Types.law_declaration) =
   let same_path (ns : Spec.namespace) p1 p2 =
     let normalize =
       match ns with
       | Value -> normalize_value_path env
+      | Extension -> normalize_extension_path env
       | Type -> normalize_type_path env
     in
     Path.same p1 p2 || Path.same (normalize p1) (normalize p2)

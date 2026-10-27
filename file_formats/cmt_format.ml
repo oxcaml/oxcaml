@@ -291,6 +291,8 @@ let iter_on_occurrences
           f ~namespace:Value stexp_env path lid
       | Stexp_construct { lid; constructor; _ } ->
           add_constructor_description stexp_env lid constructor
+      | Stexp_extension_constructor (lid, path) ->
+          f ~namespace:Extension_constructor stexp_env path lid
       | Stexp_record { fields; _ } ->
           iter_spec_fields ~namespace:Label stexp_env fields
       | Stexp_record_unboxed_product { fields; _ } ->
@@ -302,7 +304,7 @@ let iter_on_occurrences
       | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
       | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _
       | Stexp_ifthenelse _ | Stexp_sequence _ | Stexp_assert _ | Stexp_lazy _
-      | Stexp_let _ | Stexp_match _ ->
+      | Stexp_let _ | Stexp_match _ | Stexp_try _ ->
           ());
       default_iterator.spec_expression sub e);
 
@@ -369,7 +371,7 @@ let iter_on_occurrences
       | Stpat_any | Stpat_var _ | Stpat_alias _ | Stpat_constant _
       | Stpat_tuple _ | Stpat_unboxed_unit | Stpat_unboxed_bool _
       | Stpat_unboxed_tuple _ | Stpat_variant _ | Stpat_lazy _
-      | Stpat_value _ | Stpat_or _ -> ());
+      | Stpat_value _ | Stpat_exception _ | Stpat_or _ -> ());
       default_iterator.spec_pattern sub pat);
 
   binding_op = (fun sub ({bop_op_path; bop_op_name; bop_exp; _} as bop) ->

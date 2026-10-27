@@ -57,6 +57,6 @@ law? control (x : int) :
   && Lazy.force (lazy x) = x && (assert (x = x); true)
 law? binding (s : shape) :
   let a = (match s with Circle r -> r | Square w -> w) in
-  a >= 0. || a < 0.
+  (try a >= 0. with Not_found -> false) || a < 0.
 law? records (p : point) :
   ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.

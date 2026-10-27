@@ -4118,6 +4118,7 @@ let transl_extension_constructor ~scope env type_path type_params
       Types.ext_loc = sext.pext_loc;
       Types.ext_attributes = sext.pext_attributes;
       ext_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+      ext_alias = None;
     }
   in
   let ext_cstrs =

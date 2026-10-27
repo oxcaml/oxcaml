@@ -559,7 +559,11 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_jkind id2 (Path.Pident id1) subst
           | Sig_value _ ->
               Subst.add_value id2 (Path.Pident id1) subst
-          | Sig_typext _ | Sig_class _ | Sig_class_type _ | Sig_law _ ->
+          | Sig_typext _ ->
+              (* Extension constructors are substituted like types (see
+                 [Env.prefix_idents]). *)
+              Subst.add_type id2 (Path.Pident id1) subst
+          | Sig_class _ | Sig_class_type _ | Sig_law _ ->
               subst
         in
         pair new_subst

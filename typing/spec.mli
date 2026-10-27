@@ -47,12 +47,14 @@ type arg_label =
 
 type sort = Jkind_types.Sort.Const.t
 
-(** A constructor is identified by the path of its type and its name. *)
+(** A constructor is identified by the path of its type and its name, an
+    extension constructor by its path. *)
 type constructor =
   | Constructor of
       { type_path : Path.t;
         name : string
       }
+  | Extension_constructor of Path.t
 
 (** A label is identified by the path of its type and its name. *)
 type label =
@@ -60,7 +62,7 @@ type label =
     name : string
   }
 
-(** Patterns *)
+(** Patterns. [Spat_exception] occurs only at the top of a [match] case. *)
 type pattern =
   | Spat_any
   | Spat_var of Ident.t * sort
@@ -76,6 +78,7 @@ type pattern =
   | Spat_record_unboxed_product of (label * pattern) list * Asttypes.closed_flag
   | Spat_or of pattern * pattern
   | Spat_lazy of pattern
+  | Spat_exception of pattern
 
 type expression =
   | Sexp_var of Ident.t
@@ -90,6 +93,7 @@ type expression =
   | Sexp_unboxed_bool of bool
   | Sexp_construct of constructor * (sort * expression) list
   | Sexp_variant of string * expression option
+  | Sexp_extension_constructor of Path.t  (** [[%extension_constructor C]] *)
   | Sexp_record of record
   | Sexp_record_unboxed_product of record
   | Sexp_field of field
@@ -100,6 +104,7 @@ type expression =
   | Sexp_lazy of expression
   | Sexp_let of Asttypes.rec_flag * value_binding list * expression
   | Sexp_match of expression * sort * case list
+  | Sexp_try of expression * case list
 
 and value_binding =
   { vb_pat : pattern;
@@ -133,18 +138,20 @@ and field =
 
 (** [map_paths ~value_path ~type_path e] applies [value_path] to the paths of
     the globals of [e] and [type_path] to the paths of the types of its
-    constructors and labels. *)
+    constructors and labels and of its extension constructors, which are
+    substituted like types (see [Env.prefix_idents]). *)
 val map_paths :
   value_path:(Path.t -> Path.t) ->
   type_path:(Path.t -> Path.t) ->
   expression ->
   expression
 
-(** The namespaces of the global paths of an expression: values and the types of
-    constructors and labels. *)
+(** The namespaces of the global paths of an expression: values, the types of
+    constructors and labels, and extension constructors. *)
 type namespace =
   | Value
   | Type
+  | Extension
 
 (** The global paths of an expression with their namespaces, in traversal order.
 *)

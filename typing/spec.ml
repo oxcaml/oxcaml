@@ -45,6 +45,7 @@ type constructor =
       { type_path : Path.t;
         name : string
       }
+  | Extension_constructor of Path.t
 
 type label =
   { type_path : Path.t;
@@ -66,6 +67,7 @@ type pattern =
   | Spat_record_unboxed_product of (label * pattern) list * Asttypes.closed_flag
   | Spat_or of pattern * pattern
   | Spat_lazy of pattern
+  | Spat_exception of pattern
 
 type expression =
   | Sexp_var of Ident.t
@@ -78,6 +80,7 @@ type expression =
   | Sexp_unboxed_bool of bool
   | Sexp_construct of constructor * (sort * expression) list
   | Sexp_variant of string * expression option
+  | Sexp_extension_constructor of Path.t
   | Sexp_record of record
   | Sexp_record_unboxed_product of record
   | Sexp_field of field
@@ -88,6 +91,7 @@ type expression =
   | Sexp_lazy of expression
   | Sexp_let of Asttypes.rec_flag * value_binding list * expression
   | Sexp_match of expression * sort * case list
+  | Sexp_try of expression * case list
 
 and value_binding =
   { vb_pat : pattern;
@@ -118,8 +122,10 @@ and field =
 
 (* Traversals *)
 
-let map_constructor ~type_path (Constructor { type_path = p; name }) =
-  Constructor { type_path = type_path p; name }
+let map_constructor ~type_path = function
+  | Constructor { type_path = p; name } ->
+    Constructor { type_path = type_path p; name }
+  | Extension_constructor p -> Extension_constructor (type_path p)
 
 let rec map_paths ~value_path ~type_path e =
   let map e = map_paths ~value_path ~type_path e in
@@ -136,6 +142,8 @@ let rec map_paths ~value_path ~type_path e =
       ( map_constructor ~type_path cstr,
         List.map (fun (sort, e) -> sort, map e) args )
   | Sexp_variant (lbl, arg) -> Sexp_variant (lbl, Option.map map arg)
+  | Sexp_extension_constructor path ->
+    Sexp_extension_constructor (type_path path)
   | Sexp_record r -> Sexp_record (map_record ~value_path ~type_path r)
   | Sexp_record_unboxed_product r ->
     Sexp_record_unboxed_product (map_record ~value_path ~type_path r)
@@ -154,6 +162,8 @@ let rec map_paths ~value_path ~type_path e =
     Sexp_let (rf, List.map vb vbs, map body)
   | Sexp_match (e, sort, cases) ->
     Sexp_match (map e, sort, List.map (map_case ~value_path ~type_path) cases)
+  | Sexp_try (e, cases) ->
+    Sexp_try (map e, List.map (map_case ~value_path ~type_path) cases)
 
 and map_case ~value_path ~type_path { c_lhs; c_guard; c_rhs } =
   let map e = map_paths ~value_path ~type_path e in
@@ -184,6 +194,7 @@ and map_pattern ~type_path p =
     Spat_record_unboxed_product (List.map map_field fields, closed)
   | Spat_or (p1, p2) -> Spat_or (map p1, map p2)
   | Spat_lazy p -> Spat_lazy (map p)
+  | Spat_exception p -> Spat_exception (map p)
 
 and map_label ~type_path { type_path = p; name } =
   { type_path = type_path p; name }
@@ -210,8 +221,11 @@ and map_field ~value_path ~type_path { record; sort; label } =
 type namespace =
   | Value
   | Type
+  | Extension
 
-let constructor_path (Constructor { type_path; _ }) = Type, type_path
+let constructor_path = function
+  | Constructor { type_path; _ } -> Type, type_path
+  | Extension_constructor path -> Extension, path
 
 let rec paths_rev acc = function
   | Sexp_var _ | Sexp_constant _ | Sexp_unboxed_unit | Sexp_unboxed_bool _ ->
@@ -229,6 +243,7 @@ let rec paths_rev acc = function
       (constructor_path cstr :: acc)
       args
   | Sexp_variant (_, arg) -> Option.fold ~none:acc ~some:(paths_rev acc) arg
+  | Sexp_extension_constructor path -> (Extension, path) :: acc
   | Sexp_record { fields; extended_expression }
   | Sexp_record_unboxed_product { fields; extended_expression } ->
     let acc =
@@ -260,7 +275,7 @@ let rec paths_rev acc = function
         acc vbs
     in
     paths_rev acc body
-  | Sexp_match (e, _, cases) ->
+  | Sexp_match (e, _, cases) | Sexp_try (e, cases) ->
     List.fold_left case_paths_rev (paths_rev acc e) cases
 
 and case_paths_rev acc { c_lhs; c_guard; c_rhs } =
@@ -272,7 +287,8 @@ and pattern_paths_rev acc = function
   | Spat_any | Spat_var _ | Spat_constant _ | Spat_unboxed_unit
   | Spat_unboxed_bool _ ->
     acc
-  | Spat_alias (p, _, _) | Spat_lazy p -> pattern_paths_rev acc p
+  | Spat_alias (p, _, _) | Spat_lazy p | Spat_exception p ->
+    pattern_paths_rev acc p
   | Spat_tuple ps | Spat_unboxed_tuple ps ->
     List.fold_left (fun acc (_, p, _) -> pattern_paths_rev acc p) acc ps
   | Spat_construct (cstr, args) ->
@@ -324,8 +340,13 @@ let same_arg_label l1 l2 =
 
 let same_sort = Jkind_types.Sort.Const.equal
 
-let same_constructor ~same_path (Constructor c1) (Constructor c2) =
-  String.equal c1.name c2.name && same_path Type c1.type_path c2.type_path
+let same_constructor ~same_path c1 c2 =
+  match c1, c2 with
+  | Constructor c1, Constructor c2 ->
+    String.equal c1.name c2.name && same_path Type c1.type_path c2.type_path
+  | Extension_constructor p1, Extension_constructor p2 ->
+    same_path Extension p1 p2
+  | (Constructor _ | Extension_constructor _), _ -> false
 
 let same_label ~same_path l1 l2 =
   String.equal l1.name l2.name && same_path Type l1.type_path l2.type_path
@@ -395,11 +416,13 @@ let rec alpha_pattern ~same_path vars p1 p2 =
     if List.for_all (fun pair -> List.exists (same pair) left) right
     then Some left
     else None
-  | Spat_lazy p1, Spat_lazy p2 -> pattern vars p1 p2
+  | Spat_lazy p1, Spat_lazy p2 | Spat_exception p1, Spat_exception p2 ->
+    pattern vars p1 p2
   | ( ( Spat_any | Spat_var _ | Spat_alias _ | Spat_constant _ | Spat_tuple _
       | Spat_unboxed_tuple _ | Spat_unboxed_unit | Spat_unboxed_bool _
       | Spat_construct _ | Spat_variant _ | Spat_record _
-      | Spat_record_unboxed_product _ | Spat_or _ | Spat_lazy _ ),
+      | Spat_record_unboxed_product _ | Spat_or _ | Spat_lazy _
+      | Spat_exception _ ),
       _ ) ->
     None
 
@@ -430,6 +453,8 @@ let rec alpha_equal ~same_path ~vars e1 e2 =
          args1 args2
   | Sexp_variant (l1, a1), Sexp_variant (l2, a2) ->
     String.equal l1 l2 && Option.equal equal a1 a2
+  | Sexp_extension_constructor p1, Sexp_extension_constructor p2 ->
+    same_path Extension p1 p2
   | Sexp_record r1, Sexp_record r2
   | Sexp_record_unboxed_product r1, Sexp_record_unboxed_product r2 ->
     let same_def d1 d2 =
@@ -481,12 +506,15 @@ let rec alpha_equal ~same_path ~vars e1 e2 =
       && alpha_equal ~same_path ~vars:bound body1 body2)
   | Sexp_match (e1, s1, cases1), Sexp_match (e2, s2, cases2) ->
     equal e1 e2 && same_sort s1 s2 && same_cases ~same_path ~vars cases1 cases2
+  | Sexp_try (e1, cases1), Sexp_try (e2, cases2) ->
+    equal e1 e2 && same_cases ~same_path ~vars cases1 cases2
   | ( ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
       | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
-      | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ | Sexp_record _
+      | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _
+      | Sexp_extension_constructor _ | Sexp_record _
       | Sexp_record_unboxed_product _ | Sexp_field _ | Sexp_unboxed_field _
       | Sexp_ifthenelse _ | Sexp_sequence _ | Sexp_assert _ | Sexp_lazy _
-      | Sexp_let _ | Sexp_match _ ),
+      | Sexp_let _ | Sexp_match _ | Sexp_try _ ),
       _ ) ->
     false
 

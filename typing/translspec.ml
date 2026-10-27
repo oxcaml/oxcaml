@@ -41,9 +41,7 @@ type unsupported =
   | Coercions
   | Comprehensions
   | Effect_handlers
-  | Exception_handlers
   | Exclave
-  | Extension_constructors
   | First_class_modules
   | Functions
   | Layout_polymorphism
@@ -102,7 +100,7 @@ let check_primitive loc prim =
 
 let check_constructor loc (cstr : Data_types.constructor_description) =
   match cstr.cstr_tag with
-  | Extension _ -> unsupported loc Extension_constructors
+  | Extension path -> ignore (global loc path)
   | Ordinary _ | Null -> ()
 
 let value_description (desc : Types.value_description) : spec_value_description
@@ -176,7 +174,7 @@ let rec spectree_pattern : type k. k general_pattern -> k spec_general_pattern =
     | Tpat_fun_layout _ -> unsupported loc Layout_polymorphism
     | Tpat_lazy p -> Stpat_lazy (spectree_pattern p)
     | Tpat_value p -> Stpat_value (spectree_pattern (p :> Typedtree.pattern))
-    | Tpat_exception _ -> unsupported loc Exception_handlers
+    | Tpat_exception p -> Stpat_exception (spectree_pattern p)
     | Tpat_or (p1, p2, None) ->
       Stpat_or (spectree_pattern p1, spectree_pattern p2)
     | Tpat_or (_, _, Some _) -> unsupported loc Type_patterns
@@ -254,8 +252,11 @@ and spectree_desc bound loc desc : spec_expression_desc =
   | Texp_match (e, sort, cases, [], partial) ->
     let e = spectree bound e in
     Stexp_match (e, sort, List.map (case bound) cases, partial)
-  | Texp_match (_, _, _, _ :: _, _) -> unsupported loc Effect_handlers
-  | Texp_try _ -> unsupported loc Exception_handlers
+  | Texp_try (e, cases, []) ->
+    let e = spectree bound e in
+    Stexp_try (e, List.map (case bound) cases)
+  | Texp_match (_, _, _, _ :: _, _) | Texp_try (_, _, _ :: _) ->
+    unsupported loc Effect_handlers
   | Texp_tuple (es, mode) -> Stexp_tuple (List.map (labelled bound) es, mode)
   | Texp_unboxed_tuple es -> Stexp_unboxed_tuple (List.map (labelled bound) es)
   | Texp_unboxed_unit -> Stexp_unboxed_unit
@@ -320,7 +321,8 @@ and spectree_desc bound loc desc : spec_expression_desc =
   | Texp_pack _ -> unsupported loc First_class_modules
   | Texp_letop _ -> unsupported loc Binding_operators
   | Texp_unreachable -> unsupported loc Refutation_cases
-  | Texp_extension_constructor _ -> unsupported loc Extension_constructors
+  | Texp_extension_constructor (lid, path) ->
+    Stexp_extension_constructor (lid, global loc path)
   | Texp_open _ -> unsupported loc Local_opens
   | Texp_probe _ | Texp_probe_is_enabled _ -> unsupported loc Probes
   | Texp_exclave _ -> unsupported loc Exclave
@@ -409,10 +411,10 @@ let constant (c : Typedtree.constant) : Spec.constant =
 
 let constructor (cstr : Data_types.constructor_description) : Spec.constructor =
   match cstr.cstr_tag with
+  | Extension path -> Extension_constructor path
   | Ordinary _ | Null ->
     Constructor
       { type_path = Data_types.cstr_res_type_path cstr; name = cstr.cstr_name }
-  | Extension _ -> Misc.fatal_error "Translspec.spec: extension constructor"
 
 let label (lbl : _ Data_types.gen_label_description) : Spec.label =
   { type_path = Data_types.gen_lbl_res_type_path lbl; name = lbl.lbl_name }
@@ -443,6 +445,7 @@ let rec pattern : type k. k spec_general_pattern -> Spec.pattern =
     Spat_record_unboxed_product (List.map field fields, closed)
   | Stpat_lazy p -> Spat_lazy (pattern p)
   | Stpat_value p -> pattern p
+  | Stpat_exception p -> Spat_exception (pattern p)
   | Stpat_or (p1, p2) -> Spat_or (pattern p1, pattern p2)
 
 let rec spec (e : spec_expression) : Spec.expression =
@@ -463,6 +466,7 @@ let rec spec (e : spec_expression) : Spec.expression =
       (constructor cstr, List.map (fun (s, e) -> sort s, spec e) args)
   | Stexp_variant (lbl, arg) ->
     Sexp_variant (lbl, Option.map (fun (e, _) -> spec e) arg)
+  | Stexp_extension_constructor (_, path) -> Sexp_extension_constructor path
   | Stexp_record { fields; extended_expression; _ } ->
     Sexp_record
       { fields = Array.to_list (Array.map field_definition fields);
@@ -496,6 +500,7 @@ let rec spec (e : spec_expression) : Spec.expression =
     Sexp_let (rec_flag, List.map vb vbs, spec body)
   | Stexp_match (e, s, cases, _) ->
     Sexp_match (spec e, sort s, List.map spec_case cases)
+  | Stexp_try (e, cases) -> Sexp_try (spec e, List.map spec_case cases)
 
 and spec_case : type k. k spec_case -> Spec.case =
  fun c ->
@@ -571,6 +576,7 @@ let rec typedtree_pattern : type k. k spec_general_pattern -> k general_pattern
     data (Tpat_record_unboxed_product (List.map field fields, repr, closed))
   | Stpat_lazy p -> data (Tpat_lazy (typedtree_pattern p))
   | Stpat_value p -> as_computation_pattern (typedtree_pattern p)
+  | Stpat_exception p -> data (Tpat_exception (typedtree_pattern p))
   | Stpat_or (p1, p2) ->
     data (Tpat_or (typedtree_pattern p1, typedtree_pattern p2, None))
 
@@ -645,6 +651,8 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
         mode )
   | Stexp_variant (lbl, arg) ->
     Texp_variant (lbl, Option.map (fun (e, mode) -> typedtree e, mode) arg)
+  | Stexp_extension_constructor (lid, path) ->
+    Texp_extension_constructor (lid, path)
   | Stexp_record { fields; representation; extended_expression; locality_mode }
     ->
     let fields =
@@ -710,6 +718,8 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
     Texp_let (rec_flag, List.map vb vbs, typedtree body)
   | Stexp_match (e, sort, cases, partial) ->
     Texp_match (typedtree e, sort, List.map typedtree_case cases, [], partial)
+  | Stexp_try (e, cases) ->
+    Texp_try (typedtree e, List.map typedtree_case cases, [])
 
 and typedtree_case : type k. k spec_case -> k Typedtree.case =
  fun c ->
@@ -743,9 +753,7 @@ let describe = function
   | Coercions -> "coercions"
   | Comprehensions -> "comprehensions"
   | Effect_handlers -> "effect handlers"
-  | Exception_handlers -> "exception handlers"
   | Exclave -> "exclave_"
-  | Extension_constructors -> "extension constructors"
   | First_class_modules -> "first-class modules"
   | Functions -> "functions"
   | Layout_polymorphism -> "layout-polymorphic bindings"

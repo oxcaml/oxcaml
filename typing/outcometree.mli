@@ -278,6 +278,7 @@ and out_spec =
   | Ospec_unboxed_bool of bool
   | Ospec_construct of out_ident * out_spec list
   | Ospec_variant of string * out_spec option
+  | Ospec_extension_constructor of out_ident
   | Ospec_constraint of out_spec * out_type
   | Ospec_record of
       { fields : (out_ident * out_spec) list;
@@ -291,6 +292,7 @@ and out_spec =
   | Ospec_let of bool * (out_spec_pattern * out_spec) list * out_spec
       (** [Ospec_let (rec, bindings, body)] *)
   | Ospec_match of out_spec * out_spec_case list
+  | Ospec_try of out_spec * out_spec_case list
 and out_spec_case = out_spec_pattern * out_spec option * out_spec
 and out_spec_pattern =
   | Ospat_any
@@ -309,6 +311,7 @@ and out_spec_pattern =
         unboxed : bool }
   | Ospat_or of out_spec_pattern * out_spec_pattern
   | Ospat_lazy of out_spec_pattern
+  | Ospat_exception of out_spec_pattern
   | Ospat_constraint of out_spec_pattern * out_type
 
 

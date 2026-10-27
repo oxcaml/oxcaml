@@ -313,6 +313,7 @@ let spec_pattern
         (fun (lid, _, p) -> iter_loc_lid sub lid; sub.spec_pattern sub p) l
   | Stpat_lazy p -> sub.spec_pattern sub p
   | Stpat_value p -> sub.spec_pattern sub p
+  | Stpat_exception p -> sub.spec_pattern sub p
   | Stpat_or (p1, p2) ->
       sub.spec_pattern sub p1;
       sub.spec_pattern sub p2
@@ -338,6 +339,7 @@ let[@warning "+9"] rec spec_expression sub
       List.iter (fun (_, e) -> sub.spec_expression sub e) args
   | Stexp_variant (_, arg) ->
       Option.iter (fun (e, _) -> sub.spec_expression sub e) arg
+  | Stexp_extension_constructor (lid, _) -> iter_loc_lid sub lid
   | Stexp_record {fields; extended_expression; _} ->
       Array.iter (fun (_, _, def) -> spec_label_definition sub def) fields;
       Option.iter
@@ -366,6 +368,9 @@ let[@warning "+9"] rec spec_expression sub
         vbs;
       sub.spec_expression sub body
   | Stexp_match (e, _, cases, _) ->
+      sub.spec_expression sub e;
+      List.iter (spec_case sub) cases
+  | Stexp_try (e, cases) ->
       sub.spec_expression sub e;
       List.iter (spec_case sub) cases
 

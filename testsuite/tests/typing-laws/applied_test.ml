@@ -19,8 +19,10 @@ open Applied_provider
 
 module Same_instance : sig
   law? p : P.x == Q.x
+  law? e : P.E = Q.E
 end = struct
   law? p : Bound.x == Bound.x
+  law? e : Bound.E = Bound.E
 end
 
 module Different_instances : sig

@@ -1050,6 +1050,8 @@ and spec_expression i ppf x =
   | Stexp_variant (l, eo) ->
       line i ppf "Stexp_variant \"%s\"\n" l;
       option i spec_expression ppf (Option.map fst eo)
+  | Stexp_extension_constructor (li, _) ->
+      line i ppf "Stexp_extension_constructor %a\n" fmt_longident li
   | Stexp_record { fields; representation; extended_expression; _ } ->
       line i ppf "Stexp_record\n";
       let i = i+1 in
@@ -1111,6 +1113,10 @@ and spec_expression i ppf x =
       spec_expression i ppf e;
       line i ppf "%a\n" fmt_sort sort;
       list i spec_case ppf cases
+  | Stexp_try (e, cases) ->
+      line i ppf "Stexp_try\n";
+      spec_expression i ppf e;
+      list i spec_case ppf cases
 
 and spec_case : type k. _ -> _ -> k spec_case -> unit =
   fun i ppf {sc_lhs; sc_guard; sc_rhs} ->
@@ -1170,6 +1176,9 @@ and spec_pattern : type k. _ -> _ -> k spec_general_pattern -> unit =
       spec_pattern i ppf p
   | Stpat_value p ->
       line i ppf "Stpat_value\n";
+      spec_pattern i ppf p
+  | Stpat_exception p ->
+      line i ppf "Stpat_exception\n";
       spec_pattern i ppf p
   | Stpat_or (p1, p2) ->
       line i ppf "Stpat_or\n";

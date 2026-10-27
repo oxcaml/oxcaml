@@ -111,6 +111,7 @@ val find_value_no_locks_exn: Ident.t -> t ->
 
 val find_value: Path.t -> t -> Subst.Lazy.value_description
 val find_type: Path.t -> t -> type_declaration
+val find_extension_alias: Path.t -> t -> Path.t option
 val find_type_descrs: Path.t -> t -> type_descriptions
 val find_module_lazy: Path.t -> t -> Subst.Lazy.module_declaration
 val find_module: Path.t -> t -> module_declaration

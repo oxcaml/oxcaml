@@ -1093,6 +1093,7 @@ let extension_constructor' copy_scope s ext =
       | No_action -> ext.ext_loc
     end;
     ext_uid = ext.ext_uid;
+    ext_alias = Option.map (type_path s) ext.ext_alias;
   }
 
 let extension_constructor s ext =
@@ -1234,7 +1235,10 @@ let rename_bound_idents scoping s sg =
           rest
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
-        rename_bound_idents s (Sig_typext(id',ec,es,vis) :: sg) rest
+        rename_bound_idents
+          (add_type id (Pident id') s)
+          (Sig_typext(id',ec,es,vis) :: sg)
+          rest
     | Sig_jkind (id, jkd, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents

@@ -1,7 +1,7 @@
-File "applied_test.ml", lines 28-30, characters 6-3:
-28 | ......struct
-29 |   law? p : M.x == M.x
-30 | end
+File "applied_test.ml", lines 30-32, characters 6-3:
+30 | ......struct
+31 |   law? p : M.x == M.x
+32 | end
 Error: Signature mismatch:
        Modules do not match:
          sig law? p : Applied_provider.M.x == Applied_provider.M.x end
@@ -12,5 +12,5 @@ Error: Signature mismatch:
        is not included in
          law? p : Applied_provider.M.x == Applied_provider.N.x
        The clauses of the two laws differ.
-       File "applied_test.ml", line 27, characters 2-21: Expected declaration
-       File "applied_test.ml", line 29, characters 2-21: Actual declaration
+       File "applied_test.ml", line 29, characters 2-21: Expected declaration
+       File "applied_test.ml", line 31, characters 2-21: Actual declaration

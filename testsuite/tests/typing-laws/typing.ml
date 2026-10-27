@@ -251,6 +251,25 @@ Line 1, characters 53-54:
 Error: Unbound value "m"
 |}]
 
+(* An extension constructor is like a value: a law cannot refer to one that
+   [open struct] introduces. *)
+
+module Hidden_exception = struct
+  open struct exception E end
+  module Inner = struct law? l : E = E end
+end
+[%%expect {|
+Line 2, characters 2-29:
+2 |   open struct exception E end
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The extension constructor "E" introduced by this open is used by a law.
+Line 3, characters 24-38:
+3 |   module Inner = struct law? l : E = E end
+                            ^^^^^^^^^^^^^^
+  The law "l" refers to the extension constructor "E", so "E" must be accessible
+  outside of this module.
+|}]
+
 (* Laws in generative functors are rejected: the laws file names the types
    of the result of a functor through an application to the choices of a
    backend, which a generative functor does not permit. *)

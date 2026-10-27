@@ -1221,13 +1221,17 @@ and print_out_spec ppf = function
   | Ospec_match (e, cases) ->
       fprintf ppf "@[<hv>@[<2>match@ %a@ with@]%a@]" print_out_spec e
         print_out_spec_cases cases
+  | Ospec_try (e, cases) ->
+      fprintf ppf "@[<hv>@[<2>try@ %a@ with@]%a@]" print_out_spec e
+        print_out_spec_cases cases
   | Ospec_field { record; label; unboxed } ->
       fprintf ppf "@[<2>%a.%s%a@]" print_simple_out_spec record
         (if unboxed then "#" else "") print_constructor label
   | Ospec_var _ | Ospec_global _ | Ospec_constant _ | Ospec_tuple _
   | Ospec_unboxed_tuple _ | Ospec_unboxed_unit | Ospec_unboxed_bool _
   | Ospec_construct (_, []) | Ospec_variant (_, None)
-  | Ospec_constraint _ | Ospec_record _ | Ospec_sequence _ as spec ->
+  | Ospec_extension_constructor _ | Ospec_constraint _ | Ospec_record _
+  | Ospec_sequence _ as spec ->
       print_simple_out_spec ppf spec
 
 and print_simple_out_spec ppf = function
@@ -1241,6 +1245,8 @@ and print_simple_out_spec ppf = function
   | Ospec_unboxed_bool b -> fprintf ppf "#%b" b
   | Ospec_construct (c, []) -> print_constructor ppf c
   | Ospec_variant (lbl, None) -> fprintf ppf "`%a" print_lident lbl
+  | Ospec_extension_constructor c ->
+      fprintf ppf "[%%extension_constructor %a]" print_ident c
   | Ospec_constraint (e, ty) ->
       fprintf ppf "@[<1>(%a :@ %a)@]" print_out_spec e !out_type ty
   | Ospec_sequence (e1, e2) ->
@@ -1260,7 +1266,7 @@ and print_simple_out_spec ppf = function
         (print_list field (fun ppf -> fprintf ppf ";@ ")) fields
   | Ospec_apply _ | Ospec_construct (_, _ :: _) | Ospec_variant (_, Some _)
   | Ospec_field _ | Ospec_ifthenelse _ | Ospec_assert _ | Ospec_lazy _
-  | Ospec_let _ | Ospec_match _ as spec ->
+  | Ospec_let _ | Ospec_match _ | Ospec_try _ as spec ->
       fprintf ppf "(%a)" print_out_spec spec
 
 (* The right-hand side of a case is parenthesized, so that it cannot capture
@@ -1294,6 +1300,8 @@ and print_out_spec_pattern ppf = function
         print_out_spec_pattern p2
   | Ospat_lazy p ->
       fprintf ppf "@[<2>lazy@ %a@]" print_simple_out_spec_pattern p
+  | Ospat_exception p ->
+      fprintf ppf "@[<2>exception@ %a@]" print_simple_out_spec_pattern p
   | Ospat_any | Ospat_var _ | Ospat_constant _ | Ospat_tuple _
   | Ospat_unboxed_tuple _ | Ospat_unboxed_unit | Ospat_unboxed_bool _
   | Ospat_construct (_, []) | Ospat_variant (_, None) | Ospat_record _
@@ -1322,7 +1330,7 @@ and print_simple_out_spec_pattern ppf = function
   | Ospat_constraint (p, ty) ->
       fprintf ppf "@[<1>(%a :@ %a)@]" print_out_spec_pattern p !out_type ty
   | Ospat_alias _ | Ospat_construct (_, _ :: _) | Ospat_variant (_, Some _)
-  | Ospat_or _ | Ospat_lazy _ as p ->
+  | Ospat_or _ | Ospat_lazy _ | Ospat_exception _ as p ->
       fprintf ppf "(%a)" print_out_spec_pattern p
 
 and print_spec_pattern_components ppf ps =
@@ -1344,6 +1352,7 @@ and print_spec_components ppf es =
 and print_constructor ppf = function
   | Oide_ident { printed_name = "::" } -> fprintf ppf "( :: )"
   | Oide_ident { printed_name } -> pp_print_string ppf printed_name
+  | Oide_dot (m, name) -> fprintf ppf "%a.%s" print_ident m name
   | c -> print_ident ppf c
 
 let out_constr = ref print_out_constr

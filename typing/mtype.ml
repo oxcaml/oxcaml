@@ -40,7 +40,7 @@ let freshen ~scope mty =
   argument remains non-aliasable even if we later substitute a "real" module
   for it. This ensures that strengthening commutes with substitution and
   that it is irrelevant when exactly a strengthening node is expanded.  *)
-(* Strengthening also records [val_alias] as it adds
+(* Strengthening also records [val_alias] and [ext_alias] as it adds
   manifests, if [value_equations] says so (see [Types.Value_equations]).
   Like a manifest, an equation already recorded is kept. *)
 
@@ -148,7 +148,14 @@ and strengthen_lazy_sig' ~aliasable ~value_equations sg p =
       in
       Sig_type(id, newdecl, rs, vis) ::
         strengthen_lazy_sig' ~aliasable ~value_equations rem p
-  | (Sig_typext _ as sigelt) :: rem ->
+  | (Sig_typext (id, ext, es, vis) as sigelt) :: rem ->
+      let sigelt =
+        match (value_equations : Value_equations.t), ext.ext_alias with
+        | Recorded, None ->
+            let ext = { ext with ext_alias = Some (Pdot (p, Ident.name id)) } in
+            Sig_typext (id, ext, es, vis)
+        | Recorded, Some _ | Not_recorded, _ -> sigelt
+      in
       sigelt :: strengthen_lazy_sig' ~aliasable ~value_equations rem p
   | Sig_module(id, pres, md, rs, vis) :: rem ->
       let str =
@@ -487,6 +494,8 @@ let rec remove_value_equations mty =
 and remove_value_equations_item = function
   | Sig_value (id, ({ val_alias = Some _; _ } as vd), vis) ->
       Sig_value (id, { vd with val_alias = None }, vis)
+  | Sig_typext (id, ({ ext_alias = Some _; _ } as ext), es, vis) ->
+      Sig_typext (id, { ext with ext_alias = None }, es, vis)
   | Sig_module (id, pres, md, rs, vis) ->
       let md = { md with md_type = remove_value_equations md.md_type } in
       Sig_module (id, pres, md, rs, vis)

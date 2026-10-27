@@ -118,7 +118,7 @@ let locations =
         start_line = 58;
         start_col = 0;
         end_line = 60;
-        end_col = 19
+        end_col = 49
       };
     records =
       {
@@ -515,7 +515,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                          match s with
                          | (Circle r : Laws_gen_Gen_flat.shape) -> r
                          | (Square w : Laws_gen_Gen_flat.shape) -> w in
-                       Laws_gen_Stdlib.(||) (Laws_gen_Stdlib.(>=) a 0.)
+                       Laws_gen_Stdlib.(||)
+                         (try Laws_gen_Stdlib.(>=) a 0.
+                          with | Laws_gen_Stdlib.Not_found -> (false : bool))
                          (Laws_gen_Stdlib.(<) a 0.) : bool));
                  location =
                    {
@@ -523,7 +525,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      start_line = 59;
                      start_col = 2;
                      end_line = 60;
-                     end_col = 19
+                     end_col = 49
                    }
                }))
     let records ((module C)  : (module Choices))  : unit Law.t =

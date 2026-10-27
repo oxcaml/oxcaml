@@ -474,7 +474,8 @@ let check_exported ctx ~loc display (ld : law_declaration) =
     (fun ((ns : Spec.namespace), p) ->
       match ns with
       | Value -> check "value" Env.find_value p
-      | Type -> check "type" Env.find_type p)
+      | Type -> check "type" Env.find_type p
+      | Extension -> check "extension constructor" Env.find_extension_alias p)
     (List.concat_map Spec.paths (ld.law_conclusion :: ld.law_assumptions));
   with_type_mark (fun mark ->
       let it =

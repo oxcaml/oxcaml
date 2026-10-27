@@ -378,6 +378,7 @@ let spec_pattern
         Stpat_record_unboxed_product (List.map field l, rep, closed)
     | Stpat_lazy p -> Stpat_lazy (sub.spec_pattern sub p)
     | Stpat_value p -> Stpat_value (sub.spec_pattern sub p)
+    | Stpat_exception p -> Stpat_exception (sub.spec_pattern sub p)
     | Stpat_or (p1, p2) ->
         Stpat_or (sub.spec_pattern sub p1, sub.spec_pattern sub p2)
   in
@@ -428,6 +429,8 @@ let spec_expression sub
         Stexp_variant
           (lbl, Option.map (fun (e, mode) -> (sub.spec_expression sub e, mode))
                   arg)
+    | Stexp_extension_constructor (lid, path) ->
+        Stexp_extension_constructor (map_loc_lid sub lid, path)
     | Stexp_record r ->
         let fields =
           Array.map (fun (lbl, sort, def) ->
@@ -478,6 +481,8 @@ let spec_expression sub
         Stexp_match
           (sub.spec_expression sub e, sort, List.map (spec_case sub) cases,
            partial)
+    | Stexp_try (e, cases) ->
+        Stexp_try (sub.spec_expression sub e, List.map (spec_case sub) cases)
   in
   let stexp_extra =
     List.map

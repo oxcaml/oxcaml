@@ -31,11 +31,13 @@ law? constants (c : char) (s : string) :
 
 type shape = Circle of float | Square of float
 type other = Circle of int
+exception Failed of string
 law? constructors (s : shape) :
   s = (Circle 1. : shape) ===> s <> Square 1. && Some s <> None
 let first #(x, _) = x
 law? tuples (x : int) : (x, "s") = (x, "s") && first #(x, true) = x
 law? variants (x : int) : `A x <> `B
+law? exceptions (m : string) : Failed m = Failed m
 
 type point = { x : float; y : float }
 type other_point = { x : int }
@@ -49,7 +51,7 @@ law? control (x : int) :
 
 law? binding (s : shape) :
   let a = (match s with Circle r -> r | Square w -> w) in
-  a >= 0. || a < 0.
+  (try a >= 0. with Not_found -> false) || a < 0.
 
 (* Laws in a submodule and in a module type. *)
 

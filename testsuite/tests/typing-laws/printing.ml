@@ -80,23 +80,24 @@ module type Constants =
   end
 |}]
 
-(* Tuples, variants and unboxed values. *)
+(* Tuples, variants, unboxed values and extension constructors. *)
 
 module type Structures = sig
   val f : int * string -> [ `A of int | `B ] -> bool
-  val g : #(int * bool) -> unit# -> bool# -> bool
+  val g : #(int * bool) -> unit# -> bool# -> extension_constructor -> bool
   law? tuple (x : int) : f (x, "s") (`A x) && f (0, "") `B
   law? labelled (t : x:int * string) : t = (~x:1, "s")
-  law? unboxed : g #(1, true) #() #false
+  law? unboxed : g #(1, true) #() #false [%extension_constructor Not_found]
 end
 [%%expect {|
 module type Structures =
   sig
     val f : int * string -> [ `A of int | `B ] -> bool
-    val g : #(int * bool) -> unit# -> bool# -> bool
+    val g : #(int * bool) -> unit# -> bool# -> extension_constructor -> bool
     law? tuple (x : int) : (f (x, ("s")) (`A x)) && (f ((0), ("")) `B)
     law? labelled (t : x:int * string) : t = (~x:(1), ("s"))
-    law? unboxed : g #((1), (true : bool)) #() #false
+    law? unboxed :
+      g #((1), (true : bool)) #() #false [%extension_constructor Not_found]
   end
 |}]
 
@@ -224,7 +225,7 @@ module type Control =
   end
 |}]
 
-(* Let-bindings and pattern matching. *)
+(* Let-bindings, pattern matching and exception handlers. *)
 
 type shape = Circle of float | Rect of { w : float; h : float }
 module type Binding = sig
@@ -235,6 +236,7 @@ module type Binding = sig
      | Circle r when r > 0. -> area s > 0.
      | Circle _ | Rect { w = 0.; _ } -> true
      | Rect { w; h } as r -> area r = w *. h)
+  law? try_ (s : shape) : (try area s >= 0. with Division_by_zero -> true)
 end
 [%%expect {|
 type shape = Circle of float | Rect of { w : float; h : float; }
@@ -247,5 +249,7 @@ module type Binding =
       | (Circle r : shape) when (r > (0.)) -> ((area s) > (0.))
       | (Circle _ : shape) | (Rect { w = (0.); _ } : shape) -> (true : bool)
       | (Rect { w = w; h = h } : shape) as r -> ((area r) = (w *. h))
+    law? try_ (s : shape) :
+      try (area s) >= (0.) with | Division_by_zero -> (true : bool)
   end
 |}]

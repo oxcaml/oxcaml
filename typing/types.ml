@@ -622,6 +622,7 @@ type extension_constructor =
     ext_loc: Location.t;
     ext_attributes: Parsetree.attributes;
     ext_uid: Uid.t;
+    ext_alias: Path.t option;
   }
 
 and type_transparence =
