@@ -70,7 +70,8 @@ let standard_int_or_float =
 let int_shift_op =
   D.(
     constructor_flag
-      (["lsl", Lsl; "lsr", Lsr; "asr", Asr] : (string * P.int_shift_op) list))
+      (["lsl", Lsl; "lsr", Lsr; "asr", Asr; "rotl", Rol; "rotr", Ror]
+        : (string * P.int_shift_op) list))
 
 let unary_int_arith_op =
   D.(

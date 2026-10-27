@@ -81,6 +81,10 @@ type prefetch_info = {
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+type rotate_direction = Rotate_left | Rotate_right
+
+type rotate_bitwidth = Rotate32 | Rotate64
+
 type float_width = Cmm.float_width
 
 type specific_operation =
@@ -91,6 +95,14 @@ type specific_operation =
   | Ifloatarithmem of float_width * float_operation * addressing_mode
                                        (* Float arith operation with memory *)
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Irotate of                         (* rotation of the low [bitwidth] bits;
+                                          the count is [imm] (already reduced
+                                          modulo the bit width) if present,
+                                          otherwise the second argument *)
+      { direction: rotate_direction;
+        bitwidth: rotate_bitwidth;
+        imm: int option;
+      }
   | Isextend32                         (* 32 to 64 bit conversion with sign
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
