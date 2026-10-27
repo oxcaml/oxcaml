@@ -57,6 +57,8 @@ law? functions (xs : int list) :
   (fun ?(min = 0) x -> x >= min) 1 && List.for_all (fun x -> x >= 0) xs
   || List.exists (function 0 -> true | _ -> false) xs
 
+law? local (x : int) : Ops.(x + 1 = add x 1)
+
 (* Laws in a submodule and in a module type. *)
 
 module Nested = struct

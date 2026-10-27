@@ -274,3 +274,14 @@ module type Functions =
       List.for_all (fun x -> x >= (0)) xs
   end
 |}]
+
+(* A local open of a module path stands for the paths it introduces. *)
+
+module type Local = sig
+  module M : sig val x : int end
+  law? local_open : M.(x = x)
+end
+[%%expect {|
+module type Local =
+  sig module M : sig val x : int end law? local_open : M.x = M.x end
+|}]

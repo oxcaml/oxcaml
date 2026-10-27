@@ -301,11 +301,12 @@ let iter_on_occurrences
           add_label ~namespace:Label stexp_env lid label
       | Stexp_unboxed_field { lid; label; _ } ->
           add_label ~namespace:Unboxed_label stexp_env lid label
+      | Stexp_open ({ sopen_expr = m; _ }, _) ->
+          f ~namespace:Module m.smod_env m.smod_path m.smod_lid
       | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
       | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _
       | Stexp_ifthenelse _ | Stexp_sequence _ | Stexp_assert _ | Stexp_lazy _
-      | Stexp_let _ | Stexp_match _ | Stexp_try _ | Stexp_function _ ->
-          ());
+      | Stexp_let _ | Stexp_match _ | Stexp_try _ | Stexp_function _ -> ());
       default_iterator.spec_expression sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are

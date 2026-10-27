@@ -759,10 +759,17 @@ let constructor_lid print (cstr : Data_types.constructor_description) :
   | Extension path -> print path
   | Ordinary _ | Null -> Lident cstr.cstr_name
 
+(* Local opens are dropped: paths are written in full, and constructors and
+   labels are selected by their annotations, so nothing refers to the open. *)
 let mapper print =
   {
     Untypeast.default_mapper with
-    expr = (fun sub e -> annotate print e (Untypeast.default_mapper.expr sub e));
+    expr =
+      (fun sub e ->
+        match e.exp_desc with
+        | Texp_open (_, body) ->
+            sub.expr sub { body with exp_extra = e.exp_extra @ body.exp_extra }
+        | _ -> annotate print e (Untypeast.default_mapper.expr sub e));
     pat =
       (fun (type k) sub (p : k Typedtree.general_pattern) ->
         annotate_pattern print p (Untypeast.default_mapper.pat sub p));

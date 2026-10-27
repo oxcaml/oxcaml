@@ -45,3 +45,21 @@ Line 1, characters 36-37:
                                         ^
 Error: Laws do not support locally abstract types.
 |}]
+
+(* Local modules, and local opens of anything but a module path. *)
+
+law? local_module : (let module L = List in L.length [] = 0)
+[%%expect {|
+Line 1, characters 20-60:
+1 | law? local_module : (let module L = List in L.length [] = 0)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws do not support local modules.
+|}]
+
+law? open_structure : (let open struct let x = 0 end in x = 0)
+[%%expect {|
+Line 1, characters 22-62:
+1 | law? open_structure : (let open struct let x = 0 end in x = 0)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws do not support local opens.
+|}]

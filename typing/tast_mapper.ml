@@ -385,6 +385,20 @@ let spec_pattern
   { x with stpat_desc; stpat_loc = sub.location sub x.stpat_loc; stpat_extra;
            stpat_env = sub.env sub x.stpat_env }
 
+let spec_module_path sub m =
+  let smod_mode =
+    match m.smod_mode with
+    | _, None -> m.smod_mode
+    | mode, Some (locks, txt, loc) ->
+      let { txt; loc } = map_loc_lid sub { txt; loc } in
+      mode, Some (locks, txt, loc)
+  in
+  { m with
+    smod_lid = map_loc_lid sub m.smod_lid;
+    smod_mode;
+    smod_env = sub.env sub m.smod_env;
+    smod_loc = sub.location sub m.smod_loc }
+
 let spec_labelled sub (lbl, e, sort) = (lbl, sub.spec_expression sub e, sort)
 
 let spec_case : 'k. mapper -> 'k spec_case -> 'k spec_case =
@@ -506,6 +520,13 @@ let spec_expression sub
                             List.map (spec_extra sub) fc.sfc_exp_extra }
         in
         Stexp_function { r with params = List.map param r.params; body }
+    | Stexp_open (od, body) ->
+        let od =
+          { od with sopen_expr = spec_module_path sub od.sopen_expr;
+                    sopen_env = sub.env sub od.sopen_env;
+                    sopen_loc = sub.location sub od.sopen_loc }
+        in
+        Stexp_open (od, sub.spec_expression sub body)
   in
   let stexp_extra =
     List.map

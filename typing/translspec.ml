@@ -200,6 +200,26 @@ let extra (extra, loc, attrs) : spec_extra * Location.t =
   check_attributes loc attrs;
   spec_extra loc extra, loc
 
+(* The module of a local open, which must be a module path. A path through a
+   functor application names no particular module, so the values reached
+   through it are rejected. *)
+let module_path loc (mexp : module_expr) : spec_module_path =
+  check_attributes mexp.mod_loc mexp.mod_attributes;
+  match mexp.mod_desc with
+  | Tmod_ident (path, lid) ->
+    if Path.contains_apply path then unsupported loc Values_through_applications;
+    { smod_path = path;
+      smod_lid = lid;
+      smod_type = mexp.mod_type;
+      smod_mode = mexp.mod_mode;
+      smod_env = mexp.mod_env;
+      smod_loc = mexp.mod_loc
+    }
+  | Tmod_apply _ -> unsupported loc Values_through_applications
+  | Tmod_structure _ | Tmod_functor _ | Tmod_apply_unit _ | Tmod_unpack _
+  | Tmod_constraint _ ->
+    unsupported loc Local_opens
+
 let check_modes loc (modes : _ modes) =
   match modes.mode_desc with
   | [] -> ()
@@ -334,7 +354,18 @@ and spectree_desc bound loc desc : spec_expression_desc =
   | Texp_unreachable -> unsupported loc Refutation_cases
   | Texp_extension_constructor (lid, path) ->
     Stexp_extension_constructor (lid, global loc path)
-  | Texp_open _ -> unsupported loc Local_opens
+  | Texp_open (od, body) ->
+    check_attributes od.open_loc od.open_attributes;
+    let od =
+      { sopen_expr = module_path loc od.open_expr;
+        sopen_bound_items = od.open_bound_items;
+        sopen_items_repr = od.open_items_repr;
+        sopen_override = od.open_override;
+        sopen_env = od.open_env;
+        sopen_loc = od.open_loc
+      }
+    in
+    Stexp_open (od, spectree bound body)
   | Texp_probe _ | Texp_probe_is_enabled _ -> unsupported loc Probes
   | Texp_exclave _ -> unsupported loc Exclave
   | Texp_src_pos -> unsupported loc Source_positions
@@ -554,6 +585,9 @@ let rec spec (e : spec_expression) : Spec.expression =
   | Stexp_match (e, s, cases, _) ->
     Sexp_match (spec e, sort s, List.map spec_case cases)
   | Stexp_try (e, cases) -> Sexp_try (spec e, List.map spec_case cases)
+  (* A specification expression refers to globals by their paths: [let open M
+     in e] stands for [e]. *)
+  | Stexp_open (_, body) -> spec body
   | Stexp_function { params; body; _ } ->
     let param (p : spec_function_param) : Spec.function_param =
       let fp_kind : Spec.function_param_kind =
@@ -651,6 +685,15 @@ let rec typedtree_pattern : type k. k spec_general_pattern -> k general_pattern
   | Stpat_exception p -> data (Tpat_exception (typedtree_pattern p))
   | Stpat_or (p1, p2) ->
     data (Tpat_or (typedtree_pattern p1, typedtree_pattern p2, None))
+
+let typedtree_module_path (m : spec_module_path) : module_expr =
+  { mod_desc = Tmod_ident (m.smod_path, m.smod_lid);
+    mod_loc = m.smod_loc;
+    mod_type = m.smod_type;
+    mod_mode = m.smod_mode;
+    mod_env = m.smod_env;
+    mod_attributes = []
+  }
 
 let typedtree_value_description (desc : spec_value_description) val_kind :
     Types.value_description =
@@ -792,6 +835,18 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
     Texp_match (typedtree e, sort, List.map typedtree_case cases, [], partial)
   | Stexp_try (e, cases) ->
     Texp_try (typedtree e, List.map typedtree_case cases, [])
+  | Stexp_open (od, body) ->
+    let od =
+      { open_expr = typedtree_module_path od.sopen_expr;
+        open_bound_items = od.sopen_bound_items;
+        open_items_repr = od.sopen_items_repr;
+        open_override = od.sopen_override;
+        open_env = od.sopen_env;
+        open_loc = od.sopen_loc;
+        open_attributes = []
+      }
+    in
+    Texp_open (od, typedtree body)
   | Stexp_function
       { params; body; ret_mode; ret_sort; locality_mode; yielding; zero_alloc }
     ->

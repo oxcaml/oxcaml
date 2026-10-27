@@ -1246,6 +1246,28 @@ and spec_expression_desc =
         yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }
+  | Stexp_open of spec_open_declaration * spec_expression
+      (** [let open M in e] *)
+
+(* A [module_expr] that is a module path, without attributes *)
+and spec_module_path =
+  { smod_path: Path.t;
+    smod_lid: Longident.t loc;
+    smod_type: Types.module_type;
+    smod_mode: mode_with_locks;
+    smod_env: Env.t;
+    smod_loc: Location.t;
+  }
+
+(* An [open_declaration] of a module path, without attributes *)
+and spec_open_declaration =
+  { sopen_expr: spec_module_path;
+    sopen_bound_items: Types.signature;
+    sopen_items_repr: Types.module_representation;
+    sopen_override: override_flag;
+    sopen_env: Env.t;
+    sopen_loc: Location.t;
+  }
 
 (* A [function_param] without newtypes *)
 and spec_function_param =

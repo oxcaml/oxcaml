@@ -1117,6 +1117,10 @@ and spec_expression i ppf x =
       line i ppf "Stexp_try\n";
       spec_expression i ppf e;
       list i spec_case ppf cases
+  | Stexp_open ({sopen_override; sopen_expr; _}, body) ->
+      line i ppf "Stexp_open %a \"%a\"\n" fmt_override_flag sopen_override
+        fmt_path sopen_expr.smod_path;
+      spec_expression i ppf body
   | Stexp_function {params; body; ret_sort; _} ->
       line i ppf "Stexp_function\n";
       line i ppf "%a\n" fmt_sort ret_sort;

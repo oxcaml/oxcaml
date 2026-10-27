@@ -374,6 +374,20 @@ let[@warning "+9"] rec spec_expression sub
       sub.spec_expression sub e;
       List.iter (spec_case sub) cases
   | Stexp_function {params; body; _} -> spec_function sub params body
+  | Stexp_open ({sopen_expr; sopen_env; sopen_loc; _}, body) ->
+      sub.location sub sopen_loc;
+      spec_module_path sub sopen_expr;
+      sub.env sub sopen_env;
+      sub.spec_expression sub body
+
+and spec_module_path sub {smod_lid; smod_mode; smod_env; smod_loc; _} =
+  sub.location sub smod_loc;
+  begin match smod_mode with
+  | _, None -> ()
+  | _, Some (_, txt, loc) -> iter_loc_lid sub {txt; loc}
+  end;
+  sub.env sub smod_env;
+  iter_loc_lid sub smod_lid
 
 and spec_function sub params body =
   List.iter

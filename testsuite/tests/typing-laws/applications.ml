@@ -213,3 +213,13 @@ module Bound : sig type t = F(A).t = A | B val y : int exception E end
 module type Substitution_bound = sig law? p : Bound.y = Bound.y end
 module Bound_claim : sig law? p : Bound.y = Bound.y end
 |}]
+
+(* So does a local open of an application. *)
+
+law? local : (let open F (A) in y = y)
+[%%expect {|
+Line 1, characters 13-38:
+1 | law? local : (let open F (A) in y = y)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Laws do not support values through functor applications.
+|}]

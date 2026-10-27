@@ -61,5 +61,7 @@ law? binding (s : shape) :
 law? functions (xs : int list) :
   (fun ?(min = 0) x -> x >= min) 1 && List.for_all (fun x -> x >= 0) xs
   || List.exists (function 0 -> true | _ -> false) xs
+module Ops = struct let add = ( + ) end
+law? local (x : int) : Ops.(add x 1 = x + 1)
 law? records (p : point) :
   ({ x = 0.; y = p.y } : point) = { p with x = 0. } && (p : point).x >= 0.
