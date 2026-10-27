@@ -3,6 +3,8 @@
  flambda2;
  {
    native;
+ }{
+   jsir;
  } {
    reference = "${test_source_directory}/optional_argument_bug_o3.reference";
    flags = "-O3";

@@ -2,6 +2,8 @@
  flambda2;
  {
    native;
+ }{
+   jsir;
  } {
    flags = "-O3";
    native;

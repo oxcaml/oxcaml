@@ -3,6 +3,11 @@
  {
    native;
  }{
+   (* Under js_of_ocaml, every block is a JavaScript array, so mixed blocks
+      hash like ordinary ones. *)
+   reference = "${test_source_directory}/hash.jsir-output.reference";
+   jsir;
+ }{
    bytecode;
  }
 *)

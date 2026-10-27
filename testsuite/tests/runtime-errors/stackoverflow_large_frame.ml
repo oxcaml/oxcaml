@@ -1,6 +1,6 @@
 (* TEST
    { bytecode; }
-   { native; }
+   { native; }{ jsir; }
 *)
 
 (* Deep recursion where every frame is several pages. Without stack

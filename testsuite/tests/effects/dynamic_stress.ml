@@ -1,6 +1,6 @@
 (* TEST
    { bytecode; }
-   { native; }
+   { native; }{ jsir; }
 *)
 
 module Dynamic = struct

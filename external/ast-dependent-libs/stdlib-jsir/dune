@@ -72,6 +72,7 @@
  (target stdlib_upstream_compatible.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_upstream_compatible/*.ml)
+  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_upstream_compatible/stdlib_upstream_compatible.cmxa)
  (action
   (with-stdout-to
@@ -80,23 +81,20 @@
     %{exe:gen_jsir_lib.exe}
     --ocaml-bin
     %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
     --name
     stdlib_upstream_compatible
-    --src
-    %{ocaml_where}/stdlib_upstream_compatible
     --cmxa
     %{ocaml_where}/stdlib_upstream_compatible/stdlib_upstream_compatible.cmxa
     --flags
     "-extension-universe upstream_compatible"))))
 
-(subdir
- build/stdlib_upstream_compatible
- (dynamic_include ../../stdlib_upstream_compatible.dune))
-
 (rule
  (target stdlib_stable.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_stable/*.ml)
+  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_stable/stdlib_stable.cmxa)
  (action
   (with-stdout-to
@@ -105,21 +103,18 @@
     %{exe:gen_jsir_lib.exe}
     --ocaml-bin
     %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
     --name
     stdlib_stable
-    --src
-    %{ocaml_where}/stdlib_stable
     --cmxa
     %{ocaml_where}/stdlib_stable/stdlib_stable.cmxa))))
-
-(subdir
- build/stdlib_stable
- (dynamic_include ../../stdlib_stable.dune))
 
 (rule
  (target stdlib_beta.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_beta/*.ml)
+  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_beta/stdlib_beta.cmxa)
  (action
   (with-stdout-to
@@ -128,23 +123,20 @@
     %{exe:gen_jsir_lib.exe}
     --ocaml-bin
     %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
     --name
     stdlib_beta
-    --src
-    %{ocaml_where}/stdlib_beta
     --cmxa
     %{ocaml_where}/stdlib_beta/stdlib_beta.cmxa
     --flags
     "-extension-universe beta -extension small_numbers_beta"))))
 
-(subdir
- build/stdlib_beta
- (dynamic_include ../../stdlib_beta.dune))
-
 (rule
  (target stdlib_alpha.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_alpha/*.ml)
+  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_alpha/stdlib_alpha.cmxa)
  (action
   (with-stdout-to
@@ -153,23 +145,20 @@
     %{exe:gen_jsir_lib.exe}
     --ocaml-bin
     %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
     --name
     stdlib_alpha
-    --src
-    %{ocaml_where}/stdlib_alpha
     --cmxa
     %{ocaml_where}/stdlib_alpha/stdlib_alpha.cmxa
     --flags
     "-extension-universe alpha"))))
 
-(subdir
- build/stdlib_alpha
- (dynamic_include ../../stdlib_alpha.dune))
-
 (rule
  (target unix.dune)
  (deps
   (glob_files %{ocaml_where}/unix/*.ml)
+  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/unix/unix.cmxa)
  (action
   (with-stdout-to
@@ -178,23 +167,20 @@
     %{exe:gen_jsir_lib.exe}
     --ocaml-bin
     %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
     --name
     unix
-    --src
-    %{ocaml_where}/unix
     --cmxa
     %{ocaml_where}/unix/unix.cmxa
     --flags
-    -nolabels))))
-
-(subdir
- build/unix
- (dynamic_include ../../unix.dune))
+    "-nolabels"))))
 
 (rule
  (target str.dune)
  (deps
   (glob_files %{ocaml_where}/str/*.ml)
+  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/str/str.cmxa)
  (action
   (with-stdout-to
@@ -203,16 +189,88 @@
     %{exe:gen_jsir_lib.exe}
     --ocaml-bin
     %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
     --name
     str
-    --src
-    %{ocaml_where}/str
     --cmxa
     %{ocaml_where}/str/str.cmxa))))
+
+(rule
+ (target ocamlcommon.dune)
+ (deps
+  (glob_files %{ocaml_where}/compiler-libs/*.ml)
+  %{ocaml_where}/stdlib.cmxa
+  %{ocaml_where}/compiler-libs/ocamlcommon.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --name
+    ocamlcommon
+    --cmxa
+    %{ocaml_where}/compiler-libs/ocamlcommon.cmxa
+    --flags
+    "-w -67-47 -alert -unsafe_multidomain -alert -unsafe_effects"))))
+
+(rule
+ (target ocamlfrontend.dune)
+ (deps
+  (glob_files %{ocaml_where}/compiler-libs/*.ml)
+  %{ocaml_where}/stdlib.cmxa
+  %{ocaml_where}/compiler-libs/ocamlcommon.cmxa
+  %{ocaml_where}/compiler-libs/ocamlfrontend.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --name
+    ocamlfrontend
+    --cmxa
+    %{ocaml_where}/compiler-libs/ocamlfrontend.cmxa
+    --flags
+    "-w -67-47 -alert -unsafe_multidomain -alert -unsafe_effects"
+    --dep
+    .=%{ocaml_where}/compiler-libs/ocamlcommon.cmxa))))
+
+(subdir
+ build/stdlib_upstream_compatible
+ (dynamic_include ../../stdlib_upstream_compatible.dune))
+
+(subdir
+ build/stdlib_stable
+ (dynamic_include ../../stdlib_stable.dune))
+
+(subdir
+ build/stdlib_beta
+ (dynamic_include ../../stdlib_beta.dune))
+
+(subdir
+ build/stdlib_alpha
+ (dynamic_include ../../stdlib_alpha.dune))
+
+(subdir
+ build/unix
+ (dynamic_include ../../unix.dune))
 
 (subdir
  build/str
  (dynamic_include ../../str.dune))
+
+(subdir
+ build/compiler-libs
+ (dynamic_include ../../ocamlcommon.dune)
+ (dynamic_include ../../ocamlfrontend.dune))
 
 (install
  (package stdlib-jsir)
