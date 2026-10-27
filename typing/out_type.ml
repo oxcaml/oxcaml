@@ -1444,10 +1444,15 @@ end = struct
     fun obj v ->
       VarTbl.mem visible_vars (K (obj, v))
 
-  (* Find all direct paths (via vlowers) from some
+  (** Find all direct paths (via vlowers) from some
     variable [v] to all other reachable visible variables
-    at generic level. *)
-  (* WARNING: cycles are *not* registered
+    at generic level. Each path has an associated morphism.
+
+    [stack] holds the variables on the current search path,
+    so as to prevent cycles. Variables are removed on exit,
+    so that each acyclic path reaching a variable is registered.
+
+   WARNING: cycles are *not* registered
       as a separate morphism:
       e.g.: let [w] be a visible generic variable with
             the following (vlower) edges:
@@ -1465,9 +1470,6 @@ end = struct
       if visible dst v then [P { dst; var = v; path = C.id }]
       else paths_from_vlowers ~stack dst v
 
-  (* CR zeisbach: (nit) it might be useful to somewhere describe the purpose of
-     the stack in this traversal, either through a comment or through the
-     addition of named intermediates in the body of this function. *)
   and paths_from_vlowers :
       type b. stack:stack
       -> b C.obj -> b Desc.Var.Head.t
@@ -1496,30 +1498,12 @@ end = struct
     fun (K (dst, v)) ->
       paths_from_vlowers ~stack:(VarTbl.create 17) dst v
 
-  (* CR zeisbach: Too much of this comment describes _what_ the function does
-     (which can be deduced from the code, and risks going stale). The discussion
-     of [find_visible_morph_opt] seems to duplicate its own doc comment. It's
-     true that the comment here has less noise than the body, but I claim that
-     either (a) that isn't a problem, or (b) if it is a problem, then the way to
-     fix it is to (somehow) clean up the body of the function. I personally
-     think the body of the function is mostly fine. *)
   (** [find_path_from_description] constructs all morphisms
     from one visible mode variable to another, and records
     them in the [table] of [visible_paths].
     [find_visible_morph_opt table] takes a variable as
-    input, and returns its associated morphism. The final
-    morphism is constructed as follows:
-      - let the parameter [desc] be a morphvar
-        description [(v, f)]
-      - let g be vlower path from [v] to some [u].
-        (recall g : [u.obj] -> [v.obj])
-      - let [find_visible_morph_opt table u] = Some [h]
-    [find_path_from_description] records
-    ([v], [u]) and [fgh'] where [h'] is the left
-    adjoint of [h].
-
-    See [Paths.Monadic] for an explanation
-    why this is the morphism we want *)
+    input, and returns its associated morphism.
+    See [Paths.Monadic] for an explanation of how this morphism is constructed. *)
   let find_path_from_description :
       type s d.
       (d, (allowed * allowed)) Desc.t
@@ -1548,16 +1532,12 @@ end = struct
               fatal_error "Out_type.find_path_from_description"
           ) paths
 
-
-  (* CR zeisbach: when I read this and looked the fact that we are iterating
-     over monadic/comonadic pairs, I was confused. It might be nice to slightly
-     rephrase this comment to make it clear that we aren't using the paired-ness
-     of the (co)monadic halves here and rather just gathering up all paths. *)
-  (* The following function is expensive and should be
-  called once during preprocessing. It constructs all
-  morphisms from a visible monadic/comonadic variable to
-  another visible monadic/comonadic variable, and records
-  them in their respective tables *)
+  (** [add_visible_paths] expensive and should be called once during preprocessing.
+      It finds all paths between visible variables. Recall that each visible mode
+      in a signature is a pair of variables: a monadic variable and a comonadic
+      variable. [add_visible_paths] finds the paths from monadic variables to
+      monadic variables, the paths from comonadic variables to comonadic variables,
+      and finally the paths from monadic variables to comonadic variables. *)
   let add_visible_paths () =
     List.iter
       (fun { monadic; comonadic } ->
@@ -1661,9 +1641,8 @@ end = struct
       | Amodevar (Amorphvar (v, f)) ->
         C.apply dst f v.desc_lower
 
-  (* CR zeisbach: the [target <= src] comments below suggest a relationship
-     between the targets and sources of the returned morphisms that is relied
-     upon but not documented on this function. *)
+  (** [construct_morphs] returns a list of morphisms from [src_descr] to [target_descr],
+      where each morphism [f] in the list satisfies [f target_descr < src_descr]. *)
   let construct_morphs :
       type a. (a, a) Paths.table
         -> (a, (allowed * allowed)) Desc.t
@@ -1915,10 +1894,6 @@ end = struct
       let comonadic = construct_comonadic_between pair0 pair1 in
       simple, comonadic
 
-  (* CR zeisbach: it is not immediately obvious to me why we call
-     [construct_closing_over_to] exactly here and not in the from function
-     below. Perhaps a comment here or on [construct_closing_over_to] could
-     be useful? *)
   let construct_edges_to :
       visible_pair -> edge_as_lower list =
     fun pair1 ->
@@ -1929,6 +1904,9 @@ end = struct
           @ List.map (fun e -> Lower_comonadic e) comonadic)
           !visible_pairs
       in
+      (* closing over edges are special, and only ever get printed on the lower
+      bound of a curry mode: it is therefore sufficient to find them as part of
+      [construct_edges_to]. *)
       construct_closing_over_to pair1 @ edges
 
   let construct_edges_from :

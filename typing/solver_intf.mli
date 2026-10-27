@@ -494,10 +494,6 @@ module type Solver_mono = sig
       'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
   end
 
-  (* CR zeisbach: a lot of printing interacts with the description of a mode
-     variable and not a mode variable itself. As such, it seems appropriate to
-     document this inferface better, as well as perhaps [desc] below. *)
-
   (** The exposed description of modes *)
   module Desc : sig
     module Var : sig
@@ -506,13 +502,19 @@ module type Solver_mono = sig
       type ('b, 'd) t_with_morph =
         | Amorphvar : 'a t * ('a, 'b, 'd) morph -> ('b, 'd) t_with_morph
 
+      (** The exposed parts of a mode variable *)
       module Head : sig
         type 'a t =
           { desc_id : int;
+              (** The identifier of a mode variable *)
             desc_upper : 'a;
+              (** The precise upper bound of a mode variable *)
             desc_lower : 'a;
+              (** The precise lower bound of a mode variable *)
             desc_vlower : ('a, left_only) t_with_morph list;
+              (** A list of variables directly under the current variable *)
             desc_level : int
+              (** The level of a mode variable *)
           }
 
         val equal : 'a t -> 'b t -> bool
