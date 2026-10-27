@@ -376,6 +376,79 @@ and print_sum path sum expr =
   in
   Ast_helper.Exp.match_ expr cases
 
+let print_bindings bindings =
+  List.fold_right
+    (fun (binding : Binding.t) body ->
+      let name = Name.to_string binding.name in
+      Ast_helper.Exp.sequence
+        (print_value (name ^ "_print") binding.ty (ident name))
+        body)
+    bindings unit_
+
+let observe_body decls statement =
+  let observe expr ~initialized ~pattern ~on_return =
+    let line = "assertion_line" in
+    let column = "assertion_column" in
+    (* Each compiler configuration uses a different source directory. *)
+    let payload =
+      Ast_helper.Pat.tuple
+        [ None, Ast_helper.Pat.any ();
+          None, Ast_helper.Pat.var (loc line);
+          None, Ast_helper.Pat.var (loc column) ]
+        Closed
+    in
+    let exception_pattern =
+      Ast_helper.Pat.exception_
+        (Ast_helper.Pat.construct (lid "Assert_failure") (Some ([], payload)))
+    in
+    let on_assertion =
+      Ast_helper.Exp.sequence
+        (apply
+           (qualified_ident "Printf" "printf")
+           [ Ast_helper.Exp.constant
+               (Ast_helper.Const.string "assertion %d:%d\n");
+             ident line;
+             ident column ])
+        (print_bindings initialized)
+    in
+    (* Exception patterns protect only the scrutinee, not the continuation or
+       the observations. They also avoid boxing unboxed initializer results. *)
+    Ast_helper.Exp.match_ expr
+      [ Ast_helper.Exp.case pattern on_return;
+        Ast_helper.Exp.case exception_pattern on_assertion ]
+  in
+  let rec bind initialized = function
+    | [] ->
+      let on_return =
+        Ast_helper.Exp.sequence
+          (apply
+             (qualified_ident "Printf" "printf")
+             [Ast_helper.Exp.constant (Ast_helper.Const.string "returned\n")])
+          (print_bindings initialized)
+      in
+      observe
+        (Statement.to_code statement)
+        ~initialized
+        ~pattern:(Ast_helper.Pat.construct (lid "()") None)
+        ~on_return
+    | ((binding : Binding.t), expr) :: rest ->
+      let name = Name.to_string binding.name in
+      let body = bind (binding :: initialized) rest in
+      let on_return =
+        if binding.is_mutable
+        then Statement.let_binding binding (ident name) body
+        else body
+      in
+      observe
+        (Ast_helper.Exp.constraint_ (Expr.to_code expr)
+           (Some (Ty.to_code binding.ty))
+           [])
+        ~initialized
+        ~pattern:(Ast_helper.Pat.var (loc name))
+        ~on_return
+  in
+  bind [] decls
+
 let to_code
     { swarm;
       record_types;
@@ -393,22 +466,19 @@ let to_code
              (Ast_helper.Mod.ident (lid (String.capitalize_ascii lib)))))
       libraries
   in
-  let print_decl ((binding : Binding.t), _expr) =
-    let name = Name.to_string binding.name in
-    print_value (name ^ "_print") binding.ty (ident name)
-  in
   let body =
-    Ast_helper.Exp.sequence
-      (Statement.to_code statement)
-      (List.fold_left
-         (fun acc decl -> Ast_helper.Exp.sequence (print_decl decl) acc)
-         unit_ decls)
-  in
-  let body =
-    List.fold_right
-      (fun (binding, expr) acc ->
-        Statement.let_binding binding (Expr.to_code expr) acc)
-      decls body
+    match swarm.assertions with
+    | Disabled | Unreachable_only ->
+      let body =
+        Ast_helper.Exp.sequence
+          (Statement.to_code statement)
+          (print_bindings (List.rev_map fst decls))
+      in
+      List.fold_right
+        (fun (binding, expr) acc ->
+          Statement.let_binding binding (Expr.to_code expr) acc)
+        decls body
+    | May_raise -> observe_body decls statement
   in
   let main =
     Ast_helper.Str.value Nonrecursive
