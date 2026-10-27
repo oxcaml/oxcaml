@@ -30,7 +30,7 @@ let pass = make
   (fun _log env ->
     let reason = reason_with_fallback env "the pass action always succeeds" in
     let result = Result.pass_with_reason reason in
-    (result, env))
+    (Actions.Static result, env))
 
 let skip = make
   ~name:"skip"
@@ -39,7 +39,7 @@ let skip = make
   (fun _log env ->
     let reason = reason_with_fallback env "explicit 'skip' in the test" in
     let result = Result.skip_with_reason reason in
-    (result, env))
+    (Actions.Static result, env))
 
 let fail = make
   ~name:"fail"
@@ -48,7 +48,7 @@ let fail = make
   (fun _log env ->
     let reason = reason_with_fallback env "the fail action always fails" in
     let result = Result.fail_with_reason reason in
-    (result, env))
+    (Actions.Static result, env))
 
 let cd = make
   ~name:"cd"
@@ -58,21 +58,24 @@ let cd = make
      tests/lib-dynlink-pr4839/test.ml *)
   (fun _log env ->
     let cwd = Environments.safe_lookup Builtin_variables.cwd env in
+    Actions.Task [Chdir cwd], env)
+
+let do_chdir cwd =
     begin
       try
-        Sys.chdir cwd; (Result.pass, env)
+        Sys.chdir cwd; Result.pass
       with _ ->
         let reason = "Could not chdir to \"" ^ cwd ^ "\"" in
         let result = Result.fail_with_reason reason in
-        (result, env)
-    end)
+        result
+    end
 
 let dumpenv = make
   ~name:"dumpenv"
   ~description:"Dump the environment"
   ~does_something:false
   (fun log env ->
-    Environments.dump log env; (Result.pass, env))
+    Environments.dump log env; (Actions.Static Result.pass, env))
 
 let hasunix = make
   ~name:"hasunix"
@@ -432,22 +435,26 @@ let file_exists_action _log env =
     | None ->
       let reason = reason_with_fallback env "the file variable is undefined" in
       let result = Result.fail_with_reason reason in
-      (result, env)
+      (Actions.Static result, env)
     | Some filename ->
-      if Sys.file_exists filename
-      then begin
-        let default_reason = Printf.sprintf "File %s exists" filename in
-        let reason = reason_with_fallback env default_reason in
-        let result = Result.pass_with_reason reason in
-        (result, env)
-      end else begin
-        let default_reason =
-          Printf.sprintf "File %s does not exist" filename
-        in
-        let reason = reason_with_fallback env default_reason in
-        let result = Result.fail_with_reason reason in
-        (result, env)
-      end
+      let default_reason = Printf.sprintf "File %s exists" filename in
+      let reason = reason_with_fallback env default_reason in
+      (Actions.Task [Check_file_exists {filename;reason}], env)
+
+let do_check_file_exists ~filename ~reason =
+  if Sys.file_exists filename
+  then Result.pass_with_reason reason
+  else Result.fail_with_reason reason
+
+let do_check_file_absent ~filename =
+  if not (Sys.file_exists filename)
+  then Result.pass
+  else
+    let ic = open_in filename in
+    let msg = input_line ic in
+    close_in ic;
+    Result.fail_with_reason msg
+
 let file_exists = make
   ~name:"file-exists"
   ~description:"Pass if there is a file at the path contained in variable \
@@ -455,31 +462,32 @@ let file_exists = make
   ~does_something:true
   file_exists_action
 
-let copy_action log env =
-  let do_copy src dst =
-    let (entry_type, f) =
-      if Sys.is_directory src
-      then ("directory", Sys.copy_directory)
-      else ("file", Sys.copy_file)
-    in
-    Printf.fprintf log "Copying %s %s to %s\n%!" entry_type src dst;
-    f src dst
-  in
+let copy_action _log env =
   let src = Environments.lookup Builtin_variables.src env in
   let dst = Environments.lookup Builtin_variables.dst env in
   match (src, dst) with
     | (None, _) | (_, None) ->
       let reason = reason_with_fallback env "src or dst are undefined" in
       let result = Result.fail_with_reason reason in
-      (result, env)
+      (Actions.Static result, env)
     | (Some src, Some dst) ->
       let f =
         if String.ends_with ~suffix:"/" dst
-        then fun src -> do_copy src (dst ^ (Filename.basename src))
-        else fun src -> do_copy src dst
+        then fun src ->
+          Actions.Copy_file {src; dst=(dst ^ (Filename.basename src))}
+        else fun src -> Actions.Copy_file {src; dst}
       in
-      List.iter f (String.words src);
-      (Result.pass, env)
+      Actions.Task (List.map f (String.words src)), env
+
+let do_copy_file log ~src ~dst =
+  let (entry_type, f) =
+    if Sys.is_directory src
+    then ("directory", Sys.copy_directory)
+    else ("file", Sys.copy_file)
+  in
+  Printf.fprintf log "Copying %s %s to %s\n%!" entry_type src dst;
+  f src dst;
+  Result.pass
 
 let copy =
   make ~name:"copy" ~description:"Copy a file"

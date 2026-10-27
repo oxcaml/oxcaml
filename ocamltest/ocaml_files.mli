@@ -24,6 +24,8 @@ val runtime_variant : unit -> runtime_variant
 
 val ocamlrun : string
 
+val ocamlrun_sys : string
+
 val ocamlc : string
 
 val ocaml : string

@@ -145,8 +145,8 @@ let run_jsir_js =
     ~description:"Run the jsir-js test"
     ~does_something:true
     (fun log env ->
-      let (result, env') = Tests.run log env jsir_js in
-      if Result.is_pass result then (result, env) else (result, env'))
+      let task, _env' = Tests.collect log env jsir_js in
+      task, env)
 
 (* The halves whose compiler is installed; skipped when neither is. *)
 let jsir =
