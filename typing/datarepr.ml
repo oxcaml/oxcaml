@@ -61,7 +61,14 @@ let constructor_existentials cd_args cd_res =
   in
   (tyl, existentials)
 
-let constructor_args ~current_unit priv cd_args cd_res path rep =
+let unboxed_constructor_sort cd_args =
+  match cd_args with
+  | Cstr_tuple [{ ca_sort; _ }] -> ca_sort
+  | Cstr_record [{ ld_sort; _ }] -> ld_sort
+  | Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _) ->
+    Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
+
+let constructor_args ~current_unit priv cd_args cd_res path tag shape vrep =
   let tyl, existentials = constructor_existentials cd_args cd_res in
   match cd_args with
   | Cstr_tuple l -> existentials, l, None
@@ -82,7 +89,8 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
         {
           type_params;
           type_arity = arity;
-          type_kind = Type_record (lbls, rep, None);
+          type_kind =
+            Type_record (lbls, Record_inlined (tag, shape, vrep), None);
           type_jkind = jkind;
           type_ikind = Types.ikinds_todo "datarepr boxed record";
           type_private = priv;
@@ -163,16 +171,11 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          believes that the choice of using [decl.type_jkind] vs the algorithm
          written here should be irrelevant, and so would like to understand
          this interaction better. *)
-      begin match cd_args with
-      | Cstr_tuple [{ ca_sort = Some sort }]
-      | Cstr_record [{ ld_sort = Some sort }] ->
+      begin match unboxed_constructor_sort cd_args with
+      | Some sort ->
         [| Cstr_layout_known
              { shape = Constructor_uniform_value; sorts = [| sort |] } |]
-      | Cstr_tuple [{ ca_sort = None }]
-      | Cstr_record [{ ld_sort = None }] ->
-        [| Cstr_layout_undetermined |]
-      | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
-        Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
+      | None -> [| Cstr_layout_undetermined |]
       end
     | Variant_unboxed, ([] | _ :: _) ->
       Misc.fatal_error "Multiple or 0 constructors in [@@unboxed] variant"
@@ -239,9 +242,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =
-      let record_repr = Record_inlined (cstr_tag, cstr_shape, rep) in
       constructor_args ~current_unit decl.type_private cd_args cd_res
-        Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
+        Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) cstr_tag cstr_shape rep
     in
     let cstr =
       { cstr_name;
@@ -276,8 +278,8 @@ let extension_descr ~current_unit path_ext ext =
   let cstr_tag = Extension path_ext in
   let existentials, cstr_args, cstr_inlined =
     constructor_args ~current_unit ext.ext_private ext.ext_args ext.ext_ret_type
-      Path.(Pextra_ty (path_ext, Pext_ty))
-      (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible))
+      Path.(Pextra_ty (path_ext, Pext_ty)) cstr_tag ext.ext_shape
+      Variant_extensible
   in
     { cstr_name = Path.last path_ext;
       cstr_res = ty_res;
