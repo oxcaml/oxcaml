@@ -176,12 +176,10 @@ Assigning a branching expression to an unbound record field
 
   $ $MERLIN single errors -filename unbound_field.ml < unbound_field.ml \
   >   | revert-newlines \
-  >   | jq .value -r
-  The expression is dynamic because it has branches.
-  However, the expression highlighted is expected to be static.
+  >   | jq .value[].message -r
+  Unbound record field l
 
   $ $MERLIN single type-enclosing -position 1:23 -filename unbound_field.ml < unbound_field.ml \
   >   | revert-newlines \
-  >   | jq .value -r
-  The expression is dynamic because it has branches.
-  However, the expression highlighted is expected to be static.
+  >   | jq .value[0].type -r
+  bool
