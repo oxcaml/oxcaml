@@ -279,6 +279,66 @@ module Binding = struct
     }
 end
 
+module Exn = struct
+  type t =
+    { id : int;
+      payload : Ty.t option
+    }
+
+  let equal left right = Int.equal left.id right.id
+
+  let name { id; _ } = Format.sprintf "Exn_%d" id
+
+  let to_code t =
+    let args =
+      match t.payload with
+      | None -> []
+      | Some ty -> [Ast_helper.Type.constructor_arg (Ty.to_code ty)]
+    in
+    Ast_helper.Str.exception_
+      (Ast_helper.Te.mk_exception
+         (Ast_helper.Te.decl ~args:(Parsetree.Pcstr_tuple args) (loc (name t))))
+end
+
+module Handler = struct
+  type pattern =
+    | Exn of
+        { exn : Exn.t;
+          payload : Binding.t option
+        }
+    | Catch_all
+
+  type 'body t =
+    { pattern : pattern;
+      body : 'body
+    }
+
+  let pattern_to_code = function
+    | Catch_all -> Ast_helper.Pat.any ()
+    | Exn { exn; payload } ->
+      let payload =
+        match exn.payload, payload with
+        | None, None -> None
+        | Some _, None -> Some ([], Ast_helper.Pat.any ())
+        | Some ty, Some (binding : Binding.t) ->
+          if not (Ty.equal ty binding.ty)
+          then Misc.fatal_errorf "Handler: payload type mismatch";
+          Some
+            ( [],
+              (* CR-soon selee for xclerc: see below comment about
+                 constraints *)
+              Ast_helper.Pat.constraint_
+                (Ast_helper.Pat.var (loc (Name.to_string binding.name)))
+                (Some (Ty.to_code ty))
+                [] )
+        | None, Some _ -> Misc.fatal_errorf "Handler: exception has no payload"
+      in
+      Ast_helper.Pat.construct (lid (Exn.name exn)) payload
+
+  let to_case body_to_code { pattern; body } =
+    Ast_helper.Exp.case (pattern_to_code pattern) (body_to_code body)
+end
+
 (* CR-someday xclerc: Add unary operations as well. *)
 module Bin_op = struct
   (* CR-soon xclerc: Add more operators. Especially division and modulo (with
@@ -392,6 +452,18 @@ module Expr = struct
         { fun_name : Name.t;
           args : t list
         }
+    | Raise of raise
+    | Try of
+        { ty : Ty.t;
+          body : t;
+          handlers : t Handler.t list
+        }
+
+  and raise =
+    { exn : Exn.t;
+      payload : t option;
+      notrace : bool
+    }
 
   and case =
     { constructor : Ty.constructor;
@@ -547,6 +619,24 @@ module Expr = struct
     | Call_toplevel { fun_name; args } ->
       let args = match args with [] -> [unit_] | _ -> List.map to_code args in
       apply (ident (Name.to_string fun_name)) args
+    | Raise raise -> raise_to_code raise
+    | Try { ty; body; handlers } ->
+      if List.is_empty handlers then Misc.fatal_errorf "Try: no handlers";
+      constrain ty
+        (Ast_helper.Exp.try_ (to_code body)
+           (List.map (Handler.to_case to_code) handlers))
+
+  and raise_to_code { exn; payload; notrace } =
+    let payload =
+      match exn.payload, payload with
+      | None, None -> None
+      | Some _, Some payload -> Some (to_code payload)
+      | Some _, None | None, Some _ ->
+        Misc.fatal_errorf "Raise: payload does not match the exception"
+    in
+    apply
+      (ident (if notrace then "raise_notrace" else "raise"))
+      [Ast_helper.Exp.construct (lid (Exn.name exn)) payload]
 
   and place_to_code = function
     | Variable name -> ident (Name.to_string name)
@@ -623,6 +713,11 @@ module Statement = struct
           stride : int;
           body : t
         }
+    | Raise of Expr.raise
+    | Try of
+        { body : t;
+          handlers : t Handler.t list
+        }
 
   let let_binding ({ name; ty; is_mutable } : Binding.t) expr body =
     let mutability = if is_mutable then Mutable else Immutable in
@@ -665,12 +760,23 @@ module Statement = struct
     | Let (binding, expr, body) ->
       let_binding binding (Expr.to_code expr) (to_code body)
     | Seq statements ->
-      List.fold_right Ast_helper.Exp.sequence
-        (List.map to_code statements)
-        unit_
+      (* A trailing [raise] is not followed by [()], as the statement would
+         never be reached. *)
+      let rec sequence = function
+        | [] -> unit_
+        | [Raise raise] -> Expr.raise_to_code raise
+        | statement :: rest ->
+          Ast_helper.Exp.sequence (to_code statement) (sequence rest)
+      in
+      sequence statements
     | If (condition, if_true, if_false) ->
       Ast_helper.Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
         (Some (to_code if_false))
+    | Raise raise -> Expr.raise_to_code raise
+    | Try { body; handlers } ->
+      if List.is_empty handlers then Misc.fatal_errorf "Try: no handlers";
+      Ast_helper.Exp.try_ (to_code body)
+        (List.map (Handler.to_case to_code) handlers)
 end
 
 module Inline = struct
@@ -697,10 +803,11 @@ module Function = struct
       inline : Inline.t;
       body : Statement.t;
       return_ty : Ty.t;
-      result : Expr.t
+      result : Expr.t;
+      raises : Exn.t list
     }
 
-  let to_code { name; params; inline; body; return_ty; result } =
+  let to_code { name; params; inline; body; return_ty; result; raises = _ } =
     let to_param ({ name; ty; _ } : Binding.t) =
       value_param
         (Ast_helper.Pat.constraint_
