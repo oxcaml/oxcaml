@@ -45,7 +45,11 @@ val fill : 'a t -> 'a -> scheduler:Scheduler.t -> 'a Fill_result.t
     either run or cancelled, exactly once:
     - [run v] once [t] is filled with [v]. If [t] is already full, it is
       enqueued immediately.
-    - [cancel ()] if the handler is detached by {!cancel_all}. *)
+    - [cancel ()] if the handler is detached by {!cancel_all}.
+
+    Both run in the monitor current when [upon] is called (see
+    {!Scheduler.Monitor}), not the one current when [t] is filled or cancelled.
+*)
 val upon :
   'a t ->
   run:('a -> unit) ->
