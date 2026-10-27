@@ -437,3 +437,72 @@ type ('a : any) ru' = { x : 'a; } [@@unboxed]
 type vu = VU of t_any [@@unboxed]
 type ('a : any) vu' = VU of 'a [@@unboxed]
 |}]
+
+(********************************************************)
+(* Test 13: Projecting from an @@unboxed inline record. *)
+
+type ('a : bits64) c = C of { l : 'a } [@@unboxed]
+external box_int64 : int64_u -> int64 = "%box_int64"
+[%%expect{|
+type ('a : bits64) c = C of { l : 'a; } [@@unboxed]
+external box_int64 : int64_u -> int64 = "%box_int64"
+|}]
+
+let proj (C { l } : int64_u c) = l
+[%%expect{|
+Line 1, characters 14-15:
+1 | let proj (C { l } : int64_u c) = l
+                  ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let proj x = match x with C r -> r.l
+[%%expect{|
+>> Fatal error: expected a layout of scannable
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let v = box_int64 (match C { l = #42L } with C { l } -> l)
+let v' = box_int64 (match C { l = #42L } with C r -> r.l)
+[%%expect{|
+Line 1, characters 49-50:
+1 | let v = box_int64 (match C { l = #42L } with C { l } -> l)
+                                                     ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+type ('a : any) u = U of { u : 'a } [@@unboxed]
+[%%expect{|
+type ('a : any) u = U of { u : 'a; } [@@unboxed]
+|}]
+
+let proj (U { u } : int64_u u) = u
+[%%expect{|
+Line 1, characters 14-15:
+1 | let proj (U { u } : int64_u u) = u
+                  ^
+Error: Non-value detected in [value_kind].
+       Please report this error to the Jane Street compilers team.
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
+         because it has to be value for the V1 safety check.
+|}]
+
+let proj (x : int64_u u) = match x with U r -> r.u
+[%%expect{|
+>> Fatal error: expected a layout of scannable
+Uncaught exception: Misc.Fatal_error
+
+|}]
