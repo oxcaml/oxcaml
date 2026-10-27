@@ -45,7 +45,7 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
         (* This should already be populated by To_jsir.let_expr_normal *)
         let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
         let value_var = To_jsir_env.get_var_exn env v in
-        env, To_jsir_result.add_instr_exn res (Assign (symbol_var, value_var)))
+        env, To_jsir_shared.bind_vars ~res [symbol_var, value_var])
 
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
