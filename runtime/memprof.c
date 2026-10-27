@@ -2182,7 +2182,8 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
    * orphaned, deleting all offset entries. In this case,
    * thread->config will have changed. We will have run the allocation
    * callbacks up to the one which stopped the old profile. */
-  bool restarted = (config != entries->config && entries->config != CONFIG_NONE);
+  bool restarted = (config != entries->config &&
+                    entries->config != CONFIG_NONE);
 
   /* A callback may have raised an exception. In this case, we are
    * going to cancel this whole combined allocation and should delete
