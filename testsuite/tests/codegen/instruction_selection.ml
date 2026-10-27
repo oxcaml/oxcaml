@@ -128,6 +128,23 @@ lognot_lt_branch:
   ret
 |}]
 
+let lognot_lognot_lte_branch x y f =
+  if Int64_u.to_int64 (Int64_u.lognot x) <= Int64_u.to_int64 (Int64_u.lognot y)
+  then f ()
+[%%expect_asm X86_64{|
+lognot_lognot_lte_branch:
+  movq  %rbx, %rsi
+  movq  %rdi, %rbx
+  cmpq  %rsi, %rax
+  jl    .L0
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L0:
+  movl  $1, %eax
+  ret
+|}]
+
 (* CR ttebbi: We materialize comparison result bits despite
    only using them for a single branch. Also, the `_ -> 0`
    case is duplicated for no good reason. *)
@@ -276,15 +293,15 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jge   .L1
+  jl    .L0
+  subq  %rax, %rax
+  incq  %rax
+  cmpq  $1, %rax
+  jne   .L1
 .L0:
   movl  $7, %eax
   ret
 .L1:
-  subq  %rax, %rax
-  incq  %rax
-  cmpq  $1, %rax
-  je    .L0
   movl  $9, %eax
   ret
 |}]

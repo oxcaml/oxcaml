@@ -5212,11 +5212,15 @@ let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
 let cmp_int cmp ~dbg x y =
   match x, y with
-  | Cop (Cnot, [arg], _), ((Cconst_int _ | Cconst_natint _) as const) ->
+  (* Bitwise-not reverses signed and unsigned order. We can use this to remove
+     an [lnot] from both sides of a comparison, e.g. [lnot x < lnot y] iff [x >
+     y]. This transformation can also remove a single [lnot] if the other side
+     is a constant. *)
+  | Cop (Cnot, _, _), Cop (Cnot, _, _)
+  | Cop (Cnot, _, _), (Cconst_int _ | Cconst_natint _)
+  | (Cconst_int _ | Cconst_natint _), Cop (Cnot, _, _) ->
     let cmp = Cmm.swap_integer_comparison cmp in
-    binary (Ccmpi cmp) ~dbg arg (not_int const dbg)
-  | ((Cconst_int _ | Cconst_natint _) as const), Cop (Cnot, [arg], _) ->
-    binary (Ccmpi cmp) ~dbg arg (not_int const dbg)
+    binary (Ccmpi cmp) ~dbg (not_int x dbg) (not_int y dbg)
   | _, _ -> binary (Ccmpi cmp) ~dbg x y
 
 let eq ~dbg x y =
