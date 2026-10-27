@@ -294,13 +294,13 @@ module CU_data = struct
       cu : Types.value Or_missing.t
     }
 
-  type raw = File_sections.Idx.t
+  type raw = t File_sections.Idx.t
 
   let empty () = { templates = Template_store.empty (); cu = Missing }
 
-  let read raw ~sections = Obj.obj (File_sections.get sections raw)
+  let read raw ~sections = File_sections.get sections raw
 
-  let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
+  let write t ~sections = File_sections.Builder.add sections t
 
   let print ppf { templates; cu } =
     Fmt.fprintf ppf "@[<v 0>%a%a@]" Types.print_value_or_missing cu
