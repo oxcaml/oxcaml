@@ -109,16 +109,16 @@ The result must be complete, as if aggregated directly from the cmt files:
 
   $ ocaml-index aggregate ea.cmt sl.cmt -o direct.ocaml-index
   $ ocaml-index stats all.ocaml-index direct.ocaml-index
-  Index "direct.ocaml-index" contains:
-  - 86 definitions
-  - 238 locations
+  Index "all.ocaml-index" contains:
+  - 88 definitions
+  - 244 locations
   - 0 approximated definitions
   - 0 compilation units shapes
   - root dir: none
   
-  Index "all.ocaml-index" contains:
-  - 86 definitions
-  - 238 locations
+  Index "direct.ocaml-index" contains:
+  - 88 definitions
+  - 244 locations
   - 0 approximated definitions
   - 0 compilation units shapes
   - root dir: none

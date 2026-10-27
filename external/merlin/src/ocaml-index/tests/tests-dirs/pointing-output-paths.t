@@ -7,17 +7,17 @@ This test check the robustness and flexibility of the -o argument
   $ cat >b.ml <<'EOF2'
   > let z = A.x + A.y
   > EOF2
-  $ ocamlc -bin-annot -bin-annot-occurrences -c a.ml b.ml
+  $ $OCAMLC -bin-annot -bin-annot-occurrences -c a.ml b.ml
   $ ocaml-index aggregate a.cmt -o a.ocaml-index
   $ ocaml-index aggregate b.cmt -o b.ocaml-index
   $ ocaml-index stats a.ocaml-index b.ocaml-index | grep -v "^- [0a-z]"
-  Index "b.ocaml-index" contains:
-  - 5 definitions
-  - 6 locations
-  
   Index "a.ocaml-index" contains:
   - 3 definitions
   - 4 locations
+  
+  Index "b.ocaml-index" contains:
+  - 5 definitions
+  - 6 locations
   
 
 A plain relative output path, read from the current directory and from
