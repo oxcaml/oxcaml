@@ -1654,6 +1654,11 @@ LBL(resume_preemption): /* %rdx -> gc_regs */
 LBL(caml_continue_preempted):
         jmp     LBL(restore_regs_and_ret)
 LBL(continuation_already_resumed):
+    /* Drop the gc_regs slot pushed by DO_RESUME_SWITCH, so that the
+       caller's return address is on top of the stack again if it is
+       scanned during the raise. */
+        addq    $8, %rsp
+        CFI_ADJUST(-8)
         ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller in the TSan
                                   backtrace */
