@@ -631,12 +631,14 @@ type codegen_option =
       { strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
+        arguments : Zero_alloc_utils.Arguments.t;
         loc : Location.t
       }
   | Check_zero_alloc of
       { strict : bool;
         loc : Location.t;
-        custom_error_msg : string option
+        custom_error_msg : string option;
+        arguments : Zero_alloc_utils.Arguments.t
       }
 
 type fundecl =

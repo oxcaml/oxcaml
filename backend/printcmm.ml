@@ -528,13 +528,14 @@ let codegen_option = function
     Printf.sprintf "regalloc_param[%s]"
       (String.concat ";" (List.map (Printf.sprintf "%S") params))
   | Cold -> "cold"
-  | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }
+  | Assume_zero_alloc
+      { strict; never_returns_normally; never_raises; arguments = _; loc = _ }
     ->
     Printf.sprintf "assume_zero_alloc_%s%s%s"
       (if strict then "_strict" else "")
       (if never_returns_normally then "_never_returns_normally" else "")
       (if never_raises then "_never_raises" else "")
-  | Check_zero_alloc { strict; loc = _; custom_error_msg } ->
+  | Check_zero_alloc { strict; loc = _; custom_error_msg; arguments = _ } ->
     Printf.sprintf "assert_zero_alloc%s%s"
       (if strict then "_strict" else "")
       (match custom_error_msg with

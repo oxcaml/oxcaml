@@ -1650,6 +1650,7 @@ end = struct
       assume : bool;
       never_returns_normally : bool;
       never_raises : bool;
+      arguments : Zero_alloc_utils.Arguments.t;
       loc : Location.t;
           (** Source location of the annotation, used for error messages. *)
       custom_error_msg : string option
@@ -1659,15 +1660,49 @@ end = struct
 
   let get_custom_error_msg t = t.custom_error_msg
 
+  let callbacks (arguments : Zero_alloc_utils.Argument.t list) =
+    arguments
+    |> List.mapi (fun argument_index argument -> argument_index, argument)
+    |> List.filter_map
+         (fun (argument_index, (argument : Zero_alloc_utils.Argument.t)) ->
+           match argument with
+           | Not_a_callback -> None
+           (* CR-someday wsturgeon: honor [partial] callbacks. *)
+           | Callback { arity; partial = _ } ->
+             Some
+               ( argument_index,
+                 { Zero_alloc_utils.Relevant_components_by_argument_index.arity;
+                   relevant_components =
+                     Zero_alloc_utils.Components.create (fun _tag -> true)
+                 } ))
+    |> Numbers.Int.Map.of_list
+
   let expected_value
       { strict;
         never_returns_normally;
         never_raises;
+        arguments;
         assume = _;
         loc = _;
         custom_error_msg = _
       } =
-    Value.of_annotation ~strict ~never_returns_normally ~never_raises
+    let value =
+      Value.of_annotation ~strict ~never_returns_normally ~never_raises
+    in
+    match arguments with
+    | Unconditional _ -> value
+    | Conditional { arguments } ->
+      let calling_callbacks =
+        V.top
+          ~allocation_sources:
+            (No_allocation_other_than_calling_arguments (callbacks arguments))
+          ~witnesses:Witnesses.empty
+      in
+      Zero_alloc_utils.Components.map value ~f:(fun _tag v ->
+          V.match_with v
+            ~resolved:(function
+              | Safe -> calling_callbacks | Top _ | Bot -> v)
+            ~unresolved:(fun () -> v))
 
   let valid t v =
     (* Use Value.lessequal but ignore witnesses. *)
@@ -1688,22 +1723,25 @@ end = struct
       List.filter_map
         (fun (c : Cmm.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { strict; loc; custom_error_msg; arguments } ->
             Some
               { strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
+                arguments;
                 loc;
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { strict; never_returns_normally; never_raises; arguments; loc }
+            ->
             Some
               { strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
+                arguments;
                 loc;
                 custom_error_msg = None
               }
@@ -1724,22 +1762,25 @@ end = struct
       List.filter_map
         (fun (c : Cfg.codegen_option) ->
           match c with
-          | Check_zero_alloc { strict; loc; custom_error_msg } ->
+          | Check_zero_alloc { strict; loc; custom_error_msg; arguments } ->
             Some
               { strict;
                 assume = false;
                 never_returns_normally = false;
                 never_raises = false;
+                arguments;
                 loc;
                 custom_error_msg
               }
           | Assume_zero_alloc
-              { strict; never_returns_normally; never_raises; loc } ->
+              { strict; never_returns_normally; never_raises; arguments; loc }
+            ->
             Some
               { strict;
                 assume = true;
                 never_returns_normally;
                 never_raises;
+                arguments;
                 loc;
                 custom_error_msg = None
               }
@@ -2463,7 +2504,15 @@ end = struct
         match Compilenv_utils.get_value_opt callee with
         | None ->
           if is_caml_internal callee
-          then return_top No_hint "missing summary: callee is caml internal"
+          then (
+            match
+              Annotation.find
+                (Cmm_helpers.generic_function_codegen_options callee)
+                callee dbg
+            with
+            | Some annotation -> resolved (Annotation.expected_value annotation)
+            | None ->
+              return_top No_hint "missing summary: callee is caml internal")
           else
             return_top Missing_summary
               "missing summary: callee compiled without checks"

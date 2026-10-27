@@ -1236,6 +1236,8 @@ val send_function :
 val apply_function :
   Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
+val generic_function_codegen_options : string -> Cmm.codegen_option list
+
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 
 val emit_divide_by_zero_message : unit -> Cmm.phrase list

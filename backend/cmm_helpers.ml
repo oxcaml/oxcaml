@@ -2848,6 +2848,34 @@ let apply_function_sym arity result mode =
   Compilenv.need_apply_fun arity result mode;
   global_symbol (apply_function_name arity result mode)
 
+let apply_function_codegen_options arity =
+  [ Assume_zero_alloc
+      { strict = true;
+        never_returns_normally = false;
+        never_raises = false;
+        arguments =
+          Conditional
+            { arguments =
+                List.map (fun _ -> Zero_alloc_utils.Argument.Not_a_callback) arity
+                @ [ Zero_alloc_utils.Argument.Callback
+                      { arity = List.length arity; partial = false } ]
+            };
+        loc = Location.none
+      } ]
+
+let generic_function_codegen_options name =
+  let { Cmx_format.apply_fun; curry_fun = _; send_fun = _ } =
+    Compilenv.current_generic_fns ()
+  in
+  match
+    List.find_opt
+      (fun (arity, result, mode) ->
+        String.equal name (apply_function_name arity result mode))
+      apply_fun
+  with
+  | Some (arity, _result, _mode) -> apply_function_codegen_options arity
+  | None -> []
+
 let tuplify_function_name arity result =
   "caml_tuplify" ^ Int.to_string arity ^ result_layout_suffix result
 
@@ -3684,10 +3712,16 @@ let split_arity_for_apply arity args =
     let args1, args2 = Misc.Stdlib.List.split_at max_arity args in
     (a1, args1), Some (a2, args2)
 
-let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
+let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg
+    ~callees =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
   let ty = Extended_machtype.to_machtype extended_ty in
+  let closure_known_argument =
+    match callees with
+    | Some [(Argument _ as callee)] -> Some callee
+    | Some _ | None -> None
+  in
   let really_call_caml_apply clos args =
     let sym = apply_function_sym extended_args_type extended_ty mode in
     let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
@@ -3696,8 +3730,8 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
           { result_type = ty;
             region = pos;
             callees = Some [Symbol sym];
-            (* CR wsturgeon for wsturgeon: propagate known arguments *)
-            known_arguments = []
+            known_arguments =
+              List.map (fun _ -> None) args @ [closure_known_argument]
           },
         cargs,
         dbg )
@@ -3774,7 +3808,7 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg ~callees =
               },
             (get_field_codepointer mut clos 0 dbg :: args) @ [clos],
             dbg ))
-  | _ -> call_caml_apply result arity mut clos args pos mode dbg
+  | _ -> call_caml_apply result arity mut clos args pos mode dbg ~callees
 
 let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
     mode dbg ~callees =
@@ -3796,7 +3830,7 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
     let body old_region =
       bind "result"
         (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
+           Cmx_format.Maybe_alloc_stack dbg ~callees) (fun clos ->
           might_split_call_caml_apply ?old_region result arity' mut clos args'
             pos mode dbg ~callees:None)
     in
@@ -4163,7 +4197,7 @@ let apply_function (arity, result, mode) =
     { fun_name;
       fun_args = List.map (fun (arg, ty) -> VP.create arg, ty) all_args;
       fun_body = body;
-      fun_codegen_options = [];
+      fun_codegen_options = apply_function_codegen_options arity;
       fun_dbg;
       fun_poll = Default_poll;
       fun_ret_type = result

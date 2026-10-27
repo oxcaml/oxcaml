@@ -441,11 +441,11 @@ end)
 let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   function
   | Default_zero_alloc -> []
-  | Assume { strict; never_returns_normally; never_raises; arguments = _; loc }
-    ->
-    [Assume_zero_alloc { strict; never_returns_normally; never_raises; loc }]
-  | Check { strict; loc; custom_error_msg; arguments = _; partial = _ } ->
-    [Check_zero_alloc { strict; loc; custom_error_msg }]
+  | Assume { strict; never_returns_normally; never_raises; arguments; loc } ->
+    [ Assume_zero_alloc
+        { strict; never_returns_normally; never_raises; arguments; loc } ]
+  | Check { strict; loc; custom_error_msg; arguments; partial = _ } ->
+    [Check_zero_alloc { strict; loc; custom_error_msg; arguments }]
 
 (* Answers "Is it even possible to partially apply this thing?" *)
 (* Returns `false` for single-argument functions, including "tupled" arguments

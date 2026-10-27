@@ -57,12 +57,14 @@ type codegen_option =
       { strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
+        arguments : Zero_alloc_utils.Arguments.t;
         loc : Location.t
       }
   | Check_zero_alloc of
       { strict : bool;
         loc : Location.t;
-        custom_error_msg : string option
+        custom_error_msg : string option;
+        arguments : Zero_alloc_utils.Arguments.t
       }
 
 let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
@@ -73,11 +75,13 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
     match hd with
     | No_CSE -> No_CSE :: of_cmm_codegen_option tl
     | Reduce_code_size -> Reduce_code_size :: of_cmm_codegen_option tl
-    | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc } ->
-      Assume_zero_alloc { strict; never_returns_normally; never_raises; loc }
+    | Assume_zero_alloc
+        { strict; never_returns_normally; never_raises; arguments; loc } ->
+      Assume_zero_alloc
+        { strict; never_returns_normally; never_raises; arguments; loc }
       :: of_cmm_codegen_option tl
-    | Check_zero_alloc { strict; loc; custom_error_msg } ->
-      Check_zero_alloc { strict; loc; custom_error_msg }
+    | Check_zero_alloc { strict; loc; custom_error_msg; arguments } ->
+      Check_zero_alloc { strict; loc; custom_error_msg; arguments }
       :: of_cmm_codegen_option tl
     | Use_linscan_regalloc -> Use_linscan_regalloc :: of_cmm_codegen_option tl
     | Use_regalloc regalloc -> Use_regalloc regalloc :: of_cmm_codegen_option tl
