@@ -53,7 +53,7 @@ let warn_once =
   fun message ->
     if not (Hashtbl.mem seen message) then begin
       Hashtbl.add seen message ();
-      if !Clflags.verbose then prerr_endline ("Warning: " ^ message)
+      prerr_endline ("Warning: " ^ message)
     end
 
 let warn_jsir_ignore what =

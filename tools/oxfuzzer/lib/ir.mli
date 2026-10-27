@@ -1,4 +1,4 @@
-(* CR-someday hwasilewski: Turn on strong warnings (unused value etc.). *)
+(* CR-someday xclerc: Turn on strong warnings (unused value etc.). *)
 module Name : sig
   type t
 
@@ -72,8 +72,10 @@ module Ty : sig
   type t =
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
+    | Unboxed_tuple of t list
     | Record of record
     | Variant of variant
+    | Or_null of t
     | Bool
 
   and record =
@@ -104,14 +106,26 @@ module Ty : sig
 
   val constructor_name : variant -> constructor -> string
 
-  val constructor_pattern :
-    variant -> constructor -> Name.t list -> Parsetree.pattern
-
   val record_name : record -> string
 
   val field_name : record -> field -> string
 
   val to_code : t -> Parsetree.core_type
+end
+
+module Sum : sig
+  type t =
+    | Variant of Ty.variant
+    | Or_null of Ty.t
+
+  val ty : t -> Ty.t
+
+  val constructors : t -> Ty.constructor list
+
+  val constructor_name : t -> Ty.constructor -> string
+
+  val constructor_pattern :
+    t -> Ty.constructor -> Name.t list -> Parsetree.pattern
 end
 
 module Binding : sig
@@ -133,7 +147,7 @@ module Bin_op : sig
     | Shift_left
     | Shift_right
     | Shift_right_logical
-    | Eq (* CR-someday hwasilewski: Also add non-equality. *)
+    | Eq (* CR-someday xclerc: Also add non-equality. *)
     | Lt
     | Le
     | Gt
@@ -161,6 +175,7 @@ module Expr : sig
           init_name : Name.t;
           init : t
         }
+    | Unboxed_tuple of (Name.t * t) list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -170,12 +185,12 @@ module Expr : sig
           expr : t
         }
     | Construct of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           constructor : Ty.constructor;
           args : (Name.t * t) list
         }
     | Match of
-        { variant : Ty.variant;
+        { sum : Sum.t;
           scrutinee : t;
           cases : case list
         }
@@ -206,6 +221,12 @@ module Expr : sig
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
     | Element of place * t list
+    | Unboxed_tuple_component of
+        { tuple : place;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   val convert_num :
     Parsetree.expression ->
@@ -225,6 +246,12 @@ module Place : sig
     | Variable of Name.t
     | Field of t * Ty.record * Ty.field
     | Element of t * Expr.t list
+    | Unboxed_tuple_component of
+        { tuple : t;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   val to_code : t -> Parsetree.expression
 end
