@@ -2654,7 +2654,7 @@ let check_primitive_arity loc p =
   in
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
 
-(* For an [args] list that zippable with the parameters of [p], produce the
+(* For an [args] list zippable with the parameters of [p], produce the
    sublist of [args] that corresponds to the non-elided parameters of [p]. *)
 let filter_elided_args (p : Primitive.description) args =
   List.filter_map
