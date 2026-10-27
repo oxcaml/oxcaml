@@ -219,7 +219,8 @@ let value_descriptions_zero_alloc
   let vd1_zero_alloc, prim_coercion_zero_alloc_check =
     match vd1.val_kind, Zero_alloc.get vd2.val_zero_alloc with
     | Val_prim p, Check check ->
-      ( Zero_alloc.create_const (Check { check with arity = p.prim_arity }),
+      ( Zero_alloc.create_const
+          (Check { check with arguments = Unconditional { arity = p.prim_arity } }),
         Some check )
     | ( (Val_reg _ | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ |
          Val_anc _),

@@ -4842,7 +4842,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:true
           ~on_application:false
-          ~default_arity valdecl.pval_attributes
+          ~default_arity ~parameter_arities:(Ctype.parameter_arities ty)
+          valdecl.pval_attributes
       in
       let zero_alloc =
         match zero_alloc with
@@ -4856,7 +4857,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
             let create_const ~opt =
               Zero_alloc.create_const
                 (Check { strict = false;
-                         arity = default_arity;
+                         arguments = Unconditional { arity = default_arity };
                          partial = false;
                          custom_error_msg = None;
                          loc;
@@ -4868,9 +4869,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
              | Assert_all_opt -> create_const ~opt:true)
         | Ignore_assert_all -> Zero_alloc.ignore_assert_all
         | Check za ->
-          if default_arity = 0 && za.arity <= 0 then
+          let arity = Builtin_attributes.Zero_alloc_arguments.arity za.arguments in
+          if default_arity = 0 && arity <= 0 then
             Error.log_and_raise valdecl.pval_loc  Zero_alloc_attr_non_function;
-          if za.arity <= 0 then
+          if arity <= 0 then
             Error.log_and_raise valdecl.pval_loc Zero_alloc_attr_bad_user_arity;
           Zero_alloc.create_const zero_alloc
         | Assume _ ->

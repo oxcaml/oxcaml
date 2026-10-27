@@ -3994,12 +3994,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                 let open Builtin_attributes in
                 match[@warning "+9"] Zero_alloc.get zero_alloc with
                 | Default_zero_alloc | Check _ -> zero_alloc
-                | Assume { strict; arity; partial; loc;
+                | Assume { strict; arguments; partial; loc;
                            never_returns_normally = _;
                            never_raises = _} ->
                   Zero_alloc.create_const
-                    (Check { strict; arity; partial; loc; opt = false;
-                             custom_error_msg = None; })
+                    (Check { strict; arguments; partial; loc;
+                             opt = false; custom_error_msg = None; })
                 | Ignore_assert_all -> Zero_alloc.default
               in
               let (first_loc, _, _) = List.hd id_info in

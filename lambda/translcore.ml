@@ -420,14 +420,16 @@ let zero_alloc_of_application
       | Check_all | Check_opt_only -> true
     in
     begin match Zero_alloc.get val_zero_alloc with
-    | Check { strict; opt; arity; partial; loc; custom_error_msg = _ }
-      when Zero_alloc.applicable_arity ~arity ~partial ~num_args
+    | Check { strict; opt; arguments; partial; loc; custom_error_msg = _ }
+      when Zero_alloc.applicable_arity
+             ~arity:(Builtin_attributes.Zero_alloc_arguments.arity arguments)
+             ~partial ~num_args
            && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =
         { strict;
           never_returns_normally = false;
           never_raises = false;
-          arity;
+          arguments;
           partial;
           loc }
       in
@@ -2432,11 +2434,12 @@ and transl_function
          then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
                       partial = false }
          else Default_zero_alloc)
-    | Check { strict; opt; arity = _; partial; loc; custom_error_msg; } ->
+    | Check { strict; opt; arguments = _; partial; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
       then Check { strict; loc; custom_error_msg; partial }
       else Default_zero_alloc
-    | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
+    | Assume { strict; never_returns_normally; never_raises; loc;
+               arguments = _; } ->
       Assume { strict; never_returns_normally; never_raises; loc }
     | Ignore_assert_all -> Default_zero_alloc
   in

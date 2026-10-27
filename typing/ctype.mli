@@ -665,6 +665,8 @@ val unalias: type_expr -> type_expr
 val arity: type_expr -> int
         (* Return the arity (as for curried functions) of the given type. *)
 
+val parameter_arities: type_expr -> int list
+
 val collapse_conj_params: Env.t -> type_expr list -> unit
         (* Collapse conjunctive types in class parameters *)
 

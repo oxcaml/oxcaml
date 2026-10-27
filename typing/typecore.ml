@@ -7097,6 +7097,7 @@ let add_zero_alloc_attribute expr attributes =
     let za =
       get_zero_alloc_attribute ~in_signature:false ~default_arity attributes
         ~on_application:false
+        ~parameter_arities:(Ctype.parameter_arities expr.exp_type)
     in
     begin match za with
     | Default_zero_alloc -> expr
@@ -7933,7 +7934,9 @@ and type_expect_
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
-          ~default_arity:(List.length args) sfunct.pexp_attributes
+          ~default_arity:(List.length args)
+          ~parameter_arities:(Ctype.parameter_arities funct.exp_type)
+          sfunct.pexp_attributes
         |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
       let funct =
@@ -12943,7 +12946,9 @@ and type_n_ary_function
     let zero_alloc =
       Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
         ~on_application:false
-        ~default_arity:syntactic_arity attributes
+        ~default_arity:syntactic_arity
+        ~parameter_arities:(Ctype.parameter_arities exp_type)
+        attributes
     in
     let zero_alloc =
       match zero_alloc with

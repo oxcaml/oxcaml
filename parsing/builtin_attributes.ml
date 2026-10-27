@@ -811,10 +811,24 @@ let get_implicit_jkind_attr x =
     end
   | _ -> []
 
+type zero_alloc_argument =
+  | Not_a_callback
+  | Callback of { arity: int; partial: bool }
+
+module Zero_alloc_arguments = struct
+  type t =
+    | Unconditional of { arity : int }
+    | Conditional of { arguments : zero_alloc_argument list }
+
+  let arity = function
+    | Unconditional { arity } -> arity
+    | Conditional { arguments } -> List.length arguments
+end
+
 type zero_alloc_check =
   { strict: bool;
     opt: bool;
-    arity: int;
+    arguments: Zero_alloc_arguments.t;
     partial: bool;
     loc: Location.t;
     custom_error_msg : string option;
@@ -824,7 +838,7 @@ type zero_alloc_assume =
   { strict: bool;
     never_returns_normally: bool;
     never_raises: bool;
-    arity: int;
+    arguments: Zero_alloc_arguments.t;
     partial: bool;
     loc: Location.t;
   }
@@ -910,22 +924,26 @@ let get_id_or_constant_from_exp =
     } -> Result.Ok (Const_string, s)
   | _ -> Result.Error ()
 
-let get_ids_and_constants_from_exp exp =
-  let open Parsetree in
-  (match exp with
-   | { pexp_desc = Pexp_apply (exp, args) } ->
-     get_id_or_constant_from_exp exp ::
-     List.map (function
-       | (Asttypes.Nolabel, arg) -> get_id_or_constant_from_exp arg
-       | (_, _) -> Result.Error ())
-       args
-   | _ -> [get_id_or_constant_from_exp exp])
-  |> List.fold_left (fun acc r ->
-    match acc, r with
-    | Result.Ok ids, Ok id -> Result.Ok (id::ids)
+let all_ok results =
+  List.fold_right (fun r acc ->
+    match r, acc with
+    | Result.Ok x, Ok xs -> Result.Ok (x::xs)
     | (Result.Error _ | Ok _), _ -> Result.Error ())
-    (Ok [])
-  |> Result.map List.rev
+    results (Ok [])
+
+let get_application_from_exp =
+  let open Parsetree in
+  function
+  | { pexp_desc = Pexp_apply (exp, args) } ->
+    all_ok
+      (Result.Ok exp :: List.map (function
+         | (Asttypes.Nolabel, arg) -> Result.Ok arg
+         | (_, _) -> Result.Error ())
+         args)
+  | exp -> Result.Ok [exp]
+
+let get_ids_and_constants_from_exps exps =
+  all_ok (List.map get_id_or_constant_from_exp exps)
 
 let parse_optional_id_payload txt loc ~empty cases payload =
   let[@local] warn () =
@@ -963,7 +981,7 @@ let filter_custom_error_message payload =
 
 (* Looks for `arity n` in payload. If present, this returns `n` and an updated
    payload with `arity n` removed. Note it may change the order of the payload,
-   which is fine because we sort it later. *)
+   which is fine because order doesn't matter. *)
 let filter_arity payload =
   let rec find_arity acc payload =
     match payload with
@@ -976,16 +994,69 @@ let filter_arity payload =
   in
   find_arity [] payload
 
-let partition_partial payload =
-  let is_partial = function
-    | (Ident, "partial") -> true
-    | _ -> false
+let is_id name exp =
+  match get_id_from_exp exp with
+  | Result.Ok id -> String.equal id name
+  | Error () -> false
+
+let get_argument_from_exp exp =
+  let open Parsetree in
+  match exp.pexp_desc with
+  | Pexp_apply (slash, [Asttypes.Nolabel, n; Asttypes.Nolabel, a])
+    when is_id "/" slash && is_id "n" n && is_id "a" a ->
+    Result.Ok Not_a_callback
+  | Pexp_apply (keyword, [Asttypes.Nolabel, arity])
+    when is_id "arity" keyword ->
+    Result.map (fun arity -> Callback { arity; partial = false })
+      (get_int_from_exp arity)
+  | Pexp_apply (partial, [Asttypes.Nolabel, keyword; Asttypes.Nolabel, arity])
+    when is_id "partial" partial && is_id "arity" keyword ->
+    Result.map (fun arity -> Callback { arity; partial = true })
+      (get_int_from_exp arity)
+  | _ -> Result.Error ()
+
+let get_arguments_from_exp exp =
+  let open Parsetree in
+  match exp.pexp_desc with
+  | Pexp_tuple arguments ->
+    all_ok (List.map (function
+      | (None, argument) -> get_argument_from_exp argument
+      | (Some _, _) -> Result.Error ())
+      arguments)
+  | _ -> Result.map (fun argument -> [argument]) (get_argument_from_exp exp)
+
+let filter_arguments payload =
+  let rec find acc payload =
+    match payload with
+    | [] | [_] -> None
+    | conditional :: arguments :: payload' when is_id "conditional" conditional ->
+      (match get_arguments_from_exp arguments with
+       | Ok arguments ->
+         Some (arguments, List.rev_append acc (conditional :: payload'))
+       | Error () -> find (conditional :: acc) (arguments :: payload'))
+    | exp :: payload' -> find (exp :: acc) payload'
   in
-  List.exists is_partial payload, List.filter (Fun.negate is_partial) payload
+  find [] payload
+
+let get_zero_alloc_payload_from_exp exp =
+  Result.bind (get_application_from_exp exp) (fun payload ->
+    let arguments, payload =
+      match filter_arguments payload with
+      | None -> None, payload
+      | Some (arguments, payload) -> Some arguments, payload
+    in
+    Result.map (fun payload -> arguments, payload)
+      (get_ids_and_constants_from_exps payload))
+
+let default_conditional_arguments ~arity ~parameter_arities =
+  List.init arity (fun index ->
+    match List.nth_opt parameter_arities index with
+    | None | Some 0 -> Not_a_callback
+    | Some arity -> Callback { arity; partial = false })
 
 (* If "assume_unless_opt" is not found returns None, otherwise
    returns the rest of the payload. Note it may change the order of the payload,
-   which is fine because we sort it later.  *)
+   which is fine because order doesn't matter. *)
 let filter_assume_unless_opt payload =
   let rec find acc payload =
     match payload with
@@ -995,99 +1066,86 @@ let filter_assume_unless_opt payload =
   in
   find [] payload
 
-let zero_alloc_lookup_table =
-  (* These are the possible payloads (sans arity) paired with a function that
-     returns the corresponding check_attribute, given the arity, the partiality,
-     and the loc. *)
-  [
-    (["assume"],
-     fun arity partial loc _ ->
-       Assume { strict = false; never_returns_normally = false;
-                never_raises = false;
-                arity; partial; loc; });
-    (["assume_unless_opt"],
-     fun arity partial loc _ ->
-       (* same as "assume" *)
-       Assume { strict = false; never_returns_normally = false;
-                never_raises = false;
-                arity; partial; loc; });
-    (["strict"],
-     fun arity partial loc custom_error_msg ->
-       Check { strict = true; opt = false; arity; partial; loc;
-               custom_error_msg; });
-    (["opt"],
-     fun arity partial loc custom_error_msg ->
-       Check { strict = false; opt = true; arity; partial; loc;
-               custom_error_msg; });
-    (["opt"; "strict"; ],
-     fun arity partial loc custom_error_msg ->
-       Check { strict = true; opt = true; arity; partial; loc;
-               custom_error_msg; });
-    (["assume"; "strict"],
-     fun arity partial loc _ ->
-       Assume { strict = true; never_returns_normally = false;
-                never_raises = false;
-                arity; partial; loc; });
-    (["assume"; "never_returns_normally"],
-     fun arity partial loc _ ->
-       Assume {  strict = false; never_returns_normally = true;
-                never_raises = false;
-                arity; partial; loc; });
-    (["assume"; "never_returns_normally"; "strict"],
-     fun arity partial loc _ ->
-       Assume { strict = true; never_returns_normally = true;
-                never_raises = false;
-                arity; partial; loc; });
-    (["assume"; "error"],
-     fun arity partial loc _ ->
-       Assume { strict = true; never_returns_normally = true;
-                never_raises = true;
-                arity; partial; loc; });
-    (["ignore"], fun _ _ _ _ -> Ignore_assert_all)
-  ]
+type zero_alloc_payload_options =
+  { arguments : Zero_alloc_arguments.t;
+    strict : bool;
+    opt : bool;
+    partial : bool;
+    assume : bool;
+    ignore : bool;
+    never_returns_normally : bool;
+    never_raises : bool;
+    has_unknown_option : bool;
+  }
 
-let parse_zero_alloc_payload ~loc ~arity ~partial ~custom_error_message
-      ~warn ~empty payload =
-  (* This parses the remainder of the payload after arity has been parsed
-     out. *)
-  match payload with
-  | [] -> empty
-  | _ :: _ ->
-    let payload = List.sort String.compare payload in
-    match List.assoc_opt payload zero_alloc_lookup_table with
-    | None -> warn ();  Default_zero_alloc
-    | Some ca -> ca arity partial loc custom_error_message
+let parse_zero_alloc_payload ~loc ~arity ~conditional_arguments
+      ~custom_error_message ~warn payload =
+  let options =
+    List.fold_left
+      (fun options -> function
+        | "conditional" ->
+          { options with
+            arguments = Conditional { arguments = conditional_arguments } }
+        | "strict" -> { options with strict = true }
+        | "opt" -> { options with opt = true }
+        | "partial" -> { options with partial = true }
+        | "assume" | "assume_unless_opt" -> { options with assume = true }
+        | "ignore" -> { options with ignore = true }
+        | "never_returns_normally" ->
+          { options with never_returns_normally = true }
+        | "error" ->
+          { options with strict = true;
+                         never_returns_normally = true;
+                         never_raises = true }
+        | _ -> { options with has_unknown_option = true })
+      { arguments = Unconditional { arity };
+        strict = false;
+        opt = false;
+        partial = false;
+        assume = false;
+        ignore = false;
+        never_returns_normally = false;
+        never_raises = false;
+        has_unknown_option = false }
+      payload
+  in
+  match options with
+  | { arguments; strict; opt; partial; assume = false; ignore = false;
+      never_returns_normally = false; never_raises = false;
+      has_unknown_option = false } ->
+    Check { strict; opt; arguments; partial; loc;
+            custom_error_msg = custom_error_message }
+  | { arguments; strict; opt = false; partial; assume = true;
+      ignore = false; never_returns_normally; never_raises;
+      has_unknown_option = false } ->
+    Assume { strict; never_returns_normally; never_raises; arguments; partial;
+             loc }
+  | { arguments = Unconditional _; strict = false; opt = false; partial = false;
+      assume = false; ignore = true; never_returns_normally = false;
+      never_raises = false; has_unknown_option = false } ->
+    Ignore_assert_all
+  | _ -> warn (); Default_zero_alloc
 
-let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr =
+let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity
+      ~parameter_arities attr =
   match attr with
   | None -> Default_zero_alloc
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
     let warn () =
-      let ( %> ) f g x = g (f x) in
-      let msg =
-        let custom_payloads =
-          let fail _ _ _ _ = assert false in
-          [
-            (["arity <int_constant>"], fail);
-            (["partial"], fail);
-            (["custom_error_message <string_constant>"], fail)
-          ]
-        in
-        (zero_alloc_lookup_table@custom_payloads)
-        |> List.map (fst %> String.concat " " %> Printf.sprintf "'%s'")
-        |> String.concat ", "
-        |> Printf.sprintf "It must be either %s or empty"
-      in
-      Location.prerr_warning loc (Warnings.Attribute_payload (txt, msg))
+      warn_payload loc txt
+        "Expected a supported combination of conditional, strict, opt, \
+         partial, assume, assume_unless_opt, never_returns_normally, error, \
+         or ignore, optionally with arity <int_constant>, \
+         custom_error_message <string_constant>, and conditional arguments \
+         such as conditional(arity <int_constant>, \
+         partial arity <int_constant>, n/a)."
     in
-    let empty arity partial custom_error_msg =
-      Check
-        { strict = false; opt = false; arity; partial; loc; custom_error_msg; }
-    in
-    match get_optional_payload get_ids_and_constants_from_exp payload with
+    match get_optional_payload get_zero_alloc_payload_from_exp payload with
     | Error () -> warn (); Default_zero_alloc
-    | Ok None -> empty default_arity false None
-    | Ok (Some payload) ->
+    | Ok payload ->
+      let explicit_arguments, payload =
+        Option.value payload ~default:(None, [])
+      in
       let custom_error_message, payload =
         match filter_custom_error_message payload with
         | None -> None, payload
@@ -1115,12 +1173,24 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
                 signatures";
              default_arity, payload)
       in
-      let partial, payload = partition_partial payload in
+      let conditional_arguments =
+        let default_arguments =
+          default_conditional_arguments ~arity ~parameter_arities
+        in
+        match explicit_arguments with
+        | None -> default_arguments
+        | Some arguments ->
+          if List.compare_length_with arguments arity = 0 then arguments
+          else
+            (warn_payload loc txt
+               "The number of conditional arguments must match the arity \
+                of \"zero_alloc\".";
+             default_arguments)
+      in
       let _, payload = List.split payload in
-      let parse p =
-        let empty = empty arity partial custom_error_message in
-        parse_zero_alloc_payload ~loc ~arity ~partial ~custom_error_message
-          ~warn ~empty p
+      let parse =
+        parse_zero_alloc_payload ~loc ~arity ~conditional_arguments
+          ~custom_error_message ~warn
       in
       match filter_assume_unless_opt payload with
       | None -> parse payload
@@ -1143,7 +1213,7 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
                     forcing the function to be checked.
                     Setting [opt = false] to satisfy [@zero_alloc]
                     and not only [@zero_alloc opt] on the corresponding signatures. *)
-                 empty arity partial custom_error_message)
+                 parse [])
             else
               (* Treat "assume_unless_opt" as "assume".
                  Reuse standard parsing for better error messages. *)
@@ -1154,18 +1224,17 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
             Default_zero_alloc)
 
 
-let get_zero_alloc_attribute ~in_signature ~on_application ~default_arity l =
+let get_zero_alloc_attribute ~in_signature ~on_application ~default_arity
+      ~parameter_arities l =
   let attr = select_attribute is_zero_alloc_attribute l in
   let res =
       parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity
-        attr
+        ~parameter_arities attr
   in
   (match attr, res with
-   | None, Default_zero_alloc -> ()
    | _, Default_zero_alloc -> ()
    | None, (Check _ | Assume _ | Ignore_assert_all) -> assert false
-   | Some _, Ignore_assert_all -> ()
-   | Some _, Assume _ -> ()
+   | Some _, (Ignore_assert_all | Assume _) -> ()
    | Some attr, Check { opt; _ } ->
      if not in_signature && is_zero_alloc_check_enabled ~opt
         && Clflags.target_is_native ()
@@ -1181,19 +1250,13 @@ let zero_alloc_attribute_only_assume_allowed za =
   | Assume assume -> Some assume
   | Default_zero_alloc | Ignore_assert_all -> None
   | Check { loc; _ } ->
-    let name = "zero_alloc" in
-    let msg = "Only the following combinations are supported in this context: \
-               'zero_alloc assume', \
-               'zero_alloc assume_unless_opt', \
-               `zero_alloc assume strict`, \
-               `zero_alloc assume error`,\
-               `zero_alloc assume never_returns_normally`,\
-               `zero_alloc assume never_returns_normally strict`."
-    in
-    Location.prerr_warning loc (Warnings.Attribute_payload (name, msg));
+    warn_payload loc "zero_alloc"
+      "Only zero_alloc assume or zero_alloc assume_unless_opt, with their \
+       modifiers, are supported in this context.";
     None
 
-let assume_zero_alloc ~inferred assume : Zero_alloc_utils.Assume_info.t =
+let assume_zero_alloc ~inferred (assume : zero_alloc_assume)
+    : Zero_alloc_utils.Assume_info.t =
   match assume with
   | { strict; never_returns_normally; never_raises; } ->
     Zero_alloc_utils.Assume_info.create ~strict ~never_returns_normally ~never_raises ~inferred

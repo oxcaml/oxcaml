@@ -3607,13 +3607,37 @@ let tree_of_value_description id decl =
     in
     count 0 decl.val_type
   in
+  let print_conditional : Builtin_attributes.Zero_alloc_arguments.t -> _ =
+    function
+    | Unconditional _ -> ""
+    | Conditional { arguments } ->
+      let default_arguments =
+        Builtin_attributes.default_conditional_arguments
+          ~arity:(List.length arguments)
+          ~parameter_arities:(Ctype.parameter_arities decl.val_type)
+      in
+      if arguments = default_arguments then " conditional" else
+        let print_argument : Builtin_attributes.zero_alloc_argument -> _ =
+          function
+          | Not_a_callback -> "n/a"
+          | Callback { arity; partial = false } ->
+            Printf.sprintf "arity %d" arity
+          | Callback { arity; partial = true } ->
+            Printf.sprintf "partial arity %d" arity
+        in
+        Printf.sprintf " conditional(%s)"
+          (String.concat ", " (List.map print_argument arguments))
+  in
   let attrs =
     match Zero_alloc.get decl.val_zero_alloc with
     | Default_zero_alloc | Ignore_assert_all -> []
-    | Check { strict; opt; arity; partial; custom_error_msg; loc = _; } ->
+    | Check { strict; opt; arguments; partial; custom_error_msg;
+              loc = _; } ->
+      let arity = Builtin_attributes.Zero_alloc_arguments.arity arguments in
       [{ oattr_name =
            String.concat ""
              ["zero_alloc";
+              print_conditional arguments;
               if strict then " strict" else "";
               if opt then " opt" else "";
               if partial then " partial" else "";
@@ -3623,10 +3647,12 @@ let tree_of_value_description id decl =
               | None -> ""
               | Some msg -> Printf.sprintf " custom_error_message %S" msg
              ] }]
-    | Assume { strict; never_returns_normally; arity; partial; _ } ->
+    | Assume { strict; never_returns_normally; arguments; partial; _ } ->
+      let arity = Builtin_attributes.Zero_alloc_arguments.arity arguments in
       [{ oattr_name =
            String.concat ""
              ["zero_alloc assume";
+              print_conditional arguments;
               if strict then " strict" else "";
               if never_returns_normally then " never_returns_normally" else "";
               if partial then " partial" else "";

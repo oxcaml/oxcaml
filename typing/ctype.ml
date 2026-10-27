@@ -8423,6 +8423,11 @@ let rec arity ty =
     Tarrow(_, _t1, t2, _) -> 1 + arity t2
   | _ -> 0
 
+let rec parameter_arities ty =
+  match get_desc ty with
+    Tarrow(_, t1, t2, _) -> arity t1 :: parameter_arities t2
+  | _ -> []
+
 (* Check for non-generalizable type variables *)
 let add_nongen_vars_in_schema =
   let rec loop env ((visited, weak_set) as acc) ty =

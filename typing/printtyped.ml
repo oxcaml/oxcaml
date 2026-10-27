@@ -390,9 +390,10 @@ let val_description_modal_info i ppf = function
   | Valmi_str_primitive ms -> modes_with_locality_opt i ppf ms
 
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
-    { strict; never_returns_normally; never_raises; arity; partial; loc = _ } ->
+    { strict; never_returns_normally; never_raises; arguments; partial;
+      loc = _ } ->
     line i ppf "assume_zero_alloc arity=%d%s%s%s%s\n"
-      arity
+      (Builtin_attributes.Zero_alloc_arguments.arity arguments)
       (if partial then " partial" else "")
       (if strict then " strict" else "")
       (if never_returns_normally then " never_returns_normally" else "")

@@ -4,7 +4,7 @@ module ZA = Zero_alloc_utils
 type check = Builtin_attributes.zero_alloc_check =
   { strict : bool;
     opt : bool;
-    arity : int;
+    arguments : Builtin_attributes.Zero_alloc_arguments.t;
     partial : bool;
     loc : Location.t;
     custom_error_msg : string option
@@ -14,7 +14,7 @@ type assume = Builtin_attributes.zero_alloc_assume =
   { strict : bool;
     never_returns_normally : bool;
     never_raises : bool;
-    arity : int;
+    arguments : Builtin_attributes.Zero_alloc_arguments.t;
     partial : bool;
     loc : Location.t
   }
@@ -26,7 +26,8 @@ type const = Builtin_attributes.zero_alloc_attribute =
   | Assume of assume
 
 type desc =
-  { strict : bool;
+  { arguments : Builtin_attributes.Zero_alloc_arguments.t;
+    strict : bool;
     opt : bool;
     custom_error_msg : string option;
     partial : bool
@@ -91,11 +92,11 @@ let ignore_assert_all = Const Ignore_assert_all
 let get (t : t) =
   match t with
   | Const c -> c
-  | Var { loc; arity; desc } -> (
+  | Var { loc; arity = _; desc } -> (
     match desc with
     | None -> Default_zero_alloc
-    | Some { strict; opt; custom_error_msg; partial } ->
-      Check { loc; arity; partial; strict; opt; custom_error_msg })
+    | Some { arguments; strict; opt; custom_error_msg; partial } ->
+      Check { loc; arguments; partial; strict; opt; custom_error_msg })
 
 type error =
   | Less_general of { missing_entirely : bool }
@@ -186,8 +187,8 @@ let sub_const_const_exn za1 za2 =
   end;
   (* arity check *)
   let get_arity = function
-    | Check { arity; partial; _ } | Assume { arity; partial; _ } ->
-      Some (arity, partial)
+    | Check { arguments; partial; _ } | Assume { arguments; partial; _ } ->
+      Some (Builtin_attributes.Zero_alloc_arguments.arity arguments, partial)
     | Default_zero_alloc | Ignore_assert_all -> None
   in
   match get_arity za1, get_arity za2 with
@@ -202,20 +203,27 @@ let sub_var_const_exn v c =
   (* This can only fail due to an arity mismatch. We have a linear order and can
      always constrain the var lower to make the sub succeed. *)
   begin match c with
-  | Check { arity; partial; _ } ->
+  | Check { arguments; partial; _ } ->
+    let arity = Builtin_attributes.Zero_alloc_arguments.arity arguments in
     check_arity_exn ~actual:(v.arity, partial) ~required:(arity, partial)
   | Default_zero_alloc | Ignore_assert_all | Assume _ -> ()
   end;
   match v, c with
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
-  | { arity = arity1; _ }, Check { arity = arity2; _ } when arity1 <> arity2 ->
-    raise (Error (Arity_mismatch (arity1, arity2)))
-  | { desc = None; _ }, Check { strict; opt; custom_error_msg; partial } ->
+  | { arity = arity1; _ }, Check { arguments; _ }
+    when arity1 <> Builtin_attributes.Zero_alloc_arguments.arity arguments ->
+    raise
+      (Error
+         (Arity_mismatch
+            (arity1, Builtin_attributes.Zero_alloc_arguments.arity arguments)))
+  | ( { desc = None; _ },
+      Check { arguments; strict; opt; custom_error_msg; partial } ) ->
     log (None, v);
-    v.desc <- Some { strict; opt; custom_error_msg; partial }
+    v.desc <- Some { arguments; strict; opt; custom_error_msg; partial }
   | ( { desc =
           Some
-            { strict = strict1;
+            { arguments = arguments1;
+              strict = strict1;
               opt = opt1;
               custom_error_msg = msg1;
               partial = partial1
@@ -223,11 +231,16 @@ let sub_var_const_exn v c =
         _
       },
       Check
-        { strict = strict2;
+        { arguments = arguments2;
+          strict = strict2;
           opt = opt2;
           custom_error_msg = msg2;
           partial = partial2
         } ) ->
+    let arguments : Builtin_attributes.Zero_alloc_arguments.t =
+      if arguments1 = arguments2 then arguments1
+      else Unconditional { arity = v.arity }
+    in
     let strict = strict1 || strict2 in
     let opt = opt1 && opt2 in
     let partial = partial1 || partial2 in
@@ -241,10 +254,12 @@ let sub_var_const_exn v c =
         let msg = if b then msg1 else Some (String.concat "\n" [m1; m2]) in
         msg, not b
     in
-    if strict <> strict1 || opt <> opt1 || partial <> partial1 || msg_changed
+    if
+      arguments <> arguments1 || strict <> strict1 || opt <> opt1
+      || partial <> partial1 || msg_changed
     then begin
       log (desc, v);
-      v.desc <- Some { strict; opt; custom_error_msg; partial }
+      v.desc <- Some { arguments; strict; opt; custom_error_msg; partial }
     end
 
 let sub_exn za1 za2 =
