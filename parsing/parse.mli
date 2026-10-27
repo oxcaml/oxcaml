@@ -113,6 +113,6 @@ val unprefixed_compilation_unit: Lexing.lexbuf -> Compilation_unit.t
 (**
    This function parses a compilation unit name without a pack prefix, with
    instance arguments written as [M[P1:A1][P2:A2]]. For instance, [A] and
-   [F[P:A][Q:G[R:B]]] are valid, but [Pack.A], [F[A]] and [F(P)(A)] are
+   [F[P:A][Q:G[R:B]]] are valid, but [Pack.A], [F[A]] and [F[P.Q:A]] are
    rejected.
 *)
