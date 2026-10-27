@@ -196,7 +196,8 @@ typedef uint64_t uintnat;
 #endif
 
 /* Whether to use guard pages for fiber stacks */
-#if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
+#if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && \
+    !defined(STACK_CHECKS_ENABLED)
 #define STACK_GUARD_PAGES
 #endif
 

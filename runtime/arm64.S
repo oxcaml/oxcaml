@@ -202,6 +202,10 @@ G(name):
 #define Cstack_async_exn_handler(reg) \
                                 [reg, #Cstack_async_exn_handler_offset]
 
+/* Offset of the variable slot of dynamic cache entry [n]. */
+#define Dynamic_cache_var(n) \
+        (Dynamic_cache + (n)*Dynamic_binding_size + Dynamic_binding_var)
+
 /* Continuation values
  *
  * A continuation is a two or three word object:
@@ -286,8 +290,8 @@ G(name):
         str     x25, [TMP, 192]
     /* Save caller-save floating-point registers
        (callee-saves are preserved by C functions,
-	but only the low 64-bits are preserved,
-	save the entire register here for simplicity).  */
+        but only the low 64-bits are preserved,
+        save the entire register here for simplicity).  */
         stp     q0, q1, [TMP, 208]
         stp     q2, q3, [TMP, 240]
         stp     q4, q5, [TMP, 272]
@@ -356,14 +360,14 @@ G(name):
 
 .macro FLUSH_DYNAMIC_CACHE
         ldr     TMP, Caml_state(dynamic_bindings)
-        str     xzr, [TMP, (Dynamic_cache + 0*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 1*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 2*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 3*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 4*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)]
-        str     xzr, [TMP, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)]
+        str     xzr, [TMP, Dynamic_cache_var(0)]
+        str     xzr, [TMP, Dynamic_cache_var(1)]
+        str     xzr, [TMP, Dynamic_cache_var(2)]
+        str     xzr, [TMP, Dynamic_cache_var(3)]
+        str     xzr, [TMP, Dynamic_cache_var(4)]
+        str     xzr, [TMP, Dynamic_cache_var(5)]
+        str     xzr, [TMP, Dynamic_cache_var(6)]
+        str     xzr, [TMP, Dynamic_cache_var(7)]
 .endm
 
 /* See [caml_tls_update_cache]: set (Caml_state->tls_state) to the nearest TLS.
@@ -654,9 +658,9 @@ FUNCTION(caml_preempt)
         mov     TMP, #1
         str     TMP, Caml_state(preemption)
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
-        add     x3, x2, #1                    /* x3 (last_fiber) := Val_ptr(old stack) */
+        add     x3, x2, #1                    /* last_fiber := Val_ptr(x2) */
         str     x3, Cont_fiber(x1)            /* Store fiber in continuation */
-        str     xzr, Cont_last_fiber(x1)      /* set last fiber of continuation to NULL */
+        str     xzr, Cont_last_fiber(x1)      /* set last fiber to NULL */
         ldr     TMP, Caml_state(gc_regs)
         str     TMP, Cont_gc_regs(x1)         /* save gc_regs in continuation */
     /* Clear gc_regs, as we'll be leaving the runtime after the effect is
@@ -1716,11 +1720,11 @@ OBJECT(CAMLSEP(system,frametable))
            carries its own relative return address). See frame_descriptors.h. */
         .byte   0                   /* escape: medium descriptor follows */
         .4byte  L(caml_retaddr) - . /* return address into callback */
-        .short  -1                  /* negative frame size => use callback link */
+        .short  -1                  /* negative size => use callback link */
         .short  0                   /* no roots */
         .byte   0                   /* escape: medium descriptor follows */
         .4byte  L(frame_runstack) - . /* return address into fiber handler */
-        .short  -1                    /* negative frame size => use callback link */
+        .short  -1                    /* negative size => use callback link */
         .short  0                     /* no roots here */
         END_OBJECT(CAMLSEP(system,frametable))
 

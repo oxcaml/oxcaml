@@ -497,7 +497,8 @@ static intnat pool_sweep(struct caml_heap_state* local,
                          pool**,
                          sizeclass_t sz ,
                          int release_to_global_pool);
-static void pool_finalise(struct caml_heap_state* local, pool**, sizeclass_t sz);
+static void pool_finalise(struct caml_heap_state* local,
+                          pool**, sizeclass_t sz);
 
 /* Adopt pool from the pool_freelist avail and full pools
    to satisfy an allocation */
@@ -1782,7 +1783,8 @@ bool compact_phase_two_mark(int participating_count,
 
   if (!pool_array) {
     CAML_GC_MESSAGE(COMPACT,
-                    "Unable to allocate pool array for compaction phase two.\n");
+                    "Unable to allocate pool array for compaction "
+                    "phase two.\n");
     return false;
   }
 
