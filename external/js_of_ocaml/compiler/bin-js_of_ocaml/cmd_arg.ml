@@ -62,7 +62,6 @@ type t =
   ; input :
       [ `Bytecode_file of string
       | `Cmj of string
-      | `Cmja of string
       | `Bytecode_stdin
       | `None
       ]
@@ -128,8 +127,7 @@ let options =
   in
   let input_file =
     let doc =
-      "Compile the bytecode program, Js_of_ocaml IR file (.cmj) or IR archive (.cmja) \
-       [$(docv)]. "
+      "Compile the bytecode program or Js_of_ocaml IR file (.cmj) [$(docv)]. "
       ^ "Use '-' to read from the standard input instead."
     in
     Arg.(value & pos ~rev:true 0 (some filepath) None & info [] ~docv:"PROGRAM" ~doc)
@@ -342,7 +340,6 @@ let options =
           match input_file with
           | Some "-" -> `Bytecode_stdin
           | Some x when Filename.check_suffix x ".cmj" -> `Cmj x
-          | Some x when Filename.check_suffix x ".cmja" -> `Cmja x
           | Some x -> `Bytecode_file x
           | None -> `None
         in
@@ -352,7 +349,7 @@ let options =
           | Some s -> `Name s, true
           | None -> (
               match input with
-              | `Bytecode_file s | `Cmj s | `Cmja s ->
+              | `Bytecode_file s | `Cmj s ->
                   `Name (chop_extension s ^ ".js"), false
               | `Bytecode_stdin | `None -> `Stdout, false)
         in
