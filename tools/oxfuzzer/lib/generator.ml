@@ -1008,9 +1008,10 @@ and gen_match (st : State.t) env result_ty =
                   constructor.constructor_index)
               reachable_constructors
           in
-          if st.swarm.unreachable_assertions && not reachable
-          then Expr.Assert_false
-          else gen_value st env result_ty))
+          match st.swarm.assertions, reachable with
+          | Unreachable_only, false -> Expr.Assert_false
+          | (Disabled | May_raise), _ | Unreachable_only, true ->
+            gen_value st env result_ty))
 
 and gen_decl (st : State.t) env =
   let binding =

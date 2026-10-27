@@ -10,4 +10,6 @@ val create :
   toplevel_statement:Ir.Statement.t ->
   t
 
+(** In [Config.May_raise] mode, reports termination and initialized top-level
+    state. Other modes leave exceptions uncaught. *)
 val to_code : t -> string
