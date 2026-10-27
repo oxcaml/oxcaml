@@ -235,7 +235,8 @@ Line 1, characters 12-30:
 1 | type t = #{ inherit a : int8#; b : int }
                 ^^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record,
-       or of a record or constructor declared "[@@unboxed]"
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
 |}]
 
 type t = #{ a : int; inherit b : int8# }
@@ -244,7 +245,8 @@ Line 1, characters 21-38:
 1 | type t = #{ a : int; inherit b : int8# }
                          ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record,
-       or of a record or constructor declared "[@@unboxed]"
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
 |}]
 
 type t = { inherit a : int8# }
@@ -253,7 +255,8 @@ Line 1, characters 11-28:
 1 | type t = { inherit a : int8# }
                ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record,
-       or of a record or constructor declared "[@@unboxed]"
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
 |}]
 
 type t = { inherit a : int8# } [@@unboxed]
@@ -267,7 +270,8 @@ Line 1, characters 16-33:
 1 | type t = A of { inherit a : int8# }
                     ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record,
-       or of a record or constructor declared "[@@unboxed]"
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
 |}]
 
 type t = A of { inherit a : int8# } [@@unboxed]
@@ -283,7 +287,65 @@ Line 2, characters 17-34:
 2 | type t += A of { inherit a : int8# }
                      ^^^^^^^^^^^^^^^^^
 Error: "inherit" is only supported on the sole field of an unboxed record,
-       or of a record or constructor declared "[@@unboxed]"
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
+|}]
+
+(* Tuple arguments of constructors *)
+type t = A of inherit int8#
+[%%expect{|
+Line 1, characters 14-27:
+1 | type t = A of inherit int8#
+                  ^^^^^^^^^^^^^
+Error: "inherit" is only supported on the sole field of an unboxed record,
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
+|}]
+
+type t = A of int * inherit int8#
+[%%expect{|
+Line 1, characters 20-33:
+1 | type t = A of int * inherit int8#
+                        ^^^^^^^^^^^^^
+Error: "inherit" is only supported on the sole field of an unboxed record,
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
+|}]
+
+type t = A of inherit int8# * int [@@unboxed]
+[%%expect{|
+Line 1, characters 0-45:
+1 | type t = A of inherit int8# * int [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type cannot be unboxed because
+       its constructor has more than one argument.
+|}]
+
+type t = A : inherit int8# -> t
+[%%expect{|
+Line 1, characters 13-26:
+1 | type t = A : inherit int8# -> t
+                 ^^^^^^^^^^^^^
+Error: "inherit" is only supported on the sole field of an unboxed record,
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
+|}]
+
+type t = ..
+type t += A of inherit int8#
+[%%expect{|
+type t = ..
+Line 2, characters 15-28:
+2 | type t += A of inherit int8#
+                   ^^^^^^^^^^^^^
+Error: "inherit" is only supported on the sole field of an unboxed record,
+       or on the sole field or argument of a record or constructor
+       declared "[@@unboxed]"
+|}]
+
+type t = A of inherit int8# [@@unboxed]
+[%%expect{|
+type t = A of inherit int8# [@@unboxed]
 |}]
 
 (* Unboxed records cannot have mutable fields, so an [inherit] field cannot be

@@ -1286,6 +1286,7 @@ let idx #{ data = _ ; i } = i
 let #{ data = payload; _ } = #{ data = "payload" ; i = 0 }
 let inc r = #{ r with i = r.#i + 1 }
 type inherited : float64 = #{ inherit f : float# }
+type inherited_arg : float64 = A of inherit float# [@@unboxed]
 [%%expect{|
 type 'a boxed_with_idx = { data : 'a; i : int; }
 type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
@@ -1293,6 +1294,13 @@ val idx : 'a with_idx -> int = <fun>
 val payload : string = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
 type inherited = #{ inherit f : float#; }
+Line 8, characters 0-62:
+8 | type inherited_arg : float64 = A of inherit float# [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "inherited_arg" is float64 addressable
+         because it is the unboxed version of the primitive type float.
+       But the layout of type "inherited_arg" must be a sublayout of float64
+         because of the annotation on the declaration of the type inherited_arg.
 |}]
 
 (*****************)

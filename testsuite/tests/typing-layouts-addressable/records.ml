@@ -530,6 +530,102 @@ type c : bits8 = A of { inherit a : int8# } [@@unboxed]
 type c = A of { inherit a : int8#; } [@@unboxed]
 |}]
 
+(* [inherit] opts out for a tuple argument *)
+type c : bits8 = A of inherit int8# [@@unboxed]
+[%%expect{|
+Line 1, characters 0-47:
+1 | type c : bits8 = A of inherit int8# [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "c" is bits8 addressable
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "c" must be a sublayout of bits8
+         because of the annotation on the declaration of the type c.
+|}]
+
+type c : bits8 addressable = A of inherit int8# [@@unboxed]
+[%%expect{|
+type c = A of inherit int8# [@@unboxed]
+|}]
+
+type _ g : bits8 = A : inherit int8# -> int g [@@unboxed]
+[%%expect{|
+Line 1, characters 0-57:
+1 | type _ g : bits8 = A : inherit int8# -> int g [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "g" is bits8 addressable
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "g" must be a sublayout of bits8
+         because of the annotation on the declaration of the type g.
+|}]
+
+module M : sig
+  type c : bits8 = A of inherit int8# [@@unboxed]
+end = struct
+  type c = A of inherit int8# [@@unboxed]
+end
+[%%expect{|
+Line 2, characters 2-49:
+2 |   type c : bits8 = A of inherit int8# [@@unboxed]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "c" is bits8 addressable
+         because it is the unboxed version of the primitive type int8.
+       But the layout of type "c" must be a sublayout of bits8
+         because of the annotation on the declaration of the type c.
+|}]
+
+(* [inherit] is part of the constructor's declaration *)
+module M : sig
+  type c = A of inherit int8# [@@unboxed]
+end = struct
+  type c = A of int8# [@@unboxed]
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type c = A of int8# [@@unboxed]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type c = A of int8# [@@unboxed] end
+       is not included in
+         sig type c = A of inherit int8# [@@unboxed] end
+       Type declarations do not match:
+         type c = A of int8# [@@unboxed]
+       is not included in
+         type c = A of inherit int8# [@@unboxed]
+       Constructors do not match:
+         "A of int8#"
+       is not the same as:
+         "A of inherit int8#"
+       Argument 1 of the second is inherit and that of the first is not.
+|}]
+
+module M : sig
+  type c = A of int8# [@@unboxed]
+end = struct
+  type c = A of inherit int8# [@@unboxed]
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type c = A of inherit int8# [@@unboxed]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type c = A of inherit int8# [@@unboxed] end
+       is not included in
+         sig type c = A of int8# [@@unboxed] end
+       Type declarations do not match:
+         type c = A of inherit int8# [@@unboxed]
+       is not included in
+         type c = A of int8# [@@unboxed]
+       Constructors do not match:
+         "A of inherit int8#"
+       is not the same as:
+         "A of int8#"
+       Argument 1 of the first is inherit and that of the second is not.
+|}]
+
 (* Expressions *)
 type c = A of int8# [@@unboxed]
 let f (x : c) : ('b : bits8 addressable) = x
