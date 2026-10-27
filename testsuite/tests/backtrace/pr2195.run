@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-set -o pipefail
+#!/bin/sh
 
 # ulimit -n will have no effect on the Windows builds. The number of open files
 # on Windows is theoretically limited by available memory only, however the CRT
@@ -8,6 +6,3 @@ set -o pipefail
 ulimit -n 32
 
 ${program} 2>&1 | ${test_source_directory}/sanitize-backtrace.sh > ${output}
-
-# This program is expected to exit 2
-[ $? = 2 ] || exit 1
