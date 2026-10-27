@@ -44,6 +44,16 @@ val bind_expr_to_var' :
   Jsir.expr ->
   Jsir.Var.t * To_jsir_env.t * To_jsir_result.t
 
+(** [bind_vars ~res [(x1, y1); ...; (xn, yn)]] binds each already existing but
+    not yet bound variable [xi] to the value of [yi], by ending the current
+    block with a jump to a fresh block whose parameters are the [xi]s.
+
+    JSIR has no expression that merely copies a variable. The only way to bind a
+    variable created ahead of its definition is thus to make it a block
+    parameter. *)
+val bind_vars :
+  res:To_jsir_result.t -> (Jsir.Var.t * Jsir.Var.t) list -> To_jsir_result.t
+
 (** Convert various integer types into a [Jsir.constant]. *)
 val target_ocaml_int_to_jsir_const : Target_ocaml_int.t -> Jsir.constant
 
