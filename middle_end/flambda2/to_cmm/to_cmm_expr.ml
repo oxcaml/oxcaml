@@ -115,64 +115,30 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
       (Flambda_arity.unarize (Apply.args_arity apply)
       |> List.map K.With_subkind.kind)
   in
-  (* Fuse each fat-pointer argument pair (base, byte offset) into a single raw
-     pointer [base + offset], nested directly in the [Cextcall] argument list so
-     that no later pass can separate the pointer arithmetic from the call.
-     [Cadda] gives the result machtype [Addr], which prevents CSE from keeping
-     the derived pointer live across an allocation or poll point.
-
-     The argument expressions themselves can contain GC points: in particular
-     allocations inlined by [To_cmm_env], which the backend evaluates in
-     sequence in the argument list. A raw pointer must not be computed until
-     every argument has been evaluated, so bind each argument to a variable
-     first. The bindings are nested so that the arguments are still evaluated
-     right to left, the order the backend uses for argument lists.
-
-     The offset is added verbatim: [@fat_ptr] requires a plain byte offset (a
-     non-mixed pointee), so there are no mixed-block "gap" bits to strip. This
-     is the caller's contract; masking them here would be wrong for pointees
-     whose offset legitimately uses the full word (e.g. external pointers under
-     5-level paging). *)
-  let args, ty_args, bind_args =
+  (* A fat-pointer argument is an unboxed pair (base, byte offset) that C
+     receives as a single raw pointer [base + offset]. The addition is performed
+     by the backend as part of the call itself: computing it any earlier would
+     risk a GC safepoint invalidating the result, and a safepoint can appear
+     between any two instructions preceding the call, e.g. a poll inserted by
+     [Cfg_polling]. Until the call, the base travels as an ordinary [Val]. Here
+     we only merge each pair's two [exttype]s into a single [XFat_pointer]; the
+     two arguments themselves are passed through unchanged. *)
+  let ty_args =
     match fat_ptr_arg_starts with
-    | [] -> args, ty_args, fun body -> body
+    | [] -> ty_args
     | _ :: _ ->
-      let rev_bindings, rev_args =
-        List.fold_left
-          (fun (rev_bindings, rev_args) (arg : Cmm.expression) ->
-            let id = Ident.create_local "fat_ptr_arg" in
-            let var = Backend_var.With_provenance.create id in
-            (var, arg) :: rev_bindings, Cmm.Cvar id :: rev_args)
-          ([], []) args
-      in
-      let bind_args body =
-        (* Folding in argument order wraps each binding outside the previous
-           ones, so the last argument's binding ends up outermost and the
-           arguments are evaluated right to left. *)
-        List.fold_left
-          (fun body (var, defining_expr) -> C.letin var ~defining_expr ~body)
-          body (List.rev rev_bindings)
-      in
-      let rec fuse index args ty_args starts =
-        match starts, args, ty_args with
-        | [], _, _ -> args, ty_args
-        | start :: starts', base :: offset :: args', _ :: _ :: ty_args'
-          when start = index ->
-          let ptr = C.add_int_ptr ~ptr_out_of_heap:false base offset dbg in
-          let args'', ty_args'' = fuse (index + 2) args' ty_args' starts' in
-          ptr :: args'', Cmm.XInt :: ty_args''
-        | _ :: _, arg :: args', ty :: ty_args' ->
-          let args'', ty_args'' = fuse (index + 1) args' ty_args' starts in
-          arg :: args'', ty :: ty_args''
-        | _ :: _, _, _ ->
+      let rec fuse index ty_args starts =
+        match starts, ty_args with
+        | [], _ -> ty_args
+        | start :: starts', _ :: _ :: ty_args' when start = index ->
+          Cmm.XFat_pointer :: fuse (index + 2) ty_args' starts'
+        | _ :: _, ty :: ty_args' -> ty :: fuse (index + 1) ty_args' starts
+        | _ :: _, [] ->
           Misc.fatal_errorf
             "translate_external_call: malformed fat_ptr_arg_starts for %s"
             callee
       in
-      let args, ty_args =
-        fuse 0 (List.rev rev_args) ty_args fat_ptr_arg_starts
-      in
-      args, ty_args, bind_args
+      fuse 0 ty_args fat_ptr_arg_starts
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
@@ -284,7 +250,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   let cmm =
     C.letin extcall_var ~defining_expr:extcall ~body:(wrap (Cvar extcall_ident))
   in
-  bind_args cmm, free_vars, env, res, Ece.all
+  cmm, free_vars, env, res, Ece.all
 
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in

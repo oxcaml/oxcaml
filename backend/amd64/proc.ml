@@ -374,14 +374,84 @@ let win64_loc_external_arguments arg =
   done;
   (loc, Misc.align !ofs 16, Align_16) (* keep stack 16-aligned *)
 
-let loc_external_arguments ty_args =
-  let arg = Cmm.machtype_of_exttype_list ty_args in
-  let loc, stack_ofs, align =
-    if win64
-    then win64_loc_external_arguments arg
-    else unix_loc_external_arguments arg
+(* [XFat_pointer] arguments: the base goes in the slot's real C argument
+   register; the offset in a leftover C integer argument register. The
+   addition is emitted as part of the call itself. Note that, as a value
+   argument of an external call, the base is not a GC root once moved
+   into its argument register; this is sound because no GC safepoint can
+   occur between an external call's argument moves and the call. *)
+let unix_loc_external_arguments_fat ty_args =
+  let int_arg_regs = Regs.[RDI; RSI; RDX; RCX; R8; R9] in
+  let real_component (t : Cmm.exttype) : machtype_component =
+    match t with
+    | XFat_pointer -> Val
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 -> Int
+    | XFloat -> Float
+    | XFloat32 -> Float32
+    | XVec128 -> Vec128
+    | XVec256 -> Vec256
+    | XVec512 -> Vec512
   in
-  Array.map (fun reg -> [|reg|]) loc, stack_ofs, align
+  let reals = Array.of_list (List.map real_component ty_args) in
+  let loc, stack_ofs, align = unix_loc_external_arguments reals in
+  let next_stack_ofs = ref stack_ofs in
+  let ints_consumed =
+    Array.fold_left
+      (fun k (c : machtype_component) ->
+        match c with
+        | Val | Int | Addr -> k + 1
+        | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask | Valx2 -> k)
+      0 reals
+  in
+  let leftover_int_regs =
+    ref (List.filteri (fun i _ -> i >= ints_consumed) int_arg_regs)
+  in
+  let locs =
+    List.mapi
+      (fun i (t : Cmm.exttype) ->
+        match t with
+        | XFat_pointer ->
+          (match (loc.(i).Reg.loc : Reg.location) with
+          | Reg _ -> ()
+          | Stack _ | Unknown ->
+            Misc.fatal_error
+              "Fat-pointer external arguments passed on the stack are not \
+               supported (too many integer arguments)");
+          let offset_loc =
+            match !leftover_int_regs with
+            | offset_reg :: rest ->
+              leftover_int_regs := rest;
+              phys_reg Int (P offset_reg)
+            | [] ->
+              (* Stash offset in an extra stack word after the real arguments.*)
+              let ofs = !next_stack_ofs in
+              next_stack_ofs := ofs + size_int;
+              stack_slot (Outgoing ofs) Int
+          in
+          [| loc.(i); offset_loc |]
+        | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32 | XVec128
+        | XVec256 | XVec512 ->
+          [| loc.(i) |])
+      ty_args
+  in
+  Array.of_list locs, Misc.align !next_stack_ofs 16, align
+
+let loc_external_arguments ty_args =
+  if List.mem Cmm.XFat_pointer ty_args
+  then
+    if win64
+    then
+      Misc.fatal_error
+        "Fat-pointer external arguments are not supported on Win64"
+    else unix_loc_external_arguments_fat ty_args
+  else
+    let arg = Cmm.machtype_of_exttype_list ty_args in
+    let loc, stack_ofs, align =
+      if win64
+      then win64_loc_external_arguments arg
+      else unix_loc_external_arguments arg
+    in
+    Array.map (fun reg -> [|reg|]) loc, stack_ofs, align
 
 let loc_exn_bucket = rax
 

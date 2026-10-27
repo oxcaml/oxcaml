@@ -266,7 +266,10 @@ type call_kind =
       { kind : Call_kind.Method_kind.t;
         obj : simple
       }
-  | C_call of { alloc : bool }
+  | C_call of
+      { alloc : bool;
+        fat_ptr_arg_starts : int list
+      }
 
 type function_arities =
   { params_arity : arity option;

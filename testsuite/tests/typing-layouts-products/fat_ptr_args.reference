@@ -7,3 +7,5 @@ cmp-gt: 1
 cmp-self: -1
 ptr-id: true
 gc-fresh-args: 0 bad
+poll-loop: .xx.
+sum3: 256

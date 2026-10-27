@@ -138,3 +138,38 @@ let () =
     if sum_fresh i (2 * i) <> 3 * i then incr bad
   done;
   Printf.printf "gc-fresh-args: %d bad\n" !bad
+
+(* A non-allocating loop around a fat-pointer call: [Cfg_polling] inserts a
+   poll on the back edge, which lands between the call's argument set-up and
+   the call itself.  The raw pointer must therefore not exist yet at the poll:
+   the base is passed as an ordinary value (a GC root, updated if the poll
+   GCs) and the addition is fused into the call during emission. *)
+let () =
+  let b = Bytes.make 4 '.' in
+  for _ = 1 to 100_000 do
+    fill #(b, #1L) (Char.code 'x') 2
+  done;
+  print_bytes "poll-loop" b
+
+(* Three fat pointers plus two integers: five C integer-class slots, so the
+   third fat pointer's offset does not fit in a leftover argument register
+   and travels in an extra outgoing stack word (which also routes the call
+   through caml_c_call_stack_args). *)
+external sum3
+  :  (#(bytes * int64_u)[@fat_ptr])
+  -> int64_u
+  -> (#(bytes * int64_u)[@fat_ptr])
+  -> int64_u
+  -> (#(bytes * int64_u)[@fat_ptr])
+  -> (int[@untagged])
+  = "test_sum3_bytecode" "test_sum3_native"
+  [@@noalloc]
+
+let () =
+  let p = Bytes.of_string "\001\002\003" in
+  let q = Bytes.of_string "\010\020\030" in
+  let r = Bytes.of_string "\100\200\250" in
+  (* reads p.[1] and q.[2] scaled by 3 and 5, plus r.[0]:
+     2*3 + 30*5 + 100 = 256 *)
+  Printf.printf "sum3: %d\n"
+    (sum3 #(p, #1L) #3L #(q, #2L) #5L #(r, #0L))

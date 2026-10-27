@@ -346,7 +346,24 @@ let instr_cfg_with_layout :
                (Cfg.successor_labels after ~normal:true ~exn:false),
              after.exn )
          with
-        | 1, None -> DLL.add_end after.body poll
+        | 1, None ->
+          (* Don't add a poll between moving an external call's arguments into
+             their calling-convention locations and the call itself: those
+             locations are not GC roots. In that case, place the poll at the
+             start of the block. (This also keeps a fat-pointer's base from
+             being relocated between the argument set-up and the addition). *)
+          let poll_before_body =
+            match after.terminator.desc with
+            | Prim { op = External _; _ } | Call_no_return _ -> true
+            | Prim { op = Probe _; _ }
+            | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+            | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+            | Tailcall_func _ | Call _ | Invalid _ ->
+              false
+          in
+          if poll_before_body
+          then DLL.add_begin after.body poll
+          else DLL.add_end after.body poll
         | _ ->
           let before = Some (Cfg.get_block_exn cfg dst) in
           let instrs = DLL.of_list [poll] in

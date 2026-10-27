@@ -72,3 +72,18 @@ value test_sum_seconds_bytecode(value fp1, value fp2)
   value *q = (value *)decode_fat_pointer(fp2);
   return Val_long(Long_val(*p) + Long_val(*q));
 }
+
+intnat test_sum3_native(unsigned char *p, intnat x, unsigned char *q,
+                        intnat y, unsigned char *r)
+{
+  return (intnat)*p * x + (intnat)*q * y + (intnat)*r;
+}
+
+value test_sum3_bytecode(value fp1, value x, value fp2, value y, value fp3)
+{
+  unsigned char *p = (unsigned char *)decode_fat_pointer(fp1);
+  unsigned char *q = (unsigned char *)decode_fat_pointer(fp2);
+  unsigned char *r = (unsigned char *)decode_fat_pointer(fp3);
+  return Val_long((intnat)*p * (intnat)Int64_val(x)
+                  + (intnat)*q * (intnat)Int64_val(y) + (intnat)*r);
+}
