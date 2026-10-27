@@ -338,6 +338,8 @@ let spec_extra sub = function
   | Stexp_constraint cty -> Stexp_constraint (sub.typ sub cty)
   | Stexp_inspected_type _ as e -> e
 
+let spec_labelled sub (lbl, e, sort) = (lbl, sub.spec_expression sub e, sort)
+
 let spec_expression sub
       {stexp_desc; stexp_loc; stexp_extra; stexp_type; stexp_env} =
   let stexp_desc =
@@ -355,6 +357,20 @@ let spec_expression sub
             args
         in
         Stexp_apply {funct; args; ret_mode; yielding}
+    | Stexp_tuple (es, mode) ->
+        Stexp_tuple (List.map (spec_labelled sub) es, mode)
+    | Stexp_unboxed_tuple es ->
+        Stexp_unboxed_tuple (List.map (spec_labelled sub) es)
+    | Stexp_unboxed_unit | Stexp_unboxed_bool _ as d -> d
+    | Stexp_construct r ->
+        let args =
+          List.map (fun (sort, e) -> (sort, sub.spec_expression sub e)) r.args
+        in
+        Stexp_construct { r with lid = map_loc_lid sub r.lid; args }
+    | Stexp_variant (lbl, arg) ->
+        Stexp_variant
+          (lbl, Option.map (fun (e, mode) -> (sub.spec_expression sub e, mode))
+                  arg)
   in
   let stexp_extra =
     List.map

@@ -79,3 +79,88 @@ module type Constants =
     law? unboxed : unboxed (-#1.5)
   end
 |}]
+
+(* Tuples, variants and unboxed values. *)
+
+module type Structures = sig
+  val f : int * string -> [ `A of int | `B ] -> bool
+  val g : #(int * bool) -> unit# -> bool# -> bool
+  law? tuple (x : int) : f (x, "s") (`A x) && f (0, "") `B
+  law? labelled (t : x:int * string) : t = (~x:1, "s")
+  law? unboxed : g #(1, true) #() #false
+end
+[%%expect {|
+module type Structures =
+  sig
+    val f : int * string -> [ `A of int | `B ] -> bool
+    val g : #(int * bool) -> unit# -> bool# -> bool
+    law? tuple (x : int) : (f (x, ("s")) (`A x)) && (f ((0), ("")) `B)
+    law? labelled (t : x:int * string) : t = (~x:(1), ("s"))
+    law? unboxed : g #((1), (true : bool)) #() #false
+  end
+|}]
+
+(* Constructors of other than predefined types are annotated with their
+   types, so that the printed signature types again with the same
+   constructors when several types share them. *)
+
+module type Disambiguated = sig
+  type t = Circle of float
+  type t2 = Circle of int
+  law? circle (c : t) : (Circle 1. : t) = c && Some c <> None
+end
+[%%expect {|
+module type Disambiguated =
+  sig
+    type t = Circle of float
+    type t2 = Circle of int
+    law? circle (c : t) :
+      ((Circle (1.) : t) = c) && ((Some c : _ option) <> (None : _ option))
+  end
+|}]
+
+(* The [None] that the type checker inserts for an omitted optional argument
+   is printed like an explicit [?x:None]. *)
+
+module type Optional = sig
+  val f : ?x:int -> unit -> int
+  law? omitted : f () = 0
+end
+[%%expect {|
+module type Optional =
+  sig
+    val f : ?x:int -> unit -> int
+    law? omitted : (f ?x:(None : _ option) (() : unit)) = (0)
+  end
+|}]
+
+(* The constructors of a type through a functor application, as
+   [with module M := F (X)] introduces, have no qualified syntax: they are
+   printed unqualified, and the annotation resolves them when the printed
+   law is typed again. *)
+
+module Applied_functor (X : sig end) : sig
+  type t = A | B
+end = struct
+  type t = A | B
+end
+module Arg = struct end
+module type Applied_sig = sig
+  module M : sig type t = A | B end
+  law? m (x : M.t) : x = M.A
+end
+module type Applied = Applied_sig with module M := Applied_functor (Arg)
+module Printed : Applied = struct
+  law? m (x : Applied_functor(Arg).t) : x = (A : Applied_functor(Arg).t)
+end
+[%%expect {|
+module Applied_functor : functor (X : sig end) -> sig type t = A | B end
+module Arg : sig end
+module type Applied_sig =
+  sig module M : sig type t = A | B end law? m (x : M.t) : x = (A : M.t) end
+module type Applied =
+  sig
+    law? m (x : Applied_functor(Arg).t) : x = (A : Applied_functor(Arg).t)
+  end
+module Printed : Applied
+|}]

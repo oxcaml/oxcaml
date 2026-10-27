@@ -1983,7 +1983,7 @@ let law_applied_path decl_impl decl_intf =
     (fun ((ns : Spec.namespace), path) ->
        match ns with
        | Value when Path.contains_apply path -> Some (Law_applied_path path)
-       | Value -> None)
+       | Value | Type -> None)
     (law_paths decl_impl @ law_paths decl_intf)
 
 (* The checks below pair the parameters of the two laws by position.
@@ -2024,8 +2024,8 @@ let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
 
 (* The clauses of the two laws must be the same expressions up to two
    things. First, the names of the parameters: [vars] pairs them by
-   position. Second, the aliases in the paths of values (see
-   [normalize_value_path]): [Alias.f] is [Outer.f] when
+   position. Second, the module aliases in the paths, and the aliases of
+   values (see [normalize_value_path]): [Alias.f] is [Outer.f] when
    [module Alias = Outer], and [f] is [M.f] in a signature strengthened with
    [M]. All other paths must be identical. This is how [Ctype.equal]
    compares the paths of types. *)
@@ -2035,6 +2035,7 @@ let law_clauses env (decl_impl : Types.law_declaration)
     let normalize =
       match ns with
       | Value -> normalize_value_path env
+      | Type -> Env.normalize_type_path None env
     in
     Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
   in

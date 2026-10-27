@@ -293,6 +293,14 @@ let[@warning "+9"] spec_expression sub
   | Stexp_apply {funct; args; _} ->
       sub.spec_expression sub funct;
       List.iter (fun (_, e, _) -> sub.spec_expression sub e) args
+  | Stexp_tuple (es, _) | Stexp_unboxed_tuple es ->
+      List.iter (fun (_, e, _) -> sub.spec_expression sub e) es
+  | Stexp_unboxed_unit | Stexp_unboxed_bool _ -> ()
+  | Stexp_construct {lid; args; _} ->
+      iter_loc_lid sub lid;
+      List.iter (fun (_, e) -> sub.spec_expression sub e) args
+  | Stexp_variant (_, arg) ->
+      Option.iter (fun (e, _) -> sub.spec_expression sub e) arg
 
 let[@warning "+9"] law_declaration sub
       ({law_id = _; law_name; law_law = _; law_params; law_assumptions;

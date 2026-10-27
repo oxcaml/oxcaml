@@ -47,6 +47,13 @@ type arg_label =
 
 type sort = Jkind_types.Sort.Const.t
 
+(** A constructor is identified by the path of its type and its name. *)
+type constructor =
+  | Constructor of
+      { type_path : Path.t;
+        name : string
+      }
+
 type expression =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
@@ -54,13 +61,29 @@ type expression =
   | Sexp_apply of expression * (arg_label * expression * sort) list
       (** No argument is omitted: the arguments of a partial application are a
           prefix of the parameters. *)
+  | Sexp_tuple of (string option * expression * sort) list
+  | Sexp_unboxed_tuple of (string option * expression * sort) list
+  | Sexp_unboxed_unit
+  | Sexp_unboxed_bool of bool
+  | Sexp_construct of constructor * (sort * expression) list
+  | Sexp_variant of string * expression option
 
 (** {1 Traversals} *)
 
-val map_paths : value_path:(Path.t -> Path.t) -> expression -> expression
+(** [map_paths ~value_path ~type_path e] applies [value_path] to the paths of
+    the globals of [e] and [type_path] to the paths of the types of its
+    constructors. *)
+val map_paths :
+  value_path:(Path.t -> Path.t) ->
+  type_path:(Path.t -> Path.t) ->
+  expression ->
+  expression
 
-(** The namespaces of the global paths of an expression: values. *)
-type namespace = Value
+(** The namespaces of the global paths of an expression: values and the types of
+    constructors. *)
+type namespace =
+  | Value
+  | Type
 
 (** The global paths of an expression with their namespaces, in traversal order.
 *)

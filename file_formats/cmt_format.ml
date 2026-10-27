@@ -282,7 +282,10 @@ let iter_on_occurrences
           f ~namespace:Value stexp_env (Path.Pident id) lid
       | Stexp_global { path; lid; _ } | Stexp_primitive { path; lid; _ } ->
           f ~namespace:Value stexp_env path lid
-      | Stexp_constant _ | Stexp_apply _ -> ());
+      | Stexp_construct { lid; constructor; _ } ->
+          add_constructor_description stexp_env lid constructor
+      | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
+      | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _ -> ());
       default_iterator.spec_expression sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are

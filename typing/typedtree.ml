@@ -1180,6 +1180,19 @@ and spec_expression_desc =
         ret_mode: return_mode;
         yielding: Mode.Yielding.l;
       }
+  | Stexp_tuple of
+      (string option * spec_expression * Jkind.sort) list * locality_mode_r
+  | Stexp_unboxed_tuple of (string option * spec_expression * Jkind.sort) list
+  | Stexp_unboxed_unit
+  | Stexp_unboxed_bool of bool
+  | Stexp_construct of
+      { lid: Longident.t loc;
+        constructor: Data_types.constructor_description;
+        repr: Types.constructor_representation;
+        args: (Jkind.sort * spec_expression) list;
+        mode: locality_mode_r option;
+      }
+  | Stexp_variant of label * (spec_expression * locality_mode_r) option
 
 and spec_ident =
   { sid_unique_use: unique_use;

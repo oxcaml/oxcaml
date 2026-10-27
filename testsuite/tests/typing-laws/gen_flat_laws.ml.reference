@@ -1,4 +1,4 @@
-[@@@ocaml.warning "-27"]
+[@@@ocaml.warning "-27-40"]
 module Laws_gen_Stdlib = Stdlib
 module Laws_gen_Gen_flat = Gen_flat
 type 'a each =
@@ -9,7 +9,9 @@ type 'a each =
   \#type: 'a ;
   alias: 'a ;
   assumption: 'a ;
-  constants: 'a }
+  constants: 'a ;
+  constructors: 'a ;
+  tuples: 'a }
 let names =
   {
     poly = "poly";
@@ -18,7 +20,9 @@ let names =
     \#type = "type";
     alias = "alias";
     assumption = "assumption";
-    constants = "constants"
+    constants = "constants";
+    constructors = "constructors";
+    tuples = "tuples"
   }
 let locations =
   {
@@ -77,9 +81,28 @@ let locations =
         start_col = 0;
         end_line = 44;
         end_col = 68
+      };
+    constructors =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 48;
+        start_col = 0;
+        end_line = 49;
+        end_col = 63
+      };
+    tuples =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 50;
+        start_col = 0;
+        end_line = 50;
+        end_col = 66
       }
   }
-let map { poly; modes; unboxed; \#type; alias; assumption; constants } ~f =
+let map
+  { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
+    tuples }
+  ~f =
   {
     poly = (f poly);
     modes = (f modes);
@@ -87,10 +110,23 @@ let map { poly; modes; unboxed; \#type; alias; assumption; constants } ~f =
     \#type = (f \#type);
     alias = (f alias);
     assumption = (f assumption);
-    constants = (f constants)
+    constants = (f constants);
+    constructors = (f constructors);
+    tuples = (f tuples)
   }
-let to_list { poly; modes; unboxed; \#type; alias; assumption; constants } =
-  [poly; modes; unboxed; \#type; alias; assumption; constants]
+let to_list
+  { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
+    tuples }
+  =
+  [poly;
+  modes;
+  unboxed;
+  \#type;
+  alias;
+  assumption;
+  constants;
+  constructors;
+  tuples]
 type poly_input =
   | Poly_input: 'a 'b . {
   xs: 'a list ;
@@ -113,6 +149,13 @@ type assumption_input =
 type constants_input =
   | Constants_input: {
   c: char } -> constants_input 
+type constructors_input =
+  | Constructors_input: {
+  s: Laws_gen_Gen_flat.shape } -> constructors_input 
+type tuples_input =
+  | Tuples_input: {
+  x: int ;
+  y: string } -> tuples_input 
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
@@ -125,6 +168,8 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         val alias : alias_input Choice.t
         val assumption : assumption_input Choice.t
         val constants : constants_input Choice.t
+        val constructors : constructors_input Choice.t
+        val tuples : tuples_input Choice.t
       end
     let poly ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -309,6 +354,75 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             end_col = 68
                           }
                       }))))
+    let constructors ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.constructors),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.constructors;
+                     predicate =
+                       (fun ((Constructors_input { s }) : constructors_input)
+                          ->
+                          (Laws_gen_Stdlib.(=) s
+                             ((Circle 1. : Laws_gen_Gen_flat.shape) : 
+                             Laws_gen_Gen_flat.shape) : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "gen_flat.ml";
+                         start_line = 49;
+                         start_col = 2;
+                         end_line = 49;
+                         end_col = 25
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.constructors;
+                        predicate =
+                          (fun
+                             ((Constructors_input { s }) : constructors_input)
+                             ->
+                             (Laws_gen_Stdlib.(&&)
+                                (Laws_gen_Stdlib.(<>) s
+                                   (Square 1. : Laws_gen_Gen_flat.shape))
+                                (Laws_gen_Stdlib.(<>) (Some s : _ option)
+                                   (None : _ option)) : bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "gen_flat.ml";
+                            start_line = 49;
+                            start_col = 31;
+                            end_line = 49;
+                            end_col = 63
+                          }
+                      }))))
+    let tuples ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.tuples),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.tuples;
+                 predicate =
+                   (fun ((Tuples_input { x; y }) : tuples_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=) (x, y) (x, y))
+                         (Laws_gen_Stdlib.(<>) (`A x) `B) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 50;
+                     start_col = 37;
+                     end_line = 50;
+                     end_col = 66
+                   }
+               }))
     let laws choices =
       {
         poly = (poly choices);
@@ -317,6 +431,8 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
         \#type = (\#type choices);
         alias = (alias choices);
         assumption = (assumption choices);
-        constants = (constants choices)
+        constants = (constants choices);
+        constructors = (constructors choices);
+        tuples = (tuples choices)
       }
   end

@@ -29,6 +29,14 @@ law? assumptions (x : int) (y : int) : x > 0 ===> y > 0 ===> x + y > 0
 law? constants (c : char) (s : string) :
   c = 'a' ===> s = {|b|} ===> 1.5 >= -0.25e1 && 1l < 2l && 3L < 4L && 5n < 6n
 
+type shape = Circle of float | Square of float
+type other = Circle of int
+law? constructors (s : shape) :
+  s = (Circle 1. : shape) ===> s <> Square 1. && Some s <> None
+let first #(x, _) = x
+law? tuples (x : int) : (x, "s") = (x, "s") && first #(x, true) = x
+law? variants (x : int) : `A x <> `B
+
 (* Laws in a submodule and in a module type. *)
 
 module Nested = struct

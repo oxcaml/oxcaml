@@ -1192,14 +1192,50 @@ and print_out_spec ppf = function
       in
       fprintf ppf "@[<2>%a%a@]" print_simple_out_spec funct
         (fun ppf -> List.iter (print_arg ppf)) args
-  | Ospec_var _ | Ospec_global _ | Ospec_constant _ as spec ->
+  | Ospec_construct (c, [arg]) ->
+      fprintf ppf "@[<2>%a@ %a@]" print_constructor c
+        print_simple_out_spec arg
+  | Ospec_construct (c, (_ :: _ :: _ as args)) ->
+      fprintf ppf "@[<2>%a@ (%a)@]" print_constructor c
+        (print_list print_out_spec (fun ppf -> fprintf ppf ",@ ")) args
+  | Ospec_variant (lbl, Some arg) ->
+      fprintf ppf "@[<2>`%a@ %a@]" print_lident lbl print_simple_out_spec arg
+  | Ospec_var _ | Ospec_global _ | Ospec_constant _ | Ospec_tuple _
+  | Ospec_unboxed_tuple _ | Ospec_unboxed_unit | Ospec_unboxed_bool _
+  | Ospec_construct (_, []) | Ospec_variant (_, None)
+  | Ospec_constraint _ as spec ->
       print_simple_out_spec ppf spec
 
 and print_simple_out_spec ppf = function
   | Ospec_var x -> value_ident ppf x
   | Ospec_global id -> print_value_path ppf id
   | Ospec_constant v -> fprintf ppf "(%a)" print_out_value v
-  | Ospec_apply _ as spec -> fprintf ppf "(%a)" print_out_spec spec
+  | Ospec_tuple es -> fprintf ppf "@[<1>(%a)@]" print_spec_components es
+  | Ospec_unboxed_tuple es ->
+      fprintf ppf "@[<1>#(%a)@]" print_spec_components es
+  | Ospec_unboxed_unit -> fprintf ppf "#()"
+  | Ospec_unboxed_bool b -> fprintf ppf "#%b" b
+  | Ospec_construct (c, []) -> print_constructor ppf c
+  | Ospec_variant (lbl, None) -> fprintf ppf "`%a" print_lident lbl
+  | Ospec_constraint (e, ty) ->
+      fprintf ppf "@[<1>(%a :@ %a)@]" print_out_spec e !out_type ty
+  | Ospec_apply _ | Ospec_construct (_, _ :: _) | Ospec_variant (_, Some _)
+    as spec ->
+      fprintf ppf "(%a)" print_out_spec spec
+
+and print_spec_components ppf es =
+  let component ppf = function
+    | None, e -> print_out_spec ppf e
+    | Some l, e -> fprintf ppf "~%s:%a" l print_simple_out_spec e
+  in
+  print_list component (fun ppf -> fprintf ppf ",@ ") ppf es
+
+(* Constructor names are not escaped like the names of values ([true],
+   [()]), and [::] is written in prefix form, as [( :: )]. *)
+and print_constructor ppf = function
+  | Oide_ident { printed_name = "::" } -> fprintf ppf "( :: )"
+  | Oide_ident { printed_name } -> pp_print_string ppf printed_name
+  | c -> print_ident ppf c
 
 let out_constr = ref print_out_constr
 let out_constr_args = ref print_out_constr_args

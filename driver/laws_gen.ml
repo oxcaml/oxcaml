@@ -30,7 +30,7 @@
    [ln] are the laws of [U], qualified by their modules, and [F] is an
    applicative functor of [U] with laws:
    {[
-     [@@@ocaml.warning "-27"]
+     [@@@ocaml.warning "-27-40"]
      module Laws_gen_U = U
      type 'a each = { l1 : 'a; ...; ln : 'a }
      let names = { l1 = "l1"; ...; ln = "ln" }
@@ -108,6 +108,7 @@ module P : sig
 
   module Typ : sig
     val var : string -> core_type
+    val any : core_type
     val constr : Longident.t -> core_type list -> core_type
     val package : Longident.t -> core_type
   end
@@ -261,6 +262,7 @@ end = struct
 
   module Typ = struct
     let var x = H.Typ.var x None
+    let any = H.Typ.any None
     let constr c args = H.Typ.constr (mknoloc c) args
     let package s = H.Typ.package (H.Typ.package_type (mknoloc s) [])
   end
@@ -469,7 +471,10 @@ let check_exported ctx ~loc display (ld : law_declaration) =
           p
   in
   List.iter
-    (fun ((Value : Spec.namespace), p) -> check "value" Env.find_value p)
+    (fun ((ns : Spec.namespace), p) ->
+      match ns with
+      | Value -> check "value" Env.find_value p
+      | Type -> check "type" Env.find_type p)
     (List.concat_map Spec.paths (ld.law_conclusion :: ld.law_assumptions));
   with_type_mark (fun mark ->
       let it =
@@ -692,10 +697,36 @@ let lident : Path.t -> Longident.t = function
 
 (* The syntax of typed trees, with the paths written by [print] *)
 
+(* Constructors are written unqualified and annotated with their type,
+   [(C : _ t)], so that the generated clause types with the same
+   constructors. Extension constructors are written by their paths. *)
+let with_type print ty pe =
+  match get_desc ty with
+  | Tconstr (p, args, _) ->
+      P.Exp.constraint_ pe
+        (P.Typ.constr (print p) (List.map (fun _ -> P.Typ.any) args))
+  | _ -> Misc.fatal_error "Laws_gen.with_type: not a type constructor"
+
+let annotate print (e : Typedtree.expression) (pe : Parsetree.expression) =
+  match e.exp_desc with
+  | Texp_construct (_, { cstr_tag = Ordinary _ | Null; cstr_res; _ }, _, _, _)
+    ->
+      with_type print cstr_res pe
+  | _ -> pe
+
+let constructor_lid print (cstr : Data_types.constructor_description) :
+    Longident.t =
+  match cstr.cstr_tag with
+  | Extension path -> print path
+  | Ordinary _ | Null -> Lident cstr.cstr_name
+
 let mapper print =
   {
     Untypeast.default_mapper with
+    expr = (fun sub e -> annotate print e (Untypeast.default_mapper.expr sub e));
     ident = (fun _ path lid -> { lid with txt = print path });
+    constructor =
+      (fun _ cstr lid -> { lid with txt = constructor_lid print cstr });
   }
 
 let core_type print cty =
@@ -1192,8 +1223,9 @@ let implementation names items =
          @ List.map (law_binding names.print) laws
          @ [ laws_binding laws ]))
   in
-  (* Unused parameters of laws in clauses *)
-  (P.Str.warning "-27" :: alias_bindings names)
+  (* Unused parameters of laws in clauses, and constructors that their type
+     annotation selects (see [with_type]) *)
+  (P.Str.warning "-27-40" :: alias_bindings names)
   @ (P.Str.type_ (each laws) :: each_values laws)
   @ List.map
       (fun law -> P.Str.type_ (input_declaration names.print law))

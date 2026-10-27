@@ -1,4 +1,4 @@
-[@@@ocaml.warning "-27"]
+[@@@ocaml.warning "-27-40"]
 module Laws_gen_Laws_gen_Stdlib = Laws_gen_Stdlib
 module Laws_gen_Stdlib_1 = Stdlib
 type 'a each = {

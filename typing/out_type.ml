@@ -3873,6 +3873,36 @@ let rec tree_of_spec (e : Spec.expression) : out_spec =
   | Spec.Sexp_apply (funct, args) ->
       let arg (lbl, e, _) = (label_of_spec lbl, tree_of_spec e) in
       Ospec_apply (tree_of_spec funct, List.map arg args)
+  | Spec.Sexp_tuple es -> Ospec_tuple (List.map tree_of_spec_labelled es)
+  | Spec.Sexp_unboxed_tuple es ->
+      Ospec_unboxed_tuple (List.map tree_of_spec_labelled es)
+  | Spec.Sexp_unboxed_unit -> Ospec_unboxed_unit
+  | Spec.Sexp_unboxed_bool b -> Ospec_unboxed_bool b
+  | Spec.Sexp_construct ((Constructor { type_path; _ } as cstr), args) ->
+      annotate type_path
+        (Ospec_construct
+           (tree_of_spec_constructor cstr,
+            List.map (fun (_, e) -> tree_of_spec e) args))
+  | Spec.Sexp_variant (lbl, arg) ->
+      Ospec_variant (lbl, Option.map tree_of_spec arg)
+
+and tree_of_spec_labelled (lbl, e, _) = (lbl, tree_of_spec e)
+
+(* Constructors are printed unqualified and annotated with their type,
+   [(C : _ t)], so that the printed clause types again with the same
+   constructors. *)
+and annotate (type_path : Path.t) e =
+  match Env.find_type type_path !printing_env with
+  | decl ->
+      let params = List.map (fun _ -> Otyp_stuff "_") decl.type_params in
+      Ospec_constraint
+        (e, Otyp_constr (tree_of_path (Some Type) type_path, params))
+  | exception Not_found ->
+      Misc.fatal_errorf "Out_type.annotate: unbound type %s"
+        (Path.name type_path)
+
+and tree_of_spec_constructor (Constructor { name; _ } : Spec.constructor) =
+  Oide_ident { printed_name = name }
 
 and label_of_spec : Spec.arg_label -> Outcometree.arg_label = function
   | Spec.Nolabel -> Nolabel

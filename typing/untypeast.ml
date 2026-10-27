@@ -37,6 +37,9 @@ type mapper = {
   class_type_declaration: mapper -> T.class_type_declaration
                           -> class_type_declaration;
   class_type_field: mapper -> T.class_type_field -> class_type_field;
+  constructor:
+    mapper -> Data_types.constructor_description -> Longident.t Location.loc
+    -> Longident.t Location.loc;
   constructor_declaration: mapper -> T.constructor_declaration
                            -> constructor_declaration;
   expr: mapper -> T.expression -> expression;
@@ -416,7 +419,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
         Ppat_unboxed_tuple
           (List.map (fun (label, p, _) -> label, sub.pat sub p) list,
            Closed)
-    | Tpat_construct (lid, _, _, args, vto) ->
+    | Tpat_construct (lid, cstr, _, args, vto) ->
         let tyo =
           match vto with
             None -> None
@@ -435,7 +438,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
                       (List.map (fun (_, p) -> None, sub.pat sub p) args)
                       Closed)
         in
-        Ppat_construct (map_loc sub lid,
+        Ppat_construct (map_loc sub (sub.constructor sub cstr lid),
           match tyo, arg with
           | Some (vl, ty), Some arg ->
               (* CR cgunn: recover mode constraint info here *)
@@ -696,8 +699,8 @@ let expression sub exp =
     | Texp_unboxed_tuple list ->
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
-    | Texp_construct (lid, _, _, args, _) ->
-        Pexp_construct (map_loc sub lid,
+    | Texp_construct (lid, cstr, _, args, _) ->
+        Pexp_construct (map_loc sub (sub.constructor sub cstr lid),
           (match args with
               [] -> None
           | [ (_, arg) ] -> Some (sub.expr sub arg)
@@ -1266,6 +1269,8 @@ let location _sub l = l
 
 let ident _sub _path lid = lid
 
+let constructor _sub _cstr lid = lid
+
 let default_mapper =
   {
     attribute = attribute;
@@ -1294,6 +1299,7 @@ let default_mapper =
     type_exception = type_exception;
     extension_constructor = extension_constructor;
     ident = ident;
+    constructor = constructor;
     value_description = value_description;
     pat = pattern;
     expr = expression;

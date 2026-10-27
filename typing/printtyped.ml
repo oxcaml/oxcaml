@@ -1033,6 +1033,29 @@ and spec_expression i ppf x =
       line i ppf "Stexp_apply\n";
       spec_expression i ppf funct;
       list i spec_argument ppf args
+  | Stexp_tuple (l, am) ->
+      line i ppf "Stexp_tuple\n";
+      locality_mode_r i ppf am;
+      list i spec_labelled ppf l
+  | Stexp_unboxed_tuple l ->
+      line i ppf "Stexp_unboxed_tuple\n";
+      list i spec_labelled ppf l
+  | Stexp_unboxed_unit -> line i ppf "Stexp_unboxed_unit\n"
+  | Stexp_unboxed_bool b -> line i ppf "Stexp_unboxed_bool %a\n" fmt_bool b
+  | Stexp_construct {lid; repr; args; mode; _} ->
+      line i ppf "Stexp_construct %a\n" fmt_longident lid;
+      constructor_representation i ppf repr;
+      locality_mode_option i ppf mode;
+      list i spec_expression ppf (List.map snd args)
+  | Stexp_variant (l, eo) ->
+      line i ppf "Stexp_variant \"%s\"\n" l;
+      option i spec_expression ppf (Option.map fst eo)
+
+and spec_labelled i ppf (l, e, s) =
+  line i ppf "<tuple component>\n";
+  option (i+1) string ppf l;
+  spec_expression (i+1) ppf e;
+  line (i+1) ppf "%a\n" fmt_sort s
 
 and spec_argument i ppf (l, e, s) =
   line i ppf "<arg>\n";

@@ -42,7 +42,6 @@ type unsupported =
   | Coercions
   | Comprehensions
   | Conditionals
-  | Constructors
   | Exception_handlers
   | Exclave
   | Extension_constructors
@@ -65,7 +64,6 @@ type unsupported =
   | Overwrite
   | Pattern_matching
   | Polymorphic_annotations
-  | Polymorphic_variants
   | Position_arguments
   | Primitive of primitive_kind
   | Probes
@@ -75,7 +73,6 @@ type unsupported =
   | Sequences
   | Source_positions
   | Stack_allocation
-  | Tuples
   | Values_through_applications
 
 type error = Unsupported of unsupported
@@ -108,6 +105,11 @@ let check_primitive loc prim =
   match unsupported_primitive prim with
   | None -> ()
   | Some kind -> unsupported loc (Primitive kind)
+
+let check_constructor loc (cstr : Data_types.constructor_description) =
+  match cstr.cstr_tag with
+  | Extension _ -> unsupported loc Extension_constructors
+  | Ordinary _ | Null -> ()
 
 let value_description (desc : Types.value_description) : spec_value_description
     =
@@ -184,10 +186,16 @@ and spectree_desc bound loc desc : spec_expression_desc =
   | Texp_function _ -> unsupported loc Functions
   | Texp_match _ -> unsupported loc Pattern_matching
   | Texp_try _ -> unsupported loc Exception_handlers
-  | Texp_tuple _ | Texp_unboxed_tuple _ -> unsupported loc Tuples
-  | Texp_unboxed_unit | Texp_unboxed_bool _ | Texp_construct _ ->
-    unsupported loc Constructors
-  | Texp_variant _ -> unsupported loc Polymorphic_variants
+  | Texp_tuple (es, mode) -> Stexp_tuple (List.map (labelled bound) es, mode)
+  | Texp_unboxed_tuple es -> Stexp_unboxed_tuple (List.map (labelled bound) es)
+  | Texp_unboxed_unit -> Stexp_unboxed_unit
+  | Texp_unboxed_bool b -> Stexp_unboxed_bool b
+  | Texp_construct (lid, constructor, repr, args, mode) ->
+    check_constructor loc constructor;
+    let args = List.map (fun (sort, e) -> sort, spectree bound e) args in
+    Stexp_construct { lid; constructor; repr; args; mode }
+  | Texp_variant (lbl, arg) ->
+    Stexp_variant (lbl, Option.map (fun (e, mode) -> spectree bound e, mode) arg)
   | Texp_record _ | Texp_record_unboxed_product _ -> unsupported loc Records
   | Texp_atomic_loc _ -> unsupported loc Atomic_fields
   | Texp_field _ | Texp_unboxed_field _ -> unsupported loc Field_accesses
@@ -236,6 +244,8 @@ and ident_desc bound loc path (lid : Longident.t Location.loc)
   | Val_reg _, Id_prim _ | Val_prim _, Id_value ->
     Misc.fatal_error "Translspec.spectree: bad Texp_ident"
 
+and labelled bound (lbl, e, sort) = lbl, spectree bound e, sort
+
 and argument bound loc (lbl, (arg : apply_arg)) =
   match arg with
   | Omitted _ -> unsupported loc Omitted_arguments
@@ -268,18 +278,33 @@ let constant (c : Typedtree.constant) : Spec.constant =
   | Const_unboxed_int64 n -> Const_unboxed_int64 n
   | Const_unboxed_nativeint n -> Const_unboxed_nativeint n
 
+let constructor (cstr : Data_types.constructor_description) : Spec.constructor =
+  match cstr.cstr_tag with
+  | Ordinary _ | Null ->
+    Constructor
+      { type_path = Data_types.cstr_res_type_path cstr; name = cstr.cstr_name }
+  | Extension _ -> Misc.fatal_error "Translspec.spec: extension constructor"
+
+let sort = Jkind.Sort.default_for_transl_and_get
+
 let rec spec (e : spec_expression) : Spec.expression =
+  let labelled (lbl, e, s) = lbl, spec e, sort s in
   match e.stexp_desc with
   | Stexp_var { id; _ } -> Sexp_var id
   | Stexp_global { path; _ } | Stexp_primitive { path; _ } -> Sexp_global path
   | Stexp_constant c -> Sexp_constant (constant c)
   | Stexp_apply { funct; args; _ } ->
     Sexp_apply
-      ( spec funct,
-        List.map
-          (fun (lbl, e, sort) ->
-            lbl, spec e, Jkind.Sort.default_for_transl_and_get sort)
-          args )
+      (spec funct, List.map (fun (lbl, e, s) -> lbl, spec e, sort s) args)
+  | Stexp_tuple (es, _) -> Sexp_tuple (List.map labelled es)
+  | Stexp_unboxed_tuple es -> Sexp_unboxed_tuple (List.map labelled es)
+  | Stexp_unboxed_unit -> Sexp_unboxed_unit
+  | Stexp_unboxed_bool b -> Sexp_unboxed_bool b
+  | Stexp_construct { constructor = cstr; args; _ } ->
+    Sexp_construct
+      (constructor cstr, List.map (fun (s, e) -> sort s, spec e) args)
+  | Stexp_variant (lbl, arg) ->
+    Sexp_variant (lbl, Option.map (fun (e, _) -> spec e) arg)
 
 (* Typed expressions *)
 
@@ -349,6 +374,22 @@ and typedtree_desc : spec_expression_desc -> Typedtree.expression_desc =
         ret_mode,
         yielding,
         None )
+  | Stexp_tuple (es, mode) -> Texp_tuple (List.map typedtree_labelled es, mode)
+  | Stexp_unboxed_tuple es ->
+    Texp_unboxed_tuple (List.map typedtree_labelled es)
+  | Stexp_unboxed_unit -> Texp_unboxed_unit
+  | Stexp_unboxed_bool b -> Texp_unboxed_bool b
+  | Stexp_construct { lid; constructor; repr; args; mode } ->
+    Texp_construct
+      ( lid,
+        constructor,
+        repr,
+        List.map (fun (sort, e) -> sort, typedtree e) args,
+        mode )
+  | Stexp_variant (lbl, arg) ->
+    Texp_variant (lbl, Option.map (fun (e, mode) -> typedtree e, mode) arg)
+
+and typedtree_labelled (lbl, e, sort) = lbl, typedtree e, sort
 
 and typedtree_argument (lbl, e, sort) =
   typedtree_arg_label lbl, Arg (typedtree e, sort)
@@ -368,7 +409,6 @@ let describe = function
   | Coercions -> "coercions"
   | Comprehensions -> "comprehensions"
   | Conditionals -> "conditionals"
-  | Constructors -> "constructors"
   | Exception_handlers -> "exception handlers"
   | Exclave -> "exclave_"
   | Extension_constructors -> "extension constructors"
@@ -391,7 +431,6 @@ let describe = function
   | Overwrite -> "overwrite_"
   | Pattern_matching -> "pattern matching"
   | Polymorphic_annotations -> "polymorphic type annotations"
-  | Polymorphic_variants -> "polymorphic variants"
   | Position_arguments -> "source position arguments"
   | Primitive kind -> describe_primitive kind
   | Probes -> "probes"
@@ -401,7 +440,6 @@ let describe = function
   | Sequences -> "sequences"
   | Source_positions -> "source positions"
   | Stack_allocation -> "stack_"
-  | Tuples -> "tuples"
   | Values_through_applications -> "values through functor applications"
 
 let report_error ppf = function

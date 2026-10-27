@@ -272,6 +272,13 @@ and out_spec =
   | Ospec_global of out_ident
   | Ospec_constant of out_value
   | Ospec_apply of out_spec * (arg_label * out_spec) list
+  | Ospec_tuple of (string option * out_spec) list
+  | Ospec_unboxed_tuple of (string option * out_spec) list
+  | Ospec_unboxed_unit
+  | Ospec_unboxed_bool of bool
+  | Ospec_construct of out_ident * out_spec list
+  | Ospec_variant of string * out_spec option
+  | Ospec_constraint of out_spec * out_type
 
 
 type out_phrase =

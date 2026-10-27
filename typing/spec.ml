@@ -40,33 +40,67 @@ type arg_label =
 
 type sort = Jkind_types.Sort.Const.t
 
+type constructor =
+  | Constructor of
+      { type_path : Path.t;
+        name : string
+      }
+
 type expression =
   | Sexp_var of Ident.t
   | Sexp_global of Path.t
   | Sexp_constant of constant
   | Sexp_apply of expression * (arg_label * expression * sort) list
+  | Sexp_tuple of (string option * expression * sort) list
+  | Sexp_unboxed_tuple of (string option * expression * sort) list
+  | Sexp_unboxed_unit
+  | Sexp_unboxed_bool of bool
+  | Sexp_construct of constructor * (sort * expression) list
+  | Sexp_variant of string * expression option
 
 (* Traversals *)
 
-let rec map_paths ~value_path e =
+let map_constructor ~type_path (Constructor { type_path = p; name }) =
+  Constructor { type_path = type_path p; name }
+
+let rec map_paths ~value_path ~type_path e =
+  let map e = map_paths ~value_path ~type_path e in
+  let map_labelled (lbl, e, sort) = lbl, map e, sort in
   match e with
-  | Sexp_var _ | Sexp_constant _ -> e
+  | Sexp_var _ | Sexp_constant _ | Sexp_unboxed_unit | Sexp_unboxed_bool _ -> e
   | Sexp_global path -> Sexp_global (value_path path)
   | Sexp_apply (funct, args) ->
-    Sexp_apply
-      ( map_paths ~value_path funct,
-        List.map (fun (lbl, e, sort) -> lbl, map_paths ~value_path e, sort) args
-      )
+    Sexp_apply (map funct, List.map map_labelled args)
+  | Sexp_tuple es -> Sexp_tuple (List.map map_labelled es)
+  | Sexp_unboxed_tuple es -> Sexp_unboxed_tuple (List.map map_labelled es)
+  | Sexp_construct (cstr, args) ->
+    Sexp_construct
+      ( map_constructor ~type_path cstr,
+        List.map (fun (sort, e) -> sort, map e) args )
+  | Sexp_variant (lbl, arg) -> Sexp_variant (lbl, Option.map map arg)
 
-type namespace = Value
+type namespace =
+  | Value
+  | Type
+
+let constructor_path (Constructor { type_path; _ }) = Type, type_path
 
 let rec paths_rev acc = function
-  | Sexp_var _ | Sexp_constant _ -> acc
+  | Sexp_var _ | Sexp_constant _ | Sexp_unboxed_unit | Sexp_unboxed_bool _ ->
+    acc
   | Sexp_global path -> (Value, path) :: acc
   | Sexp_apply (funct, args) ->
     List.fold_left
       (fun acc (_, e, _) -> paths_rev acc e)
       (paths_rev acc funct) args
+  | Sexp_tuple es | Sexp_unboxed_tuple es ->
+    List.fold_left (fun acc (_, e, _) -> paths_rev acc e) acc es
+  | Sexp_construct (cstr, args) ->
+    List.fold_left
+      (fun acc (_, e) -> paths_rev acc e)
+      (constructor_path cstr :: acc)
+      args
+  | Sexp_variant (_, arg) -> Option.fold ~none:acc ~some:(paths_rev acc) arg
 
 let paths e = List.rev (paths_rev [] e)
 
@@ -103,17 +137,38 @@ let same_arg_label l1 l2 =
 
 let same_sort = Jkind_types.Sort.Const.equal
 
+let same_constructor ~same_path (Constructor c1) (Constructor c2) =
+  String.equal c1.name c2.name && same_path Type c1.type_path c2.type_path
+
 let rec alpha_equal ~same_path ~vars e1 e2 =
+  let equal e1 e2 = alpha_equal ~same_path ~vars e1 e2 in
+  let equal_labelled (l1, e1, s1) (l2, e2, s2) =
+    Option.equal String.equal l1 l2 && equal e1 e2 && same_sort s1 s2
+  in
   match e1, e2 with
   | Sexp_var id1, Sexp_var id2 -> same_var vars id1 id2
   | Sexp_global p1, Sexp_global p2 -> same_path Value p1 p2
   | Sexp_constant c1, Sexp_constant c2 -> same_constant c1 c2
   | Sexp_apply (funct1, args1), Sexp_apply (funct2, args2) ->
-    alpha_equal ~same_path ~vars funct1 funct2
+    equal funct1 funct2
     && List.equal
          (fun (l1, e1, s1) (l2, e2, s2) ->
-           same_arg_label l1 l2
-           && alpha_equal ~same_path ~vars e1 e2
-           && same_sort s1 s2)
+           same_arg_label l1 l2 && equal e1 e2 && same_sort s1 s2)
          args1 args2
-  | (Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _), _ -> false
+  | Sexp_tuple es1, Sexp_tuple es2
+  | Sexp_unboxed_tuple es1, Sexp_unboxed_tuple es2 ->
+    List.equal equal_labelled es1 es2
+  | Sexp_unboxed_unit, Sexp_unboxed_unit -> true
+  | Sexp_unboxed_bool b1, Sexp_unboxed_bool b2 -> Bool.equal b1 b2
+  | Sexp_construct (c1, args1), Sexp_construct (c2, args2) ->
+    same_constructor ~same_path c1 c2
+    && List.equal
+         (fun (s1, e1) (s2, e2) -> same_sort s1 s2 && equal e1 e2)
+         args1 args2
+  | Sexp_variant (l1, a1), Sexp_variant (l2, a2) ->
+    String.equal l1 l2 && Option.equal equal a1 a2
+  | ( ( Sexp_var _ | Sexp_global _ | Sexp_constant _ | Sexp_apply _
+      | Sexp_tuple _ | Sexp_unboxed_tuple _ | Sexp_unboxed_unit
+      | Sexp_unboxed_bool _ | Sexp_construct _ | Sexp_variant _ ),
+      _ ) ->
+    false

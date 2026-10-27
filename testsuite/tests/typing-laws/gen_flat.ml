@@ -42,3 +42,9 @@ law? \#type (\#method : int) : \#method = \#method
 law? alias (x : (int as 'a)) : x = x
 law? assumption (x : int) : x > 0 ===> x <> 0
 law? constants (c : char) : c = 'a' ===> 1.5 >= -0.5 && {|s|} <> "t"
+
+type shape = Circle of float | Square of float
+type other = Circle of int
+law? constructors (s : shape) :
+  s = (Circle 1. : shape) ===> s <> Square 1. && Some s <> None
+law? tuples (x : int) (y : string) : (x, y) = (x, y) && `A x <> `B

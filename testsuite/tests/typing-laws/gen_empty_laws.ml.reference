@@ -1,4 +1,4 @@
-[@@@ocaml.warning "-27"]
+[@@@ocaml.warning "-27-40"]
 type 'a each = unit
 let names = ()
 let locations = ()

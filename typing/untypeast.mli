@@ -34,6 +34,9 @@ type mapper = {
   class_type_declaration: mapper -> Typedtree.class_type_declaration
                           -> class_type_declaration;
   class_type_field: mapper -> Typedtree.class_type_field -> class_type_field;
+  constructor:
+    mapper -> Data_types.constructor_description -> Longident.t Location.loc
+    -> Longident.t Location.loc;
   constructor_declaration: mapper -> Typedtree.constructor_declaration
                            -> constructor_declaration;
   expr: mapper -> Typedtree.expression -> expression;
