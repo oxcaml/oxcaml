@@ -824,6 +824,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
+    pca_inherit: inherit_flag;  (** [C of inherit T] *)
     pca_modalities: modalities;
     pca_type: core_type;
     pca_loc: Location.t;

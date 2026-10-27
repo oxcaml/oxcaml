@@ -2963,9 +2963,10 @@ and tree_of_labeled_typlist mode tyl =
       label, tree_of_typexp mode With_locality.Const.legacy ty)
     tyl
 
-and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
-  (tree_of_typexp Type With_locality.Const.legacy ty,
-   tree_of_modalities Immutable gf)
+and tree_of_typ_gf {ca_inherit; ca_type=ty; ca_modalities=gf; _} =
+  { oca_inherit = ca_inherit;
+    oca_type = tree_of_typexp Type With_locality.Const.legacy ty;
+    oca_modalities = tree_of_modalities Immutable gf }
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
@@ -3161,7 +3162,10 @@ let tree_of_label l =
 
 let tree_of_constructor_arguments = function
   | Cstr_tuple l -> List.map tree_of_typ_gf l
-  | Cstr_record l -> [ Otyp_record (List.map tree_of_label l), [] ]
+  | Cstr_record l ->
+    [ { oca_inherit = Not_inherited;
+        oca_type = Otyp_record (List.map tree_of_label l);
+        oca_modalities = [] } ]
 
 let extension_constructor_args_and_ret_type_subtree args ret_type =
   match ret_type with

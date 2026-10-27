@@ -263,7 +263,7 @@ module T = struct
     let pca_type = sub.typ sub x.pca_type in
     let pca_loc = sub.location sub x.pca_loc in
     let pca_modalities = sub.modalities sub x.pca_modalities in
-    { pca_type; pca_loc; pca_modalities }
+    { pca_inherit = x.pca_inherit; pca_type; pca_loc; pca_modalities }
 
   let map_constructor_arguments sub = function
     | Pcstr_tuple l -> Pcstr_tuple (List.map (map_constructor_argument sub) l)

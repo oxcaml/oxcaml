@@ -167,9 +167,15 @@ and out_label = {
   olab_modalities: out_modality list;
 }
 
+and out_constructor_argument = {
+  oca_inherit: Asttypes.inherit_flag;
+  oca_type: out_type;
+  oca_modalities: out_modality list;
+}
+
 and out_constructor = {
   ocstr_name: string;
-  ocstr_args: (out_type * out_modality list) list;
+  ocstr_args: out_constructor_argument list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
   ocstr_immediate_all_void: bool;
 }
@@ -235,7 +241,7 @@ and out_extension_constructor =
   { oext_name: string;
     oext_type_name: string;
     oext_type_params: string list;
-    oext_args: (out_type * out_modality list) list;
+    oext_args: out_constructor_argument list;
     oext_ret_type: (out_vars_jkinds * out_type) option;
     oext_private: Asttypes.private_flag }
 and out_type_extension =

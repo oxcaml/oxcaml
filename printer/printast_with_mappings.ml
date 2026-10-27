@@ -1242,8 +1242,11 @@ and constructor_decl i ppf
   constructor_arguments (i+1) ppf pcd_args;
   option (i+1) core_type ppf pcd_res
 
-and constructor_argument i ppf {pca_modalities; pca_type; pca_loc} =
+and constructor_argument i ppf {pca_inherit; pca_modalities; pca_type; pca_loc} =
   line i ppf "%a\n" fmt_location pca_loc;
+  (match pca_inherit with
+   | Not_inherited -> ()
+   | Inherited -> line (i+1) ppf "Inherited\n");
   modalities (i+1) ppf pca_modalities;
   core_type (i+1) ppf pca_type
 
