@@ -34,7 +34,7 @@ let open_gen = Stdlib.open_in_gen
 let with_open openfun s f =
   let ic = openfun s in
   Fun.protect ~finally:(fun () -> Stdlib.close_in_noerr ic)
-    (fun () -> f ic)
+    (fun () -> f ic) [@nontail]
 
 let with_open_bin s f =
   with_open Stdlib.open_in_bin s f
@@ -69,7 +69,7 @@ let input_line ic =
 let input = Stdlib.input
 
 external unsafe_input_bigarray :
-  t -> _ Bigarray.Array1.t -> int -> int -> int
+  t @ local -> _ Bigarray.Array1.t @ local -> int -> int -> int
   @@ portable
   = "caml_ml_input_bigarray"
 
@@ -190,7 +190,7 @@ let input_all ic =
         in
         let buf = ensure buf nread (chunk_size + 1) in
         Bytes.set buf nread c;
-        loop buf (nread + 1)
+        loop buf (nread + 1) [@nontail]
   end
 
 let [@tail_mod_cons] rec input_lines ic =
@@ -205,6 +205,7 @@ let rec fold_lines f accu ic =
 
 let set_binary_mode = Stdlib.set_binary_mode_in
 
-external is_binary_mode : in_channel -> bool @@ portable = "caml_ml_is_binary_mode"
+external is_binary_mode :
+  in_channel @ local -> bool @@ portable = "caml_ml_is_binary_mode"
 
-external isatty : t -> bool @@ portable = "caml_sys_isatty"
+external isatty : t @ local -> bool @@ portable = "caml_sys_isatty"

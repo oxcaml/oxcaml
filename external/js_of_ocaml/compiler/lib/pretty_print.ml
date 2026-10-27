@@ -258,7 +258,7 @@ let to_out_channel ch =
   ; last_char = None
   ; needed_space = None
   ; adjust_indentation = None
-  ; output = output_substring ch
+  ; output = (fun s i n -> output_substring ch s i n)
   }
 
 let to_buffer b =

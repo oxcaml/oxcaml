@@ -314,7 +314,7 @@ let write_unit_info info filename =
   Misc.protect_output_to_file filename (fun oc ->
   output_string oc cmx_magic_number;
   output_value oc raw_info;
-  Array.iter (output_string oc) serialized_sections;
+  Array.iter (fun v -> output_string oc v) serialized_sections;
   flush oc;
   let crc = Digest.file filename in
   Digest.output oc crc)
