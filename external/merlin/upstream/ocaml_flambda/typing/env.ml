@@ -1013,6 +1013,19 @@ let is_in_signature env = env.flags land in_signature_flag <> 0
 let has_local_constraints env =
   not (StagedPath.Map.is_empty env.local_constraints)
 
+let rec has_local_type_constraint path env =
+  match
+    StagedPath.Map.find_opt
+      (path_at_current_stage env path)
+      env.local_constraints
+  with
+  | Some { type_manifest = Some _; _ } -> true
+  | Some { type_manifest = None; _ } | None -> (
+    match path with
+    | Pextra_ty (path, Punboxed_ty) -> has_local_type_constraint path env
+    | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) ->
+      false)
+
 let is_ext cda =
   match cda.cda_description with
   | {cstr_tag = Extension _} -> true
@@ -1504,50 +1517,59 @@ let step_find_unboxed_version decl =
           | Tconstr (path, args, _) -> Aliases (path, args)
           | _ -> Lacks_unboxed_version
 
-let rec find_type_data path env seen =
-  match
-    StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
-  with
-  | decl ->
-    {
-      tda_declaration = decl;
-      tda_descriptions = Type_abstract (Btype.type_origin decl);
-      tda_shape = Shape.leaf decl.type_uid;
-      tda_unboxed_version_descriptions = None;
-      tda_hidden = false;
-    }
-  | exception Not_found -> begin
-      match path with
-      | Pident id ->
-          IdTbl.find_same_without_locks id env.types
-      | Pdot(p, s) ->
-          let sc = find_structure_components p env in
-          NameMap.find s sc.comp_types
-      | Papply _ -> raise Not_found
-      | Pextra_ty (p, extra) -> begin
-          match extra with
-          | Pcstr_ty s ->
-              let cstr = find_cstr p s env in
-              type_of_cstr path cstr
-          | Pext_ty ->
-              let cda = find_extension_full p env in
-              type_of_cstr path cda.cda_description
-          | Punboxed_ty ->
-              find_type_unboxed_version_data p env seen
-        end
+let rec find_type_data path env seen ~ignore_local_constraints =
+  if ignore_local_constraints
+  then find_declared_type_data path env seen ~ignore_local_constraints
+  else
+    match
+      StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
+    with
+    | decl ->
+      { tda_declaration = decl;
+        tda_descriptions = Type_abstract (Btype.type_origin decl);
+        tda_shape = Shape.leaf decl.type_uid;
+        tda_unboxed_version_descriptions = None;
+        tda_hidden = false
+      }
+    | exception Not_found ->
+      find_declared_type_data path env seen ~ignore_local_constraints
+
+and find_declared_type_data path env seen ~ignore_local_constraints =
+  match path with
+  | Pident id ->
+      IdTbl.find_same_without_locks id env.types
+  | Pdot(p, s) ->
+      let sc = find_structure_components p env in
+      NameMap.find s sc.comp_types
+  | Papply _ -> raise Not_found
+  | Pextra_ty (p, extra) -> begin
+      match extra with
+      | Pcstr_ty s ->
+          let cstr = find_cstr p s env ~ignore_local_constraints in
+          type_of_cstr path cstr
+      | Pext_ty ->
+          let cda = find_extension_full p env in
+          type_of_cstr path cda.cda_description
+      | Punboxed_ty ->
+          find_type_unboxed_version_data p env seen
+            ~ignore_local_constraints
     end
-and find_cstr path name env =
-  let tda = find_type_data path env Path.Set.empty in
+
+and find_cstr path name env ~ignore_local_constraints =
+  let tda = find_type_data path env Path.Set.empty ~ignore_local_constraints in
   match tda.tda_descriptions with
   | Type_variant (cstrs, _, _) ->
       List.find (fun cstr -> cstr.cstr_name = name) cstrs
   | Type_record _ | Type_record_unboxed_product _ | Type_abstract _
   | Type_open ->
       raise Not_found
-and find_type_unboxed_version path env seen =
+
+and find_type_unboxed_version path env seen ~ignore_local_constraints =
   if Path.Set.mem path seen then raise Not_found else
   let seen = Path.Set.add path seen in
-  let decl = (find_type_data path env seen).tda_declaration in
+  let decl =
+    (find_type_data path env seen ~ignore_local_constraints).tda_declaration
+  in
   match step_find_unboxed_version decl with
   | Has_unboxed_version ud -> ud
   | Lacks_unboxed_version -> raise Not_found
@@ -1584,7 +1606,9 @@ and find_type_unboxed_version path env seen =
        Nested boxed types fail for the same reason, as [box#] is like [id] (the
        unboxed version of ['a box] is ['a]).
     *)
-    let ud = find_type_unboxed_version path env seen in
+    let ud =
+      find_type_unboxed_version path env seen ~ignore_local_constraints
+    in
     let man =
       Btype.newgenty
         (Tconstr (Path.unboxed_version path, args, ref Mnil))
@@ -1627,10 +1651,15 @@ and find_type_unboxed_version path env seen =
    Parts of the logic looking at type kinds also belong in Ctype.
    See https://github.com/oxcaml/oxcaml/pull/3526#discussion_r1957157050
 *)
-and find_type_unboxed_version_data path env seen =
-  let tda_declaration = find_type_unboxed_version path env seen in
+and find_type_unboxed_version_data path env seen ~ignore_local_constraints =
+  let tda_declaration =
+    find_type_unboxed_version path env seen ~ignore_local_constraints
+  in
   let descrs =
-    match (find_type_data path env seen).tda_unboxed_version_descriptions with
+    match
+      (find_type_data path env seen ~ignore_local_constraints)
+        .tda_unboxed_version_descriptions
+    with
     | Some descrs -> descrs
     | None -> Type_abstract Definition (* path is an alias *)
   in
@@ -1690,9 +1719,24 @@ let find_ident_label record_form id env =
   TycompTbl.find_same id (env_labels record_form env)
 
 let find_type p env =
-  (find_type_data p env Path.Set.empty).tda_declaration
+  (find_type_data p env Path.Set.empty ~ignore_local_constraints:false)
+    .tda_declaration
+
+let find_type_ignoring_local_constraints p env =
+  (find_type_data p env Path.Set.empty ~ignore_local_constraints:true)
+    .tda_declaration
+
+let rec is_locally_abstract p env =
+  match p with
+  | Pextra_ty (p, Punboxed_ty) -> is_locally_abstract p env
+  | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> (
+    match find_type_ignoring_local_constraints p env with
+    | decl -> decl.type_is_newtype
+    | exception Not_found -> false)
+
 let find_type_descrs p env =
-  (find_type_data p env Path.Set.empty).tda_descriptions
+  (find_type_data p env Path.Set.empty ~ignore_local_constraints:false)
+    .tda_descriptions
 
 let find_jkind p env =
   match p with
@@ -4588,7 +4632,10 @@ let lookup_type ~errors ~use ~loc lid env =
     (* To get the hash version, look up without the hash, then look for the
        unboxed version *)
     let path, data = lookup_type_full ~errors ~use ~loc lid env in
-    match find_type_unboxed_version path env Path.Set.empty with
+    match
+      find_type_unboxed_version path env Path.Set.empty
+        ~ignore_local_constraints:false
+    with
     | decl ->
       Path.unboxed_version path, decl
     | exception Not_found ->
