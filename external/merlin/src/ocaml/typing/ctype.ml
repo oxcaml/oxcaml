@@ -3220,7 +3220,7 @@ let apply_jkind_wrapping_l ~env ~level
         Ok (Jkind.set_layout instance_jkind layout)
       | Error _ as e -> e
       end
-    | None -> Ok (Jkind.apply_operator_l operator jkind)
+    | None -> Ok (Jkind.apply_operator_l env operator jkind)
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
@@ -3475,7 +3475,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
   let rec loop ~fuel ~expanded ~operator env ty ty's_jkind jkind =
     let type_equal = !type_equal' env in
     let context = mk_jkind_context_check_principal env in
-    let ty's_jkind = Jkind.apply_operator_l operator ty's_jkind in
+    let ty's_jkind = Jkind.apply_operator_l env operator ty's_jkind in
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
     if fuel < 0 then
@@ -3520,7 +3520,8 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             | Error () ->
               Error (Jkind.Violation.of_ ~context env
                        (Not_a_subjkind
-                          (Jkind.apply_operator_l operator var_jkind, jkind,
+                          (Jkind.apply_operator_l env operator var_jkind,
+                           jkind,
                            [Layout_disagreement])))
         in
         let jkind_inter =
@@ -9082,7 +9083,7 @@ let check_decl_jkind env decl jkind =
         match find_unboxed_type decl with
         | Some (inner_ty, modality, operator) ->
           Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
-          |> Jkind.apply_operator_l operator
+          |> Jkind.apply_operator_l env operator
         | None -> decl.type_jkind
       end
     | _ -> decl.type_jkind

@@ -3271,10 +3271,19 @@ let apply_or_null_l env jkind =
     | Some l -> Ok (set_layout jkind l)
     | None -> Error ())
 
-let apply_operator_l (operator : Jkind_types.Kind_operator.t) jkind =
+let apply_operator_l env (operator : Jkind_types.Kind_operator.t) jkind =
   match operator with
   | Id -> jkind
   | Addressable ->
+    (* Expand kind abbreviations first, so that a kind that is already
+       addressable (e.g. [value], via [immutable_data]) is left unchanged
+       rather than wrapped. *)
+    let jkind =
+      match jkind.jkind.base with
+      | Layout _ -> jkind
+      | Kconstr _ ->
+        { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+    in
     let base =
       match jkind.jkind.base with
       | Layout l -> Layout (Layout.addressable l)
