@@ -592,7 +592,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
     lbls;
   let inherit_allowed =
     match record_form, kloc with
-    | Unboxed_product, _ | Legacy, Record { unboxed = true } ->
+    | Unboxed_product, _
+    | Legacy, (Record { unboxed = true } | Inlined_record { unboxed = true }) ->
       List.compare_length_with lbls 1 = 0
     | Legacy, _ -> false
   in
@@ -2699,6 +2700,7 @@ let rec update_decl_jkind env dpath decl =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
             if Option.is_none sort then assert_any_args_support loc;
+            let jkind = Jkind.apply_operator_l Addressable jkind in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -2710,6 +2712,10 @@ let rec update_decl_jkind env dpath decl =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
             if Option.is_none sort then assert_any_args_support loc;
+            let jkind =
+              Jkind.apply_operator_l
+                (Types.unboxed_record_field_operator lbl) jkind
+            in
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
             Variant_unboxed, jkind
@@ -5705,8 +5711,8 @@ let report_error ~loc = function
       Location.errorf ~loc "Unboxed record labels cannot be mutable"
   | Inherit_unsupported ->
       Location.errorf ~loc
-        "%a is only supported on the sole field of an unboxed record@ \
-         or of a record declared %a"
+        "%a is only supported on the sole field of an unboxed record,@ \
+         or of a record or constructor declared %a"
         Style.inline_code "inherit" Style.inline_code "[@@unboxed]"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
