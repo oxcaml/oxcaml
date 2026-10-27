@@ -206,9 +206,11 @@ and value_description id
     pval_poly = false
   }
 
-and constructor_argument { ca_type; ca_loc; ca_modalities; ca_sort = _ } =
+and constructor_argument
+    { ca_inherit; ca_type; ca_loc; ca_modalities; ca_sort = _ } =
   { Parsetree.pca_type = core_type ca_type;
     pca_loc = ca_loc;
+    pca_inherit = ca_inherit;
     pca_modalities = const_modalities ~mut:Immutable ca_modalities
   }
 
