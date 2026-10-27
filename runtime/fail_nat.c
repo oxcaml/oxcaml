@@ -56,7 +56,8 @@ CAMLnoret extern
 void caml_raise_exception (caml_domain_state* state, value bucket);
 
 CAMLnoreturn_start
-  extern void caml_raise_async_exception (caml_domain_state* state, value bucket)
+  extern void caml_raise_async_exception (caml_domain_state* state,
+                                          value bucket)
 CAMLnoreturn_end;
 
 static void unwind_local_roots(char *limit_of_current_c_stack_chunk)

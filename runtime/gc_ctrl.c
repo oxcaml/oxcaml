@@ -57,7 +57,7 @@ uintnat caml_measure_frametables = 0; /* see frame_descriptors.c */
 uintnat caml_override_max_domains = 0;
 
 /* runtime config parameters set with caml_gc_set */
-extern atomic_uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
+extern atomic_uintnat caml_major_heap_increment;/* % or words; shared_heap.c */
 extern atomic_uintnat caml_percent_free; /* see major_gc.c */
 extern atomic_uintnat caml_max_percent_free;     /*        see major_gc.c */
 extern atomic_uintnat caml_custom_major_ratio; /* see custom.c */
@@ -486,8 +486,8 @@ void caml_print_gc_tweaks(void)
 {
   for (int i = 0; i < N_GC_TWEAKS; i++) {
     fprintf(stderr, "%s (initial value %ld)\n",
-	gc_tweaks[i].name,
-	gc_tweaks[i].initial_value);
+            gc_tweaks[i].name,
+            gc_tweaks[i].initial_value);
   }
 }
 

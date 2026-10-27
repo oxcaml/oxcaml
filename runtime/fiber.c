@@ -93,8 +93,10 @@ uintnat caml_get_init_stack_wsize (int context)
 #else
   switch(context) {
   case STACK_SIZE_MAIN:
-  case STACK_SIZE_THREAD: init_stack_wsize = Wsize_bsize(Stack_init_bsize); break;
-  case STACK_SIZE_FIBER:  init_stack_wsize = Wsize_bsize(Stack_threshold * 2); break;
+  case STACK_SIZE_THREAD:
+    init_stack_wsize = Wsize_bsize(Stack_init_bsize); break;
+  case STACK_SIZE_FIBER:
+    init_stack_wsize = Wsize_bsize(Stack_threshold * 2); break;
   default: caml_fatal_error("caml_get_init_stack_wsize: invalid context");
   }
 #endif

@@ -142,11 +142,17 @@ G(name):
 
 /* struct dynamic_cache_s */
 
-/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
+/* If you change Dynamic_cache_entries, you must also update
+   FLUSH_DYNAMIC_CACHE */
 #define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
 #define Dynamic_binding_size     (2*8) /* dyn, val */
 #define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
+#define Dynamic_cache_entries    8 /* = DYNAMIC_CACHE_SIZE in dynamic.c */
+
+/* Offset of the variable slot of dynamic cache entry [n]. */
+#define Dynamic_cache_var(n) \
+        (Dynamic_cache + (n)*Dynamic_binding_size + Dynamic_binding_var)
+
 
 /* struct c_stack_link */
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
@@ -220,7 +226,8 @@ DO_0_7(X) X(8) X(9) X(10) X(11) X(12) X(13) X(14) X(15)
 
 #define DO_0_31(X) \
 DO_0_15(X) \
-X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(29) X(30) X(31)
+X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) \
+X(24) X(25) X(26) X(27) X(28) X(29) X(30) X(31)
 
 
 /******************************************************************************/
@@ -308,14 +315,14 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
 
 #define FLUSH_DYNAMIC_CACHE(reg)                    \
         movq    Caml_state(dynamic_bindings), reg; \
-        movq    $0, (Dynamic_cache + 0*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 1*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 2*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 3*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 4*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)(reg) ; \
-        movq    $0, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)(reg)
+        movq    $0, Dynamic_cache_var(0)(reg) ; \
+        movq    $0, Dynamic_cache_var(1)(reg) ; \
+        movq    $0, Dynamic_cache_var(2)(reg) ; \
+        movq    $0, Dynamic_cache_var(3)(reg) ; \
+        movq    $0, Dynamic_cache_var(4)(reg) ; \
+        movq    $0, Dynamic_cache_var(5)(reg) ; \
+        movq    $0, Dynamic_cache_var(6)(reg) ; \
+        movq    $0, Dynamic_cache_var(7)(reg)
 
 /* See [caml_tls_update_cache]: set (Caml_state->tls_state) to the nearest TLS.
    Must occur after switching stacks. Clobbers reg_stk and reg_tmp. */
@@ -1124,7 +1131,8 @@ LBL(108):
         .endif
         .cfi_escape DW_CFA_def_cfa_expression, 4 + 2,                 \
             /* load Caml_state(c_stack) */                            \
-          DW_OP_breg + DW_REG_r14, 0x80 + 8*domain_field_caml_c_stack, 0, DW_OP_deref, \
+          DW_OP_breg + DW_REG_r14,                                    \
+            0x80 + 8*domain_field_caml_c_stack, 0, DW_OP_deref,       \
           DW_OP_plus_uconst,                                          \
              SIZEOF_C_STACK_LINK  /* struct c_stack_link */ +         \
              6*8 /* callee save regs */ +                             \
@@ -1543,7 +1551,7 @@ CFI_STARTPROC
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
         leaq    1(%rsi), %rdi   /* %rdi (last_fiber) := Val_ptr(old stack) */
         movq    %rdi, Cont_fiber(%rbx)    /* Store fiber in continuation */
-        movq    $0, Cont_last_fiber(%rbx) /* set last fiber of continuation to NULL */
+        movq    $0, Cont_last_fiber(%rbx) /* set last fiber to NULL */
         movq    Caml_state(gc_regs), %r12
         movq    %r12, Cont_gc_regs(%rbx) /* save gc_regs in continuation */
         /* clear gc_regs, as we'll be leaving the runtime after the effect is
@@ -1888,8 +1896,8 @@ G(caml_system__frametable):
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
         .byte   0            /* escape: medium descriptor follows */
-        .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
-        .value  -1                      /* negative frame size => use callback link */
+        .4byte  LBL(frame_runstack) - . /* retaddr into fiber_val_handler */
+        .value  -1                      /* negative size => use callback link */
         .value  0                       /* no roots here */
 
 #if defined(SYS_macosx)
@@ -1937,7 +1945,8 @@ LBL(ocaml_eff_desc):
         .quad   LBL(caml_continue_enter) - G(caml_continue)
         .quad   LBL(caml_continue_preempted) - G(caml_continue)
         .quad   LBL(caml_discontinue_enter) - G(caml_discontinue)
-        .quad   LBL(caml_discontinue_with_backtrace_enter) - G(caml_discontinue_with_backtrace)
+        .quad   LBL(caml_discontinue_with_backtrace_enter) \
+                - G(caml_discontinue_with_backtrace)
         .quad   0
 LBL(ocaml_eff_desc_end):
         .balign 4

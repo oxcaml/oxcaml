@@ -901,8 +901,10 @@ void caml_reset_major_pacing(bool add_overhead)
     if (diffmod(completed, incurred) > 0) {
       target = completed;
     }
-    res = (atomic_compare_exchange_strong(&total_work_incurred, &incurred, target) &&
-           atomic_compare_exchange_strong(&total_work_completed, &completed, target));
+    res = (atomic_compare_exchange_strong(&total_work_incurred,
+                                          &incurred, target) &&
+           atomic_compare_exchange_strong(&total_work_completed,
+                                          &completed, target));
   } while (!res);
   {
     uintnat virtual_sweep_work = latest_sweep_work;
@@ -1225,7 +1227,8 @@ static void mark_stack_prune(struct mark_stack* stk)
   }
   if (old_compressed_entries > 0) {
     CAML_GC_MESSAGE(MARK_STACK,
-                    "Preserved %"ARCH_INTNAT_PRINTF_FORMAT "d compressed entries\n",
+                    "Preserved %"ARCH_INTNAT_PRINTF_FORMAT"d "
+                    "compressed entries\n",
                     old_compressed_entries);
   }
   caml_addrmap_clear(&stk->compressed_stack);
@@ -1249,7 +1252,8 @@ static void mark_stack_prune(struct mark_stack* stk)
   }
 
   CAML_GC_MESSAGE(MARK_STACK,
-                  "Compressed %"ARCH_INTNAT_PRINTF_FORMAT "d mark stack words into "
+                  "Compressed %"ARCH_INTNAT_PRINTF_FORMAT"d "
+                  "mark stack words into "
                   "%"ARCH_INTNAT_PRINTF_FORMAT "d mark stack entries and "
                   "%"ARCH_INTNAT_PRINTF_FORMAT "d compressed entries\n",
                   total_words, new_stk_count,
@@ -1708,7 +1712,8 @@ void caml_darken(void* state, value v, volatile value* ignored) {
  * Root Marking
  ******************************************************************************/
 
-void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_participants)
+void caml_mark_roots_stw (int participant_count,
+                          caml_domain_state** barrier_participants)
 {
   if (caml_gc_phase != Phase_sweep_main)
     return;
@@ -1723,7 +1728,8 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
   Caml_global_barrier_if_final(participant_count) {
     caml_gc_phase = Phase_sweep_and_mark_main;
     latest_sweep_work =
-      diffmod (atomic_load (&total_work_completed), work_completed_at_sweep_start);
+      diffmod (atomic_load (&total_work_completed),
+               work_completed_at_sweep_start);
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
 
     /* Adopt orphaned work from domains that were spawned and
@@ -1957,7 +1963,8 @@ static void cycle_major_heap_from_stw_single(
       double space_overhead = 100.0 * (double)(last_cycle.heap_words
                                                - live_words) / live_words;
 
-      CAML_GC_MESSAGE(SLICE, "Previous cycle's space_overhead: %lf", space_overhead);
+      CAML_GC_MESSAGE(SLICE, "Previous cycle's space_overhead: %lf",
+                      space_overhead);
     }
     last_cycle.heap_words = heap_words;
     last_cycle.not_garbage_words = not_garbage_words;
@@ -2498,7 +2505,8 @@ mark_again:
 #define F_U "%"ARCH_INTNAT_PRINTF_FORMAT"u"
 
   CAML_GC_MESSAGE(SLICE,
-                  "Major slice completed [%c%c%c]: "F_U " sweep, "F_U" mark ("F_U" blocks), "
+                  "Major slice completed [%c%c%c]: "F_U " sweep, "
+                  F_U" mark ("F_U" blocks), "
                   F_U" ephe mark, "F_U" ephe sweep\n",
                   collection_slice_mode_char(mode),
                   !caml_incoming_interrupts_queued() ? '.' : '*',
@@ -2590,13 +2598,15 @@ void caml_major_collection_slice(intnat howmuch)
         Compaction_auto
         );
     if (caml_incoming_interrupts_queued()) {
-      CAML_GC_MESSAGE(SLICE, "Major slice interrupted, rescheduling major slice\n");
+      CAML_GC_MESSAGE(SLICE,
+                      "Major slice interrupted, rescheduling major slice\n");
       caml_request_major_slice(0);
     }
   } else {
     /* TODO: could make forced API slices interruptible, but would need to do
        accounting or pass up interrupt */
-    major_collection_slice(howmuch, 0, 0, Slice_uninterruptible, Compaction_auto);
+    major_collection_slice(howmuch, 0, 0, Slice_uninterruptible,
+                           Compaction_auto);
   }
   /* Record that this domain has completed a major slice for this minor cycle.
    */

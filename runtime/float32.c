@@ -64,7 +64,8 @@
 static_assert(sizeof(float) == sizeof(int32_t), "");
 
 #define Max_array_wosize                 (Max_wosize)
-#define Max_unboxed_float32_array_wosize (Max_array_wosize * (sizeof(intnat) / sizeof(float)))
+#define Max_unboxed_float32_array_wosize \
+  (Max_array_wosize * (sizeof(intnat) / sizeof(float)))
 
 intnat caml_float32_compare_unboxed(float f, float g)
 {
@@ -193,7 +194,8 @@ CAMLprim value caml_sqrt_float32(value f)
 
 CAMLprim value caml_float32_compare(value vf, value vg)
 {
-  return Val_int(caml_float32_compare_unboxed(Float32_val(vf), Float32_val(vg)));
+  return Val_int(caml_float32_compare_unboxed(Float32_val(vf),
+                                              Float32_val(vg)));
 }
 
 #define DEFINE_NAN_CMP(op)                             \
@@ -258,7 +260,8 @@ CAMLprim value caml_power_float32_bytecode DEFINE_BYTE_BINOP(powf)
 
 CAMLprim value caml_fma_float32_bytecode(value f, value g, value h)
 {
-  return caml_copy_float32(fmaf(Float32_val(f), Float32_val(g), Float32_val(h)));
+  return caml_copy_float32(fmaf(Float32_val(f), Float32_val(g),
+                                Float32_val(h)));
 }
 
 float caml_float32_of_int64(int64_t i) {
@@ -366,7 +369,8 @@ float caml_simd_float32_round_towards_zero(float f) {
 }
 
 CAMLprim value caml_simd_float32_round_towards_zero_bytecode(value f) {
-  return caml_copy_float32(caml_simd_float32_round_towards_zero(Float32_val(f)));
+  return
+    caml_copy_float32(caml_simd_float32_round_towards_zero(Float32_val(f)));
 }
 
 enum { FP_normal, FP_subnormal, FP_zero, FP_infinite, FP_nan };
@@ -501,7 +505,8 @@ CAMLprim value caml_ba_uint8_getf32_indexed_by_int64(value array, value index);
 CAMLprim value caml_ba_uint8_getf32_indexed_by_int32(value array, value index);
 CAMLprim value caml_ba_uint8_getf32_indexed_by_int16(value array, value index);
 CAMLprim value caml_ba_uint8_getf32_indexed_by_int8(value array, value index);
-CAMLprim value caml_ba_uint8_getf32_indexed_by_nativeint(value array, value index);
+CAMLprim value caml_ba_uint8_getf32_indexed_by_nativeint(value array,
+                                                         value index);
 
 CAMLprim value caml_ba_uint8_setf32_indexed_by_int64(value array, value index,
                                                      value newval);
@@ -511,14 +516,16 @@ CAMLprim value caml_ba_uint8_setf32_indexed_by_int16(value array, value index,
                                                      value newval);
 CAMLprim value caml_ba_uint8_setf32_indexed_by_int8(value array, value index,
                                                     value newval);
-CAMLprim value caml_ba_uint8_setf32_indexed_by_nativeint(value array, value index,
+CAMLprim value caml_ba_uint8_setf32_indexed_by_nativeint(value array,
+                                                         value index,
                                                          value newval);
 
 CAMLprim value caml_string_getf32_indexed_by_int64(value array, value index);
 CAMLprim value caml_string_getf32_indexed_by_int32(value array, value index);
 CAMLprim value caml_string_getf32_indexed_by_int16(value array, value index);
 CAMLprim value caml_string_getf32_indexed_by_int8(value array, value index);
-CAMLprim value caml_string_getf32_indexed_by_nativeint(value array, value index);
+CAMLprim value caml_string_getf32_indexed_by_nativeint(value array,
+                                                       value index);
 
 CAMLprim value caml_bytes_getf32_indexed_by_int64(value array, value index);
 CAMLprim value caml_bytes_getf32_indexed_by_int32(value array, value index);
@@ -870,7 +877,7 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   /* This is only used on 64-bit targets. */
 
   mlsize_t num_elements = Long_val(len);
-  if (num_elements > Max_unboxed_float32_array_wosize) 
+  if (num_elements > Max_unboxed_float32_array_wosize)
     caml_invalid_argument("Array.make");
 
   /* Empty arrays have tag 0 */
@@ -879,11 +886,11 @@ static value caml_make_unboxed_float32_vect0(value len, int local)
   }
 
   mlsize_t num_fields = num_elements / 2 + num_elements % 2;
-  
+
   /* Use appropriate unboxed array tag based on even/odd length */
-  tag_t tag = (num_elements % 2 == 0) 
+  tag_t tag = (num_elements % 2 == 0)
     ? Unboxed_float32_array_zero_tag : Unboxed_float32_array_one_tag;
-  
+
   /* Mixed block with no scannable fields */
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
