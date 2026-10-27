@@ -1,5 +1,10 @@
-File "unbound_label_setfield.ml", line 10, characters 17-40:
+File "unbound_label_setfield.ml", line 1:
+Error: Multiple errors were encountered
+File "unbound_label_setfield.ml", line 10, characters 12-13:
 10 | let f r = r.l <- (if true then 1 else 2)
-                      ^^^^^^^^^^^^^^^^^^^^^^^
-Error: The expression is dynamic because it has branches.
-       However, the expression highlighted is expected to be static.
+                 ^
+  Unbound record field l
+File "unbound_label_setfield.ml", line 12, characters 17-19:
+12 | let t : string = 10
+                      ^^
+  The constant 10 has type int but an expression was expected of type string
