@@ -137,7 +137,8 @@ To pass such a product, split it into smaller products, or use
 [`[@unpacked]`](#unpacked).
 
 A product with a single non-void component, such as `#(int * unit#)`, is passed
-like that component.
+like that component in most cases (the exception being macOS arm64 with
+`bits{8,16,32}`).
 
 ## Unboxed product arguments: `[@unpacked]` {#unpacked}
 

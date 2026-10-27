@@ -29,7 +29,8 @@
 (** How unboxed products are passed to and returned from external (C) calls: the
     C struct layouts, their splitting into register and stack slots, and the
     resulting argument list of the [Cextcall], following the x86-64 System V and
-    arm64 ABIs.
+    arm64 ABIs. The ABI is represented as independently as possible of the
+    specific target IR (in this case [Cmm]).
 
     Currently, we only support struct shapes which don't require passing via
     pointers. *)
@@ -42,86 +43,105 @@ end
 
 (** A non-void leaf of a product: a member of the corresponding C struct. *)
 module Component : sig
-  type t =
-    { kind : Flambda_kind.With_subkind.t;
-      reg_class : Reg_class.t;
-      size : int;  (** In bytes *)
-      offset : int  (** In bytes, from the start of the containing unit *)
-    }
+  type t
 
-  val exttype : t -> Cmm.exttype
+  val kind : t -> Flambda_kind.With_subkind.t
+
+  val reg_class : t -> Reg_class.t
+
+  (** In bytes *)
+  val size : t -> int
+
+  (** In bytes, from the start of the containing unit *)
+  val offset : t -> int
 end
 
 (** Part of a struct occupying one stack slot. *)
 module Unit : sig
-  type t =
-    { components : Component.t list;  (** Empty for padding *)
-      size : int  (** In bytes *)
-    }
+  type t
 
-  val num_components : t -> int
+  (** Empty for padding *)
+  val components : t -> Component.t list
 
   (** The component of a unit consisting of a single component that fills it,
       which is passed as that component. *)
   val single_component : t -> Component.t option
-
-  (** As what a unit on the stack is passed *)
-  val exttype : t -> Cmm.exttype
 end
 
 (** Part of a struct occupying one register. *)
 module Reg_unit : sig
-  type t =
-    { reg_class : Reg_class.t;
-      components : Component.t Misc.Nonempty_list.t
-    }
+  type t
 
-  val num_components : t -> int
+  (** With offsets from the start of the unit *)
+  val components : t -> Component.t Misc.Nonempty_list.t
 
-  (** As what a register unit is passed. *)
-  val exttype : t -> Cmm.exttype
-end
+  (** How the C ABI views the contents of a register unit, i.e. what is passed
+      in or received from the register. *)
+  module Contents : sig
+    type t =
+      | Component of Component.t  (** The component itself *)
+      | Int_bits
+          (** An integer holding the components packed at their offsets, or the
+              bits of a floating-point component (arm64) *)
+      | Float_bits  (** A double holding two packed float32s (x86-64) *)
+  end
 
-(** How one C argument is passed. *)
-module Arg : sig
-  type t =
-    | Void  (** No C argument *)
-    | Scalar of
-        { component : Component.t;
-          exttype : Cmm.exttype
-        }  (** A scalar, or a product with a single non-void component *)
-    | Reg_units of Reg_unit.t list  (** A struct in registers *)
-    | Units of Unit.t list  (** A struct on the stack *)
-end
-
-(** An element of the [Cextcall]'s argument list. *)
-module Slot : sig
-  type t =
-    | Arg of
-        { arg : int;  (** Index of the C argument *)
-          slot : int  (** Index among the C argument's slots *)
-        }
-    | Dummy of Reg_class.t  (** Uses up a register the ABI leaves unused *)
-    | Padding  (** An 8-byte stack slot whose contents are unspecified *)
+  val contents : t -> Contents.t
 end
 
 (** The [Cextcall]'s argument list. *)
 module Arg_slots : sig
-  type t =
-    { args : Arg.t array;  (** Indexed by C argument *)
-      slots : Slot.t list
-    }
+  type t
 
   val create : Flambda.Apply.t -> t
+
+  (** Whether [pack] keeps the arguments of the call in order. It may not when
+      some are passed on the stack, since those come after all the arguments
+      passed in registers. *)
+  val in_argument_order : t -> bool
+
+  (** A generic function that, given the original argument expressions and how
+      to pack / represent every type of "slot", returns the packed expression
+      alongside their [exttype]s.
+
+      [reg_unit] and [stack_unit] combine the arguments for the components of a
+      unit passed in a register or on the stack respectively. [dummy] is passed
+      for registers the ABI leaves unused, and [padding] for stack slots whose
+      contents are unspecified. *)
+  val pack :
+    t ->
+    reg_unit:(Reg_unit.t -> 'a list -> 'a) ->
+    stack_unit:(Unit.t -> 'a list -> 'a) ->
+    dummy:'a ->
+    padding:'a ->
+    'a list ->
+    ('a * Cmm.exttype) list
 end
 
 (** How a return value is passed back. *)
 module Return : sig
-  type t =
-    | No_value  (** A void return in C *)
-    | Scalar of Flambda_kind.With_subkind.t
-        (** Including products with a single non-void component *)
-    | Reg_units of Reg_unit.t list
+  type t
 
   val create : Flambda.Apply.t -> [`Complex] Flambda_arity.t -> t
+
+  (** The machtype of the [Cextcall]'s result, where [return_ty] is that of the
+      unarized return value. *)
+  val machtype : t -> return_ty:Cmm.machtype -> Cmm.machtype
+
+  (** A generic function that, given the return value from the "raw" call,
+      returns the unarized return value.
+
+      [scalar] is applied to a return value passed as itself. Otherwise, the
+      result holds one or more register units.
+      [unit_value result ~component_tys i] extracts the [i]th of several,
+      [component] extracts a component from the value of its unit, and [tuple]
+      combines the components. *)
+  val unpack :
+    t ->
+    scalar:(Flambda_kind.With_subkind.t -> 'a -> 'a) ->
+    unit_value:('a -> component_tys:Cmm.machtype array -> int -> 'a) ->
+    component:(Reg_unit.t -> Component.t -> 'a -> 'a) ->
+    tuple:('a list -> 'a) ->
+    'a ->
+    'a
 end

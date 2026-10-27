@@ -82,3 +82,13 @@ static double big_sum(args_big p) {
 double big_pair_native(int64_t x, args_big p, double y, args_big q) {
   return x + 2 * y + 4 * big_sum(p) + 32768 * big_sum(q);
 }
+
+/* See [eval_order] in unboxed_args_memory.ml. */
+
+typedef struct { value a; value b; value c; } args_value3;
+
+value eval_order_native(args_value3 p, value b) {
+  return Val_long(Long_val(p.a) + 10 * Long_val(p.b) + 100 * Long_val(p.c)
+                  + 1000 * Long_val(b));
+}
+

@@ -12,6 +12,10 @@
    flags = "-extension layouts_beta -flambda2-reaper -reaper-local-fields";
    native;
  }
+ {
+   flags = "-extension layouts_beta -flambda2-expert-inline-effects-in-cmm";
+   native;
+ }
 *)
 
 (* Structs over 16 bytes, which x86-64 passes on the stack (class MEMORY).
@@ -141,3 +145,16 @@ let () =
   Printf.eprintf "big_pair: %.4f\n%!" (box_float (big_pair #3L p #0.5 q));
   Printf.eprintf "big_pair_noalloc: %.4f\n%!"
     (box_float (big_pair_noalloc #3L p #0.5 q))
+
+(* The struct goes on the stack and [b] in the first register, so the
+   [Cextcall]'s arguments are not in source order. With
+   [-flambda2-expert-inline-effects-in-cmm], both [fetch_and_add]s are
+   substituted into the arguments, so they must still be evaluated in source
+   order: [b] first. *)
+external eval_order : #(int * int * int) -> int -> int = "" "eval_order_native"
+
+let () =
+  let counter = Atomic.make 0 in
+  let b = Atomic.fetch_and_add counter 10 in
+  let a = Atomic.fetch_and_add counter 1 in
+  Printf.eprintf "eval_order: %d\n%!" (eval_order #(a, 0, 0) b)
