@@ -92,10 +92,6 @@ let f (t : t) =
 [%%expect{|
 type t = { foo : 'a. Abs.t * unit; }
 type t = { foo : 'a. Abs.t * unit; }
-val f : t -> unit = <fun>
-|}, Principal{|
-type t = { foo : 'a. Abs.t * unit; }
-type t = { foo : 'a. Abs.t * unit; }
 Line 7, characters 27-28:
 7 |     require_immutable_data t
                                ^
