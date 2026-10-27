@@ -43,6 +43,7 @@ let bind_vars ~res bindings =
   | [] -> res
   | _ :: _ ->
     let params, args = List.split bindings in
+    let res = List.fold_left To_jsir_result.add_late_bound_var_exn res params in
     let res, addr = To_jsir_result.reserve_address res in
     let res =
       To_jsir_result.end_block_with_last_exn res (Branch (addr, args))

@@ -50,7 +50,10 @@ val bind_expr_to_var' :
 
     JSIR has no expression that merely copies a variable. The only way to bind a
     variable created ahead of its definition is thus to make it a block
-    parameter. *)
+    parameter.
+
+    Raises if any [xi] has already been bound this way, since a JSIR variable
+    may only be defined once (see [To_jsir_result.add_late_bound_var_exn]). *)
 val bind_vars :
   res:To_jsir_result.t -> (Jsir.Var.t * Jsir.Var.t) list -> To_jsir_result.t
 
