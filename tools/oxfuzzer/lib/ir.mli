@@ -136,6 +136,33 @@ module Binding : sig
     }
 end
 
+module Exn : sig
+  type t =
+    { id : int;
+      payload : Ty.t option  (** Must be a value type (boxed). *)
+    }
+
+  val equal : t -> t -> bool
+
+  val name : t -> string
+
+  val to_code : t -> Parsetree.structure_item
+end
+
+module Handler : sig
+  type pattern =
+    | Exn of
+        { exn : Exn.t;
+          payload : Binding.t option
+        }
+    | Catch_all
+
+  type 'body t =
+    { pattern : pattern;
+      body : 'body
+    }
+end
+
 module Bin_op : sig
   type t =
     | Add
@@ -210,6 +237,18 @@ module Expr : sig
         { fun_name : Name.t;
           args : t list
         }
+    | Raise of raise
+    | Try of
+        { ty : Ty.t;
+          body : t;
+          handlers : t Handler.t list
+        }
+
+  and raise =
+    { exn : Exn.t;
+      payload : t option;
+      notrace : bool
+    }
 
   and case =
     { constructor : Ty.constructor;
@@ -235,6 +274,8 @@ module Expr : sig
     Parsetree.expression
 
   val to_code : t -> Parsetree.expression
+
+  val raise_to_code : raise -> Parsetree.expression
 
   val place_to_code : place -> Parsetree.expression
 
@@ -269,6 +310,11 @@ module Statement : sig
           stride : int;
           body : t
         }
+    | Raise of Expr.raise
+    | Try of
+        { body : t;
+          handlers : t Handler.t list
+        }
 
   val let_binding :
     Binding.t ->
@@ -295,7 +341,9 @@ module Function : sig
       inline : Inline.t;
       body : Statement.t;
       return_ty : Ty.t;
-      result : Expr.t
+      result : Expr.t;
+      raises : Exn.t list
+          (** Exceptions that may escape a call. Callers must catch them. *)
     }
 
   val to_code : t -> Parsetree.structure_item

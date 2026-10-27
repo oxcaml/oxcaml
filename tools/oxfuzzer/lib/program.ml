@@ -2,6 +2,7 @@
 open Asttypes
 open Parsetree_helpers
 module Binding = Ir.Binding
+module Exn = Ir.Exn
 module Expr = Ir.Expr
 module Function = Ir.Function
 module Name = Ir.Name
@@ -13,16 +14,18 @@ module Ty = Ir.Ty
 type t =
   { swarm : Config.Swarm.t;
     record_types : Ty.record list;
+    exceptions : Exn.t list;
     variant_types : Ty.variant list;
     functions : Function.t list;
     toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~swarm ~record_types ~variant_types ~functions ~toplevel_decls
-    ~toplevel_statement =
+let create ~swarm ~record_types ~exceptions ~variant_types ~functions
+    ~toplevel_decls ~toplevel_statement =
   { swarm;
     record_types;
+    exceptions;
     variant_types;
     functions;
     toplevel_decls;
@@ -376,6 +379,7 @@ and print_sum path sum expr =
 let to_code
     { swarm;
       record_types;
+      exceptions;
       variant_types;
       functions;
       toplevel_decls = decls;
@@ -429,6 +433,7 @@ let to_code
   let structure =
     opens
     @ record_declarations record_types
+    @ List.map Exn.to_code exceptions
     @ variant_declarations variant_types
     @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions
