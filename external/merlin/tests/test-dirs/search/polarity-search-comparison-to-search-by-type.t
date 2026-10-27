@@ -10,27 +10,27 @@ potential failures, so lifting the result in an int option).
   > tr '\n' ' ' | jq  '.value.entries[:10][] | {name,desc}'
   {
     "name": "bool_of_string_opt",
-    "desc": "string -> bool option"
+    "desc": "string @ local -> bool option"
   }
   {
     "name": "bool_of_string_opt",
-    "desc": "string -> bool option"
+    "desc": "string @ local -> bool option"
   }
   {
     "name": "float_of_string_opt",
-    "desc": "string -> float option"
+    "desc": "string @ local -> float option"
   }
   {
     "name": "float_of_string_opt",
-    "desc": "string -> float option"
+    "desc": "string @ local -> float option"
   }
   {
     "name": "int_of_string_opt",
-    "desc": "string -> int option"
+    "desc": "string @ local -> int option"
   }
   {
     "name": "int_of_string_opt",
-    "desc": "string -> int option"
+    "desc": "string @ local -> int option"
   }
   {
     "name": "Stdlib__Float.of_string_opt",

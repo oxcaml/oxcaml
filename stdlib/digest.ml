@@ -53,10 +53,10 @@ module type S = sig
   val bytes : bytes -> t
   val substring : string -> int -> int -> t
   val subbytes : bytes -> int -> int -> t
-  val channel : in_channel -> int -> t
+  val channel : in_channel @ local -> int -> t
   val file : string -> t
-  val output : out_channel -> t -> unit
-  val input : in_channel -> t
+  val output : out_channel @ local -> t -> unit
+  val input : in_channel @ local -> t
   val to_hex : t -> string
   val of_hex : string -> t
 end
@@ -114,7 +114,7 @@ module BLAKE2 (X: sig val hash_length : int end) : sig @@ portable include S end
         if n = 0
         then final ctx hash_length
         else (update ctx buf 0 n; do_read ())
-      in do_read ()
+      in do_read () [@nontail]
     end else begin
       let rec do_read toread =
         if toread = 0 then final ctx hash_length else begin
@@ -126,7 +126,7 @@ module BLAKE2 (X: sig val hash_length : int end) : sig @@ portable include S end
             do_read (toread - n)
           end
         end
-      in do_read toread
+      in do_read toread [@nontail]
     end
 
   let file filename =
@@ -163,7 +163,7 @@ module MD5 = struct
 
   external unsafe_string: string -> int -> int -> t @@ portable = "caml_md5_string"
   external unsafe_bytes: bytes -> int -> int -> t @@ portable = "caml_md5_bytes"
-  external channel: in_channel -> int -> t @@ portable = "caml_md5_chan"
+  external channel: in_channel @ local -> int -> t @@ portable = "caml_md5_chan"
 
   let string str =
     unsafe_string str 0 (String.length str)

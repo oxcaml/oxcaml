@@ -64,7 +64,7 @@ type extern_flags =
 (** The flags to the [Marshal.to_*] functions below. *)
 
 val to_channel : ('a : value_or_null)
-  . out_channel -> 'a -> extern_flags list -> unit
+  . out_channel @ local -> 'a -> extern_flags list -> unit
 (** [Marshal.to_channel chan v flags] writes the representation
    of [v] on channel [chan]. The [flags] argument is a
    possibly empty list of flags that governs the marshaling
@@ -118,8 +118,7 @@ val to_channel : ('a : value_or_null)
 
  *)
 
-external to_bytes :
-  ('a : value_or_null)
+external to_bytes : ('a : value_or_null)
   . 'a -> extern_flags list -> bytes = "caml_output_value_to_bytes"
 (** [Marshal.to_bytes v flags] returns a byte sequence containing
    the representation of [v].
@@ -127,14 +126,14 @@ external to_bytes :
    {!Marshal.to_channel}.
    @since 4.02 *)
 
-external to_string :
-  ('a : value_or_null)
-  . 'a -> extern_flags list -> string = "caml_output_value_to_string"
+external to_string : ('a : value_or_null)
+  . 'a -> extern_flags list -> string
+  = "caml_output_value_to_string"
 (** Same as [to_bytes] but return the result as a string instead of
     a byte sequence. *)
 
 val to_buffer : ('a : value_or_null)
-  . bytes -> int -> int -> 'a -> extern_flags list -> int
+  . bytes @ local -> int -> int -> 'a -> extern_flags list -> int
 (** [Marshal.to_buffer buff ofs len v flags] marshals the value [v],
    storing its byte representation in the sequence [buff],
    starting at index [ofs], and writing at most
@@ -144,7 +143,7 @@ val to_buffer : ('a : value_or_null)
    is raised. *)
 
 val from_channel : ('a : value_or_null)
-  . in_channel -> 'a
+  . in_channel @ local -> 'a
 (** [Marshal.from_channel chan] reads from channel [chan] the
    byte representation of a structured value, as produced by
    one of the [Marshal.to_*] functions, and reconstructs and
@@ -156,7 +155,7 @@ val from_channel : ('a : value_or_null)
    unmarshalling itself or if [chan] is not in binary mode.*)
 
 val from_bytes : ('a : value_or_null)
-  . bytes -> int -> 'a
+  . bytes @ local read -> int -> 'a
 (** [Marshal.from_bytes buff ofs] unmarshals a structured value
    like {!Marshal.from_channel} does, except that the byte
    representation is not read from a channel, but taken from
@@ -165,7 +164,7 @@ val from_bytes : ('a : value_or_null)
    @since 4.02 *)
 
 val from_string : ('a : value_or_null)
-  . string -> int -> 'a
+  . string @ local -> int -> 'a
 (** Same as [from_bytes] but take a string as argument instead of a
     byte sequence. *)
 
@@ -191,10 +190,10 @@ val header_size : int
    data, then read it, and finally call {!Marshal.from_bytes}
    to unmarshal the value. *)
 
-val data_size : bytes -> int -> int
+val data_size : bytes @ local read -> int -> int
 (** See {!Marshal.header_size}.*)
 
-val total_size : bytes -> int -> int
+val total_size : bytes @ local read -> int -> int
 (** See {!Marshal.header_size}.*)
 
 (** {1:marshal_concurrency Marshal and domain safety}
