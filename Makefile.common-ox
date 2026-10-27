@@ -258,15 +258,6 @@ install_for_test: install
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.testing.objs/native/testing.cm* \
           _runtest/testsuite/lib/
-	 # replace backend-specific testsuite/tests/asmcomp with their new versions
-	rm _runtest/testsuite/tests/asmcomp/*
-	cp -a oxcaml/testsuite/tests/asmcomp/* _runtest/testsuite/tests/asmcomp/
-	 # replace backend-specific testsuite/tests/asmgen with their new versions
-	rm _runtest/testsuite/tests/asmgen/*
-	cp -a oxcaml/testsuite/tests/asmgen/* _runtest/testsuite/tests/asmgen/
-	 # add extension library tests that are not supported by the upstream compiler
-	rm _runtest/testsuite/tests/lib-extensions/*
-	cp -a oxcaml/testsuite/tests/lib-extensions/* _runtest/testsuite/tests/lib-extensions
 
 	cp $(ocamldir)/Makefile.* _runtest/
 
