@@ -973,7 +973,7 @@ and gen_match (st : State.t) env result_ty =
         st.matches_remaining > 0
         && with_probability st ~probability:Config.match_in_match_probability
       in
-      let scrutinee =
+      let scrutinee, reachable_constructors =
         if nested
         then (
           st.matches_remaining <- st.matches_remaining - 1;
@@ -981,20 +981,36 @@ and gen_match (st : State.t) env result_ty =
           let constructors = Sum.constructors sum in
           let count = List.length constructors in
           let offset = Random.State.int st.random_state count in
+          let output_constructor (input_constructor : Ty.constructor) =
+            List.nth constructors
+              ((input_constructor.constructor_index + offset) mod count)
+          in
+          let reachable_constructors =
+            List.map output_constructor (Sum.constructors input_sum)
+          in
           let input = Expr.Opaque (gen_sum st env input_sum) in
           (* Hide the input tag, but preserve the produced tags so that the
              outer match can be specialized at the producer's branch exits. *)
-          gen_match_expr st env input_sum input
-            ~branch:(fun env (input_constructor : Ty.constructor) ->
-              let constructor =
-                List.nth constructors
-                  ((input_constructor.constructor_index + offset) mod count)
-              in
-              gen_constructor st env sum constructor))
-        else Expr.Opaque (gen_sum st env sum)
+          let scrutinee =
+            gen_match_expr st env input_sum input
+              ~branch:(fun env constructor ->
+                gen_constructor st env sum (output_constructor constructor))
+          in
+          scrutinee, reachable_constructors)
+        else Expr.Opaque (gen_sum st env sum), Sum.constructors sum
       in
-      gen_match_expr st env sum scrutinee ~branch:(fun env _ ->
-          gen_value st env result_ty))
+      gen_match_expr st env sum scrutinee
+        ~branch:(fun env (constructor : Ty.constructor) ->
+          let reachable =
+            List.exists
+              (fun (reachable : Ty.constructor) ->
+                Int.equal reachable.constructor_index
+                  constructor.constructor_index)
+              reachable_constructors
+          in
+          if st.swarm.unreachable_assertions && not reachable
+          then Expr.Assert_false
+          else gen_value st env result_ty))
 
 and gen_decl (st : State.t) env =
   let binding =
