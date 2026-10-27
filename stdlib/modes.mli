@@ -17,40 +17,38 @@
     wrappers. *)
 
 module Global : sig
-  type ('a : value_or_null) t = { global : 'a @@ global } [@@unboxed]
+  type ('a : any) t = { global : 'a @@ global } [@@unboxed]
   (** Wraps values in the [global] mode, even in a [local] context. *)
 end
 
 module Portable : sig
-  type ('a : value_or_null) t = { portable : 'a @@ portable } [@@unboxed]
+  type ('a : any) t = { portable : 'a @@ portable } [@@unboxed]
 end
 
 module Contended : sig
-  type ('a : value_or_null) t = { contended : 'a @@ contended } [@@unboxed]
+  type ('a : any) t = { contended : 'a @@ contended } [@@unboxed]
   (** Wraps values in the [contended] mode, even in an [uncontended] context. *)
 end
 
 module Portended : sig
-  type ('a : value_or_null) t =
-    { portended : 'a @@ portable contended }
-  [@@unboxed]
+  type ('a : any) t = { portended : 'a @@ portable contended } [@@unboxed]
   (** Wraps values in the [portable contended] mode, even in a [nonportable uncontended]
       context. A ['a Portended.t] is equivalent to a ['a Portable.t Contended.t] and a
       ['a Contended.t Portable.t], but much more ergonomic to work with. *)
 end
 
 module Aliased : sig
-  type ('a : value_or_null) t = { aliased : 'a @@ aliased } [@@unboxed]
+  type ('a : any) t = { aliased : 'a @@ aliased } [@@unboxed]
 end
 
 module Shared : sig
-  type ('a : value_or_null) t = { shared : 'a @@ shared } [@@unboxed]
+  type ('a : any) t = { shared : 'a @@ shared } [@@unboxed]
 end
 
 module Many : sig
-  type ('a : value_or_null) t = { many : 'a @@ many } [@@unboxed]
+  type ('a : any) t = { many : 'a @@ many } [@@unboxed]
 end
 
 module Unyielding : sig
-  type ('a : value_or_null) t = { unyielding : 'a @@ unyielding } [@@unboxed]
+  type ('a : any) t = { unyielding : 'a @@ unyielding } [@@unboxed]
 end

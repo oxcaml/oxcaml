@@ -3639,6 +3639,8 @@ module Format_history = struct
       fprintf ppf
         "it's the element type of an array that is iterated over in a \
          comprehension"
+    | List_comprehension_element ->
+      fprintf ppf "it's the element type of a list comprehension"
     | Idx_base ->
       fprintf ppf
         "it's the base type (the first type parameter) for a@ block index (idx \
@@ -4817,6 +4819,7 @@ module Debug_printers = struct
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
       fprintf ppf "Array_comprehension_iterator_element"
+    | List_comprehension_element -> fprintf ppf "List_comprehension_element"
     | Idx_base -> fprintf ppf "Idx_base"
 
   let value_creation_reason ppf : History.value_creation_reason -> _ = function
