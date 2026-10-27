@@ -7,7 +7,7 @@ exec > ${output} 2>&1
 
 subdir=${test_source_directory}/subdir
 
-export PATH="/bin:/usr/bin:${subdir}:"
+export PATH=":${subdir}:$PATH"
 export BAR=bar
 
 echo "## Test 1: a binary program in the path"
