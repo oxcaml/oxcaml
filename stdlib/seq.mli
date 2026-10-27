@@ -158,7 +158,7 @@ val length : ('a : value_or_null). 'a t -> int
 
     @since 4.14 *)
 
-val iter : ('a : value_or_null). ('a -> unit) -> 'a t -> unit
+val iter : ('a : value_or_null). ('a -> unit) @ local -> 'a t -> unit
 (** [iter f xs] invokes [f x] successively
     for every element [x] of the sequence [xs],
     from left to right.

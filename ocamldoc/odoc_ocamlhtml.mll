@@ -158,7 +158,7 @@ let margin = ref 0
 
 let comment_buffer = Buffer.create 32
 let reset_comment_buffer () = Buffer.reset comment_buffer
-let store_comment_char = Buffer.add_char comment_buffer
+let store_comment_char c = Buffer.add_char comment_buffer c
 
 let make_margin () =
   let rec iter n =
@@ -197,7 +197,7 @@ let print_comment () =
 
 let string_buffer = Buffer.create 32
 let reset_string_buffer () = Buffer.reset string_buffer
-let store_string_char = Buffer.add_char string_buffer
+let store_string_char c = Buffer.add_char string_buffer c
 let get_stored_string () =
   Buffer.contents string_buffer
 

@@ -61,7 +61,7 @@ val subbytes : bytes -> int -> int -> t
     of [s] starting at index [ofs] and containing [len] bytes.
     @since 4.02 *)
 
-val channel : in_channel -> int -> t
+val channel : in_channel @ local -> int -> t
 (** If [len] is nonnegative, [Digest.channel ic len] reads [len]
    characters from channel [ic] and returns their digest, or raises
    [End_of_file] if end-of-file is reached before [len] characters
@@ -72,10 +72,10 @@ val channel : in_channel -> int -> t
 val file : string -> t
 (** Return the digest of the file whose name is given. *)
 
-val output : out_channel -> t -> unit
+val output : out_channel @ local -> t -> unit
 (** Write a digest on the given output channel. *)
 
-val input : in_channel -> t
+val input : in_channel @ local -> t
 (** Read a digest from the given input channel. *)
 
 val to_hex : t -> string
@@ -124,17 +124,17 @@ module type S = sig
     (** [subbytes s ofs len] returns the digest of the subsequence
         of [s] starting at index [ofs] and containing [len] bytes. *)
 
-  val channel : in_channel -> int -> t
+  val channel : in_channel @ local -> int -> t
     (** Read characters from the channel and return their digest.
         See {!Digest.channel} for the full specification. *)
 
   val file : string -> t
     (** Return the digest of the file whose name is given. *)
 
-  val output : out_channel -> t -> unit
+  val output : out_channel @ local -> t -> unit
     (** Write a digest on the given output channel. *)
 
-  val input : in_channel -> t
+  val input : in_channel @ local -> t
     (** Read a digest from the given input channel. *)
 
   val to_hex : t -> string

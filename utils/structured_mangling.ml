@@ -162,7 +162,10 @@ let encode buf str =
     encode_split_parts str raw escaped ins_pos 0 Raw;
     Printf.bprintf buf "u%d%a_%a"
       (Buffer.length escaped + Buffer.length raw + 1)
-      Buffer.add_buffer escaped Buffer.add_buffer raw
+      (fun b1 b2 -> Buffer.add_buffer b1 b2)
+      escaped
+      (fun b1 b2 -> Buffer.add_buffer b1 b2)
+      raw
 
 (** {1 Path mangling} *)
 

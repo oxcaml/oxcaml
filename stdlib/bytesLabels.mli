@@ -63,12 +63,12 @@ open! Stdlib
 external length : (bytes[@local_opt]) @ immutable -> int = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
 
-external get : bytes -> int -> char = "%bytes_safe_get"
+external get : (bytes[@local_opt]) @ read -> int -> char = "%bytes_safe_get"
 (** [get s n] returns the byte at index [n] in argument [s].
     @raise Invalid_argument if [n] is not a valid index in [s]. *)
 
 
-external set : bytes -> int -> char -> unit = "%bytes_safe_set"
+external set : (bytes[@local_opt]) -> int -> char -> unit = "%bytes_safe_set"
 (** [set s n c] modifies [s] in place, replacing the byte at index [n]
     with [c].
     @raise Invalid_argument if [n] is not a valid index in [s]. *)
@@ -103,18 +103,18 @@ val of_string : string @ local -> bytes
 (** Return a new byte sequence that contains the same bytes as the
     given string. *)
 
-val to_string : bytes @ local -> string
+val to_string : bytes @ local read -> string
 (** Return a new string that contains the same bytes as the given byte
     sequence. *)
 
-val sub : bytes -> pos:int -> len:int -> bytes
+val sub : bytes @ local read -> pos:int -> len:int -> bytes
 (** [sub s ~pos ~len] returns a new byte sequence of length [len],
     containing the subsequence of [s] that starts at position [pos]
     and has length [len].
     @raise Invalid_argument if [pos] and [len] do not designate a
     valid range of [s]. *)
 
-val sub_string : bytes -> pos:int -> len:int -> string
+val sub_string : bytes @ local read -> pos:int -> len:int -> string
 (** Same as {!sub} but return a string instead of a byte sequence. *)
 
 val extend : bytes -> left:int -> right:int -> bytes
@@ -134,7 +134,7 @@ val fill : bytes -> pos:int -> len:int -> char -> unit
     valid range of [s]. *)
 
 val blit
-  :  src:bytes @ local
+  :  src:bytes @ local read
   -> src_pos:int
   -> dst:bytes @ local
   -> dst_pos:int
@@ -594,167 +594,167 @@ val is_valid_utf_16le : t -> bool
        bytes.}}
 *)
 
-val get_uint8 : bytes -> int -> int
+val get_uint8 : bytes @ local read -> int -> int
 (** [get_uint8 b i] is [b]'s unsigned 8-bit integer starting at byte index [i].
     @since 4.08
 *)
 
-val get_int8 : bytes -> int -> int
+val get_int8 : bytes @ local read -> int -> int
 (** [get_int8 b i] is [b]'s signed 8-bit integer starting at byte index [i].
     @since 4.08
 *)
 
-val get_uint16_ne : bytes -> int -> int
+val get_uint16_ne : bytes @ local read -> int -> int
 (** [get_uint16_ne b i] is [b]'s native-endian unsigned 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_uint16_be : bytes -> int -> int
+val get_uint16_be : bytes @ local read -> int -> int
 (** [get_uint16_be b i] is [b]'s big-endian unsigned 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_uint16_le : bytes -> int -> int
+val get_uint16_le : bytes @ local read -> int -> int
 (** [get_uint16_le b i] is [b]'s little-endian unsigned 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int16_ne : bytes -> int -> int
+val get_int16_ne : bytes @ local read -> int -> int
 (** [get_int16_ne b i] is [b]'s native-endian signed 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int16_be : bytes -> int -> int
+val get_int16_be : bytes @ local read -> int -> int
 (** [get_int16_be b i] is [b]'s big-endian signed 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int16_le : bytes -> int -> int
+val get_int16_le : bytes @ local read -> int -> int
 (** [get_int16_le b i] is [b]'s little-endian signed 16-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int32_ne : bytes -> int -> int32
+val get_int32_ne : bytes @ local read -> int -> int32
 (** [get_int32_ne b i] is [b]'s native-endian 32-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int32_be : bytes -> int -> int32
+val get_int32_be : bytes @ local read -> int -> int32
 (** [get_int32_be b i] is [b]'s big-endian 32-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int32_le : bytes -> int -> int32
+val get_int32_le : bytes @ local read -> int -> int32
 (** [get_int32_le b i] is [b]'s little-endian 32-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int64_ne : bytes -> int -> int64
+val get_int64_ne : bytes @ local read -> int -> int64
 (** [get_int64_ne b i] is [b]'s native-endian 64-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int64_be : bytes -> int -> int64
+val get_int64_be : bytes @ local read -> int -> int64
 (** [get_int64_be b i] is [b]'s big-endian 64-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val get_int64_le : bytes -> int -> int64
+val get_int64_le : bytes @ local read -> int -> int64
 (** [get_int64_le b i] is [b]'s little-endian 64-bit integer
     starting at byte index [i].
     @since 4.08
 *)
 
-val set_uint8 : bytes -> int -> int -> unit
+val set_uint8 : bytes @ local -> int -> int -> unit
 (** [set_uint8 b i v] sets [b]'s unsigned 8-bit integer starting at byte index
     [i] to [v].
     @since 4.08
 *)
 
-val set_int8 : bytes -> int -> int -> unit
+val set_int8 : bytes @ local -> int -> int -> unit
 (** [set_int8 b i v] sets [b]'s signed 8-bit integer starting at byte index
     [i] to [v].
     @since 4.08
 *)
 
-val set_uint16_ne : bytes -> int -> int -> unit
+val set_uint16_ne : bytes @ local -> int -> int -> unit
 (** [set_uint16_ne b i v] sets [b]'s native-endian unsigned 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_uint16_be : bytes -> int -> int -> unit
+val set_uint16_be : bytes @ local -> int -> int -> unit
 (** [set_uint16_be b i v] sets [b]'s big-endian unsigned 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_uint16_le : bytes -> int -> int -> unit
+val set_uint16_le : bytes @ local -> int -> int -> unit
 (** [set_uint16_le b i v] sets [b]'s little-endian unsigned 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int16_ne : bytes -> int -> int -> unit
+val set_int16_ne : bytes @ local -> int -> int -> unit
 (** [set_int16_ne b i v] sets [b]'s native-endian signed 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int16_be : bytes -> int -> int -> unit
+val set_int16_be : bytes @ local -> int -> int -> unit
 (** [set_int16_be b i v] sets [b]'s big-endian signed 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int16_le : bytes -> int -> int -> unit
+val set_int16_le : bytes @ local -> int -> int -> unit
 (** [set_int16_le b i v] sets [b]'s little-endian signed 16-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int32_ne : bytes -> int -> int32 -> unit
+val set_int32_ne : bytes @ local -> int -> int32 -> unit
 (** [set_int32_ne b i v] sets [b]'s native-endian 32-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int32_be : bytes -> int -> int32 -> unit
+val set_int32_be : bytes @ local -> int -> int32 -> unit
 (** [set_int32_be b i v] sets [b]'s big-endian 32-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int32_le : bytes -> int -> int32 -> unit
+val set_int32_le : bytes @ local -> int -> int32 -> unit
 (** [set_int32_le b i v] sets [b]'s little-endian 32-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int64_ne : bytes -> int -> int64 -> unit
+val set_int64_ne : bytes @ local -> int -> int64 @ local -> unit
 (** [set_int64_ne b i v] sets [b]'s native-endian 64-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int64_be : bytes -> int -> int64 -> unit
+val set_int64_be : bytes @ local -> int -> int64 @ local -> unit
 (** [set_int64_be b i v] sets [b]'s big-endian 64-bit integer
     starting at byte index [i] to [v].
     @since 4.08
 *)
 
-val set_int64_le : bytes -> int -> int64 -> unit
+val set_int64_le : bytes @ local -> int -> int64 @ local -> unit
 (** [set_int64_le b i v] sets [b]'s little-endian 64-bit integer
     starting at byte index [i] to [v].
     @since 4.08
