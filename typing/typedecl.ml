@@ -2714,7 +2714,10 @@ let rec update_decl_jkind env dpath decl =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
             if Option.is_none sort then assert_any_args_support loc;
-            let jkind = Jkind.apply_operator_l Addressable jkind in
+            let jkind =
+              Jkind.apply_operator_l
+                (Types.unboxed_constructor_argument_operator arg) jkind
+            in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
