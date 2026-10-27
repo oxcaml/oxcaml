@@ -505,16 +505,12 @@ module type Solver_mono = sig
       (** The exposed parts of a mode variable *)
       module Head : sig
         type 'a t =
-          { desc_id : int;
-              (** The identifier of a mode variable *)
-            desc_upper : 'a;
-              (** The precise upper bound of a mode variable *)
-            desc_lower : 'a;
-              (** The precise lower bound of a mode variable *)
+          { desc_id : int;  (** The identifier of a mode variable *)
+            desc_upper : 'a;  (** The precise upper bound of a mode variable *)
+            desc_lower : 'a;  (** The precise lower bound of a mode variable *)
             desc_vlower : ('a, left_only) t_with_morph list;
-              (** A list of variables directly under the current variable *)
-            desc_level : int
-              (** The level of a mode variable *)
+                (** A list of variables directly under the current variable *)
+            desc_level : int  (** The level of a mode variable *)
           }
 
         val equal : 'a t -> 'b t -> bool

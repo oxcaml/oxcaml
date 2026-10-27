@@ -1394,8 +1394,8 @@ end = struct
           visible_pairs := pair :: !visible_pairs
       end
 
-  (** [register_visible_modes] iterates over the type and registers every visible
-      mode variable. *)
+  (** [register_visible_modes] iterates over the type and registers every
+      visible mode variable. *)
   let rec register_visible_modes ty =
     let px = proxy ty in
     if not (List.memq px !visited_for_named_modevars) then begin
@@ -1503,7 +1503,8 @@ end = struct
     them in the [table] of [visible_paths].
     [find_visible_morph_opt table] takes a variable as
     input, and returns its associated morphism.
-    See [Paths.Monadic] for an explanation of how this morphism is constructed. *)
+    See [Paths.Monadic] for an explanation of how this morphism is
+    constructed. *)
   let find_path_from_description :
       type s d.
       (d, (allowed * allowed)) Desc.t
@@ -1532,12 +1533,13 @@ end = struct
               fatal_error "Out_type.find_path_from_description"
           ) paths
 
-  (** [add_visible_paths] expensive and should be called once during preprocessing.
-      It finds all paths between visible variables. Recall that each visible mode
-      in a signature is a pair of variables: a monadic variable and a comonadic
-      variable. [add_visible_paths] finds the paths from monadic variables to
-      monadic variables, the paths from comonadic variables to comonadic variables,
-      and finally the paths from monadic variables to comonadic variables. *)
+  (** [add_visible_paths] expensive and should be called once during
+      preprocessing. It finds all paths between visible variables. Recall that
+      each visible mode in a signature is a pair of variables: a monadic
+      variable and a comonadic variable. [add_visible_paths] finds the paths
+      from monadic variables to monadic variables, the paths from comonadic
+      variables to comonadic variables, and finally the paths from monadic
+      variables to comonadic variables. *)
   let add_visible_paths () =
     List.iter
       (fun { monadic; comonadic } ->
@@ -1641,8 +1643,9 @@ end = struct
       | Amodevar (Amorphvar (v, f)) ->
         C.apply dst f v.desc_lower
 
-  (** [construct_morphs] returns a list of morphisms from [src_descr] to [target_descr],
-      where each morphism [f] in the list satisfies [f target_descr < src_descr]. *)
+  (** [construct_morphs] returns a list of morphisms from [src_descr] to
+      [target_descr], where each morphism [f] in the list satisfies
+      [f target_descr < src_descr]. *)
   let construct_morphs :
       type a. (a, a) Paths.table
         -> (a, (allowed * allowed)) Desc.t
