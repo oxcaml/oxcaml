@@ -17,6 +17,7 @@
      bad_instance_arg_value_wrong_type.no-alias-deps.reference \
    bad_instance_repeated_arg_name.ml bad_instance_repeated_arg_name.reference \
    bad_instance_wrong_mode.ml bad_instance_wrong_mode.reference \
+   bad_instantiate_uninstantiated_arg.reference \
    bad_instantiate_missing_arg.reference \
    bad_instantiate_no_such_param.reference \
    bad_instantiate_not_arg.reference \
@@ -411,6 +412,17 @@
            ocamlc.byte;
 
            compiler_reference = "bad_instantiate_missing_arg.reference";
+           check-ocamlc.byte-output;
+         }{
+           module = "";
+           flags = "-instantiate monoid_utils.cmo Monoid_of_semigroup";
+           program = "monoid_utils-Monoid_of_semigroup.cmo";
+           all_modules = "";
+           compiler_output = "bad_instantiate_uninstantiated_arg.output";
+           ocamlc_byte_exit_status = "2";
+           ocamlc.byte;
+
+           compiler_reference = "bad_instantiate_uninstantiated_arg.reference";
            check-ocamlc.byte-output;
          }{
            module = "";
@@ -913,6 +925,17 @@
            ocamlopt.byte;
 
            compiler_reference = "bad_instantiate_missing_arg.reference";
+           check-ocamlopt.byte-output;
+         }{
+           module = "";
+           flags = "-instantiate monoid_utils.cmx Monoid_of_semigroup";
+           program = "monoid_utils-Monoid_of_semigroup.cmx";
+           all_modules = "";
+           compiler_output = "bad_instantiate_uninstantiated_arg.output";
+           ocamlopt_byte_exit_status = "2";
+           ocamlopt.byte;
+
+           compiler_reference = "bad_instantiate_uninstantiated_arg.reference";
            check-ocamlopt.byte-output;
          }{
            module = "";
