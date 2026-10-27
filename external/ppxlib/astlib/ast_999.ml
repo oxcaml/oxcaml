@@ -851,6 +851,7 @@ module Parsetree = struct
 
   and constructor_argument (*IF_CURRENT = Parsetree.constructor_argument *) =
     {
+      pca_inherit: inherit_flag;
       pca_modalities: modalities;
       pca_type: core_type;
       pca_loc: Location.t;

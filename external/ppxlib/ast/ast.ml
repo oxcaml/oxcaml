@@ -847,6 +847,7 @@ and constructor_declaration = Parsetree.constructor_declaration = {
 }
 
 and constructor_argument = Parsetree.constructor_argument = {
+  pca_inherit: inherit_flag;
   pca_modalities: modalities;
   pca_type: core_type;
   pca_loc: location;
@@ -2071,11 +2072,12 @@ class virtual map =
         { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_loc; pcd_attributes }
     method constructor_argument :
       constructor_argument -> constructor_argument=
-      fun { pca_modalities; pca_type; pca_loc } ->
+      fun { pca_inherit; pca_modalities; pca_type; pca_loc } ->
+        let pca_inherit = self#inherit_flag pca_inherit in
         let pca_modalities = self#modalities pca_modalities in
         let pca_type = self#core_type pca_type in
         let pca_loc = self#location pca_loc in
-        { pca_modalities; pca_type; pca_loc }
+        { pca_inherit; pca_modalities; pca_type; pca_loc }
     method constructor_arguments :
       constructor_arguments -> constructor_arguments=
       fun x ->
@@ -3084,7 +3086,8 @@ class virtual iter =
         self#location pcd_loc;
         self#attributes pcd_attributes
     method constructor_argument : constructor_argument -> unit=
-      fun { pca_modalities; pca_type; pca_loc } ->
+      fun { pca_inherit; pca_modalities; pca_type; pca_loc } ->
+        self#inherit_flag pca_inherit;
         self#modalities pca_modalities;
         self#core_type pca_type;
         self#location pca_loc
@@ -4085,7 +4088,8 @@ class virtual ['acc] fold =
         let acc = self#location pcd_loc acc in
         let acc = self#attributes pcd_attributes acc in acc
     method constructor_argument : constructor_argument -> 'acc -> 'acc=
-      fun { pca_modalities; pca_type; pca_loc } acc ->
+      fun { pca_inherit; pca_modalities; pca_type; pca_loc } acc ->
+        let acc = self#inherit_flag pca_inherit acc in
         let acc = self#modalities pca_modalities acc in
         let acc = self#core_type pca_type acc in
         let acc = self#location pca_loc acc in acc
@@ -5400,11 +5404,12 @@ class virtual ['acc] fold_map =
           acc)
     method constructor_argument :
       constructor_argument -> 'acc -> (constructor_argument * 'acc)=
-      fun { pca_modalities; pca_type; pca_loc } acc ->
+      fun { pca_inherit; pca_modalities; pca_type; pca_loc } acc ->
+        let (pca_inherit, acc) = self#inherit_flag pca_inherit acc in
         let (pca_modalities, acc) = self#modalities pca_modalities acc in
         let (pca_type, acc) = self#core_type pca_type acc in
         let (pca_loc, acc) = self#location pca_loc acc in
-        ({ pca_modalities; pca_type; pca_loc }, acc)
+        ({ pca_inherit; pca_modalities; pca_type; pca_loc }, acc)
     method constructor_arguments :
       constructor_arguments -> 'acc -> (constructor_arguments * 'acc)=
       fun x acc ->
@@ -6828,11 +6833,12 @@ class virtual ['ctx] map_with_context =
         { pcd_name; pcd_vars; pcd_args; pcd_res; pcd_loc; pcd_attributes }
     method constructor_argument :
       'ctx -> constructor_argument -> constructor_argument=
-      fun ctx { pca_modalities; pca_type; pca_loc } ->
+      fun ctx { pca_inherit; pca_modalities; pca_type; pca_loc } ->
+        let pca_inherit = self#inherit_flag ctx pca_inherit in
         let pca_modalities = self#modalities ctx pca_modalities in
         let pca_type = self#core_type ctx pca_type in
         let pca_loc = self#location ctx pca_loc in
-        { pca_modalities; pca_type; pca_loc }
+        { pca_inherit; pca_modalities; pca_type; pca_loc }
     method constructor_arguments :
       'ctx -> constructor_arguments -> constructor_arguments=
       fun ctx x ->
@@ -8270,12 +8276,14 @@ class virtual ['res] lift =
           ("pcd_loc", pcd_loc);
           ("pcd_attributes", pcd_attributes)]
     method constructor_argument : constructor_argument -> 'res=
-      fun { pca_modalities; pca_type; pca_loc } ->
+      fun { pca_inherit; pca_modalities; pca_type; pca_loc } ->
+        let pca_inherit = self#inherit_flag pca_inherit in
         let pca_modalities = self#modalities pca_modalities in
         let pca_type = self#core_type pca_type in
         let pca_loc = self#location pca_loc in
         self#record
-          [("pca_modalities", pca_modalities);
+          [("pca_inherit", pca_inherit);
+          ("pca_modalities", pca_modalities);
           ("pca_type", pca_type);
           ("pca_loc", pca_loc)]
     method constructor_arguments : constructor_arguments -> 'res=
@@ -10227,17 +10235,20 @@ class virtual ['ctx,'res] lift_map_with_context =
              ("pcd_attributes", (Stdlib.snd pcd_attributes))]))
     method constructor_argument :
       'ctx -> constructor_argument -> (constructor_argument * 'res)=
-      fun ctx { pca_modalities; pca_type; pca_loc } ->
+      fun ctx { pca_inherit; pca_modalities; pca_type; pca_loc } ->
+        let pca_inherit = self#inherit_flag ctx pca_inherit in
         let pca_modalities = self#modalities ctx pca_modalities in
         let pca_type = self#core_type ctx pca_type in
         let pca_loc = self#location ctx pca_loc in
         ({
+           pca_inherit = (Stdlib.fst pca_inherit);
            pca_modalities = (Stdlib.fst pca_modalities);
            pca_type = (Stdlib.fst pca_type);
            pca_loc = (Stdlib.fst pca_loc)
          },
           (self#record ctx
-             [("pca_modalities", (Stdlib.snd pca_modalities));
+             [("pca_inherit", (Stdlib.snd pca_inherit));
+             ("pca_modalities", (Stdlib.snd pca_modalities));
              ("pca_type", (Stdlib.snd pca_type));
              ("pca_loc", (Stdlib.snd pca_loc))]))
     method constructor_arguments :

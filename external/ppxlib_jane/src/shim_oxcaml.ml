@@ -72,7 +72,11 @@ module Pcstr_tuple_arg = struct
   let to_core_type t = t.pca_type
 
   let of_core_type core_type =
-    { pca_type = core_type; pca_loc = core_type.ptyp_loc; pca_modalities = [] }
+    { pca_inherit = Not_inherited
+    ; pca_type = core_type
+    ; pca_loc = core_type.ptyp_loc
+    ; pca_modalities = []
+    }
   ;;
 
   let map_core_type t ~f = { t with pca_type = f t.pca_type }
@@ -83,7 +87,11 @@ module Pcstr_tuple_arg = struct
   ;;
 
   let create ~loc ~modalities ~type_ =
-    { pca_type = type_; pca_loc = loc; pca_modalities = modalities }
+    { pca_inherit = Not_inherited
+    ; pca_type = type_
+    ; pca_loc = loc
+    ; pca_modalities = modalities
+    }
   ;;
 end
 

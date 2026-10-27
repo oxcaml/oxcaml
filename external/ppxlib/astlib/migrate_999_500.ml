@@ -1589,11 +1589,13 @@ and copy_constructor_argument :
   Ast_999.Parsetree.constructor_argument ->
   Ast_500.Parsetree.constructor_argument =
   fun {
+    Ast_999.Parsetree.pca_inherit;
     Ast_999.Parsetree.pca_modalities;
     Ast_999.Parsetree.pca_type;
     Ast_999.Parsetree.pca_loc;
   } ->
   {
+    Ast_500.Parsetree.pca_inherit = copy_inherit_flag pca_inherit;
     Ast_500.Parsetree.pca_modalities = copy_modalities pca_modalities;
     Ast_500.Parsetree.pca_type = copy_core_type pca_type;
     Ast_500.Parsetree.pca_loc = copy_location pca_loc;
