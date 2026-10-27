@@ -316,25 +316,19 @@ let fold {persistent_structures; _} f x =
     persistent_structures x
 
 let register_pers_for_short_paths penv modname ps components =
-  let old_style_crcs =
-    ps.ps_name_info.pn_import.imp_crcs
+  Short_paths.Basis.add (short_paths_basis penv)
+    modname.Global_module.Name.head;
+  let names imports =
+    imports
     |> Array.to_list
     |> List.map
-         (fun import ->
-            let name = Import_info.name import in
-            let crc = Import_info.crc import in
-            name, crc)
+         (fun name ->
+            let name_as_string = Compilation_unit.Name.to_string name in
+            Short_paths.Basis.add (short_paths_basis penv) name_as_string;
+            name_as_string)
   in
-  let depends, alias_depends =
-    List.fold_left
-      (fun (deps, alias_deps) (name, digest) ->
-         let name_as_string = Compilation_unit.Name.to_string name in
-         Short_paths.Basis.add (short_paths_basis penv) name_as_string;
-         match digest with
-         | None -> deps, name_as_string :: alias_deps
-         | Some _ -> name_as_string :: deps, alias_deps)
-      ([], []) old_style_crcs
-  in
+  let depends = names ps.ps_name_info.pn_import.imp_imports in
+  let alias_depends = names ps.ps_name_info.pn_import.imp_alias_imports in
   let desc =
     Short_paths.Desc.Module.(Fresh (Signature components))
   in
@@ -416,7 +410,6 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_cmi_name = found_name;
     }
   in
-<<<<<<< Merlin:no-consistency-check
   begin try
   if not (CU.Name.equal modname found_name) then
     error (Illegal_renaming(modname, found_name, filename));
@@ -438,32 +431,19 @@ let acknowledge_import penv ~check modname pers_sig =
         error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
   | _, _ -> ()
   end;
-  if check then check_consistency penv import
+  if check then record_import penv modname import
   with Error _ as exn ->
     (* Merlin needs to know that a module was found even if it is invalid to
        properly invalidate the cache. *)
     Hashtbl.replace imports modname (Invalid import);
     raise exn
   end;
-||||||| Compiler:last-imported
-  if check then check_consistency penv import;
-=======
-  if check then record_import penv modname import;
->>>>>>> Compiler:HEAD
   Hashtbl.add imports modname (Found import);
   import
 
 let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
-<<<<<<< Merlin:no-consistency-check
-  add_import penv modname;
   let cmi = Cmi_cache.read filename in
-||||||| Compiler:last-imported
-  add_import penv modname;
-  let cmi = read_cmi_lazy filename in
-=======
-  let cmi = read_cmi_lazy filename in
->>>>>>> Compiler:HEAD
   let pers_sig =
     { Persistent_signature.filename; cmi;
       visibility = Visible { cmx_guaranteed = false } }
