@@ -559,6 +559,9 @@ let transl_mode_with_locality annots =
   in
   { mode_modes = modes; mode_desc = annots }
 
+let legacy_modes : With_locality.lr modes =
+  { mode_modes = With_locality.legacy; mode_desc = [] }
+
 let everything_modality =
   List.fold_left
     (fun acc -> function
@@ -724,7 +727,7 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
   Jkind.Mod_bounds.set_crossing crossing bounds
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
-    Parsetree.modes =
+    string list =
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let least_modalities =
@@ -733,8 +736,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
   let modality_annots =
     List.map
       (fun (Atom (ax, m) : Modality.atom) ->
-        let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
-        { Location.txt = Parsetree.Mode s; loc = Location.none })
+        Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m)
       least_modalities
   in
   (* These mod-bounds are top ones, which are redundant to print. But we
@@ -757,7 +759,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
               (Modality.Per_axis.print ax)
               (Modality.Const.proj ax modality)
           in
-          Some { Location.txt = Parsetree.Mode s; loc = Location.none })
+          Some s)
       With_regionality.Axis.all
   in
   let nonmodal_annots, top_nonmodal_annots =
@@ -765,8 +767,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     let mk_annot top print value =
       let only_when_verbose = value = top in
       let s = Format_doc.asprintf "%a" print value in
-      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
-        only_when_verbose )
+      s, only_when_verbose
     in
     [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->

@@ -57,6 +57,12 @@ val iter_code : t -> f:(Code.t -> unit) -> unit
 
 val from_raw : sections:File_sections.t -> raw -> t
 
-val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+val to_raw : sections:File_sections.Builder.t -> t -> raw
 
-val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw
+(* CR-someday ncourant: ideally, the type would be [('a. 'a File_sections.Idx.t
+   -> 'a File_sections.Idx.t) -> raw -> raw]. *)
+val map_raw_index :
+  (Code_or_metadata.section_data File_sections.Idx.t ->
+  Code_or_metadata.section_data File_sections.Idx.t) ->
+  raw ->
+  raw
