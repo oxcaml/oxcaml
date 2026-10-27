@@ -1478,6 +1478,11 @@ L(resume_preemption): /* x25 -> gc_regs */
        registers and `ret` to resume */
         b       L(resume_from_preempt)
 L(continuation_already_resumed):
+    /* Pop the frame pushed by DO_RESUME_SWITCH, which the normal path pops
+       before switching stacks.  This restores x30 as well as sp, which
+       caml_c_call records as the return address for use during scanning. */
+        ldp     x29, x30, [sp], 16
+        CFI_ADJUST(-16)
         ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
         b       G(caml_c_call)
         CFI_ENDPROC
