@@ -59,6 +59,7 @@ let exttype ppf = function
   | XInt16 -> fprintf ppf "int16"
   | XInt32 -> fprintf ppf "int32"
   | XInt64 -> fprintf ppf "int64"
+  | XMask -> fprintf ppf "mask"
   | XFloat -> fprintf ppf "float"
   | XFloat32 -> fprintf ppf "float32"
   | XVec128 -> fprintf ppf "vec128"
