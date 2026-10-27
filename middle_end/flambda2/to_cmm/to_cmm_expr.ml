@@ -85,7 +85,7 @@ let fail_if_probe apply =
 
 let translate_external_call env res ~free_vars apply ~callee_simple ~args
     ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-    ~coeffects =
+    ~coeffects ~fat_ptr_arg_starts =
   fail_if_probe apply;
   let callee =
     match callee_simple with
@@ -114,6 +114,31 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
     List.map C.exttype_of_kind
       (Flambda_arity.unarize (Apply.args_arity apply)
       |> List.map K.With_subkind.kind)
+  in
+  (* A fat-pointer argument is an unboxed pair (base, byte offset) that C
+     receives as a single raw pointer [base + offset]. The addition is performed
+     by the backend as part of the call itself: computing it any earlier would
+     risk a GC safepoint invalidating the result, and a safepoint can appear
+     between any two instructions preceding the call, e.g. a poll inserted by
+     [Cfg_polling]. Until the call, the base travels as an ordinary [Val]. Here
+     we only merge each pair's two [exttype]s into a single [XFat_pointer]; the
+     two arguments themselves are passed through unchanged. *)
+  let ty_args =
+    match fat_ptr_arg_starts with
+    | [] -> ty_args
+    | _ :: _ ->
+      let rec fuse index ty_args starts =
+        match starts, ty_args with
+        | [], _ -> ty_args
+        | start :: starts', _ :: _ :: ty_args' when start = index ->
+          Cmm.XFat_pointer :: fuse (index + 2) ty_args' starts'
+        | _ :: _, ty :: ty_args' -> ty :: fuse (index + 1) ty_args' starts
+        | _ :: _, [] ->
+          Misc.fatal_errorf
+            "translate_external_call: malformed fat_ptr_arg_starts for %s"
+            callee
+      in
+      fuse 0 ty_args fat_ptr_arg_starts
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
@@ -374,10 +399,16 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
+  | C_call
+      { needs_caml_c_call;
+        is_c_builtin;
+        effects;
+        coeffects;
+        fat_ptr_arg_starts
+      } ->
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-      ~coeffects
+      ~coeffects ~fat_ptr_arg_starts
   | Method { kind; obj } ->
     fail_if_probe apply;
     let callee =

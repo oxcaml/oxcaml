@@ -64,6 +64,7 @@ let exttype ppf = function
   | XVec128 -> fprintf ppf "vec128"
   | XVec256 -> fprintf ppf "vec256"
   | XVec512 -> fprintf ppf "vec512"
+  | XFat_pointer -> fprintf ppf "fat_pointer"
 
 let extcall_signature ppf (ty_res, ty_args) =
   (match ty_args with

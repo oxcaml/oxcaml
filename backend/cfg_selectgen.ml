@@ -729,13 +729,34 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | _ :: _ -> ty_args
     in
     let locs, stack_ofs, align = Proc.loc_external_arguments ty_args in
-    let ty_args = Array.of_list ty_args in
     if stack_ofs <> 0
     then SU.insert env sub_cfg (SU.make_stack_offset stack_ofs) [||] [||];
-    List.iteri
-      (fun i arg ->
-        insert_move_extcall_arg env sub_cfg ty_args.(i) arg locs.(i) dbg)
-      args;
+    (* An [XFat_pointer] entry corresponds to two Cmm arguments (base and
+       offset) and a two-register [locs] entry; the addition happens when the
+       call itself is emitted. All other [exttype]s are one argument each. *)
+    let rec move_args i (ty_args : Cmm.exttype list) args =
+      match ty_args, args with
+      | [], [] -> ()
+      | XFat_pointer :: ty_args', base :: offset :: args' ->
+        SU.insert_moves env sub_cfg base [| locs.(i).(0) |];
+        SU.insert_moves env sub_cfg offset [| locs.(i).(1) |];
+        move_args (i + 1) ty_args' args'
+      | ( (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+           | XVec128 | XVec256 | XVec512 ) as ty_arg)
+          :: ty_args',
+          arg :: args' ) ->
+        insert_move_extcall_arg env sub_cfg ty_arg arg locs.(i) dbg;
+        move_args (i + 1) ty_args' args'
+      | XFat_pointer :: _, ([] | [_])
+      | ( ( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat | XFloat32
+          | XVec128 | XVec256 | XVec512 )
+          :: _,
+          [] )
+      | [], _ :: _ ->
+        Misc.fatal_error
+          "emit_extcall_args: arguments do not match the declared [ty_args]"
+    in
+    move_args 0 ty_args args;
     Ok (Array.concat (Array.to_list locs), stack_ofs, align)
 
   and emit_stores env sub_cfg dbg (args : Cmm.expression list) regs_addr =
