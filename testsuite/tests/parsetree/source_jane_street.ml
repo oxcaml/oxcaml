@@ -1294,13 +1294,7 @@ val idx : 'a with_idx -> int = <fun>
 val payload : string = "payload"
 val inc : 'a with_idx -> 'a with_idx = <fun>
 type inherited = #{ inherit f : float#; }
-Line 8, characters 0-62:
-8 | type inherited_arg : float64 = A of inherit float# [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "inherited_arg" is float64 addressable
-         because it is the unboxed version of the primitive type float.
-       But the layout of type "inherited_arg" must be a sublayout of float64
-         because of the annotation on the declaration of the type inherited_arg.
+type inherited_arg = A of inherit float# [@@unboxed]
 |}]
 
 (*****************)
