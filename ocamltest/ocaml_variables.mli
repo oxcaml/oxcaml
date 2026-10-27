@@ -88,6 +88,8 @@ val asmext : Variables.t
 val ocamlc_byte : Variables.t
 val ocamlopt_byte : Variables.t
 val ocamlrun : Variables.t
+val stdlib : Variables.t
+val runtime : Variables.t
 
 val ocamlc_flags : Variables.t
 val ocamlc_default_flags : Variables.t
