@@ -28,6 +28,8 @@ val untransl_mode : _ modes -> Parsetree.modes
 val transl_mode_with_locality :
   Parsetree.modes -> Mode.With_locality.Const.t modes
 
+val legacy_modes : Mode.With_locality.lr modes
+
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
     attributes on the field and insert mutable-implied modalities accordingly.
@@ -95,7 +97,7 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)
-val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes
+val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> string list
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
 

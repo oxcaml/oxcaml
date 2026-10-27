@@ -51,11 +51,11 @@ class Toolchain:
 
     @property
     def ocamllib(self) -> Path:
-        return self.build_root / "runtime_stdlib_install/lib/ocaml_runtime_stdlib"
+        return self.build_root / "default/stdlib/build"
 
     @property
     def ocamlrun(self) -> Path:
-        return self.build_root / "runtime_stdlib_install/bin/ocamlrun"
+        return self.build_root / "default/runtime/ocamlrun"
 
     @property
     def otherlibs(self) -> Path:
@@ -320,7 +320,7 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes:
         output_prefix=work_dir / "generate",
     )
     stderr = result.stderr.decode(errors="replace")
-    # CR-soon hwasilewski: This should not interrupt the fuzzing campaign,
+    # CR-soon xclerc: This should not interrupt the fuzzing campaign,
     # it should probably be reported as a standard failure and saved to
     # investigate the generator bug.
 
@@ -489,7 +489,7 @@ def reproduction_script(
     command = compile_command(
         configuration, source=Path("../program.ml"), executable=Path("program.exe")
     )
-    # CR-soon hwasilewski: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
+    # CR-soon xclerc: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
     # which are inherited by compilation and execution by default, but may differ
     # in the shell, which executes ./run.sh.
     return "\n".join(
@@ -576,7 +576,7 @@ def check_case(
         stats.report()
         return
 
-    # CR-soon hwasilewski: This is a bug, execution failures should take
+    # CR-soon xclerc: This is a bug, execution failures should take
     # precedence over timeouts and if any execution fails the test is considered
     # a failure.
 
@@ -662,7 +662,7 @@ async def run_case(
 
 SELF_CHECK_SEED = 0
 
-# CR-soon hwasilewski: Self check more than 1 case, possibly ~100, maybe turn
+# CR-soon xclerc: Self check more than 1 case, possibly ~100, maybe turn
 # off swarm testing for this also.
 
 # Compile and run one generated program before running the fuzzer. This
@@ -776,7 +776,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         default=None,
         help="seed for the sequence of case seeds (default: random, printed)",
     )
-    # CR-soon hwasilewski: Add flag to limit amount of failures before the
+    # CR-soon xclerc: Add flag to limit amount of failures before the
     # campaign is aborted, so that there are no space leaks.
     args = parser.parse_args()
     if args.jobs < 1:
@@ -793,7 +793,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     toolchain_dir = Path(tempfile.mkdtemp(
         prefix="toolchain-", dir=args.output.resolve()
     ))
-    # CR-someday hwasilewski: Clean up the snapshot after finishing fuzzing if
+    # CR-someday xclerc: Clean up the snapshot after finishing fuzzing if
     # no failures were saved.
     toolchain = toolchain.snapshot(toolchain_dir)
     print(f"toolchain: {toolchain_dir}", file=sys.stderr)
@@ -813,7 +813,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
                 run_dir=Path(run_dir),
                 iterations=args.iterations,
                 jobs=args.jobs,
-                # CR-soon hwasilewski: We should instead create a temporary
+                # CR-soon xclerc: We should instead create a temporary
                 # directory inside of args.output, so that there are no
                 # collisions on rerunning a command with the same output
                 # directory.
