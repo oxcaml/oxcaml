@@ -673,25 +673,15 @@ external f : c -> (float [@unboxed]) = "foo" "bar"
 type u : immutable_data = { more : v } [@@unboxed]
 and v : immutable_data = { x : int }
 [%%expect{|
-Line 1, characters 0-50:
-1 | type u : immutable_data = { more : v } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "u" is immutable_data
-         because of the annotation on the declaration of the type v.
-       But the kind of type "u" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type u.
+type u = { more : v; } [@@unboxed]
+and v = { x : int; }
 |}]
 
 type u : immutable_data = A of v [@@unboxed]
 and v : immutable_data = { x : int }
 [%%expect{|
-Line 1, characters 0-44:
-1 | type u : immutable_data = A of v [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "u" is immutable_data
-         because of the annotation on the declaration of the type v.
-       But the kind of type "u" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type u.
+type u = A of v [@@unboxed]
+and v = { x : int; }
 |}]
 
 type u : immutable_data = #{ more : v }
