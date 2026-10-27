@@ -112,6 +112,9 @@ type import = {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  imp_cmi_name : CU.Name.t;
+  (* Physically the [cmi_name] of the [cmi_infos] this import was read from;
+     Merlin compares it with [==] against the [Cmi_cache] entry. *)
 }
 
 (* If a .cmi file is missing (or failed to load), we store it as Missing in the
@@ -422,6 +425,7 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_visibility = visibility;
       imp_crcs = crcs;
       imp_flags = flags;
+      imp_cmi_name = found_name;
     }
   in
   begin try
@@ -458,7 +462,7 @@ let acknowledge_import penv ~check modname pers_sig =
 let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
-  let cmi = read_cmi_lazy filename in
+  let cmi = Cmi_cache.read filename in
   let pers_sig =
     { Persistent_signature.filename; cmi;
       visibility = Visible { cmx_guaranteed = false } }
@@ -1053,7 +1057,7 @@ let read penv modname a =
   read_pers_struct penv true modname a
 
 let read_cmi_file penv filename =
-  let cmi = read_cmi_lazy filename in
+  let cmi = Cmi_cache.read filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
   add_import penv unit_name;
@@ -1400,9 +1404,9 @@ let forall ~found ~invalid ~missing t =
   Std.Hashtbl.forall t.imports (fun name -> function
       | Missing _ -> missing name
       | Found import ->
-        found name import.imp_filename name
+        found name import.imp_filename import.imp_cmi_name
       | Invalid import ->
-        invalid name import.imp_filename name
+        invalid name import.imp_filename import.imp_cmi_name
     )
 
 let report_error = Format_doc.compat report_error_doc

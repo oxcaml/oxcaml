@@ -5832,7 +5832,7 @@ let check_state_consistency () =
     | exception Not_found -> true
   and present _modname filename ps_name =
     match Cmi_cache.get_cached_entry filename with
-    | cmi_infos -> Compilation_unit.Name.equal ps_name cmi_infos.Cmi_format.cmi_name
+    | cmi_infos -> ps_name == cmi_infos.Cmi_format.cmi_name
     | exception Not_found -> false
   in
   Persistent_env.forall ~found:present ~invalid:present ~missing !persistent_env
