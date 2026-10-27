@@ -1444,7 +1444,10 @@ and label_decl i ppf {ld_id; ld_name = _; ld_inherit; ld_mutable; ld_type;
   core_type (i+1) ppf ld_type;
   modalities (i+1) ppf ld_modalities
 
-and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities} =
+and field_decl i ppf {ca_inherit; ca_type=ty; ca_loc=_; ca_modalities} =
+  (match ca_inherit with
+   | Not_inherited -> ()
+   | Inherited -> line (i+1) ppf "Inherited\n");
   core_type (i+1) ppf ty;
   modalities (i+1) ppf ca_modalities
 

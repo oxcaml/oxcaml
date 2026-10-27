@@ -1085,6 +1085,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
+    ca_inherit: inherit_flag;
     ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t option;
@@ -1103,9 +1104,14 @@ val tys_of_constr_args : constructor_arguments -> type_expr list
 val unboxed_record_field_operator :
   label_declaration -> Jkind_types.Kind_operator.t
 
+(** The kind operator a constructor declared [@@unboxed] applies to the kind
+    of its argument: the argument is made addressable unless it is
+    [inherit]. *)
+val unboxed_constructor_argument_operator :
+  constructor_argument -> Jkind_types.Kind_operator.t
+
 (** The type of the single unboxed field of a declaration, with the modality
-    and kind operator the declaration applies to it. The argument of an
-    [@@unboxed] constructor is made addressable. *)
+    and kind operator the declaration applies to it. *)
 val find_unboxed_type : type_declaration ->
   (type_expr * Mode.Modality.Const.t * Jkind_types.Kind_operator.t) option
 

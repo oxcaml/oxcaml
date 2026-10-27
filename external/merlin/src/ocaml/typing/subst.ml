@@ -884,6 +884,7 @@ let constructor_argument copy_scope s ca =
     ca_type = typexp copy_scope s ca.ca_loc ca.ca_type;
     ca_sort = ca.ca_sort;
     ca_loc = loc s ca.ca_loc;
+    ca_inherit = ca.ca_inherit;
     ca_modalities = ca.ca_modalities;
   }
 

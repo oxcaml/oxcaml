@@ -271,7 +271,8 @@ module Type:
       str ->
       constructor_declaration
 
-    val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
+    val constructor_arg: ?loc:loc -> ?inherit_:inherit_flag ->
+      ?modalities:modality with_loc list -> core_type ->
       constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->

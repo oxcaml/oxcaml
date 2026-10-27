@@ -608,6 +608,7 @@ let unrestricted tvar ca_sort =
   {
     ca_type=tvar;
     ca_sort;
+    ca_inherit=Not_inherited;
     ca_modalities=Mode.Modality.Const.id;
     ca_loc=Location.none
   }
@@ -1199,6 +1200,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                 {
                   ca_type;
                   ca_sort = Jkind_types.Sort.Const.(some scannable);
+                  ca_inherit=Not_inherited;
                   ca_modalities=Mode.Modality.Const.id;
                   ca_loc=Location.none
                 })

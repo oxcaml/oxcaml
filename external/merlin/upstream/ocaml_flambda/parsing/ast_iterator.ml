@@ -203,7 +203,8 @@ module T = struct
         List.iter (sub.label_declaration sub) l
     | Ptype_open -> ()
 
-  let iter_constructor_argument sub {pca_type; pca_loc; pca_modalities} =
+  let iter_constructor_argument sub
+        {pca_inherit = _; pca_type; pca_loc; pca_modalities} =
     sub.typ sub pca_type;
     sub.location sub pca_loc;
     sub.modalities sub pca_modalities

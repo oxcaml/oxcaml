@@ -1018,6 +1018,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
+    ca_inherit: inherit_flag;
     ca_modalities: modalities;
     ca_type: core_type;
     ca_loc: Location.t;

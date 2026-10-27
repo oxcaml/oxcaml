@@ -446,6 +446,7 @@ type record_mismatch =
 type constructor_mismatch =
   | Type of Errortrace.equality_error
   | Arity
+  | Inherit_argument of int * position
   | Inline_record of record_change list
   | Kind of position
   | Explicit_return_type of position
@@ -710,6 +711,9 @@ let report_constructor_mismatch first second decl env ppf err =
   match (err : constructor_mismatch) with
   | Type err -> report_type_inequality env ppf err
   | Arity -> pr "They have different arities."
+  | Inherit_argument (i, ord) ->
+      pr "Argument %i of %s is inherit and that of %s is not."
+        (i + 1) (choose ord first second) (choose_other ord first second)
   | Inline_record err ->
       report_patch pp_record_diff first second decl env ppf err
   | Kind ord ->
@@ -1242,10 +1246,26 @@ module Variant_diffing = struct
              Note [Contravariance of type parameter jkinds]. *)
           match Ctype.equal env true (params1 @ arg1_tys) (params2 @ arg2_tys) with
           | exception Ctype.Equality err -> Some (Type err)
-          | () -> List.combine arg1_gfs arg2_gfs
-                  |> find_map_idx
-                    (fun (x,y) -> get_error @@ Modality.Const.equate x y)
-                  |> Option.map (fun (i, err) -> Modality (i, err))
+          | () ->
+            let inherit_mismatch =
+              List.combine arg1 arg2
+              |> find_map_idx
+                (fun ((ca1 : Types.constructor_argument),
+                      (ca2 : Types.constructor_argument)) ->
+                  match ca1.ca_inherit, ca2.ca_inherit with
+                  | Inherited, Not_inherited -> Some First
+                  | Not_inherited, Inherited -> Some Second
+                  | Inherited, Inherited | Not_inherited, Not_inherited ->
+                    None)
+              |> Option.map (fun (i, ord) -> Inherit_argument (i, ord))
+            in
+            match inherit_mismatch with
+            | Some _ as err -> err
+            | None ->
+              List.combine arg1_gfs arg2_gfs
+              |> find_map_idx
+                (fun (x,y) -> get_error @@ Modality.Const.equate x y)
+              |> Option.map (fun (i, err) -> Modality (i, err))
         end
     | Types.Cstr_record l1, Types.Cstr_record l2 ->
         Option.map

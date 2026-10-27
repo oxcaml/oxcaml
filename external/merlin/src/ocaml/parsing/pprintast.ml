@@ -469,7 +469,8 @@ let optional_atat_modalities_newline f m =
 
 let modalities_type pty ctxt f pca =
   let m = pca.pca_modalities in
-  pp f "%a%a"
+  pp f "%a%a%a"
+    inherit_flag pca.pca_inherit
     (pty ctxt) pca.pca_type
     optional_space_atat_modalities m
 

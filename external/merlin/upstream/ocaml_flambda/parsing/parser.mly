@@ -4360,9 +4360,10 @@ generalized_constructor_arguments:
 ;
 
 %inline constructor_argument:
-  gbl=global_flag cty=atomic_type m1=optional_atat_modalities_expr {
+  inherit_=inherit_flag gbl=global_flag cty=atomic_type
+  m1=optional_atat_modalities_expr {
     let modalities = gbl @ m1 in
-    Type.constructor_arg cty ~modalities ~loc:(make_loc $sloc)
+    Type.constructor_arg cty ~inherit_ ~modalities ~loc:(make_loc $sloc)
   }
 ;
 

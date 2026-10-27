@@ -82,6 +82,7 @@ type record_mismatch =
 type constructor_mismatch =
   | Type of Errortrace.equality_error
   | Arity
+  | Inherit_argument of int * position
   | Inline_record of record_change list
   | Kind of position
   | Explicit_return_type of position

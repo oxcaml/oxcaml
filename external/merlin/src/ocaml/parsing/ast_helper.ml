@@ -652,8 +652,10 @@ module Type = struct
      pcd_attributes = add_info_attrs info attrs;
     }
 
-  let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =
+  let constructor_arg ?(loc = !default_loc) ?(inherit_ = Not_inherited)
+        ?(modalities = []) typ =
     {
+      pca_inherit = inherit_;
       pca_modalities = modalities;
       pca_type = typ;
       pca_loc = loc;

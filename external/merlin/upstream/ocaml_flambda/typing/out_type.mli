@@ -140,7 +140,7 @@ val hide_variant_name: Types.type_expr -> Types.type_expr
 (** {1: Label and constructors }*)
 val prepare_type_constructor_arguments: constructor_arguments -> unit
 val tree_of_constructor_arguments:
-  constructor_arguments -> (out_type * out_modality list) list
+  constructor_arguments -> out_constructor_argument list
 
 val tree_of_label: label_declaration -> out_label
 
@@ -151,7 +151,7 @@ val tree_of_extension_constructor:
     Ident.t -> extension_constructor -> ext_status -> out_sig_item
 val extension_constructor_args_and_ret_type_subtree:
   constructor_arguments -> type_expr option ->
-  (out_type * out_modality list) list * (out_vars_jkinds * out_type) option
+  out_constructor_argument list * (out_vars_jkinds * out_type) option
 val add_extension_constructor_to_preparation :
     extension_constructor -> unit
 val prepared_extension_constructor:

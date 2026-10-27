@@ -1067,9 +1067,12 @@ and print_out_type_decl kwd ppf td =
     print_or_null_attr
     print_out_attrs td.otype_attributes
 
-and print_simple_out_gf_type ppf (ty, gf) =
-  print_simple_out_type ppf ty;
-  print_out_modalities ppf gf
+and print_simple_out_gf_type ppf { oca_inherit; oca_type; oca_modalities } =
+  (match oca_inherit with
+   | Not_inherited -> ()
+   | Inherited -> pp_print_string ppf "inherit ");
+  print_simple_out_type ppf oca_type;
+  print_out_modalities ppf oca_modalities
 
 and print_out_constr_args ppf tyl =
   print_typlist print_simple_out_gf_type " *" ppf tyl

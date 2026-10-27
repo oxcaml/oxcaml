@@ -591,6 +591,7 @@ and constructor_declaration =
 
 and constructor_argument =
   {
+    ca_inherit: inherit_flag;
     ca_modalities: Mode.Modality.Const.t;
     ca_type: type_expr;
     ca_sort: Jkind_types.Sort.Const.t option;
@@ -1085,10 +1086,13 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
-let unboxed_record_field_operator ld : Jkind_types.Kind_operator.t =
-  match ld.ld_inherit with
+let inherit_operator : inherit_flag -> Jkind_types.Kind_operator.t = function
   | Not_inherited -> Addressable
   | Inherited -> Id
+
+let unboxed_record_field_operator ld = inherit_operator ld.ld_inherit
+
+let unboxed_constructor_argument_operator ca = inherit_operator ca.ca_inherit
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -1105,8 +1109,8 @@ let find_unboxed_type decl =
        Record_inlined (_, _, Variant_unboxed), _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _} as ld]; _}], Variant_unboxed, _) ->
     Some (arg, ms, unboxed_record_field_operator ld)
-  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _) ->
-    Some (arg, ms, Jkind_types.Kind_operator.Addressable)
+  | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _} as ca]; _}], Variant_unboxed, _) ->
+    Some (arg, ms, unboxed_constructor_argument_operator ca)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined

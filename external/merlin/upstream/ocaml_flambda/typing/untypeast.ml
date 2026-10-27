@@ -275,10 +275,11 @@ let type_kind sub tk = match tk with
       Ptype_record_unboxed_product (List.map (sub.label_declaration sub) list)
   | Ttype_open -> Ptype_open
 
-let constructor_argument sub {ca_loc; ca_type; ca_modalities} =
+let constructor_argument sub {ca_inherit; ca_loc; ca_type; ca_modalities} =
   let loc = sub.location sub ca_loc in
   let pca_modalities = Typemode.untransl_modalities ca_modalities in
-  { pca_loc = loc; pca_type = sub.typ sub ca_type; pca_modalities }
+  { pca_inherit = ca_inherit; pca_loc = loc; pca_type = sub.typ sub ca_type;
+    pca_modalities }
 
 let constructor_arguments sub = function
    | Cstr_tuple l -> Pcstr_tuple (List.map (constructor_argument sub) l)

@@ -672,7 +672,19 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
   lbls, lbls'
 
 let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
+  let inherit_allowed =
+    match (kloc : jkind_sort_loc) with
+    | Cstr_tuple { unboxed = true } -> List.compare_length_with cal 1 = 0
+    | Cstr_tuple { unboxed = false } | Record _ | Record_unboxed_product
+    | Inlined_record _ | Mixed_product | External
+    | External_with_layout_poly -> false
+  in
   let mk arg =
+    (match arg.pca_inherit with
+     | Not_inherited -> ()
+     | Inherited ->
+       if not inherit_allowed then
+         Error.log_and_raise arg.pca_loc Inherit_unsupported);
     let cty =
       transl_simple_type ~new_var_jkind env ?univars ~closed
         Mode.With_locality.Const.legacy arg.pca_type
@@ -680,7 +692,8 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
     let gf =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
-    {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
+    {ca_inherit = arg.pca_inherit; ca_modalities = gf; ca_type = cty;
+     ca_loc = arg.pca_loc}
   in
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
@@ -690,7 +703,8 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
         env loc kloc ca.ca_type.ctyp_type
     end;
     {
-      Types.ca_modalities = ca.ca_modalities.moda_modalities;
+      Types.ca_inherit = ca.ca_inherit;
+      ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = None;
@@ -2700,7 +2714,10 @@ let rec update_decl_jkind env dpath decl =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
             in
             if Option.is_none sort then assert_any_args_support loc;
-            let jkind = Jkind.apply_operator_l Addressable jkind in
+            let jkind =
+              Jkind.apply_operator_l
+                (Types.unboxed_constructor_argument_operator arg) jkind
+            in
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
             Variant_unboxed, jkind
@@ -5712,7 +5729,8 @@ let report_error ~loc = function
   | Inherit_unsupported ->
       Location.errorf ~loc
         "%a is only supported on the sole field of an unboxed record,@ \
-         or of a record or constructor declared %a"
+         or on the sole field or argument of a record or constructor@ \
+         declared %a"
         Style.inline_code "inherit" Style.inline_code "[@@unboxed]"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in

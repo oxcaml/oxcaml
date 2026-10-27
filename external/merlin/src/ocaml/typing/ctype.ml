@@ -4926,9 +4926,10 @@ and mcomp_variant_description type_pairs env xs ys =
 and mcomp_tuple_description type_pairs env =
   let rec iter x y =
     match x, y with
-    | {ca_type=ty1; ca_modalities=gf1; _} :: xs, {ca_type=ty2; ca_modalities=gf2} :: ys ->
+    | {ca_type=ty1; ca_modalities=gf1; ca_inherit=in1; _} :: xs,
+      {ca_type=ty2; ca_modalities=gf2; ca_inherit=in2; _} :: ys ->
       mcomp type_pairs env ty1 ty2;
-      if gf1 = gf2
+      if gf1 = gf2 && in1 = in2
       then iter xs ys
       else raise Incompatible
     | [], [] -> ()
