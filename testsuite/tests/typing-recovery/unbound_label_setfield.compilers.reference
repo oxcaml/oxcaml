@@ -1,0 +1,5 @@
+File "unbound_label_setfield.ml", line 10, characters 17-40:
+10 | let f r = r.l <- (if true then 1 else 2)
+                      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The expression is dynamic because it has branches.
+       However, the expression highlighted is expected to be static.
