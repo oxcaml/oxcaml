@@ -4,7 +4,7 @@ module ZA = Zero_alloc_utils
 type check = Builtin_attributes.zero_alloc_check =
   { strict : bool;
     opt : bool;
-    arguments : Builtin_attributes.Zero_alloc_arguments.t;
+    arguments : Zero_alloc_utils.Arguments.t;
     partial : bool;
     loc : Location.t;
     custom_error_msg : string option
@@ -14,7 +14,7 @@ type assume = Builtin_attributes.zero_alloc_assume =
   { strict : bool;
     never_returns_normally : bool;
     never_raises : bool;
-    arguments : Builtin_attributes.Zero_alloc_arguments.t;
+    arguments : Zero_alloc_utils.Arguments.t;
     partial : bool;
     loc : Location.t
   }
@@ -26,7 +26,7 @@ type const = Builtin_attributes.zero_alloc_attribute =
   | Assume of assume
 
 type desc =
-  { arguments : Builtin_attributes.Zero_alloc_arguments.t;
+  { arguments : Zero_alloc_utils.Arguments.t;
     strict : bool;
     opt : bool;
     custom_error_msg : string option;
@@ -188,7 +188,7 @@ let sub_const_const_exn za1 za2 =
   (* arity check *)
   let get_arity = function
     | Check { arguments; partial; _ } | Assume { arguments; partial; _ } ->
-      Some (Builtin_attributes.Zero_alloc_arguments.arity arguments, partial)
+      Some (Zero_alloc_utils.Arguments.arity arguments, partial)
     | Default_zero_alloc | Ignore_assert_all -> None
   in
   match get_arity za1, get_arity za2 with
@@ -204,18 +204,18 @@ let sub_var_const_exn v c =
      always constrain the var lower to make the sub succeed. *)
   begin match c with
   | Check { arguments; partial; _ } ->
-    let arity = Builtin_attributes.Zero_alloc_arguments.arity arguments in
+    let arity = Zero_alloc_utils.Arguments.arity arguments in
     check_arity_exn ~actual:(v.arity, partial) ~required:(arity, partial)
   | Default_zero_alloc | Ignore_assert_all | Assume _ -> ()
   end;
   match v, c with
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
   | { arity = arity1; _ }, Check { arguments; _ }
-    when arity1 <> Builtin_attributes.Zero_alloc_arguments.arity arguments ->
+    when arity1 <> Zero_alloc_utils.Arguments.arity arguments ->
     raise
       (Error
          (Arity_mismatch
-            (arity1, Builtin_attributes.Zero_alloc_arguments.arity arguments)))
+            (arity1, Zero_alloc_utils.Arguments.arity arguments)))
   | ( { desc = None; _ },
       Check { arguments; strict; opt; custom_error_msg; partial } ) ->
     log (None, v);
@@ -237,7 +237,7 @@ let sub_var_const_exn v c =
           custom_error_msg = msg2;
           partial = partial2
         } ) ->
-    let arguments : Builtin_attributes.Zero_alloc_arguments.t =
+    let arguments : Zero_alloc_utils.Arguments.t =
       if arguments1 = arguments2 then arguments1
       else Unconditional { arity = v.arity }
     in

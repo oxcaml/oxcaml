@@ -4869,7 +4869,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
              | Assert_all_opt -> create_const ~opt:true)
         | Ignore_assert_all -> Zero_alloc.ignore_assert_all
         | Check za ->
-          let arity = Builtin_attributes.Zero_alloc_arguments.arity za.arguments in
+          let arity = Zero_alloc_utils.Arguments.arity za.arguments in
           if default_arity = 0 && arity <= 0 then
             Error.log_and_raise valdecl.pval_loc  Zero_alloc_attr_non_function;
           if arity <= 0 then

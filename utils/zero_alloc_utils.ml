@@ -27,6 +27,25 @@
    Perhaps we should translate "strict" and "never_returns_normally" directly
    into (nor,exn,div) *)
 
+module Argument = struct
+  type t =
+    | Not_a_callback
+    | Callback of
+        { arity : int;
+          partial : bool
+        }
+end
+
+module Arguments = struct
+  type t =
+    | Unconditional of { arity : int }
+    | Conditional of { arguments : Argument.t list }
+
+  let arity = function
+    | Unconditional { arity } -> arity
+    | Conditional { arguments } -> List.length arguments
+end
+
 module Component = struct
   type 'top t =
     | Top of 'top

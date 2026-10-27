@@ -1,7 +1,7 @@
 type check = Builtin_attributes.zero_alloc_check =
   { strict : bool;
     opt : bool;
-    arguments : Builtin_attributes.Zero_alloc_arguments.t;
+    arguments : Zero_alloc_utils.Arguments.t;
     partial : bool;
     loc : Location.t;
     custom_error_msg : string option
@@ -11,7 +11,7 @@ type assume = Builtin_attributes.zero_alloc_assume =
   { strict : bool;
     never_returns_normally : bool;
     never_raises : bool;
-    arguments : Builtin_attributes.Zero_alloc_arguments.t;
+    arguments : Zero_alloc_utils.Arguments.t;
     partial : bool;
     loc : Location.t
   }

@@ -422,7 +422,7 @@ let zero_alloc_of_application
     begin match Zero_alloc.get val_zero_alloc with
     | Check { strict; opt; arguments; partial; loc; custom_error_msg = _ }
       when Zero_alloc.applicable_arity
-             ~arity:(Builtin_attributes.Zero_alloc_arguments.arity arguments)
+             ~arity:(Zero_alloc_utils.Arguments.arity arguments)
              ~partial ~num_args
            && (use_opt || not opt) ->
       let assume : Zero_alloc.assume =

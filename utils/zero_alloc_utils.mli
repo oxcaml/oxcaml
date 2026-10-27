@@ -1,3 +1,20 @@
+module Argument : sig
+  type t =
+    | Not_a_callback
+    | Callback of
+        { arity : int;
+          partial : bool
+        }
+end
+
+module Arguments : sig
+  type t =
+    | Unconditional of { arity : int }
+    | Conditional of { arguments : Argument.t list }
+
+  val arity : t -> int
+end
+
 (** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"
     respectively. *)
 module Component : sig

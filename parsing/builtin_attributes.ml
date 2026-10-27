@@ -811,24 +811,10 @@ let get_implicit_jkind_attr x =
     end
   | _ -> []
 
-type zero_alloc_argument =
-  | Not_a_callback
-  | Callback of { arity: int; partial: bool }
-
-module Zero_alloc_arguments = struct
-  type t =
-    | Unconditional of { arity : int }
-    | Conditional of { arguments : zero_alloc_argument list }
-
-  let arity = function
-    | Unconditional { arity } -> arity
-    | Conditional { arguments } -> List.length arguments
-end
-
 type zero_alloc_check =
   { strict: bool;
     opt: bool;
-    arguments: Zero_alloc_arguments.t;
+    arguments: Zero_alloc_utils.Arguments.t;
     partial: bool;
     loc: Location.t;
     custom_error_msg : string option;
@@ -838,7 +824,7 @@ type zero_alloc_assume =
   { strict: bool;
     never_returns_normally: bool;
     never_raises: bool;
-    arguments: Zero_alloc_arguments.t;
+    arguments: Zero_alloc_utils.Arguments.t;
     partial: bool;
     loc: Location.t;
   }
@@ -1004,14 +990,16 @@ let get_argument_from_exp exp =
   match exp.pexp_desc with
   | Pexp_apply (slash, [Asttypes.Nolabel, n; Asttypes.Nolabel, a])
     when is_id "/" slash && is_id "n" n && is_id "a" a ->
-    Result.Ok Not_a_callback
+    Result.Ok Zero_alloc_utils.Argument.Not_a_callback
   | Pexp_apply (keyword, [Asttypes.Nolabel, arity])
     when is_id "arity" keyword ->
-    Result.map (fun arity -> Callback { arity; partial = false })
+    Result.map
+      (fun arity -> Zero_alloc_utils.Argument.Callback { arity; partial = false })
       (get_int_from_exp arity)
   | Pexp_apply (partial, [Asttypes.Nolabel, keyword; Asttypes.Nolabel, arity])
     when is_id "partial" partial && is_id "arity" keyword ->
-    Result.map (fun arity -> Callback { arity; partial = true })
+    Result.map
+      (fun arity -> Zero_alloc_utils.Argument.Callback { arity; partial = true })
       (get_int_from_exp arity)
   | _ -> Result.Error ()
 
@@ -1051,8 +1039,8 @@ let get_zero_alloc_payload_from_exp exp =
 let default_conditional_arguments ~arity ~parameter_arities =
   List.init arity (fun index ->
     match List.nth_opt parameter_arities index with
-    | None | Some 0 -> Not_a_callback
-    | Some arity -> Callback { arity; partial = false })
+    | None | Some 0 -> Zero_alloc_utils.Argument.Not_a_callback
+    | Some arity -> Zero_alloc_utils.Argument.Callback { arity; partial = false })
 
 (* If "assume_unless_opt" is not found returns None, otherwise
    returns the rest of the payload. Note it may change the order of the payload,
@@ -1067,7 +1055,7 @@ let filter_assume_unless_opt payload =
   find [] payload
 
 type zero_alloc_payload_options =
-  { arguments : Zero_alloc_arguments.t;
+  { arguments : Zero_alloc_utils.Arguments.t;
     strict : bool;
     opt : bool;
     partial : bool;

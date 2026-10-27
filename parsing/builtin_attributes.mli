@@ -290,18 +290,6 @@ val parse_optional_id_payload :
   Parsetree.payload -> ('a,unit) Result.t
 
 (* Support for zero_alloc *)
-type zero_alloc_argument =
-  | Not_a_callback
-  | Callback of { arity: int; partial: bool }
-
-module Zero_alloc_arguments : sig
-  type t =
-    | Unconditional of { arity : int }
-    | Conditional of { arguments : zero_alloc_argument list }
-
-  val arity : t -> int
-end
-
 type zero_alloc_check =
   { strict: bool;
     (* [strict=true] property holds on all paths.
@@ -310,7 +298,7 @@ type zero_alloc_check =
        exceptional returns or diverging loops are ignored).
        This definition may not be applicable to new properties. *)
     opt: bool;
-    arguments: Zero_alloc_arguments.t;
+    arguments: Zero_alloc_utils.Arguments.t;
     partial: bool;
     loc: Location.t;
     custom_error_msg : string option;
@@ -324,7 +312,7 @@ type zero_alloc_assume =
        via an exception. The function (directly or transitively)
        may raise exceptions that do not escape, i.e.,
        handled before the function returns. *)
-    arguments: Zero_alloc_arguments.t;
+    arguments: Zero_alloc_utils.Arguments.t;
     partial: bool;
     loc: Location.t;
   }
@@ -345,7 +333,7 @@ val get_zero_alloc_attribute :
   parameter_arities:int list -> Parsetree.attributes -> zero_alloc_attribute
 
 val default_conditional_arguments :
-  arity:int -> parameter_arities:int list -> zero_alloc_argument list
+  arity:int -> parameter_arities:int list -> Zero_alloc_utils.Argument.t list
 
 (* This returns the [zero_alloc_assume] if the input is an assume.  Otherwise,
    it returns None. If the input attribute is [Check], this issues a warning. *)

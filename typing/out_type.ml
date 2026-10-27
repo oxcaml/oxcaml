@@ -3607,7 +3607,7 @@ let tree_of_value_description id decl =
     in
     count 0 decl.val_type
   in
-  let print_conditional : Builtin_attributes.Zero_alloc_arguments.t -> _ =
+  let print_conditional : Zero_alloc_utils.Arguments.t -> _ =
     function
     | Unconditional _ -> ""
     | Conditional { arguments } ->
@@ -3617,7 +3617,7 @@ let tree_of_value_description id decl =
           ~parameter_arities:(Ctype.parameter_arities decl.val_type)
       in
       if arguments = default_arguments then " conditional" else
-        let print_argument : Builtin_attributes.zero_alloc_argument -> _ =
+        let print_argument : Zero_alloc_utils.Argument.t -> _ =
           function
           | Not_a_callback -> "n/a"
           | Callback { arity; partial = false } ->
@@ -3633,7 +3633,7 @@ let tree_of_value_description id decl =
     | Default_zero_alloc | Ignore_assert_all -> []
     | Check { strict; opt; arguments; partial; custom_error_msg;
               loc = _; } ->
-      let arity = Builtin_attributes.Zero_alloc_arguments.arity arguments in
+      let arity = Zero_alloc_utils.Arguments.arity arguments in
       [{ oattr_name =
            String.concat ""
              ["zero_alloc";
@@ -3648,7 +3648,7 @@ let tree_of_value_description id decl =
               | Some msg -> Printf.sprintf " custom_error_message %S" msg
              ] }]
     | Assume { strict; never_returns_normally; arguments; partial; _ } ->
-      let arity = Builtin_attributes.Zero_alloc_arguments.arity arguments in
+      let arity = Zero_alloc_utils.Arguments.arity arguments in
       [{ oattr_name =
            String.concat ""
              ["zero_alloc assume";
