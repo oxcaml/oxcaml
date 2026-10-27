@@ -12,7 +12,18 @@ module Error : sig
   val print : Format.formatter -> t -> unit
 end
 
+(** [test description ~rematerializations cfg] validates the allocated [cfg]
+    against the pre-allocation [description]; [rematerializations] are the
+    instructions the allocator reports having inserted as rematerializations
+    (cf. [Regalloc_rematerializations]). *)
 val test :
-  Description.t -> Cfg_with_layout.t -> (Cfg_with_layout.t, Error.t) Result.t
+  Description.t ->
+  rematerializations:Regalloc_rematerializations.t ->
+  Cfg_with_layout.t ->
+  (Cfg_with_layout.t, Error.t) Result.t
 
-val run : Description.t option -> Cfg_with_infos.t -> Cfg_with_infos.t
+val run :
+  Description.t option ->
+  rematerializations:Regalloc_rematerializations.t ->
+  Cfg_with_infos.t ->
+  Cfg_with_infos.t

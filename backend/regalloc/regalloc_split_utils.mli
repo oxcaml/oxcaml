@@ -33,3 +33,13 @@ type destruction_kind =
 val equal_destruction_kind : destruction_kind -> destruction_kind -> bool
 
 val destruction_point_at_end : Cfg.basic_block -> destruction_kind option
+
+(** [is_rematerializable_shape desc] is [true] iff a basic instruction with that
+    [desc] is a legitimate rematerialization source: it must be pure (no side
+    effects, no observable memory write or fence), cheap enough to be worth
+    duplicating, and must not destroy hardware registers in ways that change the
+    surrounding allocation. The set of accepted shapes is shared between the
+    analysis (cf. {!Uses.compute}) that classifies rematerialization sources and
+    the validator (cf. [Regalloc_validate]) that recognizes the rematerialized
+    instructions in the post-allocation CFG. *)
+val is_rematerializable_shape : Cfg.basic -> bool

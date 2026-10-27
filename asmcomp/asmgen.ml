@@ -339,6 +339,15 @@ let cfg_with_layout_profile ?accumulate pass f x =
 let cfg_with_infos_profile ?accumulate pass f x =
   cfg_profile Cfg_with_infos.cfg ?accumulate pass f x
 
+(* Like [cfg_with_infos_profile], for the register allocators, which also return
+   the rematerializations they performed (cf. [Regalloc_rematerializations]). *)
+let register_allocator_profile ?accumulate pass f x =
+  cfg_profile
+    (fun ((cfg_with_infos, _) :
+           Cfg_with_infos.t * Regalloc_rematerializations.t) ->
+      Cfg_with_infos.cfg cfg_with_infos)
+    ?accumulate pass f x
+
 let ( ++ ) x f = f x
 
 let reorder_blocks_random ppf_dump cl =
@@ -363,13 +372,13 @@ let block_layout ppf_dump cl =
     pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_block_layout" cl
 
 let register_allocator_gi cfg_with_infos =
-  cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
+  register_allocator_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
     cfg_with_infos
 
 let register_allocator_irc cfg_with_infos =
   (* CR-soon xclerc for xclerc: we are mis-attributing the time to IRC even when
      we switch to linscan *)
-  cfg_with_infos_profile ~accumulate:true "cfg_irc"
+  register_allocator_profile ~accumulate:true "cfg_irc"
     (fun cfg_with_infos ->
       match Regalloc_irc.run cfg_with_infos with
       | Ok result -> result
@@ -377,11 +386,12 @@ let register_allocator_irc cfg_with_infos =
     cfg_with_infos
 
 let register_allocator_ls cfg_with_infos =
-  cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run
+  register_allocator_profile ~accumulate:true "cfg_ls" Regalloc_ls.run
     cfg_with_infos
 
 type register_allocator =
-  { allocator : Cfg_with_infos.t -> Cfg_with_infos.t;
+  { allocator :
+      Cfg_with_infos.t -> Cfg_with_infos.t * Regalloc_rematerializations.t;
     copy_propagation : bool
   }
 
@@ -473,9 +483,10 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
         Regalloc_validate.Description.create
           (Cfg_with_infos.cfg_with_layout cfg_with_infos)
       in
-      cfg_with_infos ++ allocator
+      let cfg_with_infos, rematerializations = allocator cfg_with_infos in
+      cfg_with_infos
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
-           (Regalloc_validate.run cfg_description)))
+           (Regalloc_validate.run cfg_description ~rematerializations)))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate

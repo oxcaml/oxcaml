@@ -47,7 +47,8 @@ type prelude_result =
   { cfg_with_infos : Cfg_with_infos.t;
     cfg_infos : cfg_infos;
     stack_slots : Regalloc_stack_slots.t;
-    affinity : Regalloc_affinity.t
+    affinity : Regalloc_affinity.t;
+    rematerializations : Regalloc_rematerializations.t
   }
 
 (** Runs the common preparation once: reinitializes registers, splits live
