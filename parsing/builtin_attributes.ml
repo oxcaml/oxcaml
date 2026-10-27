@@ -1037,7 +1037,7 @@ let get_zero_alloc_payload_from_exp exp =
       (get_ids_and_constants_from_exps payload))
 
 let default_conditional_arguments ~arity ~parameter_arities =
-  List.init arity (fun index ->
+  List.init (Int.max arity 0) (fun index ->
     match List.nth_opt parameter_arities index with
     | None | Some 0 -> Zero_alloc_utils.Argument.Not_a_callback
     | Some arity -> Zero_alloc_utils.Argument.Callback { arity; partial = false })

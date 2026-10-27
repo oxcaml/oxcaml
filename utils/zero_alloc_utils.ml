@@ -170,22 +170,63 @@ module Components = struct
 end
 
 module Relevant_components_by_argument_index = struct
-  type t = bool Components.t Numbers.Int.Map.t
+  type callback =
+    { arity : int;
+      relevant_components : bool Components.t
+    }
 
-  let compare = Numbers.Int.Map.compare (Components.compare Bool.compare)
+  type t = callback Numbers.Int.Map.t
 
-  let join =
-    Numbers.Int.Map.union (fun _ c1 c2 ->
-        Some (Components.map2 ~f:(fun _ r1 r2 -> r1 || r2) c1 c2))
+  let compare_callback c1 c2 =
+    let c = Int.compare c1.arity c2.arity in
+    if c <> 0
+    then c
+    else
+      Components.compare Bool.compare c1.relevant_components
+        c2.relevant_components
+
+  let compare = Numbers.Int.Map.compare compare_callback
+
+  let arities_agree t1 t2 =
+    Numbers.Int.Map.for_all
+      (fun argument_index c1 ->
+        match Numbers.Int.Map.find_opt argument_index t2 with
+        | None -> true
+        | Some c2 -> Int.equal c1.arity c2.arity)
+      t1
+
+  let join t1 t2 =
+    if arities_agree t1 t2
+    then
+      Some
+        (Numbers.Int.Map.union
+           (fun _argument_index c1 c2 ->
+             Some
+               { c1 with
+                 relevant_components =
+                   Components.map2
+                     ~f:(fun _tag r1 r2 -> r1 || r2)
+                     c1.relevant_components c2.relevant_components
+               })
+           t1 t2)
+    else None
 
   let meet t1 t2 =
     Numbers.Int.Map.merge
       (fun _argument_index c1 c2 ->
         match c1, c2 with
-        | Some c1, Some c2 ->
-          let c = Components.map2 ~f:(fun _tag r1 r2 -> r1 && r2) c1 c2 in
-          if c.nor || c.exn || c.div then Some c else None
-        | None, _ | _, None -> None)
+        | Some c1, Some c2 when Int.equal c1.arity c2.arity ->
+          let relevant_components =
+            Components.map2
+              ~f:(fun _tag r1 r2 -> r1 && r2)
+              c1.relevant_components c2.relevant_components
+          in
+          if
+            relevant_components.nor || relevant_components.exn
+            || relevant_components.div
+          then Some { c1 with relevant_components }
+          else None
+        | Some _, Some _ | None, _ | _, None -> None)
       t1 t2
 
   let lessequal t1 t2 =
@@ -193,18 +234,23 @@ module Relevant_components_by_argument_index = struct
       (fun argument_index c1 ->
         match Numbers.Int.Map.find_opt argument_index t2 with
         | None -> false
-        | Some c2 -> Components.lessequal (fun r1 r2 -> (not r1) || r2) c1 c2)
+        | Some c2 ->
+          Int.equal c1.arity c2.arity
+          && Components.lessequal
+               (fun r1 r2 -> (not r1) || r2)
+               c1.relevant_components c2.relevant_components)
       t1
 
-  let print_argument ppf (argument_index, (relevant : bool Components.t)) =
+  let print_argument ppf (argument_index, { arity; relevant_components }) =
     let paths =
       List.filter_map
         (fun (is_relevant, path) -> if is_relevant then Some path else None)
-        [ relevant.nor, "normal";
-          relevant.exn, "exceptional";
-          relevant.div, "diverging" ]
+        [ relevant_components.nor, "normal";
+          relevant_components.exn, "exceptional";
+          relevant_components.div, "diverging" ]
     in
-    Format.fprintf ppf "argument #%d on %a paths" (argument_index + 1)
+    Format.fprintf ppf "argument #%d with arity %d on %a paths"
+      (argument_index + 1) arity
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.fprintf ppf "/")
          Format.pp_print_string)
@@ -266,7 +312,10 @@ module Allocation_sources = struct
       Allocation_other_than_calling_arguments
     | ( No_allocation_other_than_calling_arguments a1,
         No_allocation_other_than_calling_arguments a2 ) ->
-      No_allocation_other_than_calling_arguments (join_args_only a1 a2)
+      begin match join_args_only a1 a2 with
+      | Some joined -> No_allocation_other_than_calling_arguments joined
+      | None -> Allocation_other_than_calling_arguments
+      end
 
   let meet ~meet_args_only t1 t2 =
     match t1, t2 with
@@ -313,7 +362,7 @@ module type Allocation_sources = sig
 
   val top : t
 
-  val argument : argument_index:int -> tag:Tag.t -> t
+  val argument : argument_index:int -> arity:int -> tag:Tag.t -> t
 end
 
 module type Component = sig
@@ -419,7 +468,7 @@ module No_allocation_sources : Allocation_sources with type t = unit = struct
 
   let top = ()
 
-  let argument ~argument_index:_ ~tag:_ = ()
+  let argument ~argument_index:_ ~arity:_ ~tag:_ = ()
 end
 
 module Assume_info = struct

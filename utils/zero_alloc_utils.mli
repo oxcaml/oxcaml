@@ -94,11 +94,16 @@ module Components : sig
 end
 
 module Relevant_components_by_argument_index : sig
-  type t = bool Components.t Numbers.Int.Map.t
+  type callback =
+    { arity : int;
+      relevant_components : bool Components.t
+    }
+
+  type t = callback Numbers.Int.Map.t
 
   val compare : t -> t -> int
 
-  val join : t -> t -> t
+  val join : t -> t -> t option
 
   val meet : t -> t -> t
 
@@ -129,7 +134,7 @@ module Allocation_sources : sig
     bool
 
   val join :
-    join_args_only:('args_only -> 'args_only -> 'args_only) ->
+    join_args_only:('args_only -> 'args_only -> 'args_only option) ->
     'args_only t ->
     'args_only t ->
     'args_only t
@@ -176,7 +181,7 @@ module type Allocation_sources = sig
 
   val top : t
 
-  val argument : argument_index:int -> tag:Tag.t -> t
+  val argument : argument_index:int -> arity:int -> tag:Tag.t -> t
 end
 
 module type Component = sig

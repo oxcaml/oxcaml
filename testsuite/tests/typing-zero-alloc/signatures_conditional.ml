@@ -2,6 +2,11 @@
    expect.opt;
 *)
 
+let[@zero_alloc conditional(arity 2, n/a, n/a)] apply2 f x y = f x y
+[%%expect{|
+val apply2 : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c [@@zero_alloc conditional]
+|}]
+
 module type Apply2 = sig
   val call : ('a -> 'b -> 'c) -> 'a -> 'b -> 'c
   [@@zero_alloc conditional]

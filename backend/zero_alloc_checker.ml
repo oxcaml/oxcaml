@@ -1368,7 +1368,8 @@ end = struct
        do this, we fold over the callee ([f])'s relevant argument indices (see
        the last line of this function). *)
     let fold (callee_argument_index : int)
-        (relevant_components : bool Components.t) (acc : t) : t =
+        (callback : Relevant_components_by_argument_index.callback) (acc : t) :
+        t =
       begin match List.nth_opt arguments_passed callee_argument_index with
       | None ->
         (* This is a partial application, and there is no nth argument. *)
@@ -1384,8 +1385,7 @@ end = struct
         top
           ~allocation_sources:
             (No_allocation_other_than_calling_arguments
-               (Numbers.Int.Map.singleton caller_argument_index
-                  relevant_components))
+               (Numbers.Int.Map.singleton caller_argument_index callback))
           ~witnesses:caller_witnesses
       | Some (Some (Symbol _)) ->
         (* CR wsturgeon for wsturgeon: look up this symbol's summary (work for
@@ -1514,12 +1514,15 @@ module Allocation_sources :
   let top =
     Zero_alloc_utils.Allocation_sources.Allocation_other_than_calling_arguments
 
-  let argument ~argument_index ~tag :
+  let argument ~argument_index ~arity ~tag :
       Zero_alloc_utils.(
         Relevant_components_by_argument_index.t Allocation_sources.t) =
     Zero_alloc_utils.(
       Allocation_sources.No_allocation_other_than_calling_arguments
-        (Numbers.Int.Map.singleton argument_index (Components.one_hot tag)))
+        (Numbers.Int.Map.singleton argument_index
+           { Relevant_components_by_argument_index.arity;
+             relevant_components = Components.one_hot tag
+           }))
 end
 
 module T = Zero_alloc_utils.Make_value (Allocation_sources) (Witnesses) (V)
@@ -2802,7 +2805,8 @@ end = struct
                   Zero_alloc_utils.Components.create (fun tag ->
                       V.top
                         ~allocation_sources:
-                          (Allocation_sources.argument ~argument_index ~tag)
+                          (Allocation_sources.argument ~argument_index ~arity:1
+                             ~tag)
                         ~witnesses)
               in
               let effect_ =

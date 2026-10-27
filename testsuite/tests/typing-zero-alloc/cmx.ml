@@ -64,15 +64,16 @@ read_cmx "stdlib__List.cmx" "camlStdlib__List__iter_"
 - : summary =
 {Components.nor =
   Component.Top
-   No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   No_allocation_other_than_calling_arguments
+    {argument #1 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/exceptional paths};
+    {argument #1 with arity 1 on normal/exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/diverging paths}}
+    {argument #1 with arity 1 on normal/diverging paths}}
 |}];;
 
 read_cmx_lib "catch_and_discard_exceptions"
@@ -81,12 +82,12 @@ read_cmx_lib "catch_and_discard_exceptions"
 {Components.nor =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/exceptional paths};
+    {argument #1 with arity 1 on normal/exceptional paths};
  exn = Component.Bot;
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on diverging paths}}
+    {argument #1 with arity 1 on diverging paths}}
 |}];;
 
 read_cmx_lib "either"
@@ -95,15 +96,18 @@ read_cmx_lib "either"
 {Components.nor =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal paths; argument #2 on normal paths};
+    {argument #1 with arity 1 on normal paths;
+     argument #2 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on exceptional paths; argument #2 on exceptional paths};
+    {argument #1 with arity 1 on exceptional paths;
+     argument #2 with arity 1 on exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on diverging paths; argument #2 on diverging paths}}
+    {argument #1 with arity 1 on diverging paths;
+     argument #2 with arity 1 on diverging paths}}
 |}];;
 
 (* Tail-recursive, *not* optimized into a loop: *)
@@ -112,15 +116,16 @@ read_cmx_lib "iter_rec"
 - : summary =
 {Components.nor =
   Component.Top
-   No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   No_allocation_other_than_calling_arguments
+    {argument #1 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/exceptional paths};
+    {argument #1 with arity 1 on normal/exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/diverging paths}}
+    {argument #1 with arity 1 on normal/diverging paths}}
 |}];;
 
 (* Tail-recursive, optimized into a loop: *)
@@ -129,15 +134,16 @@ read_cmx_lib "iter_loop"
 - : summary =
 {Components.nor =
   Component.Top
-   No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   No_allocation_other_than_calling_arguments
+    {argument #1 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/exceptional paths};
+    {argument #1 with arity 1 on normal/exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/diverging paths}}
+    {argument #1 with arity 1 on normal/diverging paths}}
 |}];;
 
 (* Call sites: *)
@@ -146,15 +152,16 @@ read_cmx_lib "apply"
 - : summary =
 {Components.nor =
   Component.Top
-   No_allocation_other_than_calling_arguments {argument #1 on normal paths};
+   No_allocation_other_than_calling_arguments
+    {argument #1 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on exceptional paths};
+    {argument #1 with arity 1 on exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on diverging paths}}
+    {argument #1 with arity 1 on diverging paths}}
 |}];;
 
 (* Call sites, flipping argument order: *)
@@ -163,15 +170,16 @@ read_cmx_lib "ylppa"
 - : summary =
 {Components.nor =
   Component.Top
-   No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   No_allocation_other_than_calling_arguments
+    {argument #2 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #2 on exceptional paths};
+    {argument #2 with arity 1 on exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #2 on diverging paths}}
+    {argument #2 with arity 1 on diverging paths}}
 |}];;
 
 (* Across compilation units: *)
@@ -180,15 +188,16 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__iter_flipped_"
 - : summary =
 {Components.nor =
   Component.Top
-   No_allocation_other_than_calling_arguments {argument #2 on normal paths};
+   No_allocation_other_than_calling_arguments
+    {argument #2 with arity 1 on normal paths};
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #2 on normal/exceptional paths};
+    {argument #2 with arity 1 on normal/exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #2 on normal/diverging paths}}
+    {argument #2 with arity 1 on normal/diverging paths}}
 |}];;
 
 (* Mutual recursion: *)
@@ -199,11 +208,11 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__ping_"
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/exceptional paths};
+    {argument #1 with arity 1 on normal/exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/diverging paths}}
+    {argument #1 with arity 1 on normal/diverging paths}}
 |}];;
 
 (* Mutual recursion: *)
@@ -214,11 +223,11 @@ read_cmx "cmx_lib.cmx" "camlCmx_lib__pong_"
  exn =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/exceptional paths};
+    {argument #1 with arity 1 on normal/exceptional paths};
  div =
   Component.Top
    No_allocation_other_than_calling_arguments
-    {argument #1 on normal/diverging paths}}
+    {argument #1 with arity 1 on normal/diverging paths}}
 |}];;
 
 (* CR wsturgeon for wsturgeon: fix [caml_apply] interaction (next PR) *)

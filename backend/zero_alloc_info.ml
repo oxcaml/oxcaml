@@ -28,6 +28,22 @@ module Encoded = struct
       Components.map (unpack ~bits_per_component:1 packed) ~f:(fun _tag bit ->
           bit <> 0)
 
+    let relevant_components_bits = 3
+
+    let pack_callback
+        ({ arity; relevant_components } :
+          Relevant_components_by_argument_index.callback) =
+      pack_relevant_components relevant_components
+      lor (arity lsl relevant_components_bits)
+
+    let unpack_callback packed : Relevant_components_by_argument_index.callback
+        =
+      { arity = packed lsr relevant_components_bits;
+        relevant_components =
+          unpack_relevant_components
+            (packed land ((1 lsl relevant_components_bits) - 1))
+      }
+
     let encode_arguments
         (relevant_components_by_argument_index :
           Relevant_components_by_argument_index.t) =
@@ -43,13 +59,13 @@ module Encoded = struct
                 relevant_components_by_argument_index
             with
             | None -> 0
-            | Some relevant -> pack_relevant_components relevant)
+            | Some callback -> pack_callback callback)
 
     let decode_arguments arguments : Relevant_components_by_argument_index.t =
       arguments
       |> List.mapi (fun i bits -> i, bits)
       |> List.filter (fun (_, bits) -> bits <> 0)
-      |> List.map (fun (i, bits) -> i, unpack_relevant_components bits)
+      |> List.map (fun (i, bits) -> i, unpack_callback bits)
       |> Numbers.Int.Map.of_list
 
     let encode = Component.map ~f:(Allocation_sources.map ~f:encode_arguments)
@@ -172,7 +188,12 @@ module Raw = struct
     | Safe -> "safe"
     | Top Allocation_other_than_calling_arguments -> "top"
     | Top (No_allocation_other_than_calling_arguments arguments) ->
-      "[" ^ String.concat "; " (List.map (bits ~width:3) arguments) ^ "]"
+      let describe_argument packed =
+        Printf.sprintf "%s@%d"
+          (bits ~width:Encoded.Component.relevant_components_bits packed)
+          (packed lsr Encoded.Component.relevant_components_bits)
+      in
+      "[" ^ String.concat "; " (List.map describe_argument arguments) ^ "]"
 
   let print t =
     let print (name, (components : Encoded.Components.t)) =
