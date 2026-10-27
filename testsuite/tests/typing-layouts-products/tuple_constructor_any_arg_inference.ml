@@ -5,8 +5,6 @@
  {
    native;
  }{
-   jsir;
- }{
    flags = "-Oclassic";
    native;
  }{

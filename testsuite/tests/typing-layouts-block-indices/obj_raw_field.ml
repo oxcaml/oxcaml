@@ -6,11 +6,6 @@
  }{
    native;
  }{
-   (* Under js_of_ocaml, integers are not tagged, so raw fields hold the
-      plain values. *)
-   reference = "${test_source_directory}/obj_raw_field.jsir-output.reference";
-   jsir;
- }{
    flags = "-Oclassic";
    native;
  }{

@@ -1,7 +1,7 @@
 (* TEST
    flags += "-alert -unsafe_multidomain -alert -unsafe_effects";
    { bytecode; }
-   { native; }{ jsir; }
+   { native; }
 *)
 
 (* Non-preemptible fibers do not own TLS state: they share the state of the

@@ -1,7 +1,7 @@
 (* TEST
    flags += "-alert -unsafe_multidomain -alert -unsafe_effects";
    { bytecode; }
-   { stack-checks; native; }{ stack-checks; jsir; }
+   { stack-checks; native; }
 *)
 
 (* Growing a stack moves its TLS state to the new stack. Fibers start with

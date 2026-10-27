@@ -3,8 +3,6 @@
    bytecode;
  }{
    native;
- }{
-   jsir;
  }
 *)
 

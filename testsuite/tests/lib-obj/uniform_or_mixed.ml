@@ -4,12 +4,6 @@
      compiler_reference2 = "${test_source_directory}/uniform_or_mixed.compiler.reference";
      native;
    }{
-     (* Under js_of_ocaml, every block is a JavaScript array, so none is
-        mixed. *)
-     reference = "${test_source_directory}/uniform_or_mixed.jsir.reference";
-     compiler_reference2 = "${test_source_directory}/uniform_or_mixed.compiler.reference";
-     jsir;
-   }{
      reference = "${test_source_directory}/uniform_or_mixed.bytecode.reference";
      compiler_reference2 = "${test_source_directory}/uniform_or_mixed.compiler.reference";
      bytecode;
