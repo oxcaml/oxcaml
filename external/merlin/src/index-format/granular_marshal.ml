@@ -578,6 +578,11 @@ let write ?(flags = []) fd ~filename ~(file_kind : File_kind.t) root_schema
   | Standalone -> materialize root_schema root_value
   | No_standalone -> ());
   let relativize =
+    (* Note: the target path to relativize could look like
+    /abs/olute/../semirelative (due to the Filename.concat in resolve_filename
+    which made the relative path absolute, without canonicalize to drop the
+    olute/..), and further relativize would keep on stacking more dir/../
+    intermediate folders. *)
     relativize ~wrt:(Filename.dirname (Misc.canonicalize_filename filename))
   in
   let write_id = File_digest.write_delayed fd in
