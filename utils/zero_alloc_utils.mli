@@ -5,6 +5,8 @@ module Argument : sig
         { arity : int;
           partial : bool
         }
+
+  val equal : t -> t -> bool
 end
 
 module Arguments : sig
@@ -13,6 +15,8 @@ module Arguments : sig
     | Conditional of { arguments : Argument.t list }
 
   val arity : t -> int
+
+  val equal : t -> t -> bool
 end
 
 (** Bot/Safe/Top, meaning "impossible," "won't allocate," and "might allocate,"

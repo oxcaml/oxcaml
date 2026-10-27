@@ -2422,25 +2422,27 @@ and transl_function
   let zero_alloc : Lambda.zero_alloc_attribute =
     match (zero_alloc : Builtin_attributes.zero_alloc_attribute) with
     | Default_zero_alloc ->
+      let arguments =
+        Zero_alloc_utils.Arguments.Unconditional { arity = List.length params }
+      in
       (match !Clflags.zero_alloc_assert with
        | Assert_default -> Default_zero_alloc
        | Assert_all ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:false
          then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
-                      partial = false }
+                      arguments; partial = false }
          else Default_zero_alloc
        | Assert_all_opt ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt:true
          then Check { strict = false; loc = e.exp_loc; custom_error_msg = None;
-                      partial = false }
+                      arguments; partial = false }
          else Default_zero_alloc)
-    | Check { strict; opt; arguments = _; partial; loc; custom_error_msg; } ->
+    | Check { strict; opt; arguments; partial; loc; custom_error_msg; } ->
       if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-      then Check { strict; loc; custom_error_msg; partial }
+      then Check { strict; loc; custom_error_msg; arguments; partial }
       else Default_zero_alloc
-    | Assume { strict; never_returns_normally; never_raises; loc;
-               arguments = _; } ->
-      Assume { strict; never_returns_normally; never_raises; loc }
+    | Assume { strict; never_returns_normally; never_raises; loc; arguments; } ->
+      Assume { strict; never_returns_normally; never_raises; arguments; loc }
     | Ignore_assert_all -> Default_zero_alloc
   in
   let attr =

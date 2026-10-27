@@ -34,6 +34,14 @@ module Argument = struct
         { arity : int;
           partial : bool
         }
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Not_a_callback, Not_a_callback -> true
+    | ( Callback { arity = arity1; partial = partial1 },
+        Callback { arity = arity2; partial = partial2 } ) ->
+      Int.equal arity1 arity2 && Bool.equal partial1 partial2
+    | (Not_a_callback | Callback _), _ -> false
 end
 
 module Arguments = struct
@@ -44,6 +52,15 @@ module Arguments = struct
   let arity = function
     | Unconditional { arity } -> arity
     | Conditional { arguments } -> List.length arguments
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Unconditional { arity = arity1 }, Unconditional { arity = arity2 } ->
+      Int.equal arity1 arity2
+    | ( Conditional { arguments = arguments1 },
+        Conditional { arguments = arguments2 } ) ->
+      List.equal Argument.equal arguments1 arguments2
+    | (Unconditional _ | Conditional _), _ -> false
 end
 
 module Component = struct

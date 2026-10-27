@@ -860,11 +860,13 @@ type zero_alloc_attribute =
                   This definition may not be applicable to new properties. *)
                loc: Location.t;
                custom_error_msg: string option;
+               arguments: Zero_alloc_utils.Arguments.t;
                partial: bool;
              }
   | Assume of { strict: bool;
                 never_returns_normally: bool;
                 never_raises: bool;
+                arguments: Zero_alloc_utils.Arguments.t;
                 loc: Location.t;
               }
 

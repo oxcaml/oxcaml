@@ -16,25 +16,33 @@ type t = Lambda.zero_alloc_attribute =
       { strict : bool;
         loc : Location.t;
         custom_error_msg : string option;
+        arguments : Zero_alloc_utils.Arguments.t;
         partial : bool
       }
   | Assume of
       { strict : bool;
         never_returns_normally : bool;
         never_raises : bool;
+        arguments : Zero_alloc_utils.Arguments.t;
         loc : Location.t
       }
+
+let print_conditional ppf : Zero_alloc_utils.Arguments.t -> unit = function
+  | Unconditional _ -> ()
+  | Conditional _ -> Format.fprintf ppf "_conditional"
 
 let print ppf t =
   match t with
   | Default_zero_alloc -> ()
-  | Assume { strict; never_returns_normally; never_raises; loc = _ } ->
-    Format.fprintf ppf "@[assume_zero_alloc%s%s%s@]"
+  | Assume { strict; never_returns_normally; never_raises; arguments; loc = _ }
+    ->
+    Format.fprintf ppf "@[assume_zero_alloc%a%s%s%s@]" print_conditional
+      arguments
       (if strict then "_strict" else "")
       (if never_returns_normally then "_never_returns_normally" else "")
       (if never_raises then "_never_raises" else "")
-  | Check { strict; loc = _; custom_error_msg = _; partial } ->
-    Format.fprintf ppf "@[assert_zero_alloc%s%s@]"
+  | Check { strict; loc = _; custom_error_msg = _; arguments; partial } ->
+    Format.fprintf ppf "@[assert_zero_alloc%a%s%s@]" print_conditional arguments
       (if strict then "_strict" else "")
       (if partial then "_partial" else "")
 
@@ -43,26 +51,41 @@ let from_lambda : Lambda.zero_alloc_attribute -> t = Fun.id
 let equal x y =
   match x, y with
   | Default_zero_alloc, Default_zero_alloc -> true
-  | ( Check { strict = s1; loc = loc1; custom_error_msg = msg1; partial = p1 },
-      Check { strict = s2; loc = loc2; custom_error_msg = msg2; partial = p2 } )
-    ->
+  | ( Check
+        { strict = s1;
+          loc = loc1;
+          custom_error_msg = msg1;
+          arguments = a1;
+          partial = p1
+        },
+      Check
+        { strict = s2;
+          loc = loc2;
+          custom_error_msg = msg2;
+          arguments = a2;
+          partial = p2
+        } ) ->
     Bool.equal s1 s2
     && Location.compare loc1 loc2 = 0
     && Option.equal String.equal msg1 msg2
+    && Zero_alloc_utils.Arguments.equal a1 a2
     && Bool.equal p1 p2
   | ( Assume
         { strict = s1;
           never_returns_normally = n1;
           never_raises = r1;
+          arguments = a1;
           loc = loc1
         },
       Assume
         { strict = s2;
           never_returns_normally = n2;
           never_raises = r2;
+          arguments = a2;
           loc = loc2
         } ) ->
     Bool.equal s1 s2 && Bool.equal n1 n2 && Bool.equal r1 r2
+    && Zero_alloc_utils.Arguments.equal a1 a2
     && Location.compare loc1 loc2 = 0
   | (Default_zero_alloc | Check _ | Assume _), _ -> false
 

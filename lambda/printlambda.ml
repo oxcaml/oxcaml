@@ -1226,15 +1226,21 @@ let name_of_primitive = function
   | Pbox _ -> "Pbox"
   | Punbox _ -> "Punbox"
 
+let conditional_suffix : Zero_alloc_utils.Arguments.t -> string = function
+  | Unconditional _ -> ""
+  | Conditional _ -> "_conditional"
+
 let zero_alloc_attribute ppf check =
   match check with
   | Default_zero_alloc -> ()
-  | Assume {strict; never_returns_normally; loc = _} ->
-    fprintf ppf "assume_zero_alloc%s%s@ "
+  | Assume {strict; never_returns_normally; arguments; loc = _} ->
+    fprintf ppf "assume_zero_alloc%s%s%s@ "
+      (conditional_suffix arguments)
       (if strict then "_strict" else "")
       (if never_returns_normally then "_never_returns_normally" else "")
-  | Check {strict; loc = _; custom_error_msg; partial } ->
-    fprintf ppf "assert_zero_alloc%s%s%s@ "
+  | Check {strict; loc = _; custom_error_msg; arguments; partial } ->
+    fprintf ppf "assert_zero_alloc%s%s%s%s@ "
+      (conditional_suffix arguments)
       (if strict then "_strict" else "")
       (if partial then "_partial" else "")
       (match custom_error_msg with

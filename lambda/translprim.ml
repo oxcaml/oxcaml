@@ -2721,9 +2721,9 @@ let transl_primitive
      let zero_alloc : Lambda.zero_alloc_attribute =
        match (zero_alloc_check : Zero_alloc.check option) with
        | None -> Default_zero_alloc
-       | Some { strict; opt; arguments = _; partial; loc; custom_error_msg } ->
+       | Some { strict; opt; arguments; partial; loc; custom_error_msg } ->
          if Builtin_attributes.is_zero_alloc_check_enabled ~opt
-         then Check { strict; loc; custom_error_msg; partial }
+         then Check { strict; loc; custom_error_msg; arguments; partial }
          else Default_zero_alloc
      in
      lfunction
