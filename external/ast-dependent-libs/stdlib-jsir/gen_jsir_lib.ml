@@ -151,25 +151,24 @@ type dep =
     installed_dir : string; (* where its .cmi are *)
     dep_units : string list }
 
+let dep ~dir ~cmxa =
+  { dir;
+    installed_dir = in_rules (Filename.dirname cmxa);
+    dep_units = fst (read_cmxa cmxa) }
+
+let parse_dep spec =
+  match String.index_opt spec '=' with
+  | None -> fail "--dep expects DIR=CMXA, got %s" spec
+  | Some i ->
+    let dir = String.sub spec 0 i in
+    let cmxa = String.sub spec (i + 1) (String.length spec - i - 1) in
+    dep ~dir ~cmxa
+
 let read_deps () =
   let stdlib =
-    { dir = "..";
-      installed_dir = "%{ocaml_where}";
-      dep_units = fst (read_cmxa (Filename.concat !ocaml_where "stdlib.cmxa")) }
+    dep ~dir:".." ~cmxa:(Filename.concat !ocaml_where "stdlib.cmxa")
   in
-  stdlib
-  :: List.map
-       (* CR selee: this is a little too deeply nested, could you denest? *)
-       (fun spec ->
-         match String.index_opt spec '=' with
-         | None -> fail "--dep expects DIR=CMXA, got %s" spec
-         | Some i ->
-           let dir = String.sub spec 0 i in
-           let cmxa = String.sub spec (i + 1) (String.length spec - i - 1) in
-           { dir;
-             installed_dir = in_rules (Filename.dirname cmxa);
-             dep_units = fst (read_cmxa cmxa) })
-       (List.rev !deps)
+  stdlib :: List.map parse_dep (List.rev !deps)
 
 (* Dependencies between units, from ocamldep: module [Foo] referenced from a
    unit is [Lib__Foo] when the library is wrapped (a reference to [Lib__Foo]
