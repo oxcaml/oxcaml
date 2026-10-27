@@ -10584,14 +10584,18 @@ and type_label_access
     in
     let make_fake_label (type rep) (record_form : rep record_form)
       : rep gen_label_description =
+      let lbl_mut =
+        Mutable {
+          mode = Mode.With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+      in
       {
         lbl_name = "";
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
-        lbl_mut =
-          Mutable { mode = Mode.With_regionality.Comonadic.legacy;
-                    atomic = Nonatomic };
-        lbl_modalities = Mode.Modality.Const.id;
+        lbl_mut;
+        lbl_modalities = Typemode.mutable_modalities lbl_mut;
         lbl_pos = 0;
         lbl_all = [||];
         lbl_repres =
