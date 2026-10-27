@@ -1,5 +1,4 @@
 (* The generator's internal representation of a subset of OxCaml. *)
-open Ast_helper
 open Asttypes
 open Parsetree_helpers
 
@@ -92,7 +91,7 @@ module NumberTy = struct
       | Float32 | Nativeint | Int64 | Int32 -> true
       | Float | Int | Int16 | Int8 -> false
     in
-    Typ.constr (lid (to_string ~no_hash t)) []
+    Ast_helper.Typ.constr (lid (to_string ~no_hash t)) []
 
   let converter_name ~from ~to_ =
     Format.sprintf "%s_of_%s"
@@ -115,8 +114,8 @@ module Number = struct
     | Int16 of int
     | Int8 of int
 
-  (* CR-someday hwasilewski: This feels like a hacky workaround, maybe change
-     the generation to be more direct for each numeric type. *)
+  (* CR-someday xclerc: This feels like a hacky workaround, maybe change the
+     generation to be more direct for each numeric type. *)
 
   (* This function truncates an int64 to an int of a given [width], meaning that
      its last [width] bits are kept, the rest is zeroed and the sign is
@@ -140,24 +139,27 @@ module Number = struct
     | Float bits ->
       apply
         (qualified_ident "Int64" "float_of_bits")
-        [Exp.constant (Const.int64 bits)]
+        [Ast_helper.Exp.constant (Ast_helper.Const.int64 bits)]
     | Float32 bits ->
       apply
         (qualified_ident "Float32" "of_bits")
-        [Exp.constant (Const.int32 bits)]
-    | Int n -> Exp.constant (Const.int n)
-    | Nativeint n -> Exp.constant (Const.nativeint n)
-    | Int64 n -> Exp.constant (Const.int64 n)
-    | Int32 n -> Exp.constant (Const.int32 n)
-    | Int16 n -> Exp.constant (Const.int ~suffix:'S' n)
-    | Int8 n -> Exp.constant (Const.int ~suffix:'s' n)
+        [Ast_helper.Exp.constant (Ast_helper.Const.int32 bits)]
+    | Int n -> Ast_helper.Exp.constant (Ast_helper.Const.int n)
+    | Nativeint n -> Ast_helper.Exp.constant (Ast_helper.Const.nativeint n)
+    | Int64 n -> Ast_helper.Exp.constant (Ast_helper.Const.int64 n)
+    | Int32 n -> Ast_helper.Exp.constant (Ast_helper.Const.int32 n)
+    | Int16 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'S' n)
+    | Int8 n -> Ast_helper.Exp.constant (Ast_helper.Const.int ~suffix:'s' n)
 end
 
 module Ty = struct
   type t =
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
+    | Unboxed_tuple of t list
     | Record of record
+    | Variant of variant
+    | Or_null of t
     | Bool
 
   and record =
@@ -172,14 +174,36 @@ module Ty = struct
       is_mutable : bool
     }
 
-  let equal left right =
+  and variant =
+    { variant_id : int;
+      constructors : constructor list
+    }
+
+  and constructor =
+    { constructor_index : int;
+      args : t list
+    }
+
+  let rec equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
     | Array (l, ls), Array (r, rs) ->
       NumberTy.equal l r && List.equal Int.equal ls rs
+    | Unboxed_tuple l, Unboxed_tuple r -> List.equal equal l r
     | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
+    | Variant l, Variant r -> Int.equal l.variant_id r.variant_id
+    | Or_null l, Or_null r -> equal l r
     | Bool, Bool -> true
-    | (Number _ | Array _ | Record _ | Bool), _ -> false
+    | ( ( Number _ | Array _ | Unboxed_tuple _ | Record _ | Variant _
+        | Or_null _ | Bool ),
+        _ ) ->
+      false
+
+  let variant_name variant = Format.sprintf "variant_%d" variant.variant_id
+
+  let constructor_name variant constructor =
+    Format.sprintf "Variant_%d_C%d" variant.variant_id
+      constructor.constructor_index
 
   let record_name { id; unboxed; _ } =
     Format.sprintf "record_%d_%s" id (if unboxed then "u" else "b")
@@ -187,14 +211,64 @@ module Ty = struct
   let field_name record { index; _ } =
     Format.sprintf "%s_field_%d" (record_name record) index
 
-  let to_code = function
+  let rec to_code = function
     | Number nty -> NumberTy.to_code nty
     | Array (nty, dimensions) ->
       List.fold_left
-        (fun ty _ -> Typ.constr (lid "array") [ty])
+        (fun ty _ -> Ast_helper.Typ.constr (lid "array") [ty])
         (NumberTy.to_code nty) dimensions
-    | Record record -> Typ.constr (lid (record_name record)) []
-    | Bool -> Typ.constr (lid "bool") []
+    | Unboxed_tuple components ->
+      Ast_helper.Typ.unboxed_tuple
+        (List.map (fun ty -> None, to_code ty) components)
+    | Record record -> Ast_helper.Typ.constr (lid (record_name record)) []
+    | Variant variant -> Ast_helper.Typ.constr (lid (variant_name variant)) []
+    | Or_null ty -> Ast_helper.Typ.constr (lid "or_null") [to_code ty]
+    | Bool -> Ast_helper.Typ.constr (lid "bool") []
+end
+
+module Sum = struct
+  type t =
+    | Variant of Ty.variant
+    | Or_null of Ty.t
+
+  let ty = function
+    | Variant variant -> Ty.Variant variant
+    | Or_null payload -> Ty.Or_null payload
+
+  let constructors = function
+    | Variant variant -> variant.constructors
+    | Or_null payload ->
+      [ { Ty.constructor_index = 0; args = [] };
+        { Ty.constructor_index = 1; args = [payload] } ]
+
+  let constructor_name sum (constructor : Ty.constructor) =
+    match sum with
+    | Variant variant -> Ty.constructor_name variant constructor
+    | Or_null _ -> (
+      match constructor.constructor_index with
+      | 0 -> "Null"
+      | 1 -> "This"
+      | _ -> Misc.fatal_errorf "Or_null: invalid constructor index")
+
+  let constructor_pattern sum (constructor : Ty.constructor) names =
+    if List.length names <> List.length constructor.args
+    then Misc.fatal_errorf "Constructor pattern: incorrect number of arguments";
+    let patterns =
+      List.map
+        (fun name -> Ast_helper.Pat.var (loc (Name.to_string name)))
+        names
+    in
+    let arg =
+      match patterns with
+      | [] -> None
+      | [pattern] -> Some ([], pattern)
+      | patterns ->
+        Some
+          ( [],
+            Ast_helper.Pat.tuple (List.map (fun p -> None, p) patterns) Closed
+          )
+    in
+    Ast_helper.Pat.construct (lid (constructor_name sum constructor)) arg
 end
 
 module Binding = struct
@@ -205,10 +279,10 @@ module Binding = struct
     }
 end
 
-(* CR-someday hwasilewski: Add unary operations as well. *)
+(* CR-someday xclerc: Add unary operations as well. *)
 module Bin_op = struct
-  (* CR-soon hwasilewski: Add more operators. Especially division and modulo
-     (with safe wrappers). *)
+  (* CR-soon xclerc: Add more operators. Especially division and modulo (with
+     safe wrappers). *)
   type t =
     | Add
     | Sub
@@ -237,7 +311,7 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ | Record _ ->
+    | Bool | Array _ | Unboxed_tuple _ | Record _ | Variant _ | Or_null _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop ~lhs ~rhs =
@@ -245,7 +319,8 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ | Ty.Record _ ->
+      | Ty.Array _ | Ty.Unboxed_tuple _ | Ty.Record _ | Ty.Variant _
+      | Ty.Or_null _ ->
         Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
@@ -260,7 +335,7 @@ module Bin_op = struct
     | Shift_right -> call "shift_right"
     | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
-    (* CR-someday hwasilewski: Sometimes emit compare x y = 0 instead. *)
+    (* CR-someday xclerc: Sometimes emit compare x y = 0 instead. *)
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
     | Gt -> op ">" [call "compare"; int 0]
@@ -270,9 +345,9 @@ module Bin_op = struct
 end
 
 module Expr = struct
-  (* CR-soon hwasilewski: Currently this type is constructed manually, but that
-     is a mistake, as we can create for example a [Bin_op] with invalid types.
-     To mitigate, we should make [t] private and add smart constructors. *)
+  (* CR-soon xclerc: Currently this type is constructed manually, but that is a
+     mistake, as we can create for example a [Bin_op] with invalid types. To
+     mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
     | Read of place
@@ -282,6 +357,7 @@ module Expr = struct
           init_name : Name.t;
           init : t
         }
+    | Unboxed_tuple of (Name.t * t) list
     | Record of Ty.record * t list
     | Record_update of Ty.record * t * Ty.field * t
     | Record_convert of
@@ -289,6 +365,16 @@ module Expr = struct
           to_unboxed : bool;
           source_name : Name.t;
           expr : t
+        }
+    | Construct of
+        { sum : Sum.t;
+          constructor : Ty.constructor;
+          args : (Name.t * t) list
+        }
+    | Match of
+        { sum : Sum.t;
+          scrutinee : t;
+          cases : case list
         }
     | Opaque of t
     | Bin_op of
@@ -307,10 +393,22 @@ module Expr = struct
           args : t list
         }
 
+  and case =
+    { constructor : Ty.constructor;
+      bindings : Binding.t list;
+      body : t
+    }
+
   and place =
     | Variable of Name.t
     | Field of place * Ty.record * Ty.field
     | Element of place * t list
+    | Unboxed_tuple_component of
+        { tuple : place;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   let convert_num expr ~(from : NumberTy.t) ~(to_ : NumberTy.t) =
     if NumberTy.equal from to_
@@ -319,28 +417,41 @@ module Expr = struct
 
   let bind name expr body =
     let name = Name.to_string name in
-    Exp.let_ Immutable Nonrecursive
-      [Vb.mk (Pat.var (loc name)) expr]
+    Ast_helper.Exp.let_ Immutable Nonrecursive
+      [Ast_helper.Vb.mk (Ast_helper.Pat.var (loc name)) expr]
       (body (ident name))
 
-  let constrain ty expr = Exp.constraint_ expr (Some (Ty.to_code ty)) []
+  (* CR-soon xclerc for xclerc: the constraint always sends the expression
+     through the type checker's expected-type path. Consider sometimes omitting
+     it, e.g. under a swarm flag, so that plain inference is exercised too;
+     generated constructor and field names are unique, so disambiguation does
+     not require it. *)
+  let constrain ty expr =
+    Ast_helper.Exp.constraint_ expr (Some (Ty.to_code ty)) []
 
   let field_code (record : Ty.record) field receiver =
-    let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+    let project =
+      if record.unboxed
+      then Ast_helper.Exp.unboxed_field
+      else Ast_helper.Exp.field
+    in
     project
       (constrain (Ty.Record record) receiver)
       (lid (Ty.field_name record field))
 
   let record_code (record : Ty.record) fields source =
     let make =
-      if record.unboxed then Exp.record_unboxed_product else Exp.record
+      if record.unboxed
+      then Ast_helper.Exp.record_unboxed_product
+      else Ast_helper.Exp.record
     in
     constrain (Ty.Record record) (make fields source)
 
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
     | Read place -> place_to_code place
-    | Array_literal elements -> Exp.array Mutable (List.map to_code elements)
+    | Array_literal elements ->
+      Ast_helper.Exp.array Mutable (List.map to_code elements)
     | Array_make { dimensions; init_name; init } ->
       bind init_name (to_code init) (fun initial_value ->
           let rec make = function
@@ -349,9 +460,23 @@ module Expr = struct
             | size :: rest ->
               apply
                 (qualified_ident "Array" "init")
-                [int size; function_ [value_param (Pat.any ())] (make rest)]
+                [ int size;
+                  function_ [value_param (Ast_helper.Pat.any ())] (make rest) ]
           in
           make dimensions)
+    | Unboxed_tuple components ->
+      let body =
+        Ast_helper.Exp.unboxed_tuple
+          (List.map
+             (fun (name, _) -> None, ident (Name.to_string name))
+             components)
+      in
+      (* CR-soon xclerc for xclerc: here to, we may want to not let-bind. *)
+      (* As with constructor payloads, sequence effectful components
+         explicitly. *)
+      List.fold_right
+        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
+        components body
     | Record (record, values) ->
       if List.length record.fields <> List.length values
       then Misc.fatal_errorf "Record: incorrect number of fields";
@@ -377,6 +502,43 @@ module Expr = struct
               from.fields
           in
           record_code target fields None)
+    | Construct { sum; constructor; args } ->
+      if List.length args <> List.length constructor.args
+      then Misc.fatal_errorf "Constructor: incorrect number of arguments";
+      let values =
+        List.map (fun (name, _) -> ident (Name.to_string name)) args
+      in
+      let arg =
+        match values with
+        | [] -> None
+        | [value] -> Some value
+        | values ->
+          Some
+            (Ast_helper.Exp.tuple (List.map (fun value -> None, value) values))
+      in
+      let body =
+        Ast_helper.Exp.construct
+          (lid (Sum.constructor_name sum constructor))
+          arg
+      in
+      (* CR-soon xclerc for xclerc: we may want to avoid these bindings. *)
+      (* Payload expressions can have effects: explicitly sequence their
+         evaluation. *)
+      List.fold_right
+        (fun (name, expr) body -> bind name (to_code expr) (fun _ -> body))
+        args body
+    | Match { sum; scrutinee; cases } ->
+      Ast_helper.Exp.match_
+        (constrain (Sum.ty sum) (to_code scrutinee))
+        (List.map
+           (fun { constructor; bindings; body } ->
+             let names =
+               List.map (fun (binding : Binding.t) -> binding.name) bindings
+             in
+             Ast_helper.Exp.case
+               (Sum.constructor_pattern sum constructor names)
+               (to_code body))
+           cases)
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->
@@ -394,15 +556,29 @@ module Expr = struct
       List.fold_left
         (fun array index -> apply (ident "array_get") [array; to_code index])
         (place_to_code parent) indices
+    | Unboxed_tuple_component { tuple; arity; index; name } ->
+      let name = Name.to_string name in
+      let pattern =
+        Ast_helper.Pat.unboxed_tuple
+          (List.init arity (fun i ->
+               ( None,
+                 if i = index
+                 then Ast_helper.Pat.var (loc name)
+                 else Ast_helper.Pat.any () )))
+          Closed
+      in
+      Ast_helper.Exp.let_ Immutable Nonrecursive
+        [Ast_helper.Vb.mk pattern (place_to_code tuple)]
+        (ident name)
 
   let assignment_to_code place value =
     match place with
     | Variable name ->
-      Exp.setinstvar (loc (Name.to_string name)) (to_code value)
+      Ast_helper.Exp.setinstvar (loc (Name.to_string name)) (to_code value)
     | Field (parent, record, field) ->
       if record.unboxed || not field.is_mutable
       then Misc.fatal_errorf "Assign: field is not mutable";
-      Exp.setfield
+      Ast_helper.Exp.setfield
         (constrain (Ty.Record record) (place_to_code parent))
         (lid (Ty.field_name record field))
         (to_code value)
@@ -415,6 +591,8 @@ module Expr = struct
           set (apply (ident "array_get") [array; to_code index]) rest
       in
       set (place_to_code parent) indices
+    | Unboxed_tuple_component _ ->
+      Misc.fatal_errorf "Assign: unboxed tuple components are immutable"
 end
 
 module Place = struct
@@ -422,6 +600,12 @@ module Place = struct
     | Variable of Name.t
     | Field of t * Ty.record * Ty.field
     | Element of t * Expr.t list
+    | Unboxed_tuple_component of
+        { tuple : t;
+          arity : int;
+          index : int;
+          name : Name.t
+        }
 
   let to_code = Expr.place_to_code
 end
@@ -442,10 +626,10 @@ module Statement = struct
 
   let let_binding ({ name; ty; is_mutable } : Binding.t) expr body =
     let mutability = if is_mutable then Mutable else Immutable in
-    Exp.let_ mutability Nonrecursive
-      [ Vb.mk
-          (Pat.constraint_
-             (Pat.var (loc (Name.to_string name)))
+    Ast_helper.Exp.let_ mutability Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.constraint_
+             (Ast_helper.Pat.var (loc (Name.to_string name)))
              (Some (Ty.to_code ty))
              [])
           expr ]
@@ -468,19 +652,24 @@ module Statement = struct
           is_mutable = true
         }
         (Expr.to_code init)
-        (Exp.let_ Immutable Nonrecursive
-           [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
-           (* CR-someday hwasilewski: Sometimes emit as a for loop instead. *)
-           (Exp.while_
+        (Ast_helper.Exp.let_ Immutable Nonrecursive
+           [ Ast_helper.Vb.mk
+               (Ast_helper.Pat.var (loc bound_name))
+               (Expr.to_code bound) ]
+           (* CR-someday xclerc: Sometimes emit as a for loop instead. *)
+           (Ast_helper.Exp.while_
               (op comparison [ident name; ident bound_name])
-              (Exp.sequence (to_code body)
-                 (Exp.setinstvar (loc name) (op "+" [ident name; int stride])))))
+              (Ast_helper.Exp.sequence (to_code body)
+                 (Ast_helper.Exp.setinstvar (loc name)
+                    (op "+" [ident name; int stride])))))
     | Let (binding, expr, body) ->
       let_binding binding (Expr.to_code expr) (to_code body)
     | Seq statements ->
-      List.fold_right Exp.sequence (List.map to_code statements) unit_
+      List.fold_right Ast_helper.Exp.sequence
+        (List.map to_code statements)
+        unit_
     | If (condition, if_true, if_false) ->
-      Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
+      Ast_helper.Exp.ifthenelse (Expr.to_code condition) (to_code if_true)
         (Some (to_code if_false))
 end
 
@@ -492,7 +681,8 @@ module Inline = struct
 
   let to_attributes inline =
     let attribute payload =
-      [Attr.mk (loc "inline") (PStr [Str.eval (ident payload)])]
+      [ Ast_helper.Attr.mk (loc "inline")
+          (PStr [Ast_helper.Str.eval (ident payload)]) ]
     in
     match inline with
     | Default -> []
@@ -513,19 +703,21 @@ module Function = struct
   let to_code { name; params; inline; body; return_ty; result } =
     let to_param ({ name; ty; _ } : Binding.t) =
       value_param
-        (Pat.constraint_
-           (Pat.var (loc (Name.to_string name)))
+        (Ast_helper.Pat.constraint_
+           (Ast_helper.Pat.var (loc (Name.to_string name)))
            (Some (Ty.to_code ty))
            [])
     in
     let function_params =
       match params with
-      | [] -> [value_param (Pat.construct (lid "()") None)]
+      | [] -> [value_param (Ast_helper.Pat.construct (lid "()") None)]
       | _ -> List.map to_param params
     in
     let body =
-      Exp.sequence (Statement.to_code body)
-        (Exp.constraint_ (Expr.to_code result) (Some (Ty.to_code return_ty)) [])
+      Ast_helper.Exp.sequence (Statement.to_code body)
+        (Ast_helper.Exp.constraint_ (Expr.to_code result)
+           (Some (Ty.to_code return_ty))
+           [])
     in
     let body =
       List.fold_right
@@ -535,9 +727,9 @@ module Function = struct
             body)
         params body
     in
-    Str.value Nonrecursive
-      [ Vb.mk
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
           ~attrs:(Inline.to_attributes inline)
-          (Pat.var (loc (Name.to_string name)))
+          (Ast_helper.Pat.var (loc (Name.to_string name)))
           (function_ function_params body) ]
 end

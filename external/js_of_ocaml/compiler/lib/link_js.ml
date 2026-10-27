@@ -250,11 +250,11 @@ let link
         , Global_name.Compunit_set.empty
         , Global_name.Compunit_set.empty )
       ~f:(fun (_file, _lr, (build_info, units)) acc ->
-        let cmo_file =
+        let cmo_or_cmj_file =
           match build_info with
           | Some bi -> (
               match Build_info.kind bi with
-              | `Cmo -> true
+              | `Cmo | `Cmj | `Cmja -> true
               | `Cma | `Exe | `Runtime | `Unknown -> false)
           | None -> false
         in
@@ -266,7 +266,7 @@ let link
             if
               (not (Config.Flag.auto_link ()))
               || mklib
-              || cmo_file
+              || cmo_or_cmj_file
               || linkall
               || info.force_link
               || not
@@ -321,7 +321,7 @@ let link
         | Some bi -> (
             match Build_info.kind bi with
             | `Runtime -> Some bi
-            | `Cma | `Exe | `Cmo | `Unknown -> None)
+            | `Cma | `Exe | `Cmo | `Cmj | `Cmja | `Unknown -> None)
         | None -> None
       in
       let sm_for_file = ref None in

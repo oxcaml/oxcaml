@@ -1,5 +1,4 @@
 (* Final program lowering from the generator IR into OxCaml code. *)
-open Ast_helper
 open Asttypes
 open Parsetree_helpers
 module Binding = Ir.Binding
@@ -8,23 +7,32 @@ module Function = Ir.Function
 module Name = Ir.Name
 module NumberTy = Ir.NumberTy
 module Statement = Ir.Statement
+module Sum = Ir.Sum
 module Ty = Ir.Ty
 
 type t =
   { swarm : Config.Swarm.t;
     record_types : Ty.record list;
+    variant_types : Ty.variant list;
     functions : Function.t list;
     toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~swarm ~record_types ~functions ~toplevel_decls ~toplevel_statement =
-  { swarm; record_types; functions; toplevel_decls; toplevel_statement }
+let create ~swarm ~record_types ~variant_types ~functions ~toplevel_decls
+    ~toplevel_statement =
+  { swarm;
+    record_types;
+    variant_types;
+    functions;
+    toplevel_decls;
+    toplevel_statement
+  }
 
 let is_floating_point_to_integral ~from ~to_ =
   NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
 
-(* CR-someday hwasilewski: Optimize the prelude for faster compilation. Some
+(* CR-someday xclerc: Optimize the prelude for faster compilation. Some
    possibilities are precompiling the prelude into a .cmxa file and only linking
    it during fuzzing, possibly only emitting the subset of functions that are
    needed. *)
@@ -42,10 +50,12 @@ let conversions number_types =
       else NumberTy.converter_name ~from ~to_
     in
     let conversion_type =
-      Typ.arrow Nolabel (NumberTy.to_code from) (NumberTy.to_code to_) [] []
+      Ast_helper.Typ.arrow Nolabel (NumberTy.to_code from)
+        (NumberTy.to_code to_) [] []
     in
-    Str.primitive
-      (Val.mk (loc function_name) conversion_type ~prim:[primitive_name])
+    Ast_helper.Str.primitive
+      (Ast_helper.Val.mk (loc function_name) conversion_type
+         ~prim:[primitive_name])
   in
   List.concat_map
     (fun from ->
@@ -73,7 +83,8 @@ let integral_size (base : NumberTy.Base.t) =
    These wrappers map NaN to zero and saturate infinities and overflow. *)
 let integral_bounds =
   let value name expr =
-    Str.value Nonrecursive [Vb.mk (Pat.var (loc name)) expr]
+    Ast_helper.Str.value Nonrecursive
+      [Ast_helper.Vb.mk (Ast_helper.Pat.var (loc name)) expr]
   in
   let bounds base =
     let name = integral_bound_name base in
@@ -83,7 +94,7 @@ let integral_bounds =
     let upper =
       apply
         (qualified_ident "Float" "ldexp")
-        [Exp.constant (Const.float "1.0"); exponent]
+        [Ast_helper.Exp.constant (Ast_helper.Const.float "1.0"); exponent]
     in
     let lower = op "~-." [ident upper_name] in
     [value upper_name upper; value lower_name lower]
@@ -121,28 +132,30 @@ let float_to_integral_conversions number_types =
           int 0 ]
     in
     let body =
-      Exp.ifthenelse
+      Ast_helper.Exp.ifthenelse
         (apply (qualified_ident "Float" "is_nan") [x_for_comparison])
         (integral_value to_ "zero")
         (Some
-           (Exp.ifthenelse
+           (Ast_helper.Exp.ifthenelse
               (compare_to_bound ">=" "_upper_bound")
               (integral_value to_ "max_int")
               (Some
-                 (Exp.ifthenelse
+                 (Ast_helper.Exp.ifthenelse
                     (compare_to_bound "<" "_lower_bound")
                     (integral_value to_ "min_int")
                     (Some (apply (ident (unsafe_converter_name ~from ~to_)) [x]))))))
     in
     let body =
-      Exp.let_ Immutable Nonrecursive
-        [Vb.mk (Pat.var (loc "x_for_comparison")) (float_for_comparison from x)]
+      Ast_helper.Exp.let_ Immutable Nonrecursive
+        [ Ast_helper.Vb.mk
+            (Ast_helper.Pat.var (loc "x_for_comparison"))
+            (float_for_comparison from x) ]
         body
     in
-    Str.value Nonrecursive
-      [ Vb.mk
-          (Pat.var (loc (NumberTy.converter_name ~from ~to_)))
-          (function_ [value_param (Pat.var (loc "x"))] body) ]
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.var (loc (NumberTy.converter_name ~from ~to_)))
+          (function_ [value_param (Ast_helper.Pat.var (loc "x"))] body) ]
   in
   List.concat_map
     (fun from ->
@@ -162,15 +175,15 @@ let canon_nan_name = "canonicalize_nan"
 let canonicalize_nan =
   let x = ident "x" in
   let body =
-    Exp.ifthenelse
+    Ast_helper.Exp.ifthenelse
       (apply (qualified_ident "Float" "is_nan") [x])
       (qualified_ident "Float" "nan")
       (Some x)
   in
-  Str.value Nonrecursive
-    [ Vb.mk
-        (Pat.var (loc canon_nan_name))
-        (function_ [value_param (Pat.var (loc "x"))] body) ]
+  Ast_helper.Str.value Nonrecursive
+    [ Ast_helper.Vb.mk
+        (Ast_helper.Pat.var (loc canon_nan_name))
+        (function_ [value_param (Ast_helper.Pat.var (loc "x"))] body) ]
 
 (* Produce an expression, which prints the value of the numeric expression [e]
    of type [nty] *)
@@ -185,7 +198,7 @@ let print_number nty e =
   in
   apply
     (qualified_ident "Printf" "printf")
-    [Exp.constant (Const.string fmt); arg]
+    [Ast_helper.Exp.constant (Ast_helper.Const.string fmt); arg]
 
 (* Keep in sync with [LIBRARIES] in oxfuzzer.py. *)
 let libraries = ["stdlib_upstream_compatible"; "stdlib_stable"]
@@ -200,21 +213,21 @@ let array_primitives =
       pjka_desc = Pjk_mod (any, [loc (Mode "separable")])
     }
   in
-  let a = Typ.var "a" None in
-  let array = Typ.constr (lid "array") [a] in
-  let int = Typ.constr (lid "int") [] in
-  let unit = Typ.constr (lid "unit") [] in
+  let a = Ast_helper.Typ.var "a" None in
+  let array = Ast_helper.Typ.constr (lid "array") [a] in
+  let int = Ast_helper.Typ.constr (lid "int") [] in
+  let unit = Ast_helper.Typ.constr (lid "unit") [] in
   let external_ name primitive args result =
     let typ =
       List.fold_right
-        (fun arg result -> Typ.arrow Nolabel arg result [] [])
+        (fun arg result -> Ast_helper.Typ.arrow Nolabel arg result [] [])
         args result
     in
-    Str.primitive
-      (Val.mk
-         ~attrs:[Attr.mk (loc "layout_poly") (PStr [])]
+    Ast_helper.Str.primitive
+      (Ast_helper.Val.mk
+         ~attrs:[Ast_helper.Attr.mk (loc "layout_poly") (PStr [])]
          ~prim:[primitive] (loc name)
-         (Typ.poly [loc "a", Some separable] typ))
+         (Ast_helper.Typ.poly [loc "a", Some separable] typ))
   in
   [ external_ "array_make" "%makearray_dynamic" [int; a] array;
     external_ "array_get" "%array_safe_get" [array; int] a;
@@ -231,7 +244,7 @@ let record_declarations records =
             then Mutable
             else Immutable
           in
-          Type.field ~mut
+          Ast_helper.Type.field ~mut
             (loc (Ty.field_name record field))
             (Ty.to_code field.ty))
         record.fields
@@ -241,9 +254,30 @@ let record_declarations records =
       then Parsetree.Ptype_record_unboxed_product fields
       else Parsetree.Ptype_record fields
     in
-    Str.type_ Recursive [Type.mk ~kind (loc (Ty.record_name record))]
+    Ast_helper.Str.type_ Recursive
+      [Ast_helper.Type.mk ~kind (loc (Ty.record_name record))]
   in
   List.map declaration records
+
+let constructor_declaration variant (constructor : Ty.constructor) =
+  let args =
+    List.map
+      (fun ty -> Ast_helper.Type.constructor_arg (Ty.to_code ty))
+      constructor.args
+  in
+  Ast_helper.Type.constructor ~args:(Parsetree.Pcstr_tuple args)
+    (loc (Ty.constructor_name variant constructor))
+
+let variant_declarations variants =
+  let declaration (variant : Ty.variant) =
+    let constructors =
+      List.map (constructor_declaration variant) variant.constructors
+    in
+    Ast_helper.Str.type_ Nonrecursive
+      [ Ast_helper.Type.mk ~kind:(Parsetree.Ptype_variant constructors)
+          (loc (Ty.variant_name variant)) ]
+  in
+  List.map declaration variants
 
 let rec print_value path ty expr =
   match ty with
@@ -254,8 +288,8 @@ let rec print_value path ty expr =
       | [] -> print_number nty array
       | _ :: rest ->
         let index = path ^ "_index_" ^ string_of_int depth in
-        Exp.for_
-          (Pat.var (loc index))
+        Ast_helper.Exp.for_
+          (Ast_helper.Pat.var (loc index))
           (int 0)
           (op "-" [apply (ident "array_length") [array]; int 1])
           Upto
@@ -263,22 +297,86 @@ let rec print_value path ty expr =
              (apply (ident "array_get") [array; ident index]))
     in
     print_elements 0 dimensions expr
+  | Ty.Unboxed_tuple components ->
+    let components =
+      List.mapi
+        (fun index ty -> Format.sprintf "%s_component_%d" path index, ty)
+        components
+    in
+    let pattern =
+      Ast_helper.Pat.unboxed_tuple
+        (List.map
+           (fun (name, _) -> None, Ast_helper.Pat.var (loc name))
+           components)
+        Closed
+    in
+    let body =
+      List.fold_right
+        (fun (name, ty) body ->
+          Ast_helper.Exp.sequence (print_value name ty (ident name)) body)
+        components unit_
+    in
+    Ast_helper.Exp.let_ Immutable Nonrecursive
+      [Ast_helper.Vb.mk pattern expr]
+      body
   | Ty.Record record ->
     List.fold_right
       (fun (field : Ty.field) acc ->
-        let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+        let project =
+          if record.unboxed
+          then Ast_helper.Exp.unboxed_field
+          else Ast_helper.Exp.field
+        in
         let value = project expr (lid (Ty.field_name record field)) in
         let path = path ^ "_field_" ^ string_of_int field.index in
-        Exp.sequence (print_value path field.ty value) acc)
+        Ast_helper.Exp.sequence (print_value path field.ty value) acc)
       record.fields unit_
+  | Ty.Variant variant -> print_sum path (Sum.Variant variant) expr
+  | Ty.Or_null payload -> print_sum path (Sum.Or_null payload) expr
   | Ty.Bool ->
     apply
       (qualified_ident "Printf" "printf")
-      [Exp.constant (Const.string "%b "); expr]
+      [Ast_helper.Exp.constant (Ast_helper.Const.string "%b "); expr]
+
+and print_sum path sum expr =
+  let cases =
+    List.map
+      (fun (constructor : Ty.constructor) ->
+        let args =
+          List.mapi
+            (fun index ty ->
+              let name =
+                Format.sprintf "%s_case_%d_arg_%d" path
+                  constructor.constructor_index index
+              in
+              Name.of_string name, ty)
+            constructor.args
+        in
+        let body =
+          List.fold_right
+            (fun (name, ty) body ->
+              let name = Name.to_string name in
+              Ast_helper.Exp.sequence (print_value name ty (ident name)) body)
+            args unit_
+        in
+        let tag =
+          apply
+            (qualified_ident "Printf" "printf")
+            [ Ast_helper.Exp.constant
+                (Ast_helper.Const.string
+                   (Sum.constructor_name sum constructor ^ " ")) ]
+        in
+        Ast_helper.Exp.case
+          (Sum.constructor_pattern sum constructor (List.map fst args))
+          (Ast_helper.Exp.sequence tag body))
+      (Sum.constructors sum)
+  in
+  Ast_helper.Exp.match_ expr cases
 
 let to_code
     { swarm;
       record_types;
+      variant_types;
       functions;
       toplevel_decls = decls;
       toplevel_statement = statement
@@ -286,7 +384,9 @@ let to_code
   let opens =
     List.map
       (fun lib ->
-        Str.open_ (Opn.mk (Mod.ident (lid (String.capitalize_ascii lib)))))
+        Ast_helper.Str.open_
+          (Ast_helper.Opn.mk
+             (Ast_helper.Mod.ident (lid (String.capitalize_ascii lib)))))
       libraries
   in
   let print_decl ((binding : Binding.t), _expr) =
@@ -294,10 +394,10 @@ let to_code
     print_value (name ^ "_print") binding.ty (ident name)
   in
   let body =
-    Exp.sequence
+    Ast_helper.Exp.sequence
       (Statement.to_code statement)
       (List.fold_left
-         (fun acc decl -> Exp.sequence (print_decl decl) acc)
+         (fun acc decl -> Ast_helper.Exp.sequence (print_decl decl) acc)
          unit_ decls)
   in
   let body =
@@ -307,12 +407,16 @@ let to_code
       decls body
   in
   let main =
-    Str.value Nonrecursive
-      [ Vb.mk
-          (Pat.var (loc "main"))
-          (function_ [value_param (Pat.construct (lid "()") None)] body) ]
+    Ast_helper.Str.value Nonrecursive
+      [ Ast_helper.Vb.mk
+          (Ast_helper.Pat.var (loc "main"))
+          (function_
+             [value_param (Ast_helper.Pat.construct (lid "()") None)]
+             body) ]
   in
-  let run = Str.eval (Exp.apply (ident "main") [Nolabel, unit_]) in
+  let run =
+    Ast_helper.Str.eval (Ast_helper.Exp.apply (ident "main") [Nolabel, unit_])
+  in
   let number_types = Config.Swarm.number_types swarm in
   let array_primitives = if swarm.arrays then array_primitives else [] in
   let float_helpers =
@@ -325,6 +429,7 @@ let to_code
   let structure =
     opens
     @ record_declarations record_types
+    @ variant_declarations variant_types
     @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions
     @ [main; run]

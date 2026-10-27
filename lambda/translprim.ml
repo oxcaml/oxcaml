@@ -1756,41 +1756,33 @@ let glb_array_set_type loc t1 t2 =
   (* Pfloatarray is a minimum *)
   | Pfloatarray_set, Pfloatarray -> Pfloatarray_set
 
-let peek_or_poke_layout_from_type ~prim_name error_loc env ty
-      : Lambda.peek_or_poke option =
-  match Jkind.get_layout env (Ctype.type_jkind env ty) with
-  | Some layout when Jkind.Layout.Const.has_genvar layout ->
-    (* CR layout poly: We can't pick a [Lambda.peek_or_poke] constructor here if
-       the argument is layout polymorphic. Other primitives have similar
-       dilemmas. We should consider moving primitive specialization after
-       slambda eval. *)
+let peek_or_poke_layout ~prim_name error_loc env ~poly_sort contents_repr ty
+      : Lambda.peek_or_poke =
+  let sort = sort_of_native_repr ~poly_sort contents_repr in
+  match Typeopt.layout env error_loc sort ty with
+  | Punboxed_float Unboxed_float32 -> Ppp_unboxed_float32
+  | Punboxed_float Unboxed_float64 -> Ppp_unboxed_float
+  | Punboxed_or_untagged_integer Untagged_int8 -> Ppp_untagged_int8
+  | Punboxed_or_untagged_integer Untagged_int16 -> Ppp_untagged_int16
+  | Punboxed_or_untagged_integer Unboxed_int32 -> Ppp_unboxed_int32
+  | Punboxed_or_untagged_integer Unboxed_int64 -> Ppp_unboxed_int64
+  | Punboxed_or_untagged_integer Unboxed_nativeint -> Ppp_unboxed_nativeint
+  | Punboxed_or_untagged_integer Untagged_int -> Ppp_untagged_immediate
+  | Pvalue { raw_kind = Pintval ; _ } -> Ppp_tagged_immediate
+  | Psplicevar _ ->
+    (* CR layout poly: We can't pick a [Lambda.peek_or_poke] constructor here
+       if the argument is layout polymorphic; we'd have to wait until after
+       slambda evaluation. Other primitives have similar dilemmas. We should
+       consider moving all of primitive specialization after slambda eval. *)
     raise (Error (error_loc, Layout_poly_arguments_unsupported prim_name))
-  | Some _ | None ->
-  match Ctype.type_sort ~why:Peek_or_poke ~allow_mutation:false env ty with
-  | Error _ -> None
-  | Ok sort ->
-    let sort = Jkind.Sort.default_to_scannable_and_get sort in
-    let layout = Typeopt.layout env error_loc sort ty in
-    match layout with
-    | Punboxed_float Unboxed_float32 -> Some Ppp_unboxed_float32
-    | Punboxed_float Unboxed_float64 -> Some Ppp_unboxed_float
-    | Punboxed_or_untagged_integer Untagged_int8 -> Some Ppp_untagged_int8
-    | Punboxed_or_untagged_integer Untagged_int16 -> Some Ppp_untagged_int16
-    | Punboxed_or_untagged_integer Unboxed_int32 -> Some Ppp_unboxed_int32
-    | Punboxed_or_untagged_integer Unboxed_int64 -> Some Ppp_unboxed_int64
-    | Punboxed_or_untagged_integer Unboxed_nativeint ->
-      Some Ppp_unboxed_nativeint
-    | Punboxed_or_untagged_integer Untagged_int -> Some Ppp_untagged_immediate
-    | Pvalue { raw_kind = Pintval ; _ } -> Some Ppp_tagged_immediate
-    | Ptop
-    | Pvalue _
-    | Punboxed_vector _
-    | Punboxed_mask
-    | Pvoid
-    | Punboxed_product _
-    | Pbottom
-    | Psplicevar _ ->
-      raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
+  | Ptop
+  | Pvalue _
+  | Punboxed_vector _
+  | Punboxed_mask
+  | Pvoid
+  | Punboxed_product _
+  | Pbottom ->
+    raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
 
 let should_specialize_primitive p =
   match p.prim_name with
@@ -1829,7 +1821,8 @@ let layout_of_ty_for_idx_set env loc ty =
 (* Specialize a primitive from available type information. *)
 (* CR layouts v7: This function had a loc argument added just to support the void
    check error message.  Take it out when we remove that. *)
-let specialize_primitive env loc ty ~has_constant_constructor prim =
+let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
+      prim_desc prim =
   let param_tys, rest_ty =
     match is_function_type env ty with
     | None -> [], ty
@@ -2007,20 +2000,24 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     match is_function_type env ty with
     | None -> None
     | Some (_p1, result_ty) ->
-      match
-        peek_or_poke_layout_from_type ~prim_name:"peek"
-          (to_location loc) env result_ty
-      with
-      | None -> None
-      | Some contents_layout -> Some (Peek (Some contents_layout))
+      let _, result_repr = prim_desc.prim_native_repr_res in
+      let contents_layout =
+        peek_or_poke_layout ~prim_name:"peek" (to_location loc) env
+          ~poly_sort result_repr result_ty
+      in
+      Some (Peek (Some contents_layout))
   )
   | Poke _, _ptr_ty :: new_value_ty :: _ -> (
-    match
-      peek_or_poke_layout_from_type ~prim_name:"poke"
-        (to_location loc) env new_value_ty
-    with
-    | None -> None
-    | Some contents_layout -> Some (Poke (Some contents_layout))
+    match prim_desc.prim_native_repr_args with
+    | [_; (_, new_value_repr)] ->
+      let contents_layout =
+        peek_or_poke_layout ~prim_name:"poke" (to_location loc) env
+          ~poly_sort new_value_repr new_value_ty
+      in
+      Some (Poke (Some contents_layout))
+    | _ ->
+      (* [check_primitive_arity] would have rejected this *)
+      Misc.fatal_error "Translprim.specialize_primitive: wrong arity for Poke"
   )
   | Atomic (Load, Field_like ((Ref | Loc) as kind, Pointer)), _ ->
     (match is_function_type env ty with
@@ -2614,7 +2611,10 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
     | _ -> false
   in
   if should_specialize_primitive p then
-    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    match
+      specialize_primitive env loc ty ~has_constant_constructor ~poly_sort p
+        prim
+    with
     | None -> prim
     | Some prim -> prim
   else

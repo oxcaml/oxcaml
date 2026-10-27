@@ -2600,7 +2600,6 @@ let tree_of_modalities mut t =
 
 let out_modalities_of_mod_bounds mod_bounds =
   Typemode.untransl_mod_bounds mod_bounds
-  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
 
 let tree_of_modes_const (modes : Mode.With_locality.Const.t) =
   (* Step 1: Compute the modes to print *)

@@ -62,7 +62,13 @@ end
 
 (* A *sort* is the information the middle/back ends need to be able to
    compile a manipulation (storing, passing, etc) of a runtime value. *)
-module Sort = Jkind_types.Sort
+module Sort = struct
+  include Jkind_types.Sort
+
+  let new_var = Btype.new_sort_var
+
+  let instance_with ~level = instance_with ~new_var:(fun () -> new_var ~level)
+end
 
 type sort = Sort.t
 
@@ -647,6 +653,17 @@ module Layout = struct
     | Any _ -> ()
     | Addressable t -> generalize ~current_level t
     | Box (t, _) -> generalize ~current_level t
+
+  let rec update_level level : _ Layout.t -> unit = function
+    | Any _ -> ()
+    | Sort (s, _) -> Sort.update_level level s
+    | Product ts -> List.iter (update_level level) ts
+    | Addressable t -> update_level level t
+    | Box (t, _) -> update_level level t
+
+  let of_new_sort_var ~level sa =
+    let sort = Sort.(of_var (new_var ~level)) in
+    Sort (sort, sa), sort
 end
 
 module Externality = Externality
@@ -2152,8 +2169,7 @@ module Const = struct
       in
       Option.map
         (fun bounds_to_print ->
-          Typemode.untransl_mod_bounds ~verbose:show_all_bounds bounds_to_print
-          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s))
+          Typemode.untransl_mod_bounds ~verbose:show_all_bounds bounds_to_print)
         bounds_to_print
 
     (* Returns [None] if [actual] has any scannable axis strictly greater
@@ -3091,6 +3107,11 @@ let generalize ~current_level t =
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
 
+let update_level level t =
+  match t.jkind.base with
+  | Kconstr _ -> ()
+  | Layout l -> Layout.update_level level l
+
 let get t = Jkind_desc.get t.jkind
 
 (* CR layouts: this function is suspect; it seems likely to reisenberg
@@ -3494,8 +3515,6 @@ module Format_history = struct
         "it's the layout polymorphic type in an external declaration@ \
          ([@@layout_poly] forces all variables of layout 'any' to be@ \
          representable at call sites)"
-    | Peek_or_poke ->
-      fprintf ppf "it's the type being used for a peek or poke primitive"
     | Array_element -> fprintf ppf "it's the type of an array element"
     | Idx_element ->
       fprintf ppf
@@ -4720,7 +4739,6 @@ module Debug_printers = struct
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Tuple_element -> fprintf ppf "Tuple_element"
-    | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
     | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"

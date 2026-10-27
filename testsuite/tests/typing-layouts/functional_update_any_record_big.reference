@@ -1,3 +1,5 @@
 cross x=2.5 cross: f0=0.5 f100=100.5 f253=253.5 y=999
 same x=5 same: f0=0.5 f100=100.5 f253=253.5 y=1000
 scannable axes x=aaa scannable axes: f0=0.5 f100=100.5 f253=253.5 y=999
+mutate copy: r1.x.#i=1 r2.x.#i=100
+mutate original: r1.x.#j=200 r2.x.#j=2

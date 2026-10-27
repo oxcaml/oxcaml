@@ -69,6 +69,13 @@ module Var : sig
 
   val reset : unit -> unit
 
+  val set_last : int -> unit
+  (** [set_last n] ensures that subsequent calls to [fresh] return indices
+      greater than [n]. *)
+
+  val last : unit -> t
+  (** The last allocated variable. *)
+
   module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
@@ -245,6 +252,31 @@ type program =
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
   }
+
+(** A [program] in a form that can be marshaled. *)
+module Marshalable_program : sig
+  type t
+
+  val of_program : program -> t
+
+  val to_program : t -> program
+end
+
+type cmj_body =
+  { program : Marshalable_program.t
+  ; last_var : int
+        (** Highest variable index used in [program]. [Var] keeps this in mutable
+            state, so the OxCaml JSIR backend must communicate it to
+            [js_of_ocaml] to keep the two in sync. *)
+  ; imported_compilation_units : string list
+        (** Full paths of the compilation units whose symbols [program] fetches
+            from the global symbol table. Needed to fill in [Unit_info.t]. *)
+  ; exported_compilation_unit : string
+        (** Full path of the compilation unit [program] defines. Needed to fill
+            in [Unit_info.t]. *)
+  }
+(** Contents of a [.cmj] file produced by the OxCaml JSIR backend (after the
+    magic number), marshaled. *)
 
 module Print : sig
   type xinstr =

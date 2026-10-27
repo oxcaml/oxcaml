@@ -59,6 +59,10 @@ val compile_bc_to_javascript :
 val jsoo_minify :
   ?flags:string list -> pretty:bool -> Filetype.js_file -> Filetype.js_file
 
+val js_of_ocaml : ?fail:bool -> string list -> string
+(** Run [js_of_ocaml.exe] with the given arguments and return its output. Fails
+    if it exits with a non-zero code, unless [fail] is [false]. *)
+
 val extract_sourcemap : Filetype.js_file -> Js_of_ocaml_compiler.Source_map.t option
 
 val run_javascript : Filetype.js_file -> string

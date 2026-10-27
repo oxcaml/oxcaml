@@ -44,6 +44,7 @@ let%expect_test _ =
     +mlBytes.js
     +nat.js
     +obj.js
+    +ocamlj.js
     +parsing.js
     +prng.js
     +promise.js
@@ -91,6 +92,7 @@ let%expect_test _ =
     +mlBytes.js
     +nat.js
     +obj.js
+    +ocamlj.js
     +parsing.js
     +prng.js
     +promise.js
