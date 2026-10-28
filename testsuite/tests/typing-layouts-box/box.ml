@@ -1646,7 +1646,9 @@ type 'a imm_box = 'a imm
 let not_a_leak (x : derived imm# box) : base imm# box =
   ((x : derived imm) :> base imm);;
 
-(* Unlike above, [imm# box] is _not_ reduced to [imm] *)
+(* Unlike above, the coercion is checked at [imm# box] rather than [imm]. Here,
+   subtyping does not reduce the [imm# box] to [imm] and instead descends
+   through [box] and uses [imm#]'s variance. *)
 let not_a_leak_unreduced (x : derived imm# box) = (x :> base imm# box)
 [%%expect{|
 val not_a_leak : derived imm -> base imm = <fun>

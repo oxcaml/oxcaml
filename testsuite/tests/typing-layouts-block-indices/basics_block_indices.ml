@@ -920,8 +920,8 @@ let ok () = (.mut.#mut_not_global.#item)
 val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
 |}]
 
-(* Block indices can't start at an unboxed record. Mutable block indices can be
-   made into stored unboxed records, regardless of their mutability. *)
+(* Mutable block indices can be made into stored unboxed records,
+   regardless of their mutability. *)
 type mut = #{ mutable i : int; j : int }
 type mut_ref = { mutable m : mut }
 let idx_to_mutable_field = (.m.#i)
@@ -967,6 +967,40 @@ Line 2, characters 14-22:
                   ^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
        immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* A mutable index can write to an immutable field of a stored unboxed record,
+   even though the unboxed record is covariant in that field. This is sound
+   because the boxed record containing it is invariant. *)
+type +'a is_covariant = #{ mutable x : int; y : 'a }
+type 'a is_covariant_mut_box = { mutable inner : 'a is_covariant }
+type base = < base : int >
+type derived = < base : int; derived : int >
+let base : base = object method base = 42 end
+let derived : derived = object method base = 42 method derived = 42 end
+let wrap_derived : derived is_covariant_mut_box =
+  { inner = #{ x = 42; y = derived } }
+[%%expect{|
+type 'a is_covariant = #{ mutable x : int; y : 'a; }
+type 'a is_covariant_mut_box = { mutable inner : 'a is_covariant; }
+type base = < base : int >
+type derived = < base : int; derived : int >
+val base : base = <obj>
+val derived : derived = <obj>
+val wrap_derived : derived is_covariant_mut_box =
+  {inner = #{x = 42; y = <obj>}}
+|}]
+
+let () =
+  Idx_mut.set (wrap_derived :> base is_covariant_mut_box) (.inner.#y) base
+let bad = (wrap_derived.inner.#y)#derived
+[%%expect{|
+Line 2, characters 14-57:
+2 |   Idx_mut.set (wrap_derived :> base is_covariant_mut_box) (.inner.#y) base
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "derived is_covariant_mut_box" is not a subtype of
+         "base is_covariant_mut_box"
+       The second object type has no method "derived"
 |}]
 
 (******************************************************)
