@@ -24,6 +24,9 @@ law? negative (x : int) : f (-1) = x ===> x = -1
 law? labelled (c : int) : g ~a:1 c = g c ~a:1
 law? stdlib (xs : 'a list) (n : int) : List.length xs >= n
 law? kinded (x : ('a : immutable_data)) (y : 'a) : f x = f y
+type _ ty = Int : int ty | Bool : bool ty
+law? types (type a) (type (b : value_or_null)) (w : a ty) (x : a) (y : b) :
+  (match w with Int -> x >= 0 | Bool -> x || true) && y == y
 law? \#type (\#method : int) : \#method = \#method
 law? assumptions (x : int) (y : int) : x > 0 ===> y > 0 ===> x + y > 0
 law? constants (c : char) (s : string) :

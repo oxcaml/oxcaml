@@ -1584,11 +1584,20 @@ and law_declaration =
   { law_id: Ident.t;
     law_name: string loc;
     law_law: Types.law_declaration;
+    law_newtypes: law_newtype list;
     law_params: law_param list;
     law_assumptions: spec_expression list;
     law_conclusion: spec_expression;
     law_attributes: attribute list;
     law_loc: Location.t
+   }
+
+and law_newtype =
+  { ln_id: Ident.t;
+    ln_name: string loc;
+    ln_jkind: Parsetree.jkind_annotation option;
+    ln_type: Types.type_expr
+    (* The type variable of [law_law] that the type stands for *)
    }
 
 and law_param =

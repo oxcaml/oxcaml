@@ -521,6 +521,7 @@ let type_iterators_without_type_expr =
     it.it_class_type it ctd.clty_type;
     it.it_path ctd.clty_path
   and it_law_declaration it ld =
+    List.iter (it.it_type_expr it) ld.law_newtypes;
     List.iter (fun (_, ty) -> it.it_type_expr it ty) ld.law_params;
     let clause e =
       List.iter

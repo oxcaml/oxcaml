@@ -537,9 +537,16 @@ let spec_expression sub
    stexp_env = sub.env sub stexp_env}
 
 let[@warning "+9"] law_declaration sub
-     {law_id; law_name; law_law; law_params; law_assumptions; law_conclusion;
-      law_attributes; law_loc} =
+     {law_id; law_name; law_law; law_newtypes; law_params; law_assumptions;
+      law_conclusion; law_attributes; law_loc} =
   let law_name = map_loc sub law_name in
+  let law_newtypes =
+    List.map
+      (fun {ln_id; ln_name; ln_jkind; ln_type} ->
+         {ln_id; ln_name = map_loc sub ln_name;
+          ln_jkind = Option.map (sub.jkind_annotation sub) ln_jkind; ln_type})
+      law_newtypes
+  in
   let law_params =
     List.map
       (fun {lp_id; lp_name; lp_type} ->
@@ -551,8 +558,8 @@ let[@warning "+9"] law_declaration sub
   let law_conclusion = sub.spec_expression sub law_conclusion in
   let law_attributes = sub.attributes sub law_attributes in
   let law_loc = sub.location sub law_loc in
-  {law_id; law_name; law_law; law_params; law_assumptions; law_conclusion;
-   law_attributes; law_loc}
+  {law_id; law_name; law_law; law_newtypes; law_params; law_assumptions;
+   law_conclusion; law_attributes; law_loc}
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d

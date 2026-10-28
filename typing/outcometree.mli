@@ -264,6 +264,7 @@ and out_jkind_decl =
     ojkind_jkind: out_jkind option }
 and out_law_decl =
   { olaw_name: string;
+    olaw_newtypes: (string * out_jkind option) list;
     olaw_params: (string * out_type) list;
     olaw_assumptions: out_spec list;
     olaw_conclusion: out_spec }

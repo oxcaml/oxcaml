@@ -1,41 +1,74 @@
 [@@@ocaml.warning "-27-40"]
 module Laws_gen_Stdlib = Stdlib
 module Laws_gen_Gen_kinded = Gen_kinded
-type 'a each = {
+type 'a each =
+  {
   kinded: 'a ;
   narrowed: 'a ;
-  plain: 'a }
-let names = { kinded = "kinded"; narrowed = "narrowed"; plain = "plain" }
+  nullable: 'a ;
+  plain: 'a ;
+  refined: 'a }
+let names =
+  {
+    kinded = "kinded";
+    narrowed = "narrowed";
+    nullable = "nullable";
+    plain = "plain";
+    refined = "refined"
+  }
 let locations =
   {
     kinded =
       {
         CamlinternalLaw.file = "gen_kinded.ml";
-        start_line = 22;
+        start_line = 23;
         start_col = 0;
-        end_line = 22;
+        end_line = 23;
         end_col = 45
       };
     narrowed =
       {
         CamlinternalLaw.file = "gen_kinded.ml";
-        start_line = 24;
+        start_line = 25;
         start_col = 0;
-        end_line = 24;
+        end_line = 25;
         end_col = 44
+      };
+    nullable =
+      {
+        CamlinternalLaw.file = "gen_kinded.ml";
+        start_line = 26;
+        start_col = 0;
+        end_line = 26;
+        end_col = 56
       };
     plain =
       {
         CamlinternalLaw.file = "gen_kinded.ml";
-        start_line = 25;
+        start_line = 27;
         start_col = 0;
-        end_line = 25;
+        end_line = 27;
         end_col = 27
+      };
+    refined =
+      {
+        CamlinternalLaw.file = "gen_kinded.ml";
+        start_line = 30;
+        start_col = 0;
+        end_line = 31;
+        end_col = 60
       }
   }
-let map { kinded; narrowed; plain } ~f =
-  { kinded = (f kinded); narrowed = (f narrowed); plain = (f plain) }
-let to_list { kinded; narrowed; plain } = [kinded; narrowed; plain]
+let map { kinded; narrowed; nullable; plain; refined } ~f =
+  {
+    kinded = (f kinded);
+    narrowed = (f narrowed);
+    nullable = (f nullable);
+    plain = (f plain);
+    refined = (f refined)
+  }
+let to_list { kinded; narrowed; nullable; plain; refined } =
+  [kinded; narrowed; nullable; plain; refined]
 type kinded_input =
   | Kinded_input: ('a : immutable_data) . {
   x: ('a : immutable_data) } -> kinded_input 
@@ -43,9 +76,16 @@ type narrowed_input =
   | Narrowed_input: ('a : immutable_data) . {
   x: 'a ;
   y: 'a } -> narrowed_input 
+type nullable_input =
+  | Nullable_input: ('a : value_or_null) . {
+  x: 'a } -> nullable_input 
 type plain_input =
   | Plain_input: 'a . {
   x: 'a } -> plain_input 
+type refined_input =
+  | Refined_input: 'a . {
+  w: 'a Laws_gen_Gen_kinded.ty ;
+  x: 'a } -> refined_input 
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
@@ -53,7 +93,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
       sig
         val kinded : kinded_input Choice.t
         val narrowed : narrowed_input Choice.t
+        val nullable : nullable_input Choice.t
         val plain : plain_input Choice.t
+        val refined : refined_input Choice.t
       end
     let kinded ((module C)  : (module Choices))  : unit Law.t =
       Law.Bind
@@ -69,9 +111,9 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "gen_kinded.ml";
-                     start_line = 22;
+                     start_line = 23;
                      start_col = 42;
-                     end_line = 22;
+                     end_line = 23;
                      end_col = 45
                    }
                }))
@@ -90,10 +132,31 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "gen_kinded.ml";
-                     start_line = 24;
+                     start_line = 25;
                      start_col = 34;
-                     end_line = 24;
+                     end_line = 25;
                      end_col = 44
+                   }
+               }))
+    let nullable ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.nullable),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.nullable;
+                 predicate =
+                   (fun ((Nullable_input { x }) : nullable_input) ->
+                      (fun (type a : value_or_null) (x : a) ->
+                         (Laws_gen_Stdlib.(=) 1 1 : bool)) x);
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_kinded.ml";
+                     start_line = 26;
+                     start_col = 51;
+                     end_line = 26;
+                     end_col = 56
                    }
                }))
     let plain ((module C)  : (module Choices))  : unit Law.t =
@@ -110,16 +173,45 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                  location =
                    {
                      CamlinternalLaw.file = "gen_kinded.ml";
-                     start_line = 25;
+                     start_line = 27;
                      start_col = 22;
-                     end_line = 25;
+                     end_line = 27;
                      end_col = 27
+                   }
+               }))
+    let refined ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.refined),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.refined;
+                 predicate =
+                   (fun ((Refined_input { w; x }) : refined_input) ->
+                      (fun (type a) (w : a Laws_gen_Gen_kinded.ty) (x : a) ->
+                         (Laws_gen_Stdlib.(&&)
+                            (match w with
+                             | (Int : _ Laws_gen_Gen_kinded.ty) ->
+                                 Laws_gen_Stdlib.(>=) x 0
+                             | (Bool : _ Laws_gen_Gen_kinded.ty) ->
+                                 Laws_gen_Stdlib.(||) x (true : bool))
+                            (Laws_gen_Stdlib.(==) x x) : bool)) w x);
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_kinded.ml";
+                     start_line = 31;
+                     start_col = 2;
+                     end_line = 31;
+                     end_col = 60
                    }
                }))
     let laws choices =
       {
         kinded = (kinded choices);
         narrowed = (narrowed choices);
-        plain = (plain choices)
+        nullable = (nullable choices);
+        plain = (plain choices);
+        refined = (refined choices)
       }
   end

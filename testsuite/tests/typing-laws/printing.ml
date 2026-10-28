@@ -24,13 +24,14 @@ module type Basic =
 |}]
 
 (* The kind of a type variable shared by the parameters is printed at its
-   first occurrence. *)
+   first occurrence, and the one of a type of the law where it is bound. *)
 
 module type Kinded = sig
   val f : ('a : immutable_data) -> bool
   law? kinded (x : ('a : immutable_data)) (y : 'a) : f x && f y
   law? kinded_unused (x : ('a : immutable_data)) : 1 = 1
   law? plain (xs : 'a list) : 1 = 1
+  law? types (type a (b : value_or_null)) (x : a) (y : b) (z : 'a) : 1 = 1
 end
 [%%expect {|
 module type Kinded =
@@ -39,6 +40,8 @@ module type Kinded =
     law? kinded (x : ('a : immutable_data)) (y : 'a) : (f x) && (f y)
     law? kinded_unused (x : ('a : immutable_data)) : (1) = (1)
     law? plain (xs : 'a list) : (1) = (1)
+    law? types (type a) (type (b : value_or_null)) (x : a) (y : b)
+      (z : 'a0) : (1) = (1)
   end
 |}]
 

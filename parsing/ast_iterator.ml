@@ -915,9 +915,14 @@ let default_iterator =
       );
 
     law_declaration =
-      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-                  plaw_attributes; plaw_loc } ->
+      (fun this { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+                  plaw_conclusion; plaw_attributes; plaw_loc } ->
          iter_loc this plaw_name;
+         List.iter
+           (fun (name, jkind) ->
+              iter_loc this name;
+              Option.iter (this.jkind_annotation this) jkind)
+           plaw_newtypes;
          List.iter
            (fun (name, ty) ->
               iter_loc this name; Option.iter (this.typ this) ty)

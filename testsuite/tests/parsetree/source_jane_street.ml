@@ -1895,7 +1895,7 @@ Error: Exclave expression should only be in tail position of the current region.
 
 law? length_nonneg (s : string) : String.length s >= 0
 [%%expect{|
-law? length_nonneg (s : String.t) : (String.length s) >= (0)
+law? length_nonneg (s : string) : (String.length s) >= (0)
 |}]
 
 law? sum_pos (x : int) (y : int) : x > 0 ===> y > 0 ===> x + y > 0

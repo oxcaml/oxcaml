@@ -24,6 +24,7 @@ law? polymorphic_params (xs : 'a list) (f : 'a -> 'b) :
   (List.length (List.map f xs)) = (List.length xs)
 law? unannotated_params x y z : ((x + y) + z) = ((z + y) + x)
 law? mixed_params x (y : int) z (t : 'a list) : ((x + y) = z) && (t = [])
+law? type_params (type a) (type (b : value_or_null)) (type c) (x : a) : true
 law? complex_param_types (p : (int * string)) (f : int -> int -> int) (o :
   int option) (r : < m: int   > ) (v : [ `A  | `B of int ]) (t :
   (int, string) Hashtbl.t) : true

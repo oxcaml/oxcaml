@@ -1166,13 +1166,19 @@ and print_out_jkind_decl ppf jkd =
   fprintf ppf "@[kind_ %s%a@]" jkd.ojkind_name print_manifest jkd.ojkind_jkind
 
 and print_out_law_decl ppf ld =
+  let print_newtype ppf = function
+    | (a, None) -> fprintf ppf "@ (type %a)" print_lident a
+    | (a, Some jkind) ->
+        fprintf ppf "@ (type (%a : %a))" print_lident a print_out_jkind jkind
+  in
   let print_param ppf (x, ty) =
     fprintf ppf "@ (%a : %a)" print_lident x !out_type ty
   in
   let print_assumption ppf spec =
     fprintf ppf "%a ===>@ " print_out_spec spec
   in
-  fprintf ppf "@[<2>law? %a%a :@ %a%a@]" print_lident ld.olaw_name
+  fprintf ppf "@[<2>law? %a%a%a :@ %a%a@]" print_lident ld.olaw_name
+    (fun ppf -> List.iter (print_newtype ppf)) ld.olaw_newtypes
     (fun ppf -> List.iter (print_param ppf)) ld.olaw_params
     (fun ppf -> List.iter (print_assumption ppf)) ld.olaw_assumptions
     print_out_spec ld.olaw_conclusion

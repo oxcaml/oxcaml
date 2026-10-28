@@ -4218,14 +4218,14 @@ jkind_decl:
     }
 ;
 
-(* Laws: [law? name p1 ... pn : A1 ===> ... ===> Ak ===> C], where each
-   parameter is [x] or [(x : T)] *)
+(* Laws: [law? name (type a1 ... am) p1 ... pn : A1 ===> ... ===> Ak ===> C],
+   where each parameter is [x] or [(x : T)]. The types come first. *)
 
 law_declaration:
   LAWQUESTION
   attrs1 = attributes
   plaw_name = mkrhs(LIDENT)
-  plaw_params = law_param*
+  params = law_params
   COLON
   body = law_body
   attrs2 = post_item_attributes
@@ -4234,9 +4234,18 @@ law_declaration:
       let plaw_attributes = add_docs_attrs docs (attrs1 @ attrs2) in
       let plaw_loc = make_loc $sloc in
       let plaw_assumptions, plaw_conclusion = body in
-      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-        plaw_attributes; plaw_loc }
+      let plaw_newtypes, plaw_params = params in
+      { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+        plaw_conclusion; plaw_attributes; plaw_loc }
     }
+;
+
+law_params:
+  | params = law_param*
+      { ([], params) }
+  | LPAREN TYPE newtypes = newtypes RPAREN rest = law_params
+      { let (newtypes', params) = rest in
+        (newtypes @ newtypes', params) }
 ;
 
 law_param:

@@ -85,10 +85,12 @@ module P : sig
 
     val fun_ :
       ?return:core_type ->
+      ?newtypes:(string * jkind_annotation option) list ->
       (Asttypes.arg_label * pattern) list ->
       expression ->
       expression
-    (** [fun_ ~return params body] is [fun params : return -> body]. *)
+    (** [fun_ ~return ~newtypes params body] is
+        [fun (type (a1 : k1) ...) params : return -> body]. *)
 
     val constraint_ : expression -> core_type -> expression
     val letmodule : string -> module_expr -> expression -> expression
@@ -217,15 +219,13 @@ end = struct
 
     let apply f args = H.Exp.apply f args
 
-    let fun_ ?return params body =
+    let fun_ ?return ?(newtypes = []) params body =
+      let param pparam_desc = { pparam_desc; pparam_loc = Location.none } in
       let params =
-        List.map
-          (fun (label, pat) ->
-            {
-              pparam_desc = Pparam_val (label, None, pat);
-              pparam_loc = Location.none;
-            })
-          params
+        List.map (fun (a, k) -> param (Pparam_newtype (mknoloc a, k))) newtypes
+        @ List.map
+            (fun (label, pat) -> param (Pparam_val (label, None, pat)))
+            params
       in
       let constraint_ =
         {
@@ -354,6 +354,7 @@ type law = {
   l_loc : Location.t;
   (* The scopes of the law, outermost first. *)
   l_frames : frame list;
+  l_newtypes : Typedtree.law_newtype list;
   l_params : Typedtree.law_param list;
   l_assumptions : Typedtree.expression list;
   l_conclusion : Typedtree.expression;
@@ -496,6 +497,7 @@ let law ctx (ld : Typedtree.law_declaration) =
     l_display = display;
     l_loc = ld.law_loc;
     l_frames = List.rev ctx.frames;
+    l_newtypes = ld.law_newtypes;
     l_params = ld.law_params;
     l_assumptions = List.map Translspec.typedtree ld.law_assumptions;
     l_conclusion = Translspec.typedtree ld.law_conclusion;
@@ -779,8 +781,22 @@ let mapper print =
     label = (fun _ lbl lid -> { lid with txt = Lident lbl.lbl_name });
   }
 
-let core_type print cty =
+(* The types [(type a)] of [newtypes] are written as type variables. With
+   [wildcards], the type variables that are not universal are written [_], and
+   aliases are dropped. *)
+let core_type ?(newtypes = []) ?(wildcards = false) print cty =
   let m = mapper print in
+  let typ (sub : Untypeast.mapper) (cty : Typedtree.core_type) =
+    match (cty.ctyp_desc, get_desc cty.ctyp_type) with
+    | Ttyp_constr (Pident id, _, []), _ -> (
+        match List.find_opt (fun (id', _) -> Ident.same id id') newtypes with
+        | Some (_, name) -> P.Typ.var name
+        | None -> m.typ sub cty)
+    | Ttyp_var _, Tvar _ when wildcards -> P.Typ.any
+    | Ttyp_alias (cty, _, _), _ when wildcards -> sub.typ sub cty
+    | _ -> m.typ sub cty
+  in
+  let m = { m with typ } in
   m.typ m cty
 
 let module_type print mty =
@@ -935,25 +951,45 @@ let each_values laws =
           (P.Exp.list (List.map (fun law -> P.Exp.var law.l_field) laws));
       ]
 
-(** The input type of a law [l (x1 : t1) ... (xn : tn)], which quantifies the
-    type variables of the annotations with their kinds:
+let param_type_variables law =
+  Typemod.law_type_variables
+    (List.map
+       (fun (p : Typedtree.law_param) -> p.lp_type.ctyp_type)
+       law.l_params)
+
+let newtype_jkind law (t : Typedtree.law_newtype) =
+  printable_jkind ~loc:law.l_loc t.ln_name.txt t.ln_type
+
+(** The input type of a law [l (type a ...) (x1 : t1) ... (xn : tn)], which
+    quantifies the types of the law and the type variables of the annotations
+    with their kinds:
     {[
       type l_input =
         | L_input : ('a : k) ... . { x1 : t1; ...; xn : tn } -> l_input
     ]} *)
 let input_declaration print law =
-  let vars =
+  let tyvars = param_type_variables law in
+  let used = ref (String.Set.of_list (List.map fst tyvars)) in
+  let newtypes =
     List.map
-      (fun (name, ty) -> (name, printable_jkind ~loc:law.l_loc name ty))
-      (Typemod.law_type_variables
-         (List.map
-            (fun (p : Typedtree.law_param) -> p.lp_type.ctyp_type)
-            law.l_params))
+      (fun (t : Typedtree.law_newtype) -> (t, fresh used t.ln_name.txt))
+      law.l_newtypes
+  in
+  let vars =
+    List.map (fun (t, name) -> (name, newtype_jkind law t)) newtypes
+    @ List.map
+        (fun (name, ty) -> (name, printable_jkind ~loc:law.l_loc name ty))
+        tyvars
+  in
+  let newtypes =
+    List.map
+      (fun ((t : Typedtree.law_newtype), name) -> (t.ln_id, name))
+      newtypes
   in
   let args =
     List.map
       (fun (p : Typedtree.law_param) ->
-        (Ident.name p.lp_id, core_type (law_print print law) p.lp_type))
+        (Ident.name p.lp_id, core_type ~newtypes (law_print print law) p.lp_type))
       law.l_params
   in
   P.Type.variant (input_type law)
@@ -1052,6 +1088,12 @@ let law_constructor name arg = P.Exp.construct (ldot "Law" name) (Some arg)
           predicate = (fun (M.L_input { x1; ...; xn } : M.l_input) ->
             (clause : bool));
           location = { CamlinternalLaw.file = ...; ... } }
+    ]}
+    The types [(type a)] of a law are bound for the clause, which may refer to
+    them, by a function of the parameters, whose other type variables are the
+    existential types of the input:
+    {[
+      (fun (type (a : k)) (x1 : t1) ... (xn : tn) -> (clause : bool)) x1 ... xn
     ]} *)
 let clause_check ~check print law n (clause : Typedtree.expression) =
   let fields =
@@ -1069,10 +1111,35 @@ let clause_check ~check print law n (clause : Typedtree.expression) =
       (P.Pat.construct (qualified n (constructor law)) fields)
       (P.Typ.constr (qualified n (input_type law)) [])
   in
-  let body = expression (clause_print print law) clause in
-  let predicate =
-    P.Exp.fun_ [ param pattern ] (P.Exp.constraint_ body (tconstr "bool" []))
+  let body =
+    P.Exp.constraint_
+      (expression (clause_print print law) clause)
+      (tconstr "bool" [])
   in
+  let newtypes =
+    List.map
+      (fun (t : Typedtree.law_newtype) -> (t.ln_name.txt, newtype_jkind law t))
+      law.l_newtypes
+  in
+  let typed (p : Typedtree.law_param) =
+    param
+      (P.Pat.constraint_
+         (P.Pat.var (Ident.name p.lp_id))
+         (core_type ~wildcards:true (clause_print print law) p.lp_type))
+  in
+  let argument (p : Typedtree.law_param) =
+    (Asttypes.Nolabel, P.Exp.var (Ident.name p.lp_id))
+  in
+  let body =
+    match (newtypes, law.l_params) with
+    | [], _ -> body
+    | newtypes, [] -> P.Exp.fun_ ~newtypes [] body
+    | newtypes, params ->
+        P.Exp.apply
+          (P.Exp.fun_ ~newtypes (List.map typed params) body)
+          (List.map argument params)
+  in
+  let predicate = P.Exp.fun_ [ param pattern ] body in
   law_constructor check
     (P.Exp.record
        [

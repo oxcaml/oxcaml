@@ -397,9 +397,14 @@ and copy_jkind_declaration :
 
 and copy_law_declaration :
   Ast_500.Parsetree.law_declaration -> Ast_999.Parsetree.law_declaration =
-  fun { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-        plaw_attributes; plaw_loc } ->
+  fun { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+        plaw_conclusion; plaw_attributes; plaw_loc } ->
   { plaw_name = copy_loc (fun x -> x) plaw_name;
+    plaw_newtypes =
+      List.map
+        (fun (x, jkind) ->
+          copy_loc (fun x -> x) x, Option.map copy_jkind_annotation jkind)
+        plaw_newtypes;
     plaw_params =
       List.map
         (fun (x, ty) -> copy_loc (fun x -> x) x, Option.map copy_core_type ty)

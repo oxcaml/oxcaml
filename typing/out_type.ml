@@ -4055,14 +4055,17 @@ and label_of_spec : Spec.arg_label -> Outcometree.arg_label = function
 
 (* The kind of a type variable with one worth printing (see [val f : ('a :
    k). ...]) is annotated at its first occurrence in the parameters, which
-   share their variables: [(x : ('a : k))]. *)
-let rec annotate_first_occurrence kinds (ty : out_type) =
-  let annotate = annotate_first_occurrence in
+   share their variables: [(x : ('a : k))]. The variables of [newtypes] are
+   printed as the types [(type a)] of the law. *)
+let rec annotate_first_occurrence ~newtypes kinds (ty : out_type) =
+  let annotate = annotate_first_occurrence ~newtypes in
   let labelled kinds (label, ty) =
     let kinds, ty = annotate kinds ty in
     kinds, (label, ty)
   in
   match ty with
+  | Otyp_var (_, name) when List.mem name newtypes ->
+      kinds, Otyp_constr (Oide_ident { printed_name = name }, [])
   | Otyp_var (_, name) ->
       begin match List.assoc_opt name kinds with
       | Some kind -> List.remove_assoc name kinds, Otyp_jkind_annot (ty, kind)
@@ -4128,10 +4131,18 @@ let tree_of_type_jkind ty =
   out_jkind_option_of_jkind ~ignore_null:false !printing_env
     (Ctype.estimate_type_jkind !printing_env ty)
 
-let tree_of_law_params params =
+let tree_of_law_params newtypes params =
   let tys = List.map snd params in
   let base = With_locality.Const.legacy in
-  prepare_for_printing ~base tys;
+  prepare_for_printing ~base (newtypes @ tys);
+  let newtypes =
+    List.map
+      (fun ty ->
+         (Variable_names.name_of_type Variable_names.new_name
+            (Transient_expr.repr ty),
+          tree_of_type_jkind ty))
+      newtypes
+  in
   let params =
     List.map
       (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
@@ -4139,20 +4150,31 @@ let tree_of_law_params params =
   in
   let kinds =
     List.filter_map
-      (fun (name, kind) -> Option.map (fun kind -> (name, kind)) kind)
+      (fun (name, kind) ->
+         if List.mem_assoc name newtypes then None
+         else Option.map (fun kind -> (name, kind)) kind)
       (zap_qtvs_if_boring (tree_of_qtvs (extract_qtvs tys)))
   in
-  snd
-    (List.fold_left_map
-       (fun kinds (x, ty) ->
-          let kinds, ty = annotate_first_occurrence kinds ty in
-          kinds, (x, ty))
-       kinds params)
+  let params =
+    snd
+      (List.fold_left_map
+         (fun kinds (x, ty) ->
+            let kinds, ty =
+              annotate_first_occurrence ~newtypes:(List.map fst newtypes)
+                kinds ty
+            in
+            kinds, (x, ty))
+         kinds params)
+  in
+  newtypes, params
 
 let tree_of_law_declaration id decl =
-  let olaw_params = tree_of_law_params decl.law_params in
+  let olaw_newtypes, olaw_params =
+    tree_of_law_params decl.law_newtypes decl.law_params
+  in
   Osig_law
     { olaw_name = Ident.name id;
+      olaw_newtypes;
       olaw_params;
       olaw_assumptions = List.map tree_of_spec decl.law_assumptions;
       olaw_conclusion = tree_of_spec decl.law_conclusion }

@@ -418,12 +418,16 @@ and spec_label_definition sub = function
   | Soverridden (lid, e) -> iter_loc_lid sub lid; sub.spec_expression sub e
 
 let[@warning "+9"] law_declaration sub
-      ({law_id = _; law_name; law_law = _; law_params; law_assumptions;
-        law_conclusion; law_attributes; law_loc} as x) =
+      ({law_id = _; law_name; law_law = _; law_newtypes; law_params;
+        law_assumptions; law_conclusion; law_attributes; law_loc} as x) =
   sub.item_declaration sub (Law x);
   sub.location sub law_loc;
   sub.attributes sub law_attributes;
   iter_loc sub law_name;
+  List.iter
+    (fun {ln_id = _; ln_name; ln_jkind = _; ln_type = _} ->
+       iter_loc sub ln_name)
+    law_newtypes;
   List.iter
     (fun {lp_id = _; lp_name; lp_type} ->
        iter_loc sub lp_name; sub.typ sub lp_type)

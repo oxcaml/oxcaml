@@ -2251,14 +2251,18 @@ let transl_law env (ld : Parsetree.law_declaration)
   Language_extension.assert_enabled ~loc:ld.plaw_loc Laws ();
   (* Shadowing in law parameters causes issues in the generated code, so we
      disallow shadowing. *)
-  List.fold_left
-    (fun seen (name, _) ->
-       if List.mem name.txt seen then
-         Error.log_and_raise name.loc env
-           (Law_duplicate_parameter name.txt);
-       name.txt :: seen)
-    [] ld.plaw_params
-  |> ignore;
+  let check_duplicates names =
+    List.fold_left
+      (fun seen (name, _) ->
+         if List.mem name.txt seen then
+           Error.log_and_raise name.loc env
+             (Law_duplicate_parameter name.txt);
+         name.txt :: seen)
+      [] names
+    |> ignore
+  in
+  check_duplicates ld.plaw_newtypes;
+  check_duplicates ld.plaw_params;
   (* We require law parameters to be fully annotated, because the generation
      of laws must be able to print their types. We print their types based on
      the typedtree expression rather than the inferred type to ensure they can
@@ -2271,10 +2275,35 @@ let transl_law env (ld : Parsetree.law_declaration)
             Error.log_and_raise sty.ptyp_loc env Law_wildcard_in_parameter
         | _ -> Ast_iterator.default_iterator.typ it sty) }
   in
-  let law_params, vars, law_assumptions, law_conclusion =
+  let law_newtypes, law_params, law_types, vars, law_assumptions,
+      law_conclusion =
     Ctype.with_local_level_generalize ~before_generalize:ignore
       begin fun () ->
         Typetexp.TyVarEnv.reset ();
+        (* The types are abstract in the law, as in [fun (type a) -> ...] *)
+        let env, newtypes =
+          List.fold_left_map
+            (fun env (ln_name, ln_jkind) ->
+               let jkind =
+                 Jkind.of_annotation_option_default env
+                   ~context:(Newtype_declaration ln_name.txt)
+                   ~default:(Jkind.Builtin.value ~why:Univar) ln_jkind
+               in
+               let decl =
+                 Ctype.new_local_type ~loc:ln_name.loc Definition jkind
+               in
+               let ln_id, env =
+                 Env.enter_type ~scope:(Ctype.create_scope ()) ln_name.txt
+                   decl env
+               in
+               let ln_type =
+                 if Typetexp.valid_tyvar_name ln_name.txt then
+                   Ctype.newvar ~name:ln_name.txt jkind
+                 else Ctype.newvar jkind
+               in
+               env, { ln_id; ln_name; ln_jkind; ln_type })
+            env ld.plaw_newtypes
+        in
         let params =
           List.map
             (fun (lp_name, sty) ->
@@ -2287,9 +2316,13 @@ let transl_law env (ld : Parsetree.law_declaration)
                in
                let lp_type =
                  (* New type variables get a sort, as in a value
-                    declaration. *)
-                 Typetexp.transl_simple_type env ~new_var_jkind:Sort
-                   ~closed:false With_locality.Const.legacy sty
+                    declaration. The structure of the type is generalized, as
+                    for an annotation in an expression, so that a refinement in
+                    a clause is principal. *)
+                 Ctype.with_local_level_generalize_structure
+                   ~before_generalize:ignore (fun () ->
+                      Typetexp.transl_simple_type env ~new_var_jkind:Sort
+                        ~closed:false With_locality.Const.legacy sty)
                in
                let ty = lp_type.ctyp_type in
                let sort =
@@ -2342,7 +2375,33 @@ let transl_law env (ld : Parsetree.law_declaration)
         in
         let law_assumptions = List.map clause ld.plaw_assumptions in
         let law_conclusion = clause ld.plaw_conclusion in
-        List.map fst params, vars, law_assumptions, law_conclusion
+        (* Outside of the law, the types stand for type variables. *)
+        let law_types =
+          List.map
+            (fun ({ lp_type; _ }, _) ->
+               let ty = Subst.type_expr Subst.identity lp_type.ctyp_type in
+               let seen = Hashtbl.create 8 in
+               let rec replace t =
+                 if not (Hashtbl.mem seen (get_id t)) then begin
+                   Hashtbl.add seen (get_id t) ();
+                   match get_desc t with
+                   | Tconstr (Path.Pident id, _, _) ->
+                       begin match
+                         List.find_opt
+                           (fun { ln_id; _ } -> Ident.same id ln_id) newtypes
+                       with
+                       | Some { ln_type; _ } -> link_type t ln_type
+                       | None -> Btype.iter_type_expr replace ignore t
+                       end
+                   | _ -> Btype.iter_type_expr replace ignore t
+                 end
+               in
+               replace ty;
+               ty)
+            params
+        in
+        newtypes, List.map fst params, law_types, vars, law_assumptions,
+        law_conclusion
       end
   in
   (* Type variables in paramter annotations may not be instantiated, including
@@ -2368,8 +2427,8 @@ let transl_law env (ld : Parsetree.law_declaration)
   let law_assumptions = List.map spectree law_assumptions in
   let law_conclusion = spectree law_conclusion in
   let law_law : Types.law_declaration =
-    { law_params =
-        List.map (fun p -> (p.lp_id, p.lp_type.ctyp_type)) law_params;
+    { law_newtypes = List.map (fun t -> t.ln_type) law_newtypes;
+      law_params = List.map2 (fun p ty -> (p.lp_id, ty)) law_params law_types;
       law_assumptions = List.map Translspec.spec law_assumptions;
       law_conclusion = Translspec.spec law_conclusion;
       law_attributes = ld.plaw_attributes;
@@ -2385,6 +2444,7 @@ let transl_law env (ld : Parsetree.law_declaration)
   { law_id = Ident.create_local ld.plaw_name.txt;
     law_name = ld.plaw_name;
     law_law;
+    law_newtypes;
     law_params;
     law_assumptions;
     law_conclusion;

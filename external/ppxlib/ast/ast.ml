@@ -938,6 +938,7 @@ and extension_constructor_kind = Parsetree.extension_constructor_kind =
   and law_declaration = Parsetree.law_declaration =
     {
       plaw_name : string loc;
+      plaw_newtypes : (string loc * jkind_annotation option) list;
       plaw_params : (string loc * core_type option) list;
       plaw_assumptions : expression list;
       plaw_conclusion : expression;
@@ -2158,9 +2159,15 @@ class virtual map =
         { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     method law_declaration : law_declaration -> law_declaration=
       fun
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } ->
         let plaw_name = self#loc self#string plaw_name in
+        let plaw_newtypes =
+          self#list
+            (fun (a, b) ->
+               let a = self#loc self#string a in
+               let b = self#option self#jkind_annotation b in (a, b))
+            plaw_newtypes in
         let plaw_params =
           self#list
             (fun (a, b) ->
@@ -2171,8 +2178,8 @@ class virtual map =
         let plaw_conclusion = self#expression plaw_conclusion in
         let plaw_attributes = self#attributes plaw_attributes in
         let plaw_loc = self#location plaw_loc in
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc }
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc }
     method class_type : class_type -> class_type=
       fun { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc pcty_desc in
@@ -3163,9 +3170,13 @@ class virtual iter =
         self#location pjkind_loc
     method law_declaration : law_declaration -> unit=
       fun
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } ->
         self#loc self#string plaw_name;
+        self#list
+          (fun (a, b) ->
+             self#loc self#string a; self#option self#jkind_annotation b)
+          plaw_newtypes;
         self#list
           (fun (a, b) -> self#loc self#string a; self#option self#core_type b)
           plaw_params;
@@ -4185,9 +4196,15 @@ class virtual ['acc] fold =
         let acc = self#location pjkind_loc acc in acc
     method law_declaration : law_declaration -> 'acc -> 'acc=
       fun
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } acc ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } acc ->
         let acc = self#loc self#string plaw_name acc in
+        let acc =
+          self#list
+            (fun (a, b) acc ->
+               let acc = self#loc self#string a acc in
+               let acc = self#option self#jkind_annotation b acc in acc)
+            plaw_newtypes acc in
         let acc =
           self#list
             (fun (a, b) acc ->
@@ -5542,9 +5559,15 @@ class virtual ['acc] fold_map =
     method law_declaration :
       law_declaration -> 'acc -> (law_declaration * 'acc)=
       fun
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } acc ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } acc ->
         let (plaw_name, acc) = self#loc self#string plaw_name acc in
+        let (plaw_newtypes, acc) =
+          self#list
+            (fun (a, b) acc ->
+               let (a, acc) = self#loc self#string a acc in
+               let (b, acc) = self#option self#jkind_annotation b acc in
+               ((a, b), acc)) plaw_newtypes acc in
         let (plaw_params, acc) =
           self#list
             (fun (a, b) acc ->
@@ -5556,8 +5579,8 @@ class virtual ['acc] fold_map =
         let (plaw_conclusion, acc) = self#expression plaw_conclusion acc in
         let (plaw_attributes, acc) = self#attributes plaw_attributes acc in
         let (plaw_loc, acc) = self#location plaw_loc acc in
-        ({ plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc },
+        ({ plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc },
           acc)
     method class_type : class_type -> 'acc -> (class_type * 'acc)=
       fun { pcty_desc; pcty_loc; pcty_attributes } acc ->
@@ -6983,9 +7006,15 @@ class virtual ['ctx] map_with_context =
         { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
     method law_declaration : 'ctx -> law_declaration -> law_declaration=
       fun ctx
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } ->
         let plaw_name = self#loc self#string ctx plaw_name in
+        let plaw_newtypes =
+          self#list
+            (fun ctx (a, b) ->
+               let a = self#loc self#string ctx a in
+               let b = self#option self#jkind_annotation ctx b in (a, b)) ctx
+            plaw_newtypes in
         let plaw_params =
           self#list
             (fun ctx (a, b) ->
@@ -6997,8 +7026,8 @@ class virtual ['ctx] map_with_context =
         let plaw_conclusion = self#expression ctx plaw_conclusion in
         let plaw_attributes = self#attributes ctx plaw_attributes in
         let plaw_loc = self#location ctx plaw_loc in
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc }
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc }
     method class_type : 'ctx -> class_type -> class_type=
       fun ctx { pcty_desc; pcty_loc; pcty_attributes } ->
         let pcty_desc = self#class_type_desc ctx pcty_desc in
@@ -8451,9 +8480,16 @@ class virtual ['res] lift =
           ("pjkind_loc", pjkind_loc)]
     method law_declaration : law_declaration -> 'res=
       fun
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } ->
         let plaw_name = self#loc self#string plaw_name in
+        let plaw_newtypes =
+          self#list
+            (fun (a, b) ->
+               let a = self#loc self#string a in
+               let b = self#option self#jkind_annotation b in
+               self#tuple [a; b])
+            plaw_newtypes in
         let plaw_params =
           self#list
             (fun (a, b) ->
@@ -8466,6 +8502,7 @@ class virtual ['res] lift =
         let plaw_loc = self#location plaw_loc in
         self#record
           [("plaw_name", plaw_name);
+          ("plaw_newtypes", plaw_newtypes);
           ("plaw_params", plaw_params);
           ("plaw_assumptions", plaw_assumptions);
           ("plaw_conclusion", plaw_conclusion);
@@ -10479,9 +10516,17 @@ class virtual ['ctx,'res] lift_map_with_context =
     method law_declaration :
       'ctx -> law_declaration -> (law_declaration * 'res)=
       fun ctx
-        { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-          plaw_attributes; plaw_loc } ->
+        { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+          plaw_conclusion; plaw_attributes; plaw_loc } ->
         let plaw_name = self#loc self#string ctx plaw_name in
+        let plaw_newtypes =
+          self#list
+            (fun ctx (a, b) ->
+               let a = self#loc self#string ctx a in
+               let b = self#option self#jkind_annotation ctx b in
+               (((Stdlib.fst a), (Stdlib.fst b)),
+                 (self#tuple ctx [Stdlib.snd a; Stdlib.snd b]))) ctx
+            plaw_newtypes in
         let plaw_params =
           self#list
             (fun ctx (a, b) ->
@@ -10497,6 +10542,7 @@ class virtual ['ctx,'res] lift_map_with_context =
         let plaw_loc = self#location ctx plaw_loc in
         ({
            plaw_name = (Stdlib.fst plaw_name);
+           plaw_newtypes = (Stdlib.fst plaw_newtypes);
            plaw_params = (Stdlib.fst plaw_params);
            plaw_assumptions = (Stdlib.fst plaw_assumptions);
            plaw_conclusion = (Stdlib.fst plaw_conclusion);
@@ -10505,6 +10551,7 @@ class virtual ['ctx,'res] lift_map_with_context =
          },
           (self#record ctx
              [("plaw_name", (Stdlib.snd plaw_name));
+             ("plaw_newtypes", (Stdlib.snd plaw_newtypes));
              ("plaw_params", (Stdlib.snd plaw_params));
              ("plaw_assumptions", (Stdlib.snd plaw_assumptions));
              ("plaw_conclusion", (Stdlib.snd plaw_conclusion));

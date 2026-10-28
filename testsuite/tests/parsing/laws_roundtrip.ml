@@ -48,6 +48,16 @@ let () = roundtrip {|
 law? mixed x (y : int) z (t : 'a list) : ((x + y) = z) && (t = [])
 |}]
 
+(* Types, with and without kinds, come before the parameters. *)
+
+let () = roundtrip {|
+  law? types (type a (b : value_or_null)) (type c) (x : a) (y : b) : true
+|}
+[%%expect {|
+law? types (type a) (type (b : value_or_null)) (type c) (x : a) (y :
+  b) : true
+|}]
+
 (* The clauses are [expr]s: the ones that extend as far as possible are
    parenthesized. *)
 

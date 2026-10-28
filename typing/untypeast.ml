@@ -356,6 +356,10 @@ let jkind_declaration _sub decl =
 
 let law_declaration sub (decl : T.law_declaration) =
   { plaw_name = map_loc sub decl.law_name;
+    plaw_newtypes =
+      List.map
+        (fun (t : T.law_newtype) -> (map_loc sub t.ln_name, t.ln_jkind))
+        decl.law_newtypes;
     plaw_params =
       List.map
         (fun (p : T.law_param) ->

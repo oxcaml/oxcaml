@@ -191,6 +191,26 @@ Error: Signature mismatch:
        the layout value non_float.
 |}]
 
+(* The types of a law stand for type variables, with their kinds. *)
+
+module Types : sig
+  law? p (x : 'a) (y : 'b) : 1 = 1
+end = struct
+  law? p (type a) (x : a) (y : 'b) : 1 = 1
+end
+[%%expect {|
+module Types : sig law? p (x : 'a) (y : 'b) : (1) = (1) end
+|}]
+
+module Types_nullable : sig
+  law? p (type a) (x : a) : 1 = 1
+end = struct
+  law? p (type (a : value_or_null)) (x : a) : 1 = 1
+end
+[%%expect {|
+module Types_nullable : sig law? p (type a) (x : a) : (1) = (1) end
+|}]
+
 (* Two laws of a signature cannot have the same name. *)
 
 module type Dup = sig

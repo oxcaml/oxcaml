@@ -8958,6 +8958,7 @@ let nondep_law_declaration env ids decl =
   let spec = Spec.map_paths ~value_path:path ~type_path:path in
   let decl =
     { decl with
+      law_newtypes = List.map ty decl.law_newtypes;
       law_params = List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;
       law_assumptions = List.map spec decl.law_assumptions;
       law_conclusion = spec decl.law_conclusion }

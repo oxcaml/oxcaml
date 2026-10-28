@@ -143,6 +143,66 @@ Error: The type variable "'b" of the law parameters stands for "'a".
        Write that type in the annotation instead.
 |}]
 
+(* The types of a law are abstract in its clauses, *)
+
+law? abstract (type a) (x : a) : x = 1
+[%%expect {|
+Line 1, characters 37-38:
+1 | law? abstract (type a) (x : a) : x = 1
+                                         ^
+Error: The constant "1" has type "int" but an expression was expected of type "a"
+|}]
+
+(* which can refine them by matching on a GADT. *)
+
+type _ ty = Int : int ty | Bool : bool ty
+law? refined (type a) (w : a ty) (x : a) :
+  (match w with Int -> x >= 0 | Bool -> x || not x)
+[%%expect {|
+type _ ty = Int : int ty | Bool : bool ty
+law? refined (type a) (w : a ty) (x : a) :
+  match w with | (Int : _ ty) -> (x >= (0)) | (Bool : _ ty) -> (x || (not x))
+|}]
+
+(* A type of a law has kind [value] unless annotated. The types of the
+   parameters must still be representable. *)
+
+law? value (type a) (x : a or_null) : true
+law? nullable (type (a : value_or_null)) (x : a or_null) : true
+[%%expect {|
+law? value (type a) (x : a or_null) : (true : bool)
+Line 2, characters 46-47:
+2 | law? nullable (type (a : value_or_null)) (x : a or_null) : true
+                                                  ^
+Error: This type "a" should be an instance of type "('a : value_maybe_separable)"
+       The layout of a is value_or_null
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be a sublayout of value_maybe_separable
+         because the type argument of or_null has layout value.
+|}]
+
+law? not_representable (type (a : any)) (x : a) : true
+[%%expect {|
+Line 1, characters 45-46:
+1 | law? not_representable (type (a : any)) (x : a) : true
+                                                 ^
+Error: The parameters of a law must be representable.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a law parameter.
+|}]
+
+(* Two types of a law cannot have the same name. *)
+
+law? dup_type (type a a) : true
+[%%expect {|
+Line 1, characters 22-23:
+1 | law? dup_type (type a a) : true
+                          ^
+Error: The law parameter "a" is bound several times.
+|}]
+
 (* A variable bound in the annotation is not one of the law. *)
 
 law? poly (o : < m : 'a. 'a -> 'a >) : 1 = 1

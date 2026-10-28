@@ -1043,9 +1043,16 @@ let default_mapper =
          { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc });
 
     law_declaration =
-      (fun this { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-                  plaw_attributes; plaw_loc } ->
+      (fun this { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+                  plaw_conclusion; plaw_attributes; plaw_loc } ->
          let plaw_name = map_loc this plaw_name in
+         let plaw_newtypes =
+           List.map
+             (fun (name, jkind) ->
+                (map_loc this name,
+                 Option.map (this.jkind_annotation this) jkind))
+             plaw_newtypes
+         in
          let plaw_params =
            List.map
              (fun (name, ty) ->
@@ -1056,8 +1063,8 @@ let default_mapper =
          let plaw_conclusion = this.expr this plaw_conclusion in
          let plaw_attributes = this.attributes this plaw_attributes in
          let plaw_loc = this.location this plaw_loc in
-         { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
-           plaw_attributes; plaw_loc });
+         { plaw_name; plaw_newtypes; plaw_params; plaw_assumptions;
+           plaw_conclusion; plaw_attributes; plaw_loc });
 
     modes = (fun this m ->
       List.map (map_loc this) m);

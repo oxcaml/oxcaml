@@ -1005,12 +1005,18 @@ and law_declaration i ppf x =
        fmt_location x.law_loc;
   attributes i ppf x.law_attributes;
   let i = i+1 in
+  line i ppf "law_newtypes =\n";
+  list (i+1) law_newtype ppf x.law_newtypes;
   line i ppf "law_params =\n";
   list (i+1) law_param ppf x.law_params;
   line i ppf "law_assumptions =\n";
   list (i+1) spec_expression ppf x.law_assumptions;
   line i ppf "law_conclusion =\n";
   spec_expression (i+1) ppf x.law_conclusion
+
+and law_newtype i ppf x =
+  line i ppf "%a\n" fmt_ident x.ln_id;
+  option (i+1) jkind_annotation ppf x.ln_jkind
 
 and law_param i ppf x =
   line i ppf "%a\n" fmt_ident x.lp_id;
