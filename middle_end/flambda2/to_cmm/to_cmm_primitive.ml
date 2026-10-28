@@ -125,7 +125,7 @@ let make_block ~dbg kind alloc_mode args =
   match (kind : P.Block_kind.t) with
   | Values (tag, _) ->
     let tag = Tag.Scannable.to_int tag in
-    C.make_alloc ~mode dbg ~tag args
+    C.make_alloc ~strict_init:false ~mode dbg ~tag args
   | Naked_floats ->
     let tag = Tag.to_int Tag.double_array_tag in
     C.make_float_alloc ~mode dbg ~tag args
@@ -135,7 +135,7 @@ let make_block ~dbg kind alloc_mode args =
       List.map C.memory_chunk_of_kind (mixed_block_kinds shape)
     in
     let tag = Tag.Scannable.to_int tag in
-    C.make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks
+    C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag ~value_prefix_size args args_memory_chunks
 
 let memory_chunk_of_flat_suffix_element :
     K.flat_suffix_element -> Cmm.memory_chunk = function
@@ -238,14 +238,14 @@ let make_non_scannable_unboxed_product_array ~dbg kind mode args =
         mem_chunks_per_non_unarized_element.(index))
       args
   in
-  C.make_mixed_alloc ~mode dbg ~tag:0 ~value_prefix_size:0 args mem_chunks
+  C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag:0 ~value_prefix_size:0 args mem_chunks
 
 let make_array ~dbg kind alloc_mode args =
   check_alloc_fields args;
   let mode = C.alloc_mode_for_allocations_to_cmm alloc_mode in
   match (kind : P.Array_kind.t) with
   | Immediates | Gc_ignorable_values | Values ->
-    C.make_alloc ~mode dbg ~tag:0 args
+    C.make_alloc ~strict_init:false ~mode dbg ~tag:0 args
   | Naked_floats ->
     C.make_float_alloc ~mode dbg ~tag:(Tag.to_int Tag.double_array_tag) args
   | Naked_float32s -> C.allocate_unboxed_float32_array ~elements:args mode dbg
@@ -262,7 +262,7 @@ let make_array ~dbg kind alloc_mode args =
   | Naked_masks -> C.allocate_unboxed_mask_array ~elements:args mode dbg
   | Unboxed_product _ ->
     if P.Array_kind.must_be_gc_scannable kind
-    then C.make_alloc ~mode dbg ~tag:0 args
+    then C.make_alloc ~strict_init:false ~mode dbg ~tag:0 args
     else make_non_scannable_unboxed_product_array ~dbg kind mode args
 
 let array_length ~dbg arr (kind : P.Array_kind.t) =
@@ -1312,7 +1312,7 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Make_lazy { lazy_tag; alloc_region = _ } ->
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let tag = Tag.to_int (P.Lazy_block_tag.to_tag lazy_tag) in
-    None, res, C.make_alloc ~mode:Heap dbg ~tag [arg]
+    None, res, C.make_alloc ~strict_init:true ~mode:Heap dbg ~tag [arg]
 
 let binary_primitive env dbg f (_x_simple : Simple.t option)
     (_y_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression) =

@@ -165,6 +165,11 @@ let bind_list name args fn =
   in
   aux [] (List.rev args)
 
+let bind_load name arg fn =
+  match arg with
+  | Cop(Cload _, [Cvar _], _) -> fn arg
+  | _ -> bind name arg fn
+
 let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 
 let caml_local = Nativeint.shift_left (Nativeint.of_int 3) 8
@@ -2684,7 +2689,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
       "Fields with memory_chunk %s are not supported in generic allocations"
       (Printcmm.chunk memory_chunk)
 
-let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
+let make_alloc_generic ~strict_init ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
     args_memory_chunks =
   (* allocs of size 0 must be statically allocated else the Gc will bug *)
   assert (List.compare_length_with args 0 > 0);
@@ -2696,56 +2701,83 @@ let make_alloc_generic ~block_kind ~mode ~alloc_block_kind dbg tag wordsize args
       | Heap -> block_header ~block_kind tag wordsize
     in
     Cop (Calloc (mode, alloc_block_kind), Cconst_natint (hdr, dbg) :: args, dbg)
-  else
-    let id = V.create_local "*alloc*" in
-    let rec fill_fields acc idx args memory_chunks =
-      match args, memory_chunks with
-      | [], [] -> acc
-      | e1 :: el, m1 :: ml ->
-        let ofs = memory_chunk_size_in_words_for_mixed_block m1 in
-        (* We want fields to be intialized right-to-left, that is last fields
-           first, to match the behavior of selection/selectgen on [Calloc] *)
-        let acc =
-          Csequence (
-          alloc_generic_set_fn (Cvar id) (int_const dbg idx) e1 m1 dbg, acc)
-        in
-        fill_fields acc (idx + ofs) el ml
-      | _ ->
-        Misc.fatal_errorf
+  else begin
+    (* Note on [strict_init]:
+
+       If we're not in the strict case, we generate a call to [caml_alloc],
+       which returns a GC-safe block that we can then initialize field by field,
+       computing the field expressions right when needed.
+       Assuming that the set of free variables of the field expressions is
+       smaller than the number of fields (which is assumed to be the most common
+       case for large allocations), this reduces the number of registers to keep
+       live across the allocation function, improving compile times and even
+       execution times.
+
+       The strict case, however, is for allocations where it is not safe to
+       expose the result to the GC before it has been initialized properly.
+       So we need to use [caml_alloc_shr_check_gc], which will check for urgent
+       GC before allocating the block instead of after, and we need to make
+       sure that no GC can occur between the allocation and the initialization.
+       This is done by binding the field expressions to variables if they're not
+       simple enough, then allocating the block, then patching it using
+       constructions that are never going to trigger a GC. *)
+    let do_alloc args =
+      let id = V.create_local "*alloc*" in
+      let rec fill_fields acc idx args memory_chunks =
+        match args, memory_chunks with
+        | [], [] -> acc
+        | e1::el, m1::ml ->
+            let ofs = memory_chunk_size_in_words_for_mixed_block m1 in
+            let acc =
+              Csequence(alloc_generic_set_fn (Cvar id) (int_const dbg idx) e1 m1 dbg, acc)
+            in
+            fill_fields acc (idx + ofs) el ml
+        | _ ->
+          Misc.fatal_errorf
           "To_cmm_helpers.make_alloc_generic: mismatched list sizes between \
            fields and memory chunks"
+      in
+      let caml_alloc_func, caml_alloc_args =
+        match block_kind with
+        | Regular_block ->
+            (if strict_init then "caml_alloc_shr_check_gc" else "caml_alloc"),
+            [wordsize; tag]
+        | Mixed_block { scannable_prefix } ->
+            Mixed_block_support.assert_mixed_block_support ();
+            "caml_alloc_mixed_shr_check_gc", [wordsize; tag; scannable_prefix]
+      in
+      Clet(VP.create id,
+           Cop
+             ( Cextcall
+                 { func = caml_alloc_func;
+                   ty = typ_val;
+                   alloc = true;
+                   builtin = false;
+                   returns = true;
+                   effects = Arbitrary_effects;
+                   coeffects = Has_coeffects;
+                   ty_args = []
+                 },
+               List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
+               dbg),
+           fill_fields (Cvar id) 0 args args_memory_chunks)
     in
-    let caml_alloc_func, caml_alloc_args =
-      match block_kind with
-      | Regular_block -> "caml_alloc_shr_check_gc", [wordsize; tag]
-      | Mixed_block { scannable_prefix } ->
-        Mixed_block_support.assert_mixed_block_support ();
-        "caml_alloc_mixed_shr_check_gc", [wordsize; tag; scannable_prefix]
+    let rec bind_args_then_alloc simple_args = function
+      | [] -> do_alloc simple_args
+      | arg :: args_rev ->
+          bind_load "alloc_arg" arg
+            (fun arg -> bind_args_then_alloc (arg :: simple_args) args_rev)
     in
-    Clet
-      ( VP.create id,
-        Cop
-          ( Cextcall
-              { func = caml_alloc_func;
-                ty = typ_val;
-                alloc = true;
-                builtin = false;
-                returns = true;
-                effects = Arbitrary_effects;
-                coeffects = Has_coeffects;
-                ty_args = []
-              },
-            List.map (fun arg -> Cconst_int (arg, dbg)) caml_alloc_args,
-            dbg ),
-        fill_fields (Cvar id) 0 args args_memory_chunks)
+    if strict_init then bind_args_then_alloc [] (List.rev args) else do_alloc args
+  end
 
-let make_alloc ~mode dbg ~tag args =
-  make_alloc_generic ~block_kind:Regular_block ~mode dbg tag (List.length args)
+let make_alloc ~strict_init ~mode dbg ~tag args =
+  make_alloc_generic ~strict_init ~block_kind:Regular_block ~mode dbg tag (List.length args)
     ~alloc_block_kind:Alloc_block_kind_other args
     (List.map (fun _ -> Word_val) args)
 
 let make_float_alloc ~mode dbg ~tag args =
-  make_alloc_generic ~block_kind:Regular_block ~mode dbg tag
+  make_alloc_generic ~strict_init:false ~block_kind:Regular_block ~mode dbg tag
     ~alloc_block_kind:Alloc_block_kind_float
     (List.length args * size_float / size_addr)
     args
@@ -2758,10 +2790,10 @@ let make_closure_alloc ~mode dbg ~tag args args_memory_chunks =
         acc + memory_chunk_size_in_words_for_mixed_block memory_chunk)
       0 args_memory_chunks
   in
-  make_alloc_generic ~block_kind:Regular_block ~mode dbg tag size args
+  make_alloc_generic ~strict_init:true ~block_kind:Regular_block ~mode dbg tag size args
     ~alloc_block_kind:Alloc_block_kind_closure args_memory_chunks
 
-let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
+let make_mixed_alloc ~strict_init ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
   let size =
     List.fold_left
       (fun ofs memory_chunk ->
@@ -2804,7 +2836,7 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Word_val -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
   in
-  make_alloc_generic
+  make_alloc_generic ~strict_init
     ~block_kind:(Mixed_block { scannable_prefix = value_prefix_size })
     ~alloc_block_kind:Alloc_block_kind_other ~mode dbg tag size args
     args_memory_chunks
@@ -5632,7 +5664,7 @@ let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag
       [int_const dbg 0; int_const dbg 0]
-      ~mode:Cmm.Alloc_mode.Heap
+      ~mode:Cmm.Alloc_mode.Heap ~strict_init:false
   in
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
