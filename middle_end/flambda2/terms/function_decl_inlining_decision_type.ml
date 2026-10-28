@@ -132,9 +132,9 @@ let report_decision ppf t =
       large_functor_size
   | Recursive -> Format.fprintf ppf "this@ function@ is@ recursive"
   | Jsir_inlining_disabled ->
-    Format.fprintf ppf
-      "the@ function's@ body@ refers@ to@ closure@ slots,@ which@ cannot@ be@ \
-       moved@ into@ another@ function@ when@ compiling@ to@ Js_of_ocaml"
+    Format.pp_print_text ppf
+      "the function's body refers to closure slots, which cannot be moved into \
+       another function when compiling to Js_of_ocaml"
 
 type inlining_behaviour =
   | Cannot_be_inlined
