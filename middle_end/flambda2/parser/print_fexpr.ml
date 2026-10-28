@@ -569,13 +569,20 @@ let alloc_mode_for_allocations ppf (alloc_mode : alloc_mode_for_allocations) =
   | Local { alloc_region; region = r } ->
     Format.fprintf ppf "@ &%a@ &%a" region alloc_region region r
 
+(* ACTUAL COMPILER: print deleted slot identity and size for round-tripping. *)
 let fun_decl expr_or_static ppf (decl : fun_decl) =
   let pp_at_function_slot ppf cid =
     pp_option ~space:Before (pp_like "@@%a" function_slot) ppf cid
   in
-  Format.fprintf ppf "@[<2>%tclosure%t@ %a%a%a@]" expr_or_static
-    Flambda_colours.pop code_id decl.code_id pp_at_function_slot
-    decl.function_slot alloc_mode_for_allocations decl.alloc
+  match decl.code with
+  | Code_id { code_id = id; function_slot = slot } ->
+    Format.fprintf ppf "@[<2>%tclosure%t@ %a%a%a@]" expr_or_static
+      Flambda_colours.pop code_id id pp_at_function_slot slot
+      alloc_mode_for_allocations decl.alloc
+  | Deleted { function_slot = slot; function_slot_size } ->
+    Format.fprintf ppf "@[<2>%tclosure%t deleted@ %a(%d)%a@]" expr_or_static
+      Flambda_colours.pop function_slot slot function_slot_size
+      alloc_mode_for_allocations decl.alloc
 
 let named ppf = function
   | (Simple s : named) -> simple ppf s

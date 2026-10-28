@@ -620,11 +620,17 @@ value_slot:
     { { var; value; kind = Some kind } }
 ;
 
+(* ACTUAL COMPILER: deleted declarations retain their slot name and size. *)
 fun_decl:
   | KWD_CLOSURE; code_id = code_id;
     function_slot = function_slot_opt;
     alloc = alloc_mode_for_allocations;
-    { { code_id; function_slot; alloc; } }
+    { { code = Code_id { code_id; function_slot }; alloc } }
+  | KWD_CLOSURE; KWD_DELETED;
+    function_slot = function_slot;
+    LPAREN; function_slot_size = plain_int; RPAREN;
+    alloc = alloc_mode_for_allocations;
+    { { code = Deleted { function_slot; function_slot_size }; alloc } }
 ;
 
 apply_expr:

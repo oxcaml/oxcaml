@@ -8,10 +8,26 @@
    native;
  }{
    ocamlopt_flags = "-O2 -flambda2-reaper";
-   native;
+   native with dump-reaper;
+   script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "${test_source_directory}/../../tools/fexprc -dfexpr-annot-after=raw ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
+   script;
+   script = "${test_source_directory}/../../tools/fexprc ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
+   script;
  }{
    ocamlopt_flags = "-O4";
-   native;
+   native with dump-reaper;
+   script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "${test_source_directory}/../../tools/fexprc -dfexpr-annot-after=raw ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
+   script;
+   script = "${test_source_directory}/../../tools/fexprc ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
+   script;
  }{
    ocamlopt_flags = "-O2 -stubs-forward-inlining";
    native;
@@ -21,8 +37,8 @@
  }
 *)
 
-(* Keep the boxed entry available, but eliminate the saturated recursive
-   worker's argument/result boxing. Inputs are opaque so the recurrence
+(* ACTUAL COMPILER: Keep the boxed entry available, but eliminate the saturated
+   recursive worker's argument/result boxing. Inputs are opaque so the recurrence
    cannot be folded; quarter-integer results have an independent exact oracle. *)
 let[@inline never] sum n x =
   let[@unboxable] rec loop i (acc[@unboxable]) =

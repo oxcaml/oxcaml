@@ -40,3 +40,18 @@
  (instrumentation (backend bisect_ppx))
  (modules datalog)
  (libraries flambda2_datalog))
+
+; ACTUAL COMPILER: round-trip closure layouts including deleted function slots.
+(executable
+ (name deleted_slots_roundtrip)
+ (modes native)
+ (modules deleted_slots_roundtrip)
+ (libraries ocamlfrontend ocamloptcomp flambda2_cmx flambda2_parser))
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:deleted_slots_roundtrip.exe}
+   %{dep:deleted_slots_roundtrip.fl}
+   %{dep:deleted_slots_consistent.fl}
+   %{dep:deleted_slots_inconsistent.fl})))

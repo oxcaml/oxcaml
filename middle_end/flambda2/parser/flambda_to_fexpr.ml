@@ -235,16 +235,24 @@ let value_slots env map =
       { Fexpr.var; value; kind })
     (map |> Value_slot.Map.bindings)
 
-let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =
-  let code_id = Env.find_code_id_exn env code_id in
+(* ACTUAL COMPILER: preserve deleted slots in the ordered closure layout. *)
+let function_declaration env decl function_slot alloc : Fexpr.fun_decl =
   let function_slot = Env.translate_function_slot env function_slot in
-  (* Omit the function slot when possible *)
-  let function_slot =
-    if String.equal code_id.txt function_slot.txt
-    then None
-    else Some function_slot
+  let code : Fexpr.fun_decl_code =
+    match decl with
+    | Function_declarations.Deleted { function_slot_size; dbg = _ } ->
+      Deleted { function_slot; function_slot_size }
+    | Function_declarations.Code_id { code_id; only_full_applications = _ } ->
+      let code_id = Env.find_code_id_exn env code_id in
+      (* Omit the function slot when possible. *)
+      let function_slot =
+        if String.equal code_id.txt function_slot.txt
+        then None
+        else Some function_slot
+      in
+      Code_id { code_id; function_slot }
   in
-  { code_id; function_slot; alloc }
+  { code; alloc }
 
 let set_of_closures env sc alloc =
   let fun_decls =
@@ -252,13 +260,7 @@ let set_of_closures env sc alloc =
       (fun (function_slot, fun_decl) ->
         function_declaration env fun_decl function_slot alloc)
       (Set_of_closures.function_decls sc
-      |> Function_declarations.funs_in_order
-      |> Function_slot.Lmap.map (function
-        | Function_declarations.Deleted _ -> Misc.fatal_error "todo"
-        | Function_declarations.Code_id { code_id; only_full_applications = _ }
-          ->
-          code_id)
-      |> Function_slot.Lmap.bindings)
+      |> Function_declarations.funs_in_order |> Function_slot.Lmap.bindings)
   in
   let elts = value_slots env (Set_of_closures.value_slots sc) in
   let elts = match elts with [] -> None | _ -> Some elts in
