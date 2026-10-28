@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension omnidirectionality";
  arch64;
  expect;
 *)
