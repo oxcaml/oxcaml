@@ -2023,11 +2023,12 @@ let finalize_variants p =
 type pattern_variable_kind =
   | Std_var
   | As_var
+  | Deref_var
   | Continuation_var
 
 let unused_variable_warning pv_kind name : Warnings.t =
   match pv_kind with
-  | As_var -> Unused_var { name; mutated = false }
+  | As_var | Deref_var -> Unused_var { name; mutated = false }
   | Std_var | Continuation_var -> Unused_var_strict { name; mutated = false }
 
 type pattern_variable =
@@ -4663,8 +4664,8 @@ and type_pat_aux
       let type_expr = instance ty_addr in
       let mode = cross_left !!penv ty_addr mode in
       let id, uid =
-        enter_variable tps name.loc name mode ~kind:(Val_reg addr_sort)
-          type_expr sp1.ppat_attributes addr_sort
+        enter_variable ~pv_kind:Deref_var tps name.loc name mode
+          ~kind:(Val_reg addr_sort) type_expr sp1.ppat_attributes addr_sort
       in
       rvp {
         pat_desc =
