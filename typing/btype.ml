@@ -1940,17 +1940,6 @@ module Jkind0 = struct
         of_const Const.Builtin.immediate_or_null.jkind
     end
 
-    let product tys_modalities layouts =
-      let base = Layout (Jkind_types.Layout.product layouts) in
-      let mod_bounds = Mod_bounds.min in
-      let with_bounds =
-        List.fold_right
-          (fun (type_expr, modality) bounds ->
-            With_bounds.add_modality ~type_expr ~modality bounds)
-          tys_modalities No_with_bounds
-      in
-      { base; mod_bounds; with_bounds }
-
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
   end
@@ -2155,14 +2144,6 @@ module Jkind0 = struct
         fresh_jkind Jkind_desc.Builtin.immediate_or_null
           ~annotation:(mk_annot "immediate_or_null")
           ~why:(Immediate_or_null_creation why)
-
-      let product ~why tys_modalities layouts =
-        let desc = Jkind_desc.product tys_modalities layouts in
-        fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
-        (* [mark_best] is correct here because the with-bounds of a product
-           jkind include all the components of the product. Accordingly, looking
-           through the product, by one step, never loses any information. *)
-        |> mark_best
 
       let product_of_any ~why arity =
         let layout =
