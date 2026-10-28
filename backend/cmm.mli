@@ -426,7 +426,7 @@ val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
 
 type operation =
   | Capply of
-      { result_type : machtype;
+      { result_type : machtype option;
         region : Lambda.region_close;
         callees : symbol list option
             (* List of possible callees, or [None] if not known. The actual

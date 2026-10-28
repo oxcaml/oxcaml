@@ -138,7 +138,7 @@ let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
     false
   | Raise _ -> false
   | Tailcall_self _ | Tailcall_func _ | Return | Invalid _ -> true
-  | Call_no_return _ | Call _ | Prim _ -> false
+  | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ -> false
 
 let is_safe_block : Cfg.basic_block -> bool =
  fun block ->
@@ -238,7 +238,8 @@ module Polls_before_prtc_transfer = struct
       then Ok Might_not_poll
       else Ok Always_polls
     | Return -> Ok Always_polls
-    | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    | Call_no_return_ext _ | Call_no_return_func _ | Call _ | Prim _ | Invalid _
+      ->
       if Cfg.can_raise_terminator term.desc
       then Ok (Polls_before_prtc_domain.join dom exn)
       else Ok dom
@@ -394,8 +395,8 @@ let add_calls_terminator :
   | Switch _ | Return | Raise _ ->
     points
   | Tailcall_self _ | Tailcall_func _ -> (Function_call, term.dbg) :: points
-  | Call _ -> (Function_call, term.dbg) :: points
-  | Call_no_return
+  | Call _ | Call_no_return_func _ -> (Function_call, term.dbg) :: points
+  | Call_no_return_ext
       { alloc = false;
         func_symbol = _;
         ty_res = _;
@@ -418,7 +419,7 @@ let add_calls_terminator :
         label_after = _
       } ->
     points
-  | Call_no_return
+  | Call_no_return_ext
       { alloc = true;
         func_symbol = _;
         ty_res = _;
