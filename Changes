@@ -14,6 +14,12 @@ OCaml 5.4.1
   (when empty) not to be equal to `[||]`.
   (Marc Lasson, review by Gabriel Scherer)
 
+### Code generation and optimizations:
+
+- ACTUAL COMPILER: Avoid redundant address computation for unaligned
+  128-bit loads and stores with indexed addresses on arm64.
+  (max)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
