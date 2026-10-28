@@ -95,7 +95,7 @@
 ---
 >         Astlib.Longident.t loc
 >         * ((string loc * jkind_annotation option) list * pattern) option
-313c314,319
+314c315,320
 <   type t = expression_desc =
 ---
 >   (* TODO: Fully support comprehensions upstream. *)
@@ -104,42 +104,42 @@
 >     | Pcomp_array_comprehension of unit
 > 
 >   type t =
-373c379
+374c380
 <   type t = type_kind =
 ---
 >   type t =
-399c405
+400c406
 <   type 'a t = 'a include_infos =
 ---
 >   type 'a t =
-411c417
+412c418
 <   type t = signature_item_desc =
 ---
 >   type t =
-435c441
+436c442
 <   type t = signature =
 ---
 >   type t =
-446c452
+447c453
 <   type t = structure_item_desc =
 ---
 >   type t =
-469c475
+470c476
 <   type t = functor_parameter =
 ---
 >   type t =
-478c484
+479c485
 <   type t = module_type_desc =
 ---
 >   type t =
-493c499,502
+494c500,503
 <   type t = module_expr_desc =
 ---
 >   (* TODO: Fully support module instances upstream. *)
 >   type module_instance = private Module_instance
 > 
 >   type t =
-509,514c518,643
+510,515c519,644
 <   class virtual map : Ppxlib_ast.Ast.map
 <   class virtual iter : Ppxlib_ast.Ast.iter
 <   class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
@@ -273,7 +273,7 @@
 >     inherit ['ctx] Ppxlib_ast.Ast.map_with_context
 >     inherit ['ctx] Jane_street_extensions0_ctx(Ts.Map_with_context).t
 >   end
-516,517c645,653
+517,518c646,654
 <   class virtual ['ctx, 'res] lift_map_with_context :
 <     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
 ---

@@ -493,6 +493,7 @@ module Pattern_desc = struct
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
@@ -549,6 +550,10 @@ module Pattern_desc = struct
         ~loc
         "Immutable [Ppat_array] cannot be converted to an usptream [pattern_desc]"
     (* new constructors *)
+    | Ppat_addr _ ->
+      Location.raise_errorf
+        ~loc
+        "[Ppat_addr] cannot be converted to an upstream [pattern_desc]"
     | Ppat_unboxed_unit -> Ppat_construct ({ loc; txt = Lident "()" }, None)
     | Ppat_unboxed_bool b ->
       Ppat_construct ({ loc; txt = Lident (if b then "true" else "false") }, None)

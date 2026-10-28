@@ -177,6 +177,8 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_AND) -> "and"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_AMPERSAND) -> "&"
   | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_AMPERAMPER) -> "&&"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_ADDR_IMM) -> "addr_imm_"
+  | MenhirInterpreter.X (MenhirInterpreter.T MenhirInterpreter.T_ADDR) -> "addr_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_with_type_binder) -> "with_type_binder"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_with_constraint) -> "with_constraint"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_virtual_with_private_flag) -> "virtual_with_private_flag"
@@ -617,6 +619,8 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.T MenhirInterpreter.T_AND -> (fun _ -> "and")
   | MenhirInterpreter.T MenhirInterpreter.T_AMPERSAND -> (fun _ -> "&")
   | MenhirInterpreter.T MenhirInterpreter.T_AMPERAMPER -> (fun _ -> "&&")
+  | MenhirInterpreter.T MenhirInterpreter.T_ADDR_IMM -> (fun _ -> "addr_imm_")
+  | MenhirInterpreter.T MenhirInterpreter.T_ADDR -> (fun _ -> "addr_")
   | MenhirInterpreter.N MenhirInterpreter.N_with_type_binder -> (fun _ -> "with_type_binder")
   | MenhirInterpreter.N MenhirInterpreter.N_with_constraint -> (fun _ -> "with_constraint")
   | MenhirInterpreter.N MenhirInterpreter.N_virtual_with_private_flag -> (fun _ -> "virtual_with_private_flag")
@@ -1056,6 +1060,8 @@ let print_token = function
   | AND -> print_value (MenhirInterpreter.T MenhirInterpreter.T_AND) ()
   | AMPERSAND -> print_value (MenhirInterpreter.T MenhirInterpreter.T_AMPERSAND) ()
   | AMPERAMPER -> print_value (MenhirInterpreter.T MenhirInterpreter.T_AMPERAMPER) ()
+  | ADDR_IMM -> print_value (MenhirInterpreter.T MenhirInterpreter.T_ADDR_IMM) ()
+  | ADDR -> print_value (MenhirInterpreter.T MenhirInterpreter.T_ADDR) ()
 
 let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : token =
   match t with
@@ -1218,3 +1224,5 @@ let token_of_terminal (type a) (t : a MenhirInterpreter.terminal) (v : a) : toke
   | MenhirInterpreter.T_AND -> AND
   | MenhirInterpreter.T_AMPERSAND -> AMPERSAND
   | MenhirInterpreter.T_AMPERAMPER -> AMPERAMPER
+  | MenhirInterpreter.T_ADDR_IMM -> ADDR_IMM
+  | MenhirInterpreter.T_ADDR -> ADDR
