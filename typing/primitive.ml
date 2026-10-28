@@ -254,11 +254,10 @@ let parse_declaration valdecl ~native_repr_args ~native_repr_res ~is_layout_poly
       (native_repr_args, native_repr_res)
   in
   let apply_arity =
-    List.length
-      (List.filter
-         (function (_, Elided_void) -> false | (_, Native_repr _) -> true)
-         native_repr_args )
-    in
+    Stdlib.List.count
+      (function (_, Elided_void) -> false | (_, Native_repr _) -> true)
+      native_repr_args
+  in
   {prim_name = name;
    prim_type_arity = arity;
    prim_apply_arity = apply_arity;
