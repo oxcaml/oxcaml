@@ -41,19 +41,9 @@ val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
 
 (*
 val refine_mixed_block_element :
-<<<<<<< Merlin:oops-all-any
-  Env.t -> Location.t -> Types.type_expr -> unit Lambda.mixed_block_element
-  -> unit Lambda.mixed_block_element
-*)
-||||||| Compiler:last-imported
-  Env.t -> Location.t -> Types.type_expr -> unit Lambda.mixed_block_element
-  -> unit Lambda.mixed_block_element
-
-=======
   Env.t -> Location.t -> Types.type_expr -> 'a Lambda.mixed_block_element
   -> 'a Lambda.mixed_block_element
-
->>>>>>> Compiler:HEAD
+*)
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut
