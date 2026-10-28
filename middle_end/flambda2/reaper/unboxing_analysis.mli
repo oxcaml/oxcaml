@@ -99,8 +99,8 @@ val find_code_metadata :
 val pp_result : Format.formatter -> result -> unit
 
 val perform_analysis :
+  ?stats:Datalog.Schedule.stats ->
   Datalog.database ->
-  stats:Datalog.Schedule.stats ->
   analysis_scope:Analysis_scope.t ->
   result
 

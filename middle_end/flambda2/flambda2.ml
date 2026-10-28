@@ -183,7 +183,7 @@ let flambda_to_flambda0 : type m.
         in
         let flambda, all_code, slot_offsets, final_typing_env =
           run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-            ~final_typing_env:(Some final_typing_env) ~free_names raw_flambda
+            ~final_typing_env ~free_names raw_flambda
         in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
@@ -253,8 +253,7 @@ let flambda_to_flambda0 : type m.
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
   (match cmx with
-  | None ->
-    () (* Either opaque was passed, or there is no need to export offsets *)
+  | None -> () (* Opaque compilation *)
   | Some cmx -> Compilenv.set_export_info cmx);
   { flambda; offsets = exported_offsets; reachable_names; all_code }
 
@@ -344,5 +343,21 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     in
     if not keep_symbol_tables then reset_symbol_tables ();
     cmm
+  in
+  Profile.record_call "flambda2" run
+
+let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
+    (program : Lambda.program) : Optcomp_intf.jsir_program =
+  let run () =
+    let { flambda; all_code; offsets; reachable_names } =
+      lambda_to_flambda ~ppf_dump ~prefixname
+        ~machine_width:Thirty_two_no_gc_tag_bit program
+    in
+    let { Flambda2_to_jsir.To_jsir_result.program; imported_compilation_units }
+        =
+      Flambda2_to_jsir.To_jsir.unit ~offsets ~all_code ~reachable_names flambda
+    in
+    if not keep_symbol_tables then reset_symbol_tables ();
+    { Optcomp_intf.program; imported_compilation_units }
   in
   Profile.record_call "flambda2" run

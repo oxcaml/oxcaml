@@ -70,6 +70,16 @@ val from_cma :
   -> in_channel
   -> one
 
+type jsir_unit =
+  { name : string
+  ; program : Code.program
+  ; info : Unit_info.t
+  }
+
+val from_cmj : in_channel -> jsir_unit
+(** Read the unit of a [.cmj] file produced by OxCaml's [ocamlopt -target
+    js_of_ocaml]. The channel must be positioned just after the magic number. *)
+
 val from_channel :
      in_channel
   -> [ `Cmo of Ocaml_compiler.Cmo_format.t | `Cma of Cmo_format.library | `Exe ]

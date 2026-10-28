@@ -102,7 +102,10 @@ let transl_type_extension ~scopes env rootpath tyext body =
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
   | Module_mixed (shape, _) ->
-    Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
+    (* Shapes containing splices are checked after static evaluation *)
+    if not (Lambda.mixed_block_shape_has_splices shape)
+    then
+      Typeopt.assert_mixed_product_support_for_lambda_shape loc Module shape;
     Pmakeblock(0, Immutable, Shape shape, alloc_heap)
 
 (* Compile a coercion *)
@@ -1058,19 +1061,18 @@ and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
-  let params = if generative then [params;[]] else [params] in
-  let params = List.map (fun coercion ->
+  let arg =
     Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
-            coercion,
-          loc))
-    params
+            params,
+          loc)
   in
+  let args = if generative then [arg; lambda_unit] else [arg] in
   Lapply {
     ap_loc = loc;
     ap_func = modl;
-    ap_args = params;
+    ap_args = args;
     ap_result_layout = Lambda.layout_module;
     ap_region_close=Rc_normal;
     ap_mode = not_alloc_stack;

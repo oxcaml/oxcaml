@@ -1,4 +1,4 @@
-(* CR-someday hwasilewski: Make sure all constants, including probabilities, are
+(* CR-someday xclerc: Make sure all constants, including probabilities, are
    inside Config. *)
 let max_function_count = 10
 
@@ -24,8 +24,34 @@ let max_record_types = 3
 
 let max_record_fields = 4
 
-(* Percentages. *)
+let max_exception_count = 3
+
+let max_handler_count = 2
+
+let max_try_count = 8
+
+let max_variant_types = 3
+
+let max_variant_constructors = 4
+
+let max_constructor_args = 3
+
+let max_match_count = 8
+
+let max_unboxed_tuple_arity = 4
+
+let max_unboxed_tuple_depth = 2
+
+(* Probabilities in percent, conditional on reaching each choice. *)
 let record_probability = 25
+
+let variant_probability = 25
+
+let or_null_probability = 25
+
+let unboxed_tuple_probability = 25
+
+let match_in_match_probability = 50
 
 let nested_record_probability = 15
 
@@ -45,6 +71,16 @@ let opaque_leaf_probability = 5
 
 let opaque_loop_bound_probability = 50
 
+let exception_payload_probability = 50
+
+let payload_binding_probability = 75
+
+let catch_all_probability = 25
+
+let raise_notrace_probability = 50
+
+let callee_raises_probability = 50
+
 module Swarm = struct
   type t =
     { floats : bool;
@@ -53,6 +89,10 @@ module Swarm = struct
       multidimensional_arrays : bool;
       boxed_records : bool;
       unboxed_records : bool;
+      unboxed_tuples : bool;
+      variants : bool;
+      or_null : bool;
+      matches : bool;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
@@ -66,7 +106,8 @@ module Swarm = struct
       bitwise_operations : bool;
       opaque_initializers : bool;
       opaque_leaves : bool;
-      opaque_loop_bounds : bool
+      opaque_loop_bounds : bool;
+      exceptions : bool
     }
 
   let create random_state =
@@ -76,6 +117,10 @@ module Swarm = struct
       multidimensional_arrays = Random.State.bool random_state;
       boxed_records = Random.State.bool random_state;
       unboxed_records = Random.State.bool random_state;
+      unboxed_tuples = Random.State.bool random_state;
+      variants = Random.State.bool random_state;
+      or_null = Random.State.bool random_state;
+      matches = Random.State.bool random_state;
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;
@@ -89,7 +134,8 @@ module Swarm = struct
       bitwise_operations = Random.State.bool random_state;
       opaque_initializers = Random.State.bool random_state;
       opaque_leaves = Random.State.bool random_state;
-      opaque_loop_bounds = Random.State.bool random_state
+      opaque_loop_bounds = Random.State.bool random_state;
+      exceptions = Random.State.bool random_state
     }
 
   let to_string t =
@@ -99,6 +145,10 @@ module Swarm = struct
       "multidimensional_arrays", t.multidimensional_arrays;
       "boxed_records", t.boxed_records;
       "unboxed_records", t.unboxed_records;
+      "unboxed_tuples", t.unboxed_tuples;
+      "variants", t.variants;
+      "or_null", t.or_null;
+      "matches", t.matches;
       "record_updates", t.record_updates;
       "record_representation_conversions", t.record_representation_conversions;
       "mutable_bindings", t.mutable_bindings;
@@ -112,7 +162,8 @@ module Swarm = struct
       "bitwise_operations", t.bitwise_operations;
       "opaque_initializers", t.opaque_initializers;
       "opaque_leaves", t.opaque_leaves;
-      "opaque_loop_bounds", t.opaque_loop_bounds ]
+      "opaque_loop_bounds", t.opaque_loop_bounds;
+      "exceptions", t.exceptions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
     |> String.concat "\n"
 

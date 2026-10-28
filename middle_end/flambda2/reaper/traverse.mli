@@ -35,7 +35,7 @@ module Problem : sig
         ( 'f,
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list )
         With_types.t;
-      final_typing_env : ('f, typing_env option) With_types.t;
+      final_typing_env : ('f, typing_env) With_types.t;
       module_symbol : ('f, Symbol.t) With_types.t
     }
 end
@@ -48,12 +48,13 @@ module Skeleton : sig
       code : Rev_expr.rev_code Code_id.Map.t;
       ordered_code_ids : Code_id.t array;
       fixed_arity_continuations : Continuation.Set.t;
-      continuation_info : Traverse_acc.continuation_info Continuation.Map.t
+      continuation_info : Traverse_acc.continuation_info Continuation.Map.t;
+      metadata : Flambda_unit.Metadata.t
     }
 end
 
 val run :
   Flambda_unit.t ->
-  final_typing_env:('f, typing_env option) With_types.t ->
+  final_typing_env:('f, typing_env) With_types.t ->
   free_names:Name_occurrences.t ->
   'f Problem.t * Skeleton.t

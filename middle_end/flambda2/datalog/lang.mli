@@ -22,7 +22,7 @@ module Variable : sig
 
     module Set : Container_types.Set with type elt = t
 
-    module Map : Container_types.Map with type key = t
+    module Map : Container_types.Map with type key = t and module Set = Set
 
     module Tbl : Hashtbl.S with type key = t
   end
@@ -35,6 +35,32 @@ module Variable : sig
 
      Variables with the same [uid] are guaranteed to be equal. *)
   val must_be_equal : 'a t -> 'b t -> ('a, 'b) Type.eq
+
+  module Map : sig
+    module type S = sig
+      type t
+
+      type 'a elt
+
+      type binding = B : 'a variable * 'a elt -> binding
+
+      val empty : t
+
+      val singleton : 'a variable -> 'a elt -> t
+
+      val add : 'a variable -> 'a elt -> t -> t
+
+      val remove : 'a variable -> t -> t
+
+      val find : 'a variable -> t -> 'a elt
+
+      val fold : (binding -> 'a -> 'a) -> t -> 'a -> 'a
+    end
+
+    module Make (T : sig
+      type 'a t
+    end) : S with type 'a elt = 'a T.t
+  end
 end
 
 type 'a term =
@@ -72,11 +98,13 @@ type ('k, 'v) relation =
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
   | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
+  | If_let : ('k Constant.hlist -> 'v Or_null.t) with_name -> ('k, 'v) relation
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
       -> ('k, unit) relation
 
-type atom = Atom : ('k, 'v) relation * 'k Term.hlist -> atom
+type atom =
+  | Atom : ('k, 'v) relation * 'k Term.hlist * 'v variable option -> atom
 
 val print_atom : Format.formatter -> atom -> unit
 
@@ -92,6 +120,13 @@ val distinct : (_, 'k, _) Column.id -> 'k term -> 'k term -> atom
 
 val filter :
   ?name:string -> ('k Constant.hlist -> bool) -> 'k Term.hlist -> atom
+
+val if_let :
+  ?name:string ->
+  'v variable ->
+  ('k Constant.hlist -> 'v Or_null.t) ->
+  'k Term.hlist ->
+  atom
 
 val callback_with_bindings :
   name:string ->

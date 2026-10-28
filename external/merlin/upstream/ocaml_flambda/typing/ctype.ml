@@ -207,7 +207,7 @@ let mark_persistent_in_quotations env =
 let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   begin_def ();
   let level = !current_level in
-  let result, pool =
+  let result, pool, sort_pool =
     with_new_pool ~level:!current_level begin fun () ->
       let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
@@ -263,6 +263,18 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
           | _ -> ()
         end
   end pool;
+  List.iter begin fun s ->
+    let open Jkind_types.Sort in
+    (* In contrast to types, which can be generalised implicitly, sort variables
+       need to be explicitly generalized and instantiated in [Typecore].
+       Hence, we lower all non-generic variables like type variables
+       in [structure] mode. *)
+    iter_var s ~f:(fun v ->
+      let t = of_var v in
+      if get_level t = generic_level then () else
+      update_level !current_level t;
+      add_to_sort_pool ~level:(get_level t) t)
+  end sort_pool;
   result
 
 let with_local_level_generalize ~before_generalize f =
@@ -992,7 +1004,11 @@ let duplicate_class_type ty =
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
-    iter_type_expr lower_all (Fun.const ()) ty
+    begin match get_desc ty with
+    | Tvar { jkind } -> Jkind.update_level !current_level jkind
+    | _ -> ()
+    end;
+    iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
   end
 
 (*
@@ -1051,10 +1067,12 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   let current_level = !current_level in
-  if level <> generic_level then begin
-    if is_Tvar ty && level > current_level then
-      set_level ty current_level
-    else if level > current_level then begin
+  if level <> generic_level && level > current_level then
+    match get_desc ty with
+    | Tvar { jkind } ->
+      set_level ty current_level;
+      Jkind.update_level current_level jkind
+    | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -1063,8 +1081,6 @@ let rec generalize_structure ty =
       set_level ty generic_level;
       let mgen m = Mode.With_locality.generalize_structure ~current_level m in
       iter_type_expr generalize_structure mgen ty
-    end
-  end
 
 let generalize_structure ty =
   simple_abbrevs := Mnil;
@@ -1274,6 +1290,9 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
+    | Tvar { jkind } ->
+      set_level ();
+      Jkind.update_level level jkind
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1312,7 +1331,11 @@ let rec lower_contravariant env var_level visited contra ty =
     Hashtbl.add visited (get_id ty) contra;
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
-      Tvar _ -> if contra then set_level ty var_level
+      Tvar { jkind } ->
+        if contra then begin
+          set_level ty var_level;
+          Jkind.update_level var_level jkind
+        end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
        let variance, maybe_expand =
@@ -2607,6 +2630,9 @@ let rec try_reduce_once env t =
     end
   | _ -> raise Cannot_expand
 
+(** Apply a reduction step on [<[t]> eval].
+    [copy_persistent] relies on this function to always return copies,
+    and to behave well on ill-staged types. *)
 and try_reduce_quote_eval env t =
   let path_must_be_persistent env path =
     if not (Env.path_is_persistent_in_quotations env path) then
@@ -2729,6 +2755,22 @@ let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
   try try_reduce env ty'
   with Cannot_expand -> ty'
+
+(** Deeply reduce all [Tquote_eval]s appearing in a type.
+    The resulting type does not contain any [Tquote_eval]s and has no sharing.
+    Raises [Cannot_expand] on failure. *)
+let rec try_full_reduce_quote_eval_desc env = function
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
+  | Tvariant row ->
+    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
+    Tvariant (
+      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
+  | t ->
+    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
+and try_full_reduce_quote_eval env t =
+  try_full_reduce_quote_eval_desc env (get_desc t)
+  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
 
 (* [Predef]'s [eval] and [box] are special -- we want to always expand it in
    [reduce_head], so we special-case its abbreviation expansion there. *)
@@ -3447,12 +3489,12 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-       let jkind_inter =
-         Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection env
-           ty's_jkind jkind
-       in
-       Result.map (set_var_jkind ty) jkind_inter
+        Jkind.intersection_or_error ~type_equal ~context
+          ~reason:Tyvar_refinement_intersection env
+          ty's_jkind jkind
+        |> Result.map (fun jkind ->
+          Jkind.update_level (get_level ty) jkind;
+          set_var_jkind ty jkind)
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
@@ -4480,6 +4522,14 @@ let rec is_aliasable_ty env ty =
   | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
 
+let copy_persistent env ty =
+  try_full_reduce_quote_eval env (new_quote_eval_ty ty)
+
+let is_persistent_ty env ty =
+  match copy_persistent env ty with
+  | _ -> true
+  | exception Cannot_expand -> false
+
 let compatible_paths p1 p2 =
   let open Predef in
   Path.same p1 p2 ||
@@ -5301,6 +5351,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tquote_eval t1, _) when is_persistent_ty (get_env uenv) t2' ->
+      let t2' = copy_persistent (get_env uenv) t2' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2')
+  | (_, Tquote_eval t2) when is_persistent_ty (get_env uenv) t1' ->
+      let t1' = copy_persistent (get_env uenv) t1' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1' t2)
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
@@ -6697,6 +6753,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when is_persistent_ty env t2' ->
+              let t2' = copy_persistent env t2' in
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
@@ -6924,13 +6984,13 @@ let moregeneral ~self_check env inst_nongen
         changed.
        *)
       let (subj_inst_sorts, subj_inst) =
-        Jkind_types.Sort.instance_with ~level:!current_level subj_sch_sorts
+        Jkind.Sort.instance_with ~level:!current_level subj_sch_sorts
           (fun () -> instance_aux ~instantiate_modes subj_sch)
       in
       let subj_inst' = duplicate_type subj_inst in
       (* Duplicate generic variables *)
       let (pat_inst_sorts, pat_inst) =
-        Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
+        Jkind.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       try
@@ -6942,8 +7002,7 @@ let moregeneral ~self_check env inst_nongen
       with Moregen_trace trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
-        ignore
-          (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
+        ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
     | _, Ok (subj_inst_sorts, pat_inst_sorts) ->
       (* After [moregen], [pat_inst_sorts] have been set to [subj_inst_sorts],

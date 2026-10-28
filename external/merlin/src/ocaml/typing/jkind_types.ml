@@ -480,6 +480,18 @@ module Sort = struct
         v.contents v.level v.id
   end
 
+  (* CR-someday jbachurski: We need a forward declaration of [add_to_pool]
+     because we might need to add a generic variable to a pool if it is lowered
+     in [update_level]. This is just a hack to avoid a dependency cycle, which
+     occurs because sort/layout/jkind inference functions morally belong in
+     [Jkind] (which corresponds to [Ctype]) so that they can use [Btype],
+     and not [Jkind_types] (which corresponds to [Types]) where they are now.
+     It is better to avoid using this reference when possible. *)
+  let add_to_pool : (level:int -> t -> unit) ref =
+    ref (fun ~level:_ _ -> assert false)
+
+  let set_add_to_pool f = add_to_pool := f
+
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
   type sort_change =
     | Ccontents of t option
@@ -496,21 +508,33 @@ module Sort = struct
 
   include With_backtracking.Make (Change)
 
+  let rec get_level = function
+    | Var { contents = Some t } -> get_level t
+    | Var { contents = None; level } -> level
+    | Base _ | Univar _ -> generic_level
+    | Product ts ->
+      List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
+    | Addressable t -> get_level t
+
   let[@inline] set_var_level (v : var) (level : int) =
     if level < v.level
     then (
       log (v, Clevel v.level);
       v.level <- level)
 
-  let rec update_level level = function
-    | Var v -> update_level_var level v
+  let rec iter_var ~f = function
+    | Var { contents = Some t } -> iter_var ~f t
+    | Var ({ contents = None } as v) -> f v
     | Base _ | Univar _ -> ()
-    | Product ts -> List.iter (update_level level) ts
-    | Addressable t -> update_level level t
+    | Product ts -> List.iter (iter_var ~f) ts
+    | Addressable t -> iter_var ~f t
 
-  and update_level_var level = function
-    | { contents = Some t; _ } -> update_level level t
-    | { contents = None } as v -> set_var_level v level
+  let update_level level =
+    iter_var ~f:(fun v ->
+        assert (v.contents = None);
+        let generic = v.level = generic_level in
+        set_var_level v level;
+        if generic then !add_to_pool ~level (Var v))
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
@@ -699,15 +723,19 @@ module Sort = struct
 
   let reset_cmi_sort_id () = last_var_cmi_id := 0
 
-  let new_var_unsafe ~level =
+  let proto_new_var_unsafe ~level =
     incr last_var_id;
     { contents = None; level; id = !last_var_id }
 
-  let new_var ~level =
+  (** Like [Types.proto_newty3], this function should not be called directly.
+      Use [Btype.new_sort_var], which adds the variable to a level pool. *)
+  let proto_new_var ~level =
     assert (level >= 0 && level <= generic_level);
-    new_var_unsafe ~level
+    proto_new_var_unsafe ~level
 
-  let new_genvar () = new_var_unsafe ~level:generic_level
+  let new_genvar () =
+    (* Generic variables are not tracked by pools. *)
+    proto_new_var_unsafe ~level:generic_level
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
@@ -715,15 +743,14 @@ module Sort = struct
 
   let instance_map : (var * var) list ref = ref []
 
-  let instance_with ~level vars f =
+  let instance_with ~new_var vars f =
     let new_vars =
       List.map
         (fun v ->
           assert (is_genvar v);
           (* ensure the variable is not a CMI serialised variable *)
           assert (v.id > 0);
-          let v' = new_var ~level in
-          v, v')
+          v, new_var ())
         vars
     in
     let old_map = !instance_map in
@@ -1374,8 +1401,4 @@ module Layout = struct
   let get_flat_const t = get_const Const.of_flat_sort t
 
   let get_const t = get_const Const.of_sort t
-
-  let of_new_sort_var ~level sa =
-    let sort = Sort.(of_var (new_var ~level)) in
-    Sort (sort, sa), sort
 end

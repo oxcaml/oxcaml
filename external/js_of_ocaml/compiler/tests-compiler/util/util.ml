@@ -335,6 +335,13 @@ let compile_to_javascript
      something weird happens, we'll get the results here *)
   jsfile
 
+let js_of_ocaml ?(fail = true) args =
+  let compiler_location =
+    Filename.concat js_of_ocaml_root "compiler/bin-js_of_ocaml/js_of_ocaml.exe"
+  in
+  let cmd = String.concat ~sep:" " (compiler_location :: args) in
+  exec_to_string_exn ~fail ~cmd ()
+
 let jsoo_minify ?(flags = []) ~pretty file =
   let file = Filetype.path_of_js_file file in
   let out_file = swap_extention file ~ext:"min.js" in

@@ -292,7 +292,7 @@ module type Sort = sig
   module Change : With_backtracking.Change.S
 
   (** Create a new sort variable with the given level. *)
-  val new_var : level:int -> var
+  val proto_new_var : level:int -> var
 
   (** Create a generic sort variable. *)
   val new_genvar : unit -> var
@@ -338,6 +338,12 @@ module type Sort = sig
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
 
+  val update_level : int -> t -> unit
+
+  val get_level : t -> int
+
+  val iter_var : f:(var -> unit) -> t -> unit
+
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit
 
@@ -371,7 +377,6 @@ module History = struct
     | Optional_arg_default
     | Layout_poly_in_external
     | Tuple_element
-    | Peek_or_poke
     | Array_element
     | Idx_element
     | Field_in_indexed_record

@@ -1444,10 +1444,6 @@ let udivimm_parameters d =
                                                      (* n * (M*d - 2^P) < 2^P *)
  *)
 
-let raise_symbol dbg symb =
-  Cop
-    (Craise Lambda.Raise_regular, [Cconst_symbol (global_symbol symb, dbg)], dbg)
-
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
   | Cconst_natint (i, _) -> Some i
@@ -1478,9 +1474,18 @@ let make_safe_divmod operator ~if_divisor_is_negative_one
 
 let is_power_of_2_or_zero n = Nativeint.logand n (Nativeint.pred n) = 0n
 
-let divide_by_zero dividend ~dbg =
+let divide_by_zero_message = "Division by zero after check"
+
+let divide_by_zero_message_symbol =
+  { sym_name = "caml_divide_by_zero_uncaught"; sym_global = Global }
+
+let divide_by_zero dividend ~dbg:_ =
   bind "dividend" dividend (fun _ ->
-      raise_symbol dbg "caml_exn_Division_by_zero")
+      (* Unreachable code (since Flambda already introduces a check). *)
+      Cinvalid
+        { message = divide_by_zero_message;
+          symbol = divide_by_zero_message_symbol
+        })
 
 let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_negative_one ~dividend ~dbg = neg_int dividend dbg in
@@ -2437,14 +2442,14 @@ let set_field_unboxed ~dbg memory_chunk block ~index_in_words newval =
 let string_length exp dbg =
   bind "str" exp (fun str ->
       let tmp_var = V.create_local "tmp" in
+      (* A string header never has reserved (mixed-block) bits set, so the size
+         can be read from the unmasked header. *)
+      let size = lsr_const (get_header str dbg) 10 dbg in
       Clet
         ( VP.create tmp_var,
           Cop
             ( Csubi,
-              [ Cop
-                  ( Clsl,
-                    [get_size str dbg; Cconst_int (log2_size_addr, dbg)],
-                    dbg );
+              [ Cop (Clsl, [size; Cconst_int (log2_size_addr, dbg)], dbg);
                 Cconst_int (1, dbg) ],
               dbg ),
           Cop
@@ -2589,6 +2594,7 @@ module Extended_machtype = struct
       typ_any_int
     | Pvalue { raw_kind = Pintval; _ } -> typ_tagged_int
     | Pvalue _ -> typ_val
+    | Pvoid -> [||]
     | Punboxed_product fields -> Array.concat (List.map of_layout fields)
 end
 
@@ -4763,6 +4769,12 @@ let fail_if_called_indirectly_function () =
     }
   in
   [Cdata string_data; Cfunction fn]
+
+(* Error message for division by zero after the check *)
+let emit_divide_by_zero_message () =
+  [ Cdata
+      (emit_string_constant divide_by_zero_message_symbol divide_by_zero_message
+         []) ]
 
 (* Generate the entry point *)
 (*

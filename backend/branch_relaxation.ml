@@ -120,9 +120,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
           ~available_across:Reg_availability_set.Unreachable
           ~phantom_available_before:None
     in
-    let rec fixup did_fix pc instr sizes =
+    let rec fixup did_fix acc pc instr sizes =
       match instr.desc with
-      | Lend -> did_fix, []
+      | Lend -> did_fix, List.rev acc
       | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
       | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel_for_jump_target _
       | Llabel_for_dwarf _ | Lbranch _
@@ -141,17 +141,14 @@ module Make (T : Branch_relaxation_intf.S) = struct
         in
         if not overflows
         then
-          let did_fix, rest_sizes = fixup did_fix (pc + size) instr.next rest in
-          ( did_fix,
-            { Branch_relaxation_intf.size; max_displacement } :: rest_sizes )
+          fixup did_fix
+            ({ Branch_relaxation_intf.size; max_displacement } :: acc)
+            (pc + size) instr.next rest
         else
           let relax_instr ri =
             instr.desc <- T.relaxed_instruction_desc ri;
             let new_size = T.relaxed_instruction_size ri in
-            let did_fix, rest_sizes =
-              fixup true (pc + new_size.size) instr.next rest
-            in
-            did_fix, new_size :: rest_sizes
+            fixup true (new_size :: acc) (pc + new_size.size) instr.next rest
           in
           match instr.desc with
           | Lop Poll -> relax_instr (T.relax_poll ())
@@ -188,11 +185,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
             let label_size : Branch_relaxation_intf.instruction_size =
               { size = 0; max_displacement = None }
             in
-            let did_fix, rest_sizes =
-              fixup true (pc + inverted_size.size) instr.next
-                (branch_size :: label_size :: rest)
-            in
-            did_fix, inverted_size :: rest_sizes
+            fixup true (inverted_size :: acc) (pc + inverted_size.size)
+              instr.next
+              (branch_size :: label_size :: rest)
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let original_next = instr.next in
             let cont =
@@ -227,7 +222,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 measure_expanded i.next (s :: sizes)
             in
             let new_sizes = List.rev (measure_expanded instr []) @ rest in
-            fixup true pc instr new_sizes
+            fixup true acc pc instr new_sizes
           | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
           | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _
           | Llabel_for_jump_target _ | Llabel_for_dwarf _ | Lbranch _
@@ -252,7 +247,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               "Branch_relaxation.fixup: instruction should have been rejected \
                by instr_overflows")
     in
-    fixup false 0 code sizes
+    fixup false [] 0 code sizes
 
   (* Iterate branch expansion till all conditional branches are OK *)
 

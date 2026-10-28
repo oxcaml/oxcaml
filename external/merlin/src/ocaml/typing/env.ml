@@ -188,7 +188,7 @@ type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.With_regionality.Comonadic.Const.t
   | Closure_lock of Mode.Hint.pinpoint * Mode.With_regionality.Comonadic.r
-  | Region_lock
+  | Region_lock of Mode.Hint.region option
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
@@ -3296,7 +3296,7 @@ let add_closure_lock closure_context comonadic env =
   in
   add_lock lock env
 
-let add_region_lock env = add_lock Region_lock env
+let add_region_lock ?region env = add_lock (Region_lock region) env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
@@ -3999,7 +3999,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
   List.fold_left
     (fun vmode lock ->
       try match lock with
-      | Region_lock -> region_mode vmode
+      | Region_lock _ -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
           const_closure_mode pp vmode closure_context comonadic
       | Closure_lock (closure_context, comonadic) ->
@@ -4047,7 +4047,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
   List.fold_left
     (fun (mode : Mode.With_regionality.r) lock ->
       match lock with
-      | Region_lock ->
+      | Region_lock region ->
           (* CR zqian: once we have finer regionality, remove this branch *)
           (* First map [regional] to [global], then cap [local] to [regional] *)
           let mode =
@@ -4055,10 +4055,13 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
             |> Mode.with_regionality_to_locality_r2g
             |> Mode.with_locality_as_regionality
           in
+          let hint_comonadic =
+            Option.map (fun r -> Mode.Hint.Escape_region r) region
+          in
           Mode.With_regionality.meet
             [mode;
-             Mode.With_regionality.max_with_comonadic Areality
-                                 (Mode.Regionality.regional)]
+             Mode.With_regionality.of_const ?hint_comonadic
+               { Mode.With_regionality.Const.max with areality = Regional }]
       | Exclave_lock ->
           (* If [m0] is [global], then inside the exclave we require new values
           to be [global]. If [m0] is [regional], then we require the new values
@@ -5827,12 +5830,12 @@ let check_state_consistency () =
     match Load_path.find_normalized (modname_as_string ^ ".cmi") with
     | _ -> false
     | exception Not_found -> true
-  and found _modname filename ps_name =
+  and present _modname filename ps_name =
     match Cmi_cache.get_cached_entry filename with
-    | cmi_infos -> Compilation_unit.Name.equal ps_name cmi_infos.Cmi_format.cmi_name
+    | cmi_infos -> ps_name == cmi_infos.Cmi_format.cmi_name
     | exception Not_found -> false
   in
-  Persistent_env.forall ~found ~missing !persistent_env
+  Persistent_env.forall ~found:present ~invalid:present ~missing !persistent_env
 
 let with_cmis f =
   Persistent_env.with_cmis !persistent_env f ()

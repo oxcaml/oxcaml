@@ -33,14 +33,13 @@ type 'f result = private
   { unit : Flambda_unit.t;
     exported_code : Exported_code.t;
     slot_offsets : Slot_offsets.result;
-    final_typing_env : ('f, typing_env option) Traverse.With_types.t
+    final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
 val rebuild :
   machine_width:Target_system.Machine_width.t ->
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->
-  unit:Flambda_unit.t ->
   skeleton:Traverse.Skeleton.t ->
   solution:'f Analysis.solution ->
   'f result

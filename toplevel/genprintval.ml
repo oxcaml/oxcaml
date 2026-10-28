@@ -353,6 +353,20 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | None -> Print_as "<unknown>"
       | Some sort -> print_sort sort
 
+    (* How to print a value of type [ty] that's a field/ctor arg whose declared
+       sort is [sort] *)
+    let print_type env ty ~sort ~why =
+      match sort with
+      | Some sort ->
+          (* The sort was fixed at declaration time, so just use that *)
+          print_sort sort
+      | None ->
+          (* The sort is undetermined (e.g., a field/arg of kind [any]), so
+             compute it from the type of this particular value *)
+          match Ctype.type_sort env ty ~allow_mutation:false ~why with
+          | Ok sort -> print_sort (Jkind.Sort.default_for_transl_and_get sort)
+          | Error _ -> Print_as "<unknown>"
+
     let field_types_of_labels env lbl_list type_params ty_list () =
       let label_params_and_types, record_params =
         Ctype.instance_label_declarations ~fixed:false
@@ -363,10 +377,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       List.map snd (Array.to_list label_params_and_types)
 
     let outval_mixed_rep shape =
-      Outval_record_mixed
-        (Mixed_block_shape.of_mixed_block_elements
-           (Lambda.transl_mixed_product_shape shape)
-           ~print_locality:(fun ppf () -> Format.fprintf ppf "()"))
+      let shape = Lambda.transl_mixed_product_shape shape in
+      match Lambda.singleton_product_shape_for_bytecode shape with
+      | Some _ when not (Clflags.target_is_native ()) ->
+          Outval_record_unboxed
+      | _ ->
+          Outval_record_mixed
+            (Mixed_block_shape.of_mixed_block_elements shape
+               ~print_locality:(fun ppf () -> Format.fprintf ppf "()"))
 
     let outval_rep_of_field_types env field_types =
       match Typedecl.compute_block_shape env (field_types ()) with
@@ -735,20 +753,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               let ty_args =
                 List.map2
                   (fun { ca_sort } ty_arg ->
-                     let sort =
-                       match ca_sort with
-                       | Some sort -> Some sort
-                       | None ->
-                           (match
-                              Ctype.type_sort env ty_arg ~allow_mutation:false
-                                ~why:Constructor_arg_projection
-                            with
-                            | Ok sort ->
-                                Some
-                                  (Jkind.Sort.default_for_transl_and_get sort)
-                            | Error _ -> None)
-                     in
-                     (ty_arg, print_sort_option sort)
+                     (ty_arg,
+                      print_type env ty_arg ~sort:ca_sort
+                        ~why:Constructor_arg_projection)
                   ) l ty_args
               in
               let field_types () = List.map fst ty_args in
@@ -896,7 +903,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 if first then tree_of_unboxed_product_label env path name
                 else tree_of_name name
               and v =
-                match print_sort_option ld_sort with
+                match
+                  print_type env ty_arg ~sort:ld_sort ~why:Field_projection
+                with
                 | Print_as msg -> Oval_stuff msg
                 | Print_as_value ->
                   match lbl_list with
@@ -1005,6 +1014,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | _ -> assert false
         in
         let args = instantiate_types env type_params ty_list cstr.cstr_args in
+        (* CR lmaurer: Extension constructors can't have [any] arguments yet,
+           so [ca_sort] is never [None] here. Once they can, use [print_type]
+           as [tree_of_variant] does. *)
         let args = List.map2 (fun { ca_sort } arg ->
             (arg, print_sort_option ca_sort))
             cstr.cstr_args args
