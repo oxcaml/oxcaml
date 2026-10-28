@@ -3152,6 +3152,7 @@ let tree_of_label l =
   let ld_modalities = tree_of_modalities l.ld_mutable l.ld_modalities in
   {
     olab_name = Ident.name l.ld_id;
+    olab_inherit = l.ld_inherit;
     olab_mut = mut;
     olab_type = tree_of_typexp ~base:With_locality.Const.legacy Type l.ld_type;
     olab_modalities = ld_modalities;

@@ -963,10 +963,12 @@ let default_mapper =
       );
 
     label_declaration =
-      (fun this {pld_name; pld_type; pld_loc; pld_mutable; pld_modalities; pld_attributes} ->
+      (fun this {pld_name; pld_type; pld_loc; pld_inherit; pld_mutable;
+                 pld_modalities; pld_attributes} ->
          Type.field
            (map_loc this pld_name)
            (this.typ this pld_type)
+           ~inherit_:pld_inherit
            ~mut:pld_mutable
            ~modalities:(this.modalities this pld_modalities)
            ~loc:(this.location this pld_loc)
