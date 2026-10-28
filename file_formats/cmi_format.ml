@@ -118,6 +118,7 @@ let deserialize data =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_alias = vd.val_alias;
     }
   in
   Deserialize.signature {map_signature; map_type_expr; map_value_description}
@@ -153,6 +154,7 @@ let serialize oc base =
       val_attributes = vd.val_attributes;
       val_loc = vd.val_loc;
       val_uid = vd.val_uid;
+      val_alias = vd.val_alias;
     }
   in
   Serialize.signature {map_signature; map_type_expr; map_value_description}

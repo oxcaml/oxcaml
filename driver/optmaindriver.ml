@@ -98,6 +98,9 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
         (ppf,
          Compiler.implementation,
          Compiler.interface,
+         (fun file ~output ->
+            let info, _crc = Compilenv.read_unit_info file in
+            Laws_file.write info.ui_laws ~file ~output),
          Compiler.ext_flambda_obj,
          Compiler.ext_flambda_lib);
     with Arg.Bad msg ->

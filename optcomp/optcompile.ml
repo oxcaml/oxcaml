@@ -156,7 +156,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     match start_from with
     | Parsing ->
       let backend info
-          ({ structure; coercion; argument_interface; _ } :
+          ({ structure; coercion; argument_interface; _ } as impl :
             Typedtree.implementation) =
         let argument_coercion =
           match argument_interface with
@@ -164,6 +164,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             Some ai_coercion_from_primary
           | None -> None
         in
+        Compilenv.set_laws (Laws_gen.generate ~unit:info.module_name impl);
         let typed = structure, coercion, argument_coercion in
         if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
         compile_from_typed info typed ~keep_symbol_tables

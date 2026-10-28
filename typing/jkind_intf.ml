@@ -382,6 +382,7 @@ module History = struct
     | Field_in_indexed_record
     | Structure_item
     | Signature_item
+    | Law_parameter
     | Layout_poly
     | Typing_recovery
 

@@ -802,8 +802,8 @@ let c_object_of_filename name =
   Filename.chop_suffix (Filename.basename name) ".c" ^ Config.ext_obj
 
 let process_action
-    (ppf, implementation, interface, ocaml_mod_ext, ocaml_lib_ext) action
-    ~keep_symbol_tables =
+    (ppf, implementation, interface, print_laws, ocaml_mod_ext, ocaml_lib_ext)
+    action ~keep_symbol_tables =
   let impl ~start_from name =
     readenv ppf (Before_compile name);
     let opref = output_prefix name in
@@ -844,6 +844,8 @@ let process_action
       if !Clflags.functorize then
         (* Anonymous args are module names, not filepaths. *)
         objfiles := name :: !objfiles
+      else if !generate_laws && Filename.check_suffix name ocaml_mod_ext then
+        print_laws name ~output:!output_name
       else if Filename.check_suffix name ocaml_mod_ext
       || Filename.check_suffix name ocaml_lib_ext then
         objfiles := name :: !objfiles
@@ -900,10 +902,11 @@ let intf filename =
   defer (ProcessInterface filename)
 
 let process_deferred_actions env =
+  let (_, _, _, _, ocaml_mod_ext, _) = env in
   let final_output_name = !output_name in
   (* Make sure the intermediate products don't clash with the final one
      when we're invoked like: ocamlopt -o foo bar.c baz.ml. *)
-  if not !compile_only then output_name := None;
+  if not (!compile_only || !generate_laws) then output_name := None;
   begin
     match final_output_name with
     | None -> ()
@@ -915,6 +918,14 @@ let process_deferred_actions env =
               | ProcessInterface _ -> true
               | _ -> false) !deferred_actions) > 1 then
             fatal "Options -c -o are incompatible with compiling multiple files"
+        end;
+        if !generate_laws then begin
+          if List.length (List.filter (function
+              | ProcessOtherFile name ->
+                  Filename.check_suffix name ocaml_mod_ext
+              | _ -> false) !deferred_actions) > 1 then
+            fatal "Options -generate-laws-implementation -o are incompatible \
+                   with multiple object files"
         end;
   end;
   if !make_archive then begin

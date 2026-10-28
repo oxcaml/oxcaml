@@ -215,6 +215,7 @@ and out_sig_item =
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
   | Osig_jkind of out_jkind_decl
+  | Osig_law of out_law_decl
   | Osig_ellipsis
 and out_type_decl =
   { otype_name: string;
@@ -261,6 +262,63 @@ and out_ext_status =
 and out_jkind_decl =
   { ojkind_name: string;
     ojkind_jkind: out_jkind option }
+and out_law_decl =
+  { olaw_name: string;
+    olaw_newtypes: (string * out_jkind option) list;
+    olaw_params: (string * out_type) list;
+    olaw_assumptions: out_spec list;
+    olaw_conclusion: out_spec }
+and out_spec =
+  | Ospec_var of string
+  | Ospec_global of out_ident
+  | Ospec_constant of out_value
+  | Ospec_apply of out_spec * (arg_label * out_spec) list
+  | Ospec_tuple of (string option * out_spec) list
+  | Ospec_unboxed_tuple of (string option * out_spec) list
+  | Ospec_unboxed_unit
+  | Ospec_unboxed_bool of bool
+  | Ospec_construct of out_ident * out_spec list
+  | Ospec_variant of string * out_spec option
+  | Ospec_extension_constructor of out_ident
+  | Ospec_constraint of out_spec * out_type
+  | Ospec_record of
+      { fields : (out_ident * out_spec) list;
+        extended : out_spec option;
+        unboxed : bool }
+  | Ospec_field of { record : out_spec; label : out_ident; unboxed : bool }
+  | Ospec_ifthenelse of out_spec * out_spec * out_spec option
+  | Ospec_sequence of out_spec * out_spec
+  | Ospec_assert of out_spec
+  | Ospec_lazy of out_spec
+  | Ospec_let of bool * (out_spec_pattern * out_spec) list * out_spec
+      (** [Ospec_let (rec, bindings, body)] *)
+  | Ospec_match of out_spec * out_spec_case list
+  | Ospec_try of out_spec * out_spec_case list
+  | Ospec_function of out_spec_param list * out_spec_function_body
+and out_spec_param = arg_label * out_spec_pattern * out_spec option
+and out_spec_function_body =
+  | Ospec_body of out_spec
+  | Ospec_cases of out_spec_case list
+and out_spec_case = out_spec_pattern * out_spec option * out_spec
+and out_spec_pattern =
+  | Ospat_any
+  | Ospat_var of string
+  | Ospat_alias of out_spec_pattern * string
+  | Ospat_constant of out_value
+  | Ospat_tuple of (string option * out_spec_pattern) list
+  | Ospat_unboxed_tuple of (string option * out_spec_pattern) list
+  | Ospat_unboxed_unit
+  | Ospat_unboxed_bool of bool
+  | Ospat_construct of out_ident * out_spec_pattern list
+  | Ospat_variant of string * out_spec_pattern option
+  | Ospat_record of
+      { fields : (out_ident * out_spec_pattern) list;
+        closed : bool;
+        unboxed : bool }
+  | Ospat_or of out_spec_pattern * out_spec_pattern
+  | Ospat_lazy of out_spec_pattern
+  | Ospat_exception of out_spec_pattern
+  | Ospat_constraint of out_spec_pattern * out_type
 
 
 type out_phrase =

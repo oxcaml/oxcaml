@@ -1752,7 +1752,8 @@ let type_continuation_pat env expected_ty sp =
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
-          val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()); }
+          val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+          val_alias = None; }
       in
         Some (id, desc)
   | Ppat_extension ext ->
@@ -2037,7 +2038,8 @@ let add_pattern_variables ?check ?check_as env pv =
           Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
-          val_uid = pv_uid
+          val_uid = pv_uid;
+          val_alias = None;
          } env
     )
     pv env
@@ -4480,6 +4482,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
+            ; val_alias = None
             }
             val_env
          in
@@ -4493,6 +4496,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
             ; val_modalities = Modality.undefined
             ; val_loc = pv_loc
             ; val_uid = pv_uid
+            ; val_alias = None
             }
             met_env
          in
@@ -5765,6 +5769,7 @@ and is_nonexpansive_mod mexp =
           | Tstr_class _ -> false (* could be more precise *)
           | Tstr_attribute _ -> true
           | Tstr_jkind _ -> true
+          | Tstr_law _ -> true
         )
         str.str_items
   | Tmod_apply _ | Tmod_apply_unit _ -> false
@@ -7079,7 +7084,8 @@ let create_typing_recovery_error_node loc env ty_expected ~attributes =
                 val_attributes = [];
                 val_uid = Uid.internal_not_actually_unique;
                 val_zero_alloc = Zero_alloc.default;
-                val_modalities = Modality.of_const Modality.Const.id
+                val_modalities = Modality.of_const Modality.Const.id;
+                val_alias = None
               };
             kind = Id_value;
             unique_use = (Uniqueness.newvar (get_current_level ()),
@@ -11080,6 +11086,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
             val_modalities = Modality.undefined;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+            val_alias = None;
           }
         in
         let exp_env = Env.add_value ~mode id desc env in

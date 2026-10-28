@@ -1000,6 +1000,263 @@ and jkind_declaration i ppf x =
   line i ppf "pjkind_manifest =\n";
   option (i+1) jkind_annotation ppf x.jkind_annotation
 
+and law_declaration i ppf x =
+  line i ppf "law_declaration %a %a\n" fmt_ident x.law_id
+       fmt_location x.law_loc;
+  attributes i ppf x.law_attributes;
+  let i = i+1 in
+  line i ppf "law_newtypes =\n";
+  list (i+1) law_newtype ppf x.law_newtypes;
+  line i ppf "law_params =\n";
+  list (i+1) law_param ppf x.law_params;
+  line i ppf "law_assumptions =\n";
+  list (i+1) spec_expression ppf x.law_assumptions;
+  line i ppf "law_conclusion =\n";
+  spec_expression (i+1) ppf x.law_conclusion
+
+and law_newtype i ppf x =
+  line i ppf "%a\n" fmt_ident x.ln_id;
+  option (i+1) jkind_annotation ppf x.ln_jkind
+
+and law_param i ppf x =
+  line i ppf "%a\n" fmt_ident x.lp_id;
+  core_type (i+1) ppf x.lp_type
+
+and spec_expression i ppf x =
+  line i ppf "spec_expression %a\n" fmt_location x.stexp_loc;
+  let i = i+1 in
+  begin match x.stexp_extra with
+  | [] -> ()
+  | extra -> line i ppf "extra\n"; List.iter (spec_extra (i+1) ppf) extra
+  end;
+  match x.stexp_desc with
+  | Stexp_var {id; _} -> line i ppf "Stexp_var %a\n" fmt_ident id
+  | Stexp_global {path; _} -> line i ppf "Stexp_global %a\n" fmt_path path
+  | Stexp_primitive {path; _} ->
+      line i ppf "Stexp_primitive %a\n" fmt_path path
+  | Stexp_constant c -> line i ppf "Stexp_constant %a\n" fmt_constant c
+  | Stexp_apply {funct; args; _} ->
+      line i ppf "Stexp_apply\n";
+      spec_expression i ppf funct;
+      list i spec_argument ppf args
+  | Stexp_tuple (l, am) ->
+      line i ppf "Stexp_tuple\n";
+      locality_mode_r i ppf am;
+      list i spec_labelled ppf l
+  | Stexp_unboxed_tuple l ->
+      line i ppf "Stexp_unboxed_tuple\n";
+      list i spec_labelled ppf l
+  | Stexp_unboxed_unit -> line i ppf "Stexp_unboxed_unit\n"
+  | Stexp_unboxed_bool b -> line i ppf "Stexp_unboxed_bool %a\n" fmt_bool b
+  | Stexp_construct {lid; repr; args; mode; _} ->
+      line i ppf "Stexp_construct %a\n" fmt_longident lid;
+      constructor_representation i ppf repr;
+      locality_mode_option i ppf mode;
+      list i spec_expression ppf (List.map snd args)
+  | Stexp_variant (l, eo) ->
+      line i ppf "Stexp_variant \"%s\"\n" l;
+      option i spec_expression ppf (Option.map fst eo)
+  | Stexp_extension_constructor (li, _) ->
+      line i ppf "Stexp_extension_constructor %a\n" fmt_longident li
+  | Stexp_record { fields; representation; extended_expression; _ } ->
+      line i ppf "Stexp_record\n";
+      let i = i+1 in
+      line i ppf "fields =\n";
+      array (i+1) spec_record_field ppf fields;
+      line i ppf "representation =\n";
+      record_representation (i+1) ppf representation;
+      line i ppf "extended_expression =\n";
+      option (i+1) spec_expression ppf
+        (Option.map Misc.fst4 extended_expression)
+  | Stexp_record_unboxed_product
+      { fields; representation; extended_expression } ->
+      line i ppf "Stexp_record_unboxed_product\n";
+      let i = i+1 in
+      line i ppf "fields =\n";
+      array (i+1) spec_record_field ppf fields;
+      line i ppf "representation =\n";
+      record_unboxed_product_representation (i+1) ppf representation;
+      line i ppf "extended_expression =\n";
+      option (i+1) spec_expression ppf (Option.map fst extended_expression)
+  | Stexp_field { record; lid; record_sort; _ } ->
+      line i ppf "Stexp_field\n";
+      spec_expression i ppf record;
+      sort i ppf record_sort;
+      longident i ppf lid
+  | Stexp_unboxed_field { record; lid; record_sort; _ } ->
+      line i ppf "Stexp_unboxed_field\n";
+      spec_expression i ppf record;
+      sort i ppf record_sort;
+      longident i ppf lid
+  | Stexp_ifthenelse (e1, e2, eo) ->
+      line i ppf "Stexp_ifthenelse\n";
+      spec_expression i ppf e1;
+      spec_expression i ppf e2;
+      option i spec_expression ppf eo
+  | Stexp_sequence (e1, s, e2) ->
+      line i ppf "Stexp_sequence\n";
+      spec_expression i ppf e1;
+      line i ppf "%a\n" fmt_sort s;
+      spec_expression i ppf e2
+  | Stexp_assert (e, _) ->
+      line i ppf "Stexp_assert\n";
+      spec_expression i ppf e
+  | Stexp_lazy e ->
+      line i ppf "Stexp_lazy\n";
+      spec_expression i ppf e
+  | Stexp_let (rf, vbs, body) ->
+      line i ppf "Stexp_let %a\n" fmt_rec_flag rf;
+      List.iter
+        (fun {svb_pat; svb_expr; svb_sort; _} ->
+           line (i+1) ppf "<def>\n";
+           spec_pattern (i+2) ppf svb_pat;
+           line (i+2) ppf "%a\n" fmt_sort svb_sort;
+           spec_expression (i+2) ppf svb_expr)
+        vbs;
+      spec_expression i ppf body
+  | Stexp_match (e, sort, cases, _) ->
+      line i ppf "Stexp_match\n";
+      spec_expression i ppf e;
+      line i ppf "%a\n" fmt_sort sort;
+      list i spec_case ppf cases
+  | Stexp_try (e, cases) ->
+      line i ppf "Stexp_try\n";
+      spec_expression i ppf e;
+      list i spec_case ppf cases
+  | Stexp_open ({sopen_override; sopen_expr; _}, body) ->
+      line i ppf "Stexp_open %a \"%a\"\n" fmt_override_flag sopen_override
+        fmt_path sopen_expr.smod_path;
+      spec_expression i ppf body
+  | Stexp_function {params; body; ret_sort; _} ->
+      line i ppf "Stexp_function\n";
+      line i ppf "%a\n" fmt_sort ret_sort;
+      list i spec_function_param ppf params;
+      begin match body with
+      | Stfunction_body e -> spec_expression i ppf e
+      | Stfunction_cases {sfc_cases; _} -> list i spec_case ppf sfc_cases
+      end
+
+and spec_function_param i ppf {sfp_arg_label; sfp_kind; sfp_sort; _} =
+  line i ppf "<param>\n";
+  arg_label (i+1) ppf sfp_arg_label;
+  line (i+1) ppf "%a\n" fmt_sort sfp_sort;
+  match sfp_kind with
+  | Stparam_pat p -> spec_pattern (i+1) ppf p
+  | Stparam_optional_default (p, e, _) ->
+      spec_pattern (i+1) ppf p;
+      spec_expression (i+1) ppf e
+
+and spec_case : type k. _ -> _ -> k spec_case -> unit =
+  fun i ppf {sc_lhs; sc_guard; sc_rhs} ->
+  line i ppf "<case>\n";
+  spec_pattern (i+1) ppf sc_lhs;
+  option (i+1) spec_expression ppf sc_guard;
+  spec_expression (i+1) ppf sc_rhs
+
+and spec_pattern : type k. _ -> _ -> k spec_general_pattern -> unit =
+  fun i ppf x ->
+  line i ppf "spec_pattern %a\n" fmt_location x.stpat_loc;
+  let i = i+1 in
+  List.iter (spec_pat_extra i ppf) x.stpat_extra;
+  let labelled i ppf (label, p, sort) =
+    tuple_component_label i ppf label;
+    spec_pattern i ppf p;
+    line i ppf "%a\n" fmt_sort sort
+  in
+  let field i ppf (li, _, p) =
+    line i ppf "%a\n" fmt_longident li;
+    spec_pattern (i+1) ppf p
+  in
+  match x.stpat_desc with
+  | Stpat_any -> line i ppf "Stpat_any\n"
+  | Stpat_var { id; sort; mode; _ } ->
+      line i ppf "Stpat_var \"%a\"\n" fmt_ident id;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf mode
+  | Stpat_alias { pattern = p; id; sort; mode; _ } ->
+      line i ppf "Stpat_alias \"%a\"\n" fmt_ident id;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf mode;
+      spec_pattern i ppf p
+  | Stpat_constant c -> line i ppf "Stpat_constant %a\n" fmt_constant c
+  | Stpat_unboxed_unit -> line i ppf "Stpat_unboxed_unit\n"
+  | Stpat_unboxed_bool b -> line i ppf "Stpat_unboxed_bool %a\n" fmt_bool b
+  | Stpat_tuple l ->
+      line i ppf "Stpat_tuple\n";
+      list i labelled ppf l
+  | Stpat_unboxed_tuple l ->
+      line i ppf "Stpat_unboxed_tuple\n";
+      list i labelled ppf l
+  | Stpat_construct (li, _, _, args) ->
+      line i ppf "Stpat_construct %a\n" fmt_longident li;
+      list i spec_pattern ppf (List.map snd args)
+  | Stpat_variant (l, po, _) ->
+      line i ppf "Stpat_variant \"%s\"\n" l;
+      option i spec_pattern ppf po
+  | Stpat_record (l, _, _) ->
+      line i ppf "Stpat_record\n";
+      list i field ppf l
+  | Stpat_record_unboxed_product (l, _, _) ->
+      line i ppf "Stpat_record_unboxed_product\n";
+      list i field ppf l
+  | Stpat_lazy p ->
+      line i ppf "Stpat_lazy\n";
+      spec_pattern i ppf p
+  | Stpat_value p ->
+      line i ppf "Stpat_value\n";
+      spec_pattern i ppf p
+  | Stpat_exception p ->
+      line i ppf "Stpat_exception\n";
+      spec_pattern i ppf p
+  | Stpat_or (p1, p2) ->
+      line i ppf "Stpat_or\n";
+      spec_pattern i ppf p1;
+      spec_pattern i ppf p2
+
+and spec_pat_extra i ppf (extra, loc) =
+  match extra with
+  | Stpat_constraint ct ->
+      line i ppf "Stpat_constraint %a\n" fmt_location loc;
+      core_type (i+1) ppf ct
+  | Stpat_inspected_type _ ->
+      line i ppf "Stpat_inspected_type %a\n" fmt_location loc
+
+and spec_record_field
+    : 'a. _ -> _ -> 'a * _ * _ -> _
+  = fun i ppf (_, _, definition) ->
+  match definition with
+  | Soverridden (li, e) ->
+      line i ppf "%a\n" fmt_longident li;
+      spec_expression (i+1) ppf e
+  | Skept _ ->
+      line i ppf "<kept>"
+
+and spec_labelled i ppf (l, e, s) =
+  line i ppf "<tuple component>\n";
+  option (i+1) string ppf l;
+  spec_expression (i+1) ppf e;
+  line (i+1) ppf "%a\n" fmt_sort s
+
+and spec_argument i ppf (l, e, s) =
+  line i ppf "<arg>\n";
+  spec_arg_label (i+1) ppf l;
+  spec_expression (i+1) ppf e;
+  line (i+1) ppf "%a\n" fmt_sort s
+
+and spec_arg_label i ppf (l : Spec.arg_label) =
+  match l with
+  | Nolabel -> line i ppf "Nolabel\n"
+  | Labelled s -> line i ppf "Labelled \"%s\"\n" s
+  | Optional s -> line i ppf "Optional \"%s\"\n" s
+
+and spec_extra i ppf (extra, loc) =
+  match extra with
+  | Stexp_constraint ct ->
+      line i ppf "Stexp_constraint %a\n" fmt_location loc;
+      core_type (i+1) ppf ct
+  | Stexp_inspected_type _ ->
+      line i ppf "Stexp_inspected_type %a\n" fmt_location loc
+
 and type_extension i ppf x =
   line i ppf "type_extension\n";
   attributes i ppf x.tyext_attributes;
@@ -1287,6 +1544,9 @@ and signature_item i ppf x =
   | Tsig_jkind jd ->
       line i ppf "Tsig_jkind";
       jkind_declaration i ppf jd
+  | Tsig_law ld ->
+      line i ppf "Tsig_law\n";
+      law_declaration i ppf ld
 
 and module_declaration i ppf md =
   line i ppf "%a\n" fmt_modname md.md_id;
@@ -1415,6 +1675,9 @@ and structure_item i ppf x =
   | Tstr_jkind jd ->
       line i ppf "Tstr_jkind";
       jkind_declaration i ppf jd
+  | Tstr_law ld ->
+      line i ppf "Tstr_law\n";
+      law_declaration i ppf ld
 
 and longident_x_with_constraint i ppf (li, _, wc) =
   line i ppf "%a\n" fmt_path li;

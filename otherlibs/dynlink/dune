@@ -131,6 +131,7 @@
   scalar
   primitive
   zero_alloc
+  spec
   types
   oprint
   typemode
@@ -191,6 +192,7 @@
   typedtree
   outcometree
   cmo_format
+  laws_file
   cmxs_format
   cmt_format
   debug_event
@@ -311,6 +313,8 @@
 
 (copy_files ../../parsing/ast_helper.ml)
 
+(copy_files ../../file_formats/laws_file.ml)
+
 (copy_files ../../parsing/ast_mapper.ml)
 
 (copy_files ../../parsing/attr_helper.ml)
@@ -355,6 +359,8 @@
 
 (copy_files ../../typing/zero_alloc.ml)
 
+(copy_files ../../typing/spec.ml)
+
 (copy_files ../../typing/types.ml)
 
 (copy_files ../../typing/errortrace.ml)
@@ -364,6 +370,7 @@
 (copy_files ../../typing/ctype.ml)
 
 (copy_files ../../typing/out_type.ml)
+
 
 (copy_files ../../typing/printtyp.ml)
 
@@ -560,6 +567,8 @@
 
 (copy_files ../../typing/zero_alloc.mli)
 
+(copy_files ../../typing/spec.mli)
+
 (copy_files ../../typing/types.mli)
 
 (copy_files ../../typing/errortrace.mli)
@@ -571,6 +580,7 @@
 (copy_files ../../typing/signature_group.mli)
 
 (copy_files ../../typing/out_type.mli)
+
 
 (copy_files ../../typing/printtyp.mli)
 
@@ -677,6 +687,8 @@
 (copy_files ../../typing/outcometree.mli)
 
 (copy_files ../../file_formats/cmo_format.mli)
+
+(copy_files ../../file_formats/laws_file.mli)
 
 (copy_files ../../file_formats/cmxs_format.mli)
 
@@ -790,6 +802,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Spec.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
@@ -933,6 +946,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Spec.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx

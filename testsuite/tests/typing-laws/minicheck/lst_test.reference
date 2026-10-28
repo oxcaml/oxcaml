@@ -1,0 +1,26 @@
+init_length
+  law? init_length (n : int) (f : int -> ('a : value)) :
+    n >= 0 ===> length (init n ~f) = n
+  passed 3, discarded 1
+length_nonneg
+  law? length_nonneg (xs : ('a : value) list) : length xs >= 0
+  passed 5, discarded 0
+trivial
+  law? trivial : 1 = 1
+  passed 1, discarded 0
+unzip_zip
+  law? unzip_zip (xs : int list) (ys : int list) :
+    length xs = length ys ===>
+    let xs', ys' = unzip (zip (xs, ys)) in
+    eq Int.equal xs' xs && eq Int.equal ys' ys
+  passed 4, discarded 12
+zip_unzip
+  law? zip_unzip (zs : (int * int) list) :
+    eq (fun (a, b) (c, d) -> Int.equal a c && Int.equal b d) (zip (unzip zs)) zs
+  passed 4, discarded 0
+init_length
+  law? init_length (n : int) (f : int -> ('a : value)) :
+    n >= 0 ===> length (init n ~f) = n
+  FAILED, raised Failure("boom")
+  length (init n ~f) = n
+  counterexample: 7

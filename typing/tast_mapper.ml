@@ -43,6 +43,7 @@ type mapper =
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
     jkind_declaration:
       mapper -> jkind_declaration -> jkind_declaration;
+    law_declaration: mapper -> law_declaration -> law_declaration;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -64,6 +65,9 @@ type mapper =
     open_description: mapper -> open_description -> open_description;
     signature: mapper -> signature -> signature;
     signature_item: mapper -> signature_item -> signature_item;
+    spec_expression: mapper -> spec_expression -> spec_expression;
+    spec_pattern:
+      'k . mapper -> 'k spec_general_pattern -> 'k spec_general_pattern;
     structure: mapper -> structure -> structure;
     structure_item: mapper -> structure_item -> structure_item;
     typ: mapper -> core_type -> core_type;
@@ -214,6 +218,7 @@ let structure_item sub {str_loc; str_desc; str_env} =
     | Tstr_open od -> Tstr_open (sub.open_declaration sub od)
     | Tstr_attribute attr -> Tstr_attribute (sub.attribute sub attr)
     | Tstr_jkind d -> Tstr_jkind (sub.jkind_declaration sub d)
+    | Tstr_law d -> Tstr_law (sub.law_declaration sub d)
   in
   {str_desc; str_env; str_loc}
 
@@ -330,6 +335,231 @@ let[@warning "+9"] jkind_declaration sub
   let jkind_loc = sub.location sub jkind_loc in
   {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
    jkind_loc}
+
+let spec_extra sub = function
+  | Stexp_constraint cty -> Stexp_constraint (sub.typ sub cty)
+  | Stexp_inspected_type _ as e -> e
+
+let spec_pat_extra sub = function
+  | Stpat_constraint cty -> Stpat_constraint (sub.typ sub cty)
+  | Stpat_inspected_type _ as e -> e
+
+let spec_pattern
+  : type k . mapper -> k spec_general_pattern -> k spec_general_pattern
+  = fun sub x ->
+  let stpat_extra =
+    List.map
+      (fun (e, loc) -> (spec_pat_extra sub e, sub.location sub loc))
+      x.stpat_extra
+  in
+  let labelled (label, p, sort) = label, sub.spec_pattern sub p, sort in
+  let field (lid, lbl, p) = map_loc_lid sub lid, lbl, sub.spec_pattern sub p in
+  let stpat_desc : k spec_pattern_desc =
+    match x.stpat_desc with
+    | Stpat_any
+    | Stpat_constant _
+    | Stpat_unboxed_unit
+    | Stpat_unboxed_bool _ -> x.stpat_desc
+    | Stpat_var r -> Stpat_var { r with name = map_loc sub r.name }
+    | Stpat_alias r ->
+        Stpat_alias { r with pattern = sub.spec_pattern sub r.pattern;
+                             name = map_loc sub r.name }
+    | Stpat_tuple l -> Stpat_tuple (List.map labelled l)
+    | Stpat_unboxed_tuple l -> Stpat_unboxed_tuple (List.map labelled l)
+    | Stpat_construct (lid, cd, rep, l) ->
+        Stpat_construct
+          (map_loc_lid sub lid, cd, rep,
+           List.map (fun (sort, p) -> sort, sub.spec_pattern sub p) l)
+    | Stpat_variant (l, po, rd) ->
+        Stpat_variant (l, Option.map (sub.spec_pattern sub) po, rd)
+    | Stpat_record (l, rep, closed) ->
+        Stpat_record (List.map field l, rep, closed)
+    | Stpat_record_unboxed_product (l, rep, closed) ->
+        Stpat_record_unboxed_product (List.map field l, rep, closed)
+    | Stpat_lazy p -> Stpat_lazy (sub.spec_pattern sub p)
+    | Stpat_value p -> Stpat_value (sub.spec_pattern sub p)
+    | Stpat_exception p -> Stpat_exception (sub.spec_pattern sub p)
+    | Stpat_or (p1, p2) ->
+        Stpat_or (sub.spec_pattern sub p1, sub.spec_pattern sub p2)
+  in
+  { x with stpat_desc; stpat_loc = sub.location sub x.stpat_loc; stpat_extra;
+           stpat_env = sub.env sub x.stpat_env }
+
+let spec_module_path sub m =
+  let smod_mode =
+    match m.smod_mode with
+    | _, None -> m.smod_mode
+    | mode, Some (locks, txt, loc) ->
+      let { txt; loc } = map_loc_lid sub { txt; loc } in
+      mode, Some (locks, txt, loc)
+  in
+  { m with
+    smod_lid = map_loc_lid sub m.smod_lid;
+    smod_mode;
+    smod_env = sub.env sub m.smod_env;
+    smod_loc = sub.location sub m.smod_loc }
+
+let spec_labelled sub (lbl, e, sort) = (lbl, sub.spec_expression sub e, sort)
+
+let spec_case : 'k. mapper -> 'k spec_case -> 'k spec_case =
+  fun sub {sc_lhs; sc_guard; sc_rhs} ->
+  { sc_lhs = sub.spec_pattern sub sc_lhs;
+    sc_guard = Option.map (sub.spec_expression sub) sc_guard;
+    sc_rhs = sub.spec_expression sub sc_rhs }
+
+let spec_label_definition sub = function
+  | Skept _ as d -> d
+  | Soverridden (lid, e) ->
+      Soverridden (map_loc_lid sub lid, sub.spec_expression sub e)
+
+let spec_expression sub
+      {stexp_desc; stexp_loc; stexp_extra; stexp_type; stexp_env} =
+  let stexp_desc =
+    match stexp_desc with
+    | Stexp_var r -> Stexp_var { r with name_loc = sub.location sub r.name_loc }
+    | Stexp_global r -> Stexp_global { r with lid = map_loc_lid sub r.lid }
+    | Stexp_primitive r ->
+        Stexp_primitive { r with lid = map_loc_lid sub r.lid }
+    | Stexp_constant _ as d -> d
+    | Stexp_apply {funct; args; position; ret_mode; yielding} ->
+        let funct = sub.spec_expression sub funct in
+        let args =
+          List.map
+            (fun (lbl, e, sort) -> (lbl, sub.spec_expression sub e, sort))
+            args
+        in
+        Stexp_apply {funct; args; position; ret_mode; yielding}
+    | Stexp_tuple (es, mode) ->
+        Stexp_tuple (List.map (spec_labelled sub) es, mode)
+    | Stexp_unboxed_tuple es ->
+        Stexp_unboxed_tuple (List.map (spec_labelled sub) es)
+    | Stexp_unboxed_unit | Stexp_unboxed_bool _ as d -> d
+    | Stexp_construct r ->
+        let args =
+          List.map (fun (sort, e) -> (sort, sub.spec_expression sub e)) r.args
+        in
+        Stexp_construct { r with lid = map_loc_lid sub r.lid; args }
+    | Stexp_variant (lbl, arg) ->
+        Stexp_variant
+          (lbl, Option.map (fun (e, mode) -> (sub.spec_expression sub e, mode))
+                  arg)
+    | Stexp_extension_constructor (lid, path) ->
+        Stexp_extension_constructor (map_loc_lid sub lid, path)
+    | Stexp_record r ->
+        let fields =
+          Array.map (fun (lbl, sort, def) ->
+              (lbl, sort, spec_label_definition sub def)) r.fields
+        in
+        let extended_expression =
+          Option.map (fun (e, sort, repr, barrier) ->
+              (sub.spec_expression sub e, sort, repr, barrier))
+            r.extended_expression
+        in
+        Stexp_record { r with fields; extended_expression }
+    | Stexp_record_unboxed_product r ->
+        let fields =
+          Array.map (fun (lbl, sort, def) ->
+              (lbl, sort, spec_label_definition sub def)) r.fields
+        in
+        let extended_expression =
+          Option.map (fun (e, sort) -> (sub.spec_expression sub e, sort))
+            r.extended_expression
+        in
+        Stexp_record_unboxed_product { r with fields; extended_expression }
+    | Stexp_field r ->
+        Stexp_field
+          { r with record = sub.spec_expression sub r.record;
+                   lid = map_loc_lid sub r.lid }
+    | Stexp_unboxed_field r ->
+        Stexp_unboxed_field
+          { r with record = sub.spec_expression sub r.record;
+                   lid = map_loc_lid sub r.lid }
+    | Stexp_ifthenelse (c, e1, e2) ->
+        Stexp_ifthenelse
+          (sub.spec_expression sub c, sub.spec_expression sub e1,
+           Option.map (sub.spec_expression sub) e2)
+    | Stexp_sequence (e1, sort, e2) ->
+        Stexp_sequence
+          (sub.spec_expression sub e1, sort, sub.spec_expression sub e2)
+    | Stexp_assert (e, loc) ->
+        Stexp_assert (sub.spec_expression sub e, sub.location sub loc)
+    | Stexp_lazy e -> Stexp_lazy (sub.spec_expression sub e)
+    | Stexp_let (rec_flag, vbs, body) ->
+        let vb r =
+          { r with svb_pat = sub.spec_pattern sub r.svb_pat;
+                   svb_expr = sub.spec_expression sub r.svb_expr;
+                   svb_loc = sub.location sub r.svb_loc }
+        in
+        Stexp_let (rec_flag, List.map vb vbs, sub.spec_expression sub body)
+    | Stexp_match (e, sort, cases, partial) ->
+        Stexp_match
+          (sub.spec_expression sub e, sort, List.map (spec_case sub) cases,
+           partial)
+    | Stexp_try (e, cases) ->
+        Stexp_try (sub.spec_expression sub e, List.map (spec_case sub) cases)
+    | Stexp_function r ->
+        let param p =
+          let sfp_kind =
+            match p.sfp_kind with
+            | Stparam_pat q -> Stparam_pat (sub.spec_pattern sub q)
+            | Stparam_optional_default (q, e, s) ->
+                Stparam_optional_default
+                  (sub.spec_pattern sub q, sub.spec_expression sub e, s)
+          in
+          { p with sfp_kind; sfp_loc = sub.location sub p.sfp_loc }
+        in
+        let body =
+          match r.body with
+          | Stfunction_body e -> Stfunction_body (sub.spec_expression sub e)
+          | Stfunction_cases fc ->
+              Stfunction_cases
+                { fc with sfc_cases = List.map (spec_case sub) fc.sfc_cases;
+                          sfc_env = sub.env sub fc.sfc_env;
+                          sfc_loc = sub.location sub fc.sfc_loc;
+                          sfc_exp_extra =
+                            List.map (spec_extra sub) fc.sfc_exp_extra }
+        in
+        Stexp_function { r with params = List.map param r.params; body }
+    | Stexp_open (od, body) ->
+        let od =
+          { od with sopen_expr = spec_module_path sub od.sopen_expr;
+                    sopen_env = sub.env sub od.sopen_env;
+                    sopen_loc = sub.location sub od.sopen_loc }
+        in
+        Stexp_open (od, sub.spec_expression sub body)
+  in
+  let stexp_extra =
+    List.map
+      (fun (extra, loc) -> (spec_extra sub extra, sub.location sub loc))
+      stexp_extra
+  in
+  {stexp_desc; stexp_loc = sub.location sub stexp_loc; stexp_extra; stexp_type;
+   stexp_env = sub.env sub stexp_env}
+
+let[@warning "+9"] law_declaration sub
+     {law_id; law_name; law_law; law_newtypes; law_params; law_assumptions;
+      law_conclusion; law_attributes; law_loc} =
+  let law_name = map_loc sub law_name in
+  let law_newtypes =
+    List.map
+      (fun {ln_id; ln_name; ln_jkind; ln_type} ->
+         {ln_id; ln_name = map_loc sub ln_name;
+          ln_jkind = Option.map (sub.jkind_annotation sub) ln_jkind; ln_type})
+      law_newtypes
+  in
+  let law_params =
+    List.map
+      (fun {lp_id; lp_name; lp_type} ->
+         {lp_id; lp_name = map_loc sub lp_name;
+          lp_type = sub.typ sub lp_type})
+      law_params
+  in
+  let law_assumptions = List.map (sub.spec_expression sub) law_assumptions in
+  let law_conclusion = sub.spec_expression sub law_conclusion in
+  let law_attributes = sub.attributes sub law_attributes in
+  let law_loc = sub.location sub law_loc in
+  {law_id; law_name; law_law; law_newtypes; law_params; law_assumptions;
+   law_conclusion; law_attributes; law_loc}
 
 let pat_extra sub = function
   | Tpat_unpack as d -> d
@@ -824,6 +1054,7 @@ let signature_item sub x =
     | Tsig_open od -> Tsig_open (sub.open_description sub od)
     | Tsig_attribute attr -> Tsig_attribute (sub.attribute sub attr)
     | Tsig_jkind jd -> Tsig_jkind (sub.jkind_declaration sub jd)
+    | Tsig_law ld -> Tsig_law (sub.law_declaration sub ld)
   in
   {sig_loc; sig_desc; sig_env}
 
@@ -1212,6 +1443,7 @@ let default =
     extension_constructor;
     jkind_annotation;
     jkind_declaration;
+    law_declaration;
     location;
     modalities;
     modes;
@@ -1230,6 +1462,8 @@ let default =
     open_description;
     signature;
     signature_item;
+    spec_expression;
+    spec_pattern;
     structure;
     structure_item;
     typ;

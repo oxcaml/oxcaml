@@ -36,6 +36,7 @@ type iterator =
     extension_constructor: iterator -> extension_constructor -> unit;
     jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
     jkind_declaration: iterator -> jkind_declaration -> unit;
+    law_declaration: iterator -> law_declaration -> unit;
     location: iterator -> Location.t -> unit;
     modalities: iterator -> modalities -> unit;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -56,6 +57,8 @@ type iterator =
     open_description: iterator -> open_description -> unit;
     signature: iterator -> signature -> unit;
     signature_item: iterator -> signature_item -> unit;
+    spec_expression: iterator -> spec_expression -> unit;
+    spec_pattern: 'k . iterator -> 'k spec_general_pattern -> unit;
     structure: iterator -> structure -> unit;
     structure_item: iterator -> structure_item -> unit;
     typ: iterator -> core_type -> unit;
@@ -179,6 +182,7 @@ let structure_item sub {str_loc; str_desc; str_env; _} =
   | Tstr_open od -> sub.open_declaration sub od
   | Tstr_attribute attr -> sub.attribute sub attr
   | Tstr_jkind jd -> sub.jkind_declaration sub jd
+  | Tstr_law ld -> sub.law_declaration sub ld
 
 let value_description sub x =
   sub.item_declaration sub (Value x);
@@ -272,6 +276,164 @@ let[@warning "+9"] jkind_declaration sub
   sub.attributes sub jkind_attributes;
   iter_loc sub jkind_name;
   Option.iter (sub.jkind_annotation sub) jkind_annotation
+
+let spec_extra sub = function
+  | Stexp_constraint cty -> sub.typ sub cty
+  | Stexp_inspected_type _ -> ()
+
+let spec_pat_extra sub = function
+  | Stpat_constraint cty -> sub.typ sub cty
+  | Stpat_inspected_type _ -> ()
+
+let spec_pattern
+  : type k . iterator -> k spec_general_pattern -> unit
+  = fun sub {stpat_desc; stpat_loc; stpat_extra; stpat_env; _} ->
+  sub.location sub stpat_loc;
+  sub.env sub stpat_env;
+  List.iter
+    (fun (e, loc) -> spec_pat_extra sub e; sub.location sub loc) stpat_extra;
+  match stpat_desc with
+  | Stpat_any | Stpat_constant _ | Stpat_unboxed_unit | Stpat_unboxed_bool _ ->
+      ()
+  | Stpat_var {name; _} -> iter_loc sub name
+  | Stpat_alias {pattern; name; _} ->
+      sub.spec_pattern sub pattern;
+      iter_loc sub name
+  | Stpat_tuple l | Stpat_unboxed_tuple l ->
+      List.iter (fun (_, p, _) -> sub.spec_pattern sub p) l
+  | Stpat_construct (lid, _, _, l) ->
+      iter_loc_lid sub lid;
+      List.iter (fun (_, p) -> sub.spec_pattern sub p) l
+  | Stpat_variant (_, po, _) -> Option.iter (sub.spec_pattern sub) po
+  | Stpat_record (l, _, _) ->
+      List.iter
+        (fun (lid, _, p) -> iter_loc_lid sub lid; sub.spec_pattern sub p) l
+  | Stpat_record_unboxed_product (l, _, _) ->
+      List.iter
+        (fun (lid, _, p) -> iter_loc_lid sub lid; sub.spec_pattern sub p) l
+  | Stpat_lazy p -> sub.spec_pattern sub p
+  | Stpat_value p -> sub.spec_pattern sub p
+  | Stpat_exception p -> sub.spec_pattern sub p
+  | Stpat_or (p1, p2) ->
+      sub.spec_pattern sub p1;
+      sub.spec_pattern sub p2
+
+let[@warning "+9"] rec spec_expression sub
+      {stexp_desc; stexp_loc; stexp_extra; stexp_type = _; stexp_env} =
+  sub.location sub stexp_loc;
+  List.iter
+    (fun (e, loc) -> spec_extra sub e; sub.location sub loc) stexp_extra;
+  sub.env sub stexp_env;
+  match stexp_desc with
+  | Stexp_var {name_loc; _} -> sub.location sub name_loc
+  | Stexp_global {lid; _} | Stexp_primitive {lid; _} -> iter_loc_lid sub lid
+  | Stexp_constant _ -> ()
+  | Stexp_apply {funct; args; _} ->
+      sub.spec_expression sub funct;
+      List.iter (fun (_, e, _) -> sub.spec_expression sub e) args
+  | Stexp_tuple (es, _) | Stexp_unboxed_tuple es ->
+      List.iter (fun (_, e, _) -> sub.spec_expression sub e) es
+  | Stexp_unboxed_unit | Stexp_unboxed_bool _ -> ()
+  | Stexp_construct {lid; args; _} ->
+      iter_loc_lid sub lid;
+      List.iter (fun (_, e) -> sub.spec_expression sub e) args
+  | Stexp_variant (_, arg) ->
+      Option.iter (fun (e, _) -> sub.spec_expression sub e) arg
+  | Stexp_extension_constructor (lid, _) -> iter_loc_lid sub lid
+  | Stexp_record {fields; extended_expression; _} ->
+      Array.iter (fun (_, _, def) -> spec_label_definition sub def) fields;
+      Option.iter
+        (fun (e, _, _, _) -> sub.spec_expression sub e) extended_expression
+  | Stexp_record_unboxed_product {fields; extended_expression; _} ->
+      Array.iter (fun (_, _, def) -> spec_label_definition sub def) fields;
+      Option.iter (fun (e, _) -> sub.spec_expression sub e) extended_expression
+  | Stexp_field {record; lid; _} | Stexp_unboxed_field {record; lid; _} ->
+      sub.spec_expression sub record;
+      iter_loc_lid sub lid
+  | Stexp_ifthenelse (c, e1, e2) ->
+      sub.spec_expression sub c;
+      sub.spec_expression sub e1;
+      Option.iter (sub.spec_expression sub) e2
+  | Stexp_sequence (e1, _, e2) ->
+      sub.spec_expression sub e1;
+      sub.spec_expression sub e2
+  | Stexp_assert (e, loc) -> sub.spec_expression sub e; sub.location sub loc
+  | Stexp_lazy e -> sub.spec_expression sub e
+  | Stexp_let (_, vbs, body) ->
+      List.iter
+        (fun {svb_pat; svb_expr; svb_loc; _} ->
+           sub.location sub svb_loc;
+           sub.spec_pattern sub svb_pat;
+           sub.spec_expression sub svb_expr)
+        vbs;
+      sub.spec_expression sub body
+  | Stexp_match (e, _, cases, _) ->
+      sub.spec_expression sub e;
+      List.iter (spec_case sub) cases
+  | Stexp_try (e, cases) ->
+      sub.spec_expression sub e;
+      List.iter (spec_case sub) cases
+  | Stexp_function {params; body; _} -> spec_function sub params body
+  | Stexp_open ({sopen_expr; sopen_env; sopen_loc; _}, body) ->
+      sub.location sub sopen_loc;
+      spec_module_path sub sopen_expr;
+      sub.env sub sopen_env;
+      sub.spec_expression sub body
+
+and spec_module_path sub {smod_lid; smod_mode; smod_env; smod_loc; _} =
+  sub.location sub smod_loc;
+  begin match smod_mode with
+  | _, None -> ()
+  | _, Some (_, txt, loc) -> iter_loc_lid sub {txt; loc}
+  end;
+  sub.env sub smod_env;
+  iter_loc_lid sub smod_lid
+
+and spec_function sub params body =
+  List.iter
+    (fun {sfp_kind; sfp_loc; _} ->
+       sub.location sub sfp_loc;
+       match sfp_kind with
+       | Stparam_pat p -> sub.spec_pattern sub p
+       | Stparam_optional_default (p, e, _) ->
+           sub.spec_pattern sub p;
+           sub.spec_expression sub e)
+    params;
+  match body with
+  | Stfunction_body e -> sub.spec_expression sub e
+  | Stfunction_cases {sfc_cases; sfc_env; sfc_loc; sfc_exp_extra; _} ->
+      sub.location sub sfc_loc;
+      sub.env sub sfc_env;
+      List.iter (spec_extra sub) sfc_exp_extra;
+      List.iter (spec_case sub) sfc_cases
+
+and spec_case : 'k. iterator -> 'k spec_case -> unit =
+  fun sub {sc_lhs; sc_guard; sc_rhs} ->
+  sub.spec_pattern sub sc_lhs;
+  Option.iter (sub.spec_expression sub) sc_guard;
+  sub.spec_expression sub sc_rhs
+
+and spec_label_definition sub = function
+  | Skept _ -> ()
+  | Soverridden (lid, e) -> iter_loc_lid sub lid; sub.spec_expression sub e
+
+let[@warning "+9"] law_declaration sub
+      ({law_id = _; law_name; law_law = _; law_newtypes; law_params;
+        law_assumptions; law_conclusion; law_attributes; law_loc} as x) =
+  sub.item_declaration sub (Law x);
+  sub.location sub law_loc;
+  sub.attributes sub law_attributes;
+  iter_loc sub law_name;
+  List.iter
+    (fun {ln_id = _; ln_name; ln_jkind = _; ln_type = _} ->
+       iter_loc sub ln_name)
+    law_newtypes;
+  List.iter
+    (fun {lp_id = _; lp_name; lp_type} ->
+       iter_loc sub lp_name; sub.typ sub lp_type)
+    law_params;
+  List.iter (sub.spec_expression sub) law_assumptions;
+  sub.spec_expression sub law_conclusion
 
 let pat_extra sub (e, loc, attrs) =
   sub.location sub loc;
@@ -569,6 +731,7 @@ let signature_item sub {sig_loc; sig_desc; sig_env; _} =
   | Tsig_open od -> sub.open_description sub od
   | Tsig_attribute _ -> ()
   | Tsig_jkind d -> sub.jkind_declaration sub d
+  | Tsig_law d -> sub.law_declaration sub d
 
 let class_description sub x =
   sub.item_declaration sub (Class_type x);
@@ -868,6 +1031,7 @@ let default_iterator =
     extension_constructor;
     jkind_annotation;
     jkind_declaration;
+    law_declaration;
     location;
     modalities;
     modes;
@@ -886,6 +1050,8 @@ let default_iterator =
     open_description;
     signature;
     signature_item;
+    spec_expression;
+    spec_pattern;
     structure;
     structure_item;
     typ;

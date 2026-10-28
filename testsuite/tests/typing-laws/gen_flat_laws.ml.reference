@@ -1,0 +1,657 @@
+[@@@ocaml.warning "-27-40"]
+module Laws_gen_Stdlib = Stdlib
+module Laws_gen_Gen_flat = Gen_flat
+type 'a each =
+  {
+  poly: 'a ;
+  modes: 'a ;
+  unboxed: 'a ;
+  \#type: 'a ;
+  alias: 'a ;
+  assumption: 'a ;
+  constants: 'a ;
+  constructors: 'a ;
+  tuples: 'a ;
+  control: 'a ;
+  binding: 'a ;
+  functions: 'a ;
+  local: 'a ;
+  records: 'a }
+let names =
+  {
+    poly = "poly";
+    modes = "modes";
+    unboxed = "unboxed";
+    \#type = "type";
+    alias = "alias";
+    assumption = "assumption";
+    constants = "constants";
+    constructors = "constructors";
+    tuples = "tuples";
+    control = "control";
+    binding = "binding";
+    functions = "functions";
+    local = "local";
+    records = "records"
+  }
+let locations =
+  {
+    poly =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 37;
+        start_col = 0;
+        end_line = 38;
+        end_col = 46
+      };
+    modes =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 39;
+        start_col = 0;
+        end_line = 39;
+        end_col = 54
+      };
+    unboxed =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 40;
+        start_col = 0;
+        end_line = 40;
+        end_col = 55
+      };
+    \#type =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 41;
+        start_col = 0;
+        end_line = 41;
+        end_col = 50
+      };
+    alias =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 42;
+        start_col = 0;
+        end_line = 42;
+        end_col = 36
+      };
+    assumption =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 43;
+        start_col = 0;
+        end_line = 43;
+        end_col = 45
+      };
+    constants =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 44;
+        start_col = 0;
+        end_line = 44;
+        end_col = 68
+      };
+    constructors =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 48;
+        start_col = 0;
+        end_line = 49;
+        end_col = 63
+      };
+    tuples =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 50;
+        start_col = 0;
+        end_line = 50;
+        end_col = 66
+      };
+    control =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 55;
+        start_col = 0;
+        end_line = 57;
+        end_col = 54
+      };
+    binding =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 58;
+        start_col = 0;
+        end_line = 60;
+        end_col = 49
+      };
+    functions =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 61;
+        start_col = 0;
+        end_line = 63;
+        end_col = 53
+      };
+    local =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 65;
+        start_col = 0;
+        end_line = 65;
+        end_col = 44
+      };
+    records =
+      {
+        CamlinternalLaw.file = "gen_flat.ml";
+        start_line = 66;
+        start_col = 0;
+        end_line = 67;
+        end_col = 74
+      }
+  }
+let map
+  { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
+    tuples; control; binding; functions; local; records }
+  ~f =
+  {
+    poly = (f poly);
+    modes = (f modes);
+    unboxed = (f unboxed);
+    \#type = (f \#type);
+    alias = (f alias);
+    assumption = (f assumption);
+    constants = (f constants);
+    constructors = (f constructors);
+    tuples = (f tuples);
+    control = (f control);
+    binding = (f binding);
+    functions = (f functions);
+    local = (f local);
+    records = (f records)
+  }
+let to_list
+  { poly; modes; unboxed; \#type; alias; assumption; constants; constructors;
+    tuples; control; binding; functions; local; records }
+  =
+  [poly;
+  modes;
+  unboxed;
+  \#type;
+  alias;
+  assumption;
+  constants;
+  constructors;
+  tuples;
+  control;
+  binding;
+  functions;
+  local;
+  records]
+type poly_input =
+  | Poly_input: 'a 'b . {
+  xs: 'a list ;
+  f: 'a -> 'b } -> poly_input 
+type modes_input =
+  | Modes_input: {
+  g: int @ local -> int } -> modes_input 
+type unboxed_input =
+  | Unboxed_input: {
+  x: float# } -> unboxed_input 
+type type_input =
+  | Type_input: {
+  \#method: int } -> type_input 
+type alias_input =
+  | Alias_input: {
+  x: int as 'a } -> alias_input 
+type assumption_input =
+  | Assumption_input: {
+  x: int } -> assumption_input 
+type constants_input =
+  | Constants_input: {
+  c: char } -> constants_input 
+type constructors_input =
+  | Constructors_input: {
+  s: Laws_gen_Gen_flat.shape } -> constructors_input 
+type tuples_input =
+  | Tuples_input: {
+  x: int ;
+  y: string } -> tuples_input 
+type control_input =
+  | Control_input: {
+  x: int } -> control_input 
+type binding_input =
+  | Binding_input: {
+  s: Laws_gen_Gen_flat.shape } -> binding_input 
+type functions_input =
+  | Functions_input: {
+  xs: int list } -> functions_input 
+type local_input =
+  | Local_input: {
+  x: int } -> local_input 
+type records_input =
+  | Records_input: {
+  p: Laws_gen_Gen_flat.point } -> records_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    module type Choices  =
+      sig
+        val poly : poly_input Choice.t
+        val modes : modes_input Choice.t
+        val unboxed : unboxed_input Choice.t
+        val \#type : type_input Choice.t
+        val alias : alias_input Choice.t
+        val assumption : assumption_input Choice.t
+        val constants : constants_input Choice.t
+        val constructors : constructors_input Choice.t
+        val tuples : tuples_input Choice.t
+        val control : control_input Choice.t
+        val binding : binding_input Choice.t
+        val functions : functions_input Choice.t
+        val local : local_input Choice.t
+        val records : records_input Choice.t
+      end
+    let poly ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.poly),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.poly;
+                 predicate =
+                   (fun ((Poly_input { xs; f }) : poly_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Stdlib.List.length
+                            (Laws_gen_Stdlib.List.map f xs))
+                         (Laws_gen_Stdlib.List.length xs) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 38;
+                     start_col = 2;
+                     end_line = 38;
+                     end_col = 46
+                   }
+               }))
+    let modes ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.modes),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.modes;
+                 predicate =
+                   (fun ((Modes_input { g }) : modes_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.apply g)
+                         (Laws_gen_Gen_flat.apply g) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 39;
+                     start_col = 37;
+                     end_line = 39;
+                     end_col = 54
+                   }
+               }))
+    let unboxed ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.unboxed),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.unboxed;
+                 predicate =
+                   (fun ((Unboxed_input { x }) : unboxed_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.of_unboxed x)
+                         (Laws_gen_Gen_flat.of_unboxed x) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 40;
+                     start_col = 28;
+                     end_line = 40;
+                     end_col = 55
+                   }
+               }))
+    let \#type ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.\#type),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.\#type;
+                 predicate =
+                   (fun ((Type_input { \#method }) : type_input) ->
+                      (Laws_gen_Stdlib.(=) \#method \#method : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 41;
+                     start_col = 31;
+                     end_line = 41;
+                     end_col = 50
+                   }
+               }))
+    let alias ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.alias),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.alias;
+                 predicate =
+                   (fun ((Alias_input { x }) : alias_input) ->
+                      (Laws_gen_Stdlib.(=) x x : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 42;
+                     start_col = 31;
+                     end_line = 42;
+                     end_col = 36
+                   }
+               }))
+    let assumption ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.assumption),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.assumption;
+                     predicate =
+                       (fun ((Assumption_input { x }) : assumption_input) ->
+                          (Laws_gen_Stdlib.(>) x 0 : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "gen_flat.ml";
+                         start_line = 43;
+                         start_col = 28;
+                         end_line = 43;
+                         end_col = 33
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.assumption;
+                        predicate =
+                          (fun ((Assumption_input { x }) : assumption_input)
+                             -> (Laws_gen_Stdlib.(<>) x 0 : bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "gen_flat.ml";
+                            start_line = 43;
+                            start_col = 39;
+                            end_line = 43;
+                            end_col = 45
+                          }
+                      }))))
+    let constants ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.constants),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.constants;
+                     predicate =
+                       (fun ((Constants_input { c }) : constants_input) ->
+                          (Laws_gen_Stdlib.(=) c 'a' : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "gen_flat.ml";
+                         start_line = 44;
+                         start_col = 28;
+                         end_line = 44;
+                         end_col = 35
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.constants;
+                        predicate =
+                          (fun ((Constants_input { c }) : constants_input) ->
+                             (Laws_gen_Stdlib.(&&)
+                                (Laws_gen_Stdlib.(>=) 1.5 (-0.5))
+                                (Laws_gen_Stdlib.(<>) {|s|} "t") : bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "gen_flat.ml";
+                            start_line = 44;
+                            start_col = 41;
+                            end_line = 44;
+                            end_col = 68
+                          }
+                      }))))
+    let constructors ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.constructors),
+          (fun input ->
+             Law.Bind
+               ((Law.Assumption
+                   {
+                     value = input;
+                     source = C.constructors;
+                     predicate =
+                       (fun ((Constructors_input { s }) : constructors_input)
+                          ->
+                          (Laws_gen_Stdlib.(=) s
+                             ((Circle 1. : Laws_gen_Gen_flat.shape) : 
+                             Laws_gen_Gen_flat.shape) : bool));
+                     location =
+                       {
+                         CamlinternalLaw.file = "gen_flat.ml";
+                         start_line = 49;
+                         start_col = 2;
+                         end_line = 49;
+                         end_col = 25
+                       }
+                   }),
+                 (fun () ->
+                    Law.Assertion
+                      {
+                        value = input;
+                        source = C.constructors;
+                        predicate =
+                          (fun
+                             ((Constructors_input { s }) : constructors_input)
+                             ->
+                             (Laws_gen_Stdlib.(&&)
+                                (Laws_gen_Stdlib.(<>) s
+                                   (Square 1. : Laws_gen_Gen_flat.shape))
+                                (Laws_gen_Stdlib.(<>) (Some s : _ option)
+                                   (None : _ option)) : bool));
+                        location =
+                          {
+                            CamlinternalLaw.file = "gen_flat.ml";
+                            start_line = 49;
+                            start_col = 31;
+                            end_line = 49;
+                            end_col = 63
+                          }
+                      }))))
+    let tuples ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.tuples),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.tuples;
+                 predicate =
+                   (fun ((Tuples_input { x; y }) : tuples_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=) (x, y) (x, y))
+                         (Laws_gen_Stdlib.(<>) (`A x) `B) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 50;
+                     start_col = 37;
+                     end_line = 50;
+                     end_col = 66
+                   }
+               }))
+    let control ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.control),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.control;
+                 predicate =
+                   (fun ((Control_input { x }) : control_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(>=)
+                            (if Laws_gen_Stdlib.(>) x 0 then x else 0) 0)
+                         (Laws_gen_Stdlib.(&&)
+                            (Laws_gen_Stdlib.(=)
+                               (Laws_gen_Gen_flat.g (() : unit); x) x)
+                            (Laws_gen_Stdlib.(&&)
+                               (Laws_gen_Stdlib.(=)
+                                  (Laws_gen_Stdlib.Lazy.force (lazy x)) x)
+                               (assert (Laws_gen_Stdlib.(=) x x);
+                                (true : bool)))) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 56;
+                     start_col = 2;
+                     end_line = 57;
+                     end_col = 54
+                   }
+               }))
+    let binding ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.binding),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.binding;
+                 predicate =
+                   (fun ((Binding_input { s }) : binding_input) ->
+                      (let a =
+                         match s with
+                         | (Circle r : Laws_gen_Gen_flat.shape) -> r
+                         | (Square w : Laws_gen_Gen_flat.shape) -> w in
+                       Laws_gen_Stdlib.(||)
+                         (try Laws_gen_Stdlib.(>=) a 0.
+                          with | Laws_gen_Stdlib.Not_found -> (false : bool))
+                         (Laws_gen_Stdlib.(<) a 0.) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 59;
+                     start_col = 2;
+                     end_line = 60;
+                     end_col = 49
+                   }
+               }))
+    let functions ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.functions),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.functions;
+                 predicate =
+                   (fun ((Functions_input { xs }) : functions_input) ->
+                      (Laws_gen_Stdlib.(||)
+                         (Laws_gen_Stdlib.(&&)
+                            ((fun ?(min= 0) x -> Laws_gen_Stdlib.(>=) x min)
+                               ?min:(None : _ option) 1)
+                            (Laws_gen_Stdlib.List.for_all
+                               (fun x -> Laws_gen_Stdlib.(>=) x 0) xs))
+                         (Laws_gen_Stdlib.List.exists
+                            (function
+                             | 0 -> (true : bool)
+                             | _ -> (false : bool)) xs) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 62;
+                     start_col = 2;
+                     end_line = 63;
+                     end_col = 53
+                   }
+               }))
+    let local ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.local),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.local;
+                 predicate =
+                   (fun ((Local_input { x }) : local_input) ->
+                      (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.Ops.add x 1)
+                         (Laws_gen_Stdlib.(+) x 1) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 65;
+                     start_col = 23;
+                     end_line = 65;
+                     end_col = 44
+                   }
+               }))
+    let records ((module C)  : (module Choices))  : unit Law.t =
+      Law.Bind
+        ((Law.Choose C.records),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = C.records;
+                 predicate =
+                   (fun ((Records_input { p }) : records_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=)
+                            (({ y = ((p : Laws_gen_Gen_flat.point).y); x = 0.
+                              } : Laws_gen_Gen_flat.point) : Laws_gen_Gen_flat.point)
+                            ({ p with x = 0. } : Laws_gen_Gen_flat.point))
+                         (Laws_gen_Stdlib.(>=)
+                            ((p : Laws_gen_Gen_flat.point) : Laws_gen_Gen_flat.point).x
+                            0.) : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_flat.ml";
+                     start_line = 67;
+                     start_col = 2;
+                     end_line = 67;
+                     end_col = 74
+                   }
+               }))
+    let laws choices =
+      {
+        poly = (poly choices);
+        modes = (modes choices);
+        unboxed = (unboxed choices);
+        \#type = (\#type choices);
+        alias = (alias choices);
+        assumption = (assumption choices);
+        constants = (constants choices);
+        constructors = (constructors choices);
+        tuples = (tuples choices);
+        control = (control choices);
+        binding = (binding choices);
+        functions = (functions choices);
+        local = (local choices);
+        records = (records choices)
+      }
+  end

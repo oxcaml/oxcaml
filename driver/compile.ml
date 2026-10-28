@@ -78,20 +78,20 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
     (Translmod.transl_implementation ~loc i.module_name)
   |> tlambda_to_bytecode i
 
-let emit_bytecode i
+let emit_bytecode i ~laws
       (bytecode, required_globals, main_module_block_format) =
   let cmo = Unit_info.cmo i.target in
   Misc.protect_output_to_file (Unit_info.Artifact.filename cmo) (fun oc ->
        bytecode
        |> Profile.(record ~accumulate:true generate)
          (Emitcode.to_file oc i.module_name cmo ~required_globals
-            ~main_module_block_format);
+            ~main_module_block_format ~laws);
     )
 
 let emit_lambda_program info program =
   let bytecode = tlambda_to_bytecode info program in
   if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
-  then emit_bytecode info bytecode
+  then emit_bytecode info ~laws:Laws_file.none bytecode
 
 type starting_point =
   | Parsing
@@ -117,8 +117,9 @@ let implementation_aux ~start_from ~source_file ~output_prefix
   match start_from with
   | Parsing ->
     let backend info typed =
+      let laws = Laws_gen.generate ~unit:info.module_name typed in
       let bytecode = to_bytecode info typed in
-      emit_bytecode info bytecode
+      emit_bytecode info ~laws bytecode
     in
     Compile_common.implementation
       ~hook_parse_tree:Fun.id
@@ -138,7 +139,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         ~main_module_block_repr
     in
     let bytecode = tlambda_to_bytecode info impl in
-    emit_bytecode info bytecode
+    emit_bytecode info ~laws:Laws_file.none bytecode
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in

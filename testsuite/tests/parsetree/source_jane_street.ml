@@ -1887,3 +1887,27 @@ Line 1, characters 21-34:
                          ^^^^^^^^^^^^^
 Error: Exclave expression should only be in tail position of the current region.
 |}]
+
+(********)
+(* Laws *)
+
+(* Laws are type checked with the parameters they annotate. *)
+
+law? length_nonneg (s : string) : String.length s >= 0
+[%%expect{|
+law? length_nonneg (s : string) : (String.length s) >= (0)
+|}]
+
+law? sum_pos (x : int) (y : int) : x > 0 ===> y > 0 ===> x + y > 0
+[%%expect{|
+law? sum_pos (x : int) (y : int) : x > (0) ===> y > (0) ===> (x + y) > (0)
+|}]
+
+module type S = sig
+  val f : int -> int
+  law? f_id (x : int) : x >= 0 ===> f x = x [@@test.attr]
+end
+[%%expect{|
+module type S =
+  sig val f : int -> int law? f_id (x : int) : x >= (0) ===> (f x) = x end
+|}]

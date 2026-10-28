@@ -81,6 +81,11 @@ val modtype_of_package:
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
+(** The named type variables of the types [tys], in order of appearance.
+    For the types of the parameters of a law, these are the variables of
+    their annotations. *)
+val law_type_variables : type_expr list -> (string * type_expr) list
+
 val save_signature:
   Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->
   Env.t -> Cmi_format.cmi_infos_lazy -> unit
@@ -128,6 +133,7 @@ module Sig_component_kind : sig
     | Class
     | Class_type
     | Jkind
+    | Law
 
   val to_string : t -> string
 end
@@ -206,6 +212,12 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Law_parameter_not_representable of type_expr * Jkind.Violation.t
+  | Law_duplicate_parameter of string
+  | Law_unannotated_parameter of string
+  | Law_wildcard_in_parameter
+  | Law_instantiated_type_variable of string * type_expr
+  | Law_in_generative_functor
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

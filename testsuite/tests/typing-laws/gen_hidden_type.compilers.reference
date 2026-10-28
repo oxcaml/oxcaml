@@ -1,0 +1,5 @@
+File "gen_hidden_type.ml", line 17, characters 0-30:
+17 | law? about_t (x : t) : f x = x
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The law about_t refers to the type Gen_hidden_type.t,
+       which the interface of the unit does not export.

@@ -7029,6 +7029,30 @@ let moregeneral ~self_check env inst_nongen
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 
+(* [moregeneral_list] piggybacks on [moregeneral]: each list is packed into an
+   unboxed tuple, so that [moregeneral] instantiates it as a whole. Lists of
+   length zero and one are packed too, although no such unboxed tuples exist
+   normally. *)
+let moregeneral_list ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_schs subj_schs =
+  if List.compare_lengths pat_schs subj_schs <> 0 then
+    invalid_arg
+      (Printf.sprintf "Ctype.moregeneral_list: unequal lengths: %d vs %d"
+         (List.length pat_schs) (List.length subj_schs));
+  let pack tys =
+    newgenty (Tunboxed_tuple (List.map (fun ty -> (None, ty)) tys))
+  in
+  match
+    moregeneral ~self_check env inst_nongen pat_sch_sorts subj_sch_sorts
+      (pack pat_schs) (pack subj_schs)
+  with
+  | result -> result
+  | exception Moregen { trace = _ :: trace } ->
+      (* The head of the trace is the pair of packed tuples, which was
+         constructed internally. The rest of the trace is the trace of the
+         components, so we drop the head. *)
+      raise (Moregen (moregen_error ~trace))
+
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
     moregeneral ~self_check:false env inst_nongen [] [] pat_sch subj_sch
@@ -8855,6 +8879,10 @@ let nondep_extension_constructor env ids ext =
         ext_attributes = ext.ext_attributes;
         ext_loc = ext.ext_loc;
         ext_uid = ext.ext_uid;
+        ext_alias =
+          (* As the manifest of a type (see [nondep_type_decl]) *)
+          Option.bind ext.ext_alias (fun p ->
+            if Path.exists_free ids p then None else Some p);
       }
   with Nondep_cannot_erase _ as exn ->
     clear_hash ();
@@ -8916,6 +8944,24 @@ let nondep_cltype_declaration env ids decl =
       clty_attributes = decl.clty_attributes;
       clty_uid = decl.clty_uid;
     }
+  in
+  clear_hash ();
+  decl
+
+let nondep_law_declaration env ids decl =
+  let ty = nondep_type_rec env ids in
+  let path p =
+    match Path.find_free_opt ids p with
+    | Some id -> raise (Nondep_cannot_erase id)
+    | None -> p
+  in
+  let spec = Spec.map_paths ~value_path:path ~type_path:path in
+  let decl =
+    { decl with
+      law_newtypes = List.map ty decl.law_newtypes;
+      law_params = List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;
+      law_assumptions = List.map spec decl.law_assumptions;
+      law_conclusion = spec decl.law_conclusion }
   in
   clear_hash ();
   decl

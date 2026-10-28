@@ -77,6 +77,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Let_mutable -> (module Unit)
   | Layout_poly -> (module Maturity)
   | Runtime_metaprogramming -> (module Unit)
+  | Laws -> (module Unit)
 
 (* We'll do this in a more principled way later. *)
 (* CR layouts: Note that layouts is only "mostly" erasable, because of annoying
@@ -88,7 +89,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
 *)
 let is_erasable : type a. a t -> bool = function
   | Mode | Unique | Overwriting | Layouts | Layout_poly | Mode_polymorphism
-  | Mode_polymorphism_printing ->
+  | Mode_polymorphism_printing | Laws ->
     true
   | Comprehensions | Include_functor | Polymorphic_parameters | Immutable_arrays
   | Module_strengthening | SIMD | Small_numbers | Instances | Let_mutable
@@ -120,6 +121,7 @@ module Exist_pair = struct
     | Pair (Let_mutable, ()) -> Some Stable
     | Pair (Layout_poly, m) -> Some m
     | Pair (Runtime_metaprogramming, ()) -> Some Beta
+    | Pair (Laws, ()) -> Some Alpha
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
 
@@ -138,7 +140,7 @@ module Exist_pair = struct
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Instances | Overwriting
            | Let_mutable | Runtime_metaprogramming | Mode_polymorphism_printing
-             ) as ext),
+           | Laws ) as ext),
           _ ) ->
       to_string ext
 
@@ -179,6 +181,7 @@ module Exist_pair = struct
     | "layout_poly_alpha" -> Some (Pair (Layout_poly, Alpha))
     | "layout_poly_beta" -> Some (Pair (Layout_poly, Beta))
     | "runtime_metaprogramming" -> Some (Pair (Runtime_metaprogramming, ()))
+    | "laws" -> Some (Pair (Laws, ()))
     | _ -> None
 end
 
@@ -203,7 +206,8 @@ let all_extensions =
     Pack Instances;
     Pack Let_mutable;
     Pack Layout_poly;
-    Pack Runtime_metaprogramming ]
+    Pack Runtime_metaprogramming;
+    Pack Laws ]
 
 (**********************************)
 (* string conversions *)
@@ -246,11 +250,12 @@ let equal_t (type a b) (a : a t) (b : b t) : (a, b) Misc.eq option =
   | Let_mutable, Let_mutable -> Some Refl
   | Layout_poly, Layout_poly -> Some Refl
   | Runtime_metaprogramming, Runtime_metaprogramming -> Some Refl
+  | Laws, Laws -> Some Refl
   | ( ( Comprehensions | Mode | Unique | Overwriting | Include_functor
       | Polymorphic_parameters | Immutable_arrays | Module_strengthening
       | Layouts | SIMD | Small_numbers | Instances | Let_mutable | Layout_poly
       | Runtime_metaprogramming | Mode_polymorphism | Mode_polymorphism_printing
-        ),
+      | Laws ),
       _ ) ->
     None
 

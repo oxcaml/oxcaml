@@ -83,6 +83,8 @@ val process_deferred_actions :
   (* compile implementation *)
   (source_file:string -> output_prefix:string -> unit) *
   (* compile interface *)
+  (string -> output:string option -> unit) *
+  (* print the laws file of an object file (-generate-laws-implementation) *)
   string * (* ocaml module extension *)
   string -> (* ocaml library extension *)
   unit

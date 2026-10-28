@@ -311,7 +311,7 @@ module Is_modal = struct
     | Value_descriptions d -> value_mismatch d.symptom
     | Class_declarations d -> class_declaration_symptom d.symptom
     | Type_declarations _ | Extension_constructors _ | Class_type_declarations _
-    | Modalities _ | Jkind_declarations _ -> None
+    | Modalities _ | Jkind_declarations _ | Law_declarations _ -> None
 
   and class_declaration_symptom = function
     | Class_mode e ->
@@ -563,7 +563,7 @@ module With_shorthand = struct
         Fmt.dprintf "(struct end%t)" (maybe_print_mode_l ~is_modal mode)
     | Named p ->
         let mty = match mty with
-          | Types.Mty_strengthen (mty,q,_) when Path.same p q -> mty
+          | Types.Mty_strengthen (mty,q,_,_) when Path.same p q -> mty
           | _ -> mty
         in
         let mty = modtype { ua with item = mty } in
@@ -956,6 +956,19 @@ let core env id x =
         (Out_type.tree_of_jkind_declaration id diff.expected)
         (Includecore.report_jkind_mismatch "the first" "the second")
         diff.symptom show_locs (diff.got.jkind_loc, diff.expected.jkind_loc)
+  | Err.Law_declarations diff ->
+        (* CR sspies: The two laws are printed separately, whereas the trace
+            that follows names their type variables jointly: a variable printed
+            as ['a] in both laws appears as ['a] and ['b] in the trace. *)
+      Fmt.dprintf "@[<v>@[<hv>%s:@;<1 2>%a@ %s@;<1 2>%a@]%a%a@]"
+        "Laws do not match"
+        !Oprint.out_sig_item
+        (Out_type.tree_of_law_declaration id diff.got)
+        "is not included in"
+        !Oprint.out_sig_item
+        (Out_type.tree_of_law_declaration id diff.expected)
+        (Includecore.report_law_mismatch env)
+        diff.symptom show_locs (diff.got.law_loc, diff.expected.law_loc)
 
 let missing_field ppf item =
   let id, loc, kind =  Includemod.item_ident_name item in

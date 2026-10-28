@@ -761,7 +761,9 @@ and value_entry =
 and constructor_data =
   { cda_description : constructor_description;
     cda_address : address_lazy option;
-    cda_shape: Shape.t; }
+    cda_shape: Shape.t;
+    cda_alias : Path.t option;
+  }
 
 and label_data = label_description
 
@@ -1692,6 +1694,9 @@ let find_cltype path env =
 let find_value path env =
   find_value_full path env |> vda_description
 
+let find_extension_alias path env =
+  (find_extension_full path env).cda_alias
+
 let find_value_no_locks_exn id env =
   match IdTbl.find_same_and_locks id env.values with
   | Val_bound _, _ :: _ -> Misc.fatal_error "locks encountered"
@@ -1851,6 +1856,12 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same id env.cltypes).cltda_shape
   | Jkind ->
       (IdTbl.find_same id env.jkinds).jkda_shape
+  | Law ->
+      (* No language construct supports referencing a law (i.e., there is no way
+         to refer to law [foo] of module [Bar]). Thus, we do not need a separate
+         namespace for laws, and we do not add them to environments unlike other
+         signature items in the rest of this file. *)
+      raise Not_found
 
 
 let shape_of_path ~namespace env =
@@ -2264,7 +2275,10 @@ let find_shadowed_types path env =
        (fun env -> env.types) (fun comps -> comps.comp_types) path env)
 
 (* Given a signature and a root path, prefix all idents in the signature
-   by the root path and build the corresponding substitution. *)
+   by the root path and build the corresponding substitution.
+
+   Values and extension constructors keep the aliases of their
+   declarations (see [Types.val_alias]). *)
 
 let prefix_idents root prefixing_sub sg =
   let open Subst.Lazy in
@@ -2274,7 +2288,9 @@ let prefix_idents root prefixing_sub sg =
     | Sig_value(id, _, _) as item :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
-        ((item, p) :: items_and_paths) prefixing_sub rem
+        ((item, p) :: items_and_paths)
+        (Subst.add_value id p prefixing_sub)
+        rem
     | Sig_type(id, td, rs, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
@@ -2318,6 +2334,12 @@ let prefix_idents root prefixing_sub sg =
       prefix_idents root
         ((Sig_jkind(id, jkd, vis), p) :: items_and_paths)
         (Subst.add_jkind id p prefixing_sub)
+        rem
+    | Sig_law(id, ld, vis) :: rem ->
+      let p = Pdot(root, Ident.name id) in
+      prefix_idents root
+        ((Sig_law(id, ld, vis), p) :: items_and_paths)
+        prefixing_sub
         rem
   in
   let sg = Subst.Lazy.force_signature_once sg in
@@ -2432,7 +2454,8 @@ let rec components_of_module_maker
                       let cda = {
                         cda_description = descr;
                         cda_address = None;
-                        cda_shape }
+                        cda_shape;
+                        cda_alias = None }
                       in
                       c.comp_constrs <-
                         add_to_tbl descr.cstr_name cda c.comp_constrs
@@ -2487,7 +2510,8 @@ let rec components_of_module_maker
               Shape.proj cm_shape (Shape.Item.extension_constructor id)
             in
             let cda =
-              { cda_description = descr; cda_address = Some addr; cda_shape }
+              { cda_description = descr; cda_address = Some addr; cda_shape;
+                cda_alias = ext'.ext_alias }
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
@@ -2569,6 +2593,7 @@ let rec components_of_module_maker
             let shape = Shape.proj cm_shape (Shape.Item.jkind id) in
             let jkda = { jkda_declaration = decl'; jkda_shape = shape } in
             c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
+        | Sig_law _ -> ()
       )
         items_and_paths;
       inner_full_env := !env;
@@ -2589,7 +2614,8 @@ let rec components_of_module_maker
           fcomp_shape = cm_shape;
           fcomp_cache = Hashtbl.create 17;
           fcomp_subst_cache = Hashtbl.create 17 })
-  | Mty_ident p | Mty_strengthen (_, p, _) -> Error (No_components_abstract p)
+  | Mty_ident p | Mty_strengthen (_, p, _, _) ->
+      Error (No_components_abstract p)
   | Mty_alias p -> Error (No_components_alias p)
 
 (* Insertion of bindings by identifier + path *)
@@ -2675,7 +2701,9 @@ and store_constructor ~check type_decl type_id cstr_id cstr env =
   { env with
     constrs =
       TycompTbl.add cstr_id
-        { cda_description = cstr; cda_address = None; cda_shape } env.constrs;
+        { cda_description = cstr; cda_address = None; cda_shape;
+          cda_alias = None }
+        env.constrs;
   }
 
 and store_label
@@ -2815,7 +2843,8 @@ and store_extension ~check ~rebind id addr ext shape env =
   let cda =
     { cda_description = cstr;
       cda_address = Some addr;
-      cda_shape = shape }
+      cda_shape = shape;
+      cda_alias = ext.ext_alias }
   in
   Builtin_attributes.mark_alerts_used ext.ext_attributes;
   Builtin_attributes.mark_warn_on_literal_pattern_used cstr.cstr_attributes;
@@ -3257,6 +3286,7 @@ end) = struct
     | Sig_jkind(id, decl, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.jkind id) in
         map, add_jkind ~check:false ?shape id decl env
+    | Sig_law _ -> map, env
 
   let add_signature
       map

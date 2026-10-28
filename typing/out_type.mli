@@ -179,6 +179,13 @@ val tree_of_cltype_declaration:
 val tree_of_jkind_declaration:
     Ident.t -> jkind_declaration -> out_sig_item
 
+(** The kind of a type, keeping its nullability, or [None] for the default
+    kind. *)
+val tree_of_type_jkind: type_expr -> out_jkind option
+
+val tree_of_law_declaration:
+    Ident.t -> law_declaration -> out_sig_item
+
 (** {1 Module types }*)
 
 val tree_of_module:

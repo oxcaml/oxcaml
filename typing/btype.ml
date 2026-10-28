@@ -466,6 +466,7 @@ type 'a type_iterators =
     it_class_type_declaration:
         'a type_iterators -> class_type_declaration -> unit;
     it_jkind_declaration : 'a type_iterators -> jkind_declaration -> unit;
+    it_law_declaration : 'a type_iterators -> law_declaration -> unit;
     it_functor_param: 'a type_iterators -> functor_parameter -> unit;
     it_module_type: 'a type_iterators -> module_type -> unit;
     it_class_type: 'a type_iterators -> class_type -> unit;
@@ -491,6 +492,7 @@ let type_iterators_without_type_expr =
     | Sig_class (_, cd, _, _)       -> it.it_class_declaration it cd
     | Sig_class_type (_, ctd, _, _) -> it.it_class_type_declaration it ctd
     | Sig_jkind (_ , jkd, _)        -> it.it_jkind_declaration it jkd
+    | Sig_law (_, ld, _)            -> it.it_law_declaration it ld
   and it_value_description it vd =
     it.it_type_expr it vd.val_type;
     it.it_modality vd.val_modalities
@@ -518,6 +520,16 @@ let type_iterators_without_type_expr =
     List.iter (it.it_type_expr it) ctd.clty_params;
     it.it_class_type it ctd.clty_type;
     it.it_path ctd.clty_path
+  and it_law_declaration it ld =
+    List.iter (it.it_type_expr it) ld.law_newtypes;
+    List.iter (fun (_, ty) -> it.it_type_expr it ty) ld.law_params;
+    let clause e =
+      List.iter
+        (fun ((Value | Type | Extension : Spec.namespace), p) -> it.it_path p)
+        (Spec.paths e)
+    in
+    List.iter clause ld.law_assumptions;
+    clause ld.law_conclusion
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
@@ -539,7 +551,7 @@ let type_iterators_without_type_expr =
         it.it_functor_param it p;
         it.it_module_type it mt;
         it.it_mode_expr mm
-    | Mty_strengthen (mty, p, _) ->
+    | Mty_strengthen (mty, p, _, _) ->
         it.it_module_type it mty;
         it.it_path p
   and it_class_type it = function
@@ -565,6 +577,7 @@ let type_iterators_without_type_expr =
     it_type_kind; it_class_type; it_functor_param; it_module_type;
     it_signature; it_class_type_declaration; it_class_declaration;
     it_jkind_declaration;
+    it_law_declaration;
     it_modtype_declaration; it_module_declaration; it_extension_constructor;
     it_type_declaration; it_value_description;
     it_signature_item; it_mode_expr; it_modality }

@@ -305,6 +305,17 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+and law_declaration =
+  {
+    law_newtypes : type_expr list;
+    law_params : (Ident.t * type_expr) list;
+    law_assumptions : Spec.expression list;
+    law_conclusion : Spec.expression;
+    law_attributes : Parsetree.attributes;
+    law_uid : Shape.Uid.t;
+    law_loc : Location.t
+  }
+
 module TransientTypeOps = struct
   type t = type_expr
   let compare t1 t2 = t1.id - t2.id
@@ -612,6 +623,7 @@ type extension_constructor =
     ext_loc: Location.t;
     ext_attributes: Parsetree.attributes;
     ext_uid: Uid.t;
+    ext_alias: Path.t option;
   }
 
 and type_transparence =
@@ -682,6 +694,10 @@ module Aliasability = struct
     | Not_aliasable -> false
 end
 
+module Value_equations = struct
+  type t = Recorded | Not_recorded
+end
+
 module type Wrap = sig
   type 'a t
 end
@@ -720,6 +736,7 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_alias: Path.t option;
     }
 
   type module_type =
@@ -727,7 +744,8 @@ module type Wrapped = sig
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
-  | Mty_strengthen of module_type * Path.t * Aliasability.t
+  | Mty_strengthen of
+      module_type * Path.t * Aliasability.t * Value_equations.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
@@ -748,6 +766,7 @@ module type Wrapped = sig
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
   | Sig_jkind of Ident.t * jkind_declaration * visibility
+  | Sig_law of Ident.t * law_declaration * visibility
 
   and module_declaration =
   {
@@ -797,7 +816,8 @@ module Make_wrapped(Wrap : Wrap) = struct
       end
     | Sig_class _ ->
         Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _
+    | Sig_law _ -> None
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -818,8 +838,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
     | Mty_functor (parm,mty,mm) ->
         To.Mty_functor (functor_parameter m parm, module_type m mty, mm)
     | Mty_signature sg -> To.Mty_signature (signature m sg)
-    | Mty_strengthen (mty,p,aliasable) ->
-        To.Mty_strengthen (module_type m mty, p, aliasable)
+    | Mty_strengthen (mty,p,aliasable,value_equations) ->
+        To.Mty_strengthen (module_type m mty, p, aliasable, value_equations)
 
   and functor_parameter m = function
       | Unit -> To.Unit
@@ -862,6 +882,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_class_type (id,ctd,rs,vis)
     | Sig_jkind (id,jkd,vis) ->
         To.Sig_jkind (id,jkd,vis)
+    | Sig_law (id,ld,vis) ->
+        To.Sig_law (id,ld,vis)
 end
 
 include Make_wrapped(struct type 'a t = 'a end)
@@ -1117,7 +1139,8 @@ let item_visibility = function
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
   | Sig_class_type (_, _, _, vis)
-  | Sig_jkind (_, _, vis) -> vis
+  | Sig_jkind (_, _, vis)
+  | Sig_law (_, _, vis) -> vis
 
 let rec bound_value_identifiers = function
     [] -> []
@@ -1138,6 +1161,7 @@ let signature_item_id = function
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)
   | Sig_jkind (id, _, _)
+  | Sig_law (id, _, _)
     -> id
 
 let signature_item_representation sg =

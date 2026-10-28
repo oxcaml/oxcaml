@@ -36,6 +36,8 @@ let main argv ppf =
         (ppf,
          Compile.implementation,
          Compile.interface,
+         (fun file ~output ->
+            Laws_file.write (Cmo_io.read_cmo file).cu_laws ~file ~output),
          ".cmo",
          ".cma");
     with Arg.Bad msg ->

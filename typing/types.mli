@@ -474,6 +474,18 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+and law_declaration =
+  {
+    law_newtypes : type_expr list;
+    (* The type variables that the types [(type a)] of the law stand for *)
+    law_params : (Ident.t * type_expr) list;
+    law_assumptions : Spec.expression list;
+    law_conclusion : Spec.expression;
+    law_attributes : Parsetree.attributes;
+    law_uid : Shape.Uid.t;
+    law_loc : Location.t
+  }
+
 val ikinds_todo : string -> type_ikind
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -1112,6 +1124,7 @@ type extension_constructor =
     ext_loc: Location.t;
     ext_attributes: Parsetree.attributes;
     ext_uid: Uid.t;
+    ext_alias: Path.t option;
   }
 
 and type_transparence =
@@ -1174,6 +1187,13 @@ module Aliasability : sig
 
   val aliasable : bool -> t
   val is_aliasable : t -> bool
+end
+
+(* Whether a strengthening records that the values and extension
+   constructors of the signature are those of the path (see [val_alias]):
+   [Not_recorded] for a user-written [S with M], which is an obligation. *)
+module Value_equations : sig
+  type t = Recorded | Not_recorded
 end
 
 (* Wrap.t encapsulates bits of module types which can be lazy *)
@@ -1244,6 +1264,12 @@ module type Wrapped = sig
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
       val_uid: Uid.t;
+      val_alias: Path.t option;
+      (** [Some p.x] in the signature of a module strengthened with [p],
+          as a type [t] gets the manifest [p.t] (see [Mtype.strengthen]).
+          Only the clauses of laws use it (see
+          [Includecore.law_declarations]). [ext_alias] is the same for
+          extension constructors. *)
     }
 
   type module_type =
@@ -1251,7 +1277,8 @@ module type Wrapped = sig
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
-  | Mty_strengthen of module_type * Path.t * Aliasability.t
+  | Mty_strengthen of
+      module_type * Path.t * Aliasability.t * Value_equations.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
@@ -1274,6 +1301,7 @@ module type Wrapped = sig
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
   | Sig_jkind of Ident.t * jkind_declaration * visibility
+  | Sig_law of Ident.t * law_declaration * visibility
 
   and module_declaration =
   {

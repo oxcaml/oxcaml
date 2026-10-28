@@ -704,6 +704,7 @@ and structure_item_desc =
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
   | Tstr_jkind of jkind_declaration
+  | Tstr_law of law_declaration
 
 and module_binding =
     {
@@ -808,6 +809,7 @@ and signature_item_desc =
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
   | Tsig_jkind of jkind_declaration
+  | Tsig_law of law_declaration
 
 and module_declaration =
     {
@@ -1124,6 +1126,311 @@ and jkind_declaration =
     jkind_loc: Location.t
    }
 
+and law_declaration =
+  { law_id: Ident.t;
+    law_name: string loc;
+    law_law: Types.law_declaration;
+    law_newtypes: law_newtype list;
+    law_params: law_param list;
+    law_assumptions: spec_expression list;
+    law_conclusion: spec_expression;
+    law_attributes: attribute list;
+    law_loc: Location.t
+   }
+
+and law_newtype =
+  { ln_id: Ident.t;
+    ln_name: string loc;
+    ln_jkind: Parsetree.jkind_annotation option;
+    ln_type: Types.type_expr
+    (* The type variable of [law_law] that the type stands for *)
+   }
+
+and law_param =
+  { lp_id: Ident.t;
+    lp_name: string loc;
+    lp_type: core_type
+   }
+
+and spec_expression =
+  { stexp_desc: spec_expression_desc;
+    stexp_loc: Location.t;
+    stexp_extra: (spec_extra * Location.t) list;
+    stexp_type: Types.type_expr;
+    stexp_env: Env.t;
+  }
+
+and spec_expression_desc =
+  | Stexp_var of
+      { id: Ident.t;
+        name_loc: Location.t;
+        sort: Jkind.sort;
+        ident: spec_ident;
+      }
+  | Stexp_global of
+      { path: Path.t;
+        lid: Longident.t loc;
+        sort: Jkind.sort;
+        ident: spec_ident;
+      }
+  | Stexp_primitive of
+      { path: Path.t;
+        lid: Longident.t loc;
+        prim: Primitive.description;
+        locality: Mode.Locality.l option;
+        sort: Jkind.sort option;
+        yielding: Mode.Yielding.l;
+        ident: spec_ident;
+      }
+  | Stexp_constant of constant
+  | Stexp_apply of
+      { funct: spec_expression;
+        args: (Spec.arg_label * spec_expression * Jkind.sort) list;
+        position: apply_position;
+        ret_mode: return_mode;
+        yielding: Mode.Yielding.l;
+      }
+  | Stexp_tuple of
+      (string option * spec_expression * Jkind.sort) list * locality_mode_r
+  | Stexp_unboxed_tuple of (string option * spec_expression * Jkind.sort) list
+  | Stexp_unboxed_unit
+  | Stexp_unboxed_bool of bool
+  | Stexp_construct of
+      { lid: Longident.t loc;
+        constructor: Data_types.constructor_description;
+        repr: Types.constructor_representation;
+        args: (Jkind.sort * spec_expression) list;
+        mode: locality_mode_r option;
+      }
+  | Stexp_variant of label * (spec_expression * locality_mode_r) option
+  | Stexp_extension_constructor of Longident.t loc * Path.t
+  | Stexp_record of {
+      fields :
+        (Data_types.label_description * Jkind.sort * spec_label_definition)
+          array;
+      representation : Types.record_representation;
+      extended_expression :
+        (spec_expression * Jkind.sort * Types.record_representation
+         * Unique_barrier.t) option;
+      locality_mode : locality_mode_r option
+    }
+  | Stexp_record_unboxed_product of {
+      fields : ( Data_types.unboxed_label_description * Jkind.sort *
+                 spec_label_definition ) array;
+      representation : Types.record_unboxed_product_representation;
+      extended_expression : (spec_expression * Jkind.sort) option;
+    }
+  | Stexp_field of {
+      record : spec_expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      boxing : texp_field_boxing;
+      unique_barrier : Unique_barrier.t;
+    }
+  | Stexp_unboxed_field of {
+      record : spec_expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_unboxed_product_representation;
+      lid : Longident.t loc;
+      label : Data_types.unboxed_label_description;
+      unique_use : unique_use;
+    }
+  | Stexp_ifthenelse of
+      spec_expression * spec_expression * spec_expression option
+  | Stexp_sequence of spec_expression * Jkind.sort * spec_expression
+  | Stexp_assert of spec_expression * Location.t
+  | Stexp_lazy of spec_expression
+  | Stexp_let of rec_flag * spec_value_binding list * spec_expression
+  | Stexp_match of
+      spec_expression * Jkind.sort * computation spec_case list * partial
+  | Stexp_try of spec_expression * value spec_case list
+  | Stexp_function of
+      { params : spec_function_param list;
+        body : spec_function_body;
+        ret_mode : return_mode modes;
+        ret_sort : Jkind.sort;
+        locality_mode : locality_mode_r;
+        yielding : Mode.Yielding.l;
+        zero_alloc : Zero_alloc.t;
+      }
+  | Stexp_open of spec_open_declaration * spec_expression
+      (** [let open M in e] *)
+
+(* A [module_expr] that is a module path, without attributes *)
+and spec_module_path =
+  { smod_path: Path.t;
+    smod_lid: Longident.t loc;
+    smod_type: Types.module_type;
+    smod_mode: mode_with_locks;
+    smod_env: Env.t;
+    smod_loc: Location.t;
+  }
+
+(* An [open_declaration] of a module path, without attributes *)
+and spec_open_declaration =
+  { sopen_expr: spec_module_path;
+    sopen_bound_items: Types.signature;
+    sopen_items_repr: Types.module_representation;
+    sopen_override: override_flag;
+    sopen_env: Env.t;
+    sopen_loc: Location.t;
+  }
+
+(* A [function_param] without newtypes *)
+and spec_function_param =
+  { sfp_arg_label: arg_label;
+    sfp_param: Ident.t;
+    sfp_param_debug_uid: Shape.Uid.t;
+    sfp_partial: partial;
+    sfp_kind: spec_function_param_kind;
+    sfp_sort: Jkind.sort;
+    sfp_mode: locality_mode_l modes;
+    sfp_curry: function_curry;
+    sfp_loc: Location.t;
+  }
+
+and spec_function_param_kind =
+  | Stparam_pat of spec_pattern
+  | Stparam_optional_default of spec_pattern * spec_expression * Jkind.sort
+
+and spec_function_body =
+  | Stfunction_body of spec_expression
+  | Stfunction_cases of spec_function_cases
+
+(* [function_cases] without attributes, with the extras of a specification
+   expression *)
+and spec_function_cases =
+  { sfc_cases: value spec_case list;
+    sfc_env : Env.t;
+    sfc_arg_mode: locality_mode_l;
+    sfc_arg_sort: Jkind.sort;
+    sfc_ret_type : Types.type_expr;
+    sfc_partial: partial;
+    sfc_param: Ident.t;
+    sfc_param_debug_uid : Shape.Uid.t;
+    sfc_loc: Location.t;
+    sfc_exp_extra: spec_extra list;
+  }
+
+(* A [value_binding] without attributes *)
+and spec_value_binding =
+  { svb_pat: spec_pattern;
+    svb_expr: spec_expression;
+    svb_rec_kind: Value_rec_types.recursive_binding_kind;
+    svb_sort: Jkind.sort;
+    svb_loc: Location.t;
+  }
+
+(* A [case] without a continuation, which only effect handlers bind *)
+and 'k spec_case =
+  { sc_lhs: 'k spec_general_pattern;
+    sc_guard: spec_expression option;
+    sc_rhs: spec_expression;
+  }
+
+(* Patterns, which are a subset of the typedtree patterns like spectree
+   expressions *)
+and 'k spec_general_pattern = 'k spec_pattern_desc spec_pattern_data
+
+and spec_pattern = value spec_general_pattern
+
+(* [pattern_data] without attributes *)
+and 'a spec_pattern_data =
+  { stpat_desc: 'a;
+    stpat_loc: Location.t;
+    stpat_extra: (spec_pat_extra * Location.t) list;
+    stpat_type: Types.type_expr;
+    stpat_env: Env.t;
+    stpat_unique_barrier: Unique_barrier.t;
+  }
+
+and spec_pat_extra =
+  | Stpat_constraint of core_type
+      (** [P : T], with no modes *)
+  | Stpat_inspected_type of [ `pat ] type_inspection
+
+and 'k spec_pattern_desc =
+  | Stpat_any : value spec_pattern_desc
+  | Stpat_var : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+    } -> value spec_pattern_desc
+  | Stpat_alias : {
+      pattern: spec_pattern;
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    } -> value spec_pattern_desc
+  | Stpat_constant : constant -> value spec_pattern_desc
+  | Stpat_unboxed_unit : value spec_pattern_desc
+  | Stpat_unboxed_bool : bool -> value spec_pattern_desc
+  | Stpat_tuple :
+      (string option * spec_pattern * Jkind.sort) list ->
+      value spec_pattern_desc
+  | Stpat_unboxed_tuple :
+      (string option * spec_pattern * Jkind.sort) list ->
+      value spec_pattern_desc
+  | Stpat_construct :
+      Longident.t loc * Data_types.constructor_description *
+        Types.constructor_representation * (Jkind.sort * spec_pattern) list ->
+      value spec_pattern_desc
+        (** A [Tpat_construct] without type annotations of its arguments *)
+  | Stpat_variant :
+      label * spec_pattern option * Types.row_desc ref ->
+      value spec_pattern_desc
+  | Stpat_record :
+      (Longident.t loc * Data_types.label_description * spec_pattern) list *
+        Types.record_representation * closed_flag ->
+      value spec_pattern_desc
+  | Stpat_record_unboxed_product :
+      (Longident.t loc * Data_types.unboxed_label_description * spec_pattern)
+        list *
+        Types.record_unboxed_product_representation * closed_flag ->
+      value spec_pattern_desc
+  | Stpat_lazy : spec_pattern -> value spec_pattern_desc
+  | Stpat_value : spec_pattern -> computation spec_pattern_desc
+      (** As [Tpat_value], the data of the pattern is that of its argument
+          (see [as_computation_pattern]). *)
+  | Stpat_exception : spec_pattern -> computation spec_pattern_desc
+  | Stpat_or :
+      'k spec_general_pattern * 'k spec_general_pattern ->
+      'k spec_pattern_desc
+        (** A [Tpat_or] that is not of a type pattern *)
+
+and spec_label_definition =
+  | Skept of Types.type_expr * Types.mutability * unique_use
+  | Soverridden of Longident.t loc * spec_expression
+
+and spec_ident =
+  { sid_unique_use: unique_use;
+    sid_staticity: Mode.Staticity.r;
+    sid_mode: Mode.With_regionality.l;
+    sid_desc: spec_value_description;
+  }
+
+and spec_value_description =
+  { sval_type: Types.type_expr;
+    sval_modalities: Mode.Modality.t;
+    sval_lpoly: Types.Lpoly.t;
+    sval_loc: Location.t;
+    sval_zero_alloc: Zero_alloc.t;
+    sval_attributes: attributes;
+    sval_uid: Shape.Uid.t;
+    sval_alias: Path.t option;
+  }
+
+and spec_extra =
+  | Stexp_constraint of core_type
+  | Stexp_inspected_type of [ `exp ] type_inspection
+
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
@@ -1151,6 +1458,7 @@ type item_declaration =
   | Class of class_declaration
   | Class_type of class_type_declaration
   | Jkind of jkind_declaration
+  | Law of law_declaration
 
 (* Auxiliary functions over the a.s.t. *)
 
@@ -1570,6 +1878,7 @@ let loc_of_decl ~uid =
   | Class cd -> cd.ci_id_name
   | Class_type ctd -> ctd.ci_id_name
   | Jkind jd -> jd.jkind_name
+  | Law ld -> ld.law_name
 
 let min_mode_with_locks = (Mode.With_regionality.(disallow_right legacy), None)
 

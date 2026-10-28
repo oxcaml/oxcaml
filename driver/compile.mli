@@ -40,10 +40,12 @@ val to_bytecode :
 
 val emit_bytecode :
   Compile_common.info ->
+  laws:Laws_file.t ->
   Instruct.instruction list * Compilation_unit.Set.t *
     Lambda.main_module_block_format ->
     unit
-(** [emit_bytecode bytecode] output the bytecode executable. *)
+(** [emit_bytecode ~laws bytecode] output the bytecode executable, which
+    records the laws file [laws] of the unit. *)
 
 val emit_lambda_program : Compile_common.info -> Lambda.program -> unit
 (** Lower a [Lambda.program] to bytecode and emit the .cmo, honouring

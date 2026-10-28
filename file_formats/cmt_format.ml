@@ -106,6 +106,7 @@ let iter_on_declaration f decl =
   | Class cd -> f cd.ci_decl.cty_uid decl
   | Class_type ct -> f ct.ci_decl.cty_uid decl
   | Jkind jd -> f jd.jkind_jkind.jkind_uid decl
+  | Law ld -> f ld.law_law.law_uid decl
 
 let iter_on_declarations ~(f: Shape.Uid.t -> item_declaration -> unit) = {
   Tast_iterator.default_iterator with
@@ -189,15 +190,22 @@ let iter_on_occurrences
       | Overridden (lid, _) -> add_label ~namespace exp_env lid label_descr
       | Kept _ -> ()) fields
   in
-  let iter_field_pats ~namespace pat_env fields =
+  let iter_spec_fields ~namespace env fields =
+    Array.iter (fun (label_descr, _, definition) ->
+      match definition with
+      | Soverridden (lid, _) -> add_label ~namespace env lid label_descr
+      | Skept _ -> ()) fields
+  in
+  let iter_field_pats ~namespace ~pat_loc pat_env fields =
     List.iter (fun (lid, label_descr, pat) ->
       let lid =
         let open Location in
+        let pat_loc = pat_loc pat in
         (* In the presence of punning we want to index the label
             even if it is ghosted *)
-        if (not pat.pat_loc.loc_ghost
-          && lid.loc.loc_start = pat.pat_loc.loc_start
-          && lid.loc.loc_end = pat.pat_loc.loc_end)
+        if (not pat_loc.loc_ghost
+          && lid.loc.loc_start = pat_loc.loc_start
+          && lid.loc.loc_end = pat_loc.loc_end)
         then {lid with loc = {lid.loc with loc_ghost = false}}
         else lid
       in
@@ -272,6 +280,35 @@ let iter_on_occurrences
       | Texp_hole _  | Texp_quote _ | Texp_splice _ -> ());
       default_iterator.expr sub e);
 
+  spec_expression = (fun sub ({ stexp_desc; stexp_env; _ } as e) ->
+      (match stexp_desc with
+      | Stexp_var { id; name_loc; _ } ->
+          let lid =
+            { Location.txt = Longident.Lident (Ident.name id); loc = name_loc }
+          in
+          f ~namespace:Value stexp_env (Path.Pident id) lid
+      | Stexp_global { path; lid; _ } | Stexp_primitive { path; lid; _ } ->
+          f ~namespace:Value stexp_env path lid
+      | Stexp_construct { lid; constructor; _ } ->
+          add_constructor_description stexp_env lid constructor
+      | Stexp_extension_constructor (lid, path) ->
+          f ~namespace:Extension_constructor stexp_env path lid
+      | Stexp_record { fields; _ } ->
+          iter_spec_fields ~namespace:Label stexp_env fields
+      | Stexp_record_unboxed_product { fields; _ } ->
+          iter_spec_fields ~namespace:Unboxed_label stexp_env fields
+      | Stexp_field { lid; label; _ } ->
+          add_label ~namespace:Label stexp_env lid label
+      | Stexp_unboxed_field { lid; label; _ } ->
+          add_label ~namespace:Unboxed_label stexp_env lid label
+      | Stexp_open ({ sopen_expr = m; _ }, _) ->
+          f ~namespace:Module m.smod_env m.smod_path m.smod_lid
+      | Stexp_constant _ | Stexp_apply _ | Stexp_tuple _ | Stexp_unboxed_tuple _
+      | Stexp_unboxed_unit | Stexp_unboxed_bool _ | Stexp_variant _
+      | Stexp_ifthenelse _ | Stexp_sequence _ | Stexp_assert _ | Stexp_lazy _
+      | Stexp_let _ | Stexp_match _ | Stexp_try _ | Stexp_function _ -> ());
+      default_iterator.spec_expression sub e);
+
   (* Remark: some types get iterated over twice due to how constraints are
       encoded in the typedtree. For example, in [let x : t = 42], [t] is
       present in both a [Tpat_constraint] and a [Texp_constraint] node) *)
@@ -301,9 +338,11 @@ let iter_on_occurrences
       | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
       | Tpat_record (fields, _, _) ->
-        iter_field_pats ~namespace:Label pat_env fields
+        iter_field_pats ~namespace:Label ~pat_loc:(fun p -> p.pat_loc) pat_env
+          fields
       | Tpat_record_unboxed_product (fields, _, _) ->
-        iter_field_pats ~namespace:Unboxed_label pat_env fields
+        iter_field_pats ~namespace:Unboxed_label ~pat_loc:(fun p -> p.pat_loc)
+          pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_fun_layout _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _
@@ -318,6 +357,23 @@ let iter_on_occurrences
         | Tpat_constraint _ | Tpat_unpack | Tpat_inspected_type _ -> ())
         pat_extra;
       default_iterator.pat sub pat);
+
+  spec_pattern =
+    (fun (type a) sub
+      ({ stpat_desc; stpat_env; _ } as pat : a spec_general_pattern) ->
+      let pat_loc p = p.stpat_loc in
+      (match stpat_desc with
+      | Stpat_construct (lid, constr_desc, _, _) ->
+          add_constructor_description stpat_env lid constr_desc
+      | Stpat_record (fields, _, _) ->
+        iter_field_pats ~namespace:Label ~pat_loc stpat_env fields
+      | Stpat_record_unboxed_product (fields, _, _) ->
+        iter_field_pats ~namespace:Unboxed_label ~pat_loc stpat_env fields
+      | Stpat_any | Stpat_var _ | Stpat_alias _ | Stpat_constant _
+      | Stpat_tuple _ | Stpat_unboxed_unit | Stpat_unboxed_bool _
+      | Stpat_unboxed_tuple _ | Stpat_variant _ | Stpat_lazy _
+      | Stpat_value _ | Stpat_exception _ | Stpat_or _ -> ());
+      default_iterator.spec_pattern sub pat);
 
   binding_op = (fun sub ({bop_op_path; bop_op_name; bop_exp; _} as bop) ->
     let lid = { bop_op_name with txt = Longident.Lident bop_op_name.txt } in
@@ -377,7 +433,7 @@ let iter_on_occurrences
       | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_exception _
       | Tsig_module _ | Tsig_recmodule _ | Tsig_modtype _ | Tsig_modtypesubst _
       | Tsig_open _ | Tsig_include _ | Tsig_class _ | Tsig_class_type _
-      | Tsig_attribute _ | Tsig_jkind _ -> ());
+      | Tsig_attribute _ | Tsig_jkind _ | Tsig_law _ -> ());
       default_iterator.signature_item sub sig_item);
 
   structure_item =
@@ -391,7 +447,7 @@ let iter_on_occurrences
       | Tstr_eval _ | Tstr_value _ | Tstr_primitive _ | Tstr_type _
       | Tstr_exception _ | Tstr_module _ | Tstr_recmodule _
       | Tstr_modtype _ | Tstr_open _ | Tstr_class _ | Tstr_class_type _
-      | Tstr_include _ | Tstr_attribute _ | Tstr_jkind _ -> ());
+      | Tstr_include _ | Tstr_attribute _ | Tstr_jkind _ | Tstr_law _ -> ());
       default_iterator.structure_item sub str_item)
 }
 

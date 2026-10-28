@@ -148,6 +148,7 @@ let human_unique n id = Printf.sprintf "%s/%d" (Ident.name id) n
     | Class
     | Class_type
     | Jkind
+    | Law
 
 
 module Namespace = struct
@@ -161,9 +162,10 @@ module Namespace = struct
     | Extension_constructor | Value | Constructor | Label -> 5
     | Unboxed_label -> 6
     | Jkind -> 7
+    | Law -> 8
      (* we do not handle those component *)
 
-  let size = 1 + id Jkind
+  let size = 1 + id Law
 
 
   let pp ppf x =
@@ -182,7 +184,7 @@ module Namespace = struct
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | Some Jkind -> to_lookup Env.find_jkind_by_name
     | None
-    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label) ->
+    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label|Law) ->
          fun _ -> raise Not_found
 
   let location namespace id =
@@ -196,7 +198,8 @@ module Namespace = struct
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
         | Some Jkind -> (in_printing_env @@ Env.find_jkind path).jkind_loc
-        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
+        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label
+               |Law)
         | None ->
             Location.none
       ) with Not_found -> None
@@ -479,12 +482,20 @@ let instance_name global =
 
 let ident_stdlib = Ident.create_persistent "Stdlib"
 
-let non_shadowed_pervasive = function
-  | Pdot(Pident id, s) as path ->
-      Ident.same id ident_stdlib &&
-      (match in_printing_env (Env.find_type_by_name (Lident s)) with
-       | (path', _) -> Path.same path path'
-       | exception Not_found -> true)
+(* Whether the unqualified name [s] still denotes [path] in the printing
+   environment, [find] being the lookup of the namespace of [path]. *)
+let unshadowed find path s =
+  match in_printing_env (find (Lident s)) with
+  | (path', _) -> Path.same path path'
+  | exception Not_found -> true
+
+let non_shadowed_pervasive namespace = function
+  | Pdot(Pident id, s) as path when Ident.same id ident_stdlib ->
+      begin match (namespace : namespace option) with
+      | Some Module -> unshadowed Env.find_module_by_name_lazy path s
+      | Some Value -> unshadowed Env.find_value_by_name path s
+      | _ -> unshadowed Env.find_type_by_name path s
+      end
   | _ -> false
 
 let find_double_underscore s =
@@ -583,7 +594,7 @@ let rec rewrite_double_underscore_longidents env (l : Longident.t) =
 let rec tree_of_path namespace = function
   | Pident id ->
       Oide_ident (ident_name namespace id)
-  | Pdot(_, s) as path when non_shadowed_pervasive path ->
+  | Pdot(_, s) as path when non_shadowed_pervasive namespace path ->
       Oide_ident (Ident_names.pervasives_name namespace s)
   | Pdot(p, s) ->
       Oide_dot (tree_of_path (Some Module) p, s)
@@ -3827,6 +3838,347 @@ let tree_of_cltype_declaration id cl rs =
      tree_of_class_type Type_scheme params cl.clty_type,
      tree_of_rec rs)
 
+(* Clauses of laws *)
+let unboxed_integer n suffix =
+  Oval_stuff (Printf.sprintf "%s%c" (Misc.format_as_unboxed_literal n) suffix)
+
+(* Constants are printed as written. *)
+let tree_of_spec_constant : Spec.constant -> out_value = function
+  | Const_int n -> Oval_int n
+  | Const_char c -> Oval_char c
+  | Const_string s -> Oval_string (s, max_int, Ostr_string)
+  | Const_int32 n -> Oval_int32 n
+  | Const_int64 n -> Oval_int64 n
+  | Const_nativeint n -> Oval_nativeint n
+  | Const_int8 n -> Oval_int8 n
+  | Const_int16 n -> Oval_int16 n
+  | Const_float f -> Oval_stuff f
+  | Const_float32 f -> Oval_stuff (f ^ "s")
+  | Const_untagged_char c -> Oval_stuff (Printf.sprintf "#%C" (Char.chr c))
+  | Const_unboxed_float f -> Oval_stuff (Misc.format_as_unboxed_literal f)
+  | Const_unboxed_float32 f ->
+      Oval_stuff (Misc.format_as_unboxed_literal f ^ "s")
+  | Const_untagged_int n -> unboxed_integer (Int.to_string n) 'm'
+  | Const_untagged_int8 n -> unboxed_integer (Int.to_string n) 's'
+  | Const_untagged_int16 n -> unboxed_integer (Int.to_string n) 'S'
+  | Const_unboxed_int32 n -> unboxed_integer (Int32.to_string n) 'l'
+  | Const_unboxed_int64 n -> unboxed_integer (Int64.to_string n) 'L'
+  | Const_unboxed_nativeint n -> unboxed_integer (Nativeint.to_string n) 'n'
+
+let rec tree_of_spec (e : Spec.expression) : out_spec =
+  match e with
+  | Spec.Sexp_var id -> Ospec_var (Ident.name id)
+  | Spec.Sexp_global path -> Ospec_global (tree_of_path (Some Value) path)
+  | Spec.Sexp_constant c -> Ospec_constant (tree_of_spec_constant c)
+  | Spec.Sexp_apply (funct, args) ->
+      let arg (lbl, e, _) = (label_of_spec lbl, tree_of_spec e) in
+      Ospec_apply (tree_of_spec funct, List.map arg args)
+  | Spec.Sexp_tuple es -> Ospec_tuple (List.map tree_of_spec_labelled es)
+  | Spec.Sexp_unboxed_tuple es ->
+      Ospec_unboxed_tuple (List.map tree_of_spec_labelled es)
+  | Spec.Sexp_unboxed_unit -> Ospec_unboxed_unit
+  | Spec.Sexp_unboxed_bool b -> Ospec_unboxed_bool b
+  | Spec.Sexp_construct (cstr, args) ->
+      let e =
+        Ospec_construct
+          (tree_of_spec_constructor cstr,
+           List.map (fun (_, e) -> tree_of_spec e) args)
+      in
+      begin match cstr with
+      | Constructor { type_path; _ } -> annotate type_path e
+      | Extension_constructor _ -> e
+      end
+  | Spec.Sexp_variant (lbl, arg) ->
+      Ospec_variant (lbl, Option.map tree_of_spec arg)
+  | Spec.Sexp_extension_constructor path ->
+      Ospec_extension_constructor
+        (tree_of_path (Some Extension_constructor) path)
+  | Spec.Sexp_record r -> tree_of_spec_record ~unboxed:false r
+  | Spec.Sexp_record_unboxed_product r -> tree_of_spec_record ~unboxed:true r
+  | Spec.Sexp_field { record; label; _ } ->
+      Ospec_field
+        { record = annotate label.type_path (tree_of_spec record);
+          label = tree_of_spec_label label; unboxed = false }
+  | Spec.Sexp_unboxed_field { record; label; _ } ->
+      Ospec_field
+        { record = annotate label.type_path (tree_of_spec record);
+          label = tree_of_spec_label label; unboxed = true }
+  | Spec.Sexp_ifthenelse (c, e1, e2) ->
+      Ospec_ifthenelse
+        (tree_of_spec c, tree_of_spec e1, Option.map tree_of_spec e2)
+  | Spec.Sexp_sequence (e1, _, e2) ->
+      Ospec_sequence (tree_of_spec e1, tree_of_spec e2)
+  | Spec.Sexp_assert e -> Ospec_assert (tree_of_spec e)
+  | Spec.Sexp_lazy e -> Ospec_lazy (tree_of_spec e)
+  | Spec.Sexp_let (rec_flag, vbs, body) ->
+      let binding (vb : Spec.value_binding) =
+        (tree_of_spec_pattern vb.vb_pat, tree_of_spec vb.vb_expr)
+      in
+      let rec_ =
+        match rec_flag with Recursive -> true | Nonrecursive -> false
+      in
+      Ospec_let (rec_, List.map binding vbs, tree_of_spec body)
+  | Spec.Sexp_match (e, _, cases) ->
+      Ospec_match (tree_of_spec e, List.map tree_of_spec_case cases)
+  | Spec.Sexp_try (e, cases) ->
+      Ospec_try (tree_of_spec e, List.map tree_of_spec_case cases)
+  | Spec.Sexp_function (params, body) ->
+      let param (p : Spec.function_param) =
+        match p.fp_kind with
+        | Sparam_pat q ->
+            (label_of_spec p.fp_label, tree_of_spec_pattern q, None)
+        | Sparam_optional_default (q, e, _) ->
+            (label_of_spec p.fp_label, tree_of_spec_pattern q,
+             Some (tree_of_spec e))
+      in
+      let body =
+        match body with
+        | Sfunction_body e -> Ospec_body (tree_of_spec e)
+        | Sfunction_cases cases ->
+            Ospec_cases (List.map tree_of_spec_case cases)
+      in
+      Ospec_function (List.map param params, body)
+
+and tree_of_spec_case (c : Spec.case) =
+  (tree_of_spec_pattern c.c_lhs, Option.map tree_of_spec c.c_guard,
+   tree_of_spec c.c_rhs)
+
+(* Constructors and records in patterns are annotated like in expressions
+   (see [annotate]). *)
+and tree_of_spec_pattern (p : Spec.pattern) : out_spec_pattern =
+  let labelled (lbl, p, _) = (lbl, tree_of_spec_pattern p) in
+  let field ((label : Spec.label), p) =
+    (tree_of_spec_label label, tree_of_spec_pattern p)
+  in
+  let record ~unboxed fields closed =
+    let p =
+      Ospat_record
+        { fields = List.map field fields;
+          closed = (match (closed : Asttypes.closed_flag) with
+              | Closed -> true | Open -> false);
+          unboxed }
+    in
+    match fields with
+    | ((label : Spec.label), _) :: _ -> annotate_pattern label.type_path p
+    | [] -> p
+  in
+  match p with
+  | Spat_any -> Ospat_any
+  | Spat_var (id, _) -> Ospat_var (Ident.name id)
+  | Spat_alias (p, id, _) -> Ospat_alias (tree_of_spec_pattern p, Ident.name id)
+  | Spat_constant c -> Ospat_constant (tree_of_spec_constant c)
+  | Spat_tuple ps -> Ospat_tuple (List.map labelled ps)
+  | Spat_unboxed_tuple ps -> Ospat_unboxed_tuple (List.map labelled ps)
+  | Spat_unboxed_unit -> Ospat_unboxed_unit
+  | Spat_unboxed_bool b -> Ospat_unboxed_bool b
+  | Spat_construct (cstr, args) ->
+      let p =
+        Ospat_construct
+          (tree_of_spec_constructor cstr,
+           List.map (fun (_, p) -> tree_of_spec_pattern p) args)
+      in
+      begin match cstr with
+      | Constructor { type_path; _ } -> annotate_pattern type_path p
+      | Extension_constructor _ -> p
+      end
+  | Spat_variant (lbl, arg) ->
+      Ospat_variant (lbl, Option.map tree_of_spec_pattern arg)
+  | Spat_record (fields, closed) -> record ~unboxed:false fields closed
+  | Spat_record_unboxed_product (fields, closed) ->
+      record ~unboxed:true fields closed
+  | Spat_or (p1, p2) ->
+      Ospat_or (tree_of_spec_pattern p1, tree_of_spec_pattern p2)
+  | Spat_lazy p -> Ospat_lazy (tree_of_spec_pattern p)
+  | Spat_exception p -> Ospat_exception (tree_of_spec_pattern p)
+
+(* The overridden fields, which are all the fields without an extended
+   expression *)
+and tree_of_spec_record ~unboxed ({ fields; extended_expression } : Spec.record)
+    =
+  let overridden =
+    List.filter_map
+      (fun (label, _, (def : Spec.field_definition)) ->
+         match def with
+         | Kept -> None
+         | Overridden e -> Some (tree_of_spec_label label, tree_of_spec e))
+      fields
+  in
+  let extended =
+    Option.map (fun (e, _) -> tree_of_spec e) extended_expression
+  in
+  let e = Ospec_record { fields = overridden; extended; unboxed } in
+  match fields with
+  | ((label : Spec.label), _, _) :: _ -> annotate label.type_path e
+  | [] -> e
+
+and tree_of_spec_label ({ name; _ } : Spec.label) =
+  Oide_ident { printed_name = name }
+
+and tree_of_spec_labelled (lbl, e, _) = (lbl, tree_of_spec e)
+
+(* Constructors and labels are printed unqualified, and the constructors,
+   records and records of field accesses are annotated with their type,
+   [(C : _ t)], so that the printed clause types again with the same
+   constructors and labels. The types of inline records have no syntax, but
+   their constructor determines them. *)
+and annotate (type_path : Path.t) e =
+  match type_annotation type_path with
+  | Some ty -> Ospec_constraint (e, ty)
+  | None -> e
+
+and annotate_pattern (type_path : Path.t) p =
+  match type_annotation type_path with
+  | Some ty -> Ospat_constraint (p, ty)
+  | None -> p
+
+and type_annotation (type_path : Path.t) =
+  match type_path with
+  | Pextra_ty (_, (Pcstr_ty _ | Pext_ty)) -> None
+  | Pident _ | Pdot _ | Papply _ | Pextra_ty (_, Punboxed_ty) -> (
+      match Env.find_type type_path !printing_env with
+      | decl ->
+          let params = List.map (fun _ -> Otyp_stuff "_") decl.type_params in
+          Some (Otyp_constr (tree_of_path (Some Type) type_path, params))
+      | exception Not_found ->
+          Misc.fatal_errorf "Out_type.type_annotation: unbound type %s"
+            (Path.name type_path))
+
+and tree_of_spec_constructor : Spec.constructor -> out_ident = function
+  | Constructor { name; _ } -> Oide_ident { printed_name = name }
+  | Extension_constructor path ->
+      tree_of_path (Some Extension_constructor) path
+
+and label_of_spec : Spec.arg_label -> Outcometree.arg_label = function
+  | Spec.Nolabel -> Nolabel
+  | Spec.Labelled s -> Labelled s
+  | Spec.Optional s -> Optional s
+
+(* The kind of a type variable with one worth printing (see [val f : ('a :
+   k). ...]) is annotated at its first occurrence in the parameters, which
+   share their variables: [(x : ('a : k))]. The variables of [newtypes] are
+   printed as the types [(type a)] of the law. *)
+let rec annotate_first_occurrence ~newtypes kinds (ty : out_type) =
+  let annotate = annotate_first_occurrence ~newtypes in
+  let labelled kinds (label, ty) =
+    let kinds, ty = annotate kinds ty in
+    kinds, (label, ty)
+  in
+  match ty with
+  | Otyp_var (_, name) when List.mem name newtypes ->
+      kinds, Otyp_constr (Oide_ident { printed_name = name }, [])
+  | Otyp_var (_, name) ->
+      begin match List.assoc_opt name kinds with
+      | Some kind -> List.remove_assoc name kinds, Otyp_jkind_annot (ty, kind)
+      | None -> kinds, ty
+      end
+  | Otyp_constr (p, args) ->
+      let kinds, args = List.fold_left_map annotate kinds args in
+      kinds, Otyp_constr (p, args)
+  | Otyp_arrow (label, modes, arg, ret) ->
+      let kinds, arg = annotate kinds arg in
+      let kinds, ret = annotate kinds ret in
+      kinds, Otyp_arrow (label, modes, arg, ret)
+  | Otyp_ret (modes, ty) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_ret (modes, ty)
+  | Otyp_tuple tys ->
+      let kinds, tys = List.fold_left_map labelled kinds tys in
+      kinds, Otyp_tuple tys
+  | Otyp_unboxed_tuple tys ->
+      let kinds, tys = List.fold_left_map labelled kinds tys in
+      kinds, Otyp_unboxed_tuple tys
+  | Otyp_alias { non_gen; aliased; alias } ->
+      let kinds, aliased = annotate kinds aliased in
+      kinds, Otyp_alias { non_gen; aliased; alias }
+  | Otyp_poly (vars, ty) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_poly (vars, ty)
+  | Otyp_variant (Ovar_fields fields, closed, tags) ->
+      let field kinds (tag, empty, tys) =
+        let kinds, tys = List.fold_left_map annotate kinds tys in
+        kinds, (tag, empty, tys)
+      in
+      let kinds, fields = List.fold_left_map field kinds fields in
+      kinds, Otyp_variant (Ovar_fields fields, closed, tags)
+  | Otyp_variant (Ovar_typ ty, closed, tags) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_variant (Ovar_typ ty, closed, tags)
+  | Otyp_object { fields; open_row } ->
+      let kinds, fields = List.fold_left_map labelled kinds fields in
+      kinds, Otyp_object { fields; open_row }
+  | Otyp_class (p, args) ->
+      let kinds, args = List.fold_left_map annotate kinds args in
+      kinds, Otyp_class (p, args)
+  | Otyp_module { opack_path; opack_cstrs } ->
+      let kinds, opack_cstrs = List.fold_left_map labelled kinds opack_cstrs in
+      kinds, Otyp_module { opack_path; opack_cstrs }
+  | Otyp_mod (ty, modalities) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_mod (ty, modalities)
+  | Otyp_attribute (ty, attr) ->
+      let kinds, ty = annotate kinds ty in
+      kinds, Otyp_attribute (ty, attr)
+  | Otyp_abstract | Otyp_open | Otyp_manifest _ | Otyp_record _
+  | Otyp_record_unboxed_product _ | Otyp_stuff _ | Otyp_sum _ | Otyp_quote _
+  | Otyp_splice _ | Otyp_repr _ | Otyp_newlayout _ | Otyp_jkind_annot _
+  | Otyp_of_kind _ ->
+      kinds, ty
+
+(* Unlike [tree_of_qtvs], nullability is kept: the kind of a type variable
+   of a law declares the inputs of the law, which [value_or_null] parameters
+   must admit. *)
+let tree_of_type_jkind ty =
+  out_jkind_option_of_jkind ~ignore_null:false !printing_env
+    (Ctype.estimate_type_jkind !printing_env ty)
+
+let tree_of_law_params newtypes params =
+  let tys = List.map snd params in
+  let base = With_locality.Const.legacy in
+  prepare_for_printing ~base (newtypes @ tys);
+  let newtypes =
+    List.map
+      (fun ty ->
+         (Variable_names.name_of_type Variable_names.new_name
+            (Transient_expr.repr ty),
+          tree_of_type_jkind ty))
+      newtypes
+  in
+  let params =
+    List.map
+      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
+      params
+  in
+  let kinds =
+    List.filter_map
+      (fun (name, kind) ->
+         if List.mem_assoc name newtypes then None
+         else Option.map (fun kind -> (name, kind)) kind)
+      (zap_qtvs_if_boring (tree_of_qtvs (extract_qtvs tys)))
+  in
+  let params =
+    snd
+      (List.fold_left_map
+         (fun kinds (x, ty) ->
+            let kinds, ty =
+              annotate_first_occurrence ~newtypes:(List.map fst newtypes)
+                kinds ty
+            in
+            kinds, (x, ty))
+         kinds params)
+  in
+  newtypes, params
+
+let tree_of_law_declaration id decl =
+  let olaw_newtypes, olaw_params =
+    tree_of_law_params decl.law_newtypes decl.law_params
+  in
+  Osig_law
+    { olaw_name = Ident.name id;
+      olaw_newtypes;
+      olaw_params;
+      olaw_assumptions = List.map tree_of_spec decl.law_assumptions;
+      olaw_conclusion = tree_of_spec decl.law_conclusion }
+
 let tree_of_jkind_declaration id decl =
   let ojkind =
     { ojkind_name = Ident.name id
@@ -3894,6 +4246,7 @@ let dummy =
 let ident_sigitem = function
   | Types.Sig_type(ident,_,_,_) ->  {hide=true;ident}
   | Types.Sig_jkind (ident,_,_)
+  | Types.Sig_law (ident,_,_)
   | Types.Sig_class(ident,_,_,_)
   | Types.Sig_class_type (ident,_,_,_)
   | Types.Sig_module(ident,_, _,_,_)
@@ -4002,7 +4355,7 @@ let rec tree_of_modtype ?abbrev = function
       Omty_alias (tree_of_path (Some Module) p)
   | Mty_strengthen _ as mty ->
       begin match !expand_module_type !printing_env mty with
-      | Mty_strengthen (mty,p,a) ->
+      | Mty_strengthen (mty,p,a,_) ->
           let unaliasable =
             not (Aliasability.is_aliasable a)
             && not (Env.is_functor_arg p !printing_env)
@@ -4124,6 +4477,8 @@ and tree_of_sigitem ?abbrev = function
       tree_of_cltype_declaration id decl rs
   | Sig_jkind(id, decl, _) ->
       tree_of_jkind_declaration id decl
+  | Sig_law(id, decl, _) ->
+      tree_of_law_declaration id decl
 
 and tree_of_modtype_declaration ?abbrev id decl =
   let mty =
