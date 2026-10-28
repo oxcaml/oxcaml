@@ -1884,8 +1884,9 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     | (_, repr) :: reprs ->
       match is_function_type env ty with
       | None ->
-          (* [p.prim_native_repr_args] were derived from the annotated type, so by
-             construction [ty] must have at least as many arrows as [p] has args. *)
+          (* [p.prim_native_repr_args] were derived from the annotated type, so
+             by construction [ty] must have at least as many arrows as [p] has
+             args. *)
           Misc.fatal_errorf "Primitive %s type does not match arity"
             prim_desc.prim_name
       | Some (arg_ty, result_ty) ->
@@ -1894,7 +1895,9 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
         | Elided_void -> param_tys, param_reprs, rest_ty
         | Native_repr repr -> arg_ty :: param_tys, repr :: param_reprs, rest_ty
   in
-  let param_tys, param_reprs, rest_ty = parameter_types prim_desc.prim_native_repr_args ty in
+  let param_tys, param_reprs, rest_ty =
+    parameter_types prim_desc.prim_native_repr_args ty
+  in
   match prim, param_tys with
   | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
       match fst (maybe_pointer_type env p2) with
