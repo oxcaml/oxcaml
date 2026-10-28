@@ -483,15 +483,25 @@ module Unboxed_field_transformation : sig
   (* CR zeisbach: this comment can probably be workshopped. I'm not sure exactly
      where it belongs, either (on the [sig]? on [t]?). *)
   (** The kind of an unboxed container is built from the kinds of its unboxed
-      contents (which get stored inline), transformed based on the modalities on
-      its fields (to strengthen mode crossing).
+      contents (which get stored inline), transformed based on the modalities
+      and [mutable] labels on its fields (to strengthen or weaken mode crossing,
+      respectively).
 
       An [Unboxed_field_transformation.t] represents such a kind transformation
       as data. *)
   type t
 
-  (** The identity transformation, for fields without modalities. *)
+  (** The identity transformation, for immutable fields without modalities. *)
   val id : t
+
+  (** Constructs the transformation for a field declared with the given
+      mutability and modality, representing the transformation of [t]'s kind
+      into [r]'s in the following example:
+      {[
+        type r = #{ <<mutability>> x : t @@ <<modality>> }
+      ]} *)
+  val of_field :
+    mutability:Types.mutability -> modality:Mode.Modality.Const.t -> t
 
   (** Constructs the transformation for an immutable field declared with the
       given modality. *)
@@ -612,7 +622,7 @@ val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
     ]}
 
     For unboxed singletons, we further transform this kind using the given
-    transformation, as it may have modalities. *)
+    transformation, as it may have modalities or a [mutable] label. *)
 val for_abbreviation :
   type_jkind_purely:(Types.type_expr -> Types.jkind_l) ->
   Unboxed_field_transformation.t ->

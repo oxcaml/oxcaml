@@ -2974,7 +2974,7 @@ let unbox_once env ty =
         apply env (extra_params @ decl.type_params) ty2 (extra_args @ args)
       in
       begin match find_unboxed_type decl with
-      | Some (ty2, modality, _mutability) ->
+      | Some (ty2, modality, mutability) ->
         let extra_substs =
           match Env.find_type_descrs p env with
           | Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) ->
@@ -2998,7 +2998,7 @@ let unbox_once env ty =
         Stepped
           { ty = apply ty2 ~extra_substs;
             wrapping =
-              Jkind.Unboxed_field_transformation.of_modality modality;
+              Jkind.Unboxed_field_transformation.of_field ~mutability ~modality;
             or_null = None }
       | None -> begin match decl.type_kind with
         | Type_record_unboxed_product ([_], _, _) ->
@@ -3293,8 +3293,14 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
               (Format_doc.compat Path.print) p
           end;
           let fields =
-            List.map (fun (_, ty) -> ty, Jkind.Unboxed_field_transformation.id)
-              (Array.to_list label_params_and_tys)
+            List.map2
+              (fun lbl (_, ty) ->
+                 (* Unlike [Jkind.for_unboxed_record], this ignores the
+                    modality of the label (but not its mutability). *)
+                 ty,
+                 Jkind.Unboxed_field_transformation.of_label
+                   { lbl with ld_modalities = Mode.Modality.Const.id })
+              lbls (Array.to_list label_params_and_tys)
           in
           estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
             env fields ~why:Jkind_intf.History.Unboxed_record
@@ -9056,6 +9062,7 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely
         (Jkind.Unboxed_field_transformation.of_modality modality)
         inner_ty
+    (* Unboxed records may additionally have [mutable] labels *)
     | Type_record_unboxed_product ([lbl], _, None), _ ->
       Jkind.for_abbreviation ~type_jkind_purely
         (Jkind.Unboxed_field_transformation.of_label lbl) lbl.ld_type
