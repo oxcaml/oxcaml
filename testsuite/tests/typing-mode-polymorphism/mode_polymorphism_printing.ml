@@ -708,9 +708,9 @@ val optional_arg :
 let shared_curry g = [g; (fun x y -> y)]
 [%%expect{|
 val shared_curry :
-  ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)]) @ [< 'o & global] ->
-  ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)])
-  list @ [> 'o] = <fun>
+  ('a @ ([< past('m) & global] as 'mm0) ->
+   ('b @ ([< 'o] as 'q) -> 'b @ ([> 'o] as 'p)) @ ([> past('m)] as 'n)) @ [< 'mm1 & global] ->
+  ('a @ 'mm0 -> ('b @ 'q -> 'b @ 'p) @ 'n) list @ [> 'mm1] = <fun>
 |}]
 
 let labelled_curry ~g () = ignore (g == (fun x y -> x))
@@ -775,19 +775,19 @@ let empty_heads (x @ local once unforkable yielding)
   exclave_ (if true then f x else fun ~a:_ -> g)
 [%%expect{|
 val empty_heads :
-  'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
+  'a @ [< 'n & uncontended read_write > local once unforkable yielding] ->
   (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
-  (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n mod aliased contended immutable] ->
+  (b:int -> 'b @ ([> aliased nonportable stateful dynamic] as 'm)) @ [< 'o mod aliased contended immutable] ->
   (a:int ->
-   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
+   (b:int -> 'b @ 'm) @ [> 'o | local once nonportable unforkable yielding stateful]) @ [> 'n | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}, Principal{|
 val empty_heads :
-  'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
+  'a @ [< 'n & uncontended read_write > local once unforkable yielding] ->
   (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
-  (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n] ->
+  (b:int -> 'b @ ([> aliased nonportable stateful dynamic] as 'm)) @ [< 'o] ->
   (a:int ->
-   (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
+   (b:int -> 'b @ 'm) @ [> 'o | local once nonportable unforkable yielding stateful]) @ [> 'n | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}]
 
@@ -815,24 +815,22 @@ Error: Signature mismatch:
        is not included in
          val g : ('a -> int) -> unit
        The type
-         "('a @ [> local] -> 'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< many uncontended read_write] ->
+         "('a @ [> local] ->
+          'b @ 'p -> 'c @ ([< 'm] as 'o) -> 'c @ ([> 'm] as 'n)) @ [< many uncontended read_write] ->
          unit @ [> dynamic]"
        is not compatible with the type "('a -> int) -> unit"
-       Type "'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]" is not compatible with type
-         "int"
+       Type "'b @ 'p -> 'c @ 'o -> 'c @ 'n" is not compatible with type "int"
 |}]
 
 let call_and_return f x = f x, f
 [%%expect{|
 val call_and_return :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global many] ->
-  'a @ [< 'n] ->
-  'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | past('o) | aliased dynamic] =
-  <fun>
+  ('a @ ([> 'o] as 'p) -> 'b @ ([< 'm & global] as 'n)) @ [< past('q) & global many] ->
+  'a @ [< 'o] ->
+  'b * ('a @ 'p -> 'b @ 'n) @ [> 'm | past('q) | aliased dynamic] = <fun>
 |}, Principal{|
 val call_and_return :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many] ->
-  'a @ [< 'n] ->
-  'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | 'o | aliased dynamic] =
+  ('a @ ([> 'o] as 'p) -> 'b @ ([< 'm & global] as 'n)) @ [< 'q & global many] ->
+  'a @ [< 'o] -> 'b * ('a @ 'p -> 'b @ 'n) @ [> 'm | 'q | aliased dynamic] =
   <fun>
 |}]
