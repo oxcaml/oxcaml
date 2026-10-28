@@ -509,8 +509,9 @@ module Unboxed_field_transformation : sig
   val apply_l : t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
   (** Executes [t]'s transformation on an expectation for an unboxed container
-      to turn it into an expectation on its unboxed contents. *)
-  val apply_r : t -> ('l * allowed) Types.jkind -> Types.jkind_r
+      to turn it into an expectation on its unboxed contents, failing if it is
+      unsatisfiable. *)
+  val apply_r : t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
 end
 
 (** Build a jkind of unboxed products, from a list of types, with how they are

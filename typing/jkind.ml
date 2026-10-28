@@ -2940,7 +2940,7 @@ module Unboxed_field_transformation = struct
 
   let apply_l t jk = apply_modality_l t.modality jk
 
-  let apply_r t jk = apply_modality_r t.modality jk
+  let apply_r t jk = Ok (apply_modality_r t.modality jk)
 end
 
 (* [Builtin.product] is hidden from [Jkind]'s interface, but it is still
