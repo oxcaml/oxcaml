@@ -29,7 +29,7 @@ let cmxa = ref ""
 let flags = ref ""
 
 (* [DIR=CMXA] *)
-let deps = ref []
+let library_dep_specs = ref []
 
 let speclist =
   [ ( "--ocaml-bin",
@@ -47,7 +47,7 @@ let speclist =
       "FLAGS  Extra flags for compiling the units (e.g. -extension-universe \
        beta)" );
     ( "--dep",
-      Arg.String (fun s -> deps := s :: !deps),
+      Arg.String (fun s -> library_dep_specs := s :: !library_dep_specs),
       "DIR=CMXA  Another library built with these rules, in DIR, that this \
        one depends on, and its installed native archive" ) ]
 
@@ -59,12 +59,17 @@ let fail fmt = Printf.ksprintf (fun s -> prerr_endline s; exit 2) fmt
 let run_lines cmd args =
   let tmp = Filename.temp_file "gen_jsir_lib" ".out" in
   let cmdline = Filename.quote_command cmd ~stdout:tmp args in
-  (match Sys.command cmdline with
-   | 0 -> ()
-   | n -> fail "%s failed with exit code %d" cmdline n);
-  let lines = In_channel.with_open_text tmp In_channel.input_lines in
-  Sys.remove tmp;
-  lines
+  let result =
+    Fun.protect
+      ~finally:(fun () -> Sys.remove tmp)
+      (fun () ->
+        match Sys.command cmdline with
+        | 0 -> Ok (In_channel.with_open_text tmp In_channel.input_lines)
+        | status -> Error status)
+  in
+  match result with
+  | Ok lines -> lines
+  | Error status -> fail "%s failed with exit code %d" cmdline status
 
 (* "key: value" lines *)
 let split_key_value line =
@@ -92,7 +97,7 @@ let read_cmxa cmxa =
   if !units = [] then fail "No units found in %s" cmxa;
   List.rev !units, !force_link
 
-let in_rules path =
+let dune_path path =
   let prefix = !ocaml_where ^ "/" in
   if path = !ocaml_where
   then "%{ocaml_where}"
@@ -111,7 +116,7 @@ let lib_prefix () = String.capitalize_ascii !name ^ "__"
 let file_of_unit unit_name ext = String.uncapitalize_ascii unit_name ^ ext
 
 let installed unit_name ext =
-  in_rules (Filename.concat (src_dir ()) (file_of_unit unit_name ext))
+  dune_path (Filename.concat (src_dir ()) (file_of_unit unit_name ext))
 
 (* Strips the wrapping prefix (e.g. [Int] for unit [Stdlib_stable__Int]).
    Unwrapped units are unchanged. *)
@@ -143,7 +148,7 @@ type unit_info =
     source : string (* file name, in the installed directory *) }
 
 (* Finds the installed source of each unit, failing if it is missing. *)
-let classify ~alias units =
+let find_unit_sources ~alias units =
   List.map
     (fun unit_name ->
       let source =
@@ -156,39 +161,42 @@ let classify ~alias units =
       { unit_name; source })
     units
 
-type dep =
+type library_dep =
   { dir : string; (* where its .cmjx are, relative to the rules *)
     installed_dir : string; (* where its .cmi are *)
     cmjx_deps : string list (* dune dependencies on its .cmjx *) }
 
 (* The compiler may read any .cmjx of a library this one depends on. *)
-let dep ~dir ~cmxa =
+let library_dep ~dir ~cmxa =
   let cmjx_deps =
     if dir = "."
-    then List.map (fun u -> file_of_unit u ".cmjx") (fst (read_cmxa cmxa))
+    then
+      (* A glob would include the outputs of the library being built, creating
+         dependency cycles. *)
+      List.map (fun u -> file_of_unit u ".cmjx") (fst (read_cmxa cmxa))
     else [Printf.sprintf "(glob_files %s/*.cmjx)" dir]
   in
-  { dir; installed_dir = in_rules (Filename.dirname cmxa); cmjx_deps }
+  { dir; installed_dir = dune_path (Filename.dirname cmxa); cmjx_deps }
 
-let parse_dep spec =
+let parse_library_dep spec =
   match String.index_opt spec '=' with
   | None -> fail "--dep expects DIR=CMXA, got %s" spec
   | Some i ->
     let dir = String.sub spec 0 i in
     let cmxa = String.sub spec (i + 1) (String.length spec - i - 1) in
-    dep ~dir ~cmxa
+    library_dep ~dir ~cmxa
 
-let read_deps () =
+let read_library_deps () =
   let stdlib =
-    dep ~dir:".." ~cmxa:(Filename.concat !ocaml_where "stdlib.cmxa")
+    library_dep ~dir:".." ~cmxa:(Filename.concat !ocaml_where "stdlib.cmxa")
   in
-  stdlib :: List.map parse_dep (List.rev !deps)
+  stdlib :: List.map parse_library_dep (List.rev !library_dep_specs)
 
 (* Dependencies between units, from ocamldep: module [Foo] referenced from a
    unit is [Lib__Foo] when the library is wrapped (a reference to [Lib__Foo]
    itself also works), [Foo] otherwise. Closed transitively, as the compiler
    may read the .cmjx of units imported by the ones a unit uses. *)
-let unit_deps ~alias units =
+let read_unit_deps ~alias units =
   let unit_names = List.map (fun u -> u.unit_name) units |> StrSet.of_list in
   let resolve modname =
     let wrapped = lib_prefix () ^ modname in
@@ -216,38 +224,43 @@ let unit_deps ~alias units =
     | Some unit_name -> unit_name
     | None -> fail "ocamldep reported unknown file %s" file
   in
-  let deps_of_unit unit_name mods =
+  let resolve_unit_deps unit_name mods =
     String.split_on_char ' ' mods
     |> List.filter_map (fun m -> if m = "" then None else resolve m)
     |> List.filter (fun d -> d <> unit_name)
     |> StrSet.of_list
   in
-  let imm =
+  let direct_deps =
     List.filter_map split_key_value lines
     |> List.fold_left
          (fun acc (file, mods) ->
            let unit_name = unit_of_file file in
-           StrMap.add unit_name (deps_of_unit unit_name mods) acc)
+           StrMap.add unit_name (resolve_unit_deps unit_name mods) acc)
          StrMap.empty
   in
-  let imm_deps u = Option.value (StrMap.find_opt u imm) ~default:StrSet.empty in
-  let closure = Hashtbl.create 16 in
-  let rec trans u visiting =
-    match Hashtbl.find_opt closure u with
+  let direct_deps_of unit_name =
+    Option.value (StrMap.find_opt unit_name direct_deps) ~default:StrSet.empty
+  in
+  let cache = Hashtbl.create 16 in
+  let rec transitive_deps unit_name visiting =
+    match Hashtbl.find_opt cache unit_name with
     | Some deps -> deps
     | None ->
-      if StrSet.mem u visiting then fail "Dependency cycle through %s" u;
-      let visiting = StrSet.add u visiting in
-      let imm = imm_deps u in
+      if StrSet.mem unit_name visiting
+      then fail "Dependency cycle through %s" unit_name;
+      let visiting = StrSet.add unit_name visiting in
+      let direct = direct_deps_of unit_name in
       let deps =
-        StrSet.fold (fun d acc -> StrSet.union acc (trans d visiting)) imm imm
+        StrSet.fold
+          (fun dep acc -> StrSet.union acc (transitive_deps dep visiting))
+          direct direct
       in
-      Hashtbl.replace closure u deps;
+      Hashtbl.replace cache unit_name deps;
       deps
   in
-  fun u -> trans u StrSet.empty
+  fun unit_name -> transitive_deps unit_name StrSet.empty
 
-let run_ocamlopt args =
+let ocamlopt_action args =
   Printf.sprintf
     "(setenv OXCAML_JS_OF_OCAML %%{bin:js_of_ocaml} (run %%{ocamlopt} -target \
      js_of_ocaml %s))"
@@ -265,9 +278,9 @@ let dedup l =
 
 (* The .cmjx and the .cmi are in the current and installed directories,
    respectively. *)
-let include_dirs deps =
-  List.concat_map (fun d -> [d.dir; d.installed_dir]) deps
-  @ [in_rules (src_dir ()); "%{ocaml_where}"]
+let include_dirs library_deps =
+  List.concat_map (fun d -> [d.dir; d.installed_dir]) library_deps
+  @ [dune_path (src_dir ()); "%{ocaml_where}"]
   |> List.filter (fun d -> d <> ".")
   |> dedup
   |> List.concat_map (fun d -> ["-I"; d])
@@ -284,9 +297,9 @@ let () =
       cmxa, "--cmxa" ];
   let unit_names, force_link = read_cmxa !cmxa in
   let alias = alias_module unit_names in
-  let units = classify ~alias unit_names in
-  let deps = read_deps () in
-  let deps_of = unit_deps ~alias units in
+  let units = find_unit_sources ~alias unit_names in
+  let library_deps = read_library_deps () in
+  let unit_deps_of = read_unit_deps ~alias units in
   let extra_flags =
     String.split_on_char ' ' !flags |> List.filter (fun s -> s <> "")
   in
@@ -300,21 +313,21 @@ let () =
         ((Printf.sprintf "(:src %s)" src_path :: cmi
           :: List.map (fun d -> installed d ".cmi") cmi_deps)
         @ List.map (fun d -> file_of_unit d ".cmjx") cmjx_deps
-        @ List.concat_map (fun d -> d.cmjx_deps) deps)
+        @ List.concat_map (fun d -> d.cmjx_deps) library_deps)
       ~action:
-        (run_ocamlopt
-           (common_flags @ flags @ include_dirs deps
+        (ocamlopt_action
+           (common_flags @ flags @ include_dirs library_deps
            @ ["-cmi-file"; cmi; "-o"; cmjx; "-c"; "%{src}"]))
   in
   List.iter
     (fun u ->
-      let src_path = in_rules (Filename.concat (src_dir ()) u.source) in
+      let src_path = dune_path (Filename.concat (src_dir ()) u.source) in
       if Some u.unit_name = alias
       then
         compile_rule ~unit_name:u.unit_name ~src_path ~cmi_deps:[]
           ~cmjx_deps:[] ~flags:["-w"; "-49"]
       else
-        let unit_deps = StrSet.elements (deps_of u.unit_name) in
+        let unit_deps = StrSet.elements (unit_deps_of u.unit_name) in
         let alias_deps, alias_flags =
           match alias with
           | None -> [], []
@@ -328,7 +341,7 @@ let () =
     ~targets:[!name ^ ".cmjxa"; !name ^ ".cmja"]
     ~deps:(List.map (fun u -> file_of_unit u.unit_name ".cmjo") units)
     ~action:
-      (run_ocamlopt
+      (ocamlopt_action
          (["-g"; "-nostdlib"]
          @ (if force_link then ["-linkall"] else [])
          @ ["-a"; "-o"; !name ^ ".cmjxa"]
