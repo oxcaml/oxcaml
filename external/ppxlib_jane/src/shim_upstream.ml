@@ -129,10 +129,10 @@ end
 module Value_binding = struct
   let extract_modes vb = [], vb
 
-  let create ~loc ~pat ~expr ~modes:_ =
+  let create ~loc ~pat ~expr ~constraint_ ~modes:_ =
     { pvb_pat = pat
     ; pvb_expr = expr
-    ; pvb_constraint = None
+    ; pvb_constraint = constraint_
     ; pvb_attributes = []
     ; pvb_loc = loc
     }
@@ -1083,6 +1083,7 @@ module Module_expr_desc = struct
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension
@@ -1094,11 +1095,7 @@ module Module_expr_desc = struct
     | Pmod_structure x -> Pmod_structure x
     | Pmod_functor (x0, x1) -> Pmod_functor (x0, x1)
     | Pmod_apply (x0, x1) -> Pmod_apply (x0, x1)
-    | Pmod_apply_unit x ->
-      (* [M ()] as it was represented before OCaml 5.1. *)
-      let loc = { x.pmod_loc with loc_ghost = true } in
-      Pmod_apply
-        (x, { pmod_desc = Pmod_structure []; pmod_loc = loc; pmod_attributes = [] })
+    | Pmod_apply_unit x -> Pmod_apply_unit x
     | Pmod_constraint (x0, x1) -> Pmod_constraint (x0, Some x1, [])
     | Pmod_unpack x -> Pmod_unpack x
     | Pmod_extension x -> Pmod_extension x
@@ -1132,6 +1129,7 @@ module Module_expr_desc = struct
     | Pmod_structure x -> Pmod_structure x
     | Pmod_functor (x0, x1) -> Pmod_functor (x0, x1)
     | Pmod_apply (x0, x1) -> Pmod_apply (x0, x1)
+    | Pmod_apply_unit x -> Pmod_apply_unit x
     | Pmod_unpack x -> Pmod_unpack x
     | Pmod_extension x -> Pmod_extension x
   ;;

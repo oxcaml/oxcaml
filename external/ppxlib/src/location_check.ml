@@ -225,7 +225,17 @@ let enforce_invariants fname =
 
     method! binding_op x siblings_locs =
       let childrens_locs = super#binding_op x Non_intersecting_ranges.empty in
-      do_check ~node_name:"binding operator" x.pbop_loc childrens_locs
+      (* A binding operator's location overlaps the adjacent parts of the [let*]
+         expression, so don't treat it as a range of its own. *)
+      do_check ~node_name:"binding operator"
+        { x.pbop_loc with loc_ghost = true }
+        childrens_locs siblings_locs
+
+    method! jkind_annotation x siblings_locs =
+      let childrens_locs =
+        super#jkind_annotation x Non_intersecting_ranges.empty
+      in
+      do_check ~node_name:"jkind annotation" x.pjka_loc childrens_locs
         siblings_locs
 
     method! value_description x siblings_locs =
