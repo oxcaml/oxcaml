@@ -47,14 +47,28 @@ struct stack_handler {
  *  - accessing the stack_handler for the stack to handle effects
  *  - handling a freelist of OCaml stacks in a stack_cache
  */
+struct cached_stack;
+
 struct stack_info {
+  union {
+    /* While the stack is in use. */
+    struct {
 #ifdef NATIVE_CODE
-  void* sp;            /* stack pointer of the OCaml stack when suspended */
-  void* exception_ptr; /* exception pointer of OCaml stack when suspended */
+      void* sp;            /* stack pointer of the OCaml stack when suspended */
+      void* exception_ptr; /* exception pointer of OCaml stack when suspended */
 #else
-  value* sp;
-  value* exception_ptr;
+      value* sp;
+      value* exception_ptr;
 #endif
+    };
+    /* While the stack is in a stack cache (see [struct cached_stack]). */
+    struct {
+      /* The major cycle at which the stack was demoted, used to free
+         long-unused stacks; only set in the global and extra caches. */
+      uintnat cache_stamp;
+      struct cached_stack* cache_next; /* the next stack in this cache */
+    };
+  };
   struct stack_handler* handler; /* effect handling state for the fiber */
 
   /* [cache_bucket] is an index into the [Caml_state->stack_cache] array if
@@ -329,23 +343,15 @@ enum tick_outcome {
   TICK_RESULT_CONTINUE = 1
 };
 
-/* A stack in one of the stack caches: the same memory as a [struct
-   stack_info], viewed through a different type while it has no
-   execution state. Mirrors the leading layout of [struct stack_info],
-   repurposing the first two words. The remaining [struct stack_info]
-   fields are dead while cached, and are reinitialized when the stack is
-   reused. */
+/* A stack in one of the stack caches, which has no execution state: only
+   its geometry, [magic] and the cache arm of the union in [struct
+   stack_info] are live, and the stack data itself is dead (and may have
+   been reclaimed by the OS). A distinct type, so that a cached stack
+   cannot be passed where a runnable one is expected; it is the same
+   object, as a structure and its first member share an address (C11
+   6.7.2.1). */
 struct cached_stack {
-  /* Overlays [sp]: the major-cycle count when this stack was demoted,
-     used to free long-unused stacks (global and extra caches only). */
-  uintnat stamp;
-  /* Overlays [exception_ptr]: the next stack in this cache. */
-  struct cached_stack* next;
-  /* The address at which the handler will be rebuilt on reuse. */
-  struct stack_handler* handler_space;
-  int cache_bucket; /* as in struct stack_info */
-  size_t size;      /* as in struct stack_info */
-  uintnat magic;    /* as in struct stack_info */
+  struct stack_info stack;
 };
 
 struct stack_cache {

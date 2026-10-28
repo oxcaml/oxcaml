@@ -414,7 +414,7 @@ static struct cached_stack* cache_pop_with_lock(struct stack_cache* c)
 {
   struct cached_stack* stk = atomic_load_relaxed(&c->head);
   if (stk == NULL) return NULL;
-  atomic_store_relaxed(&c->head, stk->next);
+  atomic_store_relaxed(&c->head, stk->stack.cache_next);
   atomic_store_relaxed(&c->len, atomic_load_relaxed(&c->len) - 1);
   return stk;
 }
@@ -424,32 +424,16 @@ static struct cached_stack* cache_pop_with_lock(struct stack_cache* c)
 static void cache_push_with_lock(struct stack_cache* c,
                                  struct cached_stack* stk)
 {
-  stk->next = atomic_load_relaxed(&c->head);
+  stk->stack.cache_next = atomic_load_relaxed(&c->head);
   atomic_store_relaxed(&c->head, stk);
   atomic_store_relaxed(&c->len, atomic_load_relaxed(&c->len) + 1);
 }
 
 #endif /* STACK_GUARD_PAGES */
 
-/* [struct cached_stack] mirrors the leading layout of
-   [struct stack_info]: pin the field offsets. */
-static_assert(offsetof(struct cached_stack, stamp) ==
-              offsetof(struct stack_info, sp), "");
-static_assert(offsetof(struct cached_stack, next) ==
-              offsetof(struct stack_info, exception_ptr), "");
-static_assert(offsetof(struct cached_stack, handler_space) ==
-              offsetof(struct stack_info, handler), "");
-static_assert(offsetof(struct cached_stack, cache_bucket) ==
-              offsetof(struct stack_info, cache_bucket), "");
-static_assert(offsetof(struct cached_stack, size) ==
-              offsetof(struct stack_info, size), "");
-static_assert(offsetof(struct cached_stack, magic) ==
-              offsetof(struct stack_info, magic), "");
-static_assert(sizeof(struct cached_stack) <= sizeof(struct stack_info), "");
-
-/* Convert between the live and cached views of a stack: used only at
-   the cache boundaries ([stack_release_memory], the cache pops, and
-   freeing from a cache). */
+/* Move between the runnable and cached views of a stack, at the cache
+   boundaries ([stack_release_memory], the cache pops, and freeing from
+   a cache). */
 Caml_inline struct cached_stack* cached_of_stack(struct stack_info* stack)
 {
   return (struct cached_stack*)stack;
@@ -457,7 +441,7 @@ Caml_inline struct cached_stack* cached_of_stack(struct stack_info* stack)
 
 Caml_inline struct stack_info* stack_of_cached(struct cached_stack* cached)
 {
-  return (struct stack_info*)cached;
+  return &cached->stack;
 }
 
 /* Count and peak of live stacks. Used to drive GC, so not a
@@ -494,8 +478,10 @@ static struct stack_stats stack_stats_sum(void)
   struct stack_stats t = { 0, };
   for (int i = 0; i < caml_params->max_domains; i++) {
     struct stack_stats* s = &domain_stack_stats[i];
+    /* [t] is local, so these relaxed accesses are just arithmetic. */
 #define Add(field) \
-    caml_atomic_counter_add_relaxed(&t.field, atomic_load_relaxed(&s->field))
+    atomic_store_relaxed(&t.field, atomic_load_relaxed(&t.field) \
+                                   + atomic_load_relaxed(&s->field))
     Add(created);
     Add(freed);
     Add(idled);
@@ -611,7 +597,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
          only the owner pops. */
       struct cached_stack* cached = atomic_load_acquire(&cache->head);
       if (cached) {
-        struct cached_stack* top = cached->next;
+        struct cached_stack* top = cached->stack.cache_next;
         alloc = atomic_compare_exchange_weak(&cache->head, &cached, top);
         if(alloc) {
           stack = stack_of_cached(cached);
@@ -1429,7 +1415,7 @@ void caml_free_stack_caches(struct stack_cache* caches)
   for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
     while (caches[i].head != NULL) {
       struct cached_stack* stk = caches[i].head;
-      caches[i].head = stk->next;
+      caches[i].head = stk->stack.cache_next;
       free_stack_memory(stack_of_cached(stk));
     }
   }
@@ -1485,7 +1471,7 @@ void caml_disable_stack_caches(struct stack_cache* caches)
         continue;
       }
 
-      struct cached_stack* next = top->next;
+      struct cached_stack* next = top->stack.cache_next;
       if(atomic_compare_exchange_weak(&cache->head, &top, next)) {
         cache->len -= 1;
         free_stack_memory(stack_of_cached(top));
@@ -1537,7 +1523,7 @@ static void stack_release_memory(struct stack_info* stack)
       bool freed = false;
       do {
         struct cached_stack* top = cache->head;
-        cached->next = top;
+        cached->stack.cache_next = top;
         freed = atomic_compare_exchange_weak(&cache->head, &top, cached);
       } while(!freed);
     }
@@ -1624,8 +1610,9 @@ static struct stack_info* stack_idle(struct stack_info* stack)
   memcpy(idle->sp, stack->sp, data_bytes + sizeof(struct stack_handler));
 
   caml_atomic_counter_incr(Stack_stat(idled));
-  caml_atomic_counter_add_relaxed(Stack_stat(idled_bytes),
-                          data_bytes + sizeof(struct stack_handler));
+  atomic_uintnat* bytes = Stack_stat(idled_bytes);
+  atomic_store_relaxed(bytes, atomic_load_relaxed(bytes)
+                              + data_bytes + sizeof(struct stack_handler));
   CAML_EV_COUNTER(EV_C_STACK_IDLED,
                   data_bytes + sizeof(struct stack_handler));
   return idle;
@@ -1743,8 +1730,9 @@ static void stack_wake(struct stack_info* idle, struct stack_info* stack,
   }
 
   caml_atomic_counter_incr(Stack_stat(woken));
-  caml_atomic_counter_add_relaxed(Stack_stat(woken_bytes),
-                          data_bytes + sizeof(struct stack_handler));
+  atomic_uintnat* bytes = Stack_stat(woken_bytes);
+  atomic_store_relaxed(bytes, atomic_load_relaxed(bytes)
+                              + data_bytes + sizeof(struct stack_handler));
   CAML_EV_COUNTER(EV_C_STACK_WOKEN,
                   data_bytes + sizeof(struct stack_handler));
   caml_stat_free(idle);
@@ -1862,13 +1850,14 @@ void caml_stack_cache_flush_from_stw(void)
     while (stk != NULL) {
 #ifdef MADV_FREE
       /* Let the OS know we don't care about anything above the guard
-         page; the first page holds the cached_stack. */
-      char* data = (char*)Stack_base(stk);
-      (void)madvise(data, ((char*)stk + stk->size) - data, MADV_FREE);
+         page; the first page holds the stack's own fields. */
+      struct stack_info* stack = stack_of_cached(stk);
+      char* data = (char*)Stack_base(stack);
+      (void)madvise(data, ((char*)stack + stack->size) - data, MADV_FREE);
 #endif
-      stk->stamp = caml_major_cycles_completed;
+      stk->stack.cache_stamp = caml_major_cycles_completed;
       ++ n;
-      stk = stk->next;
+      stk = stk->stack.cache_next;
     }
     atomic_fetch_sub(&caches[i].len, n);
     demoted += n;
@@ -1884,7 +1873,7 @@ void caml_stack_cache_flush_from_stw(void)
   for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
     struct cached_stack* stk = flushing[i];
     while (stk != NULL) {
-      struct cached_stack* next = stk->next;
+      struct cached_stack* next = stk->stack.cache_next;
       if (cached < caml_max_guarded_stacks) {
         cache_push_with_lock(&stack_cache_global[i], stk);
         ++ cached;
@@ -1895,7 +1884,8 @@ void caml_stack_cache_flush_from_stw(void)
     }
   }
   caml_plat_unlock(&stack_cache_global_lock);
-  caml_atomic_counter_add_relaxed(Stack_stat(demoted), demoted);
+  atomic_uintnat* total = Stack_stat(demoted);
+  atomic_store_relaxed(total, atomic_load_relaxed(total) + demoted);
   if (demoted > 0) {
     CAML_GC_MESSAGE(STACKS,
                     "Demoted %" ARCH_INTNAT_PRINTF_FORMAT "u guarded "
@@ -1921,7 +1911,7 @@ void caml_stack_cache_trim_from_stw_single(void)
     struct cached_stack* stk =
       atomic_exchange(&stack_cache_extra[i].head, NULL);
     while (stk != NULL) {
-      struct cached_stack* next = stk->next;
+      struct cached_stack* next = stk->stack.cache_next;
       atomic_store_relaxed(&stack_cache_extra[i].len,
                            atomic_load_relaxed(&stack_cache_extra[i].len) - 1);
       free_stack_memory(stack_of_cached(stk));
@@ -1931,15 +1921,15 @@ void caml_stack_cache_trim_from_stw_single(void)
     struct cached_stack* keep = NULL;
     stk = atomic_exchange(&stack_cache_global[i].head, NULL);
     while (stk != NULL) {
-      struct cached_stack* next = stk->next;
-      if (stk->stamp + 1 < current) {
+      struct cached_stack* next = stk->stack.cache_next;
+      if (stk->stack.cache_stamp + 1 < current) {
         atomic_store_relaxed(
           &stack_cache_global[i].len,
           atomic_load_relaxed(&stack_cache_global[i].len) - 1);
         free_stack_memory(stack_of_cached(stk));
         ++ freed;
       } else {
-        stk->next = keep;
+        stk->stack.cache_next = keep;
         keep = stk;
       }
       stk = next;
@@ -1965,7 +1955,7 @@ void caml_stack_cache_compact_from_stw_single(void)
     for (int j = 0; j < 2; j++) {
       struct cached_stack* stk = atomic_exchange(&cs[j]->head, NULL);
       while (stk != NULL) {
-        struct cached_stack* next = stk->next;
+        struct cached_stack* next = stk->stack.cache_next;
         atomic_store_relaxed(&cs[j]->len,
                              atomic_load_relaxed(&cs[j]->len) - 1);
         free_stack_memory(stack_of_cached(stk));
