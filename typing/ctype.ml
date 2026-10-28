@@ -2974,7 +2974,7 @@ let unbox_once env ty =
         apply env (extra_params @ decl.type_params) ty2 (extra_args @ args)
       in
       begin match find_unboxed_type decl with
-      | Some (ty2, modality) ->
+      | Some (ty2, modality, _mutability) ->
         let extra_substs =
           match Env.find_type_descrs p env with
           | Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) ->
@@ -3217,7 +3217,7 @@ let apply_jkind_wrapping_l ~env ~level
 
 let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; wrapping; or_null }
       jkind =
-  begin
+  let jkind =
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
          [assert false]. But we don't have a principled reason why (one likely
@@ -3226,8 +3226,8 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; wrapping; or_null }
       Jkind.apply_or_null_r env jkind
     else
       Ok jkind
-  end
-  |> Result.map (Jkind.Unboxed_field_transformation.apply_r wrapping)
+  in
+  Result.bind jkind (Jkind.Unboxed_field_transformation.apply_r wrapping)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3267,7 +3267,8 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   | Tunboxed_tuple ltys ->
       let tys = List.map snd ltys in
       estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds env
-        tys ~why:Jkind_intf.History.Unboxed_tuple
+        (List.map (fun ty -> ty, Jkind.Unboxed_field_transformation.id) tys)
+        ~why:Jkind_intf.History.Unboxed_tuple
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
       let jkind =
@@ -3291,9 +3292,12 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
             Misc.fatal_errorf "failed to unify %a"
               (Format_doc.compat Path.print) p
           end;
-          let tys = Array.map snd label_params_and_tys |> Array.to_list in
+          let fields =
+            List.map (fun (_, ty) -> ty, Jkind.Unboxed_field_transformation.id)
+              (Array.to_list label_params_and_tys)
+          in
           estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
-            env tys ~why:Jkind_intf.History.Unboxed_record
+            env fields ~why:Jkind_intf.History.Unboxed_record
         | _ -> type_decl.type_jkind
       in
       (* Checking [has_with_bounds] here is needed for correctness, because
@@ -3368,13 +3372,19 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     Jkind.mark_best jkind
   | Tpackage _ -> Jkind.for_non_float ~why:First_class_module
 and estimate_unboxed_product_jkind
-      ~expand_components ~ignore_mod_bounds ~why env tys =
+      ~expand_components ~ignore_mod_bounds ~why env fields =
   let fields, layouts =
     List.map
-      (fun ty ->
-         compute_ty_wrapping_layout ~expand_components ~ignore_mod_bounds env
-           (maybe_expand_component env ty ~expand_components))
-      tys
+      (fun (ty, wrapping) ->
+         let (ty, inner_wrapping), layout =
+           compute_ty_wrapping_layout ~expand_components ~ignore_mod_bounds env
+             (maybe_expand_component env ty ~expand_components)
+         in
+         (ty,
+          Jkind.Unboxed_field_transformation.nest ~outer:wrapping
+            ~inner:inner_wrapping),
+         layout)
+      fields
     |> List.split
   in
   Jkind.product_of_fields ~why fields layouts
@@ -3710,11 +3720,10 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
               Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
             in
-            let jkind =
-              Jkind.Unboxed_field_transformation.apply_r wrapping jkind
-            in
             match
-              Jkind.apply_or_null_r env jkind
+              Result.bind
+                (Jkind.Unboxed_field_transformation.apply_r wrapping jkind)
+                (Jkind.apply_or_null_r env)
             with
             | Ok jkind ->
               (match
@@ -3760,11 +3769,14 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                | Final_result ->
                  Error error
                | Stepped { ty; wrapping; or_null = None } ->
-                 let jkind =
+                 begin match
                    Jkind.Unboxed_field_transformation.apply_r wrapping jkind
-                 in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
-                    jkind
+                 with
+                 | Ok jkind ->
+                   estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env
+                     ty jkind
+                 | Error () -> Error error
+                 end
                | Stepped { ty; wrapping; or_null = Some _ } ->
                  or_null ~fuel:(fuel - 1) ty wrapping
                | Stepped_record_unboxed_product unwrapped_tys ->
@@ -9034,8 +9046,6 @@ let check_decl_jkind env decl jkind =
     | Type_record (
         [{ ld_type = inner_ty; ld_modalities = modality }],
         Record_unboxed, None), _
-    | Type_record_unboxed_product ([{ ld_type = inner_ty;
-                                      ld_modalities = modality }], _, None), _
     | Type_variant (
         [{ cd_args =
              (Cstr_tuple [{ ca_type = inner_ty;
@@ -9046,6 +9056,9 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely
         (Jkind.Unboxed_field_transformation.of_modality modality)
         inner_ty
+    | Type_record_unboxed_product ([lbl], _, None), _ ->
+      Jkind.for_abbreviation ~type_jkind_purely
+        (Jkind.Unboxed_field_transformation.of_label lbl) lbl.ld_type
     | _ -> decl.type_jkind
   in
   match
