@@ -376,6 +376,42 @@ type 'a t_rec = { fld : 'a; }
 val f : 'a t_gadt -> 'a -> 'a = <fun>
 |}]
 
+(* Some more interesting GADT cases *)
+type _ t_gadt = Int : int t_gadt | Bool : bool t_gadt
+let f (type a) (x : a t_gadt) (local_ y : a) =
+  match x with
+  | Int -> { fld = y }.fld
+  | Bool -> { fld = y }.fld
+[%%expect{|
+type _ t_gadt = Int : int t_gadt | Bool : bool t_gadt
+val f : 'a t_gadt -> 'a @ local -> 'a = <fun>
+|}]
+
+type _ t_gadt = Int : int t_gadt | Bool : bool t_gadt | String : string t_gadt
+let f (type a) (x : a t_gadt) (local_ y : a) =
+  match x with
+  | Int -> { fld = y }.fld
+  | Bool -> { fld = y }.fld
+  | String -> { fld = y }.fld
+[%%expect{|
+type _ t_gadt =
+    Int : int t_gadt
+  | Bool : bool t_gadt
+  | String : string t_gadt
+Line 6, characters 22-23:
+6 |   | String -> { fld = y }.fld
+                          ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "fld" of the record at line 6, characters 14-25
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a record whose field "fld" is the expression at line 6, characters 14-29
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
 (* Mode crossing in coercing arrow types *)
 let foo : int -> int = fun x -> x
 [%%expect{|
