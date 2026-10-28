@@ -24,7 +24,7 @@ let handle_state init f x =
               loop new_state k ())
           | e -> None) }
   in
-  loop init (Safe.fiber f) x
+  loop init (Yielding.fiber f) x
 
 let handle_print f =
   let rec loop : type r. (unit, r) continuation -> r =
@@ -38,13 +38,13 @@ let handle_print f =
               print_string s; loop k)
           | e -> None) }
   in
-  loop (Safe.fiber f)
+  loop (Yielding.fiber f)
 
 let comp h () =
-  Effect.Safe.perform h (Print (Printf.sprintf "Initial state: %d\n" (Effect.Safe.perform h Get)));
-  Effect.Safe.perform h (Set 42);
-  Effect.Safe.perform h (Print (Printf.sprintf "Updated state: %d\n" (Effect.Safe.perform h Get)));
-  Effect.Safe.perform h (Set 43)
+  Effect.Yielding.perform h (Print (Printf.sprintf "Initial state: %d\n" (Effect.Yielding.perform h Get)));
+  Effect.Yielding.perform h (Set 42);
+  Effect.Yielding.perform h (Print (Printf.sprintf "Updated state: %d\n" (Effect.Yielding.perform h Get)));
+  Effect.Yielding.perform h (Set 43)
 
 let main () =
   let (), i = handle_print (fun _h () -> handle_state 0 comp ()) in

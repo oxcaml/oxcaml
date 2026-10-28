@@ -5,7 +5,7 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 exception E
 type _ t += Yield : unit t
@@ -44,10 +44,10 @@ let run main =
 
 let test h =
   say "A";
-  Effect.Safe.perform h (Fork (fun h ->
-     Effect.Safe.perform h Yield; say "C"; Effect.Safe.perform h Yield;
+  Effect.Yielding.perform h (Fork (fun h ->
+     Effect.Yielding.perform h Yield; say "C"; Effect.Yielding.perform h Yield;
      begin match_with (fun h () ->
-       Effect.Safe.perform h Ping; failwith "no pong?") ()
+       Effect.Yielding.perform h Ping; failwith "no pong?") ()
       { retc = (fun x -> x);
         exnc = (function
           | Pong -> say "]"
@@ -58,9 +58,9 @@ let test h =
           | _ -> None }
      end;
      raise E));
-  Effect.Safe.perform h (Fork (fun _h -> say "B"; "ok"));
+  Effect.Yielding.perform h (Fork (fun _h -> say "B"; "ok"));
   say "D";
-  Effect.Safe.perform h Yield;
+  Effect.Yielding.perform h Yield;
   say "E";
   "ok"
 

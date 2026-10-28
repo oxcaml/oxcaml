@@ -5,13 +5,13 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : int -> int t
           | F : unit t
 
 let rec nest h = function
-  | 0 -> Effect.Safe.perform h (E 42)
+  | 0 -> Effect.Yielding.perform h (E 42)
   | n ->
      match_with (fun h _ -> Printf.printf "[%d\n" n; nest h (n - 1)) ()
      { retc = (fun x -> Printf.printf " %d]\n" n; x);

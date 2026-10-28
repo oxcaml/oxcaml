@@ -5,12 +5,12 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += Foo : int -> int t
 
 let r =
-  try_with (fun h eff -> Effect.Safe.perform h eff [@nontail]) (Foo 3)
+  try_with (fun h eff -> Effect.Yielding.perform h eff [@nontail]) (Foo 3)
   { effc = fun (type a) (e : a t) ->
       match e with
       | Foo i -> Some (fun (k : (a,_) continuation) ->

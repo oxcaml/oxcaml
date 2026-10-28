@@ -5,7 +5,7 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : unit t
 
