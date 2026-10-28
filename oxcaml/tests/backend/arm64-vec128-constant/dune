@@ -1,0 +1,28 @@
+(rule
+ (enabled_if
+  (and (= %{context_name} "main") (= %{architecture} "arm64")))
+ (targets accesses.exe accesses.cmi accesses.cmx accesses.o accesses.s)
+ (deps accesses.ml)
+ (action
+  (setenv OCAMLPARAM ""
+   (run %{bin:ocamlopt.opt} -O3 -S -extension simd -o accesses.exe accesses.ml))))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main") (= %{architecture} "arm64")))
+ (targets contract.exe contract.cmi contract.cmx contract.o)
+ (deps contract.ml)
+ (action
+  (setenv OCAMLPARAM ""
+   (run %{bin:ocamlopt.opt} -O3 -o contract.exe contract.ml))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main") (= %{architecture} "arm64")))
+ (deps check.sh accesses.s accesses.exe contract.exe)
+ (action
+  (progn
+   (run bash check.sh accesses.s)
+   (run ./accesses.exe)
+   (run ./contract.exe))))
