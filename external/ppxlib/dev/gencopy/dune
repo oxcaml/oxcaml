@@ -1,0 +1,5 @@
+(executable
+ (name gencopy)
+ (libraries ppxlib astlib)
+ (preprocess
+  (pps ppxlib.metaquot)))

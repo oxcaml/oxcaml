@@ -20,20 +20,21 @@ homepage: "https://github.com/ocaml-ppx/ppxlib"
 doc: "https://ocaml-ppx.github.io/ppxlib/"
 bug-reports: "https://github.com/ocaml-ppx/ppxlib/issues"
 depends: [
-  "dune" {>= "2.7"}
-  "ocaml" {>= "4.04.1" & < "5.2.0" & != "5.1.0~alpha1"}
+  "dune" {>= "3.8"}
+  "ocaml" {>= "4.08.0" & < "5.7.0"}
   "ocaml-compiler-libs" {>= "v0.11.0"}
   "ppx_derivers" {>= "1.0"}
   "sexp_type"
-  "stdlib-shims"
   "ocamlfind" {with-test}
   "re" {with-test & >= "1.9.0"}
   "cinaps" {with-test & >= "v0.12.1"}
+  "ocamlformat" {with-dev-setup & = "0.28.1"}
   "odoc" {with-doc}
 ]
 conflicts: [
   "ocaml-migrate-parsetree" {< "2.0.0"}
-  "base-effects"
+  "ocaml-base-compiler" {= "5.1.0~alpha1"}
+  "ocaml-variants" {= "5.1.0~alpha1+options"}
 ]
 build: [
   ["dune" "subst"] {dev}
@@ -50,3 +51,4 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/ocaml-ppx/ppxlib.git"
+x-maintenance-intent: ["(latest)"]

@@ -48,9 +48,10 @@ let time_run_blocking program args =
   timestamp_after -. timestamp_before
 
 (* Takes the path of a directory and returns a list of the full paths of the
-   files contained within it *)
+   files contained within it. Filters dot files and folders. *)
 let readdir_full_paths dir =
   Sys.readdir dir |> Array.to_list |> List.sort String.compare
+  |> List.filter (fun path -> path.[0] <> '.')
   |> List.map (Filename.concat dir)
 
 module Input = struct
@@ -101,8 +102,6 @@ module Output = struct
           ("results", `List (List.map Result.to_json results));
         ]
   end
-
-  type t = { benchmarks : Benchmark.t list }
 end
 
 module Stats = struct

@@ -16,6 +16,7 @@ The manual consists of several sections. It can be read linearly, but you can al
 {ol
 {li {{!page-"quick_intro"}An introduction to [ppxlib]}}
 {li {{!page-"driver"}How [ppxlib] works internally}}
+{li {{!page-compatibility}Compatibility with Multiple OCaml Versions}}
 {li {{!page-"writing-ppxs"}Registering a transformation}}
 {li {{!page-"generating-code"}Generating AST nodes}}
 {li {{!page-"matching-code"}Destructing AST nodes}}

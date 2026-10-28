@@ -104,8 +104,7 @@ module Context = struct
     | Ppx_import, type_decl -> get_ppx_import_extension type_decl
     | _ -> None
 
-  let merge_attributes_res :
-      type a.
+  let merge_attributes_res : type a.
       a t -> a -> attributes -> (a, Location.Error.t NonEmptyList.t) result =
    fun t x attrs ->
     match t with
@@ -152,8 +151,7 @@ struct
     with_arg : bool;
   }
 
-  let declare :
-      type a.
+  let declare : type a.
       with_arg:bool ->
       string ->
       a Context.t ->
@@ -293,8 +291,8 @@ let check_context_for_inline : type a. func:string -> a Context.t -> unit =
       Printf.ksprintf invalid_arg "%s: %s can't be inlined" func
         (Context.desc context)
 
-let rec filter_by_context :
-    type a. a Context.t -> t list -> a For_context.t list =
+let rec filter_by_context : type a.
+    a Context.t -> t list -> a For_context.t list =
  fun context expanders ->
   match expanders with
   | [] -> []
@@ -325,6 +323,10 @@ let collect_unhandled_extension_errors =
           Location.Error.createf ~loc:name.loc
             "extension not expected here, Ppxlib.Extension needs updating!";
         ]
+
+    (* Skip extensions in attributes, they will be handled by the PPX that
+       handles each specific attribute. *)
+    method! attribute _x acc = acc
 
     method! core_type_desc x acc =
       match x with

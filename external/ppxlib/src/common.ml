@@ -24,8 +24,8 @@ let strip_gen_symbol_suffix =
     if
       chop 1 ~or_more:false string pos (Char.equal '_')
       && chop 3 ~or_more:true string pos (function
-           | '0' .. '9' -> true
-           | _ -> false)
+        | '0' .. '9' -> true
+        | _ -> false)
       && chop 2 ~or_more:false string pos (Char.equal '_')
     then String.prefix string !pos
     else string
@@ -46,17 +46,17 @@ let name_type_params_in_td_res (td : type_declaration) :
   in
   let name_param i (tp, variance) =
     (match tp.ptyp_desc with
-    | Ptyp_any -> Ok (Ptyp_var (gen_symbol ~prefix:(prefix_string i) ()))
-    | Ptyp_var _ as v -> Ok v
-    | _ ->
-        Error (Location.Error.createf ~loc:tp.ptyp_loc "not a type parameter"))
+      | Ptyp_any -> Ok (Ptyp_var (gen_symbol ~prefix:(prefix_string i) ()))
+      | Ptyp_var _ as v -> Ok v
+      | _ ->
+          Error (Location.Error.createf ~loc:tp.ptyp_loc "not a type parameter"))
     >>| fun ptyp_desc -> ({ tp with ptyp_desc }, variance)
   in
   let ptype_params, errors =
     td.ptype_params |> List.mapi ~f:name_param
     |> List.partition_map (function
-         | Ok o -> Either.Left o
-         | Error e -> Either.Right e)
+      | Ok o -> Either.Left o
+      | Error e -> Either.Right e)
   in
   match errors with [] -> Ok { td with ptype_params } | t :: q -> Error (t, q)
 
@@ -115,8 +115,9 @@ class type_is_recursive rec_flag tds =
       | Pcstr_tuple args -> List.iter args ~f:self#core_type
       | Pcstr_record fields -> List.iter fields ~f:self#label_declaration
 
-    method! attributes _ = (* Don't recurse through attributes *)
-                           ()
+    method! attributes _ =
+      (* Don't recurse through attributes *)
+      ()
 
     method go () =
       match rec_flag with
@@ -148,7 +149,7 @@ let loc_of_attribute { attr_name; attr_payload; attr_loc = _ } =
      from older asts. *)
   (* "ocaml.doc" attributes are generated with [Location.none], which is not helpful for
      error messages. *)
-  if Poly.( = ) attr_name.loc Location.none then
+  if Location.is_none attr_name.loc then
     loc_of_name_and_payload attr_name attr_payload
   else
     {
@@ -157,7 +158,7 @@ let loc_of_attribute { attr_name; attr_payload; attr_loc = _ } =
     }
 
 let loc_of_extension (name, payload) =
-  if Poly.( = ) name.loc Location.none then loc_of_name_and_payload name payload
+  if Location.is_none name.loc then loc_of_name_and_payload name payload
   else
     { name.loc with loc_end = (loc_of_name_and_payload name payload).loc_end }
 
@@ -254,6 +255,9 @@ let mk_named_sig ~loc ~sg_name ~handle_polymorphic_variant = function
                   [ Pwith_typesubst (Located.lident ~loc "t", for_subst) ]))
   | _ -> None
 
+let exn_to_loc_error exn =
+  match Location.Error.of_exn exn with Some error -> error | None -> raise exn
+
 module With_errors = struct
   type 'a t = 'a * Location.Error.t list
 
@@ -272,3 +276,12 @@ module With_errors = struct
 
   let combine_errors list = (List.map list ~f:fst, List.concat_map list ~f:snd)
 end
+
+let valid_string_constant_delimiter string =
+  let rec attempt_string_constant_delimiter n =
+    let delimiter = String.make n 'x' in
+    if String.is_substring string ~substring:("|" ^ delimiter ^ "}") then
+      attempt_string_constant_delimiter (n + 1)
+    else delimiter
+  in
+  attempt_string_constant_delimiter 0

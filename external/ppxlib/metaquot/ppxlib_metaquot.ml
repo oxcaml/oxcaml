@@ -11,6 +11,27 @@ type quoted_attributes = {
          attributes are placed on, e.g. pexp_attributes. *)
 }
 
+let coalesce_arity_expr (input : expression) super =
+  match input with
+  | { pexp_desc = Pexp_function _; pexp_loc = loc; _ } ->
+      let ppxlib_coalesce_arity =
+        Ldot
+          ( Ldot (Ldot (Lident "Ppxlib", "Ast_builder"), "Default"),
+            "coalesce_arity" )
+      in
+      pexp_apply ~loc
+        (pexp_ident ~loc { txt = ppxlib_coalesce_arity; loc })
+        [ (Nolabel, super input) ]
+  | exp -> super exp
+
+(* Produce a pattern that matches on the maximum arity of a function *)
+let coalesce_arity_pat (input : expression) super =
+  match input with
+  | { pexp_desc = Pexp_function _; pexp_loc = _loc; _ } as exp ->
+      let c = Ast_builder.Default.coalesce_arity exp in
+      super c
+  | e -> super e
+
 module Make (M : sig
   type result
 
@@ -33,6 +54,7 @@ module Make (M : sig
   val location : location -> result
   val location_stack : (location -> result) option
   val attributes : (location -> result) option
+  val coalesce : (expression -> (expression -> result) -> result) option
 
   class std_lifters : location -> [result] Ppxlib_traverse_builtins.std_lifters
 end) =
@@ -68,8 +90,8 @@ struct
         | Some f -> f loc
 
       method! expression e =
-        match e.pexp_desc with
-        | Pexp_extension (({ txt = "e"; _ }, _) as ext) ->
+        match (M.coalesce, e.pexp_desc) with
+        | _, Pexp_extension (({ txt = "e"; _ }, _) as ext) ->
             let attributes =
               {
                 quoted_attributes = e.pexp_attributes;
@@ -77,7 +99,8 @@ struct
               }
             in
             M.cast self ext (Some attributes) ~type_name:"expression"
-        | _ -> super#expression e
+        | Some f, _ -> f e super#expression
+        | None, _ -> super#expression e
 
       method! pattern p =
         match p.ppat_desc with
@@ -149,6 +172,7 @@ module Expr = Make (struct
   let location loc = evar ~loc:{ loc with loc_ghost = true } "loc"
   let location_stack = None
   let attributes = None
+  let coalesce = Some coalesce_arity_expr
 
   class std_lifters = Ppxlib_metaquot_lifters.expression_lifters
 
@@ -228,6 +252,7 @@ module Patt = Make (struct
     Some (fun loc -> ppat_any ~loc:{ loc with loc_ghost = true })
 
   let attributes = Some (fun loc -> ppat_any ~loc:{ loc with loc_ghost = true })
+  let coalesce = Some coalesce_arity_pat
 
   class std_lifters = Ppxlib_metaquot_lifters.pattern_lifters
 

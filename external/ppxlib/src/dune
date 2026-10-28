@@ -12,7 +12,6 @@
   ppxlib_jane
   ppxlib_traverse_builtins
   stdppx
-  stdlib-shims
   sexp_type)
  (flags
   (:standard -safe-string -open Ocaml_shadow))
