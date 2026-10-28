@@ -97,7 +97,7 @@ let copy_file name new_name =
   (copy ${source} ${target})))
 |}
 
-let mangle flag = String.map (function '-' -> '_' | c -> c) flag
+let mangle flag = String.map (function '-' | ' ' -> '_' | c -> c) flag
 
 let print_test ?extra_flag name =
   let name, extra_flags =
@@ -121,8 +121,12 @@ let () =
       "arrays512";
       "arrays512_u";
       "arrays512_mask";
-      "strings512_mask" ]
+      "strings512_mask";
+      "extcall512_mask" ]
   in
   List.iter (print_test ?extra_flag:None) tests;
   List.iter (print_test ~extra_flag:"-nodynlink") tests;
-  List.iter (print_test ~extra_flag:"-internal-assembler") tests
+  List.iter (print_test ~extra_flag:"-internal-assembler") tests;
+  (* The reaper rewrites the arities of external calls. *)
+  print_test ~extra_flag:"-flambda2-reaper -reaper-local-fields"
+    "extcall512_mask"

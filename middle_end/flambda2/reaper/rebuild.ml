@@ -1183,15 +1183,12 @@ let rebuild_apply env apply =
                (Flambda_arity.unarize (Apply.args_arity apply)))
         in
         (* The calling convention is not changing, but the arguments might have
-           been replaced by poison, so we need to rewrite the arities. *)
+           been replaced by poison, so we need to rewrite the arities. The
+           structure of the arity must be preserved: for external calls it
+           determines the C struct layout of unboxed product arguments (see
+           [To_cmm_extcall]). *)
         let args_arity =
-          Flambda_arity.create
-            (List.map
-               (fun kinds ->
-                 Flambda_arity.Component_for_creation.(
-                   Unboxed_product (List.map (fun kind -> Singleton kind) kinds)))
-               (Flambda_arity.group_by_parameter (Apply.args_arity apply)
-                  args_arity))
+          Flambda_arity.with_unarized_kinds (Apply.args_arity apply) args_arity
         in
         let return_arity =
           match Apply.continuation apply with
