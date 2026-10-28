@@ -36,6 +36,7 @@ type primitive_mismatch =
   | Native_name
   | Result_repr
   | Argument_repr of int
+  | Elided_args
   | Layout_poly_attr
 
 type value_mismatch =
@@ -124,8 +125,12 @@ let native_repr_args nra1 nra2 =
     | [], [] -> None
     | [], _ :: _ -> assert false
     | _ :: _, [] -> assert false
+    | (_, Primitive.Elided_void) :: _, (_, Primitive.Native_repr _) :: _
+    | (_, Primitive.Native_repr _) :: _, (_, Primitive.Elided_void) :: _ ->
+      Some Elided_args
     | (_, nr1) :: nra1, (_, nr2) :: nra2 ->
-      if not (Primitive.equal_native_repr nr1 nr2) then Some (Argument_repr i)
+      if not (Primitive.equal_native_repr_or_elided nr1 nr2)
+      then Some (Argument_repr i)
       else loop (i+1) nra1 nra2
   in
   loop 1 nra1 nra2
@@ -134,7 +139,7 @@ let primitive_descriptions pd1 pd2 =
   let open Primitive in
   if not (String.equal pd1.prim_name pd2.prim_name) then
     Some Name
-  else if not (Int.equal pd1.prim_arity pd2.prim_arity) then
+  else if not (Int.equal pd1.prim_type_arity pd2.prim_type_arity) then
     Some Arity
   else if (not pd1.prim_alloc) && pd2.prim_alloc then
     Some (No_alloc First)
@@ -219,7 +224,8 @@ let value_descriptions_zero_alloc
   let vd1_zero_alloc, prim_coercion_zero_alloc_check =
     match vd1.val_kind, Zero_alloc.get vd2.val_zero_alloc with
     | Val_prim p, Check check ->
-      ( Zero_alloc.create_const (Check { check with arity = p.prim_arity }),
+      ( Zero_alloc.create_const
+          (Check { check with arity = p.prim_type_arity }),
         Some check )
     | ( (Val_reg _ | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ |
          Val_anc _),
@@ -323,7 +329,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
            pc_poly_sort = sort1;
            pc_yielding =
              Ctype.prim_params_yielding env vd2.Types.val_type
-               ~arity:p1.prim_arity;
+               ~arity:p1.prim_type_arity;
            pc_zero_alloc_check = prim_coercion_zero_alloc_check;
            pc_kindtemplate = tc;
            pc_env = env;
@@ -566,6 +572,8 @@ let report_primitive_mismatch first second ppf err =
   | Argument_repr n ->
       pr "The two primitives' %d%s arguments have different representations"
         n (Misc.ordinal_suffix n)
+  | Elided_args ->
+      pr "The two primitives elide different arguments"
   | Layout_poly_attr ->
       pr "The two primitives have different [@@layout_poly] attributes"
 
