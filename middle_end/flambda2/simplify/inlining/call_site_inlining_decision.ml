@@ -315,6 +315,197 @@ let get_rec_info dacc ~function_type =
   | Need_meet -> Rec_info_expr.unknown
   | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
 
+let is_self_worker_adapter dacc code_metadata =
+  let denv = DA.denv dacc in
+  if not (Code_metadata.stub code_metadata)
+  then false
+  else
+    match DE.closure_info denv with
+    | Not_in_a_closure | In_a_set_of_closures_but_not_yet_in_a_specific_closure
+      ->
+      false
+    | Closure { code_id = worker_code_id; my_closure = worker_closure; _ } -> (
+      try
+        let worker_metadata = DE.find_code_metadata_exn denv worker_code_id in
+        let wrapper =
+          DE.find_code_exn denv (Code_metadata.code_id code_metadata)
+        in
+        if
+          Code_metadata.stub worker_metadata
+          || not (Code_or_metadata.code_present wrapper)
+        then false
+        else
+          let remaining = ref 64 in
+          let has_numeric_adaptation = ref false in
+          let projected_worker =
+            let typing_env = DE.typing_env denv in
+            let closure_type =
+              TE.find typing_env (Name.var worker_closure) None
+            in
+            match T.meet_single_closures_entry typing_env closure_type with
+            | Known_result (function_slot, _, _, function_type) ->
+              Some (function_slot, FT.code_id function_type)
+            | Need_meet | Invalid -> None
+          in
+          let calls_worker apply code_id =
+            let code_age_relation = TE.code_age_relation (DE.typing_env denv) in
+            let rec is_version_of fuel newer older =
+              if Code_id.equal newer older
+              then true
+              else if fuel = 0
+              then false
+              else
+                match
+                  Code_age_relation.get_older_version_of code_age_relation newer
+                with
+                | None -> false
+                | Some previous -> is_version_of (fuel - 1) previous older
+            in
+            if
+              is_version_of 64 code_id worker_code_id
+              || is_version_of 64 worker_code_id code_id
+            then
+              let target = DE.find_code_metadata_exn denv code_id in
+              (not (Code_metadata.stub target))
+              && Flambda_arity.equal_ignoring_subkinds (Apply.args_arity apply)
+                   (Code_metadata.params_arity target)
+              && Flambda_arity.equal_ignoring_subkinds
+                   (Apply.return_arity apply)
+                   (Code_metadata.result_arity target)
+            else false
+          in
+          let is_worker_callee worker_callees simple =
+            Simple.pattern_match simple
+              ~name:(fun name ~coercion:_ ->
+                Name.pattern_match name
+                  ~var:(fun var -> Variable.Set.mem var worker_callees)
+                  ~symbol:(fun _ -> false))
+              ~const:(fun _ -> false)
+          in
+          let adapter_binding wrapper_closure worker_callees (named : Named.t) =
+            match named with
+            | Simple simple -> true, is_worker_callee worker_callees simple
+            | Rec_info _ -> true, false
+            | Set_of_closures _ | Static_consts _ -> false, false
+            | Prim (primitive, _) -> (
+              match primitive with
+              | Nullary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _ ->
+                false, false
+              | Unary (primitive, arg) -> (
+                match primitive with
+                | Box_number _ | Unbox_number _ ->
+                  has_numeric_adaptation := true;
+                  true, false
+                | Project_function_slot { move_to; _ } ->
+                  let is_worker =
+                    match projected_worker with
+                    | None -> false
+                    | Some (worker_slot, _) ->
+                      Function_slot.equal move_to worker_slot
+                      && Simple.equal
+                           (Simple.without_coercion arg)
+                           (Simple.var wrapper_closure)
+                  in
+                  true, is_worker
+                | Block_load _ | Duplicate_block _ | Duplicate_array _
+                | Is_int _ | Is_null | Get_tag | Array_length _
+                | Bigarray_length _ | String_length _ | Int_as_pointer _
+                | Opaque_identity _ | Int_arith _ | Float_arith _ | Num_conv _
+                | Boolean_not | Reinterpret_64_bit_word _
+                | Reinterpret_boxed_vector | Untag_immediate | Tag_immediate
+                | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
+                | End_region _ | End_try_region _ | Obj_dup _ | Get_header
+                | Peek _ | Make_lazy _ ->
+                  false, false))
+          in
+          let rec count_calls wrapper_closure worker_callees expr =
+            if !remaining = 0
+            then None
+            else (
+              decr remaining;
+              match Expr.descr expr with
+              | Let let_expr ->
+                let allowed, is_worker_projection =
+                  adapter_binding wrapper_closure worker_callees
+                    (Let.defining_expr let_expr)
+                in
+                if allowed
+                then
+                  Let.pattern_match let_expr ~f:(fun bound_pattern ~body ->
+                      let worker_callees =
+                        match bound_pattern with
+                        | Singleton var when is_worker_projection ->
+                          Variable.Set.add (Bound_var.var var) worker_callees
+                        | Singleton _ | Set_of_closures _ | Static _ ->
+                          worker_callees
+                      in
+                      count_calls wrapper_closure worker_callees body)
+                else None
+              | Let_cont
+                  (Non_recursive { handler; is_applied_with_traps = false; _ })
+                -> (
+                let continuation_handler =
+                  Non_recursive_let_cont_handler.handler handler
+                in
+                if Continuation_handler.is_exn_handler continuation_handler
+                then None
+                else
+                  let handler_calls =
+                    Continuation_handler.pattern_match continuation_handler
+                      ~f:(fun _ ~handler ->
+                        count_calls wrapper_closure worker_callees handler)
+                  in
+                  match handler_calls with
+                  | None -> None
+                  | Some handler_calls ->
+                    Non_recursive_let_cont_handler.pattern_match handler
+                      ~f:(fun _ ~body ->
+                        match
+                          count_calls wrapper_closure worker_callees body
+                        with
+                        | None -> None
+                        | Some body_calls -> Some (handler_calls + body_calls)))
+              | Apply apply -> (
+                match Apply.call_kind apply with
+                | Function { function_call = Direct code_id } ->
+                  if calls_worker apply code_id then Some 1 else None
+                | Function { function_call = Indirect_known_arity _ } -> (
+                  match Apply.callee apply, projected_worker with
+                  | Some callee, Some (_, worker_code_id)
+                    when is_worker_callee worker_callees callee
+                         && calls_worker apply worker_code_id ->
+                    Some 1
+                  | _ -> None)
+                | Function { function_call = Indirect_unknown_arity }
+                | Method _ | C_call _ | Effect _ ->
+                  None)
+              | Apply_cont apply_cont -> (
+                match Apply_cont.trap_action apply_cont with
+                | None -> Some 0
+                | Some _ -> None)
+              | Let_cont (Non_recursive { is_applied_with_traps = true; _ })
+              | Let_cont (Recursive _)
+              | Switch _ | Invalid _ ->
+                None)
+          in
+          Function_params_and_body.pattern_match
+            (Code.params_and_body (Code_or_metadata.get_code wrapper))
+            ~f:(fun
+                ~return_continuation:_
+                ~exn_continuation:_
+                _
+                ~body
+                ~my_closure
+                ~is_my_closure_used:_
+                ~my_alloc_mode:_
+                ~my_depth:_
+                ~free_names_of_body:_
+              ->
+              match count_calls my_closure Variable.Set.empty body with
+              | Some 1 -> !has_numeric_adaptation
+              | None | Some _ -> false)
+      with Not_found -> false)
+
 let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
     ~return_arity : Call_site_inlining_decision_type.t =
   let must_inline = DE.must_inline (DA.denv dacc) in
@@ -421,6 +612,9 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
             if
               Simplify_rec_info_expr.depth_may_exceed dacc rec_info
                 max_rec_depth
+              (* Expand only a bounded numeric adapter back to this worker. The
+                 worker is not a stub and retains its recursion limit. *)
+              && not (is_self_worker_adapter dacc code_metadata)
             then do_not_inline Recursion_depth_exceeded
             else if must_inline
             then
