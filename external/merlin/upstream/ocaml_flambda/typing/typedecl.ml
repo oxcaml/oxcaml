@@ -88,7 +88,7 @@ type error =
   | Duplicate_constructor of string
   | Too_many_constructors
   | Duplicate_label of string
-  | Unboxed_mutable_label
+  | Unboxed_atomic_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -595,18 +595,17 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       (fun () ->
          let is_atomic = Builtin_attributes.has_atomic attrs in
          let mut : mutability =
+          let mode = Mode.With_regionality.Comonadic.legacy in
           match mut, is_atomic with
           | Immutable, false -> Immutable
           | Immutable, true ->
               Error.log_and_raise loc (Atomic_field_must_be_mutable name.txt)
-          | Mutable, is_atomic ->
-              match record_form with
-              | Legacy -> Mutable {
-                mode = Mode.With_regionality.Comonadic.legacy;
-                atomic = if is_atomic then Atomic else Nonatomic
-              }
-              | Unboxed_product ->
-                  Error.log_and_raise loc Unboxed_mutable_label
+          | Mutable, false -> Mutable { mode; atomic = Nonatomic }
+          | Mutable, true ->
+              begin match record_form with
+              | Legacy -> Mutable { mode; atomic = Atomic }
+              | Unboxed_product -> Error.log_and_raise loc Unboxed_atomic_label
+              end
          in
          let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
@@ -1470,11 +1469,11 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
       List.map
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
-            ld_mutable = Immutable;
+            ld_mutable = ld.ld_mutable;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
-                  are affected by the mutability of the boxed label, even
-                  though the unboxed version is always immutable. *)
+                 are affected by the mutability of the boxed label, even
+                 though the unboxed version cannot (currently) be mutated. *)
             ld_sort = None;
             ld_type = ld.ld_type;
             ld_loc = ld.ld_loc;
@@ -5676,8 +5675,8 @@ let report_error ~loc = function
       (Config.max_tag + 1)
   | Duplicate_label s ->
       Location.errorf "Two labels are named %a" Style.inline_code s
-  | Unboxed_mutable_label ->
-      Location.errorf ~loc "Unboxed record labels cannot be mutable"
+  | Unboxed_atomic_label ->
+      Location.errorf ~loc "Unboxed record labels cannot be atomic"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
