@@ -668,6 +668,8 @@ and copy_pattern_desc_with_loc :
         copy_modes x2 )
   | Ast_500.Parsetree.Ppat_type x0 ->
       Ast_999.Parsetree.Ppat_type (copy_loc (copy_Longident_t ~loc:x0.Location.loc) x0)
+  | Ast_500.Parsetree.Ppat_addr (x0, x1) ->
+      Ast_999.Parsetree.Ppat_addr (copy_mutable_flag x0, copy_pattern x1)
   | Ast_500.Parsetree.Ppat_lazy x0 ->
       Ast_999.Parsetree.Ppat_lazy (copy_pattern x0)
   | Ast_500.Parsetree.Ppat_unpack x0 ->

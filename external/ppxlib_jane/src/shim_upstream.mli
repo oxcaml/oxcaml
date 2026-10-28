@@ -300,6 +300,7 @@ module Pattern_desc : sig
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
