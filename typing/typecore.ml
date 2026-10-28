@@ -7030,8 +7030,10 @@ and type_expect_
           None, expected_mode
       in
       let type_label_exp overwrite ((_, label, _) as x) =
-        check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
-          ~modalities:label.lbl_modalities record_mode;
+        let check_mutability ty_arg =
+          check_construct_mutability ~loc ~env label.lbl_mut ~ty:ty_arg
+            ~modalities:label.lbl_modalities record_mode
+        in
         let is_contained_by : Mode.Hint.is_contained_by =
           { containing = Record (label.lbl_name, Modality);
             container = (loc, Expression) }
@@ -7040,7 +7042,8 @@ and type_expect_
           mode_is_contained_by is_contained_by ~modalities:label.lbl_modalities
             record_mode
         in
-        type_label_exp ~overwrite true env argument_mode loc ty_record x record_form
+        type_label_exp ~check_mutability ~overwrite true env argument_mode loc
+          ty_record x record_form
       in
       let overwrites =
         assign_label_children (List.length lbl_a_list)
@@ -7077,15 +7080,23 @@ and type_expect_
             lbl_exp_list
         in
         let unify_kept record_loc extended_expr_loc ty_exp mode lbl =
-          let _, ty_arg1, ty_res1 = instance_label ~fixed:false lbl in
-          unify_exp_types extended_expr_loc env ty_exp ty_res1;
+          let ty_arg1 =
+            with_local_level_generalize_structure_if_principal
+              ~before_generalize:generalize_structure
+              begin fun () ->
+                let _, ty_arg1, ty_res1 = instance_label ~fixed:false lbl in
+                unify_exp_types extended_expr_loc env ty_exp ty_res1;
+                ty_arg1
+              end
+          in
           match matching_label lbl with
           | lid, _lbl, lbl_exp ->
               (* do not connect result types for overridden labels *)
               Overridden (lid, lbl_exp)
           | exception Not_found -> begin
+              let ty_arg = instance ty_arg1 in
               let _, ty_arg2, ty_res2 = instance_label ~fixed:false lbl in
-              unify_exp_types record_loc env ty_arg1 ty_arg2;
+              unify_exp_types record_loc env ty_arg ty_arg2;
               with_explanation (fun () ->
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
               check_project_mutability ~loc:extended_expr_loc ~env
@@ -7099,9 +7110,9 @@ and type_expect_
                 apply_left_is_contained_by is_contained_by
                   ~modalities:lbl.lbl_modalities mode
               in
-              let mode = cross_left env lbl.lbl_arg mode in
+              let mode = cross_left env ty_arg1 mode in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
-                ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
+                ~ty:ty_arg1 ~modalities:lbl.lbl_modalities record_mode;
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
                   container = (record_loc, Expression) }
@@ -7111,7 +7122,7 @@ and type_expect_
                   ~modalities:lbl.lbl_modalities record_mode
               in
               submode ~loc:extended_expr_loc ~env mode argument_mode;
-              Kept (ty_arg1, lbl.lbl_mut,
+              Kept (ty_arg, lbl.lbl_mut,
                     unique_use ~loc:record_loc ~env mode
                       (as_single_mode argument_mode))
             end
@@ -8004,8 +8015,8 @@ and type_expect_
             (Record_field label.lbl_name));
           let mode = mutable_mode m0 |> mode_default in
           let mode = mode_modality label.lbl_modalities mode in
-          type_label_exp ~overwrite:No_overwrite_label false env mode loc ty_record
-            (lid, label, snewval) Legacy
+          type_label_exp ~check_mutability:ignore ~overwrite:No_overwrite_label
+            false env mode loc ty_record (lid, label, snewval) Legacy
         | Immutable ->
           raise(Error(loc, env, Label_not_mutable lid.txt))
       in
@@ -10494,10 +10505,12 @@ and type_option_some env expected_mode sarg ty ty0 =
    allocation, mutation and modalities. *)
 and type_label_exp
   : type rep.
+    check_mutability:(type_expr -> unit) ->
     overwrite:_ -> _ -> _ -> _ -> _ -> _ ->
     _ * rep gen_label_description * _ -> rep record_form ->
     _ * rep gen_label_description * _
-  = fun ~overwrite create env arg_mode loc ty_expected (lid, label, sarg) record_form ->
+  = fun ~check_mutability ~overwrite create env arg_mode loc
+      ty_expected (lid, label, sarg) record_form ->
   (* Here also ty_expected may be at generic_level *)
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let is_poly = is_poly_Tpoly label.lbl_arg in
@@ -10528,6 +10541,9 @@ and type_label_exp
         end
       in
       let (vars, ty_arg) = unify_as_label ty_expected in
+      (* Check mutability at the instance, rather than at [label.lbl_arg],
+         whose variables are generic. *)
+      check_mutability ty_arg;
       if label.lbl_private = Private then
         if create then
           raise (Error(loc, env, Private_type ty_expected))
