@@ -160,6 +160,8 @@ type token =
   | AND
   | AMPERSAND
   | AMPERAMPER
+  | ADDR_IMM
+  | ADDR
 
 (* This exception is raised by the monolithic API functions. *)
 
@@ -366,6 +368,8 @@ module MenhirInterpreter : sig
     | T_AND : unit terminal
     | T_AMPERSAND : unit terminal
     | T_AMPERAMPER : unit terminal
+    | T_ADDR_IMM : unit terminal
+    | T_ADDR : unit terminal
   
   (* The indexed type of nonterminal symbols. *)
   
