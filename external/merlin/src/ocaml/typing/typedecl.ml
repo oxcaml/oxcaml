@@ -4954,6 +4954,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
        | "%box" | "%unbox" ->
          Language_extension.assert_enabled ~loc Layouts Language_extension.Alpha
        | _ -> ());
+      (*
       if prim.prim_apply_arity = 0
          && (prim.prim_name = "" || prim.prim_name.[0] <> '%')
       then
@@ -4962,6 +4963,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
           (if prim.prim_type_arity = 0
            then Null_arity_external
            else All_external_arguments_elided);
+      *)
       if Clflags.target_is_native ()
       && prim.prim_apply_arity > 5
       && prim.prim_native_name = ""
