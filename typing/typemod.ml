@@ -3223,21 +3223,24 @@ let check_package_closed ~loc ~env ~typ fl =
 
 let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
 
-let rec type_module ?alias ~strengthen ~funct_body anchor env smod =
+let rec type_module ?alias ~strengthen ~funct_body ~at_toplevel anchor env
+    smod =
   let md, shape =
     type_module_maybe_hold_locks ?alias ~hold_locks:false ~strengthen
-      ~funct_body anchor env smod
+      ~funct_body ~at_toplevel anchor env smod
   in
   md, shape
 
 and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
-    ~funct_body anchor env smod =
+    ~funct_body ~at_toplevel anchor env smod =
   Builtin_attributes.warning_scope smod.pmod_attributes
     (fun () -> type_module_aux ~alias ~hold_locks ~strengthen ~funct_body
-        anchor env smod)
+        ~at_toplevel anchor env smod)
 
-and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
-    smod =
+(* [at_toplevel] is [false] when the module is typed as part of an expression
+   (e.g. [let module], [let open struct ... end], first-class modules). *)
+and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body ~at_toplevel
+    anchor env smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -3254,7 +3257,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
   | Pmod_structure sstr ->
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
-        type_structure ~funct_body anchor env sstr in
+        type_structure ~funct_body ~at_toplevel anchor env sstr in
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
@@ -3328,7 +3331,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       in
 
       let body, body_shape =
-        type_module ~strengthen:true ~funct_body None newenv sbody
+        type_module ~strengthen:true ~funct_body ~at_toplevel None newenv
+          sbody
       in
       let body_mode = mode_without_locks_exn body.mod_mode in
       let ret_mode = With_locality.newvar 0 in
@@ -3358,7 +3362,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_loc = smod.pmod_loc },
       Shape.abs funct_shape_param body_shape
   | Pmod_apply _ | Pmod_apply_unit _ ->
-      type_application smod.pmod_loc ~strengthen ~funct_body env smod
+      type_application smod.pmod_loc ~strengthen ~funct_body ~at_toplevel env
+        smod
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
       let hold_locks = Option.is_some smty in
@@ -3368,7 +3373,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks ~strengthen:true
-          ~funct_body anchor env sarg
+          ~funct_body ~at_toplevel anchor env sarg
       in
       let md, final_shape =
         match smty with
@@ -3503,13 +3508,13 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
   in
   md, shape
 
-and type_application loc ~strengthen ~funct_body env smod =
+and type_application loc ~strengthen ~funct_body ~at_toplevel env smod =
   let rec extract_application ~funct_body env sargs smod =
     match smod.pmod_desc with
     | Pmod_apply (f, sarg) ->
         let arg, shape =
           type_module_maybe_hold_locks ~hold_locks:true ~strengthen:true
-            ~funct_body None env sarg
+            ~funct_body ~at_toplevel None env sarg
         in
         let summary = {
           loc = smod.pmod_loc;
@@ -3540,7 +3545,7 @@ and type_application loc ~strengthen ~funct_body env smod =
       | Some { path = Some _ } -> true
     in
     let strengthen = strengthen && List.for_all has_path args in
-    type_module ~strengthen ~funct_body None env sfunct
+    type_module ~strengthen ~funct_body ~at_toplevel None env sfunct
   in
   List.fold_left
     (type_one_application ~ctx:(loc, sfunct, funct, args) funct_body env)
@@ -3742,13 +3747,16 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       in
       raise(Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args})
 
-and type_open_decl ?used_slot ?toplevel ~funct_body names env sod =
+and type_open_decl ?used_slot ?toplevel ~funct_body ~at_toplevel names env
+    sod =
   Builtin_attributes.warning_scope sod.popen_attributes
     (fun () ->
-       type_open_decl_aux ?used_slot ?toplevel ~funct_body names env sod
+       type_open_decl_aux ?used_slot ?toplevel ~funct_body ~at_toplevel names
+         env sod
     )
 
-and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
+and type_open_decl_aux ?used_slot ?toplevel ~funct_body ~at_toplevel names
+    env od =
   let loc = od.popen_loc in
   match od.popen_expr.pmod_desc with
   | Pmod_ident lid ->
@@ -3774,7 +3782,8 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     open_descr, Mode.With_regionality.(max |> disallow_right), [], newenv
   | _ ->
     let md, mod_shape =
-      type_module ~strengthen:true ~funct_body None env od.popen_expr
+      type_module ~strengthen:true ~funct_body ~at_toplevel None env
+        od.popen_expr
     in
     let mode = mode_without_locks_exn md.mod_mode in
     let scope = Ctype.create_scope () in
@@ -3814,7 +3823,8 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
+and type_structure ?(toplevel = None) ~funct_body ~at_toplevel anchor env
+    sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
   let _, md_mode = register_allocation loc_md in
@@ -3823,7 +3833,9 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
     let smodl = sincl.pincl_mod in
     let modl, modl_shape =
       Builtin_attributes.warning_scope sincl.pincl_attributes
-        (fun () -> type_module ~strengthen:true ~funct_body None env smodl)
+        (fun () ->
+           type_module ~strengthen:true ~funct_body ~at_toplevel None env
+             smodl)
     in
     let scope = Ctype.create_scope () in
     let incl_kind, sg, mode =
@@ -3880,12 +3892,14 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
              though for now the sort is used in the void safety check. *)
           Builtin_attributes.warning_scope attrs
             (fun () -> Typecore.type_representable_expression
-                         ~why:Structure_item_expression env sexpr)
+                         ~why:Structure_item_expression ~at_toplevel env
+                         sexpr)
         in
         Tstr_eval (expr, sort, attrs), [], shape_map, env
     | Pstr_value (rec_flag, sdefs) ->
         let (defs, newenv) =
-          Typecore.type_binding env Immutable rec_flag ~force_toplevel sdefs in
+          Typecore.type_binding ~at_toplevel env Immutable rec_flag
+            ~force_toplevel sdefs in
         let defs = match rec_flag with
           | Recursive -> Typecore.annotate_recursive_bindings env defs
           | Nonrecursive -> defs
@@ -4013,7 +4027,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
           Builtin_attributes.warning_scope attrs
             (fun () ->
                type_module ~alias:true ~strengthen:true ~funct_body
-                 (anchor_submodule name.txt anchor) env smodl
+                 ~at_toplevel (anchor_submodule name.txt anchor) env smodl
             )
         in
         let pres =
@@ -4100,7 +4114,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                let modl, shape =
                  Builtin_attributes.warning_scope attrs
                    (fun () ->
-                      type_module ~strengthen:true ~funct_body
+                      type_module ~strengthen:true ~funct_body ~at_toplevel
                         (anchor_recmodule id) newenv smodl
                    )
                in
@@ -4171,7 +4185,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
     | Pstr_open sod ->
         let toplevel = Option.is_some toplevel in
         let (od, mode, sg, newenv) =
-          type_open_decl ~toplevel ~funct_body names env sod
+          type_open_decl ~toplevel ~funct_body ~at_toplevel names env sod
         in
         let sg =
           rebase_modalities_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
@@ -4276,6 +4290,10 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let desc, sg, shape_map, new_env =
           type_str_item env shape_map pstr sig_acc_include_functor
         in
+        (* Default the suspended constraints that outlived the item (e.g.
+           in class definitions). Inside an expression, the enclosing
+           generalization scope defaults them instead. *)
+        if at_toplevel then Ctype.run_scheduler_and_default_all ();
         let str = { str_desc = desc; str_loc = pstr.pstr_loc; str_env = env } in
         Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
                                     :: previous_saved_types);
@@ -4316,7 +4334,8 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_probes ();
   Typecore.reset_allocations ();
   let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
+    type_structure ~toplevel:(Some sig_acc) ~funct_body:false
+      ~at_toplevel:true None env s in
   With_regionality.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4325,30 +4344,7 @@ let type_toplevel_phrase env sig_acc s =
 
 let type_module_alias env smod =
   type_module_maybe_hold_locks ~alias:true ~hold_locks:true ~strengthen:true
-    ~funct_body:false None env smod
-
-let type_module =
-  type_module ~strengthen:true ~funct_body:false None
-let type_module_maybe_hold_locks =
-  type_module_maybe_hold_locks ~strengthen:true ~funct_body:false None
-let type_structure =
-  type_structure ~funct_body:false None
-
-(* Normalize types in a signature *)
-
-let rec normalize_modtype = function
-    Mty_ident _
-  | Mty_alias _ -> ()
-  | Mty_signature sg -> normalize_signature sg
-  | Mty_functor(_param, body, _) -> normalize_modtype body
-  | Mty_strengthen (mty,_,_) -> normalize_modtype mty
-
-and normalize_signature sg = List.iter normalize_signature_item sg
-
-and normalize_signature_item = function
-    Sig_value(_id, desc, _) -> Ctype.normalize_type desc.val_type
-  | Sig_module(_id, _, md, _, _) -> normalize_modtype md.md_type
-  | _ -> ()
+    ~funct_body:false ~at_toplevel:false None env smod
 
 (* Extract the module type of a module expression *)
 
@@ -4371,7 +4367,13 @@ let type_module_type_of env smod =
             mod_loc = smod.pmod_loc },
           skip_nongen_check
     | _ ->
-        let me, _shape = type_module env smod in
+        let me, _shape =
+          (* Typecheck the module as a top-level module to ensure we default any
+             ivars. This ensures that we don't zap any modes *before* we resolve
+             delayed mode crossing constraints. *)
+          type_module ~strengthen:true ~funct_body:false ~at_toplevel:true None
+            env smod
+        in
         me, false
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
@@ -4384,6 +4386,31 @@ let type_module_type_of env smod =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
   in
   tmty, mty
+
+(* Not at top level. Callers at top level default afterwards. *)
+let type_module =
+  type_module ~strengthen:true ~funct_body:false ~at_toplevel:false None
+let type_module_maybe_hold_locks =
+  type_module_maybe_hold_locks ~strengthen:true ~funct_body:false
+    ~at_toplevel:false None
+let type_structure =
+  type_structure ~funct_body:false ~at_toplevel:true None
+
+(* Normalize types in a signature *)
+
+let rec normalize_modtype = function
+    Mty_ident _
+  | Mty_alias _ -> ()
+  | Mty_signature sg -> normalize_signature sg
+  | Mty_functor(_param, body, _) -> normalize_modtype body
+  | Mty_strengthen (mty,_,_) -> normalize_modtype mty
+
+and normalize_signature sg = List.iter normalize_signature_item sg
+
+and normalize_signature_item = function
+    Sig_value(_id, desc, _) -> Ctype.normalize_type desc.val_type
+  | Sig_module(_id, _, md, _, _) -> normalize_modtype md.md_type
+  | _ -> ()
 
 (* For Typecore *)
 
@@ -4503,7 +4530,7 @@ let type_package env m pack =
 let type_open_decl ?used_slot env od =
   let od, _, _, env =
     type_open_decl ?used_slot ?toplevel:None ~funct_body:false
-      (Signature_names.create ()) env od
+      ~at_toplevel:false (Signature_names.create ()) env od
   in
   od, env
 
@@ -4861,6 +4888,9 @@ let type_interface ~sourcefile modulename env ast =
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
   let sg = transl_signature ~interface_toplevel:true env ast in
+  (* Default the suspended constraints left by structures in the signature
+     (e.g. [module type of struct ... end]). *)
+  Ctype.run_scheduler_and_default_all ();
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string

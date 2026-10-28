@@ -73,8 +73,8 @@ type packed = Packed : 'a t -> packed
 (** The global pool of ivars that must be filled or cancelled, described at the
     top of this module. *)
 module Global_pool : sig
-  (** [take ()] empties the pool, returning the ivars that were in it. Like all
-      mutations, this is logged, so backtracking restores the pool. *)
+  (** [take ()] empties the pool, returning the entries that were in it. Like
+      all mutations, this is logged, so backtracking restores the pool. *)
   val take : unit -> packed list
 end
 

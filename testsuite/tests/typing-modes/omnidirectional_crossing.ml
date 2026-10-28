@@ -21,16 +21,10 @@ val f : int @ local -> int * unit = <fun>
 
 let f (local_ x) = (x, ignore (x ^ ""))
 [%%expect{|
-Line 1, characters 20-21:
+Line 1, characters 31-32:
 1 | let f (local_ x) = (x, ignore (x ^ ""))
-                        ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 1, characters 19-39
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+                                   ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
@@ -62,9 +56,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let f (x @ nonportable) =
   ((x : _ @ portable), unify x (Some None), unify x (Some (Some (fun () -> ()))))
 [%%expect{|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), unify x (Some None), unify x (Some (Some (fun () -> ()))))
-        ^
+Line 1, characters 7-8:
+1 | let f (x @ nonportable) =
+           ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
@@ -72,10 +66,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 let f (x @ nonportable) =
   ((x : _ @ portable), unify x (Some None), unify x (Some (Some 1)))
 [%%expect{|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), unify x (Some None), unify x (Some (Some 1)))
-        ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option option -> int option option * unit * unit = <fun>
 |}]
 
 (* Reported examples *)
@@ -96,7 +87,12 @@ let variant = Variant ()
 
 let works1 = foo variant
 let works2 = foo (Variant () : _)
-(* CR-soon omni: this fails due to eager defaulting *)
+(* XCR-soon omni: this fails due to eager defaulting
+
+   aobrien: This fails due to order dependence in typing (not mode crossing).
+   Essentially, the type ['a t] is unified with [foo]'s argument type,
+   which results in the subkinding ['a t <= value mod portable contended],
+   *before* we start typing the arguments. *)
 let doesn't_work = foo (Variant ())
 [%%expect {|
 type 'a t = Variant of 'a
@@ -104,9 +100,9 @@ val foo : ('a : value mod portable contended). 'a -> unit = <fun>
 val variant : unit t = Variant ()
 val works1 : unit = ()
 val works2 : unit = ()
-Line 9, characters 23-35:
-9 | let doesn't_work = foo (Variant ())
-                           ^^^^^^^^^^^^
+Line 14, characters 23-35:
+14 | let doesn't_work = foo (Variant ())
+                            ^^^^^^^^^^^^
 Error: This constructor has type "'a t" but an expression was expected of type
          "('b : value mod portable contended)"
        The kind of 'a t is immutable_data with 'a
@@ -146,16 +142,7 @@ let f (local_ r) =
   let rec loop i = if i >= r then i else loop (i + 1) in
   loop 0
 [%%expect {|
-Line 3, characters 2-6:
-3 |   loop 0
-      ^^^^
-Error: This value is "local"
-         because it is allocated at line 2, characters 15-53 containing data
-         which is "local" to the parent region
-         because it closes over the value "r" at line 2, characters 27-28
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is the function in a tail call.
+val f : int @ local -> int = <fun>
 |}]
 
 type t = { mutable x : int }
@@ -249,24 +236,42 @@ type 'a field = { fld : 'a; }
 val gadt_field : 'a gadt -> 'a -> 'a = <fun>
 |}]
 
-(* CR-soon omni: rejected due to eager defaulting *)
 let f (x @ nonportable) =
   ((x : _ @ portable), (match x with Some 1 -> () | _ -> ()))
 [%%expect {|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), (match x with Some 1 -> () | _ -> ()))
-        ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option -> int option * unit = <fun>
 |}]
 
-(* CR-soon omni: rejected due to eager defaulting *)
 let f (x @ nonportable) =
   let p = ((x : _ @ portable), ()) in
   ignore (x = Some 1);
   p
 [%%expect {|
-Line 2, characters 12-13:
-2 |   let p = ((x : _ @ portable), ()) in
-                ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option -> int option * unit = <fun>
+|}]
+
+(* We only default completely at the toplevel *)
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let module M = struct let y = () end in M.y), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let module M = struct end in ()), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let open struct let y = () end in y), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let open struct end in ()), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
 |}]
