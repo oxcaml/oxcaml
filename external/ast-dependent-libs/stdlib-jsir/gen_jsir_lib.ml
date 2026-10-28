@@ -266,12 +266,16 @@ let ocamlopt_action args =
      js_of_ocaml %s))"
     (String.concat " " args)
 
-(* dune compiles every module with -no-alias-deps, so an alias to a module
+(* Keep in sync with the env stanza of the root dune file and the dune
+   context in Makefile.common-ox.
+
+   dune compiles every module with -no-alias-deps, so an alias to a module
    without implementation (e.g. [module Hint = Mode_hint] in the compiler)
    does not require that implementation to be linked. *)
 let common_flags =
   [ "-g"; "-nostdlib"; "-no-alias-deps"; "-strict-sequence"; "-strict-formats";
-    "-safe-string"; "-w"; "+a-4-9-40-41-42-44-45-48-66-67-70" ]
+    "-safe-string"; "-w"; "+a-4-9-40-41-42-44-45-48-66-67-70"; "-alert";
+    "-unsafe_multidomain"; "-alert"; "-unsafe_effects" ]
 
 let dedup l =
   List.fold_left (fun acc x -> if List.mem x acc then acc else acc @ [x]) [] l

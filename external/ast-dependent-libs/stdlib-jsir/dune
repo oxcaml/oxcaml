@@ -86,6 +86,7 @@
     stdlib_upstream_compatible
     --cmxa
     %{ocaml_where}/stdlib_upstream_compatible/stdlib_upstream_compatible.cmxa
+    ; keep in sync with otherlibs/stdlib_upstream_compatible/dune
     --flags
     "-extension-universe upstream_compatible"))))
 
@@ -126,6 +127,7 @@
     stdlib_beta
     --cmxa
     %{ocaml_where}/stdlib_beta/stdlib_beta.cmxa
+    ; keep in sync with otherlibs/stdlib_beta/dune
     --flags
     "-extension-universe beta -extension small_numbers_beta"))))
 
@@ -147,6 +149,7 @@
     stdlib_alpha
     --cmxa
     %{ocaml_where}/stdlib_alpha/stdlib_alpha.cmxa
+    ; keep in sync with otherlibs/stdlib_alpha/dune
     --flags
     "-extension-universe alpha"))))
 
@@ -168,6 +171,7 @@
     unix
     --cmxa
     %{ocaml_where}/unix/unix.cmxa
+    ; keep in sync with otherlibs/unix/dune
     --flags
     "-nolabels"))))
 
@@ -188,7 +192,10 @@
     --name
     str
     --cmxa
-    %{ocaml_where}/str/str.cmxa))))
+    %{ocaml_where}/str/str.cmxa
+    ; keep in sync with otherlibs/str/dune
+    --flags
+    "-w +67+70"))))
 
 (rule
  (target ocamlcommon.dune)
@@ -208,8 +215,9 @@
     ocamlcommon
     --cmxa
     %{ocaml_where}/compiler-libs/ocamlcommon.cmxa
+    ; keep in sync with the ocamlcommon library in the root dune file
     --flags
-    "-w -67-47 -alert -unsafe_multidomain -alert -unsafe_effects"))))
+    "-w -67-47"))))
 
 (rule
  (target ocamlfrontend.dune)
@@ -230,8 +238,9 @@
     ocamlfrontend
     --cmxa
     %{ocaml_where}/compiler-libs/ocamlfrontend.cmxa
+    ; keep in sync with the ocamlfrontend library in the root dune file
     --flags
-    "-w -67-47 -alert -unsafe_multidomain -alert -unsafe_effects"
+    "-w -47"
     --dep
     .=%{ocaml_where}/compiler-libs/ocamlcommon.cmxa))))
 
