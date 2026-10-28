@@ -102,6 +102,17 @@ let raise_unexplained_for tr_exn =
 let raise_for tr_exn e =
   raise_trace_for tr_exn [e]
 
+(* [extend_trace_for tr_exn elt f] runs [f], prepending [elt] to the trace of
+   any [tr_exn] exception it raises, including from checks it delays. *)
+let extend_trace_for (type a) (tr_exn : a trace_exn)
+    (elt : (type_expr, a) Errortrace.elt) f =
+  Scheduler.Monitor.try_ f ~with_:(fun e ->
+      match tr_exn, e with
+      | Unify, Unify_trace tr -> Unify_trace (elt :: tr)
+      | Equality, Equality_trace tr -> Equality_trace (elt :: tr)
+      | Moregen, Moregen_trace tr -> Moregen_trace (elt :: tr)
+      | _ -> e)
+
 (* Thrown from [moregen_kind] *)
 exception Public_method_to_private_method
 
@@ -179,9 +190,8 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none remain.
-   Defaulting calls each handler's [run] with its [default ()]; [run]'s
-   unification fills the ivar (see [upon_shape]). *)
+(* Runs the scheduler, then defaults any still-empty ivars, until none
+   remain. *)
 let run_scheduler_and_default_ivars () =
   let rec loop () =
     Scheduler.run (scheduler ());
@@ -5326,32 +5336,42 @@ let at_current_levels f =
     nongen_level := nongen;
     wrap_end_def (fun () -> f x)
 
-(* Registers [run] on [ivar]. If [ivar] is defaulted, calls [run (default ())]
-   instead. A conflicting default fails in [run]'s unification. *)
-let ivar_upon ivar ~run ~default ~scheduler =
-  Ivar.upon ivar ~run ~cancel:(fun () -> run (default ())) ~scheduler
-
 let upon_shape env ty ~run ~default =
   let run = at_current_levels run in
+  let default = at_current_levels default in
   let scheduler = scheduler () in
   if get_level ty = generic_level
   then Misc.fatal_error "Ctype.upon_shape: generic type";
   let ty = expand_head_ignoring_local_constraints env ty in
   let head = Type_head.of_expanded_type env ty in
+  let wait ivar =
+    let cancel () =
+      (* [cancel]ling because we did not determine [ty]'s shape: turn [ty]
+         back into a [Tvar] and run its default constraint. If [ty] is now a
+         [Tivar] for a different ivar (registered by an earlier default),
+         leave it. *)
+      (match get_desc ty with
+      | Tivar { name; jkind; ivar = ivar' } when ivar == ivar' ->
+        set_type_desc ty (Tvar { name; jkind })
+      | _ -> ());
+      default ()
+    in
+    Ivar.upon ivar ~run ~cancel ~scheduler
+  in
   match head with
   | Var when not (Language_extension.is_enabled Omnidirectionality) ->
-    Scheduler.add scheduler (fun () -> run (default ()))
+    Scheduler.add scheduler default
   | Var ->
     let ivar = Ivar.create ~in_global_pool:true () in
     transfer_ivar ivar ty;
-    ivar_upon ivar ~run ~default ~scheduler
-  | Ivar ivar -> ivar_upon ivar ~run ~default ~scheduler
+    wait ivar
+  | Ivar ivar -> wait ivar
   | Shape s ->
     (* Fast path: [ty] is not a variable, so behaves as if its ivar
        were already filled, or defaulted if [ty] has no shape. *)
     Scheduler.add scheduler (fun () -> run s)
   | Locally_abstract | Undefined ->
-    Scheduler.add scheduler (fun () -> run (default ()))
+    Scheduler.add scheduler (fun () -> default ())
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -6609,7 +6629,7 @@ let moregen_occur env level ty =
       let lv = get_level ty in
       if lv <= level then () else
       match get_desc ty with
-      | Tvar _ when lv >= subject_level -> raise Occur
+      | (Tvar _ | Tivar _) when lv >= subject_level -> raise Occur
       | Tvar _ | Tivar _ | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _
       | Tmod _ | Tobject _ | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _
       | Tnil | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _
@@ -6747,53 +6767,126 @@ let crossing_of_ty env ?modalities ty =
   | None -> crossing
   | Some m -> Crossing.modality m crossing
 
-let cross_left env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_regionality.disallow_right |> Crossing.apply_left crossing
+let () =
+  Defined_later.Fun.define_exn Ikind.upon_shape_later upon_shape;
+  Defined_later.Fun.define_exn Ikind.scheduler_later scheduler
 
-let cross_right env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_regionality.disallow_left |> Crossing.apply_right crossing
+let upon_crossing env ?modalities ty ~cross ~later =
+  if Language_extension.is_enabled Omnidirectionality && !Clflags.ikinds
+  then
+    Ikind.upon_crossing_of_type env ty
+      ~cross:(fun crossing ->
+        cross
+          (match modalities with
+          | None -> crossing
+          | Some m -> Crossing.modality m crossing))
+      ~later
+  else cross (crossing_of_ty env ?modalities ty)
 
-let cross_left_with_locality env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode
-  |> With_locality.disallow_right
-  |> Crossing.apply_left_with_locality crossing
+exception Crossing_failed of Mode.With_regionality.error
+exception Crossing_failed_with_locality of Mode.With_locality.error
 
-let cross_right_with_locality env ?modalities ty mode =
-  let crossing = crossing_of_ty env ?modalities ty in
-  mode
-  |> With_locality.disallow_left
-  |> Crossing.apply_right_with_locality crossing
+(* Mode crossing, shared between [With_regionality] and [With_locality]. *)
+module Cross (M : sig
+  type 'd t constraint 'd = 'l * 'r
+
+  type error
+
+  val newvar : int -> ('l * 'r) t
+
+  val disallow_left : ('l * 'r) t -> (disallowed * 'r) t
+
+  val disallow_right : ('l * 'r) t -> ('l * disallowed) t
+
+  val submode :
+    ?pp:Mode_hint.pinpoint ->
+    (allowed * 'r) t ->
+    ('l * allowed) t ->
+    (unit, error) result
+
+  val crossing_failed : error -> exn
+end) = struct
+  (* Runs from a delayed handler, so it cannot return an error to the caller of
+     [left] or [right]: it raises, and the monitor current at that call
+     converts the exception (see [cross_right] in the mli). *)
+  let check ?pp mode expected_mode =
+    match M.submode ?pp mode expected_mode with
+    | Ok () -> ()
+    | Error e -> raise (M.crossing_failed e)
+
+  (* If the crossing is delayed, return a fresh [mode'] and check
+     [apply crossing mode <= mode'] once the crossing is known. *)
+  let left ~apply env ?modalities ?pp ty mode =
+    let mode = M.disallow_right mode in
+    upon_crossing env ?modalities ty
+      ~cross:(fun crossing -> apply crossing mode)
+      ~later:(fun () ->
+        let mode' = M.newvar (get_current_level ()) in
+        ( M.disallow_right mode',
+          ~run:(fun crossed -> check ?pp crossed mode') ))
+
+  (* If the crossing is delayed, return a fresh [mode'] and check
+     [mode' <= apply crossing mode] once the crossing is known. *)
+  let right ~apply env ?modalities ?pp ty mode =
+    let mode = M.disallow_left mode in
+    upon_crossing env ?modalities ty
+      ~cross:(fun crossing -> apply crossing mode)
+      ~later:(fun () ->
+        let mode' = M.newvar (get_current_level ()) in
+        ( M.disallow_left mode',
+          ~run:(fun crossed -> check ?pp mode' crossed) ))
+end
+
+module Cross_with_regionality = Cross (struct
+  include With_regionality
+
+  let crossing_failed e = Crossing_failed e
+end)
+
+module Cross_with_locality = Cross (struct
+  include With_locality
+
+  let crossing_failed e = Crossing_failed_with_locality e
+end)
+
+let cross_left env ?modalities ?pp ty mode =
+  Cross_with_regionality.left ~apply:Crossing.apply_left
+    env ?modalities ?pp ty mode
+
+let cross_right env ?modalities ?pp ty mode =
+  Cross_with_regionality.right ~apply:Crossing.apply_right
+    env ?modalities ?pp ty mode
+
+let cross_left_with_locality env ?modalities ?pp ty mode =
+  Cross_with_locality.left ~apply:Crossing.apply_left_with_locality
+    env ?modalities ?pp ty mode
+
+let cross_right_with_locality env ?modalities ?pp ty mode =
+  Cross_with_locality.right ~apply:Crossing.apply_right_with_locality
+    env ?modalities ?pp ty mode
 
 (* The locality axis of the return mode of an arrow cannot cross modes,
    because a local-returning function might allocate in the caller's region,
    and this info must be preserved. The [_ret] variants below cross modes on
    all axes except locality and are to be used on return modes. *)
 
-let cross_left_with_locality_ret env ?modalities ty mode =
-  let mode' = cross_left_with_locality env ?modalities ty mode in
-  With_locality.join
-    [mode';
-     With_locality.min_with_comonadic
-       Areality
-       (With_locality.proj_comonadic Areality mode)]
+let cross_left_with_locality_ret env ?modalities ?pp ty mode =
+  Cross_with_locality.left
+    ~apply:(fun crossing mode ->
+      With_locality.join
+        [ Crossing.apply_left_with_locality crossing mode;
+          With_locality.min_with_comonadic Areality
+            (With_locality.proj_comonadic Areality mode) ])
+    env ?modalities ?pp ty mode
 
-let cross_right_with_locality_ret env ?modalities ty mode =
-  let mode' = cross_right_with_locality env ?modalities ty mode in
-  With_locality.meet
-    [mode';
-     With_locality.max_with_comonadic
-       Areality
-       (With_locality.proj_comonadic Areality mode)]
-
-let submode_with_cross env ~is_ret ty l r =
-  let r' =
-    if is_ret then cross_right_with_locality_ret env ty r
-    else cross_right_with_locality env ty r
-  in
-  With_locality.submode l r'
+let cross_right_with_locality_ret env ?modalities ?pp ty mode =
+  Cross_with_locality.right
+    ~apply:(fun crossing mode ->
+      With_locality.meet
+        [ Crossing.apply_right_with_locality crossing mode;
+          With_locality.max_with_comonadic Areality
+            (With_locality.proj_comonadic Areality mode) ])
+    env ?modalities ?pp ty mode
 
 let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
   let tighten () =
@@ -6804,22 +6897,49 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
       With_locality.Guts.zap_towards_ceil_of a1 ~towards:a2 |> ignore
     | Invariant | Bivariant -> ()
   in
-  match
-    match v with
-    | Invariant ->
-        Result.bind (submode_with_cross env ~is_ret ty a1 a2)
-          (fun _ -> submode_with_cross env ~is_ret ty a2 a1)
-    | Covariant -> submode_with_cross env ~is_ret ty a1 a2
-    | Contravariant -> submode_with_cross env ~is_ret ty a2 a1
-    | Bivariant -> Ok ()
-  with
-  | Ok () -> ()
-  | Error e ->
+  let mismatch e =
     tighten ();
     let pos : Errortrace.arrow_position =
       if is_ret then Return else Argument
     in
-    raise_for Moregen (Mode_mismatch (pos, e))
+    Moregen_trace [Mode_mismatch (pos, e)]
+  in
+  (* CR-soon omni: delayed crossing in [moregen] does not yet support mode
+     polymorphism, so under [-extension mode_polymorphism_alpha] cross eagerly
+     here, as if [-extension omnidirectionality] were off. *)
+  let cross_eagerly =
+    Language_extension.(
+      is_enabled Omnidirectionality && is_at_least Mode_polymorphism Alpha)
+  in
+  let submode_with_cross l r =
+    let cross () =
+      if is_ret then cross_right_with_locality_ret env ty r
+      else cross_right_with_locality env ty r
+    in
+    let r' =
+      if cross_eagerly
+      then Language_extension.with_disabled Omnidirectionality cross
+      else cross ()
+    in
+    With_locality.submode l r'
+  in
+  match
+    (* A monitor frame, so that a delayed crossing fails as if here. *)
+    Scheduler.Monitor.try_
+      (fun () ->
+        match v with
+        | Invariant ->
+            Result.bind (submode_with_cross a1 a2)
+              (fun _ -> submode_with_cross a2 a1)
+        | Covariant -> submode_with_cross a1 a2
+        | Contravariant -> submode_with_cross a2 a1
+        | Bivariant -> Ok ())
+      ~with_:(function
+        | Crossing_failed_with_locality e -> mismatch e
+        | e -> e)
+  with
+  | Ok () -> ()
+  | Error e -> raise (mismatch e)
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
@@ -6828,17 +6948,19 @@ let may_instantiate inst_nongen t1 =
 
 let rec moregen inst_nongen variance type_pairs env t1 t2 =
   if eq_type t1 t2 then () else
-
-  try
+  extend_trace_for Moregen (Diff { got = t1; expected = t2 }) begin fun () ->
     match (get_desc t1, get_desc t2) with
-      (Tvar { jkind }, _) when may_instantiate inst_nongen t1
-                            && not (deep_occur t1 t2) ->
+      ((Tvar { jkind } | Tivar { jkind; _ }), _)
+        when may_instantiate inst_nongen t1 && not (deep_occur t1 t2) ->
         moregen_occur env (get_level t1) t2;
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
-        link_type t1 t2
+        (* A [Tivar] [t1] may be waited on by a crossing delayed by
+           [moregen]. An orphaned ivar is defaulted on exit from [moregeneral]
+           or [match_class_types]. *)
+        link_var Moregen env t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | _ ->
@@ -6850,14 +6972,15 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         if not (TypePairs.mem pairs (t1', t2')) then begin
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
-            (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
+            ((Tvar { jkind } | Tivar { jkind; _ }), _)
+              when may_instantiate inst_nongen t1' ->
               let t2 = reduce_head ~expand_reducible_abbrevs:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
               check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
-              link_type t1' t2
+              link_var Moregen env t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
               eq_labels Moregen ~in_pattern_mode:false l1 l2;
@@ -6940,8 +7063,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (_, _) ->
               raise_unexplained_for Moregen
         end
-  with Moregen_trace trace ->
-    raise_trace_for Moregen (Diff {got = t1; expected = t2} :: trace)
+  end
 
 
 and moregen_list inst_nongen variance type_pairs env tl1 tl2 =
@@ -6993,9 +7115,10 @@ and moregen_fields inst_nongen variance type_pairs env ty1 ty2 =
     (fun (name, k1, t1, k2, t2) ->
        (* The below call should never throw [Public_method_to_private_method] *)
        moregen_kind k1 k2;
-       try moregen inst_nongen variance type_pairs env t1 t2 with Moregen_trace trace ->
-         raise_trace_for Moregen
-           (incompatible_fields ~name ~got:t1 ~expected:t2 :: trace)
+       extend_trace_for Moregen (incompatible_fields ~name ~got:t1 ~expected:t2)
+         begin fun () ->
+           moregen inst_nongen variance type_pairs env t1 t2
+         end
     )
     pairs
 
@@ -7056,46 +7179,43 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
          if f1 == f2 then () else
          match row_field_repr f1, row_field_repr f2 with
          (* Both matching [Rpresent]s *)
-         | Rpresent(Some t1), Rpresent(Some t2) -> begin
-             try
-               moregen inst_nongen variance type_pairs env t1 t2
-             with Moregen_trace trace ->
-               raise_trace_for Moregen
-                 (Variant (Incompatible_types_for l) :: trace)
-           end
+         | Rpresent(Some t1), Rpresent(Some t2) ->
+             extend_trace_for Moregen (Variant (Incompatible_types_for l))
+               begin fun () ->
+                 moregen inst_nongen variance type_pairs env t1 t2
+               end
          | Rpresent None, Rpresent None -> ()
          (* Both [Reither] *)
-         | Reither(c1, tl1, _), Reither(c2, tl2, m2) -> begin
-             try
-               if not (eq_row_field_ext f1 f2) then begin
-                 if c1 && not c2 then raise_unexplained_for Moregen;
-                 let f2' =
-                   rf_either [] ~use_ext_of:f2 ~no_arg:c2 ~matched:m2 in
-                 link_row_field_ext ~inside:f1 f2';
-                 if List.length tl1 = List.length tl2 then
-                   List.iter2 (moregen inst_nongen variance type_pairs env) tl1 tl2
-                 else match tl2 with
-                   | t2 :: _ ->
-                     List.iter
-                       (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
-                       tl1
-                   | [] -> if tl1 <> [] then raise_unexplained_for Moregen
+         | Reither(c1, tl1, _), Reither(c2, tl2, m2) ->
+             extend_trace_for Moregen (Variant (Incompatible_types_for l))
+               begin fun () ->
+                 if not (eq_row_field_ext f1 f2) then begin
+                   if c1 && not c2 then raise_unexplained_for Moregen;
+                   let f2' =
+                     rf_either [] ~use_ext_of:f2 ~no_arg:c2 ~matched:m2 in
+                   link_row_field_ext ~inside:f1 f2';
+                   if List.length tl1 = List.length tl2 then
+                     List.iter2
+                       (moregen inst_nongen variance type_pairs env)
+                       tl1 tl2
+                   else match tl2 with
+                     | t2 :: _ ->
+                       List.iter
+                         (fun t1 ->
+                           moregen inst_nongen variance type_pairs env t1 t2)
+                         tl1
+                     | [] -> if tl1 <> [] then raise_unexplained_for Moregen
+                 end
                end
-             with Moregen_trace trace ->
-               raise_trace_for Moregen
-                 (Variant (Incompatible_types_for l) :: trace)
-           end
          (* Generalizing [Reither] *)
-         | Reither(false, tl1, _), Rpresent(Some t2) when may_inst -> begin
-             try
-               link_row_field_ext ~inside:f1 f2;
-               List.iter
-                 (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
-                 tl1
-             with Moregen_trace trace ->
-               raise_trace_for Moregen
-                 (Variant (Incompatible_types_for l) :: trace)
-           end
+         | Reither(false, tl1, _), Rpresent(Some t2) when may_inst ->
+             extend_trace_for Moregen (Variant (Incompatible_types_for l))
+               begin fun () ->
+                 link_row_field_ext ~inside:f1 f2;
+                 List.iter
+                   (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
+                   tl1
+               end
          | Reither(true, [], _), Rpresent None when may_inst ->
              link_row_field_ext ~inside:f1 f2
          | Reither(_, _, _), Rabsent when may_inst ->
@@ -7165,13 +7285,18 @@ let moregeneral ~self_check env inst_nongen
         Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
-      try
-        with_univar_pairs [] begin fun () ->
-          let type_pairs = fresh_moregen_pairs () in
-          moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
-        end;
-        subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
-      with Moregen_trace trace -> subj_inst, Error trace
+      Scheduler.Monitor.try_ begin fun () ->
+        try
+          with_univar_pairs [] begin fun () ->
+            let type_pairs = fresh_moregen_pairs () in
+            moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
+          end;
+          subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
+        with Moregen_trace trace -> subj_inst, Error trace
+      end
+      ~with_:(function
+        | Moregen_trace trace -> Moregen (expand_to_moregen_error env trace)
+        | e -> e)
     end
       ~before_generalize:(fun (subj_inst, _) ->
         ignore
@@ -7718,10 +7843,16 @@ let match_class_sig_shape ~strict sign1 sign2 =
       else err)
     sign1.csig_vars errors
 
-(* [arrow_index] is the number of [Cty_arrow]
-           constructors we've seen so far. *)
+(* [arrow_index] is the number of [Cty_arrow] constructors we've seen so far.
+   The handlers below are monitor frames, so that checks delayed by [moregen]
+   (e.g. mode crossing) fail with the same [Failure]. *)
 let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
-  try
+  Scheduler.Monitor.try_
+    ~with_:(function
+      | Failure error when trace || error = [] ->
+        Failure (CM_Class_type_mismatch (env, cty1, cty2) :: error)
+      | e -> e)
+  begin fun () ->
     match cty1, cty2 with
     | Cty_constr (_, _, cty1), _ ->
         moregen_clty ~arrow_index true type_pairs env cty1 cty2
@@ -7729,12 +7860,14 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
         moregen_clty ~arrow_index true type_pairs env cty1 cty2
     | Cty_arrow (l1, ty1, cty1'), Cty_arrow (l2, ty2, cty2') when l1 = l2 ->
         let arrow_index = arrow_index + 1 in
-        begin
-          try moregen true Covariant type_pairs env ty1 ty2 with Moregen_trace trace ->
-            raise (Failure [
+        Scheduler.Monitor.try_
+          (fun () -> moregen true Covariant type_pairs env ty1 ty2)
+          ~with_:(function
+            | Moregen_trace trace ->
+              Failure [
                 CM_Parameter_mismatch
-                  (arrow_index, env, expand_to_moregen_error env trace)])
-        end;
+                  (arrow_index, env, expand_to_moregen_error env trace)]
+            | e -> e);
         moregen_clty ~arrow_index false type_pairs env cty1' cty2'
     | Cty_signature sign1, Cty_signature sign2 ->
         Meths.iter
@@ -7745,15 +7878,17 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                   all methods in sign2 are present in sign1. *)
                assert false
              | (_, _, ty') ->
-                 match moregen true Covariant type_pairs env ty' ty with
-                 | () -> ()
-                 | exception Moregen_trace trace ->
-                     raise (Failure [
-                       CM_Meth_type_mismatch
-                         (lab,
-                          env,
-                          Moregen_error
-                            (expand_to_moregen_error env trace))]))
+                 Scheduler.Monitor.try_
+                   (fun () -> moregen true Covariant type_pairs env ty' ty)
+                   ~with_:(function
+                     | Moregen_trace trace ->
+                       Failure [
+                         CM_Meth_type_mismatch
+                           (lab,
+                            env,
+                            Moregen_error
+                              (expand_to_moregen_error env trace))]
+                     | e -> e))
           sign2.csig_meths;
         Vars.iter
           (fun lab (_, _, ty) ->
@@ -7763,21 +7898,21 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                   all instance variables in sign2 are present in sign1. *)
                assert false
              | (_, _, ty') ->
-                 match moregen true Covariant type_pairs env ty' ty with
-                 | () -> ()
-                 | exception Moregen_trace trace ->
-                     raise (Failure [
-                       CM_Val_type_mismatch
-                         (lab,
-                          env,
-                          Moregen_error
-                            (expand_to_moregen_error env trace))]))
+                 Scheduler.Monitor.try_
+                   (fun () -> moregen true Covariant type_pairs env ty' ty)
+                   ~with_:(function
+                     | Moregen_trace trace ->
+                       Failure [
+                         CM_Val_type_mismatch
+                           (lab,
+                            env,
+                            Moregen_error
+                              (expand_to_moregen_error env trace))]
+                     | e -> e))
           sign2.csig_vars
     | _ ->
         raise (Failure [])
-  with
-    Failure error when trace || error = [] ->
-      raise (Failure (CM_Class_type_mismatch (env, cty1, cty2)::error))
+  end
 
 let moregen_clty trace type_pairs env cty1 cty2 =
   moregen_clty ~arrow_index:0 trace type_pairs env cty1 cty2
@@ -7801,6 +7936,14 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
          the original types, but that would be rather ad hoc.
        *)
       with_level ~level:(subject_level - 1) begin fun () ->
+      (* CR-someday omni: This is somewhat disgusting & will break later.
+
+         A crossing delayed by [moregen_clty] can raise [Failure] after the
+         inner [try] has returned, when [with_local_level_generalize] runs
+         delayed checks on exit; catch it here too. That exit defaults every
+         pending ivar, so no check is left to fail after
+         [match_class_types] returns. *)
+        match
         with_local_level_generalize ~before_generalize:ignore begin fun () ->
           assert (!current_level = subject_level);
           (*
@@ -7829,6 +7972,9 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
           try moregen_clty trace type_pairs env patt subj; []
           with Failure res -> res
         end
+        with
+        | res -> res
+        | exception Failure res -> res
       end
   | errors ->
       CM_Class_type_mismatch (env, pat_sch, subj_sch) :: errors
@@ -8222,8 +8368,26 @@ and build_subtype_tuple env visited loops posi level t labeled_tlist
 
 let enlarge_type env ty =
   warn := false;
+  (* A mode crossing delayed by [build_subtype] fails once [ty'] has been
+     unified with the type it is meant to accept, so report that type as not
+     being a subtype of [ty]. [build_subtype] does not fill ivars, so the
+     handler below only runs after [ty'] is assigned to [enlarged]. *)
+  let enlarged = ref ty in
   (* [level = 4] allows 2 expansions involving objects/variants *)
-  let (ty', _) = build_subtype env [] [] true 4 ty in
+  let (ty', _) =
+    Scheduler.Monitor.try_
+      (fun () -> build_subtype env [] [] true 4 ty)
+      ~with_:(function
+        | Crossing_failed_with_locality _ ->
+          Subtype
+            (Subtype.error
+               ~trace:
+                 (expand_subtype_trace env
+                    [Subtype.Diff {got = !enlarged; expected = ty}])
+               ~unification_trace:[])
+        | e -> e)
+  in
+  enlarged := ty';
   (ty', !warn)
 
 (**** Check whether a type is a subtype of another type. ****)
@@ -8285,10 +8449,21 @@ let rec subtype_rec env trace t1 t2 cstrs =
             t2 t1
             cstrs
         in
-        let a2 = cross_left_with_locality env t2 a2 in
-        subtype_mode_with_locality env trace a2 a1;
-        let r2 = cross_right_with_locality_ret env u2 r2 in
-        subtype_mode_with_locality env trace r1 r2;
+        (* A monitor frame, so that a delayed crossing fails as
+           [subtype_mode_with_locality] does. *)
+        Scheduler.Monitor.try_
+          (fun () ->
+            let a2 = cross_left_with_locality env t2 a2 in
+            subtype_mode_with_locality env trace a2 a1;
+            let r2 = cross_right_with_locality_ret env u2 r2 in
+            subtype_mode_with_locality env trace r1 r2)
+          ~with_:(function
+            | Crossing_failed_with_locality _ ->
+              Subtype
+                (Subtype.error
+                   ~trace:(expand_subtype_trace env (List.rev trace))
+                   ~unification_trace:[])
+            | e -> e);
         subtype_rec
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)

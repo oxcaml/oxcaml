@@ -2124,10 +2124,13 @@ let check_coercions env { id; id_loc; clty; ty_id; cltydef; obj_id; obj_abbr;
             cl_ty, obj_ty
         | _ -> assert false
       in
-      begin try Ctype.subtype env cl_ty obj_ty ()
-      with Ctype.Subtype err ->
-        raise(Typecore.Error(loc, env, Typecore.Not_subtype err))
-      end;
+      (* A monitor frame, so that it also reports delayed mode crossings. *)
+      Scheduler.Monitor.try_
+        (fun () -> Ctype.subtype env cl_ty obj_ty ())
+        ~with_:(function
+          | Ctype.Subtype err ->
+            Typecore.Error (loc, env, Typecore.Not_subtype err)
+          | e -> e);
       if not (Ctype.opened_object cl_ty) then
         raise(Error(loc, env, Cannot_coerce_self obj_ty))
   end;

@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension omnidirectionality";
  expect;
 *)
 
@@ -164,19 +165,11 @@ Error: This value is "local" to the parent region
          because it is an element (with some modality) of the array at line 2, characters 11-19.
 |}]
 
-(* after discussion with sdolan, we agree that
-  the following cannot type check because of lock;
-  lazy is not commonly used anyway. *)
+(* [n] crosses once its type is known to be [int], despite the lock. *)
 let f: local_ _ -> int lazy_t =
   fun n -> lazy n
 [%%expect{|
-Line 2, characters 16-17:
-2 |   fun n -> lazy n
-                    ^
-Error: The value "n" is "local" to the parent region
-       but is expected to be "global"
-         because it is used inside the lazy expression at line 2, characters 11-17
-         which is expected to be "global".
+val f : int @ local -> int lazy_t = <fun>
 |}]
 
 (* record field crosses mode at projection  *)
@@ -383,6 +376,42 @@ type 'a t_rec = { fld : 'a; }
 val f : 'a t_gadt -> 'a -> 'a = <fun>
 |}]
 
+(* Some more interesting GADT cases *)
+type _ t_gadt = Int : int t_gadt | Bool : bool t_gadt
+let f (type a) (x : a t_gadt) (local_ y : a) =
+  match x with
+  | Int -> { fld = y }.fld
+  | Bool -> { fld = y }.fld
+[%%expect{|
+type _ t_gadt = Int : int t_gadt | Bool : bool t_gadt
+val f : 'a t_gadt -> 'a @ local -> 'a = <fun>
+|}]
+
+type _ t_gadt = Int : int t_gadt | Bool : bool t_gadt | String : string t_gadt
+let f (type a) (x : a t_gadt) (local_ y : a) =
+  match x with
+  | Int -> { fld = y }.fld
+  | Bool -> { fld = y }.fld
+  | String -> { fld = y }.fld
+[%%expect{|
+type _ t_gadt =
+    Int : int t_gadt
+  | Bool : bool t_gadt
+  | String : string t_gadt
+Line 6, characters 22-23:
+6 |   | String -> { fld = y }.fld
+                          ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is the field "fld" of the record at line 6, characters 14-25
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a record whose field "fld" is the expression at line 6, characters 14-29
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
 (* Mode crossing in coercing arrow types *)
 let foo : int -> int = fun x -> x
 [%%expect{|
@@ -421,13 +450,11 @@ let _ = bar (foo : int -> int :> local_ int -> int)
 - : int = 42
 |}]
 
-(* Only the RHS type of :> is looked at for mode crossing *)
+(* Only the RHS type of :> is looked at for mode crossing; here its [_] is
+   later unified with [int], so it crosses. *)
 let _ = bar (foo : int -> int :> local_ _ -> _)
 [%%expect{|
-Line 1, characters 12-47:
-1 | let _ = bar (foo : int -> int :> local_ _ -> _)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Type "int -> int" is not a subtype of "'a @ local -> 'b"
+- : int = 42
 |}]
 
 
@@ -486,7 +513,7 @@ module M :
 
 (* Mode crossing at identifiers - in the following, x and y are added to the
 environment at mode local, but they cross to global when they are refered to
-again. Note that ref is polymorphic and thus doesn't trigger crossing. *)
+again. *)
 let foo () =
   let x, y = local_ (42, 24) in
   let _ = ref x, ref y in
