@@ -21,6 +21,10 @@ open Format
 
 val symbol : formatter -> Cmm.symbol -> unit
 
+val callee : formatter -> Cmm.callee -> unit
+
+val callee_doc : Format_doc.formatter -> Cmm.callee -> unit
+
 val ccatch_flag : formatter -> Cmm.ccatch_flag -> unit
 
 val machtype_component : formatter -> Cmm.machtype_component -> unit

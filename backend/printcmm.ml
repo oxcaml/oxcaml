@@ -83,6 +83,16 @@ let is_global ppf = function
 
 let symbol ppf s = fprintf ppf "%a:\"%s\"" is_global s.sym_global s.sym_name
 
+let callee ppf = function
+  | Symbol s -> fprintf ppf "Symbol %a" symbol s
+  | Argument { argument_index } ->
+    fprintf ppf "Argument { argument_index = %d }" argument_index
+
+let callee_doc ppf = function
+  | Symbol { sym_name; _ } -> Format_doc.fprintf ppf "%s" sym_name
+  | Argument { argument_index } ->
+    Format_doc.fprintf ppf "argument #%d" (argument_index + 1)
+
 let integer_comparison = function
   | Ceq -> "=="
   | Cne -> "!="
