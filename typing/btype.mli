@@ -741,11 +741,6 @@ module Jkind0 : sig
         ('l * disallowed) jkind
       val immediate_or_null :
         why:Jkind_intf.History.immediate_or_null_creation_reason -> 'd jkind
-      val product :
-        why:Jkind_intf.History.product_creation_reason ->
-        (type_expr * Mode.Modality.Const.t) list ->
-        Jkind_types.Sort.t Jkind_types.Layout.t list ->
-        jkind_l
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
         int ->
