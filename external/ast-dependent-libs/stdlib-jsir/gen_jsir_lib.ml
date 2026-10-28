@@ -7,10 +7,11 @@
    - the interfaces are the installed .cmi files (-cmi-file), so that programs
      compiled against the installed library link against the same interfaces;
    - the sources are the installed ones too, next to the .cmxa (some are
-     generated when the compiler is built: unix.ml, parser.ml, ...);
+     generated when the compiler is built: unix.ml, parser.ml, ...), including
+     the alias module of a wrapped library, which dune generates and installs
+     with the other sources;
    - unit names follow dune's wrapping convention: unit Lib__Foo comes from
-     foo.ml compiled with -open Lib__, and the alias module Lib__ (which has no
-     source) is regenerated as dune generates it;
+     foo.ml compiled with -open Lib__;
    - dependencies between units come from ocamldep.
 *)
 
@@ -93,7 +94,9 @@ let read_cmxa cmxa =
 
 let in_rules path =
   let prefix = !ocaml_where ^ "/" in
-  if String.starts_with path ~prefix
+  if path = !ocaml_where
+  then "%{ocaml_where}"
+  else if String.starts_with path ~prefix
   then
     "%{ocaml_where}/"
     ^ String.sub path (String.length prefix)
@@ -110,51 +113,62 @@ let file_of_unit unit_name ext = String.uncapitalize_ascii unit_name ^ ext
 let installed unit_name ext =
   in_rules (Filename.concat (src_dir ()) (file_of_unit unit_name ext))
 
-(* [Foo] for unit [Lib__Foo], [None] for the alias module [Lib__] *)
+(* Strips the wrapping prefix (e.g. [Int] for unit [Stdlib_stable__Int]).
+   Unwrapped units are unchanged. *)
 let module_name unit_name =
   let prefix = lib_prefix () in
-  let modname =
-    if String.starts_with unit_name ~prefix
-    then
-      String.sub unit_name (String.length prefix)
-        (String.length unit_name - String.length prefix)
-    else unit_name
-  in
-  if modname = "" then None else Some modname
+  if String.starts_with unit_name ~prefix
+  then
+    String.sub unit_name (String.length prefix)
+      (String.length unit_name - String.length prefix)
+  else unit_name
+
+(* The alias module of a wrapped library. dune names it [Lib__], or [Lib]
+   when the library has no module of that name. *)
+let alias_module units =
+  let prefix = lib_prefix () in
+  if not (List.exists (String.starts_with ~prefix) units)
+  then None
+  else if List.mem prefix units
+  then Some prefix
+  else
+    let lib = String.capitalize_ascii !name in
+    if List.mem lib units
+    then Some lib
+    else
+      fail "No alias module (%s or %s) among the units of %s" prefix lib !cmxa
 
 type unit_info =
   { unit_name : string;
-    source : string option (* [None] for the alias module [Lib__] *) }
+    source : string (* file name, in the installed directory *) }
 
-let classify units =
-  let wrapped =
-    List.exists (fun u -> String.starts_with u ~prefix:(lib_prefix ())) units
-  in
+(* Finds the installed source of each unit, failing if it is missing. *)
+let classify ~alias units =
   List.map
     (fun unit_name ->
-      match module_name unit_name with
-      | None -> { unit_name; source = None }
-      | Some modname ->
-        let file = String.uncapitalize_ascii modname ^ ".ml" in
-        if Sys.file_exists (Filename.concat (src_dir ()) file)
-        then { unit_name; source = Some file }
-        else if wrapped && unit_name = String.capitalize_ascii !name
-        then
-          (* dune names the alias module after the library when the library
-             has no module of that name. *)
-          { unit_name; source = None }
-        else fail "No source %s for unit %s in %s" file unit_name (src_dir ()))
+      let source =
+        if Some unit_name = alias
+        then file_of_unit unit_name ".ml"
+        else String.uncapitalize_ascii (module_name unit_name) ^ ".ml"
+      in
+      if not (Sys.file_exists (Filename.concat (src_dir ()) source))
+      then fail "No source %s for unit %s in %s" source unit_name (src_dir ());
+      { unit_name; source })
     units
 
 type dep =
   { dir : string; (* where its .cmjx are, relative to the rules *)
     installed_dir : string; (* where its .cmi are *)
-    dep_units : string list }
+    cmjx_deps : string list (* dune dependencies on its .cmjx *) }
 
+(* The compiler may read any .cmjx of a library this one depends on. *)
 let dep ~dir ~cmxa =
-  { dir;
-    installed_dir = in_rules (Filename.dirname cmxa);
-    dep_units = fst (read_cmxa cmxa) }
+  let cmjx_deps =
+    if dir = "."
+    then List.map (fun u -> file_of_unit u ".cmjx") (fst (read_cmxa cmxa))
+    else [Printf.sprintf "(glob_files %s/*.cmjx)" dir]
+  in
+  { dir; installed_dir = in_rules (Filename.dirname cmxa); cmjx_deps }
 
 let parse_dep spec =
   match String.index_opt spec '=' with
@@ -174,7 +188,7 @@ let read_deps () =
    unit is [Lib__Foo] when the library is wrapped (a reference to [Lib__Foo]
    itself also works), [Foo] otherwise. Closed transitively, as the compiler
    may read the .cmjx of units imported by the ones a unit uses. *)
-let unit_deps units =
+let unit_deps ~alias units =
   let unit_names = List.map (fun u -> u.unit_name) units |> StrSet.of_list in
   let resolve modname =
     let wrapped = lib_prefix () ^ modname in
@@ -187,9 +201,9 @@ let unit_deps units =
   let sources =
     List.filter_map
       (fun u ->
-        Option.map
-          (fun s -> Filename.concat (src_dir ()) s, u.unit_name)
-          u.source)
+        if Some u.unit_name = alias
+        then None
+        else Some (Filename.concat (src_dir ()) u.source, u.unit_name))
       units
   in
   let lines =
@@ -258,15 +272,6 @@ let include_dirs deps =
   |> dedup
   |> List.concat_map (fun d -> ["-I"; d])
 
-(* The compiler may read any .cmjx of the libraries this one depends on. *)
-let dep_cmjx deps =
-  List.concat_map
-    (fun d ->
-      List.map
-        (fun u -> Filename.concat d.dir (file_of_unit u ".cmjx"))
-        d.dep_units)
-    deps
-
 let rule ~ppf ~targets ~deps ~action =
   Printf.fprintf ppf "(rule\n  (targets %s)\n  (deps %s)\n  (action %s))\n\n"
     (String.concat " " targets) (String.concat " " deps) action
@@ -278,15 +283,10 @@ let () =
     [ ocaml_bin, "--ocaml-bin"; ocaml_where, "--ocaml-where"; name, "--name";
       cmxa, "--cmxa" ];
   let unit_names, force_link = read_cmxa !cmxa in
-  let units = classify unit_names in
-  let alias_module =
-    match List.filter (fun u -> u.source = None) units with
-    | [] -> None
-    | [u] -> Some u.unit_name
-    | _ :: _ :: _ -> fail "Several units of %s have no source" !name
-  in
+  let alias = alias_module unit_names in
+  let units = classify ~alias unit_names in
   let deps = read_deps () in
-  let deps_of = unit_deps units in
+  let deps_of = unit_deps ~alias units in
   let extra_flags =
     String.split_on_char ' ' !flags |> List.filter (fun s -> s <> "")
   in
@@ -300,58 +300,28 @@ let () =
         ((Printf.sprintf "(:src %s)" src_path :: cmi
           :: List.map (fun d -> installed d ".cmi") cmi_deps)
         @ List.map (fun d -> file_of_unit d ".cmjx") cmjx_deps
-        @ dep_cmjx deps)
+        @ List.concat_map (fun d -> d.cmjx_deps) deps)
       ~action:
         (run_ocamlopt
            (common_flags @ flags @ include_dirs deps
            @ ["-cmi-file"; cmi; "-o"; cmjx; "-c"; "%{src}"]))
   in
-  let wrapped_units =
-    List.filter_map
-      (fun u ->
-        match u.source, module_name u.unit_name with
-        | Some _, Some modname
-          when String.starts_with u.unit_name ~prefix:(lib_prefix ()) ->
-          Some (modname, u.unit_name)
-        | _ -> None)
-      units
-  in
-  (match alias_module with
-   | None -> ()
-   | Some alias ->
-     (* Regenerate the alias module as dune does (including the shadowing of
-        the alias module itself, which the installed .cmi has). *)
-     let ml = file_of_unit alias ".ml" in
-     let contents =
-       List.map
-         (fun (modname, unit_name) ->
-           Printf.sprintf "module %s = %s\\n" modname unit_name)
-         wrapped_units
-       @ [ Printf.sprintf "module %s = struct end\\n" alias;
-           "[@@deprecated \\\"this module is shadowed\\\"]\\n" ]
-     in
-     Printf.fprintf ppf
-       "(rule\n\
-       \  (target %s)\n\
-       \  (action (with-stdout-to %%{target} (echo \"%s\"))))\n\n"
-       ml (String.concat "" contents);
-     compile_rule ~unit_name:alias ~src_path:ml
-       ~cmi_deps:(List.map snd wrapped_units) ~cmjx_deps:[]
-       ~flags:["-w"; "-49"; "-no-alias-deps"]);
   List.iter
     (fun u ->
-      match u.source with
-      | None -> ()
-      | Some file ->
+      let src_path = in_rules (Filename.concat (src_dir ()) u.source) in
+      if Some u.unit_name = alias
+      then
+        compile_rule ~unit_name:u.unit_name ~src_path ~cmi_deps:[]
+          ~cmjx_deps:[] ~flags:["-w"; "-49"]
+      else
         let unit_deps = StrSet.elements (deps_of u.unit_name) in
         let alias_deps, alias_flags =
-          match alias_module with
+          match alias with
           | None -> [], []
           | Some alias -> [alias], ["-open"; alias]
         in
-        compile_rule ~unit_name:u.unit_name
-          ~src_path:(in_rules (Filename.concat (src_dir ()) file))
-          ~cmi_deps:unit_deps ~cmjx_deps:(alias_deps @ unit_deps)
+        compile_rule ~unit_name:u.unit_name ~src_path ~cmi_deps:unit_deps
+          ~cmjx_deps:(alias_deps @ unit_deps)
           ~flags:(extra_flags @ alias_flags))
     units;
   rule ~ppf

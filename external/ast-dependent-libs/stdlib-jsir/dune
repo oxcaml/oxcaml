@@ -72,7 +72,6 @@
  (target stdlib_upstream_compatible.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_upstream_compatible/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_upstream_compatible/stdlib_upstream_compatible.cmxa)
  (action
   (with-stdout-to
@@ -94,7 +93,6 @@
  (target stdlib_stable.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_stable/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_stable/stdlib_stable.cmxa)
  (action
   (with-stdout-to
@@ -114,7 +112,6 @@
  (target stdlib_beta.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_beta/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_beta/stdlib_beta.cmxa)
  (action
   (with-stdout-to
@@ -136,7 +133,6 @@
  (target stdlib_alpha.dune)
  (deps
   (glob_files %{ocaml_where}/stdlib_alpha/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/stdlib_alpha/stdlib_alpha.cmxa)
  (action
   (with-stdout-to
@@ -158,7 +154,6 @@
  (target unix.dune)
  (deps
   (glob_files %{ocaml_where}/unix/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/unix/unix.cmxa)
  (action
   (with-stdout-to
@@ -180,7 +175,6 @@
  (target str.dune)
  (deps
   (glob_files %{ocaml_where}/str/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/str/str.cmxa)
  (action
   (with-stdout-to
@@ -200,7 +194,6 @@
  (target ocamlcommon.dune)
  (deps
   (glob_files %{ocaml_where}/compiler-libs/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/compiler-libs/ocamlcommon.cmxa)
  (action
   (with-stdout-to
@@ -222,7 +215,6 @@
  (target ocamlfrontend.dune)
  (deps
   (glob_files %{ocaml_where}/compiler-libs/*.ml)
-  %{ocaml_where}/stdlib.cmxa
   %{ocaml_where}/compiler-libs/ocamlcommon.cmxa
   %{ocaml_where}/compiler-libs/ocamlfrontend.cmxa)
  (action

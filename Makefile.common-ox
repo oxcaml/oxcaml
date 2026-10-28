@@ -367,7 +367,8 @@ ifeq ($(with_jsir),true)
 	    -I ../../stdlib" && \
 	  $$ocamlopt_jsir -c lib.ml && \
 	  $$ocamlopt_jsir -linkall -a -o testing.cmjxa testing.ml
-	cp $(ast_dependent_libs_root)/_build/default/stdlib-jsir/build/compiler-libs/*.cmj{x,o} \
+	cp _install/lib/ocaml/compiler-libs/*.cmjx _runtest/utils
+	cp $(ast_dependent_libs_root)/_build/default/stdlib-jsir/build/compiler-libs/*.cmjo \
 	  _runtest/utils
 endif
 test: install_for_test

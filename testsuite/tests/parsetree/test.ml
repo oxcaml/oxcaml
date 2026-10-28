@@ -5,7 +5,9 @@
    bytecode;
  }{
    native;
- }{ jsir; }
+ }{
+   jsir;
+ }
 *)
 
 (* (c) Alain Frisch / Lexifi *)

@@ -14,7 +14,9 @@
    bytecode;
  } {
    native;
- }{ jsir; } {
+ } {
+   jsir;
+ } {
    flags = "-Oclassic";
    native;
  } {
