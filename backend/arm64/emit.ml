@@ -887,7 +887,7 @@ let is_immediate_float bits =
   && Int64.equal (Int64.logand mant 0xF_0000_0000_0000L) mant
 
 let is_immediate_float32 bits =
-  let exp = (Int32.(to_int (shift_right_logical bits 23)) land 0x7F) - 63 in
+  let exp = (Int32.(to_int (shift_right_logical bits 23)) land 0xFF) - 127 in
   let mant = Int32.logand bits 0x7F_FFFFl in
   exp >= -3 && exp <= 4 && Int32.equal (Int32.logand mant 0x78_0000l) mant
 
