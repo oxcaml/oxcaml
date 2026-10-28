@@ -559,8 +559,7 @@ let rec qualify_constructors ~unmangling_tables f pat =
       Tpat_array (m, sort, List.map ps ~f:(qualify_constructors f))
     | Tpat_or (p1, p2, row_desc) ->
       Tpat_or (qualify_constructors f p1, qualify_constructors f p2, row_desc)
-    | Tpat_addr (mut, sort, p) ->
-      Tpat_addr (mut, sort, qualify_constructors f p)
+    | Tpat_addr (mut, sort, p) -> Tpat_addr (mut, sort, qualify_constructors f p)
     | Tpat_lazy p -> Tpat_lazy (qualify_constructors f p)
     | desc -> desc
   in
@@ -577,7 +576,8 @@ let find_branch patterns sub =
       | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> false
       | Tpat_alias { pattern = p; _ }
       | Tpat_variant (_, Some p, _)
-      | Tpat_addr (_, _, p) | Tpat_lazy p -> is_sub_patt p ~sub
+      | Tpat_addr (_, _, p)
+      | Tpat_lazy p -> is_sub_patt p ~sub
       | Tpat_tuple lst ->
         List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
       | Tpat_unboxed_tuple lst ->
