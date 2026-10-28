@@ -1023,3 +1023,468 @@ Warning 26 [unused-var]: unused variable "a".
 val unused_deref : int * int -> int = <fun>
 val unused_deref_underscore : int * int -> int = <fun>
 |}]
+
+
+(*****************************************************)
+(* Alias dereference patterns [P as deref_ x] *)
+
+(* They have the same positions as dereference patterns *)
+let tuple_alias ((x as deref_ a), (_ as deref_ b)) = #(x, a, b)
+let record_alias ({ imm = (x as deref_ a); mut = (y as deref_ b) } : r) =
+  #(x, a, y, b)
+[%%expect{|
+val tuple_alias : 'a * 'b -> #('a * 'a addr_imm * 'b addr_imm) = <fun>
+val record_alias : r -> #(int * int addr_imm * string * string addr) = <fun>
+|}]
+
+let addr_alias (addr_ (x as deref_ a)) = #(x, a)
+let addr_imm_alias (addr_imm_ (x as deref_ a)) = #(x, a)
+[%%expect{|
+val addr_alias : 'a addr -> #('a * 'a addr) = <fun>
+val addr_imm_alias : 'a addr_imm -> #('a * 'a addr_imm) = <fun>
+|}]
+
+let unboxed_tuple_alias (addr_imm_ #((x as deref_ a), _)) = #(x, a)
+let unboxed_record_alias ({ u = #{ x = (x as deref_ a); _ } } : r2) = #(x, a)
+let unboxed_record_attr_alias (addr_ ({ f = (x as deref_ a) } : u_record)) =
+  #(x, a)
+[%%expect{|
+val unboxed_tuple_alias : #('a * 'b) addr_imm -> #('a * 'a addr_imm) = <fun>
+val unboxed_record_alias : r2 -> #(int * int addr) = <fun>
+val unboxed_record_attr_alias : u_record addr -> #(int * int addr) = <fun>
+|}]
+
+let unboxed_tuple_in_tuple_alias ((_ as deref_ a), #((x as deref_ b), _)) =
+  #(a, x, b)
+let unboxed_record_in_tuple_alias
+      ((_ as deref_ a), (#{ x = (x as deref_ b); _ } : ur)) =
+  #(a, x, b)
+[%%expect{|
+val unboxed_tuple_in_tuple_alias :
+  'a * #('b * 'c) -> #('a addr_imm * 'b * 'b addr_imm) = <fun>
+val unboxed_record_in_tuple_alias :
+  'a * ur -> #('a addr_imm * int * int addr_imm) = <fun>
+|}]
+
+let nested_unboxed_alias
+      ({ nest = #(#{ ni = (x as deref_ a); _ }, _) } : nested) =
+  #(x, a)
+let nested_unboxed_in_tuple_alias
+      (_, #(_, ({ f = (x as deref_ a) } : u_record))) =
+  #(x, a)
+[%%expect{|
+val nested_unboxed_alias : nested -> #(string * string addr) = <fun>
+val nested_unboxed_in_tuple_alias :
+  'a * #('b * u_record) -> #(int * int addr_imm) = <fun>
+|}]
+
+let transparent_alias
+      (((_ as deref_ a) as b), ((_ as deref_ c) : int),
+       Stdlib.((_ as deref_ d))) =
+  #(a, b, c, d)
+[%%expect{|
+val transparent_alias :
+  'a * int * 'b -> #('a addr_imm * 'a * int addr_imm * 'b addr_imm) = <fun>
+|}]
+
+(* They are not allowed at the top level... *)
+let top_alias (x as deref_ a) = #(x, a)
+[%%expect{|
+Line 1, characters 14-29:
+1 | let top_alias (x as deref_ a) = #(x, a)
+                  ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let top_unboxed_tuple_alias (#((_ as deref_ a), _) : #(int * int)) = a
+[%%expect{|
+Line 1, characters 31-46:
+1 | let top_unboxed_tuple_alias (#((_ as deref_ a), _) : #(int * int)) = a
+                                   ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let top_unboxed_record_alias (#{ x = (_ as deref_ a); _ } : ur) = a
+[%%expect{|
+Line 1, characters 37-52:
+1 | let top_unboxed_record_alias (#{ x = (_ as deref_ a); _ } : ur) = a
+                                         ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let top_unboxed_record_attr_alias ({ f = (_ as deref_ a) } : u_record) = a
+[%%expect{|
+Line 1, characters 41-56:
+1 | let top_unboxed_record_attr_alias ({ f = (_ as deref_ a) } : u_record) = a
+                                             ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+(* ...nor below constructors, lazy, arrays and unboxed constructors *)
+let constr_alias (addr_ (Some (_ as deref_ a))) = a
+[%%expect{|
+Line 1, characters 30-45:
+1 | let constr_alias (addr_ (Some (_ as deref_ a))) = a
+                                  ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let variant_alias (`A (_ as deref_ a), _) = a
+[%%expect{|
+Line 1, characters 22-37:
+1 | let variant_alias (`A (_ as deref_ a), _) = a
+                          ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let lazy_alias (lazy (_ as deref_ a), _) = a
+[%%expect{|
+Line 1, characters 21-36:
+1 | let lazy_alias (lazy (_ as deref_ a), _) = a
+                         ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let array_alias (addr_ [| (_ as deref_ a) |]) = a
+[%%expect{|
+Line 1, characters 26-41:
+1 | let array_alias (addr_ [| (_ as deref_ a) |]) = a
+                              ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let unboxed_constr_attr_alias (U (_ as deref_ a), _) = a
+[%%expect{|
+Line 1, characters 33-48:
+1 | let unboxed_constr_attr_alias (U (_ as deref_ a), _) = a
+                                     ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+let or_null_alias ({ mon = This (_ as deref_ a) } : mut_or_null) = a
+[%%expect{|
+Line 1, characters 32-47:
+1 | let or_null_alias ({ mon = This (_ as deref_ a) } : mut_or_null) = a
+                                    ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+(* Or-patterns don't propagate the position... *)
+let or_alias (((0 as deref_ a) | (_ as deref_ a)), _) = a
+[%%expect{|
+Line 1, characters 15-30:
+1 | let or_alias (((0 as deref_ a) | (_ as deref_ a)), _) = a
+                   ^^^^^^^^^^^^^^^
+Error: Dereference patterns must match a value stored in a record,
+       a tuple or at an address.
+|}]
+
+(* ...but are fine inside [P] *)
+let around_or_alias = function
+  | (((0 | 1) as deref_ a), _) -> Some a
+  | _ -> None
+[%%expect{|
+val around_or_alias : int * 'a -> int addr_imm option = <fun>
+|}]
+
+(* The restrictions on the path to the position apply *)
+let float_record_alias ({ x = (_ as deref_ a); _ } : float_record) = a
+[%%expect{|
+Line 1, characters 26-27:
+1 | let float_record_alias ({ x = (_ as deref_ a); _ } : float_record) = a
+                              ^
+Error: Dereference patterns do not support float records.
+|}]
+
+let flat_float_record_alias ({ u = (_ as deref_ a); _ } : flat_float_record) =
+  a
+[%%expect{|
+Line 1, characters 31-32:
+1 | let flat_float_record_alias ({ u = (_ as deref_ a); _ } : flat_float_record) =
+                                   ^
+Error: Dereference patterns do not support [@@flatten_floats] records.
+|}]
+
+let float_array_record_alias { fa = (_ as deref_ a) } = a
+[%%expect{|
+Line 1, characters 31-33:
+1 | let float_array_record_alias { fa = (_ as deref_ a) } = a
+                                   ^^
+Error: Dereference patterns do not support [@@represent_as_float_array] records.
+|}]
+
+let mixed_record_alias ({ i = (x as deref_ a); _ } : mixed_record) = #(x, a)
+let mixed_tuple_alias (((x : string) as deref_ a), ((y : float#) as deref_ b))
+  =
+  #(x, a, y, b)
+[%%expect{|
+val mixed_record_alias : mixed_record -> #(float# * float# addr_imm) = <fun>
+val mixed_tuple_alias :
+  string * float# -> #(string * string addr_imm * float# * float# addr_imm) =
+  <fun>
+|}]
+
+let inlined_alias (I { i = (_ as deref_ a) }) = a
+[%%expect{|
+Line 1, characters 23-24:
+1 | let inlined_alias (I { i = (_ as deref_ a) }) = a
+                           ^
+Error: Dereference patterns do not support inlined records.
+|}]
+
+let atomic_alias ({ at = (_ as deref_ a) } : atomic) = a
+[%%expect{|
+Line 1, characters 20-22:
+1 | let atomic_alias ({ at = (_ as deref_ a) } : atomic) = a
+                        ^^
+Error: Dereference patterns do not support atomic fields.
+|}]
+
+let poly_alias ({ poly = (_ as deref_ a) } : poly) = a
+[%%expect{|
+Line 1, characters 18-22:
+1 | let poly_alias ({ poly = (_ as deref_ a) } : poly) = a
+                      ^^^^
+Error: Dereference patterns do not support polymorphic record fields
+       (here "poly").
+|}]
+
+let global_field_alias ({ g = (_ as deref_ a) } : global_field) = a
+[%%expect{|
+Line 1, characters 30-45:
+1 | let global_field_alias ({ g = (_ as deref_ a) } : global_field) = a
+                                  ^^^^^^^^^^^^^^^
+Error: Dereference patterns do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* The address has the type of the position, unlike the variable of an
+   alias *)
+type pv = { mutable pv : [ `A | `B ] }
+let not_narrowed = function { pv = `A as deref_ a } -> Some a | _ -> None
+let narrowed = function { pv = `A as v } -> Some v | _ -> None
+[%%expect{|
+type pv = { mutable pv : [ `A | `B ]; }
+val not_narrowed : pv -> [ `A | `B ] addr option = <fun>
+val narrowed : pv -> [> `A ] option = <fun>
+|}]
+
+(* Dereference patterns in [P] have their own positions... *)
+type leaf_r = { mutable leaf : string }
+type node_r = { mutable node : leaf_r }
+let nested_positions { node = { leaf = deref_ l } as deref_ n } = #(n, l)
+[%%expect{|
+type leaf_r = { mutable leaf : string; }
+type node_r = { mutable node : leaf_r; }
+val nested_positions : node_r -> #(leaf_r addr * string addr) = <fun>
+|}]
+
+(* ...unless they are at the same position *)
+let same_position ((deref_ a as deref_ b), _) = #(a, b)
+let alias_chain (((v as deref_ a) as w), _) = #(v, a, w)
+[%%expect{|
+val same_position : 'a * 'b -> #('a addr_imm * 'a addr_imm) = <fun>
+val alias_chain : 'a * 'b -> #('a * 'a addr_imm * 'a) = <fun>
+|}]
+
+(* The address has the mode of the container *)
+let bad_local_alias (t : string * string @ local) =
+  match t with (_ as deref_ a), _ -> use_global_addr_imm a
+[%%expect{|
+Line 2, characters 57-58:
+2 |   match t with (_ as deref_ a), _ -> use_global_addr_imm a
+                                                             ^
+Error: This value is "local" to the parent region
+         because it is an address derived from the value at line 2, characters 15-33
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "global".
+|}]
+
+(* The address owns the value matched by [P]... *)
+let bad_consume_alias_value (r : imm_field @ unique) =
+  match r with { imm = y as deref_ a } -> consume y; use_addr_imm a
+[%%expect{|
+Line 2, characters 66-67:
+2 |   match r with { imm = y as deref_ a } -> consume y; use_addr_imm a
+                                                                      ^
+Error: This value is used here, but it has already been used as unique at:
+Line 2, characters 50-51:
+2 |   match r with { imm = y as deref_ a } -> consume y; use_addr_imm a
+                                                      ^
+
+|}]
+
+(* ...but taking it doesn't use that value *)
+let ok_consume_alias_part (r : outer @ unique) =
+  match r with { o = { f } as deref_ _a; _ } -> consume f
+[%%expect{|
+val ok_consume_alias_part : outer @ unique -> unit = <fun>
+|}]
+
+(* The address owns the memory storing the value, but [P] doesn't *)
+let bad_consume_alias_then_read (r : mutable_field @ unique) =
+  match r with { m = _ as deref_ a } -> consume_addr a; use_aliased r.m
+[%%expect{|
+Line 2, characters 68-69:
+2 |   match r with { m = _ as deref_ a } -> consume_addr a; use_aliased r.m
+                                                                        ^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 2, characters 53-54:
+2 |   match r with { m = _ as deref_ a } -> consume_addr a; use_aliased r.m
+                                                         ^
+
+|}]
+
+let ok_consume_alias_value_then_memory (r : imm_fields @ unique) =
+  match r with
+  | { g1 = y as deref_ _a; _ } ->
+    consume y; (match r with { g1 = deref_ _b; _ } -> ())
+[%%expect{|
+val ok_consume_alias_value_then_memory : imm_fields @ unique -> unit = <fun>
+|}]
+
+(* The value in a mutable field is aliased, so using it doesn't conflict with
+   the address *)
+let ok_use_alias_value_then_consume_addr (r : mutable_field @ unique) =
+  match r with { m = y as deref_ a } -> use_aliased y; consume_addr a
+[%%expect{|
+val ok_use_alias_value_then_consume_addr : mutable_field @ unique -> unit =
+  <fun>
+|}]
+
+(* [P] reads the value as usual *)
+let bad_constant_alias (r : imm_fields @ unique) =
+  match r with
+  | { g1 = "" as deref_ a; _ } -> consume_addr_imm a
+  | _ -> ()
+[%%expect{|
+Line 3, characters 51-52:
+3 |   | { g1 = "" as deref_ a; _ } -> consume_addr_imm a
+                                                       ^
+Error: This value is used here as unique,
+       but it has already been used in a constant pattern at:
+Line 3, characters 11-13:
+3 |   | { g1 = "" as deref_ a; _ } -> consume_addr_imm a
+               ^^
+
+|}]
+
+(* Dereference patterns at the same position share the address *)
+let bad_same_position_alias (r : imm_field @ unique) =
+  match r with
+  | { imm = deref_ a as deref_ b } -> consume_addr_imm a; use_addr_imm b
+[%%expect{|
+Line 3, characters 71-72:
+3 |   | { imm = deref_ a as deref_ b } -> consume_addr_imm a; use_addr_imm b
+                                                                           ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 55-56:
+3 |   | { imm = deref_ a as deref_ b } -> consume_addr_imm a; use_addr_imm b
+                                                           ^
+
+|}]
+
+(* Positions in [P] are part of the address... *)
+type inner2 = { h1 : string; h2 : string }
+type outer2 = { o2 : inner2 }
+let bad_nested_position_alias (r : outer2 @ unique) =
+  match r with
+  | { o2 = { h1 = deref_ b; _ } as deref_ a } ->
+    consume_addr_imm b; use_addr_imm a
+[%%expect{|
+type inner2 = { h1 : string; h2 : string; }
+type outer2 = { o2 : inner2; }
+Line 6, characters 37-38:
+6 |     consume_addr_imm b; use_addr_imm a
+                                         ^
+Error: This value is used here, but it has already been used as unique at:
+Line 6, characters 21-22:
+6 |     consume_addr_imm b; use_addr_imm a
+                         ^
+
+|}]
+
+(* ...but independent of each other *)
+let ok_nested_position_sibling (r : outer2 @ unique) =
+  match r with
+  | { o2 = { h1 = deref_ b; h2 = y } as deref_ _a } ->
+    consume_addr_imm b; consume y
+[%%expect{|
+val ok_nested_position_sibling : outer2 @ unique -> unit = <fun>
+|}]
+
+(* Below an address, [P] matches the loaded value, which the address owns *)
+let bad_consume_alias_below_addr_imm (t : string addr_imm @ unique) =
+  match t with addr_imm_ (y as deref_ a) -> consume y; use_addr_imm a
+[%%expect{|
+Line 2, characters 68-69:
+2 |   match t with addr_imm_ (y as deref_ a) -> consume y; use_addr_imm a
+                                                                        ^
+Error: This value is used here, but it has already been used as unique at:
+Line 2, characters 52-53:
+2 |   match t with addr_imm_ (y as deref_ a) -> consume y; use_addr_imm a
+                                                        ^
+
+|}]
+
+(* In a tuple expression, the address is identified with the component *)
+let bad_tuple_expr_alias (x : string @ unique) =
+  match (x, 0) with
+  | ((y as deref_ a), _) -> consume y; use_addr_imm a
+[%%expect{|
+Line 3, characters 52-53:
+3 |   | ((y as deref_ a), _) -> consume y; use_addr_imm a
+                                                        ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 36-37:
+3 |   | ((y as deref_ a), _) -> consume y; use_addr_imm a
+                                        ^
+
+|}]
+
+(* Exhaustiveness and unused cases look inside [P] *)
+let exh_alias = function (Some _ as deref_ a), _ -> a
+[%%expect{|
+Line 1, characters 16-53:
+1 | let exh_alias = function (Some _ as deref_ a), _ -> a
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "(None, _)"
+
+val exh_alias : 'a option * 'b -> 'a option addr_imm = <fun>
+|}]
+
+let unused_alias = function
+  | (_ as deref_ a), _ -> a
+  | (Some _ as deref_ a), _ -> a
+[%%expect{|
+Line 3, characters 4-27:
+3 |   | (Some _ as deref_ a), _ -> a
+        ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 11 [redundant-case]: this match case is unused.
+
+val unused_alias : 'a option * 'b -> 'a option addr_imm = <fun>
+|}]
+
+(* Unused variables of alias dereference patterns are reported, too *)
+let unused_alias_deref (x : int option * int) =
+  match x with ((_ as deref_ a), _) -> 0
+[%%expect{|
+Line 2, characters 29-30:
+2 |   match x with ((_ as deref_ a), _) -> 0
+                                 ^
+Warning 26 [unused-var]: unused variable "a".
+
+val unused_alias_deref : int option * int -> int = <fun>
+|}]
