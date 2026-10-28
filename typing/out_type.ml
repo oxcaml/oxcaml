@@ -1127,7 +1127,6 @@ end = struct
   let name_counter = ref 0
   let named_vars = ref ([] : string list)
   let visited_for_named_vars = ref ([] : transient_expr list)
-  let visited_for_named_modevars = ref ([] : transient_expr list)
 
   module Desc = With_locality.Desc
   module C = With_locality.C
@@ -1317,6 +1316,11 @@ end = struct
   descriptions visible in the type *)
   let visible_pairs = ref ([] : visible_pair list)
 
+  (* [printed_aliases] is a subset of [aliased_pairs] that records aliased mode
+  pairs that have already been printed *)
+  let aliased_pairs = ref ([] : visible_pair list)
+  let printed_aliases = ref ([] : (visible_pair * string) list)
+
   (** Tracks all mode variables that may occur in the above
   list (for fast visibility checking) *)
   let visible_vars = VarTbl.create 17
@@ -1383,24 +1387,29 @@ end = struct
     let comonadic = With_locality.get_comonadic_desc comonadic in
     { monadic; comonadic }
 
+  let is_aliased pair = List.exists (eq_pair pair) !aliased_pairs
+
+  let mark_aliased pair =
+    if not (is_aliased pair) then aliased_pairs := pair :: !aliased_pairs
+
   let register_visible_mode : With_locality.lr -> unit =
     fun mode ->
       if With_locality.check_generic mode then begin
         let ({ monadic; comonadic } as pair) = pair_of_mode mode in
         add_visible With_locality.obj_monadic monadic;
         add_visible With_locality.obj_comonadic comonadic;
-        if not (List.exists (eq_pair pair) !visible_pairs) then
-          visible_pairs := pair :: !visible_pairs
+        if List.exists (eq_pair pair) !visible_pairs then mark_aliased pair
+        else visible_pairs := pair :: !visible_pairs
       end
 
   (** [register_visible_modes] iterates over the type and registers every
       visible mode variable. *)
-  let rec register_visible_modes ty =
+  let rec register_visible_modes visited ty =
     let px = proxy ty in
-    if not (List.memq px !visited_for_named_modevars) then begin
-      visited_for_named_modevars := px :: !visited_for_named_modevars;
-      printer_iter_type_expr register_visible_modes register_visible_mode ty
-    end
+    if not (List.memq px visited) then
+      printer_iter_type_expr
+        (register_visible_modes (px :: visited))
+        register_visible_mode ty
 
   (* The next preprocessing step registers all direct
     paths from one visible mode variable to another.
@@ -1927,6 +1936,7 @@ end = struct
     || List.exists (fun (_, name') -> name = name') !names
     || String.Set.mem name !named_weak_vars
     || List.exists (fun (_, name') -> name = name') !modenames
+    || List.exists (fun (_, name') -> name = name') !printed_aliases
 
   let pick_name : int -> string = fun i ->
     match i with
@@ -2041,8 +2051,9 @@ end = struct
     name_counter := 0;
     named_vars := [];
     visited_for_named_vars := [];
-    visited_for_named_modevars := [];
     visible_pairs := [];
+    aliased_pairs := [];
+    printed_aliases := [];
     modenames := [];
     edge_table := [];
     suppressed_curry_heads := [];
@@ -2083,6 +2094,7 @@ end = struct
     let pair = pair_of_mode m in
     let implied =
       bounds_implied
+      && (not (is_aliased pair))
       &&
       let { lower; upper } = find_edges pair in
       let acc_heads = acc_heads acc in
@@ -2149,17 +2161,25 @@ end = struct
       let has_lower =
         not (List.is_empty edges_lower) || lo <> ""
       in
-      Fmt.fprintf ppf "[%s%a%s%s%a]"
-        (if has_upper then "< " else "")
-        (pp_bounds print_raw_upper_bound
-           " & " hi)
-        edges_upper
-        (if has_upper && has_lower
-         then " " else "")
-        (if has_lower then "> " else "")
-        (pp_bounds print_raw_lower_bound
-           " | " lo)
-        edges_lower
+      let constraints =
+        Fmt.asprintf "[%s%a%s%s%a]"
+          (if has_upper then "< " else "")
+          (pp_bounds print_raw_upper_bound
+             " & " hi)
+          edges_upper
+          (if has_upper && has_lower
+           then " " else "")
+          (if has_lower then "> " else "")
+          (pp_bounds print_raw_lower_bound
+             " | " lo)
+          edges_lower
+      in
+      if is_aliased pair then begin
+        let alias = new_mode_name () in
+        printed_aliases := (pair, alias) :: !printed_aliases;
+        Fmt.fprintf ppf "(%s as '%s)" constraints alias
+      end
+      else Fmt.fprintf ppf "%s" constraints
     end
 
   let name_of_modes (modes : With_locality.lr) =
@@ -2170,8 +2190,13 @@ end = struct
          (heads_of_mode modes)
     then
       fatal_error "Out_type.name_of_modes: printing an elided curry mode";
-    let bounds = construct_raw_bounds pair in
-    Fmt.asprintf "%a" (print_raw_constraints bounds) pair
+    match
+      List.find_opt (fun (pair', _) -> eq_pair pair pair') !printed_aliases
+    with
+    | Some (_, alias) -> "'" ^ alias
+    | None ->
+      let bounds = construct_raw_bounds pair in
+      Fmt.asprintf "%a" (print_raw_constraints bounds) pair
 
   let substitute ty =
     match List.assq ty !name_subst with
@@ -2269,7 +2294,7 @@ end = struct
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
-      register_visible_modes ty;
+      register_visible_modes [] ty;
       add_visible_paths ();
       add_visible_edges ()
     end
