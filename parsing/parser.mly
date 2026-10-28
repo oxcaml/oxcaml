@@ -2978,7 +2978,7 @@ spliceable_expr:
       { unclosed "(" $loc($1) ")" $loc($3) }
   | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
+        mkexp_opt_type_constraint_with_modes ~loc:$sloc ~modes:m $2
           t }
   | mkrhs(val_longident)
       { mkexp ~loc:$sloc (Pexp_ident ($1)) }
@@ -2993,7 +2993,7 @@ simple_expr:
       { unclosed "(" $loc($1) ")" $loc($3) }
   | LPAREN seq_expr opt_type_constraint_with_modes RPAREN
       { let (t, m) = $3 in
-        mkexp_opt_type_constraint_with_modes ~ghost:true ~loc:$sloc ~modes:m $2
+        mkexp_opt_type_constraint_with_modes ~loc:$sloc ~modes:m $2
           t }
   | indexop_expr(DOT, seq_expr, { None })
       { mk_indexop_expr builtin_indexing_operators ~loc:$sloc $1 }
