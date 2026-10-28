@@ -406,7 +406,7 @@ module Dynamic = Make_layout_filler (struct
      evaluated last. *)
   let simple ~dbg env res simple =
     let To_cmm_env.{ env; res; expr = { cmm; free_vars; effs } } =
-      C.simple ~dbg env res simple
+      C.simple ~consider_inlining_effectful_expressions:true ~dbg env res simple
     in
     `Expr cmm, free_vars, env, res, effs
 
