@@ -2908,29 +2908,85 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
+let apply_modality_l modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
+  let with_bounds =
+    With_bounds.map
+      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
+      jk.jkind.with_bounds
+  in
+  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  |> disallow_right
+
+let apply_modality_r modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
+  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+module Unboxed_field_transformation = struct
+  type t = { modality : Mode.Modality.Const.t }
+
+  let id = { modality = Mode.Modality.Const.id }
+
+  let of_modality modality = { modality }
+
+  let of_label ({ ld_modalities; _ } : Types.label_declaration) =
+    { modality = ld_modalities }
+
+  let nest ~outer ~inner =
+    { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality
+    }
+
+  let apply_l t jk = apply_modality_l t.modality jk
+
+  let apply_r t jk = apply_modality_r t.modality jk
+end
+
+let product_of_fields ~why fields layouts =
+  let with_bounds =
+    List.fold_right
+      (fun (type_expr, ({ modality } : Unboxed_field_transformation.t))
+           with_bounds ->
+        With_bounds.add_modality ~type_expr ~modality with_bounds)
+      fields No_with_bounds
+  in
+  fresh_jkind_poly
+    { base = Layout (Layout.product layouts);
+      mod_bounds = Mod_bounds.min;
+      with_bounds
+    }
+    ~annotation:None ~why:(Product_creation why)
+  (* [mark_best] is correct here because the with-bounds of a product jkind
+     include all the components of the product. Accordingly, looking through
+     the product, by one step, never loses any information. *)
+  |> mark_best
+
 let for_unboxed_record lbls =
-  let open Types in
-  let tys_modalities =
+  let fields =
     List.map
-      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
+      (fun ((lbl : Types.label_declaration), _layout) ->
+        lbl.ld_type, Unboxed_field_transformation.of_label lbl)
       lbls
   in
   let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  product_of_fields ~why:Unboxed_record fields layouts
 
-let for_abbreviation ~type_jkind_purely ~modality ty =
+let for_abbreviation ~type_jkind_purely wrapping ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
-  let with_bounds_types =
-    let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-    With_bounds_types.singleton ty { bounds_mask }
+  let with_ty_bound =
+    With_bounds_types.singleton ty { bounds_mask = Axis_lattice.top }
   in
-  fresh_jkind_poly
-    { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
-    }
-    ~annotation:None ~why:Abbreviation
+  let jkind_before_wrapping =
+    fresh_jkind_poly
+      { base = jkind.jkind.base;
+        mod_bounds = Mod_bounds.min;
+        with_bounds = With_bounds with_ty_bound
+      }
+      ~annotation:None ~why:Abbreviation
+  in
+  Unboxed_field_transformation.apply_l wrapping jkind_before_wrapping
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2961,7 +3017,9 @@ let for_boxed_row row =
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most
+         cases. But if we ever allow open types to mode-cross, we have to get
+         rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
       (* Here we count how many rows are in the polymorphic variant and default
@@ -3214,22 +3272,6 @@ let of_mod_bounds ~history mod_bounds =
     ran_out_of_fuel_during_normalize = false;
     quality = Not_best
   }
-
-let apply_modality_l modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
-  let with_bounds =
-    With_bounds.map
-      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
-      jk.jkind.with_bounds
-  in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
-  |> disallow_right
-
-let apply_modality_r modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
   let or_null_axes ({ nullability; separability } : Scannable_axes.t) :
