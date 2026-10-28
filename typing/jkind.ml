@@ -2925,22 +2925,71 @@ let apply_modality_r modality jk =
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 module Unboxed_field_transformation = struct
-  type t = { modality : Mode.Modality.Const.t }
-
-  let id = { modality = Mode.Modality.Const.id }
-
-  let of_modality modality = { modality }
-
-  let of_label ({ ld_modalities; _ } : Types.label_declaration) =
-    { modality = ld_modalities }
-
-  let nest ~outer ~inner =
-    { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality
+  type t =
+    { modality : Mode.Modality.Const.t;
+      bounds : Axis_lattice.t
     }
 
-  let apply_l t jk = apply_modality_l t.modality jk
+  let id = { modality = Mode.Modality.Const.id; bounds = Axis_lattice.bot }
 
-  let apply_r t jk = Ok (apply_modality_r t.modality jk)
+  (* An unboxed record has no block of its own, so a mutable label only
+     contributes the axes on which a mutable block exceeds an immutable one.
+     Joining [immutable_data] with the kind of [r#] then gives the kind of
+     [r]. *)
+  let mutable_label_bounds =
+    Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
+
+  let of_field ~(mutability : Types.mutability) ~modality =
+    let bounds =
+      match mutability with
+      | Immutable -> Axis_lattice.bot
+      | Mutable { atomic = Nonatomic; _ } -> mutable_label_bounds
+      | Mutable { atomic = Atomic; _ } ->
+        Misc.fatal_error
+          "Jkind.Unboxed_field_transformation.of_field: atomic field"
+    in
+    { modality; bounds }
+
+  let of_modality modality = of_field ~mutability:Immutable ~modality
+
+  let of_label ({ ld_modalities; ld_mutable; _ } : Types.label_declaration) =
+    of_field ~mutability:ld_mutable ~modality:ld_modalities
+
+  (* The modality of [outer] masks the bounds of [inner]. For example, [y] is
+     reached from [t] through [x] in
+
+       type u = #{ mutable y : int ref }
+       type t = #{ x : u @@ contended }
+
+     where [outer] is for [x] and [inner] is for [y]. Here, [contended] hides
+     the mutability of [y] on contention, but not on visibility. *)
+  let nest ~outer ~inner =
+    { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality;
+      bounds =
+        Axis_lattice.join outer.bounds
+          (Axis_lattice.meet
+             (Axis_lattice.mask_of_modality outer.modality)
+             inner.bounds)
+    }
+
+  let join_bounds bounds (jk : _ jkind) =
+    if Axis_lattice.equal bounds Axis_lattice.bot
+    then jk
+    else
+      { jk with
+        jkind =
+          { jk.jkind with
+            mod_bounds = Mod_bounds.join_axis_lattice jk.jkind.mod_bounds bounds
+          }
+      }
+
+  let apply_l t jk = apply_modality_l t.modality jk |> join_bounds t.bounds
+
+  let apply_r t jk =
+    if
+      Axis_lattice.leq t.bounds (Mod_bounds.to_axis_lattice jk.jkind.mod_bounds)
+    then Ok (apply_modality_r t.modality jk)
+    else Error ()
 end
 
 (* [Builtin.product] is hidden from [Jkind]'s interface, but it is still
@@ -2954,7 +3003,14 @@ let product_of_fields ~why fields layouts =
         ty, wrapping.modality)
       fields
   in
+  let bounds =
+    List.fold_left
+      (fun acc (_, (wrapping : Unboxed_field_transformation.t)) ->
+        Axis_lattice.join acc wrapping.bounds)
+      Axis_lattice.bot fields
+  in
   Builtin.product ~why tys_modalities layouts
+  |> Unboxed_field_transformation.join_bounds bounds
 
 let for_unboxed_record lbls =
   let fields =
