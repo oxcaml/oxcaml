@@ -1331,8 +1331,7 @@ let without_cmis f x =
 
 let imports () = Persistent_env.imports !persistent_env
 
-let import_crcs ~source crcs =
-  Persistent_env.import_crcs !persistent_env ~source crcs
+let import_names () = Persistent_env.import_names !persistent_env
 
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
@@ -3523,14 +3522,13 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
       visibility = Visible { cmx_guaranteed = false }
     }
   in
-  Persistent_env.save_cmi !persistent_env pers_sig;
-  cmi
+  Persistent_env.save_cmi !persistent_env pers_sig
 
 let save_signature ~alerts sg modname cu cmi =
   save_signature_with_transform (fun cmi -> cmi) ~alerts sg modname cu cmi
 
 let save_signature_with_imports ~alerts sg modname cu cmi imports =
-  let with_imports cmi = { cmi with cmi_crcs = imports } in
+  let with_imports cmi = { cmi with cmi_imports = imports } in
   save_signature_with_transform with_imports ~alerts sg modname cu cmi
 
 (* Make the initial environment. *)
