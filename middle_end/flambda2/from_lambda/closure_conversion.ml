@@ -402,11 +402,14 @@ module Inlining = struct
         let code = Code_or_metadata.get_code code in
         let inlined_call = Apply_expr.inlined apply in
         let decision, res =
-          (* Normally [close_one_function] should give [Jsir_inlining_disabled]
-             for code using slots, so shouldn't be present here. However the
-             wrappers created by [make_unboxed_function_wrapper] inherit the
-             main function's decision while projecting from their own closure,
-             so they can reach this point with code present. *)
+          (* Normally [close_one_function] gives [Jsir_inlining_disabled] to
+             code using slots, so such code should not be present here. There
+             are two exceptions: the wrappers created by
+             [make_unboxed_function_wrapper] inherit the main function's
+             decision while projecting from their own closure, and for code
+             imported from other units [Acc.approximation_for_external_symbol]
+             recomputes the decision from [inline] and [cost_metrics] without
+             the JSIR restriction. *)
           if
             Clflags.target_is_jsir () && not (Code.can_be_inlined_for_jsir code)
           then
