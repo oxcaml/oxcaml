@@ -2973,7 +2973,7 @@ module Unboxed_field_transformation = struct
 
   let apply_l t jk = apply_modality_l t.modality jk
 
-  let apply_r t jk = apply_modality_r t.modality jk
+  let apply_r t jk = Ok (apply_modality_r t.modality jk)
 end
 
 let product_of_fields ~why fields layouts =
