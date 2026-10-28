@@ -14,6 +14,22 @@ let[@inline never] next msg () =
   1
 ;;
 
+
+(* once compiled, this code currently results
+   in roughly the following:
+   ```
+   *alloc* = caml_alloc_shr_check_gc (closure_tag, ...)
+   store (+a *alloc* 6160) (apply 'next' "a" ())
+   ```
+   and therefore the funciton `next` is called while the
+   *alloc* value is a root and can be scanned, however at that
+   point, it's a block with a closure tag, but its first
+   arity+start-of-env field is not set, breaking the invariant
+   mentionned in a comment written for `caml_alloc_shr_check_gc`;
+   it's not trivial to reproduce as a segfault/runtime error because
+   for that we would need the GC to partially scan the closure block
+   during the call to `next` (but only partially), and then resume
+   it later, which is surprisingly hard to do *)
 let[@inline never] test_big () =
   let a = next "a" () in
   let b = 0 in
