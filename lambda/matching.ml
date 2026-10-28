@@ -258,7 +258,6 @@ let deref_binder (q : pattern) =
   match q.pat_desc with
   | Tpat_any -> None
   | Tpat_var { id; uid; _ } -> Some (id, uid)
-  | Tpat_fun_layout { lpoly; _ } -> fatal_var_lpoly lpoly
   | _ -> fatal_error "Matching.deref_binder: argument is not a variable"
 
 module General = struct

@@ -2017,11 +2017,12 @@ let finalize_variants p =
 type pattern_variable_kind =
   | Std_var
   | As_var
+  | Deref_var
   | Continuation_var
 
 let unused_variable_warning pv_kind name : Warnings.t =
   match pv_kind with
-  | As_var -> Unused_var { name; mutated = false }
+  | As_var | Deref_var -> Unused_var { name; mutated = false }
   | Std_var | Continuation_var -> Unused_var_strict { name; mutated = false }
 
 type pattern_variable =
@@ -4630,10 +4631,12 @@ and type_pat_aux
       (* CR address-patterns: support [as deref_ x], which lifts the
          restriction below; then, print a more informative error when
          the argument is a pattern that [as deref_ x] would accept. *)
-      (match sp1.ppat_desc with
-       | Ppat_var _ -> ()
-       | _ ->
-         Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument);
+      let name =
+        match sp1.ppat_desc with
+        | Ppat_var name -> name
+        | _ ->
+          Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument
+      in
       let { position_mutability; container_mode; container_loc; base;
             rev_unboxed } =
         match pat_addr with
@@ -4650,9 +4653,18 @@ and type_pat_aux
         { containing = Derived_address; container = (container_loc, Pattern) }
       in
       let mode = apply_left_is_contained_by is_contained_by container_mode in
+      let mode = cross_left !!penv ty_addr mode in
+      let id, uid =
+        enter_variable ~pv_kind:Deref_var tps name.loc name mode
+          ~kind:(Val_reg addr_sort) ty_addr sp1.ppat_attributes addr_sort
+      in
       let p1 =
-        type_pat ~pat_mode:(simple_pat_mode mode) tps Value sp1 ty_addr
-          addr_sort
+        { pat_desc = Tpat_var { id; name; uid; sort = addr_sort; mode };
+          pat_loc = sp1.ppat_loc; pat_extra = [];
+          pat_type = ty_addr;
+          pat_attributes = sp1.ppat_attributes;
+          pat_env = !!penv;
+          pat_unique_barrier = Unique_barrier.not_computed () }
       in
       rvp {
         pat_desc = Tpat_deref (position_mutability, base, unboxed, p1);

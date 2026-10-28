@@ -876,3 +876,18 @@ Warning 57 [ambiguous-var-in-pattern-guard]: Ambiguous or-pattern variables unde
 
 val amb_warn : 'a * (int option * int option) -> int = <fun>
 |}]
+
+(* Unused variables of dereference patterns are reported like those of
+   aliases, unless they start with an underscore *)
+let unused_deref (x : int * int) = match x with (deref_ a, _) -> 0
+let unused_deref_underscore (x : int * int) =
+  match x with (deref_ _a, _) -> 0
+[%%expect{|
+Line 1, characters 56-57:
+1 | let unused_deref (x : int * int) = match x with (deref_ a, _) -> 0
+                                                            ^
+Warning 26 [unused-var]: unused variable "a".
+
+val unused_deref : int * int -> int = <fun>
+val unused_deref_underscore : int * int -> int = <fun>
+|}]
