@@ -65,6 +65,9 @@ type pattern_variable_kind =
   | As_var
   | Continuation_var
 
+(** The warning for an unused pattern variable of the given kind *)
+val unused_variable_warning : pattern_variable_kind -> string -> Warnings.t
+
 type pattern_variable =
   {
     pv_id: Ident.t;
