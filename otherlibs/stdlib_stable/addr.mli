@@ -13,7 +13,7 @@
 (**************************************************************************)
 
 type ('a : any) t :
-  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a
   = 'a addr
 
 val of_idx

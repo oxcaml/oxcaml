@@ -58,25 +58,12 @@ Line 1, characters 0-59:
 1 | type 'a t : value_or_null & bits64 mod everything = 'a addr
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "'a addr" is
-           value_or_null
-             mod forkable unyielding many stateless
-             with 'a @@ many
-           & bits64 mod forkable unyielding many stateless with 'a @@ many
+           value_or_null mod forkable unyielding many stateless with 'a
+           & bits64 mod forkable unyielding many stateless with 'a
          because it is the primitive type addr.
        But the kind of type "'a addr" must be a subkind of
            value_or_null mod everything & bits64 mod everything
          because of the definition of t at line 1, characters 0-59.
-
-       The first mode-crosses less than the second along:
-         locality: mod local ≰ mod global
-         uniqueness: mod unique ≰ mod aliased
-         contention: mod uncontended ≰ mod contended
-         portability: mod portable with 'a ≰ mod portable
-         forkable: mod forkable with 'a ≰ mod forkable
-         yielding: mod unyielding with 'a ≰ mod unyielding
-         statefulness: mod stateless with 'a ≰ mod stateless
-         visibility: mod read_write ≰ mod immutable
-         externality: mod internal ≰ mod external_
 |}]
 
 type 'a t : value_or_null & bits64 mod everything = 'a addr_imm
@@ -97,16 +84,16 @@ Error: The kind of type "'a addr_imm" is
 
 (* Upper and lower bounds using an abstract type *)
 type 'a addr_kind :
-  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a
 type 'a addr_upper :
-  value_or_null & bits64 mod forkable unyielding many stateless with 'a @@ many
+  value_or_null & bits64 mod forkable unyielding many stateless with 'a
   = 'a addr
 type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
   'a addr_kind
 [%%expect{|
 type 'a addr_kind
-  : value_or_null mod forkable unyielding many stateless with 'a @@ many
-    & bits64 mod forkable unyielding many stateless with 'a @@ many
+  : value_or_null mod forkable unyielding many stateless with 'a
+    & bits64 mod forkable unyielding many stateless with 'a
 type 'a addr_upper = 'a addr
 type 'a addr_lower = 'a addr_kind
 |}]
@@ -129,11 +116,12 @@ type 'a addr_imm_lower = 'a addr_imm_kind
 |}]
 
 (* Upper and lower bounds, phrased in terms of records *)
-(* See [Typemode.address_modalities] for why we have @@ local here. *)
-type 'a mut = { mutable contents : 'a @@ local }
+(* The [@@ local once] disables exactly the implied comonadic modalities. See
+   [Typemode.address_modalities] for why. *)
+type 'a mut = { mutable contents : 'a @@ local once }
 type 'a imm = { contents : 'a }
 [%%expect{|
-type 'a mut = { mutable contents : 'a @@ local; }
+type 'a mut = { mutable contents : 'a @@ local once; }
 type 'a imm = { contents : 'a; }
 |}]
 
@@ -143,8 +131,8 @@ type 'a addr_lower : value_or_null & bits64 mod everything with 'a addr =
   'a addr_kind
 [%%expect{|
 type 'a addr_kind
-  : value_or_null mod forkable unyielding many stateless with 'a @@ many
-    & bits64 mod forkable unyielding many stateless with 'a @@ many
+  : value_or_null mod forkable unyielding many stateless with 'a
+    & bits64 mod forkable unyielding many stateless with 'a
 type 'a addr_upper = 'a addr
 type 'a addr_lower = 'a addr_kind
 |}]
@@ -759,7 +747,7 @@ let ok_read (a : int addr @ read) =
 val ok_read : int addr @ read -> unit = <fun>
 |}]
 
-(* The value at a mutable address is many and aliased, but not global,
+(* The value at a mutable address is aliased, but not many, global,
    unyielding or forkable *)
 let bad_local (a : string addr @ local) =
   match a with
@@ -774,11 +762,24 @@ Error: This value is "local" to the parent region
        However, the highlighted expression is expected to be "global".
 |}]
 
-let ok_once (a : (unit -> unit) addr @ once) =
+let bad_once (a : (unit -> unit) addr @ once) =
   match a with
   | addr_ f -> use_many f
 [%%expect{|
-val ok_once : (unit -> unit) addr @ once -> unit = <fun>
+Line 3, characters 24-25:
+3 |   | addr_ f -> use_many f
+                            ^
+Error: This value is "once"
+         because it is the value at the address at line 3, characters 4-11
+         which is "once".
+       However, the highlighted expression is expected to be "many".
+|}]
+
+let ok_many (a : (unit -> unit) addr @ many) =
+  match a with
+  | addr_ f -> use_many f
+[%%expect{|
+val ok_many : (unit -> unit) addr -> unit = <fun>
 |}]
 
 let bad_unique (a : bytes addr @ unique) =
@@ -1077,9 +1078,32 @@ let unique_addr_after_match_mut (a : int addr @ unique) =
   | addr_ 1 -> use_unique_addr a
   | _ -> ()
 [%%expect{|
-val unique_addr_after_match_mut : int addr @ unique -> unit = <fun>
+Line 3, characters 31-32:
+3 |   | addr_ 1 -> use_unique_addr a
+                                   ^
+Error: This value is used here as unique,
+       but part of it has already been used in a constant pattern at:
+Line 3, characters 10-11:
+3 |   | addr_ 1 -> use_unique_addr a
+              ^
+
 |}]
 
+let unique_addr_imm_after_match (a : int addr_imm @ unique) =
+  match a with
+  | addr_imm_ 1 -> use_unique_addr_imm a
+  | _ -> ()
+[%%expect{|
+Line 3, characters 39-40:
+3 |   | addr_imm_ 1 -> use_unique_addr_imm a
+                                           ^
+Error: This value is used here as unique,
+       but part of it has already been used in a constant pattern at:
+Line 3, characters 14-15:
+3 |   | addr_imm_ 1 -> use_unique_addr_imm a
+                  ^
+
+|}]
 (*************)
 (* Linearity *)
 
@@ -1164,12 +1188,28 @@ let many_use_twice (a : (unit -> unit) addr_imm @ many) =
 val many_use_twice : (unit -> unit) addr_imm -> unit = <fun>
 |}]
 
-(* The value at a mutable address is always many *)
+(* The value at a once mutable address is once *)
 let once_use_twice_mut (a : (unit -> unit) addr @ once) =
   match a with
   | addr_ f -> f (); f ()
 [%%expect{|
-val once_use_twice_mut : (unit -> unit) addr @ once -> unit = <fun>
+Line 3, characters 21-22:
+3 |   | addr_ f -> f (); f ()
+                         ^
+Error: This value is used here,
+       but it is defined as once and has already been used at:
+Line 3, characters 15-16:
+3 |   | addr_ f -> f (); f ()
+                   ^
+
+|}]
+
+(* The value at a many mutable address is many *)
+let many_use_twice_mut (a : (unit -> unit) addr @ many) =
+  match a with
+  | addr_ f -> f (); f ()
+[%%expect{|
+val many_use_twice_mut : (unit -> unit) addr -> unit = <fun>
 |}]
 
 (******************)

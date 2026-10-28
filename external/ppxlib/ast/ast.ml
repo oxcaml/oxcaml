@@ -442,6 +442,11 @@ and pattern_desc = Parsetree.pattern_desc =
           - [(P @ modes)] when [tyopt] is [None]
          *)
   | Ppat_type of longident_loc  (** Pattern [#tconst] *)
+  | Ppat_addr of mutable_flag * pattern
+      (** [Ppat_addr(flag, P)] represents:
+          - [addr_ P]     when [flag] is [Mutable]
+          - [addr_imm_ P] when [flag] is [Immutable]
+       *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc
       (** [Ppat_unpack(s)] represents:
@@ -1739,6 +1744,9 @@ class virtual map =
             let b = self#option self#core_type b in
             let c = self#modes c in Ppat_constraint (a, b, c)
         | Ppat_type a -> let a = self#longident_loc a in Ppat_type a
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag a in
+            let b = self#pattern b in Ppat_addr (a, b)
         | Ppat_lazy a -> let a = self#pattern a in Ppat_lazy a
         | Ppat_unpack a ->
             let a = self#loc (self#option self#string) a in Ppat_unpack a
@@ -2928,6 +2936,7 @@ class virtual iter =
         | Ppat_constraint (a, b, c) ->
             (self#pattern a; self#option self#core_type b; self#modes c)
         | Ppat_type a -> self#longident_loc a
+        | Ppat_addr (a, b) -> (self#mutable_flag a; self#pattern b)
         | Ppat_lazy a -> self#pattern a
         | Ppat_unpack a -> self#loc (self#option self#string) a
         | Ppat_exception a -> self#pattern a
@@ -3891,6 +3900,9 @@ class virtual ['acc] fold =
             let acc = self#option self#core_type b acc in
             let acc = self#modes c acc in acc
         | Ppat_type a -> self#longident_loc a acc
+        | Ppat_addr (a, b) ->
+            let acc = self#mutable_flag a acc in
+            let acc = self#pattern b acc in acc
         | Ppat_lazy a -> self#pattern a acc
         | Ppat_unpack a -> self#loc (self#option self#string) a acc
         | Ppat_exception a -> self#pattern a acc
@@ -5102,6 +5114,9 @@ class virtual ['acc] fold_map =
             ((Ppat_constraint (a, b, c)), acc)
         | Ppat_type a ->
             let (a, acc) = self#longident_loc a acc in ((Ppat_type a), acc)
+        | Ppat_addr (a, b) ->
+            let (a, acc) = self#mutable_flag a acc in
+            let (b, acc) = self#pattern b acc in ((Ppat_addr (a, b)), acc)
         | Ppat_lazy a ->
             let (a, acc) = self#pattern a acc in ((Ppat_lazy a), acc)
         | Ppat_unpack a ->
@@ -6645,6 +6660,9 @@ class virtual ['ctx] map_with_context =
             let b = self#option self#core_type ctx b in
             let c = self#modes ctx c in Ppat_constraint (a, b, c)
         | Ppat_type a -> let a = self#longident_loc ctx a in Ppat_type a
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag ctx a in
+            let b = self#pattern ctx b in Ppat_addr (a, b)
         | Ppat_lazy a -> let a = self#pattern ctx a in Ppat_lazy a
         | Ppat_unpack a ->
             let a = self#loc (self#option self#string) ctx a in Ppat_unpack a
@@ -8086,6 +8104,9 @@ class virtual ['res] lift =
             let c = self#modes c in self#constr "Ppat_constraint" [a; b; c]
         | Ppat_type a ->
             let a = self#longident_loc a in self#constr "Ppat_type" [a]
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag a in
+            let b = self#pattern b in self#constr "Ppat_addr" [a; b]
         | Ppat_lazy a ->
             let a = self#pattern a in self#constr "Ppat_lazy" [a]
         | Ppat_unpack a ->
@@ -9826,6 +9847,11 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#longident_loc ctx a in
             ((Ppat_type (Stdlib.fst a)),
               (self#constr ctx "Ppat_type" [Stdlib.snd a]))
+        | Ppat_addr (a, b) ->
+            let a = self#mutable_flag ctx a in
+            let b = self#pattern ctx b in
+            ((Ppat_addr ((Stdlib.fst a), (Stdlib.fst b))),
+              (self#constr ctx "Ppat_addr" [Stdlib.snd a; Stdlib.snd b]))
         | Ppat_lazy a ->
             let a = self#pattern ctx a in
             ((Ppat_lazy (Stdlib.fst a)),
