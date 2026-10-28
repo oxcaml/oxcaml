@@ -130,7 +130,8 @@ module Deep : sig
 
       When using this API, the handler must handle all effects. Otherwise,
       the call to [match_with] or [try_with] can be wrongly marked [unyielding]
-      even though some effects may be reperformed. *)
+      even though some effects may be reperformed. Use [With_handler] if you
+      need to reperform effects. *)
   module Yielding : sig
     val match_with
       :  (Handler.t @ local -> 'c -> 'a) @ unyielding
@@ -145,7 +146,10 @@ module Deep : sig
       -> 'a
 
     (** Like {!Deep.Yielding}, but allow threading [Handler.t @ local] for the
-        parent stack to the handler callbacks *)
+        parent stack to the handler callbacks.
+
+        Since the parent [Handler.t] is passed in, calls to [match_with] and
+        [try_with] are never marked [unyielding]. *)
     module With_handler : sig
       type ('a,'b) handler =
         { retc: Handler.t @ local -> 'a -> 'b;
@@ -225,7 +229,8 @@ module Deep : sig
 
         When using this API, the handler must handle all effects. Otherwise,
         the call to [match_with] or [try_with] can be wrongly marked
-        [unyielding] even though some effects may be reperformed. *)
+        [unyielding] even though some effects may be reperformed. Use
+        [With_handler] if you need to reperform effects. *)
     module Yielding : sig
       val match_with
         :  (Handler.t @ local -> 'c -> 'a) @ unyielding
@@ -241,7 +246,10 @@ module Deep : sig
         -> 'a
 
       (** Like {!Deep.Preemptible.Yielding}, but allow threading
-          [Handler.t @ local] for the parent stack to the handler callbacks *)
+          [Handler.t @ local] for the parent stack to the handler callbacks.
+
+          Since the parent [Handler.t] is passed in, calls to [match_with] and
+          [try_with] are never marked [unyielding]. *)
       module With_handler : sig
         type ('a,'b) handler =
             { retc: Handler.t @ local -> 'a -> 'b;
@@ -330,7 +338,8 @@ module Shallow : sig
       When using this API, the handler passed to [continue_with] or
       [discontinue_with] must handle all effects. Otherwise, the call to
       [continue_with] or [discontinue_with] can be wrongly marked [unyielding]
-      even though some effects may be reperformed. *)
+      even though some effects may be reperformed. Use [With_handler] if you
+      need to reperform effects. *)
   module Yielding : sig
     (** OxCaml version of [fiber], which provides a [Handler.t @ local] to an
         [unyielding] computation. *)
@@ -338,7 +347,10 @@ module Shallow : sig
       : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
     (** Like {!Shallow}, but allow threading [Handler.t @ local]
-        for the parent stack to the handler callbacks *)
+        for the parent stack to the handler callbacks.
+
+        Since the parent [Handler.t] is passed in, calls to [continue_with] and
+        [discontinue_with] are never marked [unyielding]. *)
     module With_handler : sig
       type ('a,'b) handler =
         { retc: Handler.t @ local -> 'a -> 'b;
@@ -431,7 +443,8 @@ module Shallow : sig
         When using this API, the handler passed to [continue_with] or
         [discontinue_with] must handle all effects. Otherwise, the call to
         [continue_with] or [discontinue_with] can be wrongly marked
-        [unyielding] even though some effects may be reperformed. *)
+        [unyielding] even though some effects may be reperformed. Use
+        [With_handler] if you need to reperform effects. *)
     module Yielding : sig
       (** OxCaml version of [fiber], which provides a [Handler.t @ local] to an
           [unyielding] computation. *)
@@ -439,7 +452,10 @@ module Shallow : sig
         : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
       (** Like {!Shallow.Preemptible}, but allow threading [Handler.t @ local]
-          for the parent stack to the handler callbacks *)
+          for the parent stack to the handler callbacks.
+
+          Since the parent [Handler.t] is passed in, calls to [continue_with]
+          and [discontinue_with] are never marked [unyielding]. *)
       module With_handler : sig
         type ('a,'b) handler =
             { retc: Handler.t @ local -> 'a -> 'b;
