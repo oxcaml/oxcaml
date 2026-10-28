@@ -1,3 +1,4 @@
+(* ACTUAL COMPILER: Wrapping arithmetic control. *)
 (* The ordinary conversion must preserve OCaml's 63-bit wrapping arithmetic.
    This program performs no memory access with an invalid index. *)
 let[@inline never] wrapped_word o k = Int64.of_int (o + k)

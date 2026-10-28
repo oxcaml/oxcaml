@@ -1546,7 +1546,9 @@ let consider_inlining_effectful_expressions p =
     None
 
 let byte_vector_index ~dbg env simple (index : Env.expr_with_info) =
-  (* A byte access requires a nonnegative index. For an even nonnegative [n],
+  (* ACTUAL COMPILER: A defined Bytes128 access requires [0 <= index <=
+     Bytes.length bytes - 16], even for unsafe accesses. [c] may be any signed
+     machine word; its producer need not be known. For an even nonnegative [n],
      [(c + n) asr 1] differs from [(c asr 1) + (n / 2)] only when the addition
      overflows, in which case the wrapped index is negative. Distribute only at
      this access: the original bounds check and other uses of the converted

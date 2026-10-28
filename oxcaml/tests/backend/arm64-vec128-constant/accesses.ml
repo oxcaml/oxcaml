@@ -1,4 +1,4 @@
-(* Scalar byte-copy oracles for the access-local positive-offset prototype. *)
+(* ACTUAL COMPILER: Scalar byte-copy oracles for the access-local positive-offset prototype. *)
 external get : bytes -> int -> int64x2# = "%caml_bytes_getu128u#"
 external set : bytes -> int -> int64x2# -> unit = "%caml_bytes_setu128u#"
 external get_checked : bytes -> int -> int64x2# = "%caml_bytes_getu128#"
@@ -6,6 +6,7 @@ external set_checked : bytes -> int -> int64x2# -> unit = "%caml_bytes_setu128#"
 
 let[@inline never] load_positive a out o = set out 0 (get a (o + 16))
 let[@inline never] store_positive a out o = set out (o + 16) (get a 0)
+let[@inline never] wrapped_producer x = x + x
 let[@inline never] load_checked a out o = set out 0 (get_checked a (o + 16))
 let[@inline never] store_checked a out o = set_checked out (o + 16) (get a 0)
 let[@inline never] load_negative a out o = set out 0 (get a (o - 16))
@@ -48,6 +49,20 @@ let expect_invalid f =
 
 let () =
   let a = input 128 3 and b = input 128 29 in
+  let o = wrapped_producer (Sys.opaque_identity max_int) in
+  assert (o = -2);
+  List.iter (fun load ->
+    let out = input 128 91 in
+    let expected = Bytes.copy out in
+    scalar_copy a 14 expected 0;
+    load a out o;
+    assert (Bytes.equal out expected)) [load_positive; load_checked];
+  List.iter (fun store ->
+    let out = input 128 91 in
+    let expected = Bytes.copy out in
+    scalar_copy a 0 expected 14;
+    store a out o;
+    assert (Bytes.equal out expected)) [store_positive; store_checked];
   List.iter (fun o ->
     List.iter (fun load ->
       let out = input 128 91 in
