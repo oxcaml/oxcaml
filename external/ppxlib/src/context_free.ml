@@ -74,12 +74,16 @@ module Rule = struct
   module Attr_floating_inline = struct
     type ('a, 'b) unpacked = {
       attribute : ('a, 'b) Attribute.Floating.t;
+      expand_items : bool;
       expand : ctxt:Expansion_context.Deriver.t -> 'b -> 'a list;
     }
 
     type 'a t = T : ('a, _) unpacked -> 'a t
 
     let attr_name (T t) = Attribute.Floating.name t.attribute
+
+    let split_normal_and_expand l =
+      List.partition l ~f:(fun (T t) -> not t.expand_items)
   end
 
   module Special_function = struct
@@ -220,6 +224,11 @@ module Rule = struct
       T (Attr_replace kind, T { name; attributes; expand })
   end
 
+  module Attribute_list = Attr_multiple_replace.Attribute_list
+  module Parsed_payload_list = Attr_multiple_replace.Parsed_payload_list
+
+  let attr_multiple_replace = Attr_multiple_replace.attr_multiple_replace
+
   let attr_str_type_decl attribute expand =
     T (Attr_str_type_decl, T { attribute; expand; expect = false })
 
@@ -292,11 +301,17 @@ module Rule = struct
   let attr_sig_class_type_decl_expect attribute expand =
     T (Attr_sig_class_type_decl, T { attribute; expand; expect = true })
 
+  let attr_str_floating_expect attribute expand =
+    T (Attr_str_floating, T { attribute; expand; expand_items = false })
+
+  let attr_sig_floating_expect attribute expand =
+    T (Attr_sig_floating, T { attribute; expand; expand_items = false })
+
   let attr_str_floating_expect_and_expand attribute expand =
-    T (Attr_str_floating, T { attribute; expand })
+    T (Attr_str_floating, T { attribute; expand; expand_items = true })
 
   let attr_sig_floating_expect_and_expand attribute expand =
-    T (Attr_sig_floating, T { attribute; expand })
+    T (Attr_sig_floating, T { attribute; expand; expand_items = true })
 end
 
 module Generated_code_hook = struct
@@ -366,7 +381,7 @@ let handle_attr_replace_once context attrs item base_ctxt : 'a option t =
           | [] -> return (false, Rule.Attr_replace.Parsed_payload_list.[])
           | x :: xs ->
               (if Attribute.Context.equal context (Attribute.context x) then
-                 return @@ Attribute.get x item
+                 Attribute.get_res x item |> of_result ~default:None
                else return None)
               >>= fun p ->
               get_attr_payloads xs >>| fun (any_attrs, ps) ->
@@ -377,64 +392,82 @@ let handle_attr_replace_once context attrs item base_ctxt : 'a option t =
         if any_attrs then
           Some
             ( (payloads, errors) >>= fun payloads ->
-              return
-              @@ Attribute.remove_seen context
-                   (Rule.Attr_replace.Attribute_list.to_packed_list a.attributes)
-                   item
-              >>| fun item -> a.expand ~ctxt:base_ctxt item payloads )
-        else None)
+              Attribute.remove_seen_res context
+                (Rule.Attr_replace.Attribute_list.to_packed_list a.attributes)
+                item
+              |> of_result ~default:item
+              >>| fun item -> Some (a.expand ~ctxt:base_ctxt item payloads) )
+        else match errors with _ :: _ -> Some (None, errors) | [] -> None)
   in
   match result with
-  | Some (item, errors) -> (Some item, errors)
+  | Some (option, errors) -> (option, errors)
   | None -> (None, [])
 
-let rec handle_attr_replace_str attrs item base_ctxt =
-  (match item.pstr_desc with
-    | Pstr_extension _ ->
-        handle_attr_replace_once AC.Pstr_extension attrs item base_ctxt
-    | Pstr_eval _ -> handle_attr_replace_once AC.Pstr_eval attrs item base_ctxt
-    | _ -> return None)
-  >>= function
-  | Some item -> handle_attr_replace_str attrs item base_ctxt
-  | None -> return item
+(* Applies [once] until it returns [None], and tells whether it applied at
+   all. Stops as soon as an application reports errors: the offending
+   attributes may still be on the item, so applying again could loop. *)
+let handle_attr_replace_fix once item =
+  let rec loop ~replaced item =
+    match once item with
+    | Some item, [] -> loop ~replaced:true item
+    | Some item, errors -> ((true, item), errors)
+    | None, errors -> ((replaced, item), errors)
+  in
+  loop ~replaced:false item
 
-let rec handle_attr_replace_sig attrs item base_ctxt =
-  (match item.psig_desc with
-    | Psig_extension _ ->
-        handle_attr_replace_once AC.Psig_extension attrs item base_ctxt
-    | _ -> return None)
-  >>= function
-  | Some item -> handle_attr_replace_sig attrs item base_ctxt
-  | None -> return item
+let handle_attr_replace_str attrs item base_ctxt =
+  handle_attr_replace_fix
+    (fun item ->
+      match item.pstr_desc with
+      | Pstr_extension _ ->
+          handle_attr_replace_once AC.Pstr_extension attrs item base_ctxt
+      | Pstr_eval _ ->
+          handle_attr_replace_once AC.Pstr_eval attrs item base_ctxt
+      | _ -> return None)
+    item
+  >>| snd
+
+let handle_attr_replace_sig attrs item base_ctxt =
+  handle_attr_replace_fix
+    (fun item ->
+      match item.psig_desc with
+      | Psig_extension _ ->
+          handle_attr_replace_once AC.Psig_extension attrs item base_ctxt
+      | _ -> return None)
+    item
+  >>| snd
 
 let rec map_node_rec attr_context attr_rules ext_context ts super_call loc
+    base_ctxt x ~embed_errors =
+  handle_attr_replace_fix
+    (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+    x
+  >>= fun (_, x) ->
+  map_extension_rec attr_context attr_rules ext_context ts super_call loc
+    base_ctxt x ~embed_errors
+
+and map_extension_rec attr_context attr_rules ext_context ts super_call loc
     base_ctxt x ~embed_errors =
   let ctxt =
     Expansion_context.Extension.make ~extension_point_loc:loc ~base:base_ctxt ()
   in
-  handle_attr_replace_once attr_context attr_rules x base_ctxt >>= function
-  | Some x ->
-      map_node_rec attr_context attr_rules ext_context ts super_call loc
-        base_ctxt x ~embed_errors
-  | None -> (
-      match EC.get_extension ext_context x with
+  match EC.get_extension ext_context x with
+  | None -> super_call base_ctxt x
+  | Some (ext, attrs) -> (
+      (try
+         E.For_context.convert_res ts ~ctxt ext
+         |> With_errors.of_result ~default:None
+       with exn when embed_errors ->
+         With_errors.return (Some (exn_to_error_extension ext_context x exn)))
+      >>= fun converted ->
+      match converted with
       | None -> super_call base_ctxt x
-      | Some (ext, attrs) -> (
-          (try
-             E.For_context.convert_res ts ~ctxt ext
-             |> With_errors.of_result ~default:None
-           with exn when embed_errors ->
-             With_errors.return
-               (Some (exn_to_error_extension ext_context x exn)))
-          >>= fun converted ->
-          match converted with
-          | None -> super_call base_ctxt x
-          | Some x ->
-              EC.merge_attributes_res ext_context x attrs
-              |> With_errors.of_result ~default:x
-              >>= fun x ->
-              map_node_rec attr_context attr_rules ext_context ts super_call loc
-                base_ctxt x ~embed_errors))
+      | Some x ->
+          EC.merge_attributes_res ext_context x attrs
+          |> With_errors.of_result ~default:x
+          >>= fun x ->
+          map_node_rec attr_context attr_rules ext_context ts super_call loc
+            base_ctxt x ~embed_errors)
 
 let map_context : type a. a EC.t -> a AC.t = function
   | EC.Class_expr -> AC.Class_expr
@@ -458,11 +491,14 @@ let map_node attr_rules ext_context ts super_call loc base_ctxt x ~hook
   let ctxt =
     Expansion_context.Extension.make ~extension_point_loc:loc ~base:base_ctxt ()
   in
-  handle_attr_replace_once attr_context attr_rules x base_ctxt >>= function
-  | Some x ->
-      map_node_rec attr_context attr_rules ext_context ts super_call loc
+  handle_attr_replace_fix
+    (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+    x
+  >>= function
+  | true, x ->
+      map_extension_rec attr_context attr_rules ext_context ts super_call loc
         base_ctxt x ~embed_errors
-  | None -> (
+  | false, x -> (
       match EC.get_extension ext_context x with
       | None -> super_call base_ctxt x
       | Some (ext, attrs) -> (
@@ -491,49 +527,47 @@ let rec map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l ~hook
   match l with
   | [] -> return []
   | x :: l -> (
-      handle_attr_replace_once attr_context attr_rules x base_ctxt >>= function
-      | Some x ->
-          map_nodes attr_rules ext_context ts super_call get_loc base_ctxt
-            (x :: l) ~hook ~embed_errors ~in_generated_code
-      | None -> (
-          match EC.get_extension ext_context x with
-          | None ->
-              (* These two lets force the evaluation order, so that errors are reported in
+      handle_attr_replace_fix
+        (fun x -> handle_attr_replace_once attr_context attr_rules x base_ctxt)
+        x
+      >>= fun (_, x) ->
+      match EC.get_extension ext_context x with
+      | None ->
+          (* These two lets force the evaluation order, so that errors are reported in
              the same order as they appear in the source file. *)
+          super_call base_ctxt x >>= fun x ->
+          map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l
+            ~hook ~embed_errors ~in_generated_code
+          >>| fun l -> x :: l
+      | Some (ext, attrs) -> (
+          let extension_point_loc = get_loc x in
+          let ctxt =
+            Expansion_context.Extension.make ~extension_point_loc
+              ~base:base_ctxt ()
+          in
+          (try
+             E.For_context.convert_inline_res ts ~ctxt ext
+             |> With_errors.of_result ~default:None
+           with exn when embed_errors ->
+             With_errors.return
+               (Some [ exn_to_error_extension ext_context x exn ]))
+          >>= function
+          | None ->
               super_call base_ctxt x >>= fun x ->
               map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l
                 ~hook ~embed_errors ~in_generated_code
               >>| fun l -> x :: l
-          | Some (ext, attrs) -> (
-              let extension_point_loc = get_loc x in
-              let ctxt =
-                Expansion_context.Extension.make ~extension_point_loc
-                  ~base:base_ctxt ()
-              in
-              (try
-                 E.For_context.convert_inline_res ts ~ctxt ext
-                 |> With_errors.of_result ~default:None
-               with exn when embed_errors ->
-                 With_errors.return
-                   (Some [ exn_to_error_extension ext_context x exn ]))
-              >>= function
-              | None ->
-                  super_call base_ctxt x >>= fun x ->
-                  map_nodes attr_rules ext_context ts super_call get_loc
-                    base_ctxt l ~hook ~embed_errors ~in_generated_code
-                  >>| fun l -> x :: l
-              | Some converted ->
-                  ((), attributes_errors attrs) >>= fun () ->
-                  map_nodes attr_rules ext_context ts super_call get_loc
-                    base_ctxt converted ~hook ~embed_errors
-                    ~in_generated_code:true
-                  >>= fun generated_code ->
-                  if not in_generated_code then
-                    Generated_code_hook.replace hook ext_context
-                      extension_point_loc (Many generated_code);
-                  map_nodes attr_rules ext_context ts super_call get_loc
-                    base_ctxt l ~hook ~embed_errors ~in_generated_code
-                  >>| fun code -> generated_code @ code)))
+          | Some converted ->
+              ((), attributes_errors attrs) >>= fun () ->
+              map_nodes attr_rules ext_context ts super_call get_loc base_ctxt
+                converted ~hook ~embed_errors ~in_generated_code:true
+              >>= fun generated_code ->
+              if not in_generated_code then
+                Generated_code_hook.replace hook ext_context extension_point_loc
+                  (Many generated_code);
+              map_nodes attr_rules ext_context ts super_call get_loc base_ctxt l
+                ~hook ~embed_errors ~in_generated_code
+              >>| fun code -> generated_code @ code))
 
 let map_nodes = map_nodes ~in_generated_code:false
 
@@ -807,11 +841,15 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
     |> sort_attr_group_inline |> Rule.Attr_group_inline.split_normal_and_expect
   in
 
-  let attr_str_floating_expect_and_expand =
-    Rule.filter Attr_str_floating rules |> sort_attr_floating_inline
+  let attr_str_floating_expect, attr_str_floating_expect_and_expand =
+    Rule.filter Attr_str_floating rules
+    |> sort_attr_floating_inline
+    |> Rule.Attr_floating_inline.split_normal_and_expand
   in
-  let attr_sig_floating_expect_and_expand =
-    Rule.filter Attr_sig_floating rules |> sort_attr_floating_inline
+  let attr_sig_floating_expect, attr_sig_floating_expect_and_expand =
+    Rule.filter Attr_sig_floating rules
+    |> sort_attr_floating_inline
+    |> Rule.Attr_floating_inline.split_normal_and_expand
   in
 
   let map_node = map_node ~hook ~embed_errors in
@@ -896,14 +934,12 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
       let { pexp_desc = _; pexp_loc; pexp_attributes; pexp_loc_stack } = e in
       let func =
         with_context base_ctxt func >>= fun (base_ctxt, func) ->
-        let rec handle_attr_replace_fix replaced item =
-          handle_attr_replace_once AC.expression attr_replace_expression item
-            base_ctxt
-          >>= function
-          | Some item -> handle_attr_replace_fix true item
-          | None -> return (replaced, item)
-        in
-        handle_attr_replace_fix false func >>= fun (replaced, func) ->
+        handle_attr_replace_fix
+          (fun item ->
+            handle_attr_replace_once AC.expression attr_replace_expression item
+              base_ctxt)
+          func
+        >>= fun (replaced, func) ->
         match replaced with
         (* If the attribute replacement changed the func then we should traverse it after
            all. This might cause some weirdness if the attribute replacement doesn't
@@ -1053,6 +1089,9 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                         item.pstr_loc (Many items);
                     loop rest ~in_generated_code >>| fun rest -> items @ rest)
             | Pstr_attribute at ->
+                handle_attr_floating_inline attr_str_floating_expect ~item:at
+                  ~loc ~base_ctxt ~convert_exn
+                >>= fun expect_items ->
                 handle_attr_floating_inline attr_str_floating_expect_and_expand
                   ~item:at ~loc ~base_ctxt ~convert_exn
                 >>= fun expect_items_unexpanded ->
@@ -1060,9 +1099,10 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                 |> combine_errors
                 >>= fun expect_items_expanded ->
                 (* Shouldn't matter if we use [rev_concat] or [List.concat] here, there
-                   should be only one (outer) list among [expect_items_expanded] unless
-                   a single floating attribute is somehow registered twice. *)
-                (match rev_concat expect_items_expanded with
+                   should be only one (outer) list among [expect_items] and
+                   [expect_items_expanded] unless a single floating attribute is
+                   somehow registered twice. *)
+                (match rev_concat (expect_items @ expect_items_expanded) with
                   | [] -> return ()
                   | expected ->
                       Code_matcher.match_structure_res rest
@@ -1144,7 +1184,7 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
       in
       loop st ~in_generated_code:false
 
-    method! signature base_ctxt sg =
+    method! signature_items base_ctxt psg_items =
       let convert_exn = exn_to_sigi in
       let rec with_extra_items item ~extra_items ~expect_items ~rest
           ~in_generated_code =
@@ -1184,7 +1224,8 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                 >>= function
                 | None ->
                     super#signature_item base_ctxt item >>= fun item ->
-                    self#signature base_ctxt rest >>| fun rest -> item :: rest
+                    self#signature_items base_ctxt rest >>| fun rest ->
+                    item :: rest
                 | Some items ->
                     ((), attributes_errors attrs) >>= fun () ->
                     (* assert_no_attributes attrs; *)
@@ -1194,16 +1235,21 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                         item.psig_loc (Many items);
                     loop rest ~in_generated_code >>| fun rest -> items @ rest)
             | Psig_attribute at ->
+                handle_attr_floating_inline attr_sig_floating_expect ~item:at
+                  ~loc ~base_ctxt ~convert_exn
+                >>= fun expect_items ->
                 handle_attr_floating_inline attr_sig_floating_expect_and_expand
                   ~item:at ~loc ~base_ctxt ~convert_exn
                 >>= fun expect_items_unexpanded ->
-                List.map expect_items_unexpanded ~f:(self#signature base_ctxt)
+                List.map expect_items_unexpanded
+                  ~f:(self#signature_items base_ctxt)
                 |> combine_errors
                 >>= fun expect_items_expanded ->
                 (* Shouldn't matter if we use [rev_concat] or [List.concat] here, there
-                   should be only one (outer) list among [expect_items_expanded] unless
-                   a single floating attribute is somehow registered twice. *)
-                (match rev_concat expect_items_expanded with
+                   should be only one (outer) list among [expect_items] and
+                   [expect_items_expanded] unless a single floating attribute is
+                   somehow registered twice. *)
+                (match rev_concat (expect_items @ expect_items_expanded) with
                   | [] -> return ()
                   | expected ->
                       Code_matcher.match_signature_res rest
@@ -1281,8 +1327,12 @@ class map_top_down ?(expect_mismatch_handler = Expect_mismatch_handler.nop)
                     with_extra_items expanded_item ~extra_items ~expect_items
                       ~rest ~in_generated_code
                 | _, _ ->
-                    self#signature base_ctxt rest >>| fun rest ->
+                    self#signature_items base_ctxt rest >>| fun rest ->
                     expanded_item :: rest))
       in
-      loop sg ~in_generated_code:false
+      loop psg_items ~in_generated_code:false
+
+    method! signature base_ctxt { psg_items; psg_modalities; psg_loc } =
+      self#signature_items base_ctxt psg_items >>| fun psg_items ->
+      { psg_items; psg_modalities; psg_loc }
   end

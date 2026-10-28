@@ -175,6 +175,9 @@ let map1 (T func) ~f = T (fun ctx loc x k -> func ctx loc x (fun a -> k (f a)))
 let map2 (T func) ~f =
   T (fun ctx loc x k -> func ctx loc x (fun a b -> k (f a b)))
 
+let map3 (T func) ~f =
+  T (fun ctx loc x k -> func ctx loc x (fun a b c -> k (f a b c)))
+
 let map0' (T func) ~f = T (fun ctx loc x k -> func ctx loc x (k (f loc)))
 
 let map1' (T func) ~f =
@@ -182,6 +185,9 @@ let map1' (T func) ~f =
 
 let map2' (T func) ~f =
   T (fun ctx loc x k -> func ctx loc x (fun a b -> k (f loc a b)))
+
+let map3' (T func) ~f =
+  T (fun ctx loc x k -> func ctx loc x (fun a b c -> k (f loc a b c)))
 
 let map_value (T func) ~f = T (fun ctx loc x k -> func ctx loc (f x) k)
 let map_value' (T func) ~f = T (fun ctx loc x k -> func ctx loc (f loc x) k)
@@ -205,7 +211,42 @@ let pack3 t = map t ~f:(fun f x y z -> f (x, y, z))
 
 include Ast_pattern_generated
 
-let value_binding ~pat ~expr = value_binding ~pat ~expr
+(*-------------------------------------------------------*)
+
+(* override changed nodes *)
+
+let ptyp_arrow label cty1 cty2 =
+  ptyp_arrow label cty1 cty2 drop drop
+
+let ptyp_tuple l = ptyp_tuple (map_value ~f:(List.map ~f:snd) l)
+let ptyp_var l = ptyp_var l drop
+
+let type_declaration = type_declaration ~jkind_annotation:drop
+
+let value_binding ~pat ~expr ~constraint_ =
+  value_binding ~pat ~expr ~constraint_ ~modes:drop ~is_poly:drop
+
+let value_description ~name ~type_ ~prim =
+  value_description ~name ~type_ ~modalities:drop ~prim ~poly:drop
+
+let ppat_constraint pat cty =
+  ppat_constraint pat (some cty) drop
+
+let ppat_tuple l = ppat_tuple (map_value ~f:(List.map ~f:snd) l) drop
+
+let pexp_constraint exp cty =
+  pexp_constraint exp (some cty) drop
+
+let pexp_tuple l = pexp_tuple (map_value ~f:(List.map ~f:snd) l)
+
+let module_declaration = module_declaration ~modalities:drop
+
+let signature t = signature ~items:t ~modalities:drop
+
+let pexp_let rf vbs body = pexp_let immutable rf vbs body
+
+(* ----------------------------------------------------- *)
+
 let echar t = pexp_constant (pconst_char t)
 let estring t = pexp_constant (pconst_string t drop drop)
 let efloat t = pexp_constant (pconst_float t drop)
@@ -236,6 +277,12 @@ let no_label t = cst Asttypes.Nolabel ~to_string:(fun _ -> "Nolabel") ** t
 let ebool t = pexp_construct (lident (bool' t)) none
 let pbool t = ppat_construct (lident (bool' t)) none
 
+let pexp_function params constraint_ body =
+  pexp_function params
+    (function_constraint ~mode_annotations:nil ~ret_mode_annotations:nil
+      ~ret_type_constraint:constraint_)
+    body
+
 let extension (T f1) (T f2) =
   T
     (fun ctx loc ((name : _ Loc.t), payload) k ->
@@ -250,7 +297,7 @@ let rec parse_elist (e : Parsetree.expression) acc =
   | Pexp_construct ({ txt = Lident "::"; _ }, Some arg) -> (
       Common.assert_no_attributes arg.pexp_attributes;
       match arg.pexp_desc with
-      | Pexp_tuple [ hd; tl ] -> parse_elist tl (hd :: acc)
+      | Pexp_tuple [ None, hd; None, tl ] -> parse_elist tl (hd :: acc)
       | _ -> fail arg.pexp_loc "list")
   | _ -> fail e.pexp_loc "list"
 
@@ -276,94 +323,46 @@ let esequence (T f) =
 let of_func f = T f
 let to_func (T f) = f
 
-let ppat_effect (T fe) (T fk) =
-  T
-    (fun ctx _loc x k ->
-      let loc = x.ppat_loc in
-      let x = x.ppat_desc in
-      match x with
-      | Ppat_extension ({ txt; _ }, payload)
-        when String.equal txt Astlib__.Encoding_503.Ext_name.ppat_effect ->
-          let effect_, kpat =
-            Astlib__.Encoding_503.To_502.decode_ppat_effect ~loc payload
-          in
-          ctx.matched <- ctx.matched + 1;
-          let k = fe ctx loc effect_ k in
-          let k = fk ctx loc kpat k in
-          k
-      | _ -> fail loc "ppat_effect")
-
 let ptyp_labeled_tuple (T f0) =
   T
     (fun ctx _loc x k ->
       let loc = x.ptyp_loc in
-      let x = x.ptyp_desc in
-      match x with
-      | Ptyp_extension ({ txt; _ }, payload)
-        when String.equal txt Astlib__.Encoding_504.Ext_name.ptyp_labeled_tuple
+      match x.ptyp_desc with
+      | Ptyp_tuple l when List.exists l ~f:(fun (lbl, _) -> Option.is_some lbl)
         ->
-          let x0 =
-            Astlib__.Encoding_504.To_502.decode_ptyp_labeled_tuple ~loc payload
-          in
           ctx.matched <- ctx.matched + 1;
-          let k = f0 ctx loc x0 k in
-          k
+          f0 ctx loc l k
       | _ -> fail loc "labeled tuple")
 
 let pexp_labeled_tuple (T f0) =
   T
     (fun ctx _loc x k ->
       let loc = x.pexp_loc in
-      let x = x.pexp_desc in
-      match x with
-      | Pexp_extension ({ txt; _ }, payload)
-        when String.equal txt Astlib__.Encoding_504.Ext_name.pexp_labeled_tuple
+      match x.pexp_desc with
+      | Pexp_tuple l when List.exists l ~f:(fun (lbl, _) -> Option.is_some lbl)
         ->
-          let x0 =
-            Astlib__.Encoding_504.To_502.decode_pexp_labeled_tuple ~loc payload
-          in
           ctx.matched <- ctx.matched + 1;
-          let k = f0 ctx loc x0 k in
-          k
+          f0 ctx loc l k
       | _ -> fail loc "labeled tuple")
 
 let ppat_labeled_tuple (T f0) =
   T
     (fun ctx _loc x k ->
       let loc = x.ppat_loc in
-      let x = x.ppat_desc in
-      match x with
-      | Ppat_extension ({ txt; _ }, payload)
-        when String.equal txt Astlib__.Encoding_504.Ext_name.ppat_labeled_tuple
-        ->
-          let x0 =
-            Astlib__.Encoding_504.To_502.decode_ppat_labeled_tuple ~loc payload
-          in
+      match x.ppat_desc with
+      | Ppat_tuple (l, flag)
+        when List.exists l ~f:(fun (lbl, _) -> Option.is_some lbl)
+             || match flag with Open -> true | Closed -> false ->
           ctx.matched <- ctx.matched + 1;
-          let k = f0 ctx loc x0 k in
-          k
+          f0 ctx loc (l, flag) k
       | _ -> fail loc "labeled tuple")
 
 let pexp_hole =
   T
     (fun ctx _loc x k ->
       let loc = x.pexp_loc in
-      let x = x.pexp_desc in
-      match x with
-      | Pexp_extension ({ txt; _ }, PStr [])
-        when String.equal txt Astlib__.Encoding_506.Ext_name.pexp_hole ->
+      match x.pexp_desc with
+      | Pexp_hole ->
           ctx.matched <- ctx.matched + 1;
           k
       | _ -> fail loc "expression hole")
-
-let pmod_hole =
-  T
-    (fun ctx _loc x k ->
-      let loc = x.pmod_loc in
-      let x = x.pmod_desc in
-      match x with
-      | Pmod_extension ({ txt; _ }, PStr [])
-        when String.equal txt Astlib__.Encoding_506.Ext_name.pmod_hole ->
-          ctx.matched <- ctx.matched + 1;
-          k
-      | _ -> fail loc "module expression hole")

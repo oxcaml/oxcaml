@@ -570,48 +570,6 @@ end
       n n n;
   )
 *)
-module OCaml_408 = struct
-  module Ast = Astlib.Ast_408
-  include Make_witness(Astlib.Ast_408)
-  let version = 408
-  let string_version = "4.08"
-end
-let ocaml_408 : OCaml_408.types ocaml_version = (module OCaml_408)
-module OCaml_409 = struct
-  module Ast = Astlib.Ast_409
-  include Make_witness(Astlib.Ast_409)
-  let version = 409
-  let string_version = "4.09"
-end
-let ocaml_409 : OCaml_409.types ocaml_version = (module OCaml_409)
-module OCaml_410 = struct
-  module Ast = Astlib.Ast_410
-  include Make_witness(Astlib.Ast_410)
-  let version = 410
-  let string_version = "4.10"
-end
-let ocaml_410 : OCaml_410.types ocaml_version = (module OCaml_410)
-module OCaml_411 = struct
-  module Ast = Astlib.Ast_411
-  include Make_witness(Astlib.Ast_411)
-  let version = 411
-  let string_version = "4.11"
-end
-let ocaml_411 : OCaml_411.types ocaml_version = (module OCaml_411)
-module OCaml_412 = struct
-  module Ast = Astlib.Ast_412
-  include Make_witness(Astlib.Ast_412)
-  let version = 412
-  let string_version = "4.12"
-end
-let ocaml_412 : OCaml_412.types ocaml_version = (module OCaml_412)
-module OCaml_413 = struct
-  module Ast = Astlib.Ast_413
-  include Make_witness(Astlib.Ast_413)
-  let version = 413
-  let string_version = "4.13"
-end
-let ocaml_413 : OCaml_413.types ocaml_version = (module OCaml_413)
 module OCaml_414 = struct
   module Ast = Astlib.Ast_414
   include Make_witness(Astlib.Ast_414)
@@ -626,67 +584,21 @@ module OCaml_500 = struct
   let string_version = "5.0"
 end
 let ocaml_500 : OCaml_500.types ocaml_version = (module OCaml_500)
-module OCaml_501 = struct
-  module Ast = Astlib.Ast_501
-  include Make_witness(Astlib.Ast_501)
-  let version = 501
-  let string_version = "5.1"
+module OCaml_999 = struct
+  module Ast = Astlib.Ast_999
+  include Make_witness(Astlib.Ast_999)
+  let version = 999
+  let string_version = "9.99"
 end
-let ocaml_501 : OCaml_501.types ocaml_version = (module OCaml_501)
-module OCaml_502 = struct
-  module Ast = Astlib.Ast_502
-  include Make_witness(Astlib.Ast_502)
-  let version = 502
-  let string_version = "5.2"
-end
-let ocaml_502 : OCaml_502.types ocaml_version = (module OCaml_502)
-module OCaml_503 = struct
-  module Ast = Astlib.Ast_503
-  include Make_witness(Astlib.Ast_503)
-  let version = 503
-  let string_version = "5.3"
-end
-let ocaml_503 : OCaml_503.types ocaml_version = (module OCaml_503)
-module OCaml_504 = struct
-  module Ast = Astlib.Ast_504
-  include Make_witness(Astlib.Ast_504)
-  let version = 504
-  let string_version = "5.4"
-end
-let ocaml_504 : OCaml_504.types ocaml_version = (module OCaml_504)
-module OCaml_505 = struct
-  module Ast = Astlib.Ast_505
-  include Make_witness(Astlib.Ast_505)
-  let version = 505
-  let string_version = "5.5"
-end
-let ocaml_505 : OCaml_505.types ocaml_version = (module OCaml_505)
-module OCaml_506 = struct
-  module Ast = Astlib.Ast_506
-  include Make_witness(Astlib.Ast_506)
-  let version = 506
-  let string_version = "5.6"
-end
-let ocaml_506 : OCaml_506.types ocaml_version = (module OCaml_506)
+let ocaml_999 : OCaml_999.types ocaml_version = (module OCaml_999)
 (*$*)
 
 let all_versions : (module OCaml_version) list = [
   (*$foreach_version (fun n _ ->
       printf "(module OCaml_%d : OCaml_version);\n" n)*)
-(module OCaml_408 : OCaml_version);
-(module OCaml_409 : OCaml_version);
-(module OCaml_410 : OCaml_version);
-(module OCaml_411 : OCaml_version);
-(module OCaml_412 : OCaml_version);
-(module OCaml_413 : OCaml_version);
 (module OCaml_414 : OCaml_version);
 (module OCaml_500 : OCaml_version);
-(module OCaml_501 : OCaml_version);
-(module OCaml_502 : OCaml_version);
-(module OCaml_503 : OCaml_version);
-(module OCaml_504 : OCaml_version);
-(module OCaml_505 : OCaml_version);
-(module OCaml_506 : OCaml_version);
+(module OCaml_999 : OCaml_version);
 (*$*)
 ]
 
@@ -695,32 +607,10 @@ let all_versions : (module OCaml_version) list = [
     printf "    (Astlib.Migrate_%d_%d)(Astlib.Migrate_%d_%d)\n" a b b a
   )
 *)
-include Register_migration(OCaml_408)(OCaml_409)
-    (Astlib.Migrate_408_409)(Astlib.Migrate_409_408)
-include Register_migration(OCaml_409)(OCaml_410)
-    (Astlib.Migrate_409_410)(Astlib.Migrate_410_409)
-include Register_migration(OCaml_410)(OCaml_411)
-    (Astlib.Migrate_410_411)(Astlib.Migrate_411_410)
-include Register_migration(OCaml_411)(OCaml_412)
-    (Astlib.Migrate_411_412)(Astlib.Migrate_412_411)
-include Register_migration(OCaml_412)(OCaml_413)
-    (Astlib.Migrate_412_413)(Astlib.Migrate_413_412)
-include Register_migration(OCaml_413)(OCaml_414)
-    (Astlib.Migrate_413_414)(Astlib.Migrate_414_413)
 include Register_migration(OCaml_414)(OCaml_500)
     (Astlib.Migrate_414_500)(Astlib.Migrate_500_414)
-include Register_migration(OCaml_500)(OCaml_501)
-    (Astlib.Migrate_500_501)(Astlib.Migrate_501_500)
-include Register_migration(OCaml_501)(OCaml_502)
-    (Astlib.Migrate_501_502)(Astlib.Migrate_502_501)
-include Register_migration(OCaml_502)(OCaml_503)
-    (Astlib.Migrate_502_503)(Astlib.Migrate_503_502)
-include Register_migration(OCaml_503)(OCaml_504)
-    (Astlib.Migrate_503_504)(Astlib.Migrate_504_503)
-include Register_migration(OCaml_504)(OCaml_505)
-    (Astlib.Migrate_504_505)(Astlib.Migrate_505_504)
-include Register_migration(OCaml_505)(OCaml_506)
-    (Astlib.Migrate_505_506)(Astlib.Migrate_506_505)
+include Register_migration(OCaml_500)(OCaml_999)
+    (Astlib.Migrate_500_999)(Astlib.Migrate_999_500)
 (*$*)
 
 module OCaml_current = OCaml_OCAML_VERSION
