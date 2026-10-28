@@ -469,6 +469,7 @@ type operation =
   | Cand
   | Cor
   | Cxor
+  | Cnot
   | Clsl
   | Clsr
   | Casr
