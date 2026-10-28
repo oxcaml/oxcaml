@@ -441,10 +441,10 @@ end)
 let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   function
   | Default_zero_alloc -> []
-  | Assume { strict; never_returns_normally; never_raises; loc } ->
-    [Assume_zero_alloc { strict; never_returns_normally; never_raises; loc }]
-  | Check { strict; loc; custom_error_msg; partial = _ } ->
-    [Check_zero_alloc { strict; loc; custom_error_msg }]
+  | Assume { conditional; strict; never_returns_normally; never_raises; loc } ->
+    [Assume_zero_alloc { conditional; strict; never_returns_normally; never_raises; loc }]
+  | Check { conditional; strict; loc; custom_error_msg; partial = _ } ->
+    [Check_zero_alloc { conditional; strict; loc; custom_error_msg }]
 
 (* Answers "Is it even possible to partially apply this thing?" *)
 (* Returns `false` for single-argument functions, including "tupled" arguments
@@ -520,6 +520,15 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
     ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_alloc_mode
     ~(translate_expr : translate_expr) =
+  (* Init the env and create a jump id for the return continuation in case a
+     trap action is attached to one of its calls *)
+  let return_continuation_arity =
+    List.map To_cmm_shared.machtype_of_kind (Flambda_arity.unarize result_arity)
+  in
+  let env =
+    Env.enter_function_body env ~params ~return_continuation
+      ~return_continuation_arity ~exn_continuation
+  in
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -536,15 +545,6 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       in
       Bound_parameters.append params
         (Bound_parameters.create [my_closure_param])
-  in
-  (* Init the env and create a jump id for the return continuation in case a
-     trap action is attached to one of its calls *)
-  let return_continuation_arity =
-    List.map To_cmm_shared.machtype_of_kind (Flambda_arity.unarize result_arity)
-  in
-  let env =
-    Env.enter_function_body env ~return_continuation ~return_continuation_arity
-      ~exn_continuation
   in
   (* [my_region] can be referenced in [Begin_region] primitives so must be in
      the environment; however it should never end up in actual generated code,
@@ -660,6 +660,27 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
 
 (* Translation of sets of closures. *)
 
+let register_zero_alloc_aliases env res closure_symbols decls =
+  Function_slot.Map.iter
+    (fun function_slot closure_symbol ->
+      match
+        (Function_slot.Map.find function_slot decls
+          : Function_declarations.code_id_in_function_declaration)
+      with
+      | Deleted _ -> ()
+      | Code_id { code_id; only_full_applications = _ } ->
+        (* CR-someday wsturgeon for wsturgeon: arbitrary-arity callbacks *)
+        if not (can_be_partially_applied (Env.get_code_metadata env code_id))
+        then
+          let symbol = R.symbol res closure_symbol in
+          let code_symbol =
+            R.symbol_of_code_id res ~currently_in_inlined_body:false code_id
+          in
+          Zero_alloc_info.add_alias
+            (Compilenv.current_zero_alloc_info ())
+            ~symbol:symbol.sym_name ~code_symbol:code_symbol.sym_name)
+    closure_symbols
+
 let layout_for_set_of_closures env set =
   Slot_offsets.Layout.make (Env.exported_offsets env)
     (Set_of_closures.function_decls set |> Function_declarations.funs_in_order)
@@ -688,6 +709,7 @@ let let_static_set_of_closures0 env res closure_symbols
     (layout : Slot_offsets.Layout.t) set ~prev_updates =
   let fun_decls = Set_of_closures.function_decls set in
   let decls = Function_declarations.funs fun_decls in
+  register_zero_alloc_aliases env res closure_symbols decls;
   let value_slots = Set_of_closures.value_slots set in
   let dbg = debuginfo_for_set_of_closures env set in
   (* Pick one of the closure symbols to do any updates relative to (see

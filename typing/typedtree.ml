@@ -1441,7 +1441,8 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
              else
                let create_const ~opt =
                  Zero_alloc.create_const
-                   (Check { strict = false;
+                   (Check { conditional = false;
+                            strict = false;
                             arity;
                             partial = false;
                             custom_error_msg = None;

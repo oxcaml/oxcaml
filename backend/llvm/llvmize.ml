@@ -522,7 +522,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
     (op : Cfg.func_call_operation) =
   let args_begin, args_end =
     (* [Indirect] has the function in i.arg.(0) *)
-    match op with
+    match op.desc with
     | Direct _ -> 0, Array.length i.arg
     | Indirect _ -> 1, Array.length i.arg - 1
   in
@@ -536,7 +536,7 @@ let call ?(tail = false) t (i : Cfg.terminator Cfg.instruction)
     else Some (make_ret_type (List.map T.of_reg res_regs))
   in
   let func =
-    match op with
+    match op.desc with
     | Direct { sym_name; sym_global = _ } ->
       add_referenced_symbol t sym_name;
       LL.Ident.global sym_name
@@ -797,7 +797,7 @@ let emit_terminator t (i : Cfg.terminator Cfg.instruction) =
     reject_addr_regs i.arg "call";
     call t i op;
     br_label t label_after
-  | Tailcall_self { destination } -> br_label t destination
+  | Tailcall_self { destination; _ } -> br_label t destination
   | Tailcall_func op ->
     reject_addr_regs i.arg "tailcall func";
     call ~tail:true t i op

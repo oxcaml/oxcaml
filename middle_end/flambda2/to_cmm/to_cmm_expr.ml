@@ -75,6 +75,13 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
 
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
+  let argument_callees =
+    match callee_simple with
+    | None -> None
+    | Some callee ->
+      Env.function_parameter_index env callee
+      |> Option.map (fun index -> [Cmm.Argument index])
+  in
   let args = Apply.args apply in
   (* CR mshinwell: When we fix the problem that [prim_effects] and
      [prim_coeffects] are ignored for C calls, we need to take into account the
@@ -181,7 +188,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg ~callees:argument_callees return_ty pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -200,13 +207,15 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     let callees =
       match callees with
-      | Unknown -> None
+      | Unknown -> argument_callees
       | Known code_id_set ->
         Some
           (List.map
              (fun code_id ->
-               To_cmm_result.symbol_of_code_id res code_id
-                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env))
+               Cmm.Symbol
+                 (To_cmm_result.symbol_of_code_id res code_id
+                    ~currently_in_inlined_body:
+                      (Env.currently_in_inlined_body env)))
              (Code_id.Set.elements code_id_set))
     in
     if not (C.check_arity (Apply.args_arity apply) args)

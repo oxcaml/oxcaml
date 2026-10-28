@@ -60,8 +60,9 @@ module Instruction_requirements = struct
       match instr.desc with
       (* These will cause the function to return, and therefore the stack should
          be unwound. *)
-      | Cfg.Return | Tailcall_func (Indirect _) -> Requires_no_prologue
-      | Tailcall_func (Direct func)
+      | Cfg.Return | Tailcall_func { desc = Indirect _; _ } ->
+        Requires_no_prologue
+      | Tailcall_func { desc = Direct func; _ }
         when not (String.equal func.sym_name fun_name) ->
         Requires_no_prologue
       (* These are implemented by calling a function when emitted and therefore
@@ -71,7 +72,7 @@ module Instruction_requirements = struct
       | Prim { op = External _ | Probe _; _ }
       | Invalid _ (* CR-soon vkarvonen: Does [Invalid] require prologue? *) ->
         Requires_prologue
-      | Tailcall_func (Direct _)
+      | Tailcall_func { desc = Direct _; _ }
       | Tailcall_self _
       | Raise Raise_notrace
       | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _

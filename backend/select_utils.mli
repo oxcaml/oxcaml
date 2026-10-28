@@ -46,6 +46,7 @@ type environment =
     static_exceptions : static_handler Static_label.Map.t;
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t;
+    parameters : (VP.t * Cmm.machtype) list;
     phantom_lets : V.Set.t;
     all_phantom_lets :
       (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
@@ -56,7 +57,8 @@ type environment =
             function construction by [phantom_lets_for_fundecl]. *)
   }
 
-val env_create : tailrec_label:Label.t -> environment
+val env_create :
+  tailrec_label:Label.t -> parameters:(VP.t * Cmm.machtype) list -> environment
 
 val env_add :
   ?mut:Asttypes.mutable_flag ->
