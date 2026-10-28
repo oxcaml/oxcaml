@@ -252,8 +252,11 @@ let r : int array @ portable = [| 42; 24 |]
 val r : int array = [|42; 24|]
 |}]
 
-(* CR zqian: the following should pass but does not. Would have to shuffle
-things in [type_expect_record]. *)
+(* XCR zqian: the following should pass but does not. Would have to shuffle
+   things in [type_expect_record].
+
+   aobrien: fixed; mutability is now checked at the instance of the field's
+   type. *)
 type 'a r =
   { f : string -> string;
     mutable a : 'a
@@ -263,8 +266,5 @@ let r : int r @ portable =
     a = 42 }
 [%%expect{|
 type 'a r = { f : string -> string; mutable a : 'a; }
-Lines 6-7, characters 2-12:
-6 | ..{ f = (fun x -> x);
-7 |     a = 42 }
-Error: This value is "nonportable" but is expected to be "portable".
+val r : int r = {f = <fun>; a = 42}
 |}]
