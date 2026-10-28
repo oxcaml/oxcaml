@@ -570,11 +570,8 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
   Env.enter_value ~check ~mode:Mode.With_regionality.legacy name desc met_env
 
 let add_self_met loc id sign self_var_kind vars cl_num
-      as_var ty attrs met_env =
-  let check =
-    if as_var then (fun s -> Warnings.Unused_var { name = s; mutated = false })
-    else (fun s -> Warnings.Unused_var_strict { name = s; mutated = false })
-  in
+      pv_kind ty attrs met_env =
+  let check = Typecore.unused_variable_warning pv_kind in
   let kind = Val_self (sign, self_var_kind, vars, cl_num) in
   let desc =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
@@ -1210,7 +1207,7 @@ and class_structure cl_num virt self_scope final val_env met_env loc
     List.fold_right
       (fun {Typecore.pv_id; pv_type; pv_loc; pv_kind; pv_attributes} met_env ->
          add_self_met pv_loc pv_id sign self_var_kind vars
-           cl_num (pv_kind=Typecore.As_var) pv_type pv_attributes met_env)
+           cl_num pv_kind pv_type pv_attributes met_env)
       self_pat_vars met_env
   in
   let fields =
