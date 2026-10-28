@@ -1312,3 +1312,4 @@ let () =
       exit 1
     in
     ()
+  else Format.printf "No failure\n"
