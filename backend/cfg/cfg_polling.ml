@@ -341,12 +341,29 @@ let instr_cfg_with_layout :
             Cfg.res = [||]
           }
         in
+        (* The arguments of a call are moved into their calling-convention
+           locations at the end of the block body, immediately before the
+           terminator. Those locations are not GC roots (the physical registers
+           are typed [Int], and arguments passed in the domain state's
+           extra_params area cannot be described in a frame descriptor), so a
+           poll must not be placed between the moves and the call. For such
+           terminators, the poll is inserted in a new block on the back edge,
+           i.e. after the call. *)
+        let can_append_to_body =
+          match after.terminator.desc with
+          | Call _ | Call_no_return _ | Prim { op = External _; _ } -> false
+          | Prim { op = Probe _; _ }
+          | Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+          | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+          | Tailcall_func _ | Invalid _ ->
+            true
+        in
         (match
            ( Label.Set.cardinal
                (Cfg.successor_labels after ~normal:true ~exn:false),
              after.exn )
          with
-        | 1, None -> DLL.add_end after.body poll
+        | 1, None when can_append_to_body -> DLL.add_end after.body poll
         | _ ->
           let before = Some (Cfg.get_block_exn cfg dst) in
           let instrs = DLL.of_list [poll] in
