@@ -1883,7 +1883,11 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     | [] -> [], [], ty
     | (_, repr) :: reprs ->
       match is_function_type env ty with
-      | None -> [], [], ty
+      | None ->
+          (* [p.prim_native_repr_args] were derived from the annotated type, so by
+             construction [ty] must have at least as many arrows as [p] has args. *)
+          Misc.fatal_errorf "Primitive %s type does not match arity"
+            prim_desc.prim_name
       | Some (arg_ty, result_ty) ->
         let param_tys, param_reprs, rest_ty = parameter_types reprs result_ty in
         match repr with
@@ -1891,7 +1895,6 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
         | Native_repr repr -> arg_ty :: param_tys, repr :: param_reprs, rest_ty
   in
   let param_tys, param_reprs, rest_ty = parameter_types prim_desc.prim_native_repr_args ty in
-  let resolved_params = List.length param_tys in
   match prim, param_tys with
   | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
       match fst (maybe_pointer_type env p2) with
@@ -1900,11 +1903,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     end
   | Primitive (Pfield (n, Pointer, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
-      let is_int =
-        if resolved_params <> 1
-        then Pointer
-        else fst (maybe_pointer_type env rest_ty)
-      in
+      let is_int = fst (maybe_pointer_type env rest_ty) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
   | Primitive (Psetmixedfield ([0], [| elt |], init), arity), [_; p2] ->
       (* CR-someday lmaurer: What's really important here is to find out whether
@@ -2063,15 +2062,12 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       None
     end
   | Peek _, _ -> (
-    if resolved_params <> 1
-    then None
-    else
-      let _, result_repr = prim_desc.prim_native_repr_res in
-      let contents_layout =
-        peek_or_poke_layout ~prim_name:"peek" (to_location loc) env
-          ~poly_sort result_repr rest_ty
-      in
-      Some (Peek (Some contents_layout))
+    let _, result_repr = prim_desc.prim_native_repr_res in
+    let contents_layout =
+      peek_or_poke_layout ~prim_name:"peek" (to_location loc) env
+        ~poly_sort result_repr rest_ty
+    in
+    Some (Peek (Some contents_layout))
   )
   | Poke _, _ptr_ty :: new_value_ty :: _ -> (
     match param_reprs with
@@ -2085,21 +2081,10 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       (* [check_primitive_arity] would have rejected this *)
       Misc.fatal_error "Translprim.specialize_primitive: wrong arity for Poke"
   )
-  | Atomic (Load, Field_like ((Ref | Loc) as kind, Pointer)), _ ->
-    if resolved_params <> 1
-    then None
-    else (
-    match fst (maybe_pointer_type env rest_ty) with
+  | Atomic (Load, Field_like ((Ref | Loc | Field) as kind, Pointer)), _ ->
+    (match fst (maybe_pointer_type env rest_ty) with
     | Pointer -> None
     | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
-  | Atomic (Load, Field_like (Field, Pointer)), _ ->
-    if resolved_params <> 2
-    then None
-    else (
-    match fst (maybe_pointer_type env rest_ty) with
-    | Pointer -> None
-    | Immediate ->
-      Some (Atomic (Load, Field_like (Field, Immediate))))
   | Atomic (Set _ as op, Field_like ((Ref | Loc) as kind, Pointer)), [_; v]
   | Atomic (Set _ as op, Field_like (Field as kind, Pointer)), [_; _; v]
   | Atomic (Exchange _ as op, Field_like ((Ref | Loc) as kind, Pointer)),
