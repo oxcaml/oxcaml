@@ -601,3 +601,100 @@ let () =
   (let (deref_ a, _) = (say "a", say "b") in Addr_imm.get a);
   print_newline ();
   print_newline ()
+
+(* Alias dereference patterns *)
+
+let describe_opt = function
+  | { m_opt = (Some n as deref_ a); _ } -> Addr.set a None; n
+  | { m_opt = (None as deref_ a); _ } -> Addr.set a (Some 0); -1
+
+let () =
+  print_endline "alias deref record fields";
+  let r = make () in
+  print_int_ln (describe_opt r);
+  print_int_ln (describe_opt r);
+  print_int_ln (describe_opt r);
+  (match r with
+   | { m_int = (x as deref_ m_int); i_str = (s as deref_ i_str);
+       m_float = (f as deref_ m_float);
+       i_pair = (#{ a; _ } as deref_ i_pair); _ } ->
+     print_int_ln x;
+     print_endline (s ^ Addr_imm.get i_str);
+     print_float_ln f;
+     print_i64_ln a;
+     print_pair_ln (Addr_imm.get i_pair);
+     Addr.set m_int (x + 10);
+     Addr.set m_float (Float_u.add f #1.0));
+  print_int_ln r.m_int;
+  print_float_ln r.m_float;
+  print_newline ()
+
+let () =
+  print_endline "alias deref unboxed";
+  let u = make_u () in
+  (match u with
+   | { m_ub = { ub = (n as deref_ m_ub) };
+       m_ut = #((i as deref_ m_ut_i), s);
+       i_outer = #{ ob = (#{ ia; _ } as deref_ i_ob); _ };
+       _ } ->
+     Addr.set m_ub (n * 10);
+     Addr.set m_ut_i (i + String.length s);
+     print_int_ln ia;
+     (match Addr_imm.get i_ob with #{ ib; _ } -> print_float_ln ib));
+  print_int_ln u.m_ub.ub;
+  print_ut_ln u.m_ut;
+  print_newline ()
+
+let tuple_alias = function
+  | ((0 as deref_ _a), s) -> "zero " ^ s
+  | ((n as deref_ a), (s as deref_ b)) ->
+    string_of_int (n + Addr_imm.get a) ^ " " ^ s ^ Addr_imm.get b
+
+let () =
+  print_endline "alias deref tuples";
+  print_endline (tuple_alias (0, "a"));
+  print_endline (tuple_alias (2, "b"));
+  (match 3, "c" with
+   | ((n as deref_ a), _) -> print_int_ln (n + Addr_imm.get a));
+  let nested = ((4, "d"), 5) in
+  (match nested with
+   | (((i, deref_ s) as deref_ p), _) ->
+     print_int_ln (i + fst (Addr_imm.get p));
+     print_endline (Addr_imm.get s));
+  print_newline ()
+
+let () =
+  print_endline "alias deref below addr";
+  let r = make () in
+  (match Addr.of_idx r (.m_int) with
+   | addr_ (x as deref_ a) -> Addr.set a (x * 3));
+  (match Addr.of_idx r (.m_pair) with
+   | addr_ #{ a = (x as deref_ a); b = (y as deref_ b) } ->
+     Addr.set a y;
+     Addr.set b x);
+  (match Addr.of_idx r (.m_addr) with
+   | addr_ ((addr_ (x as deref_ a)) as deref_ b) ->
+     Addr.set a (x + 1);
+     print_int_ln (Addr.get (Addr.get b)));
+  print_int_ln r.m_int;
+  print_pair_ln r.m_pair;
+  print_newline ()
+
+let pick_alias = function
+  | { sel = true; p = (x as deref_ a); _ }
+  | { sel = false; q = (x as deref_ a); _ } ->
+    Addr.set a (x + 1)
+
+let () =
+  print_endline "alias deref choosing and sharing positions";
+  let t1 = { p = 1; q = 10; sel = true } in
+  let t2 = { p = 1; q = 10; sel = false } in
+  pick_alias t1;
+  pick_alias t2;
+  Printf.printf "%d %d %d %d\n" t1.p t1.q t2.p t2.q;
+  let r = make () in
+  (match r with
+   | { m_str = (deref_ a as deref_ b); _ } ->
+     Addr.set a "x";
+     print_endline (Addr.get b));
+  print_newline ()
