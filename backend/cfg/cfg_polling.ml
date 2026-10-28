@@ -365,7 +365,8 @@ let instr_cfg_with_layout :
           | Tailcall_func _ | Return | Invalid _ ->
             unexpected "the source block is safe"
           | Tailcall_self _ ->
-            (* Covered by prologue poll *)
+            (* Unreachable since prologue poll covers it. Otherwise, this one
+               could also trigger the bug mentioned above. *)
             unexpected "tailcall self"
           | Never | Raise _ | Call_no_return _ ->
             unexpected "the source block has no normal successor"
