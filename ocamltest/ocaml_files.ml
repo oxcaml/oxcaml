@@ -92,6 +92,10 @@ let ocamlmklib =
   Filename.make_path
     [Ocaml_directories.srcdir; "tools"; Filename.mkexe "ocamlmklib"]
 
+let ocamlfilt =
+  Filename.make_path
+    [Ocaml_directories.srcdir; "tools"; Filename.mkexe "ocamlfilt"]
+
 let codegen =
   Filename.make_path
     [Ocaml_directories.srcdir; "testsuite"; "tools"; Filename.mkexe "codegen"]

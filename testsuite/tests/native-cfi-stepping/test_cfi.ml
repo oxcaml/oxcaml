@@ -1,7 +1,7 @@
 (* TEST
   arch_amd64;  (* CR sdolan: get this to pass on arm64 as well *)
   flags = "-g";
-  program = "${test_source_directory}/test_cfi";
+  program = "${test_build_directory}/test_cfi";
   readonly_files = "test_cfi_stubs.c gdb_stepper.py";
   all_modules = "test_cfi_stubs.c test_cfi.ml";
   setup-ocamlopt.opt-build-env;

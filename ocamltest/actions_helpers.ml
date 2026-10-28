@@ -129,6 +129,7 @@ let setup_simple_build_env add_testfile additional_files log env =
   setup_build_env add_testfile additional_files log build_env
 
 let run_cmd
+    ~full_environment
     ?(environment=[||])
     ?(stdin_variable=Builtin_variables.stdin)
     ?(stdout_variable=Builtin_variables.stdout)
@@ -175,6 +176,7 @@ let run_cmd
   log_redirection "stderr" stderr_filename;
   let systemenv =
     Environments.append_to_system_env
+      ~full:full_environment
       environment
       env
   in
@@ -210,6 +212,7 @@ let run_cmd
   n
 
 let run
+    ~full_environment
     (log_message : string)
     (redirect_output : bool)
     (can_skip : bool)
@@ -232,20 +235,23 @@ let run
     begin if arguments="" then "without any argument"
     else "with arguments " ^ arguments
     end in
-    let env =
+    let stdout_variable, stderr_variable =
       if redirect_output
       then begin
-        let output = Environments.safe_lookup Builtin_variables.output env in
-        let env =
-          Environments.add_if_undefined Builtin_variables.stdout output env
-        in
-        Environments.add_if_undefined Builtin_variables.stderr output env
-      end else env
+        (if Environments.is_variable_defined Builtin_variables.stdout env
+         then Some Builtin_variables.stdout
+         else Some Builtin_variables.output),
+        (if Environments.is_variable_defined Builtin_variables.stderr env
+         then Some Builtin_variables.stderr
+         else Some Builtin_variables.output)
+      end else None, None
     in
     let expected_exit_status =
       exit_status_of_variable env Builtin_variables.exit_status
     in
-    let exit_status = run_cmd log env commandline in
+    let exit_status =
+      run_cmd ~full_environment ?stdout_variable ?stderr_variable
+        log env commandline in
     if exit_status=expected_exit_status
     then (Result.pass, env)
     else begin
@@ -254,6 +260,8 @@ let run
       then (Result.skip_with_reason reason, env)
       else (Result.fail_with_reason reason, env)
     end
+
+let run_cmd = run_cmd ~full_environment:false
 
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
@@ -271,6 +279,7 @@ let run_program log env =
     end
   in
   run
+    ~full_environment:false
     "Running program"
     true
     false
@@ -285,6 +294,7 @@ let run_script log env =
   let scriptenv = Environments.add
     Builtin_variables.ocamltest_response response_file env in
   let (result, newenv) = run
+    ~full_environment:true
     "Running script"
     true
     true
@@ -293,23 +303,7 @@ let run_script log env =
     log scriptenv in
   let final_value =
     if Result.is_pass result then begin
-      match Modifier_parser.modifiers_of_file response_file with
-      | modifiers ->
-        let modified_env = Environments.apply_modifiers newenv modifiers in
-        (result, modified_env)
-      | exception Failure reason ->
-        (Result.fail_with_reason reason, newenv)
-      | exception Variables.No_such_variable name ->
-        let reason =
-          Printf.sprintf "error in script response: unknown variable %s" name
-        in
-        (Result.fail_with_reason reason, newenv)
-      | exception Variables.Recursive_variable_definition name ->
-        let reason =
-          Printf.sprintf "error in script response: \
-            recursive variable definition %s" name
-        in
-        (Result.fail_with_reason reason, newenv)
+      result, newenv
     end else begin
       let reason = String.trim (Sys.string_of_file response_file) in
       let newresult = { result with Result.reason = Some reason } in
@@ -327,7 +321,7 @@ let run_hook hook_name log input_env =
   let hookenv = Environments.add
     Builtin_variables.ocamltest_response response_file input_env in
   let systemenv =
-    Environments.to_system_env hookenv in
+    Environments.to_system_env ~full:true hookenv in
   let timeout =
     Option.value ~default:0
       (Environments.lookup_as_int Builtin_variables.timeout input_env) in
@@ -345,24 +339,7 @@ let run_hook hook_name log input_env =
   } in let exit_status = run settings in
   let final_value = match exit_status with
     | 0 ->
-      begin match Modifier_parser.modifiers_of_file response_file with
-      | modifiers ->
-        let modified_env = Environments.apply_modifiers hookenv modifiers in
-        (Result.pass, modified_env)
-      | exception Failure reason ->
-        (Result.fail_with_reason reason, hookenv)
-      | exception Variables.No_such_variable name ->
-        let reason =
-          Printf.sprintf "error in script response: unknown variable %s" name
-        in
-        (Result.fail_with_reason reason, hookenv)
-      | exception Variables.Recursive_variable_definition name ->
-        let reason =
-          Printf.sprintf "error in script response: \
-            recursive variable definition %s" name
-        in
-        (Result.fail_with_reason reason, hookenv)
-      end
+      Result.pass, hookenv
     | _ ->
       Printf.fprintf log "Hook returned %d" exit_status;
       let reason = String.trim (Sys.string_of_file response_file) in

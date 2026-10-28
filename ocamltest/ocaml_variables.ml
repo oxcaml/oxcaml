@@ -60,11 +60,11 @@ let export_caml_ld_library_path value =
     if local_value="" then current_value else
     if current_value="" then local_value else
     String.concat Filename.path_sep [local_value; current_value] in
-  (caml_ld_library_path_name, new_value)
+  new_value
 
 let caml_ld_library_path =
   make_with_exporter
-    export_caml_ld_library_path
+    (caml_ld_library_path_name, export_caml_ld_library_path)
     ("ld_library_path",
       "List of paths to lookup for loading dynamic libraries")
 
@@ -147,6 +147,12 @@ let ocamlopt_byte = make ("ocamlopt_byte",
 let ocamlrun = make ("ocamlrun",
   "Path of the ocamlrun executable")
 
+let stdlib = make ("stdlib",
+  "Path of the stdlib")
+
+let runtime = make ("runtime",
+  "Path of the runtime")
+
 let ocamlc_flags = make ("ocamlc_flags",
   "Flags passed to ocamlc.byte and ocamlc.opt")
 
@@ -188,12 +194,9 @@ let ocamlc_opt_exit_status = make ("ocamlc_opt_exit_status",
 let ocamlopt_opt_exit_status = make ("ocamlopt_opt_exit_status",
   "Expected exit status of ocamlopt.opt")
 
-let export_ocamlrunparam value =
-  ("OCAMLRUNPARAM", value)
-
 let ocamlrunparam =
   make_with_exporter
-    export_ocamlrunparam
+    ("OCAMLRUNPARAM", Fun.id)
     ("ocamlrunparam",
       "Equivalent of OCAMLRUNPARAM")
 
@@ -225,6 +228,10 @@ let ocamldoc_reference =
 let ocaml_script_as_argument =
   Variables.make ( "ocaml_script_as_argument",
     "Whether the ocaml script should be passed as argument or on stdin")
+
+let ocamlfilt =
+  Variables.make ( "ocamlfilt",
+    "Path to ocamlfilt binary")
 
 let plugins =
   Variables.make ( "plugins", "plugins for ocamldoc" )
@@ -308,6 +315,7 @@ let init () =
     ocamldoc_exit_status;
     ocamldebug_flags;
     ocaml_script_as_argument;
+    ocamlfilt;
     os_type;
     plugins;
     shared_library_cflags;

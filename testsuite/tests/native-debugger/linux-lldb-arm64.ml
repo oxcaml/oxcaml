@@ -1,4 +1,7 @@
 (* TEST
+   set BUILD_PATH_PREFIX_MAP = "";
+   file = "${test_source_directory}/sanitize.awk";
+   file-exists;
    native-compiler;
    no-tsan; (* Skip, TSan inserts extra frames into backtraces *)
    linux;
@@ -13,6 +16,8 @@
    ocamlopt.byte;
    debugger_script = "${test_source_directory}/lldb-script";
    lldb;
+   stdout = "";
+   stderr = "";
    script = "sh ${test_source_directory}/sanitize.sh linux-lldb-arm64";
    script;
    check-program-output;

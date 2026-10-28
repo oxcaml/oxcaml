@@ -37,11 +37,9 @@ CAMLprim value caml_unix_execvp(value path, value args)
                                     /* from smart compilers */
 }
 
-#ifndef HAS_EXECVPE
 int caml_unix_execvpe_emulation(const char * name,
                            char * const argv[],
                            char * const envp[]);
-#endif
 
 CAMLprim value caml_unix_execvpe(value path, value args, value env)
 {
@@ -56,6 +54,13 @@ CAMLprim value caml_unix_execvpe(value path, value args, value env)
 #ifdef HAS_EXECVPE
   (void) execvpe_os((const char_os *)wpath, EXECV_CAST argv, EXECV_CAST envp);
   err = errno;
+  if (err == ENOEXEC) {
+    /* This case should be impossible, because POSIX specifies that the exec*p
+       family fall back to executing the program as a /bin/sh script here.
+       However, musl does not implement this fallback, so we can see this error.
+       In that case, we implement the fallback ourselves. */
+    err = caml_unix_execvpe_emulation(wpath, argv, envp);
+  }
 #else
   err = caml_unix_execvpe_emulation(wpath, argv, envp);
 #endif
@@ -66,8 +71,6 @@ CAMLprim value caml_unix_execvpe(value path, value args, value env)
   return Val_unit;                  /* never reached, but suppress warnings */
                                     /* from smart compilers */
 }
-
-#ifndef HAS_EXECVPE
 
 static int caml_unix_execve_script(const char * path,
                               char * const argv[],
@@ -160,5 +163,3 @@ int caml_unix_execvpe_emulation(const char * name,
      (ENOENT). */
   return got_eacces ? EACCES : ENOENT;
 }
-
-#endif

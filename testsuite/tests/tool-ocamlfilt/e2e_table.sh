@@ -38,7 +38,7 @@ OBJ=${1:?"missing object file argument"}
 # relocation table regardless of the scheme used to compile this test.
 EXCLUDE=${2:?"missing exclude-pattern argument"}
 
-OCAMLFILT="${ocamlsrcdir}/tools/ocamlfilt"
+OCAMLFILT="${ocamlfilt}"
 TAB="$(printf '\t')"
 
 # ocamlfilt mirrors c++filt and passes unrecognised input through unchanged

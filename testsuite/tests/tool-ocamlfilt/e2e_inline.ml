@@ -1,5 +1,5 @@
 (* TEST
- native-compiler;
+ native-compiler; setup-ocamlfilt;
  readonly_files = "e2e_inline_lib.ml e2e_inline_mid.ml";
  setup-ocamlopt.byte-build-env;
  flags = "-name-mangling-scheme structured -O3 -c";

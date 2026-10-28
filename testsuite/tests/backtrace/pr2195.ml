@@ -30,7 +30,7 @@ let () =
 
 (* TEST
  flags += "-g";
- exit_status = "2";
+ readonly_files = "sanitize-backtrace.sh";
  no-tsan; (* Exhausting file descriptors kills TSan support (libunwind fails) *)
  {
    ocamlrunparam += ",b=0";
