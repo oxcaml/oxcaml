@@ -2966,6 +2966,13 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
         end
     | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
   end;
+  (* CR layouts: We are sad to move considerations of argument evaluation
+     order so far into the frontend, but this is the easiest way to implement
+     [[@elide_void]] for now. The evaluation component of elision would be
+     more properly at home in unarization, which also handles the calling
+     convention for normal [void] arguments. However, there is no analogous
+     precedent in the bytecode compiler. Once we move to JSIR, the switch to
+     the more principled implementation should be easier. *)
   let build args =
     let lam =
       lambda_of_prim p.prim_name prim ~yielding loc args (Some apply_arg_exps)
