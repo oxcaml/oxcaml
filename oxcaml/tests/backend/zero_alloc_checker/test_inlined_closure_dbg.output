@@ -1,0 +1,12 @@
+File "test_inlined_closure_dbg.ml", line 30, characters 5-15:
+Error: Annotation check for zero_alloc failed on function Test_inlined_closure_dbg.f (camlTest_inlined_closure_dbg__f_HIDE_STAMP).
+
+File "test_inlined_closure_dbg.ml", line 28, characters 19-50:
+Error: called function may allocate (direct tailcall camlTest_inlined_closure_dbg__eval_HIDE_STAMP)
+inlined from
+test_inlined_closure_dbg.ml:30,25--37[Test_inlined_closure_dbg.f]
+
+File "test_inlined_closure_dbg.ml", line 28, characters 26-50:
+Error: allocation of 32 bytes for closure
+inlined from
+test_inlined_closure_dbg.ml:30,25--37[Test_inlined_closure_dbg.f]

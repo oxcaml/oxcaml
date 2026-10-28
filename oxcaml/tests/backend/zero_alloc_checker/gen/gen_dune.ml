@@ -248,6 +248,9 @@ let () =
     ~extra_sources:[] ~exit_code:2 "test_signatures_separate_b";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:[] ~exit_code:2 "test_assume_inlining";
+  print_test "test_assume_inlined_closure.ml";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_inlined_closure_dbg";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:[] ~exit_code:2 "test_assume_error";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]

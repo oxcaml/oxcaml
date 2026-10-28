@@ -1134,6 +1134,32 @@
  (action (diff test_assume_inlining.output test_assume_inlining.output.corrected)))
 
 (rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_assume_inlined_closure.ml)
+ (action (run %{bin:ocamlopt.opt} %{deps} -g -c -zero-alloc-check default -dcse -dzero-alloc -dump-into-file -O3 -warn-error +a)))
+
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test_inlined_closure_dbg.output.corrected)
+ (deps (:ml test_inlined_closure_dbg.ml) filter.sh)
+ (action
+   (with-outputs-to test_inlined_closure_dbg.output.corrected
+    (pipe-outputs
+    (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} %{ml} -g -color never -error-style short -c
+          -zero-alloc-checker-details-extra
+          -zero-alloc-check default -zero-alloc-checker-details-cutoff 20 -O3))
+    (run "./filter.sh")
+   ))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test_inlined_closure_dbg.output test_inlined_closure_dbg.output.corrected)
+ (action (diff test_inlined_closure_dbg.output test_inlined_closure_dbg.output.corrected)))
+
+(rule
  (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
  (targets test_assume_error.output.corrected)
  (deps (:ml test_assume_error.ml) filter.sh)

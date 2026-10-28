@@ -3434,7 +3434,19 @@ let close_functions acc external_env ~current_alloc_region ~current_region
       (Function_decls.alloc_mode function_declarations)
       ~current_alloc_region ~current_region
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let dbg =
+    (* Choose the debuginfo with the earliest source location. *)
+    List.map
+      (fun decl -> Debuginfo.from_location (Function_decl.loc decl))
+      func_decl_list
+    |> List.sort Debuginfo.compare
+    |> function
+    | [] -> Debuginfo.none
+    | dbg :: _ -> dbg
+  in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   let acc =
     Acc.add_set_of_closures_offsets ~is_phantom:false acc set_of_closures
   in

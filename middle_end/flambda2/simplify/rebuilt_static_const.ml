@@ -112,11 +112,6 @@ let find_code_characteristics find_code_metadata code_id :
   }
 
 let create_set_of_closures are_rebuilding ~find_code_metadata set =
-  let set =
-    Set_of_closures.create
-      ~value_slots:(Set_of_closures.value_slots set)
-      (Set_of_closures.function_decls set)
-  in
   let free_names = Set_of_closures.free_names set in
   let cost_metrics =
     Cost_metrics.set_of_closures

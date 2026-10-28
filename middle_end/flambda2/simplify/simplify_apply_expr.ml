@@ -798,7 +798,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             applied_values
           |> Value_slot.Map.of_list
         in
-        ( Set_of_closures.create ~value_slots function_decls,
+        ( Set_of_closures.create ~value_slots ~dbg function_decls,
           new_closure_alloc_mode,
           dacc,
           code_id,
