@@ -193,6 +193,12 @@ let prim_sys_argv =
 let to_locality ~poly = function
   | Prim_global, _ -> alloc_heap
   | Prim_local, _ -> alloc_local
+  | Prim_mode_poly (Instance locality), _ -> transl_locality_mode_l locality
+  | Prim_mode_poly Arbitrary, _ -> alloc_heap
+  | Prim_mode_poly Generic, _ ->
+    (* Only instances of primitives are translated, see
+       [Ctype.instance_prim_with_desc]. *)
+    assert false
   | Prim_poly, _ ->
     match poly with
     | None -> assert false
@@ -201,6 +207,12 @@ let to_locality ~poly = function
 let to_modify_mode ~poly = function
   | Prim_global, _ -> modify_heap
   | Prim_local, _ -> modify_maybe_stack
+  | Prim_mode_poly (Instance mode), _ -> transl_modify_mode mode
+  | Prim_mode_poly Arbitrary, _ -> modify_heap
+  | Prim_mode_poly Generic, _ ->
+    (* Only instances of primitives are translated, see
+       [Ctype.instance_prim_with_desc]. *)
+    assert false
   | Prim_poly, _ ->
     match poly with
     | None -> assert false
@@ -209,6 +221,12 @@ let to_modify_mode ~poly = function
 let to_return_mode ~poly = function
   | Prim_global, _ -> not_alloc_stack
   | Prim_local, _ -> maybe_alloc_stack
+  | Prim_mode_poly (Instance locality), _ -> transl_return_mode_l locality
+  | Prim_mode_poly Arbitrary, _ -> not_alloc_stack
+  | Prim_mode_poly Generic, _ ->
+    (* Only instances of primitives are translated, see
+       [Ctype.instance_prim_with_desc]. *)
+    assert false
   | Prim_poly, _ ->
     match poly with
     | None -> assert false
@@ -2557,12 +2575,24 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
 let check_primitive_arity loc p =
   let mode =
     match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ ->
+    | Prim_global, _ | Prim_poly, _ | Prim_mode_poly _, _ ->
       (* We assume all primitives are compiled to have the same arity for
          different modes and types, so just pick one of the modes in the
          [Prim_poly] case. *)
       Some Mode.Locality.global
     | Prim_local, _ -> Some Mode.Locality.local
+  in
+  (* The arity does not depend on the locality of [Prim_mode_poly] modes, which
+     are not instantiated in a declaration, so we replace them with [Arbitrary]
+     to express that any locality can be chosen in [to_locality] *)
+  let arbitrary = function
+    | Prim_mode_poly _, _ -> Prim_mode_poly Arbitrary
+    | ((Prim_global | Prim_local | Prim_poly) as mode), _ -> mode
+  in
+  let p =
+    Primitive.with_modes p
+      ~args:(List.map arbitrary p.prim_native_repr_args)
+      ~res:(arbitrary p.prim_native_repr_res)
   in
   (* By a similar assumption, the sort shouldn't change the arity.  So it's ok
      to lie here. *)

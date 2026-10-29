@@ -2100,6 +2100,7 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.global, None
   | Primitive.Prim_local, _ ->
     Locality.allow_right Locality.local, None
+  | Primitive.Prim_mode_poly _, _ -> assert false
   | Primitive.Prim_poly, _ ->
     match mvars with
     | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
@@ -2107,10 +2108,16 @@ let prim_mode' mvars = function
 
 (* Exported version. *)
 let prim_mode mvar prim ~level =
-  let mvar = Option.map
-    (fun mvar_l -> mvar_l, (Forkable.newvar level, Yielding.newvar level)) mvar
-  in
-  fst (prim_mode' mvar prim)
+  match prim with
+  | Primitive.Prim_mode_poly (Primitive.Instance m), _ -> m
+  | Primitive.Prim_mode_poly (Primitive.Generic | Primitive.Arbitrary), _ ->
+    assert false
+  | (Primitive.Prim_global | Primitive.Prim_local | Primitive.Prim_poly), _ ->
+    let mvar = Option.map
+      (fun mvar_l -> mvar_l, (Forkable.newvar level, Yielding.newvar level))
+      mvar
+    in
+    fst (prim_mode' mvar prim)
 
 (** Returns a new mode variable whose locality is the given locality and
     whose yieldingness is the given yieldingness, while all other axes are
@@ -2163,34 +2170,44 @@ let curry_mode_const alloc arg : With_locality.Const.t =
 
 module Curry_mode = struct
   type t =
-    | Const of With_locality.Const.t
+    | Const of { mode : With_locality.Const.t; pin_areality : bool }
     | Variable of
         { comonadic : With_locality.Comonadic.l;
-          areality : Locality.Const.t }
+          areality : Locality.Const.t option }
+
+  let const mode = Const { mode; pin_areality = true }
+
+  let legacy = const With_locality.Const.legacy
+
+  let primitive mode = Const { mode; pin_areality = false }
 
   let comonadic = function
-    | Const c ->
-      With_locality.Comonadic.of_const (With_locality.Const.partial_apply c)
+    | Const { mode; _ } ->
+      With_locality.Comonadic.of_const (With_locality.Const.partial_apply mode)
     | Variable { comonadic; _ } -> comonadic
 
   let areality = function
-    | Const c -> c.areality
+    | Const { mode; pin_areality } ->
+      if pin_areality then Some mode.areality else None
     | Variable { areality; _ } -> areality
 
   let add_arg t marg ~upper_areality =
-    let areality = Locality.Const.join (areality t) upper_areality in
-    let pinned =
-      With_locality.Comonadic.of_const
-        { With_locality.Comonadic.Const.min with areality }
-    in
-    Variable
-      { comonadic =
-          With_locality.Comonadic.join [curry_mode (comonadic t) marg; pinned];
-        areality }
+    let comonadic = curry_mode (comonadic t) marg in
+    match areality t with
+    | None -> Variable { comonadic; areality = None }
+    | Some areality ->
+      let areality = Locality.Const.join areality upper_areality in
+      let pinned =
+        With_locality.Comonadic.of_const
+          { With_locality.Comonadic.Const.min with areality }
+      in
+      Variable
+        { comonadic = With_locality.Comonadic.join [comonadic; pinned];
+          areality = Some areality }
 
   let add_const_arg t (arg : With_locality.Const.t) =
     match t with
-    | Const c -> Const (curry_mode_const c arg)
+    | Const c -> Const { c with mode = curry_mode_const c.mode arg }
     | Variable _ ->
       add_arg t (With_locality.of_const arg) ~upper_areality:arg.areality
 end
@@ -2225,6 +2242,32 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   | _ :: _, _ -> assert false
   | [], _ ->
      ty
+
+let instance_mode_poly (prim, _) m =
+  match prim with
+  | Primitive.Prim_mode_poly (Primitive.Instance _ | Primitive.Arbitrary)
+  | Primitive.Prim_poly ->
+    assert false
+  | Primitive.Prim_mode_poly Primitive.Generic ->
+    let mode_l = Locality.newvar 0 in
+    Locality.equate_exn (With_locality.proj_comonadic Areality m) mode_l;
+    Primitive.Prim_mode_poly
+      (Primitive.Instance (Locality.disallow_right mode_l))
+  | (Primitive.Prim_global | Primitive.Prim_local) as prim -> prim
+
+let rec instance_prim_poly modes res ty =
+  match modes, get_desc ty with
+  | m :: modes, Tarrow ((_, marg, mret), _, ret, _) ->
+     let m = instance_mode_poly m marg in
+     let modes, res =
+       match modes with
+       | [] -> [], instance_mode_poly res mret
+       | _ :: _ -> instance_prim_poly modes res ret
+     in
+     m :: modes, res
+  | _ :: _, _ -> assert false
+  | [], _ ->
+     [], fst res
 
 (* This function makes a copy of [ty] if [desc] is marked [prim_is_layout_poly]
    AND at least one generic type variable with jkind [any] is present. The
@@ -2353,6 +2396,23 @@ let instance_prim env (desc : Primitive.description) ty =
   let ty, sort = instance_prim_layout env desc ty in
   let ty, mode_l, mode_y = instance_prim_mode desc ty in
   ty, mode_l, mode_y, sort
+
+let instance_prim_with_desc env (desc : Primitive.description) ty =
+  let is_mode_poly = function
+    | Primitive.Prim_mode_poly _, _ -> true
+    | _ -> false
+  in
+  if List.exists is_mode_poly
+       (desc.prim_native_repr_res :: desc.prim_native_repr_args)
+  then
+    let ty, sort = instance_prim_layout env desc (generic_instance ty) in
+    let args, res =
+      instance_prim_poly desc.prim_native_repr_args desc.prim_native_repr_res ty
+    in
+    ty, None, None, sort, Primitive.with_modes desc ~args ~res
+  else
+    let ty, mode_l, mode_y, sort = instance_prim env desc ty in
+    ty, mode_l, mode_y, sort, desc
 
 (**** Instantiation with parameter substitution ****)
 

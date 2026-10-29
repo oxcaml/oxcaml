@@ -297,8 +297,8 @@ let value_descriptions_without_modes ~loc env name ~self_check
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
-        let ty1, mode_l1, _, sort1 =
-          Ctype.instance_prim env p1 vd1.val_type
+        let ty1, mode_l1, _, sort1, p1 =
+          Ctype.instance_prim_with_desc env p1 vd1.val_type
         in
         let tc =
           try
