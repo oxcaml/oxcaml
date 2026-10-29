@@ -147,10 +147,23 @@ let unit ~env ~res =
     To_jsir_result.add_instr_exn res (Let (var, Constant (Int Targetint.zero)))
   )
 
+(* We only place debug events to primitives that are compiled to runtime calls
+   by JSOO. *)
+let is_runtime_call (prim : Jsir.prim) =
+  match prim with
+  | Extern (name, _) -> not (String.starts_with ~prefix:"%" name)
+  | Vectlength _ | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult -> false
+
 let use_prim0 ~env ~res prim args =
   let expr : Jsir.expr = Prim (prim, args) in
   let var = Jsir.Var.fresh () in
-  var, env, To_jsir_result.add_instr_exn res (Jsir.Let (var, expr))
+  let instr : Jsir.instr = Let (var, expr) in
+  let res =
+    if is_runtime_call prim
+    then To_jsir_result.add_call_exn res instr
+    else To_jsir_result.add_instr_exn res instr
+  in
+  var, env, res
 
 let use_prim ~env ~res prim args =
   let var, env, res = use_prim0 ~env ~res prim args in
@@ -675,23 +688,9 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
             Extern ("caml_lessequal", hint) )
       in
       let unsigned_le x y =
-        let var_ule = Jsir.Var.fresh () in
-        let var_eq = Jsir.Var.fresh () in
-        let var_or = Jsir.Var.fresh () in
-        let expr_ule : Jsir.expr = Prim (ult, [x; y]) in
-        let expr_eq : Jsir.expr = Prim (eq, [x; y]) in
-        let res =
-          To_jsir_result.add_instr_exn res (Jsir.Let (var_ule, expr_ule))
-        in
-        let res =
-          To_jsir_result.add_instr_exn res (Jsir.Let (var_eq, expr_eq))
-        in
-        let expr_or : Jsir.expr =
-          Prim (Extern ("%int_or", None), [Pv var_ule; Pv var_eq])
-        in
-        ( Some var_or,
-          env,
-          To_jsir_result.add_instr_exn res (Jsir.Let (var_or, expr_or)) )
+        let var_ult, env, res = use_prim0 ~env ~res ult [x; y] in
+        let var_eq, env, res = use_prim0 ~env ~res eq [x; y] in
+        use_prim ~env ~res (Extern ("%int_or", None)) [Pv var_ult; Pv var_eq]
       in
       let x, res = prim_arg ~env ~res x in
       let y, res = prim_arg ~env ~res y in
@@ -947,5 +946,5 @@ let extern ~env ~res symbol args =
      threaded through. *)
   let var = Jsir.Var.fresh () in
   ( var,
-    To_jsir_result.add_instr_exn res
+    To_jsir_result.add_call_exn res
       (Let (var, Prim (Extern (name, None), args))) )

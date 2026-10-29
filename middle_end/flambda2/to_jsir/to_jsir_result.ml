@@ -50,9 +50,17 @@ type t =
             call; we mimic this here. *)
     imported_compilation_units : Compilation_unit.Set.t;
     global_data_var : Jsir.Var.t option;
-    late_bound_vars : Jsir.Var.Set.t
+    late_bound_vars : Jsir.Var.Set.t;
         (** Variables created ahead of their definition and since bound with
             [To_jsir_shared.bind_vars]. *)
+    call_events : call_events option
+        (** The events to put around the calls added by [add_call_exn], set by
+            [with_debuginfo_exn]. *)
+  }
+
+and call_events =
+  { start : Parse_info.t;
+    end_ : Parse_info.t option
   }
 
 let create () =
@@ -64,39 +72,67 @@ let create () =
     next_method_cache_id = 1;
     imported_compilation_units = Compilation_unit.Set.empty;
     global_data_var = None;
-    late_bound_vars = Jsir.Var.Set.empty
+    late_bound_vars = Jsir.Var.Set.empty;
+    call_events = None
   }
 
-let add_instr_exn t instr =
+let map_top_current_block_exn t ~f =
   let top_current_block, rest_current_blocks =
     match t.current_blocks with
-    | [] ->
-      Misc.fatal_error
-        "To_jsir_result.add_instr_exn: expected nonempty current_blocks"
+    | [] -> Misc.fatal_error "To_jsir_result: expected nonempty current_blocks"
     | hd :: tl -> hd, tl
   in
   let top_current_block =
-    { top_current_block with body = instr :: top_current_block.body }
+    { top_current_block with body = f top_current_block.body }
   in
   { t with current_blocks = top_current_block :: rest_current_blocks }
 
-let maybe_add_debuginfo_exn t dbg ~pos =
-  if Debuginfo.is_none dbg
-  then t
+let add_instr_exn t instr =
+  map_top_current_block_exn t ~f:(fun body -> instr :: body)
+
+(* An event supersedes an event immediately preceding it, so that there are
+   never two consecutive events (which JSOO rejects). *)
+let push_event parse_info (body : Jsir.instr list) : Jsir.instr list =
+  match body with
+  | Event _ :: body -> Event parse_info :: body
+  | (Let _ | Assign _ | Set_field _ | Offset_ref _ | Array_set _) :: _ | [] ->
+    Event parse_info :: body
+
+let parse_info_of_debuginfo dbg ~pos =
+  if not (Flambda_features.debug ())
+  then None
   else
     let loc = Debuginfo.to_location dbg in
-    let parse_info =
+    if Location.is_none loc
+    then None
+    else
       match pos with
-      | `Start -> Parse_info.t_of_pos loc.loc_start
-      | `End -> Parse_info.t_of_pos loc.loc_end
-    in
-    add_instr_exn t (Event parse_info)
+      | `Start -> Some (Parse_info.t_of_pos loc.loc_start)
+      | `End -> Some (Parse_info.t_of_pos loc.loc_end)
 
-let with_debuginfo_exn t dbg ~f =
-  let t = maybe_add_debuginfo_exn t dbg ~pos:`Start in
-  let x, t = f t in
-  let t = maybe_add_debuginfo_exn t dbg ~pos:`End in
-  x, t
+let add_event_exn t dbg ~pos =
+  match parse_info_of_debuginfo dbg ~pos with
+  | None -> t
+  | Some parse_info -> map_top_current_block_exn t ~f:(push_event parse_info)
+
+let add_call_exn t instr =
+  match t.call_events with
+  | None -> add_instr_exn t instr
+  | Some { start; end_ } ->
+    map_top_current_block_exn t ~f:(fun body ->
+        let body = instr :: push_event start body in
+        match end_ with None -> body | Some end_ -> push_event end_ body)
+
+let with_debuginfo_exn t dbg ~event_after ~f =
+  match parse_info_of_debuginfo dbg ~pos:`Start with
+  | None -> f t
+  | Some start ->
+    let end_ =
+      if event_after then parse_info_of_debuginfo dbg ~pos:`End else None
+    in
+    let outer_call_events = t.call_events in
+    let x, t = f { t with call_events = Some { start; end_ } } in
+    x, { t with call_events = outer_call_events }
 
 let new_block t ~params =
   let new_block = { params; body = []; addr = t.next_addr } in
@@ -213,7 +249,8 @@ let to_program_exn
       next_method_cache_id = _;
       imported_compilation_units;
       global_data_var;
-      late_bound_vars = _
+      late_bound_vars = _;
+      call_events = _
     } =
   if List.length current_blocks <> 0
   then
