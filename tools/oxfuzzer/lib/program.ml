@@ -205,7 +205,7 @@ let array_primitives =
   in
   let separable =
     { pjka_loc = Location.none;
-      pjka_desc = Pjk_mod (any, [loc (Mode "separable")])
+      pjka_desc = Pjk_mod (any, [loc (Pmode "separable")])
     }
   in
   let a = Typ.var "a" None in

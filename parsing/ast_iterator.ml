@@ -30,7 +30,7 @@ type iterator = {
   modes : iterator -> modes -> unit;
   mode : iterator -> mode Location.loc -> unit;
   mode_bound : iterator -> mode_bound -> unit;
-  mode_bound_elem : iterator -> mode_bound_elem -> unit;
+  mode_bound_var : iterator -> mode_bound_var -> unit;
   modalities : iterator -> modalities -> unit;
   binding_op: iterator -> binding_op -> unit;
   case: iterator -> case -> unit;
@@ -876,19 +876,22 @@ let default_iterator =
 
     mode = (fun this { txt; loc } ->
       (match txt with
-       | Mode _ | Mode_var _ -> ()
-       | Mode_var_with_constraints { upper; lower } ->
+       | Pmode _ | Pmode_var _ -> ()
+       | Pmode_bounded { upper; lower } ->
          this.mode_bound this upper;
          this.mode_bound this lower);
       this.location this loc
     );
 
-    mode_bound = (fun this { bound_vars; bound_const } ->
-      List.iter (this.mode_bound_elem this) bound_vars;
-      List.iter (iter_loc this) bound_const
+    mode_bound = (fun this elems ->
+      List.iter
+        (function
+          | Pbound_var v -> this.mode_bound_var this v
+          | Pbound_const c -> iter_loc this c)
+        elems
     );
 
-    mode_bound_elem = (fun this { elem_morph; elem_var; elem_mod } ->
+    mode_bound_var = (fun this { elem_morph; elem_var; elem_mod } ->
       Option.iter (iter_loc this) elem_morph;
       iter_loc this elem_var;
       List.iter (iter_loc this) elem_mod

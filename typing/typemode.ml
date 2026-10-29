@@ -254,8 +254,8 @@ let mode_consts_of_modes annots =
   List.map
     (fun { txt; loc } ->
       match (txt : Parsetree.mode) with
-      | Mode txt -> { txt; loc }
-      | Mode_var _ | Mode_var_with_constraints _ -> mode_variable_error ~loc)
+      | Pmode txt -> { txt; loc }
+      | Pmode_var _ | Pmode_bounded _ -> mode_variable_error ~loc)
     annots
 
 let transl_mode_annots annots =
@@ -280,7 +280,7 @@ let untransl_mode modes =
   let untransl_annot =
     Location.map
       (fun (Atom (ax, mode) : Mode.With_locality.atom) : Parsetree.mode ->
-        Mode
+        Pmode
           (Format_doc.asprintf "%a"
              (Mode.With_locality.Const.print_axis ax)
              mode))

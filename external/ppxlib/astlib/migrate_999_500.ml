@@ -1713,14 +1713,14 @@ and copy_mode :
   Ast_999.Parsetree.mode ->
   Ast_500.Parsetree.mode =
   function
-  | Ast_999.Parsetree.Mode m -> Ast_500.Parsetree.Mode m
-  | Ast_999.Parsetree.Mode_var v -> Ast_500.Parsetree.Mode_var v
-  | Ast_999.Parsetree.Mode_var_with_constraints b ->
-      Ast_500.Parsetree.Mode_var_with_constraints (copy_mode_bounds b)
+  | Ast_999.Parsetree.Pmode m -> Ast_500.Parsetree.Pmode m
+  | Ast_999.Parsetree.Pmode_var v -> Ast_500.Parsetree.Pmode_var v
+  | Ast_999.Parsetree.Pmode_bounded b ->
+      Ast_500.Parsetree.Pmode_bounded (copy_mode_bounded b)
 
-and copy_mode_bounds :
-  Ast_999.Parsetree.mode_bounds ->
-  Ast_500.Parsetree.mode_bounds =
+and copy_mode_bounded :
+  Ast_999.Parsetree.mode_bounded ->
+  Ast_500.Parsetree.mode_bounded =
   fun { Ast_999.Parsetree.upper; lower } ->
   { Ast_500.Parsetree.upper = copy_mode_bound upper;
     lower = copy_mode_bound lower;
@@ -1729,14 +1729,19 @@ and copy_mode_bounds :
 and copy_mode_bound :
   Ast_999.Parsetree.mode_bound ->
   Ast_500.Parsetree.mode_bound =
-  fun { Ast_999.Parsetree.bound_vars; bound_const } ->
-  { Ast_500.Parsetree.bound_vars = List.map copy_mode_bound_elem bound_vars;
-    bound_const;
-  }
+  fun x -> List.map copy_mode_bound_elem x
 
 and copy_mode_bound_elem :
   Ast_999.Parsetree.mode_bound_elem ->
   Ast_500.Parsetree.mode_bound_elem =
+  function
+  | Ast_999.Parsetree.Pbound_var v ->
+      Ast_500.Parsetree.Pbound_var (copy_mode_bound_var v)
+  | Ast_999.Parsetree.Pbound_const c -> Ast_500.Parsetree.Pbound_const c
+
+and copy_mode_bound_var :
+  Ast_999.Parsetree.mode_bound_var ->
+  Ast_500.Parsetree.mode_bound_var =
   fun { Ast_999.Parsetree.elem_morph; elem_var; elem_mod } ->
   { Ast_500.Parsetree.elem_morph; elem_var; elem_mod }
 
