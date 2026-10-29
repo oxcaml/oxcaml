@@ -487,6 +487,9 @@ module Pattern : sig
 
   val union : f:(Var.t -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
   val untag : 'a t -> 'a t
 
   type 'a block_field
@@ -519,6 +522,11 @@ module Pattern : sig
 end = struct
   type 'a t = 'a pattern
 
+  let rec print print_keep ppf { keep; unbox } =
+    Misc.Sexp.print ppf
+      [ Misc.Sexp.a "keep" keep (Var.Map.print print_keep);
+        Misc.Sexp.a "unbox" unbox
+          (Discriminant.Map.print (Accessor.Map.print (print print_keep))) ]
 
   let any = { keep = Var.Map.empty; unbox = Discriminant.Map.empty }
 
