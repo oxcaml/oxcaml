@@ -637,7 +637,7 @@ type operation =
       { name : string;
         enabled_at_init : bool option
       }
-  | Copaque
+  | Copaque of machtype
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
@@ -817,7 +817,7 @@ let iter_shallow_tail f = function
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
         | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
-        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
+        | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
         | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
         | Capply _ | Cextcall _ | Cload _
         | Cstore (_, _)
@@ -855,7 +855,7 @@ let map_shallow_tail f = function
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
           | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
-          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
+          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque _ | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
           | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
