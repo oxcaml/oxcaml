@@ -41,9 +41,6 @@ let x86_peephole_remove_redundant_test = ref true
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
-let cfg_eliminate_dead_trap_handlers = ref true
-(* -cfg-eliminate-dead-trap-handlers *)
-
 let cfg_eliminate_dead_code_validate = ref false
 (* -cfg-eliminate-dead-code-validate *)
 
