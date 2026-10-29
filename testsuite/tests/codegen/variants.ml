@@ -2,6 +2,7 @@
  flags += " -O3";
  flags += " -experimental-optimizations";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -57,6 +58,20 @@ Variant_with_uneven_mutability.get:
   movq  (%rax), %rax
   ret
 .L0:
+  movq  (%rax), %rax
+  ret
+|}]
+
+
+module Or_pattern_on_mutable = struct
+  type t =
+    | A of { mutable x : string }
+    | B of { mutable x : string }
+
+  let get (t : t) = match t with A { x } | B { x } -> x
+end
+[%%expect_asm X86_64{|
+Or_pattern_on_mutable.get:
   movq  (%rax), %rax
   ret
 |}]

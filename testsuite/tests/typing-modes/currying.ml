@@ -254,6 +254,20 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
+let app7 (f : a:int -> b:'b @ unique -> unit) (y @ unique) : (a:int -> unit) @ many = f ~b:y
+[%%expect{|
+Line 1, characters 86-92:
+1 | let app7 (f : a:int -> b:'b @ unique -> unit) (y @ unique) : (a:int -> unit) @ many = f ~b:y
+                                                                                          ^^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+let app8 (f : a:int -> b:'b @ uncontended -> unit) (y @ uncontended) : (a:int -> unit) @ portable = f ~b:y
+[%%expect{|
+Line 1, characters 100-106:
+1 | let app8 (f : a:int -> b:'b @ uncontended -> unit) (y @ uncontended) : (a:int -> unit) @ portable = f ~b:y
+                                                                                                        ^^^^^^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
 
 let bug1 () =
   let foo : a:local_ string -> b:local_ string -> c:int -> unit =
@@ -398,12 +412,32 @@ let _ =
   let f : _ @ unique -> (_ -> _) = fun _ -> fun x -> x in
   f "hello" "world"
 [%%expect{|
-Line 3, characters 2-11:
-3 |   f "hello" "world"
-      ^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling once values, extra arguments are passed in a separate application.
-Hint: Try wrapping the marked application in parentheses.
+- : string = "world"
+|}]
+
+let use_unique (x @ unique) = ()
+[%%expect{|
+val use_unique : 'a @ unique -> unit = <fun>
+|}]
+
+let _ =
+  let f : _ @ unique -> (_ -> _) = fun x -> use_unique x; fun x -> x in
+  f "hello" "world"
+[%%expect{|
+- : string = "world"
+|}]
+
+let _ =
+  let f : _ @ unique -> (_ -> _) = fun y -> fun x -> use_unique y; x in
+  f "hello" "world"
+[%%expect{|
+Line 2, characters 64-65:
+2 |   let f : _ @ unique -> (_ -> _) = fun y -> fun x -> use_unique y; x in
+                                                                    ^
+Error: This value is "aliased"
+         because it is used inside the function at line 2, characters 44-68
+         which is expected to be "many".
+       However, the highlighted expression is expected to be "unique".
 |}]
 
 let _ =
@@ -486,8 +520,6 @@ let f (g @ unique) x =
   g x x [@nontail]
 [%%expect{|
 val f : ('a -> 'a -> 'b) @ unique -> ('a -> 'b) = <fun>
-|}, Principal{|
-val f : ('a -> 'a -> 'b) @ unique -> 'a -> 'b = <fun>
 |}]
 
 let f (g @ once) x =

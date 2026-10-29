@@ -26,6 +26,7 @@ type t =
   | Naked_vec128s
   | Naked_vec256s
   | Naked_vec512s
+  | Naked_masks
       (** Arrays of unboxed numbers, with a slightly different runtime
           representation. *)
 

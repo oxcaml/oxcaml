@@ -1,0 +1,30 @@
+File "send.ml", line 28, characters 56-64:
+Event before/fun
+File "send.ml", line 25, characters 55-67:
+Event before/fun
+File "send.ml", line 25, characters 55-63:
+Event after/ret(2)
+File "send.ml", line 21, characters 19-25:
+Event before/fun
+File "send.ml", line 21, characters 19-25:
+Event pseudo/unyielding-call(2)
+File "send.ml", line 18, characters 22-32:
+Event before/fun
+File "send.ml", line 18, characters 22-28:
+Event after/unyielding-call(2)
+File "send.ml", line 12, characters 15-20:
+Event before/fun
+File "send.ml", line 13, characters 47-48:
+Event before/fun
+File "send.ml", line 18, characters 17-32:
+Event pseudo
+File "send.ml", line 21, characters 14-25:
+Event pseudo
+File "send.ml", line 25, characters 22-67:
+Event pseudo
+File "send.ml", line 28, characters 23-64:
+Event pseudo
+File "send.ml", line 0, characters -1--1:
+Event pseudo
+File "send.ml", line 0, characters -1--1:
+Event pseudo

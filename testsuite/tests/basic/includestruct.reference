@@ -14,4 +14,7 @@ A
 foo1
 foo1
 1 / 2 / 10 
-XXX
+Includestruct.XXX
+Includestruct.Mod.Foo
+Includestruct.Mod.Bar
+Includestruct.Mod.Baz

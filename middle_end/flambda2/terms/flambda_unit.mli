@@ -16,6 +16,18 @@
 
 (** The Flambda representation of a single compilation unit's code. *)
 
+module Metadata : sig
+  type t
+
+  val module_symbol : t -> Symbol.t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+
+  val print : Format.formatter -> t -> unit
+end
+
 type t
 
 val print : Format.formatter -> t -> unit
@@ -23,30 +35,21 @@ val print : Format.formatter -> t -> unit
 val create :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
-  toplevel_my_region:Variable.t ->
-  toplevel_my_ghost_region:Variable.t ->
   toplevel_my_alloc_region:Variable.t ->
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
-  used_value_slots:Value_slot.Set.t Or_unknown.t ->
   t
+
+val create_from_metadata_and_body : Metadata.t -> Flambda.Expr.t -> t
+
+val metadata : t -> Metadata.t
 
 val return_continuation : t -> Continuation.t
 
 val exn_continuation : t -> Continuation.t
 
-val toplevel_my_region : t -> Variable.t
-
-val toplevel_my_ghost_region : t -> Variable.t
-
 val toplevel_my_alloc_region : t -> Variable.t
 
 val module_symbol : t -> Symbol.t
 
-val used_value_slots : t -> Value_slot.Set.t Or_unknown.t
-
-val with_used_value_slots : t -> Value_slot.Set.t -> t
-
 val body : t -> Flambda.Expr.t
-
-val with_body : t -> Flambda.Expr.t -> t

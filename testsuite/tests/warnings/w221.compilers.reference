@@ -1,0 +1,47 @@
+File "w221.ml", line 23, characters 8-18:
+23 | let _ = W221_lib.z [@@alert "-foo"]
+             ^^^^^^^^^^
+Alert bar: W221_lib.z
+Bar!
+
+File "w221.ml", line 19, characters 19-35:
+19 | let _ = W221_lib.y [@@alert "-foo"]
+                        ^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert foo,
+  but it did not suppress any occurrence of the alert.
+
+File "w221.ml", line 23, characters 19-35:
+23 | let _ = W221_lib.z [@@alert "-foo"]
+                        ^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert foo,
+  but it did not suppress any occurrence of the alert.
+
+File "w221.ml", line 26, characters 10-34:
+26 | let _ = 0 [@@alert "-never_fires"]
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert never_fires,
+  but it did not suppress any occurrence of the alert.
+
+File "w221.ml", line 32, characters 29-53:
+32 | let _ = 0 [@@warning "-221"] [@@alert "-never_fires"]
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert never_fires,
+  but it did not suppress any occurrence of the alert.
+
+File "w221.ml", line 36, characters 20-35:
+36 | let _ = (W221_lib.y [@alert "-foo"])
+                         ^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert foo,
+  but it did not suppress any occurrence of the alert.
+
+File "w221.ml", line 48, characters 0-17:
+48 | [@@@alert "-all"]
+     ^^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert all,
+  but it did not suppress any occurrence of the alert.
+
+File "w221.ml", line 52, characters 0-18:
+52 | [@@@alert "-quux"]
+     ^^^^^^^^^^^^^^^^^^
+Warning 221 [unused-alert-disable]: This attribute disables alert quux,
+  but it did not suppress any occurrence of the alert.

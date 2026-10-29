@@ -21,7 +21,7 @@
 module Const : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S with type t := t
 
@@ -76,6 +76,8 @@ module Const : sig
 
   val naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
+  val naked_mask : Vector_types.Mask.Bit_pattern.t -> t
+
   module Descr : sig
     type t = private
       | Naked_immediate of Target_ocaml_int.t
@@ -90,6 +92,7 @@ module Const : sig
       | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
       | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
       | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
+      | Naked_mask of Vector_types.Mask.Bit_pattern.t
       | Null
       | Poison of Flambda_kind.t * string
 
@@ -98,21 +101,28 @@ module Const : sig
 
   val descr : t -> Descr.t
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 end
 
 module Variable : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S_plus_iterator with type t := t
 
   module Lmap : Lmap.S with type key := t
 
   val create : ?user_visible:unit -> string -> Flambda_kind.t -> t
+
+  val create_in_compilation_unit :
+    compilation_unit:Compilation_unit.t ->
+    ?user_visible:unit ->
+    string ->
+    Flambda_kind.t ->
+    t
 
   val compilation_unit : t -> Compilation_unit.t
 
@@ -124,15 +134,17 @@ module Variable : sig
 
   val user_visible : t -> bool
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
+
+  val import_and_rename : importer -> t -> t
 end
 
 module Symbol : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S_plus_iterator with type t := t
 
@@ -153,9 +165,9 @@ module Symbol : sig
 
   val linkage_name_as_string : t -> string
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 
   val external_symbols_compilation_unit : unit -> Compilation_unit.t
 end
@@ -187,7 +199,7 @@ module Coercion :
 module Simple : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S_plus_iterator with type t := t
 
@@ -220,15 +232,21 @@ module Simple : sig
      [same s (with_coercion s coercion)] returns true *)
   val same : t -> t -> bool
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import :
+    importer ->
+    t ->
+    import_const:(Const.t -> Const.t) ->
+    import_symbol:(Symbol.t -> Symbol.t) ->
+    import_var:(Variable.t -> Variable.t) ->
+    t
 end
 
 module Code_id : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S with type t := t
 
@@ -254,9 +272,9 @@ module Code_id : sig
 
   val invert_map : t Map.t -> t Map.t
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 end
 
 module Code_id_or_symbol : sig

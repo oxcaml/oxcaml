@@ -13,6 +13,7 @@
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
  flags += " -cfg-merge-blocks";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -51,10 +52,9 @@ push:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 
@@ -117,9 +117,6 @@ ref_unsafe_set:
   ret
 |}]
 
-(* CR ttebbi: Stackframe creation is only necessary on the GC-calling path.
-   In this case, this would require moving the stackframe creation into the
-   hidden block where the GC is actually called. *)
 let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
@@ -141,7 +138,7 @@ poly_unsafe_set:
   ret
 |}]
 
-let int32_unsafe_get (a : int32# array) (i : int) =
+let int32_unsafe_get (a : int32_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 int32_unsafe_get:
@@ -149,7 +146,7 @@ int32_unsafe_get:
   ret
 |}]
 
-let int32_unsafe_set (a : int32# array) (i : int) (v : int32#) =
+let int32_unsafe_set (a : int32_u array) (i : int) (v : int32_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 int32_unsafe_set:
@@ -158,7 +155,7 @@ int32_unsafe_set:
   ret
 |}]
 
-let int64_unsafe_get (a : int64# array) (i : int) =
+let int64_unsafe_get (a : int64_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 int64_unsafe_get:
@@ -166,7 +163,7 @@ int64_unsafe_get:
   ret
 |}]
 
-let int64_unsafe_set (a : int64# array) (i : int) (v : int64#) =
+let int64_unsafe_set (a : int64_u array) (i : int) (v : int64_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 int64_unsafe_set:
@@ -220,7 +217,7 @@ float_unsafe_set_plain:
   ret
 |}]
 
-let nativeint_unsafe_get (a : nativeint# array) (i : int) =
+let nativeint_unsafe_get (a : nativeint_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 nativeint_unsafe_get:
@@ -228,8 +225,8 @@ nativeint_unsafe_get:
   ret
 |}]
 
-let nativeint_unsafe_set (a : nativeint# array) (i : int)
-    (v : nativeint#) =
+let nativeint_unsafe_set (a : nativeint_u array) (i : int)
+    (v : nativeint_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 nativeint_unsafe_set:
@@ -255,7 +252,7 @@ floatarray_unsafe_set:
   ret
 |}]
 
-let float32_unsafe_get (a : float32# array) (i : int) =
+let float32_unsafe_get (a : float32_u array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 float32_unsafe_get:
@@ -263,7 +260,7 @@ float32_unsafe_get:
   ret
 |}]
 
-let float32_unsafe_set (a : float32# array) (i : int) (v : float32#) =
+let float32_unsafe_set (a : float32_u array) (i : int) (v : float32_u) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 float32_unsafe_set:
@@ -332,7 +329,7 @@ poly_length:
 
 (* CR ttebbi: The header is loaded twice. Also, extracting the bits can be done
     better. Also for other arrays with element size < 8 below. *)
-let int32_length (a : int32# array) = Array.length a
+let int32_length (a : int32_u array) = Array.length a
 [%%expect_asm X86_64{|
 int32_length:
   movzbq -8(%rax), %rbx
@@ -346,13 +343,13 @@ int32_length:
   ret
 |}]
 
-let int64_length (a : int64# array) = Array.length a
+let int64_length (a : int64_u array) = Array.length a
 [%%expect_asm X86_64{|
 int64_length:
   movq  -8(%rax), %rax
   salq  $8, %rax
-  shrq  $18, %rax
-  leaq  1(%rax,%rax), %rax
+  shrq  $17, %rax
+  orq   $1, %rax
   ret
 |}]
 
@@ -366,7 +363,7 @@ float_length:
   ret
 |}]
 
-let float32_length (a : float32# array) = Array.length a
+let float32_length (a : float32_u array) = Array.length a
 [%%expect_asm X86_64{|
 float32_length:
   movzbq -8(%rax), %rbx
@@ -422,11 +419,11 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let ref_safe_set (a : string array) (i : int) (v : string) =
@@ -447,16 +444,11 @@ ref_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
-(* CR ttebbi: The header is loaded twice: once for the bounds check and once
-   for the tag check (to distingish float arrays). The non-float case should
-   be the inline one for code compactness.
-*)
 let poly_safe_get (a : 'a array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
@@ -469,11 +461,11 @@ poly_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
@@ -494,31 +486,29 @@ poly_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 (* CR ttebbi: shrq $18 followed by salq $1 could be shrq $17. *)
-let int64_safe_get (a : int64# array) (i : int) =
+let int64_safe_get (a : int64_u array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int64_safe_get:
   movq  -8(%rax), %rdi
   salq  $8, %rdi
-  shrq  $18, %rdi
-  salq  $1, %rdi
+  shrq  $17, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let float_safe_get (a : float# array) (i : int) =
@@ -533,11 +523,11 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let float_safe_get_plain (a : float array) (i : int) =
@@ -553,14 +543,14 @@ float_safe_get_plain:
   vmovsd (%rax), %xmm0
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
-let int32_safe_get (a : int32# array) (i : int) =
+let int32_safe_get (a : int32_u array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 int32_safe_get:
@@ -577,9 +567,9 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]

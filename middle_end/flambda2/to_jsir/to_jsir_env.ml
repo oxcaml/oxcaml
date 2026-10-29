@@ -113,7 +113,7 @@ let register_symbol' ~res symbol var =
       (Let
          ( Jsir.Var.fresh (),
            Prim
-             ( Extern "caml_register_symbol",
+             ( Extern ("caml_register_symbol", None),
                [ Pc (NativeString compilation_unit_name);
                  Pc (NativeString symbol_name);
                  Pv var ] ) ))
@@ -146,7 +146,9 @@ let get_symbol_from_global_data ~symbol_name ~res =
   let symbol_name = Jsir.Native_string.of_string symbol_name in
   let var = Jsir.Var.fresh () in
   let expr : Jsir.expr =
-    Prim (Extern "caml_js_get", [Pv global_data; Pc (NativeString symbol_name)])
+    Prim
+      ( Extern ("caml_js_get", None),
+        [Pv global_data; Pc (NativeString symbol_name)] )
   in
   var, To_jsir_result.add_instr_exn res (Let (var, expr))
 
@@ -164,7 +166,7 @@ let get_predef_exception ~res symbol =
       (String.length symbol_name - String.length caml_exn_)
   in
   (* jsoo already registers these in global data *)
-  get_symbol_from_global_data ~symbol_name ~res
+  get_symbol_from_global_data ~symbol_name:("predef:" ^ symbol_name) ~res
 
 let get_external_symbol ~res symbol =
   match Symbol.is_predefined_exception symbol with
@@ -179,20 +181,26 @@ let get_external_symbol ~res symbol =
       in
       get_symbol_from_global_data ~symbol_name:compilation_unit_name ~res
     | false ->
+      (* The unit defining the symbol must be linked (and initialised) before
+         this one, so record it as an import too. *)
+      let res =
+        To_jsir_result.import_compilation_unit res
+          (Symbol.compilation_unit symbol)
+      in
       let compilation_unit_name, symbol_name =
         symbol_to_native_strings symbol
       in
       let var = Jsir.Var.fresh () in
       let expr : Jsir.expr =
         Prim
-          ( Extern "caml_get_symbol",
+          ( Extern ("caml_get_symbol", None),
             [ Pc (NativeString compilation_unit_name);
               Pc (NativeString symbol_name) ] )
       in
       var, To_jsir_result.add_instr_exn res (Let (var, expr)))
 
 let get_symbol t ~res symbol =
-  match Symbol.compilation_unit symbol |> Compilation_unit.is_current with
+  match Symbol.compilation_unit symbol |> Current_unit.is_current with
   | true -> Option.map (fun v -> v, res) (Symbol.Map.find_opt symbol t.symbols)
   | false -> Some (get_external_symbol ~res symbol)
 

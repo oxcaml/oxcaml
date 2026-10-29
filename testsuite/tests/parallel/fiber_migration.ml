@@ -17,11 +17,13 @@ let rec push stack item =
 
 let main () =
   let fibers_in = Atomic.make [] in
+  let completed = Atomic.make 0 in
   let receiving_domain = Domain.spawn begin fun () ->
     try
       let rec loop = function
         | fiber :: fibers ->
           fiber ();
+          Atomic.incr completed;
           loop fibers
         | [] ->
           while Atomic.get fibers_in == [] do
@@ -46,7 +48,12 @@ let main () =
         None
     in
     let handler = { Effect.Deep.retc = Fun.id; exnc = raise; effc } in
-    for _ = 1 to 1_000_000 do
+    (* Bound the number of in-flight fibers, to prevent running out of
+       mappings when stacks have guard pages. *)
+    for i = 1 to 1_000_000 do
+      while i - Atomic.get completed > 1_000 do
+        Domain.cpu_relax ()
+      done;
       Effect.Deep.match_with (fun () -> Effect.perform Migrate) () handler
     done;
     Printf.printf "OK\n%!"

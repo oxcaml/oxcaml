@@ -75,7 +75,8 @@ let int_shift_op =
 let unary_int_arith_op =
   D.(
     constructor_flag
-      (["bswp", Swap_byte_endianness] : (string * P.unary_int_arith_op) list))
+      (["bswp", Swap_byte_endianness; "not", Not]
+        : (string * P.unary_int_arith_op) list))
 
 let binary_int_arith_op =
   D.(
@@ -83,8 +84,10 @@ let binary_int_arith_op =
       ([ "add", Add;
          "sub", Sub;
          "mul", Mul;
-         "div", Div;
-         "mod", Mod;
+         "div", Div Signed;
+         "mod", Mod Signed;
+         "udiv", Div Unsigned;
+         "umod", Mod Unsigned;
          "and", And;
          "or", Or;
          "xor", Xor ]
@@ -121,7 +124,8 @@ let flat_suffix_element =
         "imm", Naked_immediate;
         "vec128", Naked_vec128;
         "vec256", Naked_vec256;
-        "vec512", Naked_vec512 ]
+        "vec512", Naked_vec512;
+        "mask", Naked_mask ]
 
 let mixed_block_shape =
   let open D in
@@ -227,6 +231,7 @@ let string_accessor_width =
           | "256u" -> Two_fifty_six { aligned = false }
           | "512a" -> Five_twelve { aligned = true }
           | "512u" -> Five_twelve { aligned = false }
+          | "mask" -> Mask
           | _ -> Misc.fatal_errorf "invalid string accessor width '%s'" i);
       encode =
         (fun _ saw ->
@@ -245,6 +250,7 @@ let string_accessor_width =
             | Two_fifty_six { aligned = true } -> "256a"
             | Five_twelve { aligned = false } -> "512u"
             | Five_twelve { aligned = true } -> "512a"
+            | Mask -> "mask"
           in
           wrap_loc s)
     }
@@ -269,11 +275,12 @@ let alloc_mode_for_allocation =
           then env.toplevel_alloc_region
           else Fexpr_to_flambda_commons.find_var env alloc_region
         in
-        (* CR-someday ncourant: right now this is unable to produce ghost
-           regions at toplevel, which is a bit unfortunate *)
         let region =
           if String.equal (unwrap_loc region) "toplevel"
-          then env.toplevel_region
+          then
+            Misc.fatal_errorf
+              "[toplevel] is an alloc region, but we are expecting a local \
+               region here."
           else Fexpr_to_flambda_commons.find_var env region
         in
         Alloc_mode.For_allocations.local ~alloc_region ~region )
@@ -295,16 +302,12 @@ let alloc_mode_for_allocation =
           match
             Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region
           with
-          | Fexpr.Toplevel_alloc_region | Toplevel_region
-          | Toplevel_ghost_region ->
-            wrap_loc "toplevel"
+          | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
           | Named s -> s
         in
         let region =
           match Flambda_to_fexpr_commons.Env.find_region_exn env region with
-          | Fexpr.Toplevel_alloc_region | Toplevel_region
-          | Toplevel_ghost_region ->
-            wrap_loc "toplevel"
+          | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
           | Named s -> s
         in
         local (alloc_region, region) env
@@ -313,9 +316,7 @@ let alloc_mode_for_allocation =
           match
             Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region
           with
-          | Fexpr.Toplevel_alloc_region | Toplevel_region
-          | Toplevel_ghost_region ->
-            wrap_loc "toplevel"
+          | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
           | Named s -> s
         in
         heap alloc_region env)
@@ -324,8 +325,7 @@ let alloc_region =
   D.maps
     ~to_:(fun env alloc_region ->
       match Flambda_to_fexpr_commons.Env.find_region_exn env alloc_region with
-      | Fexpr.Toplevel_alloc_region | Toplevel_region | Toplevel_ghost_region ->
-        wrap_loc "toplevel"
+      | Fexpr.Toplevel_alloc_region -> wrap_loc "toplevel"
       | Named s -> s)
     ~from:(fun env alloc_region ->
       if String.equal (unwrap_loc alloc_region) "toplevel"
@@ -355,7 +355,8 @@ let boxable_number =
         "nativeint", Naked_nativeint;
         "vec128", Naked_vec128;
         "vec256", Naked_vec256;
-        "vec512", Naked_vec512 ]
+        "vec512", Naked_vec512;
+        "mask", Naked_mask ]
 
 let array_kind =
   let open D in
@@ -375,6 +376,7 @@ let array_kind =
         let| vec128 = flag_case "vec128" Naked_vec128s in
         let| vec256 = flag_case "vec256" Naked_vec256s in
         let| vec512 = flag_case "vec512" Naked_vec512s in
+        let| mask = flag_case "mask" Naked_masks in
         let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
         let| product = list ak, fun _ aks -> Unboxed_product aks in
         return_either (function
@@ -391,6 +393,7 @@ let array_kind =
           | Naked_vec128s -> vec128 ()
           | Naked_vec256s -> vec256 ()
           | Naked_vec512s -> vec512 ()
+          | Naked_masks -> mask ()
           | Gc_ignorable_values -> gc_ign ()
           | Unboxed_product aks -> product aks))
   in
@@ -463,6 +466,10 @@ let duplicate_array_kind =
     ( labeled "vec512" (option target_ocaml_int),
       fun _ length -> Naked_vec512s { length } )
   in
+  let| mask =
+    ( labeled "mask" (option target_ocaml_int),
+      fun _ length -> Naked_masks { length } )
+  in
   return_either (function
     | Immediates -> imm ()
     | Values -> values ()
@@ -476,7 +483,8 @@ let duplicate_array_kind =
     | Naked_nativeints { length } -> nativeint length
     | Naked_vec128s { length } -> vec128 length
     | Naked_vec256s { length } -> vec256 length
-    | Naked_vec512s { length } -> vec512 length)
+    | Naked_vec512s { length } -> vec512 length
+    | Naked_masks { length } -> mask length)
 
 let bigarray_kind =
   D.(
@@ -510,6 +518,9 @@ let reinterp_64bit_word =
         "int64_as_float64", Unboxed_int64_as_unboxed_float64;
         "float64_as_int64", Unboxed_float64_as_unboxed_int64 ]
 
+let atomic_offset_units =
+  D.constructor_flag P.["field", Field_index; "offset", Byte_offset]
+
 let int_atomic_op =
   D.constructor_flag
     P.
@@ -536,6 +547,7 @@ let kind =
            "vec128", K.naked_vec128;
            "vec256", K.naked_vec256;
            "vec512", K.naked_vec512;
+           "mask", K.naked_mask;
            "region", K.region;
            "rec_info", K.rec_info ])
 
@@ -560,6 +572,7 @@ let kind_with_subkind =
         let| boxed_vec128 = flag_case "boxed_vec128" Boxed_vec128 in
         let| boxed_vec256 = flag_case "boxed_vec256" Boxed_vec256 in
         let| boxed_vec512 = flag_case "boxed_vec512" Boxed_vec512 in
+        let| boxed_mask = flag_case "boxed_mask" Boxed_mask in
         let| value_array = flag_case "value_array" Value_array in
         let| imm_array = flag_case "imm_array" Immediate_array in
         let| float_array = flag_case "float_array" Float_array in
@@ -594,6 +607,9 @@ let kind_with_subkind =
         let| unboxed_vec512_array =
           flag_case "unboxed_vec512_array" Unboxed_vec512_array
         in
+        let| unboxed_mask_array =
+          flag_case "unboxed_mask_array" Unboxed_mask_array
+        in
         let| unboxed_product_array =
           flag_case "unboxed_product_array" Unboxed_product_array
         in
@@ -602,7 +618,16 @@ let kind_with_subkind =
             fun _ num_fields -> Float_block { num_fields } )
         in
         let| variant =
-          let item = param2 block_shape (list full_kind) in
+          let item =
+            maps
+              (option (param2 block_shape (list full_kind)))
+              ~from:(fun _ -> function
+                | None -> Undetermined
+                | Some (shape, fields) -> Determined (shape, fields))
+              ~to_:(fun _ -> function
+                | Undetermined -> None
+                | Determined (shape, fields) -> Some (shape, fields))
+          in
           let map_bind = positional (param2 scannable_tag item) in
           let tag_map =
             maps (list map_bind)
@@ -627,6 +652,7 @@ let kind_with_subkind =
           | Boxed_vec128 -> boxed_vec128 ()
           | Boxed_vec256 -> boxed_vec256 ()
           | Boxed_vec512 -> boxed_vec512 ()
+          | Boxed_mask -> boxed_mask ()
           | Tagged_immediate -> tagged_imm ()
           | Float_array -> float_array ()
           | Immediate_array -> imm_array ()
@@ -642,6 +668,7 @@ let kind_with_subkind =
           | Unboxed_vec128_array -> unboxed_vec128_array ()
           | Unboxed_vec256_array -> unboxed_vec256_array ()
           | Unboxed_vec512_array -> unboxed_vec512_array ()
+          | Unboxed_mask_array -> unboxed_mask_array ()
           | Unboxed_product_array -> unboxed_product_array ()
           | Float_block { num_fields } -> float_block num_fields
           | Variant { consts; non_consts } -> variant (consts, non_consts))
@@ -661,6 +688,7 @@ let kind_with_subkind =
       let| naked_vec128 = flag_case "vec128" K.With_subkind.naked_vec128 in
       let| naked_vec256 = flag_case "vec256" K.With_subkind.naked_vec256 in
       let| naked_vec512 = flag_case "vec512" K.With_subkind.naked_vec512 in
+      let| naked_mask = flag_case "mask" K.With_subkind.naked_mask in
       let| value =
         param2_case non_null_value_subkind nullable ~decode:(fun _ sk n ->
             K.With_subkind.create K.value sk n)
@@ -682,6 +710,7 @@ let kind_with_subkind =
           | Naked_number K.Naked_number_kind.Naked_vec128 -> naked_vec128 ()
           | Naked_number K.Naked_number_kind.Naked_vec256 -> naked_vec256 ()
           | Naked_number K.Naked_number_kind.Naked_vec512 -> naked_vec512 ()
+          | Naked_number K.Naked_number_kind.Naked_mask -> naked_mask ()
           | Value ->
             value
               ( K.With_subkind.non_null_value_subkind full_kind,
@@ -709,7 +738,8 @@ let probe_is_enabled =
 let enter_inlined_apply =
   D.(
     nullary "%inlined_apply" ~params:param0 (fun _env () ->
-        P.Enter_inlined_apply { dbg = Inlined_debuginfo.none }))
+        P.Enter_inlined_apply
+          { dbg = Inlined_debuginfo.none; inlined_attribute = Default_inlined }))
 
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
@@ -864,6 +894,9 @@ let project_value_slot =
      if the value slot's definition (in a "with" clause, where kinds are
      supported) has already been parsed, the slot registered under this name
      will have the correct kind and the kind here is ignored. *)
+  (* If a function slot is fresh when defining a primitive, it means it does not
+  exist in constructions, but only in projections. As such, it will be deleted
+  when computing the slot_offsets. This means we can give it a dummy size. *)
   let kind = Flambda_kind.value in
   D.(
     unary "%project_value_slot"
@@ -871,7 +904,8 @@ let project_value_slot =
         (param2
            (maps (positional string)
               ~from:(fun env pf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env pf
+                  ~size:0)
               ~to_:(fun env pf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env pf))
            (maps (positional string)
@@ -890,12 +924,14 @@ let project_function_slot =
         (param2
            (maps (positional string)
               ~from:(fun env mf ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mf
+                  ~size:0)
               ~to_:(fun env mf ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mf))
            (maps (positional string)
               ~from:(fun env mt ->
-                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt)
+                Fexpr_to_flambda_commons.fresh_or_existing_function_slot env mt
+                  ~size:0)
               ~to_:(fun env mt ->
                 Flambda_to_fexpr_commons.Env.translate_function_slot env mt)))
       (fun _ (move_from, move_to) ->
@@ -931,10 +967,11 @@ let duplicate_block =
     (fun _ (kind, alloc_region) -> P.Duplicate_block { kind; alloc_region })
 
 (* Binaries *)
-let atomic_load_field =
+let atomic_load =
   D.(
-    binary "%atomic_load_field" ~params:block_access_field_kind (fun _ kind ->
-        P.Atomic_load_field kind))
+    binary "%atomic_load"
+      ~params:(param2 atomic_offset_units block_access_field_kind)
+      (fun _ (offset_units, kind) -> P.Atomic_load (offset_units, kind)))
 
 let block_set =
   D.(
@@ -961,7 +998,8 @@ let array_load =
         "nativeint", Naked_nativeints;
         "vec128", Naked_vec128s;
         "vec256", Naked_vec256s;
-        "vec512", Naked_vec512s ]
+        "vec512", Naked_vec512s;
+        "mask", Naked_masks ]
   in
   binary "%array_load"
     ~params:
@@ -987,6 +1025,7 @@ let array_load =
                | Naked_vec128s -> Naked_vec128s
                | Naked_vec256s -> Naked_vec256s
                | Naked_vec512s -> Naked_vec512s
+               | Naked_masks -> Naked_masks
                | Unboxed_product _ ->
                  Misc.fatal_error "missing product array load kind")
            in
@@ -998,7 +1037,7 @@ let array_load =
              | Immediates | Gc_ignorable_values | Values | Naked_floats
              | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
              | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-             | Naked_vec256s | Naked_vec512s ->
+             | Naked_vec256s | Naked_vec512s | Naked_masks ->
                None
            in
            k, lk, m))
@@ -1133,6 +1172,7 @@ let array_set =
     let| vec128 = flag_case "vec128" Naked_vec128s in
     let| vec256 = flag_case "vec256" Naked_vec256s in
     let| vec512 = flag_case "vec512" Naked_vec512s in
+    let| mask = flag_case "mask" Naked_masks in
     let| gc_ign = flag_case "gc_ign" Gc_ignorable_values in
     return_either (function
       | Immediates -> imm ()
@@ -1148,6 +1188,7 @@ let array_set =
       | Naked_vec128s -> vec128 ()
       | Naked_vec256s -> vec256 ()
       | Naked_vec512s -> vec512 ()
+      | Naked_masks -> mask ()
       | Gc_ignorable_values -> gc_ign ())
   in
   ternary "%array_set"
@@ -1176,6 +1217,7 @@ let array_set =
                | Naked_vec128s -> Naked_vec128s
                | Naked_vec256s -> Naked_vec256s
                | Naked_vec512s -> Naked_vec512s
+               | Naked_masks -> Naked_masks
                | Unboxed_product _ ->
                  Misc.fatal_error "Missing product array set kind")
            in
@@ -1187,26 +1229,35 @@ let array_set =
              | Immediates | Gc_ignorable_values | Values | Naked_floats
              | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
              | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-             | Naked_vec256s | Naked_vec512s ->
+             | Naked_vec256s | Naked_vec512s | Naked_masks ->
                None
            in
            k, sk))
     (fun _ (k, sk) -> P.Array_set (k, sk))
 
-let atomic_exchange_field =
+let atomic_exchange =
   D.(
-    ternary "%atomic_exchange_field" ~params:block_access_field_kind (fun _ a ->
-        P.Atomic_exchange_field a))
+    ternary "%atomic_exchange"
+      ~params:
+        (param3 atomic_offset_units block_access_field_kind
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, field_kind, mode) ->
+        P.Atomic_exchange (offset_units, field_kind, mode)))
 
-let atomic_field_int_arith =
+let atomic_int_arith =
   D.(
-    ternary "%atomic_field_int_arith" ~params:int_atomic_op (fun _ o ->
-        P.Atomic_field_int_arith o))
+    ternary "%atomic_int_arith"
+      ~params:(param2 atomic_offset_units int_atomic_op)
+      (fun _ (offset_units, op) -> P.Atomic_int_arith (offset_units, op)))
 
-let atomic_set_field =
+let atomic_set =
   D.(
-    ternary "%atomic_set_field" ~params:block_access_field_kind (fun _ a ->
-        P.Atomic_set_field a))
+    ternary "%atomic_set"
+      ~params:
+        (param3 atomic_offset_units block_access_field_kind
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, field_kind, mode) ->
+        P.Atomic_set (offset_units, field_kind, mode)))
 
 let bigarray_set =
   D.(
@@ -1237,17 +1288,25 @@ let write_offset =
       (fun _ (wok, kind, alloc_mode) -> P.Write_offset (wok, kind, alloc_mode)))
 
 (* Quaternaries *)
-let atomic_compare_and_set_field =
+let atomic_compare_and_set =
   D.(
-    quaternary "%atomic_compare_and_set_field" ~params:block_access_field_kind
-      (fun _ a -> P.Atomic_compare_and_set_field a))
+    quaternary "%atomic_compare_and_set"
+      ~params:
+        (param3 atomic_offset_units block_access_field_kind
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, field_kind, mode) ->
+        P.Atomic_compare_and_set (offset_units, field_kind, mode)))
 
-let atomic_compare_exchange_field =
+let atomic_compare_exchange =
   D.(
-    quaternary "%atomic_compare_exchange_field"
-      ~params:(param2 block_access_field_kind block_access_field_kind)
-      (fun _ (atomic_kind, args_kind) ->
-        P.Atomic_compare_exchange_field { atomic_kind; args_kind }))
+    quaternary "%atomic_compare_exchange"
+      ~params:
+        (param4 atomic_offset_units
+           (labeled "atomic_kind" block_access_field_kind)
+           (labeled "args_kind" block_access_field_kind)
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, atomic_kind, args_kind, mode) ->
+        P.Atomic_compare_exchange { offset_units; atomic_kind; args_kind; mode }))
 
 (* Variadics *)
 let begin_region =
@@ -1298,7 +1357,8 @@ module OfFlambda = struct
     | Optimised_out kind -> optimised_out env kind
     | Probe_is_enabled { name; enabled_at_init } ->
       probe_is_enabled env (wrap_loc name, enabled_at_init)
-    | Enter_inlined_apply { dbg = _ } -> enter_inlined_apply env ()
+    | Enter_inlined_apply { dbg = _; inlined_attribute = _ } ->
+      enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
@@ -1351,7 +1411,7 @@ module OfFlambda = struct
 
   let binop env (op : P.binary_primitive) =
     match op with
-    | Atomic_load_field ak -> atomic_load_field env ak
+    | Atomic_load (offset_units, ak) -> atomic_load env (offset_units, ak)
     | Block_set { kind; init; field } -> block_set env (kind, init, field)
     | Array_load (ak, width, mut) -> array_load env (ak, width, mut)
     | Bigarray_load (d, k, l) -> bigarray_load env (d, k, l)
@@ -1372,9 +1432,12 @@ module OfFlambda = struct
   let ternop env (op : P.ternary_primitive) =
     match op with
     | Array_set (k, sk) -> array_set env (k, sk)
-    | Atomic_exchange_field a -> atomic_exchange_field env a
-    | Atomic_field_int_arith o -> atomic_field_int_arith env o
-    | Atomic_set_field a -> atomic_set_field env a
+    | Atomic_exchange (offset_units, a, mode) ->
+      atomic_exchange env (offset_units, a, mode)
+    | Atomic_int_arith (offset_units, o) ->
+      atomic_int_arith env (offset_units, o)
+    | Atomic_set (offset_units, a, mode) ->
+      atomic_set env (offset_units, a, mode)
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset (wok, kind, alloc_mode) ->
@@ -1382,9 +1445,10 @@ module OfFlambda = struct
 
   let quaternop env (op : P.quaternary_primitive) =
     match op with
-    | Atomic_compare_and_set_field a -> atomic_compare_and_set_field env a
-    | Atomic_compare_exchange_field { atomic_kind; args_kind } ->
-      atomic_compare_exchange_field env (atomic_kind, args_kind)
+    | Atomic_compare_and_set (offset_units, a, mode) ->
+      atomic_compare_and_set env (offset_units, a, mode)
+    | Atomic_compare_exchange { offset_units; atomic_kind; args_kind; mode } ->
+      atomic_compare_exchange env (offset_units, atomic_kind, args_kind, mode)
 
   let varop env (op : P.variadic_primitive) =
     match op with

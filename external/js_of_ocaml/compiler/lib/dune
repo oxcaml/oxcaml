@@ -3,18 +3,33 @@
  (public_name js_of_ocaml-compiler)
  (synopsis "Js_of_ocaml compiler library")
  (libraries
-  compiler-libs.common
-  compiler-libs.bytecomp
+  ocaml-compiler-libs.common
+  ocaml-compiler-libs.bytecomp
   menhirLib
   sedlex
-  time_now
   yojson)
  (flags
   (:standard -w -7-37 -safe-string))
+ (foreign_stubs
+  (language c)
+  (names float32_stubs))
  (preprocess
   (pps ppx_optcomp_light sedlex.ppx)))
 
 (ocamllex annot_lexer)
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (enabled_if %{oxcaml_supported})
+ (action
+  (copy ocaml_or_oxcaml.oxcaml.ml %{target})))
+
+(rule
+ (target ocaml_or_oxcaml.ml)
+ (enabled_if
+  (not %{oxcaml_supported}))
+ (action
+  (copy ocaml_or_oxcaml.ocaml.ml %{target})))
 
 (menhir
  (modules js_parser)
@@ -29,9 +44,7 @@
   --unused-token
   TCommentLineDirective
   --unused-token
-  T_ERROR
-  --unused-token
-  T_AT))
+  T_ERROR))
 
 (menhir
  (modules annot_parser))

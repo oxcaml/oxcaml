@@ -25,7 +25,8 @@
   %{bin:ocamlmerlin-server}
   %{bin:ocamlmerlin}
   %{bin:dot-merlin-reader}
-  %{bin:revert-newlines}))
+  %{bin:revert-newlines}
+  (env_var MERLIN_TEST_OCAML_VERSION)))
 
 (cram
  (applies_to with-ppx)

@@ -45,7 +45,15 @@ type environment =
       (Reg.t array * V.Provenance.t option * Asttypes.mutable_flag) V.Map.t;
     static_exceptions : static_handler Static_label.Map.t;
     trap_stack : Operation.trap_stack;
-    tailrec_label : Label.t
+    tailrec_label : Label.t;
+    phantom_lets : V.Set.t;
+    all_phantom_lets :
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
+        (** Accumulates every phantom let encountered in the current function
+            (unlike [phantom_lets], which is scoped). The [ref] is created
+            afresh by [env_create], once per function, and shared between all
+            environments derived from that environment; it is read at the end of
+            function construction by [phantom_lets_for_fundecl]. *)
   }
 
 val env_create : tailrec_label:Label.t -> environment
@@ -56,6 +64,13 @@ val env_add :
   Reg.t array ->
   environment ->
   environment
+
+val env_add_phantom_let :
+  VP.t -> Cmm.phantom_defining_expr option -> environment -> environment
+
+val phantom_lets_for_fundecl :
+  environment ->
+  (V.Provenance.t option * Cfg.phantom_defining_expr) Backend_var.Map.t
 
 val env_add_static_exception :
   Static_label.t ->
@@ -75,6 +90,8 @@ val env_find_regs_for_exception_extra_args :
 val env_find_static_exception : Static_label.t -> environment -> static_handler
 
 val env_set_trap_stack : environment -> Operation.trap_stack -> environment
+
+val phantom_vars_from_env : environment -> V.Set.t option
 
 val print_traps : Format.formatter -> Operation.trap_stack -> unit
 
@@ -98,6 +115,10 @@ val oper_result_type : Cmm.operation -> Cmm.machtype
 val size_component : Cmx_format.machtype_component -> int
 
 val size_machtype : Cmx_format.machtype_component array -> int
+
+(** Compute the size in bytes of a (simple) Cmm expression, using [size_of_var]
+    to determine the size of free variables. *)
+val size_expr_with : size_of_var:(Backend_var.t -> int) -> Cmm.expression -> int
 
 val size_expr : environment -> Cmm.expression -> int
 
@@ -166,6 +187,32 @@ module Or_never_returns : sig
     val ( let** ) : 'a t -> ('a -> unit) -> unit
   end
 end
+
+(** Prepare the arguments [exp_list] of an operation for right-to-left
+    evaluation (as required by the Flambda [Un_anf] pass, and to be consistent
+    with the bytecode compiler). Expressions that may safely be deferred (per
+    their (co)effects and [is_simple_expr]) are returned unchanged for the
+    caller to evaluate in place; every other expression is evaluated immediately
+    (right to left) via [emit] and replaced by a fresh [Cvar] whose binding is
+    recorded in the environment by [bind_result]. *)
+val emit_parts_list :
+  effects_of:(Cmm.expression -> Effect_and_coeffect.t) ->
+  is_simple_expr:(Cmm.expression -> bool) ->
+  emit:('env -> Cmm.expression -> 'value array Or_never_returns.t) ->
+  bind_result:('env -> Backend_var.t -> 'value array -> 'env) ->
+  'env ->
+  Cmm.expression list ->
+  (Cmm.expression list * 'env) Or_never_returns.t
+
+(** The memory chunk to use when storing one component of a value, e.g. when
+    initialising the fields of a freshly allocated block ([emit_stores]). *)
+val chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk
+
+(** Whether moving a call result out of its ABI location [src] into [dst] needs
+    a [Reinterpret_cast Mask_of_int64] rather than a plain [Move]. [Proc] types
+    a C-ABI mask location as [Int] so that whoever materialises ABI locations
+    inserts the conversion; targets with mask registers type it [Mask]. *)
+val result_needs_mask_of_int64 : Reg.t -> Reg.t -> bool
 
 val float_test_of_float_comparison :
   Cmm.float_width ->

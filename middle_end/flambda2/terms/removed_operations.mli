@@ -20,6 +20,12 @@ type t = private
     prim : int;
     branch : int;
     direct_call_of_indirect : int;
+    updated_direct_call : int;
+        (** Updated direct calls is the count of direct call changed from one
+            code_id to another. It does not count in evaluate, but it matters
+            for equal. *)
+    (* CR pchambart: it should track in some way the difference between the
+       called codes *)
     specialized_poly_compare : int;
     requested_inline : int
   }
@@ -35,6 +41,8 @@ val prim : Flambda_primitive.t -> t
 val alloc : t
 
 val direct_call_of_indirect : t
+
+val updated_direct_call : t
 
 val specialized_poly_compare : t
 

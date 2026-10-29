@@ -13,3 +13,14 @@ type t2 = A.Foo(A).t
    constructor argument is representable *)
 
 type v = A of A.a | Z
+
+(* [M.pair] cannot be expanded when compiling [main_ok.ml]. *)
+type ('a, 'b : any) any_record = { x : 'a; y : 'b }
+  constraint 'a = int * int
+
+let use_any_record (_ : (M.pair, float#) any_record) = ()
+
+type ('a, 'b : any) any_variant = V of 'a * 'b
+  constraint 'a = int * int
+
+let use_any_variant (_ : (M.pair, float#) any_variant) = ()

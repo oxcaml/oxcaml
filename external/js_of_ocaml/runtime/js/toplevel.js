@@ -34,18 +34,18 @@ function caml_get_current_environment() {
 //////////////////////////////////////////////////////////////////////
 
 //Provides: caml_get_section_table
-//Requires: caml_global_data, caml_failwith
+//Requires: caml_link_info, caml_failwith
 //Requires: caml_string_of_jsbytes, caml_jsbytes_of_string
 //Requires: caml_list_of_js_array
 //Version: < 5.3
 function caml_get_section_table() {
-  if (!caml_global_data.sections) {
+  if (!caml_link_info.sections) {
     caml_failwith("Program not compiled with --toplevel");
   }
-  var symb = caml_global_data.sections[1];
-  var crcs = caml_global_data.sections[2];
-  var prim = caml_global_data.sections[3];
-  var dlpt = caml_global_data.sections[4];
+  var symb = caml_link_info.sections[1];
+  var crcs = caml_link_info.sections[2];
+  var prim = caml_link_info.sections[3];
+  var dlpt = caml_link_info.sections[4];
   function sl(l) {
     var x = "";
     while (l) {
@@ -65,27 +65,27 @@ function caml_get_section_table() {
 }
 
 //Provides: caml_dynlink_get_bytecode_sections
-//Requires: caml_global_data, caml_failwith
+//Requires: caml_link_info, caml_failwith
 //Alias: jsoo_get_bytecode_sections
 function caml_dynlink_get_bytecode_sections() {
-  if (!caml_global_data.sections) {
+  if (!caml_link_info.sections) {
     caml_failwith("Program not compiled with --toplevel");
   }
-  return caml_global_data.sections;
+  return caml_link_info.sections;
 }
 
 //Provides: jsoo_get_runtime_aliases
-//Requires: caml_global_data, caml_failwith
+//Requires: caml_link_info, caml_failwith
 function jsoo_get_runtime_aliases() {
-  if (caml_global_data.aliases === undefined) {
+  if (caml_link_info.aliases === undefined) {
     caml_failwith("Program not compiled with --toplevel");
   }
-  return caml_global_data.aliases;
+  return caml_link_info.aliases;
 }
 
 //Provides: jsoo_toplevel_compile
 //Requires: caml_failwith
-var jsoo_toplevel_compile = undefined;
+var jsoo_toplevel_compile;
 
 //Provides: jsoo_toplevel_init_compile
 //Requires: jsoo_toplevel_compile
@@ -100,18 +100,6 @@ function jsoo_toplevel_init_reloc(f) {
 }
 
 //Provides: caml_reify_bytecode
-//Requires: caml_callback
-//Requires: caml_string_of_uint8_array, caml_ba_to_typed_array
-//Requires: jsoo_toplevel_compile, caml_failwith
-//Version: >= 5.2
-function caml_reify_bytecode(code, debug, _digest) {
-  if (!jsoo_toplevel_compile) {
-    caml_failwith("Toplevel not initialized (jsoo_toplevel_compile)");
-  }
-  code = caml_string_of_uint8_array(caml_ba_to_typed_array(code));
-  return [0, 0, caml_callback(jsoo_toplevel_compile, [code, debug])];
-}
-
 //Provides: caml_reify_bytecode
 //Requires: caml_callback
 //Requires: caml_string_of_uint8_array, caml_uint8_array_of_bytes
@@ -132,6 +120,39 @@ function caml_reify_bytecode(code, debug, _digest) {
   for (var i = 0, len = 0; i < all.length; i++) {
     code.set(all[i], len);
     len += all[i].length;
+  }
+  code = caml_string_of_uint8_array(code);
+  return [0, 0, caml_callback(jsoo_toplevel_compile, [code, debug])];
+}
+
+//Provides: caml_reify_bytecode
+//Requires: caml_callback
+//Requires: caml_string_of_uint8_array, caml_uint8_array_of_bytes
+//Requires: caml_ba_to_typed_array
+//Requires: jsoo_toplevel_compile, caml_failwith
+//Version: >= 5.2
+//Compatible with OxCaml
+function caml_reify_bytecode(code, debug, _digest) {
+  if (!jsoo_toplevel_compile) {
+    caml_failwith("Toplevel not initialized (jsoo_toplevel_compile)");
+  }
+  if (code.data) {
+    //Version: >= 5.2
+    code = caml_ba_to_typed_array(code);
+  } else {
+    // Oxcaml or version < 5.2
+    var len = 0;
+    var all = [];
+    for (var i = 1; i < code.length; i++) {
+      var a = caml_uint8_array_of_bytes(code[i]);
+      all.push(a);
+      len += a.length;
+    }
+    code = new Uint8Array(len);
+    for (var i = 0, len = 0; i < all.length; i++) {
+      code.set(all[i], len);
+      len += all[i].length;
+    }
   }
   code = caml_string_of_uint8_array(code);
   return [0, 0, caml_callback(jsoo_toplevel_compile, [code, debug])];

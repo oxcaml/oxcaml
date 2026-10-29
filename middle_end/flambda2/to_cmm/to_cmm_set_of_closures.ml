@@ -64,8 +64,15 @@ let get_func_decl_params_arity t code_id =
     then Lambda.Tupled
     else
       let nlocal =
-        Flambda_arity.num_params (Code_metadata.params_arity info)
-        - Code_metadata.first_complex_local_param info
+        match
+          (Code_metadata.first_complex_local_param info
+            : First_complex_local_param.t)
+        with
+        | Index index ->
+          Flambda_arity.num_params (Code_metadata.params_arity info) - index
+        | Never_partially_applied ->
+          (* This value should never be observed. *)
+          0
       in
       Lambda.Curried { nlocal }
   in
@@ -196,6 +203,7 @@ end = struct
               | Naked_number Naked_vec128 -> UK.naked_vec128_fields
               | Naked_number Naked_vec256 -> UK.naked_vec256_fields
               | Naked_number Naked_vec512 -> UK.naked_vec512_fields
+              | Naked_number Naked_mask -> UK.naked_mask_fields
               (* The "fields" update kinds are used because we are writing into
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields
@@ -435,8 +443,60 @@ let transl_check_attrib : Zero_alloc_attribute.t -> Cmm.codegen_option list =
   | Default_zero_alloc -> []
   | Assume { strict; never_returns_normally; never_raises; loc } ->
     [Assume_zero_alloc { strict; never_returns_normally; never_raises; loc }]
-  | Check { strict; loc; custom_error_msg } ->
+  | Check { strict; loc; custom_error_msg; partial = _ } ->
     [Check_zero_alloc { strict; loc; custom_error_msg }]
+
+(* Answers "Is it even possible to partially apply this thing?" *)
+(* Returns `false` for single-argument functions, including "tupled" arguments
+   (e.g. `fun (x, y, z) -> ...`), which the compiler represents separately. *)
+let can_be_partially_applied metadata =
+  (not (Code_metadata.is_tupled metadata))
+  && Flambda_arity.num_params (Code_metadata.params_arity metadata) > 1
+
+(* Ask Flambda2 whether *all* partial closures will be local. *)
+(* This requires two conditions: (1.) stack allocation must be enabled; and
+   (2.) Flambda's `first_complex_local_param` (explained below) is zero. *)
+let flambda_builds_local_closures metadata =
+  Flambda_features.stack_allocation_enabled ()
+  && begin match Code_metadata.first_complex_local_param metadata with
+  (* `first_complex_local_param` asks "How many arguments can go on the heap?"
+     This is useful e.g. for `let f a (local_ b) c = ...`, where it's 1. For
+     e.g. `val f : int -> (int -> int) @ local`, it's zero, since `(int -> int)
+     @ local` captures the first argument and must be local. *)
+  | Index index -> index = 0
+  | Never_partially_applied -> true
+  end
+
+(* Asks (1.) can we partially apply this at all, and (2.) if so, is Flambda2
+   required to place every such partial closure on the stack? *)
+let partial_applications_build_local_closures env code_id =
+  let metadata = Env.get_code_metadata env code_id in
+  (not (can_be_partially_applied metadata))
+  || flambda_builds_local_closures metadata
+
+(* Get a function's name from its debug info. For diagnostics only. *)
+let scoped_name fun_dbg =
+  fun_dbg |> Debuginfo.get_dbg |> Debuginfo.Dbg.to_list
+  |> List.map (fun (dbg : Debuginfo.item) ->
+      Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+        dbg.dinfo_scopes)
+  |> String.concat ","
+
+(* If this function has a `zero_alloc ... partial ...` annotation, check it;
+   otherwise, do nothing. *)
+let check_zero_alloc_partial env code_id ~fun_dbg ~(fun_sym : Cmm.symbol)
+    (zero_alloc_attribute : Zero_alloc_attribute.t) =
+  match zero_alloc_attribute with
+  | Check { partial = true; loc; _ }
+    when (not !Oxcaml_flags.disable_zero_alloc_checker)
+         && not (partial_applications_build_local_closures env code_id) ->
+    Location.raise_errorf ~loc
+      "Annotation check for zero_alloc failed on function %s (%s).@ Partial \
+       applications of this function may allocate a closure on the heap.@ \
+       Hint: try marking the partial function %a, as in %a."
+      (scoped_name fun_dbg) fun_sym.sym_name Misc.Style.inline_code "local"
+      Misc.Style.inline_code "'a -> ('b -> ... -> 'z) @ local"
+  | Check _ | Assume _ | Default_zero_alloc -> ()
 
 (* Translation of regalloc attributes on functions. *)
 let transl_regalloc_attrib : Regalloc_attribute.t -> Cmm.codegen_option list =
@@ -480,8 +540,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   (* Init the env and create a jump id for the return continuation in case a
      trap action is attached to one of its calls *)
   let return_continuation_arity =
-    List.map To_cmm_shared.machtype_of_kind
-      (Flambda_arity.unarized_components result_arity)
+    List.map To_cmm_shared.machtype_of_kind (Flambda_arity.unarize result_arity)
   in
   let env =
     Env.enter_function_body env ~return_continuation ~return_continuation_arity
@@ -495,8 +554,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let env, my_region_var, my_ghost_region_var =
     (* CR alloc_regions: my_alloc_region should be propagated as well. *)
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region = _ } -> env, None, None
-    | Local
+    | Not_alloc_stack { alloc_region = _ } -> env, None, None
+    | Maybe_alloc_stack
         { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
       ->
       let my_region_duid = Flambda_debug_uid.none in
@@ -557,6 +616,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let fun_sym =
     R.symbol_of_code_id res code_id ~currently_in_inlined_body:false
   in
+  check_zero_alloc_partial env code_id ~fun_dbg ~fun_sym zero_alloc_attribute;
   let fun_poll =
     Env.get_code_metadata env code_id
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
@@ -702,7 +762,7 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
-  let comp_unit = Compilation_unit.get_current_exn () in
+  let comp_unit = Current_unit.get_cu_exn () in
   let dbg = debuginfo_for_set_of_closures env set in
   let cids =
     Function_declarations.funs_in_order (Set_of_closures.function_decls set)
@@ -712,9 +772,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
     List.map2
       (fun cid v ->
         let v = Bound_var.var v in
-        (* Rename v to have different names for the symbol and variable *)
-        let name = Variable.unique_name (Variable.rename v) in
-        cid, Symbol.create comp_unit (Linkage_name.of_string name))
+        let name = Variable.canonical_name v in
+        cid, Symbol.manufacture comp_unit name)
       cids bound_vars
     |> Function_slot.Map.of_list
   in

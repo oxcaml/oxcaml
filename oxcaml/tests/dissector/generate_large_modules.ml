@@ -285,6 +285,24 @@ let generate_mylib_b () =
   Buffer.add_string buf (generate_functions 10001 num_functions);
   Buffer.contents buf
 
+let generate_mylib_unused () =
+  {|(* Generated mylib_unused - do not edit *)
+(* Not referenced by cmxa_main: the dissector must not link it *)
+
+let unused_marker () = 12345
+
+let unused_data = [| 1; 2; 3; 4; 5 |]
+|}
+
+let generate_unusedlib () =
+  {|(* Generated unusedlib - do not edit *)
+(* An archive whose units are all unreferenced: the dissector must skip it *)
+
+let unusedlib_marker () = 54321
+
+let unusedlib_data = [| 6; 7; 8; 9; 10 |]
+|}
+
 let generate_cmxa_main () =
   {|(* Generated cmxa main - do not edit *)
 
@@ -321,10 +339,12 @@ let () =
   | ["gen_main"] -> output_file "gen_main.ml" (generate_main ())
   | ["mylib_a"] -> output_file "mylib_a.ml" (generate_mylib_a ())
   | ["mylib_b"] -> output_file "mylib_b.ml" (generate_mylib_b ())
+  | ["mylib_unused"] -> output_file "mylib_unused.ml" (generate_mylib_unused ())
+  | ["unusedlib"] -> output_file "unusedlib.ml" (generate_unusedlib ())
   | ["cmxa_main"] -> output_file "cmxa_main.ml" (generate_cmxa_main ())
   | _ ->
     Printf.eprintf
       "Usage: %s \
-       <gen_module_a|gen_module_b|gen_module_c|gen_main|mylib_a|mylib_b|cmxa_main>\n"
+       <gen_module_a|gen_module_b|gen_module_c|gen_main|mylib_a|mylib_b|mylib_unused|unusedlib|cmxa_main>\n"
       Sys.argv.(0);
     exit 1

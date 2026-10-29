@@ -61,6 +61,54 @@ module Component = struct
 
   let component : [`Unarized] t -> KS.t =
    fun t -> match t with Singleton kind -> kind
+
+  let component_if_singleton : type uc. uc t -> KS.t option =
+   fun t ->
+    match t with Singleton kind -> Some kind | Unboxed_product _ -> None
+
+  (* Returns [None] if there are too few kinds. Any kinds left over are
+     returned. *)
+  let rec with_unarized_kinds : type uc.
+      uc t -> KS.t list -> (uc t * KS.t list) option =
+   fun t kinds ->
+    match t with
+    | Singleton _ -> (
+      match kinds with
+      | kind :: kinds -> Some (Singleton kind, kinds)
+      | [] -> None)
+    | Unboxed_product ts -> (
+      match with_unarized_kinds_list ts kinds with
+      | None -> None
+      | Some (ts, kinds) -> Some (Unboxed_product ts, kinds))
+
+  and with_unarized_kinds_list : type uc.
+      uc t list -> KS.t list -> (uc t list * KS.t list) option =
+   fun ts kinds ->
+    match ts with
+    | [] -> Some ([], kinds)
+    | t :: ts -> (
+      match with_unarized_kinds t kinds with
+      | None -> None
+      | Some (t, kinds) -> (
+        match with_unarized_kinds_list ts kinds with
+        | None -> None
+        | Some (ts, kinds) -> Some (t :: ts, kinds)))
+
+  let rec fold : type uc.
+      init:'acc ->
+      singleton:('acc -> KS.t -> 'acc) ->
+      unboxed_product:(outer:'acc -> inner:'acc -> 'acc) ->
+      uc t ->
+      'acc =
+   fun ~init ~singleton ~unboxed_product t ->
+    match t with
+    | Singleton kind -> singleton init kind
+    | Unboxed_product ts ->
+      List.fold_left
+        (fun outer t ->
+          let inner = fold ~init ~singleton ~unboxed_product t in
+          unboxed_product ~outer ~inner)
+        init ts
 end
 
 type 'uc t = 'uc Component.t list
@@ -85,6 +133,8 @@ module Component_for_creation = struct
     | Punboxed_vector Unboxed_vec128 -> Singleton KS.naked_vec128
     | Punboxed_vector Unboxed_vec256 -> Singleton KS.naked_vec256
     | Punboxed_vector Unboxed_vec512 -> Singleton KS.naked_vec512
+    | Punboxed_mask -> Singleton KS.naked_mask
+    | Pvoid -> Unboxed_product []
     | Punboxed_product layouts ->
       Unboxed_product (List.map (from_lambda ~machine_width) layouts)
     | Ptop | Pbottom ->
@@ -106,6 +156,19 @@ let print ppf t =
          Format.fprintf ppf " @<1>\u{2a2f} "))
     t
 
+let fold ~init ~component ~singleton ~unboxed_product t =
+  List.fold_left
+    (fun outer c ->
+      let inner = Component.fold ~init ~singleton ~unboxed_product c in
+      component ~outer ~inner)
+    init t
+
+let fold_per_parameter ~init ~singleton ~unboxed_product t =
+  List.map (Component.fold ~init ~singleton ~unboxed_product) t
+
+let singleton_component_per_parameter t =
+  List.map Component.component_if_singleton t
+
 let equal_ignoring_subkinds : type uc1 uc2. uc1 t -> uc2 t -> bool =
  fun t1 t2 -> Misc.Stdlib.List.equal Component.equal_ignoring_subkinds t1 t2
 
@@ -125,6 +188,27 @@ let unarized_components (t : [`Unarized] t) = List.map Component.component t
 let unarize_per_parameter t = t |> List.map Component.unarize
 
 let unarize_t t = t |> unarize |> create_singletons
+
+let with_unarized_kinds t kinds =
+  let print_kinds ppf kinds =
+    Format.pp_print_list ~pp_sep:Format.pp_print_space KS.print ppf kinds
+  in
+  match Component.with_unarized_kinds_list t kinds with
+  | Some (t, []) -> t
+  | None ->
+    Misc.fatal_errorf
+      "with_unarized_kinds: too few kinds (%d, but %d expected)@ for arity \
+       %a:@ %a"
+      (List.length kinds)
+      (List.length (unarize t))
+      print t print_kinds kinds
+  | Some (_, _ :: _) ->
+    Misc.fatal_errorf
+      "with_unarized_kinds: too many kinds (%d, but %d expected)@ for arity \
+       %a:@ %a"
+      (List.length kinds)
+      (List.length (unarize t))
+      print t print_kinds kinds
 
 let fresh_idents_unarized t ~id =
   List.mapi

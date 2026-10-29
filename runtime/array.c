@@ -23,8 +23,6 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/signals.h"
-#include "caml/runtime_events.h"
-#include "caml/custom.h"
 
 static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
 
@@ -502,7 +500,7 @@ CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
 
   int tag = 0;
   // These arrays are always mixed blocks without packing.
-  // This currently differs from e.g. int32# array, which is allocated as a
+  // This currently differs from e.g. int32_u array, which is allocated as a
   // custom block, and is packed.
   int reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
@@ -1103,11 +1101,7 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
     CAMLassert (depth == 1);
     intnat pos = Long_val(Field(idx, 0));
     double d = Double_flat_field(base, pos);
-#define Setup_for_gc
-#define Restore_after_gc
     Alloc_small(res, Double_wosize, Double_tag, Alloc_small_enter_GC);
-#undef Setup_for_gc
-#undef Restore_after_gc
     Store_double_val(res, d);
     CAMLreturn (res);
   }
@@ -1118,6 +1112,23 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
     res = Field(res, pos);
   }
   CAMLreturn (res);
+}
+
+static value unimplemented_ext_ptr(void)
+{
+  caml_failwith("External ptrs are unimplemented on bytecode");
+  return Val_unit;
+}
+
+Caml_inline void check_atomic_idx(value base, value idx)
+{
+  /* A null base means [idx] is a raw address (an external ptr), which cannot be
+    dereferenced on bytecode. */
+  if (Is_null(base)) unimplemented_ext_ptr();
+  CAMLassert (Tag_val(idx) == 0);
+  CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
+  CAMLassert (Tag_val(base) != Double_array_tag);
+  (void)idx;
 }
 
 CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
@@ -1134,6 +1145,14 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
     CAMLreturn (Val_unit);
   }
 #endif
+  // writing into an unboxed product that has been flattened into a singleton
+  if (depth == 0) {
+    CAMLassert (Wosize_val(base) == Wosize_val(v));
+    for (mlsize_t i = 0; i < Wosize_val(v); i++) {
+      caml_modify(&Field(base, i), Field(v, i));
+    }
+    CAMLreturn (Val_unit);
+  }
   volatile value* dst = &base;
   for (mlsize_t i = 0; i < depth; i++) {
     intnat pos = Long_val(Field(idx, i));
@@ -1143,49 +1162,127 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
   CAMLreturn (Val_unit);
 }
 
+CAMLprim value caml_atomic_load_idx_bytecode(value base, value idx)
+{
+  CAMLparam2 (base, idx);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_load_field(base, Field(idx, 0)));
+}
+
+CAMLprim value caml_atomic_set_idx_bytecode(value base, value idx, value v)
+{
+  CAMLparam3 (base, idx, v);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_set_field(base, Field(idx, 0), v));
+}
+
+CAMLprim value caml_atomic_exchange_idx_bytecode(value base, value idx,
+                                                 value v)
+{
+  CAMLparam3 (base, idx, v);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_exchange_field(base, Field(idx, 0), v));
+}
+
+CAMLprim value caml_atomic_compare_exchange_idx_bytecode(value base, value idx,
+                                                         value oldv,
+                                                         value newv)
+{
+  CAMLparam4 (base, idx, oldv, newv);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_compare_exchange_field(base, Field(idx, 0),
+                                                 oldv, newv));
+}
+
+CAMLprim value caml_atomic_cas_idx_bytecode(value base, value idx,
+                                            value oldv, value newv)
+{
+  CAMLparam4 (base, idx, oldv, newv);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_cas_field(base, Field(idx, 0), oldv, newv));
+}
+
+CAMLprim value caml_atomic_fetch_add_idx_bytecode(value base, value idx,
+                                                  value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_fetch_add_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_add_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_add_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_sub_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_sub_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_land_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_land_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_lor_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_lor_field(base, Field(idx, 0), incr));
+}
+
+CAMLprim value caml_atomic_lxor_idx_bytecode(value base, value idx, value incr)
+{
+  CAMLparam3 (base, idx, incr);
+  check_atomic_idx(base, idx);
+  CAMLreturn (caml_atomic_lxor_field(base, Field(idx, 0), incr));
+}
+
 CAMLprim value caml_get_ptr_bytecode(value ptr)
 {
   value base = Field(ptr, 0);
-  if (Is_null(base))
-    caml_failwith("External ptrs are unimplemented on bytecode");
+  if (Is_null(base)) unimplemented_ext_ptr();
   return caml_get_idx_bytecode(base, Field(ptr, 1));
 }
 
 CAMLprim value caml_set_ptr_bytecode(value ptr, value v)
 {
   value base = Field(ptr, 0);
-  if (Is_null(base))
-    caml_failwith("External ptrs are unimplemented on bytecode");
+  if (Is_null(base)) unimplemented_ext_ptr();
   return caml_set_idx_bytecode(base, Field(ptr, 1), v);
 }
 
 CAMLprim value caml_get_ext_ptr_bytecode(value idx)
 {
-  caml_failwith("External ptr primitives are unimplemented on bytecode");
-  return Val_unit;
+  return unimplemented_ext_ptr();
 }
 
 CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
 {
-  caml_failwith("External ptr primitives are unimplemented on bytecode");
-  return Val_unit;
+  return unimplemented_ext_ptr();
 }
 
 /* Concatenates idx_prefix and idx_suffix */
 CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
+  CAMLparam2 (idx_prefix, idx_suffix);
   mlsize_t prefix_depth = Wosize_val(idx_prefix);
   mlsize_t suffix_depth = Wosize_val(idx_suffix);
 
   mlsize_t wosize = prefix_depth + suffix_depth;
+  // both paths may be empty (singleton products and unboxed records)
+  if (wosize == 0) CAMLreturn (Atom(0));
   tag_t tag = 0;
   value block;
   mlsize_t i = 0;
   if (wosize <= Max_young_wosize) {
-#define Setup_for_gc
-#define Restore_after_gc
     Alloc_small(block, wosize, tag, Alloc_small_enter_GC);
-#undef Setup_for_gc
-#undef Restore_after_gc
     for (mlsize_t j = 0; j < prefix_depth; j++) {
       value jth = Field(idx_prefix, j);
       Field(block, i) = jth;
@@ -1207,7 +1304,7 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
       i++;
     }
   }
-  return block;
+  CAMLreturn (block);
 }
 
 /* generic [gather] functions for extraction and concatenation of sub-arrays */

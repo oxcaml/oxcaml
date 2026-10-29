@@ -29,7 +29,9 @@ type constructor_description =
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
     cstr_shape: constructor_representation;
                                         (* Repr of the constructor itself *)
-    cstr_constant: bool;                (* True if all args are void *)
+    cstr_constant: bool;                (* True if represented as a constant:
+                                           no args, or all-void args with
+                                           [@immediate_all_void_constructor] *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)
     cstr_generalized: bool;             (* Constrained return type? *)

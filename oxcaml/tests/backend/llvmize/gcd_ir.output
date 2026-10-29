@@ -64,11 +64,11 @@ L109:
   store ptr addrspace(1) %47, ptr %10
   %48 = load i64, ptr %10
   %49 = icmp slt i64 %48, 1
-  br i1 %49, label %L114, label %L150
-L150:
+  br i1 %49, label %L114, label %L144
+L144:
   %50 = load i64, ptr %10
   %51 = icmp sgt i64 %50, 1
-  br i1 %51, label %L114, label %L142
+  br i1 %51, label %L114, label %L136
 L114:
   %52 = load ptr addrspace(1), ptr %9
   %53 = load ptr addrspace(1), ptr addrspace(1) %52
@@ -95,12 +95,12 @@ L114:
   store ptr addrspace(1) %65, ptr %19
   %66 = load i64, ptr %14
   %67 = icmp slt i64 %66, 1
-  br i1 %67, label %L123, label %L151
-L151:
+  br i1 %67, label %L120, label %L145
+L145:
   %68 = load i64, ptr %14
   %69 = icmp sgt i64 %68, 1
-  br i1 %69, label %L123, label %L135
-L123:
+  br i1 %69, label %L120, label %L129
+L120:
   %70 = load ptr addrspace(1), ptr %17
   %71 = load i64, ptr %12
   store i64 %71, ptr addrspace(1) %70
@@ -130,7 +130,7 @@ L123:
   %86 = load i64, ptr %27
   store i64 %86, ptr %28
   br label %L109
-L135:
+L129:
   %87 = ptrtoint ptr @caml_exn_Division_by_zero to i64
   store i64 %87, ptr %29
   %88 = load i64, ptr %29
@@ -148,7 +148,7 @@ L135:
   store i64 %96, ptr %ds
   store i64 %97, ptr %alloc
   unreachable
-L142:
+L136:
   %98 = ptrtoint ptr @camlGcd_data to i64
   store i64 %98, ptr %30
   %99 = load ptr addrspace(1), ptr %30
@@ -196,8 +196,8 @@ define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlGcd__entry(i64 %0, 
   %7 = alloca i64
   br label %L1
 L1:
-  br label %L156
-L156:
+  br label %L150
+L150:
   %8 = ptrtoint ptr @camlGcd to i64
   store i64 %8, ptr %5
   %9 = load i64, ptr %5
@@ -226,9 +226,9 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlGcd__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlGcd = global i64 1792, section ".data", align 8
-@camlGcd = global { ptr } { ptr @camlGcd__gcd_1 }, section ".data", align 8
-@header.camlGcd__gcd_1 = global i64 3063, section ".data", align 8
-@camlGcd__gcd_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlGcd = global { ptr } { ptr @camlGcd__gcd_HIDE_STAMP }, section ".data", align 8
+@header.camlGcd__gcd_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlGcd__gcd_0_1 = global { ptr, i64 } { ptr @camlGcd__gcd_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @camlGcd_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr
 @caml_raise_exn = external global ptr
@@ -236,4 +236,5 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Gcd" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 1 }
+!llvm.module.flags = !{ !0, !1 }

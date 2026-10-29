@@ -50,6 +50,8 @@
     "Unsynchronized accesses to dynamic arrays are a programming error."
 ]
 
+open! Stdlib
+
 (**
    Concurrent accesses to dynamic arrays must be synchronized
    (for instance with a {!Mutex.t}). Unsynchronized accesses to

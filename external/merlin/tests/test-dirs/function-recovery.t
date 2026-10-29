@@ -21,7 +21,7 @@
                   pattern (test.ml[2,79+6]..test.ml[2,79+13])
                     Tpat_var \"problem\"
                     sort value
-                    value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                    value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,many,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
                   expression (test.ml[2,79+16]..test.ml[2,79+24])
                     Texp_variant \"Problem\"
                     None
@@ -40,24 +40,27 @@
                     None
                   expression (test.ml[3,104+11]..test.ml[3,104+28])
                     Texp_function
-                    alloc_mode id(modevar#13[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#14[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-                    id(modevar#11[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#12[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                    alloc_mode id(modevar#d<0>[global .. local])
+                    yielding_mode unyielding
+                    return_mode proj_Locality(modevar#e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
                     []
-                    []
-                    Tfunction_body
-                      expression (test.ml[3,104+11]..test.ml[3,104+28])
-                        attribute \"merlin.incorrect\"
+                    [
+                      Nolabel
+                      Param_pat
+                        pattern (test.ml[3,104+15]..test.ml[3,104+17])
+                          extra (test.ml[3,104+15]..test.ml[3,104+17])
+                            Tpat_inspected_type
+                              Label_disambiguation
+                                Unambiguous
+                          Tpat_construct \"()\"
                           []
-                        attribute \"merlin.saved-parts\"
-                          [
-                            structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
-                              Pstr_eval
-                              expression (_none_[0,0+-1]..[0,0+-1]) ghost
-                                Pexp_constant
-                                constant (_none_[0,0+-1]..[0,0+-1]) ghost
-                                  PConst_int (1,None)
-                          ]
-                        Texp_ident \"*type-error*\"
+                          None
+                        proj_Locality(modevar#10<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
+                        []
+                    ]
+                    Tfunction_body
+                      expression (test.ml[3,104+21]..test.ml[3,104+28])
+                        Texp_ident \"problem\"
               ]
           ]
   ]
@@ -79,13 +82,14 @@
           pattern (type.ml[1,0+4]..type.ml[1,0+5])
             Tpat_var \"f\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (type.ml[1,0+8]..type.ml[1,0+61])
             extra (type.ml[1,0+18]..type.ml[1,0+19])
               Texp_newtype  t
             Texp_function
-            alloc_mode id(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-            id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
+            yielding_mode unyielding
+            return_mode proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -93,19 +97,20 @@
                 pattern (type.ml[1,0+22]..type.ml[1,0+25])
                   extra (type.ml[1,0+21]..type.ml[1,0+35])
                     Tpat_extra_constraint
-                    core_type (type.ml[1,0+28]..type.ml[1,0+34])
-                      Ttyp_constr \"list!\"
-                      [
-                        core_type (type.ml[1,0+28]..type.ml[1,0+29])
-                          Ttyp_constr \"t\"
-                          []
-                      ]
+                    Some
+                      core_type (type.ml[1,0+28]..type.ml[1,0+34])
+                        Ttyp_constr \"list!\"
+                        [
+                          core_type (type.ml[1,0+28]..type.ml[1,0+29])
+                            Ttyp_constr \"t\"
+                            []
+                        ]
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_var \"foo\"
                   sort value
-                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#8<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -116,16 +121,17 @@
                     pattern (type.ml[1,0+44]..type.ml[1,0+45])
                       extra (type.ml[1,0+43]..type.ml[1,0+50])
                         Tpat_extra_constraint
-                        core_type (type.ml[1,0+48]..type.ml[1,0+49])
-                          Ttyp_constr \"t\"
-                          []
+                        Some
+                          core_type (type.ml[1,0+48]..type.ml[1,0+49])
+                            Ttyp_constr \"t\"
+                            []
                         global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                         []
                       Tpat_any
                     expression (type.ml[1,0+53]..type.ml[1,0+55])
-                      attribute \"merlin.incorrect\"
+                      attribute \"ocaml.incorrect\"
                         []
-                      attribute \"merlin.saved-parts\"
+                      attribute \"ocaml.saved-parts\"
                         [
                           structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                             Pstr_eval
@@ -144,6 +150,7 @@
                       Label_disambiguation
                         Unambiguous
                   Texp_construct \"()\"
+                  Constructor_uniform_value
                   []
       ]
   ]
@@ -219,7 +226,7 @@
                     "kind": "pattern (test.ml[1,0+4]..test.ml[1,0+5])
     Tpat_var \"f\"
     sort value
-    value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    value_mode id(modevar#2<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
   ",
                     "children": []
                   },
@@ -252,88 +259,37 @@
                         "kind": "pattern (test.ml[1,0+6]..test.ml[1,0+9])
     Tpat_var \"x\"
     sort '_representable_layout_1
-    value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
   ",
                         "children": []
                       },
                       {
                         "filename": "test.ml",
                         "start": {
-                          "line": 1,
-                          "col": 18
+                          "line": 2,
+                          "col": 4
                         },
                         "end": {
-                          "line": 4,
-                          "col": 17
+                          "line": 2,
+                          "col": 13
                         },
                         "ghost": false,
-                        "attrs": [
-                          {
-                            "start": {
-                              "line": 0,
-                              "col": -1
-                            },
-                            "end": {
-                              "line": 0,
-                              "col": -1
-                            },
-                            "name": "merlin.incorrect"
-                          },
-                          {
-                            "start": {
-                              "line": 0,
-                              "col": -1
-                            },
-                            "end": {
-                              "line": 0,
-                              "col": -1
-                            },
-                            "name": "merlin.saved-parts _"
-                          }
-                        ],
-                        "kind": "expression",
+                        "attrs": [],
+                        "kind": "case",
                         "children": [
                           {
                             "filename": "test.ml",
                             "start": {
-                              "line": 1,
-                              "col": 18
+                              "line": 2,
+                              "col": 4
                             },
                             "end": {
-                              "line": 4,
-                              "col": 17
+                              "line": 2,
+                              "col": 8
                             },
                             "ghost": false,
                             "attrs": [],
-                            "kind": "expression",
-                            "children": [
-                              {
-                                "filename": "test.ml",
-                                "start": {
-                                  "line": 2,
-                                  "col": 4
-                                },
-                                "end": {
-                                  "line": 2,
-                                  "col": 13
-                                },
-                                "ghost": false,
-                                "attrs": [],
-                                "kind": "case",
-                                "children": [
-                                  {
-                                    "filename": "test.ml",
-                                    "start": {
-                                      "line": 2,
-                                      "col": 4
-                                    },
-                                    "end": {
-                                      "line": 2,
-                                      "col": 8
-                                    },
-                                    "ghost": false,
-                                    "attrs": [],
-                                    "kind": "pattern (test.ml[2,27+4]..test.ml[2,27+8])
+                            "kind": "pattern (test.ml[2,27+4]..test.ml[2,27+8])
     extra (test.ml[2,27+4]..test.ml[2,27+8])
       Tpat_inspected_type
         Label_disambiguation
@@ -342,64 +298,64 @@
     []
     None
   ",
-                                    "children": []
-                                  },
-                                  {
-                                    "filename": "test.ml",
-                                    "start": {
-                                      "line": 2,
-                                      "col": 12
-                                    },
-                                    "end": {
-                                      "line": 2,
-                                      "col": 13
-                                    },
-                                    "ghost": false,
-                                    "attrs": [
-                                      {
-                                        "start": {
-                                          "line": 2,
-                                          "col": 11
-                                        },
-                                        "end": {
-                                          "line": 2,
-                                          "col": 13
-                                        },
-                                        "name": "merlin.loc"
-                                      }
-                                    ],
-                                    "kind": "expression",
-                                    "children": []
-                                  }
-                                ]
-                              },
+                            "children": []
+                          },
+                          {
+                            "filename": "test.ml",
+                            "start": {
+                              "line": 2,
+                              "col": 12
+                            },
+                            "end": {
+                              "line": 2,
+                              "col": 13
+                            },
+                            "ghost": false,
+                            "attrs": [
                               {
-                                "filename": "test.ml",
                                 "start": {
-                                  "line": 3,
-                                  "col": 4
+                                  "line": 2,
+                                  "col": 11
                                 },
                                 "end": {
-                                  "line": 3,
-                                  "col": 15
+                                  "line": 2,
+                                  "col": 13
                                 },
-                                "ghost": false,
-                                "attrs": [],
-                                "kind": "case",
-                                "children": [
-                                  {
-                                    "filename": "test.ml",
-                                    "start": {
-                                      "line": 3,
-                                      "col": 4
-                                    },
-                                    "end": {
-                                      "line": 3,
-                                      "col": 10
-                                    },
-                                    "ghost": false,
-                                    "attrs": [],
-                                    "kind": "pattern (test.ml[3,41+4]..test.ml[3,41+10])
+                                "name": "merlin.loc"
+                              }
+                            ],
+                            "kind": "expression",
+                            "children": []
+                          }
+                        ]
+                      },
+                      {
+                        "filename": "test.ml",
+                        "start": {
+                          "line": 3,
+                          "col": 4
+                        },
+                        "end": {
+                          "line": 3,
+                          "col": 15
+                        },
+                        "ghost": false,
+                        "attrs": [],
+                        "kind": "case",
+                        "children": [
+                          {
+                            "filename": "test.ml",
+                            "start": {
+                              "line": 3,
+                              "col": 4
+                            },
+                            "end": {
+                              "line": 3,
+                              "col": 10
+                            },
+                            "ghost": false,
+                            "attrs": [],
+                            "kind": "pattern (test.ml[3,41+4]..test.ml[3,41+10])
     extra (test.ml[3,41+4]..test.ml[3,41+10])
       Tpat_inspected_type
         Label_disambiguation
@@ -411,82 +367,82 @@
     ]
     None
   ",
-                                    "children": [
-                                      {
-                                        "filename": "test.ml",
-                                        "start": {
-                                          "line": 3,
-                                          "col": 9
-                                        },
-                                        "end": {
-                                          "line": 3,
-                                          "col": 10
-                                        },
-                                        "ghost": false,
-                                        "attrs": [],
-                                        "kind": "pattern (test.ml[3,41+9]..test.ml[3,41+10])
-    Tpat_constant Const_int 5
-  ",
-                                        "children": []
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "filename": "test.ml",
-                                    "start": {
-                                      "line": 3,
-                                      "col": 14
-                                    },
-                                    "end": {
-                                      "line": 3,
-                                      "col": 15
-                                    },
-                                    "ghost": false,
-                                    "attrs": [
-                                      {
-                                        "start": {
-                                          "line": 3,
-                                          "col": 13
-                                        },
-                                        "end": {
-                                          "line": 3,
-                                          "col": 15
-                                        },
-                                        "name": "merlin.loc"
-                                      }
-                                    ],
-                                    "kind": "expression",
-                                    "children": []
-                                  }
-                                ]
-                              },
+                            "children": [
                               {
                                 "filename": "test.ml",
                                 "start": {
-                                  "line": 4,
-                                  "col": 4
+                                  "line": 3,
+                                  "col": 9
                                 },
                                 "end": {
-                                  "line": 4,
-                                  "col": 17
+                                  "line": 3,
+                                  "col": 10
                                 },
                                 "ghost": false,
                                 "attrs": [],
-                                "kind": "case",
-                                "children": [
-                                  {
-                                    "filename": "test.ml",
-                                    "start": {
-                                      "line": 4,
-                                      "col": 4
-                                    },
-                                    "end": {
-                                      "line": 4,
-                                      "col": 12
-                                    },
-                                    "ghost": false,
-                                    "attrs": [],
-                                    "kind": "pattern (test.ml[4,57+4]..test.ml[4,57+12])
+                                "kind": "pattern (test.ml[3,41+9]..test.ml[3,41+10])
+    Tpat_constant Const_int 5
+  ",
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "filename": "test.ml",
+                            "start": {
+                              "line": 3,
+                              "col": 14
+                            },
+                            "end": {
+                              "line": 3,
+                              "col": 15
+                            },
+                            "ghost": false,
+                            "attrs": [
+                              {
+                                "start": {
+                                  "line": 3,
+                                  "col": 13
+                                },
+                                "end": {
+                                  "line": 3,
+                                  "col": 15
+                                },
+                                "name": "merlin.loc"
+                              }
+                            ],
+                            "kind": "expression",
+                            "children": []
+                          }
+                        ]
+                      },
+                      {
+                        "filename": "test.ml",
+                        "start": {
+                          "line": 4,
+                          "col": 4
+                        },
+                        "end": {
+                          "line": 4,
+                          "col": 17
+                        },
+                        "ghost": false,
+                        "attrs": [],
+                        "kind": "case",
+                        "children": [
+                          {
+                            "filename": "test.ml",
+                            "start": {
+                              "line": 4,
+                              "col": 4
+                            },
+                            "end": {
+                              "line": 4,
+                              "col": 12
+                            },
+                            "ghost": false,
+                            "attrs": [],
+                            "kind": "pattern (test.ml[4,57+4]..test.ml[4,57+12])
     extra (test.ml[4,57+4]..test.ml[4,57+12])
       Tpat_inspected_type
         Label_disambiguation
@@ -500,56 +456,25 @@
     ]
     None
   ",
-                                    "children": [
-                                      {
-                                        "filename": "test.ml",
-                                        "start": {
-                                          "line": 4,
-                                          "col": 9
-                                        },
-                                        "end": {
-                                          "line": 4,
-                                          "col": 12
-                                        },
-                                        "ghost": false,
-                                        "attrs": [],
-                                        "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
+                            "children": [
+                              {
+                                "filename": "test.ml",
+                                "start": {
+                                  "line": 4,
+                                  "col": 9
+                                },
+                                "end": {
+                                  "line": 4,
+                                  "col": 12
+                                },
+                                "ghost": false,
+                                "attrs": [],
+                                "kind": "pattern (test.ml[4,57+9]..test.ml[4,57+12])
     Tpat_var \"_aa\"
     sort value
     value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
   ",
-                                        "children": []
-                                      }
-                                    ]
-                                  },
-                                  {
-                                    "filename": "test.ml",
-                                    "start": {
-                                      "line": 4,
-                                      "col": 16
-                                    },
-                                    "end": {
-                                      "line": 4,
-                                      "col": 17
-                                    },
-                                    "ghost": false,
-                                    "attrs": [
-                                      {
-                                        "start": {
-                                          "line": 4,
-                                          "col": 15
-                                        },
-                                        "end": {
-                                          "line": 4,
-                                          "col": 17
-                                        },
-                                        "name": "merlin.loc"
-                                      }
-                                    ],
-                                    "kind": "expression",
-                                    "children": []
-                                  }
-                                ]
+                                "children": []
                               }
                             ]
                           },

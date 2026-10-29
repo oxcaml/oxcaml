@@ -32,9 +32,16 @@ module Make (G : Cmly_api.GRAMMAR) : S with module G = G = struct
     in
     let ft = Terminal.tabulate
         (fun t ->
-           if Terminal.typ t = None
-           then measure ~has_default:true Terminal.attributes t
-           else measure ~has_default:false Terminal.attributes t)
+           match Terminal.kind t with
+           | `ERROR | `PSEUDO ->
+             (* Recovery can never synthesize the [error] pseudo-token (see
+                [token_of_terminal] in the generated printer), so no path may
+                go through a production that shifts it. *)
+             infinity
+           | `REGULAR | `EOF ->
+             if Terminal.typ t = None
+             then measure ~has_default:true Terminal.attributes t
+             else measure ~has_default:false Terminal.attributes t)
     in
     let fn =
       Nonterminal.tabulate (measure ~has_default:false Nonterminal.attributes)

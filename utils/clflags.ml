@@ -15,27 +15,28 @@
 
 (* Command-line parameters *)
 
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
+(* Stripped down version of Numbers, as its dependencies are a lot of code *)
+module Numbers = struct
+  module Int = struct
+    type t = int
+    module Map = Map.Make(Stdlib.Int)
     let of_string = int_of_string
   end
-
-  module Value = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-
-  module Value = struct
-    include Numbers.Float
+  module Float = struct
+    type t = float
     let of_string = float_of_string
   end
+end
+
+module Int_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Int
+end)
+module Float_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Float
 end)
 
 type open_arg =
@@ -54,14 +55,14 @@ type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 module Dwarf_config_defaults = struct
-  let shape_reduce_depth = Some 2
-  let shape_eval_depth = Some 2
-  let max_cms_files_per_unit = Some 20
-  let max_cms_files_per_variable = Some 5
+  let shape_reduce_depth = Some 50
+  let shape_eval_depth = Some 5
+  let max_cms_files_per_unit = Some 1000
+  let max_cms_files_per_variable = Some 50
   let max_type_to_shape_depth = Some 10
-  let max_shape_reduce_steps_per_variable = Some 1000
-  let max_evaluation_steps_per_variable = Some 1_000_000
-  let shape_reduce_fuel = Some 10
+  let max_shape_reduce_steps_per_variable = None
+  let max_evaluation_steps_per_variable = None
+  let shape_reduce_fuel = None
 end
 type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
@@ -74,19 +75,35 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type hidden_include_file =
+  { visible_path : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+let parse_hidden_include_file ~cmx_guaranteed entry =
+  match String.split_on_char ':' entry with
+  | [ visible_path; actual_path ] ->
+    Ok { visible_path; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<visible_path>:<actual_path>', got: " ^ entry)
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
+and hidden_include_files = (* -H-file, -Hx-file *)
+  ref ([] : hidden_include_file list)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
 and print_variance = ref false          (* -i-variance *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
+and debug_ocamldebug_types = ref true   (* -gno-ocamldebug-types *)
 and debug_full = ref false              (* For full DWARF support *)
+and restrict_to_upstream_dwarf = ref (not Config.oxcaml_dwarf)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
 and dwarf_pedantic = ref false          (* -gdwarf-pedantic *)
@@ -102,9 +119,6 @@ and gdwarf_config_max_cms_files_per_unit =
 and gdwarf_config_max_cms_files_per_variable =
   ref Dwarf_config_defaults.max_cms_files_per_variable
   (* -gdwarf-config-max-cms-files-per-variable *)
-and gdwarf_config_max_type_to_shape_depth =
-  ref Dwarf_config_defaults.max_type_to_shape_depth
-  (* -gdwarf-config-max-type-to-shape-depth *)
 and gdwarf_config_max_shape_reduce_steps_per_variable =
   ref Dwarf_config_defaults.max_shape_reduce_steps_per_variable
   (* -gdwarf-config-max-shape-reduce-steps-per-variable *)
@@ -142,8 +156,12 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
-let shape_format =                      (* -shape-format *)
-  ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
+let shape_format = ref Old_merlin (* -shape-format *)
+(* CR sspies: The default here uses the DWARF default (10) for simplicity. It's
+   unclear whether this is the right choice. For type shapes without DWARF, a
+   lower default (like 2) might be more appropriate to limit the work done. *)
+let type_to_shape_max_depth =           (* -type-to-shape-max-depth *)
+  ref Dwarf_config_defaults.max_type_to_shape_depth
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)
@@ -164,6 +182,7 @@ and recursive_types = ref false         (* -rectypes *)
 and strict_sequence = ref false         (* -strict-sequence *)
 and strict_formats = ref true           (* -strict-formats *)
 and applicative_functors = ref true     (* -no-app-funct *)
+and typing_recovery = ref false         (* -typing-recovery *)
 and make_runtime = ref false            (* -make-runtime *)
 and c_compiler = ref (None: string option) (* -cc *)
 and no_auto_link = ref false            (* -noautolink *)
@@ -180,6 +199,7 @@ let parameters = ref ([] : string list) (* -parameter *)
 let as_parameter = ref false            (* -as-parameter *)
 let as_argument_for = ref None          (* -as-argument-for *)
 let instantiate = ref false             (* -instantiate *)
+let functorize = ref false              (* -functorize *)
 let dump_source = ref false             (* -dsource *)
 let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
@@ -202,6 +222,9 @@ and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
 
 let keyword_edition: string option ref = ref None
+
+let syntax_quotations = ref Config.syntax_quotations
+                                        (* -[no-]syntax-quotations *)
 
 let keep_asm_file = ref false           (* -S *)
 let optimize_for_speed = ref true       (* -compact *)
@@ -234,8 +257,51 @@ let set_profile_granularity v =
   | Some granularity -> profile_granularity := granularity
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
 
-let native_code = ref false             (* set to true under ocamlopt *)
-let jsir = ref false                    (* set to true under ocamlj *)
+module Target = struct
+  type t =
+    | Bytecode
+    | Native
+    | Js_of_ocaml
+end
+
+let target = ref Target.Bytecode
+
+let set_target t = target := t
+
+let[@inline] target_is_native () =
+  match !target with
+  | Native -> true
+  | Bytecode | Js_of_ocaml -> false
+
+let[@inline] target_is_jsir () =
+  match !target with
+  | Js_of_ocaml -> true
+  | Bytecode | Native -> false
+
+module Jsoo_phase = struct
+  type t = All | Compile | Archive | Runtime | Link
+
+  let all = [All; Compile; Archive; Runtime; Link]
+
+  let flag = function
+    | All -> "-jsoo-opt"
+    | Compile -> "-jsoo-opt-compile"
+    | Archive -> "-jsoo-opt-archive"
+    | Runtime -> "-jsoo-opt-runtime"
+    | Link -> "-jsoo-opt-link"
+end
+
+let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
+  let all = ref ([] : string list) in
+  let compile = ref [] and archive = ref [] in
+  let runtime = ref [] and link = ref [] in
+  fun (phase : Jsoo_phase.t) ->
+    match phase with
+    | All -> all
+    | Compile -> compile
+    | Archive -> archive
+    | Runtime -> runtime
+    | Link -> link
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
@@ -322,14 +388,14 @@ let set_gdwarf_fidelity fidelity =
   gdwarf_fidelity := Some fidelity;
   match fidelity with
   | Fidelity_low ->
-      gdwarf_config_shape_eval_depth := Some 1;
-      gdwarf_config_shape_reduce_depth := Some 2;
-      gdwarf_config_max_cms_files_per_unit := Some 0;
-      gdwarf_config_max_cms_files_per_variable := Some 0;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := Some 100;
-      gdwarf_config_max_evaluation_steps_per_variable := Some 1000;
-      gdwarf_config_shape_reduce_fuel := Some 10
+      gdwarf_config_shape_eval_depth := Some 3;
+      gdwarf_config_shape_reduce_depth := Some 5;
+      gdwarf_config_max_cms_files_per_unit := Some 100;
+      gdwarf_config_max_cms_files_per_variable := Some 10;
+      type_to_shape_max_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some 10_000;
+      gdwarf_config_max_evaluation_steps_per_variable := Some 10_000;
+      gdwarf_config_shape_reduce_fuel := Some 50
   | Fidelity_medium ->
       (* The default. *)
       gdwarf_config_shape_eval_depth :=
@@ -340,7 +406,7 @@ let set_gdwarf_fidelity fidelity =
         Dwarf_config_defaults.max_cms_files_per_unit;
       gdwarf_config_max_cms_files_per_variable :=
         Dwarf_config_defaults.max_cms_files_per_variable;
-      gdwarf_config_max_type_to_shape_depth :=
+      type_to_shape_max_depth :=
         Dwarf_config_defaults.max_type_to_shape_depth;
       gdwarf_config_max_shape_reduce_steps_per_variable :=
         Dwarf_config_defaults.max_shape_reduce_steps_per_variable;
@@ -349,29 +415,29 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_shape_reduce_fuel :=
         Dwarf_config_defaults.shape_reduce_fuel
   | Fidelity_high ->
-      gdwarf_config_shape_eval_depth := Some 3;
-      gdwarf_config_shape_reduce_depth := Some 3;
-      gdwarf_config_max_cms_files_per_unit := Some 50;
-      gdwarf_config_max_cms_files_per_variable := Some 10;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
-      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000);
-      gdwarf_config_shape_reduce_fuel := Some 20
+      gdwarf_config_shape_eval_depth := Some 8;
+      gdwarf_config_shape_reduce_depth := Some 100;
+      gdwarf_config_max_cms_files_per_unit := Some 10_000;
+      gdwarf_config_max_cms_files_per_variable := Some 100;
+      type_to_shape_max_depth := Some 10;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
   | Fidelity_very_high ->
-      gdwarf_config_shape_eval_depth := Some 4;
-      gdwarf_config_shape_reduce_depth := Some 3;
-      gdwarf_config_max_cms_files_per_unit := Some 100;
-      gdwarf_config_max_cms_files_per_variable := Some 10;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_shape_eval_depth := Some 8;
+      gdwarf_config_shape_reduce_depth := Some 200;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := Some 1000;
+      type_to_shape_max_depth := Some 12;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
       gdwarf_config_max_evaluation_steps_per_variable := None;
       gdwarf_config_shape_reduce_fuel := None
   | Fidelity_ultra_high ->
-      gdwarf_config_shape_eval_depth := Some 5;
-      gdwarf_config_shape_reduce_depth := Some 5;
-      gdwarf_config_max_cms_files_per_unit := Some 1000;
-      gdwarf_config_max_cms_files_per_variable := Some 50;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_shape_eval_depth := Some 10;
+      gdwarf_config_shape_reduce_depth := None;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := None;
+      type_to_shape_max_depth := Some 20;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
       gdwarf_config_max_evaluation_steps_per_variable := None;
       gdwarf_config_shape_reduce_fuel := None
@@ -380,7 +446,7 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_shape_reduce_depth := None;
       gdwarf_config_max_cms_files_per_unit := None;
       gdwarf_config_max_cms_files_per_variable := None;
-      gdwarf_config_max_type_to_shape_depth := None;
+      type_to_shape_max_depth := None;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
       gdwarf_config_max_evaluation_steps_per_variable := None;
       gdwarf_config_shape_reduce_fuel := None
@@ -670,7 +736,7 @@ module Compiler_ir = struct
 end
 
 let is_flambda2 () =
-  Config.flambda2 && (!native_code || !jsir)
+  Config.flambda2 && (target_is_native () || target_is_jsir ())
 
 module Opt_flag_handler = struct
   type t = {
@@ -1012,8 +1078,8 @@ module Dump_option = struct
     let guard descr cond =
       if cond then pass
       else fail descr in
-    let check_bytecode = guard "bytecode" (not !native_code) in
-    let check_native = guard "native" !native_code in
+    let check_bytecode = guard "bytecode" (not (target_is_native ())) in
+    let check_native = guard "native" (target_is_native ()) in
     let check_middle_end = function
       | Flambda -> guard "flambda" Config.flambda
       | Closure -> guard "closure" (not Config.flambda)
@@ -1092,7 +1158,20 @@ let ddissector_verbose = ref false             (* -ddissector-verbose *)
 let ddissector_partitions = ref false          (* -ddissector-partitions *)
 let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
 
+(* CR bclement: should be changed to [true] after proper testing *)
+let stubs_forward_inlining = ref false         (* -stubs-forward-inlining *)
+
 let prepend_directory file_name =
   match !directory with
   | Some directory -> Filename.concat directory file_name
   | None -> file_name
+
+(* Note: [-gupstream-dwarf] deliberately does not affect [shape_format].
+   Debugging shapes are the default format, independent of whether the full
+   DWARF information is emitted. *)
+let set_restrict_to_upstream_dwarf () =
+  restrict_to_upstream_dwarf := true
+
+let no_restrict_to_upstream_dwarf () =
+  restrict_to_upstream_dwarf := false;
+  shape_format := Debugging_shapes

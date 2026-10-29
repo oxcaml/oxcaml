@@ -58,6 +58,15 @@ let register callback =
     (* Save old x86 internal assembler and register our hook *)
     saved_x86_internal_assembler := !X86_proc.internal_assembler;
     X86_proc.register_internal_assembler (fun ~delayed:_ sections _filename ->
+        X86_binary_emitter.clear_cross_section_labels ();
+        (* Assemble text-like sections first: data sections may contain
+           [Delta_uleb128] directives referencing text labels. *)
+        let text, others =
+          List.partition
+            (fun (name, _) -> X86_proc.Section_name.is_text_like name)
+            sections
+        in
+        let sections = text @ others in
         (* Assemble each section *)
         let sections_map =
           List.fold_left
@@ -109,6 +118,8 @@ let register callback =
         (* Return dummy file writer - not used for JIT *)
         fun _filename -> ())
   | _ -> Misc.fatal_error "JIT not supported on this architecture"
+
+let is_registered () = Option.is_some !current_callback
 
 let unregister () =
   current_callback := None;

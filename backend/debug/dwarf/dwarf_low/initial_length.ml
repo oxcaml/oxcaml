@@ -30,6 +30,18 @@ let size t = Dwarf_int.size t
 
 let sixty_four_bit_indicator = 0xffffffffl
 
+let emit_as_label_difference ~asm_directives ~upper ~lower =
+  (* As [emit] below, but with the length computed by the assembler as the
+     distance between the two labels. *)
+  (match Dwarf_format.get () with
+  | Thirty_two -> ()
+  | Sixty_four ->
+    Dwarf_value.emit ~asm_directives
+      (Dwarf_value.int32 ~comment:"64-bit indicator" sixty_four_bit_indicator));
+  Dwarf_value.emit ~asm_directives
+    (Dwarf_value.distance_between_labels_format_width ~comment:"initial length"
+       ~upper ~lower ())
+
 let emit ~asm_directives t =
   match Dwarf_format.get () with
   | Thirty_two ->

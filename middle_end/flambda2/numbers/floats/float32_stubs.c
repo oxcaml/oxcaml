@@ -131,6 +131,13 @@ double compiler_float32_to_float(int32_t i)
     return (double)float32_of_int32(i);
 }
 
+int32_t compiler_float32_of_int64(int64_t i)
+{
+    /* Round directly to single precision (one rounding), matching the
+       backend's [cvtsi2ss]. Going via a 64-bit float would double-round. */
+    return int32_of_float32((float)i);
+}
+
 value compiler_float32_neg_boxed(value i)
 {
     return caml_copy_int32(compiler_float32_neg(Int32_val(i)));
@@ -184,6 +191,11 @@ value compiler_float32_of_float_boxed(value d)
 value compiler_float32_to_float_boxed(value i)
 {
     return caml_copy_double(compiler_float32_to_float(Int32_val(i)));
+}
+
+value compiler_float32_of_int64_boxed(value i)
+{
+    return caml_copy_int32(compiler_float32_of_int64(Int64_val(i)));
 }
 
 /* The following functions are nearly identical to those in runtime/float32.c,

@@ -16,7 +16,7 @@ open! Flambda.Import
 
 type t =
   { dacc : Downwards_acc.t;
-    bindings_to_place : Expr_builder.binding_to_place list;
+    bindings_to_place : Simplified_named.binding_to_place list;
     was_lifted_set_of_closures : bool
   }
 
@@ -41,7 +41,7 @@ let create_have_lifted_set_of_closures dacc bound_vars_to_symbols
     bindings_to_place =
       List.mapi
         (fun i (var, sym) ->
-          Expr_builder.Keep_binding
+          Simplified_named.Keep_binding
             { let_bound = Bound_pattern.singleton var;
               simplified_defining_expr =
                 Simplified_named.create ~machine_width

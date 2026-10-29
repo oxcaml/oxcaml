@@ -10,7 +10,8 @@
   (package ocaml-index)
   %{bin:ocaml-index}
   %{bin:ocamlc-wrapper}
-  %{bin:ocamlobjinfo-wrapper}))
+  %{bin:ocamlobjinfo-wrapper}
+  (env_var MERLIN_TEST_OCAML_VERSION)))
 
 (cram
  (package ocaml-index)

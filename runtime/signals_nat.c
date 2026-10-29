@@ -15,7 +15,6 @@
 
 #define CAML_INTERNALS
 
-#include <unistd.h>
 #define __USE_GNU
 #if !defined(__OpenBSD__)
 #define _GNU_SOURCE
@@ -25,24 +24,32 @@
 /* Signal handling, code specific to the native-code compiler */
 
 #include <signal.h>
-#include <errno.h>
-#include <stdio.h>
-#include "caml/codefrag.h"
 #include "caml/domain.h"
-#include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/frame_descriptors.h"
 #include "caml/memory.h"
-#include "caml/osdeps.h"
 #include "caml/signals.h"
 #include "caml/stack.h"
+
+/* The number of allocations in a frame descriptor fits in a byte. */
+#define Alloc_len_bufsize 256
 
 /* Get allocation info for the current frame, for re-doing allocations after GC
    or resuming preemption.
 
    Returns the allocation size in words (wosize, without header).
-   Sets *alloc_len_out and *nallocs_out if they are non-NULL. */
-Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
+   Sets *alloc_len_out and *nallocs_out if they are non-NULL.
+
+   [unpacked] is caller-owned scratch space of at least
+   [Alloc_len_bufsize] bytes; *alloc_len_out may point into it. It
+   must not be shared (static or thread-local): the result is
+   consumed across operations which can re-enter this function on the
+   same thread (memprof sampling captures callstacks, which can
+   allocate, run pending memprof callbacks, and so trigger a nested
+   caml_garbage_collection), and a shared buffer would be overwritten
+   while still in use. */
+Caml_inline intnat current_frame_alloc_wosize(unsigned char* unpacked,
+                                              unsigned char** alloc_len_out,
                                               int* nallocs_out)
 {
   frame_descr* d;
@@ -58,13 +65,27 @@ Caml_inline intnat current_frame_alloc_wosize(unsigned char** alloc_len_out,
   d = caml_find_frame_descr(fds, retaddr);
   CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
 
-  /* Compute the total allocation size at this point,
-     including allocations combined by Comballoc */
-  unsigned char* alloc_len = frame_end_of_live_ofs(d);
-  int nallocs = *alloc_len++;
-
+  /* Compute the total allocation size at this point, including allocations
+     combined by Comballoc. The encoded allocation lengths are returned as a
+     byte-per-allocation array. In the short descriptor format they are stored
+     as 4-bit nibbles, so we unpack them into the caller's buffer. */
+  unsigned char* alloc_len;
+  int nallocs;
+  struct frame_descr_decoded dec;
+  caml_decode_frame_descr(d, &dec);
+  nallocs = dec.num_allocs;
   if (nallocs == 0) {
     return 0; /* This is a poll */
+  }
+  if (dec.is_short) {
+    for (int i = 0; i < nallocs; i++) {
+      unsigned char byte = dec.short_allocs[i / 2];
+      unpacked[i] = (i & 1) ? (byte >> 4) : (byte & 0xf);
+    }
+    alloc_len = unpacked;
+  } else {
+    /* escaped: byte sizes follow the num_allocs byte */
+    alloc_len = (unsigned char *)dec.end_of_live + 1;
   }
 
   intnat allocsz = 0;
@@ -97,9 +118,11 @@ void caml_garbage_collection(void)
      us. */
   atomic_thread_fence(memory_order_acquire);
 
+  unsigned char alloc_len_buf[Alloc_len_bufsize];
   unsigned char* alloc_len = NULL;
   int nallocs = 0;
-  intnat allocsz = current_frame_alloc_wosize(&alloc_len, &nallocs);
+  intnat allocsz =
+    current_frame_alloc_wosize(alloc_len_buf, &alloc_len, &nallocs);
 
   if (nallocs == 0) {
     /* This is a poll */
@@ -116,7 +139,8 @@ void caml_redo_preempted_allocation(void)
 {
   caml_domain_state * dom_st = Caml_state;
 
-  intnat allocsz = current_frame_alloc_wosize(NULL, NULL);
+  unsigned char alloc_len_buf[Alloc_len_bufsize];
+  intnat allocsz = current_frame_alloc_wosize(alloc_len_buf, NULL, NULL);
 
   if (allocsz == 0) {
     /* This is a poll - no allocation to redo */
@@ -147,7 +171,41 @@ typedef void (*sigaction_t)(int sig, siginfo_t *info, void *context);
 
 CAMLextern void caml_raise_stack_overflow_nat(void);
 
+/* Keep knowledge of each platform's mcontext layout in context_*
+   accessors, so the handler logic itself is more
+   platform-independent. */
+
+#if defined(TARGET_amd64)
+
+Caml_inline void context_set_pc(ucontext_t* context, void (*pc)(void))
+{
+#ifdef SYS_macosx
+  context->uc_mcontext->__ss.__rip = (unsigned long long) pc;
+#else
+  context->uc_mcontext.gregs[REG_RIP] = (greg_t) pc;
+#endif
+}
+
+#elif defined(TARGET_arm64)
+
+/* On Darwin OCaml targets arm64, not arm64e, so the thread-state
+   fields are plain integers, not pointer-authenticated. */
+
+Caml_inline void context_set_pc(ucontext_t* context, void (*pc)(void))
+{
+#ifdef SYS_macosx
+  context->uc_mcontext->__ss.__pc = (unsigned long long) pc;
+#else
+  context->uc_mcontext.pc = (uintnat) pc;
+#endif
+}
+
+#endif /* TARGET_* */
+
 static sigaction_t prior_segv_handler = NULL;
+#ifdef SYS_macosx
+static sigaction_t prior_sigbus_handler = NULL;
+#endif
 
 DECLARE_SIGNAL_HANDLER(segv_handler)
 {
@@ -158,31 +216,34 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
     char* protected_low = Protected_stack_page(block);
     char* protected_high = protected_low + caml_plat_pagesize;
     if ((fault_addr >= protected_low) && (fault_addr < protected_high)) {
-      /* Faulting in the current guard page; presume stack overflow. Raise the
-         exception. */
-#ifdef SYS_macosx
-      context->uc_mcontext->__ss.__rip = (unsigned long long) &caml_raise_stack_overflow_nat;
-#else
-      context->uc_mcontext.gregs[REG_RIP]= (greg_t) &caml_raise_stack_overflow_nat;
-#endif
+      /* Faulting in the current guard page; presume stack overflow.
+         Redirect the faulting thread to the stub raising the exception. */
+      context_set_pc(context, &caml_raise_stack_overflow_nat);
       return; /* to caml_raise_stack_overflow_nat */
     }
   }
 
   /* Not a stack-overflow on our current Caml stack */
-  if (prior_segv_handler) {
-    /* Somebody else installed a SEGV handler before us. We make
-     * "reasonable best efforts" to invoke it, as maybe it's a SEGV
-     * they know about and can fix. We can't apply whatever sa_flags
-     * they had, but we can call their handler. */
-    prior_segv_handler(sig, info, context);
-  } else { /* default SEGV behaviour */
-    act.sa_handler = SIG_DFL;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGSEGV, &act, NULL);
+  {
+    sigaction_t prior =
+#ifdef SYS_macosx
+      sig == SIGBUS ? prior_sigbus_handler :
+#endif
+      prior_segv_handler;
+    if (prior) {
+      /* Somebody else installed a handler before us. We make
+       * "reasonable best efforts" to invoke it, as maybe it's a fault
+       * they know about and can fix. We can't apply whatever sa_flags
+       * they had, but we can call their handler. */
+      prior(sig, info, context);
+    } else { /* default behaviour for the signal */
+      act.sa_handler = SIG_DFL;
+      act.sa_flags = 0;
+      sigemptyset(&act.sa_mask);
+      sigaction(sig, &act, NULL);
+    }
   }
-  /* returning from SEGV handler restarts the failing instruction */
+  /* returning from the handler restarts the failing instruction */
 }
 
 void caml_init_nat_signals(void)
@@ -198,6 +259,17 @@ void caml_init_nat_signals(void)
   if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {
     prior_segv_handler = oldact.sa_sigaction;
   }
+#ifdef SYS_macosx
+  /* macOS reports accesses to PROT_NONE pages, such as the stack guard
+     pages, as SIGBUS (KERN_PROTECTION_FAILURE), not SIGSEGV. */
+  SET_SIGACT(act, segv_handler);
+  act.sa_flags |= SA_ONSTACK;
+  sigemptyset(&act.sa_mask);
+  sigaction(SIGBUS, &act, &oldact);
+  if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {
+    prior_sigbus_handler = oldact.sa_sigaction;
+  }
+#endif
 }
 
 #else

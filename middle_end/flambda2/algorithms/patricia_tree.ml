@@ -579,15 +579,19 @@ module Tree_operations (Tree : Tree) : sig
 
   val filter_map_sharing : (key -> 'a -> 'a option) -> 'a t -> 'a t
 
-  type 'a iterator
+  module Mutable_iterator : sig
+    type 'a iterator
 
-  val iterator : 'a t -> 'a iterator
+    val create : unit -> 'a iterator
 
-  val current : 'a iterator -> 'a Binding.t option
+    val init : 'a iterator -> 'a t -> unit
 
-  val advance : 'a iterator -> 'a iterator
+    val current : 'a iterator -> 'a Binding.t option
 
-  val seek : 'a iterator -> key -> 'a iterator
+    val advance : 'a iterator -> unit
+
+    val seek : 'a iterator -> key -> unit
+  end
 
   val to_seq : 'a t -> 'a Binding.t Seq.t
 
@@ -1860,68 +1864,186 @@ end = struct
     | Empty -> empty iv
     | Non_empty t -> filter_map_sharing_tree f t
 
-  (* NB: an iterator [Next (binding, rest)] is positioned on the binding
-     [binding] and then will iterate on the trees in [rest] in order.
+  module Mutable_iterator = struct
+    (* Use [include] to avoid exposing the internals of the [iterator] type
+       beyond what's strictly necessary to ensure internal invariants. *)
+    include (
+      struct
+        (* Note that the [iterator] type is carefully designed so that iteration
+           does not allocate. In particular, this is why we use separate fields
+           for [current] and [current_key] to represent what is conceptually a
+           [(key * 'a) Or_null.t] field. *)
+        type 'a iterator =
+          { mutable current : 'a Or_null.t;
+            (* Current datum the iterator is positioned on. If [Null], the
+               iterator is exhausted (or not yet initialized); otherwise, the
+               [current] datum is the datum associated with the [current_key] in
+               the iterated tree. *)
+            mutable current_key : key;
+            (* Current key of the iterator.
 
-     The trees in ['a t] are {b never} at top-level; in particular, they never
-     contain branches with a negative bit and we can safely use signed
-     comparison in all the functions below (except for [iterator], which is
-     called on a top-level tree). *)
+               {b Warning}: The value of [current_key] is arbitrary and must not
+               be read if [current] is [Null]. *)
+            mutable stack : 'a t array;
+            (* CR-someday xclerc: consider allocating the storage in [create]
+               and making the field immutable. This would remove the only
+               mutable pointer read in [pop_or_exhaust] and simplify [reset]. *)
+            mutable stack_size : int
+                (* Stack of later subtrees to iterate on. Storage is allocated
+                   on first initialization, with capacity [Sys.int_size], enough
+                   for one pending subtree per branching bit. Slots below
+                   [stack_size] contain nonempty trees; the rest are empty.
 
-  type 'a iterator =
-    | Done
-    | Next of 'a Binding.t * ('a, non_empty) tree list
+                   It is guaranteed that:
 
-  (* NB: We rely on [rest] not containing a top-level patricia tree to use
-     signed comparison. *)
-  let rec iterator0 t rest =
-    match tree_descr t with
-    | Leaf l -> Next (leaf_binding l, rest)
-    | Branch b -> iterator0 (branch0 b) (branch1 b :: rest)
+                   - [0 <= stack_size <= Array.length stack].
 
-  let iterator t =
-    match descr t with
-    | Empty -> Done
-    | Non_empty t -> (
-      match tree_descr t with
-      | Leaf l -> Next (leaf_binding l, [])
+                   - If [current] is [Null], the stack is empty.
+
+                   - All keys in trees in the [stack] are strictly greater than
+                   the [current_key].
+
+                   - All keys in the tree at [stack.(i)] are strictly greater
+                   than the keys in the tree at [stack.(i + 1)]. *)
+          }
+
+        let create () =
+          { current = Or_null.null;
+            current_key = 0 (* any value works *);
+            stack = [||];
+            stack_size = 0
+          }
+
+        let current t =
+          match t.current with
+          | Null -> None
+          | This datum -> Some (Binding.create t.current_key datum)
+        [@@inline]
+
+        let current_key t =
+          if Or_null.is_this t.current
+          then Or_null.this t.current_key
+          else Or_null.null
+
+        let set_current t l =
+          t.current_key <- leaf_key l;
+          t.current <- Or_null.this (leaf_datum l)
+        [@@inline]
+
+        let push t tree =
+          if t.stack_size >= Array.length t.stack
+          then Misc.fatal_error "Patricia iterator: stack overflow";
+          Array.unsafe_set t.stack t.stack_size (of_tree tree);
+          t.stack_size <- t.stack_size + 1
+        [@@inline]
+
+        let pop_or_exhaust t ~then_ =
+          if t.stack_size = 0
+          then t.current <- Or_null.null
+          else
+            let index = t.stack_size - 1 in
+            match descr (Array.unsafe_get t.stack index) with
+            | Empty -> Misc.fatal_error "Patricia iterator: empty stack slot"
+            | Non_empty tree ->
+              Array.unsafe_set t.stack index (empty (is_value_of_tree tree));
+              t.stack_size <- index;
+              (then_ [@inlined hint]) tree
+        [@@inline]
+
+        let reset t iv =
+          let empty = empty iv in
+          if Array.length t.stack = 0
+          then t.stack <- Array.make Sys.int_size empty;
+          Array.fill t.stack 0 t.stack_size empty;
+          t.stack_size <- 0;
+          t.current <- Or_null.null
+      end :
+        sig
+          (** An iterator is represented by:
+
+              - A current key (and its associated datum), and
+
+              - A stack of sub-trees to iterate on in the future. *)
+          type 'a iterator
+
+          (** Create an empty iterator with no stack storage and no current key.
+              Call [reset] before [push] to allocate the bounded stack. *)
+          val create : unit -> 'a iterator
+
+          val current : 'a iterator -> 'a Binding.t option
+
+          val current_key : 'a iterator -> key Or_null.t
+
+          val set_current : 'a iterator -> ('a, leaf) tree -> unit
+
+          (** Push a new tree onto the initialized stack. Its depth is bounded
+              by the number of branching bits, at most [Sys.int_size]. *)
+          val push : 'a iterator -> ('a, non_empty) tree -> unit
+
+          (** If the stack is not empty, pop the next tree from the top of the
+              stack and call [then_] on that tree.
+
+              Otherwise, exhaust the iterator (clear the current key).
+
+              {b Note}: This can safely be called before initialization and will
+              exhaust these iterators. *)
+          val pop_or_exhaust :
+            'a iterator -> then_:(('a, non_empty) tree -> unit) -> unit
+
+          val reset : 'a iterator -> 'a is_value -> unit
+        end)
+
+    let rec unsigned_init t tree =
+      match tree_descr tree with
+      | Leaf l -> set_current t l
       | Branch b ->
-        let t0, t1 = order_branches' b in
-        iterator0 t0 [t1])
+        push t (branch1 b);
+        unsigned_init t (branch0 b)
 
-  let current it = match it with Done -> None | Next (b, _) -> Some b
+    let init it t =
+      reset it (is_value_of t);
+      match descr t with
+      | Empty -> ()
+      | Non_empty tree -> (
+        match tree_descr tree with
+        | Leaf l -> set_current it l
+        | Branch b ->
+          let t0, t1 = order_branches' b in
+          push it t1;
+          unsigned_init it t0)
 
-  let advance it =
-    match it with
-    | Done | Next (_, []) -> Done
-    | Next (_, t :: rest) -> iterator0 t rest
+    let advance t =
+      (* NB: we never push toplevel trees. *)
+      pop_or_exhaust t ~then_:(fun tree -> unsigned_init t tree)
 
-  (* NB: We rely on [rest] not containing a top-level patricia tree to use
-     signed comparison. *)
-  let rec seek0 k t rest =
-    match tree_descr t, rest with
-    | Leaf l, _ when k <= leaf_key l -> Next (leaf_binding l, rest)
-    | Branch b, _ when match_prefix_and_bit k (branch_prefix_and_bit b) ->
-      let prefix_and_bit = branch_prefix_and_bit b in
-      let _, bit = unpack prefix_and_bit in
-      let t1 = branch1 b in
-      if zero_bit k bit
-      then seek0 k (branch0 b) (t1 :: rest)
-      else seek0 k t1 rest
-    | Branch b, _
-      when let prefix, _ = unpack (branch_prefix_and_bit b) in
-           k <= prefix ->
-      iterator0 (branch0 b) (branch1 b :: rest)
-    | (Leaf _ | Branch _), [] -> Done
-    | (Leaf _ | Branch _), t' :: rest' -> seek0 k t' rest'
+    let rec unsigned_seek t tree ~key:seek_key =
+      match tree_descr tree with
+      | Leaf l when seek_key <= leaf_key l -> set_current t l
+      | Branch b when match_prefix_and_bit seek_key (branch_prefix_and_bit b) ->
+        let prefix_and_bit = branch_prefix_and_bit b in
+        let _, bit = unpack prefix_and_bit in
+        let t1 = branch1 b in
+        if zero_bit seek_key bit
+        then (
+          push t t1;
+          unsigned_seek t (branch0 b) ~key:seek_key)
+        else unsigned_seek t t1 ~key:seek_key
+      | Branch b
+        when let prefix, _ = unpack (branch_prefix_and_bit b) in
+             seek_key <= prefix ->
+        push t (branch1 b);
+        unsigned_init t (branch0 b)
+      | Leaf _ | Branch _ ->
+        (* NB: we never push toplevel trees. *)
+        pop_or_exhaust t ~then_:(fun tree -> unsigned_seek t tree ~key:seek_key)
 
-  let seek it k =
-    match it with
-    | Done -> Done
-    | Next (b, rest) -> (
-      if k <= Binding.key b
-      then it
-      else match rest with [] -> Done | t' :: rest' -> seek0 k t' rest')
+    let seek t k =
+      match current_key t with
+      | This current_key when not (k <= current_key) ->
+        (* NB: we never push toplevel trees. *)
+        pop_or_exhaust t ~then_:(fun tree -> unsigned_seek t tree ~key:k)
+      | Null | This _ -> ()
+  end
 
   let to_seq t =
     let rec aux acc () =

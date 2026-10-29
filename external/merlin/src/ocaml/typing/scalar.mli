@@ -293,6 +293,7 @@ module Operation : sig
         | Succ  (** add 1 *)
         | Pred  (** subtract 1 *)
         | Bswap  (** byte swap; see scalars.md for semantics *)
+        | Not (* bitwise not *)
 
       val to_string : t -> string
     end
@@ -339,8 +340,8 @@ module Operation : sig
         | Add
         | Sub
         | Mul
-        | Div of division_is_safe
-        | Mod of division_is_safe
+        | Div of division_is_safe * Signedness.t
+        | Mod of division_is_safe * Signedness.t
         | And
         | Or
         | Xor

@@ -664,12 +664,12 @@ end
     Twelve is unsigned (0-4095). *)
 module Immediate = struct
   type 'width t =
-    | Six : int -> [`Six] t
-    | Twelve : int -> [`Twelve] t
-    | Sixteen_unsigned : int -> [`Sixteen_unsigned] t
-    | Sym : 'w Symbol.t -> [`Sym of 'w] t
-    | Float : float -> [`Sixty_four] t
-    | Nativeint : nativeint -> [`Sixty_four] t
+    | Six : int -> [> `Six] t
+    | Twelve : int -> [> `Twelve] t
+    | Sixteen_unsigned : int -> [> `Sixteen_unsigned] t
+    | Sym : 'w Symbol.t -> [> `Sym of 'w] t
+    | Float : float -> [> `Sixty_four] t
+    | Nativeint : nativeint -> [> `Sixty_four] t
   [@@warning "-37"]
 
   let print : type w. Format.formatter -> w t -> unit =
@@ -1005,7 +1005,7 @@ module Instruction_name = struct
         t
     | ADDV :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of ([< `B | `H | `S] as 'w)]]]
+          [`Reg of [`Neon of [`Scalar of ([< `B | `H | `S] as 'w)]]]
           * [ `Reg of
               [ `Neon of
                 [`Vector of [< `V8B | `V16B | `V4H | `V8H | `V2S | `V4S] * 'w]
@@ -1015,7 +1015,7 @@ module Instruction_name = struct
         ( quad,
           [`Reg of [`GP of [< `X | `SP | `FP]]]
           * [`Reg of [`GP of [< `X | `SP | `FP]]]
-          * [`Imm of [< `Twelve | `Sym of [`Twelve]]]
+          * [`Imm of [`Twelve | `Sym of [`Twelve]]]
           * [`Optional of [`Fixed_shift of [`Lsl_by_twelve]] option] )
         t
     | ADD_shifted_register :
@@ -1218,8 +1218,8 @@ module Instruction_name = struct
         t
     | FCVT :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]]
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTL_vector :
         ( pair,
@@ -1229,7 +1229,7 @@ module Instruction_name = struct
     | FCVTNS :
         ( pair,
           [`Reg of [`GP of [< `X]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTNS_vector :
         ( pair,
@@ -1247,7 +1247,7 @@ module Instruction_name = struct
     | FCVTZS :
         ( pair,
           [`Reg of [`GP of [< `X]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTZS_vector :
         ( pair,
@@ -1326,18 +1326,16 @@ module Instruction_name = struct
         t
     | FMOV_fp_to_gp_32 :
         ( pair,
-          [`Reg of [`GP of [`W]]] * [`Reg of [`Neon of [< `Scalar of [< `S]]]]
-        )
+          [`Reg of [`GP of [`W]]] * [`Reg of [`Neon of [`Scalar of [< `S]]]] )
         t
     | FMOV_fp_to_gp_64 :
         ( pair,
-          [`Reg of [`GP of [`X]]] * [`Reg of [`Neon of [< `Scalar of [< `D]]]]
-        )
+          [`Reg of [`GP of [`X]]] * [`Reg of [`Neon of [`Scalar of [< `D]]]] )
         t
     | FMOV_scalar_immediate :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
-          * [`Imm of [`Sixty_four]] )
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] * [`Imm of [`Sixty_four]]
+        )
         t
     | FMSUB :
         ( quad,
@@ -1497,7 +1495,7 @@ module Instruction_name = struct
         (pair, [`Reg of [`GP of [< `X]]] * [`Mem of Addressing_mode.single]) t
     | LDR_simd_and_fp :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `D | `S | `Q]]]]
+          [`Reg of [`Neon of [`Scalar of [< `D | `S | `Q]]]]
           * [`Mem of Addressing_mode.single] )
         t
     | LSLV :
@@ -1576,6 +1574,14 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
     | NOP : (singleton, unit) t
+    | ORN_shifted_register :
+        ( quad,
+          [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Optional of [`Shift of [< `Lsl | `Lsr | `Asr] * [`Six]] option]
+        )
+        t
     | ORR_immediate :
         ( triple,
           [`Reg of [`GP of [< `X]]]
@@ -1614,7 +1620,7 @@ module Instruction_name = struct
         t
     | SCVTF :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]]
           * [`Reg of [`GP of [< `X]]] )
         t
     | SCVTF_vector :
@@ -1746,7 +1752,7 @@ module Instruction_name = struct
         (pair, [`Reg of [`GP of [< `W]]] * [`Mem of Addressing_mode.single]) t
     | STR_simd_and_fp :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `D | `S | `Q]]]]
+          [`Reg of [`Neon of [`Scalar of [< `D | `S | `Q]]]]
           * [`Mem of Addressing_mode.single] )
         t
     | SUBS_immediate :
@@ -1821,6 +1827,12 @@ module Instruction_name = struct
           * [`Reg of [`GP of [< `X | `W]]]
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
+        t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
         t
     | UMAX_vector :
         ( triple,
@@ -2052,6 +2064,7 @@ module Instruction_name = struct
         | MVN_vector -> "mvn"
         | NEG_vector -> "neg"
         | NOP -> "nop"
+        | ORN_shifted_register -> "orn"
         | ORR_immediate | ORR_shifted_register | ORR_vector -> "orr"
         | RBIT -> "rbit"
         | RET -> "ret"
@@ -2087,6 +2100,7 @@ module Instruction_name = struct
         | TST -> "tst"
         | UADDLP_vector -> "uaddlp"
         | UBFM -> "ubfm"
+        | UDIV -> "udiv"
         | UMAX_vector -> "umax"
         | UMIN_vector -> "umin"
         | UMOV _ -> "umov"
@@ -2462,6 +2476,11 @@ module Instruction_name = struct
       | ORR_immediate ->
         let (Triple (rd, rs, bitmask)) = ops in
         [| o rd; o rs; o bitmask |]
+      | ORN_shifted_register -> (
+        let (Quad (rd, rs, reg, shift_opt)) = ops in
+        match shift_opt with
+        | Optional None -> [| o rd; o rs; o reg |]
+        | Optional (Some shift) -> [| o rd; o rs; o reg; o shift |])
       | ORR_shifted_register -> (
         let (Quad (rd, rs, reg, shift_opt)) = ops in
         match shift_opt with
@@ -2587,6 +2606,9 @@ module Instruction_name = struct
       | UBFM ->
         let (Quad (rd, rn, immr, imms)) = ops in
         [| o rd; o rn; o immr; o imms |]
+      | UDIV ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | UMAX_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
@@ -2691,18 +2713,19 @@ module Instruction = struct
     | FMOV_scalar_immediate | FMSUB | FMUL | FMUL_vector | FNEG | FNEG_vector
     | FNMADD | FNMSUB | FNMUL | FRECPE_vector | FRINT _ | FRINT_vector _
     | FRSQRTE_vector | FSQRT | FSQRT_vector | FSUB | FSUB_vector | INS _
-    | INS_V _ | LDAR | STLR | STLUR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH
-    | LDRSW | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ
-    | MSUB | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
-    | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
-    | SCVTF | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _
-    | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector
-    | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR | STRB | STRH
-    | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register | SUB_immediate
-    | SUB_shifted_register | SUB_vector | SXTL _ | TST | UADDLP_vector | UBFM
-    | UMAX_vector | UMIN_vector | UMOV _ | UMULH | UMULL2_vector _
-    | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _ | UQXTN2 _
-    | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1 | ZIP2 ->
+    | INS_V _ | LDAR | STLR | STLUR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
+    | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
+    | MUL_vector | MVN_vector | NEG_vector | NOP | ORN_shifted_register
+    | ORR_immediate | ORR_shifted_register | ORR_vector | RBIT | RET | REV
+    | REV16 | SBFM | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector
+    | SMIN_vector | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _
+    | SQADD_vector | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR
+    | STP _ | STR | STRB | STRH | STR_simd_and_fp | SUBS_immediate
+    | SUBS_shifted_register | SUB_immediate | SUB_shifted_register | SUB_vector
+    | SXTL _ | TST | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _
+    | UMULH | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector
+    | UQXTN _ | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD
+    | ZIP1 | ZIP2 ->
       None
 end
 
@@ -3091,6 +3114,8 @@ module DSL = struct
       let ins4 name (a, b, c, d) = ins4 name a b c d
     end
 
+    let is_32bit (Reg r : [`Reg of [`GP of _]] Operand.t) = Reg.gp_sf r = 0
+
     (* Instructions that are expanded into others *)
     let ins_mul rd rn rm = ins MADD (Quad (rd, rn, rm, reg_op Reg.xzr))
 
@@ -3135,8 +3160,7 @@ module DSL = struct
 
     (* CMP <Rn|SP>, #<imm>{, <shift>} -> SUBS ZR, <Rn|SP>, #<imm>{, <shift>} *)
     let ins_cmp rn imm shift_opt =
-      let is_32bit = match rn with Operand.Reg r -> Reg.gp_sf r = 0 in
-      if is_32bit
+      if is_32bit rn
       then ins SUBS_immediate (Quad (wzr, rn, imm, shift_opt))
       else ins SUBS_immediate (Quad (xzr, rn, imm, shift_opt))
 
@@ -3180,5 +3204,12 @@ module DSL = struct
     (* MOV <Xd>, #<imm16> -> MOVZ <Xd>, #<imm16>, LSL #0 MOV <Wd>, #<imm16> ->
        MOVZ <Wd>, #<imm16>, LSL #0 *)
     let ins_mov_imm rd imm16 = ins MOVZ (Triple (rd, imm16, Optional None))
+
+    (* MVN <Xd>, <Xm> -> ORN <Xd>, XZR, <Xm> *)
+    (* MVN <Wd>, <Wm> -> ORN <Wd>, WZR, <Wm> *)
+    let ins_mvn rd rm =
+      if is_32bit rd
+      then ins ORN_shifted_register (Quad (rd, wzr, rm, Optional None))
+      else ins ORN_shifted_register (Quad (rd, xzr, rm, Optional None))
   end
 end

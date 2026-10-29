@@ -7,8 +7,7 @@ module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b -> unit
 end
 [%%expect{|
-module type S =
-  sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end
+module type S = sig val poly_ f : 'a -> 'b -> unit end
 |}]
 
 (* layout instantiation requires static *)
@@ -32,10 +31,7 @@ end @ static = struct
   let h = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, value])
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : S @ static) -> sig val h : 'a -> 'b -> unit end
 |}]
 
 module F (M : S @ static) : sig
@@ -66,20 +62,11 @@ end = struct
   let poly_ g = M.f
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
+Line 4, characters 16-19:
 4 |   let poly_ g = M.f
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit end
-       is not included in
-         sig val g : int end
-       Values do not match:
-         val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit
-       is not included in
-         val g : int
-       The type "'a -> 'b -> unit" is not compatible with the type "int"
+                    ^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 module F (M : S @ static) = struct
@@ -88,10 +75,7 @@ module F (M : S @ static) = struct
     M.f y x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [float64, value])
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : S @ static) -> sig val g : int -> float# -> unit end
 |}]
 
 (* Two layout variables instantiated independently *)
@@ -101,10 +85,9 @@ end @ static) = struct
   let apply_int_to_float (f : int -> float#) (x : int) = M.map f x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, float64])
-Uncaught exception: Misc.Fatal_error
-
+module G :
+  functor (M : sig val poly_ map : ('a -> 'b) -> 'a -> 'b end @ static) ->
+    sig val apply_int_to_float : (int -> float#) -> int -> float# end
 |}]
 
 (* partial instantiation; the uninstantiated sort stays a variable for further unification *)
@@ -113,10 +96,9 @@ module F (M :S @ static) = struct
   let h (x : float#)= g x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, float64])
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (M : S @ static) ->
+    sig val g : float# -> unit val h : float# -> unit end
 |}]
 
 (* partial instantiation; the uninstantiated sort defaults to [value] *)
@@ -136,11 +118,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val g : '_weak1 -> unit end
        is not included in
-         sig val g : layout_ l. ('b : l). 'b -> unit end
+         sig val poly_ g : 'b -> unit end
        Values do not match:
          val g : '_weak1 -> unit
        is not included in
-         val g : layout_ l. ('b : l). 'b -> unit
+         val poly_ g : 'b -> unit
        The type "'_weak1 -> unit" is not compatible with the type "'a -> unit"
        Type "'_weak1" is not compatible with type "'a"
 |}]
@@ -154,10 +136,9 @@ end = struct
   let poly_ g x = M.f 42 x
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value, <genvar>])
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (M : sig val poly_ f : 'a -> 'b -> unit end @ static) ->
+    sig val poly_ g : 'b -> unit end
 |}]
 
 (* don't work without eta-expansion *)
@@ -173,7 +154,7 @@ Line 6, characters 16-22:
 6 |   let poly_ g = M.f 42
                     ^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 
@@ -187,15 +168,9 @@ end @ static) = struct
     (x', y')
 end
 [%%expect{|
-Line 7, characters 9-11:
-7 |     (x', y')
-             ^^
-Error: The value "y'" has type "float#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because it's the type of a tuple element.
+module H :
+  functor (M : sig val poly_ id : 'a -> 'a end @ static) ->
+    sig val use : int -> float# -> int * float# end
 |}]
 
 (* Let binding: binding a layout-poly value *)
@@ -205,10 +180,7 @@ end @ static) = struct
   let _ = M.f
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
-Uncaught exception: Misc.Fatal_error
-
+module I : functor (M : sig val poly_ f : 'a -> 'a end @ static) -> sig end
 |}]
 
 (* Layout-poly value used in a type-constrained binding *)
@@ -218,10 +190,9 @@ end @ static) = struct
   let f : int -> int = M.id
 end
 [%%expect{|
->> Fatal error: Translcore: translation of layout-polymorphic instantiation is not yet supported
-(layout args: [value])
-Uncaught exception: Misc.Fatal_error
-
+module J :
+  functor (M : sig val poly_ id : 'a -> 'a end @ static) ->
+    sig val f : int -> int end
 |}]
 
 (* Inst_mutvar: mutable variable of a layout-poly type *)

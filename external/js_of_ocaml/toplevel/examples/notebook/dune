@@ -1,0 +1,33 @@
+(executables
+ (names notebook)
+ (libraries js_of_ocaml-compiler js_of_ocaml-toplevel)
+ (link_flags
+  (:standard -linkall))
+ (modes byte)
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+(rule
+ (targets export.txt)
+ (deps notebook.bc)
+ (action
+  (run jsoo_listunits -o %{targets} stdlib)))
+
+(rule
+ (targets notebook.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   --export
+   %{dep:export.txt}
+   --toplevel
+   --pretty
+   -w
+   no-missing-effects-backend
+   %{dep:notebook.bc}
+   -o
+   %{targets})))
+
+(alias
+ (name default)
+ (deps notebook.js index.html))

@@ -94,7 +94,7 @@ val flatten_complex_shape : t -> RS.t RS.Or_void.t list
 module Shape_cache : sig
   type t
 
-  val create : int -> t
+  val create : initial_size:int -> t
 end
 
 (** Convert an evaluated type shape and layout to a complex shape for DWARF type

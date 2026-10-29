@@ -19,9 +19,6 @@
 /* This runtime provides some OxCaml-specific features */
 #define OXCAML_RUNTIME 1
 
-/* CR ocaml 5 all-runtime5: remove this and all uses of it */
-#define CAML_RUNTIME_5
-
 #include "m.h"
 #include "s.h"
 #include "compatibility.h"
@@ -203,6 +200,17 @@ typedef uint64_t uintnat;
 #define STACK_GUARD_PAGES
 #endif
 
+/* A lower bound on the size of the stack guard page: the smallest
+   page size of any supported target. Functions whose frames are at
+   least this large probe for a stack guard page using this
+   stride. Zero when there is no guard page to defend (stack checks
+   enabled); the compiler then emits no probes. */
+#if !defined(STACK_CHECKS_ENABLED)
+#define Stack_guard_stride 4096
+#else
+#define Stack_guard_stride 0
+#endif
+
 /* Whether to offset Stack_high to preserve alignment. */
 #if defined(TARGET_amd64) && !defined(WITH_FRAME_POINTERS)
 #define Stack_padding_word 1
@@ -237,6 +245,10 @@ typedef uint64_t uintnat;
    the dead objects and the free list represent this percentage of the
    total size of live objects. */
 #define Percent_free_def 80
+
+/* The major GC adds an Idle phase when a cycle's sweeping work is
+   smaller than this. */
+#define Small_heap_limit_def 262144
 
 /* Default setting for the compacter: 500%
    (i.e. trigger the compacter when 5/6 of the heap is free or garbage).

@@ -7,11 +7,12 @@ module DLL = Doubly_linked_list
 
 let function_is_assumed_to_never_poll func =
   String.begins_with ~prefix:"caml_apply" func
+  || String.begins_with ~prefix:"caml_curry" func
   || String.begins_with ~prefix:"caml_send" func
+  || String.begins_with ~prefix:"caml_tuplify" func
 
 let is_disabled fun_name =
-  (not Config.poll_insertion)
-  || !Oxcaml_flags.disable_poll_insertion
+  !Oxcaml_flags.disable_poll_insertion
   || function_is_assumed_to_never_poll fun_name
 
 (* These are used for the poll error annotation later on*)
@@ -27,7 +28,8 @@ exception Error of error
 
 (* "Might_not_poll" means there exists a path from the function entry to a
    Potentially Recursive Tail Call (an Itailcall_ind or Itailcall_imm to a
-   forward function) that does not go through an Ialloc or Ipoll instruction.
+   forward function) that does not go through an Ialloc (heap allocation) or
+   Ipoll instruction.
 
    "Always_polls", therefore, means the function always polls (via Ialloc or
    Ipoll) before doing a PRTC. *)
@@ -114,15 +116,16 @@ let () =
     | _ -> None)
 
 (* Compututation of the "safe" map, which is a map from labels to booleans where
-   `true` indicates the block contains a safe point such as a poll or an alloc
-   instruction. *)
+   `true` indicates the block contains a safe point such as a poll or a heap
+   allocation instruction. (Local allocations do not call the GC, and are hence
+   not safe points.) *)
 
 (* CR-soon xclerc for xclerc: given how we use the safe map below, it is not
    clear taking into accounts terminator makes a difference; maybe matching over
    the terminator to always return `false` would be better. *)
 
 let is_safe_basic : Cfg.basic Cfg.instruction -> bool =
- fun instr -> Cfg.is_alloc instr || Cfg.is_poll instr
+ fun instr -> Cfg.is_heap_alloc instr || Cfg.is_poll instr
 
 let is_safe_terminator : Cfg.terminator Cfg.instruction -> bool =
  fun term ->
@@ -157,11 +160,11 @@ let safe_map_of_cfg : Cfg.t -> bool Label.Tbl.t =
 
    "Might_not_poll" means there exists a path from the function entry to a
    Potentially Recursive Tail Call (a Tailcall_self of Tailcall_func which is
-   either indirect or to a forward function) that does not go through an Alloc
-   or Poll instruction.
+   either indirect or to a forward function) that does not go through a heap
+   allocation or Poll instruction.
 
-   "Always_polls", therefore, means the function always polls (via Alloc or
-   Poll) before doing a PRTC. *)
+   "Always_polls", therefore, means the function always polls (via a heap
+   allocation or Poll) before doing a PRTC. *)
 
 module Polls_before_prtc_domain = struct
   type t = Polls_before_prtc.t
@@ -191,12 +194,16 @@ module Polls_before_prtc_transfer = struct
       if InstructionId.equal instr.id optimistic_prologue_poll_instr_id
       then Ok dom
       else Ok Always_polls
-    | Op (Alloc _) -> Ok Always_polls
+    | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> Ok Always_polls
+    | Op (Alloc { mode = Local; bytes = _; dbginfo = _ }) ->
+      (* A local allocation does not call the GC, and is hence not a polling
+         point. *)
+      Ok dom
     | Op
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
         | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Stackoffset _ | Load _
+        | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -364,10 +371,11 @@ let add_poll_or_alloc_basic :
     match op with
     | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
     | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-    | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
-    | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
-    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-    | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause ->
+    | Const_mask _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+    | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+    | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
+    | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+    | Pause ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)
@@ -467,8 +475,7 @@ let instrument_fundecl :
     let safe_map = safe_map_of_cfg cfg in
     (* CR-soon xclerc for xclerc: consider using `Cfg_with_infos` to cache the
        computations *)
-    let doms = Cfg_dominators.build cfg in
-    let back_edges = Cfg_loop_infos.compute_back_edges cfg doms in
+    let back_edges = Cfg_loop_infos.compute_back_edges cfg in
     let added_poll =
       instr_cfg_with_layout cfg_with_layout ~safe_map ~back_edges
     in
@@ -490,7 +497,7 @@ let instrument_fundecl :
       cfg.fun_contains_calls || added_poll || contains_polls cfg
     in
     let cfg = { cfg with fun_contains_calls = new_contains_calls } in
-    Cfg_with_layout.create cfg ~layout:(Cfg_with_layout.layout cfg_with_layout)
+    Cfg_with_layout.with_cfg cfg_with_layout cfg
 
 let requires_prologue_poll :
     future_funcnames:Misc.Stdlib.String.Set.t ->

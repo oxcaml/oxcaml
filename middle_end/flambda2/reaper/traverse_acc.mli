@@ -21,35 +21,72 @@ module Graph = Global_flow_graph
 (** Information about a continuation, including its parameters, arity, and
     whether it is an exception handler. This is used to register dependencies on
     the continuation at call sites. *)
-type continuation_info =
-  { is_exn_handler : bool;
-    params : Variable.t list;
-    arity : Flambda_kind.With_subkind.t list
-  }
+module Continuation_info : sig
+  type t =
+    { is_exn_handler : bool;
+      params : Variable.t list;
+      arity : Flambda_kind.With_subkind.t list
+    }
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
 
 (** Information about a function's code that is needed for building the
     dependency graph. Created by [prepare_code] during traversal and looked up
     when processing function bodies and call sites at the end of the traversal.
 *)
-type code_dep =
-  { arity : [`Complex] Flambda_arity.t;
-    params : Variable.t list;
-    my_closure : Variable.t;
-    return : Variable.t list;
-    exn : Variable.t;
-    is_tupled : bool;
-    known_arity_call_witness : Code_id_or_name.t;
-    unknown_arity_call_witnesses : Code_id_or_name.t list
-  }
+module Code_dep : sig
+  type t =
+    { code_metadata : Code_metadata.t;
+      params : Variable.t list;
+      my_closure : Variable.t;
+      return : Variable.t list;
+      exn : Variable.t;
+      known_arity_call_witness : Code_id_or_name.t;
+      unknown_arity_call_witnesses : Code_id_or_name.t list
+    }
 
-(** A record of a direct function application, to be resolved into graph edges
-    once all code has been traversed. *)
-type apply_dep =
-  { function_containing_apply_expr : Code_id.t option;
-    apply_code_id : Code_id.t;
-    apply_closure : Simple.t option;
-    apply_call_witness : Code_id_or_name.t
-  }
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
+
+module Delayed_deps : sig
+  type t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
+
+(** The function applications seen during traversal: for each callee, the size
+    of the largest (complex) arguments. *)
+module Applications : sig
+  (* CR-someday ncourant: the arguments and return relations are *not* separated
+     by kind, unlike block fields, which means that they can introduce aliases
+     between variables of different kinds... We might want to change that; it
+     would require changing the type here as well to retain, for each possible
+     position, the possible kinds. *)
+  type bounds =
+    { (* The maximum number of arguments in a known-arity call, if any. *)
+      known : int option;
+      (* For each complex argument, the maximum number of unarized variables in
+         an unknown-arity call. *)
+      unknown : int list option
+    }
+
+  type t = bounds Code_id_or_name.Map.t
+
+  val empty : t
+
+  val union : t -> t -> t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
 
 (** The type of traversal accumulators. *)
 type t
@@ -57,17 +94,11 @@ type t
 (** Create a fresh, empty accumulator. *)
 val create : unit -> t
 
-(** Record the kind of a name. *)
-val kind : t -> Name.t -> Flambda_kind.t -> unit
+(** Record an application, so that the queries that will be needed for
+    rebuilding can be precomputed. *)
+val record_apply_for_rebuild : t -> Flambda.Apply.t -> unit
 
-(** Record the kind of a bound parameter's variable. *)
-val bound_parameter_kind : t -> Bound_parameter.t -> unit
-
-(** Record the kind of [name] by inferring it from [simple]. *)
-val alias_kind : t -> Name.t -> Simple.t -> unit
-
-(** Return the map of all recorded kinds. *)
-val kinds : t -> Flambda_kind.t Name.Map.t
+val applications : t -> Applications.t
 
 (** Mark a continuation as having fixed arity (mostly function return
     continuations): the rebuild pass may not change its number of parameters. *)
@@ -87,22 +118,22 @@ val continuation_info :
   unit
 
 (** Return the map of all recorded continuation metadata. *)
-val get_continuation_info : t -> continuation_info Continuation.Map.t
+val get_continuation_info : t -> Continuation_info.t Continuation.Map.t
 
 (** Register a [code_dep] for a code id, recording the function's parameters,
     returns, and call witnesses in the accumulator. *)
-val add_code_dep : t -> Code_id.t -> code_dep -> unit
+val add_code_dep : t -> Code_id.t -> Code_dep.t -> unit
 
 (** Look up the [code_dep] for a code id. Returns [None] if the code id has not
     been registered (e.g. it belongs to another compilation unit). *)
-val find_code_dep : t -> Code_id.t -> code_dep option
+val find_code_dep : t -> Code_id.t -> Code_dep.t option
 
 (** Return the map of all registered code deps. *)
-val code_deps : t -> code_dep Code_id.Map.t
+val code_deps : t -> Code_dep.t Code_id.Map.t
 
-val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
+val add_code : t -> Code_id.t -> Rev_expr.Rev_code.t -> unit
 
-val get_all_code : t -> Rev_expr.rev_code Code_id.Map.t
+val get_all_code : t -> Rev_expr.Rev_code.t Code_id.Map.t
 
 (** Add a (directed) alias edge: [from] flows into [to_], meaning that every
     usage of [to_] is a usage of [from]; and every source of [from] is a source
@@ -132,15 +163,6 @@ val add_argument_dep :
 val add_parameter_dep :
   t -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
 
-(** Add a conditional propagation edge: if [if_used] is [any_usage] then add an
-    alias from [from] to [to_]. *)
-val add_propagate_dep :
-  t ->
-  if_used:Code_id_or_name.t ->
-  to_:Code_id_or_name.t ->
-  from:Code_id_or_name.t ->
-  unit
-
 (** Add a conditional alias edge: if [if_any_source] is marked as [any_source]
     then add an alias from [from] to [to_]. *)
 val add_alias_if_any_source_dep :
@@ -167,7 +189,7 @@ val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
 
 (** Convert a [Simple.t] to a dependency graph node. Constants map to the
     [all_constants] node; variables map to themselves; symbols from other
-    compilation units are marked [any_source]. *)
+    compilation units are recorded in the [delayed_deps]. *)
 val simple_to_node : t -> denv:Traverse_env.t -> Simple.t -> Code_id_or_name.t
 
 (** Mark a [Simple.t] as used, conditional on the current function (if any)
@@ -178,9 +200,15 @@ val add_cond_any_usage : t -> denv:Traverse_env.t -> Simple.t -> unit
     being used. At the top level, marks it unconditionally. *)
 val add_cond_any_source : t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
 
-(** Record a direct function application to be resolved later by [deps]. Only
-    used for applications to code ids in the current compilation unit. *)
-val add_apply : t -> apply_dep -> unit
+(** Record a direct function application to [apply_code_id] to be resolved later
+    by [resolve_delayed_deps]. *)
+val add_apply :
+  t ->
+  function_containing_apply_expr:Code_id.t option ->
+  apply_code_id:Code_id.t ->
+  apply_closure:Code_id_or_name.t option ->
+  apply_call_witness:Code_id_or_name.t ->
+  unit
 
 (** Create the call witness node for a known-arity function definition. The
     witness carries parameter, return, exception, and code-id edges
@@ -231,8 +259,8 @@ val make_unknown_arity_apply_widget :
   Code_id_or_name.t
 
 (** Record a dependency between a closure binding and its code id. This is
-    resolved later by [deps] to connect closures to their function code in the
-    graph. *)
+    resolved later by [resolve_delayed_deps] to connect closures to their
+    function code in the graph. *)
 val add_set_of_closures_dep :
   t ->
   Name.t ->
@@ -241,9 +269,22 @@ val add_set_of_closures_dep :
   defined_in_code_id:Code_id.t option ->
   unit
 
-(** Finalize the graph by resolving all deferred apply and set-of-closures
-    dependencies, and return the completed dependency graph. *)
-val deps : t -> all_constants:Name.t -> Graph.graph
+(** Return the dependency graph, without the [delayed_deps]. *)
+val deps : t -> Graph.graph
+
+(** Return the dependencies recorded by [add_apply] and
+    [add_set_of_closures_dep], and the symbols from other compilation units
+    recorded by [simple_to_node]. *)
+val delayed_deps : t -> Delayed_deps.t
+
+(** Resolve all deferred dependencies into the graph. Imported symbols from
+    compilation units outside [analysis_scope] are marked [any_source]. *)
+val resolve_delayed_deps :
+  Graph.graph ->
+  analysis_scope:Analysis_scope.t ->
+  code_deps:Code_dep.t Code_id.Map.t ->
+  Delayed_deps.t ->
+  unit
 
 val sort_code_ids : t -> Code_id.t array
 

@@ -35,12 +35,6 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
-# TODO: Remove this check
-AC_ARG_ENABLE([runtime5], [],
-  [AS_IF([test "x$enableval" != 'xyes'],
-    [AC_MSG_ERROR(m4_normalize([OxCaml 5.4 does not support runtime4 and must be
-                               configured with --enable-runtime5]))])], [])
-
 # Optionally pin to a specific opam switch for reproducible builds
 AC_PATH_PROG([opam], [opam], [])
 
@@ -302,7 +296,6 @@ AC_SUBST([CMXS_MAGIC_NUMBER], [CMXS__MAGIC_NUMBER])
 AC_SUBST([CMT_MAGIC_NUMBER], [CMT__MAGIC_NUMBER])
 AC_SUBST([CMS_MAGIC_NUMBER], [CMS__MAGIC_NUMBER])
 AC_SUBST([CMJ_MAGIC_NUMBER], [CMJ__MAGIC_NUMBER])
-AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER])
 AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER])
 AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
@@ -394,6 +387,7 @@ AC_SUBST([optional_libraries])
 AC_SUBST([optional_bytecode_tools])
 AC_SUBST([optional_native_tools])
 AC_SUBST([ocamltest_CPP])
+AC_SUBST([ocamltest_CXX])
 AC_SUBST([ocamltest_libunix])
 AC_SUBST([unix_library])
 AC_SUBST([unix_directory])
@@ -417,6 +411,7 @@ AC_SUBST([ASPP])
 AC_SUBST([endianness])
 AC_SUBST([AS])
 AC_SUBST([asm_cfi_supported])
+AC_SUBST([asm_file0_supported])
 AC_SUBST([as_compress_debug_sections_flag])
 AC_SUBST([cc_compress_debug_sections_flag])
 AC_SUBST([objcopy_compress_debug_sections_flag])
@@ -471,6 +466,8 @@ AC_SUBST([TARGET_LIBDIR])
 AC_SUBST([QS])
 AC_SUBST([ar_supports_response_files])
 AC_SUBST([target_bindir])
+AC_SUBST([cc_extra_warnings])
+AC_SUBST([cxx_extra_warnings])
 
 ## Generated files
 
@@ -495,6 +492,7 @@ AC_CONFIG_FILES([otherlibs/stdlib_alpha/META])
 AC_CONFIG_FILES([otherlibs/dynlink/META])
 AC_CONFIG_FILES([otherlibs/runtime_events/META])
 AC_CONFIG_FILES([otherlibs/eval/META])
+AC_CONFIG_FILES([external/ocaml-jit/lib/META])
 AC_CONFIG_FILES([stdlib/META])
 
 # Definitions related to the version of OCaml
@@ -636,8 +634,10 @@ AC_ARG_VAR([DLLIBS],
 AC_ARG_ENABLE([instrumented-runtime],
   [AS_HELP_STRING([--enable-instrumented-runtime],
     [build the instrumented runtime @<:@default=auto@:>@])],
-  [],
-  [enable_instrumented_runtime=auto])
+  [AS_IF([test "x$enableval" != 'xno'],
+    [AC_MSG_ERROR(m4_normalize([The instrumented runtime is not supported by
+      OxCaml]))])],
+  [enable_instrumented_runtime=no])
 
 AC_ARG_ENABLE([vmthreads], [],
   [AS_IF([test "x$enableval" != 'xno'],
@@ -1201,17 +1201,25 @@ AS_IF(
 AS_CASE([$ocaml_cc_vendor],
   [xlc-*],
     [warn_error_flag=''
+    cc_extra_warnings=''
+    cxx_extra_warnings=''
     cc_warnings='-qflag=i:i'], # all warnings enabled
   [sunc-*],
-    [cc_warnings=""],
+    [cc_extra_warnings=''
+     cxx_extra_warnings=''
+     cc_warnings=''],
   [msvc-*],
     [AS_CASE([$ocaml_cc_vendor],
       [msvc-*-clang-*],
         [cc_warnings='-W4 -Wno-unused-parameter -Wno-sign-compare -Wundef'
          warn_error_flag='-WX'],
       [cc_warnings='-W2'
-       warn_error_flag='-WX -options:strict'])],
+       cc_extra_warnings='-permissive-'
+       warn_error_flag='-WX -options:strict'
+       cxx_extra_warnings="$cc_extra_warnings $warn_error_flag"])],
   [warn_error_flag='-Werror'
+  cc_extra_warnings='-Wextra -Wpedantic -pedantic -std=c11'
+  cxx_extra_warnings='-Werror -Wextra -Wpedantic -pedantic'
   cc_warnings="-Wall -Wno-pragmas -Wint-conversion -Wstrict-prototypes \
 -Wold-style-definition -Wundef"])
 
@@ -1233,7 +1241,9 @@ for flag in '-Wimplicit-fallthrough=5' '-Wimplicit-fallthrough'; do
 done
 
 AS_CASE([$enable_warn_error],
-  [no], [],
+  [no],
+    [cc_extra_warnings=''
+    cxx_extra_warnings=''],
   [*],
     [cc_warnings="$cc_warnings $warn_error_flag"])
 
@@ -1954,13 +1964,12 @@ AS_CASE([$arch],
     [arch_specific_SOURCES='$(intel_SOURCES)'],
   [arch_specific_SOURCES=''])
 
-# Disabling of stack checks is only supported on amd64.
 AS_IF([test x"$enable_stack_checks" = xyes],
   [AC_DEFINE([STACK_CHECKS_ENABLED])],
-  [AS_IF([test x"$arch" != xamd64],
+  [AS_CASE([$arch],
+    [amd64|arm64], [],
     [enable_stack_checks=yes
-     AC_DEFINE([STACK_CHECKS_ENABLED])],
-    [])])
+     AC_DEFINE([STACK_CHECKS_ENABLED])])])
 
 native_cflags=''
 oc_native_cflags=''
@@ -3053,6 +3062,7 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
 ## Does the assembler support debug prefix map and CFI directives
 as_debug_prefix_map_flag=""
 asm_cfi_supported=false
+asm_file0_supported=false
 as_compress_debug_sections_flag=""
 cc_compress_debug_sections_flag=""
 objcopy_compress_debug_sections_flag=""
@@ -3061,6 +3071,7 @@ AS_IF([$native_compiler],
     [*-w64-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
     OCAML_AS_HAS_CFI_DIRECTIVES
+    OCAML_AS_HAS_FILE_ZERO_DIRECTIVE
     OCAML_AS_COMPRESSION_SUPPORT
     OCAML_CC_COMPRESSION_SUPPORT
     OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
@@ -3180,7 +3191,8 @@ AS_CASE([$enable_ocamltest,OCAML__DEVELOPMENT_VERSION],
     ocamltest_opt_target=ocamltest.opt
     ocamltest='ocamltest'
     testsuite_tools='testsuite/tools/codegen testsuite/tools/expect'
-    optional_bytecode_tools="$optional_bytecode_tools $testsuite_tools"],
+    optional_bytecode_tools="$optional_bytecode_tools $testsuite_tools"
+    OCAML_CXX_COMPILE_STDCXX_11],
   [build_ocamltest=false
   ocamltest=''])
 
@@ -3363,6 +3375,18 @@ int main(void) {
   }
 }
 ]])], AC_DEFINE([HAS_PCLMUL]) has_pclmul=yes, [])
+
+AC_SUBST([has_aes])
+AC_RUN_IFELSE([AC_LANG_SOURCE([[
+int main(void) {
+  __builtin_cpu_init ();
+  if (__builtin_cpu_supports("aes")) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+]])], AC_DEFINE([HAS_AES]) has_aes=yes, [])
 
 AC_SUBST([has_sse3])
 AC_RUN_IFELSE([AC_LANG_SOURCE([[

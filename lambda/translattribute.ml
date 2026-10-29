@@ -131,6 +131,7 @@ let parse_inlined_attribute attr : inlined_attribute =
           "never", Never_inlined;
           "always", Always_inlined;
           "hint", Hint_inlined;
+          "forward", Forward_inlined;
         ]
         payload
 
@@ -308,15 +309,17 @@ let check_opaque_local loc attr =
       ()
 
 
-let lfunction_with_attr ~attr
+let lfunction'_with_attr ~attr
   { kind; params; return; body; attr=_; loc; mode; ret_mode } =
-  lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+  lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+
+let lfunction_with_attr ~attr funct =
+  Lfunction (lfunction'_with_attr ~attr funct)
 
 let add_inline_attribute expr loc attributes =
-  match expr with
-  | Lfunction({ attr = { stub = false } as attr } as funct) ->
-    begin match get_inline_attribute attributes with
-      | Default_inline -> expr
+  let add_inline_attribute funct attr =
+    match get_inline_attribute attributes with
+      | Default_inline -> funct
       | (Always_inline | Available_inline | Never_inline | Unroll _)
           as inline ->
         begin match attr.inline with
@@ -328,8 +331,14 @@ let add_inline_attribute expr loc attributes =
         let attr = { attr with inline } in
         check_local_inline loc attr;
         check_poll_inline loc attr;
-        lfunction_with_attr ~attr funct
-    end
+        lfunction'_with_attr ~attr funct
+  in
+  match expr with
+  | Lfunction({ attr = { stub = false } as attr } as funct) ->
+    Lfunction(add_inline_attribute funct attr)
+  | Ltemplate
+      {tmpl_func = ({ attr = { stub = false } as attr } as funct); tmpl_env } ->
+    Ltemplate{ tmpl_func = add_inline_attribute funct attr; tmpl_env }
   | _ -> expr
 
 let add_specialise_attribute expr loc attributes =
@@ -527,10 +536,34 @@ let add_unbox_return_attribute expr loc attributes =
       begin match attr with
       | None -> expr
       | Some _ ->
-          if funct.attr.unbox_return then
+          (* CR-soon : when setting the unbox_return attribute, we must
+          choose an allocation locality for the allocation that it might
+          introduce (which was not originally there).
+
+          For example, the following function must project out elements
+          from the tuple to construct an unboxed tuple:
+            let id (x : _ * _) = x
+            [@@unboxed]
+
+          Currently, we choose this based on the mode of the return
+          [funct.ret_mode], where [Not_alloc_stack] -> [Alloc_heap] and
+          [Maybe_alloc_stack] -> [Alloc_stack]
+
+          However, this is currently only sound because modes are fully
+          determined, and [Maybe_alloc_stack] is derived from a [local]
+          return mode. However, if we introduce mode variables (e.g. for
+          mode polymorphism), we might have situations where
+          [Maybe_alloc_stack] is derived from a [global -- local] return
+          mode variable, where it is no longer sound to choose
+          [Alloc_stack] (nor is it safe to choose [Alloc_heap]).
+
+          *)
+          let return_mode = funct.ret_mode in
+          let locality_mode = return_mode_to_locality_mode return_mode in
+          if Option.is_some funct.attr.unbox_return then
             Location.prerr_warning loc
               (Warnings.Duplicated_attribute "unboxable");
-          let attr = { funct.attr with unbox_return = true } in
+          let attr = { funct.attr with unbox_return = Some locality_mode } in
           lfunction_with_attr ~attr funct
       end
   | _ -> expr
@@ -550,7 +583,8 @@ let get_inlined_attribute_on_module e =
       | Tmod_constraint (me, _, _, _) ->
         let inner_attr = get me in
         begin match attr with
-        | Always_inlined | Hint_inlined | Never_inlined | Unroll _ -> attr
+        | Always_inlined | Hint_inlined | Forward_inlined | Never_inlined
+        | Unroll _ -> attr
         | Default_inlined -> inner_attr
         end
       | _ -> attr

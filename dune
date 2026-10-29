@@ -12,8 +12,6 @@
 ;*                                                                        *
 ;**************************************************************************
 
-(vendored_dirs external)
-
 ; set warning as error in release profile
 
 (env
@@ -64,6 +62,8 @@
 (copy_files# tools/simdgen/*.ml{,i})
 
 (copy_files# backend/cfg/*.ml{,i})
+
+(copy_files# backend/ssa/*.ml{,i})
 
 (copy_files# backend/debug/*.ml{,i})
 
@@ -133,32 +133,21 @@
       (echo "module MenhirLib = CamlinternalMenhirLib")
       (run cat %{input-file})))
     parser)))
- (library_flags -linkall)
- (libraries flambda2_floats)
- (modules_without_implementation
-  annot
-  value_rec_types
-  cmo_format
-  cmj_format
-  outcometree
-  parsetree
-  debug_event
-  solver_intf
-  mode_hint
-  mode_intf)
+ (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  json
   arrayset
   config
   build_path_prefix_map
   misc
+  hash_consed
   identifiable
   numbers
   arg_helper
   clflags
   debug
   profile
-  profile_counters_functions
   priority_queue
   terminfo
   ccomp
@@ -176,19 +165,24 @@
   compilation_unit
   import_info
   linkage_name
+  opt_fuel
+  runtimetags
+  structured_mangling
   symbol
   lazy_backtrack
+  with_backtracking_intf
+  with_backtracking
   diffing
   diffing_with_keys
-  unit_info
   linkdeps
   language_extension_kernel
-  language_extension
   zero_alloc_utils
   zero_alloc_annotations
   doubly_linked_list
   file_sections
   lru
+  id_counter
+  likelihood
   ;; PARSING
   location
   longident
@@ -207,10 +201,54 @@
   builtin_attributes
   ast_invariants
   depend
-  parser_types ; manual update: mli only files asttypes parsetree
-  ;; TYPING
+  parser_types
+  unit_info
+  language_extension
+  asttypes
+  parsetree ; mli only file
+  ;; DRIVER
+  pparse
+  compenv
+  makedepend
+  ;; TYPING (these depend only on utils/, so live here to let
+  ;; compilation_unit and symbol reference them)
   ident
+  global_module))
+
+(library
+ (name ocamlfrontend)
+ (wrapped false)
+ (flags
+  (:standard
+   -strict-sequence
+   -bin-annot
+   -safe-string
+   -strict-formats
+   -w
+   -47
+   ; -47 needed because [@inline available] is not recognized by the system compiler
+   ))
+ (ocamlopt_flags
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+ (library_flags -linkall)
+ (libraries flambda2_floats ocamlcommon)
+ (modules_without_implementation
+  annot
+  value_rec_types
+  cmo_format
+  outcometree
+  debug_event
+  solver_intf
+  mode_hint
+  mode_intf)
+ (modules
+  ;; UTILS
+  ;; profile_counters_functions stays here (rather than moving to
+  ;; ocamlcommon with the rest of utils/) because it depends on typing/
+  profile_counters_functions
+  ;; TYPING
   path
+  current_unit
   jkind
   scalar
   primitive
@@ -223,7 +261,6 @@
   subst
   predef
   datarepr
-  global_module
   cmi_format
   vicuna_traverse_typed_tree
   vicuna_value_shapes
@@ -267,6 +304,8 @@
   typedecl
   typeopt
   value_rec_check
+  typing_recovery_state
+  typing_recovery
   typecore
   solver_intf
   solver
@@ -287,6 +326,7 @@
   outcometree
   allowance
   ;; lambda/
+  branch_annotations
   debuginfo
   lambda
   static_label
@@ -295,8 +335,6 @@
   mixed_product_bytes
   printlambda
   runtimedef
-  runtimetags
-  structured_mangling
   tmc
   simplif
   slambda_fracture
@@ -316,6 +354,7 @@
   translobj
   translprim
   translquote
+  translrepr
   ;; bytecomp/
   debug_event
   meta
@@ -324,48 +363,17 @@
   dll
   symtable
   ;; some of COMP
-  pparse
   main_args
-  compenv
   compmisc
-  opt_fuel
-  makedepend
   compile_common
   instantiator
+  functorizer
   ; manual update: mli only files
   annot
   value_rec_types
-  asttypes
   cmo_format
-  cmj_format
   outcometree
-  parsetree
-  debug_event
-  ; See note below about camlinternalQuote
-  (:include
-   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
-
-; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
-; we need to compile it as an additional target, but only for the first
-; stage build.  See also duneconf/dune.
-
-(rule
- (targets camlinternalQuote.ml)
- (enabled_if
-  (= %{context_name} "default"))
- (action
-  (copy#
-   %{project_root}/stdlib/camlinternalQuote.ml
-   %{project_root}/camlinternalQuote.ml)))
-
-(rule
- (targets camlinternalQuote.mli)
- (enabled_if
-  (= %{context_name} "default"))
- (action
-  (copy#
-   %{project_root}/stdlib/camlinternalQuote.mli
-   %{project_root}/camlinternalQuote.mli)))
+  debug_event))
 
 (library
  (name ocamlbytecomp)
@@ -374,7 +382,7 @@
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (libraries ocamlcommon)
+ (libraries ocamlfrontend)
  (modules
   ;; bytecomp/
   blambda
@@ -382,6 +390,8 @@
   blambda_of_lambda
   bytegen
   byteinstantiator
+  bytefunctorizer
+  cmo_io
   bytelibrarian
   bytelink
   bytepackager
@@ -398,7 +408,7 @@
  (modes byte)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamlbytecomp ocamlcommon)
+ (libraries ocamlbytecomp ocamlfrontend)
  (modules main))
 
 (executable
@@ -406,26 +416,8 @@
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamlbytecomp ocamlcommon)
+ (libraries ocamlbytecomp ocamlfrontend)
  (modules main_native))
-
-(library
- (name ocamljcomp)
- (wrapped false)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (libraries ocamlcommon flambda2)
- (modules jsmaindriver jscompile jslibrarian))
-
-(executable
- (name boot_ocamlj)
- (modes native)
- (flags
-  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlcommon flambda2)
- (modules boot_ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
@@ -464,11 +456,22 @@
 (rule
  (targets ocamlopt_flags.sexp)
  (enabled_if
-  (or
-   (= %{context_name} "main")
-   (= %{context_name} "runtime_stdlib")))
+   (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; Write empty files in an unconfigured tree
+(rule
+ (target Makefile.config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
+
+(rule
+ (target Makefile.build_config)
+ (mode fallback)
+ (action
+  (write-file %{target} "")))
 
 (install
  (files ocamlyacc)
@@ -492,12 +495,6 @@
  (section bin)
  (package ocaml))
 
-(install
- (files
-  (boot_ocamlj.exe as ocamlj.opt))
- (section bin)
- (package ocaml))
-
 ; For the moment we don't install optmain.{cmo,cmx,o} and opttopstart.{cmx,o}.
 ; When built with Dune, these have the "dune exe" module prefixes, so won't
 ; be named as a client would expect.  There should also be a patch upstream
@@ -508,19 +505,14 @@
 (install
  (files
   (ocamlbytecomp.a as compiler-libs/ocamlbytecomp.a)
+  (ocamlfrontend.a as compiler-libs/ocamlfrontend.a)
   (ocamlcommon.a as compiler-libs/ocamlcommon.a)
   (ocamlbytecomp.cmxa as compiler-libs/ocamlbytecomp.cmxa)
+  (ocamlfrontend.cmxa as compiler-libs/ocamlfrontend.cmxa)
   (ocamlcommon.cmxa as compiler-libs/ocamlcommon.cmxa)
   (ocamlbytecomp.cma as compiler-libs/ocamlbytecomp.cma)
+  (ocamlfrontend.cma as compiler-libs/ocamlfrontend.cma)
   (ocamlcommon.cma as compiler-libs/ocamlcommon.cma))
- (section lib)
- (package ocaml))
-
-(install
- (files
-  Makefile.build_config
-  Makefile.config_if_required
-  Makefile.config)
  (section lib)
  (package ocaml))
 
@@ -531,7 +523,12 @@
  ; We should change the code so this "-open" can be removed.
  ; Likewise fix occurrences of warnings 9, 27, 32, 33, 34, 37, 39, and 60.
  (flags
-  (:standard -w -27-32-33-34-37-39-60-69-70))
+  (:standard
+   -strict-sequence
+   -bin-annot
+   -safe-string
+   -strict-formats
+   -w -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation
@@ -549,6 +546,7 @@
   ;; middle_end/
   backend_var
   compilenv
+  is_parameter
   ;; asmcomp/
   asmgen
   binary_emitter_verify
@@ -571,6 +569,7 @@
   partial_link
   partition
   partition_object_files
+  relocatable_symbol_name
   rewrite_sections
   ;; backend/
   afl_instrument
@@ -643,6 +642,8 @@
   cfg
   cfg_available_regs
   cfg_colours
+  cfg_compare
+  cfg_copy_propagation
   cfg_edge
   cfg_intf
   cfg_quick_hash
@@ -654,16 +655,22 @@
   cfg_dataflow
   cfg_deadcode
   cfg_liveness
+  cfg_validation_facts
+  cfg_liveness_validate
   cfg_dominators
+  cfg_dominators_validate
   cfg_loop_infos
   cfg_to_linear_desc
   cfg_cse
   cfg_cse_target_intf
+  cfg_reachability_validate
   cfg_stack_checks
   cfg_polling
   cfg_simplify
+  cfg_z3
   cfg_prologue
   cfg_merge_blocks
+  cfg_block_layout
   extra_debug
   label
   printcfg
@@ -698,14 +705,22 @@
   regalloc_utils
   regalloc_validate
   ;; file_formats/
+  ir_config_fingerprint
   linear_format
   cfg_format
+  ;; backend/ssa/
+  ssa
+  ssa_print
+  ssa_reducer
+  ssa_simplify
+  ssa_tail_call
+  ssa_of_cmm
+  cfg_of_ssa
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
   compute_ranges_intf
   inlined_frame_ranges
-  is_parameter
   reg_availability_set
   reg_with_debug_info
   stack_reg_offset
@@ -714,6 +729,7 @@
   ;; build it as part of that library.
   dwarf
   dwarf_abstract_instances
+  dwarf_base_address_selection
   dwarf_compilation_unit
   dwarf_concrete_instances
   dwarf_inlined_frames
@@ -725,6 +741,7 @@
   complex_shape
   dwarf_type
   ;; optcomp/
+  jscomp
   linkenv
   optcompile
   optlibrarian
@@ -742,10 +759,12 @@
   ; be tricky because it has a different name...
   )
  (libraries
-  ocamlcommon
+  ocamlfrontend
   oxcaml_common
   flambda2_identifiers
   flambda2_cmx
+  flambda2_datalog
+  jsoo_imports
   compiler_owee
   gc_timings
   arm64_ast
@@ -757,7 +776,7 @@
  (name oxcaml_common)
  (wrapped false)
  (modes byte native)
- ; same flags as for ocamlcommon library
+ ; same flags as for ocamlfrontend library
  (flags
   (:standard
    -strict-sequence
@@ -773,7 +792,7 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   dwarf_flags
   asm_targets
   arm64_ast
@@ -792,7 +811,7 @@
   flambda2_to_cmm
   gc_timings
   ocamloptcomp
-  ocamlcommon
+  ocamlfrontend
   unix)
  (modules oxcaml_main))
 
@@ -815,7 +834,7 @@
   flambda2_to_cmm
   gc_timings
   ocamloptcomp
-  ocamlcommon
+  ocamlfrontend
   unix)
  (modules oxcaml_main_native))
 
@@ -835,7 +854,7 @@
   flambda2_ui
   flambda2_to_cmm
   ocamloptcomp
-  ocamlcommon)
+  ocamlfrontend)
  (modules boot_ocamlopt))
 
 ; The input archives (.a, .cma and .cmxa) to the following three rules
@@ -878,8 +897,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.a}
    %{dep:external/owee/compiler_owee.a}
    %{dep:external/gc-timings/gc_timings.a}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.a}
    %{dep:ocamloptcomp.a}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.a}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.a}
    %{dep:middle_end/flambda2/flambda2.a})))
 
 (rule
@@ -919,8 +940,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.cma}
    %{dep:external/owee/compiler_owee.cma}
    %{dep:external/gc-timings/gc_timings.cma}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cma}
    %{dep:ocamloptcomp.cma}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cma}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cma}
    %{dep:middle_end/flambda2/flambda2.cma})))
 
 (rule
@@ -960,8 +983,10 @@
    %{dep:middle_end/flambda2/parser/flambda2_parser.cmxa}
    %{dep:external/owee/compiler_owee.cmxa}
    %{dep:external/gc-timings/gc_timings.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/jsoo_imports/jsoo_imports.cmxa}
    %{dep:ocamloptcomp.cmxa}
    %{dep:middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa}
+   %{dep:middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa}
    %{dep:middle_end/flambda2/flambda2.cmxa})))
 
 (install
@@ -998,12 +1023,62 @@
   (middle_end/flambda2/algorithms/libflambda2_algorithms_stubs.a
    as
    compiler-libs/libflambda2_algorithms_stubs_native.a)
+  (middle_end/flambda2/to_jsir/jsoo_imports/libjsoo_imports_stubs.a
+   as
+   compiler-libs/libjsoo_imports_stubs.a)
+  (middle_end/flambda2/to_jsir/jsoo_imports/libjsoo_imports_stubs.a
+   as
+   compiler-libs/libjsoo_imports_stubs_native.a)
   ; for special_dune compat
   (ocamloptcomp_with_flambda2.cma as compiler-libs/ocamloptcomp.cma)
   (ocamloptcomp_with_flambda2.cmxa as compiler-libs/ocamloptcomp.cmxa)
   (ocamloptcomp_with_flambda2.a as compiler-libs/ocamloptcomp.a))
  (section lib)
  (package ocaml))
+
+; Build all the files that Merlin needs to work on the compiler. Building @check
+; for the entire repo will build too much, as we don't want to build directories
+; like stdlib/ or the tests. Also, aliases like `@typing/check` are empty in our
+; build rules, which is why we glob on cmi, cmt, and cmti files.
+(alias
+ (name merlin-support)
+ (deps
+  (glob_files .ocamlcommon.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .oxcaml_common.objs/byte/*.{cmi,cmt,cmti})
+  (alias_rec middle_end/check)
+  (alias_rec backend/check)
+  (alias_rec driver/check)
+  (alias_rec file_formats/check)
+  (alias_rec lex/check)
+  (alias_rec printer/check)
+  (alias_rec chamelon/check)
+  (alias_rec extract_externals/check)
+  (alias_rec ocamltest/check)))
+
+; Index files for Merlin's project-wide occurrences (find-all-references) in
+; the same code as merlin-support. The root ocaml-index alias would also pull in
+; code that doesn't build in this workspace, so list the root libraries'
+; indexes explicitly.
+(alias
+ (name merlin-index)
+ (deps
+  .ocamlcommon.objs/cctx.ocaml-index
+  .ocamlfrontend.objs/cctx.ocaml-index
+  .ocamlbytecomp.objs/cctx.ocaml-index
+  .ocamloptcomp.objs/cctx.ocaml-index
+  .oxcaml_common.objs/cctx.ocaml-index
+  (alias_rec middle_end/ocaml-index)
+  (alias_rec backend/ocaml-index)
+  (alias_rec driver/ocaml-index)
+  (alias_rec file_formats/ocaml-index)
+  (alias_rec lex/ocaml-index)
+  (alias_rec printer/ocaml-index)
+  (alias_rec chamelon/ocaml-index)
+  (alias_rec extract_externals/ocaml-index)
+  (alias_rec ocamltest/ocaml-index)))
 
 (rule
  (targets compiler-libs-installation.sexp)
@@ -1014,6 +1089,8 @@
   (glob_files *.mli)
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/native/*.cmx)
+  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files .ocamlfrontend.objs/native/*.cmx)
   (glob_files .ocamlcommon.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamlcommon.objs/native/*.cmx)
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmo,cmt,cmti})
@@ -1035,6 +1112,11 @@
   (glob_files middle_end/flambda2/.flambda2objs/byte/flambda2.{cmi,cmt})
   (glob_files
    middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/byte/flambda2_to_cmm{,__To_cmm}.{cmi,cmt})
+  ; ocamloptcomp's interface mentions the js_of_ocaml IR (Optcomp_intf).
+  (glob_files
+   middle_end/flambda2/to_jsir/jsoo_imports/.jsoo_imports.objs/byte/*.{cmi,cmo,cmt,cmti})
+  (glob_files
+   middle_end/flambda2/to_jsir/jsoo_imports/.jsoo_imports.objs/native/*.cmx)
   (glob_files
    .oxcaml_common.objs/byte/oxcaml_{args,flags}.{cmi,cmo,cmt,cmti})
   (glob_files .oxcaml_common.objs/native/oxcaml_{args,flags}.cmx)
@@ -1066,12 +1148,12 @@
   (include compiler-libs-installation.sexp)))
 
 ; This is entirely redundant, but without it, each target in these libraries
-; and their dependencies waits until ocamlcommon is built, including those
+; and their dependencies waits until ocamlfrontend is built, including those
 ; targets that don't actually depend on it. This produces severe bottlenecking,
 ; costing about 15 seconds when building in dev mode. It's not immediately clear
 ; why Dune fails to parallelise here. Going by the progress indicator, my best
 ; guess is that targets in subdirectories aren't even discovered until
-; ocamlcommon is built, unless something in the subdirectory is explicitly made
+; ocamlfrontend is built, unless something in the subdirectory is explicitly made
 ; a dependency.
 
 (alias

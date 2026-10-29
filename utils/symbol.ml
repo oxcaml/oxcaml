@@ -49,7 +49,7 @@ let caml_symbol_prefix = "caml"
 
 (* NB OCaml 5.4 uses [.] as a separator only on Linux and uses $ on other
       systems. The mangling convention in OxCaml has not yet been changed
-      to match.4 merge. *)
+      to match *)
 let upstream_symbol_separator =
   match Config.ccomp_type with
   | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
@@ -115,26 +115,12 @@ let for_structured_mangling_path ~compilation_unit ~path ~suffix =
     linkage_name;
     hash = Hashtbl.hash linkage_name; }
 
-let for_local_ident id =
-  assert (not (Ident.is_global_or_predef id));
-  let compilation_unit = CU.get_current_exn () in
-  for_name compilation_unit (Ident.unique_name id)
-
 let for_compilation_unit compilation_unit =
   let linkage_name = linkage_name_for_compilation_unit compilation_unit in
   { compilation_unit;
     linkage_name;
     hash = Hashtbl.hash linkage_name;
   }
-
-let for_current_unit () =
-  for_compilation_unit (CU.get_current_exn ())
-
-let const_label = ref 0
-
-let for_new_const_in_current_unit () =
-  incr const_label;
-  for_name (Compilation_unit.get_current_exn ()) (Int.to_string !const_label)
 
 let is_predef_exn t =
   CU.equal t.compilation_unit CU.predef_exn

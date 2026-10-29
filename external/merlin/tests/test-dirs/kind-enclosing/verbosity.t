@@ -13,7 +13,7 @@
   > type t = int
   > EOF
   Verbosity 0: immediate
-  Verbosity 1: value non_pointer mod global many stateless immutable external_
+  Verbosity 1: value non_pointer mod global many stateless immutable
   Verbosity 2: value non_pointer non_null
     mod global
         many
@@ -76,8 +76,8 @@
         unforkable
         yielding
         once
-        stateful
         unique
+        stateful
         read_write
         uncontended
         static
@@ -88,8 +88,8 @@
         unforkable
         yielding
         once
-        stateful
         unique
+        stateful
         read_write
         uncontended
         static

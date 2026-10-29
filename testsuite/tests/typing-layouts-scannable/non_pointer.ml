@@ -331,15 +331,15 @@ let f (type a : float64 maybe_separable) (x : a) =
   let g (x : (_ : float64 non_pointer)) = () in
   g x
 [%%expect{|
-Line 1, characters 16-39:
+Line 1, characters 24-39:
 1 | let f (type a : float64 maybe_separable) (x : a) =
-                    ^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "maybe_separable" have no effect on the kind "float64".
+                            ^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "maybe_separable" has no effect on the kind "float64".
 
-Line 2, characters 18-37:
+Line 2, characters 26-37:
 2 |   let g (x : (_ : float64 non_pointer)) = () in
-                      ^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "float64".
+                              ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_pointer" has no effect on the kind "float64".
 
 val f : ('a : float64). 'a -> unit = <fun>
 |}]
@@ -460,7 +460,7 @@ end = struct
   type t = #(int or_null * float#)
 end
 [%%expect{|
-module M : sig type t : value_or_null non_pointer mod external_ & float64 end
+module M : sig type t : value_or_null non_pointer & float64 end
 |}]
 
 (* modules and module inclusion *)
@@ -720,9 +720,9 @@ module M : sig
   type t
   (* Because [t := int] only via the substitution below, the compiler doesn't
      realize that [t] is [non_pointer] when computing the type declaration *)
-  type r = { t : t; i : int64# }
+  type r = { t : t; i : int64_u }
 end with type t := int = struct
-  type r = { t : int ; i : int64# }
+  type r = { t : int ; i : int64_u }
 end
 
 (* Then, for this check, the new record declaration technically has a more
@@ -733,8 +733,8 @@ end
    test with a "CR layouts-scannable" in
    testsuite/tests/typing-layouts-caml-modify/non_pointer.ml
 *)
-type r = M.r = { t : int ; i : int64# }
+type r = M.r = { t : int ; i : int64_u }
 [%%expect{|
-module M : sig type r = { t : int; i : int64#; } end
-type r = M.r = { t : int; i : int64#; }
+module M : sig type r = { t : int; i : int64_u; } end
+type r = M.r = { t : int; i : int64_u; }
 |}]

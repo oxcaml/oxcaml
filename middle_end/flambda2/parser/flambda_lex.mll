@@ -73,8 +73,8 @@ let keyword_table =
     "int64", KWD_INT64;
     "invalid", KWD_INVALID;
     "let", KWD_LET;
-    "local", KWD_LOCAL;
     "loopify", KWD_LOOPIFY;
+    "mask", KWD_MASK;
     "mutable", KWD_MUTABLE;
     "nativeint", KWD_NATIVEINT;
     "never", KWD_NEVER;
@@ -94,6 +94,7 @@ let keyword_table =
     "reraise", KWD_RERAISE;
     "set_of_closures", KWD_SET_OF_CLOSURES;
     "size", KWD_SIZE;
+    "stack", KWD_STACK;
     "succ", KWD_SUCC;
     "stub", KWD_STUB;
     "switch", KWD_SWITCH;

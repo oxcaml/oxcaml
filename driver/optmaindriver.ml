@@ -20,8 +20,8 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
-  native_code := true;
+let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
+  Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
@@ -60,7 +60,7 @@ let main unix argv ppf ~flambda2 =
         (use 'ocamlopt -depend -help' for details)"];
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
-    Compmisc.read_clflags_from_env ();
+    Location.read_clflags_from_env ();
     (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
        enabled *)
     if Config.oxcaml_dwarf &&
@@ -68,7 +68,7 @@ let main unix argv ppf ~flambda2 =
        Target_system.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
-    if !Clflags.debug && !Clflags.native_code then
+    if !Clflags.debug && Clflags.target_is_native () then
       Clflags.dwarf_c_toolchain_flag :=
         Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
@@ -83,7 +83,15 @@ let main unix argv ppf ~flambda2 =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      if Clflags.target_is_jsir () then begin
+        if !output_c_object then
+          Compenv.fatal
+            "-output-obj is not supported when targeting js_of_ocaml";
+        if !make_package then
+          Compenv.fatal "-pack is not supported when targeting js_of_ocaml";
+        Jscomp.make ~lambda_to_jsir:Flambda2.lambda_to_jsir
+      end
+      else Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -103,6 +111,7 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
+                      functorize;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -110,7 +119,7 @@ let main unix argv ppf ~flambda2 =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate";
+                         -output-obj, -instantiate, -functorize";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -154,6 +163,16 @@ let main unix argv ppf ~flambda2 =
       Compiler.instantiate ~src ~args target;
       Warnings.check_fatal ();
     end
+    else if !functorize then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let input_module_names =
+        Compenv.get_objfiles ~with_ocamlparam:false
+        |> Functorizer.validate_inputs
+      in
+      Compiler.functorize input_module_names target;
+      Warnings.check_fatal ();
+    end
     else if !shared then begin
       Compmisc.init_path ();
       let target = Compenv.extract_output !output_name in
@@ -176,7 +195,9 @@ let main unix argv ppf ~flambda2 =
                  Config.ext_obj Config.ext_dll
               )
         else
-          Compenv.default_output !output_name
+          match !output_name with
+          | Some name -> name
+          | None -> Compiler.default_executable_name
       in
       Compmisc.init_path ();
       Compmisc.with_ppf_dump ~file_prefix:target (fun ppf_dump ->

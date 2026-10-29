@@ -1,7 +1,6 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
- flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -108,6 +107,28 @@ let s = #{ s = "hi" }
 [%%expect{|
 type t = #{ s : string; }
 val s : t = #{s = "hi"}
+|}]
+
+(* Fields whose declared type leaves the sort unknown (here, an [('a : any)]
+   parameter) are printed according to the instantiated type. These used to
+   print as [<unknown>]. *)
+
+type ('a : any) with_any = #{ id : int; v : 'a }
+let wa_int = #{ id = 1; v = 2 }
+let wa_str = #{ id = 2; v = "s" }
+let wa_float = #{ id = 3; v = #2.5 }
+[%%expect{|
+type ('a : any) with_any = #{ id : int; v : 'a; }
+val wa_int : int with_any = #{id = 1; v = 2}
+val wa_str : string with_any = #{id = 2; v = "s"}
+val wa_float : float# with_any = #{id = 3; v = <abstr>}
+|}]
+
+type ('a : any) only_any = #{ v : 'a }
+let oa = #{ v = 42 }
+[%%expect{|
+type ('a : any) only_any = #{ v : 'a; }
+val oa : int only_any = #{v = 42}
 |}]
 
 ;;
@@ -763,13 +784,9 @@ type q : any mod portable = #{ x : int -> int; y : int -> q }
 Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "q" is
-           value non_float mod aliased immutable
-           & value non_float mod aliased immutable
-         because it is an unboxed record.
-       But the kind of type "q" must be a subkind of
-           any mod portable & any mod portable
-         because of the annotation on the declaration of the type q.
+Error: This type definition does not satisfy its kind annotation
+         any mod portable & any mod portable,
+       because functions are not mod portable.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without
    with-bounds. Internal ticket 5096. *)

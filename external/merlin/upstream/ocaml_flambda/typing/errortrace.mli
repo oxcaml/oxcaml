@@ -89,6 +89,8 @@ type first_class_module =
     | Package_inclusion of Format_doc.doc
     | Package_coercion of Format_doc.doc
 
+type arrow_position = Argument | Return
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -106,6 +108,8 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Mode_mismatch :
+      arrow_position * Mode.With_locality.error -> ('a, comparison) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
@@ -115,6 +119,10 @@ type 'variety error = (expanded_type, 'variety) t
 val map_elt : ('a -> 'b) -> ('a, 'variety) elt -> ('b, 'variety) elt
 
 val map : ('a -> 'b) -> ('a, 'variety) t -> ('b, 'variety) t
+
+val map_types :
+  (type_expr -> type_expr) ->
+  (expanded_type, 'variety) t -> (expanded_type, 'variety) t
 
 val incompatible_fields :
   name:string -> got:type_expr -> expected:type_expr -> (type_expr, _) elt
@@ -180,4 +188,6 @@ module Subtype : sig
     trace:error_trace -> unification_trace:unification_error_trace -> error
 
   val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val map_types : (type_expr -> type_expr) -> expanded_type t -> expanded_type t
 end

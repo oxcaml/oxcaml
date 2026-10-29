@@ -1,0 +1,7 @@
+bar_len_1: 5
+bar_len_2: 5
+bar_len_3: 5
+mk_string: 1 hi
+mk_float: 2 3.14
+mk_product: 3 4 four
+set_payload: 2.72 7

@@ -264,7 +264,11 @@ let rec expand_paths_lazy paths env =
         Unit -> Unit, env
       | Named (name,mty,mm) ->
           let mty = expand_paths_lazy paths env mty in
-          let mode = Mode.(alloc_as_value mm |> Value.disallow_right) in
+          let mode =
+            Mode.(
+              with_locality_as_regionality mm
+              |> With_regionality.disallow_right)
+          in
           let env = match name with
             | Some param when !Clflags.applicative_functors ->
                 Env.add_module_lazy ~update_summary:false param Mp_present mty
@@ -508,7 +512,11 @@ let rec nondep_mty_with_presence env va ids pres mty =
   | Mty_functor(Named (param, arg, marg), res, mres) ->
       let var_inv =
         match va with Co -> Contra | Contra -> Co | Strict -> Strict in
-      let mode = Mode.(alloc_as_value marg |> Value.disallow_right) in
+      let mode =
+        Mode.(
+          with_locality_as_regionality marg
+          |> With_regionality.disallow_right)
+      in
       let res_env =
         match param with
         | None -> env
@@ -928,12 +936,17 @@ let lower_nongen nglev mty =
     let super = type_iterators mark in
     let it_do_type_expr it ty =
       match get_desc ty with
-        Tvar _ ->
+        Tvar { jkind } ->
           let level = get_level ty in
-          if level < generic_level && level > nglev then set_level ty nglev
+          if level < generic_level && level > nglev then (
+            set_level ty nglev; Jkind.update_level nglev jkind)
       | _ ->
           super.it_do_type_expr it ty
     in
-    let it = {super with it_do_type_expr} in
-    it.it_module_type it mty
+  let it_mode_expr m =
+    if not (Mode.With_locality.check_generic m) then
+      Mode.With_locality.update_level nglev m
+  in
+  let it = {super with it_do_type_expr; it_mode_expr} in
+  it.it_module_type it mty
   end

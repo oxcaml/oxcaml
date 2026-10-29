@@ -2,6 +2,7 @@
  flags += " -O3";
  flags += " -experimental-optimizations";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -52,19 +53,19 @@ let spill_slot_lifetime () =
 spill_slot_lifetime:
   subq  $24, %rsp
   movl  $1, %eax
-  call  camlTOP3__get_one_3_5_code@PLT
+  call  camlTOP3__get_one_2_5_code@PLT
 .L0:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
-  call  camlTOP3__get_one_3_5_code@PLT
+  call  camlTOP3__get_one_2_5_code@PLT
 .L1:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
-  call  camlTOP3__get_one_3_5_code@PLT
+  call  camlTOP3__get_one_2_5_code@PLT
 .L2:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
-  call  camlTOP3__get_one_3_5_code@PLT
+  call  camlTOP3__get_one_2_5_code@PLT
 .L3:
   subq  $40, %r15
   cmpq  (%r14), %r15

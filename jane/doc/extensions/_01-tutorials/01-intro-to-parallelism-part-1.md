@@ -882,8 +882,8 @@ This value is contended but expected to be uncontended.
 ```
 
 because rule 2b insists that it treat `a` as `contended`. Fortunately, `loop`
-doesn't need to be `portable`: since it's defined inside `functorial`, it's
-safe for `functorial` to call `loop` even though `loop` isn't `portable`.
+doesn't need to be `portable`: since it's defined inside `factorial`, it's
+safe for `factorial` to call `loop` even though `loop` isn't `portable`.
 (Remember, rule 1 says we can't call `loop` from _outside the domain that
 created it._ Since `factorial` is `portable`, that could be any domain, but
 nonetheless its whole body executes in one consistent domain.)
@@ -1071,7 +1071,7 @@ ignoring those modes. In summary (this table isn't nearly exhaustive—see the
 | `mutable_data` | no functions, deeply | portability |
 | `value` | none | none |
 
-(Note that unboxed types like `int64#` can't have any of these kinds, since
+(Note that unboxed types like `int64_u` can't have any of these kinds, since
 they have different kinds that express how they're represented in memory and
 in registers. Nonetheless, they are all immutable data and thus cross both
 portability and contention.)

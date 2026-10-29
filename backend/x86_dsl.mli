@@ -124,6 +124,8 @@ module I : sig
 
   val idiv : arg -> unit
 
+  val div : arg -> unit
+
   val imul : arg -> arg option -> unit
 
   val mul : arg -> unit
@@ -179,6 +181,8 @@ module I : sig
   val neg : arg -> unit
 
   val nop : unit -> unit
+
+  val not_ : arg -> unit
 
   val or_ : arg -> arg -> unit
 

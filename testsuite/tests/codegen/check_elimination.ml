@@ -2,6 +2,7 @@
  flags += " -O3";
  flags += " -experimental-optimizations";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -41,34 +42,35 @@ let arr_sum arr =
 ;;
 [%%expect_asm X86_64{|
 arr_sum:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rdi
-  salq  $8, %rdi
-  shrq  $17, %rdi
-  orq   $1, %rdi
-  leaq  -2(%rdi), %rsi
-  cmpq  $1, %rsi
-  jl    .L2
-  sarq  $1, %rsi
+  movq  %rax, %rdx
+  movq  -8(%rdx), %rbx
+  salq  $8, %rbx
+  shrq  $17, %rbx
+  orq   $1, %rbx
+  leaq  -2(%rbx), %rdi
+  cmpq  $1, %rdi
+  jl    .L3
+  subq  $8, %rsp
+  sarq  $1, %rdi
   movl  $1, %eax
-  xorl  %edx, %edx
+  xorl  %esi, %esi
 .L0:
-  leaq  1(%rdx,%rdx), %rcx
-  cmpq  %rdi, %rcx
+  leaq  1(%rsi,%rsi), %rcx
+  cmpq  %rbx, %rcx
   jae   .L1
-  movq  -4(%rbx,%rcx,4), %rcx
+  movq  -4(%rdx,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
-  incq  %rdx
-  cmpq  %rsi, %rdx
+  incq  %rsi
+  cmpq  %rdi, %rsi
   jle   .L0
+  addq  $8, %rsp
   ret
 .L1:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
 .L2:
+.L3:
   movl  $1, %eax
   ret
 |}]
@@ -89,27 +91,27 @@ let search ~target (start : int list) =
 ;;
 [%%expect_asm X86_64{|
 search:
-  movq  %rax, %rdi
+  movq  %rax, %rsi
   testb $1, %bl
   je    .L1
 .L0:
-  xorl  %esi, %esi
+  xorl  %edi, %edi
   movl  $1, %eax
   jmp   .L4
 .L1:
-  movq  (%rbx), %rax
-  xorl  %esi, %esi
-  cmpq  %rax, %rdi
-  setl  %sil
-  testq %rsi, %rsi
-  je    .L2
+  movq  (%rbx), %rdx
+  xorl  %edi, %edi
+  cmpq  %rdx, %rsi
+  setl  %dil
+  jge   .L2
   movq  8(%rbx), %rax
-  testq %rsi, %rsi
+  testq %rdi, %rdi
   jne   .L3
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  jmp   .L4
+  testq %rdi, %rdi
+  je    .L4
 .L3:
   movq  %rax, %rbx
   testb $1, %bl
@@ -160,23 +162,19 @@ let complex_branching_on_two_comparisons (x: int) (y: int) c1 c2 c3 =
  | false, _ -> c3 ()
 [%%expect_asm X86_64{|
 complex_branching_on_two_comparisons:
-  movq  %rax, %rcx
-  movq  %rbx, %rax
+  movq  %rbx, %rcx
   movq  %rsi, %rbx
   cmpq  $5, %rax
-  sete  %al
-  movzbq %al, %rax
+  jne   .L0
   cmpq  $5, %rcx
   jne   .L0
-  testq %rax, %rax
-  je    .L0
   movl  $1, %eax
   movq  (%rdi), %rsi
   movq  %rdi, %rbx
   jmp   *%rsi
 .L0:
-  testq %rax, %rax
-  je    .L1
+  cmpq  $5, %rcx
+  jne   .L1
   movl  $1, %eax
   movq  (%rdx), %rdi
   movq  %rdx, %rbx

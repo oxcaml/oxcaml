@@ -42,7 +42,8 @@ val has_three_operand_float_ops : unit -> bool
 
 (* For argument number [n] split across multiple registers, the target-specific
    implementation of [loc_external_arguments] must return [regs] such that
-   [regs.(n).(0)] is to hold the part of the value at the lowest address. *)
+   [regs.(n).(0)] is to hold the part of the value at the lowest address.
+   [regs.(n)] is empty for dummy arguments. *)
 val loc_external_arguments :
   Cmm.exttype list -> Reg.t array array * int * Cmm.stack_align
 
@@ -58,7 +59,7 @@ val loc_exn_bucket : Reg.t
 val max_arguments_for_tailcalls : int
 
 (* Registers destroyed by operations *)
-val destroyed_at_raise : Reg.t array
+val destroyed_at_raise : unit -> Reg.t array
 
 val destroyed_at_reloadretaddr : Reg.t array
 

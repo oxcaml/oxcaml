@@ -156,9 +156,6 @@ val cms_magic_number: string
 val cmj_magic_number: string
 (** Magic number for Js_of_ocaml IR files *)
 
-val cmja_magic_number: string
-(** Magic number for Js_of_ocaml IR archive files *)
-
 val linear_magic_number: string
 (** Magic number for Linear internal representation files *)
 
@@ -212,6 +209,10 @@ val asm: string
 
 val asm_cfi_supported: bool
 (** Whether assembler understands CFI directives *)
+
+val asm_file0_supported: bool
+(** Whether the assembler accepts the DWARF-5 [.file 0] and [.loc 0]
+    directives, which define the line table's primary source file entry *)
 
 val asm_size_type_directives: bool
 (** Whether the [.size] and [.type] assembler directives can be used
@@ -345,10 +346,6 @@ val poll_insertion : bool
 val ar_supports_response_files: bool
 (** Whether ar supports @FILE arguments. *)
 
-val runtime5 : bool
-(** Always [true], Previously:[false] when using the
-    OCaml 4.14 runtime. *)
-
 val no_stack_checks : bool
 (** [true] if stack checks are disabled. *)
 
@@ -363,7 +360,7 @@ val parameterised_modules : bool
 (** Whether parameterised modules are supported *)
 
 val syntax_quotations : bool
-(** Whether runtime quotations syntax is enabled. *)
+(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
 (** Access to configuration values *)
 val print_config : out_channel -> unit
@@ -379,6 +376,9 @@ val merlin : bool
 
 val has_pclmul : bool
 (* Whether the compiler was configured on a machine with PCLMUL *)
+
+val has_aes : bool
+(* Whether the compiler was configured on a machine with AES *)
 
 val has_popcnt : bool
 (* Whether the compiler was configured on a machine with POPCNT *)

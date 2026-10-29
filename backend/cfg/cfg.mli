@@ -64,6 +64,33 @@ type basic_block =
            trap stack. *)
   }
 
+type phantom_defining_expr = private
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of Cmm.symbol
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : Cmm.symbol;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+  | Cphantom_optimised_out
+
+val phantom_defining_expr_of_cmm :
+  Cmm.phantom_defining_expr -> phantom_defining_expr
+
+val phantom_optimised_out : phantom_defining_expr
+
 (* Subset of Cmm.codegen_option. *)
 type codegen_option =
   | Reduce_code_size
@@ -108,11 +135,19 @@ type t =
         (** Precomputed during selection and poll insertion. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
+    mutable fun_frame_required : bool;
+        (** Whether the function needs a stack frame, set by [Cfg_prologue]. *)
+    mutable fun_prologue_required : bool;
+        (** Whether the function needs a prologue, set by [Cfg_prologue]. *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
     fun_ret_type : Cmm.machtype;
         (** Function return type. As in [fun_args], this value is not used when
             starting from Linear. *)
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t;
+        (** Phantom variables and their defining expressions *)
     mutable allowed_to_be_irreducible : bool;
         (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
            is irreducible, the information about loops cannot be trusted). *)
@@ -131,10 +166,16 @@ val create :
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
   fun_ret_type:Cmm.machtype ->
+  fun_phantom_lets:
+    (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t ->
   allowed_to_be_irreducible:bool ->
   t
 
 val fun_name : t -> string
+
+val fun_phantom_lets :
+  t ->
+  (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t
 
 val entry_label : t -> Label.t
 
@@ -175,6 +216,20 @@ val fold_blocks : t -> f:(Label.t -> basic_block -> 'a -> 'a) -> init:'a -> 'a
 val fold_body_instructions :
   t -> f:('a -> basic instruction -> 'a) -> init:'a -> 'a
 
+val iter_instructions :
+  t ->
+  instruction:(basic instruction -> unit) ->
+  terminator:(terminator instruction -> unit) ->
+  unit
+
+type instruction_iterator = { f : 'a. 'a instruction -> unit } [@@unboxed]
+
+val iter_all_instructions : t -> instruction_iterator -> unit
+
+type 'a instruction_folder = { f : 'b. 'a -> 'b instruction -> 'a } [@@unboxed]
+
+val fold_all_instructions : t -> f:'a instruction_folder -> init:'a -> 'a
+
 (* CR-soon xclerc for xclerc: [register_predecessors_for_all_blocks] only adds
    blocks to the predecessor sets, and does not clear the sets beforehand. This
    looks like a mistake; at the very least a named boolean parameter should be
@@ -204,9 +259,17 @@ val is_return_terminator : terminator -> bool
 
 val is_pure_basic : basic -> bool
 
+(** [is_dead_basic instr ~live_after] holds when [instr] is pure and all its
+    results are unused (disjoint from [live_after], the registers live
+    immediately after [instr]). Shared by [Cfg_liveness] (optimistic dead-code
+    case) and [Cfg_deadcode] (actual removal) so the two tests stay in sync. *)
+val is_dead_basic : basic instruction -> live_after:Reg.Set.t -> bool
+
 val is_noop_move : basic instruction -> bool
 
 val is_alloc : basic instruction -> bool
+
+val is_heap_alloc : basic instruction -> bool
 
 val is_poll : basic instruction -> bool
 
@@ -227,6 +290,7 @@ val make_instruction :
   id:InstructionId.t ->
   ?available_before:Reg_availability_set.t ->
   ?available_across:Reg_availability_set.t ->
+  ?phantom_available_before:Backend_var.Set.t option ->
   unit ->
   'a instruction
 

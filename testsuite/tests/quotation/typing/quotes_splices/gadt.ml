@@ -14,7 +14,7 @@ end
 [%%expect {|
 module M : sig type t type t' end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 let sorry0 =
         fun (f : (_ Type.eq -> _ @ once)) -> f (Obj.magic Type.Equal) |> Obj.magic_many
@@ -142,8 +142,8 @@ val maybe_non_negative : <[int]> t -> bool = <fun>
    In cases when it's significant that [S_min =/= S_subj] or [S_max =/= S_subj],
    we extend the notation to [S_proof ~~> x ~~> S_subj] for x in {S_min, S_max}.
 
-   For [t] we use either a locally abstract type or the top-level [M.t],
-   and for [s] we usually use a simple top-level type: [int] or [bool]. *)
+   For [t] we use either a locally abstract type or the persistent [M.t],
+   and for [s] we usually use a simple persistent type: [int] or [bool]. *)
 
 (* Evidence stays in the same stage -- should always succeed:
    [S_proof = S_min] and [T_proof = T_subj] *)
@@ -251,7 +251,7 @@ let _ = <[ fun (type t) (Equal : (t, bool) Type.eq) (x : t) ->
       ]>
 ]>
 |}]
-(* 1 ~~> 3 ~~> 1  @  1 <=> 1  with top-level [M.t] *)
+(* 1 ~~> 3 ~~> 1  @  1 <=> 1  with persistent [M.t] *)
 let _ = <[ fun (Equal : (M.t, bool) Type.eq) (x : M.t) ->
     <[ Obj.magic_many <[ $($(
       match x with

@@ -158,12 +158,26 @@ module Context = struct
       depth : int option;
       unrolling_depth : int option option;
       are_rebuilding_terms : Are_rebuilding_terms.t;
+      inlined_forwarded_from : Debuginfo.t option;
       pass : Pass.t
     }
 
   let create ?depth ?unrolling_depth ?cost_metrics ~are_rebuilding_terms ~args
-      ~pass () =
-    { args; depth; unrolling_depth; cost_metrics; are_rebuilding_terms; pass }
+      ~pass ~inlined_forwarded_from () =
+    let inlined_forwarded_from =
+      Option.map
+        (fun inlined_forwarded_from ->
+          Inlined_debuginfo.rewrite inlined_forwarded_from Debuginfo.none)
+        inlined_forwarded_from
+    in
+    { args;
+      depth;
+      unrolling_depth;
+      cost_metrics;
+      are_rebuilding_terms;
+      pass;
+      inlined_forwarded_from
+    }
 
   let print_cost_metrics ppf c =
     let Removed_operations.
@@ -172,6 +186,7 @@ module Context = struct
             prim;
             branch;
             direct_call_of_indirect;
+            updated_direct_call;
             specialized_poly_compare;
             requested_inline
           } =
@@ -183,6 +198,7 @@ module Context = struct
           `String "Prim";
           `String "Branch";
           `String "Direct call of indirect";
+          `String "Updated direct call";
           `String "Specialized poly compare";
           `String "Requested inline" ];
         [ `Int call;
@@ -190,6 +206,7 @@ module Context = struct
           `Int prim;
           `Int branch;
           `Int direct_call_of_indirect;
+          `Int updated_direct_call;
           `Int specialized_poly_compare;
           `Int requested_inline ] ]
       |> Table.create
@@ -209,8 +226,16 @@ module Context = struct
         depth;
         unrolling_depth;
         are_rebuilding_terms;
+        inlined_forwarded_from;
         pass = _
       } =
+    let print_inlined_forwarded_from ppf = function
+      | None -> ()
+      | Some forwarded_from ->
+        Format.fprintf ppf "@[<h>%a%a@]@,@," Format.pp_print_text
+          "[@inlined] attribute forwarded from: " Debuginfo.print_compact
+          forwarded_from
+    in
     let print_unrolling_depth ppf = function
       | None -> ()
       | Some (Some unroll) ->
@@ -267,7 +292,8 @@ module Context = struct
     print_args ppf args;
     print_cost_metrics ppf cost_metrics;
     print_depth ppf depth;
-    print_unrolling_depth ppf unrolling_depth
+    print_unrolling_depth ppf unrolling_depth;
+    print_inlined_forwarded_from ppf inlined_forwarded_from
 end
 
 module Decision_with_context = struct
@@ -304,7 +330,8 @@ type raw_decision =
 let log : raw_decision list ref = ref []
 
 let record_decision_at_call_site_for_known_function ~tracker ~unrolling_depth
-    ~apply ~pass ~callee ~are_rebuilding_terms decision =
+    ~apply ~pass ~callee ~are_rebuilding_terms ~inlined_forwarded_from decision
+    =
   if
     Flambda_features.inlining_report ()
     || Flambda_features.inlining_report_bin ()
@@ -320,7 +347,7 @@ let record_decision_at_call_site_for_known_function ~tracker ~unrolling_depth
       Context.create
         ~depth:(Inlining_state.depth state)
         ~args:(Inlining_state.arguments state)
-        ~unrolling_depth ~are_rebuilding_terms ~pass ()
+        ~unrolling_depth ~are_rebuilding_terms ~pass ~inlined_forwarded_from ()
     in
     log
       := { decision_with_context = Some { decision = Call decision; context };
@@ -355,7 +382,8 @@ let record_decision_at_function_definition ~absolute_history ~code_metadata
     let args = Code_metadata.inlining_arguments code_metadata in
     let cost_metrics = Code_metadata.cost_metrics code_metadata in
     let context =
-      Context.create ~args ~cost_metrics ~are_rebuilding_terms ~pass ()
+      Context.create ~args ~cost_metrics ~are_rebuilding_terms ~pass
+        ~inlined_forwarded_from:None ()
     in
     log
       := { decision_with_context = Some { decision = Fundecl decision; context };
@@ -705,7 +733,7 @@ let output_then_forget_decisions ~output_prefix =
          (that is not one of the numbered warnings)? *)
       Format.eprintf "WARNING: inlining report output failed@.")
     (fun () ->
-      let compilation_unit = Compilation_unit.get_current_exn () in
+      let compilation_unit = Current_unit.get_cu_exn () in
       let tree =
         lazy
           (List.fold_left

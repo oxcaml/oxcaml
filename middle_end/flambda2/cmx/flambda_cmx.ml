@@ -28,23 +28,23 @@ type loader =
 let load_cmx_file_contents loader comp_unit =
   let accessible_comp_unit =
     Compilation_unit.which_cmx_file comp_unit
-      ~accessed_by:(Compilation_unit.get_current_exn ())
+      ~accessed_by:(Current_unit.get_cu_exn ())
   in
   let cmx_file =
     Compilation_unit.to_global_name_without_prefix accessible_comp_unit
   in
   match Imported_unit_map.find cmx_file loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
-  | exception Not_found -> (
-    match loader.get_module_info accessible_comp_unit with
-    | None ->
-      (* To make things easier to think about, we never retry after a .cmx load
-         fails. *)
-      loader.imported_units
-        <- Imported_unit_map.add cmx_file None loader.imported_units;
-      None
-    | Some cmx ->
-      Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+        match loader.get_module_info accessible_comp_unit with
+        | None ->
+          (* To make things easier to think about, we never retry after a .cmx
+             load fails. *)
+          loader.imported_units
+            <- Imported_unit_map.add cmx_file None loader.imported_units;
+          None
+        | Some cmx ->
           let typing_env, all_code =
             Flambda_cmx_format.import_typing_env_and_code cmx
           in
@@ -54,7 +54,7 @@ let load_cmx_file_contents loader comp_unit =
           loader.imported_units
             <- Imported_unit_map.add cmx_file (Some typing_env)
                  loader.imported_units;
-          Some typing_env))
+          Some typing_env)
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
@@ -117,9 +117,7 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
       in
       let fold_code_id names_to_add code_id =
         if
-          not
-            (Code_id.in_compilation_unit code_id
-               (Compilation_unit.get_current_exn ()))
+          not (Code_id.in_compilation_unit code_id (Current_unit.get_cu_exn ()))
         then
           (* Code in units upon which the current unit depends cannot reference
              this unit. *)
@@ -145,7 +143,7 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
           not
             (Compilation_unit.equal
                (Name.compilation_unit name)
-               (Compilation_unit.get_current_exn ()))
+               (Current_unit.get_cu_exn ()))
         then
           (* Names in units upon which the current unit depends cannot reference
              this unit. *)
@@ -208,17 +206,18 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let slots_used_in_typing_env =
     TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
+  let is_local = Current_unit.is_current in
   let exported_offsets =
     exported_offsets
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             free_slots_of_all_code)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode free_slots_of_all_code)
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             slots_used_in_typing_env)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode
             slots_used_in_typing_env)
   in
@@ -230,12 +229,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
 
 let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     ~exported_offsets ~sections all_code =
-  match final_typing_env with
-  | None ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some _ when Flambda_features.opaque () ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some final_typing_env ->
+  if Flambda_features.opaque ()
+  then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
+  else
     let typing_env, canonicalise =
       TE.Pre_serializable.create final_typing_env ~used_value_slots
     in

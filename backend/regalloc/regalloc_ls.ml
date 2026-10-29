@@ -67,7 +67,7 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
     let off = on + 1 in
     if trap_handler
     then
-      Array.iter Proc.destroyed_at_raise ~f:(fun reg ->
+      Array.iter (Proc.destroyed_at_raise ()) ~f:(fun reg ->
           update_range reg ~begin_:on ~end_:on);
     State.set_ls_order state ~instruction_id:instr.id ~ls_order:on;
     Array.iter instr.arg ~f:(fun reg -> update_range reg ~begin_:on ~end_:on);
@@ -91,7 +91,7 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
          present at the end of every "block". *)
       incr pos);
   Reg.Tbl.iter (fun reg (range : Range.t) -> add_range reg range) current_ranges;
-  (if debug && Lazy.force verbose
+  (if debug && Param.get verbose
    then
      let ls_order_mapping = State.ls_order_mapping state in
      Cfg.iter_blocks_dfs (Cfg_with_layout.cfg cfg_with_layout)
@@ -316,7 +316,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
     (module Utils)
     state
     ~f:(fun () ->
-      if debug && Lazy.force verbose
+      if debug && Param.get verbose
       then (
         let liveness = Cfg_with_infos.liveness cfg_with_infos in
         indent ();

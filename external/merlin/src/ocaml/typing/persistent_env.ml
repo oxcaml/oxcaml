@@ -62,6 +62,7 @@ type error =
         value: Global_module.Name.t;
       }
 
+(* These errors are location-less and will be logged and re-raised in Env *)
 exception Error of error
 let error err = raise (Error err)
 
@@ -103,7 +104,7 @@ type global_name_info = {
 type import = {
   imp_is_param : bool;
   imp_params : Global_module.Parameter_name.t list;
-  imp_arg_for : Global_module.Parameter_name.t option;
+  imp_arg_signature : Types.arg_signature option;
   imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
@@ -111,13 +112,18 @@ type import = {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  imp_cmi_name : CU.Name.t;
+  (* Physically the [cmi_name] of the [cmi_infos] this import was read from;
+     Merlin compares it with [==] against the [Cmi_cache] entry. *)
 }
 
-(* If a .cmi file is missing (or invalid), we
-   store it as Missing in the cache. *)
+(* If a .cmi file is missing (or failed to load), we store it as Missing in the
+   cache. We use Invalid when a .cmi is present, readable, but is inconsistent.
+   *)
 type import_info =
   | Missing of { hidden_were_allowed : bool }
   | Found of import
+  | Invalid of import
 
 (* Data relating to a global name (possibly with arguments) but not necessarily
    a value in scope. For example, if we've encountered a module only by seeing
@@ -216,7 +222,7 @@ let clear_missing {imports; _} =
     Hashtbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
-       | Found _ -> acc)
+       | Found _ | Invalid _ -> acc)
       imports []
   in
   List.iter (Hashtbl.remove imports) missing_entries
@@ -238,13 +244,8 @@ let register_import_as_opaque {imported_opaque_units; _} s =
 let find_import_info_in_cache {imports; _} import =
   match Hashtbl.find imports import with
   | exception Not_found -> None
-  | Missing _ -> None
+  | Missing _ | Invalid _ -> None
   | Found imp -> Some imp
-
-let find_name_info_in_cache {persistent_names; _} name =
-  match Hashtbl.find persistent_names name with
-  | exception Not_found -> None
-  | pn -> Some pn
 
 let find_info_in_cache {persistent_structures; _} name =
   match Hashtbl.find persistent_structures name with
@@ -262,8 +263,8 @@ let register_parameter ({param_imports; _} as penv) modname =
       ()
   | Some imp ->
       if not imp.imp_is_param then
-        raise (Error (Not_compiled_as_parameter
-                        (Global_module.Name.of_parameter_name modname)))
+        error (Not_compiled_as_parameter
+                 (Global_module.Name.of_parameter_name modname))
   end;
   param_imports := Param_set.add modname !param_imports
 
@@ -390,34 +391,15 @@ let acknowledge_import penv ~check modname pers_sig =
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
-  if not (CU.Name.equal modname found_name) then
-    error (Illegal_renaming(modname, found_name, filename));
-  List.iter
-    (function
-        | Rectypes ->
-            if not !Clflags.recursive_types then
-              error (Need_recursive_types(modname))
-        | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
-  begin match kind, CU.get_current () with
-  | Normal { cmi_impl = imported_unit }, Some current_unit ->
-      let access_allowed =
-        CU.can_access_by_name imported_unit ~accessed_by:current_unit
-      in
-      if not access_allowed then
-        let prefix = CU.for_pack_prefix current_unit in
-        error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
-  | _, _ -> ()
-  end;
   let is_param =
     match kind with
     | Normal _ -> false
     | Parameter -> true
   in
-  let arg_for, impl =
+  let arg_signature, impl =
     match kind with
-    | Normal { cmi_arg_for; cmi_impl } -> cmi_arg_for, Some cmi_impl
+    | Normal { cmi_arg_signature; cmi_impl } ->
+        cmi_arg_signature, Some cmi_impl
     | Parameter -> None, None
   in
   let uid =
@@ -435,7 +417,7 @@ let acknowledge_import penv ~check modname pers_sig =
   let import =
     { imp_is_param = is_param;
       imp_params = params;
-      imp_arg_for = arg_for;
+      imp_arg_signature = arg_signature;
       imp_impl = impl;
       imp_raw_sign = sign;
       imp_filename = filename;
@@ -443,16 +425,44 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_visibility = visibility;
       imp_crcs = crcs;
       imp_flags = flags;
+      imp_cmi_name = found_name;
     }
   in
-  if check then check_consistency penv import;
+  begin try
+  if not (CU.Name.equal modname found_name) then
+    error (Illegal_renaming(modname, found_name, filename));
+  List.iter
+    (function
+        | Rectypes ->
+            if not !Clflags.recursive_types then
+              error (Need_recursive_types(modname))
+        | Alerts _ -> ()
+        | Opaque -> register_import_as_opaque penv modname)
+    flags;
+  begin match kind, Current_unit.get_cu () with
+  | Normal { cmi_impl = imported_unit }, Some current_unit ->
+      let access_allowed =
+        CU.can_access_by_name imported_unit ~accessed_by:current_unit
+      in
+      if not access_allowed then
+        let prefix = CU.for_pack_prefix current_unit in
+        error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
+  | _, _ -> ()
+  end;
+  if check then check_consistency penv import
+  with Error _ as exn ->
+    (* Merlin needs to know that a module was found even if it is invalid to
+       properly invalidate the cache. *)
+    Hashtbl.replace imports modname (Invalid import);
+    raise exn
+  end;
   Hashtbl.add imports modname (Found import);
   import
 
 let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
-  let cmi = read_cmi_lazy filename in
+  let cmi = Cmi_cache.read filename in
   let pers_sig =
     { Persistent_signature.filename; cmi;
       visibility = Visible { cmx_guaranteed = false } }
@@ -471,7 +481,7 @@ let find_import ~allow_hidden penv ~check modname =
   | Found imp -> check_visibility ~allow_hidden imp; imp
   | Missing { hidden_were_allowed = true } -> raise Not_found
   | Missing { hidden_were_allowed = false }
-  | exception Not_found ->
+  | Invalid _ | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> raise Not_found
       | Can_load_cmis ->
@@ -549,7 +559,7 @@ let rec approximate_global_by_name penv global_name =
   global
 
 let current_unit_is_aux name ~allow_args =
-  match CU.get_current () with
+  match Current_unit.get_cu () with
   | None -> false
   | Some current ->
       match CU.to_global_name current with
@@ -597,6 +607,12 @@ let check_for_unset_parameters penv global =
            }))
     global.Global_module.hidden_args
 
+let mode_pers_mod staticity =
+  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
+  Mode.With_regionality.of_const
+    { Mode.With_regionality.Const.legacy with staticity }
+    ~hint_monadic:hint ~hint_comonadic:hint
+
 let rec global_of_global_name penv ~check name ~allow_excess_args =
   let load () =
     let pn =
@@ -610,6 +626,16 @@ let rec global_of_global_name penv ~check name ~allow_excess_args =
   | exception Not_found -> load ()
 
 and compute_global penv modname ~params ~check ~allow_excess_args =
+  let args =
+    if allow_excess_args then
+      (* Drop anything we already know is an excess argument, since otherwise
+         we'll resolve it now only to throw it away in Global.subst. *)
+      List.filter
+        (fun ({ param; _ } : Global_module.Name.argument) ->
+           List.exists (Global_module.Parameter_name.equal param) params)
+        modname.Global_module.Name.args
+    else modname.Global_module.Name.args
+  in
   let arg_global_by_param_name =
     List.map
       (fun ({ param = name; value } : Global_module.Name.argument) ->
@@ -618,12 +644,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
          | exception Not_found ->
              error
                (Unbound_module_as_argument_value { instance = modname; value }))
-      modname.Global_module.Name.args
+      args
   in
   let subst : Global_module.subst =
     Global_module.Parameter_name.Map.of_list arg_global_by_param_name
   in
-  if check && modname.Global_module.Name.args <> [] then begin
+  if check && args <> [] then begin
     let compare_by_param param1 (param2, _) =
       Global_module.Parameter_name.compare param1 param2
     in
@@ -640,13 +666,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
         (fun (param, value) ->
             (* Argument with no parameter: fine only if allowed by flag *)
             if not allow_excess_args then
-              raise
-                (Error (Imported_module_has_no_such_parameter {
-                          imported = CU.Name.of_head_of_global_name modname;
-                          valid_parameters = params;
-                          parameter = param;
-                          value = value |> Global_module.to_name;
-                        })))
+              error (Imported_module_has_no_such_parameter {
+                  imported = CU.Name.of_head_of_global_name modname;
+                  valid_parameters = params;
+                  parameter = param;
+                  value = value |> Global_module.to_name;
+                }))
       ~both:
         (fun expected_type (_arg_name, arg_value_global) ->
             let arg_value = arg_value_global |> Global_module.to_name in
@@ -655,21 +680,21 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
                 ~allow_excess_args
             in
             let actual_type =
-              match pn.pn_import.imp_arg_for with
+              match pn.pn_import.imp_arg_signature with
               | None ->
                   error (Not_compiled_as_argument
                            { param = expected_type; value = arg_value;
                              filename = pn.pn_import.imp_filename })
-              | Some ty -> ty
+              | Some { Types.arg_param; _ } -> arg_param
             in
             if not (Global_module.Parameter_name.equal expected_type actual_type)
             then begin
-              raise (Error (Argument_type_mismatch {
+              error (Argument_type_mismatch {
                   value = arg_value;
                   filename = pn.pn_import.imp_filename;
                   expected = expected_type;
                   actual = actual_type;
-                }))
+                })
             end)
   end;
   (* Form the name without any arguments at all, then substitute in all the
@@ -737,9 +762,29 @@ and acknowledge_new_pers_name penv check global_name global import =
        remember_global penv bound_global ~precision
          ~mentioned_by:(Other global_name))
     sign.bound_globals;
+  let pn_sign =
+    let signature, staticity = sign.sign in
+    let mode = Mode.With_regionality.disallow_right (mode_pers_mod staticity) in
+    let mode =
+      match import.imp_visibility with
+      | Visible { cmx_guaranteed = true } ->
+        mode
+      | Visible { cmx_guaranteed = false } | Hidden ->
+        (* Without a guaranteed [.cmx], the unit is not available for
+           compile-time evaluation, so its staticity is forced to [Dynamic]
+           regardless of what the [.cmi] claims. *)
+        Mode.With_regionality.join
+          [ mode;
+            Mode.With_regionality.min_with_monadic Staticity
+              (Mode.Staticity.of_const
+                 ~hint:(Cmx_not_guaranteed import.imp_impl)
+                 Mode.Staticity.Dynamic) ]
+    in
+    signature, mode
+  in
   let pn = { pn_import = import;
              pn_global = global;
-             pn_sign = sign.sign;
+             pn_sign;
            } in
   if check then check_consistency penv import;
   Hashtbl.add persistent_names global_name pn;
@@ -835,7 +880,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
     Constant unit
 
 type address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
@@ -855,7 +900,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
-  let sign = pers_name.pn_sign in
+  let (_, mode) as sign = pers_name.pn_sign in
   let is_param = import.imp_is_param in
   let impl = import.imp_impl in
   let filename = import.imp_filename in
@@ -873,7 +918,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
   let address : address =
     match binding with
     | Runtime_parameter id -> Alocal id
-    | Constant unit -> Aunit unit
+    | Constant unit -> Aunit (unit, mode)
   in
   let shape =
     match import.imp_impl, import.imp_params with
@@ -1012,7 +1057,7 @@ let read penv modname a =
   read_pers_struct penv true modname a
 
 let read_cmi_file penv filename =
-  let cmi = read_cmi_lazy filename in
+  let cmi = Cmi_cache.read filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
   add_import penv unit_name;
@@ -1102,6 +1147,9 @@ let loaded_transitive_dependencies penv intfs =
   Compilation_unit.Name.Set.iter add_loaded_deps intfs;
   !names
 
+let find_import penv modname =
+  find_import ~allow_hidden:true penv ~check:true modname
+
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
 
@@ -1151,11 +1199,6 @@ let looked_up {persistent_structures; _} modname =
 
 let is_imported_opaque {imported_opaque_units; _} s =
   CU.Name.Set.mem s !imported_opaque_units
-
-let implemented_parameter penv modname =
-  match find_name_info_in_cache penv modname with
-  | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
-  | None -> None
 
 let make_cmi penv modname kind sign alerts =
   let flags =
@@ -1357,11 +1400,13 @@ let with_cmis penv f x =
           [R (penv.can_load_cmis, Can_load_cmis)]
           (fun () -> f x))
 
-let forall ~found ~missing t =
+let forall ~found ~invalid ~missing t =
   Std.Hashtbl.forall t.imports (fun name -> function
       | Missing _ -> missing name
       | Found import ->
-        found name import.imp_filename name
+        found name import.imp_filename import.imp_cmi_name
+      | Invalid import ->
+        invalid name import.imp_filename import.imp_cmi_name
     )
 
 let report_error = Format_doc.compat report_error_doc

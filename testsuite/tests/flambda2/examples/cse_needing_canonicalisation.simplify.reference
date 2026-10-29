@@ -8,9 +8,7 @@ let code loopify(never) size(10) newer_version_of(f_0)
   let Pmakeblock = %block.[`0`].my_alloc_region (a, a) in
   cont k (Pmakeblock)
 in
-let $camlCse_needing_canonicalisation__f_1 =
-  closure f_0_1 @f &toplevel.alloc_region
-in
+let $camlCse_needing_canonicalisation__f_1 = closure f_0_1 @f &toplevel in
 let $camlCse_needing_canonicalisation =
   Block 0 ($camlCse_needing_canonicalisation__f_1)
 in

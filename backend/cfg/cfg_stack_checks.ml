@@ -82,9 +82,18 @@ let build_cfg_info : Cfg.t -> cfg_info =
         block_preproc_stack_check_result block ~frame_size
       in
       let block_needs_stack_checks =
-        preproc_stack_check_result.contains_nontail_calls
-        || preproc_stack_check_result.max_frame_size
-           >= Stack_check.stack_threshold_size
+        if Config.no_stack_checks
+        then
+          (* Only frames big enough to step over the stack's guard page need
+             probing; [stack_guard_stride = 0] means there is no guard page to
+             defend, so nothing is inserted. *)
+          Domainstate.stack_guard_stride > 0
+          && preproc_stack_check_result.max_frame_size
+             >= Domainstate.stack_guard_stride
+        else
+          preproc_stack_check_result.contains_nontail_calls
+          || preproc_stack_check_result.max_frame_size
+             >= Stack_check.stack_threshold_size
       in
       let max_frame_size =
         Int.max max_frame_size preproc_stack_check_result.max_frame_size
@@ -161,6 +170,29 @@ let rec find_stack_check_block :
 let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
   let block = Cfg.get_block_exn cfg label in
   let stack_offset = Cfg.first_instruction_stack_offset block in
+  (* Registers live across the check are the block's live-in = the next
+     instruction's live-in. As [instr.live] is the live-across set, recover the
+     live-in by adding the next instruction's arguments. This is what the
+     emitter's [save_simd] needs to preserve SIMD registers across the realloc
+     handler (a C call that clobbers caller-save SIMD registers).
+
+     [Prologue] and [Epilogue] are skipped: they are inserted by [Cfg_prologue]
+     after liveness was last computed, so their [live] field is a copy of a
+     neighbour's live-across set that does not account for registers dying at
+     the next instruction (and their [arg] is empty). Since they neither use nor
+     define registers, the block's live-in is the live-in of the first other
+     instruction. *)
+  let rec live_in_from (cell : Cfg.basic Cfg.instruction DLL.cell option) =
+    match cell with
+    | None -> Reg.add_set_array block.terminator.live block.terminator.arg
+    | Some cell -> (
+      let instr = DLL.value cell in
+      match instr.desc with
+      | Prologue | Epilogue -> live_in_from (DLL.next cell)
+      | Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Stack_check _ ->
+        Reg.add_set_array instr.live instr.arg)
+  in
+  let live = live_in_from (DLL.hd_cell block.body) in
   let check : Cfg.basic Cfg.instruction =
     (* CR xclerc for xclerc: double check `available_before` and
        `available_across`.
@@ -173,7 +205,7 @@ let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
     let id = InstructionId.get_and_incr cfg.next_instruction_id in
     Cfg.make_instruction ()
       ~desc:(Cfg.Stack_check { max_frame_size_bytes = max_frame_size })
-      ~stack_offset ~id ~available_before:Reg_availability_set.Unreachable
+      ~stack_offset ~id ~live ~available_before:Reg_availability_set.Unreachable
       ~available_across:Reg_availability_set.Unreachable
   in
   DLL.add_begin block.body check
@@ -183,7 +215,7 @@ let insert_stack_checks (cfg : Cfg.t) ~max_frame_size
   (* CR-soon xclerc for xclerc: use the dominators and loop infos from
      Cfg_with_infos (at least on some paths). *)
   let doms = Cfg_dominators.build cfg in
-  let loop_infos = lazy (Cfg_loop_infos.build cfg doms) in
+  let loop_infos = lazy (Cfg_loop_infos.build cfg) in
   (* note: the other entries in the forest are dead code *)
   let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
   let num_checks = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
@@ -200,12 +232,10 @@ let insert_stack_checks (cfg : Cfg.t) ~max_frame_size
    cases, rather than simply pushing it down. *)
 let cfg (cfg_with_layout : Cfg_with_layout.t) =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  (if not Config.no_stack_checks
+  (let { max_frame_size; blocks_needing_stack_checks } = build_cfg_info cfg in
+   if not (Label.Set.is_empty blocks_needing_stack_checks)
    then
-     let { max_frame_size; blocks_needing_stack_checks } = build_cfg_info cfg in
-     if not (Label.Set.is_empty blocks_needing_stack_checks)
-     then
-       if Label.Tbl.length cfg.blocks < !Oxcaml_flags.cfg_stack_checks_threshold
-       then insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
-       else insert_instruction cfg cfg.entry_label ~max_frame_size);
+     if Label.Tbl.length cfg.blocks < !Oxcaml_flags.cfg_stack_checks_threshold
+     then insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
+     else insert_instruction cfg cfg.entry_label ~max_frame_size);
   cfg_with_layout

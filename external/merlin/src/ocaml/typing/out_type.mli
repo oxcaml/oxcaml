@@ -89,7 +89,8 @@ val shorten_class_type_path: Env.t -> Path.t -> Path.t
     variable names and marking cycles. Any type variables that are shared
     between multiple types in the input list will be given the same name when
     printed with {!prepared_type_expr}. *)
-val prepare_for_printing: type_expr list -> unit
+val prepare_for_printing:
+  base:Mode.With_locality.Const.t -> type_expr list -> unit
 
 (** [add_type_to_preparation ty] extend a previous type expression preparation
     to the type expression [ty]
@@ -99,7 +100,8 @@ val add_type_to_preparation: type_expr -> unit
 (** In [Type_scheme] mode, non-generic types variables are printed as weakly
     polymorphic type variables. *)
 type type_or_scheme = Type | Type_scheme
-val tree_of_typexp: type_or_scheme -> type_expr -> out_type
+val tree_of_typexp:
+  base:Mode.With_locality.Const.t -> type_or_scheme -> type_expr -> out_type
 (** [tree_of_typexp] generate the [outcometree] for a prepared type
     expression.*)
 
@@ -108,8 +110,14 @@ val tree_of_type_scheme: type_expr -> out_type
 val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
-val tree_of_modes:
-  Mode.Alloc.Const.t -> Outcometree.out_mode list
+val tree_of_modes_const:
+  Mode.With_locality.Const.t -> Outcometree.out_mode list
+
+(** [out_jkind_of_jkind env jkind] converts a jkind to an [out_jkind]
+    for printing. This uses the same naming scheme as error messages (e.g.,
+    ['_representable_layout_N] for sort variables). *)
+val out_jkind_of_jkind: Env.t -> 'd Types.jkind -> out_jkind
+
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
@@ -297,8 +305,8 @@ module Variable_names: sig
   (** Add external type equalities*)
   val add_subst: (type_expr * type_expr) list -> unit
 
-  (** [reserve ty] registers the variable names appearing in [ty] *)
-  val reserve: type_expr -> unit
+  (** [reserve ~base ty] registers the variable names appearing in [ty] *)
+  val reserve: base:Mode.With_locality.Const.t -> type_expr -> unit
 end
 
 (** Register internal typechecker names ([$0],[$a]) appearing in the

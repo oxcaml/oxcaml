@@ -158,10 +158,15 @@ let () =
     assert (equal_arith (Smallint.of_string s) (int_of_string s)));
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;
+  (* Test constant folding *)
+  assert (Smallint.compare (Smallint.unsigned_div #0xFFs #1s) #0s < 0);
+  assert (Smallint.compare (Smallint.unsigned_rem #0xFEs #0xFFs) #0s < 0);
+  assert (Smallint.equal (Smallint.lognot #1s) (-#2s));
   ()
 
 (* test that the value is stored sign-extended in the register *)
-external get_register : Smallint.t -> nativeint = "get_register_bytecode" "get_register"
+external get_register : (Smallint.t[@unsafe_unextended]) -> nativeint
+  = "get_register_bytecode" "get_register"
 
 let () =
   assert (get_register (Smallint.shift_left (Smallint.max_int()) 1) = -2n);

@@ -74,9 +74,37 @@ val equal_exact : 'a t -> 'a t -> bool
     ones with a single component.) *)
 val is_one_param_of_kind_value : _ t -> bool
 
+(** Fold over an arity, left to right, including inside unboxed products. Each
+    parameter, and each member of an unboxed product, is folded on its own
+    starting from [init]; the results are then combined by [component] (for
+    parameters) and [unboxed_product] (for members), where [outer] is the
+    accumulator so far and [inner] the result for the next one. *)
+val fold :
+  init:'a ->
+  component:(outer:'a -> inner:'a -> 'a) ->
+  singleton:('a -> Flambda_kind.With_subkind.t -> 'a) ->
+  unboxed_product:(outer:'a -> inner:'a -> 'a) ->
+  _ t ->
+  'a
+
+(** Like [fold], but folds each parameter separately, returning one result per
+    parameter. *)
+val fold_per_parameter :
+  init:'a ->
+  singleton:('a -> Flambda_kind.With_subkind.t -> 'a) ->
+  unboxed_product:(outer:'a -> inner:'a -> 'a) ->
+  _ t ->
+  'a list
+
+(** Returns [Some kind] for every singleton parameter component and [None] for
+    unboxed products. *)
+val singleton_component_per_parameter :
+  _ t -> Flambda_kind.With_subkind.t option list
+
 (** Convert, in a left-to-right depth-first order, an arity into a flattened
-    list of kinds for all parameters. *)
-val unarize : [`Complex] t -> Flambda_kind.With_subkind.t list
+    list of kinds for all parameters. (For [`Unarized] arities this simply
+    returns the components.) *)
+val unarize : _ t -> Flambda_kind.With_subkind.t list
 
 (** Like [unarize] but works on arities that are known not to contain any
     unboxed products. *)
@@ -88,6 +116,10 @@ val unarize_per_parameter :
 
 (** Like [unarize] but returns a value of type [t]. *)
 val unarize_t : [`Complex] t -> [`Unarized] t
+
+(** Replace the kinds of the unarized components of an arity, given in the same
+    order as [unarize] returns them, preserving the structure of the arity. *)
+val with_unarized_kinds : 'uc t -> Flambda_kind.With_subkind.t list -> 'uc t
 
 (** Given an arity and an identifier, produce a list of identifiers (with
     corresponding kinds) whose length matches [unarize t], with names derived

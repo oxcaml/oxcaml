@@ -1,7 +1,15 @@
 [
   {
     "name": "root",
-    "reaches": ["init", "exn", "mem", "bytes", "bytes_get", "bytes_set"],
+    "reaches": [
+      "init",
+      "exn",
+      "mem",
+      "mem_size",
+      "bytes",
+      "bytes_get",
+      "bytes_set"
+    ],
     "root": true
   },
   {
@@ -17,6 +25,10 @@
     "export": "caml_buffer"
   },
   {
+    "name": "mem_size",
+    "export": "caml_buffer_size"
+  },
+  {
     "name": "bytes",
     "export": "caml_extract_bytes"
   },
@@ -30,7 +42,12 @@
   },
   {
     "name": "callback",
-    "export": "caml_callback"
+    "export": "caml_callback",
+    "reaches": ["effect_allowed"]
+  },
+  {
+    "name": "effect_allowed",
+    "export": "effect_allowed"
   },
   {
     "name": "wrap_callback",

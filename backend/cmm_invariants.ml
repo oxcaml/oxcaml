@@ -130,12 +130,14 @@ let rec check env (expr : Cmm.expression) =
   match expr with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Cvar _ | Cinvalid _ ->
+  | Cconst_mask _ | Cvar _ | Cinvalid _ ->
     ()
   | Clet (_, expr, body) ->
     check env expr;
     check env body
   | Cphantom_let (_, _, expr) ->
+    check env expr
+  | Cname_for_debugger (_, expr) ->
     check env expr
   | Ctuple exprs ->
     List.iter (check env) exprs
@@ -144,13 +146,13 @@ let rec check env (expr : Cmm.expression) =
   | Csequence (expr1, expr2) ->
     check env expr1;
     check env expr2
-  | Cifthenelse (test, _, ifso, _, ifnot, _) ->
+  | Cifthenelse (test, _, _, ifso, _, _, ifnot, _) ->
     check env test;
     check env ifso;
     check env ifnot
   | Cswitch (body, _, branches, _) ->
     check env body;
-    Array.iter (fun (expr, _) -> check env expr) branches
+    Array.iter (fun (expr, _, _) -> check env expr) branches
   | Ccatch (flag, handlers, body) ->
     let env_extended =
       List.fold_left

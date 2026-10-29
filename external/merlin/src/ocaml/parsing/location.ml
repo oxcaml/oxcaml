@@ -1020,6 +1020,12 @@ let error_of_printer ?(loc = none) ?(sub = []) ?(source=Typer)
 let error_of_printer_file ?source print x =
   error_of_printer ?source ~loc:(in_file !input_name) print x
 
+let multiple_errors ?loc = function
+  | [error] -> error
+  | errors ->
+      let sub = List.concat_map (fun err -> err.main :: err.sub) errors in
+      errorf ?loc ~sub "Multiple errors were encountered@,"
+
 (******************************************************************************)
 (* Reporting warnings: generating a report from a warning number using the
    information in [Warnings] + convenience functions. *)
@@ -1122,6 +1128,31 @@ let deprecated_script_alert program =
      message = Format.asprintf "@[@\n%a@]" Format.pp_print_text message}
   in
   prerr_alert none alert
+
+(*
+let set_from_env flag Clflags.{ parse; usage; env_var } =
+  try
+    match parse (Sys.getenv env_var) with
+    | None ->
+        prerr_warning none (Warnings.Bad_env_variable (env_var, usage))
+    | Some x -> match !flag with
+      | None -> flag := Some x
+      | Some _ -> ()
+  with
+    Not_found -> ()
+
+let read_clflags_from_env () =
+  set_from_env Clflags.color Clflags.color_reader;
+  let no_color () = (* See https://no-color.org/ *)
+    match Sys.getenv_opt "NO_COLOR" with
+    | None | Some "" -> false
+    | _ -> true
+  in
+  if Option.is_none !Clflags.color && no_color () then
+    Clflags.color := Some Misc.Color.Never;
+  set_from_env Clflags.error_style Clflags.error_style_reader;
+  ()
+*)
 
 (******************************************************************************)
 (* Reporting errors on exceptions *)

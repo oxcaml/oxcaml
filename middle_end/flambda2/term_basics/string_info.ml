@@ -14,52 +14,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type string_contents =
-  | Contents of string
-  | Unknown_or_mutable
-
-type t =
-  { contents : string_contents;
-    size : Target_ocaml_int.t
-  }
-
-let create ~contents ~size = { contents; size }
-
-let contents t = t.contents
-
-let size t = t.size
+type t = string
 
 include Container_types.Make (struct
-  type nonrec t = t
+  type t = string
 
-  let compare t1 t2 =
-    let c =
-      match t1.contents, t2.contents with
-      | Contents s1, Contents s2 -> String.compare s1 s2
-      | Unknown_or_mutable, Unknown_or_mutable -> 0
-      | Contents _, Unknown_or_mutable -> -1
-      | Unknown_or_mutable, Contents _ -> 1
+  let compare = String.compare
+
+  let equal = String.equal
+
+  let hash = String.hash
+
+  let print ppf str =
+    let size = String.length str in
+    let s, dots =
+      let max_size = 10 in
+      let long = size > max_size in
+      if long then String.sub str 0 8, "..." else str, ""
     in
-    if c <> 0 then c else Stdlib.compare t1.size t2.size
-
-  let equal t1 t2 = compare t1 t2 = 0
-
-  let hash t = Hashtbl.hash t
-
-  let print ppf { contents; size } =
-    match contents with
-    | Unknown_or_mutable ->
-      Format.fprintf ppf "(size %a)" Target_ocaml_int.print size
-    | Contents s ->
-      let s, dots =
-        let machine_width =
-          (* This value doesn't matter *)
-          Target_system.Machine_width.Sixty_four
-        in
-        let max_size = Target_ocaml_int.ten machine_width in
-        let long = Target_ocaml_int.compare size max_size > 0 in
-        if long then String.sub s 0 8, "..." else s, ""
-      in
-      Format.fprintf ppf "(size %a) (contents \"%S\"%s)" Target_ocaml_int.print
-        size s dots
+    Format.fprintf ppf "(size %d) (contents \"%S\"%s)" size s dots
 end)

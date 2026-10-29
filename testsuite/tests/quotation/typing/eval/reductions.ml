@@ -65,6 +65,13 @@ val f : <[string]> expr -> string = <fun>
 
 let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
 [%%expect {|
+Line 1, characters 41-42:
+1 | let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
+                                             ^
+Error: The value "x" has type "<[int]> expr"
+       but an expression was expected of type "<[string]> expr"
+       Type "int" is not compatible with type "string"
+|}, Principal{|
 Line 1, characters 36-42:
 1 | let f (x : <[int]> expr) : string = eval x (* type error: int ~/~ string *)
                                         ^^^^^^
@@ -96,7 +103,7 @@ let f (x : <[($('a), $('b)) Either.t]> expr)
 val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
-(* non-top-level type constructor -- locally abstract type *)
+(* non-persistent type constructor -- locally abstract type *)
 let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
 [%%expect {|
 Line 1, characters 36-50:
@@ -138,7 +145,10 @@ val f :
 let f (x : <[$('a) * $('b) * $('c)]> expr)
     : 'a eval * 'b eval * 'c eval = eval x
 [%%expect {|
-val f : <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval = <fun>
+val f :
+  ('a : any) ('b : any) ('c : any).
+    <[$('a) * $('b) * $('c)]> expr -> 'a eval * 'b eval * 'c eval =
+  <fun>
 |}]
 
 (* Unboxed tuples *)
@@ -324,13 +334,13 @@ val f :
   <[(module Map.OrderedType with type t = $('a)) -> unit]> expr ->
   (module Map.OrderedType with type t = 'a eval) -> unit = <fun>
 |}]
-(* non-top-level package type -- generative functor *)
+(* non-persistent package type -- generative functor *)
 module S () = struct
   module type T = sig
     type s
   end
 end
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 let _ = <[
   (* It is illegal to write [S()] in a type, so we have an intermediate [Z]. *)
   let module Z = S () in
@@ -444,6 +454,7 @@ Line 1, characters 42-43:
                                               ^
 Error: The value "x" has type "<[<[int]>]> eval eval"
        but an expression was expected of type "int"
+       Type "$(<[<[int]>]> eval)" is not compatible with type "int"
 |}]
 let f (x : <[ <[ <[int]> ]> ]> eval eval eval) : int = x
 [%%expect {|
@@ -452,6 +463,7 @@ Line 1, characters 55-56:
                                                            ^
 Error: The value "x" has type "<[<[<[int]>]>]> eval eval eval"
        but an expression was expected of type "int"
+       Type "$(<[<[<[int]>]>]> eval eval)" is not compatible with type "int"
 |}]
 let f (x : <[ <[ <[int]> ]> ]> eval eval expr) : <[int]> expr = x
 [%%expect {|
@@ -505,7 +517,7 @@ end
 module QuoteKinded : sig type t end
 module QuoteKindedParam : sig type 'a t end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 (* CR quoted-kinds jbachurski: None of the types on [x] should reduce and hence all tests
    with annotated results should error. *)
@@ -545,6 +557,7 @@ Line 1, characters 60-61:
                                                                 ^
 Error: The value "x" has type "<[<[int]> eval]> eval" = "int"
        but an expression was expected of type "<[<[int]>]> eval eval"
+       Type "int" is not compatible with type "$(<[<[int]>]> eval)"
 |}]
 (* This one should definitely succeed *)
 let f (x : <[<[int]> eval]> eval) : int = x

@@ -40,7 +40,7 @@ type t =
   | In_memory of Obj.t array
 
 module Idx = struct
-  type t = int
+  type 'a t = int
 end
 
 let create section_toc file channel ~first_section_offset =
@@ -79,14 +79,14 @@ let unsafe_get t index =
   | From_file { sections; channel } -> read_section sections channel index
   | In_memory sections -> sections.(index)
 
-let get t index =
+let get (type a) (t : t) (index : a Idx.t) : a =
   let len = length t in
   if index < 0 || index >= len
   then
     Misc.fatal_errorf
       "File_sections.get index out of bounds: index is %d, but length is %d"
       index len;
-  unsafe_get t index
+  Obj.obj (unsafe_get t index)
 
 let unsafe_blit_to_array t dest start_index =
   match t with
@@ -129,31 +129,10 @@ module Builder = struct
     Dynarray.ensure_capacity sections capacity;
     sections
 
-  let of_file_sections file_sections =
-    let length = length file_sections in
-    let t = create length in
-    for i = 0 to length - 1 do
-      Dynarray.add_last t (unsafe_get file_sections i)
-    done;
-    t
-
-  let add t section =
+  let add (type a) (t : t) (section : a) : a Idx.t =
     let idx = Dynarray.length t in
-    Dynarray.add_last t section;
+    Dynarray.add_last t (Obj.repr section);
     idx
-
-  let add_all t sections =
-    let offset = Dynarray.length t in
-    (match sections with
-    | From_file { sections; channel } ->
-      let num_new_sections = Array.length sections in
-      Dynarray.ensure_extra_capacity t num_new_sections;
-      for i = 0 to num_new_sections - 1 do
-        Dynarray.add_last t (read_section sections channel i)
-      done;
-    | In_memory sections ->
-      Dynarray.append_array t sections);
-    (fun i -> i + offset)
 
   let build t = In_memory (Dynarray.to_array t)
 

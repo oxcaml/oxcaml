@@ -374,12 +374,12 @@ module Type_structure = struct
     | Int32 -> "int32"
     | Int -> "int"
     | Float -> "float"
-    | Int64_u -> "int64#"
-    | Int32_u -> "int32#"
-    | Nativeint_u -> "nativeint#"
+    | Int64_u -> "int64_u"
+    | Int32_u -> "int32_u"
+    | Nativeint_u -> "nativeint_u"
     | Unit_u -> "unit_u"
     | Float_u -> "float#"
-    | Float32_u -> "float32#"
+    | Float32_u -> "float32_u"
     | Int64x2_u -> "int64x2#"
 
   let size (t : t) ~bytecode =
@@ -398,7 +398,18 @@ module Type_structure = struct
     match t with
     | Record (ts, Boxed) ->
       if bytecode
-      then List.length ts
+      then
+        (* A block whose only field is an unboxed product stores the fields of
+           that product directly. *)
+        match ts with
+        | [t] -> (
+          match layout t with
+          | Product layouts -> List.length layouts
+          | Void | Value _ | Float64 | Float32 | Bits64 | Bits32 | Vec128 | Word
+            ->
+            1
+        )
+        | _ -> List.length ts
       else
         List.fold_left ts ~init:0 ~f:(fun acc t ->
             acc + layout_size_in_block (layout t)
@@ -528,16 +539,16 @@ module Type = struct
     | Option t -> code t ^ " option"
     | Int -> "int"
     | Int64 -> "int64"
-    | Int64_u -> "int64#"
+    | Int64_u -> "int64_u"
     | Int32 -> "int32"
-    | Int32_u -> "int32#"
+    | Int32_u -> "int32_u"
     | Nativeint -> "nativeint"
-    | Nativeint_u -> "nativeint#"
+    | Nativeint_u -> "nativeint_u"
     | Unit_u -> "unit_u"
     | Float -> "float"
     | Float_u -> "float#"
     | Float32 -> "float32"
-    | Float32_u -> "float32#"
+    | Float32_u -> "float32_u"
     | String -> "string"
     | Int64x2_u -> "int64x2#"
 

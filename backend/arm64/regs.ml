@@ -40,7 +40,8 @@ module T = struct
       | Val | Int | Addr -> Int64
       | Float | Float32 -> Float128
       | Vec128 | Valx2 -> Float128
-      | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
+      | Vec256 | Vec512 | Mask ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask"
 
     let all = [Int64; Float128]
 
@@ -196,7 +197,8 @@ module T = struct
       | Float -> float_reg_name
       | Float32 -> float32_reg_name
       | Vec128 | Valx2 -> vec128_reg_name
-      | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
+      | Vec256 | Vec512 | Mask ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask"
     in
     names.(index_in_class)
 end

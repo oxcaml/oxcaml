@@ -26,6 +26,8 @@
 #include "gc_stats.h"
 #include "major_gc.h"
 #include "sizeclasses.h"
+#include "domain_state.h"
+#include "mlvalues.h"
 
 CAMLextern atomic_uintnat caml_compactions_count;
 
@@ -41,6 +43,15 @@ void caml_orphan_shared_heap(struct caml_heap_state* heap);
 
 // requires that the shared heap is empty
 void caml_free_shared_heap(struct caml_heap_state* heap);
+
+
+/* Add [size] bytes at [base] to the major heap. It should be already
+   filled with well-formed blocks, each with wosize >= 1. Once all the
+   extent's blocks are dead, the memory is returned to the caller via
+   [free_callback](base, size). */
+void caml_add_extent(struct caml_heap_state *local,
+                     void *base, size_t size,
+                     void (*free_callback)(void *, size_t));
 
 
 value* caml_shared_try_alloc(struct caml_heap_state*,

@@ -54,7 +54,9 @@ module Externality = struct
     (* We check that we're compiling to (64-bit) native code before counting
         External64 types as gc_ignorable, because bytecode is intended to be
         platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64 then External64 else External
+    if Clflags.target_is_native () && Sys.word_size = 64
+    then External64
+    else External
 end
 
 module Nullability = struct
@@ -119,7 +121,7 @@ module Separability = struct
     (* We check that we're compiling to (64-bit) native code before counting
         Non_pointer64 types as gc_ignorable, because bytecode is intended to be
         platform independent. *)
-    if !Clflags.native_code && Sys.word_size = 64
+    if Clflags.target_is_native () && Sys.word_size = 64
     then Non_pointer64
     else Non_pointer
 end
@@ -149,12 +151,21 @@ module Axis = struct
       (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
       Pack (Nonmodal Externality) ]
 
+  let equal (Pack axis1) (Pack axis2) =
+    match axis1, axis2 with
+    | Modal axis1, Modal axis2 ->
+      let axis1 = Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis1) in
+      let axis2 = Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis2) in
+      Int.equal (Mode.Modality.Axis.compare axis1 axis2) 0
+    | Nonmodal Externality, Nonmodal Externality -> true
+    | Modal _, Nonmodal _ | Nonmodal _, Modal _ -> false
+
   let name (type a) : a t -> string = function
     | Modal ax ->
       let (P ax) =
         P ax |> Mode.Crossing.Axis.to_modality |> Mode.Modality.Axis.to_value
       in
-      Fmt.asprintf "%a" Mode.Value.Axis.print ax
+      Fmt.asprintf "%a" Mode.With_regionality.Axis.print ax
     | Nonmodal Externality -> "externality"
 end
 

@@ -143,9 +143,6 @@ let simplify_condition = function
   | J.ECond (e, J.ENum one, J.ENum zero) when J.Num.is_one one && J.Num.is_zero zero -> e
   | J.ECond (e, J.ENum zero, J.ENum one) when J.Num.is_one one && J.Num.is_zero zero ->
       J.EUn (J.Not, e)
-  | J.ECond (J.EBin ((J.NotEqEq | J.NotEq), J.ENum n, y), e1, e2)
-  | J.ECond (J.EBin ((J.NotEqEq | J.NotEq), y, J.ENum n), e1, e2) ->
-      J.ECond (J.EBin (J.Band, y, J.ENum n), e1, e2)
   | cond -> cond
 
 let rec depth = function
@@ -192,9 +189,18 @@ and depth_class_block b =
       match s with
       | J.CEMethod _ -> acc
       | J.CEField _ -> acc
+      | J.CEAccessor _ -> acc
       | J.CEStaticBLock b -> depth_block b + 2)
 
 let expression_equal (a : J.expression) b = Poly.equal a b
+
+(* Whether fusing [if (e) var x = e; else var x = e2] into
+   [var x = e || e2] is sound: the original evaluates [e] twice when
+   truthy, the fused form only once, so [e] must be effect-free (this
+   also excludes property accesses, which can trigger getters). *)
+let can_be_evaluated_once = function
+  | J.EVar _ | J.EBool _ | J.ENum _ | J.EStr _ -> true
+  | _ -> false
 
 let binding_pattern_equal (a : J.binding_pattern) b = Poly.equal a b
 
@@ -220,13 +226,17 @@ let rec if_statement_2 ~function_end e loc iftrue truestop iffalse falsestop =
         | DeclIdent (x1, Some (e1, _)), DeclIdent (x2, Some (e2, _))
           when J.ident_equal x1 x2 ->
             let exp =
-              if expression_equal e1 e then J.EBin (J.Or, e, e2) else J.ECond (e, e1, e2)
+              if can_be_evaluated_once e && expression_equal e1 e
+              then J.EBin (J.Or, e, e2)
+              else J.ECond (e, e1, e2)
             in
             [ J.Variable_statement (Var, [ DeclIdent (x1, Some (exp, loc)) ]), loc ]
         | DeclPattern (p1, (e1, _)), DeclPattern (p2, (e2, _))
           when binding_pattern_equal p1 p2 ->
             let exp =
-              if expression_equal e1 e then J.EBin (J.Or, e, e2) else J.ECond (e, e1, e2)
+              if can_be_evaluated_once e && expression_equal e1 e
+              then J.EBin (J.Or, e, e2)
+              else J.ECond (e, e1, e2)
             in
             [ J.Variable_statement (Var, [ DeclPattern (p1, (exp, loc)) ]), loc ]
         | _ -> raise Not_assignment

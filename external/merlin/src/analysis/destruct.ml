@@ -80,6 +80,14 @@ end
 
 let placeholder = Ast_helper.Exp.hole ()
 
+let omega_with_sort env (label, ty) =
+  let sort : Jkind.Sort.t =
+    match Ctype.type_sort ~why:Tuple_element ~allow_mutation:false env ty with
+    | Ok sort -> sort
+    | Error _ -> Var (Jkind.Sort.new_genvar ())
+  in
+  (label, Patterns.omega, sort)
+
 let rec gen_patterns ?(recurse = true) env type_expr =
   let open Types in
   log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
@@ -92,13 +100,11 @@ let rec gen_patterns ?(recurse = true) env type_expr =
   | Tobject _ -> raise (Not_allowed "object type")
   | Tpackage _ -> raise (Not_allowed "modules")
   | Ttuple lst ->
-    let patterns =
-      (* Both [List.map] and [Patterns.omega_list] are length-preserving,
-         so [combine] won't raise.
-      *)
-      List.combine (List.map ~f:fst lst) (Patterns.omega_list lst)
-    in
+    let patterns = List.map lst ~f:(omega_with_sort env) in
     [ Tast_helper.Pat.tuple env type_expr patterns ]
+  | Tunboxed_tuple lst ->
+    let patterns = List.map lst ~f:(omega_with_sort env) in
+    [ Tast_helper.Pat.unboxed_tuple env type_expr patterns ]
   | Tconstr (path, _params, _) ->
     begin match Env.find_type_descrs path env with
     | Type_record (labels, _, _) ->
@@ -272,7 +278,7 @@ let collect_every_pattern_for_expression parent =
                   Typedtree.
                     { f =
                         (fun p ->
-                          List.memq Msupport.incorrect_attribute
+                          List.memq Typing_recovery_state.incorrect_attribute
                             ~set:p.pat_attributes)
                     }
                 in
@@ -384,7 +390,8 @@ let rec subst_patt initial ~by patt =
       { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
     | Tpat_tuple lst ->
       { patt with
-        pat_desc = Tpat_tuple (List.map lst ~f:(fun (lbl, p) -> (lbl, f p)))
+        pat_desc =
+          Tpat_tuple (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
       }
     | Tpat_unboxed_tuple lst ->
       { patt with
@@ -402,18 +409,16 @@ let rec subst_patt initial ~by patt =
       { patt with
         pat_desc = Tpat_variant (lbl, Option.map pat_opt ~f, row_desc)
       }
-    | Tpat_record (sub, sorts, repr, flg) ->
+    | Tpat_record (sub, repr, flg) ->
       let sub' =
         List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
       in
-      { patt with pat_desc = Tpat_record (sub', sorts, repr, flg) }
-    | Tpat_record_unboxed_product (sub, sorts, repr, flg) ->
+      { patt with pat_desc = Tpat_record (sub', repr, flg) }
+    | Tpat_record_unboxed_product (sub, repr, flg) ->
       let sub' =
         List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
       in
-      { patt with
-        pat_desc = Tpat_record_unboxed_product (sub', sorts, repr, flg)
-      }
+      { patt with pat_desc = Tpat_record_unboxed_product (sub', repr, flg) }
     | Tpat_array (m, sort, lst) ->
       { patt with pat_desc = Tpat_array (m, sort, List.map lst ~f) }
     | Tpat_or (p1, p2, row) ->
@@ -434,7 +439,8 @@ let rec rm_sub patt sub =
     { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
   | Tpat_tuple lst ->
     { patt with
-      pat_desc = Tpat_tuple (List.map lst ~f:(fun (lbl, p) -> (lbl, f p)))
+      pat_desc =
+        Tpat_tuple (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
     }
   | Tpat_unboxed_tuple lst ->
     { patt with
@@ -450,18 +456,16 @@ let rec rm_sub patt sub =
     }
   | Tpat_variant (lbl, pat_opt, row_desc) ->
     { patt with pat_desc = Tpat_variant (lbl, Option.map pat_opt ~f, row_desc) }
-  | Tpat_record (sub, sorts, repr, flg) ->
+  | Tpat_record (sub, repr, flg) ->
     let sub' =
       List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
     in
-    { patt with pat_desc = Tpat_record (sub', sorts, repr, flg) }
-  | Tpat_record_unboxed_product (sub, sorts, repr, flg) ->
+    { patt with pat_desc = Tpat_record (sub', repr, flg) }
+  | Tpat_record_unboxed_product (sub, repr, flg) ->
     let sub' =
       List.map sub ~f:(fun (lid, lbl_descr, patt) -> (lid, lbl_descr, f patt))
     in
-    { patt with
-      pat_desc = Tpat_record_unboxed_product (sub', sorts, repr, flg)
-    }
+    { patt with pat_desc = Tpat_record_unboxed_product (sub', repr, flg) }
   | Tpat_array (m, sort, lst) ->
     { patt with pat_desc = Tpat_array (m, sort, List.map lst ~f) }
   | Tpat_or (p1, p2, row) ->
@@ -475,7 +479,7 @@ let rec qualify_constructors ~unmangling_tables f pat =
   let qualify_constructors = qualify_constructors ~unmangling_tables in
   let qualify_in_record (type rep)
       (labels : (_ * rep Data_types.gen_label_description * _) list) lable_table
-      closed (record_form : rep Data_types.record_form) ~sorts ~(repr : rep) =
+      closed (record_form : rep Data_types.record_form) ~(repr : rep) =
     let labels =
       let open Longident in
       List.map labels ~f:(fun ((Location.{ txt; _ } as lid), lbl_des, pat) ->
@@ -496,9 +500,8 @@ let rec qualify_constructors ~unmangling_tables f pat =
       else closed
     in
     match record_form with
-    | Legacy -> Tpat_record (labels, sorts, repr, closed)
-    | Unboxed_product ->
-      Tpat_record_unboxed_product (labels, sorts, repr, closed)
+    | Legacy -> Tpat_record (labels, repr, closed)
+    | Unboxed_product -> Tpat_record_unboxed_product (labels, repr, closed)
   in
   let pat_desc =
     match pat.pat_desc with
@@ -506,17 +509,18 @@ let rec qualify_constructors ~unmangling_tables f pat =
       Tpat_alias { alias with pattern = qualify_constructors f p }
     | Tpat_tuple ps ->
       Tpat_tuple
-        (List.map ps ~f:(fun (lbl, p) -> (lbl, qualify_constructors f p)))
+        (List.map ps ~f:(fun (lbl, p, sort) ->
+             (lbl, qualify_constructors f p, sort)))
     | Tpat_unboxed_tuple ps ->
       Tpat_unboxed_tuple
         (List.map ps ~f:(fun (lbl, p, sort) ->
              (lbl, qualify_constructors f p, sort)))
-    | Tpat_record (labels, sorts, repr, closed) ->
+    | Tpat_record (labels, repr, closed) ->
       let _, label_table, _ = unmangling_tables in
-      qualify_in_record labels label_table closed Legacy ~sorts ~repr
-    | Tpat_record_unboxed_product (labels, sorts, repr, closed) ->
+      qualify_in_record labels label_table closed Legacy ~repr
+    | Tpat_record_unboxed_product (labels, repr, closed) ->
       let _, _, label_table = unmangling_tables in
-      qualify_in_record labels label_table closed Unboxed_product ~sorts ~repr
+      qualify_in_record labels label_table closed Unboxed_product ~repr
     | Tpat_construct (lid, cstr_desc, repr, ps, lco) ->
       let lid =
         match lid.Asttypes.txt with
@@ -569,15 +573,15 @@ let find_branch patterns sub =
       | Tpat_variant (_, Some p, _)
       | Tpat_lazy p -> is_sub_patt p ~sub
       | Tpat_tuple lst ->
-        List.exists lst ~f:(fun (_lbl, p) -> is_sub_patt ~sub p)
+        List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
       | Tpat_unboxed_tuple lst ->
         List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
       | Tpat_construct (_, _, _, lst, _) ->
         List.exists lst ~f:(fun (_, p) -> is_sub_patt ~sub p)
       | Tpat_array (_, _, lst) -> List.exists lst ~f:(is_sub_patt ~sub)
-      | Tpat_record (subs, _, _, _) ->
+      | Tpat_record (subs, _, _) ->
         List.exists subs ~f:(fun (_, _, p) -> is_sub_patt p ~sub)
-      | Tpat_record_unboxed_product (subs, _, _, _) ->
+      | Tpat_record_unboxed_product (subs, _, _) ->
         List.exists subs ~f:(fun (_, _, p) -> is_sub_patt p ~sub)
       | Tpat_or (p1, p2, _) -> is_sub_patt p1 ~sub || is_sub_patt p2 ~sub
   in
@@ -592,7 +596,7 @@ let find_branch patterns sub =
    reconstructed with the label. ie: [{a; b}] with destruction on [a]
    becomes [{a = destruct_result; b}]. *)
 let find_field_name_for_punned_field patt = function
-  | Pattern { pat_desc = Tpat_record (fields, _, _, _); _ } :: _ ->
+  | Pattern { pat_desc = Tpat_record (fields, _, _); _ } :: _ ->
     List.find_opt
       ~f:(fun (_, _, opat) ->
         let ppat_loc = patt.Typedtree.pat_loc
@@ -652,7 +656,7 @@ module Conv = struct
       | Tpat_constant c -> mkpat (Ppat_constant (Untypeast.constant c))
       | Tpat_alias { pattern = p; _ } -> loop p
       | Tpat_tuple lst ->
-        let lst = List.map ~f:(fun (lbl, p) -> (lbl, loop p)) lst in
+        let lst = List.map ~f:(fun (lbl, p, _sort) -> (lbl, loop p)) lst in
         mkpat (Ppat_tuple (lst, Closed))
       | Tpat_unboxed_tuple lst ->
         let lst = List.map ~f:(fun (lbl, p, _sort) -> (lbl, loop p)) lst in
@@ -673,9 +677,9 @@ module Conv = struct
       | Tpat_variant (label, p_opt, _row_desc) ->
         let arg = Option.map ~f:loop p_opt in
         mkpat (Ppat_variant (label, arg))
-      | Tpat_record (subpatterns, _, _, _closed_flag) ->
+      | Tpat_record (subpatterns, _, _closed_flag) ->
         conv_record labels subpatterns Legacy
-      | Tpat_record_unboxed_product (subpatterns, _, _, _closed_flag) ->
+      | Tpat_record_unboxed_product (subpatterns, _, _closed_flag) ->
         conv_record unboxed_labels subpatterns Unboxed_product
       | Tpat_array (mut, _, lst) ->
         let lst = List.map ~f:loop lst in

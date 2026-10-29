@@ -24,9 +24,6 @@
 #include "caml/misc.h"
 #include "caml/memory.h"
 #include "caml/osdeps.h"
-#include "caml/domain.h"
-#include "caml/startup.h"
-#include "caml/startup_aux.h"
 
 _Atomic caml_timing_hook caml_major_slice_begin_hook = (caml_timing_hook)NULL;
 _Atomic caml_timing_hook caml_major_slice_end_hook = (caml_timing_hook)NULL;
@@ -108,14 +105,12 @@ void caml_gc_log (const char *msg, ...)
   }
 }
 
-void caml_gc_message (int level, const char *msg, ...)
+void caml_gc_message (const char *msg, ...)
 {
-  if ((atomic_load_relaxed(&caml_verb_gc) & level) != 0){
-    va_list ap;
-    va_start(ap, msg);
-    print_log(msg, 0, ap);
-    va_end(ap);
-  }
+  va_list ap;
+  va_start (ap, msg);
+  print_log(msg, 0, ap);
+  va_end (ap);
 }
 
 _Atomic fatal_error_hook caml_fatal_error_hook = (fatal_error_hook)NULL;

@@ -33,7 +33,7 @@ module M :
     val send : 'a @ portable -> unit
   end
 |}]
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 (** Splicing non-legacy expressions **)
 
@@ -122,7 +122,7 @@ Error: This value is "local"
 (* Unique result *)
 <[ let x @ unique = M.x_unique () in x ]>
 [%%expect {|
-- : <[M.t]> expr = <[let x = (M.x_unique () : _ @ unique) in x]>
+- : <[M.t]> expr = <[let x : _ @ unique = (M.x_unique () : _ @ unique) in x]>
 |}];;
 
 (* Once result *)
@@ -139,7 +139,7 @@ Error: This value is "once"
 (* Portable result *)
 <[ let x @ portable = M.x in x ]>
 [%%expect {|
-- : <[M.t]> expr = <[let x = (M.x : _ @ portable) in x]>
+- : <[M.t]> expr = <[let x : _ @ portable = (M.x : _ @ portable) in x]>
 |}];;
 
 (* Contended result *)

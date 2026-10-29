@@ -66,7 +66,8 @@ let deciders =
     Unboxers.Nativeint.decider;
     Unboxers.Vec128.decider;
     Unboxers.Vec256.decider;
-    Unboxers.Vec512.decider ]
+    Unboxers.Vec512.decider;
+    Unboxers.Mask.decider ]
 
 let rec make_optimistic_decision ~depth ~recursive tenv ~param_type : U.decision
     =

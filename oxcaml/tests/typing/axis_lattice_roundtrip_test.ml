@@ -130,6 +130,14 @@ let co_sub_reference_impl (type t)
     (fun acc c -> if Axis.le a (Axis.join b c) then Axis.meet acc c else acc)
     Axis.max all_values
 
+let imply_reference_impl (type t)
+    (module Axis : Mode_intf.Lattice with type t = t) (all_values : t list)
+    (a : t) (b : t) =
+  (* imply(a, b) = join { c | meet(a, c) <= b } *)
+  List.fold_left
+    (fun acc c -> if Axis.le (Axis.meet a c) b then Axis.join acc c else acc)
+    Axis.min all_values
+
 let check_operations (type t) (module Axis : Mode_intf.Lattice with type t = t)
     label update extract (all_values : t list) =
   List.iter
@@ -158,6 +166,11 @@ let check_operations (type t) (module Axis : Mode_intf.Lattice with type t = t)
               expect_value "co_sub"
                 (extract (co_sub lhs rhs))
                 (co_sub_reference_impl
+                   (module Axis)
+                   all_values lhs_value rhs_value);
+              expect_value "imply"
+                (extract (imply lhs rhs))
+                (imply_reference_impl
                    (module Axis)
                    all_values lhs_value rhs_value);
               let expected_leq = Axis.le lhs_value rhs_value in
@@ -232,6 +245,43 @@ let check_of_axis_set () =
              Jkind_axis.Axis_set.print set (to_string expected)
              (to_string actual)))
     all_axis_sets
+
+let check_imply_mixed_axes () =
+  let from_top = sample_of_lattice top in
+  let mask =
+    lattice_of_sample
+      { from_top with
+        portability = Mode.Portability.Const.Shareable;
+        contention = Mode.Contention.Const.Shared;
+        statefulness = Mode.Statefulness.Const.Reading;
+        visibility = Mode.Visibility.Const.Read
+      }
+  in
+  let rhs =
+    lattice_of_sample
+      { from_top with
+        portability = Mode.Portability.Const.Portable;
+        contention = Mode.Contention.Const.Contended;
+        statefulness = Mode.Statefulness.Const.Stateless;
+        visibility = Mode.Visibility.Const.Immutable
+      }
+  in
+  let expected_result =
+    lattice_of_sample
+      { from_top with
+        portability = Mode.Portability.Const.Corruptible;
+        contention = Mode.Contention.Const.Corrupted;
+        statefulness = Mode.Statefulness.Const.Writing;
+        visibility = Mode.Visibility.Const.Write
+      }
+  in
+  let result = imply mask rhs in
+  if not (equal result expected_result)
+  then
+    failwith
+      (Format.asprintf "mixed-axis imply mismatch: expected %s, got %s"
+         (to_string expected_result)
+         (to_string result))
 
 let () =
   check_axis
@@ -316,4 +366,5 @@ let () =
     [ Jkind_axis.Externality.External;
       Jkind_axis.Externality.External64;
       Jkind_axis.Externality.Internal ];
-  check_of_axis_set ()
+  check_of_axis_set ();
+  check_imply_mixed_axes ()

@@ -71,20 +71,43 @@ module Datalog : sig
     end) : S with type t = int
   end
 
+  type 'v repr
+
+  val unit_repr : unit repr
+
+  (** The datalog engine can operate on a tables whose values are in a
+      user-provided lattice, extended with a distinguished maximal element
+      "null" (with [meet x null = meet null x = x] for all values [x] in the
+      user-provided lattice).
+
+      [diff_or_null y x] must compute the information provided by [y] that is
+      not already present in [x], i.e. any information added to [x] by
+      [meet x y]. More precisely, [diff_or_null] and [meet] must be related by
+      the following laws:
+
+      - [meet x (diff_or_null y x) = meet x y], and
+
+      - [meet x y = x ==> diff_or_null y x = null] (this is the criterion used
+        to detect fixed points)
+
+      {b Note}: [meet] and [diff_or_null] are only called if tables with this
+      representation are used as output of rules. *)
+  val lattice_repr :
+    print:(Format.formatter -> 'a -> unit) ->
+    meet:('a -> 'a -> 'a) ->
+    diff_or_null:('a -> 'a -> 'a Or_null.t) ->
+    'a repr
+
   type (!'t, !'k, !'v) table
 
-  (** The [provenance] argument is [true] by default. If set to [false],
-      provenance tracking will be disabled for this table. This is useful for
-      derived tables that are defined by a single rule, such as indices defined
-      by a permutation of another table. *)
+  val columns : ('t, 'k, 'v) table -> ('t, 'k, 'v) Column.hlist
+
   val create_table :
     ?provenance:bool ->
     name:string ->
-    default_value:'v ->
     ('t, 'k, 'v) Column.hlist ->
+    'v repr ->
     ('t, 'k, 'v) table
-
-  val columns : ('t, 'k, 'v) table -> ('t, 'k, 'v) Column.hlist
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
@@ -99,7 +122,10 @@ module Datalog : sig
       implication for the performance of iterations on the relation, and needs
       to be chosen carefully.
 
-      See documentation of [create_table] for the [provenance] argument.
+      The [provenance] argument is [true] by default. If set to [false],
+      provenance tracking will be disabled for this table. This is useful for
+      derived tables that are defined by a single rule, such as indices defined
+      by a permutation of another table.
 
       @raise Misc.Fatal_error if [schema] is empty.
 
@@ -167,7 +193,22 @@ module Datalog : sig
 
       let edge = atom edge_rel
       ]} *)
-  val atom : ('t, 'k) relation -> 'k Term.hlist -> [> `Atom of atom]
+  val atom : ('t, 'k, _) table -> 'k Term.hlist -> [> `Atom of atom]
+
+  (** [less_than_or_equal table args value], written [table(args) <= value],
+      represents the fact that the value stored in [table(args)] is at most
+      [value].
+
+      When used as an input, it binds the [value] to the value of [table(args)]
+      and this must be the only binding occurrence of [value].
+
+      When used as an output, it [meet]s the value with the existing content of
+      [table(args)].
+
+      {b Note}: [value] must be a local variable, not a constant or a parameter.
+  *)
+  val less_than_or_equal :
+    ('t, 'k, 'v) table -> 'k Term.hlist -> 'v Term.t -> [> `Atom of atom]
 
   val not : [< `Atom of atom] -> [> `Not_atom of atom]
 
@@ -183,9 +224,16 @@ module Datalog : sig
 
   val empty : database
 
+  (* Raises [Misc.Fatal_error] on missing nullary relations. Use
+     [get_table_or_null] instead. *)
   val get_table : ('t, 'k, 'v) table -> database -> 't
 
+  val get_table_or_null : ('t, 'k, 'v) table -> database -> 't Or_null.t
+
   val set_table : ('t, 'k, 'v) table -> 't -> database -> database
+
+  val set_table_or_null :
+    ('t, 'k, 'v) table -> 't Or_null.t -> database -> database
 
   (** [add_fact rel args db] records a fact into the database [db].
 
@@ -473,10 +521,6 @@ module Datalog : sig
     val run : ?stats:stats -> t -> database -> database
   end
 
-  type bindings
-
-  val print_bindings : Format.formatter -> bindings -> unit
-
   (** The type [('p, 'v) program] is the type of programs returning values of
       type ['v] with parameters ['p].
 
@@ -509,6 +553,13 @@ module Datalog : sig
 
   val where : hypothesis list -> ('p, 'a) program -> ('p, 'a) program
 
+  val bind :
+    string ->
+    ('k Constant.hlist -> 'v Or_null.t) ->
+    'k Term.hlist ->
+    ('v Term.t -> ('p, 'b) program) ->
+    ('p, 'b) program
+
   (** [yield args] is a query program that outputs the tuple [args]. *)
   val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.with_parameters) program
 
@@ -522,7 +573,7 @@ module Datalog : sig
   val deduce : deduction -> (nil, rule) program
 
   module Schema : sig
-    module type S = sig
+    module type Schema_type = sig
       type keys
 
       type value
@@ -531,7 +582,11 @@ module Datalog : sig
 
       val columns : (t, keys, value) Column.hlist
 
-      val default_value : value
+      val result_repr : value Table.result_repr
+    end
+
+    module type S = sig
+      include Schema_type
 
       val create : name:string -> (t, keys, value) table
 
@@ -543,14 +598,13 @@ module Datalog : sig
 
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
-      val remove : keys Constant.hlist -> t -> t
-
-      val union : (value -> value -> value option) -> t -> t -> t
-
       val find_opt : keys Constant.hlist -> t -> value option
     end
 
-    module Cons (C : Column.S) (S : S) :
+    module Nil :
+      Schema_type with type keys = nil and type value = unit and type t = unit
+
+    module Cons (C : Column.S) (S : Schema_type) :
       S
         with type keys = C.t -> S.keys
          and type t = S.t C.Map.t

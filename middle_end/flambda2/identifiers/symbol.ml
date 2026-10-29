@@ -18,3 +18,17 @@ include Int_ids.Symbol
 
 let is_predefined_exception t =
   Compilation_unit.equal (compilation_unit t) Compilation_unit.predef_exn
+
+let manufacture =
+  let c = ref (-1) in
+  fun cu name ->
+    let suffix =
+      incr c;
+      string_of_int !c
+    in
+    let name =
+      if Flambda_features.Expert.shorten_symbol_names ()
+      then "s" ^ suffix
+      else name ^ "_" ^ suffix
+    in
+    create cu (Linkage_name.of_string name)

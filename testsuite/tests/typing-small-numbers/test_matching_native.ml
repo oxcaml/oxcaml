@@ -1,6 +1,8 @@
 (* TEST
- flambda2;
  {
+   toplevel;
+ }{
+   flambda2;
    toplevel.opt;
  }
 *)
@@ -242,4 +244,19 @@ let forty =
 let five_hundred_partial =
   match #6S with
   | #0S | #1S | #2S | #3S | #4S | #5S | #6S | #7S | #8S | #9S | #10S -> 500
+;;
+
+external int8_u_of_int : int -> int8# = "%int8#_of_int"
+external char_u_of_int8_u : int8# -> char# = "%identity"
+
+let char_u_of_code code = char_u_of_int8_u (int8_u_of_int code)
+
+let[@inline never] f_count_in_hexstring = function
+  | #'\x00' -> 0
+  | #'\xf0' -> 1
+  | #'\xff' -> 2
+  | _ -> failwith "not implemented"
+
+let f_count_in_0xff = f_count_in_hexstring (char_u_of_code 0xff)
+let f_count_in_'xff' = f_count_in_hexstring #'\xff'
 ;;

@@ -45,8 +45,6 @@ module Serializable : sig
 
   val print : Format.formatter -> t -> unit
 
-  val name_domain : t -> Name.Set.t
-
   val ids_for_export : t -> Ids_for_export.t
 
   val apply_renaming : t -> Renaming.t -> t
@@ -84,6 +82,13 @@ val print : Format.formatter -> t -> unit
 val create :
   machine_width:Target_system.Machine_width.t ->
   resolver:(Compilation_unit.t -> Serializable.t option) ->
+  t
+
+(** Convert closure conversion approximations to a typing environment. *)
+val create_from_closure_conversion_approx :
+  machine_width:Target_system.Machine_width.t ->
+  resolver:(Compilation_unit.t -> Serializable.t option) ->
+  'a Value_approximation.t Symbol.Map.t ->
   t
 
 val machine_width : t -> Target_system.Machine_width.t

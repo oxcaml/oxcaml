@@ -190,10 +190,9 @@ module Fixit : sig
 
   val ( let@ ) : ('a -> 'b) -> 'a -> 'b
 end = struct
-  let empty columns =
-    Datalog.create_table ~name:"empty" ~default_value:() columns
+  let empty columns = Datalog.create_relation ~name:"empty" columns
 
-  let local name columns = Datalog.create_table ~name ~default_value:() columns
+  let local name columns = Datalog.create_relation ~name columns
 
   module Table = struct
     type ('t, 'k, 'v) t = ('t, 'k, 'v) Datalog.table
@@ -217,7 +216,9 @@ end = struct
       | [], [] -> db
       | from_table :: from_tables, to_table :: to_tables ->
         let db =
-          Datalog.set_table to_table (Datalog.get_table from_table db) db
+          Datalog.set_table_or_null to_table
+            (Datalog.get_table_or_null from_table db)
+            db
         in
         copy from_tables to_tables db
 
@@ -346,7 +347,8 @@ end = struct
     let body = g y in
     Now
       ( Seq (Run schedule, body),
-        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+        fun db ->
+          Datalog.set_table_or_null y (Datalog.get_table_or_null x db) db )
 
   let fix' x f =
     let y = Table.locals x in
@@ -373,7 +375,8 @@ end = struct
     let schedule = Datalog.Schedule.saturate (f y) in
     Now
       ( Map (Run schedule, fun db () -> Datalog.get_table y db),
-        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+        fun db ->
+          Datalog.set_table_or_null y (Datalog.get_table_or_null x db) db )
 
   let ( let@ ) f x = f x
 end
@@ -412,4 +415,94 @@ end = struct
   let cols =
     let open! Datalog.Column in
     [datalog_column_id]
+end
+
+module type Schema_with_renaming = sig
+  include Datalog.Schema.S with type value = unit
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end
+
+module Cons (C : sig
+  include Datalog.Column.S
+
+  val add_id_for_export : t -> Ids_for_export.t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end) (S : sig
+  include Datalog.Schema.Schema_type
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end) =
+struct
+  include Datalog.Schema.Cons (C) (S)
+
+  let ids_for_export t =
+    C.Map.fold
+      (fun key v ids_for_export ->
+        Ids_for_export.union ids_for_export
+          (C.add_id_for_export key (S.ids_for_export v)))
+      t Ids_for_export.empty
+
+  let apply_renaming t renaming =
+    C.Map.fold
+      (fun key v acc ->
+        C.Map.add
+          (C.apply_renaming key renaming)
+          (S.apply_renaming v renaming)
+          acc)
+      t C.Map.empty
+end
+
+module Code_id_or_name = struct
+  include Code_id_or_name
+
+  let add_id_for_export code_id_or_name ids_for_export =
+    Ids_for_export.add_code_id_or_name ids_for_export code_id_or_name
+
+  let apply_renaming code_id_or_name renaming =
+    Renaming.apply_code_id_or_name renaming code_id_or_name
+end
+
+module Field = struct
+  include Field
+
+  let add_id_for_export field ids_for_export =
+    Ids_for_export.add_field ids_for_export field
+
+  let apply_renaming field renaming = Renaming.apply_field renaming field
+end
+
+module Cofield = struct
+  include Cofield
+
+  (* Cofields are a simple [int] internally, so never need to be exported or
+     renamed. *)
+  let add_id_for_export _cofield ids_for_export = ids_for_export
+
+  let apply_renaming cofield _renaming = cofield
+end
+
+module Nil = struct
+  include Datalog.Schema.Nil
+
+  let ids_for_export _ = Ids_for_export.empty
+
+  let apply_renaming t _renaming = t
+end
+
+module Schemas = struct
+  module N = Cons (Code_id_or_name) (Nil)
+  module NN = Cons (Code_id_or_name) (N)
+  module NNN = Cons (Code_id_or_name) (NN)
+  module F = Cons (Field) (Nil)
+  module NF = Cons (Code_id_or_name) (F)
+  module FN = Cons (Field) (N)
+  module NFN = Cons (Code_id_or_name) (FN)
+  module CN = Cons (Cofield) (N)
+  module NCN = Cons (Code_id_or_name) (CN)
 end

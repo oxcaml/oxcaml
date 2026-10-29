@@ -33,16 +33,17 @@ val create : Cfg.t -> layout:layout -> t
 
 val cfg : t -> Cfg.t
 
+(** [with_cfg t cfg] returns a value that shares the layout of [t], but holds
+    [cfg]. It is intended for updates to function-level fields of the cfg: the
+    graph itself is expected to be unchanged. *)
+val with_cfg : t -> Cfg.t -> t
+
 val layout : t -> layout
 
 val set_layout : t -> layout -> unit
 
 (** Add to cfg, layout, and other data-structures that track labels. *)
 val add_block : t -> Cfg.basic_block -> after:Label.t -> unit
-
-val assign_blocks_to_section : t -> Label.t list -> string -> unit
-
-val get_section : t -> Label.t -> string option
 
 (** Remove from cfg, layout, and other data-structures that track labels. *)
 val remove_blocks : t -> Label.Set.t -> unit

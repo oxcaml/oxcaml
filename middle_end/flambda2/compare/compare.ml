@@ -439,7 +439,7 @@ and subst_apply env apply =
   let exn_continuation = Apply_expr.exn_continuation apply in
   let args = List.map (subst_simple env) (Apply_expr.args apply) in
   let call_kind = subst_call_kind env (Apply_expr.call_kind apply) in
-  let alloc_mode = Apply_expr.alloc_mode apply in
+  let return_mode = Apply_expr.return_mode apply in
   let dbg = Apply_expr.dbg apply in
   let inlined = Apply_expr.inlined apply in
   let inlining_state = Apply_expr.inlining_state apply in
@@ -448,7 +448,7 @@ and subst_apply env apply =
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
   Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
-    ~alloc_mode dbg ~inlined ~inlining_state ~probe:None ~position
+    ~return_mode dbg ~inlined ~inlining_state ~probe:None ~position
     ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
@@ -459,10 +459,12 @@ and subst_apply_cont env apply_cont =
   let dbg = Apply_cont_expr.debuginfo apply_cont in
   Apply_cont_expr.create ?trap_action cont ~args ~dbg
 
+and subst_switch_arm env arm = Switch_arm.map_action (subst_apply_cont env) arm
+
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
   let arms =
-    Target_ocaml_int.Map.map_sharing (subst_apply_cont env)
+    Target_ocaml_int.Map.map_sharing (subst_switch_arm env)
       (Switch_expr.arms switch)
   in
   Expr.create_switch
@@ -1035,8 +1037,8 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Flambda_arity.equal_exact
          (Apply.return_arity apply1)
          (Apply.return_arity apply2)
-    && Alloc_mode.For_applications.compare (Apply.alloc_mode apply1)
-         (Apply.alloc_mode apply2)
+    && Alloc_mode.For_applications.compare (Apply.return_mode apply1)
+         (Apply.return_mode apply2)
        = 0
   in
   let ok = ref atomic_things_equal in
@@ -1062,7 +1064,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             ~continuation:(Apply.continuation apply1)
             (Apply.exn_continuation apply1)
             ~args:args1' ~call_kind:call_kind1'
-            ~alloc_mode:(Apply.alloc_mode apply1) (Apply.dbg apply1)
+            ~return_mode:(Apply.return_mode apply1) (Apply.dbg apply1)
             ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
@@ -1099,15 +1101,21 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
           ~dbg:(Apply_cont.debuginfo apply_cont1))
   else Different { approximant = subst_apply_cont env apply_cont1 }
 
+let switch_arms env arm1 arm2 : Switch_arm.t Comparison.t =
+  let action1 = Switch_arm.action arm1 in
+  let action2 = Switch_arm.action arm2 in
+  apply_cont_exprs env action1 action2
+  |> Comparison.map ~f:(fun action ->
+      Switch_arm.map_action (fun _ -> action) arm1)
+
 let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
   let compare_arms env arms1 arms2 =
     lists
       ~f:
         (pairs
            ~f1:(Comparator.of_predicate Target_ocaml_int.equal)
-           ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
-      ~subst:(fun env (target_imm, apply_cont) ->
-        target_imm, subst_apply_cont env apply_cont)
+           ~f2:switch_arms ~subst2:subst_switch_arm)
+      ~subst:(fun env (target_imm, arm) -> target_imm, subst_switch_arm env arm)
       ~subst_snd:true env
       (Target_ocaml_int.Map.bindings arms1)
       (Target_ocaml_int.Map.bindings arms2)
@@ -1366,12 +1374,6 @@ let flambda_units u1 u2 =
   let toplevel_my_alloc_region =
     Variable.create "toplevel_my_alloc_region" Flambda_kind.region
   in
-  let toplevel_my_region =
-    Variable.create "toplevel_my_region" Flambda_kind.region
-  in
-  let toplevel_my_ghost_region =
-    Variable.create "toplevel_my_ghost_region" Flambda_kind.region
-  in
   let mk_renaming u =
     let renaming = Renaming.empty in
     let renaming =
@@ -1389,16 +1391,6 @@ let flambda_units u1 u2 =
         (Flambda_unit.toplevel_my_alloc_region u)
         ~guaranteed_fresh:toplevel_my_alloc_region
     in
-    let renaming =
-      Renaming.add_fresh_variable renaming
-        (Flambda_unit.toplevel_my_region u)
-        ~guaranteed_fresh:toplevel_my_region
-    in
-    let renaming =
-      Renaming.add_fresh_variable renaming
-        (Flambda_unit.toplevel_my_ghost_region u)
-        ~guaranteed_fresh:toplevel_my_ghost_region
-    in
     renaming
   in
   let env = Env.create () in
@@ -1409,5 +1401,4 @@ let flambda_units u1 u2 =
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol
-        ~used_value_slots:Unknown ~toplevel_my_alloc_region ~toplevel_my_region
-        ~toplevel_my_ghost_region)
+        ~toplevel_my_alloc_region)

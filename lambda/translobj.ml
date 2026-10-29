@@ -58,7 +58,7 @@ let rec is_path = function
 
 let meth obj lab =
   let tag = meth_tag lab in
-  if not (!cache_required && !Clflags.native_code) then (tag, []) else
+  if not (!cache_required && Clflags.target_is_native ()) then (tag, []) else
   if not (is_path obj) then next_cache tag else
   try
     let r = List.assoc obj !method_table in
@@ -134,7 +134,7 @@ let transl_label_init_flambda f =
   transl_label_init_general (fun () -> expr, repr)
 
 let transl_label_init f =
-  if !Clflags.native_code || Clflags.is_flambda2 () then
+  if Clflags.target_is_native () || Clflags.is_flambda2 () then
     transl_label_init_flambda f
   else
     transl_label_init_general f
@@ -149,6 +149,26 @@ let method_ids = ref Ident.Set.empty
 let oo_add_class id =
   classes := id :: !classes;
   (!top_env, !cache_required)
+
+let layout_of_shared_const id =
+  Hashtbl.fold
+    (fun c const_id acc ->
+       if Ident.same id const_id
+       then Some (Lambda.structured_constant_layout c)
+       else acc)
+    consts None
+
+let layout_of_ident id =
+  if List.exists (Ident.same id) !classes
+  then Some Lambda.layout_class
+  else
+    match layout_of_shared_const id with
+    | Some _ as layout -> layout
+    | None ->
+      match !method_cache with
+      | Lvar cache_id when Ident.same id cache_id ->
+        Some (Lambda.layout_array Pgenarray)
+      | _ -> None
 
 let oo_wrap_gen env req f x =
   if !wrapping then

@@ -1,0 +1,27 @@
+(* TEST
+  setup-simple-build-env;
+  run-expect;
+  reference = "${test_source_directory}/principal_trailing_code.reference";
+  check-program-output;
+*)
+
+(* Trailing code with different -principal and -no-principal outputs *)
+type t1 = A
+type t2 = A
+let x = [(A : t1); A]
+
+[%%expect{|
+type t1 = A
+type t2 = A
+val x : t1 list = [A; A]
+|}, Principal{|
+type t1 = A
+type t2 = A
+Line 3, characters 19-20:
+3 | let x = [(A : t1); A]
+                       ^
+Warning 18 [not-principal]: this type-based constructor disambiguation is not
+  principal.
+
+val x : t1 list = [A; A]
+|}]

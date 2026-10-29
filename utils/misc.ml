@@ -157,6 +157,11 @@ module Stdlib = struct
       in
       loop []
 
+    let rec split3 = function
+      | [] -> ([], [], [])
+      | (x,y,z)::l ->
+        let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
+
     let concat_map2 f l1 l2 =
       let rec aux f acc = function
         | [], [] -> rev acc
@@ -329,6 +334,10 @@ module Stdlib = struct
   module Option = struct
     type 'a t = 'a option
 
+    let exists p t = match t with
+      | Some x -> p x
+      | None -> false
+
     let first_some a b = match a with
       | Some _ -> a
       | None -> b ()
@@ -363,6 +372,13 @@ module Stdlib = struct
       let r = ref x in
       for i = 0 to Array.length a1 - 1 do
         r := f !r (Array.unsafe_get a1 i) (Array.unsafe_get a2 i)
+      done;
+      !r
+
+    let fold_lefti f x a =
+      let r = ref x in
+      for i = 0 to Array.length a - 1 do
+        r := f i !r (Array.unsafe_get a i)
       done;
       !r
 
@@ -452,6 +468,10 @@ module Stdlib = struct
           dst_pos := !dst_pos + len
         done;
         dst
+
+      let filteri (f : int -> 'a -> bool) (array : 'a array) =
+        (* CR ttebbi: This could be more efficient. *)
+        array |> Array.to_list |> List.filteri f |> Array.of_list
   end
 
   module String = struct
@@ -1095,6 +1115,11 @@ let rec log2 n =
 let rec log2_nativeint n =
   if n <= 1n then 0 else 1 + log2_nativeint (Nativeint.shift_right n 1)
 
+let rec count_leading_zeroes_nativeint n =
+  if n = 0n
+  then Nativeint.size
+  else count_leading_zeroes_nativeint (Nativeint.shift_right_logical n 1) - 1
+
 let power ~base n =
   let res = ref 1 in
   for _ = 1 to n do
@@ -1131,15 +1156,10 @@ let letter_of_int n =
   else letter ^ Int.to_string num
 
 module Int_literal_converter = struct
-  (* To convert integer literals, allowing max_int + 1 (PR#4210) *)
-  let cvt_int_aux str neg of_string =
-    if String.length str = 0 || str.[0]= '-'
-    then of_string str
-    else neg (of_string ("-" ^ str))
-  let int s = cvt_int_aux s (~-) int_of_string
-  let int32 s = cvt_int_aux s Int32.neg Int32.of_string
-  let int64 s = cvt_int_aux s Int64.neg Int64.of_string
-  let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
+  let int s = int_of_string s
+  let int32 s = Int32.of_string s
+  let int64 s = Int64.of_string s
+  let nativeint s = Nativeint.of_string s
 
   (* Follows "parse_sign_and_base" in runtime/ints.c *)
   let parse_signedness s =
@@ -1168,7 +1188,7 @@ module Int_literal_converter = struct
     let max_uint = (1 lsl bits) - 1 in
     let lower_limit, upper_limit =
       if parse_signedness str
-      then min_int, max_int + 1
+      then min_int, max_int
       else -max_uint, max_uint
     in
     if i < lower_limit || i > upper_limit
@@ -2216,89 +2236,6 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
-module Json = struct
-
-  (* [escape_unicode] is based on [Bytes.unsafe_escape], which is used
-     for the format specifier [%S]. It is adjusted to output unicode escape
-     chacarcters \u00HH instead of the usual OCaml character literals \DDD.
-     Adds quotes around the input string. *)
-  let escape_unicode str =
-    let s = Bytes.of_string str in
-    let n = ref 2 in (* for the quotes *)
-    for i = 0 to Bytes.length s - 1 do
-      n := !n +
-        (match Bytes.unsafe_get s i with
-        | '\"' | '\\' | '\n' | '\t' | '\r' | '\b' -> 2
-        | ' ' .. '~' -> 1
-        | _ -> 6)
-    done;
-    begin
-      let s' = Bytes.create !n in
-      Bytes.unsafe_set s' 0 '\"';
-      n := 1;
-      for i = 0 to Bytes.length s - 1 do
-        begin match Bytes.unsafe_get s i with
-        | ('\"' | '\\') as c ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n c
-        | '\n' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'n'
-        | '\t' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 't'
-        | '\r' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'r'
-        | '\b' ->
-            Bytes.unsafe_set s' !n '\\'; incr n; Bytes.unsafe_set s' !n 'b'
-        | (' ' .. '~') as c -> Bytes.unsafe_set s' !n c
-        | c ->
-            let a = Char.code c in
-            let hex_char n =
-              if n < 10 then Char.chr (48 + n)  (* '0'-'9' *)
-              else Char.chr (55 + n)            (* 'A'-'F' *)
-            in
-            Bytes.unsafe_set s' !n '\\';
-            incr n;
-            Bytes.unsafe_set s' !n 'u';
-            incr n;
-            Bytes.unsafe_set s' !n '0';
-            incr n;
-            Bytes.unsafe_set s' !n '0';
-            incr n;
-            Bytes.unsafe_set s' !n (hex_char (a / 16));
-            incr n;
-            Bytes.unsafe_set s' !n (hex_char (a mod 16));
-        end;
-        incr n
-      done;
-      Bytes.unsafe_set s' !n '\"';
-      String.of_bytes s'
-    end
-
-
-  let field name value = Printf.sprintf "%s: %s" (escape_unicode name) value
-
-  let string value = escape_unicode value
-
-  let int value = string_of_int value
-
-  (* Use %.17g instead of string_of_float to avoid invalid JSON output.
-     [string_of_float] can produce "1." for whole numbers, which is not valid
-     JSON. %.17g provides full double precision and produces valid JSON
-     numbers. *)
-  let float value = Printf.sprintf "%.17g" value
-
-  let object_ fields =
-    let field_strings = String.concat ",\n" fields in
-    Printf.sprintf "{\n%s\n}" field_strings
-
-  let array items =
-    let item_strings = String.concat ",\n" items in
-    Printf.sprintf "[\n%s\n]" item_strings
-
-  let null = "null"
-
-  let option f = function None -> null | Some v -> f v
-end
-
 module Nonempty_list = struct
   type nonrec 'a t = ( :: ) of 'a * 'a list
 
@@ -2438,4 +2375,107 @@ module Colours = struct
     if debug_push_and_pop then output ppf "\u{2191}"
 
   let none ppf = push ppf
+
+  let wrap directive pp ppf x =
+    Format.fprintf ppf "%t%a%t" directive pp x pop
+end
+
+module Sexp = struct
+
+  type field =
+    | Bool : Colours.directive option * string * bool -> field
+    | Int : Colours.directive option * string * int -> field
+    | String : Colours.directive option * string * string -> field
+    | Float : Colours.directive option * string * float -> field
+    | Fmt : Colours.directive option * (Format.formatter -> unit) -> field
+    | Print :
+        Colours.directive option *
+        string * (Format.formatter -> 'a -> unit) * 'a -> field
+    | Option :
+        Colours.directive option *
+        string * (Format.formatter -> 'a -> unit) * 'a option -> field
+
+  let d ?colour s i = Int (colour, s, i)
+  let b ?colour s b = Bool (colour, s, b)
+  let f ?colour s f = Float (colour, s, f)
+  let s ?colour s1 s2 = String (colour, s1, s2)
+  let a ?colour s x pp = Print (colour, s, pp, x)
+  let o ?colour s x pp = Option (colour, s, pp, x)
+  let fmt ?colour format = Format.kdprintf (fun f -> Fmt (colour, f)) format
+
+  let spacer ppf first =
+    if !first then first := false else Format.pp_print_space ppf ()
+
+  let print_field ~first ppf field =
+    let fprintf colour ppf fmt =
+      match colour with
+      | None ->
+        Format.fprintf ppf "%a@[<hov 1>" spacer first;
+        Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf fmt
+      | Some colour ->
+        Format.fprintf ppf "%a@[<hov 1>%t" spacer first colour;
+        Format.kfprintf
+          (fun ppf -> Format.fprintf ppf "%t@]" Colours.pop) ppf fmt
+    in
+    match field with
+    | String (colour, name, s) ->
+      fprintf colour ppf "(%s@ %s)" name s
+    | Bool (colour, name, b) ->
+      fprintf colour ppf "(%s@ %b)" name b
+    | Int (colour, name, i) ->
+      fprintf colour ppf "(%s@ %d)" name i
+    | Float (colour, name, f) ->
+      fprintf colour ppf "(%s@ %f)" name f
+    | Fmt (colour, t) ->
+      fprintf colour ppf "%t" t
+    | Print (colour, name, pp, x) ->
+      fprintf colour ppf "(%s@ @[<hov>%a@])" name pp x
+    | Option (colour, name, pp, opt) -> (
+        match opt with
+        | None -> ()
+        | Some x ->
+          fprintf colour ppf "(%s@ %a)" name pp x
+      )
+
+  let print ppf (l : field list) =
+    let[@local] default () =
+      let first = ref true in
+      Format.fprintf ppf "@[<hov 1>(";
+      List.iter (print_field ~first ppf) l;
+      Format.fprintf ppf ")@]"
+    in
+    match l with
+    | [field] ->
+        begin match field with
+        | (String _ | Bool _ | Int _ | Float _ | Print _) ->
+          (* avoid double parenthesis when there is a single field
+             (except for Fmt fields which don't have parentheses) *)
+           print_field ~first:(ref true) ppf field
+          | (Fmt _| Option _) ->
+           default ()
+        end
+    | _ -> default ()
+
+end
+
+module Or_null = struct
+  type 'a t = Null | This of 'a [@@or_null]
+
+  let return x = This x
+
+  let bind t f = match t with Null -> Null | This x -> f x
+
+  let ( >>= ) t f = bind t f
+
+  let map f t = match t with Null -> Null | This x -> This (f x)
+
+  let both t1 t2 =
+    match t1 with Null -> Null | This x -> map (fun y -> x, y) t2
+
+  module Syntax = struct
+    let ( let+ ) t f = map f t
+    let ( and+ ) t1 t2 = both t1 t2
+    let ( let* ) t f = bind t f
+    let ( and* ) t1 t2 = both t1 t2
+  end
 end

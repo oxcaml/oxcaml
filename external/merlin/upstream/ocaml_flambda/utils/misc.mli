@@ -161,6 +161,8 @@ module Stdlib : sig
 
     val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
 
+    val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+
     val concat_map2 : ('a -> 'b -> 'c list) -> 'a list -> 'b list -> 'c list
     (** [concat_map2 f l1 l2] gives the same result as [concat (map2 f l1 l2)].
         Tail-recursive. *)
@@ -259,6 +261,9 @@ module Stdlib : sig
   module Option : sig
     type 'a t = 'a option
 
+    val exists : ('a -> bool) -> 'a option -> bool
+    (** [exists p o] is [p x] if [o] is [Some x], and [false] otherwise. *)
+
     (* short circuits if the first argument really is a [Some] *)
     val first_some : 'a option -> (unit -> 'a option) -> 'a option
 
@@ -286,6 +291,10 @@ module Stdlib : sig
         to have different lengths.
     *)
 
+    val fold_lefti : (int -> 'acc -> 'a -> 'acc) -> 'acc -> 'a array -> 'acc
+    (** [fold_lefti f init a] is like [Array.fold_left] but [f] also takes
+        as parameter the zero-based index of the element *)
+
     val for_alli : (int -> 'a -> bool) -> 'a array -> bool
     (** Same as [Array.for_all] from the standard library, but the
         function is applied with the index of the element as first argument,
@@ -308,6 +317,10 @@ module Stdlib : sig
 
     val concat_arrays : 'a array array -> 'a array
     (** Concatenate an array of arrays into a single array. *)
+
+    val filteri : (int -> 'a -> bool) -> 'a array -> 'a array
+    (** Filter an array with the current index into a new array, possibly
+        reducing the array length. *)
   end
 
 (** {2 Extensions to the String module} *)
@@ -534,6 +547,12 @@ val log2_nativeint: nativeint -> int
     [n = Nativeint.shift_left 1n s]
 *)
 
+val count_leading_zeroes_nativeint: nativeint -> int
+(** [count_leading_zeroes_nativeint n] computes the number of leading zeroes
+    when [n] is written in binary using [Nativeint.size] bits.
+    [count_leading_zeroes_nativeint 0n = Nativeint.size].
+*)
+
 val power : base:int -> int -> int
 (** [power ~base x] computes [base**x]. *)
 
@@ -569,9 +588,7 @@ val letter_of_int : int -> string
 
 module Int_literal_converter : sig
   val int : string -> int
-    (** Convert a string to an integer.  Unlike {!Stdlib.int_of_string},
-        this function accepts the string representation of [max_int + 1]
-        and returns [min_int] in this case. *)
+    (** Convert a string to an integer. *)
 
   val int8 : string -> int
     (** Likewise, at type [int8] *)
@@ -1239,42 +1256,6 @@ type alerts = string Stdlib.String.Map.t
 
 val remove_double_underscores : string -> string
 
-(** {1 JSON utilities} *)
-module Json : sig
-  (** Simple (and not very robust) JSON generation utilities.
-
-      Everything is string based, creating lots of intermediate strings.
-      Moreover, [Json.string] uses a custom string encoding based on the code
-      for the format specifier [%S], but with escapes for [\u00HH] instead of
-      OCaml's [\DDD]. *)
-
-  val field : string -> string -> string
-  (** [field name value] creates a JSON field with the given name and value. *)
-
-  val string : string -> string
-  (** [string value] formats a string value as a JSON string. *)
-
-  val int : int -> string
-  (** [int value] formats an integer value as a JSON number. *)
-
-  val float : float -> string
-  (** [float value] formats a float value as a JSON number. *)
-
-  val object_ : string list -> string
-  (** [object_ fields] creates a JSON object from a list of field strings. *)
-
-  val array : string list -> string
-  (** [array items] creates a JSON array from a list of item strings. *)
-
-  val null : string
-  (** [null] is the JSON null literal. *)
-
-  val option : ('a -> string) -> 'a option -> string
-  (** [option f opt] formats an optional value as JSON.
-      Returns the JSON [null] literal for [None],
-      or applies [f] to the value for [Some v]. *)
-end
-
 (** Non-empty lists *)
 module Nonempty_list : sig
   type nonrec 'a t = ( :: ) of 'a * 'a list
@@ -1356,4 +1337,67 @@ module Colours : sig
   (** Run [f] with colour output globally disabled, restoring the previous
       setting when [f] returns (or raises). *)
   val without_colours : f:(unit -> 'a) -> 'a
+
+  (* "wrap" a printing function, introducing the directive before it, and then
+     a pop afterwards *)
+  val wrap :
+    directive ->
+    (Format.formatter -> 'a -> unit) ->
+    (Format.formatter -> 'a -> unit)
+end
+
+(** {1 {Sexp printing utilities} *)
+module Sexp : sig
+
+  type field
+  (** Fields (or atoms) of s-expressions *)
+
+  val d : ?colour:Colours.directive -> string -> int -> field
+  val b : ?colour:Colours.directive -> string -> bool -> field
+  val f : ?colour:Colours.directive -> string -> float -> field
+  val s : ?colour:Colours.directive -> string -> string -> field
+  val a :
+    ?colour:Colours.directive ->
+    string -> 'a -> (Format.formatter -> 'a -> unit) -> field
+  (** Convenient functions for creating fields. These functions use the same
+      one-letter shorthands as found in printf/format strings:
+      - 'd' for integers
+      - 'b' for booleans
+      - 'f' for floating point numbers
+      - 's' for strings
+      - 'a' for a custom printing function *)
+
+  val o :
+    ?colour:Colours.directive ->
+    string -> 'a option -> (Format.formatter -> 'a -> unit) -> field
+  (** Create an optional field: if the provided value is [None], then the field
+      will not be printed. *)
+
+  val fmt :
+    ?colour:Colours.directive ->
+    ('a, Format.formatter, unit, field) format4 -> 'a
+  (* Create an atom with no field name, from a custom format string. *)
+
+  val print : Format.formatter -> field list -> unit
+  (** Print a list of fields/atoms as an s-expression. *)
+
+end
+
+(** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a
+    flat or_null cannot nest, so there is no [join]. *)
+module Or_null : sig
+  type 'a t = Null | This of 'a [@@or_null]
+
+  val return : 'a -> 'a t
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+  val map : ('a -> 'b) -> 'a t -> 'b t
+  val both : 'a t -> 'b t -> ('a * 'b) t
+
+  module Syntax : sig
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+  end
 end

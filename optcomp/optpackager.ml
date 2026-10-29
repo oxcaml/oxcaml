@@ -98,16 +98,16 @@ end) : S = struct
     Profile.record_call pack_name (fun () ->
         let objtemp =
           if !Clflags.keep_asm_file
-          then Unit_info.Artifact.prefix target ^ ".pack" ^ Config.ext_obj
+          then Unit_info.Artifact.prefix target ^ ".pack" ^ Backend.ext_obj
           else
             (* Put the full name of the module in the temporary file name to
                avoid collisions with MSVC's link /lib in case of successive
                packs *)
             let name =
-              Symbol.for_current_unit () |> Symbol.linkage_name
+              Current_unit.symbol () |> Symbol.linkage_name
               |> Linkage_name.to_string
             in
-            Filename.temp_file name Config.ext_obj
+            Filename.temp_file name Backend.ext_obj
         in
         let components =
           List.map
@@ -115,7 +115,7 @@ end) : S = struct
               match m.pm_kind with
               | PM_intf -> None
               | PM_impl _ ->
-                Some (CU.create_child (CU.get_current_exn ()) m.pm_name))
+                Some (CU.create_child (Current_unit.get_cu_exn ()) m.pm_name))
             members
         in
         let compilation_unit = Unit_info.Artifact.modname target in
@@ -126,7 +126,7 @@ end) : S = struct
         in
         let code =
           Simplif.simplify_lambda code
-            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
             ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
         in
         let main_module_block_format : Lambda.main_module_block_format =
@@ -135,14 +135,9 @@ end) : S = struct
                 Module_value_only { field_count = main_module_block_size }
             }
         in
-        let arg_block_idx =
-          (* Packs not supported as argument modules *)
-          None
-        in
         let program =
           { Lambda.code;
             main_module_block_format;
-            arg_block_idx;
             compilation_unit;
             required_globals
           }
@@ -152,7 +147,7 @@ end) : S = struct
           ~prefixname ~ppf_dump program;
         let objfiles =
           List.map
-            (fun m -> Filename.remove_extension m.pm_file ^ Config.ext_obj)
+            (fun m -> Filename.remove_extension m.pm_file ^ Backend.ext_obj)
             (List.filter (fun m -> m.pm_kind <> PM_intf) members)
         in
         Misc.try_finally
@@ -183,23 +178,22 @@ end) : S = struct
         members []
     in
     let ui =
-      (* [arg_descr] is None because we don't allow packs to be arguments. *)
-      Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
+      (* [static_data] is empty as we don't support packs with layout poly. *)
+      Compilenv.build_unit_info ~main_module_block_format
+        ~static_data:(Slambdaeval.CU_data.empty ())
     in
     let file_sections =
-      File_sections.Builder.of_file_sections ui.ui_file_sections
-    in
-    let section_id_mapping =
-      List.map
-        (fun info ->
-          File_sections.Builder.add_all file_sections info.ui_file_sections)
-        units
+      let length =
+        List.fold_left
+          (fun acc info -> acc + File_sections.length info.ui_file_sections)
+          0 (ui :: units)
+      in
+      File_sections.Builder.create length
     in
     let ui_export_info =
-      List.fold_left2
-        (fun acc info map ->
-          Flambda2_cmx.Flambda_cmx_format.append acc (info.ui_export_info, map))
-        ui.ui_export_info units section_id_mapping
+      Flambda2_cmx.Flambda_cmx_format.pack ~sections:file_sections
+        (Compilenv.get_export_info ui
+        :: List.map Compilenv.get_export_info units)
     in
     let ui_zero_alloc_info = Zero_alloc_info.create () in
     List.iter
@@ -212,7 +206,6 @@ end) : S = struct
         ui_defines =
           List.flatten (List.map (fun info -> info.ui_defines) units)
           @ [ui.ui_unit];
-        ui_arg_descr = None;
         ui_imports_cmi =
           Import_info.create modname
             ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
@@ -236,6 +229,7 @@ end) : S = struct
         ui_zero_alloc_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units);
+        ui_static_data = ui.ui_static_data;
         ui_file_sections = File_sections.Builder.build file_sections
       }
     in
@@ -264,7 +258,10 @@ end) : S = struct
     let for_pack_prefix = CU.Prefix.from_clflags () in
     let cmx = Unit_info.Artifact.from_filename ~for_pack_prefix targetcmx in
     let cmi = Unit_info.companion_cmi cmx in
-    let obj = Unit_info.companion_obj cmx in
+    let obj =
+      Unit_info.Artifact.from_filename ~for_pack_prefix
+        (Unit_info.Artifact.prefix cmx ^ Backend.ext_obj)
+    in
     (* Set the name of the current "input" *)
     Location.input_name := targetcmx;
     (* Set the name of the current compunit *)

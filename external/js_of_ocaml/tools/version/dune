@@ -1,0 +1,10 @@
+; Upstream runs git describe from an OCaml-syntax dune file, which here would
+; report OxCaml's release tags as the js_of_ocaml version. Nix builds provide
+; the OxCaml commit instead; it is empty in development shells.
+
+(rule
+ (target GIT-VERSION)
+ (action
+  (with-stdout-to
+   %{target}
+   (echo "%{env:JSOO_GIT_VERSION=}"))))

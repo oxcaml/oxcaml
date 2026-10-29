@@ -71,7 +71,7 @@ let raw_info_printer : raw_info -> _ = function
    Code taken from [uTop](https://github.com/diml/utop
    with permission from Jeremie Dimino. *)
 let lookup_env f x env =
-  try Some (f x env) with Not_found | Env.Error _ -> None
+  try Some (f x env) with Not_found | Env.Error.In_context _ -> None
 
 let rec methods_of_type env ?(acc = []) type_expr =
   let open Types in
@@ -173,7 +173,7 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
       let desc =
         Types.(
           Tarrow
-            ( (Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy),
+            ( (Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy),
               label_descr.lbl_res,
               label_descr.lbl_arg,
               commu_ok ))
@@ -183,7 +183,7 @@ let make_candidate ~get_doc ~attrs ~exact ~prefix_path name ?loc ?path ty =
       let desc =
         Types.(
           Tarrow
-            ( (Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy),
+            ( (Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy),
               ty,
               label_decl.ld_type,
               commu_ok ))
@@ -807,7 +807,7 @@ let expand_prefix ~global_modules ?(kinds = []) env prefix =
 open Typedtree
 
 let labels_of_application ~prefix = function
-  | { exp_desc = Texp_apply (f, args, _, _, _); exp_env; _ } ->
+  | { exp_desc = Texp_apply (f, args, _, _, _, _); exp_env; _ } ->
     let rec labels t =
       match Types.get_desc t with
       | Types.Tarrow ((label, _, _), lhs, rhs, _) -> (label, lhs) :: labels rhs
@@ -859,7 +859,9 @@ let application_context ~prefix path =
   let context =
     match path with
     | (_, Expression earg)
-      :: (_, Expression ({ exp_desc = Texp_apply (efun, _, _, _, _); _ } as app))
+      :: ( _,
+           Expression
+             ({ exp_desc = Texp_apply (efun, _, _, _, _, _); _ } as app) )
       :: _
       when earg != efun ->
       (* Type variables shared across arguments should all be

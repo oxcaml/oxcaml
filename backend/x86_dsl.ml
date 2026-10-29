@@ -124,6 +124,8 @@ module I = struct
 
   let idiv x = emit (IDIV x)
 
+  let div x = emit (DIV x)
+
   let imul x y = emit (IMUL (x, y))
 
   let mul x = emit (MUL x)
@@ -179,6 +181,8 @@ module I = struct
   let neg x = emit (NEG x)
 
   let nop () = emit NOP
+
+  let not_ x = emit (NOT x)
 
   let or_ x y = emit (OR (x, y))
 

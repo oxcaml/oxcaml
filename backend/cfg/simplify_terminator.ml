@@ -61,7 +61,11 @@ let simplify_switch (block : C.basic_block) labels =
         { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
-  | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(m) l1);
+    assert (Label.equal labels.(m + 1) l2);
+    assert (len = m + 1 + n);
     let desc =
       C.Int_test
         { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
@@ -84,6 +88,13 @@ type known_value =
   | Const_int of nativeint
   | Const_float32 of int32
   | Const_float of int64
+
+let eval_unary_int_op op (x : nativeint) : nativeint option =
+  match (op : Operation.integer_operation) with
+  | Inot -> Some (Nativeint.lognot x)
+  | Iadd | Isub | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr | Imul | Imulh _
+  | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt | Icomp _ ->
+    None
 
 let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   let is_valid_shift =
@@ -112,7 +123,8 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
      in the future; care is needed as some may clobber registers beyond
      [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
      writing only to the destination). *)
-  | Imul | Imulh _ | Idiv | Imod | Iclz | Ictz | Ipopcnt | Icomp _ -> None
+  | Imul | Imulh _ | Idiv _ | Imod _ | Inot | Iclz | Ictz | Ipopcnt | Icomp _ ->
+    None
 
 let eval_float_op op (left : float) (right : float option) : float option =
   match (op : Operation.float_operation) with
@@ -134,7 +146,7 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
       begin if f (Array.unsafe_get arr idx)
       then
         begin match acc with
-        | None -> find arr (idx - 1) f None
+        | None -> find arr (idx - 1) f (Some idx)
         | Some _ -> None
         end
       else find arr (idx - 1) f acc
@@ -217,9 +229,12 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         let result_opt =
           match find_opt instr.arg.(0) with
           | Some (Const_int left) -> (
-            match right_opt with
-            | Some right -> eval_int_op op left right
-            | None -> None)
+            if Operation.is_unary_integer_operation op
+            then eval_unary_int_op op left
+            else
+              match right_opt with
+              | Some right -> eval_int_op op left right
+              | None -> None)
           | Some (Const_float32 _ | Const_float _) | None -> None
         in
         (match result_opt with
@@ -287,8 +302,8 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         end
       | Op
           ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Int128op _
-          | Intop_atomic _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+          | Int128op _ | Intop_atomic _
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _
@@ -444,6 +459,12 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block)
       true)
   else false
 
+(* [block cfg b] simplifies the terminator of [b], and returns [true] when the
+    simplification may have changed the set of successor labels of [b]. In that
+    case it is the caller's responsibility to make predecessor sets consistent
+    again, e.g. via [Cfg.register_predecessors_for_all_blocks].  If it returns
+    [false], successor sets are unchanged, even though the terminator may have
+    been rewritten. *)
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
    branch instructions and save cmp instructions. The main problem is that it

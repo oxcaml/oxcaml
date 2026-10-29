@@ -28,6 +28,7 @@ let shared = ref false
 let native_only = ref false
 let bytecode_only = ref false
 let raw_dependencies = ref false
+let modules_only = ref false
 let sort_files = ref false
 let all_dependencies = ref false
 let nocwd = ref false
@@ -151,7 +152,6 @@ let find_dependency target_kind modname (byt_deps, opt_deps) =
   | exception Not_found -> (byt_deps, opt_deps)
   | filename ->
     let basename = Filename.chop_extension filename in
-    (* CR jvanburen: update this for ocamlj? *)
     let cmi_file = basename ^ ".cmi" in
     let cmx_file = basename ^ ".cmx" in
     let mli_exists =
@@ -250,7 +250,10 @@ let print_dependencies oc target_files deps =
   output_string oc "\n"
 
 let print_raw_dependencies oc source_file deps =
-  print_filename oc source_file; output_string oc depends_on;
+  if not !modules_only then begin
+    print_filename oc source_file; output_string oc depends_on
+  end;
+  let sep = ref (if !modules_only then "" else " ") in
   String.Set.iter
     (fun dep ->
        (* filter out "*predef*" *)
@@ -259,11 +262,12 @@ let print_raw_dependencies oc source_file deps =
               | 'A'..'Z' | '\128'..'\255' -> true
               | _ -> false) then
         begin
-          output_char oc ' ';
+          output_string oc !sep;
+          sep := " ";
           output_string oc dep
         end)
     deps;
-  print_char '\n'
+  output_char oc '\n'
 
 
 (* Process one file *)
@@ -315,6 +319,7 @@ let read_and_approximate inputfile =
     Location.input_name := inputfile;
     let lexbuf = Lexing.from_channel ic in
     Location.init lexbuf inputfile;
+    Lexer.reset_syntax_mode ();
     lexical_approximation lexbuf
   with exn ->
     report_err exn
@@ -655,6 +660,10 @@ let run_main argv =
         "<e>  Consider <e> as a synonym of the .mli extension";
       "-modules", Arg.Set raw_dependencies,
         " Print module dependencies in raw form (not suitable for make)";
+      "-modules-only", Arg.Unit (fun () ->
+          raw_dependencies := true;
+          modules_only := true),
+        " Like -modules, but omit source file names";
       "-native", Arg.Set native_only,
         " Generate dependencies for native-code only (no .cmo files)";
       "-bytecode", Arg.Set bytecode_only,
@@ -683,6 +692,12 @@ let run_main argv =
         " Sort files according to their dependencies";
      "-strict", Arg.Set strict,
        " Fail if an input file does not exist";
+      "-syntax-quotations", Arg.Set Clflags.syntax_quotations,
+        " Lex quotation syntax in files that do not use the #syntax \
+         quotations directive (see ocamlc)";
+      "-no-syntax-quotations", Arg.Clear Clflags.syntax_quotations,
+        " Do not lex quotation syntax in files that do not use the #syntax \
+         quotations directive (see ocamlc)";
       "-version", Arg.Unit print_version,
         " Print version and exit";
       "-vnum", Arg.Unit print_version_num,

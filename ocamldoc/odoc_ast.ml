@@ -266,7 +266,7 @@ module Analyser =
 
         | Typedtree.Tpat_tuple patlist ->
             Tuple
-              (List.map (fun (_, p) -> iter_pattern p) patlist,
+              (List.map (fun (_, p, _) -> iter_pattern p) patlist,
                Odoc_env.subst_type env pat.pat_type)
 
         | Typedtree.Tpat_construct (_, cons_desc, _, _, _) when
@@ -1705,7 +1705,7 @@ module Analyser =
           { m_base with m_kind = Module_struct elements2 }
 
       | (Parsetree.Pmod_functor (param2, p_module_expr2),
-         Typedtree.Tmod_functor (param, tt_module_expr2)) ->
+         Typedtree.Tmod_functor (param, tt_module_expr2, _)) ->
            let loc, mp_name, mp_kind, mp_type =
              match param2, param with
              | Parsetree.Unit, Typedtree.Unit ->
@@ -1748,10 +1748,12 @@ module Analyser =
            { m_base with m_kind = Module_functor (param, kind) }
 
       | (Parsetree.Pmod_apply (p_module_expr1, p_module_expr2),
-         Typedtree.Tmod_apply (tt_module_expr1, tt_module_expr2, _))
+         Typedtree.Tmod_apply (tt_module_expr1, tt_module_expr2, _, _, _))
       | (Parsetree.Pmod_apply (p_module_expr1, p_module_expr2),
          Typedtree.Tmod_constraint
-           ({ Typedtree.mod_desc = Typedtree.Tmod_apply (tt_module_expr1, tt_module_expr2, _)}, _,
+           ({ Typedtree.mod_desc =
+                Typedtree.Tmod_apply
+                  (tt_module_expr1, tt_module_expr2, _, _, _)}, _,
             _, _)
         ) ->
           let m1 = analyse_module
@@ -1773,10 +1775,11 @@ module Analyser =
           { m_base with m_kind = Module_apply (m1.m_kind, m2.m_kind) }
 
       | (Parsetree.Pmod_apply_unit p_module_expr1,
-         Typedtree.Tmod_apply_unit tt_module_expr1)
+         Typedtree.Tmod_apply_unit (tt_module_expr1, _))
       | (Parsetree.Pmod_apply_unit p_module_expr1,
          Typedtree.Tmod_constraint
-           ({ Typedtree.mod_desc = Typedtree.Tmod_apply_unit tt_module_expr1}, _,
+           ({ Typedtree.mod_desc =
+                Typedtree.Tmod_apply_unit (tt_module_expr1, _)}, _,
             _, _)
         ) ->
           let m1 = analyse_module

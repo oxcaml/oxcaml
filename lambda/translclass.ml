@@ -207,7 +207,8 @@ let layout_meth = layout_any_value
 let layout_tables = layout_any_value
 
 
-let lfunction ?(kind=Curried {nlocal=0}) ?(ret_mode=alloc_heap) return_layout params body =
+let lfunction ?(kind=Curried {nlocal=0})
+    ?(ret_mode=not_alloc_stack) return_layout params body =
   if params = [] then body else
   match kind, body with
   | Curried {nlocal=0},
@@ -250,7 +251,9 @@ let mkappl (func, args, layout) =
          ap_result_layout=layout;
          ap_args=args;
          ap_region_close=Rc_normal;
-         ap_mode=alloc_heap;
+         ap_mode=not_alloc_stack;
+         (* All OO prims are builtins which do not yield *)
+         ap_yielding=Unyielding;
          ap_tailcall=Default_tailcall;
          ap_inlined=Default_inlined;
          ap_specialised=Default_specialise;
@@ -470,7 +473,7 @@ let rec build_object_init ~scopes cl_table obj params inh_init obj_init cl =
                    ~loc:(of_location ~scopes pat.pat_loc)
                    ~body
                    ~mode:alloc_heap
-                   ~ret_mode:alloc_heap
+                   ~ret_mode:not_alloc_stack
        in
        begin match obj_init with
          Lfunction {kind = Curried {nlocal=0}; params; body = rem} ->
@@ -665,7 +668,8 @@ let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
                     (transl_scoped_exp ~scopes Lambda.layout_method exp)
                 in
                 let met_code =
-                  if !Clflags.native_code && List.length met_code = 1 then
+                  if Clflags.target_is_native () && List.length met_code = 1
+                  then
                     (* Force correct naming of method for profiles *)
                     let met = Ident.create_local ("method_" ^ name.txt) in
                     [Llet(Strict, layout_meth, met, Lambda.debug_uid_none,
@@ -835,7 +839,7 @@ let rec transl_class_rebind ~scopes obj_init cl vf =
                   ~loc:(of_location ~scopes pat.pat_loc)
                   ~body
                   ~mode:alloc_heap
-                  ~ret_mode:alloc_heap
+                  ~ret_mode:not_alloc_stack
       in
       (path, path_lam,
        match obj_init with
@@ -896,7 +900,10 @@ let transl_class_rebind ~scopes cl vf =
         ap_args=[Lvar self];
         ap_result_layout=layout_obj;
         ap_region_close=Rc_normal;
-        ap_mode=alloc_heap;
+        ap_mode=not_alloc_stack;
+        (* obj_init is a builtin function which does not yield, and does not
+           execute user code. *)
+        ap_yielding=Unyielding;
         ap_tailcall=Default_tailcall;
         ap_inlined=Default_inlined;
         ap_specialised=Default_specialise;
@@ -958,7 +965,7 @@ let rec builtin_meths self env env2 body =
         "var", [Lvar n]
     | Lprim(Pfield(n, _, _), [Lvar e], _) when Ident.same e env ->
         "env", [Lvar env2; (tagged_immediate n)]
-    | Lsend(Self, met, Lvar s, [], _, _, _, _) when List.mem s self ->
+    | Lsend(Self, met, Lvar s, [], _, _, _, _, _) when List.mem s self ->
         "meth", [met]
     | _ -> raise Not_found
   in
@@ -973,15 +980,15 @@ let rec builtin_meths self env env2 body =
   | Lapply{ap_func = f; ap_args = [p; arg]} when const_path f && const_path p ->
       let s, args = conv arg in
       ("app_const_"^s, f :: p :: args)
-  | Lsend(Self, Lvar n, Lvar s, [arg], _, _, _, _) when List.mem s self ->
+  | Lsend(Self, Lvar n, Lvar s, [arg], _, _, _, _, _) when List.mem s self ->
       let s, args = conv arg in
       ("meth_app_"^s, Lvar n :: args)
-  | Lsend(Self, met, Lvar s, [], _, _, _, _) when List.mem s self ->
+  | Lsend(Self, met, Lvar s, [], _, _, _, _, _) when List.mem s self ->
       ("get_meth", [met])
-  | Lsend(Public, met, arg, [], _, _, _, _) ->
+  | Lsend(Public, met, arg, [], _, _, _, _, _) ->
       let s, args = conv arg in
       ("send_"^s, met :: args)
-  | Lsend(Cached, met, arg, [_;_], _, _, _, _) ->
+  | Lsend(Cached, met, arg, [_;_], _, _, _, _, _) ->
       let s, args = conv arg in
       ("send_"^s, met :: args)
   | Lfunction {kind = Curried _; params = [{name = x; _}]; body} ->
@@ -1073,7 +1080,7 @@ let free_methods l =
   let rec free l =
     Lambda.iter_head_constructor free l;
     match l with
-    | Lsend(Self, Lvar meth, _, _, _, _, _, _) ->
+    | Lsend(Self, Lvar meth, _, _, _, _, _, _, _) ->
         fv := Ident.Set.add meth !fv
     | Lsend _ -> ()
     | Lfunction{params} ->
@@ -1093,7 +1100,8 @@ let free_methods l =
     | Lvar _ | Lmutvar _ | Lconst _ | Lapply _
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
-    | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
+    | Levent _ | Lifused _ | Lregion _ | Lexclave _
+    | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ -> ()
     | Lsplice _ ->
       fatal_error_invalid_constructor l
   in free l; !fv
@@ -1150,7 +1158,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
           Lambda.subst no_env_update (subst env body 0 new_ids_meths) body in
         begin try
           (* Doesn't seem to improve size for bytecode *)
-          (* if not !Clflags.native_code then raise Not_found; *)
+          (* if not (Clflags.target_is_native ()) then raise Not_found; *)
           if not arr || !Clflags.debug then raise Not_found;
           builtin_meths [self.name] env env2 (lfunction return args body')
         with Not_found ->
@@ -1238,7 +1246,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
            ~loc:Loc_unknown
            ~return:layout_function
            ~mode:alloc_heap
-           ~ret_mode:alloc_heap
+           ~ret_mode:not_alloc_stack
            ~params:[lparam cla cla_duid layout_table]
            ~body:cl_init,
          Dynamic (* Placeholder, real kind is computed in [lbody] below *))
@@ -1276,7 +1284,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                           ~loc:Loc_unknown
                           ~return:layout_function
                           ~mode:alloc_heap
-                          ~ret_mode:alloc_heap
+                          ~ret_mode:not_alloc_stack
                           ~params:[lparam cla cla_duid layout_table]
                           ~body:cl_init;
            lenvs],
@@ -1343,7 +1351,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                    ~attr:default_function_attribute
                    ~loc:Loc_unknown
                    ~mode:alloc_heap
-                   ~ret_mode:alloc_heap
+                   ~ret_mode:not_alloc_stack
                    ~body:(def_ids cla cl_init), lam)
   and lset cached i lam =
     Lprim(Psetfield(i, Pointer, Assignment modify_heap),
@@ -1362,7 +1370,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
          ~attr:default_function_attribute
          ~loc:Loc_unknown
          ~mode:alloc_heap
-         ~ret_mode:alloc_heap
+         ~ret_mode:not_alloc_stack
          ~return:layout_function
          ~params:[lparam cla cla_duid layout_table]
          ~body:(def_ids cla cl_init))
@@ -1375,7 +1383,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
                     [transl_meth_list pub_meths;
                      Lvar class_init; Lvar cached], layout_unit)) in
   let lcheck_cache =
-    if !Clflags.native_code && !Clflags.afl_instrument then
+    if Clflags.target_is_native () && !Clflags.afl_instrument then
       (* When afl-fuzz instrumentation is enabled, ignore the cache
          so that the program's behaviour does not change between runs *)
       lupdate_cache

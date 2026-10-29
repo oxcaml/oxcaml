@@ -30,6 +30,6 @@ let code loopify(never) size(50) newer_version_of(f_0)
                      let Paddint = %int_barith.add (i, 1) in
                      cont k5 (Paddint))))
 in
-let $camlFoo__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlFoo__f_1 = closure f_0_1 @f &toplevel in
 let $camlLift_rec_cont = Block 0 ($camlFoo__f_1) in
 cont done ($camlLift_rec_cont)

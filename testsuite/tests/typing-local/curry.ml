@@ -19,7 +19,14 @@ module M : sig
   val all_heap : int -> int -> string -> int -> int -> int -> int list
 end = struct
   let part_local a b (local_ c) d e f =
-    let _ = c in
+    (* This function is used to test that its partial applications up
+       to the second argument are heap allocated, then further partial
+       applications to more arguments are stack allocated. If the 'c'
+       argument is unused, the reaper can detect it and remove it from
+       the closure of the partial application. All the other arguments
+       are statically known, so the partial applications ends up being
+       statically allocated. *)
+    let _ = Sys.opaque_identity c in
     [a; b; d; e; f]
   let all_heap a b c d e f = [a;b;int_of_string c;d;e;f]
 end
@@ -71,6 +78,27 @@ let[@inline never] fheap () =
     (loc g) (loc a) (loc b) (loc c) (loc d) (loc e)
 
 let () = fheap ()
+
+module N : sig
+  val local_curry : int -> (int -> int -> int) @ local
+end = struct
+  let local_curry a b c = a + b + c
+end
+
+let[@inline never] flocal_curry () =
+  let n = Sys.opaque_identity 1 in
+  let a = N.local_curry n in
+  let b = a n in
+  let g = Sys.opaque_identity N.local_curry in
+  let c = g n in
+  let d = c n in
+  let e = g n n in
+  Gc.minor ();
+  Printf.printf "%20s: %d%d%d%d%d\n"
+    "local curry"
+    (loc a) (loc b) (loc c) (loc d) (loc e)
+
+let () = flocal_curry ()
 
 (* partial application of a local function *)
 let[@inline never] f z =

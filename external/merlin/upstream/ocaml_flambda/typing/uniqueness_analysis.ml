@@ -1398,8 +1398,15 @@ end = struct
         Projection.Map.update proj
           (function
             | None ->
-              (* Path doesn't exist, treat as Unused and create node *)
-              Some (update ~f rest empty)
+              (* A missing child has the usage of its parent, as in [mapi2] *)
+              let child =
+                { empty with
+                  usage = tree.usage;
+                  overwrites =
+                    Overwrites.promote_mutation_to_children tree.overwrites
+                }
+              in
+              Some (update ~f rest child)
             | Some child -> Some (update ~f rest child))
           tree.children
       in
@@ -1993,7 +2000,7 @@ let rec pattern_match_tuple pat values =
     (* No read: the tuple does not exist in memory *)
     Unique_barrier.enable pat.pat_unique_barrier;
     List.map2
-      (fun (_, pat) value ->
+      (fun (_, pat, _) value ->
         let paths =
           match Value.paths value with
           | None -> Paths.fresh ()
@@ -2126,14 +2133,14 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, _, _, _) ->
+    | Tpat_record (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
           pattern_match_single pat paths)
         pats
       |> conjuncts_pattern_match
-    | Tpat_record_unboxed_product (pats, _, _, _) ->
+    | Tpat_record_unboxed_product (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
           let paths =
@@ -2158,7 +2165,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       ext, UF.par uf_force uf_arg
     | Tpat_tuple args ->
       List.mapi
-        (fun i (_, arg) ->
+        (fun i (_, arg, _) ->
           let paths = Paths.tuple_field i paths in
           pattern_match_single arg paths)
         args
@@ -2405,7 +2412,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     (* we are constructing a closure here, and therefore any implicit
        borrowing of free variables in the closure is in fact using aliased. *)
     lift_implicit_borrowing uf
-  | Texp_apply (fn, args, _, _, _) ->
+  | Texp_apply (fn, args, _, _, _, _) ->
     let uf_fn = check_uniqueness_exp ~overwrite:None ienv fn in
     let uf_args =
       List.map
@@ -2443,7 +2450,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_tuple (es, _) ->
     UF.pars
       (List.mapi
-         (fun i (_, e) ->
+         (fun i (_, e, _) ->
            check_uniqueness_exp
              ~overwrite:(descend (Projection.Tuple_field i) overwrite)
              ienv e)
@@ -2470,7 +2477,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     let value, uf_ext =
       match extended_expression with
       | None -> Value.fresh, UF.unused
-      | Some (exp, _, unique_barrier) ->
+      | Some (exp, _, _, unique_barrier) ->
         let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
         Unique_barrier.enable unique_barrier;
         let uf_read =
@@ -2547,7 +2554,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     let uf_write = Value.mark_implicit_borrow_memory_address Write value in
     let uf_tag = Value.invalidate_tag value in
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
-  | Texp_atomic_loc (rcd, _, _, _, _) ->
+  | Texp_atomic_loc { record = rcd; _ } ->
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf = Value.mark_consumed_memory_address value in
     UF.seq uf_rcd uf
@@ -2674,12 +2681,12 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
       Paths.mark
         (Usage.maybe_unique use occ)
         Learned_tags.empty Overwrites.empty p)
-  (* CR metaprogramming aivaskovic:
-     it might be reasonable to treat `Texp_quotation e` as `e` *)
-  | Texp_quotation e ->
+  (* CR-someday quoted-modes jbachurski: The uniqueness analysis should be
+     stage-aware for <[once]>/<[unique]> to work when they are added. *)
+  | Texp_quote e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.quote uf
-  | Texp_antiquotation e ->
+  | Texp_splice e ->
     let uf = check_uniqueness_exp ~overwrite:None ienv e in
     UF.antiquote uf
 
@@ -2797,7 +2804,7 @@ and check_uniqueness_exp_desc_for_match ~borrows ienv ~loc :
     let values, ufs =
       List.split
         (List.map
-           (fun (_, e) -> check_uniqueness_exp_as_value ~borrows ienv e)
+           (fun (_, e, _) -> check_uniqueness_exp_as_value ~borrows ienv e)
            es)
     in
     Match_tuple values, UF.pars ufs

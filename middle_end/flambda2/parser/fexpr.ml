@@ -50,8 +50,6 @@ type continuation_sort =
 type region =
   | Named of variable
   | Toplevel_alloc_region
-  | Toplevel_region
-  | Toplevel_ghost_region
 
 type tag_scannable = int
 
@@ -65,10 +63,11 @@ type subkind =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+  | Boxed_mask
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
+        non_consts : (tag_scannable * kind_with_subkind list option) list
       }
   | Float_block of { num_fields : int }
   | Float_array
@@ -85,6 +84,7 @@ type subkind =
   | Unboxed_vec128_array
   | Unboxed_vec256_array
   | Unboxed_vec512_array
+  | Unboxed_mask_array
   | Unboxed_product_array
 
 and kind_with_subkind =
@@ -106,6 +106,7 @@ type const =
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
   | Naked_vec256 of Vector_types.Vec256.Bit_pattern.bits
   | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
+  | Naked_mask of Vector_types.Mask.Bit_pattern.bits
   | Naked_nativeint of targetint
   | Null
   | Poison of kind_with_subkind * string
@@ -144,6 +145,7 @@ type static_data =
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.bits or_variable
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.bits or_variable
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.bits or_variable
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.bits or_variable
   | Immutable_float_block of float or_variable list
   | Immutable_float_array of float or_variable list
   | Immutable_float32_array of float or_variable list
@@ -160,8 +162,8 @@ type static_data =
       Vector_types.Vec256.Bit_pattern.bits or_variable list
   | Immutable_vec512_array of
       Vector_types.Vec512.Bit_pattern.bits or_variable list
+  | Immutable_mask_array of Vector_types.Mask.Bit_pattern.bits or_variable list
   | Empty_array of empty_array_kind
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
 type static_data_binding =
@@ -221,12 +223,16 @@ type alloc_mode_for_allocations =
       }
 
 type 'a alloc_mode_for_applications =
-  | Heap of { alloc_region : 'a }
-  | Local of
+  | Not_alloc_stack of { alloc_region : 'a }
+  | Maybe_alloc_stack of
       { alloc_region : 'a;
         region : 'a;
         ghost_region : 'a
       }
+
+type alloc_mode_for_return =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
 
 type alloc_mode_for_assignments =
   | Heap
@@ -277,6 +283,7 @@ type inline_attribute = Inline_attribute.t =
 type inlined_attribute =
   | Always_inlined
   | Hint_inlined
+  | Forward_inlined
   | Never_inlined
   | Unroll of int
   | Default_inlined
@@ -324,7 +331,7 @@ type expr =
       { scrutinee : simple;
         cases : (int * apply_or_inlined_cont) list
       }
-  | Invalid of { message : string }
+  | Invalid
 
 and apply_or_inlined_cont =
   | Inlined_goto of expr
@@ -407,7 +414,7 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_assignments
+    result_mode : alloc_mode_for_return
   }
 
 and code_size = int

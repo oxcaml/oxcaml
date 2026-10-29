@@ -70,7 +70,7 @@ module Inst2 : sig type t end
 module NonInst2 : sig type 'a t end
 module A : sig type _ t = | type _ t' = | end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 (* Flexible: type variables under quotes/splices *)
 
@@ -94,7 +94,7 @@ module F :
     type _ r1 = { x : <[$(int) -> unit]> expr; }
   end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 (* One side flexible and under splices *)
 (* $t ~ s  when t flexible *)

@@ -53,7 +53,11 @@ let structure : type_definition -> type_structure = fun def ->
   | Type_abstract _, _ ->
       begin match def.type_manifest with
       | None -> Abstract
-      | Some type_expr -> Synonym type_expr
+      | Some type_expr ->
+          if !Clflags.typing_recovery
+          && Typing_recovery.erroneous_type_check type_expr
+          then Abstract
+          else Synonym type_expr
       end
   | (Type_record _ | Type_variant _), None -> Algebraic
   | Type_record_unboxed_product _, None -> Algebraic
@@ -148,6 +152,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
   | Tquote ty | Tsplice ty | Tquote_eval ty | Tbox ty -> [ty]
+  | Tmod _ -> Misc.fatal_error "immediate_subtypes: Tmod"
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
@@ -472,6 +477,8 @@ let check_type
         assert false
     | (Tunivar(_)         , _      ) -> empty
     | (Tof_kind(_)         , _      ) -> empty
+    | (Tmod(_, _)          , _      ) ->
+        Misc.fatal_error "check_type: unexpected Tmod"
     (* Type constructor case. *)
     | (Tconstr(path,tys,_), m      ) ->
         let msig = (Env.find_type path env).type_separability in

@@ -187,6 +187,7 @@ G(name):
 #define Stack_local_sp(reg)     [reg, #64]
 #define Stack_local_top(reg)    [reg, #72]
 #define Stack_local_limit(reg)  [reg, #80]
+#define Stack_tls_state(reg)    [reg, #88]
 
 /* struct c_stack_link */
 #define Cstack_stack(reg)       [reg]
@@ -371,6 +372,18 @@ G(name):
         str     xzr, [TMP, (Dynamic_cache + 5*Dynamic_binding_size + Dynamic_binding_var)]
         str     xzr, [TMP, (Dynamic_cache + 6*Dynamic_binding_size + Dynamic_binding_var)]
         str     xzr, [TMP, (Dynamic_cache + 7*Dynamic_binding_size + Dynamic_binding_var)]
+.endm
+
+/* See [caml_tls_update_cache]: set (Caml_state->tls_state) to the nearest TLS.
+   Must occur after switching stacks. Clobbers \stk and TMP. */
+
+.macro UPDATE_TLS_CACHE stk
+9:      ldr     TMP, Stack_tls_state(\stk)
+        cbnz    TMP, 8f
+        ldr     \stk, Stack_handler(\stk)
+        ldr     \stk, Handler_parent(\stk)
+        b       9b
+8:      str     TMP, Caml_state(tls_state)
 .endm
 
 /* Updates the oldest saved frame pointer in the target fiber.
@@ -568,6 +581,19 @@ FUNCTION(caml_call_realloc_stack)
         CFI_ENDPROC
 END_FUNCTION(caml_call_realloc_stack)
 
+/* Raise a Stack_overflow exception after a guard-page fault.
+   SP here may point into a guard page, so we have to check and fix
+   that in caml_raise_stack_overflow. */
+
+FUNCTION(caml_raise_stack_overflow_nat)
+        CFI_STARTPROC
+        CFI_SIGNAL_FRAME
+        str     ALLOC_PTR, Caml_state(young_ptr)
+        SWITCH_OCAML_TO_C
+        b       G(caml_raise_stack_overflow)
+        CFI_ENDPROC
+END_FUNCTION(caml_raise_stack_overflow_nat)
+
 FUNCTION(caml_call_gc)
         CFI_STARTPROC
 L(caml_call_gc):
@@ -746,14 +772,18 @@ FUNCTION(caml_c_call)
         SWITCH_C_TO_OCAML
 #if defined(WITH_THREAD_SANITIZER)
     /* Save return value registers. Since the called function could be
-       anything, it may have returned its result (if any) either in x0
-       or q0:q1. */
+       anything, it may have returned its result (if any) in x0:x1 and/or
+       q0:q3 (q2:q3 for homogeneous aggregate returns). */
         stp     x0, x1, [sp, -16]!
         CFI_ADJUST(16)
         stp     q0, q1, [sp, -32]!
         CFI_ADJUST(32)
+        stp     q2, q3, [sp, -32]!
+        CFI_ADJUST(32)
         TSAN_EXIT_FUNCTION
     /* Restore return value registers */
+        ldp     q2, q3, [sp], 32
+        CFI_ADJUST(-32)
         ldp     q0, q1, [sp], 32
         CFI_ADJUST(-32)
         ldp     x0, x1, [sp], 16
@@ -1229,7 +1259,9 @@ L(do_perform):
         str     x3, [x1, 8] /* Set the last_fiber field in the continuation */
         ldr     x9, Stack_handler(x2)  /* x9 := old stack -> handler */
         ldr     x10, Handler_parent(x9) /* x10 := parent stack */
-        cbz     x10, 1f
+        ldr     TMP, Handler_effect(x9)
+        cmp     TMP, 1
+        beq     1f
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3, x9 and x10 */
         stp     x0, x1, [sp, -16]!
@@ -1252,6 +1284,14 @@ L(do_perform):
     /*  we have to null the Handler_parent after the switch because
         the Handler_parent is needed to unwind the stack for backtraces */
         str     xzr, Handler_parent(x9) /* Set parent of performer to NULL */
+    /* If the departing stack owned the TLS state, recompute the cache.
+       Note each [caml_perform] only exits a single fiber, so we will find
+       the owner while reperforming (if needed). */
+        ldr     TMP, Stack_tls_state(x2)
+        cbz     TMP, 6f
+        mov     x8, x10
+        UPDATE_TLS_CACHE x8
+6:
         ldr     TMP, Handler_effect(x9)
         mov     x2, x3                 /* x2 := last_fiber */
         mov     x3, TMP                /* x3 := effect handler */
@@ -1278,6 +1318,9 @@ L(do_perform):
         cbz     x10, 2f
         ldr     x9, Caml_state(current_stack)
         SWITCH_OCAML_STACKS x9, x10
+    /* Recompute the cached TLS state. */
+        mov     x8, x10
+        UPDATE_TLS_CACHE x8
     /*  No parent stack. If this is a preemption effect (wosize of the
         continuation is 3, meaning we have a gc_regs present) then just
         continue execution. Otherwise, raise Effect.Unhandled. */
@@ -1403,6 +1446,9 @@ END_FUNCTION(caml_reperform)
         CFI_ADJUST(-16)
         SWITCH_OCAML_STACKS x9, x0
         FLUSH_DYNAMIC_CACHE
+    /* Recompute the cached TLS state. */
+        mov     x8, x0
+        UPDATE_TLS_CACHE x8
     /* Is this a preemption continuation? */
         cbnz    x25, L(resume_preemption)
 .endm
@@ -1436,6 +1482,11 @@ L(resume_preemption): /* x25 -> gc_regs */
        registers and `ret` to resume */
         b       L(resume_from_preempt)
 L(continuation_already_resumed):
+    /* Pop the frame pushed by DO_RESUME_SWITCH, which the normal path pops
+       before switching stacks.  This restores x30 as well as sp, which
+       caml_c_call records as the return address for use during scanning. */
+        ldp     x29, x30, [sp], 16
+        CFI_ADJUST(-16)
         ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
         b       G(caml_c_call)
         CFI_ENDPROC
@@ -1538,6 +1589,11 @@ FUNCTION(caml_runstack)
     /* Switch to the new stack */
         mov     sp, x9
         FLUSH_DYNAMIC_CACHE
+    /* If the new fiber is preemptible, cache its TLS state. */
+        ldr     TMP, Stack_tls_state(x0)
+        cbz     TMP, 6f
+        str     TMP, Caml_state(tls_state)
+6:
 #ifdef ASM_CFI_SUPPORTED
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3+3+2,       \
@@ -1580,6 +1636,12 @@ L(frame_runstack):
         CFI_REMEMBER_STATE
         CFI_DEF_CFA_REGISTER(DW_REG_x21)
         FLUSH_DYNAMIC_CACHE
+    /* If the dying fiber owned the TLS state, recompute the cache. */
+        ldr     TMP, Stack_tls_state(x0)
+        cbz     TMP, 6f
+        ldr     x8, Caml_state(current_stack)
+        UPDATE_TLS_CACHE x8
+6:
         ldr     TMP, Caml_state(c_stack)
         mov     sp, TMP
         bl      G(caml_free_stack)
@@ -1619,14 +1681,18 @@ G(caml_system__code_end):
 /* Uses the same naming convention as ocamlopt generated modules. */
 OBJECT(CAMLSEP(system,frametable))
         .quad   2                   /* two descriptors */
+        /* Each descriptor is preceded by a "delta" byte. These return-to-C
+           descriptors do not fit the "short" format, so each escapes: a 0
+           delta byte followed by a descriptor in the medium format (which
+           carries its own relative return address). See frame_descriptors.h. */
+        .byte   0                   /* escape: medium descriptor follows */
         .4byte  L(caml_retaddr) - . /* return address into callback */
         .short  -1                  /* negative frame size => use callback link */
         .short  0                   /* no roots */
-        .align  3
+        .byte   0                   /* escape: medium descriptor follows */
         .4byte  L(frame_runstack) - . /* return address into fiber handler */
         .short  -1                    /* negative frame size => use callback link */
         .short  0                     /* no roots here */
-        .align 3
         END_OBJECT(CAMLSEP(system,frametable))
 
         NONEXECSTACK_NOTE

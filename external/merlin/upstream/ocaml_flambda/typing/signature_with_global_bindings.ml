@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-9-40-41-42"]
 
 type t =
-  { sign : Subst.Lazy.persistent_signature;
+  { sign : Subst.Lazy.signature * Mode.Staticity.Const.t;
     bound_globals : Global_module.With_precision.t array
   }
 

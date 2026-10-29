@@ -88,7 +88,10 @@ function record_unexp() {
     match($0, /Running tests from '[^']*'/);
     curdir = substr($0, RSTART+20, RLENGTH - 21);
     # Use SKIPPED[curdir] as a sentinel to detect no output
-    SKIPPED[curdir] = 0;
+    if (!(curdir in SEEN)) {
+        SEEN[curdir] = 1;
+        SKIPPED[curdir] = 0;
+    }
     key = curdir;
     DIRS[key] = key;
     curfile = "";

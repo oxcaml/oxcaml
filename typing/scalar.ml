@@ -413,14 +413,16 @@ module Operation = struct
         | Succ  (** add 1 *)
         | Pred  (** subtract 1 *)
         | Bswap
+        | Not
 
-      let all = [Neg; Succ; Pred; Bswap]
+      let all = [Neg; Succ; Pred; Bswap; Not]
 
       let to_string = function
         | Neg -> "neg"
         | Succ -> "succ"
         | Pred -> "pred"
         | Bswap -> "bswap"
+        | Not -> "not"
     end
 
     module Float_op = struct
@@ -434,7 +436,7 @@ module Operation = struct
     end
 
     type nonrec 'mode t =
-      (* CR jvanburen: logical Not, int Abs, float bitcast *)
+      (* CR jvanburen: int Abs, float bitcast *)
       | Integral of 'mode Integral.t * Int_op.t
       | Floating of 'mode Floating.t * Float_op.t
       | Static_cast of
@@ -459,7 +461,7 @@ module Operation = struct
       | Static_cast { src; dst } -> Static_cast { src; dst = map dst ~f }
 
     let info = function
-      | Integral (size, (Neg | Bswap | Succ | Pred)) ->
+      | Integral (size, (Neg | Bswap | Succ | Pred | Not)) ->
         { result = integral size; can_raise = false }
       | Floating (size, (Neg | Abs)) ->
         { result = floating size; can_raise = false }
@@ -496,23 +498,38 @@ module Operation = struct
         | Add
         | Sub
         | Mul
-        | Div of division_is_safe
-        | Mod of division_is_safe
+        | Div of division_is_safe * Signedness.t
+        | Mod of division_is_safe * Signedness.t
         | And
         | Or
         | Xor
 
       let all =
-        [Add; Sub; Mul; Div Safe; Div Unsafe; Mod Safe; Mod Unsafe; And; Or; Xor]
+        [ Add;
+          Sub;
+          Mul;
+          Div (Safe, Signed);
+          Div (Safe, Unsigned);
+          Div (Unsafe, Signed);
+          Div (Unsafe, Unsigned);
+          Mod (Safe, Signed);
+          Mod (Safe, Unsigned);
+          Mod (Unsafe, Signed);
+          Mod (Unsafe, Unsigned);
+          And;
+          Or;
+          Xor ]
+
+      let division_prefix safety (signedness : Signedness.t) =
+        (match safety with Safe -> "" | Unsafe -> "unsafe_")
+        ^ match signedness with Signed -> "" | Unsigned -> "unsigned_"
 
       let to_string = function
         | Add -> "add"
         | Sub -> "sub"
         | Mul -> "mul"
-        | Div Safe -> "div"
-        | Div Unsafe -> "unsafe_div"
-        | Mod Safe -> "mod"
-        | Mod Unsafe -> "unsafe_mod"
+        | Div (safety, signedness) -> division_prefix safety signedness ^ "div"
+        | Mod (safety, signedness) -> division_prefix safety signedness ^ "mod"
         | And -> "and"
         | Or -> "or"
         | Xor -> "xor"
@@ -589,8 +606,8 @@ module Operation = struct
       | Integral
           ( width,
             ( Add | Sub | Mul
-            | Div (Safe | Unsafe)
-            | Mod (Safe | Unsafe)
+            | Div ((Safe | Unsafe), (Signed | Unsigned))
+            | Mod ((Safe | Unsafe), (Signed | Unsigned))
             | And | Or | Xor ) ) ->
         let sort = Integral.sort width in
         sort, sort, sort
@@ -641,10 +658,17 @@ module Operation = struct
 
     let info = function
       | Integral
-          (size, (Add | Sub | Mul | Div Unsafe | Mod Unsafe | And | Or | Xor))
+          ( size,
+            ( Add | Sub | Mul
+            | Div (Unsafe, (Signed | Unsigned))
+            | Mod (Unsafe, (Signed | Unsigned))
+            | And | Or | Xor ) )
       | Shift (size, (Lsl | Lsr | Asr), Int) ->
         { result = integral size; can_raise = false }
-      | Integral (size, (Div Safe | Mod Safe)) ->
+      | Integral
+          ( size,
+            (Div (Safe, (Signed | Unsigned)) | Mod (Safe, (Signed | Unsigned)))
+          ) ->
         { result = integral size; can_raise = true }
       | Floating (size, (Add | Sub | Mul | Div)) ->
         { result = floating size; can_raise = false }

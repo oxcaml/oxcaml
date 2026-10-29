@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -151,6 +152,7 @@ string_get_float32:
   ret
 |}]
 
+(* CR ttebbi: The first [movslq] could be [movl] *)
 (* CR ttebbi: mov + bswap could be movbe *)
 let bytes_get_int32_bswap (buf : bytes) (i : int) =
   Int32_u.bswap (Bytes.unsafe_get_int32_ne buf i)
@@ -182,8 +184,7 @@ let bytes_safe_get_int32 (buf : bytes) (i : int) =
 [%%expect_asm X86_64{|
 bytes_safe_get_int32:
   movq  -8(%rax), %rdi
-  salq  $8, %rdi
-  shrq  $18, %rdi
+  shrq  $10, %rdi
   leaq  -1(,%rdi,8), %rdi
   movzbq (%rax,%rdi), %rsi
   subq  %rsi, %rdi
@@ -191,18 +192,18 @@ bytes_safe_get_int32:
   sarq  $1, %rbx
   movq  %rdi, %rsi
   sarq  $63, %rsi
-  xorq  $-1, %rsi
+  notq  %rsi
   andq  %rdi, %rsi
   cmpq  %rsi, %rbx
   jae   .L0
   movslq (%rax,%rbx), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let bytes_get_int64_indexed_by_int64
@@ -397,8 +398,7 @@ let str_length (s : string) = String.length s
 [%%expect_asm X86_64{|
 str_length:
   movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
+  shrq  $10, %rbx
   leaq  -1(,%rbx,8), %rbx
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx
@@ -410,8 +410,7 @@ let buf_length (b : bytes) = Bytes.length b
 [%%expect_asm X86_64{|
 buf_length:
   movq  -8(%rax), %rbx
-  salq  $8, %rbx
-  shrq  $18, %rbx
+  shrq  $10, %rbx
   leaq  -1(,%rbx,8), %rbx
   movzbq (%rax,%rbx), %rax
   subq  %rax, %rbx
@@ -420,15 +419,20 @@ buf_length:
 |}]
 
 
-(* CR ttebbi: unnecessary int tag untag sequence*)
 let u8_to_int_unsafe_set (x : bytes) (y : Uint8_u.t) =
   Bytes.unsafe_set x 0 (Uint8_u.to_int y)
 [%%expect_asm X86_64{|
 u8_to_int_unsafe_set:
-  leaq  1(%rbx,%rbx), %rbx
-  andl  $511, %ebx
-  sarq  $1, %rbx
   movb  %bl, (%rax)
   movl  $1, %eax
+  ret
+|}]
+
+let unsafe_get_u8_to_int (x : bytes) =
+  Uint8_u.to_int (Bytes.unsafe_get_int8_u_indexed_by_int64 x #0L)
+[%%expect_asm X86_64{|
+unsafe_get_u8_to_int:
+  movzbq (%rax), %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]

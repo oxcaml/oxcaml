@@ -15,12 +15,15 @@
 
 (* Compiling C files and building C libraries *)
 
-let command cmdline =
+let echo_if_verbose cmdline =
   if !Clflags.verbose then begin
     prerr_string "+ ";
     prerr_string cmdline;
     prerr_newline()
-  end;
+  end
+
+let command cmdline =
+  echo_if_verbose cmdline;
   let res = Sys.command cmdline in
   if res = 127 then raise (Sys_error cmdline);
   res
@@ -99,7 +102,9 @@ let compile_file ?output ?(opt="") ?stable_name name =
          The dwarf_c_toolchain_flag is set in optmaindriver.ml and will be
          empty when compiling C files from bytecode tools like ocamlc. *)
       let compression_flag =
-        if !Clflags.native_code then !Clflags.dwarf_c_toolchain_flag else ""
+        if Clflags.target_is_native ()
+        then !Clflags.dwarf_c_toolchain_flag
+        else ""
       in
       "-g" ^ compression_flag
     else
@@ -113,7 +118,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
           | Some cc -> cc
           | None ->
               let (cflags, cppflags) =
-                  if !Clflags.native_code
+                  if Clflags.target_is_native ()
                   then (Config.native_cflags, Config.native_cppflags)
                   else (Config.bytecode_cflags, Config.bytecode_cppflags) in
               (String.concat " " [Config.c_compiler; cflags; cppflags]))

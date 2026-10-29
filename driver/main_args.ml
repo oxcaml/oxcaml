@@ -170,6 +170,10 @@ let mk_for_pack_opt f =
 let mk_g_byt f =
   "-g", Arg.Unit f, " Save debugging information"
 
+let mk_g_no_ocamldebug_types f =
+  "-gno-ocamldebug-types", Arg.Unit f,
+  " Omit type information used only for ocamldebug"
+
 let mk_g_opt f =
   "-g", Arg.Unit f, " Record debugging information for exception backtrace"
 
@@ -210,11 +214,25 @@ let mk_I_manifest f =
   \    by the compiler, <actual_path> is where this file is in the\n\
   \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
   \    passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$MANIFEST_FILES_ROOT]."
+  \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
+  \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
+  \    resolved through manifest entries; if the entry's <actual_path> does\n\
+  \    not retain the extension, the companion object files ('foo.o',\n\
+  \    'lib.a') are resolved the same way and must therefore be listed as\n\
+  \    separate manifest entries."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
   \    paths to the list of \"hidden\" files (see -H for more details)"
+
+let mk_H_file f =
+  "-H-file", Arg.String f, "<visible_path>:<actual_path>  Add a single\n\
+  \    file to the list of \"hidden\" files (see -H-manifest)"
+
+let mk_Hx_file f =
+  "-Hx-file", Arg.String f, "<visible_path>:<actual_path>  Same as -H-file,\n\
+  \    but indicates that the cmx file for the module is always available\n\
+  \    (like -Ix)"
 
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
@@ -429,7 +447,8 @@ let mk_no_app_funct f =
   "-no-app-funct", Arg.Unit f, " Deactivate applicative functors"
 
 let mk_directory f =
-  "-directory", Arg.String f, " Directory to use for debug reporting like source code location reporting"
+  "-directory", Arg.String f,
+  " Source directory to record in debug information; relative to the build root"
 
 let mk_no_check_prims f =
   "-no-check-prims", Arg.Unit f, " Do not check runtime for primitives"
@@ -596,16 +615,19 @@ let mk_shared f =
 let mk_short_paths f =
   "-short-paths", Arg.Unit f, " Shorten paths in types"
 
+let mk_typing_recovery f =
+  "-typing-recovery", Arg.Unit f, " Enable typing recovery"
+
 let mk_stdin f =
   "-stdin", Arg.Unit f, " Read script from standard input"
 
 let mk_no_strict_sequence f =
   "-no-strict-sequence", Arg.Unit f,
-  " Left-hand part of a sequence need not have type unit (default)"
+  " Left-hand part of a sequence need not have type unit or unit# (default)"
 
 let mk_strict_sequence f =
   "-strict-sequence", Arg.Unit f,
-  " Left-hand part of a sequence must have type unit"
+  " Left-hand part of a sequence must have type unit or unit#"
 
 let mk_thread f =
   "-thread", Arg.Unit f,
@@ -803,6 +825,10 @@ let mk_instantiate_byt = mk_instantiate0 ~ext:"cmo"
 
 let mk_instantiate_opt = mk_instantiate0 ~ext:"cmx"
 
+let mk_functorize f =
+  "-functorize", Arg.Unit f,
+  " Bundle the given parameterised modules into a single functor"
+
 let mk_use_prims f =
   "-use-prims", Arg.String f, "<file>  (undocumented)"
 
@@ -978,9 +1004,6 @@ let mk_dflambda_verbose f =
   "-dflambda-verbose", Arg.Unit f, " Print Flambda 1 terms including around \
       each pass"
 
-let mk_djsir f =
-  "-djsir", Arg.Unit f, " Print Js_of_ocaml IR (JSIR) representation"
-
 let mk_dinstr f =
   "-dinstr", Arg.Unit f, " (undocumented)"
 
@@ -1027,6 +1050,12 @@ let parse_int_option ~parameter s =
       in
       raise (Arg.Bad msg)
 
+let mk_type_to_shape_max_depth f =
+  "-type-to-shape-max-depth", Arg.String f,
+  Printf.sprintf "<n|none>  Maximum depth for computing type shapes \
+  (default: %s, use 'none' for unlimited)"
+    (format_int_option Clflags.Dwarf_config_defaults.max_type_to_shape_depth)
+
 let mk_gdwarf_config_shape_reduce_depth f =
   "-gdwarf-config-shape-reduce-depth", Arg.String f,
   Printf.sprintf "<n|none>  Maximum depth for shape reduction in DWARF debug \
@@ -1050,12 +1079,6 @@ let mk_gdwarf_config_max_cms_files_per_variable f =
   Printf.sprintf "<n|none>  Maximum CMS files per variable in DWARF debug info \
   (default: %s, use 'none' for unlimited)"
     (format_int_option Clflags.Dwarf_config_defaults.max_cms_files_per_variable)
-
-let mk_gdwarf_config_max_type_to_shape_depth f =
-  "-gdwarf-config-max-type-to-shape-depth", Arg.String f,
-  Printf.sprintf "<n|none>  Maximum type-to-shape depth for generating DWARF \
-  debug info (default: %s, use 'none' for unlimited)"
-    (format_int_option Clflags.Dwarf_config_defaults.max_type_to_shape_depth)
 
 let mk_gdwarf_config_max_shape_reduce_steps_per_variable f =
   "-gdwarf-config-max-shape-reduce-steps-per-variable", Arg.String f,
@@ -1091,6 +1114,15 @@ let mk_gdwarf_fidelity f =
   \t- high and above should provide good debugging information at increased \
       compilation times"
 
+let mk_restrict_to_upstream_dwarf f =
+  "-gupstream-dwarf", Arg.Unit f,
+  " Only emit the same DWARF information as the upstream compiler"
+
+let mk_no_restrict_to_upstream_dwarf f =
+  "-gno-upstream-dwarf", Arg.Unit f,
+  " Emit potentially more DWARF information than the upstream compiler. \
+   Implies -shape-format debugging-shapes."
+
 let mk_opaque f =
   "-opaque", Arg.Unit f,
   " Does not generate cross-module optimization information\n\
@@ -1111,6 +1143,20 @@ let mk_no_strict_formats f =
   \      previous OCaml versions, and will become always-rejected\n\
   \      in future OCaml versions. You should never use this flag\n\
   \      and instead fix invalid formats.)"
+
+let mk_syntax_quotations f =
+  "-syntax-quotations", Arg.Unit f,
+  Printf.sprintf
+    " Lex quotation syntax (<[ ... ]> and $) in files that do not use the\n\
+    \     #syntax quotations directive%s"
+    (if Config.syntax_quotations then " (default)" else "")
+
+let mk_no_syntax_quotations f =
+  "-no-syntax-quotations", Arg.Unit f,
+  Printf.sprintf
+    " Do not lex quotation syntax in files that do not use the\n\
+    \     #syntax quotations directive%s"
+    (if Config.syntax_quotations then "" else " (default)")
 
 let mk_args f =
   "-args", Arg.Expand f,
@@ -1148,6 +1194,8 @@ module type Common_options = sig
   val _H : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
+  val _H_file : string -> unit
+  val _Hx_file : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
@@ -1178,6 +1226,8 @@ module type Common_options = sig
   val _no_strict_sequence : unit -> unit
   val _strict_formats : unit -> unit
   val _no_strict_formats : unit -> unit
+  val _syntax_quotations : unit -> unit
+  val _no_syntax_quotations : unit -> unit
   val _unboxed_types : unit -> unit
   val _no_unboxed_types : unit -> unit
   val _dump_debug_uids : unit -> unit
@@ -1231,6 +1281,7 @@ module type Compiler_options = sig
   val _binannot : unit -> unit
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
+  val _type_to_shape_max_depth : string -> unit
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1247,6 +1298,7 @@ module type Compiler_options = sig
   val _i_variance : unit -> unit
   val _impl : string -> unit
   val _instantiate : unit -> unit
+  val _functorize : unit -> unit
   val _intf : string -> unit
   val _intf_suffix : string -> unit
   val _keep_docs : unit -> unit
@@ -1274,6 +1326,7 @@ module type Compiler_options = sig
   val _with_runtime : unit -> unit
   val _without_runtime : unit -> unit
   val _short_paths : unit -> unit
+  val _typing_recovery : unit -> unit
   val _thread : unit -> unit
   val _v : unit -> unit
   val _verbose : unit -> unit
@@ -1314,6 +1367,7 @@ end
 module type Bytecomp_options = sig
   include Core_options
   include Compiler_options
+  val _g_no_ocamldebug_types : unit -> unit
   val _compat_32 : unit -> unit
   val _thunkify_cu_init : unit -> unit
   val _custom : unit -> unit
@@ -1382,6 +1436,8 @@ module type Optcommon_options = sig
   val _dcse : unit -> unit
   val _dlinear :  unit -> unit
   val _dstartup :  unit -> unit
+  val _restrict_to_upstream_dwarf : unit -> unit
+  val _no_restrict_to_upstream_dwarf : unit -> unit
 end;;
 
 module type Optcomp_options = sig
@@ -1406,46 +1462,11 @@ module type Optcomp_options = sig
   val _gdwarf_config_shape_eval_depth : string -> unit
   val _gdwarf_config_max_cms_files_per_unit : string -> unit
   val _gdwarf_config_max_cms_files_per_variable : string -> unit
-  val _gdwarf_config_max_type_to_shape_depth : string -> unit
   val _gdwarf_config_max_shape_reduce_steps_per_variable : string -> unit
   val _gdwarf_config_max_evaluation_steps_per_variable : string -> unit
   val _gdwarf_config_shape_reduce_fuel : string -> unit
   val _gdwarf_fidelity : string -> unit
 end;;
-
-module type Jscomp_options = sig
-  include Core_options
-  include Compiler_options
-
-  (* CR selee: should we include more things from [Native]? Review *)
-  val _inline : string -> unit
-  val _inline_toplevel : string -> unit
-  val _inlining_report : unit -> unit
-  val _dump_pass : string -> unit
-  val _inline_max_depth : string -> unit
-  val _rounds : int -> unit
-  val _inline_max_unroll : string -> unit
-  val _inline_call_cost : string -> unit
-  val _inline_alloc_cost : string -> unit
-  val _inline_prim_cost : string -> unit
-  val _inline_branch_cost : string -> unit
-  val _inline_indirect_cost : string -> unit
-  val _inline_lifting_benefit : string -> unit
-  val _inline_branch_factor : string -> unit
-
-  val _dflambda : unit -> unit
-  val _dflambda_heavy_invariants : unit -> unit
-  val _dflambda_invariants : unit -> unit
-  val _dflambda_let : int -> unit
-  val _dflambda_no_invariants : unit -> unit
-  val _dflambda_verbose : unit -> unit
-  val _djsir : unit -> unit
-  val _drawflambda : unit -> unit
-  val _classic_inlining : unit -> unit
-  val _o2 : unit -> unit
-  val _o3 : unit -> unit
-  val _o4 : unit -> unit
-end
 
 module type Opttop_options = sig
   include Toplevel_options
@@ -1510,6 +1531,7 @@ struct
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
     mk_no_g F._no_g;
+    mk_g_no_ocamldebug_types F._g_no_ocamldebug_types;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_i_variance F._i_variance;
@@ -1518,8 +1540,11 @@ struct
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
+    mk_H_file F._H_file;
+    mk_Hx_file F._Hx_file;
     mk_impl F._impl;
     mk_instantiate_byt F._instantiate;
+    mk_functorize F._functorize;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_intf_suffix_2 F._intf_suffix;
@@ -1571,10 +1596,13 @@ struct
     mk_safe_string;
     mk_safer_matching F._safer_matching;
     mk_short_paths F._short_paths;
+    mk_typing_recovery F._typing_recovery;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_syntax_quotations F._syntax_quotations;
+    mk_no_syntax_quotations F._no_syntax_quotations;
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
@@ -1601,6 +1629,7 @@ struct
     mk_match_context_rows F._match_context_rows;
     mk_use_prims F._use_prims;
     mk_shape_format F._shape_format;
+    mk_type_to_shape_max_depth F._type_to_shape_max_depth;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
     mk_dno_canonical_ids F._dno_canonical_ids;
@@ -1651,6 +1680,8 @@ struct
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
+    mk_H_file F._H_file;
+    mk_Hx_file F._Hx_file;
     mk_init F._init;
     mk_labels F._labels;
     mk_alias_deps F._alias_deps;
@@ -1691,6 +1722,8 @@ struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_syntax_quotations F._syntax_quotations;
+    mk_no_syntax_quotations F._no_syntax_quotations;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
     mk_dump_debug_uids F._dump_debug_uids;
@@ -1793,6 +1826,8 @@ struct
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
+    mk_H_file F._H_file;
+    mk_Hx_file F._Hx_file;
     mk_impl F._impl;
     mk_inline F._inline;
     mk_inline_toplevel F._inline_toplevel;
@@ -1805,6 +1840,7 @@ struct
     mk_inlining_report F._inlining_report;
     mk_insn_sched F._insn_sched;
     mk_instantiate_opt F._instantiate;
+    mk_functorize F._functorize;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
     mk_keep_docs F._keep_docs;
@@ -1866,10 +1902,13 @@ struct
     mk_safer_matching F._safer_matching;
     mk_shared F._shared;
     mk_short_paths F._short_paths;
+    mk_typing_recovery F._typing_recovery;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_syntax_quotations F._syntax_quotations;
+    mk_no_syntax_quotations F._no_syntax_quotations;
     mk_thread F._thread;
     mk_unbox_closures F._unbox_closures;
     mk_unbox_closures_factor F._unbox_closures_factor;
@@ -1939,6 +1978,7 @@ struct
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
     mk_shape_format F._shape_format;
+    mk_type_to_shape_max_depth F._type_to_shape_max_depth;
     mk_gdwarf_config_shape_reduce_depth
       F._gdwarf_config_shape_reduce_depth;
     mk_gdwarf_config_shape_eval_depth
@@ -1947,14 +1987,14 @@ struct
       F._gdwarf_config_max_cms_files_per_unit;
     mk_gdwarf_config_max_cms_files_per_variable
       F._gdwarf_config_max_cms_files_per_variable;
-    mk_gdwarf_config_max_type_to_shape_depth
-      F._gdwarf_config_max_type_to_shape_depth;
     mk_gdwarf_config_max_shape_reduce_steps_per_variable
       F._gdwarf_config_max_shape_reduce_steps_per_variable;
     mk_gdwarf_config_max_evaluation_steps_per_variable
       F._gdwarf_config_max_evaluation_steps_per_variable;
     mk_gdwarf_config_shape_reduce_fuel F._gdwarf_config_shape_reduce_fuel;
     mk_gdwarf_fidelity F._gdwarf_fidelity;
+    mk_restrict_to_upstream_dwarf F._restrict_to_upstream_dwarf;
+    mk_no_restrict_to_upstream_dwarf F._no_restrict_to_upstream_dwarf;
 
     mk_args F._args;
     mk_args0 F._args0;
@@ -1975,6 +2015,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
+    mk_H_file F._H_file;
+    mk_Hx_file F._Hx_file;
     mk_init F._init;
     mk_inline F._inline;
     mk_inline_toplevel F._inline_toplevel;
@@ -2037,6 +2079,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_syntax_quotations F._syntax_quotations;
+    mk_no_syntax_quotations F._no_syntax_quotations;
     mk_unbox_closures F._unbox_closures;
     mk_unbox_closures_factor F._unbox_closures_factor;
     mk_unboxed_types F._unboxed_types;
@@ -2088,177 +2132,10 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dstartup F._dstartup;
     mk_dump_pass F._dump_pass;
     mk_debug_ocaml F._debug_ocaml;
+    mk_restrict_to_upstream_dwarf F._restrict_to_upstream_dwarf;
+    mk_no_restrict_to_upstream_dwarf F._no_restrict_to_upstream_dwarf;
 
     mk_eval F._eval;
-  ]
-end;;
-
-module Make_jscomp_options (F : Jscomp_options) =
-struct
-  let list = [
-    (* CR selee: A lot of these are probably useless in our
-       setting. Go through and prune *)
-    mk_a F._a;
-    mk_alert F._alert;
-    mk_absname F._absname;
-    mk_no_absname F._no_absname;
-    mk_locs F._locs;
-    mk_no_locs F._no_locs;
-    mk_annot F._annot;
-    mk_as_argument_for F._as_argument_for;
-    mk_as_parameter F._as_parameter;
-    mk_binannot F._binannot;
-    mk_binannot_cms F._binannot_cms;
-    mk_binannot_occurrences F._binannot_occurrences;
-    mk_c F._c;
-    mk_cc F._cc;
-    mk_cclib F._cclib;
-    mk_ccopt F._ccopt;
-    mk_classic_inlining F._classic_inlining;
-    mk_cmi_file F._cmi_file;
-    mk_color F._color;
-    mk_error_style F._error_style;
-    mk_config F._config;
-    mk_config_var F._config_var;
-    mk_disable_all_extensions F._disable_all_extensions;
-    mk_only_erasable_extensions F._only_erasable_extensions;
-    mk_dtypes F._annot;
-    mk_extension F._extension;
-    mk_no_extension F._no_extension;
-    mk_extension_universe F._extension_universe;
-    mk_for_pack_byt F._for_pack;
-    mk_g_byt F._g;
-    mk_no_g F._no_g;
-    mk_stop_after ~native:false F._stop_after;
-    mk_i F._i;
-    mk_I F._I;
-    mk_Ix F._Ix;
-    mk_H F._H;
-    mk_I_manifest F._I_manifest;
-    mk_H_manifest F._H_manifest;
-    mk_impl F._impl;
-    mk_instantiate_byt F._instantiate;
-    mk_intf F._intf;
-    mk_intf_suffix F._intf_suffix;
-    mk_intf_suffix_2 F._intf_suffix;
-    mk_keep_docs F._keep_docs;
-    mk_no_keep_docs F._no_keep_docs;
-    mk_keep_locs F._keep_locs;
-    mk_no_keep_locs F._no_keep_locs;
-    mk_labels F._labels;
-    mk_linkall F._linkall;
-    mk_requires_metaprogramming F._requires_metaprogramming;
-    mk_uses_metaprogramming F._uses_metaprogramming;
-    mk_modern F._labels;
-    mk_alias_deps F._alias_deps;
-    mk_no_alias_deps F._no_alias_deps;
-    mk_app_funct F._app_funct;
-    mk_no_app_funct F._no_app_funct;
-    mk_directory F._directory;
-    mk_noassert F._noassert;
-    mk_noautolink_byt F._noautolink;
-    mk_nolabels F._nolabels;
-    mk_nostdlib F._nostdlib;
-    mk_no_auto_include_otherlibs F._no_auto_include_otherlibs;
-    mk_nocwd F._nocwd;
-    mk_nopervasives F._nopervasives;
-    mk_o F._o;
-    mk_o2 F._o2;
-    mk_o3 F._o3;
-    mk_o4 F._o4;
-    mk_opaque F._opaque;
-    mk_open F._open;
-    mk_open_cmi F._open_cmi;
-    mk_output_obj F._output_obj;
-    mk_pack_byt F._pack;
-    mk_parameter F._parameter;
-    mk_pp F._pp;
-    mk_ppx F._ppx;
-    mk_plugin F._plugin;
-    mk_principal F._principal;
-    mk_no_principal F._no_principal;
-    mk_rectypes F._rectypes;
-    mk_no_rectypes F._no_rectypes;
-    mk_runtime_variant F._runtime_variant;
-    mk_with_runtime F._with_runtime;
-    mk_without_runtime F._without_runtime;
-    mk_safe_string;
-    mk_safer_matching F._safer_matching;
-    mk_short_paths F._short_paths;
-    mk_strict_sequence F._strict_sequence;
-    mk_no_strict_sequence F._no_strict_sequence;
-    mk_strict_formats F._strict_formats;
-    mk_no_strict_formats F._no_strict_formats;
-    mk_thread F._thread;
-    mk_unboxed_types F._unboxed_types;
-    mk_no_unboxed_types F._no_unboxed_types;
-    mk_unsafe F._unsafe;
-    mk_v F._v;
-    mk_verbose F._verbose;
-    mk_verbose_types F._verbose_types;
-    mk_no_verbose_types F._no_verbose_types;
-    mk_kind_verbosity F._kind_verbosity;
-    mk_version F._version;
-    mk__version F._version;
-    mk_vnum F._vnum;
-    mk_w F._w;
-    mk_warn_error F._warn_error;
-    mk_warn_help F._warn_help;
-    mk_where F._where;
-    mk__ F.anonymous;
-
-    mk_match_context_rows F._match_context_rows;
-    mk_dno_unique_ids F._dno_unique_ids;
-    mk_dunique_ids F._dunique_ids;
-    mk_dno_locations F._dno_locations;
-    mk_dlocations F._dlocations;
-    mk_dsource F._dsource;
-    mk_dparsetree F._dparsetree;
-    mk_dtypedtree F._dtypedtree;
-    mk_dshape F._dshape;
-    mk_dtlambda F._dtlambda;
-    mk_dslambda F._dslambda;
-    mk_drawlambda F._drawlambda;
-    mk_dlambda F._dlambda;
-    mk_dblambda F._dblambda;
-    mk_dletreclambda F._dletreclambda;
-    mk_dtimings F._dtimings;
-    mk_dtimings_precision F._dtimings_precision;
-    mk_dcounters F._dcounters;
-    mk_dprofile F._dprofile;
-    mk_dgranularity F._dgranularity;
-    mk_dprofile_output F._dprofile_output;
-    mk_dump_into_file F._dump_into_file;
-    mk_dump_into_csv F._dump_into_csv;
-    mk_dump_dir F._dump_dir;
-    mk_debug_ocaml F._debug_ocaml;
-
-    mk_args F._args;
-    mk_args0 F._args0;
-
-    mk_inline_branch_factor F._inline_branch_factor;
-    mk_inline F._inline;
-    mk_inline_toplevel F._inline_toplevel;
-    mk_inline_alloc_cost F._inline_alloc_cost;
-    mk_inline_branch_cost F._inline_branch_cost;
-    mk_inline_call_cost F._inline_call_cost;
-    mk_inline_prim_cost F._inline_prim_cost;
-    mk_inline_indirect_cost F._inline_indirect_cost;
-    mk_inline_lifting_benefit F._inline_lifting_benefit;
-    mk_inline_max_depth F._inline_max_depth;
-    mk_inline_max_unroll F._inline_max_unroll;
-    mk_inlining_report F._inlining_report;
-    mk_rounds F._rounds;
-    mk_dump_pass F._dump_pass;
-
-    mk_dflambda F._dflambda;
-    mk_drawflambda F._drawflambda;
-    mk_dflambda_invariants F._dflambda_invariants;
-    mk_dflambda_heavy_invariants F._dflambda_heavy_invariants;
-    mk_dflambda_no_invariants F._dflambda_no_invariants;
-    mk_dflambda_let F._dflambda_let;
-    mk_dflambda_verbose F._dflambda_verbose;
-    mk_djsir F._djsir;
   ]
 end;;
 
@@ -2276,6 +2153,8 @@ struct
     mk_H F._H;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
+    mk_H_file F._H_file;
+    mk_Hx_file F._Hx_file;
     mk_impl F._impl;
     mk_intf F._intf;
     mk_intf_suffix F._intf_suffix;
@@ -2311,6 +2190,8 @@ struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_syntax_quotations F._syntax_quotations;
+    mk_no_syntax_quotations F._no_syntax_quotations;
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
@@ -2384,7 +2265,7 @@ module Default = struct
   module Common = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
-    let _alert = Warnings.parse_alert_option
+    let _alert s = Warnings.parse_alert_option s
     let _no_ikinds = clear Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
     let _alias_deps = clear no_alias_deps
@@ -2400,6 +2281,7 @@ module Default = struct
     let _no_rectypes = clear recursive_types
     let _no_strict_formats = clear strict_formats
     let _no_strict_sequence = clear strict_sequence
+    let _no_syntax_quotations = clear syntax_quotations
     let _no_unboxed_types = clear unboxed_types
     let _no_verbose_types = clear verbose_types
     let _disable_all_extensions =
@@ -2425,6 +2307,7 @@ module Default = struct
     let _short_paths = clear real_paths
     let _strict_formats = set strict_formats
     let _strict_sequence = set strict_sequence
+    let _syntax_quotations = set syntax_quotations
     let _unboxed_types = set unboxed_types
     let _dump_debug_uids = set dump_debug_uids
     let _dump_debug_uid_tables = set dump_debug_uid_tables
@@ -2448,6 +2331,12 @@ module Default = struct
     let _I_manifest file = include_manifests := file :: !include_manifests
     let _H_manifest file =
       hidden_include_manifests := file :: !hidden_include_manifests
+    let add_hidden_include_file ~cmx_guaranteed entry =
+      match Clflags.parse_hidden_include_file ~cmx_guaranteed entry with
+      | Ok file -> hidden_include_files := file :: !hidden_include_files
+      | Error msg -> raise (Arg.Bad msg)
+    let _H_file = add_hidden_include_file ~cmx_guaranteed:false
+    let _Hx_file = add_hidden_include_file ~cmx_guaranteed:true
     let _color = Misc.set_or_ignore color_reader.parse color
     let _dlambda = set dump_lambda
     let _dblambda = set dump_blambda
@@ -2567,6 +2456,8 @@ module Default = struct
     let _unbox_closures = set unbox_closures
     let _unbox_closures_factor f = unbox_closures_factor := f
     let _verbose = set verbose
+    let _restrict_to_upstream_dwarf = Clflags.set_restrict_to_upstream_dwarf
+    let _no_restrict_to_upstream_dwarf = Clflags.no_restrict_to_upstream_dwarf
   end
 
   module Compiler = struct
@@ -2583,12 +2474,15 @@ module Default = struct
       | "old-merlin" -> shape_format := Old_merlin
       | "debugging-shapes" -> shape_format := Debugging_shapes
       | _ -> ()
+    let _type_to_shape_max_depth s =
+      type_to_shape_max_depth :=
+        parse_int_option ~parameter:"-type-to-shape-max-depth" s
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)
     let _cclib s = Compenv.defer (ProcessObjects (Misc.rev_split_words s))
     let _ccopt s = Compenv.first_ccopts := (s :: (!Compenv.first_ccopts))
-    let _cmi_file s = cmi_file := (Some s)
+    let _cmi_file s = cmi_file := Some s
     let _config = Misc.show_config_and_exit
     let _config_var = Misc.show_config_variable_and_exit
     let _dprofile () = profile_columns := Profile.all_columns
@@ -2610,6 +2504,7 @@ module Default = struct
     let _i = set print_types
     let _impl = Compenv.impl
     let _instantiate = set instantiate
+    let _functorize = set functorize
     let _intf = Compenv.intf
     let _intf_suffix s = Config.interface_suffix := s
     let _keep_docs = set keep_docs
@@ -2659,6 +2554,7 @@ module Default = struct
     let _version () = Compenv.print_version_string ()
     let _vnum () = Compenv.print_version_string ()
     let _where () = Compenv.print_standard_library ()
+    let _typing_recovery = set typing_recovery
     let _with_runtime = set with_runtime
     let _without_runtime = clear with_runtime
   end
@@ -2738,9 +2634,6 @@ module Default = struct
       gdwarf_config_max_cms_files_per_variable :=
         parse_int_option
           ~parameter:"-gdwarf-config-max-cms-files-per-variable" s
-    let _gdwarf_config_max_type_to_shape_depth s =
-      gdwarf_config_max_type_to_shape_depth :=
-        parse_int_option ~parameter:"-gdwarf-config-max-type-to-shape-depth" s
     let _gdwarf_config_max_shape_reduce_steps_per_variable s =
       gdwarf_config_max_shape_reduce_steps_per_variable :=
         parse_int_option
@@ -2773,6 +2666,8 @@ module Default = struct
       *) ()
     let _I_manifest(_:string) = ()
     let _H_manifest(_:string) = ()
+    let _H_file(_:string) = ()
+    let _Hx_file(_:string) = ()
     let _impl (_:string) =
       (* placeholder:
          Odoc_global.files := ((!Odoc_global.files) @ [Odoc_global.Impl_file s])
@@ -2802,6 +2697,7 @@ third-party libraries such as Lwt, but with a different API."
 
     include Core
     include Compiler
+    let _g_no_ocamldebug_types = clear debug_ocamldebug_types
     let _compat_32 = set bytecode_compatible_32
     let _thunkify_cu_init = set thunkify_cu_init
     let _custom = set custom_runtime
@@ -2823,83 +2719,5 @@ third-party libraries such as Lwt, but with a different API."
     let _use_runtime s = use_runtime := s
     let _v () = Compenv.print_version_and_library "compiler"
     let _vmthread () = Compenv.fatal vmthread_removed_message
-  end
-
-  module Jsmain = struct
-    include Core
-    include Compiler
-
-    let _dump_pass pass = set_dumped_pass pass true
-    let _inline spec =
-      Float_arg_helper.parse spec "Syntax: -inline <n> | <round>=<n>[,...]"
-        inline_threshold
-    let _inline_alloc_cost spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-alloc-cost <n> | <round>=<n>[,...]"
-        inline_alloc_cost
-    let _inline_branch_cost spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-branch-cost <n> | <round>=<n>[,...]"
-        inline_branch_cost
-    let _inline_branch_factor spec =
-      Float_arg_helper.parse spec
-        "Syntax: -inline-branch-factor <n> | <round>=<n>[,...]"
-        inline_branch_factor
-    let _inline_call_cost spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-call-cost <n> | <round>=<n>[,...]" inline_call_cost
-    let _inline_indirect_cost spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-indirect-cost <n> | <round>=<n>[,...]"
-        inline_indirect_cost
-    let _inline_lifting_benefit spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-lifting-benefit <n> | <round>=<n>[,...]"
-        inline_lifting_benefit
-    let _inline_max_depth spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-max-depth <n> | <round>=<n>[,...]" inline_max_depth
-    let _inline_max_unroll spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-max-unroll <n> | <round>=<n>[,...]"
-        inline_max_unroll
-    let _inline_prim_cost spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-prim-cost <n> | <round>=<n>[,...]" inline_prim_cost
-    let _inline_toplevel spec =
-      Int_arg_helper.parse spec
-        "Syntax: -inline-toplevel <n> | <round>=<n>[,...]"
-        inline_toplevel_threshold
-    let _inlining_report () = inlining_report := true
-    let _rounds n = simplify_rounds := (Some n)
-
-    let _dflambda = set dump_flambda
-    let _dflambda_heavy_invariants () =
-      flambda_invariant_checks := Heavy_checks
-    let _dflambda_invariants () =
-      flambda_invariant_checks := Light_checks
-    let _dflambda_let stamp = dump_flambda_let := (Some stamp)
-    let _dflambda_no_invariants () =
-      flambda_invariant_checks := No_checks
-    let _dflambda_verbose () =
-      set dump_flambda (); set dump_flambda_verbose ()
-    let _djsir = set dump_jsir
-    let _drawflambda = set dump_rawflambda
-
-    let _output_complete_obj () =
-      output_c_object := true;
-      output_complete_object := true;
-      (* CR selee: ??? *)
-      custom_runtime := true
-    let _output_obj () =
-      output_c_object := true;
-      (* CR selee: ??? *)
-      custom_runtime := true
-    let _v () = Compenv.print_version_and_library "js-of-ocaml IR compiler"
-
-    let _classic_inlining () = set_oclassic ()
-    let _o2 () = Clflags.set_o2 ()
-    let _o3 () = Clflags.set_o3 ()
-    let _o4 () = Clflags.set_o4 ()
   end
 end

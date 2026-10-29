@@ -15,7 +15,7 @@
     Note that globals without parameters are understood to be bound but aren't
     represented explicitly. *)
 type t = private
-  { sign : Subst.Lazy.persistent_signature;
+  { sign : Subst.Lazy.signature * Mode.Staticity.Const.t;
     bound_globals : Global_module.With_precision.t array
   }
 

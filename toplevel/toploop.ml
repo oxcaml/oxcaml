@@ -34,6 +34,7 @@ let use_lexbuf ppf ~wrap_in_module lb ~modpath ~filename =
   Location.init lb filename;
   (* Skip initial #! line if any *)
   Lexer.skip_hash_bang lb;
+  Lexer.protect_syntax_mode @@ fun () ->
   Misc.protect_refs
     [ R (Location.input_name, filename);
       R (Location.input_lexbuf, Some lb); ]
@@ -424,7 +425,7 @@ let prepare ppf ?input () =
   Topcommon.set_paths ?dir ();
   begin try
     initialize_toplevel_env ()
-  with Env.Error _ | Typetexp.Error _ as exn ->
+  with Env.Error.In_context _ | Typetexp.Error.In_context _ as exn ->
     Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
   end;
   try

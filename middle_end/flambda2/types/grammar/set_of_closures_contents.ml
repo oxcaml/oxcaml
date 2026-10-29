@@ -22,13 +22,11 @@ type t =
 include Container_types.Make (struct
   type nonrec t = t
 
-  let [@ocamlformat "disable"] print ppf { closures; value_slots; } =
-    Format.fprintf ppf "@[<hov 1>(\
-          @[<hov 1>(closures@ %a)@]@ \
-          @[<hov 1>(value_slots@ %a)@]\
-          )@]"
-      Function_slot.Set.print closures
-      Value_slot.Set.print value_slots
+  let print ppf { closures; value_slots } =
+    let open! Misc.Sexp in
+    print ppf
+      [ a "closures" closures Function_slot.Set.print;
+        a "value_slots" value_slots Value_slot.Set.print ]
 
   let compare { closures = closures1; value_slots = value_slots1 }
       { closures = closures2; value_slots = value_slots2 } =
@@ -63,13 +61,15 @@ let inter { closures = closures1; value_slots = value_slots1 }
   let value_slots = Value_slot.Set.inter value_slots1 value_slots2 in
   { closures; value_slots }
 
-let apply_renaming { closures; value_slots } renaming =
-  let value_slots =
+let apply_renaming ({ closures; value_slots } as t) renaming =
+  let value_slots' =
     Value_slot.Set.filter
       (fun var -> Renaming.value_slot_is_used renaming var)
       value_slots
   in
-  { closures; value_slots }
+  if value_slots == value_slots'
+  then t
+  else { closures; value_slots = value_slots' }
 
 let free_names { closures = _; value_slots } =
   Value_slot.Set.fold
@@ -81,9 +81,7 @@ let remove_unused_value_slots { closures; value_slots } ~used_value_slots =
   let value_slots =
     Value_slot.Set.filter
       (fun var ->
-        (not
-           (Value_slot.in_compilation_unit var
-              (Compilation_unit.get_current_exn ())))
+        (not (Value_slot.in_compilation_unit var (Current_unit.get_cu_exn ())))
         || Value_slot.Set.mem var used_value_slots)
       value_slots
   in

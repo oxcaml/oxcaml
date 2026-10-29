@@ -19,6 +19,12 @@
 
 include module type of struct include Ident end
 
+(** Name equality.
+
+   (Unlike Ident, Backend_var.equal is equality of identifiers, rather
+   than equality of names) *)
+val equal_by_name : t -> t -> bool
+
 type backend_var = t
 
 val name_for_debugger : t -> string
@@ -32,12 +38,14 @@ module Provenance : sig
     -> location:Debuginfo.t
     -> original_ident:Ident.t
     -> debug_uid:Flambda2_identifiers.Flambda_debug_uid.t
+    -> is_parameter:Is_parameter.t
     -> t
 
   val module_path : t -> Path.t
   val location : t -> Debuginfo.t
   val original_ident : t -> Ident.t
   val debug_uid : t -> Flambda2_identifiers.Flambda_debug_uid.t
+  val is_parameter : t -> Is_parameter.t
 
   val print : Format.formatter -> t -> unit
 
@@ -56,6 +64,7 @@ module With_provenance : sig
 
   val var : t -> backend_var
   val provenance : t -> Provenance.t option
+  val is_parameter : t -> Is_parameter.t
 
   val name : t -> string
 

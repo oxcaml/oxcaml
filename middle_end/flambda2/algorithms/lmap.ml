@@ -43,6 +43,8 @@ module type S = sig
 
   val find_opt : key -> 'a t -> 'a option
 
+  val is_singleton : 'a t -> bool
+
   val get_singleton : 'a t -> (key * 'a) option
 
   val get_singleton_exn : 'a t -> key * 'a
@@ -52,6 +54,8 @@ module type S = sig
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
 
   val map_sharing : ('a -> 'a) -> 'a t -> 'a t
+
+  val map_keys : (key -> key) -> 'a t -> 'a t
 
   val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
 
@@ -125,6 +129,8 @@ module Make (T : Thing) : S with type key = T.t = struct
 
   let find k m = match find_opt k m with Some v -> v | None -> raise Not_found
 
+  let is_singleton = function [_] -> true | _ -> false
+
   let get_singleton = function [(k, v)] -> Some (k, v) | _ -> None
 
   let get_singleton_exn = function [(k, v)] -> k, v | _ -> raise Not_found
@@ -132,6 +138,8 @@ module Make (T : Thing) : S with type key = T.t = struct
   let map f m = List.map (fun (k, v) -> k, f v) m
 
   let mapi f m = List.map (fun (k, v) -> k, f k v) m
+
+  let map_keys f m = List.map (fun (k, v) -> f k, v) m
 
   let map_sharing f m =
     Misc.Stdlib.List.map_sharing

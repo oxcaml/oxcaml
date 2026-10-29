@@ -156,18 +156,18 @@ let module_substitution sub x =
 
 let include_kind sub = function
   | Tincl_structure -> Tincl_structure
-  | Tincl_functor { input_coercion; input_repr } ->
+  | Tincl_functor { input_coercion; input_repr; yielding } ->
       let input_coercion =
         List.map
           (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
       in
-      Tincl_functor { input_coercion; input_repr }
-  | Tincl_gen_functor { input_coercion; input_repr } ->
+      Tincl_functor { input_coercion; input_repr; yielding }
+  | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
       let input_coercion =
         List.map
           (fun (nm, cc) -> (nm, sub.module_coercion sub cc)) input_coercion
       in
-      Tincl_gen_functor { input_coercion; input_repr }
+      Tincl_gen_functor { input_coercion; input_repr; yielding }
 
 let str_include_infos sub x =
   let incl_loc = sub.location sub x.incl_loc in
@@ -337,7 +337,7 @@ let pat_extra sub = function
   | Tpat_open (path,lid,env) ->
       Tpat_open (path, map_loc_lid sub lid, sub.env sub env)
   | Tpat_constraint (ct, ma) ->
-    Tpat_constraint (sub.typ sub ct, sub.modes sub ma)
+    Tpat_constraint (Option.map (sub.typ sub) ct, sub.modes sub ma)
   | Tpat_inspected_type (Label_disambiguation _) as d -> d
   | Tpat_inspected_type (Polymorphic_parameter (Param _)) as d -> d
   | Tpat_inspected_type (Module_pack _) as d -> d
@@ -358,7 +358,8 @@ let pat
     | Tpat_var { id; name; uid; sort; mode } ->
       Tpat_var { id; name = map_loc sub name; uid; sort; mode }
     | Tpat_tuple l ->
-        Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
+        Tpat_tuple
+          (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
     | Tpat_unboxed_tuple l ->
       Tpat_unboxed_tuple
         (List.map (fun (label, p, sort) -> label, sub.pat sub p, sort) l)
@@ -374,12 +375,12 @@ let pat
                         vto)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
-    | Tpat_record (l, sorts, rep, closed) ->
+    | Tpat_record (l, rep, closed) ->
         Tpat_record (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l,
-                     sorts, rep, closed)
-    | Tpat_record_unboxed_product (l, sorts, rep, closed) ->
+                     rep, closed)
+    | Tpat_record_unboxed_product (l, rep, closed) ->
         Tpat_record_unboxed_product
-          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, sorts, rep,
+          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, rep,
            closed)
     | Tpat_array (am, arg_sort, l) ->
         Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
@@ -387,9 +388,9 @@ let pat
         Tpat_alias { pattern = sub.pat sub pattern; id;
                      name = map_loc sub name; uid;
                      sort; mode; type_expr }
-    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_alloc_mode } ->
+    | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_locality_mode } ->
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
-                          lpoly; env_alloc_mode }
+                          lpoly; env_locality_mode }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -535,8 +536,8 @@ let expr sub x =
       Baccess_block (mut, sub.expr sub idx)
   in
   let map_unboxed_access sub = function
-    | Uaccess_unboxed_field (lid, ld, sorts) ->
-      Uaccess_unboxed_field (map_loc_lid sub lid, ld, sorts)
+    | Uaccess_unboxed_field (lid, ld, r) ->
+      Uaccess_unboxed_field (map_loc_lid sub lid, ld, r)
   in
   let exp_desc =
     match x.exp_desc with
@@ -550,20 +551,20 @@ let expr sub x =
         Texp_let (rec_flag, list, sub.expr sub exp)
     | Texp_letmutable (vb, exp) ->
         Texp_letmutable (sub.value_binding sub vb, sub.expr sub exp)
-    | Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
-                      zero_alloc } ->
+    | Texp_function { params; body; locality_mode; ret_mode; ret_sort;
+                      yielding; zero_alloc } ->
         let params = List.map (function_param sub) params in
         let body = function_body sub body in
         let ret_mode = sub.modes sub ret_mode in
-        Texp_function { params; body; alloc_mode; ret_mode; ret_sort;
-                        zero_alloc }
-    | Texp_apply (exp, list, pos, am, za) ->
+        Texp_function { params; body; locality_mode; ret_mode; ret_sort;
+                        yielding; zero_alloc }
+    | Texp_apply (exp, list, pos, am, ym, za) ->
         Texp_apply (
           sub.expr sub exp,
           List.map
             (tuple2 id (Typedtree.map_apply_arg (tuple2 (sub.expr sub) id)))
             list,
-          pos, am, za
+          pos, am, ym, za
         )
     | Texp_match (exp, sort, cases, eff_cases, p) ->
         Texp_match (
@@ -582,7 +583,8 @@ let expr sub x =
     | Texp_unboxed_unit -> Texp_unboxed_unit
     | Texp_unboxed_bool b -> Texp_unboxed_bool b
     | Texp_tuple (list, am) ->
-        Texp_tuple (List.map (fun (label, e) -> label, sub.expr sub e) list, am)
+        Texp_tuple
+          (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list, am)
     | Texp_unboxed_tuple list ->
         Texp_unboxed_tuple
           (List.map (fun (label, e, s) -> label, sub.expr sub e, s) list)
@@ -593,13 +595,16 @@ let expr sub x =
                         am)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record { fields; representation; extended_expression; alloc_mode } ->
+    | Texp_record
+        { fields; representation; extended_expression; locality_mode } ->
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
-            Option.map (fun (exp, sort, ubr) -> (sub.expr sub exp, sort, ubr))
+            Option.map
+              (fun (exp, sort, repres, ubr) ->
+                 (sub.expr sub exp, sort, repres, ubr))
               extended_expression;
-          alloc_mode
+          locality_mode
         }
     | Texp_record_unboxed_product
           { fields; representation; extended_expression } ->
@@ -615,29 +620,29 @@ let expr sub x =
                      lid = map_loc_lid sub lid;
                      record_sort; record_repres; label; boxing; unique_barrier;
                    }
-    | Texp_unboxed_field { record; record_sort; record_sorts; record_repres;
+    | Texp_unboxed_field { record; record_sort; record_repres;
                            lid; label; unique_use; } ->
         Texp_unboxed_field { record = sub.expr sub record;
                              lid = map_loc_lid sub lid; record_sort;
-                             record_sorts; record_repres; label; unique_use;
+                             record_repres; label; unique_use;
                            }
-    | Texp_setfield { record; record_repres; record_sorts; modality; lid; label;
+    | Texp_setfield { record; record_repres; modality; lid; label;
                       newval } ->
         Texp_setfield {
           record = sub.expr sub record;
           lid = map_loc_lid sub lid;
           newval = sub.expr sub newval;
-          record_repres; record_sorts; modality; label;
+          record_repres; modality; label;
         }
     | Texp_atomic_loc { record; record_sort; record_repres; lid; label;
-                        alloc_mode; } ->
+                        locality_mode; } ->
         Texp_atomic_loc {
           record = sub.expr sub record;
           lid = map_loc_lid sub lid;
-          record_sort; record_repres; label; alloc_mode;
+          record_sort; record_repres; label; locality_mode;
         }
-    | Texp_array (amut, sort, list, alloc_mode) ->
-        Texp_array (amut, sort, List.map (sub.expr sub) list, alloc_mode)
+    | Texp_array (amut, sort, list, locality_mode) ->
+        Texp_array (amut, sort, List.map (sub.expr sub) list, locality_mode)
     | Texp_idx (ba, uas) ->
         Texp_idx
           (map_block_access sub ba, List.map (map_unboxed_access sub) uas)
@@ -749,10 +754,10 @@ let expr sub x =
     | Texp_overwrite (exp1, exp2) ->
         Texp_overwrite (sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole use -> Texp_hole use
-    | Texp_quotation exp ->
-        Texp_quotation (sub.expr sub exp)
-    | Texp_antiquotation exp ->
-        Texp_antiquotation (sub.expr sub exp)
+    | Texp_quote exp ->
+        Texp_quote (sub.expr sub exp)
+    | Texp_splice exp ->
+        Texp_splice (sub.expr sub exp)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -878,8 +883,9 @@ let open_declaration sub od =
 
 let module_coercion sub = function
   | Tcoerce_none -> Tcoerce_none
-  | Tcoerce_functor (c1,c2) ->
-      Tcoerce_functor (sub.module_coercion sub c1, sub.module_coercion sub c2)
+  | Tcoerce_functor (c1,c2,yielding) ->
+      Tcoerce_functor
+        (sub.module_coercion sub c1, sub.module_coercion sub c2, yielding)
   | Tcoerce_alias (env, p, c1) ->
       Tcoerce_alias (sub.env sub env, p, sub.module_coercion sub c1)
   | Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list } ->
@@ -894,6 +900,8 @@ let module_coercion sub = function
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}
+  | Tcoerce_kindtemplate ks ->
+      Tcoerce_kindtemplate ks
   | Tcoerce_invalid -> Tcoerce_invalid
 
 let module_expr sub x =
@@ -910,16 +918,19 @@ let module_expr sub x =
     match x.mod_desc with
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
-    | Tmod_functor (arg, mexpr) ->
-        Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)
-    | Tmod_apply (mexp1, mexp2, c) ->
+    | Tmod_functor (arg, mexpr, staticity) ->
+        Tmod_functor
+          (functor_parameter sub arg, sub.module_expr sub mexpr, staticity)
+    | Tmod_apply (mexp1, mexp2, c, yielding, staticity) ->
         Tmod_apply (
           sub.module_expr sub mexp1,
           sub.module_expr sub mexp2,
-          sub.module_coercion sub c
+          sub.module_coercion sub c,
+          yielding,
+          staticity
         )
-    | Tmod_apply_unit mexp1 ->
-        Tmod_apply_unit (sub.module_expr sub mexp1)
+    | Tmod_apply_unit (mexp1, yielding) ->
+        Tmod_apply_unit (sub.module_expr sub mexp1, yielding)
     | Tmod_constraint (mexpr, mt, Tmodtype_implicit, c) ->
         Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_implicit,
                          sub.module_coercion sub c)

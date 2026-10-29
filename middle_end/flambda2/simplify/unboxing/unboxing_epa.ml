@@ -154,7 +154,7 @@ let extra_args_for_const_ctor_of_variant
             | Number
                 ( ( Naked_float | Naked_float32 | Naked_int32 | Naked_int64
                   | Naked_int8 | Naked_int16 | Naked_nativeint | Naked_vec128
-                  | Naked_vec256 | Naked_vec512 ),
+                  | Naked_vec256 | Naked_vec512 | Naked_mask ),
                   _ ) );
         is_int = _
       } ->
@@ -291,6 +291,9 @@ and compute_extra_args_for_one_decision_and_use_aux ~(pass : U.pass) rewrite_id
   | Unbox (Number (Naked_vec512, epa)) ->
     compute_extra_arg_for_number Naked_vec512 Unboxers.Vec512.unboxer epa
       rewrite_id ~typing_env_at_use arg_being_unboxed
+  | Unbox (Number (Naked_mask, epa)) ->
+    compute_extra_arg_for_number Naked_mask Unboxers.Mask.unboxer epa rewrite_id
+      ~typing_env_at_use arg_being_unboxed
 
 and compute_extra_args_for_block ~pass rewrite_id ~typing_env_at_use
     ~machine_width arg_being_unboxed tag (shape : K.Block_shape.t) fields :
@@ -525,7 +528,8 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
                   | Number
                       ( ( Naked_float32 | Naked_float | Naked_int8 | Naked_int16
                         | Naked_int32 | Naked_int64 | Naked_vec128
-                        | Naked_vec256 | Naked_vec512 | Naked_nativeint ),
+                        | Naked_vec256 | Naked_vec512 | Naked_nativeint
+                        | Naked_mask ),
                         _ ) );
               is_int = _
             } ->

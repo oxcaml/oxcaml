@@ -19,17 +19,9 @@ val create_stats : ?with_provenance:bool -> Table.Map.t -> stats
 
 val print_stats : Format.formatter -> stats -> unit
 
-type rule
-
-type deduction =
-  [ `Atom of Datalog.atom
-  | `And of deduction list ]
-
-val deduce : deduction -> (Heterogenous_list.nil, rule) Datalog.program
-
 type t
 
-val saturate : rule list -> t
+val saturate : Lang.rule list -> t
 
 val fixpoint : t list -> t
 

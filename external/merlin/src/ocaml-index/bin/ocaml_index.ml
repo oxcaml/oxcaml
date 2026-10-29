@@ -13,7 +13,9 @@ let output_file = ref "project.ocaml-index"
 let root = ref ""
 let rewrite_root = ref false
 let store_shapes = ref false
+let file_kind = ref Granular_marshal.File_kind.No_standalone
 let do_not_use_cmt_loadpath = ref false
+let cache_size_kb = ref 1_000_000
 
 type command =
   | Aggregate
@@ -47,7 +49,10 @@ let anon_fun arg =
 let speclist =
   [ ("--verbose", Arg.Set verbose, "Output more information");
     ("--debug", Arg.Set debug, "Output debugging information");
-    ("-o", Arg.Set_string output_file, "Set output file name");
+    ( "-o",
+      Arg.Set_string output_file,
+      "Set output file name. Note that sub-indexes paths remains relative to \
+       the current directory." );
     ( "--root",
       Arg.Set_string root,
       "Set the root path for all relative locations" );
@@ -57,6 +62,15 @@ let speclist =
     ( "--store-shapes",
       Arg.Set store_shapes,
       "Aggregate input-indexes shapes and store them in the new index" );
+    ( "--standalone",
+      Arg.Unit (fun () -> file_kind := Standalone),
+      "The output index will not contain pointers to the input index/shape \
+       files. All data is copied into the output index." );
+    ( "--no-standalone",
+      Arg.Unit (fun () -> file_kind := No_standalone),
+      "The output may contain pointers to the input index/shape files. This \
+       will make the output index smaller, but to use it, the input \
+       index/shape files must still be available. (default)" );
     ( "-I",
       Arg.String
         (fun path ->
@@ -85,7 +99,11 @@ let speclist =
     ( "--no-cmt-load-path",
       Arg.Set do_not_use_cmt_loadpath,
       "Do not initialize the load path with the paths found in the first input \
-       cmt file" )
+       cmt file" );
+    ( "--cache-size",
+      Arg.Set_int cache_size_kb,
+      "Set LRU cache size in kb. Will bound memory usage in read-heavy \
+       scenarios. Defaults to 1_000_000 (1gb)" )
   ]
 
 let set_log_level debug verbose =
@@ -96,61 +114,74 @@ let set_log_level debug verbose =
 let () =
   Arg.parse speclist anon_fun usage_msg;
   set_log_level !debug !verbose;
-  (match !command with
-  | Some Aggregate ->
-    let root = if String.equal "" !root then None else Some !root in
-    Index.from_files ~store_shapes:!store_shapes ~root
-      ~rewrite_root:!rewrite_root ~output_file:!output_file
-      ~build_path:
-        { visible = List.rev !build_path_rev.visible;
-          hidden = List.rev !build_path_rev.hidden
-        }
-      ~do_not_use_cmt_loadpath:!do_not_use_cmt_loadpath
-      (List.rev !input_files_rev)
-  | Some Dump ->
-    List.iter
-      (fun file -> Index_format.(read_exn ~file |> pp Format.std_formatter))
-      (List.rev !input_files_rev)
-  | Some Dump_file_stats ->
-    List.iter
-      (fun file ->
-        let open Merlin_index_format.Index_format in
-        let index = read_exn ~file in
-        Printf.printf "File stats for index %S:\n" file;
-        Stats.iter
-          (fun file { mtime; size; source_digest } ->
-            Printf.printf "  %S: { mtime=%f; size=%d; source_digest=%S }\n" file
-              mtime size
-              (Option.value source_digest ~default:"none"))
-          index.stats)
-      (List.rev !input_files_rev)
-  | Some Gather_shapes ->
-    Index.gather_shapes ~output_file:!output_file (List.rev !input_files_rev)
-  | Some Stats ->
-    List.iter
-      (fun file ->
-        let open Merlin_index_format.Index_format in
-        let { defs; approximated; cu_shape; root_directory; _ } =
-          read_exn ~file
-        in
-        Printf.printf
-          "Index %S contains:\n\
-           - %i definitions\n\
-           - %i locations\n\
-           - %i approximated definitions\n\
-           - %i compilation units shapes\n\
-           - root dir: %s\n\n"
-          file (Uid_map.cardinal defs)
-          (Uid_map.fold
-             (fun _uid locs acc -> acc + Lid_set.cardinal locs)
-             defs 0)
-          (Uid_map.cardinal approximated)
-          (Hashtbl.length cu_shape)
-          (Option.value ~default:"none" root_directory))
-      (List.rev !input_files_rev)
-  | Some Magic_numbers ->
-    let json = Config.Magic_numbers.(to_json current) in
-    Yojson.Basic.to_channel stdout json;
-    print_newline ()
-  | None -> Printf.printf "Nothing to do.\n%!");
-  exit 0
+  Granular_marshal.set_lru_size (!cache_size_kb * 1000);
+  try
+    (match !command with
+    | Some Aggregate ->
+      let root = if String.equal "" !root then None else Some !root in
+      Index.from_files ~store_shapes:!store_shapes ~file_kind:!file_kind ~root
+        ~rewrite_root:!rewrite_root ~output_file:!output_file
+        ~build_path:
+          { visible = List.rev !build_path_rev.visible;
+            hidden = List.rev !build_path_rev.hidden
+          }
+        ~do_not_use_cmt_loadpath:!do_not_use_cmt_loadpath
+        (List.rev !input_files_rev)
+    | Some Dump ->
+      List.iter
+        (fun file -> Index_format.(read_exn ~file |> pp Format.std_formatter))
+        (List.rev !input_files_rev)
+    | Some Dump_file_stats ->
+      List.iter
+        (fun file ->
+          let open Merlin_index_format.Index_format in
+          let index = read_exn ~file in
+          Printf.printf "File stats for index %S:\n" file;
+          Stats.iter
+            (fun file { mtime; size; source_digest } ->
+              Printf.printf "  %S: { mtime=%f; size=%d; source_digest=%S }\n"
+                file mtime size
+                (Option.value source_digest ~default:"none"))
+            index.stats)
+        (List.rev !input_files_rev)
+    | Some Gather_shapes ->
+      Index.gather_shapes ~output_file:!output_file (List.rev !input_files_rev)
+    | Some Stats ->
+      List.iter
+        (fun file ->
+          let open Merlin_index_format.Index_format in
+          let { defs; approximated; cu_shape; root_directory; _ } =
+            read_exn ~file
+          in
+          Printf.printf
+            "Index %S contains:\n\
+             - %i definitions\n\
+             - %i locations\n\
+             - %i approximated definitions\n\
+             - %i compilation units shapes\n\
+             - root dir: %s\n\n"
+            file (Uid_map.cardinal defs)
+            (Uid_map.fold
+               (fun _uid locs acc -> acc + Lid_set.cardinal locs)
+               defs 0)
+            (Uid_map.cardinal approximated)
+            (Hashtbl.length cu_shape)
+            (Option.value ~default:"none" root_directory))
+        (List.rev !input_files_rev)
+    | Some Magic_numbers ->
+      let json = Config.Magic_numbers.(to_json current) in
+      Yojson.Basic.to_channel stdout json;
+      print_newline ()
+    | None -> Printf.printf "Nothing to do.\n%!");
+    if !debug then Granular_marshal.get_lru () |> Dbllist.pp_stats;
+    exit 0
+  with Granular_marshal.Outdated_store { filename; reason } ->
+    let msg =
+      match reason with
+      | `Missing_file -> Format.asprintf "Missing file \"%s\"." filename
+      | `Index_ids_do_not_match ->
+        Format.asprintf "Index IDs doesn't match for \"%s\"." filename
+    in
+    Printf.printf
+      "%s\nHint: try to rebuild indexes with dune build @ocaml-index.\n%!" msg;
+    exit 1

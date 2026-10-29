@@ -18,7 +18,7 @@ open! Simplify_import
 
 type simplify_result =
   { free_names : Name_occurrences.t;
-    final_typing_env : Typing_env.t option;
+    final_typing_env : Typing_env.t;
     all_code : Exported_code.t;
     slot_offsets : Slot_offsets.t;
     unit : Flambda_unit.t
@@ -27,8 +27,6 @@ type simplify_result =
 let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   let return_continuation = FU.return_continuation unit in
   let exn_continuation = FU.exn_continuation unit in
-  let toplevel_my_region = FU.toplevel_my_region unit in
-  let toplevel_my_ghost_region = FU.toplevel_my_ghost_region unit in
   let toplevel_my_alloc_region = FU.toplevel_my_alloc_region unit in
   let module_symbol = FU.module_symbol unit in
   let resolver = Flambda_cmx.load_cmx_file_contents cmx_loader in
@@ -37,8 +35,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
     DE.create ~round ~machine_width ~resolver ~get_imported_code
       ~propagating_float_consts:(Flambda_features.float_const_prop ())
       ~unit_toplevel_return_continuation:return_continuation
-      ~unit_toplevel_exn_continuation:exn_continuation ~toplevel_my_region
-      ~toplevel_my_ghost_region ~toplevel_my_alloc_region
+      ~unit_toplevel_exn_continuation:exn_continuation ~toplevel_my_alloc_region
   in
   (* CR gbury: only compute closure offsets if this is the last round. (same
      remark for the cmx contents) *)
@@ -53,11 +50,7 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
   NO.fold_names name_occurrences ~init:() ~f:(fun () name ->
       Name.pattern_match name
         ~var:(fun var ->
-          if
-            not
-              (Variable.equal var toplevel_my_region
-              || Variable.equal var toplevel_my_ghost_region
-              || Variable.equal var toplevel_my_alloc_region)
+          if not (Variable.equal var toplevel_my_alloc_region)
           then
             Misc.fatal_errorf
               "Variable %a not expected to be free in whole-compilation-unit \
@@ -70,8 +63,16 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
       UA.print uacc;
   let final_typing_env =
     let cont_uses_env = DA.continuation_uses_env (UA.creation_dacc uacc) in
-    Continuation_uses_env.get_typing_env_no_more_than_one_use cont_uses_env
-      return_continuation
+    match
+      Continuation_uses_env.get_typing_env_no_more_than_one_use cont_uses_env
+        return_continuation
+    with
+    | Some final_typing_env -> final_typing_env
+    | None ->
+      (* Create an unknown typing_env in case the module never returns *)
+      TE.add_symbol_definition
+        (TE.create ~machine_width ~resolver)
+        module_symbol
   in
   let all_code =
     Exported_code.merge (UA.all_code uacc)
@@ -85,9 +86,8 @@ let run ~cmx_loader ~machine_width ~round ~code_slot_offsets unit =
     | Known slot_offsets -> slot_offsets
   in
   let unit =
-    FU.create ~return_continuation ~exn_continuation ~toplevel_my_region
-      ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~module_symbol ~body
-      ~used_value_slots:Unknown
+    FU.create ~return_continuation ~exn_continuation ~toplevel_my_alloc_region
+      ~module_symbol ~body
   in
   { unit;
     free_names = name_occurrences;

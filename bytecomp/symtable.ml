@@ -213,9 +213,9 @@ external int_as_pointer : int -> Obj.t = "%int_as_pointer"
 
 let rec transl_const = function
     Const_base(Const_int i)
-  | Const_base(Const_untagged_int i) -> Obj.repr i
-  | Const_base(Const_char c)
-  | Const_base(Const_untagged_char c) -> Obj.repr c
+  | Const_base(Const_untagged_int i)
+  | Const_base(Const_untagged_char i) -> Obj.repr i
+  | Const_base(Const_char c) -> Obj.repr c
   | Const_base(Const_string (s, _, _)) -> Obj.repr s
   | Const_base(Const_float32 f)
   | Const_base(Const_unboxed_float32 f) ->

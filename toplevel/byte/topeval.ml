@@ -69,11 +69,15 @@ let may_trace = ref false (* Global lock on tracing *)
 let load_lambda ppf tlam =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let { Slambda.slv_comptime = _; slv_runtime = rawlam } =
+  let (_static_data, rawlam) =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+    Slambda.eval
+      ~cu_static_data:(fun _ ->
+        Misc.fatal_errorf_doc
+          "Cross-module static evaluation not implemented in the toplevel")
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam = Simplif.simplify_lambda_for_bytecode rawlam in
@@ -149,8 +153,11 @@ let execute_phrase print_outcome ppf phr =
                         let outv = outval_of_value newenv v
                                      (Types.Lpoly.determined []) exp.exp_type in
                         let ty =
-                          Out_type.prepare_for_printing [exp.exp_type];
-                          Out_type.tree_of_typexp Type_scheme exp.exp_type
+                          let base = Mode.With_locality.Const.legacy in
+                          Out_type.prepare_for_printing ~base
+                            [exp.exp_type];
+                          Out_type.tree_of_typexp ~base Type_scheme
+                            exp.exp_type
                         in
                         Ophr_eval (outv, ty)
                       | None -> Ophr_signature (pr_item oldenv sg'))

@@ -40,8 +40,11 @@ type native_repr =
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
+  | Unextended_bits8
+  | Unextended_bits16
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -69,10 +72,10 @@ type description = native_repr description_gen
    is added, then errors will always be unique and de-duping will no longer be
    necessary. *)
 type wrong_repr_error =
-  | Product_arg
   | Expected_value_prim
-  | Product_return
   | Unpacked_product_return
+  | Unextended_return
+  | Small_int_arg
   | Repr_mismatch
 [@@immediate]
 
@@ -101,8 +104,11 @@ let check_ocaml_value = function
   | _, Repr_poly -> Bad_layout
   | _, Unboxed_float _
   | _, Unboxed_vector _
+  | _, Unboxed_mask
   | _, Unboxed_or_untagged_integer _
-  | _, Unpacked_product _ -> Bad_attribute
+  | _, Unpacked_product _
+  | _, Unextended_bits8
+  | _, Unextended_bits16 -> Bad_attribute
 
 let is_builtin_prim_name name = String.length name > 0 && name.[0] = '%'
 
@@ -257,6 +263,7 @@ let rec add_native_repr_attributes ty attrs =
 let oattr_unboxed = { oattr_name = "unboxed" }
 let oattr_untagged = { oattr_name = "untagged" }
 let oattr_unpacked = { oattr_name = "unpacked" }
+let oattr_unsafe_unextended = { oattr_name = "unsafe_unextended" }
 let oattr_noalloc = { oattr_name = "noalloc" }
 let oattr_builtin = { oattr_name = "builtin" }
 let oattr_no_effects = { oattr_name = "no_effects" }
@@ -283,9 +290,12 @@ let print p osig_val_decl =
                                     | Untagged_int16) -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
+    | _, Unboxed_mask
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint) ->
       true
+    | _, Unextended_bits8
+    | _, Unextended_bits16
     | _, Same_as_ocaml_repr (Base Void) -> false
       (* The [@unboxed] attribute is not supported on void in our compiler
          or the upstream compiler. *)
@@ -303,9 +313,12 @@ let print p osig_val_decl =
     | _, Same_as_ocaml_repr _
     | _, Unboxed_float _
     | _, Unboxed_vector _
+    | _, Unboxed_mask
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint)
     | _, Unpacked_product _
+    | _, Unextended_bits8
+    | _, Unextended_bits16
     | _, Repr_poly -> false
   in
   let all_unboxed = for_all needs_unboxed_attribute in
@@ -345,6 +358,7 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
+     | Unboxed_mask
      | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64
                                    | Unboxed_nativeint) ->
        if all_unboxed then [] else [oattr_unboxed]
@@ -352,6 +366,7 @@ let print p osig_val_decl =
                                    | Untagged_int16) ->
        if all_untagged then [] else [oattr_untagged]
      | Unpacked_product _ -> [oattr_unpacked]
+     | Unextended_bits8 | Unextended_bits16 -> [oattr_unsafe_unextended]
      | Same_as_ocaml_repr _->
        if all_unboxed || not (needs_unboxed_attribute (m, repr))
        then []
@@ -430,36 +445,59 @@ let equal_native_repr nr1 nr2 =
   match nr1, nr2 with
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
-               | Unboxed_vector _ | Same_as_ocaml_repr _
+               | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
                | Unpacked_product _)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
-    | Unboxed_vector _ | Same_as_ocaml_repr _
+    | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
     | Unpacked_product _), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_or_untagged_integer _ | Unboxed_mask | Unpacked_product _) ->
+    false
+  | Unboxed_mask, Unboxed_mask -> true
+  | Unboxed_mask,
+    (Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _ |
      Unboxed_or_untagged_integer _ | Unpacked_product _) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unboxed_or_untagged_integer _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _) -> false
+  | Unextended_bits8, Unextended_bits8 -> true
+  | Unextended_bits8,
+    (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
+     Unpacked_product _)
+  | (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
+     Unpacked_product _),
+    Unextended_bits8 -> false
+  | Unextended_bits16 , Unextended_bits16 -> true
+  | Unextended_bits16,
+    (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
+     Unextended_bits8 | Unpacked_product _)
+  | (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
+     Unextended_bits8 | Unpacked_product _),
+    Unextended_bits16 -> false
 
 let equal_effects ef1 ef2 =
   match ef1, ef2 with
@@ -501,36 +539,59 @@ module Repr_check = struct
 
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
-    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
-    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Unboxed_mask -> true
+    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_bits8 |
+      Unextended_bits16 -> false
 
-  let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
-    | Product _ -> true
+  let rec sort_contains_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
+    function
+    | Product sorts -> List.exists sort_contains_bits8_or_bits16 sorts
+    | Base (Bits8 | Bits16) -> true
     | Base _ -> false
-    | Univar _ -> Misc.fatal_error "sort_is_product: univar"
-    | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
+    | Addressable sort -> sort_contains_bits8_or_bits16 sort
+    | Univar _ -> Misc.fatal_error "sort_contains_bits8_or_bits16: univar"
+    | Genvar _ -> Misc.fatal_error "sort_contains_bits8_or_bits16: genvar"
 
-  let c_stub_arg_errors = function
+  let rec sort_is_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
+    function
+    | Base (Bits8 | Bits16) -> true
+    | Base _ | Product _ -> false
+    | Addressable sort -> sort_is_bits8_or_bits16 sort
+    | Univar _ -> Misc.fatal_error "sort_is_bits8_or_bits16: univar"
+    | Genvar _ -> Misc.fatal_error "sort_is_bits8_or_bits16: genvar"
+
+  (* Arguments of layout bits8 or bits16 are passed to C in registers whose
+     upper bits are unspecified, so they are rejected unless the stub is a
+     builtin or the argument is annotated with [@unsafe_unextended]. This
+     applies to the components of [@unpacked] products (separate C arguments)
+     but not of ordinary unboxed products (C struct members). See
+     [Extcall_abi.Component] for more details. *)
+  let c_stub_arg_errors ~builtin = function
     | Same_as_ocaml_repr s ->
-      if sort_is_product s then [Product_arg] else []
-    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unpacked_product _ | Repr_poly -> []
-
-  let c_stub_return_errors = function
-    | Same_as_ocaml_repr (Base _)
-    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Repr_poly -> []
-    | Unpacked_product _ -> [Unpacked_product_return]
-    | Same_as_ocaml_repr (Product [s1; s2]) ->
-      if (sort_is_product s1) ||
-         (sort_is_product s2)
-      then [Product_return]
+      if not builtin && sort_is_bits8_or_bits16 s
+      then [Small_int_arg]
       else []
-    | Same_as_ocaml_repr (Product _) -> [Product_return]
+    | Unpacked_product s ->
+      if not builtin && sort_contains_bits8_or_bits16 s
+      then [Small_int_arg]
+      else []
+    | Unextended_bits8 | Unextended_bits16
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Unboxed_mask | Repr_poly -> []
+
+  let rec c_stub_return_errors = function
+    | Same_as_ocaml_repr (Base _ | Product _)
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Unboxed_mask | Repr_poly -> []
+    | Same_as_ocaml_repr (Addressable s) ->
+      c_stub_return_errors (Same_as_ocaml_repr s)
     | Same_as_ocaml_repr (Univar _) ->
       Misc.fatal_error "c_stub_return_errors: univar"
     | Same_as_ocaml_repr (Genvar _) ->
       Misc.fatal_error "c_stub_return_errors: genvar"
+    | Unpacked_product _ -> [Unpacked_product_return]
+    | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
@@ -570,12 +631,14 @@ module Repr_check = struct
             else [Expected_value_prim]))
       prim
 
-  let check_c_stub prim =
-    (* C externals are allowed to return a tuple, but may not take products as
-       arguments or return products with more than two elements. *)
+  let check_c_stub ~builtin prim =
+    (* CR mshinwell: it would be better to reject non-compilable shapes here
+       rather than in the backend. However, it is unclear how to do this since
+       the check is target- and backend-dependent, so the elaboration of
+       [external] declarations would become backend-dependent.  *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
-      (List.init arity (fun _ -> c_stub_arg_errors))
+      (List.init arity (fun _ -> c_stub_arg_errors ~builtin))
       @ [c_stub_return_errors]
     in
     check checks prim
@@ -609,6 +672,7 @@ module Primitive_reprs = struct
         ("u256", "", C.scannable);
         ("a512", "", C.scannable);
         ("u512", "", C.scannable);
+        ("mask", "", C.scannable);
         ("8", "#", C.bits8);
         ("i8", "#", C.bits8);
         ("16", "#", C.bits16);
@@ -622,6 +686,7 @@ module Primitive_reprs = struct
         ("u256", "#", C.vec256);
         ("a512", "#", C.vec512);
         ("u512", "#", C.vec512);
+        ("mask", "#", C.mask);
       ]
     in
     let indices : (_ * Jkind_types.Sort.Const.t) list =
@@ -769,7 +834,7 @@ let prim_has_valid_reprs ~loc prim =
     (* This doesn't prevent
 
        {|
-          external get : float# array -> int -> int32# =
+          external get : float# array -> int -> int32_u =
             "%array_safe_get"
        |}
 
@@ -982,19 +1047,129 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.word);
         is (Same_as_ocaml_repr C.bits64);
       ]
+    | "%atomic_load_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_set_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_exchange_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_cas_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_compare_exchange_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%atomic_fetch_add_idx"
+    | "%atomic_add_idx"
+    | "%atomic_sub_idx"
+    | "%atomic_land_idx"
+    | "%atomic_lor_idx"
+    | "%atomic_lxor_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_load_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_set_ptr"
+    | "%unsafe_atomic_exchange_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_cas_ptr"
+    | "%unsafe_atomic_compare_exchange_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_fetch_add_ptr"
+    | "%unsafe_atomic_add_ptr"
+    | "%unsafe_atomic_sub_ptr"
+    | "%unsafe_atomic_land_ptr"
+    | "%unsafe_atomic_lor_ptr"
+    | "%unsafe_atomic_lxor_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_load_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_set_ext_ptr"
+    | "%unsafe_atomic_exchange_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_cas_ext_ptr"
+    | "%unsafe_atomic_compare_exchange_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_fetch_add_ext_ptr"
+    | "%unsafe_atomic_add_ext_ptr"
+    | "%unsafe_atomic_sub_ext_ptr"
+    | "%unsafe_atomic_land_ext_ptr"
+    | "%unsafe_atomic_lor_ext_ptr"
+    | "%unsafe_atomic_lxor_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
     | "%unsafe_get_ptr" ->
       check [
-        is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         any
       ]
     | "%unsafe_get_ptr_imm" ->
       check [
-        is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         any
       ]
     | "%unsafe_set_ptr" ->
       check [
-        is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
@@ -1069,16 +1244,30 @@ let prim_has_valid_reprs ~loc prim =
                Same_as_ocaml_repr C.vec256]
     | "%split_vec256" ->
       exactly [Same_as_ocaml_repr C.vec256;
-               Same_as_ocaml_repr (Product [C.vec128; C.vec128])]
+               Same_as_ocaml_repr (C.product [C.vec128; C.vec128])]
     | "%box_vec512" ->
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec512]
+    | "%box_mask" ->
+      exactly [Same_as_ocaml_repr C.mask; Same_as_ocaml_repr C.scannable]
+    | "%unbox_mask" ->
+      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.mask]
 
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.bits64]
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.scannable]
+    | "%box" ->
+      check [
+        any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unbox" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        any;
+      ]
 
     | name -> (
         match String.Map.find_opt name stringlike_indexing_primitives with
@@ -1103,7 +1292,8 @@ let prim_has_valid_reprs ~loc prim =
                        | "%sendcache"
                      |}
                   *)
-                else check_c_stub)
+                else
+                  check_c_stub ~builtin:prim.prim_c_builtin)
   in
   match check prim with
   | Success -> ()
@@ -1188,26 +1378,30 @@ let report_error ppf err =
     let errors = List.sort_uniq compare_wrong_repr_error errors in
     List.iter
       (function
-      | Product_arg ->
-        Format_doc.fprintf ppf
-          "@.@{<hint>Hint@}: @[<v>\
-           Types with product layouts in C stub arguments require the@ \
-           %a attribute.@]"
-          Style.inline_code "[@unpacked]"
       | Expected_value_prim ->
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
            This was expected to be a value-only primitive. You might've@ \
            misspelled the primitive name.@]"
-      | Product_return ->
-        Format_doc.fprintf ppf
-          "@.@{<hint>Hint@}: @[<v>\
-           Unboxed products in C stub returns must be a pair of non-products.@]"
       | Unpacked_product_return ->
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
            The %a attribute is not allowed on C stub returns.@]"
           Style.inline_code "[@unpacked]"
+      | Unextended_return ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           The %a attribute is not allowed on C stub returns.@]"
+          Style.inline_code "[@unsafe_unextended]"
+      | Small_int_arg ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           Arguments with layout bits8 or bits16 are not allowed in C stubs@ \
+           except in %as. You may also annotate such an argument with@ \
+           %a if you are absolutely sure your C stub does not read@ \
+           the garbage upper bits.@]"
+          Style.inline_code "[@@builtin]"
+          Style.inline_code "[@unsafe_unextended]"
       | Repr_mismatch -> ()
         (* The error message already says "wrong layout", so a hint here would
            be redundant. *))

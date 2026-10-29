@@ -24,9 +24,9 @@ module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
  *)
 
 type uf = float#
-type i32 = int32#
-type i64 = int64#
-type i_n = nativeint#
+type i32 = int32_u
+type i64 = int64_u
+type i_n = nativeint_u
 type t_large =
   { x : string;
     f1 : uf; f2 : i_n; f3 : uf; f4 : uf; f5 : uf; f6 : uf; f7 : uf;
@@ -226,7 +226,7 @@ let () = test_large_mixed_blocks ()
 *)
 
 type t_opt1 =
-  { imm : int; fl : float#; i32 : int32#; i64 : int64#; i_n : nativeint# }
+  { imm : int; fl : float#; i32 : int32_u; i64 : int64_u; i_n : nativeint_u }
 
 let construct_and_destruct_1_1 imm fl i32 i64 i_n =
   match { imm; fl; i32; i64; i_n } with

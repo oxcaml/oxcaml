@@ -41,6 +41,7 @@ module Singleton_mixed_block_element = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -59,6 +60,7 @@ module Singleton_mixed_block_element = struct
     | Vec128 -> Format.fprintf ppf "Vec128"
     | Vec256 -> Format.fprintf ppf "Vec256"
     | Vec512 -> Format.fprintf ppf "Vec512"
+    | Mask -> Format.fprintf ppf "Mask"
     | Word -> Format.fprintf ppf "Word"
     | Untagged_immediate -> Format.fprintf ppf "Untagged_immediate"
 end
@@ -87,8 +89,6 @@ let value_prefix t = t.prefix
 let flat_suffix t = t.suffix
 
 let value_prefix_len t = Array.length t.prefix
-
-let flat_suffix_len t = Array.length t.suffix
 
 let flattened_reordered_shape t = Array.map fst t.flattened_reordered_shape
 
@@ -144,6 +144,38 @@ let new_index_to_old_path t new_index =
 
 let new_block_length t = Array.length t.flattened_reordered_shape
 
+module Field_for_printing = struct
+  type 'a t =
+    | Void
+    | Unboxed_product
+    | Singleton of
+        { element : 'a Singleton_mixed_block_element.t;
+          offset_in_words : int
+        }
+
+  let size_in_words : _ Singleton_mixed_block_element.t -> int = function
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+    | Bits64 | Mask | Word | Untagged_immediate ->
+      1
+    | Vec128 -> 2
+    | Vec256 -> 4
+    | Vec512 -> 8
+
+  let offset_in_words t new_index =
+    let offset = ref 0 in
+    for i = 0 to new_index - 1 do
+      offset := !offset + size_in_words (fst t.flattened_reordered_shape.(i))
+    done;
+    !offset
+
+  let of_shape shape ~index =
+    match shape.forest.(index) with
+    | Node { children = [||] } -> Void
+    | Node _ -> Unboxed_product
+    | Leaf { element; new_index } ->
+      Singleton { element; offset_in_words = offset_in_words shape new_index }
+end
+
 let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
   let original_path = path in
   match path with
@@ -162,6 +194,15 @@ let lookup_path_producing_new_indexes ({ forest; _ } as t) path =
           original_path print t
     in
     lookup_path' path tree
+
+let lookup_singleton_field t index =
+  match lookup_path_producing_new_indexes t [index] with
+  | [new_index] -> new_index
+  | _ ->
+    Misc.fatal_errorf
+      "lookup_singleton_field: expected exactly one flattened index for field \
+       %d@ shape: %a"
+      index print t
 
 type ('a, 'b) singleton_or_product =
   | Singleton of 'a
@@ -185,8 +226,10 @@ let singleton_or_product_of_mixed_block_element
     then Product Lambda.[| Vec128; Vec128 |]
     else Singleton Vec256
   | Vec512 -> Singleton Vec512
+  | Mask -> Singleton Mask
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate
+  | Void -> Product [||]
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
     Misc.fatal_error
@@ -250,7 +293,7 @@ let of_mixed_block_elements ~print_locality
       match elem with
       | Value _ -> true
       | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+      | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
         false
     in
     if is_value

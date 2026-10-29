@@ -15,6 +15,9 @@
 
 (* Compute a spanning tree representation of types *)
 
+module Std_map = Map
+module Std_set = Set
+
 open Misc
 open Ctype
 open Longident
@@ -81,10 +84,10 @@ module Style = Misc.Style
    (* CR layouts reisenberg: update when the default changes *)
    This is a challenge, though, because the type in a [val] does not
    explicitly quantify its free variables. So we must collect the free
-   variables, look to see whether any have interesting jkinds, and
-   print the whole set of variables if any of them do. This is all
-   implemented in [extract_qtvs], used also in a number of other places
-   we do quantification (e.g. gadt-syntax constructors).
+   variables ([extract_qtvs], used also in a number of other places we do
+   quantification, e.g. gadt-syntax constructors), look to see whether any
+   have interesting jkinds ([tree_of_qtvs]), and print the whole set of
+   variables if any of them do ([zap_qtvs_if_boring]).
 
    Exception (X1). When we are still in the process of inferring a type,
    there may be an unfilled sort variable. Here is an example:
@@ -802,6 +805,15 @@ let name_penalty s =
 let ambiguity_penalty path env =
   if is_unambiguous path env then 0 else penalty_size
 
+(* We add one to the cost of [nativeint_u], [int32_u], [int64_u], and
+   [float32_u], as if they were hash-types (they used to be), so that
+   user-defined aliases are preferred. *)
+let unboxed_predef_penalty path =
+  if List.exists (Path.same path)
+       [ Predef.path_nativeint_u; Predef.path_int32_u;
+         Predef.path_int64_u; Predef.path_float32_u ]
+  then 1 else 0
+
 let path_size path env =
   let rec size = function
       Pident id ->
@@ -817,7 +829,7 @@ let path_size path env =
         let (l, b) = size p in (1 + l, b)
   in
   let l, s = size path in
-  l + ambiguity_penalty path env, s
+  l + ambiguity_penalty path env + unboxed_predef_penalty path, s
 
 let rec get_best_path r env =
   match !r with
@@ -882,7 +894,7 @@ let nameable_row row =
 (* This specialized version of [Btype.iter_type_expr] normalizes and
    short-circuits the traversal of the [type_expr], so that it covers only the
    subterms that would be printed by the type printer. *)
-let printer_iter_type_expr f ty =
+let printer_iter_type_expr f fm ty =
   match get_desc ty with
   | Tconstr(p, tyl, _) ->
       let (_p', s) = best_type_path p in
@@ -910,11 +922,20 @@ let printer_iter_type_expr f ty =
       if field_kind_repr kind = Fpublic then
         f ty1;
       f ty2
+  | Tmod (ty, _) ->
+      f ty
   | _ ->
-      Btype.iter_type_expr f ty
+      Btype.iter_type_expr f fm ty
 
 let quoted_ident ppf x =
   Style.as_inline_code !Oprint.out_ident ppf x
+
+(* Mode variables for mode polymorphism should only be printed if
+  the following two flags are enabled *)
+let mode_polymorphism_printing_enabled () =
+  Language_extension.(
+    is_at_least Mode_polymorphism Alpha
+    && is_enabled Mode_polymorphism_printing)
 
 module Internal_names : sig
 
@@ -980,6 +1001,135 @@ end = struct
 
 end
 
+(** A mode as seen by printing: either a determined constant, or a
+    generic comonadic mode. Along an arrow chain, the accumulated curry
+    mode is a constant until a generic mode variable is encountered.
+
+    A generic accumulator is the currying fold evaluated twice: the
+    argument modes themselves ([Ctype.curry_mode]), and their constant upper
+    bounds ([Ctype.curry_mode_const]). *)
+type const_or_generic =
+  | Const of With_locality.Const.t
+  | Generic of With_locality.Comonadic.l * With_locality.Const.t
+
+(** The upper bound of a const_or_generic: exact for [Const],
+    the constant upper bound for [Generic] *)
+let const_or_generic_upper :
+    const_or_generic ->
+    With_locality.Const.t = function
+  | Const c -> c
+  | Generic (_, bound) -> bound
+
+(** Extends the curry accumulator with the argument mode [marg] of an
+    arrow. *)
+let curry_acc : const_or_generic -> With_locality.lr -> const_or_generic =
+  fun acc marg ->
+    match acc, With_locality.zap_to_legacy ~arg:true marg with
+    | Const acc, Some arg -> Const (Ctype.curry_mode_const acc arg)
+    | Generic (acc, bound), _ ->
+      Generic
+        (Ctype.curry_mode acc marg,
+         Ctype.curry_mode_const bound (With_locality.Guts.get_ceil marg))
+    | Const acc, None ->
+      if mode_polymorphism_printing_enabled ()
+      then
+        Generic
+          (Ctype.curry_mode
+             (With_locality.Comonadic.of_const
+                (With_locality.Const.partial_apply acc))
+             marg,
+           Ctype.curry_mode_const acc (With_locality.Guts.get_ceil marg))
+      else
+        Const
+          (Ctype.curry_mode_const acc
+             (With_locality.zap_to_legacy_force ~arg:true marg))
+
+(** The view of a mode occurrence [m]; zaps [m] when it has to be a
+    constant. *)
+let const_or_generic_of_mode :
+    arg:bool ->
+    With_locality.lr ->
+    const_or_generic =
+  fun ~arg m ->
+    match With_locality.zap_to_legacy ~arg m with
+    | Some c -> Const c
+    | None ->
+      if mode_polymorphism_printing_enabled ()
+      then
+        Generic
+          (With_locality.Comonadic.disallow_right m.comonadic,
+           With_locality.Guts.get_ceil m)
+      else Const (With_locality.zap_to_legacy_force ~arg m)
+
+(** Whether the return mode [m] of an arrow agrees with the constant
+    content of [acc_mode]. Mutating when [m] must be zapped: [m] is equated
+    with the constant (a [Generic] contains generic variables and cannot
+    be equated with directly); otherwise a pure bounds check.
+
+    [equate_with_const] additionally checks [m]'s edges;
+    [Variable_names.equate_curry] calls this function alone, so that the
+    mutations happen during preprocessing, before bounds and edges are
+    computed. *)
+let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
+  fun m acc_mode ->
+    if not (With_locality.check_generic m)
+       || not (mode_polymorphism_printing_enabled ())
+    then
+      Result.is_ok
+        (With_locality.equate
+           m
+           (With_locality.of_const (const_or_generic_upper acc_mode)))
+    else
+      With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
+
+let erase_implied_axes (modes : Mode.With_locality.Const.t) :
+    Mode.With_locality.Const.Option.t =
+  (* [forkable] has implied defaults depending on [areality]: *)
+  let forkable =
+    match modes.areality, modes.forkable with
+    | Local, Unforkable | Global, Forkable -> None
+    | _, _ -> Some modes.forkable
+  in
+
+  (* [yielding] has implied defaults depending on [areality]: *)
+  let yielding =
+    match modes.areality, modes.yielding with
+    | Local, Yielding | Global, Unyielding -> None
+    | _, _ -> Some modes.yielding
+  in
+
+  (* [contention] has implied defaults based on [visibility]: *)
+  let contention =
+    match modes.visibility, modes.contention with
+    | Immutable, Contended
+    | Read, Shared
+    | Write, Corrupted
+    | Read_write, Uncontended -> None
+    | _, _ -> Some modes.contention
+  in
+
+  (* [portability] has implied defaults based on [statefulness]: *)
+  let portability =
+    match modes.statefulness, modes.portability with
+    | Stateless, Portable
+    | Reading, Shareable
+    | Writing, Corruptible
+    | Stateful, Nonportable -> None
+    | _, _ -> Some modes.portability
+  in
+
+  { areality = Some modes.areality;
+    linearity = Some modes.linearity;
+    uniqueness = Some modes.uniqueness;
+    portability;
+    contention;
+    forkable;
+    yielding;
+    statefulness = Some modes.statefulness;
+    visibility = Some modes.visibility;
+    staticity = Some modes.staticity
+  }
+
 module Variable_names : sig
   val reset_names : unit -> unit
 
@@ -989,10 +1139,20 @@ module Variable_names : sig
   val new_var_name : non_gen:bool -> type_expr -> unit -> string
 
   val name_of_type : (unit -> string) -> transient_expr -> string
+  val name_of_mode : With_locality.lr -> string
+
+  (** Whether the edges on the curry mode [m] are exactly the
+      [past]/[close] edges from [acc], i.e. implied by the currying
+      interpretation. [bounds_implied] says whether the constant bounds of
+      [m] are implied as well ([equate_with_curry_bounds]); the edges into
+      [m] are suppressed (not printed by the other modes) only when both
+      hold, since [m] is then elided. Must be called after [reserve]. *)
+  val curry_edges_implied :
+    bounds_implied:bool -> acc:const_or_generic -> With_locality.lr -> bool
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
-  val reserve: type_expr -> unit
+  val reserve: base:With_locality.Const.t -> type_expr -> unit
 
   val remove_names : transient_expr list -> unit
 
@@ -1002,6 +1162,13 @@ module Variable_names : sig
      itself for the toplevel *)
   val refresh_weak : unit -> unit
 end = struct
+  type monadic_description =
+    (With_locality.Monadic.Const.t, (allowed * allowed)) With_locality.Desc.t
+  type comonadic_description =
+    (With_locality.Comonadic.Const.t, (allowed * allowed)) With_locality.Desc.t
+  type visible_pair =
+    (monadic_description, comonadic_description) monadic_comonadic
+
   (* We map from types to names, but not directly; we also store a substitution,
      which maps from types to types.  The lookup process is
      "type -> apply substitution -> find name".  The substitution is presumed to
@@ -1011,17 +1178,211 @@ end = struct
   let name_counter = ref 0
   let named_vars = ref ([] : string list)
   let visited_for_named_vars = ref ([] : transient_expr list)
+  let visited_for_modes = ref ([] : transient_expr list)
+  let visited_for_named_modevars = ref ([] : transient_expr list)
+
+  module Desc = With_locality.Desc
+  module C = With_locality.C
+
+  (** Boxed var and morphisms (paths) to use in hashtables *)
+  type boxedvar =
+  | K : 'a C.obj * 'a Desc.Var.Head.t -> boxedvar
+  type boxedpath =
+  | P :
+      { dst : 'b C.obj;
+        var : 'a Desc.Var.Head.t;
+        path : ('a, 'b, (allowed * disallowed)) C.morph
+      }
+      -> boxedpath
+
+  (** The name of polymorphic mode variables will be
+  determined by two variables and morphism pair. The object
+  types are irrelevant, and are thus forgotten. See [edge]
+  for more explanation *)
+  type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
+  type monadic_morph =
+    (With_locality.Monadic.Const.t, With_locality.Monadic.Const.t) morphl
+  type comonadic_morph =
+    (With_locality.Comonadic.Const.t, With_locality.Comonadic.Const.t)
+      morphl
+  type closing_over_morph =
+    (With_locality.Monadic.Const.t, With_locality.Comonadic.Const.t) morphl
+
+  type boxedname =
+  | Simple_name :
+      { target : 'c Desc.Var.Head.t;
+        src : 'd Desc.Var.Head.t;
+        via : (monadic_morph, comonadic_morph) monadic_comonadic
+      }
+      -> boxedname
+  | Comonadic_name :
+      { target : 'c Desc.Var.Head.t;
+        src : 'd Desc.Var.Head.t;
+        morph : comonadic_morph
+      }
+      -> boxedname
+
+  module VarTbl = Hashtbl.Make (struct
+    type t = boxedvar
+    let equal (K (_, v1)) (K (_, v2)) = Desc.Var.Head.equal v1 v2
+    let hash (K (_, v)) = Desc.Var.Head.hash v
+  end)
+
+  module VarPairMap = Std_map.Make (struct
+    type t = boxedvar * boxedvar
+    let compare (K (_, v1), K (_, v1')) (K (_, v2), K (_, v2')) =
+      match Int.compare v1.desc_id v2.desc_id with
+      | 0 -> Int.compare v1'.desc_id v2'.desc_id
+      | c -> c
+  end)
+
+  module Paths = struct
+    module Store (X : sig
+      type s
+      type d
+      val dst : d C.obj
+    end) =
+    struct
+      module Morph_set = Std_set.Make (struct
+        type t = (X.s, X.d) morphl
+        let compare m1 m2 = C.compare_morph X.dst m1 m2
+      end)
+
+      type t = Morph_set.t VarPairMap.t
+
+      let empty : t = VarPairMap.empty
+
+      let add key path t =
+        let set =
+          match VarPairMap.find_opt key t with
+          | None -> Morph_set.singleton path
+          | Some set -> Morph_set.add path set
+        in
+        VarPairMap.add key set t
+
+      let find key t =
+        match VarPairMap.find_opt key t with
+        | None -> []
+        | Some set -> Morph_set.elements set
+    end
+
+    module Monadic_paths = Store (struct
+      type s = With_locality.Monadic.Const.t
+      type d = With_locality.Monadic.Const.t
+      let dst = With_locality.obj_monadic
+    end)
+
+    module Comonadic_paths = Store (struct
+      type s = With_locality.Comonadic.Const.t
+      type d = With_locality.Comonadic.Const.t
+      let dst = With_locality.obj_comonadic
+    end)
+
+    module Closing_over_paths = Store (struct
+      type s = With_locality.Monadic.Const.t
+      type d = With_locality.Comonadic.Const.t
+      let dst = With_locality.obj_comonadic
+    end)
+
+    type ('s, 'd) table =
+      | Monadic :
+          (With_locality.Monadic.Const.t,
+           With_locality.Monadic.Const.t) table
+          (** Tracks all paths from a visible monadic mode
+          variable to another. A path is defined as follows:
+            let [(v, f)] and [(u, h)] be two visible monadic
+            morphvars, such that [v] can reach [u] by following
+            vlowers. Let [g] be one such composition of vlower
+            functions. By
+            transitivity, we know the following to be true: [g u <= v].
+
+            A path from [(v, f)] to [(u, h)] is defined as: [f ∘ g ∘ h'],
+            where [h'] is the left adjoint of [h] *)
+      | Comonadic :
+          (With_locality.Comonadic.Const.t,
+           With_locality.Comonadic.Const.t) table
+          (** Tracks all paths from a visible comonadic mode
+          variable to another. See description of
+          [Monadic] for a definition of a path *)
+      | Closing_over :
+          (With_locality.Monadic.Const.t,
+           With_locality.Comonadic.Const.t) table
+          (** Tracks all paths from a visible comonadic mode
+          variable to visible monadic mode variable. Since
+          the path goes from a comonadic to a monadic mode,
+          it will have to go through a "monadic to comonadic"
+          morphism. These paths will correspond to a closing
+          over relation between two mode variables
+
+          See description of [Monadic] for a definition of
+          a path *)
+
+    type t =
+      { mutable monadic : Monadic_paths.t;
+        mutable comonadic : Comonadic_paths.t;
+        mutable closing_over : Closing_over_paths.t
+      }
+
+    let create () =
+      { monadic = Monadic_paths.empty;
+        comonadic = Comonadic_paths.empty;
+        closing_over = Closing_over_paths.empty
+      }
+
+    let reset t =
+      t.monadic <- Monadic_paths.empty;
+      t.comonadic <- Comonadic_paths.empty;
+      t.closing_over <- Closing_over_paths.empty
+
+    let src_obj : type s d. (s, d) table -> s C.obj =
+      function
+      | Monadic -> With_locality.obj_monadic
+      | Comonadic -> With_locality.obj_comonadic
+      | Closing_over -> With_locality.obj_monadic
+
+    let dst_obj : type s d. (s, d) table -> d C.obj =
+      function
+      | Monadic -> With_locality.obj_monadic
+      | Comonadic -> With_locality.obj_comonadic
+      | Closing_over -> With_locality.obj_comonadic
+
+    let add : type s d.
+        t -> (s, d) table -> boxedvar * boxedvar -> (s, d) morphl -> unit =
+      fun t table key path ->
+      match table with
+      | Monadic -> t.monadic <- Monadic_paths.add key path t.monadic
+      | Comonadic -> t.comonadic <- Comonadic_paths.add key path t.comonadic
+      | Closing_over ->
+        t.closing_over <- Closing_over_paths.add key path t.closing_over
+
+    let find : type s d.
+        t -> (s, d) table -> boxedvar * boxedvar -> ((s, d) morphl) list =
+      fun t table key ->
+      match table with
+      | Monadic -> Monadic_paths.find key t.monadic
+      | Comonadic -> Comonadic_paths.find key t.comonadic
+      | Closing_over -> Closing_over_paths.find key t.closing_over
+  end
+
+  (** Tracks the mapping of monadic and comonadic mode
+  descriptions visible in the type *)
+  let visible_pairs = ref ([] : visible_pair list)
+  let aliased_visible_pairs = ref ([] : visible_pair list)
+  let printed_aliased_visible_pairs = ref ([] : (visible_pair * string) list)
+
+  (** Tracks all mode variables that may occur in the above
+  list (for fast visibility checking) *)
+  let visible_vars = VarTbl.create 17
+
+  let visible_paths = Paths.create ()
+
+  (** counter used to generate names for polymorphic mode variables *)
+  let modename_counter = ref 0
+  let modenames = ref ([] : (boxedname * string) list)
 
   let weak_counter = ref 1
   let weak_var_map = ref TypeMap.empty
   let named_weak_vars = ref String.Set.empty
-
-  let reset_names () =
-    names := [];
-    name_subst := [];
-    name_counter := 0;
-    named_vars := [];
-    visited_for_named_vars := []
 
   let add_named_var tty =
     match tty.desc with
@@ -1039,8 +1400,900 @@ end = struct
       | Tvar _ | Tunivar _ ->
           add_named_var tty
       | _ ->
-          printer_iter_type_expr add_named_vars ty
+          printer_iter_type_expr add_named_vars (Fun.const ()) ty
     end
+
+  (* The following preprocessing step zaps non-generic
+    modes to legacy, while equating a derived curry mode
+    with the inferred non-generic return modes. This step
+    should exactly mirror the mutations performed by
+    [tree_of_modal_typexp]. It is needed so we get the
+    correct precise bounds of mode descriptions
+  *)
+  let rec zap_non_generic_modes : const_or_generic -> type_expr -> unit =
+    fun acc_mode ty ->
+    let px = proxy ty in
+    if List.memq px !visited_for_modes then () else begin
+      visited_for_modes := px :: !visited_for_modes;
+      let tty = Transient_expr.repr ty in
+      match tty.desc with
+      | Tarrow ((_l, marg, mret), ty1, ty2, _) ->
+        zap_non_generic_modes (const_or_generic_of_mode ~arg:true marg) ty1;
+        let acc_mode = curry_acc acc_mode marg in
+        equate_curry acc_mode mret ty2
+      | Tpoly (ty, []) | Trepr (ty, []) ->
+        zap_non_generic_modes acc_mode ty
+      | _ ->
+        printer_iter_type_expr
+          (zap_non_generic_modes (Const With_locality.Const.legacy))
+          (Fun.const ()) ty
+    end
+
+  and equate_curry : const_or_generic -> With_locality.lr -> type_expr -> unit =
+    fun acc_mode mret ty ->
+      match get_desc ty with
+      | Tarrow _ when equate_with_curry_bounds mret acc_mode ->
+          zap_non_generic_modes acc_mode ty
+      | _ ->
+        zap_non_generic_modes (const_or_generic_of_mode ~arg:false mret) ty
+
+  let zap_non_generic_modes base ty =
+    zap_non_generic_modes (Const base) ty
+
+  let eq_pair :
+      visible_pair
+      -> visible_pair
+      -> bool =
+    fun { monadic = mon0; comonadic = com0 }
+        { monadic = mon1; comonadic = com1 } ->
+    Desc.equal With_locality.obj_monadic mon0 mon1
+    && Desc.equal With_locality.obj_comonadic com0 com1
+
+  (* The following preprocessing step registers all the
+    modes pointed to by a type. Recall that a [With_locality.lr]
+    has two parts: { monadic; comonadic }. We need to
+    register each individual mode variable, as well as
+    the association between the monadic and comonadic
+    parts.
+
+    The former are registered in a VarTbl, the latter
+    in a list of mode descriptions
+    We also use this step to register mode aliases
+  *)
+  let add_visible : type a. a C.obj -> (a, (allowed * allowed)) Desc.t -> unit =
+    fun dst desc ->
+      match desc with
+      | Amode _ -> ()
+      | Amodevar (Amorphvar (v, f)) ->
+        let src = C.src dst f in
+        let v = K (src, v) in
+        VarTbl.add visible_vars v ()
+
+  let add_named_modevar : With_locality.lr -> unit =
+    fun ({ monadic; comonadic } as mode) ->
+      if With_locality.check_generic mode then begin
+        let monadic_desc = With_locality.get_monadic_desc monadic in
+        let comonadic_desc = With_locality.get_comonadic_desc comonadic in
+        let pair = { monadic = monadic_desc; comonadic = comonadic_desc } in
+        add_visible With_locality.obj_monadic monadic_desc;
+        add_visible With_locality.obj_comonadic comonadic_desc;
+        if List.exists (eq_pair pair) !visible_pairs then
+          aliased_visible_pairs := pair :: !aliased_visible_pairs
+        else
+          visible_pairs := pair :: !visible_pairs
+      end
+
+  let rec add_named_modevars ty =
+    let px = proxy ty in
+    if not (List.memq px !visited_for_named_modevars) then begin
+      visited_for_named_modevars := px :: !visited_for_named_modevars;
+      printer_iter_type_expr add_named_modevars add_named_modevar ty
+    end
+
+  (* The next preprocessing step registers all direct
+    paths from one visible mode variable to another.
+  *)
+
+  type stack = unit VarTbl.t
+
+  (* Find the [b -> Paths.src_obj table] morphism
+    associated with some visible variable [v] of object
+    type [b] *)
+  let find_visible_morph_opt : type b s d.
+      (s, d) Paths.table -> b C.obj -> b Desc.Var.Head.t
+      -> ((b, s, (allowed * allowed)) C.morph) option =
+    fun table obj v ->
+      let sobj = Paths.src_obj table in
+      let desc_of_pair (pair : visible_pair)
+          : (s, (allowed * allowed)) Desc.t =
+        match table with
+        | Paths.Monadic -> pair.monadic
+        | Paths.Comonadic -> pair.comonadic
+        | Paths.Closing_over -> pair.monadic
+      in
+      let find_match pair =
+        match desc_of_pair pair with
+        | Desc.Amodevar (Amorphvar (u, f)) ->
+            if not (Desc.Var.Head.equal v u) then None else begin
+              let obj' = C.src sobj f in
+                match C.equal_obj obj obj' with
+                | Is_eq ->
+                  let (f : ((b, s, (allowed * allowed)) C.morph)) = f in
+                  Some f
+                | Is_not_eq ->
+                  fatal_error "Out_type.find_visible_morph_opt"
+            end
+        | Desc.Amode _ -> None
+      in
+      List.find_map find_match !visible_pairs
+
+  let visible : type b. b C.obj -> b Desc.Var.Head.t -> bool =
+    fun obj v ->
+      VarTbl.mem visible_vars (K (obj, v))
+
+  (* Find all direct paths (via vlowers) from some
+    variable [v] to all other reachable visible variables
+    at generic level. *)
+  (* WARNING: cycles are *not* registered
+      as a separate morphism:
+      e.g.: let [w] be a visible generic variable with
+            the following (vlower) edges:
+            v -f> u1 -g> u2 -g'> u1 -h> w
+            [find_paths v] will return only the direct
+            path [(f ∘ h)]
+      In the future, we might want to register all
+      paths. This will require a lattice of morphisms,
+      so we can calculate the fixed point of cycle *)
+  let rec paths_to_visible :
+      type b. stack:stack
+      -> b C.obj -> b Desc.Var.Head.t
+      -> boxedpath list =
+    fun ~stack dst v ->
+      if visible dst v then [P { dst; var = v; path = C.id }]
+      else paths_from_vlowers ~stack dst v
+
+  and paths_from_vlowers :
+      type b. stack:stack
+      -> b C.obj -> b Desc.Var.Head.t
+      -> boxedpath list =
+    fun ~stack dst v ->
+      if VarTbl.mem stack (K (dst, v)) then [] else begin
+        VarTbl.add stack (K (dst, v)) ();
+        let paths =
+          List.concat_map (fun (Desc.Var.Amorphvar (w, f)) ->
+            let fsrc = C.src dst f in
+            let w = Desc.Var.force fsrc w in
+            if w.desc_level <> generic_level then []
+            else
+              List.map (fun (P { dst = gdst; var = u; path = g }) ->
+                match C.equal_obj fsrc gdst with
+                | Is_eq -> P { dst; var = u; path = C.compose dst f g }
+                | Is_not_eq -> fatal_error "Out_type.paths_from_vlowers")
+                (paths_to_visible ~stack fsrc w))
+            v.desc_vlower
+        in
+        VarTbl.remove stack (K (dst, v));
+        paths
+      end
+
+  let find_paths : boxedvar -> boxedpath list =
+    fun (K (dst, v)) ->
+      paths_from_vlowers ~stack:(VarTbl.create 17) dst v
+
+  (** [find_path_from_description] constructs all morphisms
+    from one visible mode variable to another, and records
+    them in the [table] of [visible_paths].
+    [find_visible_morph_opt table] takes a variable as
+    input, and returns its associated morphism. The final
+    morphism is constructed as follows:
+      - let the parameter [desc] be a morphvar
+        description [(v, f)]
+      - let g be vlower path from [v] to some [u].
+        (recall g : [u.obj] -> [v.obj])
+      - let [find_visible_morph_opt table u] = Some [h]
+    [find_path_from_description] records
+    ([v], [u]) and [fgh'] where [h'] is the left
+    adjoint of [h].
+
+    See [Paths.Monadic] for an explanation
+    why this is the morphism we want *)
+  let find_path_from_description :
+      type s d.
+      (d, (allowed * allowed)) Desc.t
+      -> (s, d) Paths.table
+      -> unit =
+    fun desc table ->
+      let dst = Paths.dst_obj table in
+      let bobj = Paths.src_obj table in
+      match desc with
+      | Amode _ -> ()
+      | Amodevar (Amorphvar (v, f)) ->
+        let fsrc = C.src dst f in
+        let v = K (fsrc, v) in
+        let paths = find_paths v in
+        List.iter (fun (P { dst = gdst; var = u; path = g }) ->
+          match C.equal_obj fsrc gdst with
+            | Is_eq ->
+              let gsrc = C.src gdst g in
+              Option.iter (fun h ->
+                let h' = C.left_adjoint bobj h in
+                let fg = C.compose dst (C.disallow_right f) g in
+                let fgh' = C.compose dst fg h' in
+                Paths.add visible_paths table (v, (K (gsrc, u))) fgh'
+              ) (find_visible_morph_opt table gsrc u)
+            | Is_not_eq ->
+              fatal_error "Out_type.find_path_from_description"
+          ) paths
+
+
+  (* The following function is expensive and should be
+  called once during preprocessing. It constructs all
+  morphisms from a visible monadic/comonadic variable to
+  another visible monadic/comonadic variable, and records
+  them in their respective tables *)
+  let add_visible_paths () =
+    List.iter
+      (fun { monadic; comonadic } ->
+        find_path_from_description monadic Paths.Monadic;
+        find_path_from_description comonadic Paths.Comonadic;
+        find_path_from_description comonadic Paths.Closing_over
+      ) !visible_pairs
+
+  type simple_edge =
+    { via :
+        (monadic_morph, comonadic_morph)
+          monadic_comonadic;
+        (** The pair of morphisms between the two modes.
+        The monadic morphism gives a path from the
+        monadic part of [src] to the monadic part of
+        [target], the comonadic morphism gives a path
+        from the comonadic part of [target] to the
+        comonadic part of [src] *)
+      name : boxedname;
+        (** When printing, we name edges rather than
+        nodes, such that we can print monadic and
+        comonadic constraints in different bounds, thus
+        only printing left_only morphisms. By default,
+        the name is determined by the comonadic
+        morphism, but if this morphism is trivial (i.e.
+        the bounds can determine it), we use the
+        monadic morphism instead. *)
+    }
+
+  type comonadic_edge =
+    { c_via : comonadic_morph;
+        (** The comonadic morphism between two modes
+        when there is no path between their monadic
+        counterparts. This edge represents a partial
+        constraint between two modes. The morphism
+        gives a path from [target] to [src] *)
+      c_name : boxedname;
+        (** The boxed name of [c_via] *)
+    }
+
+  (** [closing_over_edge] describes a specific pattern
+  that may arise between an argument, a return and a
+  curry-mode.
+
+  Consider the following function (the K-combinator)
+  let k x y = x
+
+  The mode of the argument [x] describes a lower bound on
+  the inner return. But when [k] is partially applied, this
+  mode also describes an upper bound on the closure [k x].
+
+  We want to print such a pattern as follows:
+
+  [k : x @ [< 'm] -> (y @ 'n -> x @ [> 'm]) @ [> close('m)]]
+
+  Where [close('m)] denotes a relation to the comonadic
+  parts of the argument, and the monadic part of the return *)
+
+  (** A [closing_over_edge] describes a relationship between
+  three visible mode variables: [src], [target] and [curry]*)
+  type closing_over_edge =
+    { cls_target : closing_over_morph;
+        (** A path from [curry] to monadic
+        part of [target] *)
+      cls_src : comonadic_morph;
+        (** A path from [curry] to comonadic
+        part of [src] *)
+      cls_edge : simple_edge
+        (** the edge from [src] to [target].
+        The name of a [closing_over_edge]
+        corresponds to the name of [cls_edge]. *)
+    }
+
+  type edge =
+  | Simple of simple_edge
+      (** a constraint between two alloc modes *)
+  | Comonadic of comonadic_edge
+      (** a constraint between the comonadic parts
+      of two alloc modes *)
+  | ClosingOver of closing_over_edge
+      (** a constraint between the monadic part
+      of one mode and the comonadic part of another *)
+
+   let dupper_lr : type a. a C.obj -> (a, (allowed * allowed)) Desc.t -> a =
+    fun dst descr ->
+      match descr with
+      | Amode l -> l
+      | Amodevar (Amorphvar (v, f)) ->
+        C.apply dst f v.desc_upper
+
+  let dlower_lr : type a. a C.obj -> (a, (allowed * allowed)) Desc.t -> a =
+    fun dst descr ->
+      match descr with
+      | Amode l -> l
+      | Amodevar (Amorphvar (v, f)) ->
+        C.apply dst f v.desc_lower
+
+  let construct_morphs :
+      type a. (a, a) Paths.table
+        -> (a, (allowed * allowed)) Desc.t
+        -> (a, (allowed * allowed)) Desc.t
+        -> ((a, a) morphl) list =
+    fun table src_descr target_descr ->
+      let dst = Paths.dst_obj table in
+      match src_descr, target_descr with
+      | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
+        let vobj = C.src dst f in
+        let uobj = C.src dst g in
+        let src_lower = C.apply dst f v.desc_lower in
+        let target_upper = C.apply dst g u.desc_upper in
+        if C.le dst target_upper src_lower
+        then [C.id] (* [target <= src] already holds by bounds *)
+        else Paths.find visible_paths table (K (vobj, v), K (uobj, u))
+      | _, _ ->
+        let src_lower = dlower_lr dst src_descr in
+        let target_upper = dupper_lr dst target_descr in
+        if C.le dst target_upper src_lower
+        then [C.id] (* [target <= src] already holds by bounds *)
+        else [With_locality.meet_const_morph src_lower]
+
+  let construct_closing_over_morphs :
+      (With_locality.Comonadic.Const.t, allowed * allowed) Desc.t
+      -> (With_locality.Monadic.Const.t, allowed * allowed) Desc.t
+      -> closing_over_morph list =
+    fun src_descr target_descr ->
+    match src_descr, target_descr with
+    | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
+      let vobj = C.src With_locality.obj_comonadic f in
+      let uobj = C.src With_locality.obj_monadic g in
+        Paths.find visible_paths Paths.Closing_over (K (vobj, v), K (uobj, u))
+    | _, _ -> []
+
+  let construct_monadic_morphs src_descr target_descr =
+    construct_morphs Paths.Monadic src_descr target_descr
+
+  let construct_comonadic_morphs src_descr target_descr =
+    construct_morphs Paths.Comonadic src_descr target_descr
+
+  (* Tests whether the relation between two descriptions cannot be decided by
+  their bounds. A constraint decided by bounds does not need to be printed *)
+  let order_is_not_decided_by_bounds :
+      type a. a C.obj
+      -> (a, (allowed * allowed)) Desc.t
+      -> (a, (allowed * allowed)) Desc.t
+      -> bool =
+    fun dst a0 a1 ->
+      let upper0 = dupper_lr dst a0 in
+      let lower0 = dlower_lr dst a0 in
+      let upper1 = dupper_lr dst a1 in
+      let lower1 = dlower_lr dst a1 in
+      not (C.le dst upper0 lower1 || C.le dst upper1 lower0)
+
+  let descr_is_var : type a. (a, (allowed * allowed)) Desc.t -> bool =
+    fun v ->
+      match v with
+      | Amode _ -> false
+      | Amodevar _ -> true
+
+  (** We only want to print a constraint (and thus
+  construct an edge) between [(mon0, com0)] and
+  [(mon1, com1)] if the following is true:
+
+  1) Either [compare mon0 mon1], or
+     [compare com0 com1] can't be decided via bounds
+  2) Either [mon0] and [mon1] are both variables,
+     or [com0] and [com1] are both variables
+  3) [(mon0, com0)] and [(mon1, com1)] are not equal
+  *)
+  let construct_edge_condition :
+      visible_pair
+      -> visible_pair
+      -> bool =
+    fun ({ monadic = mon0; comonadic = com0 } as pair0)
+        ({ monadic = mon1; comonadic = com1 } as pair1) ->
+      let order_is_not_decided =
+        order_is_not_decided_by_bounds With_locality.obj_monadic mon0 mon1
+        || order_is_not_decided_by_bounds
+             With_locality.obj_comonadic com0 com1
+      in
+      let check_signature =
+        (descr_is_var mon0 && descr_is_var mon1)
+        || (descr_is_var com0 && descr_is_var com1)
+      in
+      let pairs_ne = not (eq_pair pair0 pair1) in
+      order_is_not_decided && check_signature && pairs_ne
+
+  let construct_name :
+      visible_pair
+      -> (monadic_morph, comonadic_morph) monadic_comonadic
+      -> visible_pair
+      -> boxedname =
+    fun { monadic = mon0; comonadic = com0 }
+        via
+        { monadic = mon1; comonadic = com1 } ->
+      match com0, com1 with
+      | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
+        Simple_name { target = u; src = v; via }
+      | _, _ ->
+        match mon0, mon1 with
+        | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
+          Simple_name { target = u; src = v; via }
+        | _, _ ->
+          fatal_error
+            "Out_type.construct_name: edge without variable endpoints"
+
+  let construct_comonadic_name :
+      visible_pair
+      -> comonadic_morph
+      -> visible_pair
+      -> boxedname =
+    fun { comonadic = com0 }
+        com_morph
+        { comonadic = com1 } ->
+      match com0, com1 with
+      | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
+        Comonadic_name { target = u; src = v; morph = com_morph }
+      | _, _ ->
+        fatal_error
+          "Out_type.construct_comonadic_name: edge without variable endpoints"
+
+  let construct_simple_between pair0 pair1 =
+    let mon_morphs =
+      construct_monadic_morphs pair0.monadic pair1.monadic
+    in
+    let com_morphs =
+      construct_comonadic_morphs pair1.comonadic pair0.comonadic
+    in
+    List.concat_map (fun com_morph ->
+      List.map (fun mon_morph ->
+        let via = { monadic = mon_morph; comonadic = com_morph } in
+        { via; name = construct_name pair0 via pair1 })
+        mon_morphs)
+      com_morphs
+
+  let check_closing_over_candidate pair0 pair1 =
+    List.exists
+      (fun pair2 ->
+        let closing_over_morphs =
+          construct_closing_over_morphs pair1.comonadic pair2.monadic
+        in
+        let edges =
+          if construct_edge_condition pair0 pair2
+          then construct_simple_between pair0 pair2
+          else []
+        in
+        not (List.is_empty edges)
+        && not (List.is_empty closing_over_morphs))
+      !visible_pairs
+
+  let construct_comonadic_between pair0 pair1 =
+    let mon_morphs =
+      construct_monadic_morphs pair0.monadic pair1.monadic
+    in
+    let com_morphs =
+      construct_comonadic_morphs pair1.comonadic pair0.comonadic
+    in
+    if List.is_empty mon_morphs
+       && order_is_not_decided_by_bounds With_locality.obj_comonadic
+            pair0.comonadic pair1.comonadic
+       && not (check_closing_over_candidate pair0 pair1)
+    then
+      List.map (fun com_morph ->
+        let c_name = construct_comonadic_name pair0 com_morph pair1 in
+        Comonadic { c_via = com_morph; c_name })
+        com_morphs
+    else []
+
+  let eq_morph : type a0 a1 b l0 r0 l1 r1.
+      b C.obj
+      -> (a0, b, l0 * r0) C.morph
+      -> (a1, b, l1 * r1) C.morph
+      -> bool =
+    fun obj f g ->
+    match C.equal_morph obj f g with
+    | Is_eq -> true
+    | Is_not_eq -> false
+
+  let eq_boxedname n1 n2 =
+    match n1, n2 with
+    | Simple_name { target = v; src = v'; via = via1 },
+      Simple_name { target = u; src = u'; via = via2 } ->
+      Desc.Var.Head.equal v u
+      && Desc.Var.Head.equal v' u'
+      && eq_morph With_locality.obj_monadic via1.monadic via2.monadic
+      && eq_morph With_locality.obj_comonadic via1.comonadic via2.comonadic
+    | Comonadic_name { target = v; src = v'; morph = f },
+      Comonadic_name { target = u; src = u'; morph = g } ->
+      Desc.Var.Head.equal v u
+      && Desc.Var.Head.equal v' u'
+      && eq_morph With_locality.obj_comonadic f g
+    | Simple_name _, Comonadic_name _ | Comonadic_name _, Simple_name _ ->
+      false
+
+  let closing_over_composition { cls_target; cls_src; _ } =
+    C.compose With_locality.obj_comonadic cls_src cls_target
+
+  let eq_closing_over e1 e2 =
+    eq_boxedname e1.cls_edge.name e2.cls_edge.name
+    && C.compare_morph With_locality.obj_comonadic
+         (closing_over_composition e1)
+         (closing_over_composition e2)
+       = 0
+
+  let dedup_closing_over edges =
+    List.rev
+      (List.fold_left
+         (fun acc e ->
+           if List.exists (eq_closing_over e) acc then acc else e :: acc)
+         [] edges)
+
+  let construct_closing_over_to pair1 =
+    let edges =
+    List.concat_map (fun pair0 ->
+      let com_morphs =
+        construct_comonadic_morphs pair1.comonadic pair0.comonadic
+      in
+      List.concat_map (fun pair2 ->
+        let closing_over_morphs =
+          construct_closing_over_morphs pair1.comonadic pair2.monadic
+        in
+        let simple_edges =
+          if construct_edge_condition pair0 pair2
+          then construct_simple_between pair0 pair2
+          else []
+        in
+        List.concat_map (fun edge ->
+          List.concat_map (fun cls_morph ->
+            List.map (fun com_morph ->
+                { cls_target = cls_morph;
+                  cls_src = com_morph;
+                  cls_edge = edge
+                })
+              com_morphs)
+            closing_over_morphs)
+          simple_edges)
+        !visible_pairs)
+      !visible_pairs
+    in
+    List.map (fun e -> ClosingOver e) (dedup_closing_over edges)
+
+  let construct_edges_between pair0 pair1 =
+    if not (construct_edge_condition pair0 pair1) then []
+    else begin
+      let simple = construct_simple_between pair0 pair1 in
+      let comonadic = construct_comonadic_between pair0 pair1 in
+      List.map (fun edge -> Simple edge) simple @ comonadic
+    end
+
+  let construct_edges_to :
+      visible_pair -> edge list =
+    fun pair1 ->
+      let edges =
+        List.concat_map (fun pair0 -> construct_edges_between pair0 pair1)
+          !visible_pairs
+      in
+      construct_closing_over_to pair1 @ edges
+
+  let construct_edges_from :
+      visible_pair -> edge list =
+    fun pair0 ->
+      List.concat_map (fun pair1 -> construct_edges_between pair0 pair1)
+        !visible_pairs
+
+  let pick_name : int -> string = fun i ->
+    match i with
+    | 0 -> "'m"
+    | 1 -> "'n"
+    | 2 -> "'o"
+    | 3 -> "'p"
+    | 4 -> "'q"
+    | _ -> Fmt.asprintf "'mm%d" (i - 5)
+
+  let add_named_modevar name =
+    let mopt =
+      List.find_opt
+        (fun (name', _) -> eq_boxedname name name')
+        !modenames
+    in
+    match mopt with
+    | Some (_, m) -> m
+    | None ->
+      let cnt = !modename_counter in
+      modename_counter := cnt + 1;
+      let m = pick_name cnt in
+      modenames := (name, m) :: !modenames;
+      m
+
+  type 'a interval = { lo: 'a; hi: 'a }
+  let construct_raw_bounds { monadic; comonadic } :
+      string interval =
+    let bound_diff bound trivial =
+      erase_implied_axes bound
+      |> With_locality.Const.Option.value ~default:trivial
+      |> fun bound -> With_locality.Const.diff bound trivial
+    in
+    let mupper = dupper_lr With_locality.obj_monadic monadic in
+    let mlower = dlower_lr With_locality.obj_monadic monadic in
+    let cupper = dupper_lr With_locality.obj_comonadic comonadic in
+    let clower = dlower_lr With_locality.obj_comonadic comonadic in
+    let lower =
+      With_locality.Const.merge
+        { monadic = mupper; comonadic = clower }
+    in
+    let upper =
+      With_locality.Const.merge
+        { monadic = mlower; comonadic = cupper }
+    in
+    let lower = bound_diff lower With_locality.Const.min in
+    let upper = bound_diff upper With_locality.Const.max in
+    { lo = Fmt.asprintf "%a"
+             With_locality.Const.Option.partial_print lower;
+      hi = Fmt.asprintf "%a"
+             With_locality.Const.Option.partial_print upper}
+
+  type edge_as_lower =
+  | Lower_simple : simple_edge -> edge_as_lower
+  | Lower_comonadic : comonadic_edge -> edge_as_lower
+  | Lower_closing_over_to : closing_over_edge -> edge_as_lower
+
+  type edge_as_upper =
+  | Upper_simple : simple_edge -> edge_as_upper
+  | Upper_comonadic : comonadic_edge -> edge_as_upper
+
+  let print_raw_upper_bound ppf edge =
+    match edge with
+    | Upper_simple { via; name } ->
+      let m = add_named_modevar name in
+      With_locality.pretty_print_monadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf via.monadic
+    | Upper_comonadic { c_name } ->
+      let m = add_named_modevar c_name in
+      Fmt.fprintf ppf "past(%s)" m
+
+  let print_raw_lower_bound ppf edge =
+    match edge with
+    | Lower_simple { via; name } ->
+      let m = add_named_modevar name in
+      With_locality.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf via.comonadic
+    | Lower_comonadic { c_via; c_name } ->
+      let m = add_named_modevar c_name in
+      With_locality.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "past(%s)" s)
+        m ppf c_via
+    | Lower_closing_over_to { cls_target; cls_src; cls_edge } ->
+      let m = add_named_modevar cls_edge.name in
+      With_locality.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf
+        (C.compose With_locality.obj_comonadic cls_src cls_target)
+
+  let partition_edges_into_bounds :
+      edges_from:edge list ->
+      edges_to:edge list ->
+      edge_as_lower list * edge_as_upper list =
+    fun ~edges_from ~edges_to ->
+    let into_lower_from = function
+      | ClosingOver _ -> assert false
+      | Simple e -> Upper_simple e
+      | Comonadic e -> Upper_comonadic e
+    in
+    let into_lower_to = function
+      | ClosingOver e -> Lower_closing_over_to e
+      | Simple e -> Lower_simple e
+      | Comonadic e -> Lower_comonadic e
+    in
+    let upper = List.map into_lower_from edges_from in
+    let lower = List.map into_lower_to edges_to in
+    lower, upper
+
+  type edges =
+    { lower : edge_as_lower list;
+      upper : edge_as_upper list
+    }
+
+  let edge_table = ref ([] : (visible_pair * edges) list)
+
+  type boxedhead = H : 'a Desc.Var.Head.t -> boxedhead
+
+  (* Comonadic heads of elided curry modes; edges into them must not be
+     printed. *)
+  let suppressed_curry_heads = ref ([] : boxedhead list)
+
+  let heads_of_mode (m : With_locality.lr) =
+    match With_locality.get_comonadic_desc m.comonadic with
+    | Amode _ -> []
+    | Amodevar (Amorphvar (v, _)) -> [H v]
+
+  let mem_head : boxedhead list -> 'a Desc.Var.Head.t -> bool =
+    fun heads v ->
+      List.exists (fun (H u) -> Desc.Var.Head.equal u v) heads
+
+  let reset_names () =
+    names := [];
+    name_subst := [];
+    name_counter := 0;
+    named_vars := [];
+    visited_for_named_vars := [];
+    visited_for_modes := [];
+    visited_for_named_modevars := [];
+    visible_pairs := [];
+    aliased_visible_pairs := [];
+    printed_aliased_visible_pairs := [];
+    modenames := [];
+    edge_table := [];
+    suppressed_curry_heads := [];
+    Paths.reset visible_paths;
+    VarTbl.reset visible_vars;
+    modename_counter := 0
+
+  let add_visible_edges () =
+    suppressed_curry_heads := [];
+    edge_table :=
+      List.map (fun pair ->
+        let lower, upper =
+          partition_edges_into_bounds
+            ~edges_from:(construct_edges_from pair)
+            ~edges_to:(construct_edges_to pair)
+        in
+        pair, { lower; upper })
+        !visible_pairs
+
+  let find_edges pair =
+    match
+      List.find_opt (fun (pair', _) -> eq_pair pair pair') !edge_table
+    with
+    | Some (_, edges) -> edges
+    | None -> { lower = []; upper = [] }
+
+  let pair_of_mode ({ monadic; comonadic } : With_locality.lr) =
+    let monadic = With_locality.get_monadic_desc monadic in
+    let comonadic = With_locality.get_comonadic_desc comonadic in
+    { monadic; comonadic }
+
+  (* The variable heads of the curry accumulator. *)
+  let acc_heads (acc : const_or_generic) : boxedhead list =
+    match acc with
+    | Const _ -> []
+    | Generic (acc, _) ->
+      let head (Desc.Amorphvar (v, _)) = H v in
+      (match With_locality.get_comonadic_desc acc with
+       | Amode _ -> []
+       | Amodevar mv -> [head mv]
+       | Amodejoin (_, mvs) -> List.map head mvs)
+
+  (* See the signature for the specification. *)
+  let curry_edges_implied ~bounds_implied ~(acc : const_or_generic)
+      (m : With_locality.lr) =
+    let pair = pair_of_mode m in
+    let implied =
+      bounds_implied
+      (* an aliased mode is printed at every occurrence *)
+      && (not (List.exists (eq_pair pair) !aliased_visible_pairs))
+      &&
+      let { lower; upper } = find_edges pair in
+      let acc_heads = acc_heads acc in
+      let from_acc = function
+        | Simple_name { src; _ } -> mem_head acc_heads src
+        | Comonadic_name { src; _ } -> mem_head acc_heads src
+      in
+      (* no edges from [m]... *)
+      List.is_empty upper
+      (* ...and every edge into [m] is a [past]/[close] edge from [acc] *)
+      && List.for_all
+           (function
+             | Lower_simple _ -> false
+             | Lower_comonadic { c_name; _ } -> from_acc c_name
+             | Lower_closing_over_to { cls_edge = { name; _ }; _ } ->
+               from_acc name)
+           lower
+    in
+    if implied then
+      suppressed_curry_heads := heads_of_mode m @ !suppressed_curry_heads;
+    implied
+
+  let print_raw_constraints { lo; hi } ppf pair =
+    let { lower = edges_lower; upper = edges_upper } = find_edges pair in
+    let edges_upper =
+      List.filter
+        (function
+          | Upper_comonadic { c_name = Comonadic_name { target; _ }; _ } ->
+            not (mem_head !suppressed_curry_heads target)
+          | Upper_comonadic { c_name = Simple_name _; _ }
+          | Upper_simple _ -> true)
+        edges_upper
+    in
+    if List.is_empty edges_lower && List.is_empty edges_upper
+       && lo = "" && hi = ""
+    then begin
+      let name =
+        construct_name pair
+          { monadic = C.id; comonadic = C.id }
+          pair
+      in
+      Fmt.fprintf ppf "%s" (add_named_modevar name)
+    end
+    else begin
+      let pp_sep sep ppf () =
+        Fmt.fprintf ppf "%s" sep
+      in
+      let pp_bounds pp sep extra ppf items =
+        match items, extra with
+        | [], "" -> ()
+        | [], s -> Fmt.fprintf ppf "%s" s
+        | l, "" ->
+          Fmt.pp_print_list
+            ~pp_sep:(pp_sep sep) pp ppf l
+        | l, s ->
+          Fmt.fprintf ppf "%a%s%s"
+            (Fmt.pp_print_list
+               ~pp_sep:(pp_sep sep) pp)
+            l sep s
+      in
+      let has_upper =
+        not (List.is_empty edges_upper) || hi <> ""
+      in
+      let has_lower =
+        not (List.is_empty edges_lower) || lo <> ""
+      in
+      Fmt.fprintf ppf "[%s%a%s%s%a]"
+        (if has_upper then "< " else "")
+        (pp_bounds print_raw_upper_bound
+           " & " hi)
+        edges_upper
+        (if has_upper && has_lower
+         then " " else "")
+        (if has_lower then "> " else "")
+        (pp_bounds print_raw_lower_bound
+           " | " lo)
+        edges_lower
+    end
+
+  let find_mode_already_printed pair =
+    let find (pair_alias, m) =
+      if eq_pair pair pair_alias then Some m else None
+    in
+    List.find_map find !printed_aliased_visible_pairs
+
+  let mode_print_alias ppf pair =
+    if List.exists (eq_pair pair)
+         !aliased_visible_pairs
+    then begin
+      let cnt = !modename_counter in
+      modename_counter := cnt + 1;
+      let m = pick_name cnt in
+      printed_aliased_visible_pairs :=
+        (pair,m) :: !printed_aliased_visible_pairs;
+      Fmt.fprintf ppf "as %s" m
+    end
+
+  let name_of_mode (modes : With_locality.lr) =
+    let monadic = With_locality.get_monadic_desc modes.monadic in
+    let comonadic = With_locality.get_comonadic_desc modes.comonadic in
+    let pair = { monadic; comonadic } in
+    match find_mode_already_printed pair with
+    | Some m -> Fmt.asprintf "%s" m
+    | None ->
+        let bounds = construct_raw_bounds pair in
+        Fmt.asprintf "%a%a"
+          (print_raw_constraints bounds) pair
+          mode_print_alias pair
 
   let substitute ty =
     match List.assq ty !name_subst with
@@ -1139,10 +2392,31 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve ty =
+  let reserve ~base ty =
     normalize_type ty;
-    add_named_vars ty
+    add_named_vars ty;
+    if mode_polymorphism_printing_enabled () then begin
+      let snap = Btype.snapshot () in
+      zap_non_generic_modes base ty;
+      add_named_modevars ty;
+      add_visible_paths ();
+      add_visible_edges ();
+      Btype.backtrack snap
+    end
 end
+
+(** Whether the return mode [m] of an arrow can be elided: the arrow is
+    then printed without parens and [m] is not printed. Mutates [m] when it
+    must be zapped (see [equate_with_curry_bounds]). *)
+let equate_with_const : With_locality.lr -> const_or_generic -> bool =
+  fun m acc_mode ->
+    if not (With_locality.check_generic m)
+       || not (mode_polymorphism_printing_enabled ())
+    then equate_with_curry_bounds m acc_mode
+    else
+      Variable_names.curry_edges_implied
+        ~bounds_implied:(equate_with_curry_bounds m acc_mode)
+        ~acc:acc_mode m
 
 module Aliases = struct
   let visited_objects = ref ([] : transient_expr list)
@@ -1204,13 +2478,13 @@ module Aliases = struct
           if List.memq px !visited_objects then add_proxy px else begin
             if should_visit_object ty then
               visited_objects := px :: !visited_objects;
-            printer_iter_type_expr (mark_loops_rec visited) ty
+            printer_iter_type_expr (mark_loops_rec visited) (Fun.const ()) ty
           end
       | Tpoly(ty, tyl) ->
           List.iter add tyl;
           mark_loops_rec visited ty
       | _ ->
-          printer_iter_type_expr (mark_loops_rec visited) ty
+          printer_iter_type_expr (mark_loops_rec visited) (Fun.const ()) ty
 
   let mark_loops ty =
     mark_loops_rec [] ty
@@ -1220,9 +2494,11 @@ module Aliases = struct
 
 end
 
-let prepare_type ty =
-  Variable_names.reserve ty;
+let prepare_type_with_base base ty =
+  Variable_names.reserve ~base ty;
   Aliases.mark_loops ty
+
+let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
 
 
 let reset_except_conflicts () =
@@ -1232,9 +2508,9 @@ let reset () =
   Ident_conflicts.reset ();
   reset_except_conflicts ()
 
-let prepare_for_printing tyl =
+let prepare_for_printing ~base tyl =
   reset_except_conflicts ();
-  List.iter prepare_type tyl
+  List.iter (prepare_type_with_base base) tyl
 
 let add_type_to_preparation = prepare_type
 
@@ -1258,18 +2534,31 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
-  (* Analyze a product before calling [get_const]: the machinery in
-     [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
-     products. *)
+  (* Analyze structure (products, addressability, and boxes) before calling
+     [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
+     better for atomic layouts. *)
   | Layout (Product lays) ->
     Ojkind_product
       (List.map
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
+  | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
+    if Jkind.Layout.is_surely_addressable_flat lay then
+      out_jkind_of_desc env { desc with base = Layout lay }
+    else
+      Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
+  (* While we need to handle the non-constant case here, we prefer the
+     fallthrough to [Jkind.Const.to_out_jkind_const] otherwise, which puts the
+     mod- and with-bounds outside the layout *)
+  | Layout (Box (lay, sa)) when Option.is_none (Jkind.Desc.get_const desc) ->
+    Ojkind_box (out_jkind_of_desc env { desc with base = Layout lay },
+                Jkind.Scannable_axes.to_string_list sa)
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
+
+let out_jkind_of_jkind env jkind = out_jkind_of_desc env (Jkind.get jkind)
 
 (* returns None for [value], according to (C2.1) from
    Note [When to print jkind annotations] *)
@@ -1309,68 +2598,47 @@ let tree_of_modalities mut t =
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
-let tree_of_modes (modes : Mode.Alloc.Const.t) =
+let out_modalities_of_mod_bounds mod_bounds =
+  Typemode.untransl_mod_bounds mod_bounds
+
+let tree_of_modes_const (modes : Mode.With_locality.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
-
-    (* [forkable] has implied defaults depending on [areality]: *)
-    let forkable =
-      match modes.areality, modes.forkable with
-      | Local, Unforkable | Global, Forkable -> None
-      | _, _ -> Some modes.forkable
+    let implied = erase_implied_axes modes in
+    let diff =
+      Mode.With_locality.Const.diff
+        modes
+        Mode.With_locality.Const.legacy
     in
-
-    (* [yielding] has implied defaults depending on [areality]: *)
-    let yielding =
-      match modes.areality, modes.yielding with
-      | Local, Yielding | Global, Unyielding -> None
-      | _, _ -> Some modes.yielding
-    in
-
-    (* [contention] has implied defaults based on [visibility]: *)
-    let contention =
-      match modes.visibility, modes.contention with
-      | Immutable, Contended
-      | Read, Shared
-      | Write, Corrupted
-      | Read_write, Uncontended -> None
-      | _, _ -> Some modes.contention
-    in
-
-    (* [portability] has implied defaults based on [statefulness]: *)
-    let portability =
-      match modes.statefulness, modes.portability with
-      | Stateless, Portable
-      | Reading, Shareable
-      | Writing, Corruptible
-      | Stateful, Nonportable -> None
-      | _, _ -> Some modes.portability
-    in
-
-    let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
-    { diff with forkable; yielding; contention; portability }
+    { diff with
+      forkable = implied.forkable;
+      yielding = implied.yielding;
+      contention = implied.contention;
+      portability = implied.portability }
   in
   (* Step 2: Print the modes *)
-  let print_to_string_opt print a = Option.map (Fmt.asprintf "%a" print) a in
-  let modes =
-    [ print_to_string_opt Mode.Locality.Const.print diff.areality
-    ; print_to_string_opt Mode.Uniqueness.Const.print diff.uniqueness
-    ; print_to_string_opt Mode.Linearity.Const.print diff.linearity
-    ; print_to_string_opt Mode.Portability.Const.print diff.portability
-    ; print_to_string_opt Mode.Contention.Const.print diff.contention
-    ; print_to_string_opt Mode.Forkable.Const.print diff.forkable
-    ; print_to_string_opt Mode.Yielding.Const.print diff.yielding
-    ; print_to_string_opt Mode.Statefulness.Const.print diff.statefulness
-    ; print_to_string_opt Mode.Visibility.Const.print diff.visibility ]
-  in
-  List.filter_map (fun x -> x) modes
+  List.filter_map
+    (fun (Mode.With_locality.Axis.P ax) ->
+      diff
+      |> Mode.With_locality.Const.Option.proj ax
+      |> Option.map
+           (Fmt.asprintf "%a" (Mode.With_locality.Const.print_axis ax)))
+    Mode.With_locality.Axis.all
+
+let tree_of_modes : With_locality.lr -> const_or_generic -> string list =
+  fun modes acc ->
+    match acc with
+    | Generic _ ->
+      [ (Fmt.asprintf "%s"
+            (Variable_names.name_of_mode modes))]
+    | Const c -> tree_of_modes_const c
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
 type modal =
   | Arrow_return of
-    { acc : Mode.Alloc.Const.t;
-      mode : Mode.Alloc.lr; }
+    { acc : const_or_generic;
+      mode : Mode.With_locality.lr; }
     (** This is the RHS (say [r]) of an arrow type, where [mode] is the real
         mode of [r]. and:
     - If [r] is also an arrow type, then [acc] is how users would interpret
@@ -1387,7 +2655,7 @@ type modal =
     If [r] is [Tpoly (Tarrow_, [])], it will be treated as NOT an arrow type.
     This gives tedious (but still correct) printing. *)
 
-  | Other of Mode.Alloc.Const.t
+  | Other of const_or_generic
     (** In other cases, the caller has already printed the modes (as the
         constructor argument) on the type. *)
 
@@ -1406,8 +2674,8 @@ let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
-        let mode = Alloc.zap_to_legacy mode in
-        Otyp_ret (Orm_any (tree_of_modes mode), tree)
+        let acc = const_or_generic_of_mode ~arg:false mode in
+        Otyp_ret (Orm_any (tree_of_modes mode acc), tree)
     | Other _ -> tree
   in
   let ty =
@@ -1420,7 +2688,7 @@ let rec tree_of_modal_typexp mode modal ty =
    let name = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
    not_arrow (Otyp_var (non_gen, name)) else
 
-  let pr_typ alloc_mode =
+  let pr_typ acc_mode =
     let tty = Transient_expr.repr ty in
     match tty.desc with
     | Tvar _ ->
@@ -1436,7 +2704,7 @@ let rec tree_of_modal_typexp mode modal ty =
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
-        let arg_mode = Alloc.zap_to_legacy marg in
+        let arg_acc = const_or_generic_of_mode ~arg:true marg in
         let t1 =
           if is_optional l then
             match
@@ -1444,15 +2712,15 @@ let rec tree_of_modal_typexp mode modal ty =
             with
             | Tconstr(path, [ty], _)
               when Path.same path Predef.path_option ->
-                tree_of_typexp mode arg_mode ty
+                tree_of_acc_typexp mode arg_acc ty
             | _ -> Otyp_stuff "<hidden>"
           else
-            tree_of_typexp mode arg_mode ty1
+            tree_of_acc_typexp mode arg_acc ty1
         in
-        let acc_mode = curry_mode alloc_mode arg_mode in
+        let acc_mode = curry_acc acc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
-        Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
+        Otyp_arrow (lab, tree_of_modes marg arg_acc, t1, t2)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
@@ -1461,7 +2729,7 @@ let rec tree_of_modal_typexp mode modal ty =
         let p', s = best_type_path p in
         let tyl' = apply_subst s tyl in
         if is_nth s && not (tyl'=[])
-        then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
+        then tree_of_typexp mode With_locality.Const.legacy (List.hd tyl')
         else begin
           Internal_names.add p';
           Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
@@ -1492,14 +2760,18 @@ let rec tree_of_modal_typexp mode modal ty =
         end
     | Tobject (fi, nm) ->
         tree_of_typobject mode fi !nm
+    | Tmod (ty, mod_bounds) ->
+        Otyp_mod
+          ( tree_of_acc_typexp mode acc_mode ty,
+            out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
-          (Env.enter_quotation !printing_env)
-          (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
+          (Env.enter_quote !printing_env)
+          (fun () -> Otyp_quote (tree_of_acc_typexp mode acc_mode ty))
     | Tsplice ty ->
         wrap_printing_env_unguarded
           (Env.enter_splice ~loc:Location.none !printing_env)
-          (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
+          (fun () -> Otyp_splice (tree_of_acc_typexp mode acc_mode ty))
     | Tquote_eval ty ->
         (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
         let ty = newgenty (Tquote ty) in
@@ -1508,7 +2780,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Internal_names.add p';
         let tyl =
           wrap_printing_env_unguarded
-            (Env.enter_quotation !printing_env)
+            (Env.enter_quote !printing_env)
             (fun () -> tree_of_typlist mode tyl)
         in
         Otyp_constr (tree_of_path (Some Type) p', tyl)
@@ -1520,7 +2792,7 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tlink _ ->
         fatal_error "Out_type.tree_of_typexp"
     | Tpoly (ty, []) | Trepr (ty, []) ->
-        tree_of_typexp mode alloc_mode ty
+        tree_of_acc_typexp mode acc_mode ty
     | Tpoly (ty, tyl) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
@@ -1530,8 +2802,8 @@ let rec tree_of_modal_typexp mode modal ty =
         (* Make the names delayed, so that the real type is
            printed once when used as proxy *)
         List.iter Aliases.add_delayed tyl;
-        let tl = tree_of_qtvs tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
+        let tl = tree_of_univars tyl in
+        let tr = Otyp_poly (tl, tree_of_acc_typexp mode acc_mode ty) in
         (* Forget names when we leave scope *)
         Variable_names.remove_names tyl;
         Aliases.delayed := old_delayed; tr
@@ -1566,17 +2838,18 @@ let rec tree_of_modal_typexp mode modal ty =
                List.iter Aliases.add_delayed tyl;
                let sort_names = tree_of_qsvs tyl in
                let tr =
-                Otyp_repr (sort_names, tree_of_typexp mode alloc_mode inner_ty)
-              in
+                 Otyp_repr
+                   (sort_names, tree_of_acc_typexp mode acc_mode inner_ty)
+               in
                Variable_names.remove_names tyl;
                Aliases.delayed := old_delayed;
                tr
              end else
                (* Mismatch: print Trepr and Tpoly separately *)
-               tree_of_typexp mode alloc_mode ty
+               tree_of_acc_typexp mode acc_mode ty
          | _ ->
              (* No type variables, just print the body *)
-             tree_of_typexp mode alloc_mode ty)
+             tree_of_acc_typexp mode acc_mode ty)
     | Tunivar _ ->
         Otyp_var (false, Variable_names.(name_of_type new_name) tty)
     | Tpackage pack ->
@@ -1601,38 +2874,43 @@ let rec tree_of_modal_typexp mode modal ty =
        doesn't matter.*)
     let alias = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
     let tree =
-      Otyp_alias {non_gen;  aliased = pr_typ Mode.Alloc.Const.legacy; alias }
+      Otyp_alias
+        {non_gen;
+         aliased = pr_typ (Const Mode.With_locality.Const.legacy);
+         alias}
     in
     not_arrow tree end
   else
     match modal with
     | Arrow_return {acc; mode} ->
-        let rm, alloc_mode = tree_of_ret_typ_mutating acc mode ty in
-        let ty = pr_typ alloc_mode in
+        let rm, acc_mode = tree_of_ret_typ_mutating acc mode ty in
+        let ty = pr_typ acc_mode in
         Otyp_ret (rm, ty)
-    | Other m -> pr_typ m
+    | Other acc_mode -> pr_typ acc_mode
 
-and tree_of_typexp mode alloc_mode ty =
-  tree_of_modal_typexp mode (Other alloc_mode) ty
+and tree_of_acc_typexp mode acc_mode ty =
+  tree_of_modal_typexp mode (Other acc_mode) ty
 
-(* qtvs = quantified type variables *)
-(* this silently drops any arguments that are not generic Tvar or Tunivar *)
-and tree_of_qtvs qtvs =
-  let tree_of_qtv v : (string * out_jkind option) option =
+and tree_of_typexp mode mode_with_locality ty =
+  tree_of_acc_typexp mode (Const mode_with_locality) ty
+
+and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
        ['a : value_or_null] when it's not relevant (most cases).
        Unfortunately, this makes error messages really confusing, because
        we don't consider jkind annotations. *)
-    let tree jkind =
-      Some (Variable_names.name_of_type Variable_names.new_name v,
-            out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind)
-    in
-    match v.desc with
-    | Tvar { jkind } when v.level = generic_level -> tree jkind
-    | Tunivar { jkind } -> tree jkind
-    | _ -> None
-  in
-  List.filter_map tree_of_qtv qtvs
+  Variable_names.name_of_type Variable_names.new_name v,
+  out_jkind_option_of_jkind ~ignore_null:true !printing_env jkind
+
+and tree_of_qtvs qtvs =
+  List.map (fun (v, jkind) -> tree_of_qtv v jkind) qtvs
+
+and tree_of_univars vars =
+  List.filter_map
+    (fun v -> match v.desc with
+       | Tunivar { jkind } -> Some (tree_of_qtv v jkind)
+       | _ -> None)
+    vars
 
 (* qsvs = quantified sort variables (for Trepr) *)
 (* Extract names from type variables corresponding to sort variables *)
@@ -1640,8 +2918,6 @@ and tree_of_qsvs qtvs =
   List.filter_map
     (fun v ->
       match v.desc with
-      | Tvar _ when v.level = generic_level ->
-        Some (Variable_names.name_of_type Variable_names.new_name v)
       | Tunivar _ ->
         Some (Variable_names.name_of_type Variable_names.new_name v)
       | _ -> None)
@@ -1678,36 +2954,37 @@ and tree_of_typvariant_repr row =
   { fields; name; closed; present; all_present; tags }
 
 and tree_of_typlist mode tyl =
-  List.map (tree_of_typexp mode Alloc.Const.legacy) tyl
+  List.map (tree_of_typexp mode With_locality.Const.legacy) tyl
 
 and tree_of_labeled_typlist mode tyl =
   List.map
-    (fun (label, ty) -> label, tree_of_typexp mode Alloc.Const.legacy ty)
+    (fun (label, ty) ->
+      label, tree_of_typexp mode With_locality.Const.legacy ty)
     tyl
 
 and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
-  (tree_of_typexp Type Alloc.Const.legacy ty,
+  (tree_of_typexp Type With_locality.Const.legacy ty,
    tree_of_modalities Immutable gf)
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating acc_mode m ty=
+and tree_of_ret_typ_mutating (acc_mode : const_or_generic) m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
-      match Alloc.equate (Alloc.of_const acc_mode) m with
-      | Ok () ->
+      if equate_with_const m acc_mode then begin
         (Orm_no_parens, acc_mode)
-      | Error _ ->
+      end else begin
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
-        let m = Alloc.zap_to_legacy m in
-        (Orm_parens (tree_of_modes m), m)
+        let acc_mode = const_or_generic_of_mode ~arg:false m in
+        (Orm_parens (tree_of_modes m acc_mode), acc_mode)
       end
+    end
   | _ ->
-    let m = Alloc.zap_to_legacy m in
-    (Orm_any (tree_of_modes m), m)
+    let acc_mode = const_or_generic_of_mode ~arg:false m in
+    (Orm_any (tree_of_modes m acc_mode), acc_mode)
 
 and tree_of_typobject_repr fi =
   let (fields, rest) = flatten_fields fi in
@@ -1730,7 +3007,7 @@ and tree_of_typobject mode fi nm =
       let { fields; open_row } = tree_of_typobject_repr fi in
       let fields =
         List.map
-          (fun (s, t) -> (s, tree_of_typexp mode Alloc.Const.legacy t))
+          (fun (s, t) -> (s, tree_of_typexp mode With_locality.Const.legacy t))
           fields
       in
       Otyp_object {fields; open_row}
@@ -1759,27 +3036,28 @@ and tree_of_package mode {pack_path; pack_cstrs} =
     opack_cstrs =
       List.map
         (fun (li, ty) ->
-           (String.concat "." li, tree_of_typexp mode Alloc.Const.legacy ty))
+           (String.concat "." li,
+            tree_of_typexp mode With_locality.Const.legacy ty))
         pack_cstrs }
 
-let tree_of_typexp mode ty =
+let tree_of_typexp ~base mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
+  wrap_mutation (fun () -> tree_of_typexp mode base ty)
 
-let tree_of_typexp mode ty =
+let tree_of_typexp ~base mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
-  if Ctype.contains_toplevel_splice (Env.stage !printing_env :> int) ty
+  if Ctype.contains_initial_stage_splice (Env.stage !printing_env :> int) ty
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)
-      (fun () -> tree_of_typexp mode ty)
+      (fun () -> tree_of_typexp ~base mode ty)
   else
-    tree_of_typexp mode ty
+    tree_of_typexp ~base mode ty
 
 let typexp mode ppf ty =
-  !Oprint.out_type ppf (tree_of_typexp mode ty)
+  !Oprint.out_type ppf (tree_of_typexp ~base:With_locality.Const.legacy mode ty)
 
 let prepared_type_expr ppf ty = typexp Type ppf ty
 
@@ -1793,8 +3071,8 @@ let type_expr_with_reserved_names ppf ty =
 let prepared_type_scheme ppf ty = typexp Type_scheme ppf ty
 
 let tree_of_type_scheme ty =
-  prepare_for_printing [ty];
-  tree_of_typexp Type_scheme ty
+  prepare_for_printing ~base:With_locality.Const.legacy [ty];
+  tree_of_typexp ~base:With_locality.Const.legacy Type_scheme ty
 
 (* Print one type declaration *)
 
@@ -1803,8 +3081,9 @@ let tree_of_constraints params =
     (fun ty list ->
        let ty' = unalias ty in
        if proxy ty != proxy ty' then
-         let tr = tree_of_typexp Type_scheme ty in
-         (tr, tree_of_typexp Type_scheme ty') :: list
+         let base = With_locality.Const.legacy in
+         let tr = tree_of_typexp ~base Type_scheme ty in
+         (tr, tree_of_typexp ~base Type_scheme ty') :: list
        else list)
     params []
 
@@ -1831,9 +3110,8 @@ let zap_qtvs_if_boring qtvs =
   then qtvs
   else []
 
-(* get the free variables with their jkinds; do this *after* converting the
-   type itself, so that the type names are available.
-   This implements Case (C3) from Note [When to print jkind annotations]. *)
+(* Extract the generalized free type variables of [tyl] with their jkinds, as
+   [(var, jkind)], in order of appearance. *)
 let extract_qtvs tyl =
   let fvs = Ctype.free_non_row_variables_of_list tyl in
   (* The [Ctype.free*variables] family of functions returns the free
@@ -1841,8 +3119,11 @@ let extract_qtvs tyl =
   *)
   let fvs = List.rev fvs in
   let tfvs = List.map Transient_expr.repr fvs in
-  let vars_jkinds = tree_of_qtvs tfvs in
-  zap_qtvs_if_boring vars_jkinds
+  List.filter_map (fun v ->
+       match v.desc with
+       | Tvar { jkind } when v.level = generic_level -> Some (v, jkind)
+       | _ -> None)
+    tfvs
 
 let param_jkind ty =
   match get_desc ty with
@@ -1860,7 +3141,7 @@ let tree_of_label l =
           | Nonatomic -> Nonatomic
         in
         let mut =
-          let open Value.Comonadic in
+          let open With_regionality.Comonadic in
           match equate mode legacy with
           | Ok () -> Om_mutable (None, atomic)
           | Error _ -> Om_mutable (Some "<non-legacy>", atomic)
@@ -1872,7 +3153,7 @@ let tree_of_label l =
   {
     olab_name = Ident.name l.ld_id;
     olab_mut = mut;
-    olab_type = tree_of_typexp Type l.ld_type;
+    olab_type = tree_of_typexp ~base:With_locality.Const.legacy Type l.ld_type;
     olab_modalities = ld_modalities;
   }
 
@@ -1884,12 +3165,16 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
   match ret_type with
   | None -> (tree_of_constructor_arguments args, None)
   | Some res ->
-      let out_ret = tree_of_typexp Type res in
+      let out_ret = tree_of_typexp ~base:With_locality.Const.legacy Type res in
       let out_args = tree_of_constructor_arguments args in
-      let qtvs = extract_qtvs (res :: tys_of_constr_args args) in
+      let qtvs =
+        (res :: tys_of_constr_args args)
+        |> extract_qtvs
+        |> tree_of_qtvs |> zap_qtvs_if_boring
+      in
       (out_args, Some (qtvs, out_ret))
 
-let tree_of_single_constructor ~all_void cd =
+let tree_of_single_constructor ~immediate_all_void cd =
   let name = Ident.name cd.cd_id in
   let args, ret =
     extension_constructor_args_and_ret_type_subtree cd.cd_args cd.cd_res
@@ -1898,25 +3183,8 @@ let tree_of_single_constructor ~all_void cd =
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
-      ocstr_all_void = all_void;
+      ocstr_immediate_all_void = immediate_all_void;
   }
-
-(* A constructor takes [@immediate_all_void_constructor] iff it belongs to a
-   boxed variant and has at least one argument, all of which are void. *)
-let constructor_is_all_void rep cd =
-  match (rep : Types.variant_representation) with
-  | Variant_boxed _ -> begin
-      match cd.cd_args with
-      | Cstr_tuple ((_ :: _) as args) ->
-          List.for_all
-            (fun (ca : Types.constructor_argument) ->
-               match ca.ca_sort with
-               | Some s -> Jkind.Sort.Const.all_void s
-               | None -> false)
-            args
-      | Cstr_tuple [] | Cstr_record _ -> false
-    end
-  | Variant_unboxed | Variant_extensible | Variant_with_null -> false
 
 (* When printing GADT constructor, we need to forget the naming decision we took
   for the type parameters and constraints. Indeed, in
@@ -1926,12 +3194,12 @@ let constructor_is_all_void rep cd =
   It is fine to print both the type parameter ['a] and the existentially
   quantified ['a] in the definition of the constructor X as ['a]
  *)
-let tree_of_constructor_in_decl ~all_void cd =
+let tree_of_constructor_in_decl ~immediate_all_void cd =
   match cd.cd_res with
-  | None -> tree_of_single_constructor ~all_void cd
+  | None -> tree_of_single_constructor ~immediate_all_void cd
   | Some _ ->
       Variable_names.with_local_names
-        (fun () -> tree_of_single_constructor ~all_void cd)
+        (fun () -> tree_of_single_constructor ~immediate_all_void cd)
 
 let prepare_decl id decl =
   let params = filter_params decl.type_params in
@@ -2033,7 +3301,8 @@ let tree_of_type_decl id decl =
     in
     let mk_param ty variance =
       let jkind = param_jkind ty in
-      type_param variance jkind (tree_of_typexp Type ty)
+      type_param variance jkind
+        (tree_of_typexp ~base:With_locality.Const.legacy Type ty)
     in
     (Ident.name id,
      List.map2 mk_param params vari)
@@ -2041,7 +3310,9 @@ let tree_of_type_decl id decl =
   let tree_of_manifest ty1 =
     match ty_manifest with
     | None -> ty1
-    | Some ty -> Otyp_manifest (tree_of_typexp Type ty, ty1)
+    | Some ty ->
+        Otyp_manifest
+          (tree_of_typexp ~base:With_locality.Const.legacy Type ty, ty1)
   in
   let (name, args) = type_defined decl in
   let constraints = tree_of_constraints params in
@@ -2051,7 +3322,8 @@ let tree_of_type_decl id decl =
         begin match ty_manifest with
         | None -> (Otyp_abstract, Public, false, None, false)
         | Some ty ->
-            tree_of_typexp Type ty, decl.type_private, false, None, false
+            tree_of_typexp ~base:With_locality.Const.legacy Type ty,
+            decl.type_private, false, None, false
         end
     | Type_variant (cstrs, rep, umc) ->
         let unboxed =
@@ -2066,12 +3338,28 @@ let tree_of_type_decl id decl =
           then Some "or_null_reexport"
           else None
         in
+        let immediate_all_void idx =
+          match rep with
+          | Variant_boxed layouts -> begin
+              match layouts.(idx) with
+              | Cstr_layout_known { shape = Constructor_immediate_all_void; _ }
+                -> true
+              | Cstr_layout_known
+                  { shape =
+                      ( Constructor_uniform_value
+                      | Constructor_mixed _ | Constructor_undetermined
+                      | Constructor_variable _ );
+                    _ }
+              | Cstr_layout_undetermined -> false
+            end
+          | Variant_unboxed | Variant_extensible | Variant_with_null -> false
+        in
         tree_of_manifest
           (Otyp_sum
-             (List.map
-                (fun cd ->
-                   tree_of_constructor_in_decl
-                     ~all_void:(constructor_is_all_void rep cd) cd)
+             (List.mapi
+                (fun idx cd ->
+                   let immediate_all_void = immediate_all_void idx in
+                   tree_of_constructor_in_decl ~immediate_all_void cd)
                 cstrs)),
         decl.type_private,
         unboxed,
@@ -2085,7 +3373,8 @@ let tree_of_type_decl id decl =
         (Option.is_some umc)
     | Type_record_unboxed_product(lbls,
                                   (Record_unboxed_product
-                                  | Record_unboxed_product_variable),
+                                  | Record_unboxed_product_undetermined
+                                  | Record_unboxed_product_variable _),
                                   umc) ->
         tree_of_manifest
           (Otyp_record_unboxed_product (List.map tree_of_label lbls)),
@@ -2145,7 +3434,8 @@ let add_constructor_to_preparation c =
   Option.iter prepare_type c.cd_res
 
 let prepared_constructor ppf c =
-  !Oprint.out_constr ppf (tree_of_single_constructor ~all_void:false c)
+  !Oprint.out_constr ppf
+    (tree_of_single_constructor ~immediate_all_void:false c)
 
 
 let tree_of_type_declaration id decl rs =
@@ -2210,7 +3500,11 @@ let prepared_tree_of_extension_constructor
     param_scope
       (fun () ->
          List.iter (Aliases.add_printed ~non_gen:false) ty_params;
-         List.map (fun ty -> type_param (tree_of_typexp Type ty)) ty_params
+         List.map
+           (fun ty ->
+              type_param
+                (tree_of_typexp ~base:With_locality.Const.legacy Type ty))
+           ty_params
       )
   in
   let name = Ident.name id in
@@ -2244,15 +3538,40 @@ let prepared_extension_constructor id ppf ext =
   !Oprint.out_sig_item ppf
     (prepared_tree_of_extension_constructor id ext Text_first)
 
+let maybe_val_poly_shorthand lpoly_vars qtvs =
+  let module Sort_const = Jkind.Sort.Const in
+  let same_genvar a b =
+    Sort_const.equal (Sort_const.genvar a) (Sort_const.genvar b)
+  in
+  let top_genvar (_, jkind) =
+    match Jkind.get_layout !printing_env jkind with
+    | Some layout ->
+      (match Jkind.Layout.Const.get_sort layout with
+       | Some (Sort_const.Genvar v) -> Some v
+       | _ -> None)
+    | None -> None
+  in
+  let matched_genvars, unmatched =
+    List.partition_map
+      (fun q -> match top_genvar q with Some v -> Left v | None -> Right q)
+      qtvs
+  in
+  let no_genvar (_, jkind) =
+    match Jkind.get_layout !printing_env jkind with
+    | Some layout -> not (Jkind.Layout.Const.has_genvar layout)
+    | None -> true
+  in
+  if (not (List.is_empty lpoly_vars))
+     && List.equal same_genvar matched_genvars lpoly_vars
+     && List.for_all no_genvar unmatched
+  then Some unmatched
+  else None
+
 (* Print a value declaration *)
 
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
-  let () = prepare_for_printing [decl.val_type] in
-  let ty = tree_of_typexp Type_scheme decl.val_type in
-  (* Important: process the fvs *after* the type; tree_of_type_scheme
-     resets the naming context *)
   wrap_mutation (fun () ->
   let moda =
     if Mode.Modality.is_undefined decl.val_modalities then
@@ -2261,12 +3580,24 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
-  let qsvs, qtvs =
-    (* Important: process the fvs *after* the type; tree_of_type_scheme
-       resets the naming context. Both must be inside print_with_genvars
-       so that sort poly var names are registered when jkinds are printed. *)
-    Jkind_types.Sort.print_with_genvars (Lpoly.get_exn decl.val_lpoly)
-      (fun names -> names, extract_qtvs [decl.val_type])
+  let base =
+    Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
+    |> Mode.Const.value_to_alloc_r2l
+  in
+  let () = prepare_for_printing ~base [decl.val_type] in
+  let ty = tree_of_typexp ~base Type_scheme decl.val_type in
+  (* Important: process the fvs *after* the type; tree_of_type_scheme
+     resets the naming context *)
+  let oval_poly, qsvs, qtvs =
+    let lpoly_vars = Lpoly.get_exn decl.val_lpoly in
+    let qtvs = extract_qtvs [decl.val_type] in
+    match maybe_val_poly_shorthand lpoly_vars qtvs with
+    | Some unmatched ->
+      true, [], tree_of_qtvs unmatched
+    | None ->
+      Jkind_types.Sort.print_with_genvars lpoly_vars
+        (fun names ->
+           false, names, zap_qtvs_if_boring (tree_of_qtvs qtvs))
   in
   let apparent_arity =
     let rec count n typ =
@@ -2279,24 +3610,26 @@ let tree_of_value_description id decl =
   let attrs =
     match Zero_alloc.get decl.val_zero_alloc with
     | Default_zero_alloc | Ignore_assert_all -> []
-    | Check { strict; opt; arity; custom_error_msg; loc = _; } ->
+    | Check { strict; opt; arity; partial; custom_error_msg; loc = _; } ->
       [{ oattr_name =
            String.concat ""
              ["zero_alloc";
               if strict then " strict" else "";
               if opt then " opt" else "";
+              if partial then " partial" else "";
               if arity = apparent_arity then "" else
                 Printf.sprintf " arity %d" arity;
               match custom_error_msg with
               | None -> ""
               | Some msg -> Printf.sprintf " custom_error_message %S" msg
              ] }]
-    | Assume { strict; never_returns_normally; arity; _ } ->
+    | Assume { strict; never_returns_normally; arity; partial; _ } ->
       [{ oattr_name =
            String.concat ""
              ["zero_alloc assume";
               if strict then " strict" else "";
               if never_returns_normally then " never_returns_normally" else "";
+              if partial then " partial" else "";
               if arity = apparent_arity then "" else
                 Printf.sprintf " arity %d" arity;
              ]
@@ -2305,6 +3638,7 @@ let tree_of_value_description id decl =
   let vd =
     { oval_name = id;
       oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
+      oval_poly;
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
@@ -2330,9 +3664,9 @@ let prepare_method _lab (priv, _virt, ty) =
 
 let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
-  let tty = tree_of_typexp mode ty in
+  let tty = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
   let tyl = List.map Transient_expr.repr tyl in
-  let qtvs = tree_of_qtvs tyl in
+  let qtvs = tree_of_univars tyl in
   let qtvs = zap_qtvs_if_boring qtvs in
   Variable_names.remove_names tyl;
   let priv = priv <> Mpublic in
@@ -2392,7 +3726,8 @@ let rec tree_of_class_type mode params =
         List.fold_left
           (fun csil (l, m, v, t) ->
             Ocsg_value
-              (l, m = Asttypes.Mutable, v = Virtual, tree_of_typexp mode t)
+              (l, m = Asttypes.Mutable, v = Virtual,
+               tree_of_typexp ~base:With_locality.Const.legacy mode t)
             :: csil)
           csil all_vars
       in
@@ -2417,9 +3752,9 @@ let rec tree_of_class_type mode params =
        if is_optional l then
          match get_desc (Ctype.expand_head !printing_env ty) with
          | Tconstr(path, [ty], _) when Path.same path Predef.path_option ->
-             tree_of_typexp mode ty
+             tree_of_typexp ~base:With_locality.Const.legacy mode ty
          | _ -> Otyp_stuff "<hidden>"
-       else tree_of_typexp mode ty in
+       else tree_of_typexp ~base:With_locality.Const.legacy mode ty in
       Octy_arrow (lab, tr, tree_of_class_type mode params cty)
 
 
@@ -2429,7 +3764,7 @@ let tree_of_class_param param variance =
   (* CR layouts: fix next line when adding support for jkind
      annotations on class type parameters *)
   let ot_jkind = param_jkind param in
-  match tree_of_typexp Type_scheme param with
+  match tree_of_typexp ~base:With_locality.Const.legacy Type_scheme param with
     Otyp_var (ot_non_gen, ot_name) ->
       {ot_non_gen; ot_name; ot_variance; ot_jkind}
   | _ -> {ot_non_gen=false; ot_name="?"; ot_variance; ot_jkind}
@@ -2657,7 +3992,11 @@ let rec tree_of_modtype ?abbrev = function
         tree_of_functor_parameter ?abbrev param
       in
       let res = wrap_env env (tree_of_modtype ?abbrev) ty_res in
-      let mres = m_res |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
+      let mres =
+        m_res
+        |> With_locality.zap_to_legacy_exn ~arg:false
+        |> tree_of_modes_const
+      in
       Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
@@ -2686,7 +4025,11 @@ and tree_of_functor_parameter ?abbrev = function
             Some (Ident.name id),
             fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
-      let marg = m_arg |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
+      let marg =
+        m_arg
+        |> With_locality.zap_to_legacy_exn ~arg:true
+        |> tree_of_modes_const
+      in
       Some (name, tree_of_modtype ?abbrev ty_arg, marg), env
 
 and tree_of_signature ?abbrev = function
@@ -2832,7 +4175,7 @@ type 'a diff = Same of 'a | Diff of 'a * 'a
 let trees_of_type_expansion'
       ~var_jkinds mode Errortrace.{ty = t; expanded = t'} =
   let tree_of_typexp' ty =
-    let out = tree_of_typexp mode ty in
+    let out = tree_of_typexp ~base:With_locality.Const.legacy mode ty in
     if var_jkinds then
       match get_desc ty with
       | Tvar { jkind; _ } | Tunivar { jkind; _ } ->
@@ -2890,8 +4233,9 @@ let hide_variant_name t =
 
 let prepare_expansion Errortrace.{ty; expanded} =
   let expanded = hide_variant_name expanded in
-  Variable_names.reserve ty;
-  if not (same_path ty expanded) then Variable_names.reserve  expanded;
+  Variable_names.reserve ~base:With_locality.Const.legacy ty;
+  if not (same_path ty expanded) then
+    Variable_names.reserve ~base:With_locality.Const.legacy expanded;
   Errortrace.{ty; expanded}
 
 (* Adapt functions to exposed interface *)

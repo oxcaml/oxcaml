@@ -2,6 +2,7 @@
  flags += " -O3";
  flags += " -experimental-optimizations";
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -10,9 +11,9 @@
 let neg x = -x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -51,9 +52,9 @@ mul_3:
 let div x y = x / y
 [%%expect_asm X86_64{|
 div:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L0
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -61,11 +62,11 @@ div:
   leaq  1(%rax,%rax), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 let div_by_constant x = x / 1234
@@ -104,9 +105,9 @@ div_2:
 let rem x y = x mod y
 [%%expect_asm X86_64{|
 rem:
-  movq  %rbx, %rcx
-  cmpq  $1, %rcx
+  cmpq  $1, %rbx
   je    .L0
+  movq  %rbx, %rcx
   sarq  $1, %rcx
   sarq  $1, %rax
   cqto
@@ -114,11 +115,11 @@ rem:
   leaq  1(%rdx,%rdx), %rax
   ret
 .L0:
+  subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
+  movq  $0, 272(%r14)
+  call  caml_raise_exn@PLT
+.L1:
 |}]
 
 (* CR ttebbi: This could be:
@@ -133,11 +134,10 @@ let rem_2 x = x mod 2
 [%%expect_asm X86_64{|
 rem_2:
   sarq  $1, %rax
-  movq  $-2, %rdi
   movq  %rax, %rbx
   shrq  $63, %rbx
   addq  %rax, %rbx
-  andq  %rdi, %rbx
+  andq  $-2, %rbx
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -149,12 +149,11 @@ let is_divisible_by_128 x = (x mod 128) = 0
 [%%expect_asm X86_64{|
 is_divisible_by_128:
   sarq  $1, %rax
-  movq  $-128, %rdi
   movq  %rax, %rbx
   sarq  $6, %rbx
   shrq  $57, %rbx
   addq  %rax, %rbx
-  andq  %rdi, %rbx
+  andq  $-128, %rbx
   subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $1, %rax
@@ -183,14 +182,13 @@ pred:
 let abs x = abs x
 [%%expect_asm X86_64{|
 abs:
-  movq  %rax, %rbx
-  cmpq  $1, %rbx
+  cmpq  $1, %rax
   jl    .L0
-  movq  %rbx, %rax
   ret
 .L0:
-  movl  $2, %eax
-  subq  %rbx, %rax
+  movl  $2, %ebx
+  subq  %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -220,12 +218,10 @@ logxor:
 |}]
 
 
-(* CR ttebbi: This could be `xorq  $-2, %rax` *)
 let lognot x = lnot x
 [%%expect_asm X86_64{|
 lognot:
-  xorq  $-1, %rax
-  orq   $1, %rax
+  xorq  $-2, %rax
   ret
 |}]
 
@@ -268,13 +264,13 @@ shift_right_logical:
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -290,19 +286,11 @@ equal:
 |}]
 
 
-(* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare (x : int) (y : int) =
   Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
-  xorl  %eax, %eax
-  cmpq  %rbx, %rdi
-  setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
-  cmpq  $1, %rax
+  cmpq  %rbx, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -314,13 +302,11 @@ equal_using_compare:
 let min (x : int) (y : int) = min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -328,13 +314,11 @@ min:
 let max (x : int) (y : int) = max x y
 [%%expect_asm X86_64{|
 max:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jl    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -362,8 +346,9 @@ let collatz n =
 ;;
 [%%expect_asm X86_64{|
 collatz:
+  movl  $1, %edi
   movq  %rax, %rbx
-  movl  $1, %eax
+  movq  %rdi, %rax
   cmpq  $3, %rbx
   jg    .L1
 .L0:
@@ -372,12 +357,11 @@ collatz:
   addq  $2, %rax
   movq  %rbx, %rdi
   sarq  $1, %rdi
-  movq  $-2, %rcx
   movq  %rdi, %rsi
   shrq  $63, %rsi
   leaq  (%rdi,%rsi), %rdx
   movq  %rdx, %rsi
-  andq  %rcx, %rsi
+  andq  $-2, %rsi
   subq  %rsi, %rdi
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi

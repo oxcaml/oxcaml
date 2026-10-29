@@ -95,11 +95,12 @@
           pattern (test.ml[2,15+4]..test.ml[2,15+5])
             Tpat_var \"f\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
-            alloc_mode id(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-            id(modevar#a[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,dynamic])
+            alloc_mode global
+            yielding_mode unyielding
+            return_mode proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -107,15 +108,16 @@
                 pattern (test.ml[2,15+7]..test.ml[2,15+8])
                   extra (test.ml[2,15+6]..test.ml[2,15+13])
                     Tpat_extra_constraint
-                    core_type (test.ml[2,15+11]..test.ml[2,15+12])
-                      Ttyp_constr \"t\"
-                      []
+                    Some
+                      core_type (test.ml[2,15+11]..test.ml[2,15+12])
+                        Ttyp_constr \"t\"
+                        []
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_var \"x\"
                   sort value
-                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -144,6 +146,7 @@
                           Label_disambiguation
                             Unambiguous
                       Texp_construct \"()\"
+                      Constructor_uniform_value
                       []
                   <case>
                     pattern (test.ml[5,58+4]..test.ml[5,58+5])
@@ -157,9 +160,9 @@
                         []
                         None
                     expression (test.ml[5,58+9]..test.ml[5,58+10])
-                      attribute \"merlin.incorrect\"
+                      attribute \"ocaml.incorrect\"
                         []
-                      attribute \"merlin.saved-parts\"
+                      attribute \"ocaml.saved-parts\"
                         [
                           structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                             Pstr_eval
@@ -175,13 +178,13 @@
                     pattern (test.ml[6,69+4]..test.ml[6,69+5])
                       Tpat_value
                       pattern (test.ml[6,69+4]..test.ml[6,69+5])
-                        attribute \"merlin.incorrect\"
+                        attribute \"ocaml.incorrect\"
                           []
                         Tpat_any
                     expression (test.ml[6,69+9]..test.ml[6,69+12])
-                      attribute \"merlin.incorrect\"
+                      attribute \"ocaml.incorrect\"
                         []
-                      attribute \"merlin.saved-parts\"
+                      attribute \"ocaml.saved-parts\"
                         [
                           structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                             Pstr_eval
@@ -280,34 +283,36 @@
           pattern (test2.ml[2,15+4]..test2.ml[2,15+5])
             Tpat_var \"f\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
-            alloc_mode id(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-            id(modevar#a[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
+            yielding_mode unyielding
+            return_mode proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
               Param_pat
                 pattern (test2.ml[2,15+7]..test2.ml[2,15+8])
-                  attribute \"merlin.incorrect\"
+                  attribute \"ocaml.incorrect\"
                     []
                   extra (test2.ml[2,15+6]..test2.ml[2,15+13])
                     Tpat_extra_constraint
-                    core_type (test2.ml[2,15+11]..test2.ml[2,15+12])
-                      Ttyp_constr \"t\"
-                      []
+                    Some
+                      core_type (test2.ml[2,15+11]..test2.ml[2,15+12])
+                        Ttyp_constr \"t\"
+                        []
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_any
-                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
               expression (test2.ml[2,15+22]..test2.ml[2,15+24])
-                attribute \"merlin.incorrect\"
+                attribute \"ocaml.incorrect\"
                   []
-                attribute \"merlin.saved-parts\"
+                attribute \"ocaml.saved-parts\"
                   [
                     structure_item (_none_[0,0+-1]..[0,0+-1]) ghost
                       Pstr_eval
@@ -615,14 +620,15 @@ make sure we also handle that correctly in structures:
           pattern (test_ct.ml[1,0+4]..test_ct.ml[1,0+8])
             extra (test_ct.ml[1,0+4]..test_ct.ml[1,0+8]) ghost
               Tpat_extra_constraint
-              core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
-                Ttyp_constr \"int!\"
-                []
+              Some
+                core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
+                  Ttyp_constr \"int!\"
+                  []
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo1\"
             sort value
-            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[1,0+17]..test_ct.ml[1,0+18])
             extra (test_ct.ml[1,0+4]..test_ct.ml[1,0+18]) ghost
               Texp_constraint
@@ -638,23 +644,24 @@ make sure we also handle that correctly in structures:
           pattern (test_ct.ml[3,20+4]..test_ct.ml[3,20+8])
             extra (test_ct.ml[3,20+4]..test_ct.ml[3,20+8]) ghost
               Tpat_extra_constraint
-              core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+21])
-                Ttyp_tuple
-                [
-                  Label: None
-                  core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+14])
-                    Ttyp_constr \"int!\"
-                    []
-                  Label: None
-                  core_type (test_ct.ml[3,20+17]..test_ct.ml[3,20+21])
-                    Ttyp_var _
-                    None
-                ]
+              Some
+                core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+21])
+                  Ttyp_tuple
+                  [
+                    Label: None
+                    core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+14])
+                      Ttyp_constr \"int!\"
+                      []
+                    Label: None
+                    core_type (test_ct.ml[3,20+17]..test_ct.ml[3,20+21])
+                      Ttyp_var _
+                      None
+                  ]
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo2\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode id(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,id(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+28])
             extra (test_ct.ml[3,20+4]..test_ct.ml[3,20+28]) ghost
               Texp_constraint
@@ -671,14 +678,16 @@ make sure we also handle that correctly in structures:
                     None
                 ]
             Texp_tuple
-            alloc_mode meet(local,once,nonportable,unforkable,yielding,stateful,regional_to_global_full . imply(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]));meet(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             [
               Label: None
                 expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+25])
                   Texp_constant Const_int 3
+              value
               Label: None
                 expression (test_ct.ml[3,20+27]..test_ct.ml[3,20+28])
                   Texp_constant Const_int 4
+              value
             ]
       ]
     structure_item (test_ct.ml[5,50+0]..test_ct.ml[5,50+27])
@@ -688,23 +697,24 @@ make sure we also handle that correctly in structures:
           pattern (test_ct.ml[5,50+4]..test_ct.ml[5,50+8])
             extra (test_ct.ml[5,50+4]..test_ct.ml[5,50+8]) ghost
               Tpat_extra_constraint
-              core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+20])
-                Ttyp_tuple
-                [
-                  Label: None
-                  core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+14])
-                    Ttyp_constr \"int!\"
-                    []
-                  Label: None
-                  core_type (test_ct.ml[5,50+17]..test_ct.ml[5,50+20])
-                    Ttyp_constr \"int!\"
-                    []
-                ]
+              Some
+                core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+20])
+                  Ttyp_tuple
+                  [
+                    Label: None
+                    core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+14])
+                      Ttyp_constr \"int!\"
+                      []
+                    Label: None
+                    core_type (test_ct.ml[5,50+17]..test_ct.ml[5,50+20])
+                      Ttyp_constr \"int!\"
+                      []
+                  ]
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo3\"
             sort value
-            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(unique,contended,immutable,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+27])
             extra (test_ct.ml[5,50+4]..test_ct.ml[5,50+27]) ghost
               Texp_constraint
@@ -721,14 +731,16 @@ make sure we also handle that correctly in structures:
                     []
                 ]
             Texp_tuple
-            alloc_mode global,once,nonportable,unforkable,yielding,stateful;meet(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             [
               Label: None
                 expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+24])
                   Texp_constant Const_int 3
+              value
               Label: None
                 expression (test_ct.ml[5,50+26]..test_ct.ml[5,50+27])
                   Texp_constant Const_int 4
+              value
             ]
       ]
   ]

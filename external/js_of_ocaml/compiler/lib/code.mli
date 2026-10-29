@@ -30,9 +30,8 @@ module Addr : sig
 
   val pred : t -> t
 
-  module Set : Set.S with type elt = t
-
-  module Map : Map.S with type key = t
+  module Set = Int_set
+  module Map = Int_trie
 
   module Hashtbl : Hashtbl.S with type key = t
 end
@@ -60,15 +59,24 @@ module Var : sig
 
   val get_name : t -> string option
 
-  val set_name : t -> string -> unit
+  val set_name : t -> ?generated:bool -> string -> unit
+
+  val generated_name : t -> bool
 
   val propagate_name : t -> t -> unit
+
+  val forget_generated_name : t -> unit
 
   val reset : unit -> unit
 
   val set_last : int -> unit
+  (** [set_last n] ensures that subsequent calls to [fresh] return indices
+      greater than [n]. *)
 
-  module Set : Set.S with type elt = t
+  val last : unit -> t
+  (** The last allocated variable. *)
+
+  module Set : Int_set.S with type elt = t
 
   module Map : Map.S with type key = t
 
@@ -114,9 +122,9 @@ end
 type cont = Addr.t * Var.t list
 
 type prim =
-  | Vectlength
+  | Vectlength of Optimization_hint.array_kind
   | Array_get
-  | Extern of string
+  | Extern of string * Optimization_hint.ccall option
   | Not
   | IsInt
   | Eq
@@ -151,9 +159,9 @@ type constant =
   | Int of Targetint.t
   | Int32 of Int32.t  (** Only produced when compiling to WebAssembly. *)
   | Int64 of Int64.t
-  | NativeInt of Int32.t  (** Only produced when compiling to WebAssembly. *)
+  | NativeInt of Targetnativeint.t
   | Tuple of int * constant array * array_or_not
-  | Null
+  | Null_
 
 module Constant : sig
   type t = constant
@@ -186,15 +194,31 @@ type field_type =
   | Non_float
   | Float
 
+type yielding_kind =
+  | Unyielding
+  | May_yield
+  | Unknown
+
 type expr =
   | Apply of
       { f : Var.t
       ; args : Var.t list
       ; exact : bool (* if true, then # of arguments = # of parameters *)
+      ; yielding : yielding_kind
+        (* if [Unyielding], the OCaml compiler has proven that this call cannot
+           perform an effect that would capture the current continuation
+           (see [Instruct.Event_unyielding_call]). It is thus safe to call
+           the direct-style version of the function even in CPS context.
+           [May_yield] is always a sound default. The flag applies only to this
+           call; it says nothing about the call's result (which may be a
+           closure that yields when later applied).
+           [Unknown] is used for calls emitted by passes that run after
+           [Partial_cps_analysis], which fails if it encounters [Unknown]. *)
       }
   | Block of int * Var.t array * array_or_not * mutability
   | Field of Var.t * int * field_type
-  | Closure of Var.t list * cont * Parse_info.t option
+  | Closure of
+      Var.t list * cont * (Optimization_hint.closure_hint option * Parse_info.t option)
   | Constant of constant
   | Prim of prim * prim_arg list
   | Special of special
@@ -229,12 +253,35 @@ type program =
   ; free_pc : Addr.t
   }
 
+(** A [program] in a form that can be marshaled. *)
+module Marshalable_program : sig
+  type t
+
+  val of_program : program -> t
+
+  val to_program : t -> program
+end
+
 type cmj_body =
-  { program : program
-  ; last_var : Addr.t
-  ; imported_compilation_units : Compilation_unit.t list
-  ; exported_compilation_unit : Compilation_unit.t
+  { program : Marshalable_program.t
+  ; last_var : int
+        (** Highest variable index used in [program]. [Var] keeps this in mutable
+            state, so the OxCaml JSIR backend must communicate it to
+            [js_of_ocaml] to keep the two in sync. *)
+  ; imported_compilation_units : string list
+        (** Full paths of the compilation units that must be linked, and
+            initialised, before [program]: those whose symbols it fetches from
+            the global symbol table, and those the OCaml source refers to.
+            Needed to fill in [Unit_info.t]. *)
+  ; exported_compilation_unit : string
+        (** Full path of the compilation unit [program] defines. Needed to fill
+            in [Unit_info.t]. *)
+  ; force_link : bool
+        (** Whether the unit was compiled with [-linkall], so must be linked
+            even if nothing requires it. Needed to fill in [Unit_info.t]. *)
   }
+(** Contents of a [.cmj] file produced by the OxCaml JSIR backend (after the
+    magic number), marshaled. *)
 
 module Print : sig
   type xinstr =
@@ -249,10 +296,9 @@ module Print : sig
 
   val instr : Format.formatter -> instr -> unit
 
-  val block :
-    Format.formatter -> (Addr.Map.key -> xinstr -> string) -> int -> block -> unit
+  val block : Format.formatter -> (Addr.t -> xinstr -> string) -> int -> block -> unit
 
-  val program : Format.formatter -> (Addr.Map.key -> xinstr -> string) -> program -> unit
+  val program : Format.formatter -> (Addr.t -> xinstr -> string) -> program -> unit
 
   val last : Format.formatter -> last -> unit
 
@@ -301,6 +347,8 @@ val fold_children : 'c fold_blocs
 val fold_children_skip_try_body : 'c fold_blocs
 
 val poptraps : block Addr.Map.t -> Addr.t -> Addr.Set.t
+
+val return_values : program -> Var.Set.t Var.Map.t
 
 val traverse :
   fold_blocs_poly -> (Addr.t -> 'c -> 'c) -> Addr.t -> block Addr.Map.t -> 'c -> 'c

@@ -155,8 +155,12 @@ let () =
   (* Check that compiler generated stubs are ignored with [@@@zero_alloc all] *)
   print_test "test_stub_dep.ml test_stub.ml";
   (* generates an indirect call. *)
-  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
-    ~extra_sources:[] ~exit_code:2 "t1";
+  print_test_expected_output ~cutoff:default_cutoff
+    ~extra_deps:[]
+      (* The indirect call is part of a stub, and it gets transformed to a
+         direct call when simplified. *)
+    ~extra_flags:"-no-flambda2-simplify-stubs" ~extra_sources:[] ~exit_code:2
+    "t1";
   (* deleting dead functions works *)
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:["test_warning199.mli"] ~exit_code:0 "test_warning199";
@@ -219,6 +223,17 @@ let () =
   print_cmi_target "stop_after_typing.ml";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:[] ~exit_code:2 "test_signatures_functors";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:0 "test_partial";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_partial_heap";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_partial_external_heap";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:[] ~exit_code:2 "test_partial_unboxable";
+  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
+    ~extra_sources:["test_partial_caller_lib.mli"; "test_partial_caller_lib.ml"]
+    ~exit_code:2 "test_partial_caller";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:[] ~exit_code:2 "test_signatures_first_class_modules";
   print_cmi_target "test_signatures_separate_a.ml";

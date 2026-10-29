@@ -39,13 +39,11 @@ module Int8 : sig
 
   val of_int_exn : int -> t
 
-  val unsigned_of_int_exn : int -> t
-
   val of_int64_exn : Int64.t -> t
 
-  val unsigned_of_int64_exn : Int64.t -> t
-
   val to_int : t -> int
+
+  val unsigned_to_int : t -> int
 
   val to_float : t -> float
 
@@ -65,13 +63,11 @@ module Int16 : sig
 
   val of_int_exn : int -> t
 
-  val unsigned_of_int_exn : int -> t
-
   val of_int64_exn : Int64.t -> t
 
-  val unsigned_of_int64_exn : Int64.t -> t
-
   val to_int : t -> int
+
+  val unsigned_to_int : t -> int
 
   val to_float : t -> float
 
@@ -144,11 +140,15 @@ module type Float_by_bit_pattern = sig
 
   include Container_types.S
 
+  (* Be careful when writing things like [create (Int64.to_float i)], as this is
+     a double-rounding bug in the float32 case. *)
   val create : float -> t
 
   val of_bits : bits -> t
 
   val to_bits : t -> bits
+
+  val of_int64 : int64 -> t
 
   val of_string : string -> t
 

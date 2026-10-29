@@ -333,8 +333,10 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
                      ~arms:
                        (Target_ocaml_int.Map.of_list
                           [ ( Target_ocaml_int.bool_true machine_width,
-                              condition_passed );
-                            Target_ocaml_int.bool_false machine_width, failure
+                              Switch_arm.from_apply_cont condition_passed );
+                            ( Target_ocaml_int.bool_false machine_width,
+                              Switch_arm.create
+                                ~annotations:Branch_annotations.cold failure )
                           ])))
           in
           Let_cont_with_acc.build_non_recursive acc condition_passed_cont
@@ -389,8 +391,10 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
           (Switch.create ~condition_dbg:dbg ~scrutinee:(Simple.var cond_result)
              ~arms:
                (Target_ocaml_int.Map.of_list
-                  [ Target_ocaml_int.bool_true machine_width, ifso_cont;
-                    Target_ocaml_int.bool_false machine_width, ifnot_cont ]))
+                  [ ( Target_ocaml_int.bool_true machine_width,
+                      Switch_arm.from_apply_cont ifso_cont );
+                    ( Target_ocaml_int.bool_false machine_width,
+                      Switch_arm.from_apply_cont ifnot_cont ) ]))
       in
       Let_with_acc.create acc
         (Bound_pattern.singleton cond_result_pat)
@@ -493,14 +497,14 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
     in
     bind_recs acc exn_cont ~register_const0 p dbg cont
 
-let convert_block_access_field_kind_from_value_kind
+let block_access_field_kind_of_value_kind
     ({ raw_kind; nullable = _ } : L.value_kind) : P.Block_access_field_kind.t =
   match raw_kind with
   | Pintval -> Immediate
   | Pvariant { consts = _; non_consts } -> (
     match non_consts with [] -> Immediate | _ :: _ -> Any_value)
   | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
-  | Pboxedvectorval _ ->
+  | Pboxedvectorval _ | Pboxedmaskval ->
     Any_value
 
 (* This function shouldn't be used directly since lambda mixed blocks with an
@@ -510,9 +514,9 @@ let mixed_block_access_field_kind
     P.Mixed_block_access_field_kind.t =
   match elt with
   | Value value_kind ->
-    Value_prefix (convert_block_access_field_kind_from_value_kind value_kind)
+    Value_prefix (block_access_field_kind_of_value_kind value_kind)
   | ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-    | Vec512 | Word | Untagged_immediate ) as mixed_block_element ->
+    | Vec512 | Mask | Word | Untagged_immediate ) as mixed_block_element ->
     Flat_suffix
       (K.Flat_suffix_element.from_singleton_mixed_block_element
          mixed_block_element)

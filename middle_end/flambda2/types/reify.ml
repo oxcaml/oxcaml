@@ -38,6 +38,7 @@ type to_lift =
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.t
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.t
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.t
   | Immutable_float32_array of { fields : Float32.t list }
   | Immutable_float_array of { fields : Float.t list }
   | Immutable_int_array of { fields : Target_ocaml_int.t list }
@@ -52,6 +53,7 @@ type to_lift =
       { fields : Vector_types.Vec256.Bit_pattern.t list }
   | Immutable_vec512_array of
       { fields : Vector_types.Vec512.Bit_pattern.t list }
+  | Immutable_mask_array of { fields : Vector_types.Mask.Bit_pattern.t list }
   | Immutable_value_array of { fields : Simple.t list }
   | Empty_array of Empty_array_kind.t
 
@@ -205,6 +207,14 @@ module Lift_array_of_naked_vec512s = Make_lift_array_of_naked_numbers (struct
   let prove = Provers.meet_naked_vec512s
 
   let build_to_lift ~fields = Immutable_vec512_array { fields }
+end)
+
+module Lift_array_of_naked_masks = Make_lift_array_of_naked_numbers (struct
+  module N = Vector_types.Mask.Bit_pattern
+
+  let prove = Provers.meet_naked_masks
+
+  let build_to_lift ~fields = Immutable_mask_array { fields }
 end)
 
 (* CR mshinwell: Think more to identify all the cases that should be in this
@@ -520,6 +530,13 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
       with
       | None -> try_canonical_simple ()
       | Some n -> Simple (Simple.const (Reg_width_const.naked_vec512 n)))
+    | Naked_mask (Ok ns) -> (
+      match
+        Vector_types.Mask.Bit_pattern.Set.get_singleton
+          (ns :> Vector_types.Mask.Bit_pattern.Set.t)
+      with
+      | None -> try_canonical_simple ()
+      | Some n -> Simple (Simple.const (Reg_width_const.naked_mask n)))
     (* CR-someday mshinwell: These could lift at toplevel when [ty_naked_float]
        is an alias type. That would require checking the alloc mode. *)
     | Value
@@ -629,6 +646,18 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     | Value
         (Ok
            { is_null = Not_null;
+             non_null = Ok (Boxed_mask (ty_naked_mask, _alloc_mode))
+           }) -> (
+      match Provers.meet_naked_masks env ty_naked_mask with
+      | Need_meet -> try_canonical_simple ()
+      | Invalid -> Invalid
+      | Known_result ns -> (
+        match Vector_types.Mask.Bit_pattern.Set.get_singleton ns with
+        | None -> try_canonical_simple ()
+        | Some n -> Lift (Boxed_mask n)))
+    | Value
+        (Ok
+           { is_null = Not_null;
              non_null =
                Ok
                  (Array
@@ -721,6 +750,8 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
             Lift_array_of_naked_vec256s.lift env ~fields ~try_canonical_simple
           | Naked_number Naked_vec512 ->
             Lift_array_of_naked_vec512s.lift env ~fields ~try_canonical_simple
+          | Naked_number Naked_mask ->
+            Lift_array_of_naked_masks.lift env ~fields ~try_canonical_simple
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Unexpected kind %a in immutable array case when reifying type:@ \
@@ -738,6 +769,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     | Naked_vec128 Bottom
     | Naked_vec256 Bottom
     | Naked_vec512 Bottom
+    | Naked_mask Bottom
     | Rec_info Bottom
     | Region Bottom ->
       Invalid
@@ -753,6 +785,7 @@ let reify ~allowed_if_free_vars_defined_in ~var_is_defined_at_toplevel
     | Naked_vec128 Unknown
     | Naked_vec256 Unknown
     | Naked_vec512 Unknown
+    | Naked_mask Unknown
     | Naked_nativeint Unknown
     | Rec_info Unknown
     | Region (Unknown | Ok _)

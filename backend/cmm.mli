@@ -25,6 +25,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Float32
   | Valx2
 
@@ -76,6 +77,8 @@ val typ_vec256 : machtype
 
 val typ_vec512 : machtype
 
+val typ_mask : machtype
+
 val typ_int128 : machtype
 
 (** Least upper bound of two [machtype_component]s. *)
@@ -99,6 +102,10 @@ type exttype =
   | XVec128  (**r 128-bit vector *)
   | XVec256  (**r 256-bit vector *)
   | XVec512  (**r 512-bit vector *)
+  | XDummy_int  (**r uses up an int register, passes nothing *)
+  | XDummy_float  (**r uses up a float register, passes nothing *)
+
+val is_dummy_exttype : exttype -> bool
 
 val machtype_of_exttype : exttype -> machtype
 
@@ -191,6 +198,31 @@ type coeffects =
   | No_coeffects
   | Has_coeffects
 
+type is_global =
+  | Global
+  | Local
+
+val equal_is_global : is_global -> is_global -> bool
+
+(* Symbols are marked with whether they are local or global, at both definition
+   and use sites.
+
+   Symbols defined as [Local] may only be referenced within the same file, and
+   all such references must also be [Local].
+
+   Symbols defined as [Global] may be referenced from other files. References
+   from other files must be [Global], but references from the same file may be
+   [Local].
+
+   (Marking symbols in this way speeds up linking, as many references can then
+   be resolved early) *)
+type symbol =
+  { sym_name : string;
+    sym_global : is_global
+  }
+
+val equal_symbol : symbol -> symbol -> bool
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -199,7 +231,7 @@ type phantom_defining_expr =
       (** The phantom-let-bound variable is a constant integer. The argument
           must be the tagged representation of an integer within the range of
           type [int] on the target. (Analogously to [Cconst_int].) *)
-  | Cphantom_const_symbol of string
+  | Cphantom_const_symbol of symbol
       (** The phantom-let-bound variable is an alias for a symbol. *)
   | Cphantom_var of Backend_var.t
       (** The phantom-let-bound variable is an alias for another variable. The
@@ -218,7 +250,7 @@ type phantom_defining_expr =
           number of words to the pointer contained in the given identifier, then
           dereferencing. *)
   | Cphantom_read_symbol_field of
-      { sym : string;
+      { sym : symbol;
         field : int
       }
       (** As for [Uphantom_read_var_field], but with the pointer specified by a
@@ -295,6 +327,7 @@ type memory_chunk =
     (* 64-bit integer whose accesses do not follow OCaml alignment (e.g.
        [Bytes.set_int64], [Bigarray] int64); must not use ordered
        (release/acquire) accesses, which require natural alignment on Arm. *)
+  | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)
@@ -322,6 +355,8 @@ type reinterpret_cast =
   | Int64_of_float
   | Float32_of_int32
   | Int32_of_float32
+  | Mask_of_int64
+  | Int64_of_mask
   (* When reinterpreting a smaller vector as a larger vector, the upper bits are
      unspecified. *)
   | V128_of_vec of vector_width
@@ -364,6 +399,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128
   | Alloc_block_kind_vec256
   | Alloc_block_kind_vec512
+  | Alloc_block_kind_mask
   | Alloc_block_kind_boxed_int of Primitive.boxed_integer
   | Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array
@@ -375,6 +411,7 @@ type alloc_block_kind =
   | Alloc_block_kind_vec128_u_array
   | Alloc_block_kind_vec256_u_array
   | Alloc_block_kind_vec512_u_array
+  | Alloc_block_kind_mask_u_array
 
 val equal_alloc_block_kind : alloc_block_kind -> alloc_block_kind -> bool
 
@@ -394,31 +431,6 @@ val equal_alloc_dbginfo_item : alloc_dbginfo_item -> alloc_dbginfo_item -> bool
 type alloc_dbginfo = alloc_dbginfo_item list
 
 val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
-
-type is_global =
-  | Global
-  | Local
-
-val equal_is_global : is_global -> is_global -> bool
-
-(* Symbols are marked with whether they are local or global, at both definition
-   and use sites.
-
-   Symbols defined as [Local] may only be referenced within the same file, and
-   all such references must also be [Local].
-
-   Symbols defined as [Global] may be referenced from other files. References
-   from other files must be [Global], but references from the same file may be
-   [Local].
-
-   (Marking symbols in this way speeds up linking, as many references can then
-   be resolved early) *)
-type symbol =
-  { sym_name : string;
-    sym_global : is_global
-  }
-
-val equal_symbol : symbol -> symbol -> bool
 
 type operation =
   | Capply of
@@ -453,14 +465,15 @@ type operation =
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
-  | Cdivi
-  | Cmodi
+  | Cdivi of { signed : bool }
+  | Cmodi of { signed : bool }
   | Caddi128
   | Csubi128
   | Cmuli64 of { signed : bool }
   | Cand
   | Cor
   | Cxor
+  | Cnot
   | Clsl
   | Clsr
   | Casr
@@ -561,23 +574,30 @@ and expression =
   | Cconst_vec128 of vec128_bits * Debuginfo.t
   | Cconst_vec256 of vec256_bits * Debuginfo.t
   | Cconst_vec512 of vec512_bits * Debuginfo.t
+  | Cconst_mask of int64 * Debuginfo.t
   | Cconst_symbol of symbol * Debuginfo.t
   | Cvar of Backend_var.t
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
+  | Cname_for_debugger of Backend_var.With_provenance.t * expression
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
   | Cifthenelse of
       expression
       * Debuginfo.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
+      * Branch_annotations.t
       * expression
       * Debuginfo.t
   | Cswitch of
-      expression * int array * (expression * Debuginfo.t) array * Debuginfo.t
+      expression
+      * int array
+      * (expression * Debuginfo.t * Branch_annotations.t) array
+      * Debuginfo.t
   | Ccatch of ccatch_flag * static_handler list * expression
   | Cexit of exit_label * expression list * trap_action list
   | Cinvalid of
@@ -682,8 +702,9 @@ val map_tail : (expression -> expression) -> expression -> expression
 (** Apply the callback to each immediate sub-expression. *)
 val iter_shallow : (expression -> unit) -> expression -> unit
 
-(** Apply the transformation to each immediate sub-expression. *)
-val map_shallow : (expression -> expression) -> expression -> expression
+(** Whether an expression contains constructs that only arise from debugging
+    information ([Cphantom_let] and [Cname_for_debugger]). *)
+val contains_debug_only_constructs : expression -> bool
 
 val compare_machtype_component : machtype_component -> machtype_component -> int
 

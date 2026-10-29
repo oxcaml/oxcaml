@@ -276,8 +276,6 @@ let print_out_value ppf tree =
        fprintf ppf "@[<2>[|%a|]@]"
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
          (Float.Array.to_seq arr)
-    | Oval_code e ->
-        deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -494,6 +492,10 @@ and print_simple_out_type ppf =
   | Otyp_attribute (t, attr) ->
       fprintf ppf "@[<1>(%a [@@%s])@]"
         print_out_type_0 t attr.oattr_name
+  | Otyp_mod (t, []) -> print_simple_out_type ppf t
+  | Otyp_mod (t, modalities) ->
+      fprintf ppf "@[<1>(%a%a)@]"
+        print_out_type_0 t print_out_modalities modalities
   | Otyp_jkind_annot (t, jk) ->
     fprintf ppf "@[<1>(%a@ :@ %a)@]"
       print_out_type_0 t
@@ -616,8 +618,15 @@ and print_out_jkind_const ppf ojkind =
     let base, withs = strip_withs ojkind in
     (match base with
     | Ojkind_const_default -> fprintf ppf "_"
-    | Ojkind_const_abbreviation (abbrev, sa) ->
-      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (abbrev :: sa)
+    | Ojkind_const_abbreviation (abbrev, operators) ->
+      (* A multi-word abbreviation (e.g. "bits64 mod everything") must be
+         parenthesized before postfix operators *)
+      let abbrev =
+        if operators <> [] && String.contains abbrev ' '
+        then "(" ^ abbrev ^ ")"
+        else abbrev
+      in
+      pp_print_string ppf (String.concat " " (abbrev :: operators))
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with
@@ -653,11 +662,16 @@ and print_out_jkind ppf ojkind =
   let rec pp_element ~nested ppf ojkind =
     match ojkind with
     | Ojkind_var (v, nts) ->
-      (pp_print_list ~pp_sep:pp_print_space pp_print_string) ppf (v :: nts)
+      pp_print_string ppf (String.concat " " (v :: nts))
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_addressable t ->
+      fprintf ppf "%a addressable" (pp_element ~nested:true) t
+    | Ojkind_box (t, axes) ->
+      fprintf ppf "%a %s" (pp_element ~nested:true) t
+        (String.concat " " ("box" :: axes))
   in
   pp_element ~nested:false ppf ojkind
 
@@ -807,7 +821,7 @@ let constructor_of_extension_constructor
     ocstr_name = ext.oext_name;
     ocstr_args = ext.oext_args;
     ocstr_return_type = ext.oext_ret_type;
-    ocstr_all_void = false;
+    ocstr_immediate_all_void = false;
   }
 
 let rec print_out_module_type ppf = function
@@ -945,8 +959,9 @@ and print_out_sig_item ppf =
            | Orec_next  -> "and")
           ppf td
   | Osig_value { oval_name; oval_type; oval_modalities;
-                 oval_prims; oval_attributes } ->
+                 oval_prims; oval_attributes; oval_poly } ->
       let kwd = if oval_prims = [] then "val" else "external" in
+      let poly = if oval_poly then "poly_ " else "" in
       let pr_prims ppf =
         function
           [] -> ()
@@ -954,7 +969,7 @@ and print_out_sig_item ppf =
             fprintf ppf "@ = \"%s\"" s;
             List.iter (fun s -> fprintf ppf "@ \"%s\"" s) sl
       in
-      fprintf ppf "@[<2>%s %a :@ %a%a%a%a@]" kwd value_ident oval_name
+      fprintf ppf "@[<2>%s %s%a :@ %a%a%a%a@]" kwd poly value_ident oval_name
         !out_type oval_type
         print_out_modalities oval_modalities
         pr_prims oval_prims
@@ -1060,7 +1075,7 @@ and print_out_constr ppf constr =
     ocstr_name = name;
     ocstr_args = tyl;
     ocstr_return_type = return_type;
-    ocstr_all_void;
+    ocstr_immediate_all_void;
   } = constr in
   let name =
     match name with
@@ -1068,7 +1083,7 @@ and print_out_constr ppf constr =
     | s -> s
   in
   let print_all_void ppf =
-    if ocstr_all_void
+    if ocstr_immediate_all_void
     then pp_print_string ppf " [@immediate_all_void_constructor]"
   in
   match return_type with

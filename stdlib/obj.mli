@@ -1,4 +1,3 @@
-# 2 "obj.mli"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -93,6 +92,9 @@ external add_offset : t -> Int32.t -> t = "caml_obj_add_offset"
          (* @since 3.12 *)
 external with_tag : int -> t -> t = "caml_obj_with_tag"
   (* @since 4.09 *)
+
+val hash_variant: string -> int
+  (* @since 5.6 *)
 
 val first_non_constant_constructor_tag : int
 val last_non_constant_constructor_tag : int

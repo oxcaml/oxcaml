@@ -39,29 +39,6 @@ let align_up64 value alignment =
   let mask = Int64.sub alignment 1L in
   Int64.logand (Int64.add value mask) (Int64.lognot mask)
 
-module Symbol_entry = struct
-  type t =
-    { name : string;
-      st_info : int;
-      st_other : int;
-      st_shndx : int;
-      st_value : int64;
-      st_size : int64
-    }
-
-  let name s = s.name
-
-  let st_info s = s.st_info
-
-  let st_other s = s.st_other
-
-  let st_shndx s = s.st_shndx
-
-  let st_value s = s.st_value
-
-  let st_size s = s.st_size
-end
-
 module Section_layout = struct
   type t =
     { offset : int64;
@@ -112,16 +89,18 @@ end
 module Rewritten_rela_section = struct
   type t =
     { section_offset : int64; (* Original file offset of this section *)
-      entries : Rela.rela_entry list
+      changed_entries : (int * Rela.rela_entry) list
+          (* Rewritten entries with their index within the section; entries not
+             listed are unchanged. *)
     }
 
   let section_offset t = t.section_offset
 
-  let entries t = t.entries
+  let changed_entries t = t.changed_entries
 end
 
 type t =
-  { original_symbols : Symbol_entry.t array;
+  { original_symbols : Elf.symbol array;
     symbol_to_index : int String.Tbl.t;
     total_symbols : int;
     rewritten_rela_sections : Rewritten_rela_section.t list;
@@ -200,20 +179,11 @@ let symtab_shndx_name_offset t = t.symtab_shndx_name_offset
 
 let layout t = t.layout
 
-let read_symbols ~symtab_body ~strtab_body =
-  let symbols = ref [] in
-  Elf.iter_symbols ~symtab_body ~strtab_body
-    ~f:(fun ~name ~st_info ~st_other ~st_shndx ~st_value ~st_size ->
-      symbols
-        := { Symbol_entry.name; st_info; st_other; st_shndx; st_value; st_size }
-           :: !symbols);
-  Array.of_list (List.rev !symbols)
-
 let build_symbol_index_map ~original_symbols ~igot_and_iplt strtab =
   let symbol_to_index = String.Tbl.create 256 in
   Array.iteri
-    (fun index sym ->
-      let name = Symbol_entry.name sym in
+    (fun index (sym : Elf.symbol) ->
+      let name = sym.name in
       if not (String.Tbl.mem symbol_to_index name)
       then String.Tbl.add symbol_to_index name index;
       ignore (Strtab.add strtab name))
@@ -248,22 +218,22 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
         Build_igot_and_iplt.iplt_symbol_for_plt_reloc igot_and_iplt entry
       with
       | Some sym ->
-        let orig_sym = Extract_relocations.Relocation_entry.symbol_name entry in
+        let orig_sym = Relocatable_symbol_name.to_string entry in
         if not (String.Tbl.mem plt_map orig_sym)
         then String.Tbl.add plt_map orig_sym sym
       | None -> ())
-    (Extract_relocations.convert_to_plt relocations);
+    (Extract_relocations.plt_symbols relocations);
   List.iter
     (fun entry ->
       match
         Build_igot_and_iplt.igot_symbol_for_got_reloc igot_and_iplt entry
       with
       | Some sym ->
-        let orig_sym = Extract_relocations.Relocation_entry.symbol_name entry in
+        let orig_sym = Relocatable_symbol_name.to_string entry in
         if not (String.Tbl.mem got_map orig_sym)
         then String.Tbl.add got_map orig_sym sym
       | None -> ())
-    (Extract_relocations.convert_to_got relocations);
+    (Extract_relocations.got_symbols relocations);
   plt_map, got_map
 
 (* Rewrite a single .rela.text* section. Looks up each relocation's target
@@ -271,48 +241,51 @@ let build_symbol_rewrite_map ~igot_and_iplt ~relocations =
    the synthetic IPLT/IGOT symbols.
 
    - PLT32: function calls -> PC32 to IPLT entry - GOTPCRELX: GOT references ->
-   PC32 to IGOT entry *)
-let rewrite_rela_section ~rela_body ~symtab_body ~strtab_body ~symbol_to_index
-    ~plt_rewrite_map ~got_rewrite_map =
-  let entries = ref [] in
-  Rela.iter_rela_entries ~rela_body ~f:(fun entry ->
-      let new_entry =
-        (* Look up the original symbol name for this relocation *)
-        let sym_name_opt =
-          Rela.read_symbol_name ~symtab_body ~strtab_body ~sym_index:entry.r_sym
+   PC32 to IGOT entry
+
+   Only the changed entries are returned, with their index within the section.
+   The resulting list is in reverse section order, which is fine: each changed
+   entry is written back at the offset determined by its index, so the order of
+   the list does not affect the output. *)
+let rewrite_rela_section ~rela_body ~symbols ~symbol_to_index ~plt_rewrite_map
+    ~got_rewrite_map =
+  (* CR sspies: Consider folding over the rela entries instead of accumulating
+     the changed entries through a ref. See #6447. *)
+  let changed_entries = ref [] in
+  Rela.iteri_rela_entries ~rela_body ~f:(fun ~index entry ->
+      (* Look up the original symbol for this relocation *)
+      match Elf.symbol_table_lookup symbols ~sym_index:entry.r_sym with
+      | None -> ()
+      | Some sym -> (
+        let sym_name = sym.Elf.name in
+        (* Check if this relocation type/symbol should be rewritten *)
+        let rewrite_to =
+          match entry.r_type with
+          | rt when Rela.Reloc_type.equal rt Rela.Reloc_type.plt32 ->
+            String.Tbl.find_opt plt_rewrite_map sym_name
+          | rt when Rela.Reloc_type.equal rt Rela.Reloc_type.rex_gotpcrelx ->
+            String.Tbl.find_opt got_rewrite_map sym_name
+          | _ -> None
         in
-        match sym_name_opt with
-        | None -> entry
-        | Some sym_name -> (
-          (* Check if this relocation type/symbol should be rewritten *)
-          let rewrite_to =
-            if Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.plt32
-            then String.Tbl.find_opt plt_rewrite_map sym_name
-            else if
-              Rela.Reloc_type.equal entry.r_type Rela.Reloc_type.rex_gotpcrelx
-            then String.Tbl.find_opt got_rewrite_map sym_name
-            else None
-          in
-          match rewrite_to with
-          | Some new_sym_name -> (
-            match String.Tbl.find_opt symbol_to_index new_sym_name with
-            | Some idx ->
-              log_verbose "  rewrite reloc at 0x%Lx: %s %s -> PC32 to %s"
-                entry.r_offset
-                (Rela.Reloc_type.name entry.r_type)
-                sym_name new_sym_name;
+        match rewrite_to with
+        | Some new_sym_name -> (
+          match String.Tbl.find_opt symbol_to_index new_sym_name with
+          | Some idx ->
+            log_verbose "  rewrite reloc at 0x%Lx: %s %s -> PC32 to %s"
+              entry.r_offset
+              (Rela.Reloc_type.name entry.r_type)
+              sym_name new_sym_name;
+            let new_entry =
               { entry with r_sym = idx; r_type = Rela.Reloc_type.pc32 }
-            | None ->
-              log_verbose
-                "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
-                entry.r_offset
-                (Rela.Reloc_type.name entry.r_type)
-                new_sym_name;
-              entry)
-          | None -> entry)
-      in
-      entries := new_entry :: !entries);
-  List.rev !entries
+            in
+            changed_entries := (index, new_entry) :: !changed_entries
+          | None ->
+            log_verbose "  rewrite reloc at 0x%Lx: %s -> %s NOT FOUND in symtab"
+              entry.r_offset
+              (Rela.Reloc_type.name entry.r_type)
+              new_sym_name)
+        | None -> ()));
+  !changed_entries
 
 (* Each entry in SYMTAB_SHNDX is 4 bytes (Elf64_Word) *)
 let symtab_shndx_entry_size = 4
@@ -335,13 +308,13 @@ let compute_file_layout ~original_data_end ~igot_and_iplt ~total_symbols
   let iplt_t = Build_igot_and_iplt.iplt igot_and_iplt in
   let igot = alloc 16 (Igot.section_size igot_t) in
   let rela_igot =
-    let count = List.length (Igot.relocations igot_t) in
-    alloc 8 (count * Rela.rela_entry_size)
+    (* One relocation per IGOT entry *)
+    alloc 8 (Igot.num_entries igot_t * Rela.rela_entry_size)
   in
   let iplt = alloc 16 (Iplt.section_size iplt_t) in
   let rela_iplt =
-    let count = List.length (Iplt.relocations iplt_t) in
-    alloc 8 (count * Rela.rela_entry_size)
+    (* One relocation per IPLT entry *)
+    alloc 8 (Iplt.num_entries iplt_t * Rela.rela_entry_size)
   in
   let symtab = alloc 8 (total_symbols * Rela.sym_entry_size) in
   (* Allocate SYMTAB_SHNDX section if input has one *)
@@ -399,11 +372,11 @@ let rename_section ~(partition_kind : Partition.kind) name =
 (* [rela_text_sections] is a list of (section, body) pairs for all .rela.text*
    sections in the input file. Each section's relocations will be rewritten to
    use the synthetic IGOT/IPLT symbols. *)
-let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
-    ~partition_kind ~igot_and_iplt ~relocations =
+let compute ~header ~sections ~symbols ~rela_text_sections ~partition_kind
+    ~igot_and_iplt ~relocations =
   log_verbose "forming rewrite plan for partition %s"
     (Partition.symbol_prefix partition_kind);
-  let original_symbols = read_symbols ~symtab_body ~strtab_body in
+  let original_symbols = symbols in
   let strtab = Strtab.create () in
   let symbol_to_index, total_symbols =
     build_symbol_index_map ~original_symbols ~igot_and_iplt strtab
@@ -416,12 +389,12 @@ let compute ~header ~sections ~symtab_body ~strtab_body ~rela_text_sections
     List.map
       (fun (section, rela_body) ->
         log_verbose "  rewriting section %s" section.Elf.sh_name_str;
-        let entries =
-          rewrite_rela_section ~rela_body ~symtab_body ~strtab_body
+        let changed_entries =
+          rewrite_rela_section ~rela_body ~symbols:original_symbols
             ~symbol_to_index ~plt_rewrite_map ~got_rewrite_map
         in
         { Rewritten_rela_section.section_offset = section.Elf.sh_offset;
-          entries
+          changed_entries
         })
       rela_text_sections
   in

@@ -32,6 +32,31 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
+(** A compilation unit translated to JSIR. *)
+type jsir_program =
+  { program : Jsoo_imports.Code.program;
+    imported_compilation_units : Compilation_unit.Set.t
+        (** The compilation units whose toplevel module block or symbols
+            [program] reads from js_of_ocaml's symbol tables. *)
+  }
+
+module type Flambda2 = sig
+  val lambda_to_cmm :
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    machine_width:Target_system.Machine_width.t ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    Cmm.phrase list
+
+  val lambda_to_jsir :
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    keep_symbol_tables:bool ->
+    Lambda.program ->
+    jsir_program
+end
+
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular
       string append, and removed by Filename.strip_extension *)
@@ -64,7 +89,7 @@ module type Backend = sig
 
   val link :
     Linkenv.t ->
-    string list ->
+    Linkenv.objfile_to_link list ->
     string ->
     cached_genfns_imports:Generic_fns.Partition.Set.t ->
     genfns:Generic_fns.Tbl.t ->

@@ -78,6 +78,8 @@
   local_store
   config
   build_path_prefix_map
+  with_backtracking_intf
+  with_backtracking
   misc
   format_doc
   target_system
@@ -114,6 +116,7 @@
   ident
   path
   unit_info
+  current_unit
   shape
   shape_reduce
   allowance
@@ -137,6 +140,7 @@
   value_rec_types
   btype
   lazy_backtrack
+  hash_consed
   type_shape
   zero_alloc_utils
   diffing
@@ -148,6 +152,8 @@
   datarepr
   cmi_format
   persistent_env
+  typing_recovery
+  typing_recovery_state
   env
   jkind
   ikind
@@ -158,6 +164,8 @@
   printtyp
   errortrace_report
   includecore
+  tast_mapper
+  tast_iterator
   typedecl_properties
   typedecl_separability
   typedecl_variance
@@ -184,6 +192,7 @@
   outcometree
   cmo_format
   cmxs_format
+  cmt_format
   debug_event
   compilation_unit
   import_info
@@ -223,6 +232,10 @@
 (copy_files ../../utils/config.ml)
 
 (copy_files ../../utils/build_path_prefix_map.ml)
+
+(copy_files ../../utils/with_backtracking_intf.ml)
+
+(copy_files ../../utils/with_backtracking.ml)
 
 (copy_files ../../utils/misc.ml)
 
@@ -267,6 +280,8 @@
 (copy_files ../../utils/linkage_name.ml)
 
 (copy_files ../../utils/lazy_backtrack.ml)
+
+(copy_files ../../utils/hash_consed.ml)
 
 (copy_files ../../utils/zero_alloc_utils.ml)
 
@@ -389,6 +404,8 @@
 
 (copy_files ../../typing/persistent_env.ml)
 
+(copy_files ../../typing/current_unit.ml)
+
 (copy_files ../../typing/env.ml)
 
 (copy_files ../../lambda/debuginfo.ml)
@@ -428,6 +445,8 @@
 (copy_files ../../utils/config.mli)
 
 (copy_files ../../utils/build_path_prefix_map.mli)
+
+(copy_files ../../utils/with_backtracking.mli)
 
 (copy_files ../../utils/misc.mli)
 
@@ -470,6 +489,8 @@
 (copy_files ../../utils/linkage_name.mli)
 
 (copy_files ../../utils/lazy_backtrack.mli)
+
+(copy_files ../../utils/hash_consed.mli)
 
 (copy_files ../../utils/zero_alloc_utils.mli)
 
@@ -589,6 +610,8 @@
 
 (copy_files ../../typing/persistent_env.mli)
 
+(copy_files ../../typing/current_unit.mli)
+
 (copy_files ../../typing/env.mli)
 
 (copy_files ../../lambda/debuginfo.mli)
@@ -616,6 +639,28 @@
 (copy_files ../../bytecomp/symtable.mli)
 
 (copy_files ../../bytecomp/debug_event.mli)
+
+; Typing recovery
+
+(copy_files ../../typing/tast_mapper.ml)
+
+(copy_files ../../typing/tast_iterator.ml)
+
+(copy_files ../../file_formats/cmt_format.ml)
+
+(copy_files ../../typing/typing_recovery_state.ml)
+
+(copy_files ../../typing/typing_recovery.ml)
+
+(copy_files ../../typing/tast_mapper.mli)
+
+(copy_files ../../typing/tast_iterator.mli)
+
+(copy_files ../../file_formats/cmt_format.mli)
+
+(copy_files ../../typing/typing_recovery_state.mli)
+
+(copy_files ../../typing/typing_recovery.mli)
 
 ; .mli-only:
 
@@ -692,6 +737,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Build_path_prefix_map.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Config.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Format_doc.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking_intf.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__With_backtracking.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Misc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Target_system.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Arg_helper.cmo
@@ -720,6 +767,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printast.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Syntaxerr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lazy_backtrack.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Hash_consed.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc_utils.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing_with_keys.cmo
@@ -740,6 +788,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
@@ -760,6 +809,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
@@ -773,6 +823,11 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace_report.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Includecore.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedtree.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape_reduce.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Tast_mapper.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Tast_iterator.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmt_format.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typing_recovery_state.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Slambdaident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lambda.cmo
@@ -825,6 +880,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Build_path_prefix_map.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Config.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Format_doc.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking_intf.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__With_backtracking.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Misc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Target_system.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Arg_helper.cmx
@@ -851,6 +908,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lexer.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Path.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lazy_backtrack.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Hash_consed.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc_utils.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing_with_keys.cmx
@@ -873,6 +931,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
@@ -893,6 +952,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
@@ -906,6 +966,11 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace_report.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Includecore.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedtree.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape_reduce.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Tast_mapper.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Tast_iterator.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmt_format.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typing_recovery_state.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Slambdaident.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lambda.cmx

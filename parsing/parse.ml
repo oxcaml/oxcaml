@@ -107,6 +107,8 @@ let constr_ident= wrap Parser.parse_constr_longident
 let extended_module_path = wrap Parser.parse_mod_ext_longident
 let simple_module_path = wrap Parser.parse_mod_longident
 let type_ident = wrap Parser.parse_mty_longident
+let unprefixed_compilation_unit =
+  wrap Parser.parse_unprefixed_compilation_unit
 
 (* Error reporting for Syntaxerr *)
 (* The code has been moved here so that one can reuse Pprintast.tyvar *)
@@ -207,8 +209,9 @@ let prepare_error err =
          Style.inline_code "let mutable f = fun x -> .."
   | Block_access_bad_paren loc ->
       Location.errorf ~loc
-        "Syntax error: A parenthesis here can only follow %a or %a."
+        "Syntax error: A parenthesis here can only follow %a, %a, or %a."
         Style.inline_code ".idx_imm" Style.inline_code ".idx_mut"
+        Style.inline_code ".idx_atomic"
 
 let () =
   Location.register_error_of_exn

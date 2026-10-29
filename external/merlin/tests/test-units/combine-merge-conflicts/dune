@@ -1,0 +1,12 @@
+; Tests for scripts/combine-merge-conflicts.py
+
+(rule
+ (target combine-merge-conflicts)
+ (deps ../../../scripts/combine-merge-conflicts.py)
+ (action (copy %{deps} %{target})))
+
+(env (_ (binaries combine-merge-conflicts)))
+
+(cram
+ (applies_to :whole_subtree)
+ (deps %{bin:combine-merge-conflicts}))

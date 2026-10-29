@@ -1601,6 +1601,11 @@ module Metadata : sig
   (* CR-someday gyorsh: propagate assert of arbitrary expressions. *)
   val assume_value :
     Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
+
+  (* Redundantly ignore assumptions in which we haven't lost any information, so
+     we can check the soundness of the `zero_alloc` system itself. *)
+  val assume_value_unless_inferred :
+    Debuginfo.t -> Witnesses.t -> Value.t option
 end = struct
   (* CR gyorsh: The return type of [Assume_info.get_value] is
      [Assume_info.Value.t]. It is not the same as [Zero_alloc_checker.Value.t],
@@ -1624,6 +1629,12 @@ end = struct
       let v = transl w v in
       let v = if can_raise then v else { v with exn = V.bot } in
       Some v
+
+  let assume_value_unless_inferred dbg w =
+    if
+      Zero_alloc_utils.Assume_info.is_inferred (Debuginfo.assume_zero_alloc dbg)
+    then None
+    else assume_value dbg ~can_raise:false w
 end
 
 module Report : sig
@@ -1736,6 +1747,7 @@ end = struct
       | Alloc_block_kind_vec128 -> pp "vec128"
       | Alloc_block_kind_vec256 -> pp "vec256"
       | Alloc_block_kind_vec512 -> pp "vec512"
+      | Alloc_block_kind_mask -> pp "mask"
       | Alloc_block_kind_boxed_int bi ->
         pp
           (match bi with
@@ -1752,6 +1764,7 @@ end = struct
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
       | Alloc_block_kind_vec256_u_array -> pp "unboxed_vec256_array"
       | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
+      | Alloc_block_kind_mask_u_array -> pp "unboxed_mask_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let aloc = Debuginfo.to_location item.alloc_dbg in
@@ -2336,7 +2349,7 @@ end = struct
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
-      match Metadata.assume_value dbg ~can_raise:false w with
+      match Metadata.assume_value_unless_inferred dbg w with
       | Some v -> v
       | None ->
         (* Conservatively assume that operation can return normally. *)
@@ -2622,24 +2635,31 @@ end = struct
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Floatop _
+        | Const_mask _ | Floatop _
         | Intop_imm
-            ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-              | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
+            ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz
+              | Icomp _ ),
               _ )
         | Intop
-            ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ )
+            ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+            | Ilsl | Ilsr | Iasr | Ipopcnt | Inot | Iclz | Ictz | Icomp _ )
         | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
-            | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ )
+            | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
+            | V512_of_vec _ )
         | Static_cast _ | Csel _ ->
           if not (Operation.is_pure op)
           then
             Misc.fatal_errorf "Expected pure operation, got %a\n" Operation.dump
               op;
+          next
+        | Load { is_atomic; _ } ->
+          if (not is_atomic) && not (Operation.is_pure op)
+          then
+            Misc.fatal_errorf "Expected pure operation, got non-atomic load\n";
           next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
@@ -2654,7 +2674,7 @@ end = struct
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
-            match Metadata.assume_value dbg ~can_raise:false w with
+            match Metadata.assume_value_unless_inferred dbg w with
             | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in

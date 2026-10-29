@@ -553,6 +553,67 @@ module Map_specs (V : Value) = struct
       (m |> Map.to_seq |> List.of_seq)
       (m |> Map.bindings)
 
+  let iterator_to_list it =
+    let rec aux it acc =
+      match Map.Mutable_iterator.current it with
+      | None -> List.rev acc
+      | Some (key, datum) ->
+        Map.Mutable_iterator.advance it;
+        aux it ((key, datum) :: acc)
+    in
+    aux it []
+
+  let bindings_vs_iterator m =
+    let it = Map.Mutable_iterator.create () in
+    Map.Mutable_iterator.init it m;
+    List.equal equal_bindings (m |> Map.bindings) (iterator_to_list it)
+
+  let split_vs_seek m k =
+    let it = Map.Mutable_iterator.create () in
+    Map.Mutable_iterator.init it m;
+    Map.Mutable_iterator.seek it k;
+    let exact_iterator =
+      match Map.Mutable_iterator.current it with
+      | Some (key, datum) when key = k ->
+        Map.Mutable_iterator.advance it;
+        Some datum
+      | _ -> None
+    in
+    let _, exact, after = Map.split k m in
+    Option.equal V.equal exact exact_iterator
+    && List.equal equal_bindings (after |> Map.bindings) (iterator_to_list it)
+
+  let iterator_reuse m1 m2 k =
+    let it = Map.Mutable_iterator.create () in
+    Map.Mutable_iterator.advance it;
+    Map.Mutable_iterator.seek it Int.max_int;
+    let initially_empty = Option.is_none (Map.Mutable_iterator.current it) in
+    Map.Mutable_iterator.init it m1;
+    Map.Mutable_iterator.seek it k;
+    let position = Map.Mutable_iterator.current it in
+    Map.Mutable_iterator.seek it Int.min_int;
+    let backwards_noop =
+      Option.equal equal_bindings position (Map.Mutable_iterator.current it)
+    in
+    Map.Mutable_iterator.init it m2;
+    let reused =
+      List.equal equal_bindings (Map.bindings m2) (iterator_to_list it)
+    in
+    Map.Mutable_iterator.init it Map.empty;
+    Map.Mutable_iterator.advance it;
+    let reset_empty = Option.is_none (Map.Mutable_iterator.current it) in
+    Map.Mutable_iterator.init it m1;
+    initially_empty && backwards_noop && reused && reset_empty
+    && List.equal equal_bindings (Map.bindings m1) (iterator_to_list it)
+
+  let iterator_full_depth value =
+    let keys =
+      0 :: Int.min_int :: Int.max_int
+      :: List.init (Sys.int_size - 1) (fun bit -> Int.min_int lor (1 lsl bit))
+    in
+    let m = Map.of_list (List.map (fun key -> key, value) keys) in
+    bindings_vs_iterator m && List.for_all (split_vs_seek m) keys
+
   let of_list_valid l = Map.valid (Map.of_list l)
 
   module Equality_on_bindings = struct
@@ -1210,6 +1271,10 @@ let () =
     c "filter_map_sharing vs. filter_map" filter_map_sharing_vs_filter_map
       [key_and_value_to_value_option; map];
     c "filter_map_sharing of id" filter_map_sharing_id [map];
+    c "bindings_vs_iterator" bindings_vs_iterator [map];
+    c "split_vs_seek" split_vs_seek [map; key];
+    c "iterator reset, reuse and backwards seek" iterator_reuse [map; map; key];
+    c ~n:1 "iterator full-depth signed stack" iterator_full_depth [value];
     ()
   in
   let () =

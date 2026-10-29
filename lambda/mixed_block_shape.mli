@@ -46,6 +46,7 @@ module Singleton_mixed_block_element : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -66,15 +67,31 @@ val flat_suffix : 'a t -> 'a Singleton_mixed_block_element.t array
 
 val value_prefix_len : 'a t -> int
 
-val flat_suffix_len : 'a t -> int
-
 (** Access to the shape, as flattened and following the runtime restriction. *)
 val flattened_reordered_shape : 'a t -> 'a Singleton_mixed_block_element.t array
 
 val lookup_path_producing_new_indexes : 'a t -> int list -> int list
+
+(** Translate a top-level source field index to its flattened, reordered index.
+    Fails loudly if the field does not flatten to exactly one element. *)
+val lookup_singleton_field : 'a t -> int -> int
 
 val new_indexes_to_old_indexes : 'a t -> int array
 
 val new_block_length : 'a t -> int
 
 val new_index_to_old_path : 'a t -> int -> int list
+
+module Field_for_printing : sig
+  type 'a shape := 'a t
+
+  type 'a t =
+    | Void
+    | Unboxed_product
+    | Singleton of
+        { element : 'a Singleton_mixed_block_element.t;
+          offset_in_words : int
+        }
+
+  val of_shape : 'a shape -> index:int -> 'a t
+end

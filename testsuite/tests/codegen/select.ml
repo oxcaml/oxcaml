@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 
@@ -18,11 +19,11 @@ open Intrinsics
 let select_identity x = Builtins.select x 1 0
 [%%expect_asm X86_64{|
 select_identity:
-  movq  %rax, %rbx
-  movl  $1, %eax
+  movl  $1, %ebx
   movl  $3, %edi
-  cmpq  $1, %rbx
-  cmovne %rdi, %rax
+  cmpq  $1, %rax
+  cmovne %rdi, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -32,15 +33,14 @@ select_identity:
 let select_cmp (x : int) = Builtins.select (x > 10) x 55
 [%%expect_asm X86_64{|
 select_cmp:
-  movq  %rax, %rbx
-  movl  $111, %eax
-  cmpq  $21, %rbx
-  cmovg %rbx, %rax
+  movl  $111, %ebx
+  cmpq  $21, %rax
+  cmovg %rax, %rbx
+  movq  %rbx, %rax
   ret
 |}]
 
-(* CR ttebbi: We shouldn't materialize the bit, and ideally even share the
-   cmp instructions. *)
+(* CR ttebbi: We shouldn't materialize the bit. *)
 let select_cmp_twice (x : int) (y: int) =
   (Builtins.select (x < y) x y) + (Builtins.select (x < y) 10 20)
 [%%expect_asm X86_64{|
@@ -49,19 +49,17 @@ select_cmp_twice:
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
   setl  %al
-  leaq  1(%rax,%rax), %rax
-  movl  $41, %esi
+  leaq  1(%rax,%rax), %rsi
+  movl  $41, %eax
   movl  $21, %edx
-  cmpq  $1, %rax
-  cmovne %rdx, %rsi
-  cmpq  $1, %rax
+  cmpq  $1, %rsi
+  cmovne %rdx, %rax
   cmovne %rdi, %rbx
-  leaq  -1(%rbx,%rsi), %rax
+  leaq  -1(%rbx,%rax), %rax
   ret
 |}]
 
 
-(* CR ttebbi: We could constant-fold this. *)
 let select_constant (x : int) = Builtins.select true x 55
 [%%expect_asm X86_64{|
 select_constant:
@@ -70,40 +68,37 @@ select_constant:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_int32 b (x : int32#) (y : int32#) =
+let select_int32 b (x : int32_u) (y : int32_u) =
   Builtins.select_int32 b x y
 [%%expect_asm X86_64{|
 select_int32:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   ret
 |}]
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_int64 b (x : int64#) (y : int64#) =
+let select_int64 b (x : int64_u) (y : int64_u) =
   Builtins.select_int64 b x y
 [%%expect_asm X86_64{|
 select_int64:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   ret
 |}]
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_nativeint b (x : nativeint#) (y : nativeint#) =
+let select_nativeint b (x : nativeint_u) (y : nativeint_u) =
   Builtins.select_nativeint b x y
 [%%expect_asm X86_64{|
 select_nativeint:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   ret
 |}]
 
@@ -115,21 +110,19 @@ let repeated_select_shared x y z w  a b =
   #(q,r)
 [%%expect_asm X86_64{|
 repeated_select_shared:
-  movq  %rbx, %r8
-  movq  %rcx, %rbx
-  cmpq  %r8, %rax
+  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
-  leaq  1(%rax,%rax), %rcx
+  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %rcx
+  cmpq  $1, %r8
   cmovne %rdi, %rax
-  cmpq  $1, %rcx
+  movq  %rcx, %rbx
   cmovne %rdx, %rbx
   ret
 |}]
 
-(* CR ttebbi: We should not materialize the boolean, ideally even share the cmpq. *)
+(* CR ttebbi: We should not materialize the boolean. *)
 let repeated_select_repeated x y z w  a b =
   let q =
     Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) z w
@@ -140,16 +133,14 @@ let repeated_select_repeated x y z w  a b =
   #(q,r)
 [%%expect_asm X86_64{|
 repeated_select_repeated:
-  movq  %rbx, %r8
-  movq  %rcx, %rbx
-  cmpq  %r8, %rax
+  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
-  leaq  1(%rax,%rax), %rcx
+  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %rcx
+  cmpq  $1, %r8
   cmovne %rdi, %rax
-  cmpq  $1, %rcx
+  movq  %rcx, %rbx
   cmovne %rdx, %rbx
   ret
 |}]
@@ -161,28 +152,116 @@ let unboxing_through_select b x y =
 [%%expect_asm X86_64{|
 unboxing_through_select:
   subq  $8, %rsp
+  movq  64(%r14), %rcx
   movq  64(%r14), %rsi
-  movq  64(%r14), %rdx
-  subq  $48, %rdx
-  movq  %rdx, 64(%r14)
-  cmpq  80(%r14), %rdx
+  subq  $48, %rsi
+  movq  %rsi, 64(%r14)
+  cmpq  80(%r14), %rsi
   jl    <hidden GC jump pad>
 .L0:
-  addq  72(%r14), %rdx
-  addq  $8, %rdx
-  addq  $24, %rdx
-  movq  $3071, -8(%rdx)
-  movq  caml_int64_ops@GOTPCREL(%rip), %rcx
-  movq  %rcx, (%rdx)
-  movq  %rdi, 8(%rdx)
-  leaq  -24(%rdx), %rdi
+  addq  72(%r14), %rsi
+  addq  $8, %rsi
+  addq  $24, %rsi
+  movq  $3071, -8(%rsi)
+  movq  caml_int64_ops@GOTPCREL(%rip), %rdx
+  movq  %rdx, (%rsi)
+  movq  %rdi, 8(%rsi)
+  leaq  -24(%rsi), %rdi
   movq  $3071, -8(%rdi)
-  movq  %rcx, (%rdi)
+  movq  %rdx, (%rdi)
   movq  %rbx, 8(%rdi)
   cmpq  $1, %rax
-  cmovne %rdi, %rdx
-  movq  8(%rdx), %rax
-  movq  %rsi, 64(%r14)
+  cmovne %rdi, %rsi
+  movq  8(%rsi), %rax
+  movq  %rcx, 64(%r14)
   addq  $8, %rsp
+  ret
+|}]
+
+(* Both arms are the same constant, so no csel is needed. *)
+let select_same_constant x = Builtins.select x 0 0
+[%%expect_asm X86_64{|
+select_same_constant:
+  movl  $1, %eax
+  ret
+|}]
+
+(* Both arms are the same value, so no csel is needed. *)
+let select_same_arg x y = Builtins.select x y y
+[%%expect_asm X86_64{|
+select_same_arg:
+  movq  %rbx, %rax
+  ret
+|}]
+
+(* When the condition holds the two arms are equal, so this is the identity
+   on [y]. *)
+let select_equal (x : int) (y : int) = Builtins.select (x = y) x y
+[%%expect_asm X86_64{|
+select_equal:
+  movq  %rbx, %rax
+  ret
+|}]
+
+(* CR ttebbi: Having both the test/cmov and cmp/jump is unnecessary. Ideally,
+   the jump is eliminated and the cmov selects between [g] and [h] *)
+let select_and_match x g h =
+  match Builtins.select (Int64_u.equal x #0L) true false with
+  | true -> g #()
+  | false -> h #()
+[%%expect_asm X86_64{|
+select_and_match:
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  movl  $1, %ebx
+  movl  $3, %edx
+  testq %rsi, %rsi
+  cmove %rdx, %rbx
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  (%rdi), %rbx
+  movq  %rdi, %rax
+  jmp   *%rbx
+.L0:
+  movq  (%rax), %rbx
+  jmp   *%rbx
+|}]
+
+(* CR ttebbi: Having both the test/cmov and cmp/jump is unnecessary. Ideally,
+   the jump is eliminated and the cmov selects between [g] and [h] *)
+let select_and_if x g h =
+  if Builtins.select (Int64_u.equal x #0L) true false then g #() else h #()
+[%%expect_asm X86_64{|
+select_and_if:
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  movl  $1, %ebx
+  movl  $3, %edx
+  testq %rsi, %rsi
+  cmove %rdx, %rbx
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  (%rdi), %rbx
+  movq  %rdi, %rax
+  jmp   *%rbx
+.L0:
+  movq  (%rax), %rbx
+  jmp   *%rbx
+|}]
+
+(* The inlined [min] and [max] have distinct DWARF ranges, but the peephole
+   optimizer should still remove the redundant comparison. *)
+let min_max (x : int) y =
+  let[@inline always] min x y = Builtins.select (x <= y) x y in
+  let[@inline always] max x y = Builtins.select (x >= y) x y in
+  #(min x y, max x y)
+[%%expect_asm X86_64{|
+min_max:
+  movq  %rbx, %rdi
+  cmpq  %rbx, %rax
+  cmovge %rax, %rdi
+  cmovle %rax, %rbx
+  movq  %rbx, %rax
+  movq  %rdi, %rbx
   ret
 |}]

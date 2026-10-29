@@ -45,6 +45,8 @@ module Name : sig
 
   val of_head_of_global_name : Global_module.Name.t -> t
 
+  val of_head_of_global : Global_module.t -> t
+
   val of_parameter_name : Global_module.Parameter_name.t -> t
 
   val to_global_name : t -> Global_module.Name.t
@@ -90,6 +92,8 @@ end = struct
     else str
 
   let of_head_of_global_name (name : Global_module.Name.t) = of_string name.head
+
+  let of_head_of_global (glob : Global_module.t) = of_string glob.head
 
   let of_parameter_name (name : Global_module.Parameter_name.t) =
     of_string (Global_module.Parameter_name.to_string name)
@@ -700,20 +704,6 @@ let print_debug ppf t =
 
 let print_as_inline_code = Misc.Style.as_inline_code print
 
-let fwd_get_current : (unit -> t option) ref = ref (fun () -> assert false)
-
-let get_current () = !fwd_get_current ()
-
-let get_current_or_dummy () = Option.value (get_current ()) ~default:dummy
-
-let get_current_exn () =
-  match get_current () with
-  | Some t -> t
-  | None -> Misc.fatal_error "No compilation unit set"
-
-let is_current t =
-  match get_current () with None -> false | Some t' -> equal t t'
-
 let name_mangling_scheme_override : Config.name_mangling_scheme option ref =
   ref None
 
@@ -724,7 +714,3 @@ let name_mangling_scheme_for_current_unit () =
   match !name_mangling_scheme_override with
   | Some scheme -> scheme
   | None -> Config.name_mangling_scheme
-
-module Private = struct
-  let fwd_get_current = fwd_get_current
-end
