@@ -1,1 +1,2 @@
 file a.cmi liba/a.cmi
+file a.cmx liba/a.cmx

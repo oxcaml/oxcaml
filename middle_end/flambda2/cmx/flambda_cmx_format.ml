@@ -37,11 +37,18 @@ type t0 =
 
 type raw = File_sections.Idx.t
 
-type t = t0 list * File_sections.t
+type t =
+  { units : t0 list;
+    sections : File_sections.t;
+    (* Where the .cmx file was read from, relative to the manifest files root,
+       when the location is to be recorded on the identifiers of its units (see
+       [Compilation_unit.Found]). *)
+    cmx_path : Misc.filepath option
+  }
 
-let from_raw ~sections raw =
-  let t : t0 list = Obj.obj (File_sections.get sections raw) in
-  t, sections
+let from_raw ~sections ~cmx_path raw =
+  let units : t0 list = Obj.obj (File_sections.get sections raw) in
+  { units; sections; cmx_path }
 
 let to_raw ~sections (t : t0 list) =
   File_sections.Builder.add sections (Obj.repr t)
@@ -81,7 +88,7 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   in
   to_raw ~sections t
 
-let import_typing_env_and_code0 ~sections t =
+let import_typing_env_and_code0 ~sections ~cmx_path t =
   let symbols = t.table_data.symbols in
   let variables = t.table_data.variables in
   let simples = t.table_data.simples in
@@ -91,6 +98,9 @@ let import_typing_env_and_code0 ~sections t =
   let fields = t.table_data.fields in
   let used_value_slots = t.used_value_slots in
   let original_compilation_unit = t.original_compilation_unit in
+  Symbol.relocate_importer symbols ~original_compilation_unit ~cmx_path;
+  Variable.relocate_importer variables ~original_compilation_unit ~cmx_path;
+  Code_id.relocate_importer code_ids ~original_compilation_unit ~cmx_path;
   let renaming =
     Profile.record_call ~accumulate:true "create_import_map" (fun () ->
         Renaming.create_import_map ~symbols ~variables ~simples ~consts
@@ -112,14 +122,16 @@ let import_typing_env_and_code0 ~sections t =
   in
   typing_env, all_code
 
-let import_typing_env_and_code (t, sections) =
-  match t with
+let import_typing_env_and_code { units; sections; cmx_path } =
+  match units with
   | [] -> Misc.fatal_error "Flambda cmx info should never be empty"
-  | [t0] -> import_typing_env_and_code0 ~sections t0
+  | [t0] -> import_typing_env_and_code0 ~sections ~cmx_path t0
   | t0 :: rem ->
     List.fold_left
       (fun (typing_env, code) t0 ->
-        let typing_env0, code0 = import_typing_env_and_code0 ~sections t0 in
+        let typing_env0, code0 =
+          import_typing_env_and_code0 ~sections ~cmx_path t0
+        in
         let typing_env =
           Profile.record_call ~accumulate:true "typing_env_merge" (fun () ->
               Flambda2_types.Typing_env.Serializable.merge typing_env
@@ -130,17 +142,17 @@ let import_typing_env_and_code (t, sections) =
               Exported_code.merge code code0)
         in
         typing_env, code)
-      (import_typing_env_and_code0 ~sections t0)
+      (import_typing_env_and_code0 ~sections ~cmx_path t0)
       rem
 
-let exported_offsets (t, _) =
+let exported_offsets { units; _ } =
   List.fold_left
     (fun offsets t0 -> Exported_offsets.merge offsets t0.exported_offsets)
-    Exported_offsets.empty t
+    Exported_offsets.empty units
 
-let with_exported_offsets (t, sections) exported_offsets =
-  match t with
-  | [t0] -> [{ t0 with exported_offsets }], sections
+let with_exported_offsets t exported_offsets =
+  match t.units with
+  | [t0] -> { t with units = [{ t0 with exported_offsets }] }
   | [] | _ :: _ :: _ ->
     Misc.fatal_error "Cannot set exported offsets on multiple units"
 
@@ -160,7 +172,7 @@ let pack ~sections (units : t option list) =
         (fun unit_opt pack_data ->
           let unit_data_old_idxs, unit_sections =
             match unit_opt with
-            | Some unit -> unit
+            | Some { units; sections; cmx_path = _ } -> units, sections
             | None ->
               Misc.fatal_error
                 "Some pack units do not have their export info set.\n\
@@ -200,7 +212,9 @@ let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
     Unit_info.make_dummy ~input_name:"<none>" t.original_compilation_unit
   in
   Env.set_current_unit unit_info;
-  let typing_env, code = import_typing_env_and_code0 ~sections t in
+  let typing_env, code =
+    import_typing_env_and_code0 ~sections ~cmx_path:None t
+  in
   if print_typing_env
   then
     Format.fprintf ppf "@[<hov>Typing env:@ %a@]@;"
@@ -212,7 +226,8 @@ let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
     Format.fprintf ppf "@[<hov>Offsets:@ %a@]@;" Exported_offsets.print
       t.exported_offsets
 
-let print ~print_typing_env ~print_code ~print_offsets ppf (t, sections) =
+let print ~print_typing_env ~print_code ~print_offsets ppf
+    { units = t; sections; cmx_path = _ } =
   let rec print_rest ppf = function
     | [] -> ()
     | t0 :: t ->

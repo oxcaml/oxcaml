@@ -19,7 +19,7 @@
 module CU = Compilation_unit
 
 type t = {
-  compilation_unit : Compilation_unit.t;
+  compilation_unit : Compilation_unit.Found.t;
   linkage_name : Linkage_name.t;
   hash : int;
 }
@@ -77,25 +77,30 @@ let linkage_name_for_ocamlobjinfo t =
   let prefix_len = String.length caml_symbol_prefix in
   String.sub linkage_name prefix_len (String.length linkage_name - prefix_len)
 
-let compilation_unit t = t.compilation_unit
+let compilation_unit t = CU.Found.unit t.compilation_unit
+
+let found_compilation_unit t = t.compilation_unit
+
+let with_found_compilation_unit t compilation_unit =
+  { t with compilation_unit }
 
 let linkage_name_for_compilation_unit comp_unit =
   caml_symbol_prefix ^ CU.mangle_for_linkage_name ~pack_separator comp_unit
   |> Linkage_name.of_string
 
-let for_predef_ident id =
-  assert (Ident.is_predef id);
-  let linkage_name = "caml_exn_" ^ Ident.name id |> Linkage_name.of_string in
-  let compilation_unit = CU.predef_exn in
-  { compilation_unit;
+let create compilation_unit linkage_name =
+  { compilation_unit = CU.Found.without_cmx_path compilation_unit;
     linkage_name;
     hash = Hashtbl.hash linkage_name;
   }
 
+let for_predef_ident id =
+  assert (Ident.is_predef id);
+  let linkage_name = "caml_exn_" ^ Ident.name id |> Linkage_name.of_string in
+  create CU.predef_exn linkage_name
+
 let unsafe_create compilation_unit linkage_name =
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name; }
+  create compilation_unit linkage_name
 
 let for_name compilation_unit name =
   let prefix =
@@ -104,23 +109,15 @@ let for_name compilation_unit name =
   let linkage_name =
     prefix ^ (member_separator ()) ^ name |> Linkage_name.of_string
   in
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name; }
+  create compilation_unit linkage_name
 
 let for_structured_mangling_path ~compilation_unit ~path ~suffix =
   let name = Structured_mangling.mangle_ident compilation_unit path in
   let linkage_name = name ^ suffix |> Linkage_name.of_string in
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name; }
+  create compilation_unit linkage_name
 
 let for_compilation_unit compilation_unit =
-  let linkage_name = linkage_name_for_compilation_unit compilation_unit in
-  { compilation_unit;
-    linkage_name;
-    hash = Hashtbl.hash linkage_name;
-  }
+  create compilation_unit (linkage_name_for_compilation_unit compilation_unit)
 
 let is_predef_exn t =
-  CU.equal t.compilation_unit CU.predef_exn
+  CU.equal (compilation_unit t) CU.predef_exn

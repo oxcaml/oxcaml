@@ -17,7 +17,7 @@
 open! Flambda.Import
 
 type resolver =
-  Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
+  Compilation_unit.Found.t -> Flambda2_types.Typing_env.Serializable.t option
 
 type get_imported_code = unit -> Exported_code.t
 
@@ -44,7 +44,9 @@ val all_code : t -> Code.t Code_id.Map.t
 val machine_width : t -> Target_system.Machine_width.t
 
 val resolver :
-  t -> Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
+  t ->
+  Compilation_unit.Found.t ->
+  Flambda2_types.Typing_env.Serializable.t option
 
 val propagating_float_consts : t -> bool
 

@@ -810,7 +810,9 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
     ~obj_filename:(prefixname ^ ext_obj)
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
-      Compilation_unit.Set.iter Compilenv.require_global
+      Compilation_unit.Set.iter
+        (fun cu ->
+          Compilenv.require_global (Compilation_unit.Found.without_cmx_path cu))
         program.required_globals;
       Compilenv.record_external_symbols ();
       match pipeline with
