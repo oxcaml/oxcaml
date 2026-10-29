@@ -516,8 +516,8 @@ let select_operation'
       }
   | Cstore
       ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-        | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Single _ | Double
-        | Onetwentyeight_unaligned | Onetwentyeight_aligned
+        | Thirtytwo_unsigned | Thirtytwo_signed | Sixtyfour | Word_mask
+        | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
         | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
         | Fivetwelve_aligned ),
         _ )
