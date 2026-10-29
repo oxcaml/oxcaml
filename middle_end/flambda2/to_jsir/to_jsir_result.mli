@@ -102,7 +102,20 @@ val import_compilation_unit : t -> Compilation_unit.t -> t
 (* CR selee: Eventually we should do something similar for symbols too, so that
    we don't put unused symbols in the symbol table. *)
 
+(** The variable holding the JSOO global data table, bound at the start of the
+    entry block. *)
 val global_data_var : t -> t * Jsir.Var.t
+
+(** Register [var] as the value of [symbol] in the global symbol table, so that
+    other compilation units can fetch it. *)
+val register_symbol : t -> Symbol.t -> Jsir.Var.t -> t
+
+(** The variable holding the value of [symbol], which must be from another
+    compilation unit. On the first call for a given symbol, the expression
+    fetching it is bound to a fresh variable at the start of the entry block.
+    Later calls return the same variable without emitting anything. The
+    compilation unit of the symbol is recorded as an import. *)
+val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
 
 (** Record that [var], a variable created ahead of its definition (one standing
     for a function slot, value slot or symbol), has been bound by

@@ -49,7 +49,14 @@ type t =
         (** JSOO has a similar variable which is incremented for every method
             call; we mimic this here. *)
     imported_compilation_units : Compilation_unit.Set.t;
+    entry_prelude : Jsir.instr list;
+        (** Instructions to put at the start of the entry block, in reverse
+            order. Used for the fetching of the global data and of external
+            symbols. *)
     global_data_var : Jsir.Var.t option;
+    external_symbols : Jsir.Var.t Symbol.Map.t;
+        (** The variables bound in [entry_prelude] to symbols from other
+            compilation units. *)
     late_bound_vars : Jsir.Var.Set.t;
         (** Variables created ahead of their definition and since bound with
             [To_jsir_shared.bind_vars]. *)
@@ -71,7 +78,9 @@ let create () =
     invalid_switch_block = None;
     next_method_cache_id = 1;
     imported_compilation_units = Compilation_unit.Set.empty;
+    entry_prelude = [];
     global_data_var = None;
+    external_symbols = Symbol.Map.empty;
     late_bound_vars = Jsir.Var.Set.empty;
     call_events = None
   }
@@ -231,12 +240,110 @@ let add_late_bound_var_exn t var =
       Jsir.Var.print var;
   { t with late_bound_vars = Jsir.Var.Set.add var t.late_bound_vars }
 
+let add_entry_prelude_instr t instr =
+  { t with entry_prelude = instr :: t.entry_prelude }
+
 let global_data_var t =
   match t.global_data_var with
   | Some var -> t, var
   | None ->
     let var = Jsir.Var.fresh () in
+    let t =
+      add_entry_prelude_instr t
+        (Let (var, Prim (Extern ("caml_get_global_data", None), [])))
+    in
     { t with global_data_var = Some var }, var
+
+let symbol_to_native_strings symbol =
+  ( Symbol.compilation_unit symbol
+    |> Compilation_unit.name |> Compilation_unit.Name.to_string
+    |> Jsir.Native_string.of_string,
+    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
+
+let symbol_is_for_compilation_unit symbol =
+  let compilation_unit = Symbol.compilation_unit symbol in
+  Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
+
+let register_symbol t symbol var =
+  match symbol_is_for_compilation_unit symbol with
+  | true ->
+    (* We don't need to add this symbol to our symbol table, because we will
+       instead fetch it from jsoo's global data table (see
+       [external_symbol_lookup]) *)
+    t
+  | false ->
+    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    add_instr_exn t
+      (Let
+         ( Jsir.Var.fresh (),
+           Prim
+             ( Extern ("caml_register_symbol", None),
+               [ Pc (NativeString compilation_unit_name);
+                 Pc (NativeString symbol_name);
+                 Pv var ] ) ))
+
+let global_data_lookup t ~symbol_name : t * Jsir.expr =
+  let t, global_data = global_data_var t in
+  let symbol_name = Jsir.Native_string.of_string symbol_name in
+  ( t,
+    Prim
+      ( Extern ("caml_js_get", None),
+        [Pv global_data; Pc (NativeString symbol_name)] ) )
+
+let predef_exception_lookup t symbol =
+  let symbol_name = Symbol.linkage_name_as_string symbol in
+  (* Chop off caml_exn_ *)
+  let caml_exn_ = "caml_exn_" in
+  if not (String.starts_with ~prefix:caml_exn_ symbol_name)
+  then
+    Misc.fatal_errorf
+      "Predefined exception symbol %a doesn't start with \"caml_exn_\""
+      Symbol.print symbol;
+  let symbol_name =
+    String.sub symbol_name (String.length caml_exn_)
+      (String.length symbol_name - String.length caml_exn_)
+  in
+  (* jsoo already registers these in global data *)
+  global_data_lookup t ~symbol_name:("predef:" ^ symbol_name)
+
+let external_symbol_lookup t symbol : t * Jsir.expr =
+  match Symbol.is_predefined_exception symbol with
+  | true -> predef_exception_lookup t symbol
+  | false -> (
+    match symbol_is_for_compilation_unit symbol with
+    | true ->
+      let compilation_unit = Symbol.compilation_unit symbol in
+      let t = import_compilation_unit t compilation_unit in
+      let compilation_unit_name =
+        Compilation_unit.name_as_string compilation_unit
+      in
+      global_data_lookup t ~symbol_name:compilation_unit_name
+    | false ->
+      (* The unit defining the symbol must be linked (and initialised) before
+         this one, so record it as an import too. *)
+      let t = import_compilation_unit t (Symbol.compilation_unit symbol) in
+      let compilation_unit_name, symbol_name =
+        symbol_to_native_strings symbol
+      in
+      ( t,
+        Prim
+          ( Extern ("caml_get_symbol", None),
+            [ Pc (NativeString compilation_unit_name);
+              Pc (NativeString symbol_name) ] ) ))
+
+(* Symbols from other compilation units are fetched once at the start of the
+   entry block. *)
+let external_symbol_var t symbol =
+  match Symbol.Map.find_opt symbol t.external_symbols with
+  | Some var -> t, var
+  | None ->
+    (* The lookup may fetch the global data, which must come first in the
+       prelude. *)
+    let t, expr = external_symbol_lookup t symbol in
+    let var = Jsir.Var.fresh () in
+    let t = add_entry_prelude_instr t (Let (var, expr)) in
+    ( { t with external_symbols = Symbol.Map.add symbol var t.external_symbols },
+      var )
 
 type program =
   { program : Jsir.program;
@@ -251,7 +358,9 @@ let to_program_exn
       invalid_switch_block = _;
       next_method_cache_id = _;
       imported_compilation_units;
-      global_data_var;
+      entry_prelude;
+      global_data_var = _;
+      external_symbols = _;
       late_bound_vars = _;
       call_events = _
     } =
@@ -267,14 +376,11 @@ let to_program_exn
       "To_jsir_result.to_program_exn: expected all reserved addresses to be \
        used";
   let complete_blocks =
-    match global_data_var with
-    | None -> complete_blocks
-    | Some var ->
+    match entry_prelude with
+    | [] -> complete_blocks
+    | _ :: _ ->
       let entry_block = Jsir.Addr.Map.find Jsir.Addr.zero complete_blocks in
-      let body : Jsir.instr list =
-        Let (var, Prim (Extern ("caml_get_global_data", None), []))
-        :: entry_block.body
-      in
+      let body = List.rev_append entry_prelude entry_block.body in
       Jsir.Addr.Map.add Jsir.Addr.zero { entry_block with body } complete_blocks
   in
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in

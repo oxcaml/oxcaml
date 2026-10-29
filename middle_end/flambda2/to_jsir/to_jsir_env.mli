@@ -171,7 +171,9 @@ val get_var_exn : t -> Variable.t -> Jsir.Var.t
 (** Return the JSIR variable for the given Flambda symbol.
 
     If the symbol is from the current compilation unit, we look it up in the
-    environment; otherwise, we fetch from the global symbol table. *)
+    environment; otherwise, we fetch it from the global symbol table (or the
+    JSOO global data) once, at the start of the entry block, and reuse that
+    variable for every use. *)
 val get_symbol :
   t ->
   res:To_jsir_result.t ->
