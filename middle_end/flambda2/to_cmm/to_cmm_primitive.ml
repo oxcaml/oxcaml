@@ -135,7 +135,8 @@ let make_block ~dbg kind alloc_mode args =
       List.map C.memory_chunk_of_kind (mixed_block_kinds shape)
     in
     let tag = Tag.Scannable.to_int tag in
-    C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag ~value_prefix_size args args_memory_chunks
+    C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag ~value_prefix_size args
+      args_memory_chunks
 
 let memory_chunk_of_flat_suffix_element :
     K.flat_suffix_element -> Cmm.memory_chunk = function
@@ -238,7 +239,8 @@ let make_non_scannable_unboxed_product_array ~dbg kind mode args =
         mem_chunks_per_non_unarized_element.(index))
       args
   in
-  C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag:0 ~value_prefix_size:0 args mem_chunks
+  C.make_mixed_alloc ~strict_init:false ~mode dbg ~tag:0 ~value_prefix_size:0
+    args mem_chunks
 
 let make_array ~dbg kind alloc_mode args =
   check_alloc_fields args;
