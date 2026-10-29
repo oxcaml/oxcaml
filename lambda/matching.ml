@@ -4829,17 +4829,31 @@ let root_arg arg binding_kind sort layout =
    in memory though, so if there are any, the tuple is allocated and matched
    like any other value. *)
 
-let rec derefs_tuple_element : type k. k general_pattern -> bool =
- fun p ->
+(* Whether a dereference pattern addresses the tuple element matched by [p]:
+   it is [p] itself, or below [p] through aliases, or-patterns and unboxed
+   products only. Any other pattern between them matches a value of its own. *)
+let rec derefs_tuple_element (p : pattern) =
   match p.pat_desc with
-  | Tpat_deref (_, Baccess_tuple_element _, _, _) -> true
-  | Tpat_tuple _ -> false
-  | _ ->
-      let found = ref false in
-      shallow_iter_pattern_desc
-        { f = (fun p -> if derefs_tuple_element p then found := true) }
-        p.pat_desc;
-      !found
+  | Tpat_deref _ -> true
+  | Tpat_alias { pattern; _ } -> derefs_tuple_element pattern
+  | Tpat_or (p1, p2, _) -> derefs_tuple_element p1 || derefs_tuple_element p2
+  | Tpat_unboxed_tuple ps ->
+      List.exists (fun (_, p, _) -> derefs_tuple_element p) ps
+  | Tpat_record_unboxed_product (fields, _, _) ->
+      List.exists (fun (_, _, p) -> derefs_tuple_element p) fields
+  | Tpat_record (fields, Record_unboxed, _) ->
+      List.exists (fun (_, _, p) -> derefs_tuple_element p) fields
+  | Tpat_record
+      ( _,
+        ( Record_boxed | Record_float | Record_ufloat | Record_mixed _
+        | Record_inlined _ | Record_dummy _ | Record_undetermined
+        | Record_variable _ ),
+        _ )
+  | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_constant _
+  | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+  | Tpat_construct _ | Tpat_variant _ | Tpat_array _ | Tpat_addr _
+  | Tpat_lazy _ ->
+      false
 
 (* Whether this pattern has a top-level tuple pattern with a dereference pattern
    inside *)
