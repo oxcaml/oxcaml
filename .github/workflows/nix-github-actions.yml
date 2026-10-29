@@ -18,7 +18,7 @@ jobs:
     # Keep this name equal to the job id: it is the GitHub status-check name,
     # and branch protection on `main` requires the check named `nix-matrix`.
     name: nix-matrix
-    runs-on: warp-ubuntu-latest-arm64-8x
+    runs-on: warp-ubuntu-latest-arm64-16x
     permissions:
       contents: read
     outputs:

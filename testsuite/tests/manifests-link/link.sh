@@ -70,6 +70,13 @@ compile "$@" -I-manifest manifest.txt \
   helper.$EXT mylib.$LIBEXT empty.$LIBEXT link_manifest.$EXT \
   -o link_manifest.exe
 
+# The same link, with one entry given via -H-file instead.
+grep -v "^file helper\.$EXT " manifest.txt > manifest_no_helper.txt
+compile "$@" -I-manifest manifest_no_helper.txt \
+  -H-file helper.$EXT:cas/blob_helper \
+  helper.$EXT mylib.$LIBEXT empty.$LIBEXT link_manifest.$EXT \
+  -o link_manifest_line.exe
+
 if [ "$EXT" = "cmx" ]; then
   # Negative test: dropping the '.a' entry of a non-empty archive must fail,
   # mentioning the missing file.

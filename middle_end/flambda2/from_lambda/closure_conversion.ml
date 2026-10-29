@@ -642,25 +642,29 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
 
 let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
+  let same_as_ocaml_repr (sort : Jkind.Sort.Const.t) =
+    match sort with
+    | Base Void -> []
+    | Base _ ->
+      let kind =
+        Typeopt.layout_of_non_void_sort sort
+        |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
+             ~machine_width
+        |> K.With_subkind.kind
+      in
+      [{ kind; arg_transformer = None; return_transformer = None }]
+    | Univar _ -> Misc.fatal_error "unarize_extern_repr: unexpected univar"
+    | Genvar _ -> Misc.fatal_error "unarize_extern_repr: unexpected genvar"
+    | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
+    | Addressable sort ->
+      (* Addressability does not affect the non-boxed representation *)
+      unarize_const_sort_for_extern_repr sort
+  in
   match extern_repr with
-  | Same_as_ocaml_repr (Base Void) -> []
-  | Same_as_ocaml_repr (Base _ as sort) ->
-    let kind =
-      Typeopt.layout_of_non_void_sort sort
-      |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
-           ~machine_width
-      |> K.With_subkind.kind
-    in
-    [{ kind; arg_transformer = None; return_transformer = None }]
-  | Same_as_ocaml_repr (Univar _) ->
-    Misc.fatal_error "unarize_extern_repr: unexpected univar"
-  | Same_as_ocaml_repr (Genvar _) ->
-    Misc.fatal_error "unarize_extern_repr: unexpected genvar"
-  | Same_as_ocaml_repr (Product sorts) ->
-    List.concat_map unarize_const_sort_for_extern_repr sorts
-  | Same_as_ocaml_repr (Addressable sort) ->
-    (* Addressability does not affect the non-boxed representation *)
-    unarize_const_sort_for_extern_repr sort
+  | Same_as_ocaml_repr sort -> same_as_ocaml_repr sort
+  | Unpacked_product sort ->
+    (* Unarized like an ordinary unboxed product; see [Lambda.extern_repr]. *)
+    same_as_ocaml_repr sort
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -725,6 +729,61 @@ let unarize_extern_repr ~machine_width alloc_mode
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
       } ]
+
+let rec arity_component_of_const_sort_for_extern_repr
+    (sort : Jkind.Sort.Const.t) :
+    [`Complex] Flambda_arity.Component_for_creation.t =
+  match sort with
+  | Base _ -> (
+    match unarize_const_sort_for_extern_repr sort with
+    | [] ->
+      (* Void, the nullary unboxed product. *)
+      Flambda_arity.Component_for_creation.Unboxed_product []
+    | [{ kind; _ }] ->
+      Flambda_arity.Component_for_creation.Singleton
+        (K.With_subkind.anything kind)
+    | _ :: _ :: _ ->
+      Misc.fatal_error
+        "Base sorts never unarize to more than one kind for [extern_repr] \
+         purposes")
+  | Product sorts ->
+    Flambda_arity.Component_for_creation.Unboxed_product
+      (List.map arity_component_of_const_sort_for_extern_repr sorts)
+  | Addressable sort ->
+    (* Addressability does not affect the non-boxed representation *)
+    arity_component_of_const_sort_for_extern_repr sort
+  | Univar _ ->
+    Misc.fatal_error
+      "arity_component_of_const_sort_for_extern_repr: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error
+      "arity_component_of_const_sort_for_extern_repr: unexpected genvar"
+
+(* An [@unpacked] product contributes one singleton component per unarized
+   element, and an ordinary unboxed product contributes a single product
+   component (see [Lambda.extern_repr]). *)
+let arity_components_of_extern_repr ~machine_width alloc_mode
+    (extern_repr : Lambda.extern_repr) :
+    [`Complex] Flambda_arity.Component_for_creation.t list =
+  match extern_repr with
+  | Same_as_ocaml_repr ((Product _ | Base Void | Addressable _) as sort) ->
+    [arity_component_of_const_sort_for_extern_repr sort]
+  | Unpacked_product _ ->
+    List.map
+      (fun { kind; _ } ->
+        Flambda_arity.Component_for_creation.Singleton
+          (K.With_subkind.anything kind))
+      (unarize_extern_repr ~machine_width alloc_mode extern_repr)
+  | Same_as_ocaml_repr (Base _ | Univar _ | Genvar _)
+  | Unboxed_float _ | Unboxed_vector _ | Unboxed_mask
+  | Unboxed_or_untagged_integer _ -> (
+    match unarize_extern_repr ~machine_width alloc_mode extern_repr with
+    | [{ kind; _ }] ->
+      [ Flambda_arity.Component_for_creation.Singleton
+          (K.With_subkind.anything kind) ]
+    | [] | _ :: _ :: _ ->
+      Misc.fatal_error
+        "This [extern_repr] should have unarized to exactly one kind")
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
@@ -820,14 +879,25 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       Apply_cont_expr.continuation apply_cont, false
     | _ -> Continuation.create (), true
   in
-  (* Unlike for OCaml function calls, we don't preserve unboxed product arity
-     information here, as there is no partial application etc. *)
-  let[@inline] build_arity unarized =
-    List.map (fun { kind; _ } -> K.With_subkind.anything kind) unarized
-    |> Flambda_arity.create_singletons
+  (* Unboxed products are not unarized here: [To_cmm_extcall] needs their
+     structure to lay out the corresponding C structs. *)
+  let param_arity =
+    List.concat_map
+      (fun (_mode, repr) ->
+        arity_components_of_extern_repr ~machine_width alloc_mode repr)
+      prim_native_repr_args
+    |> Flambda_arity.create
   in
-  let param_arity = build_arity unarized_params in
-  let return_arity = build_arity unarized_results in
+  let return_arity =
+    let arity =
+      arity_components_of_extern_repr ~machine_width alloc_mode
+        (snd prim_native_repr_res)
+      |> Flambda_arity.create
+    in
+    if Flambda_arity.cardinal_unarized arity = 0
+    then Flambda_arity.nullary
+    else arity
+  in
   let effects = Effects.from_lambda prim_effects in
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =

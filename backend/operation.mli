@@ -53,6 +53,7 @@ type integer_operation =
   | Iand
   | Ior
   | Ixor
+  | Inot
   | Ilsl
   | Ilsr
   | Iasr

@@ -61,13 +61,15 @@ let inter { closures = closures1; value_slots = value_slots1 }
   let value_slots = Value_slot.Set.inter value_slots1 value_slots2 in
   { closures; value_slots }
 
-let apply_renaming { closures; value_slots } renaming =
-  let value_slots =
+let apply_renaming ({ closures; value_slots } as t) renaming =
+  let value_slots' =
     Value_slot.Set.filter
       (fun var -> Renaming.value_slot_is_used renaming var)
       value_slots
   in
-  { closures; value_slots }
+  if value_slots == value_slots'
+  then t
+  else { closures; value_slots = value_slots' }
 
 let free_names { closures = _; value_slots } =
   Value_slot.Set.fold
