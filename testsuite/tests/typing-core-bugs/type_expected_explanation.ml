@@ -205,6 +205,7 @@ Line 1, characters 11-20:
                ^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type
          "bool"
+       because it is in the condition of an if-statement
 |}]
 
 let _ =
@@ -218,6 +219,7 @@ Line 2, characters 8-18:
             ^^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type
          "bool"
+       because it is in the condition of a while-loop
 |}]
 
 let _ = if true then (3 : int)
@@ -228,6 +230,7 @@ Line 1, characters 21-30:
                          ^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type
          "unit"
+       because it is in the result of a conditional with no else branch
 |}]
 
 let _ = if (3 :> int) then ()
@@ -238,6 +241,7 @@ Line 1, characters 11-21:
                ^^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type
          "bool"
+       because it is in the condition of an if-statement
 |}]
 
 let _ = if (3 : int @ local) then ();;
@@ -248,6 +252,7 @@ Line 1, characters 11-28:
                ^^^^^^^^^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type
          "bool"
+       because it is in the condition of an if-statement
 |}]
 
 let _ = if (3 : @ local) then ();;
