@@ -126,6 +126,10 @@ module Variable : sig
 
   val compilation_unit : t -> Compilation_unit.t
 
+  (** The compilation unit together with the recorded location of its .cmx file,
+      if any (see [Compilation_unit.Found]). *)
+  val found_compilation_unit : t -> Compilation_unit.Found.t
+
   val name : t -> string
 
   val name_stamp : t -> int
@@ -135,6 +139,16 @@ module Variable : sig
   val user_visible : t -> bool
 
   val export : Set.t -> importer
+
+  (** To be called before importing from the .cmx file of
+      [original_compilation_unit], read from [cmx_path] (see
+      [Compilation_unit.Found]): the identifiers of that unit get the location
+      recorded. *)
+  val relocate_importer :
+    importer ->
+    original_compilation_unit:Compilation_unit.t ->
+    cmx_path:Misc.filepath option ->
+    unit
 
   val import : importer -> t -> t
 
@@ -159,6 +173,9 @@ module Symbol : sig
 
   val compilation_unit : t -> Compilation_unit.t
 
+  (** See [Variable.found_compilation_unit]. *)
+  val found_compilation_unit : t -> Compilation_unit.Found.t
+
   val for_compilation_unit : Compilation_unit.t -> t
 
   val linkage_name : t -> Linkage_name.t
@@ -166,6 +183,13 @@ module Symbol : sig
   val linkage_name_as_string : t -> string
 
   val export : Set.t -> importer
+
+  (** See [Variable.relocate_importer]. *)
+  val relocate_importer :
+    importer ->
+    original_compilation_unit:Compilation_unit.t ->
+    cmx_path:Misc.filepath option ->
+    unit
 
   val import : importer -> t -> t
 
@@ -258,6 +282,9 @@ module Code_id : sig
 
   val get_compilation_unit : t -> Compilation_unit.t
 
+  (** See [Variable.found_compilation_unit]. *)
+  val get_found_compilation_unit : t -> Compilation_unit.Found.t
+
   val in_compilation_unit : t -> Compilation_unit.t -> bool
 
   val is_imported : t -> bool
@@ -273,6 +300,13 @@ module Code_id : sig
   val invert_map : t Map.t -> t Map.t
 
   val export : Set.t -> importer
+
+  (** See [Variable.relocate_importer]. *)
+  val relocate_importer :
+    importer ->
+    original_compilation_unit:Compilation_unit.t ->
+    cmx_path:Misc.filepath option ->
+    unit
 
   val import : importer -> t -> t
 end

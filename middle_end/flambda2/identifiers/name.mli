@@ -37,6 +37,10 @@ val must_be_symbol : t -> Symbol.t
 
 val compilation_unit : t -> Compilation_unit.t
 
+(** The compilation unit together with the recorded location of its .cmx file,
+    if any (see [Compilation_unit.Found]). *)
+val found_compilation_unit : t -> Compilation_unit.Found.t
+
 val is_imported : t -> bool
 
 val must_be_var_opt : t -> Variable.t option

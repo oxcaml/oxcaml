@@ -110,6 +110,10 @@ struct
     assert (Id.flags id = E.flags);
     HT.find t id
 
+  let replace t id elt =
+    assert (Id.flags id = E.flags);
+    HT.replace t id elt
+
   (* We serialize a table using the exact same format we use in memory, except
      that we only store the data for the exported elements. *)
   type serializable = E.t HT.t
@@ -124,4 +128,7 @@ struct
     try HT.find t id
     with Not_found ->
       Misc.fatal_error "Id was not exported from this compilation unit."
+
+  let map_serializable_inplace t ~f =
+    HT.filter_map_inplace (fun _id elt -> Some (f elt)) t
 end

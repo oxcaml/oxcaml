@@ -81,13 +81,13 @@ val print : Format.formatter -> t -> unit
 
 val create :
   machine_width:Target_system.Machine_width.t ->
-  resolver:(Compilation_unit.t -> Serializable.t option) ->
+  resolver:(Compilation_unit.Found.t -> Serializable.t option) ->
   t
 
 (** Convert closure conversion approximations to a typing environment. *)
 val create_from_closure_conversion_approx :
   machine_width:Target_system.Machine_width.t ->
-  resolver:(Compilation_unit.t -> Serializable.t option) ->
+  resolver:(Compilation_unit.Found.t -> Serializable.t option) ->
   'a Value_approximation.t Symbol.Map.t ->
   t
 
@@ -99,10 +99,13 @@ val make_bottom : t -> t
 
 val closure_env : t -> t
 
-val resolver : t -> Compilation_unit.t -> Serializable.t option
+(** The resolver loads the typing environment exported by another unit's .cmx
+    file, from the location recorded on the unit if any (see
+    [Compilation_unit.Found]). *)
+val resolver : t -> Compilation_unit.Found.t -> Serializable.t option
 
 val code_age_relation_resolver :
-  t -> Compilation_unit.t -> Code_age_relation.t option
+  t -> Compilation_unit.Found.t -> Code_age_relation.t option
 
 val current_scope : t -> Scope.t
 

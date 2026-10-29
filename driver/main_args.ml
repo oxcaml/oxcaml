@@ -1127,19 +1127,20 @@ let mk_opaque f =
 
 let mk_persistent_deps f =
   "-persistent-deps", Arg.Unit f,
-  " Record in the compiled interface where the interfaces it refers to\n\
-  \     were found, as paths relative to [$MANIFEST_FILES_ROOT], so that\n\
-  \     its users compiled with -use-persistent-deps resolve those\n\
-  \     references without having the interfaces on their load path. Only\n\
-  \     interfaces found through manifests are recorded. Module aliases\n\
-  \     load the interfaces of their targets even with -no-alias-deps."
+  " Record in the compiled interface and compilation unit description\n\
+  \     where the .cmi and .cmx files they refer to were found, as paths\n\
+  \     relative to [$MANIFEST_FILES_ROOT], so that their users compiled\n\
+  \     with -use-persistent-deps resolve those references without having\n\
+  \     the files on their load path. Only files found through manifests\n\
+  \     are recorded. Module aliases load the interfaces of their targets\n\
+  \     even with -no-alias-deps."
 
 let mk_use_persistent_deps f =
   "-use-persistent-deps", Arg.Unit f,
-  " Load the interfaces referred to by the compiled interfaces read from\n\
-  \     the locations recorded there by -persistent-deps, instead of\n\
-  \     looking for them in the load path. The locations are passed on to\n\
-  \     the compiled interface produced either way."
+  " Load the files referred to by the compiled interfaces and compilation\n\
+  \     unit descriptions read from the locations recorded there by\n\
+  \     -persistent-deps, instead of looking for them in the load path. The\n\
+  \     locations are passed on to the files produced either way."
 
 let mk_strict_formats f =
   "-strict-formats", Arg.Unit f,

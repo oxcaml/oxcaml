@@ -20,7 +20,12 @@ type t
 
 type raw
 
-val from_raw : sections:File_sections.t -> raw -> t
+(** [cmx_path] is where the .cmx file was read from, relative to the manifest
+    files root, when that location is to be recorded on the identifiers of its
+    units for the benefit of the users of the current unit's .cmx file (see
+    [Compilation_unit.Found]). *)
+val from_raw :
+  sections:File_sections.t -> cmx_path:Misc.filepath option -> raw -> t
 
 val create_raw :
   final_typing_env:Flambda2_types.Typing_env.Serializable.t ->

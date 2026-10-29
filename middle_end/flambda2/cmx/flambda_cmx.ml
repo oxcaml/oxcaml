@@ -20,17 +20,18 @@ module TE = Flambda2_types.Typing_env
 module Imported_unit_map = Compilation_unit.Map
 
 type loader =
-  { get_module_info : Compilation_unit.t -> Flambda_cmx_format.t option;
+  { get_module_info : Compilation_unit.Found.t -> Flambda_cmx_format.t option;
     mutable imported_code : Exported_code.t;
     mutable imported_units : TE.Serializable.t option Imported_unit_map.t
   }
 
 let load_cmx_file_contents loader comp_unit =
   let cmx_file =
-    Compilation_unit.which_cmx_file comp_unit
+    Compilation_unit.Found.which_cmx_file comp_unit
       ~accessed_by:(Current_unit.get_cu_exn ())
   in
-  match Imported_unit_map.find cmx_file loader.imported_units with
+  let cmx_unit = Compilation_unit.Found.unit cmx_file in
+  match Imported_unit_map.find cmx_unit loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
   | exception Not_found ->
     Profile.record_call ~accumulate:true "load_cmx" (fun () ->
@@ -39,7 +40,7 @@ let load_cmx_file_contents loader comp_unit =
           (* To make things easier to think about, we never retry after a .cmx
              load fails. *)
           loader.imported_units
-            <- Imported_unit_map.add cmx_file None loader.imported_units;
+            <- Imported_unit_map.add cmx_unit None loader.imported_units;
           None
         | Some cmx ->
           let typing_env, all_code =
@@ -49,13 +50,13 @@ let load_cmx_file_contents loader comp_unit =
           let offsets = Flambda_cmx_format.exported_offsets cmx in
           Exported_offsets.import_offsets offsets;
           loader.imported_units
-            <- Imported_unit_map.add cmx_file (Some typing_env)
+            <- Imported_unit_map.add cmx_unit (Some typing_env)
                  loader.imported_units;
           Some typing_env)
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
-  let comp_unit = Symbol.compilation_unit symbol in
+  let comp_unit = Symbol.found_compilation_unit symbol in
   match load_cmx_file_contents loader comp_unit with
   | None -> Unknown Flambda_kind.value
   | Some typing_env ->
