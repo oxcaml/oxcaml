@@ -1,0 +1,122 @@
+; oxpp erases the erasable OxCaml syntax extensions from compiler sources so
+; that the boot ("default") context can compile them with the system
+; compiler; see the ocamlcommon stanza in the root dune file.
+;
+; It links a private copy of the parser and of the utils/ modules the parser
+; depends on.  Nothing copied below may use OxCaml syntax: it is compiled by
+; the system compiler without preprocessing.
+
+(copy_files#
+ ../../utils/{build_path_prefix_map,config,format_doc,language_extension_kernel,terminfo,warnings}.ml{,i})
+
+(copy_files#
+ ../../parsing/{asttypes,parsetree,location,longident,docstrings,syntaxerr,ast_helper,parser_types,lexer,parse,ast_iterator,language_extension,camlinternalMenhirLib}.ml{,i})
+
+; misc.ml, clflags.ml and builtin_attributes.ml are copied without their
+; interfaces and truncated at their OXPP_STOP marker by the preprocess action
+; below: the part above the marker is what the parser needs and is compiled
+; as an interface-less module; the rest, like the interfaces, is free to use
+; OxCaml syntax.
+
+(copy_files# ../../utils/{misc,clflags}.ml)
+
+(copy_files# ../../parsing/builtin_attributes.ml)
+
+; The parser is generated here rather than reused from the root: menhir's
+; type inference for the root parser compiles a mock against ocamlcommon's
+; interfaces, which are produced by oxpp, so reusing the root parser.ml{,i}
+; would be a dependency cycle.  Keep the flags identical to the root stanza.
+
+(copy_files ../../parsing/parser.mly)
+
+(menhir
+ (modules parser)
+ (flags
+  --lalr
+  --explain
+  --dump
+  --require-aliases
+  --strict
+  --unused-token
+  COMMENT
+  --unused-token
+  DOCSTRING
+  --unused-token
+  EOL
+  --unused-token
+  GREATERRBRACKET
+  --table
+  --fixed-exception
+  --strategy
+  simplified
+  --cmly
+  --inspection))
+
+; OCaml 5.4's Parsetree, verbatim from upstream ppxlib.
+
+(copy_files ../../external/ppxlib/astlib/ast_504.ml)
+
+(library
+ (name oxpp_parsing)
+ (wrapped false)
+ (modes native)
+ (flags
+  (:standard
+   -strict-sequence
+   -bin-annot
+   -safe-string
+   -strict-formats
+   -w
+   -67-47))
+ (preprocess
+  (per_module
+   ;; As in the root dune file: menhir's output refers to MenhirLib.
+   ((action
+     (progn
+      (echo "module MenhirLib = CamlinternalMenhirLib")
+      (run cat %{input-file})))
+    parser)
+   ;; Keep only the part of the file above its (*OXPP_STOP*) marker line.
+   ((action
+     (run sed -e "/^(\\*OXPP_STOP\\*)$/,$d" %{input-file}))
+    misc
+    clflags
+    builtin_attributes)))
+ (modules_without_implementation parsetree)
+ (modules
+  ;; utils/
+  build_path_prefix_map
+  clflags
+  config
+  format_doc
+  language_extension_kernel
+  misc
+  terminfo
+  warnings
+  ;; parsing/
+  asttypes
+  parsetree
+  location
+  longident
+  docstrings
+  syntaxerr
+  ast_helper
+  camlinternalMenhirLib
+  parser_types
+  parser
+  lexer
+  parse
+  ast_iterator
+  builtin_attributes
+  language_extension
+  ;; OCaml 5.4's AST
+  ast_504
+  longident_504))
+
+(executable
+ (name oxpp)
+ (modes native)
+ (modules downgrade oxpp)
+ (libraries oxpp_parsing)
+ (link_deps
+  (alias check/ast-504-compat)))

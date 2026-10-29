@@ -1,0 +1,2 @@
+# The inputs use OxCaml syntax, which the ocamlformat on PATH cannot parse.
+disable=true

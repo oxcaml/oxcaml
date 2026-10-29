@@ -1,0 +1,7 @@
+type 'a t = 'a list
+type imm = int[@@immediate ]
+let f (type a) (x : a) = x
+type _ g =
+  | G: 'a . 'a -> 'a g 
+type u = int
+let i : 'a 'b . 'a -> 'b -> 'a = fun x _ -> x

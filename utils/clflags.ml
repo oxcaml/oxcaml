@@ -13,6 +13,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* The first part of this file, up to the OXPP_STOP marker, is also
+   compiled by the system compiler as part of tools/oxpp: the flags that
+   the parser, the lexer and Location read.  See the comment at the
+   marker. *)
+
 let unsafe = ref false                  (* -unsafe *)
 and applicative_functors = ref true     (* -no-app-funct *)
 and all_ppx = ref ([] : string list)        (* -ppx *)
@@ -48,7 +53,7 @@ type 'a env_reader = {
   env_var : string;
 }
 
-let color = ref None (* -color *)
+let color : Misc.Color.setting option ref = ref None (* -color *)
 
 let color_reader = {
   parse = (function
@@ -64,7 +69,8 @@ let color_reader = {
   env_var = "OCAML_COLOR";
 }
 
-let error_style = ref None (* -error-style *)
+let error_style : Misc.Error_style.setting option ref = ref None
+                                        (* -error-style *)
 
 let error_style_reader = {
   parse = (function
@@ -88,6 +94,12 @@ let error_style_reader = {
   usage = "expected \"contextual\" or \"short\"";
   env_var = "OCAML_ERROR_STYLE";
 }
+
+(* Everything above this line is linked into tools/oxpp, the OxCaml-syntax
+   eraser used by the boot build, which truncates its private copy of this
+   file here; it must therefore remain stock OCaml.  Everything below may use
+   the erasable OxCaml syntax extensions, as may the interface. *)
+(*OXPP_STOP*)
 
 (* Command-line parameters *)
 

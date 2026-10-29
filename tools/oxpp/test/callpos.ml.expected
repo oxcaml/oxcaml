@@ -1,0 +1,3 @@
+let n ?(here= Stdlib.Lexing.dummy_pos) = here
+let p () = Stdlib.Lexing.dummy_pos
+type 'a t = ?here:Stdlib.Lexing.position -> 'a

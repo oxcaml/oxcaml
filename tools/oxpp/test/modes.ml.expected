@@ -1,0 +1,10 @@
+let f x = (x, x)
+let g () = (1, 2)
+let h () = (3, 4)
+let k x = x + 1
+let m (x : int) : int= x
+let r x = let y = x in y
+let rec map f = function | [] -> [] | x::xs -> (f x) :: (map f xs)
+let q (type a) (x : a) = x
+type t = {
+  a: int [@globalized ]}

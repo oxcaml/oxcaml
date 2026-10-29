@@ -1,0 +1,32 @@
+; Proof that Ast_504 is exactly the boot compiler's Parsetree: turn the
+; "(*IF_CURRENT = Parsetree.x *)" comments of upstream ppxlib's copy into type
+; equations and typecheck the result against the boot compiler's
+; compiler-libs.  This is only possible (and only needed) in the boot
+; context; in the main context the alias below is empty.
+
+(rule
+ (target ast_504_check.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (deps %{project_root}/external/ppxlib/astlib/ast_504.ml)
+ (action
+  (with-stdout-to
+   %{target}
+   (run sed -e "s/(\\*IF_CURRENT = \\(.*\\) \\*)/= \\1/" %{deps}))))
+
+(copy_files ../longident_504.ml)
+
+(library
+ (name oxpp_ast_504_check)
+ (enabled_if
+  (= %{context_name} "default"))
+ (modes byte)
+ (modules ast_504_check longident_504)
+ (libraries compiler-libs.common)
+ (flags
+  (:standard -w -a)))
+
+(alias
+ (name ast-504-compat)
+ (deps
+  (glob_files .oxpp_ast_504_check.objs/byte/*.cmi)))

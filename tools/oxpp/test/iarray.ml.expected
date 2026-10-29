@@ -1,0 +1,4 @@
+File "iarray.ml", line 1, characters 8-18:
+1 | let a = [: 1; 2 :]
+            ^^^^^^^^^^
+Error: an immutable array is not erasable: this file must also compile with the upstream OCaml compiler (see tools/oxpp)

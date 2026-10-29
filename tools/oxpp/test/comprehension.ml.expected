@@ -1,0 +1,4 @@
+File "comprehension.ml", line 1, characters 11-29:
+1 | let f () = [x for x = 1 to 3]
+               ^^^^^^^^^^^^^^^^^^
+Error: a comprehension is not erasable: this file must also compile with the upstream OCaml compiler (see tools/oxpp)

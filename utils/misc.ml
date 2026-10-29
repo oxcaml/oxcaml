@@ -13,6 +13,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* The first part of this file, up to the OXPP_STOP marker, is also
+   compiled by the system compiler as part of tools/oxpp; see the
+   comment at the marker. *)
+
 (* Errors *)
 
 exception Fatal_error
@@ -476,6 +480,12 @@ let print_see_manual ppf manual_section =
     manual_section
 
 type (_, _) eq = Refl : ('a, 'a) eq
+
+(* Everything above this line is linked into tools/oxpp, the OxCaml-syntax
+   eraser used by the boot build, which truncates its private copy of this
+   file here; it must therefore remain stock OCaml.  Everything below may use
+   the erasable OxCaml syntax extensions, as may the interface. *)
+(*OXPP_STOP*)
 
 let fatal_errorf_doc fmt =
   Format_doc.kdoc_printf (fun doc ->

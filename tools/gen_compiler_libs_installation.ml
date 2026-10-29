@@ -7,6 +7,9 @@ let () =
     let extension = Filename.extension basename in
     let tgt_prefix_opt =
       match prefix, extension with
+      | _, ".mli" when Filename.check_suffix prefix ".pp" ->
+        (* Preprocessed interfaces (see tools/oxpp) are not installed *)
+        None
       | "boot_ocamlopt", ".mli"
       | "oxcaml_main", ".mli"
       | "oxcaml_main_native", ".mli"
@@ -25,7 +28,6 @@ let () =
         | "import_info" | "includemod_errorprinter"
         | "language_extension_kernel" | "lazy_backtrack" | "lru" | "main"
         | "main_native" | "maindriver" | "mode_hint" | "mode_intf" | "optmain"
-        | "parser.pp"
         | "parser_types" | "shape" | "shape_reduce" | "signature_group"
         | "solver_intf" | "tmc" | "transl_array_comprehension"
         | "transl_comprehension_utils" | "transl_list_comprehension"

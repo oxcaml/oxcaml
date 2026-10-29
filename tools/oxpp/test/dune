@@ -1,0 +1,170 @@
+; Tests for tools/oxpp.
+;
+; The golden tests run oxpp in erasing mode and have the system compiler print
+; the resulting AST back as source (-dsource), compared with the .expected
+; files; they only run in the boot context, where the system compiler is the
+; one on PATH.  The rejection tests compare the error message.  The end-to-end
+; test compiles oxpp's binary output with the context's compiler: the system
+; compiler in the boot context, OxCaml itself in the main context.  Refresh the
+; .expected files with "dune promote".
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "default"))
+ (targets modes.pp.mli modes.mli.out)
+ (deps modes.mli)
+ (action
+  (progn
+   (with-stdout-to
+    modes.pp.mli
+    (run %{exe:../oxpp.exe} -context default modes.mli))
+   (with-stderr-to
+    modes.mli.out
+    (run %{ocamlc} -dsource -stop-after parsing -intf modes.pp.mli))
+   (diff modes.mli.expected modes.mli.out))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "default"))
+ (targets modes.pp.ml modes.ml.out)
+ (deps modes.ml)
+ (action
+  (progn
+   (with-stdout-to
+    modes.pp.ml
+    (run %{exe:../oxpp.exe} -context default modes.ml))
+   (with-stderr-to
+    modes.ml.out
+    (run %{ocamlc} -dsource -stop-after parsing -impl modes.pp.ml))
+   (diff modes.ml.expected modes.ml.out))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "default"))
+ (targets kinds.pp.ml kinds.ml.out)
+ (deps kinds.ml)
+ (action
+  (progn
+   (with-stdout-to
+    kinds.pp.ml
+    (run %{exe:../oxpp.exe} -context default kinds.ml))
+   (with-stderr-to
+    kinds.ml.out
+    (run %{ocamlc} -dsource -stop-after parsing -impl kinds.pp.ml))
+   (diff kinds.ml.expected kinds.ml.out))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "default"))
+ (targets unboxed.pp.ml unboxed.ml.out)
+ (deps unboxed.ml)
+ (action
+  (progn
+   (with-stdout-to
+    unboxed.pp.ml
+    (run %{exe:../oxpp.exe} -context default unboxed.ml))
+   (with-stderr-to
+    unboxed.ml.out
+    (run %{ocamlc} -dsource -stop-after parsing -impl unboxed.pp.ml))
+   (diff unboxed.ml.expected unboxed.ml.out))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "default"))
+ (targets callpos.pp.ml callpos.ml.out)
+ (deps callpos.ml)
+ (action
+  (progn
+   (with-stdout-to
+    callpos.pp.ml
+    (run %{exe:../oxpp.exe} -context default callpos.ml))
+   (with-stderr-to
+    callpos.ml.out
+    (run %{ocamlc} -dsource -stop-after parsing -impl callpos.pp.ml))
+   (diff callpos.ml.expected callpos.ml.out))))
+
+; Rejections
+
+(rule
+ (alias runtest)
+ (targets comprehension.ml.err)
+ (deps comprehension.ml)
+ (action
+  (progn
+   (with-stderr-to
+    comprehension.ml.err
+    (with-accepted-exit-codes
+     2
+     (run %{exe:../oxpp.exe} -context default comprehension.ml)))
+   (diff comprehension.ml.expected comprehension.ml.err))))
+
+(rule
+ (alias runtest)
+ (targets let_mutable.ml.err)
+ (deps let_mutable.ml)
+ (action
+  (progn
+   (with-stderr-to
+    let_mutable.ml.err
+    (with-accepted-exit-codes
+     2
+     (run %{exe:../oxpp.exe} -context default let_mutable.ml)))
+   (diff let_mutable.ml.expected let_mutable.ml.err))))
+
+(rule
+ (alias runtest)
+ (targets iarray.ml.err)
+ (deps iarray.ml)
+ (action
+  (progn
+   (with-stderr-to
+    iarray.ml.err
+    (with-accepted-exit-codes
+     2
+     (run %{exe:../oxpp.exe} -context default iarray.ml)))
+   (diff iarray.ml.expected iarray.ml.err))))
+
+(rule
+ (alias runtest)
+ (targets include_functor.ml.err)
+ (deps include_functor.ml)
+ (action
+  (progn
+   (with-stderr-to
+    include_functor.ml.err
+    (with-accepted-exit-codes
+     2
+     (run %{exe:../oxpp.exe} -context default include_functor.ml)))
+   (diff include_functor.ml.expected include_functor.ml.err))))
+
+; End to end: the binary AST is accepted by the context's compiler.
+
+(rule
+ (targets e2e.pp.mli)
+ (deps e2e.mli)
+ (action
+  (with-stdout-to
+   e2e.pp.mli
+   (run %{exe:../oxpp.exe} -context %{context_name} e2e.mli))))
+
+(rule
+ (targets e2e.pp.ml)
+ (deps e2e.ml)
+ (action
+  (with-stdout-to
+   e2e.pp.ml
+   (run %{exe:../oxpp.exe} -context %{context_name} e2e.ml))))
+
+(rule
+ (alias runtest)
+ (targets e2e.cmi e2e.cmo)
+ (deps e2e.pp.mli e2e.pp.ml)
+ (action
+  (progn
+   (run %{ocamlc} -c -intf e2e.pp.mli -o e2e.cmi)
+   (run %{ocamlc} -c -impl e2e.pp.ml -o e2e.cmo))))

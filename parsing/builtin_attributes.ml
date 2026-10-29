@@ -13,6 +13,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* The first part of this file, up to the OXPP_STOP marker, is also
+   compiled by the system compiler as part of tools/oxpp: what the parser
+   and Pprintast need.  See the comment at the marker. *)
+
 open Asttypes
 open Parsetree
 open Ast_helper
@@ -148,8 +152,15 @@ let has_curry attrs =
   || has_attribute "curry" attrs
 
 let curry_attr loc =
-  Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])
+  Ast_helper.Attr.mk ~loc:Location.none
+    (Location.mkloc curry_attr_name loc) (PStr [])
 ;;
+
+(* Everything above this line is linked into tools/oxpp, the OxCaml-syntax
+   eraser used by the boot build, which truncates its private copy of this
+   file here; it must therefore remain stock OCaml.  Everything below may use
+   the erasable OxCaml syntax extensions, as may the interface. *)
+(*OXPP_STOP*)
 
 (* [attr_order] is used to issue unused attribute warnings in the order the
    attributes occur in the file rather than the random order of the hash table
@@ -167,7 +178,9 @@ let warn_unchecked_zero_alloc_attribute () =
      warn about missing ones. *)
   if !Clflags.print_types then ()
   else
-  let keys = List.of_seq (Attribute_table.to_seq_keys unchecked_zero_alloc_attributes) in
+  let keys =
+    List.of_seq (Attribute_table.to_seq_keys unchecked_zero_alloc_attributes)
+  in
   let keys = List.sort attr_order keys in
   (* Treatment of warnings is similar to [Typecore.force_delayed_checks]. *)
   let w_old = Warnings.backup () in

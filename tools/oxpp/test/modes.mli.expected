@@ -1,0 +1,14 @@
+val map : ('a -> 'b) -> 'a list -> 'b list
+val iter : ('a -> unit) -> 'a list -> unit
+val x : int
+val f : (int -> int) -> int
+type t = {
+  a: int [@globalized ];
+  mutable b: string }
+type 'a u =
+  | A of (('a)[@globalized ]) 
+  | B of int * int 
+type imm[@@immediate ]
+type imm64[@@immediate64 ]
+type any
+module M : sig val y : int end

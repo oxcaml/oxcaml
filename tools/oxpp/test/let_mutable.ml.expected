@@ -1,0 +1,5 @@
+File "let_mutable.ml", lines 2-4, characters 2-3:
+2 | ..let mutable x = 1 in
+3 |   x <- 2;
+4 |   x
+Error: let mutable is not erasable: this file must also compile with the upstream OCaml compiler (see tools/oxpp)

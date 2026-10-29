@@ -128,11 +128,95 @@
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess
   (per_module
+   ;; menhir's output refers to MenhirLib: alias it to the vendored copy.
+   ;; parser.mly's semantic actions therefore stay stock OCaml, as do the
+   ;; other modules that tools/oxpp links (see tools/oxpp/dune).
    ((action
      (progn
       (echo "module MenhirLib = CamlinternalMenhirLib")
       (run cat %{input-file})))
-    parser)))
+    parser)
+   ;; Every other module goes through tools/oxpp, which erases the erasable
+   ;; OxCaml syntax extensions when the system compiler is the consumer.
+   ;; per_module has no default: keep this list equal to (modules ...)
+   ;; below, minus parser.  The progn is deliberate: it stops Dune from
+   ;; passing a -pp flag to Merlin, which parses OxCaml syntax natively.
+   ((action
+     (progn
+      (run %{exe:tools/oxpp/oxpp.exe} -context %{context_name} %{input-file})))
+    json
+    arrayset
+    config
+    build_path_prefix_map
+    misc
+    hash_consed
+    identifiable
+    numbers
+    arg_helper
+    clflags
+    debug
+    profile
+    priority_queue
+    terminfo
+    ccomp
+    format_doc
+    warnings
+    consistbl
+    strongly_connected_components
+    targetint
+    load_path
+    int_replace_polymorphic_compare
+    domainstate
+    binutils
+    local_store
+    target_system
+    compilation_unit
+    import_info
+    linkage_name
+    opt_fuel
+    runtimetags
+    structured_mangling
+    symbol
+    lazy_backtrack
+    with_backtracking_intf
+    with_backtracking
+    diffing
+    diffing_with_keys
+    linkdeps
+    language_extension_kernel
+    zero_alloc_utils
+    zero_alloc_annotations
+    doubly_linked_list
+    file_sections
+    lru
+    id_counter
+    likelihood
+    location
+    longident
+    docstrings
+    printast
+    syntaxerr
+    ast_helper
+    camlinternalMenhirLib
+    ast_iterator
+    lexer
+    parse
+    pprintast
+    ast_mapper
+    attr_helper
+    builtin_attributes
+    ast_invariants
+    depend
+    parser_types
+    unit_info
+    language_extension
+    asttypes
+    parsetree
+    pparse
+    compenv
+    makedepend
+    ident
+    global_module)))
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
@@ -232,6 +316,12 @@
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags -linkall)
  (libraries flambda2_floats ocamlcommon)
+ ; Erase OxCaml syntax extensions for the system compiler; see tools/oxpp
+ ; and the ocamlcommon stanza above.
+ (preprocess
+  (action
+   (progn
+    (run %{exe:tools/oxpp/oxpp.exe} -context %{context_name} %{input-file}))))
  (modules_without_implementation
   annot
   value_rec_types
@@ -383,6 +473,11 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries ocamlfrontend)
+ ; Erase OxCaml syntax extensions for the system compiler; see tools/oxpp.
+ (preprocess
+  (action
+   (progn
+    (run %{exe:tools/oxpp/oxpp.exe} -context %{context_name} %{input-file}))))
  (modules
   ;; bytecomp/
   blambda
@@ -531,8 +626,14 @@
    -w -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (instrumentation
-  (backend bisect_ppx))
+ ; Erase OxCaml syntax extensions for the system compiler; see tools/oxpp.
+ ; Dune refuses to combine an action-based (preprocess ...) with
+ ; (instrumentation ...), so this library is no longer instrumented with
+ ; bisect_ppx for coverage builds.
+ (preprocess
+  (action
+   (progn
+    (run %{exe:tools/oxpp/oxpp.exe} -context %{context_name} %{input-file}))))
  (modules_without_implementation
   branch_relaxation_intf
   cmx_format
@@ -789,8 +890,14 @@
    ))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
- (instrumentation
-  (backend bisect_ppx))
+ ; Erase OxCaml syntax extensions for the system compiler; see tools/oxpp.
+ ; Dune refuses to combine an action-based (preprocess ...) with
+ ; (instrumentation ...), so this library is no longer instrumented with
+ ; bisect_ppx for coverage builds.
+ (preprocess
+  (action
+   (progn
+    (run %{exe:tools/oxpp/oxpp.exe} -context %{context_name} %{input-file}))))
  (libraries
   ocamlfrontend
   dwarf_flags
