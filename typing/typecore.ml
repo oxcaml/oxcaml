@@ -169,10 +169,10 @@ type layout_poly_inst_restriction =
 
 type mode_mismatch_kind = Parameter | Return
 
-type block_reference_kind =
+type block_path_kind =
   | Block_index
 
-type block_reference_bad_type =
+type block_path_bad_type_reason =
   | Flatten_floats_record
   | Float_record
   | Float_array_record
@@ -313,12 +313,12 @@ type error =
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_reference_bad_type of block_reference_kind * block_reference_bad_type
-  | Block_reference_modality_mismatch of
-      { reference : block_reference_kind; mutability : Types.mutability;
+  | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
+  | Block_path_modality_mismatch of
+      { kind : block_path_kind; mutability : Types.mutability;
         err : Modality.equate_error }
-  | Block_reference_polymorphic_field of
-      block_reference_kind * Longident.t
+  | Block_path_polymorphic_field of
+      block_path_kind * Longident.t
   | Submode_failed of With_regionality.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]
@@ -1709,40 +1709,33 @@ let check_atomic_loc ~loc ~env label lid =
   | Ok () -> ()
   | Error _ -> Error.log_and_raise loc env (Modalities_on_atomic_field lid)
 
-(* Block indices are only valid on certain accessors.
-   Checks a path consisting of one [block_access] and a list of
-   [unboxed_access]'s to a position with mutability [mutability], raising an
-   error if the access is invalid. *)
-let check_block_reference_path ~loc ~env reference ~mutability ba uas =
+(* Checks that a block path of kind [kind] is valid to create *)
+let check_block_path ~loc ~env kind ~mutability ba uas =
   let error (lid : Longident.t loc) err =
     Error.log_and_raise lid.loc env err
   in
   (* The expected modality of the overall access. The composition of the
      modalities along the path must be exactly this modality. *)
   let expected_modality =
-    Typemode.block_reference_expected_modalities mutability
-  in
-  (* Checks an access to [lid] into a value of a type with privacy
-     [private_flag], to a field or argument of type [arg_type]. *)
-  let check_access lid ~private_flag ~arg_type =
-    (* Mutable references through private types would allow writing into
-       them, but reading from them is fine. *)
-    (match private_flag with
-     | Private when Types.is_mutable mutability ->
-       error lid (Block_reference_bad_type (reference, Private_declaration))
-     | Private | Public -> ());
-    (* Mutable references to polymorphic fields would allow writing
-       non-polymorphic values. *)
-    if Types.is_mutable mutability && is_poly_Tpoly arg_type then
-      error lid (Block_reference_polymorphic_field (reference, lid.txt))
+    Typemode.block_path_expected_modalities mutability
   in
   let check_label_access lid (label : _ gen_label_description) =
-    check_access lid ~private_flag:label.lbl_private ~arg_type:label.lbl_arg
+    if Types.is_mutable mutability then begin
+      (* Mutable paths through private types would allow writing into them,
+         but reading from them is fine. *)
+      (match label.lbl_private with
+       | Private -> error lid (Block_path_bad_type (kind, Private_declaration))
+       | Public -> ());
+      (* Mutable paths to polymorphic fields would allow writing
+         non-polymorphic values. *)
+      if is_poly_Tpoly label.lbl_arg then
+        error lid (Block_path_polymorphic_field (kind, lid.txt))
+    end
   in
   let check_boxed_access = function
     | Baccess_field (lid, label, _) ->
       let bad_type reason =
-        error lid (Block_reference_bad_type (reference, reason))
+        error lid (Block_path_bad_type (kind, reason))
       in
       begin match label.lbl_repres with
       | Record_boxed | Record_undetermined | Record_variable _ -> ()
@@ -1755,7 +1748,7 @@ let check_block_reference_path ~loc ~env reference ~mutability ba uas =
       | Record_inlined _ -> bad_type Inlined_record
       | Record_dummy _ ->
         Misc.fatal_error
-          "Typecore.check_block_reference_path: dummy representation"
+          "Typecore.check_block_path: dummy representation"
       end;
       check_label_access lid label
     | Baccess_block _ -> ()
@@ -1782,7 +1775,7 @@ let check_block_reference_path ~loc ~env reference ~mutability ba uas =
   | Ok () -> ()
   | Error err ->
     Error.log_and_raise loc env
-      (Block_reference_modality_mismatch { reference; mutability; err })
+      (Block_path_modality_mismatch { kind; mutability; err })
 
 let check_disambiguation_principality ~loc ~name ty =
   if not (is_principal ty) then
@@ -8544,7 +8537,7 @@ and type_expect_
         el_ty
         uas
     in
-    check_block_reference_path ~loc ~env Block_index ~mutability:mut ba uas;
+    check_block_path ~loc ~env Block_index ~mutability:mut ba uas;
     let ty = match mut with
       | Immutable -> Predef.type_idx_imm base_ty el_ty
       | Mutable { atomic = Nonatomic; mode = _ } ->
@@ -13748,7 +13741,7 @@ let report_too_many_arg_error ~funct ~func_ty ~previous_arg_loc
 
 let msg = Fmt.doc_printf
 
-let block_reference_name = function
+let block_path_kind_name = function
   | Block_index -> "Block indices"
 
 let report_error ~loc env =
@@ -14427,7 +14420,7 @@ let report_error ~loc env =
           (Style.as_inline_code Printtyp.type_expr) prev_el_type
           quoted_longident lid
       end
-  | Block_reference_bad_type (reference, reason) ->
+  | Block_path_bad_type (kind, reason) ->
     let what =
       match reason with
       | Flatten_floats_record -> "[@@flatten_floats] records"
@@ -14438,33 +14431,26 @@ let report_error ~loc env =
       | Private_declaration -> "private types in mutable positions"
     in
     Location.errorf ~loc
-      "%s do not support %s." (block_reference_name reference) what
-  | Block_reference_modality_mismatch { reference; mutability; err } ->
+      "%s do not support %s." (block_path_kind_name kind) what
+  | Block_path_modality_mismatch { kind; mutability; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
-    let print_modality_doc id =
-      Printtyp.modality ~id:(fun ppf () -> Format_doc.pp_print_string ppf id) ax
-    in
     let expected, actual = match step with
       | Left_le_right -> right, left
       | Right_le_left -> left, right
-    in
-    (* On an axis where [actual] is the identity, print the identity mode *)
-    let identity =
-      Format_doc.asprintf "%a" (Modality.Per_axis.print ax) actual
     in
     let elements =
       if Types.is_mutable mutability then "mutable" else "immutable"
     in
     let what_elements_must_do =
       if Modality.Per_axis.is_id ax expected then "have the identity modality"
-      else Format_doc.asprintf "be %a" (print_modality_doc "") expected
+      else Format_doc.asprintf "be %a" (Modality.Per_axis.print ax) expected
     in
     Location.errorf ~loc
       "%s do not yet support non-default modalities. In \
        particular,@ %s elements must %s, but this is %a."
-      (block_reference_name reference) elements what_elements_must_do
-      (print_modality_doc identity) actual
-  | Block_reference_polymorphic_field (Block_index, lid) ->
+      (block_path_kind_name kind) elements what_elements_must_do
+      (Modality.Per_axis.print ax) actual
+  | Block_path_polymorphic_field (Block_index, lid) ->
     Location.errorf ~loc
       "Mutable block indices to polymorphic record fields@ (here %a) are \
        forbidden."

@@ -329,9 +329,9 @@ let mutable_implied_modalities ~for_mutable_variable mut =
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
 
-let block_reference_expected_modalities mutability =
+let block_path_expected_modalities mutability =
   (* There are two design constraints on what modalities we allow a block
-     reference (such as a block index) to point to. Because these are coupled,
+     path (such as a block index) to point to. Because these are coupled,
      this function checks that they are equal.
       1. The default modalities (id for non-mutable fields, global many aliased
          forkable unyielding for mutable fields) should work.
@@ -360,7 +360,7 @@ let block_reference_expected_modalities mutability =
   | Ok () -> expected1
   | Error _ ->
     Misc.fatal_error
-      "Typemode.block_reference_expected_modalities: mismatch with mutable \
+      "Typemode.block_path_expected_modalities: mismatch with mutable \
        implied modalities"
 
 let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
