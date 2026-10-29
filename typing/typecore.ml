@@ -2017,7 +2017,13 @@ let finalize_variants p =
 type pattern_variable_kind =
   | Std_var
   | As_var
+  | Deref_var
   | Continuation_var
+
+let unused_variable_warning pv_kind name : Warnings.t =
+  match pv_kind with
+  | As_var | Deref_var -> Unused_var { name; mutated = false }
+  | Std_var | Continuation_var -> Unused_var_strict { name; mutated = false }
 
 type pattern_variable =
   {
@@ -2143,11 +2149,11 @@ let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
     | Val_mut _ -> f_mut pv_type
     | _ -> f_immut pv_lpoly pv_type) pvs
 
-let add_pattern_variables ?check ?check_as env pv =
+let add_pattern_variables ?check env pv =
   List.fold_right
     (fun {pv_id; pv_mode; pv_value_kind; pv_type; pv_loc; pv_kind;
           pv_attributes; pv_uid; pv_lpoly} env ->
-       let check = if pv_kind=As_var then check_as else check in
+       let check = Option.map (fun check -> check pv_kind) check in
        Env.add_value ?check ~mode:pv_mode pv_id
          {val_type = pv_type; val_kind = pv_value_kind; val_lpoly = pv_lpoly;
           Types.val_loc = pv_loc;
@@ -2198,7 +2204,7 @@ let add_module_variables env module_variables =
     end
   ) env module_variables_as_list
 
-let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
+let enter_variable ?(is_module=false) ?(pv_kind=Std_var) tps loc name mode
     ?(lpoly=Lpoly.determined [])
     ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
@@ -2237,7 +2243,7 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
      pv_value_kind = kind;
      pv_type = ty;
      pv_loc = loc;
-     pv_kind = if is_as_variable then As_var else Std_var;
+     pv_kind;
      pv_attributes = attrs;
      pv_uid;
      pv_sort = sort;
@@ -2989,7 +2995,7 @@ let type_for_loop_like_index ~error ~loc ~env ~param ~any ~var =
           ~pv_mode:With_regionality.(min |> disallow_right)
           ~pv_type:(instance Predef.type_int)
           ~pv_loc:loc
-          ~pv_as_var:false
+          ~pv_kind:Std_var
           ~pv_attributes:[]
   | _ ->
       Error.log_and_raise param.ppat_loc env error
@@ -3007,10 +3013,10 @@ let type_for_loop_index ~loc ~env ~param =
               ~pv_mode
               ~pv_type
               ~pv_loc
-              ~pv_as_var
+              ~pv_kind
               ~pv_attributes
           ->
-            let check s = Warnings.Unused_for_index s in
+            let check _ s = Warnings.Unused_for_index s in
             let pv_id = Ident.create_local txt in
             let pv_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
             let pv =
@@ -3018,13 +3024,13 @@ let type_for_loop_index ~loc ~env ~param =
                 pv_value_kind =
                   Val_reg Jkind.Sort.(of_const Const.for_loop_index);
                 pv_type; pv_loc;
-                pv_kind = if pv_as_var then As_var else Std_var;
+                pv_kind;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index);
                 pv_lpoly = Lpoly.determined [];
                 }
             in
-            (pv_id, pv_uid), add_pattern_variables ~check ~check_as:check env [pv])
+            (pv_id, pv_uid), add_pattern_variables ~check env [pv])
 
 let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
   type_for_loop_like_index
@@ -3036,9 +3042,9 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
        because it can't have been referenced later so we don't need to track it
        for duplicates or anything else. *)
     ~any:Fun.id
-    ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
+    ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_kind ~pv_attributes ->
           enter_variable
-            ~is_as_variable:pv_as_var
+            ~pv_kind
             ~kind:(Val_reg Jkind.Sort.(of_const Const.for_loop_index))
             tps
             pv_loc
@@ -4136,7 +4142,7 @@ and type_pat_aux
       let ty_var, mode = solve_Ppat_alias ~mode:pat_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
-        enter_variable ~is_as_variable:true
+        enter_variable ~pv_kind:As_var
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
@@ -4625,10 +4631,12 @@ and type_pat_aux
       (* CR address-patterns: support [as deref_ x], which lifts the
          restriction below; then, print a more informative error when
          the argument is a pattern that [as deref_ x] would accept. *)
-      (match sp1.ppat_desc with
-       | Ppat_var _ -> ()
-       | _ ->
-         Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument);
+      let name =
+        match sp1.ppat_desc with
+        | Ppat_var name -> name
+        | _ ->
+          Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument
+      in
       let { position_mutability; container_mode; container_loc; base;
             rev_unboxed } =
         match pat_addr with
@@ -4645,9 +4653,18 @@ and type_pat_aux
         { containing = Derived_address; container = (container_loc, Pattern) }
       in
       let mode = apply_left_is_contained_by is_contained_by container_mode in
+      let mode = cross_left !!penv ty_addr mode in
+      let id, uid =
+        enter_variable ~pv_kind:Deref_var tps name.loc name mode
+          ~kind:(Val_reg addr_sort) ty_addr sp1.ppat_attributes addr_sort
+      in
       let p1 =
-        type_pat ~pat_mode:(simple_pat_mode mode) tps Value sp1 ty_addr
-          addr_sort
+        { pat_desc = Tpat_var { id; name; uid; sort = addr_sort; mode };
+          pat_loc = sp1.ppat_loc; pat_extra = [];
+          pat_type = ty_addr;
+          pat_attributes = sp1.ppat_attributes;
+          pat_env = !!penv;
+          pat_unique_barrier = Unique_barrier.not_computed () }
       in
       rvp {
         pat_desc = Tpat_deref (position_mutability, base, unboxed, p1);
@@ -4735,10 +4752,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
     List.fold_right
       (fun {pv_id; pv_uid; pv_type; pv_loc; pv_kind; pv_attributes; pv_sort}
         (pv, val_env, met_env) ->
-         let check s =
-           if pv_kind = As_var
-           then Warnings.Unused_var { name = s; mutated = false }
-           else Warnings.Unused_var_strict { name = s; mutated = false } in
+         let check = unused_variable_warning pv_kind in
          let id' = Ident.rename pv_id in
          let val_env =
           Env.add_value ~mode:Mode.With_regionality.legacy pv_id
@@ -12245,11 +12259,8 @@ and map_half_typed_cases
         *)
         let cont_vars, pvs =
           List.partition (fun pv -> pv.pv_kind = Continuation_var) pvs in
-        let add_pattern_vars = add_pattern_variables
-            ~check:(fun s ->
-              Warnings.Unused_var_strict { name = s; mutated = false })
-            ~check_as:(fun s ->
-              Warnings.Unused_var { name = s; mutated = false})
+        let add_pattern_vars =
+          add_pattern_variables ~check:unused_variable_warning
         in
         let when_env = add_pattern_vars ext_env pvs in
         let when_env = add_module_variables when_env mvs in
@@ -13421,9 +13432,9 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
           bindings
       in
       let env =
-        let check s = Warnings.Unused_var { name = s; mutated = false } in
+        let check _ s = Warnings.Unused_var { name = s; mutated = false } in
         let pvs = tps.tps_pattern_variables in
-        add_pattern_variables ~check ~check_as:check env pvs
+        add_pattern_variables ~check env pvs
       in
       env, Texp_comp_for tbindings
   | Pcomp_when cond ->
