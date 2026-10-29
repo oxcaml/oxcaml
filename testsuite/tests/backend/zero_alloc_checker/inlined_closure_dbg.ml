@@ -1,4 +1,13 @@
-(*= Same shape as [test_assume_inlined_closure.ml], without the call-site
+(* TEST
+ setup-ocamlopt.opt-build-env;
+ flags = "-O3 -g -flambda2-expert-shorten-symbol-names";
+ flags += " -zero-alloc-checker-details-extra";
+ ocamlopt_opt_exit_status = "2";
+ ocamlopt.opt;
+ check-ocamlopt.opt-output;
+*)
+
+(* Same shape as [assume_inlined_closure.ml], without the call-site
    [@zero_alloc assume], so that the check fails and prints the debuginfo of
    the closure allocation inside the inlined [matches].
 
@@ -11,8 +20,8 @@
    allocation is attributed directly to [f] at a line that is not in [f].  To
    see this directly:
      ocamlopt.opt -O3 -g -gdwarf-inlined-frames -gdwarf-compression=none -c \
-       test_inlined_closure_dbg.ml
-     llvm-dwarfdump --debug-info test_inlined_closure_dbg.o *)
+       inlined_closure_dbg.ml
+     llvm-dwarfdump --debug-info inlined_closure_dbg.o *)
 
 type 'a t =
   | Base of 'a

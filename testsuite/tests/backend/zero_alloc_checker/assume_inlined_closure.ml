@@ -1,3 +1,8 @@
+(* TEST
+ flags = "-O3 -g";
+ native;
+*)
+
 (* Regression test for oxcaml PR #7484 ("Avoid useless copies of functions
    (Again)"): a call-site [@zero_alloc assume] must cover closure allocations
    inside the inlined callee.
