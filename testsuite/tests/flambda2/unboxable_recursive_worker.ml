@@ -11,22 +11,34 @@
    native with dump-reaper;
    script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
    script;
-   script = "${test_source_directory}/../../tools/fexprc -dfexpr-annot-after=raw ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
+   script = "${test_source_directory}/../../tools/fexprc -dcanonical-ids -dfexpr-annot-after=raw ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
    script;
    script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
    script;
-   script = "${test_source_directory}/../../tools/fexprc ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
+   script = "mkdir -p ${test_build_directory}/reaper-roundtrip";
+   script;
+   script = "cp ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl ${test_build_directory}/reaper-roundtrip/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "${test_source_directory}/../../tools/fexprc -dcanonical-ids -dfexpr-annot-after=raw ${test_build_directory}/reaper-roundtrip/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "cmp ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl ${test_build_directory}/reaper-roundtrip/unboxable_recursive_worker.reaper.raw.fl";
    script;
  }{
    ocamlopt_flags = "-O4";
    native with dump-reaper;
    script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
    script;
-   script = "${test_source_directory}/../../tools/fexprc -dfexpr-annot-after=raw ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
+   script = "${test_source_directory}/../../tools/fexprc -dcanonical-ids -dfexpr-annot-after=raw ${test_build_directory}/unboxable_recursive_worker.reaper.fl";
    script;
    script = "grep -q 'closure deleted' ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
    script;
-   script = "${test_source_directory}/../../tools/fexprc ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl";
+   script = "mkdir -p ${test_build_directory}/reaper-roundtrip";
+   script;
+   script = "cp ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl ${test_build_directory}/reaper-roundtrip/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "${test_source_directory}/../../tools/fexprc -dcanonical-ids -dfexpr-annot-after=raw ${test_build_directory}/reaper-roundtrip/unboxable_recursive_worker.reaper.fl";
+   script;
+   script = "cmp ${test_build_directory}/unboxable_recursive_worker.reaper.raw.fl ${test_build_directory}/reaper-roundtrip/unboxable_recursive_worker.reaper.raw.fl";
    script;
  }{
    ocamlopt_flags = "-O2 -stubs-forward-inlining";

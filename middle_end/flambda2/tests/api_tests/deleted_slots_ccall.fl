@@ -1,0 +1,12 @@
+(* ACTUAL COMPILER: retain C-call allocation flags and return regions. *)
+let code size(1) heap_call (x) clo &ar my_depth -> ret * ex =
+  apply ccall &ar ($`*extern*`.caml_gc_full_major : val -> val) (x) -> ret * ex
+and code size(1) heap_noalloc (x) clo &ar my_depth -> ret * ex =
+  apply ccall noalloc &ar ($`*extern*`.caml_fresh_oo_id : val -> val) (x) -> ret * ex
+and code size(1) local_call (x) clo &ar &reg &ghost my_depth -> ret * ex : val stack =
+  apply ccall &ar &reg &ghost ($`*extern*`.caml_gc_full_major : val -> val) (x) -> ret * ex
+and code size(1) local_noalloc (x) clo &ar &reg &ghost my_depth -> ret * ex : val stack =
+  apply ccall noalloc &ar &reg &ghost ($`*extern*`.caml_fresh_oo_id : val -> val) (x) -> ret * ex
+in
+let $Ccall_result = Block 0 () in
+cont done ($Ccall_result)

@@ -1,0 +1,15 @@
+(* ACTUAL COMPILER: slash-containing identifiers, stamps and shared prefixes. *)
+let code size(1) slash_test
+    (`pair/shared/alpha`, `pair/shared/beta`, `item/path/42`, `item/path/43`,
+     `nonnumeric/end`, `trailing/path/`, `/123`)
+    clo &ar my_depth -> ret * ex =
+  cont `jump/path/one/123`
+    (`pair/shared/alpha`, `pair/shared/beta`, `item/path/42`, `item/path/43`,
+     `nonnumeric/end`, `trailing/path/`, `/123`)
+  where `jump/path/one/123` (a, b, c, d, e, f, g) =
+    cont `jump/path/two/nonnum` (a, b, c, d, e, f, g)
+  where `jump/path/two/nonnum` (u, v, w, x, y, z, t) =
+    cont ret (u)
+in
+let $Slash_test_result = Block 0 () in
+cont done ($Slash_test_result)

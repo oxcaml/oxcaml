@@ -54,4 +54,6 @@
   (run %{exe:deleted_slots_roundtrip.exe}
    %{dep:deleted_slots_roundtrip.fl}
    %{dep:deleted_slots_consistent.fl}
-   %{dep:deleted_slots_inconsistent.fl})))
+   %{dep:deleted_slots_inconsistent.fl}
+   %{dep:deleted_slots_ccall.fl}
+   %{dep:deleted_slots_slashes.fl})))

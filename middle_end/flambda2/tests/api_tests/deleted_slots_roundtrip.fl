@@ -1,10 +1,10 @@
 (* ACTUAL COMPILER: exercise the parser/printer with the same closure layout
    in static, dynamic heap and dynamic local allocations. *)
-let code size(1) live_a (x) ca &ar depth -> ret * ex =
+let code size(1) live_a (x) ca &ar my_depth -> ret * ex =
   cont ret (x)
-and code size(1) live_b (x) cb &ar depth -> ret * ex =
+and code size(1) live_b (x) cb &ar my_depth -> ret * ex =
   cont ret (x)
-and code size(1) maker (x) cm &ar &reg &ghost depth -> ret * ex : val stack =
+and code size(1) maker (x) cm &ar &reg &ghost my_depth -> ret * ex : val stack =
   let heap_a = closure live_a @slot_a &ar
   and heap_dead2 = closure deleted slot_dead2(2) &ar
   and heap_b = closure live_b @slot_b &ar

@@ -1,5 +1,5 @@
 (* ACTUAL COMPILER: exercise repeated declarations of one function slot. *)
-let code size(1) live (x) closure_var &ar depth -> ret * ex =
+let code size(1) live (x) closure_var &ar my_depth -> ret * ex =
   cont ret (x)
 in
 let first_live = closure live @live_slot &toplevel
@@ -8,5 +8,5 @@ in
 let second_live = closure live @live_slot &toplevel
 and second_deleted = closure deleted conflicting(3) &toplevel
 in
-let $Result = Block 0 () in
-cont done ($Result)
+let $Inconsistent_result = Block 0 () in
+cont done ($Inconsistent_result)
