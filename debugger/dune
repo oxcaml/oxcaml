@@ -17,15 +17,23 @@
 
 (library
  (name ocamldebug)
+ (modes byte)
  (modules (:standard \ ocamldebug_entry))
  (modules_without_implementation parser_aux)
- (libraries ocamlfrontend ocamltoplevel unix dynlink_internal))
+ (libraries ocamlfrontend ocamltoplevel unix_byte dynlink_internal))
 
 (executable
   (name ocamldebug_entry)
   (modes byte)
   (modules ocamldebug_entry)
-  (libraries unix ocamldebug))
+  ; -I otherlibs/unix/byte so the linker's primitive check finds the suffixed
+  ; dllunix_stubs there; link_deps so it is built first (see
+  ; otherlibs/unix/byte/dune).
+  (link_flags
+   (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)
+    -I otherlibs/unix/byte))
+  (link_deps (glob_files %{project_root}/otherlibs/unix/byte/dllunix_stubs-*.so))
+  (libraries unix_byte ocamldebug))
 
 (install
   (files (ocamldebug_entry.bc as ocamldebug))

@@ -43,6 +43,8 @@ CLEAN_FILES = \
   sharedlib_cflags.sexp \
   build_map_cflags.sexp \
   build_map_ccopt.sexp \
+  bytecode_launcher_flags_oxcaml.sexp \
+  $(stub_dune_fragments) \
   .rsync-output \
   .rsync-output-compare \
   ocamlc \

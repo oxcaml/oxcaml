@@ -16,6 +16,11 @@
   (name objinfo)
   (modes byte native)
   (modules objinfo)
+  ; Dual-mode: the launcher flags are bytecode-only (ocamlopt rejects them) and
+  ; must reach the bytecode link, so they go in ocamlc_flags rather than
+  ; link_flags. The same applies to the other dual-mode tools below.
+  (ocamlc_flags
+   (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
   (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
 
 (install
@@ -29,6 +34,8 @@
   (name ocamldep)
   (modes byte native)
   (modules ocamldep)
+  (ocamlc_flags
+   (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
   (libraries ocamlcommon))
 
 (install
@@ -62,7 +69,9 @@
   (name dumpobj)
   (modes byte)
   (modules dumpobj)
-  (link_flags (:standard (:include %{project_root}/build_map_ccopt.sexp)))
+  (link_flags
+   (:standard (:include %{project_root}/build_map_ccopt.sexp)
+              (:include %{project_root}/bytecode_launcher_flags.sexp)))
   (libraries ocamlfrontend ocamlbytecomp opnames))
 
 (install
@@ -85,6 +94,8 @@
   (modules ocamlmklib)
   ; FIXME Fix warning 32
   (flags (:standard -w -32))
+  (ocamlc_flags
+   (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
   (libraries ocamlfrontend ocamlbytecomp))
 
 (install
@@ -99,6 +110,8 @@
   (name ocamlmktop)
   (modes byte native)
   (modules ocamlmktop)
+  (ocamlc_flags
+   (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
   (libraries ocamlfrontend ocamlbytecomp))
 
 (install
@@ -161,6 +174,8 @@
  (name ocamlfilt)
  (modes byte native)
  (modules ocamlfilt)
+ (ocamlc_flags
+  (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamlfrontend))
 
 (install

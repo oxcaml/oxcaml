@@ -33,6 +33,7 @@
 (executable
  (name main)
  (modes byte)
+ (link_flags (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamllex_lib)
  (modules main))
 
