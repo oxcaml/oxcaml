@@ -105,18 +105,29 @@ module Event = struct
     | (name, count) :: counters ->
       (name, Json.int count) :: counters_to_json counters
 
-  let add_counters ~counters json =
-    match counters with
-    | None -> json
-    | Some counters ->
-      ("counters", Json.Object (counters_to_json counters)) :: json
+  let add_counters_to_args ~args ~counters =
+    let field_name = "counters" in
+    List.find_opt (fun (key, _) -> String.equal key field_name) args
+    |> Option.iter (fun _ ->
+        Misc.fatal_errorf
+          "Attempted to write an action trace event with counters when args \
+           also contained a field named \"%s\""
+          field_name);
+    (field_name, Json.Object (counters_to_json counters)) :: args
 
   let add_common_fields ~name ~counters ~args json =
+    let args =
+      match counters with
+      | Some counters ->
+        Some
+          (add_counters_to_args ~args:(Option.value args ~default:[]) ~counters)
+      | None -> args
+    in
     ([ "tid", Json.int 0;
        "pid", Json.int 0;
        "name", Json.String name;
        "cat", Json.String category ]
-    |> add_counters ~counters |> add_args ~args)
+    |> add_args ~args)
     @ json
 
   let instant_fields ~args ~counters ~name ~time_in_nanoseconds () =
