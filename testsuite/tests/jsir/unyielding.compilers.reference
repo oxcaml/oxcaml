@@ -10,13 +10,13 @@ Entry point: 0
   return v6
 
 ==== 2 () ====
-  event jsir_unyielding.ml:15:25
+  event unyielding.ml:15:25
   v9 = v7 + 1
-  event jsir_unyielding.ml:15:30
+  event unyielding.ml:15:30
   return v9
 
 ==== 3 (v10) ====
-  v11 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__f_1"j, v10) 
+  v11 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__f_1"j, v10) 
   v13 = fun(v12){4 ()} [hint:(int)->int never_inline]
   branch 6 (v13)
 
@@ -26,13 +26,13 @@ Entry point: 0
   branch 5 (v16)
 
 ==== 5 (v14) ====
-  event jsir_unyielding.ml:18:40
+  event unyielding.ml:18:40
   v17 = v14 + 1
-  event jsir_unyielding.ml:18:48
+  event unyielding.ml:18:48
   return v17
 
 ==== 6 (v18) ====
-  v19 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__call_unyielding_2"j, v18) 
+  v19 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_unyielding_2"j, v18) 
   v21 = fun(v20){7 ()} [hint:(value)->int never_inline]
   branch 9 (v21)
 
@@ -42,13 +42,13 @@ Entry point: 0
   branch 8 (v24)
 
 ==== 8 (v22) ====
-  event jsir_unyielding.ml:21:66
+  event unyielding.ml:21:66
   v25 = v22 + 1
-  event jsir_unyielding.ml:21:74
+  event unyielding.ml:21:74
   return v25
 
 ==== 9 (v26) ====
-  v27 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__call_yielding_3"j, v26) 
+  v27 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_yielding_3"j, v26) 
   v29 = fun(v28){10 ()} [hint:(int)->int]
   branch 11 (v29)
 
@@ -57,7 +57,7 @@ Entry point: 0
   return v30
 
 ==== 11 (v31) ====
-  v32 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__fn[jsir_unyielding.ml:25,63--76]_5"j, v31) 
+  v32 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__fn[unyielding.ml:25,63--76]_5"j, v31) 
   v34 = fun(v33){12 ()} [hint:(int)->int never_inline]
   branch 13 (v34)
 
@@ -66,19 +66,19 @@ Entry point: 0
   return v35
 
 ==== 13 (v36) ====
-  v37 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__call_with_unyielding_arg_4"j, v36) 
+  v37 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__call_with_unyielding_arg_4"j, v36) 
   v44 = fun(v43){15 ()} [hint:(int)->value never_inline]
   branch 18 (v44)
 
 ==== 14 () ====
-  event jsir_unyielding.ml:31:11
+  event unyielding.ml:31:11
   v42 = v41 + v38
-  event jsir_unyielding.ml:31:16
+  event unyielding.ml:31:16
   return v42
 
 ==== 15 () ====
-  event jsir_unyielding.ml:30:10
-  event jsir_unyielding.ml:30:18
+  event unyielding.ml:30:10
+  event unyielding.ml:30:18
   branch 16 (v43)
 
 ==== 16 (v41) ====
@@ -89,7 +89,7 @@ Entry point: 0
   return v39
 
 ==== 18 (v45) ====
-  v46 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__curried_6"j, v45) 
+  v46 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__curried_6"j, v45) 
   v48 = fun(v47){19 ()} [hint:(int)->int never_inline]
   branch 21 (v48)
 
@@ -104,18 +104,18 @@ Entry point: 0
   return v53
 
 ==== 21 (v54) ====
-  v55 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__over_app_7"j, v54) 
+  v55 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__over_app_7"j, v54) 
   v58 = fun(v56, v57){22 ()} [hint:(int,int)->int never_inline]
   branch 23 (v58)
 
 ==== 22 () ====
-  event jsir_unyielding.ml:37:29
+  event unyielding.ml:37:29
   v59 = v56 + v57
-  event jsir_unyielding.ml:37:34
+  event unyielding.ml:37:34
   return v59
 
 ==== 23 (v60) ====
-  v61 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__add_8"j, v60) 
+  v61 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__add_8"j, v60) 
   branch 24 (v60)
 
 ==== 24 (v4) ====
@@ -123,7 +123,7 @@ Entry point: 0
   branch 25 (v2, v2)
 
 ==== 25 (v62, v3) ====
-  v63 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__partial_add_9"j, v62) 
+  v63 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_add_9"j, v62) 
   v65 = fun(v64){26 ()} [hint:(int)->int never_inline]
   branch 27 (v65)
 
@@ -133,27 +133,27 @@ Entry point: 0
   return v67
 
 ==== 27 (v68) ====
-  v69 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__partial_app_10"j, v68) 
+  v69 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__partial_app_10"j, v68) 
   v71 = CONST{0}
   v72 = v18(v71)
   branch 28 (v72)
 
 ==== 28 (v70) ====
-  event jsir_unyielding.ml:44:10
-  event jsir_unyielding.ml:44:37
+  event unyielding.ml:44:10
+  event unyielding.ml:44:37
   v74 = CONST{0}
   v75 = v36(v74)
   branch 29 (v75)
 
 ==== 29 (v73) ====
-  event jsir_unyielding.ml:45:10
-  event jsir_unyielding.ml:45:46
+  event unyielding.ml:45:10
+  event unyielding.ml:45:46
   v78 = fun(v77){31 ()} [hint:(int)->int]
   branch 32 (v78)
 
 ==== 30 (v76) ====
-  event jsir_unyielding.ml:46:10
-  event jsir_unyielding.ml:46:63
+  event unyielding.ml:46:10
+  event unyielding.ml:46:63
   v84 = CONST{0}
   v85 = v54(v84)
   branch 33 (v85)
@@ -163,22 +163,22 @@ Entry point: 0
   return v79
 
 ==== 32 (v80) ====
-  v81 = "caml_register_symbol"("Jsir_unyielding"j, "camlJsir_unyielding__fn[jsir_unyielding.ml:46,33--46]_11"j, v80) 
+  v81 = "caml_register_symbol"("Unyielding"j, "camlUnyielding__fn[unyielding.ml:46,33--46]_11"j, v80) 
   v82 = v26~(v80)
   branch 30 (v82)
 
 ==== 33 (v83) ====
-  event jsir_unyielding.ml:47:10
-  event jsir_unyielding.ml:47:30
+  event unyielding.ml:47:10
+  event unyielding.ml:47:30
   v87 = CONST{0}
   v88 = v68(v87)
   branch 34 (v88)
 
 ==== 34 (v86) ====
-  event jsir_unyielding.ml:48:10
-  event jsir_unyielding.ml:48:33
+  event unyielding.ml:48:10
+  event unyielding.ml:48:33
   v89 = imm{tag=0; 0 = v10; 1 = v18; 2 = v26; 3 = v36; 4 = v45; 5 = v54; 6 = v60; 7 = v62; 8 = v68}
-  v90 = "caml_register_global"(v89, "Jsir_unyielding"j)
+  v90 = "caml_register_global"(v89, "Unyielding"j)
   stop
 
 
