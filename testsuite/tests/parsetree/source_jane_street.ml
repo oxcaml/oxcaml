@@ -25,10 +25,10 @@ let f (type (a : immediate) (b : immediate)) (x : a) = x;;
 let f (type (a : immediate) (b : immediate) c) (x : a) = x;;
 
 [%%expect{|
-val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a @ static -> 'a = <fun>
+val f : ('a : immediate). 'a @ static -> 'a = <fun>
+val f : ('a : immediate). 'a @ static -> 'a = <fun>
+val f : ('a : immediate). 'a @ static -> 'a = <fun>
 |}]
 
 let f y (type a : immediate) (x : a) = x;;
@@ -36,9 +36,9 @@ let f y (type (a : immediate)) (x : a) = x;;
 let f y (type (a : immediate) (b : immediate)) (x : a) = x;;
 
 [%%expect{|
-val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
-val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
-val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a @ static -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a @ static -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a @ static -> 'a = <fun>
 |}]
 
 let f y (type a : immediate) = y;;
@@ -59,7 +59,7 @@ let f (type a : immediate) (type b : immediate)
   = ();;
 
 [%%expect{|
-val f : unit = ()
+val f : unit @@ stateless = ()
 |}]
 
 module type S_for_layouts = sig
@@ -325,10 +325,10 @@ let nums = [| n, m, x
   |];;
 
 [%%expect{|
-val nums : int iarray = [:7; 7; 8; 7; 8; 9:]
-val nums : int array = [|7; 7; 8; 7; 8; 9|]
-val nums : int list = [7; 7; 8; 7; 8; 9]
-val nums : (int * int * int) array =
+val nums : int iarray @@ stateless = [:7; 7; 8; 7; 8; 9:]
+val nums : int array @@ stateless = [|7; 7; 8; 7; 8; 9|]
+val nums : int list @@ stateless = [7; 7; 8; 7; 8; 9]
+val nums : (int * int * int) array @@ stateless =
   [|(1, 5, 6); (1, 5, 2); (1, 2, 3); (1, 2, 3); (2, 4, 2); (2, 1, 3);
     (3, 3, 4); (3, 3, 2); (3, 0, 1); (3, 0, 3); (4, 5, 3); (4, 2, 2);
     (5, 4, 5); (5, 4, 3); (5, 1, 2); (5, 1, 2); (6, 3, 3); (6, 0, 2);
@@ -446,7 +446,7 @@ let g () = exclave_ local_
   local_ (() : @ unique once);;
 
 [%%expect{|
-val g : unit -> unit @ local once = <fun>
+val g : unit -> unit @ local = <fun>
 |}]
 
 (* type declarations *)
@@ -633,9 +633,9 @@ type t2 = {
 let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
 
 [%%expect{|
-Line 1, characters 48-49:
+Line 1, characters 8-9:
 1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
-                                                    ^
+            ^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
@@ -847,14 +847,13 @@ val double2 : int -> int = <fun>
 
 let make_tuple x y z = stack_ (x, y), z
 [%%expect{|
-Line 1, characters 23-36:
+Line 1, characters 23-39:
 1 | let make_tuple x y z = stack_ (x, y), z
-                           ^^^^^^^^^^^^^
-Error: This value is "local" because it is "stack_"-allocated.
-       However, the highlighted expression is expected to be "global"
-         because it is an element of the tuple at line 1, characters 23-39
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
+                           ^^^^^^^^^^^^^^^^
+Error: This value is "local"
+         because it is a tuple that contains the expression at line 1, characters 23-36
+         which is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
@@ -1032,8 +1031,8 @@ let matches =
 [%%expect{|
 type xy = x:int * y:int
 val lt : x:int * y:int * x2:int * int @@ stateless = (~x:1, ~y:2, ~x2:3, 4)
-val matches : int = 1
-val matches : int * int = (1, 2)
+val matches : int @@ stateless = 1
+val matches : int * int @@ stateless = (1, 2)
 |}]
 
 (********************)
@@ -1204,7 +1203,7 @@ let f x =
 
 [%%expect{|
 val f : float# -> [> `Five | `Four | `Other ] = <fun>
-val x : unit = ()
+val x : unit @@ stateless = ()
 val f : float# -> float# = <fun>
 |}]
 ;;
@@ -1257,7 +1256,7 @@ let f x =
 test_int64 "result" (f #7L);;
 
 [%%expect{|
-val x : unit = ()
+val x : unit @@ stateless = ()
 val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
@@ -1271,7 +1270,7 @@ let x =
 ;;
 
 [%%expect{|
-val x : int = 10
+val x : int @@ stateless = 10
 |}]
 
 (*******************)
@@ -1643,7 +1642,7 @@ let triangle_10 = let mutable x = 0 in
 ;;
 
 [%%expect{|
-val triangle_10 : int = 55
+val triangle_10 : int @@ stateless = 55
 |}]
 
 (*****************************)

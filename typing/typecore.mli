@@ -137,8 +137,10 @@ type module_patterns_restriction =
   | Modules_rejected
   | Modules_ignored
 
+(* [at_toplevel] is [false] when typing a structure nested in an expression
+   (e.g. [let module]). *)
 val type_binding:
-        Env.t -> mutable_flag -> rec_flag ->
+        at_toplevel:bool -> Env.t -> mutable_flag -> rec_flag ->
           ?force_toplevel:bool ->
           Parsetree.value_binding list ->
           Typedtree.value_binding list * Env.t
@@ -149,7 +151,7 @@ val type_let:
 val type_expression:
         Env.t -> Parsetree.expression -> Typedtree.expression
 val type_representable_expression:
-        why:Jkind.History.concrete_creation_reason ->
+        why:Jkind.History.concrete_creation_reason -> at_toplevel:bool ->
         Env.t -> Parsetree.expression -> Typedtree.expression * Jkind.sort
 val type_class_arg_pattern:
         string -> Env.t -> Env.t -> arg_label -> Parsetree.pattern ->

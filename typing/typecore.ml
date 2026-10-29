@@ -13003,7 +13003,8 @@ let maybe_check_uniqueness_value_bindings vbl =
 
 (* Typing of toplevel bindings *)
 
-let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
+let type_binding ~at_toplevel env mutable_flag rec_flag ?force_toplevel
+    spat_sexp_list =
   let (pat_exp_list, new_env) =
     type_let
       ~check:(fun s _ -> Warnings.Unused_value_declaration s)
@@ -13012,6 +13013,11 @@ let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
+  (* Suspended constraints that do not block generalization outlive it, so
+     must be defaulted here (before checking uniqueness, which reads the
+     modes they constrain). Inside an expression, the enclosing
+     generalization scope defaults them instead. *)
+  if at_toplevel then Ctype.run_scheduler_and_default_all ();
   maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
@@ -13025,7 +13031,7 @@ let type_let existential_ctx env mutable_flag rec_flag spat_sexp_list =
 
 (* Typing of toplevel expressions *)
 
-let type_expression env jkind sexp =
+let type_expression ~at_toplevel env jkind sexp =
   let exp =
     with_local_level_generalize begin fun () ->
       Typetexp.TyVarEnv.reset ();
@@ -13035,6 +13041,7 @@ let type_expression env jkind sexp =
     ~before_generalize:(fun exp -> may_lower_contravariant env exp)
     ~generalize:(fun exp -> generalize exp.exp_type)
   in
+  if at_toplevel then Ctype.run_scheduler_and_default_all ();
   let exp =
     match sexp.pexp_desc with
       Pexp_ident lid ->
@@ -13048,15 +13055,16 @@ let type_expression env jkind sexp =
   in
   maybe_check_uniqueness_exp exp; exp
 
-let type_representable_expression ~why env sexp =
+let type_representable_expression ~why ~at_toplevel env sexp =
   let jkind, sort =
     Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
   in
-  let exp = type_expression env jkind sexp in
+  let exp = type_expression ~at_toplevel env jkind sexp in
   exp, sort
 
 let type_expression env sexp =
-  type_expression env (Jkind.Builtin.any ~why:Type_expression_call) sexp
+  type_expression ~at_toplevel:true env
+    (Jkind.Builtin.any ~why:Type_expression_call) sexp
 
 (* Error report *)
 

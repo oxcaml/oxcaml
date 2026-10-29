@@ -106,9 +106,9 @@ val f : int @ local -> int = <fun>
 let f : local_ _ -> _ =
   fun n -> (n : string)
 [%%expect{|
-Line 2, characters 12-13:
+Line 2, characters 11-23:
 2 |   fun n -> (n : string)
-                ^
+               ^^^^^^^^^^^^
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
@@ -398,16 +398,19 @@ type _ t_gadt =
     Int : int t_gadt
   | Bool : bool t_gadt
   | String : string t_gadt
-Line 6, characters 22-23:
+Lines 3-6, characters 2-29:
+3 | ..match x with
+4 |   | Int -> { fld = y }.fld
+5 |   | Bool -> { fld = y }.fld
 6 |   | String -> { fld = y }.fld
-                          ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
+Error: This value is "local"
          because it is the field "fld" of the record at line 6, characters 14-25
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a record whose field "fld" is the expression at line 6, characters 14-29
-         which is expected to be "local" to the parent region or "global"
+         which is "local"
+         because it is allocated at line 6, characters 14-25 containing data
+         which is "local" to the parent region
+         because it is a record whose field "fld" is the expression at line 6, characters 22-23
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
