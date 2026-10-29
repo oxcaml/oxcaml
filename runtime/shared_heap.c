@@ -16,6 +16,7 @@
 #define CAML_INTERNALS
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include "caml/addrmap.h"
@@ -34,6 +35,10 @@
 #include "caml/sizeclasses.h"
 #include "caml/startup_aux.h"
 #include "caml/weak.h"
+
+#ifdef HAS_MALLOC_TRIM
+#include <malloc.h> /* for malloc_trim; HAS_MALLOC_TRIM is from s.h */
+#endif
 
 CAMLexport atomic_uintnat caml_compactions_count;
 uintnat caml_pool_min_chunk_bsz = 8 * 1024 * 1024; /* 8 MB */
@@ -2209,6 +2214,44 @@ static bool should_run_phase_two = false;
   very specific conditions the compaction algorithm expects.
 */
 
+/* An entry point to a patched TCMalloc that returns free memory to
+   the OS without breaking up any hugepage. Weak, so NULL unless
+   linked against a TCMalloc providing it (weakness is ELF only).
+
+   We deliberately do not use TCMalloc's unrestricted release call
+   (ReleaseMemoryToSystem): that one unmaps the free tails of
+   partially-used hugepages, which splits them, so the memory still
+   live on those hugepages loses its TLB coverage. */
+#if defined(__GNUC__) && defined(__ELF__)
+#define MAYBE_HAS_TCMALLOC
+extern size_t
+MallocExtension_Internal_ReleaseMemoryToSystemWithoutBreakingHugepages(void)
+  CAMLweakdef;
+#endif
+
+/* After compaction, ask the C allocator to return free memory to the OS.
+ * Where TCMalloc offers the call above, use it. Otherwise fall back to
+ * malloc_trim, which both glibc and TCMalloc implement, and which in
+ * TCMalloc's case releases only entirely free hugepages. */
+static void compact_release_malloc_memory(void)
+{
+#ifdef MAYBE_HAS_TCMALLOC
+  if (MallocExtension_Internal_ReleaseMemoryToSystemWithoutBreakingHugepages
+      != NULL) {
+    size_t released =
+      MallocExtension_Internal_ReleaseMemoryToSystemWithoutBreakingHugepages();
+    CAML_GC_MESSAGE(COMPACT,
+                    "Released %zu bytes of TCMalloc memory to the OS.\n",
+                    released);
+    return;
+  }
+#endif
+#ifdef HAS_MALLOC_TRIM
+  /* TCMalloc's malloc_trim always returns zero. */
+  malloc_trim(0);
+#endif
+}
+
 void caml_compact_heap(caml_domain_state* domain_state,
                        int participating_count,
                        caml_domain_state** participants)
@@ -2249,6 +2292,7 @@ void caml_compact_heap(caml_domain_state* domain_state,
 
   caml_global_barrier(participating_count);
   if (participants[0] == Caml_state) {
+    compact_release_malloc_memory();
      /* We are done, increment the compaction count */
     (void)caml_atomic_counter_incr(&caml_compactions_count);
     CAML_GC_MESSAGE(COMPACT,
