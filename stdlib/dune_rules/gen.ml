@@ -177,6 +177,7 @@ let write_stdlib_dune ppf =
     ~deps:(modnames |> List.map (fun m -> get_target m ^ ".cmo"))
     ~action;
   copy_files ~ppf "../../runtime/lib{asm,caml}run*.{a,so}";
+  copy_files ~ppf "../../runtime/libcomprmarsh.a";
   copy_files ~ppf "../../Makefile.config";
   copy_files ~ppf "../dune_rules/ld.conf"; 
   fprintf ppf "%s\n" {|
@@ -186,6 +187,7 @@ let write_stdlib_dune ppf =
     (deps
        libcamlrun.a libcamlrund.a libcamlrun_pic.a libcamlrun_shared.so
        libasmrun.a libasmrund.a libasmrun_pic.a libasmrun_shared.so
+       libcomprmarsh.a
        stdlib.cma stdlib.cmxa stdlib.a
        std_exit.cmo std_exit.o std_exit.cmx
        (glob_files *.{cmi,cmti,cmsi,cmo,cms,cmt,cmx})
@@ -211,7 +213,7 @@ let write_runtime_dune ppf =
     match variant with
     | `Normal -> ""
     | `Debug -> "d"
-    | `PIC | `Shared -> "_pic"
+    | `Zstd | `PIC | `Shared -> "_pic"
   in
   let obj_suff ~variant ~mode =
     (match mode with
@@ -230,7 +232,7 @@ let write_runtime_dune ppf =
   in
   let variant_flags ~variant =
     match variant with
-    | `Normal -> []
+    | `Zstd | `Normal -> []
     | `Debug -> setting "cflags.debug"
     | `PIC | `Shared -> setting "cflags.pic"
   in
@@ -239,6 +241,8 @@ let write_runtime_dune ppf =
     | `Byte when variant = `Debug ->
         setting "runtime_sources.byte" @ ["runtime/instrtrace.c"]
     | `Byte -> setting "runtime_sources.byte"
+    | `Native when variant = `Zstd ->
+        ["runtime/zstd.c"]
     | `Native -> setting "runtime_sources.native"
   in
 
@@ -276,6 +280,9 @@ let write_runtime_dune ppf =
       | (`Normal|`Debug|`PIC) as variant, `Native ->
          "libasmrun" ^ variant_suff ~variant ^ ".a",
          setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
+      | `Zstd, _ ->
+         "libcomprmarsh.a",
+         setting "ar" @ ["rc"; "%{target}"; "%{deps}"]
       | `Shared, `Byte ->
          "libcamlrun_shared.so",
          setting "mkdll" @ ["-o"; "%{target}"; "%{deps}"] @ setting "bytecclibs"
@@ -293,11 +300,12 @@ let write_runtime_dune ppf =
       target (String.concat " " objs) (String.concat " " cmd)
   in
   
+  compile_object ~variant:`PIC ~mode:`Native "runtime/zstd.c";
   [`Byte; `Native] |> List.iter (fun mode ->
     [`Normal; `Debug; `PIC] |> List.iter (fun variant ->
       sources ~variant ~mode |> List.iter (compile_object ~variant ~mode));
-    [`Normal; `Debug; `PIC; `Shared] |> List.iter (fun variant ->
-      archive ~variant ~mode));
+    [`Normal; `Debug; `PIC; `Shared; `Zstd] |> List.iter (fun variant ->
+      if variant <> `Zstd || mode <> `Byte then archive ~variant ~mode));
 
   (* primitives *)
   write_primitives_dune ppf;
