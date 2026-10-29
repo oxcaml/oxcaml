@@ -178,37 +178,32 @@ G(name):
 
 /* Stack switching operations */
 
-/* struct stack_info */
-#define Stack_sp(reg)           [reg]
-#define Stack_sp_offset         0
-#define Stack_exception(reg)    [reg, #8]
-#define Stack_handler(reg)      [reg, #16]
-#define Stack_handler_from_cont(reg) [reg, #15]
-#define Stack_local_sp(reg)     [reg, #64]
-#define Stack_local_top(reg)    [reg, #72]
-#define Stack_local_limit(reg)  [reg, #80]
-#define Stack_tls_state(reg)    [reg, #88]
+/* Offsets into the C structs used here (stack_info, stack_handler,
+   the dynamic-binding cache, c_stack_link), hand-maintained in
+   caml/asm_offsets.h and checked against the C definitions by static
+   assertions in fiber.c.  If you change Dynamic_cache_entries
+   (DYNAMIC_CACHE_BITS in caml/dynamic.h), you must also update
+   FLUSH_DYNAMIC_CACHE. */
+#include "caml/asm_offsets.h"
 
-/* struct c_stack_link */
-#define Cstack_stack(reg)       [reg]
-#define Cstack_sp(reg)          [reg, #8]
-#define Cstack_sp_offset        8
-#define Cstack_prev(reg)        [reg, #16]
-#define Cstack_async_exn_handler(reg) [reg, #24]
-
-/* struct dynamic_cache_s */
-/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
-#define Dynamic_binding_size     (2*8) /* dyn, val */
-#define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
-
-/* struct stack_handler */
-#define Handler_value(reg)      [reg]
-#define Handler_exception(reg)  [reg, #8]
-#define Handler_effect(reg)     [reg, #16]
-#define Handler_parent(reg)     [reg, #32]
-#define Handler_parent_offset   32
+#define Stack_sp(reg)           [reg, #Stack_sp_offset]
+#define Stack_exception(reg)    [reg, #Stack_exception_offset]
+#define Stack_handler(reg)      [reg, #Stack_handler_offset]
+#define Stack_handler_from_cont(reg) \
+                                [reg, #Stack_handler_from_cont_offset]
+#define Stack_local_sp(reg)     [reg, #Stack_local_sp_offset]
+#define Stack_local_top(reg)    [reg, #Stack_local_top_offset]
+#define Stack_local_limit(reg)  [reg, #Stack_local_limit_offset]
+#define Stack_tls_state(reg)    [reg, #Stack_tls_state_offset]
+#define Handler_value(reg)      [reg, #Handler_value_offset]
+#define Handler_exception(reg)  [reg, #Handler_exception_offset]
+#define Handler_effect(reg)     [reg, #Handler_effect_offset]
+#define Handler_parent(reg)     [reg, #Handler_parent_offset]
+#define Cstack_stack(reg)       [reg, #Cstack_stack_offset]
+#define Cstack_sp(reg)          [reg, #Cstack_sp_offset]
+#define Cstack_prev(reg)        [reg, #Cstack_prev_offset]
+#define Cstack_async_exn_handler(reg) \
+                                [reg, #Cstack_async_exn_handler_offset]
 
 /* Continuation values
  *

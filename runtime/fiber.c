@@ -19,6 +19,7 @@
 #define CAML_INTERNALS
 
 #include "caml/config.h"
+#include <stddef.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -49,6 +50,47 @@
 /* for gettid */
 #include <sys/syscall.h>
 #endif
+
+/* Check the hand-maintained offsets in caml/asm_offsets.h against the
+   real structure layouts. */
+#define CHECK_ASM_OFFSET(name, expr) \
+  _Static_assert((name) == (expr), \
+                 #name " in caml/asm_offsets.h disagrees with " #expr)
+
+CHECK_ASM_OFFSET(Stack_sp_offset, offsetof(struct stack_info, sp));
+CHECK_ASM_OFFSET(Stack_exception_offset,
+                 offsetof(struct stack_info, exception_ptr));
+CHECK_ASM_OFFSET(Stack_handler_offset, offsetof(struct stack_info, handler));
+CHECK_ASM_OFFSET(Stack_handler_from_cont_offset,
+                 offsetof(struct stack_info, handler) - 1);
+CHECK_ASM_OFFSET(Stack_id_offset, offsetof(struct stack_info, id));
+CHECK_ASM_OFFSET(Stack_local_sp_offset,
+                 offsetof(struct stack_info, local_sp));
+CHECK_ASM_OFFSET(Stack_local_top_offset,
+                 offsetof(struct stack_info, local_top));
+CHECK_ASM_OFFSET(Stack_local_limit_offset,
+                 offsetof(struct stack_info, local_limit));
+CHECK_ASM_OFFSET(Stack_tls_state_offset,
+                 offsetof(struct stack_info, tls_state));
+CHECK_ASM_OFFSET(Handler_value_offset,
+                 offsetof(struct stack_handler, handle_value));
+CHECK_ASM_OFFSET(Handler_exception_offset,
+                 offsetof(struct stack_handler, handle_exn));
+CHECK_ASM_OFFSET(Handler_effect_offset,
+                 offsetof(struct stack_handler, handle_effect));
+CHECK_ASM_OFFSET(Handler_parent_offset,
+                 offsetof(struct stack_handler, parent));
+CHECK_ASM_OFFSET(Dynamic_cache, offsetof(dynamic_cache_s, tbl));
+CHECK_ASM_OFFSET(Dynamic_binding_size, sizeof(dynamic_binding_s));
+CHECK_ASM_OFFSET(Dynamic_binding_var, offsetof(dynamic_binding_s, dyn));
+CHECK_ASM_OFFSET(Dynamic_cache_entries, DYNAMIC_CACHE_SIZE);
+CHECK_ASM_OFFSET(Cstack_stack_offset,
+                 offsetof(struct c_stack_link, stack));
+CHECK_ASM_OFFSET(Cstack_sp_offset, offsetof(struct c_stack_link, sp));
+CHECK_ASM_OFFSET(Cstack_prev_offset, offsetof(struct c_stack_link, prev));
+CHECK_ASM_OFFSET(Cstack_async_exn_handler_offset,
+                 offsetof(struct c_stack_link, async_exn_handler));
+CHECK_ASM_OFFSET(SIZEOF_C_STACK_LINK, sizeof(struct c_stack_link));
 
 #ifdef DEBUG
 #define fiber_debug_log(...) caml_gc_log(__VA_ARGS__)
