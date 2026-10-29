@@ -4142,7 +4142,7 @@ jkind_desc_gen(self):
       (* LIDENTs here are for modes *)
       let modes =
         List.map
-          (fun {txt; loc} -> {txt = Mode txt; loc})
+          (fun {txt; loc} -> {txt = Pmode txt; loc})
           $3
       in
       Pjk_mod ($1, modes)
@@ -4767,7 +4767,7 @@ strict_function_or_labeled_tuple_type:
 /* Legacy mode annotations */
 %inline mode_legacy:
    | LOCAL
-       { mkloc (Mode "local") (make_loc $sloc) }
+       { mkloc (Pmode "local") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
@@ -4796,7 +4796,7 @@ strict_function_or_labeled_tuple_type:
   | QUOTE ident { mkloc $2 (make_loc $sloc) }
 ;
 
-mode_bound_elem:
+mode_bound_var:
   | elem_var = mode_var
     elem_mod = iloption(preceded(MOD, mode_consts))
       { { elem_morph = None; elem_var; elem_mod } }
@@ -4805,29 +4805,35 @@ mode_bound_elem:
       { { elem_morph = Some elem_morph; elem_var; elem_mod } }
 ;
 
-mode_bound(SEP):
+mode_bound_elems:
+  | v = mode_bound_var
+      { [Pbound_var v] }
   | consts = mode_consts
-      { { bound_vars = []; bound_const = consts } }
-  | e = mode_bound_elem
-      { { bound_vars = [e]; bound_const = [] } }
-  | e = mode_bound_elem SEP rest = mode_bound(SEP)
-      { { rest with bound_vars = e :: rest.bound_vars } }
+      { List.map (fun c -> Pbound_const c) consts }
 ;
 
-mode_bounds:
+mode_bound(SEP):
+  | elems = separated_nonempty_list(SEP, mode_bound_elems)
+      { List.concat elems }
+;
+
+mode_bounded:
   | LBRACKETLESS upper = mode_bound(AMPERSAND) RBRACKET
-      { { upper; lower = { bound_vars = []; bound_const = [] } } }
+      { { upper; lower = [] } }
   | LBRACKETLESS upper = mode_bound(AMPERSAND) GREATER
     lower = mode_bound(BAR) RBRACKET
       { { upper; lower } }
   | LBRACKETGREATER lower = mode_bound(BAR) RBRACKET
-      { { upper = { bound_vars = []; bound_const = [] }; lower } }
+      { { upper = []; lower } }
+  | LBRACKETGREATER lower = mode_bound(BAR) LESS
+    upper = mode_bound(AMPERSAND) RBRACKET
+      { { upper; lower } }
 ;
 
 %inline mode:
-  | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
-  | v = mode_var { mkloc (Mode_var v.txt) v.loc }
-  | b = mode_bounds { mkloc (Mode_var_with_constraints b) (make_loc $sloc) }
+  | LIDENT { mkloc (Pmode $1) (make_loc $sloc) }
+  | v = mode_var { mkloc (Pmode_var v.txt) v.loc }
+  | b = mode_bounded { mkloc (Pmode_bounded b) (make_loc $sloc) }
 ;
 
 %inline mode_expr:
