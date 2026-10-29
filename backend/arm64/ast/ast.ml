@@ -2819,7 +2819,8 @@ module DSL = struct
   (* Force the unscaled signed 9-bit encoding, as required by stlur. *)
   let mem_offset_unscaled ~(base : [`GP of [< `X | `SP]] Reg.t) ~offset =
     check_nine_signed_unscaled offset;
-    Operand.Mem (Offset_nine_signed_unscaled (base, Nine_signed_unscaled offset))
+    Operand.Mem
+      (Offset_nine_signed_unscaled (base, Nine_signed_unscaled offset))
 
   let mem_symbol ~(base : [`GP of [< `X | `SP]] Reg.t) ~symbol =
     Operand.Mem (Offset_sym (base, symbol))

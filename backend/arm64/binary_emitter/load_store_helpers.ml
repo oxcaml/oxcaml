@@ -375,8 +375,8 @@ let encode_load_acquire : type a.
   result
 
 (* Store-Release (STLR) encoding. Identical layout to LDAR (load-acquire) but
-   with L=0 (store). Provides at least the load->store ordering of
-   [dmb ishld; str] in a single instruction. *)
+   with L=0 (store). Provides at least the load->store ordering of [dmb ishld;
+   str] in a single instruction. *)
 let encode_store_release : type a.
     rd:[`GP of a] Reg.t -> rn:[`GP of _] Reg.t -> int32 =
  fun ~rd ~rn ->
@@ -406,10 +406,10 @@ let encode_store_release : type a.
   let result = logor result (of_int rt) in
   result
 
-(* Store-Release unscaled (STLUR, FEAT_LRCPC2) encoding. Ordered-unscaled
-   class: size[31:30] | 011001 | opc[23:22]=00 | 0 | imm9[20:12] | 00 | Rn | Rt.
-   64-bit base is 0xD9000000. Lets an aligned release-store use a [base, #imm9]
-   offset directly, avoiding a separate address computation. *)
+(* Store-Release unscaled (STLUR, FEAT_LRCPC2) encoding. Ordered-unscaled class:
+   size[31:30] | 011001 | opc[23:22]=00 | 0 | imm9[20:12] | 00 | Rn | Rt. 64-bit
+   base is 0xD9000000. Lets an aligned release-store use a [base, #imm9] offset
+   directly, avoiding a separate address computation. *)
 let encode_store_release_unscaled : type a.
     rd:[`GP of a] Reg.t -> rn:[`GP of _] Reg.t -> imm9:int -> int32 =
  fun ~rd ~rn ~imm9 ->
