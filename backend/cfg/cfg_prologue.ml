@@ -239,10 +239,7 @@ module Path_needs_prologue = struct
   type t = bool Label.Tbl.t
 
   let build (cfg : Cfg.t) : t =
-    match
-      run ~init:false ~handlers_are_entry_points:true cfg
-        { fun_name = cfg.fun_name }
-    with
+    match run ~init:false cfg { fun_name = cfg.fun_name } with
     | Ok res_at_entry ->
       (* The result returned by the forward analysis is the state at the entry
          of each block, but we want the state just before the terminator, i.e.
@@ -649,7 +646,7 @@ let validate : Cfg_with_infos.t -> Cfg_with_infos.t =
     match
       Validator.run cfg
         ~init:(Validator.State_set.singleton No_prologue_on_stack)
-        ~handlers_are_entry_points:false { fun_name }
+        { fun_name }
     with
     | Ok block_states ->
       Label.Tbl.iter
