@@ -1522,4 +1522,15 @@ module type S = sig
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Fmt.formatter -> t -> unit
   end
+
+  module Typing_recovery_functions : sig
+    type t =
+      { log_and_raise : 'a. exn -> 'a;
+        register_recoverable : (exn -> bool) -> unit
+      }
+
+    (** [Typing_recovery] should call this function to pass implementations of
+        the functions in [t]. This circumvents a circular dependency issue. *)
+    val set : t -> unit
+  end
 end

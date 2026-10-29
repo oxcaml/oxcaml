@@ -5445,11 +5445,67 @@ module Error = struct
     Location.error_of_printer ~loc print ()
 end
 
-exception Submode_error_simple_context of Hint.pinpoint * Error.packed
+module rec Typing_recovery_functions : sig
+  type t =
+    { log_and_raise : 'a. exn -> 'a;
+      register_recoverable : (exn -> bool) -> unit
+    }
+
+  val get : unit -> t
+
+  val set : t -> unit
+end = struct
+  type t =
+    { log_and_raise : 'a. exn -> 'a;
+      register_recoverable : (exn -> bool) -> unit
+    }
+
+  let f =
+    ref
+      { log_and_raise =
+          (fun _ ->
+            failwith
+              "This value should be filled in with \
+               Typing_recovery.log_and_raise");
+        register_recoverable =
+          (fun _ ->
+            failwith
+              "This value should be filled in with \
+               Typing_recovery.register_recoverable")
+      }
+
+  let get () = !f
+
+  let set t =
+    f := t;
+    Submode_error_simple_context.register t
+end
+
+and Submode_error_simple_context : sig
+  type exn += private In_context of Hint.pinpoint * Error.packed
+
+  val log_and_raise : Hint.pinpoint -> Error.packed -> 'a
+
+  val register : Typing_recovery_functions.t -> unit
+end = struct
+  type exn += In_context of Hint.pinpoint * Error.packed
+
+  let log_and_raise hint err =
+    (Typing_recovery_functions.get ()).log_and_raise (In_context (hint, err))
+
+  let register (typing_recovery_functions : Typing_recovery_functions.t) =
+    (* We can't call this immediately upon startup because we need to wait for
+       the ref in [Typing_recovery_functions] to get filled. Instead, we make
+       [Typing_recovery_functions.set] call this, so that we register once it is
+       filled. *)
+    typing_recovery_functions.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 let () =
   Location.register_error_of_exn (function
-    | Submode_error_simple_context (pp, err) ->
+    | Submode_error_simple_context.In_context (pp, err) ->
       Some (Error.print_packed_simple_context pp err)
     | _ -> None)
 
@@ -5587,7 +5643,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error e -> Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let print_error pp err = Error.print_all pp obj err
 
@@ -5637,7 +5693,8 @@ module Comonadic_gen (Obj : Obj) = struct
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
-    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error (_, e) ->
+      Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -5792,7 +5849,7 @@ module Monadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error e -> Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let generic_level = S.generic_level
 
@@ -5846,7 +5903,8 @@ module Monadic_gen (Obj : Obj) = struct
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
-    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error (_, e) ->
+      Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -6373,14 +6431,14 @@ module Comonadic_with (Areality : Areality) = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
     | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
@@ -6531,14 +6589,14 @@ module Monadic = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
     | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
