@@ -1271,6 +1271,8 @@ The precedences must be listed from low to high.
 %type <Longident.t> parse_mod_longident
 %start parse_any_longident
 %type <Longident.t> parse_any_longident
+%start parse_unprefixed_compilation_unit
+%type <Compilation_unit.t> parse_unprefixed_compilation_unit
 /* END AVOID */
 
 %%
@@ -1675,6 +1677,24 @@ parse_mod_longident:
 parse_any_longident:
   any_longident EOF
     { $1 }
+;
+
+parse_unprefixed_compilation_unit:
+  unprefixed_compilation_unit EOF
+    { $1 }
+;
+
+unprefixed_compilation_unit:
+  head = UIDENT args = list(unprefixed_compilation_unit_arg)
+    { let module CU = Compilation_unit in
+      CU.create_instance (CU.create CU.Prefix.empty (CU.Name.of_string head))
+        args }
+;
+
+unprefixed_compilation_unit_arg:
+  LBRACKET param = UIDENT COLON value = unprefixed_compilation_unit RBRACKET
+    { let module CU = Compilation_unit in
+      ({ param = CU.Name.of_string param; value } : CU.argument) }
 ;
 /* END AVOID */
 
