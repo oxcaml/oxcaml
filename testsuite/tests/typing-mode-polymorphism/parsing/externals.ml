@@ -13,44 +13,37 @@ external magic : 'a @ [< 'm] -> 'b @ [> 'm] = "%identity"
 (* we can instantiate it under various annotations *)
 (magic : 'a -> 'a);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a -> 'a = <fun>
 |}];;
 
 (magic : 'a @ local -> 'a @ local);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a @ local -> 'a @ local = <fun>
 |}];;
 
 (magic : 'a @ unique -> 'a @ unique);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a @ unique -> 'a @ unique = <fun>
 |}];;
 
 (fun x -> magic x : 'a -> 'a);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a -> 'a = <fun>
 |}];;
 
 (fun x -> magic x : 'a @ unique -> 'a @ unique);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a @ unique -> 'a @ unique = <fun>
 |}];;
 
 (fun x -> exclave_ magic x : 'a @ local -> 'a @ local);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a @ local -> 'a @ local = <fun>
 |}];;
 
 (fun x -> magic x : 'a @ yielding -> 'a @ yielding);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : 'a @ yielding -> 'a @ yielding = <fun>
 |}];;
 
 (* But not under an instantiation that violates the mode polymorphic signature *)
@@ -73,8 +66,22 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity" end
+       is not included in
+         sig val id : 'a @ [< 'm] -> 'a @ [> 'm] end
+       Values do not match:
+         external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
+       is not included in
+         val id : 'a @ [< 'm] -> 'a @ [> 'm]
+       The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
+       is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
+       The return mode was expected to be "global" but is "local"
 |}];;
 
 (* We can stay polymorphic over other axes *)
@@ -85,8 +92,7 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+module Foo : sig val id : 'a @ [< 'm] -> 'a @ [> 'm | local] end
 |}]
 
 module Foo : sig
@@ -95,8 +101,7 @@ end = struct
   external id : 'a @ [< 'm] -> 'a @ [> 'm] = "%identity"
 end
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+module Foo : sig val id : 'a @ [< 'm & global] -> 'a @ [> 'm] end
 |}]
 
 module Foo : sig
@@ -122,38 +127,37 @@ external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
 
 (fun x y -> add x y);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [< global] -> int32 @ [< global] -> int32 @ [> dynamic] = <fun>
 |}];;
 
 (fun (x @ local) y -> exclave_ add x y);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [> local] -> int32 @ 'm -> int32 @ [> local dynamic] = <fun>
 |}];;
 
 (add : int32 -> int32 -> int32);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 -> int32 -> int32 = <fun>
 |}];;
 
 (add : int32 @ local -> int32 @ local -> int32 @ local);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ local -> int32 @ local -> int32 @ local = <fun>
 |}];;
 
 (fun x -> add x);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [< 'n mod contended immutable & global] ->
+    (int32 @ [< 'm & global] ->
+     int32 @ [< global > 'm | 'n mod many portable forkable unyielding stateless]) @ [> nonportable stateful dynamic]
+= <fun>
 |}];;
 
 (fun (x @ local) -> exclave_ add x);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [> local] ->
+    (int32 @ [< 'm & global] -> int32 @ [> 'm | local]) @ [> local nonportable stateful dynamic]
+= <fun>
 |}];;
 
 let () =
@@ -185,8 +189,10 @@ module M_stateless :
 
 (fun x -> M_stateless.add x);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [< 'n mod contended immutable & global] ->
+    (int32 @ [< 'm & global] ->
+     int32 @ [< global > 'm | 'n mod many portable forkable unyielding stateless]) @ [> nonportable stateful dynamic]
+= <fun>
 |}];;
 
 module M_stateless_val : sig
@@ -224,11 +230,11 @@ Error: Signature mismatch:
            int32 @ [< 'n & global] ->
            int32 @ [< 'm & global] -> int32 @ [> 'm | 'n] @@ stateless
        The type
-         "int32 @ [< 'o & past('m)] ->
-         (int32 @ [< 'n] -> int32 @ [> 'n | 'o]) @ [> past('m) | nonportable stateful]"
+         "int32 @ [< 'n & global] ->
+         int32 @ [< 'm & global] -> int32 @ [< global > 'm | 'n]"
        is not compatible with the type
-         "int32 @ [< 'mm0 & past('p) & global] ->
-         (int32 @ [< 'q & global] -> int32 @ [> 'q | 'mm0]) @ [> past('p)]"
+         "int32 @ [< 'q & past('o) & global] ->
+         (int32 @ [< 'p & global] -> int32 @ [> 'p | 'q]) @ [> past('o)]"
        The return mode was expected to be "stateless" but is "stateful"
 |}];;
 
@@ -274,8 +280,7 @@ external add_indep : int32 @ [< 'm] -> int32 @ 'n -> int32 @ [> 'm]
 
 (fun x (y @ local) -> add_indep x y);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [< global] -> int32 @ [> local] -> int32 @ [> dynamic] = <fun>
 |}];;
 
 (* We can mix constant and polymorphic arguments *)
@@ -289,14 +294,13 @@ external add_local_arg : int32 @ local -> int32 @ [< 'm] -> int32 @ [> 'm]
 
 (fun (x @ local) y -> add_local_arg x y);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [> local] -> int32 @ [< global] -> int32 @ [> dynamic] = <fun>
 |}];;
 
 (fun x (y @ local) -> exclave_ add_local_arg x y);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [< global] -> int32 @ [> local] -> int32 @ [> local dynamic] =
+<fun>
 |}];;
 
 (* Here the locality of the first argument will be considered [Prim_global] *)
@@ -319,8 +323,8 @@ Error: This value is "local" but is expected to be "global".
 
 (fun x (y @ local) -> exclave_ add_global x y);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+- : int32 @ [< global] -> int32 @ [> local] -> int32 @ [> local dynamic] =
+<fun>
 |}];;
 
 (* Primitives with higher-order functions, and more complex mode signatures *)
@@ -337,8 +341,10 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 
 (fun x -> revapply x (fun y -> use_global y));;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+- : 'a @ [< global] -> unit @ [> dynamic] = <fun>
+|}, Principal{|
+- : 'a @ [< global] -> unit @ [> aliased nonportable stateful dynamic] =
+<fun>
 |}];;
 
 (fun (x @ local) -> revapply x (fun y -> use_global y));;
@@ -483,26 +489,26 @@ external set32 : bytes @ 'o -> int @ 'n -> int32 @ 'm -> unit
 
 let set32_one_arg = set32 (Bytes.create 4)
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+val set32_one_arg : int -> (int32 -> unit) @ [> nonportable stateful] = <fun>
 |}];;
 
 let set32_two_args = set32 (Bytes.create 4) 0
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+val set32_two_args : int32 -> unit = <fun>
 |}];;
 
 (fun (b @ local) -> exclave_ set32 b);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+- : bytes @ [> local] ->
+    (int @ [< global] -> int32 @ [< global] -> unit) @ [> local nonportable stateful dynamic]
+= <fun>
 |}];;
 
 (fun (b @ local) -> exclave_ set32 b 0);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+- : bytes @ [> local] ->
+    (int32 @ [< global] -> unit) @ [> local nonportable stateful dynamic]
+= <fun>
 |}];;
 
 (fun (b @ local) -> set32 b);;
@@ -525,16 +531,18 @@ end = struct
     = "%caml_bytes_set32"
 end
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+module Set32_val :
+  sig val set32 : bytes @ 'o -> int @ 'n -> int32 @ 'm -> unit end
 |}];;
 
 let set32_val_one_arg = Set32_val.set32 (Bytes.create 4)
 [%%expect{|
-Line 1, characters 24-33:
+Line 1, characters 24-56:
 1 | let set32_val_one_arg = Set32_val.set32 (Bytes.create 4)
-                            ^^^^^^^^^
-Error: Unbound module "Set32_val"
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+Hint: This is a partial application
+      Adding 2 more arguments will make the value non-local
 |}];;
 
 module Set32_legacy : sig val set32 : bytes -> int -> int32 -> unit end =
@@ -543,16 +551,12 @@ struct
     = "%caml_bytes_set32"
 end
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+module Set32_legacy : sig val set32 : bytes -> int -> int32 -> unit end
 |}];;
 
 let set32_legacy_one_arg = Set32_legacy.set32 (Bytes.create 4)
 [%%expect{|
-Line 1, characters 27-39:
-1 | let set32_legacy_one_arg = Set32_legacy.set32 (Bytes.create 4)
-                               ^^^^^^^^^^^^
-Error: Unbound module "Set32_legacy"
+val set32_legacy_one_arg : int -> int32 -> unit = <fun>
 |}];;
 
 (* The return value has constant locality. Unlike [Id_locality_should_fail] the following
@@ -574,8 +578,11 @@ module type Same_type =
 
 let same_type_external (module X : Same_type) = X.e (Bytes.create 4)
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+val same_type_external :
+  (module Same_type) @ [< many] ->
+  (int @ [< past('m) & global] ->
+   (int32 @ [< global] -> unit) @ [> past('m) | nonportable stateful]) @ [> nonportable stateful dynamic] =
+  <fun>
 |}];;
 
 let same_type_val (module X : Same_type) = X.v (Bytes.create 4)
@@ -601,8 +608,9 @@ external set32_local_bytes : bytes @ local -> int @ 'n -> int32 @ 'm -> unit
 
 (fun (b @ local) -> exclave_ set32_local_bytes b 0);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+- : bytes @ [< uncontended read_write > local] ->
+    (int32 @ [< global] -> unit) @ [> local nonportable unforkable yielding stateful dynamic]
+= <fun>
 |}];;
 
 (* The partial application of [eq] closes over a type that does not mode cross *)
@@ -614,8 +622,7 @@ external eq : 'a @ 'n -> 'a @ 'm -> bool = "%equal"
 
 let eq_one_arg = eq "a"
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+val eq_one_arg : string -> bool = <fun>
 |}];;
 
 (* Since [Eq_val.eq] is a [val], the curry mode will be lower-bounded by [local], and will
@@ -625,16 +632,17 @@ module Eq_val : sig val eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool end = struct
   external eq : 'a @ [< 'm] -> 'a @ [< 'm] -> bool = "%equal"
 end
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+module Eq_val : sig val eq : 'a @ 'n -> 'a @ 'm -> bool end
 |}];;
 
 let eq_val_one_arg = Eq_val.eq "a"
 [%%expect{|
-Line 1, characters 21-27:
+Line 1, characters 21-34:
 1 | let eq_val_one_arg = Eq_val.eq "a"
-                         ^^^^^^
-Error: Unbound module "Eq_val"
+                         ^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}];;
 
 (* [Eq_val_close.eq] can't be inhabited, not even by a primitive which by itself
@@ -667,12 +675,11 @@ Error: Signature mismatch:
            'a @ [< past('n)] ->
            ('a @ [< past('m)] -> bool) @ [> past('m) | past('n)]
        The type
-         "'a @ [< past('m) > past('o)] ->
-         ('a @ [> past('n)] -> bool) @ [> past('m) | nonportable stateful]"
+         "'a @ [> past('n) | local] -> 'a @ [> past('m) | local] -> bool"
        is not compatible with the type
-         "'a @ [< past('q) & past('o)] ->
-         ('a @ [< past('p) & past('n)] -> bool) @ [> past('p) | past('q)]"
-       The return mode was expected to be "stateless" but is "stateful"
+         "'a @ [< past('p) & past('n)] ->
+         ('a @ [< past('o) & past('m)] -> bool) @ [> past('o) | past('p)]"
+       The return mode was expected to be "global" but is "local"
 |}];;
 
 module Eq_val_shared : sig
@@ -695,12 +702,11 @@ Error: Signature mismatch:
        is not included in
          val eq : 'a @ [< 'n] -> ('a @ [< 'm] -> bool) @ [> 'm | 'n]
        The type
-         "'a @ [< past('m) > past('o)] ->
-         ('a @ [> past('n)] -> bool) @ [> past('m) | nonportable stateful]"
+         "'a @ [> past('n) | local] -> 'a @ [> past('m) | local] -> bool"
        is not compatible with the type
-         "'a @ [< 'q & past('o)] ->
-         ('a @ [< 'p & past('n)] -> bool) @ [> 'p | 'q]"
-       The return mode was expected to be "stateless" but is "stateful"
+         "'a @ [< 'p & past('n)] ->
+         ('a @ [< 'o & past('m)] -> bool) @ [> 'o | 'p]"
+       The return mode was expected to be "global" but is "local"
 |}];;
 
 (* [p] becomes local because we apply it to the local [y], and the conservative estimate
@@ -712,8 +718,10 @@ let eq_later_arg_local (y @ local) =
   let _ = p y in
   p
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+val eq_later_arg_local :
+  string @ [> local] ->
+  (string @ [> local] -> bool) @ [> aliased nonportable stateful dynamic] =
+  <fun>
 |}];;
 
 (* If all uses are global [p] can be heap allocated *)
@@ -722,38 +730,41 @@ let eq_later_arg_global (y : string) =
   let _ = p y in
   p
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+val eq_later_arg_global :
+  string @ [< 'm mod contended immutable & global] ->
+  (string @ [< global > 'm mod many portable forkable unyielding stateless] ->
+   bool) @ [> aliased nonportable stateful dynamic] =
+  <fun>
 |}];;
 
 (fun (x @ nonportable) -> eq x);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+- : 'a @ [< past('m) & global > nonportable] ->
+    ('a @ [< global] -> bool) @ [> past('m) | nonportable stateful dynamic]
+= <fun>
 |}];;
 
 (* Although [x] is portable, the partial application is nonportable. This is due to
    the mode of [eq] itself. *)
 (fun (x @ portable) -> eq x);;
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 206, characters 14-20: Assertion failed
-
+- : 'a @ [< past('m) & global portable] ->
+    ('a @ [< global] -> bool) @ [> past('m) | nonportable stateful dynamic]
+= <fun>
 |}];;
 
 (* [add_alias] creates an instance of [add], which is why the curry mode is no longer
    polymorphic over locality *)
 let add_alias = add
 [%%expect{|
-Uncaught exception: File "lambda/translprim.ml", line 198, characters 14-20: Assertion failed
-
+val add_alias :
+  int32 @ [< 'n & global] ->
+  int32 @ [< 'm & global] -> int32 @ [< global > 'm | 'n] = <fun>
 |}];;
 
 (add_alias : int32 -> int32 -> int32);;
 [%%expect{|
-Line 1, characters 1-10:
-1 | (add_alias : int32 -> int32 -> int32);;
-     ^^^^^^^^^
-Error: Unbound value "add_alias"
+- : int32 -> int32 -> int32 = <fun>
 |}];;
 
 (add_alias : int32 @ local -> int32 @ local -> int32 @ local);;
@@ -761,7 +772,9 @@ Error: Unbound value "add_alias"
 Line 1, characters 1-10:
 1 | (add_alias : int32 @ local -> int32 @ local -> int32 @ local);;
      ^^^^^^^^^
-Error: Unbound value "add_alias"
+Error: The value "add_alias" has type "int32 -> int32 -> int32"
+       but an expression was expected of type
+         "int32 @ local -> int32 @ local -> int32"
 |}];;
 
 module type Of_struct = module type of struct
@@ -775,8 +788,8 @@ module type Of_struct =
     external add : int32 @ [< 'n] -> int32 @ [< 'm] -> int32 @ [> 'm | 'n]
       = "%int32_add"
     val add_val :
-      int32 @ [< 'o & past('m)] ->
-      (int32 @ [< 'n] -> int32 @ [> 'n | 'o]) @ [> past('m) | nonportable stateful]
+      int32 @ [< 'n & global] ->
+      int32 @ [< 'm & global] -> int32 @ [< global > 'm | 'n]
   end
 |}];;
 

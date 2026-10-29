@@ -57,11 +57,23 @@ type native_repr =
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
 
+(** The state of a [Prim_mode_poly] description. *)
+type mode_poly =
+  | Generic
+  (** Denotes a polymorphic mode variable that belongs to the primitive
+      signature. *)
+  | Instance of Mode.Locality.l
+  (** Denotes the locality of an instance of a polymorphic mode variable; used
+      when a primitive is instantiated and applied. *)
+  | Arbitrary
+  (** Denotes a special case where the locality is irrelevant,
+      e.g. when checking the arity. *)
+
 type mode =
   | Prim_local
   | Prim_global
   | Prim_poly
-  | Prim_mode_poly
+  | Prim_mode_poly of mode_poly
 (* [Prim_poly] arguments and results are subject to mode inference,
    allowing e.g. (+.) to work on local or global floats. After
    typechecking, all [Prim_poly] modes on a given primitive application
@@ -111,6 +123,12 @@ val parse_declaration
   -> native_repr_res:(mode * native_repr)
   -> is_layout_poly:bool
   -> description
+
+val with_modes
+  :  'repr description_gen
+  -> args:mode list
+  -> res:mode
+  -> 'repr description_gen
 
 val print
   :  description

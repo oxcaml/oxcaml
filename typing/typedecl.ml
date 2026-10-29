@@ -4620,7 +4620,7 @@ let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
   | Some Global -> Prim_global
   | Some Local -> Prim_local
-  | None when Mode.Locality.check_generic m -> Prim_mode_poly
+  | None when Mode.Locality.check_generic m -> Prim_mode_poly Generic
   | None -> assert false
 
 let rec parse_native_repr_attributes env core_type ty rmode
