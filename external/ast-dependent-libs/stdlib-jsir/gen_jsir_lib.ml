@@ -26,7 +26,7 @@ let name = ref ""
 
 let cmxa = ref ""
 
-let flags = ref ""
+let flags = ref []
 
 (* [DIR=CMXA] *)
 let library_dep_specs = ref []
@@ -43,9 +43,9 @@ let speclist =
       Arg.Set_string cmxa,
       "FILE  The installed native archive, next to the .cmi and sources" );
     ( "--flags",
-      Arg.Set_string flags,
+      Arg.String (fun s -> flags := s :: !flags),
       "FLAGS  Extra flags for compiling the units (e.g. -extension-universe \
-       beta)" );
+       beta); may be repeated" );
     ( "--dep",
       Arg.String (fun s -> library_dep_specs := s :: !library_dep_specs),
       "DIR=CMXA  Another library built with these rules, in DIR, that this \
@@ -268,7 +268,8 @@ let ocamlopt_action args =
 
 (* Keep in sync with the env stanza of the root dune file and the dune
    context in Makefile.common-ox, except for -directory, as it records the
-   source directory relative to a different build root.
+   source directory relative to a different build root, and for the
+   optimisation flags, which the dune file passes with --flags.
 
    dune compiles every module with -no-alias-deps, so an alias to a module
    without implementation (e.g. [module Hint = Mode_hint] in the compiler)
@@ -307,7 +308,9 @@ let () =
   let library_deps = read_library_deps () in
   let unit_deps_of = read_unit_deps ~alias units in
   let extra_flags =
-    String.split_on_char ' ' !flags |> List.filter (fun s -> s <> "")
+    List.rev !flags
+    |> List.concat_map (String.split_on_char ' ')
+    |> List.filter (fun s -> s <> "")
   in
   let ppf = stdout in
   let compile_rule ~unit_name ~src_path ~cmi_deps ~cmjx_deps ~flags =
