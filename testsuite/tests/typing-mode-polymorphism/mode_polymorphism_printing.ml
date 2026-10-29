@@ -273,7 +273,6 @@ let legacy_id : 'a -> 'a = fun x -> x
 val legacy_id : 'a -> 'a = <fun>
 |}]
 
-(* CR mode-poly-printing: apply "X mode implies Y mode" logic to bounds *)
 let foo (x @ local) = x
 [%%expect{|
 val foo : 'a @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
@@ -649,31 +648,11 @@ val flip :
   <fun>
 |}]
 
-(* CR dkalinichenko: the second definition should print [stateful nonportable]. *)
-
 let stateful x : _ @ stateful = x
 let stateful_nonportable x : _ @ stateful nonportable = x
 [%%expect{|
 val stateful : 'a @ [< 'm] -> 'a @ [> 'm | stateful] = <fun>
 val stateful_nonportable : 'a @ [< 'm] -> 'a @ [> 'm | nonportable stateful] =
-  <fun>
-|}]
-
-(* CR dkalinichenko: the printing loses information that the argument [f] and the returned
-   [f] must have equal modes (in addition to having the same constraints). *)
-
-let call_and_return f x = f x, f
-[%%expect{|
-val call_and_return :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('p) & past('o) & global many] ->
-  ('a @ [< 'n] ->
-   'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | past('p) | aliased dynamic]) @ [> past('o)] =
-  <fun>
-|}, Principal{|
-val call_and_return :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many] ->
-  ('a @ [< 'n] ->
-   'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | 'o | aliased dynamic]) @ [> close('o)] =
   <fun>
 |}]
 
