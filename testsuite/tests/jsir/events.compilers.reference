@@ -5,9 +5,9 @@ Entry point: 0
   v2 = "caml_register_symbol"("Events"j, "camlEvents__immstring_2"j, v1) 
   v3 = CONST{"Events.E"}
   v4 = "caml_register_symbol"("Events"j, "camlEvents__immstring_0"j, v3) 
-  event events.ml:23:0
+  event events.ml:17:0
   v6 = "caml_fresh_oo_id"(0) 
-  event events.ml:23:18
+  event events.ml:17:18
   branch 1 (v6)
 
 ==== 1 (v5) ====
@@ -17,13 +17,13 @@ Entry point: 0
   branch 3 (v10)
 
 ==== 2 () ====
-  event events.ml:27:25
+  event events.ml:21:25
   v11 = v9 + 1
-  event events.ml:27:29
+  event events.ml:21:29
   v12 = "caml_float_of_int"(v11) 
-  event events.ml:27:29
+  event events.ml:21:29
   v13 = "caml_add_float"(v12, 1.5)
-  event events.ml:27:56
+  event events.ml:21:56
   return v13
 
 ==== 3 (v14) ====
@@ -32,9 +32,9 @@ Entry point: 0
   branch 6 (v18)
 
 ==== 4 () ====
-  event events.ml:30:34
+  event events.ml:24:34
   v20 = v16(v17)
-  event events.ml:30:37
+  event events.ml:24:37
   branch 5 (v20)
 
 ==== 5 (v19) ====
@@ -47,7 +47,7 @@ Entry point: 0
   branch 8 (v26)
 
 ==== 7 () ====
-  event events.ml:33:30
+  event events.ml:27:30
   v27 = v24(v25)
   return v27
 
@@ -57,7 +57,7 @@ Entry point: 0
   branch 10 (v31)
 
 ==== 9 () ====
-  event events.ml:36:31
+  event events.ml:30:31
   v32 = "caml_sys_getenv"(v1) 
   return v32
 
@@ -67,13 +67,13 @@ Entry point: 0
   branch 14 (v36)
 
 ==== 11 () ====
-  event events.ml:39:27
+  event events.ml:33:27
   v37 = v35 === 3
   if v37 then 12 () else 13 ()
 
 ==== 12 () ====
   v38 = imm{tag=0; 0 = v7; 1 = v35}
-  event events.ml:39:49
+  event events.ml:33:49
   raise v38
 
 ==== 13 () ====
@@ -82,9 +82,9 @@ Entry point: 0
 ==== 14 (v39) ====
   v40 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v39) 
   v42 = CONST{1}
-  event events.ml:42:17
+  event events.ml:36:17
   v43 = v14(v42)
-  event events.ml:42:26
+  event events.ml:36:26
   branch 15 (v43)
 
 ==== 15 (v41) ====
@@ -96,43 +96,43 @@ Entry point: 0
   branch 21 (v54)
 
 ==== 17 () ====
-  event events.ml:43:27
+  event events.ml:37:27
   v47 = v45 + 1
   return v47
 
 ==== 18 (v48) ====
-  v49 = "caml_register_symbol"("Events"j, "camlEvents__fn[events.ml:43,27--43]_9"j, v48) 
+  v49 = "caml_register_symbol"("Events"j, "camlEvents__fn[events.ml:37,27--43]_9"j, v48) 
   v50 = CONST{2}
-  event events.ml:43:17
+  event events.ml:37:17
   v51 = v22(v48, v50)
-  event events.ml:43:46
+  event events.ml:37:46
   branch 16 (v51)
 
 ==== 19 (v52) ====
   v61 = CONST{0}
-  event events.ml:45:17
+  event events.ml:39:17
   v62 = v33(v61)
-  event events.ml:45:28
+  event events.ml:39:28
   branch 22 (v62)
 
 ==== 20 () ====
-  event events.ml:44:23
+  event events.ml:38:23
   v55 = v53 + 2
   return v55
 
 ==== 21 (v56) ====
-  v57 = "caml_register_symbol"("Events"j, "camlEvents__fn[events.ml:44,23--39]_10"j, v56) 
+  v57 = "caml_register_symbol"("Events"j, "camlEvents__fn[events.ml:38,23--39]_10"j, v56) 
   v58 = CONST{3}
-  event events.ml:44:17
+  event events.ml:38:17
   v59 = v28(v56, v58)
-  event events.ml:44:42
+  event events.ml:38:42
   branch 19 (v59)
 
 ==== 22 (v60) ====
   v64 = CONST{4}
-  event events.ml:46:17
+  event events.ml:40:17
   v65 = v39(v64)
-  event events.ml:46:28
+  event events.ml:40:28
   branch 23 (v65)
 
 ==== 23 (v63) ====

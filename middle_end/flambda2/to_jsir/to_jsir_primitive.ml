@@ -147,8 +147,8 @@ let unit ~env ~res =
     To_jsir_result.add_instr_exn res (Let (var, Constant (Int Targetint.zero)))
   )
 
-(* We only place debug events to primitives that are compiled to runtime calls
-   by JSOO. *)
+(* We only place debug events around primitives that are compiled to runtime
+   calls by JSOO. *)
 let is_runtime_call (prim : Jsir.prim) =
   match prim with
   | Extern (name, _) -> not (String.starts_with ~prefix:"%" name)
