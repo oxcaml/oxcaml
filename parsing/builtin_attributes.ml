@@ -27,72 +27,6 @@ end)
 let unused_attrs = Attribute_table.create 128
 let mark_used t = Attribute_table.remove unused_attrs t
 
-(* [attr_order] is used to issue unused attribute warnings in the order the
-   attributes occur in the file rather than the random order of the hash table
-*)
-let attr_order a1 a2 = Location.compare a1.loc a2.loc
-
-let unchecked_zero_alloc_attributes = Attribute_table.create 1
-let mark_zero_alloc_attribute_checked txt loc =
-  Attribute_table.remove unchecked_zero_alloc_attributes { txt; loc }
-let register_zero_alloc_attribute attr =
-    Attribute_table.replace unchecked_zero_alloc_attributes attr
-     (Warnings.backup ())
-let warn_unchecked_zero_alloc_attribute () =
-    (* When using -i, attributes will not have been translated, so we can't
-     warn about missing ones. *)
-  if !Clflags.print_types then ()
-  else
-  let keys = List.of_seq (Attribute_table.to_seq_keys unchecked_zero_alloc_attributes) in
-  let keys = List.sort attr_order keys in
-  (* Treatment of warnings is similar to [Typecore.force_delayed_checks]. *)
-  let w_old = Warnings.backup () in
-  List.iter (fun sloc ->
-    let w = Attribute_table.find unchecked_zero_alloc_attributes sloc in
-    Warnings.restore w;
-    Location.prerr_warning sloc.loc (Warnings.Unchecked_zero_alloc_attribute))
-    keys;
-  Warnings.restore w_old
-
-let compiler_stops_before_attributes_consumed () =
-  let stops_before_lambda =
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
-  in
-  stops_before_lambda || !Clflags.print_types
-
-let warn_misplaced_attributes () =
-  let keys = List.of_seq (Attribute_table.to_seq_keys unused_attrs) in
-  Attribute_table.clear unused_attrs;
-  if not (compiler_stops_before_attributes_consumed ()) then
-    let keys = List.sort attr_order keys in
-    List.iter (fun sloc ->
-      Location.prerr_warning sloc.loc (Warnings.Misplaced_attribute sloc.txt))
-      keys
-
-let warn_unused_alert_disables () =
-  let entries = Warnings.flush_unused_alert_disables () in
-  if not (compiler_stops_before_attributes_consumed ()) then begin
-    let entries =
-      List.sort
-        (fun (loc1, _, _) (loc2, _, _) -> Location.compare loc1 loc2)
-        entries
-    in
-    (* Treatment of warnings is similar to
-       [warn_unchecked_zero_alloc_attribute]. *)
-    let w_old = Warnings.backup () in
-    List.iter (fun (loc, name, state) ->
-      Warnings.restore state;
-      Location.prerr_warning loc (Warnings.Unused_alert_disable name))
-      entries;
-    Warnings.restore w_old
-  end
-
-let warn_unused () =
-  warn_misplaced_attributes ();
-  warn_unused_alert_disables ()
-
 (* These are the attributes that are tracked in the builtin_attrs table for
    misplaced attribute warnings. *)
 let builtin_attrs =
@@ -181,6 +115,108 @@ let register_attr current_phase name =
     if is_builtin_attr name.txt then
       Attribute_table.replace unused_attrs name ()
 
+
+let attr_equals_builtin {attr_name = {txt; _}; _} s =
+  (* Check for attribute s or ocaml.s.  Avoid allocating a fresh string. *)
+  txt = s ||
+  (   String.length txt = 6 + String.length s
+   && String.starts_with ~prefix:"ocaml." txt
+   && String.ends_with ~suffix:s txt)
+
+let mark_payload_attrs_used payload =
+  let iter =
+    { Ast_iterator.default_iterator
+      with attribute = fun self a ->
+        mark_used a.attr_name;
+        Ast_iterator.default_iterator.attribute self a
+    }
+  in
+  iter.payload iter payload
+
+let has_attribute nm attrs =
+  List.exists
+    (fun a ->
+       if attr_equals_builtin a nm
+       then (mark_used a.attr_name; true)
+       else false)
+    attrs
+
+let curry_attr_name = "extension.curry"
+
+let has_curry attrs =
+  has_attribute curry_attr_name attrs
+  || has_attribute "curry" attrs
+
+let curry_attr loc =
+  Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])
+;;
+
+(* [attr_order] is used to issue unused attribute warnings in the order the
+   attributes occur in the file rather than the random order of the hash table
+*)
+let attr_order a1 a2 = Location.compare a1.loc a2.loc
+
+let unchecked_zero_alloc_attributes = Attribute_table.create 1
+let mark_zero_alloc_attribute_checked txt loc =
+  Attribute_table.remove unchecked_zero_alloc_attributes { txt; loc }
+let register_zero_alloc_attribute attr =
+    Attribute_table.replace unchecked_zero_alloc_attributes attr
+     (Warnings.backup ())
+let warn_unchecked_zero_alloc_attribute () =
+    (* When using -i, attributes will not have been translated, so we can't
+     warn about missing ones. *)
+  if !Clflags.print_types then ()
+  else
+  let keys = List.of_seq (Attribute_table.to_seq_keys unchecked_zero_alloc_attributes) in
+  let keys = List.sort attr_order keys in
+  (* Treatment of warnings is similar to [Typecore.force_delayed_checks]. *)
+  let w_old = Warnings.backup () in
+  List.iter (fun sloc ->
+    let w = Attribute_table.find unchecked_zero_alloc_attributes sloc in
+    Warnings.restore w;
+    Location.prerr_warning sloc.loc (Warnings.Unchecked_zero_alloc_attribute))
+    keys;
+  Warnings.restore w_old
+
+let compiler_stops_before_attributes_consumed () =
+  let stops_before_lambda =
+    match !Clflags.stop_after with
+    | None -> false
+    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+  in
+  stops_before_lambda || !Clflags.print_types
+
+let warn_misplaced_attributes () =
+  let keys = List.of_seq (Attribute_table.to_seq_keys unused_attrs) in
+  Attribute_table.clear unused_attrs;
+  if not (compiler_stops_before_attributes_consumed ()) then
+    let keys = List.sort attr_order keys in
+    List.iter (fun sloc ->
+      Location.prerr_warning sloc.loc (Warnings.Misplaced_attribute sloc.txt))
+      keys
+
+let warn_unused_alert_disables () =
+  let entries = Warnings.flush_unused_alert_disables () in
+  if not (compiler_stops_before_attributes_consumed ()) then begin
+    let entries =
+      List.sort
+        (fun (loc1, _, _) (loc2, _, _) -> Location.compare loc1 loc2)
+        entries
+    in
+    (* Treatment of warnings is similar to
+       [warn_unchecked_zero_alloc_attribute]. *)
+    let w_old = Warnings.backup () in
+    List.iter (fun (loc, name, state) ->
+      Warnings.restore state;
+      Location.prerr_warning loc (Warnings.Unused_alert_disable name))
+      entries;
+    Warnings.restore w_old
+  end
+
+let warn_unused () =
+  warn_misplaced_attributes ();
+  warn_unused_alert_disables ()
+
 let ident_of_payload = function
   | PStr[{pstr_desc=Pstr_eval({pexp_desc=Pexp_ident {txt=Lident id}},_)}] ->
      Some id
@@ -252,13 +288,6 @@ let error_of_extension ext =
   | ({txt; loc}, _) ->
       Location.errorf ~loc "Uninterpreted extension '%s'." txt
 
-let attr_equals_builtin {attr_name = {txt; _}; _} s =
-  (* Check for attribute s or ocaml.s.  Avoid allocating a fresh string. *)
-  txt = s ||
-  (   String.length txt = 6 + String.length s
-   && String.starts_with ~prefix:"ocaml." txt
-   && String.ends_with ~suffix:s txt)
-
 let mark_alert_used a =
   if attr_equals_builtin a "deprecated" || attr_equals_builtin a "alert"
   then mark_used a.attr_name
@@ -276,16 +305,6 @@ let mark_deprecated_mutable_used l =
     if attr_equals_builtin a "deprecated_mutable"
     then mark_used a.attr_name)
     l
-
-let mark_payload_attrs_used payload =
-  let iter =
-    { Ast_iterator.default_iterator
-      with attribute = fun self a ->
-        mark_used a.attr_name;
-        Ast_iterator.default_iterator.attribute self a
-    }
-  in
-  iter.payload iter payload
 
 let kind_and_message = function
   | PStr[
@@ -465,14 +484,6 @@ let warning_scope ?ppwarning attrs f =
   with exn ->
     Warnings.restore prev;
     raise exn
-
-let has_attribute nm attrs =
-  List.exists
-    (fun a ->
-       if attr_equals_builtin a nm
-       then (mark_used a.attr_name; true)
-       else false)
-    attrs
 
 type attr_action = Mark_used_only | Return
 let select_attributes actions attrs =
@@ -721,12 +732,6 @@ let has_local_opt attrs =
 let has_layout_poly attrs =
   has_attribute "layout_poly" attrs
 
-let curry_attr_name = "extension.curry"
-
-let has_curry attrs =
-  has_attribute curry_attr_name attrs
-  || has_attribute "curry" attrs
-
 let has_or_null attrs =
   has_attribute "or_null" attrs
 
@@ -735,10 +740,6 @@ let has_or_null_reexport attrs =
 
 let has_magic_staged_modes attrs =
   has_attribute "magic_staged_modes" attrs
-
-let curry_attr loc =
-  Ast_helper.Attr.mk ~loc:Location.none (Location.mkloc curry_attr_name loc) (PStr [])
-;;
 
 let tailcall attr =
   let has_nontail = has_attribute "nontail" attr in

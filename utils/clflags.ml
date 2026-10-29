@@ -13,6 +13,82 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let unsafe = ref false                  (* -unsafe *)
+and applicative_functors = ref true     (* -no-app-funct *)
+and all_ppx = ref ([] : string list)        (* -ppx *)
+let absname = ref false                 (* -absname *)
+let locs = ref true                     (* -locs *)
+
+let keyword_edition: string option ref = ref None
+
+let syntax_quotations = ref Config.syntax_quotations
+                                        (* -[no-]syntax-quotations *)
+
+let parse_keyword_edition s =
+  let parse_version s =
+  let bad_version () =
+    raise (Arg.Bad "Ill-formed version in keywords flag,\n\
+                    the supported format is <major>.<minor>, for example 5.2 .")
+  in
+  if s = "" then None else match String.split_on_char '.' s with
+  | [] | [_] | _ :: _ :: _ :: _ -> bad_version ()
+  | [major;minor] -> match int_of_string_opt major, int_of_string_opt minor with
+    | Some major, Some minor -> Some (major,minor)
+    | _ -> bad_version ()
+  in
+  match String.split_on_char '+' s with
+  | [] -> None, []
+  | [s] -> parse_version s, []
+  | v :: rest -> parse_version v, rest
+
+type 'a env_reader = {
+  parse : string -> 'a option;
+  print : 'a -> string;
+  usage : string;
+  env_var : string;
+}
+
+let color = ref None (* -color *)
+
+let color_reader = {
+  parse = (function
+    | "auto" -> Some Misc.Color.Auto
+    | "always" -> Some Misc.Color.Always
+    | "never" -> Some Misc.Color.Never
+    | _ -> None);
+  print = (function
+    | Misc.Color.Auto -> "auto"
+    | Misc.Color.Always -> "always"
+    | Misc.Color.Never -> "never");
+  usage = "expected \"auto\", \"always\" or \"never\"";
+  env_var = "OCAML_COLOR";
+}
+
+let error_style = ref None (* -error-style *)
+
+let error_style_reader = {
+  parse = (function
+    | "contextual" -> Some Misc.Error_style.Contextual
+    | "short" ->
+      (* Jane Street specific: This little bit of code suppresses the quote
+         marks in error messages. Remove this after we can get formatted
+         output in our editors. *)
+      let styles = Misc.Style.get_styles () in
+      let styles =
+        { styles with inline_code =
+          { styles.inline_code with text_open = ""; text_close = "" } }
+      in
+      Misc.Style.set_styles styles;
+      (* End Jane Street specific code *)
+      Some Misc.Error_style.Short
+    | _ -> None);
+  print = (function
+    | Misc.Error_style.Contextual -> "contextual"
+    | Misc.Error_style.Short -> "short");
+  usage = "expected \"contextual\" or \"short\"";
+  env_var = "OCAML_ERROR_STYLE";
+}
+
 (* Command-line parameters *)
 
 (* Stripped down version of Numbers, as its dependencies are a lot of code *)
@@ -116,7 +192,7 @@ and gdwarf_config_shape_reduce_fuel =
   (* -gdwarf-config-shape-reduce-fuel *)
 and gdwarf_fidelity = ref (None : gdwarf_fidelity option)
   (* -gdwarf-fidelity *)
-and unsafe = ref false                  (* -unsafe *)
+
 and use_linscan = ref false             (* -linscan *)
 and link_everything = ref false         (* -linkall *)
 and requires_metaprogramming = ref false    (* -requires-metaprogramming *)
@@ -135,9 +211,7 @@ and nopervasives = ref false            (* -nopervasives *)
 and match_context_rows = ref 32         (* -match-context-rows *)
 and safer_matching = ref false          (* -safer-matching *)
 and preprocessor = ref(None : string option) (* -pp *)
-and all_ppx = ref ([] : string list)        (* -ppx *)
-let absname = ref false                 (* -absname *)
-let locs = ref true                     (* -locs *)
+
 let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
@@ -167,7 +241,7 @@ and real_paths = ref true               (* -short-paths *)
 and recursive_types = ref false         (* -rectypes *)
 and strict_sequence = ref false         (* -strict-sequence *)
 and strict_formats = ref true           (* -strict-formats *)
-and applicative_functors = ref true     (* -no-app-funct *)
+
 and typing_recovery = ref false         (* -typing-recovery *)
 and make_runtime = ref false            (* -make-runtime *)
 and c_compiler = ref (None: string option) (* -cc *)
@@ -206,11 +280,6 @@ and dump_flambda_verbose = ref false    (* -dflambda-verbose *)
 and dump_jsir = ref false               (* -djsir *)
 and dump_instr = ref false              (* -dinstr *)
 and keep_camlprimc_file = ref false     (* -dcamlprimc *)
-
-let keyword_edition: string option ref = ref None
-
-let syntax_quotations = ref Config.syntax_quotations
-                                        (* -[no-]syntax-quotations *)
 
 let keep_asm_file = ref false           (* -S *)
 let optimize_for_speed = ref true       (* -compact *)
@@ -625,54 +694,6 @@ let dump_into_file = ref false (* -dump-into-file *)
 let dump_into_csv = ref false (* -dump-into-csv *)
 let dump_dir: string option ref = ref None (* -dump-dir *)
 
-type 'a env_reader = {
-  parse : string -> 'a option;
-  print : 'a -> string;
-  usage : string;
-  env_var : string;
-}
-
-let color = ref None (* -color *)
-
-let color_reader = {
-  parse = (function
-    | "auto" -> Some Misc.Color.Auto
-    | "always" -> Some Misc.Color.Always
-    | "never" -> Some Misc.Color.Never
-    | _ -> None);
-  print = (function
-    | Misc.Color.Auto -> "auto"
-    | Misc.Color.Always -> "always"
-    | Misc.Color.Never -> "never");
-  usage = "expected \"auto\", \"always\" or \"never\"";
-  env_var = "OCAML_COLOR";
-}
-
-let error_style = ref None (* -error-style *)
-
-let error_style_reader = {
-  parse = (function
-    | "contextual" -> Some Misc.Error_style.Contextual
-    | "short" ->
-      (* Jane Street specific: This little bit of code suppresses the quote
-         marks in error messages. Remove this after we can get formatted
-         output in our editors. *)
-      let styles = Misc.Style.get_styles () in
-      let styles =
-        { styles with inline_code =
-          { styles.inline_code with text_open = ""; text_close = "" } }
-      in
-      Misc.Style.set_styles styles;
-      (* End Jane Street specific code *)
-      Some Misc.Error_style.Short
-    | _ -> None);
-  print = (function
-    | Misc.Error_style.Contextual -> "contextual"
-    | Misc.Error_style.Short -> "short");
-  usage = "expected \"contextual\" or \"short\"";
-  env_var = "OCAML_ERROR_STYLE";
-}
-
 let unboxed_types = ref false
 
 let dump_debug_uids = ref false         (* -ddebug-uids *)
@@ -1082,23 +1103,6 @@ module Dump_option = struct
     | Backend ->
         check_native
 end
-
-let parse_keyword_edition s =
-  let parse_version s =
-  let bad_version () =
-    raise (Arg.Bad "Ill-formed version in keywords flag,\n\
-                    the supported format is <major>.<minor>, for example 5.2 .")
-  in
-  if s = "" then None else match String.split_on_char '.' s with
-  | [] | [_] | _ :: _ :: _ :: _ -> bad_version ()
-  | [major;minor] -> match int_of_string_opt major, int_of_string_opt minor with
-    | Some major, Some minor -> Some (major,minor)
-    | _ -> bad_version ()
-  in
-  match String.split_on_char '+' s with
-  | [] -> None, []
-  | [s] -> parse_version s, []
-  | v :: rest -> parse_version v, rest
 
 module String = Misc.Stdlib.String
 
