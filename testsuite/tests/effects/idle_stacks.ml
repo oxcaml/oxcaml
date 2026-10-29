@@ -1,6 +1,7 @@
 (* TEST
    { bytecode; }
    { native; }
+   { ocamlrunparam += ",Xmax_guarded_stacks=0"; native; }
    { set OCAMLRUNPARAM = "Xno_idle_stacks=1"; native; }
 *)
 
@@ -8,7 +9,10 @@
    out of their mappings ("idled") and copied back onto fresh mappings
    when resumed ("woken"): exercise suspension, promotion and resumption
    with garbage-collection pressure in between. Under stack checks, or
-   with Xno_idle_stacks=1, the same code runs without idling. *)
+   with Xno_idle_stacks=1, the same code runs without idling. With
+   Xmax_guarded_stacks=0, every promoted continuation is idled, however
+   few stacks exist; by default, only those promoted once at least half
+   the bound's worth of stacks exist are. *)
 
 open Effect
 open Effect.Deep

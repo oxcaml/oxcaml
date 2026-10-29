@@ -95,7 +95,8 @@ uintnat caml_cache_stacks_per_class = /* Xcache_stacks_per_class */
   ;
 
 /* Soft upper bound on the number of guarded stacks in existence (see the
-   design comment below); only meaningful with STACK_GUARD_PAGES. */
+   design comment below); only meaningful with STACK_GUARD_PAGES. Stacks
+   are only idled once half this many exist. */
 uintnat caml_max_guarded_stacks = 1024; /* Xmax_guarded_stacks */
 
 /* Set nonzero to disable stack idling (see the design comment below):
@@ -336,11 +337,16 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
 
    - Running stacks (the current stack of some thread and its ancestors)
      and the stacks of continuations on the minor heap are guarded.
-   - When a continuation is promoted to the major heap, its stacks are
-     "idled": their data is copied into malloced buffers and their
+   - When a continuation is promoted to the major heap, if at least
+     half of [caml_max_guarded_stacks] guarded stacks exist, its stacks
+     are "idled": their data is copied into malloced buffers and their
      guarded stacks are recycled. Pointers into the interior of the
      stack are left unrelocated, because nothing follows them while
-     the continuation is suspended.
+     the continuation is suspended. Below that, idling would only cost
+     a copy on promotion and another on resumption, so the continuation
+     keeps its guarded stacks. Such continuations hold at most about
+     half the bound's worth of stacks, since the population they count
+     towards is what turns idling back on.
    - When such a continuation is resumed, [caml_continuation_use_noexc]
      "wakes" each stack: copies it onto a fresh guarded stack and
      relocates those pointers (the exception-handler and frame-pointer
@@ -1747,7 +1753,9 @@ struct stack_info* caml_cont_idle_stacks_from_stw(value cont)
   CAMLassert(Is_block(cont) && Tag_val(cont) == Cont_tag);
   CAMLassert(stack != NULL);
 
-  if (caml_no_idle_stacks) return stack;
+  if (caml_no_idle_stacks ||
+      atomic_load_relaxed(&stack_count) < caml_max_guarded_stacks / 2)
+    return stack;
 
   while (stack != NULL) {
     struct stack_info* next = Stack_parent(stack);

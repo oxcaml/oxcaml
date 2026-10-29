@@ -1,6 +1,8 @@
 (* TEST
  {
    include runtime_events;
+   (* Idle every promoted continuation, however few stacks exist. *)
+   ocamlrunparam += ",Xmax_guarded_stacks=0";
    no-stack-checks;
    native;
  }
