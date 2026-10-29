@@ -1895,7 +1895,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
         | Elided_void -> param_tys, param_reprs, rest_ty
         | Native_repr repr -> arg_ty :: param_tys, repr :: param_reprs, rest_ty
   in
-  let param_tys, param_reprs, rest_ty =
+  let param_tys, param_reprs, res_ty =
     parameter_types prim_desc.prim_native_repr_args ty
   in
   match prim, param_tys with
@@ -1906,7 +1906,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     end
   | Primitive (Pfield (n, Pointer, mut), arity), _ ->
       (* try strength reduction based on the *result type* *)
-      let is_int = fst (maybe_pointer_type env rest_ty) in
+      let is_int = fst (maybe_pointer_type env res_ty) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
   | Primitive (Psetmixedfield ([0], [| elt |], init), arity), [_; p2] ->
       (* CR-someday lmaurer: What's really important here is to find out whether
@@ -1915,7 +1915,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       let elt = refine_mixed_block_element env (to_location loc) p2 elt in
       Some (Primitive (Psetmixedfield ([0], [| elt |], init), arity))
   | Primitive (Pmixedfield ([0], [| elt |], sem), arity), _ ->
-      let elt = refine_mixed_block_element env (to_location loc) rest_ty elt in
+      let elt = refine_mixed_block_element env (to_location loc) res_ty elt in
       Some (Primitive (Pmixedfield ([0], [| elt |], sem), arity))
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
@@ -1929,7 +1929,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some res_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1947,7 +1947,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       let loc = to_location loc in
       let array_ref_type =
         glb_array_ref_type loc rt
-          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
+          (array_type_kind ~elt_ty:(Some res_ty) env loc p1)
       in
       let array_mut = array_type_mut env p1 in
       if rt = array_ref_type && mut = array_mut then None
@@ -1977,7 +1977,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     _ :: [] -> begin
       let loc = to_location loc in
       let new_array_kind =
-        array_type_kind ~elt_ty:None env loc rest_ty
+        array_type_kind ~elt_ty:None env loc res_ty
         |> glb_array_type loc array_kind
       in
       unboxed_product_uninitialized_array_check loc new_array_kind;
@@ -2068,7 +2068,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     let _, result_repr = prim_desc.prim_native_repr_res in
     let contents_layout =
       peek_or_poke_layout ~prim_name:"peek" (to_location loc) env
-        ~poly_sort result_repr rest_ty
+        ~poly_sort result_repr res_ty
     in
     Some (Peek (Some contents_layout))
   )
@@ -2085,7 +2085,7 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
       Misc.fatal_error "Translprim.specialize_primitive: wrong arity for Poke"
   )
   | Atomic (Load, Field_like ((Ref | Loc | Field) as kind, Pointer)), _ ->
-    (match fst (maybe_pointer_type env rest_ty) with
+    (match fst (maybe_pointer_type env res_ty) with
     | Pointer -> None
     | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
   | Atomic (Set _ as op, Field_like ((Ref | Loc) as kind, Pointer)), [_; v]
@@ -2136,10 +2136,10 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
     let loc = to_location loc in
     let err () =
       raise (Error (loc,
-        Unable_to_specialize_array_idx_primitive rest_ty))
+        Unable_to_specialize_array_idx_primitive res_ty))
     in
     let array_ty, elt_ty =
-      match Types.get_desc (Ctype.expand_head env rest_ty) with
+      match Types.get_desc (Ctype.expand_head env res_ty) with
       | Tconstr (p, [array_ty; elt_ty], _)
         when Path.same p Predef.path_idx_mut
           || Path.same p Predef.path_idx_imm ->
