@@ -56,7 +56,7 @@ module Code_age_relation : sig
 
   val meet_set :
     t ->
-    resolver:(Compilation_unit.t -> t option) ->
+    resolver:(Compilation_unit.Found.t -> t option) ->
     Code_id.Set.t ->
     Code_id.Set.t ->
     Code_id.Set.t Or_bottom.t
@@ -166,13 +166,13 @@ module Typing_env : sig
 
   val create :
     machine_width:Target_system.Machine_width.t ->
-    resolver:(Compilation_unit.t -> Serializable.t option) ->
+    resolver:(Compilation_unit.Found.t -> Serializable.t option) ->
     t
 
   (** Convert closure conversion approximations to a typing environment. * *)
   val create_from_closure_conversion_approx :
     machine_width:Target_system.Machine_width.t ->
-    resolver:(Compilation_unit.t -> Serializable.t option) ->
+    resolver:(Compilation_unit.Found.t -> Serializable.t option) ->
     'a Value_approximation.t Symbol.Map.t ->
     t
 
@@ -180,10 +180,10 @@ module Typing_env : sig
 
   val closure_env : t -> t
 
-  val resolver : t -> Compilation_unit.t -> Serializable.t option
+  val resolver : t -> Compilation_unit.Found.t -> Serializable.t option
 
   val code_age_relation_resolver :
-    t -> Compilation_unit.t -> Code_age_relation.t option
+    t -> Compilation_unit.Found.t -> Code_age_relation.t option
 
   val current_scope : t -> Scope.t
 

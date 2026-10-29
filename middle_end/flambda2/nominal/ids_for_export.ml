@@ -178,6 +178,12 @@ module Table_data = struct
       fields = Field.export exported_ids.fields
     }
 
+  let relocate_importers { symbols; variables; code_ids; _ }
+      ~original_compilation_unit ~cmx_path =
+    Symbol.relocate_importer symbols ~original_compilation_unit ~cmx_path;
+    Variable.relocate_importer variables ~original_compilation_unit ~cmx_path;
+    Code_id.relocate_importer code_ids ~original_compilation_unit ~cmx_path
+
   let create_import_map
       { symbols; variables; simples; consts; code_ids; continuations; fields }
       ~used_value_slots ~original_compilation_unit =

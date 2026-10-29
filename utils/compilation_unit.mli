@@ -255,6 +255,41 @@ val is_instance : t -> bool
     this is an instance, throwing a fatal error otherwise. *)
 val split_instance_exn : t -> t * argument list
 
+(** A compilation unit together with the location of its .cmx file, when
+    recorded. Most users should traffic in plain [t]; a [Found.t] additionally
+    remembers where the .cmx file is, as a path relative to the manifest files
+    root (see [Load_path.found]), so that later lookups load it from there
+    instead of searching the load path. Locations are recorded only under
+    [-persistent-deps], and only for .cmx files found through manifests. The
+    path does not affect identity: it is ignored by [compare], [equal] and
+    [hash]. *)
+module Found : sig
+  type cu := t
+
+  type t
+
+  (** Create without a recorded .cmx location. *)
+  val without_cmx_path : cu -> t
+
+  val unit : t -> cu
+
+  (** Record the location of the unit's .cmx file. *)
+  val with_cmx_path : t -> Misc.filepath -> t
+
+  (** The recorded location of the .cmx file, if any. *)
+  val cmx_path : t -> Misc.filepath option
+
+  (** [Compilation_unit.which_cmx_file] on the unit, keeping the recorded
+      location: a location recorded on a unit is that of the .cmx file
+      describing it, which is the file to load. *)
+  val which_cmx_file : t -> accessed_by:cu -> t
+
+  (** Printing, comparison, sets, maps, etc.; all ignore the path. *)
+  include Identifiable.S with type t := t
+
+  val print : Format_doc.formatter -> t -> unit
+end
+
 type error = private
   | Invalid_character of char * string
   | Bad_compilation_unit_name of string

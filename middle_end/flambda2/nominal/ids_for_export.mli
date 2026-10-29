@@ -112,6 +112,13 @@ module Table_data : sig
 
   val create : ids -> t
 
+  (** See [Variable.relocate_importer]. *)
+  val relocate_importers :
+    t ->
+    original_compilation_unit:Compilation_unit.t ->
+    cmx_path:Misc.filepath option ->
+    unit
+
   val create_import_map :
     t ->
     used_value_slots:Value_slot.Set.t ->
