@@ -1,0 +1,7 @@
+# Files using OxCaml syntax extensions (such as "@ local"), which the upstream
+# ocamlformat used by "make fmt" cannot parse.  They are compiled through
+# tools/oxpp in the boot build.
+algorithms/container_types_intf.ml
+algorithms/patricia_tree.ml
+types/grammar/type_grammar.ml
+types/grammar/type_grammar.mli

@@ -1,5 +1,6 @@
+# jkind.mli and ikind.mli use OxCaml syntax ("@ local") that the upstream
+# ocamlformat run by "make fmt" cannot parse, so they are not listed here.
 jkind.ml
-jkind.mli
 jkind_types.ml
 jkind_types.mli
 jkind_intf.ml
@@ -31,7 +32,6 @@ axis_lattice.mli
 global_module.ml
 global_module.mli
 ikind.ml
-ikind.mli
 ldd.ml
 ldd.mli
 ldd_intf.ml
