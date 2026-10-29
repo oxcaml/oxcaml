@@ -99,8 +99,7 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
     [verbose] is true, redundant annotations are included. *)
 val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> string list
 
-<<<<<<< Merlin:address-patterns-block-index-checks
-val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
+val block_path_expected_modalities : Types.mutability -> Mode.Modality.Const.t
 
 (* Merlin-only: This is exposed for Merlin (for syntax_doc.ml). *)
 
@@ -109,8 +108,3 @@ module Modifier_axis_pair : sig
 
   val of_string : loc:Location.t -> string -> t
 end
-||||||| Compiler:last-imported
-val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
-=======
-val block_path_expected_modalities : Types.mutability -> Mode.Modality.Const.t
->>>>>>> Compiler:HEAD
