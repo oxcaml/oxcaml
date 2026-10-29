@@ -118,7 +118,10 @@ val of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list
 (* CR-someday xclerc: we should probably make `t` abstract and make each and
    every modifiction through accessors; that would help enforce invariants. *)
 
-(** Control Flow Graph of a function. *)
+(** Control-flow graph of a function. At pipeline boundaries, every block must
+    be reachable from [entry_label] through normal or exceptional edges.
+    Construction and transformations may temporarily violate this invariant;
+    [Cfg_simplify.run] restores it. *)
 type t =
   { blocks : basic_block Label.Tbl.t;  (** Map from labels to blocks *)
     fun_name : string;  (** Function name, used for printing messages *)
