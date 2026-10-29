@@ -20,7 +20,7 @@
 
 (library
   (name odoc_lib)
-  (modes byte native)
+  (modes native)
   (wrapped false)
   (flags (:standard -w -9-32))
   (modules
@@ -77,8 +77,17 @@
   (modes byte)
   ; See note in the toplevel dune file about this.
   (flags (:standard -cclib "-L ../runtime" -cclib -lcamlrun))
+  ; -I so the linker's primitive check finds the suffixed dllunix_stubs and
+  ; dllstr_stubs; link_deps so they are built first (see otherlibs/unix/byte/dune).
+  (link_flags
+   (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)
+    -I otherlibs/unix/byte
+    -I otherlibs/str/byte))
+  (link_deps
+   (glob_files %{project_root}/otherlibs/unix/byte/dllunix_stubs-*.so)
+   (glob_files %{project_root}/otherlibs/str/byte/dllstr_stubs-*.so))
   (modules odoc_byte)
-  (libraries odoc_lib))
+  (libraries odoc_lib_byte))
 
 (rule
   (targets odoc_byte.ml)

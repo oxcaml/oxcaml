@@ -16,12 +16,16 @@
  (name topstart)
  (modes byte)
  (flags (:standard -linkall))
+ ; topstart.bc is expunged into the [ocaml] toplevel, which copies its header,
+ ; so it needs the bytecode launcher flags.
+ (link_flags (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamlbytecomp ocamlfrontend ocamltoplevel)
  (modules topstart))
 
 (executable
  (name expunge)
  (modes byte)
+ (link_flags (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamlbytecomp ocamlfrontend)
  (modules expunge))
 

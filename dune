@@ -412,6 +412,7 @@
  (modes byte)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ (link_flags (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamlbytecomp ocamlfrontend)
  (modules main))
 
@@ -463,6 +464,24 @@
    (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; Bytecode launcher flags: empty for the boot (system-compiler) context, which
+; does not understand -launch-method/-runtime-search, and the configured flags
+; for the main context (see Makefile.common-ox).
+
+(rule
+ (targets bytecode_launcher_flags.sexp)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (write-file bytecode_launcher_flags.sexp "()")))
+
+(rule
+ (targets bytecode_launcher_flags.sexp)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (copy %{project_root}/bytecode_launcher_flags_oxcaml.sexp %{targets})))
 
 ; Write empty files in an unconfigured tree
 (rule
@@ -824,15 +843,26 @@
  (modes byte)
  (instrumentation
   (backend bisect_ppx))
+ ; -I otherlibs/unix/byte (bare, i.e. relative to the _build/<ctx> link cwd, NOT
+ ; %{project_root} which is dune-file-relative) so the linker's primitive check
+ ; finds the suffixed dllunix_stubs there.
+ (link_flags
+  (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)
+   -I otherlibs/unix/byte))
+ ; ...and link_deps so it is built first (see otherlibs/unix/byte/dune).
+ (link_deps (glob_files %{project_root}/otherlibs/unix/byte/dllunix_stubs-*.so))
+ ; Byte tool: link the runtime-id-suffixed unix_byte/memtrace_byte (see
+ ; otherlibs/unix/byte/dune) so the installed ocamlopt.byte loads only this
+ ; version's dllunix_stubs.
  (libraries
-  memtrace
+  memtrace_byte
   flambda2
   flambda2_ui
   flambda2_to_cmm
   gc_timings
   ocamloptcomp
   ocamlfrontend
-  unix)
+  unix_byte)
  (modules oxcaml_main))
 
 (rule
@@ -1019,30 +1049,6 @@
 (install
  (files
   (compilerlibs/META as compiler-libs/META)
-  (external/owee/libcompiler_owee_stubs.a
-   as
-   compiler-libs/libcompiler_owee_stubs.a)
-  (external/owee/libcompiler_owee_stubs.a
-   as
-   compiler-libs/libcompiler_owee_stubs_native.a)
-  (external/gc-timings/libgc_timings_stubs.a
-   as
-   compiler-libs/libgc_timings_stubs.a)
-  (external/gc-timings/libgc_timings_stubs.a
-   as
-   compiler-libs/libgc_timings_stubs_native.a)
-  (middle_end/flambda2/numbers/floats/libflambda2_floats_stubs.a
-   as
-   compiler-libs/libflambda2_floats_stubs.a)
-  (middle_end/flambda2/numbers/floats/libflambda2_floats_stubs.a
-   as
-   compiler-libs/libflambda2_floats_stubs_native.a)
-  (middle_end/flambda2/algorithms/libflambda2_algorithms_stubs.a
-   as
-   compiler-libs/libflambda2_algorithms_stubs.a)
-  (middle_end/flambda2/algorithms/libflambda2_algorithms_stubs.a
-   as
-   compiler-libs/libflambda2_algorithms_stubs_native.a)
   (middle_end/flambda2/to_jsir/jsoo_imports/libjsoo_imports_stubs.a
    as
    compiler-libs/libjsoo_imports_stubs.a)
@@ -1055,6 +1061,12 @@
   (ocamloptcomp_with_flambda2.a as compiler-libs/ocamloptcomp.a))
  (section lib)
  (package ocaml))
+
+; The compiler's C-stub libraries are permanently renamed with the runtime-id
+; suffix (see the stub_dll.dune.in files), so their libX_stubs.a install lands
+; here with the mangled name substituted by Makefile.common-ox (dune can't put a
+; build-config value in an install path).
+(include compilerlibs_stubs.inc)
 
 ; Build all the files that Merlin needs to work on the compiler. Building @check
 ; for the entire repo will build too much, as we don't want to build directories
