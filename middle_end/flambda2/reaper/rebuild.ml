@@ -2273,8 +2273,8 @@ and rebuild_function_params_and_body env res code_metadata
       res )
 
 and rebuild_code env res code_id
-    ({ params_and_body; free_names_of_params_and_body = _ } : Rev_expr.rev_code)
-    =
+    ({ params_and_body; free_names_of_params_and_body = _ } :
+      Rev_expr.Rev_code.t) =
   (* At rebuild time, [code_metadata] may only be changed for fields that will
      never be read again if we perform LTO, namely, code_size and
      inlining_decisions. All other changes to [code_metadata] must be done in
@@ -2391,7 +2391,7 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
   in
   let cont_params_to_keep =
     Continuation.Map.mapi
-      (fun cont (info : Traverse_acc.continuation_info) ->
+      (fun cont (info : Traverse_acc.Continuation_info.t) ->
         List.map2 (should_keep_param cont) info.params info.arity)
       continuation_info
   in
