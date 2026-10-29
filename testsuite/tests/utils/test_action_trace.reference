@@ -1,6 +1,6 @@
 Number of trace files: 1
 [{"tid":0,"pid":0,"name":"plain instant","cat":"ocaml-compiler","ts":1}
-,{"args":{"file":"foo.ml","flag":true},"counters":{"allocations":10,"words":20},"tid":0,"pid":0,"name":"instant with args and counters","cat":"ocaml-compiler","ts":2000}
+,{"args":{"counters":{"allocations":10,"words":20},"file":"foo.ml","flag":true},"tid":0,"pid":0,"name":"instant with args and counters","cat":"ocaml-compiler","ts":2000}
 ,{"tid":0,"pid":0,"name":"plain span","cat":"ocaml-compiler","ts":3,"dur":2}
-,{"args":{"path":"bar.ml"},"counters":{"count":3},"tid":0,"pid":0,"name":"span with args and counters","cat":"ocaml-compiler","ts":1000,"dur":500}
+,{"args":{"counters":{"count":3},"path":"bar.ml"},"tid":0,"pid":0,"name":"span with args and counters","cat":"ocaml-compiler","ts":1000,"dur":500}
 ]
