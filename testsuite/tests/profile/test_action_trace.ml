@@ -10,68 +10,33 @@
  check-program-output;
 *)
 
-module Trace = Action_trace
-
 let trace_dir = Sys.getenv "DUNE_ACTION_TRACE_DIR"
 
-let () = assert (Trace.enabled ())
+(* [Action_trace] writes every event of the process to one file, which it only
+   closes at exit, so print what has been written since the last call. *)
+let printed_length = ref 0
 
 let print_trace () =
   let files = Sys.readdir trace_dir in
   assert (Array.length files = 1);
   let path = Filename.concat trace_dir files.(0) in
   assert (Filename.check_suffix path ".json");
-  let chan = open_in_bin path in
-  let contents = really_input_string chan (in_channel_length chan) in
-  close_in chan;
-  Sys.remove path;
+  let contents = In_channel.with_open_bin path In_channel.input_all in
+  let new_contents =
+    String.sub contents !printed_length
+      (String.length contents - !printed_length)
+  in
+  printed_length := String.length contents;
   (* Measurements vary, but their position in the hierarchy must not. *)
-  let contents = List.fold_left (fun contents column ->
+  let new_contents = List.fold_left (fun contents column ->
     let pattern = Str.regexp
       ("\"" ^ column ^ "\":[-+0-9.eE]+") in
     Str.global_replace pattern
       ("\"" ^ column ^ "\":<" ^ column ^ ">") contents
-  ) contents ["time"; "alloc"; "top-heap"; "absolute-top-heap"] in
-  print_string contents
-
-let () =
-  Trace.with_fresh_context ~name:"events" ~f:(fun context ->
-    Trace.Context.emit context
-      (Trace.Event.instant ~category:"test" ~name:"instant"
-         ~time_in_nanoseconds:1_746_546_737_170_594_596 ());
-    Trace.Context.emit context
-      (Trace.Event.span ~category:"test" ~name:"span"
-         ~start_in_nanoseconds:1_746_546_737_170_595_596
-         ~finish_in_nanoseconds:1_746_546_737_170_596_596
-         ~args:["nested", `Object [
-           "values", `Array [`Null; `True; `False; `Number "1.25"];
-           "\"key\"", `String "\b\t\n\012\r\\\"\000\031";
-           "utf8", `String "\xc3\xa9\xff\xc0";
-         ]] ()));
-  print_trace ()
-
-let () =
-  let context = Trace.Context.create ~name:"empty" in
-  Trace.Context.close context;
-  Trace.Context.close context;
-  (match Trace.Context.emit context
-     (Trace.Event.instant ~category:"test" ~name:"closed"
-        ~time_in_nanoseconds:0 ()) with
-   | () -> failwith "Unexpected success"
-   | exception Failure _ -> ());
-  print_trace ()
+  ) new_contents ["time"; "alloc"; "top-heap"; "absolute-top-heap"] in
+  print_string new_contents
 
 exception Test_exception
-
-let () =
-  (match Trace.with_fresh_context ~name:"exception" ~f:(fun context ->
-     Trace.Context.emit context
-       (Trace.Event.instant ~category:"test" ~name:"exception"
-          ~time_in_nanoseconds:0 ());
-     raise Test_exception) with
-   | _ -> failwith "Unexpected success"
-   | exception Test_exception -> ());
-  print_trace ()
 
 (* Each reading is one second after the previous one. *)
 let clock () =
@@ -143,5 +108,4 @@ let () =
         Profile.record_call "child" (fun () -> 42)) ())
   in
   assert (result = 42 && !calls = 6 && !cheap_calls = 4);
-  print_trace ();
-  Sys.rmdir trace_dir
+  print_trace ()

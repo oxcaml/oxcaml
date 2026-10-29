@@ -354,7 +354,8 @@ let column_values columns ~timings_precision (p : Measure_diff.t)
     | `Counters -> counters_display p.counters
   ) columns
 
-let action_trace_span ~name ~path ((p : Measure_diff.t), top_heap_words) =
+let write_action_trace_span ~name ~path
+    ((p : Measure_diff.t), top_heap_words) =
   let nanoseconds seconds = int_of_float (seconds *. 1e9) in
   let bytes words = words * (Sys.word_size / 8) in
   let counters =
@@ -365,11 +366,13 @@ let action_trace_span ~name ~path ((p : Measure_diff.t), top_heap_words) =
     :: ("absolute-top-heap", bytes top_heap_words)
     :: String.Map.bindings p.counters
   in
-  let args = ["path", `Array (List.rev_map (fun name -> `String name) path)] in
+  let args =
+    ["path", Json.Array (List.rev_map (fun name -> Json.String name) path)]
+  in
   (* A row usually accumulates several intervals, so the span can't match
      them all. It starts with the first one and lasts as long as all of them
      together. *)
-  Action_trace.Event.span ~category:"compiler" ~name ~counters
+  Action_trace.write_span ~name ~counters
     ~args ~start_in_nanoseconds:(nanoseconds p.wall_start)
     ~finish_in_nanoseconds:(nanoseconds (p.wall_start +. p.wall_duration)) ()
 
@@ -388,18 +391,19 @@ let emit_action_trace ~name (start_measure : Measure.t)
       ~values:(fun p ~top_heap_words ~prev_top_heap_words:_ ->
         p, top_heap_words)
   in
-  let rec spans ~parent_path (R (name, value, rows)) =
+  let rec write_spans ~parent_path (R (name, value, rows)) =
     let path = name :: parent_path in
-    action_trace_span ~name ~path value
-    :: List.concat_map (spans ~parent_path:path) rows
+    write_action_trace_span ~name ~path value;
+    List.iter (write_spans ~parent_path:path) rows
   in
-  Action_trace.with_fresh_context ~name ~f:(fun context ->
-    List.iter (Action_trace.Context.emit context)
-      (spans ~parent_path:[]
-         (R (name, (total, end_measure.top_heap_words), rows))))
+  write_spans ~parent_path:[]
+    (R (name, (total, end_measure.top_heap_words), rows))
 
 let with_action_trace ~gettimeofday ~name f =
-  if not (Action_trace.enabled ()) then f () else begin
+  (* [Action_trace] does nothing unless this is set, so avoid the cost of
+     reading the wall clock. *)
+  if Option.is_none (Sys.getenv_opt "DUNE_ACTION_TRACE_DIR") then f ()
+  else begin
     wall_clock := Some gettimeofday;
     let start_measure = Measure.create cpu_time in
     Fun.protect f ~finally:(fun () ->
