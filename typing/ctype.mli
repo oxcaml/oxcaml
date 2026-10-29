@@ -684,7 +684,9 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
    types and [Tpoly]s *)
 type unwrapped_type_expr =
   { ty : type_expr
-  ; modality : Mode.Modality.Const.t
+  ; wrapping : Jkind.Unboxed_field_transformation.t
+    (* The fields [ty] was unwrapped from, relative to the type the
+       unwrapping started from. *)
   ; or_null : unwrapped_or_null option;
     (* We store the declaration and arguments rather than a bool to avoid
        re-writing the with-bounds of [or_null], and to be more robust for the

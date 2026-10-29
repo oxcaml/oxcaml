@@ -2908,29 +2908,133 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-let for_unboxed_record lbls =
-  let open Types in
+let apply_modality_l modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
+  let with_bounds =
+    With_bounds.map
+      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
+      jk.jkind.with_bounds
+  in
+  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
+  |> disallow_right
+
+let apply_modality_r modality jk =
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
+  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+module Unboxed_field_transformation = struct
+  type t =
+    { modality : Mode.Modality.Const.t;
+      bounds : Axis_lattice.t
+    }
+
+  let id = { modality = Mode.Modality.Const.id; bounds = Axis_lattice.bot }
+
+  (* An unboxed record has no block of its own, so a mutable label only
+     contributes the axes on which a mutable block exceeds an immutable one.
+     Joining [immutable_data] with the kind of [r#] then gives the kind of
+     [r]. *)
+  let mutable_label_bounds =
+    Axis_lattice.co_sub Axis_lattice.mutable_data Axis_lattice.immutable_data
+
+  let of_field ~(mutability : Types.mutability) ~modality =
+    let bounds =
+      match mutability with
+      | Immutable -> Axis_lattice.bot
+      | Mutable { atomic = Nonatomic; _ } -> mutable_label_bounds
+      | Mutable { atomic = Atomic; _ } ->
+        Misc.fatal_error
+          "Jkind.Unboxed_field_transformation.of_field: atomic field"
+    in
+    { modality; bounds }
+
+  let of_modality modality = of_field ~mutability:Immutable ~modality
+
+  let of_label ({ ld_modalities; ld_mutable; _ } : Types.label_declaration) =
+    of_field ~mutability:ld_mutable ~modality:ld_modalities
+
+  (* The modality of [outer] masks the bounds of [inner]. For example, [y] is
+     reached from [t] through [x] in
+
+       type u = #{ mutable y : int ref }
+       type t = #{ x : u @@ contended }
+
+     where [outer] is for [x] and [inner] is for [y]. Here, [contended] hides
+     the mutability of [y] on contention, but not on visibility. *)
+  let nest ~outer ~inner =
+    { modality = Mode.Modality.Const.concat outer.modality ~then_:inner.modality;
+      bounds =
+        Axis_lattice.join outer.bounds
+          (Axis_lattice.meet
+             (Axis_lattice.mask_of_modality outer.modality)
+             inner.bounds)
+    }
+
+  let join_bounds bounds (jk : _ jkind) =
+    if Axis_lattice.equal bounds Axis_lattice.bot
+    then jk
+    else
+      { jk with
+        jkind =
+          { jk.jkind with
+            mod_bounds = Mod_bounds.join_axis_lattice jk.jkind.mod_bounds bounds
+          }
+      }
+
+  let apply_l t jk = apply_modality_l t.modality jk |> join_bounds t.bounds
+
+  let apply_r t jk =
+    if
+      Axis_lattice.leq t.bounds (Mod_bounds.to_axis_lattice jk.jkind.mod_bounds)
+    then Ok (apply_modality_r t.modality jk)
+    else Error ()
+end
+
+(* [Builtin.product] is hidden from [Jkind]'s interface, but it is still
+   reachable as [Btype.Jkind0.Jkind.Builtin.product]. Don't use it to build the
+   kind of a product of fields: go through this function, so that the
+   [Unboxed_field_transformation.t] of each field is accounted for. *)
+let product_of_fields ~why fields layouts =
   let tys_modalities =
     List.map
-      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
+      (fun (ty, (wrapping : Unboxed_field_transformation.t)) ->
+        ty, wrapping.modality)
+      fields
+  in
+  let bounds =
+    List.fold_left
+      (fun acc (_, (wrapping : Unboxed_field_transformation.t)) ->
+        Axis_lattice.join acc wrapping.bounds)
+      Axis_lattice.bot fields
+  in
+  Builtin.product ~why tys_modalities layouts
+  |> Unboxed_field_transformation.join_bounds bounds
+
+let for_unboxed_record lbls =
+  let fields =
+    List.map
+      (fun ((lbl : Types.label_declaration), _layout) ->
+        lbl.ld_type, Unboxed_field_transformation.of_label lbl)
       lbls
   in
   let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  product_of_fields ~why:Unboxed_record fields layouts
 
-let for_abbreviation ~type_jkind_purely ~modality ty =
+let for_abbreviation ~type_jkind_purely wrapping ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
-  let with_bounds_types =
-    let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-    With_bounds_types.singleton ty { bounds_mask }
+  let with_bound_no_wrapping =
+    With_bounds_types.singleton ty { bounds_mask = Axis_lattice.top }
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
       mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
+      with_bounds = With_bounds with_bound_no_wrapping
     }
     ~annotation:None ~why:Abbreviation
+  |> Unboxed_field_transformation.apply_l wrapping
 
 let for_boxed_tuple elts =
   List.fold_right
@@ -2961,7 +3065,9 @@ let for_boxed_row row =
   then
     if not (Btype.static_row row)
     then
-      (* CR layouts v2.8: We can probably do a fair bit better here in most cases. But if we ever allow open types to mode-cross, we have to get rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
+      (* CR layouts v2.8: We can probably do a fair bit better here in most
+         cases. But if we ever allow open types to mode-cross, we have to get
+         rid of the 100-row limit below. Internal ticket 5097 and 5098. *)
       for_open_boxed_row
     else
       (* Here we count how many rows are in the polymorphic variant and default
@@ -3214,22 +3320,6 @@ let of_mod_bounds ~history mod_bounds =
     ran_out_of_fuel_during_normalize = false;
     quality = Not_best
   }
-
-let apply_modality_l modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
-  let with_bounds =
-    With_bounds.map
-      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
-      jk.jkind.with_bounds
-  in
-  { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
-  |> disallow_right
-
-let apply_modality_r modality jk =
-  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
-  { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
   let or_null_axes ({ nullability; separability } : Scannable_axes.t) :
