@@ -45,8 +45,8 @@ open! Int_replace_polymorphic_compare
       (modulo skipping moves), that their terminators have the same shape, and
       that block-level metadata (is_trap_handler, can_raise, cold, stack_offset)
       agrees. Dead trap handlers (and their [Pushtrap]/[Poptrap]s) are removed
-      by [Cfg_simplify] in both pipelines when SSA is enabled, so they need no
-      special handling here.
+      by [Cfg_simplify] in both pipelines, so they need no special handling
+      here.
 
     - [verify_register_equivalence]: Backward fixpoint over matched block pairs:
       starting from all block ends with the empty equation set, propagate
