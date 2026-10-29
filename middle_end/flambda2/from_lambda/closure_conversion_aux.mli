@@ -380,6 +380,7 @@ module Function_decls : sig
       body:(Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t) ->
       attr:Lambda.function_attribute ->
       loc:Lambda.scoped_location ->
+      fdo_fingerprint:Fdo_fingerprint.t option ->
       free_idents_of_body:Ident.Set.t ->
       Recursive.t ->
       closure_alloc_mode:Lambda.locality_mode ->
@@ -438,6 +439,8 @@ module Function_decls : sig
     val stub : t -> bool
 
     val loc : t -> Lambda.scoped_location
+
+    val fdo_fingerprint : t -> Fdo_fingerprint.t option
 
     val recursive : t -> Recursive.t
 
