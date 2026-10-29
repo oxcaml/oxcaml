@@ -298,6 +298,7 @@ Line 1, characters 13-29:
                  ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a array"
        but an expression was expected of type "'b iarray"
+       because it is in a for-in iterator in an immutable array comprehension
 |}];;
 
 let empty = [||] in
