@@ -263,11 +263,11 @@ type existential_binding =
 type mode_mismatch_kind = Parameter | Return
 
 (** Different ways of pointing into a block *)
-type block_reference_kind =
+type block_path_kind =
   | Block_index
 
-(** Why a block reference can't point through a type *)
-type block_reference_bad_type =
+(** Why a block path can't point through a type *)
+type block_path_bad_type_reason =
   | Flatten_floats_record  (** [[@@flatten_floats]] *)
   | Float_record
   | Float_array_record  (** [[@@represent_as_float_array]] *)
@@ -398,12 +398,12 @@ type error =
       Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_reference_bad_type of block_reference_kind * block_reference_bad_type
-  | Block_reference_modality_mismatch of
-      { reference : block_reference_kind; mutability : Types.mutability;
+  | Block_path_bad_type of block_path_kind * block_path_bad_type_reason
+  | Block_path_modality_mismatch of
+      { kind : block_path_kind; mutability : Types.mutability;
         err : Mode.Modality.equate_error }
-  | Block_reference_polymorphic_field of
-      block_reference_kind * Longident.t
+  | Block_path_polymorphic_field of
+      block_path_kind * Longident.t
   | Submode_failed of Mode.With_regionality.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]
