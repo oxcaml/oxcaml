@@ -39,7 +39,7 @@ type t =
     cost_metrics : Cost_metrics.t;
     inlining_arguments : Inlining_arguments.t;
     dbg : Debuginfo.t;
-    fdo_entry_annotation : Fdo_annotation.t;
+    fdo_entry_annotation : Fdo_annotation.With_body_hash.t;
     is_tupled : bool;
     is_my_closure_used : bool;
     inlining_decision : Function_decl_inlining_decision_type.t;
@@ -162,7 +162,7 @@ type 'a create_type =
   cost_metrics:Cost_metrics.t ->
   inlining_arguments:Inlining_arguments.t ->
   dbg:Debuginfo.t ->
-  fdo_entry_annotation:Fdo_annotation.t ->
+  fdo_entry_annotation:Fdo_annotation.With_body_hash.t ->
   is_tupled:bool ->
   is_my_closure_used:bool ->
   inlining_decision:Function_decl_inlining_decision_type.t ->
@@ -282,9 +282,10 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Absolute.print absolute_history
 
 let [@ocamlformat "disable"] print_fdo_entry_annotation ppf annotation =
-  if !Oxcaml_flags.fdo_counters then
+  if !Oxcaml_flags.fdo_counters
+  then
     Format.fprintf ppf "@[<hov 1>(fdo_entry_annotation@ %a)@]@ "
-      Fdo_annotation.print annotation
+      Fdo_annotation.With_body_hash.print annotation
 
 let [@ocamlformat "disable"] print ppf
        { code_id = _; newer_version_of; stub; inline; zero_alloc_attribute; poll_attribute;

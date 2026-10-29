@@ -23,11 +23,13 @@
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
 
-; Stability of function identities ([Fdo_fingerprint]): the entry counters of
-; function_ids.ml and of function_ids_edited.ml (the same module with extra anonymous
-; functions inserted, compiled under the same module name via -o) must agree
-; except for the inserted functions. Additionally, the discriminators should distinguish
-; functions with the same name (or anonymous functions with the same body).
+; Stability of function identities ([Fdo_fingerprint]): the entry counters and
+; body hashes of function_ids.ml and of function_ids_edited.ml (the same module
+; with extra anonymous functions inserted, compiled under the same module name
+; via -o) must agree except for the inserted functions and the function whose
+; body they were inserted into. Additionally, the discriminators should
+; distinguish functions with the same name (or anonymous functions with the
+; same body).
 
 (executable
  (name fdo_entries)
