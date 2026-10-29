@@ -972,6 +972,21 @@ let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
 let emit_stack_str env reg r = emit_stack_load_store env STR reg r
 
+(* Moves of 8- and 16-bit external-call stack arguments, which macOS packs to
+   their own size: the store writes exactly the argument's width, so that
+   neighbouring packed arguments are not clobbered; loads sign-extend, matching
+   the in-register representation of small integers. *)
+let emit_sized_move env ~str ~ldr (src : Reg.t) (dst : Reg.t) =
+  if not (Reg.same_loc src dst)
+  then
+    match src.loc, dst.loc with
+    | Reg _, Reg _ -> A.ins_mov_reg_w (H.reg_w dst) (H.reg_w src)
+    | Reg _, Stack _ -> emit_stack_load_store env str (H.reg_w src) dst
+    | Stack _, Reg _ -> emit_stack_load_store env ldr (H.reg_x dst) src
+    | Stack _, Stack _ | _, Unknown | Unknown, _ ->
+      Misc.fatal_errorf "Emit.emit_sized_move: illegal move (%a to %a)"
+        Printreg.reg src Printreg.reg dst
+
 let emit_stack_ldr_simd_and_fp env reg r =
   emit_stack_load_store env LDR_simd_and_fp reg r
 
@@ -1510,6 +1525,10 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop (Specific Imove8) ->
+    emit_sized_move env ~str:STRB ~ldr:LDRSB i.arg.(0) i.res.(0)
+  | Lop (Specific Imove16) ->
+    emit_sized_move env ~str:STRH ~ldr:LDRSH i.arg.(0) i.res.(0)
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
