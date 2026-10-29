@@ -718,7 +718,7 @@ and invalid ~env ~res msg =
   in
   env, To_jsir_result.end_block_with_last_exn res Stop
 
-let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
+let unit ~offsets:_ ~all_code:_ ~reachable_names flambda_unit =
   (* As [Config.set_target `JavaScript] does in js_of_ocaml. *)
   Targetint.set_num_bits 32;
   Targetnativeint.set_num_bits 32;
@@ -728,7 +728,7 @@ let unit ~offsets:_ ~all_code:_ ~reachable_names:_ flambda_unit =
       ~return_continuation:(Flambda_unit.return_continuation flambda_unit)
       ~exn_continuation:(Flambda_unit.exn_continuation flambda_unit)
   in
-  let res = To_jsir_result.create () in
+  let res = To_jsir_result.create ~reachable_names in
   let res, _addr = To_jsir_result.new_block res ~params:[] in
   let _env, res = expr ~env ~res (Flambda_unit.body flambda_unit) in
   let program = To_jsir_result.to_program_exn res in

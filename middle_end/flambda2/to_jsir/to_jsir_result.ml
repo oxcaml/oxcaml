@@ -60,9 +60,12 @@ type t =
     late_bound_vars : Jsir.Var.Set.t;
         (** Variables created ahead of their definition and since bound with
             [To_jsir_shared.bind_vars]. *)
-    call_events : call_events option
+    call_events : call_events option;
         (** The events to put around the calls added by [add_call_exn], set by
             [with_debuginfo_exn]. *)
+    reachable_names : Name_occurrences.t
+        (** The names of this unit that other compilation units may refer to
+            Only these symbols need to be in the global symbol table. *)
   }
 
 and call_events =
@@ -70,7 +73,7 @@ and call_events =
     end_ : Parse_info.t option
   }
 
-let create () =
+let create ~reachable_names =
   { complete_blocks = Jsir.Addr.Map.empty;
     current_blocks = [];
     next_addr = Jsir.Addr.zero;
@@ -82,7 +85,8 @@ let create () =
     global_data_var = None;
     external_symbols = Symbol.Map.empty;
     late_bound_vars = Jsir.Var.Set.empty;
-    call_events = None
+    call_events = None;
+    reachable_names
   }
 
 let map_top_current_block_exn t ~f =
@@ -265,13 +269,17 @@ let symbol_is_for_compilation_unit symbol =
   Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
 
 let register_symbol t symbol var =
-  match symbol_is_for_compilation_unit symbol with
-  | true ->
+  if symbol_is_for_compilation_unit symbol
+  then
     (* We don't need to add this symbol to our symbol table, because we will
        instead fetch it from jsoo's global data table (see
        [external_symbol_lookup]) *)
     t
-  | false ->
+  else if not (Name_occurrences.mem_symbol t.reachable_names symbol)
+  then
+    (* No other compilation unit can refer to this symbol, as it is not exported *)
+    t
+  else
     let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
     add_instr_exn t
       (Let
@@ -362,7 +370,8 @@ let to_program_exn
       global_data_var = _;
       external_symbols = _;
       late_bound_vars = _;
-      call_events = _
+      call_events = _;
+      reachable_names = _
     } =
   if List.length current_blocks <> 0
   then
