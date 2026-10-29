@@ -13,6 +13,22 @@ type modalities =
     moda_desc : Mode.Modality.atom Location.loc list
   }
 
+type modepoly_elem = { elem_var : string Location.loc }
+
+type modepoly_bound =
+  { bound_vars : modepoly_elem list;
+    bound_const : Mode.With_locality.Const.Option.t modes
+  }
+
+type modepoly_bounds =
+  { upper : modepoly_bound;
+    lower : modepoly_bound
+  }
+
+type modepoly_annot =
+  | Pmode_var of string Location.loc
+  | Pmode_bounds of modepoly_bounds Location.loc
+
 type 'ax annot_type =
   | Modifier : 'a Axis.t annot_type
   | Mode : 'a With_locality.Axis.t annot_type
@@ -48,14 +64,18 @@ type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
+  | Mode_variable_not_allowed : error
+  | Mixed_mode_annotation : error
+  | Conflicting_mode_annotations : error
+  | Unsupported_morphism : string -> error
+  | Unsupported_mod_in_bound : error
 
 exception Error of Location.t * error
 
 let mode_variable_error ~loc =
   Language_extension.assert_enabled ~loc Mode_polymorphism
     Language_extension.Alpha;
-  Misc.fatal_errorf "%a: mode variables and mode bounds are not yet supported"
-    Location.print_loc loc
+  raise (Error (loc, Mode_variable_not_allowed))
 
 module Mode_axis_pair = struct
   type t = Mode.With_locality.atom
@@ -258,7 +278,7 @@ let mode_consts_of_modes annots =
       | Pmode_var _ | Pmode_bounded _ -> mode_variable_error ~loc)
     annots
 
-let transl_mode_annots annots =
+let transl_mode_atoms atoms =
   let annots =
     List.map
       (fun { txt; loc } ->
@@ -266,7 +286,7 @@ let transl_mode_annots annots =
         try { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
-      (mode_consts_of_modes annots)
+      atoms
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
@@ -275,6 +295,8 @@ let transl_mode_annots annots =
   in
   let modes = List.fold_left step With_locality.Const.Option.none annots in
   { mode_modes = modes; mode_desc = annots }
+
+let transl_mode_annots annots = transl_mode_atoms (mode_consts_of_modes annots)
 
 let untransl_mode modes =
   let untransl_annot =
@@ -576,6 +598,59 @@ let transl_mode_with_locality annots =
 let legacy_modes : With_locality.lr modes =
   { mode_modes = With_locality.legacy; mode_desc = [] }
 
+let transl_modepoly_elem (elem : Parsetree.mode_bound_var) : modepoly_elem =
+  Option.iter
+    (fun ({ txt; loc } : string Location.loc) ->
+      raise (Error (loc, Unsupported_morphism txt)))
+    elem.elem_morph;
+  (match elem.elem_mod with
+  | [] -> ()
+  | { loc; _ } :: _ -> raise (Error (loc, Unsupported_mod_in_bound)));
+  { elem_var = elem.elem_var }
+
+let transl_modepoly_bound (bound : Parsetree.mode_bound) : modepoly_bound =
+  let bound_vars, bound_const =
+    List.partition_map
+      (function
+        | Parsetree.Pbound_var v -> Either.Left (transl_modepoly_elem v)
+        | Parsetree.Pbound_const c -> Either.Right c)
+      bound
+  in
+  { bound_vars; bound_const = transl_mode_atoms bound_const }
+
+let has_mode_variables annots =
+  List.exists
+    (fun { Location.txt; _ } ->
+      match (txt : Parsetree.mode) with
+      | Pmode _ -> false
+      | Pmode_var _ | Pmode_bounded _ -> true)
+    annots
+
+let transl_modepoly_annot annots : modepoly_annot =
+  let transl_annot { Location.txt; loc } =
+    Language_extension.assert_enabled ~loc Mode_polymorphism
+      Language_extension.Alpha;
+    match (txt : Parsetree.mode) with
+    | Pmode _ -> raise (Error (loc, Mixed_mode_annotation))
+    | Pmode_var name -> Pmode_var { txt = name; loc }
+    | Pmode_bounded { upper; lower } ->
+      Pmode_bounds
+        { txt =
+            { upper = transl_modepoly_bound upper;
+              lower = transl_modepoly_bound lower
+            };
+          loc
+        }
+  in
+  match List.map transl_annot annots with
+  | [annot] -> annot
+  | annot :: _ ->
+    let loc =
+      match annot with Pmode_var { loc; _ } | Pmode_bounds { loc; _ } -> loc
+    in
+    raise (Error (loc, Conflicting_mode_annotations))
+  | [] -> Misc.fatal_error "transl_modepoly_annot: empty mode annotation"
+
 let everything_modality =
   List.fold_left
     (fun acc -> function
@@ -808,6 +883,22 @@ let report_error ppf =
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
+  | Mode_variable_not_allowed ->
+    fprintf ppf
+      "Mode variables and mode bounds are only allowed on function types."
+  | Mixed_mode_annotation ->
+    fprintf ppf
+      "Constant modes and mode variables cannot be mixed in a mode annotation."
+  | Conflicting_mode_annotations ->
+    fprintf ppf
+      "A mode annotation must be a single mode variable or a single bounds \
+       annotation."
+  | Unsupported_morphism s ->
+    fprintf ppf "The mode morphism %a is not yet supported."
+      Misc.Style.inline_code s
+  | Unsupported_mod_in_bound ->
+    fprintf ppf "%a in mode bounds is not yet supported." Misc.Style.inline_code
+      "mod"
 
 let () =
   Location.register_error_of_exn (function
