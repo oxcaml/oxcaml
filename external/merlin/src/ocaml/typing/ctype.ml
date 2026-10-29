@@ -290,7 +290,7 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
        in [structure] mode. *)
     iter_var s ~f:(fun v ->
       let t = of_var v in
-      if get_level t = generic_level then () else
+      if get_level t >= subject_level then () else
       update_level !current_level t;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
@@ -6689,7 +6689,14 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
-        check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+        begin try
+          check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind)
+        (* rigid variables only occur in the subject [t2].
+           they are only equated to something non-generic, like a weak variable
+           or a concrete layout *)
+        with Jkind_types.Sort.Lower_rigid ->
+          raise_for Moregen (Weaken_sort { pat = t1; subj = t2 })
+        end;
         link_type t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
@@ -6708,7 +6715,11 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
-              check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+              begin try
+                check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind)
+              with Jkind_types.Sort.Lower_rigid ->
+                raise_for Moregen (Weaken_sort { pat = t1; subj = t2 })
+              end;
               link_type t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
