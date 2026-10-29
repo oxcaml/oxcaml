@@ -35,7 +35,7 @@ type mapper = {
   modes : mapper -> modes -> modes;
   mode : mapper -> mode Location.loc -> mode Location.loc;
   mode_bound : mapper -> mode_bound -> mode_bound;
-  mode_bound_elem : mapper -> mode_bound_elem -> mode_bound_elem;
+  mode_bound_var : mapper -> mode_bound_var -> mode_bound_var;
   modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;
@@ -1048,21 +1048,23 @@ let default_mapper =
     mode = (fun this { txt; loc } ->
       let txt =
         match txt with
-        | (Mode _ | Mode_var _) as mode -> mode
-        | Mode_var_with_constraints { upper; lower } ->
-          Mode_var_with_constraints
+        | (Pmode _ | Pmode_var _) as mode -> mode
+        | Pmode_bounded { upper; lower } ->
+          Pmode_bounded
             { upper = this.mode_bound this upper;
               lower = this.mode_bound this lower
             }
       in
       { txt; loc = this.location this loc });
 
-    mode_bound = (fun this { bound_vars; bound_const } ->
-      { bound_vars = List.map (this.mode_bound_elem this) bound_vars;
-        bound_const = List.map (map_loc this) bound_const
-      });
+    mode_bound = (fun this elems ->
+      List.map
+        (function
+          | Pbound_var v -> Pbound_var (this.mode_bound_var this v)
+          | Pbound_const c -> Pbound_const (map_loc this c))
+        elems);
 
-    mode_bound_elem = (fun this { elem_morph; elem_var; elem_mod } ->
+    mode_bound_var = (fun this { elem_morph; elem_var; elem_mod } ->
       { elem_morph = Option.map (map_loc this) elem_morph;
         elem_var = map_loc this elem_var;
         elem_mod = List.map (map_loc this) elem_mod

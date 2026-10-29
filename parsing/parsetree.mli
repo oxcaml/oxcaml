@@ -72,21 +72,22 @@ type mode_var = string
 type mode_morph = string
 
 type mode =
-  | Mode of mode_const
-  | Mode_var of mode_var
-  | Mode_var_with_constraints of mode_bounds
+  | Pmode of mode_const
+  | Pmode_var of mode_var
+  | Pmode_bounded of mode_bounded
 
-and mode_bounds =
+and mode_bounded =
   { upper : mode_bound;
     lower : mode_bound;
   }
 
-and mode_bound =
-  { bound_vars : mode_bound_elem list;
-    bound_const : mode_const loc list;
-  }
+and mode_bound = mode_bound_elem list
 
 and mode_bound_elem =
+  | Pbound_var of mode_bound_var
+  | Pbound_const of mode_const loc
+
+and mode_bound_var =
   { elem_morph : mode_morph loc option;
     elem_var : mode_var loc;
     elem_mod : mode_const loc list;

@@ -433,7 +433,7 @@ let string_quot f x = pp f "`%a" ident_of_name x
 let mode_consts f consts =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") string_loc f consts
 
-let mode_bound_elem f { elem_morph; elem_var; elem_mod } =
+let mode_bound_var f { elem_morph; elem_var; elem_mod } =
   (match elem_morph with
    | None -> pp f "'%s" elem_var.txt
    | Some m -> pp f "%s('%s)" m.txt elem_var.txt);
@@ -441,30 +441,24 @@ let mode_bound_elem f { elem_morph; elem_var; elem_mod } =
   | [] -> ()
   | _ :: _ -> pp f " mod %a" mode_consts elem_mod
 
-let mode_bound sep f { bound_vars; bound_const } =
-  let elems =
-    pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) mode_bound_elem
-  in
-  match bound_vars, bound_const with
-  | vars, [] -> elems f vars
-  | [], consts -> mode_consts f consts
-  | vars, consts -> pp f "%a%s%a" elems vars sep mode_consts consts
+let mode_bound_elem f = function
+  | Pbound_var v -> mode_bound_var f v
+  | Pbound_const c -> string_loc f c
+
+let mode_bound sep f elems =
+  pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) mode_bound_elem f elems
 
 let mode f { txt; _ } =
   match txt with
-  | Mode s -> pp_print_string f s
-  | Mode_var v -> pp f "'%s" v
-  | Mode_var_with_constraints
-      { upper = { bound_vars = []; bound_const = [] };
-        lower = { bound_vars = []; bound_const = [] } } ->
+  | Pmode s -> pp_print_string f s
+  | Pmode_var v -> pp f "'%s" v
+  | Pmode_bounded { upper = []; lower = [] } ->
       pp f "[]"
-  | Mode_var_with_constraints
-      { upper; lower = { bound_vars = []; bound_const = [] } } ->
+  | Pmode_bounded { upper; lower = [] } ->
       pp f "[< %a]" (mode_bound " & ") upper
-  | Mode_var_with_constraints
-      { upper = { bound_vars = []; bound_const = [] }; lower } ->
+  | Pmode_bounded { upper = []; lower } ->
       pp f "[> %a]" (mode_bound " | ") lower
-  | Mode_var_with_constraints { upper; lower } ->
+  | Pmode_bounded { upper; lower } ->
       pp f "[< %a > %a]" (mode_bound " & ") upper (mode_bound " | ") lower
 
 let modes f m =

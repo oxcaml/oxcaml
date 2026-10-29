@@ -39,21 +39,22 @@ end
 
 module Mode = struct
   type t = mode =
-    | Mode of string
-    | Mode_var of string
-    | Mode_var_with_constraints of bounds
+    | Pmode of string
+    | Pmode_var of string
+    | Pmode_bounded of bounded
 
-  and bounds = mode_bounds =
+  and bounded = mode_bounded =
     { upper : bound
     ; lower : bound
     }
 
-  and bound = mode_bound =
-    { bound_vars : bound_elem list
-    ; bound_const : string loc list
-    }
+  and bound = bound_elem list
 
   and bound_elem = mode_bound_elem =
+    | Pbound_var of bound_var
+    | Pbound_const of string loc
+
+  and bound_var = mode_bound_var =
     { elem_morph : string loc option
     ; elem_var : string loc
     ; elem_mod : string loc list
@@ -64,7 +65,7 @@ module Modes = struct
   type t = Mode.t loc list
 
   let none = []
-  let local ~loc = [ { txt = Mode "local"; loc } ]
+  let local ~loc = [ { txt = Pmode "local"; loc } ]
 end
 
 module Include_kind = struct

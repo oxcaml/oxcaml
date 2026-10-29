@@ -15,21 +15,22 @@ type modality = Shim.Modality.t = Modality of string [@@unboxed]
 type modalities = Shim.Modalities.t
 
 type mode = Shim.Mode.t =
-  | Mode of string
-  | Mode_var of string
-  | Mode_var_with_constraints of mode_bounds
+  | Pmode of string
+  | Pmode_var of string
+  | Pmode_bounded of mode_bounded
 
-and mode_bounds = Shim.Mode.bounds =
+and mode_bounded = Shim.Mode.bounded =
   { upper : mode_bound
   ; lower : mode_bound
   }
 
-and mode_bound = Shim.Mode.bound =
-  { bound_vars : mode_bound_elem list
-  ; bound_const : string Location.loc list
-  }
+and mode_bound = mode_bound_elem list
 
 and mode_bound_elem = Shim.Mode.bound_elem =
+  | Pbound_var of mode_bound_var
+  | Pbound_const of string Location.loc
+
+and mode_bound_var = Shim.Mode.bound_var =
   { elem_morph : string Location.loc option
   ; elem_var : string Location.loc
   ; elem_mod : string Location.loc list
