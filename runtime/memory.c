@@ -652,14 +652,16 @@ void caml_local_realloc(void)
     s->next_length = 0;
   }
   if (s->count == Max_local_arenas)
-    caml_fatal_error("Local allocation stack overflow - exceeded Max_local_arenas");
+    caml_fatal_error("Local allocation stack overflow"
+                     " - exceeded Max_local_arenas");
 
   do {
     if (s->next_length == 0) {
       s->next_length = Init_local_arena_bsize;
     } else {
       /* overflow check */
-      static_assert(((intnat)Init_local_arena_bsize << (2*Max_local_arenas)) > 0, "");
+      static_assert(((intnat)Init_local_arena_bsize
+                     << (2*Max_local_arenas)) > 0, "");
       s->next_length *= 4;
     }
     /* may need to loop, if a very large allocation was requested */
@@ -1157,9 +1159,12 @@ void __asan_report_load_n_noabort(const void* addr, size_t size);
 void __asan_report_store_n_noabort(const void* addr, size_t size);
 
 #define CREATE_ASAN_REPORT_WRAPPER(suffix, ext, memory_access, size) \
-CAMLexport void __attribute__((no_caller_saved_registers, disable_tail_calls, target(ext))) \
-  caml_asan_report_ ## memory_access ## size ## _noabort ## suffix(const void* addr) { \
-  __asan_report_ ## memory_access ## _n_noabort(addr, size); \
+CAMLexport void                                                      \
+  __attribute__((no_caller_saved_registers, disable_tail_calls,      \
+                 target(ext)))                                       \
+  caml_asan_report_ ## memory_access ## size ## _noabort ## suffix   \
+    (const void* addr) {                                             \
+  __asan_report_ ## memory_access ## _n_noabort(addr, size);         \
 }
 
 #define CREATE_ASAN_REPORT_WRAPPERS(memory_access, size) \

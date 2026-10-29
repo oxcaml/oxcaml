@@ -555,7 +555,8 @@ static int allocate_minor_heap(asize_t wsize) {
   char name[32];
   snprintf(name, sizeof name, "minor heap %d", domain_self->id);
   if (!caml_mem_commit(
-          (void*)domain_self->minor_heap_area_start, Bsize_wsize(wsize), name)) {
+          (void*)domain_self->minor_heap_area_start,
+          Bsize_wsize(wsize), name)) {
     return -1;
   }
 
@@ -933,7 +934,8 @@ static void reserve_minor_heaps_from_stw_single(void) {
   minor_heap_reservation_bsize = minor_heap_max_bsz * caml_params->max_domains;
 
   /* reserve memory space for minor heaps */
-  heaps_base = caml_mem_map(minor_heap_reservation_bsize, CAML_MAP_RESERVE_ONLY, "minor reservation");
+  heaps_base = caml_mem_map(minor_heap_reservation_bsize,
+                            CAML_MAP_RESERVE_ONLY, "minor reservation");
   if (heaps_base == NULL)
     caml_fatal_error("Not enough heap memory to reserve minor heaps");
 
@@ -1047,7 +1049,8 @@ stw_resize_minor_heap_reservation(caml_domain_state* domain,
 
 void caml_update_minor_heap_max(uintnat requested_wsz) {
   CAML_GC_MESSAGE(MINOR_HEAP,
-                  "Changing minor heap max wsize from %" ARCH_INTNAT_PRINTF_FORMAT
+                  "Changing minor heap max wsize from %"
+                  ARCH_INTNAT_PRINTF_FORMAT
                   "u to %" ARCH_INTNAT_PRINTF_FORMAT "u.\n",
               caml_minor_heap_max_wsz, requested_wsz);
   while (requested_wsz > caml_minor_heap_max_wsz) {
@@ -1391,7 +1394,8 @@ static void* domain_thread_func(void* v)
     install_backup_thread(domain_self);
 
     CAML_GC_MESSAGE(DOMAIN,
-                    "Domain starting (unique ID %"ARCH_INTNAT_PRINTF_FORMAT"u)\n",
+                    "Domain starting (unique ID %"
+                    ARCH_INTNAT_PRINTF_FORMAT "u)\n",
                     domain_self->unique_id);
     CAML_EV_LIFECYCLE(EV_DOMAIN_SPAWN, getpid());
     /* FIXME: ignoring errors during domain initialization is unsafe
@@ -2512,7 +2516,8 @@ CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
 {
   /* We can do this test-and-set non-atomically, because:
       - this is the only function that can modify this value
-      - we hold the domain lock, so we know no other threads are calling this function
+      - we hold the domain lock, so we know no other threads are calling
+        this function
   */
   bool changed = atomic_load_relaxed(&domain_self->tick_interval_usec)
                  != (uintnat)interval_usec;
@@ -2532,7 +2537,8 @@ CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
   return 0;
 }
 
-CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec) {
+CAMLprim value caml_domain_set_tick_interval_usec_bytecode
+  (value v_interval_usec) {
   CAMLparam1(v_interval_usec);
   caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
   CAMLreturn(Val_unit);

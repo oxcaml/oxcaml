@@ -298,8 +298,9 @@ CAMLprim value caml_get_continuation_callstack (value cont, value max_frames)
    word has bit 25 set is not a record but a 4-byte jump to a suffix shared
    with an earlier chain: the word holds (target - here) + 0x03000000, which
    for -2^24 <= target - here < 2^24 lies in [0x02000000, 0x03FFFFFF],
-   keeping bit 25 set. A record's bit 25 is always 0, just above its 23-bit name-struct
-   offset field (see the format comment in caml_debuginfo_location). */
+   keeping bit 25 set. A record's bit 25 is always 0, just above its
+   23-bit name-struct offset field (see the format comment in
+   caml_debuginfo_location). */
 #define Debuginfo_jump_bit  ((uint32_t)1 << 25)
 #define Debuginfo_jump_bias ((uint32_t)0x03000000)
 
@@ -461,7 +462,8 @@ void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li)
       + caml_read_unaligned_int32(&name_and_loc_info->filename_offs);
     li->loc_start_lnum = li->loc_end_lnum = (info2 >> 12) & 0x7FFFF;
     li->loc_end_lnum += ((info2 & 0xFFF) << 6) | (info1 >> 26);
-    li->loc_start_chr = caml_read_unaligned_uint16(&name_and_loc_info->start_chr);
+    li->loc_start_chr =
+      caml_read_unaligned_uint16(&name_and_loc_info->start_chr);
     li->loc_end_chr = caml_read_unaligned_uint16(&name_and_loc_info->end_chr);
     li->loc_end_offset =
       caml_read_unaligned_int32(&name_and_loc_info->end_offset);

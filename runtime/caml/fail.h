@@ -161,7 +161,8 @@ Caml_inline value caml_get_value_or_raise (caml_result result)
     return result.data;
 }
 
-Caml_inline value caml_get_value_or_raise_async (caml_result result, const char *where)
+Caml_inline value caml_get_value_or_raise_async (caml_result result,
+                                                 const char *where)
 {
   if (caml_result_is_exception(result)) {
     caml_check_async(result, where);

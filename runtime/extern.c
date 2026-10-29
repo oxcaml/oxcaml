@@ -347,7 +347,8 @@ Caml_inline int extern_lookup_position(struct caml_extern_state *s, value obj,
   }
 }
 
-/* Record the given object [obj] in the hashmap, associated to the specified data [data]. */
+/* Record the given object [obj] in the hashmap, associated to the
+   specified data [data]. */
 /* The [h] parameter is the index in the hash table where the object
    must be inserted.  It was determined during lookup. */
 static void extern_record_location_with_data(struct caml_extern_state* s,
@@ -1324,16 +1325,17 @@ enum reachable_words_node_state {
   /* This node is reachable from at least two distinct roots, so it doesn't
    * have a unique owner and will be ignored in all future traversals. */
   Shared = -1,
-  /* This node is one of the roots and has not been visited yet (i.e. the computation
-   * starting at that root still hasn't ran */
+  /* This node is one of the roots and has not been visited yet
+   * (i.e. the computation starting at that root still hasn't ran */
   RootUnprocessed = -2,
-  /* This node is one of the roots and the computation for that root has already ran */
+  /* This node is one of the roots and the computation for that root
+   * has already ran */
   RootProcessed = -3,
   /* Sentinel value for a state that should never be observed */
   Invalid = -4,
-  /* States that are non-negative integers indicate that a node has only been visited
-   * starting from a single root. The state is then equal to the identifier of the
-   * root that we reached it from */
+  /* States that are non-negative integers indicate that a node has
+   * only been visited starting from a single root. The state is then
+   * equal to the identifier of the root that we reached it from */
 };
 
 /* This is multicore-safe, for the non-local reason that we only apply
@@ -1354,17 +1356,17 @@ void add_to_field(value sizes, uintnat index, intnat x) {
    without clearing the position table to share data between runs starting
    from different roots. Identifiers must be positive integers.
 
-   For each value node visited, we record its traversal status in the [pos] field
-   of its entry in [position_table.entries]. The statuses are described in detail
-   in the [reachable_words_node_state] enum.
+   For each value node visited, we record its traversal status in the
+   [pos] field of its entry in [position_table.entries]. The statuses
+   are described in detail in the [reachable_words_node_state] enum.
 
    Returns the total size of elements marked, that is ones that are reachable
    from the current root and can be reached by at most one root from the ones
    that already ran.
 
    [shared_size] is incremented by the total size of elements that were newly
-   marked [Shared], that is ones that we just found out are reachable from at least
-   two roots.
+   marked [Shared], that is ones that we just found out are reachable
+   from at least two roots.
 
    If [sizes_by_root_id] is not [Val_unit], we expect it to be an OCaml array
    with length equal to the number of roots. Then during the traversal we will
@@ -1413,7 +1415,8 @@ intnat reachable_words_once(struct caml_extern_state *s,
       } else if (mark == RootUnprocessed && v == root) {
         should_traverse = 1;
         new_mark = RootProcessed;
-      } else if (mark == Shared || mark == RootUnprocessed || mark == RootProcessed) {
+      } else if (mark == Shared || mark == RootUnprocessed ||
+                 mark == RootProcessed) {
         should_traverse = 0;
       } else if (mark == identifier) {
         should_traverse = 0;
@@ -1435,13 +1438,14 @@ intnat reachable_words_once(struct caml_extern_state *s,
         size += sz_with_header;           /* header word included */
         if (sizes_by_root_id != Val_unit) {
           if (new_mark == Shared) {
-            /* mark is identifier of some other root that we counted this node
-             * as contributing to. Since it is evidently not uniquely reachable, we
-             * undo this contribution */
+            /* mark is identifier of some other root that we counted
+             * this node as contributing to. Since it is evidently not
+             * uniquely reachable, we undo this contribution */
             add_to_field(sizes_by_root_id, mark, -sz_with_header);
             *shared_size += sz_with_header;
           } else {
-            CAMLassert(new_mark == identifier || (v == root && new_mark == RootProcessed));
+            CAMLassert(new_mark == identifier ||
+                       (v == root && new_mark == RootProcessed));
             add_to_field(sizes_by_root_id, identifier, sz_with_header);
           }
         }

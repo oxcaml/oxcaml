@@ -245,7 +245,7 @@ Caml_inline value try_promote(value v, volatile value *p, header_t hd,
   caml_domain_state *domain = st->domain;
   void *mem = NULL;
 
-  CAMLassert(!Is_update_in_progress(hd)); /* hd was obtained by get_header_val */
+  CAMLassert(!Is_update_in_progress(hd)); /* hd from get_header_val */
   CAMLassert(!Is_promoted_hd(hd)); /* Promoted blocks already filtered out */
 
   /* manual inline of parts of caml_shared_try_alloc */
@@ -459,7 +459,7 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
     while (st->todo_list != 0) {
       value v = st->todo_list;                        /* Get the head. */
       CAMLassert (Is_promoted_hd(get_header_val(v))); /* It must be promoted. */
-      value new_v = Field(v, 0);                      /* Follow forward pointer. */
+      value new_v = Field(v, 0);                      /* Follow forward ptr. */
       value next = Field (new_v, 1);
       st->todo_list = next;
       /* TODO: Measure whether this prefetch helps or hurts */
@@ -502,7 +502,8 @@ static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
       CAMLassert (Wosize_val(new_v));
     }
 
-    /* Oldify any ephemeron data fields pointing to the minor heap, and some keys.
+    /* Oldify any ephemeron data fields pointing to the minor heap,
+       and some keys.
 
        In theory the data need only be promoted if the ephemeron and all
        keys are live, but determining this may require a multi-round
@@ -680,8 +681,9 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 
       CAML_GC_MESSAGE(MINOR,
                       "Oldifying foreign refs from domain %d, count %"
-                      ARCH_INTNAT_PRINTF_FORMAT"d [%p, %p), per participant %"
-                      ARCH_INTNAT_PRINTF_FORMAT"d. Participant %d oldifying [%p, %p).\n",
+                      ARCH_INTNAT_PRINTF_FORMAT"d [%p, %p), "
+                      "per participant %"ARCH_INTNAT_PRINTF_FORMAT"d. "
+                      "Participant %d oldifying [%p, %p).\n",
                       foreign_domain->id, major_ref_size,
                       foreign_major_ref->base, foreign_major_ref->ptr,
                       refs_per_domain, participating_idx,
@@ -735,7 +737,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_GC_MESSAGE(MINOR, "roots complete (%d roots). Mopping up.\n",
                   remembered_roots);
   CAML_EV_BEGIN(EV_MINOR_REMEMBERED_SET_PROMOTE);
-  mopup_result_s mopup_result = oldify_mopup (&st, 1); /* ephemerons promoted here */
+  /* ephemerons promoted here */
+  mopup_result_s mopup_result = oldify_mopup (&st, 1);
   result.locked_ephemerons = mopup_result.locked_ephemerons;
   CAML_EV_END(EV_MINOR_REMEMBERED_SET_PROMOTE);
   CAML_EV_END(EV_MINOR_REMEMBERED_SET);
@@ -1018,7 +1021,8 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
   CAML_EV_END(EV_MINOR_FINALIZED);
 
   CAML_EV_BEGIN(EV_MINOR_DEPENDENT);
-  CAML_GC_MESSAGE(MINOR, "Accounting for minor blocks with dependent memory.\n");
+  CAML_GC_MESSAGE(MINOR,
+                  "Accounting for minor blocks with dependent memory.\n");
   dependent_accounting_minor(domain);
   CAML_EV_END(EV_MINOR_DEPENDENT);
 

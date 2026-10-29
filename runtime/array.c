@@ -31,11 +31,16 @@ static const mlsize_t mlsize_t_max = CAML_UINTNAT_MAX;
 // Note: if polymorphic comparison and/or hashing are implemented for
 // the int32 unboxed arrays, care needs to be taken with the last word
 // when the array is of odd length -- this is not currently initialized.
-#define Max_unboxed_float_array_wosize     (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
-#define Max_unboxed_int64_array_wosize     (Max_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
-#define Max_unboxed_int32_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
-#define Max_untagged_int16_array_wosize    (Max_array_wosize * (sizeof(intnat) / sizeof(int16_t)))
-#define Max_untagged_int8_array_wosize     (Max_array_wosize * (sizeof(intnat) / sizeof(int8_t)))
+#define Max_unboxed_float_array_wosize \
+  (Max_array_wosize / (sizeof(double) / sizeof(intnat)))
+#define Max_unboxed_int64_array_wosize \
+  (Max_array_wosize / (sizeof(int64_t) / sizeof(intnat)))
+#define Max_unboxed_int32_array_wosize \
+  (Max_array_wosize * (sizeof(intnat) / sizeof(int32_t)))
+#define Max_untagged_int16_array_wosize \
+  (Max_array_wosize * (sizeof(intnat) / sizeof(int16_t)))
+#define Max_untagged_int8_array_wosize \
+  (Max_array_wosize * (sizeof(intnat) / sizeof(int8_t)))
 #define Max_unboxed_nativeint_array_wosize (Max_array_wosize)
 #define Max_untagged_int_array_wosize      (Max_array_wosize)
 
@@ -735,9 +740,11 @@ static value caml_make_unboxed_int64_vect0(value len, int local)
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_local_reserved(num_elements, Unboxed_int64_array_tag, reserved);
+    return caml_alloc_local_reserved(num_elements, Unboxed_int64_array_tag,
+                                     reserved);
   else
-    return caml_alloc_with_reserved(num_elements, Unboxed_int64_array_tag, reserved);
+    return caml_alloc_with_reserved(num_elements, Unboxed_int64_array_tag,
+                                    reserved);
 }
 
 CAMLprim value caml_make_unboxed_int64_vect(value len)
@@ -772,9 +779,11 @@ static value caml_make_unboxed_nativeint_vect0(value len, int local)
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_local_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
+    return caml_alloc_local_reserved(num_elements,
+                                     Unboxed_nativeint_array_tag, reserved);
   else
-    return caml_alloc_with_reserved(num_elements, Unboxed_nativeint_array_tag, reserved);
+    return caml_alloc_with_reserved(num_elements,
+                                    Unboxed_nativeint_array_tag, reserved);
 }
 
 CAMLprim value caml_make_unboxed_nativeint_vect(value len)
@@ -809,9 +818,11 @@ static value caml_make_untagged_int_vect0(value len, int local)
   reserved_t reserved = Reserved_mixed_block_scannable_wosize_native(0);
 
   if (local)
-    return caml_alloc_local_reserved(num_elements, Untagged_int_array_tag, reserved);
+    return caml_alloc_local_reserved(num_elements, Untagged_int_array_tag,
+                                     reserved);
   else
-    return caml_alloc_with_reserved(num_elements, Untagged_int_array_tag, reserved);
+    return caml_alloc_with_reserved(num_elements, Untagged_int_array_tag,
+                                    reserved);
 }
 
 CAMLprim value caml_make_untagged_int_vect(value len)
@@ -998,8 +1009,8 @@ CAMLprim value caml_unboxed_int32_vect_blit(value a1, value ofs1, value a2,
   return Val_unit;
 }
 
-CAMLprim value caml_unboxed_int64_vect_blit(value a1, value ofs1, value a2, value ofs2,
-                                            value n)
+CAMLprim value caml_unboxed_int64_vect_blit(value a1, value ofs1,
+                                            value a2, value ofs2, value n)
 {
   /* See memory model [MM] notes in memory.c */
   atomic_thread_fence(memory_order_acquire);
@@ -1398,7 +1409,8 @@ static value uniform_array_gather(intnat num_arrays,
     /* If total size = 0, just return an empty array */
     res = Atom(0);
   }
-  else if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
+  else if (size > Max_wosize/Double_wosize)
+    caml_invalid_argument("Array.concat");
   else if (size <= Max_young_wosize || local) {
     /* Array of values, small enough to fit in young generation. */
     res = local ? caml_alloc_local(size, 0) : caml_alloc_small(size, 0);

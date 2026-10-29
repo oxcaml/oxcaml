@@ -337,7 +337,8 @@ void caml_scan_stack(
   struct stack_info* stack, value* v_gc_regs);
 
 value caml_alloc_stack(value hval, value hexn, value heff);
-value caml_alloc_stack_preemptible(value hval, value hexn, value heff, value htick);
+value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
+                                   value htick);
 
 /* try to grow the stack until at least required_size words are available.
    returns nonzero on success */
