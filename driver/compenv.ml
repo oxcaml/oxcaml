@@ -332,6 +332,8 @@ let read_one_param ppf position name v =
   | "no-alias-deps" -> set "no-alias-deps" [ no_alias_deps ] v
   | "typing-recovery" -> set "typing-recovery" [ typing_recovery ] v
   | "opaque" -> set "opaque" [ opaque ] v
+  | "persistent-deps" ->
+      set "persistent-deps" [ persistent_deps ] v
 
   | "pp" -> preprocessor := Some v
   | "runtime-variant" -> runtime_variant := v
