@@ -2692,9 +2692,8 @@ module Instruction = struct
     | FNMADD | FNMSUB | FNMUL | FRECPE_vector | FRINT _ | FRINT_vector _
     | FRSQRTE_vector | FSQRT | FSQRT_vector | FSUB | FSUB_vector | INS _
     | INS_V _ | LDAR | STLR | STLUR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH
-    | LDRSW
-    | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
-    | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
+    | LDRSW | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ
+    | MSUB | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
     | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
     | SCVTF | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _
     | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector
@@ -2796,7 +2795,8 @@ module DSL = struct
   (* Force the unscaled signed 9-bit encoding, as required by stlur. *)
   let mem_offset_unscaled ~(base : [`GP of [< `X | `SP]] Reg.t) ~offset =
     check_nine_signed_unscaled offset;
-    Operand.Mem (Offset_nine_signed_unscaled (base, Nine_signed_unscaled offset))
+    Operand.Mem
+      (Offset_nine_signed_unscaled (base, Nine_signed_unscaled offset))
 
   let mem_symbol ~(base : [`GP of [< `X | `SP]] Reg.t) ~symbol =
     Operand.Mem (Offset_sym (base, symbol))

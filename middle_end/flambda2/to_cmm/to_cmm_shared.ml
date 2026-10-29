@@ -152,8 +152,7 @@ let memory_chunk_of_non_scannable_kind kind : Cmm.memory_chunk =
     | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Single _
     | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
     | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-    | Fivetwelve_aligned ) as mem
-    ->
+    | Fivetwelve_aligned ) as mem ->
     mem
 
 let machtype_of_kinded_parameter p = Bound_parameter.kind p |> machtype_of_kind

@@ -1584,8 +1584,8 @@ end = struct
         in
         match memory_chunk with
         | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int | Sixtyfour
-        | Word_val | Double | Onetwentyeight_aligned ->
+        | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Word_int
+        | Sixtyfour | Word_val | Double | Onetwentyeight_aligned ->
           emit_shadow_check ?dependencies ~address ~report memory_chunk
         | Onetwentyeight_unaligned ->
           emit_shadow_check ?dependencies ~address ~report Byte_unsigned;
