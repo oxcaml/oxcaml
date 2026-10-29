@@ -1,0 +1,43 @@
+entry: "A.f":0
+then edge: "A.f":0:0000000a:0:branch(1)
+else edge: "A.f":0:0000000a:0:branch(0)
+call site: "A.f":0:0000000a:1:call
+edges of one construct differ: ok
+interior positions depend on the body: ok
+entries do not: ok
+module-level call site: "C":0:module("C.v":0):0:call
+module-level calls have no body hash: ok
+inlined into g: "A.f":0:0000000a:0:branch(1) <- "B.g":0:0000000b:0:call
+then into h: "A.f":0:0000000a:0:branch(1) <- "B.g":0:0000000b:0:call <- "D.h":0:0000000d:0:call
+context is innermost first: ok
+inlining keeps the position: ok
+copy of the inner function: "A.make.(fun)@x,int_add,n":0@("C":0:module("C.add3":0):0:call)
+its then edge: "A.make.(fun)@x,int_add,n":0@("C":0:module("C.add3":0):0:call):0000000f:0:branch(1)
+functor instance function: "A.make.(fun)@x,int_add,n":0@("C":0:module("C.M":0):0:call)
+copied again: "A.make.(fun)@x,int_add,n":0@("C":0:module("C.add3":0):0:call)@("C":0:module("C.M":0):0:call)
+the copy is a new function: ok
+copies share the original's name: ok
+copy made at an inlined call: "A.make.(fun)@x,int_add,n":0@("B.g":0:0000000b:0:call)@("D.h":0:0000000d:0:call)
+counter inlined into the copy: "A.f":0:0000000a:0:branch(1) <- "A.make.(fun)@x,int_add,n":0@("B.g":0:0000000b:0:call)@("D.h":0:0000000d:0:call):0000000f:1:call
+module-level call in a copy: "A.make.(fun)@x,int_add,n":0@("C":0:module("C.add3":0):0:call):module("A.make.(fun).M":0):0:call
+made in f, then copied with it: "A.make.h":0@("A.outer.f":0:00000005:0:call)@("C.top":0:0000000c:0:call)
+made in the copy of f: "A.make.h":0@("A.outer.f":0:00000005:0:call)@("C.top":0:0000000c:0:call)
+the order of copying does not matter: ok
+inlined calls follow the edge's counters: ok
+duplicates are not added: ok
+first occurrence wins: ok
+compare agrees with equal: ok
+counters are keys: ok
+entry hash: 762c1c9f
+branch hash: 1bcc2762
+module-level call hash: 33a562ac
+specialized entry hash: 7d1f5df1
+the entry hash is the function's: ok
+only entries carry the entry bit: ok
+the entry bit survives specialization: ok
+a counter hashes its position and each inlining level: ok
+specialization recomputes the hash: ok
+an edge and a later construct have distinct hashes: ok
+hash conversion preserves all bits: ok
+body hash conversion preserves all bits: ok
+hash ordering is unsigned: ok
