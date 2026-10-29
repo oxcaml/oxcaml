@@ -763,13 +763,19 @@ let letter for_debug = function
     let ocamlparam_from_env = match Sys.getenv_opt "OCAMLPARAM" with None -> "-" | Some  value -> value in
     Misc.fatal_errorf "Warnings.letter %C (for_debug=%S, ocamlparam_from_env=%S ocamlparam_from_compenv=%S)" chr for_debug ocamlparam_from_env !parsed_ocamlparam
 
+(* Local string sets and maps rather than [Misc.Stdlib.String]'s: this module
+   is part of the parser's dependency closure that tools/oxpp compiles with
+   the system compiler, and [Misc.Stdlib] is free to use OxCaml syntax. *)
+module String_set = Set.Make (String)
+module String_map = Map.Make (String)
+
 type state =
   {
     active: bool array;
     error: bool array;
-    alerts: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
-    alert_errors: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
-    alert_disable_watches: loc list Misc.Stdlib.String.Map.t;
+    alerts: (String_set.t * bool); (* false:set complement *)
+    alert_errors: (String_set.t * bool); (* false:set complement *)
+    alert_disable_watches: loc list String_map.t;
     (* Locations of attributes that disabled a given alert and are in force in
        the current scope; used to detect alert-disabling attributes that never
        suppress anything (warning 221 [Unused_alert_disable]). *)
@@ -780,9 +786,9 @@ let current =
     {
       active = Array.make (last_warning_number + 1) true;
       error = Array.make (last_warning_number + 1) false;
-      alerts = (Misc.Stdlib.String.Set.empty, false);
-      alert_errors = (Misc.Stdlib.String.Set.empty, true); (* all soft *)
-      alert_disable_watches = Misc.Stdlib.String.Map.empty;
+      alerts = (String_set.empty, false);
+      alert_errors = (String_set.empty, true); (* all soft *)
+      alert_disable_watches = String_map.empty;
     }
 
 let disabled = ref false
@@ -803,12 +809,12 @@ let is_error x =
 let alert_is_active {kind; _} =
   not !disabled &&
   let (set, pos) = (!current).alerts in
-  Misc.Stdlib.String.Set.mem kind set = pos
+  String_set.mem kind set = pos
 
 let alert_is_error {kind; _} =
   not !disabled &&
   let (set, pos) = (!current).alert_errors in
-  Misc.Stdlib.String.Set.mem kind set = pos
+  String_set.mem kind set = pos
 
 let with_state state f =
   let prev = backup () in
@@ -854,7 +860,7 @@ let alert_disables : (loc * string, alert_disable_status) Hashtbl.t =
 
 let register_alert_disable ~loc name =
   let watches =
-    Misc.Stdlib.String.Map.update name
+    String_map.update name
       (function None -> Some [loc] | Some locs -> Some (loc :: locs))
       (!current).alert_disable_watches
   in
@@ -866,7 +872,7 @@ let mark_alert_disables_used kind =
   if not !disabled then begin
     let mark name =
       match
-        Misc.Stdlib.String.Map.find_opt name (!current).alert_disable_watches
+        String_map.find_opt name (!current).alert_disable_watches
       with
       | None -> ()
       | Some locs ->
@@ -896,15 +902,15 @@ let set_alert ~error ~enable s =
   let upd =
     match s with
     | "all" ->
-        (Misc.Stdlib.String.Set.empty, not enable)
+        (String_set.empty, not enable)
     | s ->
         let (set, pos) =
           if error then (!current).alert_errors else (!current).alerts
         in
         let f =
           if enable = pos
-          then Misc.Stdlib.String.Set.add
-          else Misc.Stdlib.String.Set.remove
+          then String_set.add
+          else String_set.remove
         in
         (f s set, pos)
   in
@@ -1005,7 +1011,7 @@ let letter_alert tokens =
       let nowhere = ghost_loc_in_file "_none_" in
       let spelling_hint ppf =
         let max_seq_len =
-          List.fold_left (fun l x -> Misc.Stdlib.Int.max l (List.length x))
+          List.fold_left (fun l x -> Int.max l (List.length x))
             0 consecutive_letters
         in
         if max_seq_len >= 5 then
@@ -1100,7 +1106,7 @@ let parse_opt error active errflag s =
         in
         List.iter (action modifier) (letter s lc)
     | Num(n1,n2,modifier) ->
-        for n = n1 to Misc.Stdlib.Int.min n2 last_warning_number do action modifier n done
+        for n = n1 to Int.min n2 last_warning_number do action modifier n done
   in
   let parse_and_eval s =
     let tokens = parse_warnings s in

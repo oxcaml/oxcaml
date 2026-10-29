@@ -480,6 +480,19 @@ let lax_delim raw_name =
 let is_keyword name =
   Hashtbl.mem keyword_table name
 
+(* The source form of the type variable named [s]. *)
+let tyvar_of_name s =
+  if String.length s >= 2 && s.[1] = '\'' then
+    (* without the space, this would be parsed as
+       a character literal *)
+    "' " ^ s
+  else if is_keyword s then
+    "'\\#" ^ s
+  else if String.equal s "_" then
+    s
+  else
+    "'" ^ s
+
 let find_keyword lexbuf name =
   match Hashtbl.find keyword_table name with
   | Some x -> x

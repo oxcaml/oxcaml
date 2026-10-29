@@ -49,6 +49,11 @@ val in_string : unit -> bool
 
 val is_keyword : string -> bool
 
+val tyvar_of_name : string -> string
+(** The source form of the type variable named by the argument: ['a] for
+    ["a"], with the escaping needed when the name is a keyword or starts
+    with a quote. *)
+
 val print_warnings : bool ref
 val handle_docstrings : bool ref
 val comments : unit -> (string * Location.t) list

@@ -109,9 +109,12 @@ let simple_module_path = wrap Parser.parse_mod_longident
 let type_ident = wrap Parser.parse_mty_longident
 
 (* Error reporting for Syntaxerr *)
-(* The code has been moved here so that one can reuse Pprintast.tyvar *)
 
 module Style = Misc.Style
+
+(* [Pprintast.Doc.tyvar], without depending on Pprintast: this module is part
+   of the parser's dependency closure that tools/oxpp links. *)
+let tyvar ppf name = Format_doc.pp_print_string ppf (Lexer.tyvar_of_name name)
 
 let prepare_error err =
   let open Syntaxerr in
@@ -141,7 +144,7 @@ let prepare_error err =
       Location.errorf ~loc
         "In this scoped type, variable %a \
          is reserved for the local type %a."
-        (Style.as_inline_code Pprintast.Doc.tyvar) var
+        (Style.as_inline_code tyvar) var
         Style.inline_code var
   | Other loc ->
       Location.errorf ~loc "Syntax error"

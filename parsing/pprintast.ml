@@ -127,17 +127,7 @@ let needs_parens ~kind txt =
 let needs_spaces txt =
   first_is '*' txt || last_is '*' txt
 
-let tyvar_of_name s =
-  if String.length s >= 2 && s.[1] = '\'' then
-    (* without the space, this would be parsed as
-       a character literal *)
-    "' " ^ s
-  else if Lexer.is_keyword s then
-    "'\\#" ^ s
-  else if String.equal s "_" then
-    s
-  else
-    "'" ^ s
+let tyvar_of_name = Lexer.tyvar_of_name
 
 (* Unlike upstream, we call this module [Doc_internal] and define [Doc] at the
    end of the file to include [jkind_annotation]. *)
