@@ -360,8 +360,8 @@ let block_path_expected_modalities mutability =
   | Ok () -> expected1
   | Error _ ->
     Misc.fatal_error
-      "Typemode.block_path_expected_modalities: mismatch with mutable \
-       implied modalities"
+      "Typemode.block_path_expected_modalities: mismatch with mutable implied \
+       modalities"
 
 let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
   let baseline =

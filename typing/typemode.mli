@@ -99,5 +99,4 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
     [verbose] is true, redundant annotations are included. *)
 val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> string list
 
-val block_path_expected_modalities :
-  Types.mutability -> Mode.Modality.Const.t
+val block_path_expected_modalities : Types.mutability -> Mode.Modality.Const.t
