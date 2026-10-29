@@ -17,7 +17,8 @@
 (* Unlike most of the rest of Flambda 2, this file depends on ocamloptcomp,
    meaning it can call [Compilenv]. *)
 
-let get_module_info comp_unit =
+let get_module_info found =
+  let comp_unit = Compilation_unit.Found.unit found in
   let cmx_name = Compilation_unit.name comp_unit in
   (* Typing information for predefined exceptions should be populated directly
      by the callee. *)
@@ -31,7 +32,7 @@ let get_module_info comp_unit =
       (Flambda2_identifiers.Symbol.external_symbols_compilation_unit ()
       |> Compilation_unit.name)
   then None
-  else Compilenv.get_unit_export_info comp_unit
+  else Compilenv.get_unit_export_info found
 
 let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
