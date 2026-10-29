@@ -323,6 +323,11 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   then if for_mutable_variable then monadic else monadic @ comonadic
   else []
 
+let modality_of_atoms l =
+  List.fold_left
+    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
+    Modality.Const.id l
+
 let mutable_implied_modalities ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
