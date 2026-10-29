@@ -444,7 +444,7 @@ let run : Cfg_with_layout.t -> Cfg_with_layout.t =
     dprintf "Function %s\n%!" fun_name;
     let avail_before = RAS.Ok (RD_quotient_set.without_debug_info fun_args) in
     let init : Domain.t = { Domain.avail_before } in
-    match Analysis.run cfg ~init ~handlers_are_entry_points:false () with
+    match Analysis.run cfg ~init () with
     | Error () ->
       Misc.fatal_errorf "Cfg_available_regs.run: dataflow analysis failed"
     | Ok (_ : Domain.t Label.Tbl.t) ->
