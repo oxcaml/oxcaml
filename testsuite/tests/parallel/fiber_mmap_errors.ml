@@ -9,7 +9,7 @@
    malloced memory), so leaking many of them must not exhaust the kernel
    mapping limit. This program used to die with Out_of_fibers after a few
    tens of thousands of iterations. Where /proc is available, also check
-   that the mapping count stays bounded (by the guarded-stack cache)
+   that the mapping count stays bounded (by the guarded-stack bound)
    instead of growing with the number of suspended fibers, which would
    need ~3 mappings each. *)
 

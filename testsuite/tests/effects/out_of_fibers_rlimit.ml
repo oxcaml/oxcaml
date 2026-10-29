@@ -5,6 +5,9 @@
       follows the C library's default thread stack, which is only 128KiB
       on musl. 4194304 words is 32MiB. *)
    ocamlrunparam += ",Xfiber_stack_size=4194304";
+   (* Idle every promoted continuation, however few stacks exist: the
+      wake test needs its parked fibers idled. *)
+   ocamlrunparam += ",Xmax_guarded_stacks=0";
    no-stack-checks;
    no-address-sanitizer;
    no-tsan;
