@@ -326,6 +326,14 @@ let symbols_ref = ref []
 
 let codecops_ref = ref []
 
+let print_version () =
+  Format.printf "ocamlfilt, version %s@." Sys.ocaml_version;
+  exit 0
+
+let print_version_num () =
+  Format.printf "%s@." Sys.ocaml_version;
+  exit 0
+
 let specs =
   [ ( "--format",
       Arg.String
@@ -347,7 +355,9 @@ let specs =
     ( "--decode",
       Arg.Unit (fun () -> codecops_ref := Decode :: !codecops_ref),
       " Decode input as an identifier, instead of demangling; can be pipelined \
-       with --encode to round-trip" ) ]
+       with --encode to round-trip" );
+    ("-version", Arg.Unit print_version, " Print version and exit");
+    ("-vnum", Arg.Unit print_version_num, " Print version number and exit") ]
 
 let () =
   Arg.parse specs (fun s -> symbols_ref := !symbols_ref @ [s]) usage_msg;
