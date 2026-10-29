@@ -407,7 +407,8 @@ module Dynamic = Make_layout_filler (struct
   let simple ~dbg env res simple =
     let To_cmm_env.{ env; res; expr = { cmm; free_vars; effs } } =
       (* it's unclear that inlining effectful expressions is beneficial *)
-      C.simple ~consider_inlining_effectful_expressions:false ~dbg env res simple
+      C.simple ~consider_inlining_effectful_expressions:false ~dbg env res
+        simple
     in
     `Expr cmm, free_vars, env, res, effs
 
