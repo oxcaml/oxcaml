@@ -263,7 +263,7 @@ ws_jsoo_test = --root=$(ast_dependent_libs_root) \
   --build-dir=$(CURDIR)/_build/jsoo-test
 
 # STDLIB_JSIR_OCAMLOPT_FLAGS: the optimisation flags the compiler's libraries
-# are built with natively, so that their correponding JSIR builds can use the
+# are built with natively, so that their corresponding JSIR builds can use the
 # same flags.
 define dune_ast_dependent_libs_context
 (lang dune 3.23)
