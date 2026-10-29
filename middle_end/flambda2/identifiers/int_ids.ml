@@ -38,6 +38,59 @@ let simple_flags = 3
 
 let code_id_flags = 4
 
+(* The [Compilation_unit.Found.t] carried by variables, symbols and code ids,
+   shared per unit and recorded location so that the identifiers written to a
+   .cmx file share them. *)
+module Found_table = Hashtbl.Make (struct
+  type t = Compilation_unit.Found.t
+
+  let equal t1 t2 =
+    Compilation_unit.Found.equal t1 t2
+    && Option.equal String.equal
+         (Compilation_unit.Found.cmx_path t1)
+         (Compilation_unit.Found.cmx_path t2)
+
+  let hash = Compilation_unit.Found.hash
+end)
+
+let found_units = ref (Found_table.create 17)
+
+let share_found found =
+  match Found_table.find_opt !found_units found with
+  | Some found -> found
+  | None ->
+    Found_table.add !found_units found found;
+    found
+
+(* The unit of an identifier read from the .cmx file of
+   [original_compilation_unit] found at [cmx_path]: the identifiers of that unit
+   get the location recorded (see [Flambda_cmx_format]). *)
+let relocate_found ~original_compilation_unit ~cmx_path found =
+  let found =
+    match cmx_path with
+    | Some cmx_path
+      when Compilation_unit.equal
+             (Compilation_unit.Found.unit found)
+             original_compilation_unit ->
+      Compilation_unit.Found.with_cmx_path found cmx_path
+    | Some _ | None -> found
+  in
+  share_found found
+
+(* Intern an imported datum. An identifier may already be interned from a datum
+   without a recorded location, e.g. created from the unit's interface before
+   its .cmx file was read: the imported datum then replaces it, so that the
+   location is not lost. *)
+let import_data ~add ~find ~replace ~found_of data =
+  let id = add data in
+  let existing = find id in
+  if
+    existing != data
+    && Option.is_none (Compilation_unit.Found.cmx_path (found_of existing))
+    && Option.is_some (Compilation_unit.Found.cmx_path (found_of data))
+  then replace id data;
+  id
+
 module Const_data = struct
   type t =
     | Naked_immediate of Target_ocaml_int.t
@@ -254,7 +307,7 @@ end
 
 module Variable_data = struct
   type t =
-    { compilation_unit : Compilation_unit.t;
+    { compilation_unit : Compilation_unit.Found.t;
       name : string;
       name_stamp : int;
       kind : Flambda_kind.t;
@@ -266,7 +319,8 @@ module Variable_data = struct
   let print ppf { compilation_unit; name; name_stamp; kind; user_visible } =
     let open! Misc.Sexp in
     print ppf
-      [ a "compilation_unit" compilation_unit
+      [ a "compilation_unit"
+          (Compilation_unit.Found.unit compilation_unit)
           (Format_doc.compat Compilation_unit.print_debug);
         s "name" name;
         d "name_stamp" name_stamp;
@@ -275,7 +329,9 @@ module Variable_data = struct
 
   let hash
       { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
-    hash2 (Compilation_unit.hash compilation_unit) (Hashtbl.hash name_stamp)
+    hash2
+      (Compilation_unit.Found.hash compilation_unit)
+      (Hashtbl.hash name_stamp)
 
   let equal t1 t2 =
     if t1 == t2
@@ -298,7 +354,7 @@ module Variable_data = struct
         t2
       in
       Int.equal name_stamp1 name_stamp2
-      && Compilation_unit.equal compilation_unit1 compilation_unit2
+      && Compilation_unit.Found.equal compilation_unit1 compilation_unit2
 end
 
 module Symbol0 = Flambda2_import.Symbol
@@ -323,7 +379,7 @@ end
 
 module Code_id_data = struct
   type t =
-    { compilation_unit : Compilation_unit.t;
+    { compilation_unit : Compilation_unit.Found.t;
       name : string;
       debug_info : Debuginfo.t;
       linkage_name : Linkage_name.t
@@ -334,7 +390,8 @@ module Code_id_data = struct
   let print ppf { compilation_unit; name; debug_info = _; linkage_name } =
     let open! Misc.Sexp in
     print ppf
-      [ a "compilation_unit" compilation_unit
+      [ a "compilation_unit"
+          (Compilation_unit.Found.unit compilation_unit)
           (Format_doc.compat Compilation_unit.print_debug);
         s "name" name;
         a "linkage_name" linkage_name Linkage_name.print ]
@@ -477,7 +534,10 @@ module Variable = struct
 
   let find_data t = Table.find !grand_table_of_variables t
 
-  let compilation_unit t = (find_data t).compilation_unit
+  let found_compilation_unit t = (find_data t).compilation_unit
+
+  let compilation_unit t =
+    Compilation_unit.Found.unit (found_compilation_unit t)
 
   let name t = (find_data t).name
 
@@ -496,7 +556,8 @@ module Variable = struct
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit;
+      { compilation_unit =
+          Compilation_unit.Found.without_cmx_path compilation_unit;
         name;
         name_stamp;
         kind;
@@ -548,11 +609,31 @@ module Variable = struct
 
   type importer = Table.serializable
 
+  let with_found (data : Variable_data.t) compilation_unit : Variable_data.t =
+    if data.compilation_unit == compilation_unit
+    then data
+    else { data with compilation_unit }
+
   let export vars =
-    Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
+    let exported =
+      Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
+    in
+    Table.map_serializable_inplace exported ~f:(fun data ->
+        with_found data (share_found data.compilation_unit));
+    exported
+
+  let relocate_importer importer ~original_compilation_unit ~cmx_path =
+    Table.map_serializable_inplace importer ~f:(fun data ->
+        with_found data
+          (relocate_found ~original_compilation_unit ~cmx_path
+             data.compilation_unit))
 
   let import importer t =
-    Table.add !grand_table_of_variables (Table.import importer t)
+    let table = !grand_table_of_variables in
+    import_data ~add:(Table.add table) ~find:(Table.find table)
+      ~replace:(Table.replace table)
+      ~found_of:(fun (data : Variable_data.t) -> data.compilation_unit)
+      (Table.import importer t)
 
   let import_and_rename importer t =
     let data = Table.import importer t in
@@ -594,6 +675,8 @@ module Symbol = struct
 
   let compilation_unit t = Symbol0.compilation_unit (find_data t)
 
+  let found_compilation_unit t = Symbol0.found_compilation_unit (find_data t)
+
   let for_compilation_unit t = Symbol0.for_compilation_unit t |> create_wrapped
 
   let linkage_name t = Symbol0.linkage_name (find_data t)
@@ -632,11 +715,30 @@ module Symbol = struct
 
   type importer = Table.serializable
 
+  let with_found data compilation_unit =
+    if Symbol0.found_compilation_unit data == compilation_unit
+    then data
+    else Symbol0.with_found_compilation_unit data compilation_unit
+
   let export symbols =
-    Table.export !grand_table_of_symbols ~iter:(fun f -> Set.iter f symbols)
+    let exported =
+      Table.export !grand_table_of_symbols ~iter:(fun f -> Set.iter f symbols)
+    in
+    Table.map_serializable_inplace exported ~f:(fun data ->
+        with_found data (share_found (Symbol0.found_compilation_unit data)));
+    exported
+
+  let relocate_importer importer ~original_compilation_unit ~cmx_path =
+    Table.map_serializable_inplace importer ~f:(fun data ->
+        with_found data
+          (relocate_found ~original_compilation_unit ~cmx_path
+             (Symbol0.found_compilation_unit data)))
 
   let import importer t =
-    Table.add !grand_table_of_symbols (Table.import importer t)
+    let table = !grand_table_of_symbols in
+    import_data ~add:(Table.add table) ~find:(Table.find table)
+      ~replace:(Table.replace table) ~found_of:Symbol0.found_compilation_unit
+      (Table.import importer t)
 end
 
 module Name = struct
@@ -870,7 +972,10 @@ module Code_id = struct
 
   let find_data t = Table.find !grand_table_of_code_ids t
 
-  let get_compilation_unit t = (find_data t).compilation_unit
+  let get_found_compilation_unit t = (find_data t).compilation_unit
+
+  let get_compilation_unit t =
+    Compilation_unit.Found.unit (get_found_compilation_unit t)
 
   let linkage_name t = (find_data t).linkage_name
 
@@ -907,7 +1012,12 @@ module Code_id = struct
         |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
-      { compilation_unit; name; debug_info = debug; linkage_name }
+      { compilation_unit =
+          Compilation_unit.Found.without_cmx_path compilation_unit;
+        name;
+        debug_info = debug;
+        linkage_name
+      }
     in
     Table.add !grand_table_of_code_ids data
 
@@ -954,11 +1064,31 @@ module Code_id = struct
 
   type importer = Table.serializable
 
-  let export symbols =
-    Table.export !grand_table_of_code_ids ~iter:(fun f -> Set.iter f symbols)
+  let with_found (data : Code_id_data.t) compilation_unit : Code_id_data.t =
+    if data.compilation_unit == compilation_unit
+    then data
+    else { data with compilation_unit }
+
+  let export code_ids =
+    let exported =
+      Table.export !grand_table_of_code_ids ~iter:(fun f -> Set.iter f code_ids)
+    in
+    Table.map_serializable_inplace exported ~f:(fun data ->
+        with_found data (share_found data.compilation_unit));
+    exported
+
+  let relocate_importer importer ~original_compilation_unit ~cmx_path =
+    Table.map_serializable_inplace importer ~f:(fun data ->
+        with_found data
+          (relocate_found ~original_compilation_unit ~cmx_path
+             data.compilation_unit))
 
   let import importer t =
-    Table.add !grand_table_of_code_ids (Table.import importer t)
+    let table = !grand_table_of_code_ids in
+    import_data ~add:(Table.add table) ~find:(Table.find table)
+      ~replace:(Table.replace table)
+      ~found_of:(fun (data : Code_id_data.t) -> data.compilation_unit)
+      (Table.import importer t)
 end
 
 module Code_id_or_symbol = struct
@@ -1074,6 +1204,7 @@ module Code_id_or_name = struct
 end
 
 let initialise () =
+  found_units := Found_table.create 17;
   Const.initialise ();
   Variable.initialise ();
   Symbol.initialise ();

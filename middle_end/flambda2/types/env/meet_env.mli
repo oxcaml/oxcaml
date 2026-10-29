@@ -105,7 +105,7 @@ val add_env_extension_from_level :
 val code_age_relation : t -> Code_age_relation.t
 
 val code_age_relation_resolver :
-  t -> Compilation_unit.t -> Code_age_relation.t option
+  t -> Compilation_unit.Found.t -> Code_age_relation.t option
 
 val machine_width : t -> Target_system.Machine_width.t
 

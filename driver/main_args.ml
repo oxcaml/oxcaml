@@ -1124,11 +1124,11 @@ let mk_opaque f =
 
 let mk_persistent_deps f =
   "-persistent-deps", Arg.Unit f,
-  " Record in the compiled interface where the interfaces it refers to\n\
-  \     were found, as paths relative to [$MANIFEST_FILES_ROOT], so that\n\
-  \     its users resolve those references without having the interfaces\n\
-  \     on their load path. Only interfaces found through -I-manifest or\n\
-  \     -H-manifest are recorded."
+  " Record in the compiled interface and compilation unit description\n\
+  \     where the .cmi and .cmx files they refer to were found, as paths\n\
+  \     relative to [$MANIFEST_FILES_ROOT], so that their users resolve\n\
+  \     those references without having the files on their load path.\n\
+  \     Only files found through -I-manifest or -H-manifest are recorded."
 
 let mk_strict_formats f =
   "-strict-formats", Arg.Unit f,

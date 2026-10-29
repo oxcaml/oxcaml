@@ -1,0 +1,4 @@
+File "libc/c5.ml", line 1:
+Error: The compilation unit description for A was recorded at liba/a.cmx
+       relative to the manifest files root, but no manifest files root is set
+       (MANIFEST_FILES_ROOT).
