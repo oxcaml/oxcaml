@@ -8522,7 +8522,7 @@ module Crossing = struct
         (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
     let apply_right_unhint (Modality (Join_const c)) m =
-      (* The right adjoint of join is a restriction of identity *)
+      (* On the image of join, identity is its right adjoint *)
       Mode.join_const_unhint c m
 
     let apply_right_with_locality t m =
@@ -8628,7 +8628,7 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left_unhint (Modality (Meet_const c)) m =
-      (* The left adjoint of meet is a restriction of identity *)
+      (* On the image of meet, identity is its left adjoint *)
       Mode.meet_const_unhint c m
 
     let apply_left_with_locality t m =
