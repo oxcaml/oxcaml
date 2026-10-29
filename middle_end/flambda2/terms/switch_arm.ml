@@ -48,6 +48,9 @@ let map_action f ({ action; _ } as arm) =
   let action' = f action in
   if action == action' then arm else { arm with action = action' }
 
+let map_annotations f ({ annotations; _ } as arm) =
+  { arm with annotations = f annotations }
+
 let free_names { action; annotations = _ } = Apply_cont_expr.free_names action
 
 let apply_renaming ({ action; annotations } as arm) renaming =
