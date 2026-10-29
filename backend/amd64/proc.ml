@@ -376,10 +376,7 @@ let win64_loc_external_arguments arg =
 
 (* [XFat_pointer] arguments: the base goes in the slot's real C argument
    register; the offset in a leftover C integer argument register. The
-   addition is emitted as part of the call itself. Note that, as a value
-   argument of an external call, the base is not a GC root once moved
-   into its argument register; this is sound because no GC safepoint can
-   occur between an external call's argument moves and the call. *)
+   addition is emitted as part of the call itself. *)
 let unix_loc_external_arguments_fat ty_args =
   let int_arg_regs = Regs.[RDI; RSI; RDX; RCX; R8; R9] in
   let real_component (t : Cmm.exttype) : machtype_component =
@@ -434,7 +431,13 @@ let unix_loc_external_arguments_fat ty_args =
           [| loc.(i) |])
       ty_args
   in
-  Array.of_list locs, Misc.align !next_stack_ofs 16, align
+  let alignment =
+    match (align : Cmm.stack_align) with
+    | Align_16 -> 16
+    | Align_32 -> 32
+    | Align_64 -> 64
+  in
+  Array.of_list locs, Misc.align !next_stack_ofs alignment, align
 
 let loc_external_arguments ty_args =
   if List.mem Cmm.XFat_pointer ty_args

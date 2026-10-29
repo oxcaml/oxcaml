@@ -200,9 +200,6 @@ let external_calling_conventions
       | XFloat -> Float, float_registers, 1, size_float
       | XFloat32 -> Float32, float_registers, 2, size_float
       | XVec128 -> Vec128, float_registers, 1, size_vec128
-      (* fat pointer: base in the slot's real C argument register;
-         offset assigned below, from the leftover argument registers.
-         Addition [base + offset] emitted as part of the call itself. *)
       | XFat_pointer -> Val, int_registers, 1, size_int
       | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
