@@ -3,7 +3,18 @@
 (library
  (name flambda2_algorithms)
  (wrapped true)
- (instrumentation (backend bisect_ppx))
+ ; Erase OxCaml syntax extensions for the system compiler; see tools/oxpp.
+ ; Dune refuses to combine an action-based (preprocess ...) with
+ ; (instrumentation ...), so this library is no longer instrumented with
+ ; bisect_ppx for coverage builds.
+ (preprocess
+  (action
+   (progn
+    (run
+     %{exe:../../../tools/oxpp/oxpp.exe}
+     -context
+     %{context_name}
+     %{input-file}))))
  (foreign_stubs
   (language c)
   (names builtin_stubs)
