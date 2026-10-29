@@ -55,6 +55,7 @@ let for_package         = ref None
 let debug               = ref false
 let unsafe              = ref false
 let opaque              = ref false
+let persistent_deps     = ref false
 let unboxed_types       = ref false
 let profile_columns     = ref []
 let dwarf_pedantic      = ref false

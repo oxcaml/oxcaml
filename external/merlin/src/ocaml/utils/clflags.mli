@@ -64,6 +64,7 @@ val for_package          : string option ref
 val debug                : bool ref
 val unsafe               : bool ref
 val opaque               : bool ref
+val persistent_deps      : bool ref
 val unboxed_types        : bool ref
 val profile_columns : profile_column list ref
 val dwarf_pedantic : bool ref

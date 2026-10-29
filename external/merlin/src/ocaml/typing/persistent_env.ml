@@ -80,27 +80,6 @@ module Persistent_signature = struct
       manifest_location : string option }
 
   let load = ref (fun ~allow_hidden ~unit_name ->
-<<<<<<< Merlin:attach-cmi-path
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | filename, (Visible _ as visibility) ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
-||||||| Compiler:last-imported
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | filename, (Visible _ as visibility) ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
-=======
     let intf = CUI.Found.intf unit_name in
     match CUI.Found.cmi_path unit_name with
     | Some cmi_path ->
@@ -111,7 +90,8 @@ module Persistent_signature = struct
       let filename = Load_path.resolve_manifest_location cmi_path in
       begin match filename with
       | Some filename when Sys.file_exists filename ->
-        Some { filename; cmi = read_cmi_lazy filename;
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi;
                visibility = Visible { cmx_guaranteed = false };
                manifest_location = Some cmi_path }
       | Some _ | None ->
@@ -123,15 +103,14 @@ module Persistent_signature = struct
         Load_path.find_normalized_with_origin ~allow_hidden (unit_name ^ ".cmi")
       with
       | { path = filename; visibility; manifest_location } when allow_hidden ->
-        Some { filename; cmi = read_cmi_lazy filename; visibility;
-               manifest_location }
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility; manifest_location }
       | { path = filename; visibility = (Visible _ as visibility);
           manifest_location } ->
-        Some { filename; cmi = read_cmi_lazy filename; visibility;
-               manifest_location }
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility; manifest_location }
       | { visibility = Hidden; _ }
       | exception Not_found -> None)
->>>>>>> Compiler:HEAD
 end
 
 type can_load_cmis =
@@ -276,18 +255,10 @@ let clear penv =
 
 let clear_missing {imports; _} =
   let missing_entries =
-<<<<<<< Merlin:attach-cmi-path
-    Hashtbl.fold
+    CUI.Tbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
        | Found _ -> acc)
-||||||| Compiler:last-imported
-    Hashtbl.fold
-      (fun name r acc -> if r = Missing then name :: acc else acc)
-=======
-    CUI.Tbl.fold
-      (fun name r acc -> if r = Missing then name :: acc else acc)
->>>>>>> Compiler:HEAD
       imports []
   in
   List.iter (CUI.Tbl.remove imports) missing_entries
@@ -552,14 +523,8 @@ let find_import ~allow_hidden penv ~check modname =
             match !Persistent_signature.load ~allow_hidden ~unit_name:modname with
             | Some psig -> psig
             | None ->
-<<<<<<< Merlin:attach-cmi-path
-                Hashtbl.replace imports modname
+                CUI.Tbl.replace imports intf
                   (Missing { hidden_were_allowed = allow_hidden });
-||||||| Compiler:last-imported
-                if allow_hidden then Hashtbl.add imports modname Missing;
-=======
-                if allow_hidden then CUI.Tbl.add imports intf Missing;
->>>>>>> Compiler:HEAD
                 raise Not_found
           in
           add_import penv intf;
@@ -1013,14 +978,8 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
       ps_canonical = true;
     }
   in
-<<<<<<< Merlin:attach-cmi-path
-  Hashtbl.add persistent_structures modname ps;
-  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
-||||||| Compiler:last-imported
-  Hashtbl.add persistent_structures modname ps;
-=======
   Global_module.Name.Tbl.add persistent_structures modname ps;
->>>>>>> Compiler:HEAD
+  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
   begin match binding with
   | Runtime_parameter id -> Ident.Tbl.add locals_bound_to_runtime_parameters id ()
   | Constant _ -> ()
@@ -1076,18 +1035,10 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
-<<<<<<< Merlin:attach-cmi-path
 let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
-||||||| Compiler:last-imported
-let check_pers_struct ~allow_hidden penv f ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
-=======
-let check_pers_struct ~allow_hidden penv f ~loc name =
   let name_as_string =
     CUI.to_string (CUI.Found.intf name.Global_module.Name.head)
   in
->>>>>>> Compiler:HEAD
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
@@ -1526,10 +1477,12 @@ let with_cmis penv f x =
           (fun () -> f x))
 
 let forall ~found ~missing t =
-  Std.Hashtbl.forall t.imports (fun name -> function
-      | Missing _ -> missing name
-      | Found import ->
-        found name import.imp_filename name
-    )
+  CUI.Tbl.fold
+    (fun name entry acc ->
+      acc
+      && (match entry with
+          | Missing _ -> missing name
+          | Found import -> found name import.imp_filename name))
+    t.imports true
 
 let report_error = Format_doc.compat report_error_doc

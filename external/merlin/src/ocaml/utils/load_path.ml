@@ -249,7 +249,6 @@ end
 
 type visibility = Visible of { cmx_guaranteed : bool } | Hidden
 
-<<<<<<< Merlin:attach-cmi-path
 let visibility_eq a b =
   match a, b with
   | ( Visible { cmx_guaranteed = cmx_guaranteed_a },
@@ -258,8 +257,6 @@ let visibility_eq a b =
   | Hidden, Hidden -> true
   | Visible _, Hidden | Hidden, Visible _ -> false
 
-||||||| Compiler:last-imported
-=======
 type found =
   { path : string;
     visibility : visibility;
@@ -270,7 +267,6 @@ let resolve_manifest_location location =
     (fun root -> Filename.concat root location)
     (Dune_manifests_reader.Path.root ())
 
->>>>>>> Compiler:HEAD
 module Dir : sig
   type entry = {
     basename : string;
