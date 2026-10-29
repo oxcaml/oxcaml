@@ -386,16 +386,21 @@ module TLS0 = struct
     set_tls_state new_st;
     store idx (Obj_slot.some x)
 
+  let[@inline never] already_accessing () =
+    failwith "Domain.Safe.TLS: key is already being accessed"
+
   (* Unlike with DLS we do not prevent inlining to prevent additional poll
      points as we assume each thread will have its own TLS and we consider TLS
      use in signal handlers as unsupported. *)
   let[@inline] set (type a) ((idx, _) : a key) (x : a) =
-    if idx < Array.length (get_tls_state ())
-    then store idx (Obj_slot.some x)
+    let st = get_tls_state () in
+    if idx < Array.length st
+    then begin
+      if Obj_slot.is_borrowed (Array.unsafe_get st idx)
+      then already_accessing ()
+      else store idx (Obj_slot.some x)
+    end
     else grow_and_set idx x
-
-  let[@inline never] already_accessing () =
-    failwith "Domain.Safe.TLS: key is already being accessed"
 
   let[@cold] init (type a) ((idx, { portable = init }) as key : a key) : a =
     let st = get_tls_state () in
@@ -416,7 +421,7 @@ module TLS0 = struct
     else init key
 
   (* While [f] runs, the slot holds [Obj_slot.borrowed] instead of the value, so
-     [get] (hence [access] and splitting) raises on that key. *)
+     [get] and [set] (hence [access] and splitting) raise on that key. *)
   let access ((idx, _) as k) f = exclave_
     let v = get k in
     store idx (Obj_slot.borrowed ());
