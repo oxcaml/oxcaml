@@ -2,6 +2,7 @@
  {
    include runtime_events;
    no-stack-checks;
+   ocamlrunparam += ",Xidle_stacks=1";
    native;
  }
 *)

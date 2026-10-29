@@ -1,6 +1,7 @@
 (* TEST
  no-stack-checks;
  no-address-sanitizer;
+ ocamlrunparam += ",Xidle_stacks=1";
  native;
 *)
 

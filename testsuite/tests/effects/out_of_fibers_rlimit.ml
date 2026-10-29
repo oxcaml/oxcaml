@@ -4,7 +4,7 @@
       larger than the address space it leaves spare, and the default size
       follows the C library's default thread stack, which is only 128KiB
       on musl. 4194304 words is 32MiB. *)
-   ocamlrunparam += ",Xfiber_stack_size=4194304";
+   ocamlrunparam += ",Xfiber_stack_size=4194304,Xidle_stacks=1";
    no-stack-checks;
    no-address-sanitizer;
    no-tsan;

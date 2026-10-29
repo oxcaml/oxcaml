@@ -1,14 +1,14 @@
 (* TEST
    { bytecode; }
    { native; }
-   { set OCAMLRUNPARAM = "Xno_idle_stacks=1"; native; }
+   { ocamlrunparam += ",Xidle_stacks=1"; native; }
 *)
 
 (* Continuations that survive a minor collection have their stacks copied
    out of their mappings ("idled") and copied back onto fresh mappings
    when resumed ("woken"): exercise suspension, promotion and resumption
    with garbage-collection pressure in between. Under stack checks, or
-   with Xno_idle_stacks=1, the same code runs without idling. *)
+   without Xidle_stacks=1, the same code runs without idling. *)
 
 open Effect
 open Effect.Deep

@@ -413,7 +413,7 @@ extern uintnat caml_init_thread_stack_wsz; /* Xthread_stack_size= */
 extern uintnat caml_init_fiber_stack_wsz;  /* Xfiber_stack_size= */
 extern uintnat caml_cache_stacks_per_class;/* Xcache_stacks_per_class= */
 extern uintnat caml_max_guarded_stacks;    /* Xmax_guarded_stacks= */
-extern uintnat caml_no_idle_stacks;        /* Xno_idle_stacks= */
+extern uintnat caml_idle_stacks;           /* Xidle_stacks= */
 
 #define STACK_SIZE_MAIN   0
 #define STACK_SIZE_THREAD 1
