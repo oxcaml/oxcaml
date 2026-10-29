@@ -20,6 +20,7 @@ open Misc
 open Cmi_format
 
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
 module Style = Misc.Style
@@ -61,6 +62,11 @@ type error =
       { instance: Global_module.Name.t;
         value: Global_module.Name.t;
       }
+  | Recorded_cmi_unavailable of
+      { intf : CUI.t;
+        cmi_path : filepath;
+        filename : filepath option;
+      }
 
 (* These errors are location-less and will be logged and re-raised in Env *)
 exception Error of error
@@ -70,19 +76,41 @@ module Persistent_signature = struct
   type t =
     { filename : string;
       cmi : Cmi_format.cmi_infos_lazy;
-      visibility : Load_path.visibility }
+      visibility : Load_path.visibility;
+      manifest_location : string option }
 
   let load = ref (fun ~allow_hidden ~unit_name ->
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | filename, (Visible _ as visibility) ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
+    let intf = CUI.Found.intf unit_name in
+    match CUI.Found.cmi_path unit_name with
+    | Some cmi_path ->
+      (* A recorded location is authoritative: the cmi is loaded from there
+         without consulting the load path, and failing that is an error
+         rather than a reason to search the load path. Its visibility is not
+         checked either. *)
+      let filename = Load_path.resolve_manifest_location cmi_path in
+      begin match filename with
+      | Some filename when Sys.file_exists filename ->
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi;
+               visibility = Visible { cmx_guaranteed = false };
+               manifest_location = Some cmi_path }
+      | Some _ | None ->
+        error (Recorded_cmi_unavailable { intf; cmi_path; filename })
+      end
+    | None ->
+      let unit_name = CUI.to_string intf in
+      match
+        Load_path.find_normalized_with_origin ~allow_hidden (unit_name ^ ".cmi")
+      with
+      | { path = filename; visibility; manifest_location } when allow_hidden ->
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility; manifest_location }
+      | { path = filename; visibility = (Visible _ as visibility);
+          manifest_location } ->
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility; manifest_location }
+      | { visibility = Hidden; _ }
+      | exception Not_found -> None)
 end
 
 type can_load_cmis =
@@ -108,11 +136,25 @@ type import = {
   imp_impl : CU.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
+  (* Where the cmi is, relative to the manifest files root, when it was found
+     through a manifest or a recorded location (see [CUI.Found]). *)
+  imp_manifest_location : string option;
   imp_uid : Shape.Uid.t;
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
 }
+
+(* The location to record on names resolved through [imp], if any: recording
+   is enabled by -persistent-deps, and only cmis found through manifests
+   have a location. *)
+let cmi_path_to_record imp =
+  if !Clflags.persistent_deps then imp.imp_manifest_location else None
+
+let record_cmi_path name imp =
+  match cmi_path_to_record imp with
+  | None -> name
+  | Some cmi_path -> Global_module.Name.with_head_cmi_path name cmi_path
 
 (* If a .cmi file is missing (or invalid), we
    store it as Missing in the cache. *)
@@ -149,11 +191,10 @@ module Param_set = Global_module.Parameter_name.Set
 
 (* If you add something here, _do not forget_ to add it to [clear]! *)
 type 'a t = {
-  globals : (Global_module.Name.t, global_name_info) Hashtbl.t;
-  imports : (CU.Name.t, import_info) Hashtbl.t;
-  persistent_names : (Global_module.Name.t, pers_name) Hashtbl.t;
-  persistent_structures :
-    (Global_module.Name.t, 'a pers_struct_info) Hashtbl.t;
+  globals : global_name_info Global_module.Name.Tbl.t;
+  imports : import_info CUI.Tbl.t;
+  persistent_names : pers_name Global_module.Name.Tbl.t;
+  persistent_structures : 'a pers_struct_info Global_module.Name.Tbl.t;
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
   imported_units: CU.Name.Set.t ref;
   imported_opaque_units: CU.Name.Set.t ref;
@@ -166,10 +207,10 @@ type 'a t = {
 }
 
 let empty () = {
-  globals = Hashtbl.create 17;
-  imports = Hashtbl.create 17;
-  persistent_names = Hashtbl.create 17;
-  persistent_structures = Hashtbl.create 17;
+  globals = Global_module.Name.Tbl.create 17;
+  imports = CUI.Tbl.create 17;
+  persistent_names = Global_module.Name.Tbl.create 17;
+  persistent_structures = Global_module.Name.Tbl.create 17;
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
   imported_units = ref CU.Name.Set.empty;
   imported_opaque_units = ref CU.Name.Set.empty;
@@ -197,10 +238,10 @@ let clear penv =
     can_load_cmis;
     short_paths_basis;
   } = penv in
-  Hashtbl.clear globals;
-  Hashtbl.clear imports;
-  Hashtbl.clear persistent_names;
-  Hashtbl.clear persistent_structures;
+  Global_module.Name.Tbl.clear globals;
+  CUI.Tbl.clear imports;
+  Global_module.Name.Tbl.clear persistent_names;
+  Global_module.Name.Tbl.clear persistent_structures;
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
   imported_units := CU.Name.Set.empty;
   imported_opaque_units := CU.Name.Set.empty;
@@ -214,19 +255,19 @@ let clear penv =
 
 let clear_missing {imports; _} =
   let missing_entries =
-    Hashtbl.fold
+    CUI.Tbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
        | Found _ -> acc)
       imports []
   in
-  List.iter (Hashtbl.remove imports) missing_entries
+  List.iter (CUI.Tbl.remove imports) missing_entries
 
 let add_import {imported_units; _} s =
   imported_units := CU.Name.Set.add s !imported_units
 
 let rec add_imports_in_name penv (g : Global_module.Name.t) =
-  add_import penv g.head;
+  add_import penv (CUI.Found.intf g.head);
   let add_in_arg ({ param; value } : Global_module.Name.argument) =
     add_import penv param;
     add_imports_in_name penv value
@@ -237,13 +278,13 @@ let register_import_as_opaque {imported_opaque_units; _} s =
   imported_opaque_units := CU.Name.Set.add s !imported_opaque_units
 
 let find_import_info_in_cache {imports; _} import =
-  match Hashtbl.find imports import with
+  match CUI.Tbl.find imports import with
   | exception Not_found -> None
   | Missing _ -> None
   | Found imp -> Some imp
 
 let find_info_in_cache {persistent_structures; _} name =
-  match Hashtbl.find persistent_structures name with
+  match Global_module.Name.Tbl.find persistent_structures name with
   | exception Not_found -> None
   | ps -> Some ps
 
@@ -295,7 +336,10 @@ let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
 let is_parameter_import t modname =
-  match find_import_info_in_cache t modname.Global_module.Name.head with
+  match
+    find_import_info_in_cache t
+      (CUI.Found.intf modname.Global_module.Name.head)
+  with
   | Some { imp_is_param; _ } -> imp_is_param
   | None -> is_registered_parameter_import t modname
 
@@ -317,7 +361,7 @@ let without_cmis penv f x =
   res
 
 let fold {persistent_structures; _} f x =
-  Hashtbl.fold
+  Global_module.Name.Tbl.fold
     (fun name ps x -> if ps.ps_canonical then f name ps.ps_val x else x)
     persistent_structures x
 
@@ -377,7 +421,9 @@ let save_import penv crc modname impl flags filename =
    this .cmi. *)
 
 let acknowledge_import penv ~check modname pers_sig =
-  let { Persistent_signature.filename; cmi; visibility } = pers_sig in
+  let { Persistent_signature.filename; cmi; visibility; manifest_location } =
+    pers_sig
+  in
   let found_name = cmi.cmi_name in
   let kind = cmi.cmi_kind in
   let params = cmi.cmi_params in
@@ -434,6 +480,7 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_impl = impl;
       imp_raw_sign = sign;
       imp_filename = filename;
+      imp_manifest_location = manifest_location;
       imp_uid = uid;
       imp_visibility = visibility;
       imp_crcs = crcs;
@@ -441,7 +488,7 @@ let acknowledge_import penv ~check modname pers_sig =
     }
   in
   if check then check_consistency penv import;
-  Hashtbl.add imports modname (Found import);
+  CUI.Tbl.add imports modname (Found import);
   import
 
 let read_import penv ~check modname cmi =
@@ -450,7 +497,8 @@ let read_import penv ~check modname cmi =
   let cmi = read_cmi_lazy filename in
   let pers_sig =
     { Persistent_signature.filename; cmi;
-      visibility = Visible { cmx_guaranteed = false } }
+      visibility = Visible { cmx_guaranteed = false };
+      manifest_location = None }
   in
   acknowledge_import penv ~check modname pers_sig
 
@@ -461,8 +509,9 @@ let check_visibility ~allow_hidden imp =
 
 let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in
-  if CU.Name.equal modname CU.Name.predef_exn then raise Not_found;
-  match Hashtbl.find imports modname with
+  let intf = CUI.Found.intf modname in
+  if CUI.equal intf CUI.predef_exn then raise Not_found;
+  match CUI.Tbl.find imports intf with
   | Found imp -> check_visibility ~allow_hidden imp; imp
   | Missing { hidden_were_allowed = true } -> raise Not_found
   | Missing { hidden_were_allowed = false }
@@ -474,18 +523,21 @@ let find_import ~allow_hidden penv ~check modname =
             match !Persistent_signature.load ~allow_hidden ~unit_name:modname with
             | Some psig -> psig
             | None ->
-                Hashtbl.replace imports modname
+                CUI.Tbl.replace imports intf
                   (Missing { hidden_were_allowed = allow_hidden });
                 raise Not_found
           in
-          add_import penv modname;
-          acknowledge_import penv ~check modname psig
+          add_import penv intf;
+          acknowledge_import penv ~check intf psig
+
+let recorded_cmi_path penv intf =
+  Option.bind (find_import_info_in_cache penv intf) cmi_path_to_record
 
 let remember_global { globals; _ } global ~precision ~mentioned_by =
   let global_name = Global_module.to_name global in
-  match Hashtbl.find globals global_name with
+  match Global_module.Name.Tbl.find globals global_name with
   | exception Not_found ->
-      Hashtbl.add globals global_name
+      Global_module.Name.Tbl.add globals global_name
         { gn_global = (global, precision);
           gn_mentioned_by = mentioned_by;
         }
@@ -497,7 +549,7 @@ let remember_global { globals; _ } global ~precision ~mentioned_by =
       with
       | updated_global ->
           if not (old_global == updated_global) then
-            Hashtbl.replace globals global_name
+            Global_module.Name.Tbl.replace globals global_name
               { gn_global = updated_global;
                 gn_mentioned_by = first_mentioned_by }
       | exception Global_module.With_precision.Inconsistent ->
@@ -526,6 +578,7 @@ let rec approximate_global_by_name penv global_name =
      a hidden argument each known parameter that isn't the name of a visible
      argument. *)
   let ({ head; args = visible_args } : Global_module.Name.t) = global_name in
+  let head = CUI.Found.intf head in
   let params_not_being_passed, visible_args =
     List.fold_left_map
       (fun params ({ param; value } : _ Global_module.Argument.t) ->
@@ -550,7 +603,7 @@ let current_unit_is_aux name ~allow_args =
       match CU.to_global_name current with
       | Some { head; args } ->
           (args = [] || allow_args)
-          && CU.Name.equal name head
+          && CU.Name.equal name (CUI.Found.intf head)
       | None -> false
 
 let current_unit_is name =
@@ -558,6 +611,8 @@ let current_unit_is name =
 
 let current_unit_is_instance_of name =
   current_unit_is_aux name ~allow_args:true
+
+let is_current_unit intf = current_unit_is intf
 
 (* Enforce the subset rule: we can only refer to a module if that module's
    parameters are also our parameters. This assumes that all of the arguments in
@@ -605,7 +660,7 @@ let rec global_of_global_name penv ~check name ~allow_excess_args =
     in
     pn.pn_global
   in
-  match Hashtbl.find penv.globals name with
+  match Global_module.Name.Tbl.find penv.globals name with
   | { gn_global = (global, Exact); _ } -> global
   | { gn_global = (_, Approximate); _ } -> load ()
   | exception Not_found -> load ()
@@ -652,7 +707,7 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
             (* Argument with no parameter: fine only if allowed by flag *)
             if not allow_excess_args then
               error (Imported_module_has_no_such_parameter {
-                  imported = modname.Global_module.Name.head;
+                  imported = CUI.Found.intf modname.Global_module.Name.head;
                   valid_parameters = params;
                   parameter = param;
                   value = value |> Global_module.to_name;
@@ -687,7 +742,9 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
   let global_without_args =
     (* Won't raise an exception, since the hidden args are all different
        (since the params are different, or else we have bigger problems) *)
-    Global_module.create_exn modname.Global_module.Name.head [] ~hidden_args:params
+    Global_module.create_exn
+      (CUI.Found.intf modname.Global_module.Name.head)
+      [] ~hidden_args:params
   in
   let global, _changed = Global_module.subst global_without_args subst in
   global
@@ -706,7 +763,9 @@ and acknowledge_pers_name penv check global_name import ~allow_excess_args =
     Global_module.to_name global
   in
   let pn =
-    match Hashtbl.find_opt persistent_names canonical_global_name with
+    match
+      Global_module.Name.Tbl.find_opt persistent_names canonical_global_name
+    with
     | Some pn ->
         pn
     | None ->
@@ -722,7 +781,7 @@ and acknowledge_pers_name penv check global_name import ~allow_excess_args =
     (* CR-someday lmaurer: Modify [remember_global] so that it can remember
        multiple global names mapped to the same global. Only likely to be
        relevant if there are _a lot_ of bound globals. *)
-    Hashtbl.add persistent_names global_name pn;
+    Global_module.Name.Tbl.add persistent_names global_name pn;
   pn
 and acknowledge_new_pers_name penv check global_name global import =
   (* This checks only [global] itself without recursing into argument values.
@@ -772,13 +831,13 @@ and acknowledge_new_pers_name penv check global_name global import =
              pn_sign;
            } in
   if check then check_consistency penv import;
-  Hashtbl.add persistent_names global_name pn;
+  Global_module.Name.Tbl.add persistent_names global_name pn;
   remember_global penv global ~precision:Exact ~mentioned_by:Current;
   pn
 
 and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   let {persistent_names; _} = penv in
-  match Hashtbl.find persistent_names name with
+  match Global_module.Name.Tbl.find persistent_names name with
   | pn -> pn
   | exception Not_found ->
       let unit_name = name.Global_module.Name.head in
@@ -810,7 +869,7 @@ let need_local_ident penv (global : Global_module.t) =
      functor calls that instantiate open modules happen elsewhere (so that they
      can happen exactly once). *)
   let global_name = global |> Global_module.to_name in
-  let name = global_name.Global_module.Name.head in
+  let name = CUI.Found.intf global_name.Global_module.Name.head in
   if is_registered_parameter_import penv global_name
   then
     (* Already a parameter *)
@@ -853,7 +912,8 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
       match global.visible_args with
       | [] ->
           (* Make sure the names are consistent up to the pack prefix *)
-          assert (CU.Name.equal (CU.name unit_from_cmi) name.head);
+          assert (CU.Name.equal (CU.name unit_from_cmi)
+                    (CUI.Found.intf name.head));
           unit_from_cmi
       | _ ->
           (* Make sure the unit isn't supposed to be packed *)
@@ -918,7 +978,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
       ps_canonical = true;
     }
   in
-  Hashtbl.add persistent_structures modname ps;
+  Global_module.Name.Tbl.add persistent_structures modname ps;
   register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
   begin match binding with
   | Runtime_parameter id -> Ident.Tbl.add locals_bound_to_runtime_parameters id ()
@@ -930,16 +990,25 @@ let acknowledge_pers_struct penv modname pers_name val_of_pers_sig short_path_co
   (* This is the same dance that [acknowledge_pers_name] does. See comments
      there. *)
   let {persistent_structures; _} = penv in
-  let canonical_modname = Global_module.to_name pers_name.pn_global in
+  let canonical_modname =
+    (* Record where the .cmi was found, so that references derived from this
+       module (in particular its [Ident.t]) remember it. *)
+    record_cmi_path
+      (Global_module.to_name pers_name.pn_global)
+      pers_name.pn_import
+  in
   let ps =
-    match Hashtbl.find_opt persistent_structures canonical_modname with
+    match
+      Global_module.Name.Tbl.find_opt persistent_structures canonical_modname
+    with
     | Some ps -> ps
     | None ->
         acknowledge_new_pers_struct penv canonical_modname pers_name
           val_of_pers_sig short_path_comps
   in
   if not (Global_module.Name.equal modname canonical_modname) then
-    Hashtbl.add persistent_structures modname { ps with ps_canonical = false };
+    Global_module.Name.Tbl.add persistent_structures modname
+      { ps with ps_canonical = false };
   ps
 
 let read_pers_struct penv check intf cmi =
@@ -951,7 +1020,7 @@ let read_pers_struct penv check intf cmi =
 let find_pers_struct
     ~allow_hidden penv val_of_pers_sig short_path_comps ~check name ~allow_excess_args =
   let {persistent_structures; _} = penv in
-  match Hashtbl.find persistent_structures name with
+  match Global_module.Name.Tbl.find persistent_structures name with
   | ps -> check_visibility ~allow_hidden ps.ps_name_info.pn_import; ps
   | exception Not_found ->
       let pers_name =
@@ -967,7 +1036,9 @@ let describe_prefix ppf prefix =
 
 (* Emits a warning if there is no valid cmi for name *)
 let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
+  let name_as_string =
+    CUI.to_string (CUI.Found.intf name.Global_module.Name.head)
+  in
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
@@ -1031,6 +1102,9 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
         | Unbound_module_as_argument_value { value; _ } ->
             Format_doc.doc_printf "Can't find argument %a"
               (Style.as_inline_code Global_module.Name.print) value
+        | Recorded_cmi_unavailable { cmi_path; _ } ->
+            Format_doc.doc_printf "its recorded location %a is unavailable"
+              Location.Doc.quoted_filename cmi_path
       in
       let msg = Format_doc.(asprintf "%a" pp_doc) msg in
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
@@ -1047,7 +1121,8 @@ let read_cmi_file penv filename =
   (* Register as hidden so that direct user-code references to the module
      are still reported as unbound; only transitive lookups can reach it. *)
   let pers_sig =
-    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
+    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden;
+      manifest_location = None }
   in
   let import = acknowledge_import penv ~check:true unit_name pers_sig in
   let pers_name =
@@ -1062,7 +1137,7 @@ let find ~allow_hidden penv f1 f2 name ~allow_excess_args =
 let check ~allow_hidden penv f1 f2 ~loc name =
   let {persistent_structures; _} = penv in
   let persistent_structure_visible =
-    match Hashtbl.find persistent_structures name with
+    match Global_module.Name.Tbl.find persistent_structures name with
     | ps ->
         begin
           match
@@ -1093,7 +1168,10 @@ let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
   | Some (_impl, crc) -> crc
   | None ->
-    let import = find_import ~allow_hidden:true penv ~check:true name in
+    let import =
+      find_import ~allow_hidden:true penv ~check:true
+        (CUI.Found.without_cmi_path name)
+    in
     match Array.find_opt (Import_info.Intf.has_name ~name) import.imp_crcs with
     | None -> assert false
     | Some import_info ->
@@ -1131,7 +1209,8 @@ let loaded_transitive_dependencies penv intfs =
   !names
 
 let find_import penv modname =
-  find_import ~allow_hidden:true penv ~check:true modname
+  find_import ~allow_hidden:true penv ~check:true
+    (CUI.Found.without_cmi_path modname)
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
@@ -1157,7 +1236,7 @@ let runtime_parameter_bindings {persistent_structures; _} =
      during lambda generation?" rather than "what all did anyone ask about
      ever?". *)
   persistent_structures
-  |> Hashtbl.to_seq_values
+  |> Global_module.Name.Tbl.to_seq_values
   |> Seq.filter_map
         (fun ps ->
            match ps.ps_binding with
@@ -1178,7 +1257,7 @@ let parameters {param_imports; _} =
   Param_set.elements !param_imports
 
 let looked_up {persistent_structures; _} modname =
-  Hashtbl.mem persistent_structures modname
+  Global_module.Name.Tbl.mem persistent_structures modname
 
 let is_imported_opaque {imported_opaque_units; _} s =
   CU.Name.Set.mem s !imported_opaque_units
@@ -1199,7 +1278,7 @@ let make_cmi penv modname kind sign alerts =
      side effects *)
   let crcs = imports penv in
   let globals =
-    Hashtbl.to_seq_values penv.globals
+    Global_module.Name.Tbl.to_seq_values penv.globals
     |> Seq.filter_map
          (fun { gn_global; _ } ->
             let global, _precision = gn_global in
@@ -1362,6 +1441,20 @@ let report_error_doc ppf =
         "@[<hov>Unbound module %a@ in instance %a@]"
         (Style.as_inline_code Global_module.Name.print) value
         (Style.as_inline_code Global_module.Name.print) instance
+  | Recorded_cmi_unavailable { intf; cmi_path; filename } ->
+      fprintf ppf
+        "@[<hov>The compiled interface for %a@ was recorded at %a@ \
+         relative to the manifest files root,@ but %t.@]"
+        CU.Name.print_as_inline_code intf
+        Location.Doc.quoted_filename cmi_path
+        (fun ppf ->
+           match filename with
+           | None ->
+               fprintf ppf "no manifest files root is set@ (%a)"
+                 Style.inline_code "MANIFEST_FILES_ROOT"
+           | Some filename ->
+               fprintf ppf "%a@ does not exist"
+                 Location.Doc.quoted_filename filename)
 
 let () =
   Location.register_error_of_exn
@@ -1384,10 +1477,12 @@ let with_cmis penv f x =
           (fun () -> f x))
 
 let forall ~found ~missing t =
-  Std.Hashtbl.forall t.imports (fun name -> function
-      | Missing _ -> missing name
-      | Found import ->
-        found name import.imp_filename name
-    )
+  CUI.Tbl.fold
+    (fun name entry acc ->
+      acc
+      && (match entry with
+          | Missing _ -> missing name
+          | Found import -> found name import.imp_filename name))
+    t.imports true
 
 let report_error = Format_doc.compat report_error_doc

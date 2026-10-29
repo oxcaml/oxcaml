@@ -85,6 +85,7 @@ val include_dirs : visible_include list ref
 val hidden_include_dirs : string list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
+val persistent_deps : bool ref
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref

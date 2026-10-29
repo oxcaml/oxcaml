@@ -1122,6 +1122,14 @@ let mk_opaque f =
   " Does not generate cross-module optimization information\n\
   \     (reduces necessary recompilation on module change)"
 
+let mk_persistent_deps f =
+  "-persistent-deps", Arg.Unit f,
+  " Record in the compiled interface where the interfaces it refers to\n\
+  \     were found, as paths relative to [$MANIFEST_FILES_ROOT], so that\n\
+  \     its users resolve those references without having the interfaces\n\
+  \     on their load path. Only interfaces found through -I-manifest or\n\
+  \     -H-manifest are recorded."
+
 let mk_strict_formats f =
   "-strict-formats", Arg.Unit f,
   " Reject invalid formats accepted by legacy implementations (default)\n\
@@ -1304,6 +1312,7 @@ module type Compiler_options = sig
   val _noautolink : unit -> unit
   val _o : string -> unit
   val _opaque :  unit -> unit
+  val _persistent_deps : unit -> unit
   val _output_obj : unit -> unit
   val _output_complete_obj : unit -> unit
   val _pack : unit -> unit
@@ -1600,6 +1609,7 @@ struct
     mk_nopervasives F._nopervasives;
     mk_o F._o;
     mk_opaque F._opaque;
+    mk_persistent_deps F._persistent_deps;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
@@ -1897,6 +1907,7 @@ struct
     mk_o3 F._o3;
     mk_o4 F._o4;
     mk_opaque F._opaque;
+    mk_persistent_deps F._persistent_deps;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
@@ -2232,6 +2243,7 @@ struct
     mk_o3 F._o3;
     mk_o4 F._o4;
     mk_opaque F._opaque;
+    mk_persistent_deps F._persistent_deps;
     mk_open F._open;
     mk_open_cmi F._open_cmi;
     mk_output_obj F._output_obj;
@@ -2701,6 +2713,7 @@ module Default = struct
     let _noautolink = set no_auto_link
     let _o s = output_name := (Some s)
     let _opaque = set opaque
+    let _persistent_deps = set persistent_deps
     let _pack = set make_package
     let _parameter s = parameters := !parameters @ [ s ]
     let _plugin _p = plugin := true

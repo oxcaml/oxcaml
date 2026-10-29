@@ -27,6 +27,8 @@ open Data_types
 
 open Local_store
 
+module CUI = Compilation_unit_intf
+
 module Jkind = Btype.Jkind0
 module String = Misc.Stdlib.String
 
@@ -1979,7 +1981,7 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = global.Global_module.Name.head in
+    let name = CUI.Found.intf global.Global_module.Name.head in
     if Current_unit.Name.is (Compilation_unit.Name.to_string name)
     then begin
       (* The current compilation unit appears in quotes.
@@ -2288,7 +2290,8 @@ let same_types env1 env2 =
 let used_persistent () =
   Persistent_env.fold !persistent_env
     (fun s _m r ->
-       Compilation_unit.Name.Set.add s.Global_module.Name.head r)
+       Compilation_unit.Name.Set.add
+         (CUI.Found.intf s.Global_module.Name.head) r)
     Compilation_unit.Name.Set.empty
 
 let find_all_comps wrap proj s (p, mda) =
@@ -3502,14 +3505,69 @@ let persistent_structures_of_dir dir =
   Load_path.Dir.basenames dir
   |> persistent_structures_of_basenames
 
+(* Under [-persistent-deps], record on the head of each global unit mentioned
+   by a signature about to be saved where this compilation found the unit's
+   cmi (see [CUI.Found]), so that users of the signature load it from there
+   rather than from their load path. Module aliases are left as written: no
+   location is recorded on their targets. Units this compilation did not load,
+   such as ones only mentioned by imported signatures, are left as they came.
+   The recording is returned as a substitution, to be carried out by the
+   [Prepare_for_saving] pass. *)
+let record_cmi_paths_for_save sg =
+  if not !Clflags.persistent_deps then Subst.identity else
+  let penv = !persistent_env in
+  let subst = ref (Subst.identity : Subst.t) in
+  let seen = ref Path.Set.empty in
+  let mention id =
+    let p = Pident id in
+    if not (Path.Set.mem p !seen) then begin
+      seen := Path.Set.add p !seen;
+      match Ident.to_global id with
+      | None -> ()
+      | Some name ->
+          let intf = CUI.Found.intf name.Global_module.Name.head in
+          (* Users of the cmi have it in hand: a self-mention needs no
+             location. *)
+          if not (CUI.equal intf CUI.predef_exn
+                  || Persistent_env.is_current_unit intf)
+          then
+            Option.iter
+              (fun cmi_path ->
+                 let stamped =
+                   Ident.create_global
+                     (Global_module.Name.with_head_cmi_path name cmi_path)
+                 in
+                 subst :=
+                   Subst.add_same_module_path p (Pident stamped) !subst)
+              (Persistent_env.recorded_cmi_path penv intf)
+    end
+  in
+  with_type_mark (fun mark ->
+    let super = Btype.type_iterators mark in
+    let rec it_path : Path.t -> unit = function
+      | Pident id -> mention id
+      | Pdot (p, _) -> it_path p
+      | Papply (f, x) -> it_path f; it_path x
+      | Pextra_ty (p, _) -> it_path p
+    in
+    let it_module_type it (mty : module_type) =
+      match mty with
+      | Mty_alias _ -> ()
+      | _ -> super.Btype.it_module_type it mty
+    in
+    let it = { super with Btype.it_path; it_module_type } in
+    it.Btype.it_signature it sg);
+  !subst
+
 (* Save a signature to a file *)
 let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
       kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
+  let cmi_path_subst = record_cmi_paths_for_save sg in
   let sg = Subst.Lazy.of_signature sg
     |> Subst.Lazy.signature Make_local
-        (Subst.with_additional_action Prepare_for_saving Subst.identity)
+        (Subst.with_additional_action Prepare_for_saving cmi_path_subst)
   in
   let cmi =
     Persistent_env.make_cmi !persistent_env modname kind (sg, staticity) alerts
@@ -3518,7 +3576,8 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
   let pers_sig =
     Persistent_env.Persistent_signature.{
       filename; cmi;
-      visibility = Visible { cmx_guaranteed = false }
+      visibility = Visible { cmx_guaranteed = false };
+      manifest_location = None
     }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
