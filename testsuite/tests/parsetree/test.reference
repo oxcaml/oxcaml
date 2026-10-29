@@ -6,5 +6,6 @@ let f2 effect E,  k = ()
 let f3 = function | (lazy exception e) -> () | _ -> ()
 let f4 = function | (addr_ exception e) -> () | _ -> ()
 let f5 = function | (addr_imm_ exception e) -> () | _ -> ()
+let f6 = function | (deref_ exception e) -> () | _ -> ()
 
 =====================================================

@@ -4897,6 +4897,8 @@ module Report = struct
           | Address moda ->
             Fmt.dprintf "is an address that points to%a %t" maybe_modality moda
               print_pp
+          | Derived_address ->
+            Fmt.dprintf "has an address derived from it that is %t" print_pp
           | Constructor (s, moda) ->
             Fmt.dprintf "contains (via constructor %a)%a %t"
               Misc.Style.inline_code s maybe_modality moda print_pp
@@ -4925,6 +4927,10 @@ module Report = struct
         container
     | Address moda ->
       Fmt.dprintf "is the value%a at the address at %a" maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Derived_address ->
+      Fmt.dprintf "is an address derived from the value at %a"
         (Location.Doc.loc ~capitalize_first:false)
         container
     | Constructor (s, moda) ->

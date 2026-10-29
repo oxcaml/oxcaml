@@ -262,6 +262,22 @@ type existential_binding =
 
 type mode_mismatch_kind = Parameter | Return
 
+(* Different ways of pointing into a block: Either using a block index or
+    using a [deref_] pattern *)
+type block_reference_kind =
+  | Block_index
+  | Deref_pattern
+
+(** Why a block index or dereference pattern can't point through a type *)
+type block_reference_bad_type =
+  | Flatten_floats_record  (** [[@@flatten_floats]] *)
+  | Float_record
+  | Float_array_record  (** [[@@represent_as_float_array]] *)
+  | Unboxed_record  (** [[@@unboxed]] *)
+  | Inlined_record
+  | Atomic_field
+  | Private_declaration
+
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Label_mismatch of
@@ -335,6 +351,8 @@ type error =
   | Exception_pattern_disallowed
   | Mixed_value_and_exception_patterns_under_guard
   | Effect_pattern_below_toplevel
+  | Deref_pattern_bad_position
+  | Deref_pattern_bad_argument
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -385,10 +403,12 @@ type error =
       Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
-  | Block_access_bad_record of string
-  | Block_index_modality_mismatch of
-      { mut : bool; err : Mode.Modality.equate_error }
-  | Mutable_block_index_polymorphic_field of Longident.t
+  | Block_reference_bad_type of block_reference_kind * block_reference_bad_type
+  | Block_reference_modality_mismatch of
+      { reference : block_reference_kind; mutability : Types.mutability;
+        err : Mode.Modality.equate_error }
+  | Block_reference_polymorphic_field of
+      block_reference_kind * Longident.t
   | Submode_failed of Mode.With_regionality.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]

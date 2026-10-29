@@ -326,6 +326,9 @@ and pattern i ppf x =
   | Ppat_addr (mut, p) ->
       line i ppf "Ppat_addr %a\n" fmt_mutable_flag mut;
       pattern i ppf p;
+  | Ppat_deref p ->
+      line i ppf "Ppat_deref\n";
+      pattern i ppf p;
   | Ppat_lazy p ->
       line i ppf "Ppat_lazy\n";
       pattern i ppf p;
