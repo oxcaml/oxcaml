@@ -2018,16 +2018,6 @@ let conjuncts_pattern_match l =
   let exts, ufs = List.split l in
   Ienv.Extension.conjuncts exts, UF.pars ufs
 
-let unboxed_access_projection : deref unboxed_access -> Projection.t = function
-  | Uaccess_unboxed_field (_, l, _) -> Record_unboxed_product_field l.lbl_name
-  | Uaccess_unboxed_tuple_element i -> Tuple_field i
-  | Uaccess_unboxed_record_field (_, l, _) -> Record_field l.lbl_name
-
-(* The paths of the position reached by an unboxed access from a position with
-   paths [paths]. *)
-let unboxed_access_paths paths ua =
-  Paths.child (unboxed_access_projection ua) paths
-
 (* The projection to the part of the memory storing the field [l], if [l] is
    stored in a block. *)
 let field_memory_projection (l : label_description) : Projection.t option =
@@ -2035,7 +2025,10 @@ let field_memory_projection (l : label_description) : Projection.t option =
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _
   | Record_inlined _ | Record_undetermined | Record_variable _ ->
     Some (Record_field l.lbl_name)
-  | Record_unboxed | Record_dummy _ -> None
+  | Record_unboxed -> None
+  | Record_dummy _ ->
+    Misc.fatal_error
+      "Uniqueness_analysis.field_memory_projection: dummy representation"
 
 (* An address ['a addr] owns both:
 
@@ -2230,10 +2223,9 @@ and pattern_match_barrier pat paths : UF.t =
     (* unboxed records are not allocations *)
     no_memory_access ()
 
-(* [base_paths] are the paths of the boxed position a [deref_] pattern at this
-   position would consume: the value stored there and the part of the memory
-   storing it (see [deref_base_paths]). Unboxed accesses below that position are
-   added in [Tpat_deref]. *)
+(* [base_paths] are the paths a [deref_] pattern at this position would
+   consume: the value stored there and the part of the memory storing it (see
+   [deref_base_paths]), projected through the unboxed products in between. *)
 and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
   let uf_read = pattern_match_barrier pat paths in
   let ext, uf_pats =
@@ -2273,16 +2265,16 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, rep, _) ->
+    | Tpat_record (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
           let base_paths =
-            match rep with
-            | Record_unboxed -> base_paths
-            | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
-            | Record_mixed _ | Record_dummy _ | Record_undetermined
-            | Record_variable _ ->
-              Some (deref_base_paths (Projection.Record_field l.lbl_name) paths)
+            match field_memory_projection l with
+            | Some proj -> Some (deref_base_paths proj paths)
+            | None ->
+              Option.map
+                (Paths.child (Projection.Record_field l.lbl_name))
+                base_paths
           in
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
           pattern_match_single ?base_paths pat paths)
@@ -2291,6 +2283,11 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
     | Tpat_record_unboxed_product (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
+          let base_paths =
+            Option.map
+              (Paths.child (Projection.Record_unboxed_product_field l.lbl_name))
+              base_paths
+          in
           let paths =
             Paths.record_unboxed_product_field l.lbl_modalities l.lbl_name paths
           in
@@ -2317,14 +2314,14 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
       let base_paths = Paths.choose paths (Paths.memory_address paths) in
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
-    | Tpat_deref (_, _, uas, arg) ->
+    | Tpat_deref (_, _, _, arg) ->
       let paths =
         match base_paths with
         | None ->
           Misc.fatal_error
             "Uniqueness_analysis.pattern_match_single: dereference pattern \
              without base paths"
-        | Some base_paths -> List.fold_left unboxed_access_paths base_paths uas
+        | Some base_paths -> base_paths
       in
       pattern_match_single arg paths
     | Tpat_tuple args ->
@@ -2339,6 +2336,9 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
       (* No borrow since unboxed data can not be consumed. *)
       List.mapi
         (fun i (_, arg, _) ->
+          let base_paths =
+            Option.map (Paths.child (Projection.Tuple_field i)) base_paths
+          in
           let paths = Paths.tuple_field i paths in
           pattern_match_single ?base_paths arg paths)
         args
