@@ -21,7 +21,7 @@ open Effect.Deep
 let dynamic_wind (h @ local yielding) before_thunk thunk after_thunk =
   before_thunk ();
   let res =
-    Safe.With_handler.match_with
+    Yielding.With_handler.match_with
       h
       (fun h () -> thunk h)
       ()
@@ -35,7 +35,7 @@ let dynamic_wind (h @ local yielding) before_thunk thunk after_thunk =
             Some
               (fun (k : (a, _) continuation) ->
                 after_thunk ();
-                let res' = Effect.Safe.perform h e in
+                let res' = Effect.Yielding.perform h e in
                 before_thunk ();
                 continue k res'))
       }
@@ -50,12 +50,12 @@ let () =
   let at () = Printf.printf "OUT\n" in
   let foo h =
     Printf.printf "perform E\n";
-    Effect.Safe.perform h E;
+    Effect.Yielding.perform h E;
     Printf.printf "perform E\n";
-    Effect.Safe.perform h E;
+    Effect.Yielding.perform h E;
     Printf.printf "done\n"
   in
-  Safe.try_with
+  Yielding.try_with
     (fun h at -> dynamic_wind h bt foo at [@nontail])
     at
     { effc =

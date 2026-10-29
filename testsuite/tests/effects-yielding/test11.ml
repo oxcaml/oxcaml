@@ -7,7 +7,7 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : int t
 
@@ -20,5 +20,5 @@ let handle comp =
 
 let () =
   handle (fun h () ->
-      Printf.printf "%d\n" (Effect.Safe.perform h E);
+      Printf.printf "%d\n" (Effect.Yielding.perform h E);
       Printf.printf "%d\n") 42

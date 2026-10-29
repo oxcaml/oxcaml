@@ -5,13 +5,13 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : unit t
 
 let r = ref None
 let () =
-  match_with (fun h _ -> Effect.Safe.perform h E; 42) ()
+  match_with (fun h _ -> Effect.Yielding.perform h E; 42) ()
   { retc = (fun n -> assert (n = 42));
     exnc = (fun e -> raise e);
     effc = fun (type a) (e : a t) ->

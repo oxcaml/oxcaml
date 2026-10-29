@@ -34,14 +34,14 @@ let handle_state init f x =
               loop new_state k ())
           | e -> None) }
   in
-  loop init (Safe.fiber f) x
+  loop init (Yielding.fiber f) x
 
 
 let comp h () =
-  Printf.printf "Initial state: %d\n" (Effect.Safe.perform h Get);
-  Effect.Safe.perform h (Set 42);
-  Printf.printf "Updated state: %d\n" (Effect.Safe.perform h Get);
-  Effect.Safe.perform h (Set 43)
+  Printf.printf "Initial state: %d\n" (Effect.Yielding.perform h Get);
+  Effect.Yielding.perform h (Set 42);
+  Printf.printf "Updated state: %d\n" (Effect.Yielding.perform h Get);
+  Effect.Yielding.perform h (Set 43)
 
 let main () =
   let (), i = handle_state 0 comp () in

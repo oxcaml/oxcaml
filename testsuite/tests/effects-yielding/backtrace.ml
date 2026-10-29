@@ -7,7 +7,7 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 let rec foo i =
   if i = 0 then ()
@@ -36,7 +36,7 @@ let task1 () =
 let rec task2 h i =
   if i = 0 then ()
   else begin
-    Effect.Safe.perform h Wait;
+    Effect.Yielding.perform h Wait;
     task2 h i
   end
   [@@inline never]

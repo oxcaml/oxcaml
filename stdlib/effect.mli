@@ -45,8 +45,8 @@ type _ t +=
      finished *)
 
 external perform : 'a t -> 'a = "%perform"
-[@@alert unsafe_effects "Use [Effect.Safe.perform]. [Effect.perform] may not \
-                         function correctly on Js_of_ocaml"]
+[@@alert unsafe_effects "Use [Effect.Yielding.perform]. [Effect.perform] may \
+                         not function correctly on Js_of_ocaml"]
 (** [perform e] performs an effect [e].
 
     @raise Unhandled if there is no handler for [e]. *)
@@ -61,7 +61,7 @@ module Handler : sig
   type t : void mod external_ many stateless immutable
 end
 
-module Safe : sig
+module Yielding : sig
   (** OxCaml-compatible version of [perform]. Takes a [Handler.t @ local] to
       prove that the current function is running in an effect handler. *)
   val perform : Handler.t @ local -> 'a t -> 'a
@@ -126,8 +126,13 @@ module Deep : sig
 
   (** OxCaml versions of [Effect.Deep]. The computation passed to [match_with]
       and [try_with] receives a [Handler.t @ local], allowing it to perform
-      effects. *)
-  module Safe : sig
+      effects.
+
+      When using this API, the handler must handle all effects. Otherwise,
+      the call to [match_with] or [try_with] can be wrongly marked [unyielding]
+      even though some effects may be reperformed. Use [With_handler] if you
+      need to reperform effects. *)
+  module Yielding : sig
     val match_with
       :  (Handler.t @ local -> 'c -> 'a) @ unyielding
       -> 'c
@@ -140,8 +145,11 @@ module Deep : sig
       -> 'a effect_handler
       -> 'a
 
-    (** Like {!Deep.Safe}, but allow threading [Handler.t @ local] for the
-        parent stack to the handler callbacks *)
+    (** Like {!Deep.Yielding}, but allow threading [Handler.t @ local] for the
+        parent stack to the handler callbacks.
+
+        Since the parent [Handler.t] is passed in, calls to [match_with] and
+        [try_with] are never marked [unyielding]. *)
     module With_handler : sig
       type ('a,'b) handler =
         { retc: Handler.t @ local -> 'a -> 'b;
@@ -217,8 +225,13 @@ module Deep : sig
 
         @raise Out_of_fibers if unable to allocate a fiber. *)
 
-    (** OxCaml versions of [Effect.Deep.Preemptible]. *)
-    module Safe : sig
+    (** OxCaml versions of [Effect.Deep.Preemptible].
+
+        When using this API, the handler must handle all effects. Otherwise,
+        the call to [match_with] or [try_with] can be wrongly marked
+        [unyielding] even though some effects may be reperformed. Use
+        [With_handler] if you need to reperform effects. *)
+    module Yielding : sig
       val match_with
         :  (Handler.t @ local -> 'c -> 'a) @ unyielding
         -> 'c
@@ -232,8 +245,11 @@ module Deep : sig
         -> 'a effect_handler
         -> 'a
 
-      (** Like {!Deep.Preemptible.Safe}, but allow threading [Handler.t @ local]
-          for the parent stack to the handler callbacks *)
+      (** Like {!Deep.Preemptible.Yielding}, but allow threading
+          [Handler.t @ local] for the parent stack to the handler callbacks.
+
+          Since the parent [Handler.t] is passed in, calls to [match_with] and
+          [try_with] are never marked [unyielding]. *)
       module With_handler : sig
         type ('a,'b) handler =
             { retc: Handler.t @ local -> 'a -> 'b;
@@ -257,7 +273,7 @@ module Deep : sig
           -> ?on_tick:(unit -> tick_outcome)
           -> (Handler.t @ local -> 'b -> 'a) @ unyielding
           -> 'b
-          -> 'a Safe.With_handler.effect_handler
+          -> 'a Yielding.With_handler.effect_handler
           -> 'a
       end
     end
@@ -317,14 +333,24 @@ module Shallow : sig
       resumed.
    *)
 
-  module Safe : sig
+  (** OxCaml versions of [Effect.Shallow].
+
+      When using this API, the handler passed to [continue_with] or
+      [discontinue_with] must handle all effects. Otherwise, the call to
+      [continue_with] or [discontinue_with] can be wrongly marked [unyielding]
+      even though some effects may be reperformed. Use [With_handler] if you
+      need to reperform effects. *)
+  module Yielding : sig
     (** OxCaml version of [fiber], which provides a [Handler.t @ local] to an
         [unyielding] computation. *)
     val fiber
       : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
     (** Like {!Shallow}, but allow threading [Handler.t @ local]
-        for the parent stack to the handler callbacks *)
+        for the parent stack to the handler callbacks.
+
+        Since the parent [Handler.t] is passed in, calls to [continue_with] and
+        [discontinue_with] are never marked [unyielding]. *)
     module With_handler : sig
       type ('a,'b) handler =
         { retc: Handler.t @ local -> 'a -> 'b;
@@ -412,14 +438,24 @@ module Shallow : sig
         resumed.
     *)
 
-    module Safe : sig
+    (** OxCaml versions of [Effect.Shallow.Preemptible].
+
+        When using this API, the handler passed to [continue_with] or
+        [discontinue_with] must handle all effects. Otherwise, the call to
+        [continue_with] or [discontinue_with] can be wrongly marked
+        [unyielding] even though some effects may be reperformed. Use
+        [With_handler] if you need to reperform effects. *)
+    module Yielding : sig
       (** OxCaml version of [fiber], which provides a [Handler.t @ local] to an
           [unyielding] computation. *)
       val fiber
         : (Handler.t @ local -> 'a -> 'b) @ unyielding -> ('a, 'b) continuation
 
       (** Like {!Shallow.Preemptible}, but allow threading [Handler.t @ local]
-          for the parent stack to the handler callbacks *)
+          for the parent stack to the handler callbacks.
+
+          Since the parent [Handler.t] is passed in, calls to [continue_with]
+          and [discontinue_with] are never marked [unyielding]. *)
       module With_handler : sig
         type ('a,'b) handler =
             { retc: Handler.t @ local -> 'a -> 'b;

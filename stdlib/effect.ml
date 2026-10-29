@@ -27,7 +27,7 @@ module Handler = struct
   external unsafe_make : unit -> t @ yielding = "%unbox_unit"
 end
 
-module Safe = struct
+module Yielding = struct
   let[@inline never] perform (_ : Handler.t @ yielding) eff = perform eff
 end
 
@@ -222,7 +222,7 @@ module Deep = struct
   let[@inline] discontinue_with_backtrace k =
     of_continuation discontinue_with_backtrace k
 
-  module Safe = struct
+  module Yielding = struct
     let match_with comp arg handler =
       match_with (fun arg -> comp (Handler.unsafe_make ()) arg) arg
         handler
@@ -297,7 +297,7 @@ module Deep = struct
         };
     ;;
 
-    module Safe = struct
+    module Yielding = struct
       let match_with comp arg handler =
         match_with (fun arg -> comp (Handler.unsafe_make ()) arg)
           arg handler
@@ -332,7 +332,7 @@ module Deep = struct
             arg
 
         let try_with (h @ local) ?on_tick comp arg
-              (handler : _ Safe.With_handler.effect_handler) =
+              (handler : _ Yielding.With_handler.effect_handler) =
           match_with h comp arg
             { retc = (fun _ x -> x);
               exnc = (fun _ e -> raise e);
@@ -358,7 +358,9 @@ module Shallow = struct
     fun ~preemptible f ->
     let module M = struct type _ t += Initial_setup__ : a t end in
     let exception E of (a,b) continuation in
-    let f' () = f (Safe.perform (Handler.unsafe_make ()) M.Initial_setup__) in
+    let f' () =
+      f (Yielding.perform (Handler.unsafe_make ()) M.Initial_setup__)
+    in
     let error _ = failwith "impossible" in
     let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) _last_fiber =
       match eff with
@@ -411,7 +413,7 @@ module Shallow = struct
     discontinue_with_handler_with_backtrace (Handler.unsafe_make ())
       k handler.retc handler.exnc effc Null e bt
 
-  module Safe = struct
+  module Yielding = struct
     let fiber f =
       fiber (fun arg -> f (Handler.unsafe_make ()) arg)
 
@@ -504,7 +506,7 @@ module Shallow = struct
       discontinue_with_handler_with_backtrace (Handler.unsafe_make ())
         k handler.retc handler.exnc effc handler.tickc e bt
 
-    module Safe = struct
+    module Yielding = struct
       let fiber f =
         fiber (fun arg -> f (Handler.unsafe_make ()) arg)
 
