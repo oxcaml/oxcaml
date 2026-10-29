@@ -487,3 +487,23 @@ module Test :
         end
     end
 |}];;
+
+(** Multiple errors **)
+
+module type Id = sig val poly_ id : 'a -> 'a end
+module M = (struct let id (x : ('a : any mod portable)) = x end : Id)
+[%%expect{|
+module type Id = sig val poly_ id : 'a -> 'a end
+Line 4, characters 12-63:
+4 | module M = (struct let id (x : ('a : any mod portable)) = x end : Id)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match: sig val id : 'a -> 'a end is not included in Id
+       Values do not match:
+         val id : 'a -> 'a
+       is not included in
+         val poly_ id : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The type "'b" is layout polymorphic,
+       but "'a" is not layout polymorphic.
+|}];;
