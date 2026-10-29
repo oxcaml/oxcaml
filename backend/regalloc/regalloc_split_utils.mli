@@ -16,8 +16,6 @@ val log_dominance_frontier : Cfg.t -> Cfg_dominators.t -> unit
 
 val log_dominator_tree : Cfg_dominators.dominator_tree -> unit
 
-val log_dominator_forest : Cfg_dominators.dominator_tree list -> unit
-
 val log_substitution : Regalloc_substitution.t -> unit
 
 val log_substitutions : Regalloc_substitution.map -> unit

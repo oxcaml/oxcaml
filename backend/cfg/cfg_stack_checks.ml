@@ -216,8 +216,7 @@ let insert_stack_checks (cfg : Cfg.t) ~max_frame_size
      Cfg_with_infos (at least on some paths). *)
   let doms = Cfg_dominators.build cfg in
   let loop_infos = lazy (Cfg_loop_infos.build cfg) in
-  (* note: the other entries in the forest are dead code *)
-  let tree = Cfg_dominators.dominator_tree_for_entry_point doms in
+  let tree = Cfg_dominators.dominator_tree doms in
   let num_checks = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
   let num_checks_root =
     num_checks_tree tree ~blocks_needing_stack_checks ~num_checks
