@@ -56,6 +56,18 @@
   (flags
    (:standard (:include %{project_root}/build_map_cflags.sexp)))))
 
+; Relink eval.cma with the runtime-id-suffixed stub name (see otherlibs/unix/dune),
+; installed in place of dune's; the .so is now installed too (dune's install was
+; missing it) and renamed with the suffix in the install step.
+(rule
+ (targets eval_reloc.cma)
+ (deps eval.cma ../../natdynlinkops)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (run %{ocamlc} -a -noautolink -linkall -o %{targets} eval.cma
+       -dllib-suffixed -leval_stubs -cclib -leval_stubs
+       -ccopt %{read:../../natdynlinkops})))
+
 (install
  (files
   (META as eval/META)
@@ -63,8 +75,9 @@
   eval.cmxa
   eval.a
   libeval_stubs.a
+  (dlleval_stubs.so as stublibs/dlleval_stubs.so)
   eval.cmxs
-  eval.cma
+  (eval_reloc.cma as eval.cma)
   eval.mli
   (.eval.objs/byte/eval.cmi as eval.cmi)
   (.eval.objs/byte/eval.cmt as eval.cmt)

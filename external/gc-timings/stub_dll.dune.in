@@ -1,0 +1,27 @@
+; Generated (via Makefile.common-ox: @STUB_SUFFIX@ -> $(TARGET)-$(BYTECODE_RUNTIME_ID))
+; into stub_dll.inc, which the sibling dune (include)s. The C stub library is
+; permanently renamed with the runtime-id suffix (recorded as a plain -dllib,
+; not -dllib-suffixed) so this compiler's bytecode loads only its own
+; dllgc_timings_stubs; see otherlibs/unix/byte/dune for the rationale. dune
+; cannot put a build-config value in an (archive_name)/(foreign_archives) atom,
+; hence generating the stanza here.
+(foreign_library
+ (archive_name gc_timings_stubs-@STUB_SUFFIX@)
+ (language c)
+ (names gc_timings_stubs)
+ (flags
+  ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
+   (:include %{project_root}/sharedlib_cflags.sexp)
+   (:include %{project_root}/oc_cppflags.sexp))))
+
+(library
+ (name gc_timings)
+ (foreign_archives gc_timings_stubs-@STUB_SUFFIX@)
+ (synopsis "OCaml library to extract timing information from the GC"))
+
+(install
+ (files
+  (dllgc_timings_stubs-@STUB_SUFFIX@.so
+   as stublibs/dllgc_timings_stubs-@STUB_SUFFIX@.so))
+ (section lib)
+ (package ocaml))

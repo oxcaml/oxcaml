@@ -25,3 +25,14 @@
    ((:include %{project_root}/oc_cflags.sexp)
     (:include %{project_root}/sharedlib_cflags.sexp)
     (:include %{project_root}/oc_cppflags.sexp)))))
+
+; Relink threads.cma with the runtime-id-suffixed stub name (see
+; otherlibs/unix/dune); installed in place of dune's by otherlibs/systhreads/dune.
+(rule
+ (targets threads_reloc.cma)
+ (deps threads.cma)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (run %{ocamlc} -a -noautolink -linkall -o %{targets} threads.cma
+       -dllib-suffixed -lthreads_stubs
+       -cclib -lthreads_stubs -cclib -lpthread)))

@@ -169,6 +169,37 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
 	echo '( $(BUILD_MAP_CFLAGS) )' > build_map_cflags.sexp
 	echo '( $(foreach f,$(BUILD_MAP_CFLAGS),-ccopt $(f)) )' > build_map_ccopt.sexp
+# Bytecode launcher flags (cf. BYTECODE_LAUNCHER_FLAGS in Makefile.common) for
+# linking the compiler's own bytecode executables. Only the OxCaml compiler
+# understands them, so the boot (system-compiler) context uses an empty sexp
+# instead (see the per-context rules in the root dune).
+	echo '( -launch-method "$(LAUNCH_METHOD) $(BINDIR)" -runtime-search $(if $(RUNTIME_SEARCH),$(RUNTIME_SEARCH),disable) )' > bytecode_launcher_flags_oxcaml.sexp
+# When linking a bytecode executable, the compiler opens each stub DLL to check
+# primitives (bytelink.ml, Dll.open_dlls For_checking), using the runtime-id
+# suffixed name recorded by the unix_byte/str_byte libraries. dune only builds
+# the plain dll<name>_stubs.so, so generate a dune rule (included by the byte
+# libraries) that copies it to the suffixed name in the byte library's own
+# directory, where the linker's DLL search (its -I path) then finds it. The
+# suffix is a build-configuration value dune can't express as a static rule
+# target, hence generating the rule here (as with the .sexp files above).
+	echo '(rule (target dllunix_stubs-$(TARGET)-$(BYTECODE_RUNTIME_ID)$(EXT_DLL)) (action (copy ../dllunix_stubs$(EXT_DLL) %{target})))' > otherlibs/unix/byte/stubdll.inc
+	echo '(rule (target dllstr_stubs-$(TARGET)-$(BYTECODE_RUNTIME_ID)$(EXT_DLL)) (action (copy ../dllstr_stubs$(EXT_DLL) %{target})))' > otherlibs/str/byte/stubdll.inc
+# The compiler's own C-stub libraries (linked into every bytecode tool through
+# the flambda2/owee/gc_timings libraries) are permanently mangled with the
+# runtime-id suffix (recorded as a plain -dllib) rather than -dllib-suffixed:
+# their mixed-mode consumers (ocamlcommon, flambda2) cannot use the byte-only
+# library trick. Their library stanza is generated from stub_dll.dune.in with
+# the suffix substituted, because dune can't put a build-config value in an
+# (archive_name)/(foreign_archives) atom.
+	for d in middle_end/flambda2/numbers/floats middle_end/flambda2/algorithms \
+	         external/gc-timings external/owee; do \
+	  sed 's/@STUB_SUFFIX@/$(TARGET)-$(BYTECODE_RUNTIME_ID)/g' \
+	    $$d/stub_dll.dune.in > $$d/stub_dll.inc; \
+	done
+# ...and the root fragment installing those mangled libX_stubs.a into
+# compiler-libs.
+	sed 's/@STUB_SUFFIX@/$(TARGET)-$(BYTECODE_RUNTIME_ID)/g' \
+	  compilerlibs_stubs.dune.in > compilerlibs_stubs.inc
 
 # _build/_bootinstall: a minimal install directory for the boot compiler,
 # which is placed on PATH for subsequent builds
@@ -200,12 +231,46 @@ _install: compiler
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/default/runtime/ocamlrun{,d} _install/bin/
+# Mangle the runtime names and create the symlinks the bytecode launcher
+# expects (cf. INSTALL_RUNTIME in Makefile.upstream).
+ifeq "$(SUFFIXING)" "true"
+	cd _install/bin && for r in ocamlrun ocamlrund; do \
+	  m="$(TARGET)-$$r-$(BYTECODE_RUNTIME_ID)$(EXE)"; \
+	  mv "$$r$(EXE)" "$$m"; \
+	  ln -s "$$m" "$$r$(EXE)"; \
+	  ln -s "$$m" "$$r-$(ZINC_RUNTIME_ID)$(EXE)"; \
+	done
+endif
 	$(cpl) _build/install/main/bin/* _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/default/stdlib/build/* _install/lib/ocaml/
+# Mangle the shared runtime libraries (cf. INSTALL_RUNTIME_LIB in
+# Makefile.upstream): -runtime-variant _shared links against the mangled name.
+ifeq "$(SUFFIXING)" "true"
+	cd _install/lib/ocaml && \
+	  m="libcamlrun-$(TARGET)-$(BYTECODE_RUNTIME_ID)$(EXT_DLL)" && \
+	  mv "libcamlrun_shared$(EXT_DLL)" "$$m" && \
+	  ln -s "$$m" "libcamlrun_shared$(EXT_DLL)" && \
+	  m="libasmrun-$(TARGET)-$(NATIVE_RUNTIME_ID)$(EXT_DLL)" && \
+	  mv "libasmrun_shared$(EXT_DLL)" "$$m" && \
+	  ln -s "$$m" "libasmrun_shared$(EXT_DLL)"
+endif
 	rm -f _install/lib/ocaml/{META,dune-package,dynlink.cmxa,dynlink/dynlink.cmxa}
 	rm -f _install/lib/ocaml/{stdlib,camlinternal}*.{o,cmo}
 	$(cpl) -R _build/install/main/lib/ocaml/* _install/lib/ocaml/
+# Suffix the otherlibs C-stub DLLs with the runtime ID so that this version's
+# bytecode (whose .cma records the suffixed name; see otherlibs/*/dune) loads
+# only its own stubs (cf. MKLIB -suffixed in otherlibs/Makefile.otherlibs.common).
+ifeq "$(SUFFIXING)" "true"
+	cd _install/lib/ocaml/stublibs && \
+	  for b in dllunix_stubs dllstr_stubs dllruntime_events_stubs dllthreads_stubs \
+	           dlleval_stubs dlljit_stubs; \
+	  do \
+	    if test -e "$$b$(EXT_DLL)"; then \
+	      mv "$$b$(EXT_DLL)" "$$b-$(TARGET)-$(BYTECODE_RUNTIME_ID)$(EXT_DLL)"; \
+	    fi; \
+	  done
+endif
 	if [ "x$(legacy_layout)" == "xyes" ] ; \
 	then \
           for libdir in unix str dynlink bigarray ; do \
@@ -325,9 +390,10 @@ install_for_test: install
 	# Suppress linker errors about -I directories not existing.
 	for dir in asmcomp bytecomp driver file_formats lambda middle_end \
 	  parsing typing; do ln -s utils _runtest/$$dir; done
-	# stublibs
+	# stublibs (from _install, so the runtime-id-suffixed C-stub DLLs match the
+	# suffixed .cma dllib references; main_prefix still has the plain names)
 	mkdir -p _runtest/lib/ocaml/stublibs/
-	cp $(main_prefix)/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
+	cp _install/lib/ocaml/stublibs/*.so _runtest/lib/ocaml/stublibs
 	# ocamldebug
 	mkdir _runtest/debugger
 	ln -s ../ocamldebug _runtest/debugger
@@ -421,23 +487,54 @@ test-in-prefix: install
 # TODO eval is filtered out of $(OTHERLIBRARIES) because it's completely broken
 #      w.r.t. dynamic loading, but it's not clear whether that should even be
 #      possible!
+# Tell the harness whether runtime search is enabled (cf. the upstream
+# testsuite/in_prefix/Makefile.test).
+RUNTIME_SEARCH_FLAG = \
+  $(if $(RUNTIME_SEARCH),--with-runtime-search=$(RUNTIME_SEARCH),\
+                         --without-runtime-search)
+
+# The name the bytecode launcher searches for (cf. RUNTIME_NAME in
+# testsuite/in_prefix/Makefile.test).
+ifeq "$(SUFFIXING)" "true"
+RUNTIME_NAME = ocamlrun-$(ZINC_RUNTIME_ID)$(EXE)
+else
+RUNTIME_NAME = ocamlrun$(EXE)
+endif
+
+in_prefix_dir = $(boot_build)/testsuite/in_prefix
+
 .PHONY: test-in-prefix-no-rebuild
 test-in-prefix-no-rebuild:
 	RUNTIME_DIR=$(RUNTIME_DIR) \
 	  $(dune) build $(ws_boot) \
-	    testsuite/tools/test_in_prefix.exe testsuite/tools/main_in_c.o
+	    testsuite/tools/test_in_prefix.exe testsuite/tools/main_in_c.o \
+	    testsuite/tools/poisonedruntime.exe
 	# The harness runs from this scratch directory, but dune does not create it
 	# because nothing is built there, so ensure it exists in a fresh tree.
-	mkdir -p $(boot_build)/testsuite/in_prefix
-	cd $(boot_build)/testsuite/in_prefix && \
+	mkdir -p $(in_prefix_dir)
+	# The harness renames test-$(RUNTIME_NAME) to $(RUNTIME_NAME) to check that
+	# the launcher searches the program's own directory first, and expects a
+	# poisoned runtime of the same name earlier on PATH not to be used (cf.
+	# testsuite/in_prefix/Makefile.test).
+	rm -f $(in_prefix_dir)/ocamlrun* $(in_prefix_dir)/test-ocamlrun*
+	ln -s $(SRCDIR_ABS)/_build/default/runtime/ocamlrun$(EXE) \
+	  $(in_prefix_dir)/test-$(RUNTIME_NAME)
+	mkdir -p $(in_prefix_dir)/poisoned-runtime
+	ln -sf ../../tools/poisonedruntime.exe \
+	  $(in_prefix_dir)/poisoned-runtime/$(RUNTIME_NAME)
+	cd $(in_prefix_dir) && \
+	  PATH="$(SRCDIR_ABS)/$(in_prefix_dir)/poisoned-runtime:$$PATH" \
 	  ../tools/test_in_prefix.exe \
 	    --bindir "$(BINDIR)" --libdir "$(TARGET_LIBDIR)" \
 	    $(call bool_to_with, ocamlnat, $(INSTALL_OCAMLNAT)) \
 	    $(call bool_to_with, ocamlopt, $(NATIVE_COMPILER)) \
 	    $(call bool_to_with, cross-module-inlining, \
 	           $(if $(filter dev,$(main_build_profile)),false,true)) \
+	    $(RUNTIME_SEARCH_FLAG) \
 	    $(filter-out eval, $(OTHERLIBRARIES)) \
-	    --pwd "$(SRCDIR_ABS)/$(boot_build)/testsuite/in_prefix"
+	    --pwd "$(SRCDIR_ABS)/$(in_prefix_dir)"
+	rm -rf $(in_prefix_dir)/poisoned-runtime
+	rm -f $(in_prefix_dir)/test-ocamlrun*
 
 test-one: install_for_test
 	$(MAKE) test-one-no-rebuild
