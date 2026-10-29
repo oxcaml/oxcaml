@@ -2713,9 +2713,9 @@ module Instruction = struct
     | FMOV_scalar_immediate | FMSUB | FMUL | FMUL_vector | FNEG | FNEG_vector
     | FNMADD | FNMSUB | FNMUL | FRECPE_vector | FRINT _ | FRINT_vector _
     | FRSQRTE_vector | FSQRT | FSQRT_vector | FSUB | FSUB_vector | INS _
-    | INS_V _ | LDAR | STLR | STLUR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH | LDRSW
-    | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
-    | MUL_vector | MVN_vector | NEG_vector | NOP | ORN_shifted_register
+    | INS_V _ | LDAR | STLR | STLUR | LDP _ | LDR | LDRB | LDRH | LDRSB | LDRSH
+    | LDRSW | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ
+    | MSUB | MUL_vector | MVN_vector | NEG_vector | NOP | ORN_shifted_register
     | ORR_immediate | ORR_shifted_register | ORR_vector | RBIT | RET | REV
     | REV16 | SBFM | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector
     | SMIN_vector | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _
