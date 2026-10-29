@@ -180,14 +180,19 @@ and slot_for_c_prim name =
 
 let events = ref ([] : debug_event list)
 let debug_dirs = ref String.Set.empty
+(* Source paths whose directories are already in [debug_dirs] *)
+let debug_paths = ref String.Set.empty
 
 let record_event ev =
   let path = ev.ev_loc.Location.loc_start.Lexing.pos_fname in
-  let abspath = Location.absolute_path path in
-  debug_dirs := String.Set.add (Filename.dirname abspath) !debug_dirs;
-  if Filename.is_relative path then begin
-    let cwd = Location.rewrite_absolute_path (Sys.getcwd ()) in
-    debug_dirs := String.Set.add cwd !debug_dirs;
+  if not (String.Set.mem path !debug_paths) then begin
+    debug_paths := String.Set.add path !debug_paths;
+    let abspath = Location.absolute_path path in
+    debug_dirs := String.Set.add (Filename.dirname abspath) !debug_dirs;
+    if Filename.is_relative path then begin
+      let cwd = Location.rewrite_absolute_path (Sys.getcwd ()) in
+      debug_dirs := String.Set.add cwd !debug_dirs;
+    end
   end;
   ev.ev_pos <- !out_position;
   events := ev :: !events
@@ -199,6 +204,7 @@ let clear() =
   label_table := [||];
   reloc_info := [];
   debug_dirs := String.Set.empty;
+  debug_paths := String.Set.empty;
   events := [];
   out_buffer := create_bigarray 0
 
