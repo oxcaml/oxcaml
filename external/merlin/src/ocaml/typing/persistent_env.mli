@@ -16,6 +16,8 @@
 
 open Misc
 
+module CUI := Compilation_unit_intf
+
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 
 module Consistbl : module type of struct
@@ -55,7 +57,14 @@ type error =
       }
   | Unbound_module_as_argument_value of
       { instance : Global_module.Name.t; value : Global_module.Name.t; }
-
+  | Recorded_cmi_unavailable of
+      { intf : CUI.t;
+        cmi_path : filepath;
+        filename : filepath option;
+      }
+    (* [cmi_path] is the location recorded on a reference to [intf] (see
+       [CUI.Found]), which could not be resolved against the manifest files
+       root ([filename = None]) or resolved to a file that does not exist. *)
 
 type exn += private Error of error
 
@@ -67,6 +76,7 @@ type import = private {
   imp_impl : Compilation_unit.t option; (* None iff import is a parameter *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
+  imp_manifest_location : string option;
   imp_uid : Shape.Uid.t;
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
@@ -80,14 +90,19 @@ module Persistent_signature : sig
   type t =
     { filename : string; (** Name of the file containing the signature. *)
       cmi : Cmi_format.cmi_infos_lazy;
-      visibility : Load_path.visibility
+      visibility : Load_path.visibility;
+      manifest_location : string option;
+      (** See [Load_path.found]. *)
     }
 
-  (** Function used to load a persistent signature. The default is to look for
-      the .cmi file in the load path. This function can be overridden to load
-      it from memory, for instance to build a self-contained toplevel. *)
+  (** Function used to load a persistent signature. The default is to load
+      the .cmi file from the location recorded on [unit_name], if any
+      (raising [Error (Recorded_cmi_unavailable _)] when that fails), and
+      otherwise to look for it in the load path. This function can be
+      overridden to load it from memory, for instance to build a
+      self-contained toplevel. *)
   val load :
-    (allow_hidden:bool -> unit_name:Compilation_unit.Name.t -> t option) ref
+    (allow_hidden:bool -> unit_name:CUI.Found.t -> t option) ref
 end
 
 type can_load_cmis =
@@ -186,6 +201,14 @@ val global_of_global_name : 'a t
 (* [normalize_global_name penv g] returns [g] with any excess arguments removed,
    loading any .cmi files necessary to do so. *)
 val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
+
+(* The location to record on mentions of [intf] in the signature being saved
+   (see [CUI.Found]): where this compilation found its cmi, if it loaded it
+   through a manifest and [-persistent-deps] is set. *)
+val recorded_cmi_path : 'a t -> CUI.t -> filepath option
+
+(* Whether [intf] is the interface of the unit being compiled. *)
+val is_current_unit : CUI.t -> bool
 
 val make_cmi : 'a t
   -> Compilation_unit.Name.t

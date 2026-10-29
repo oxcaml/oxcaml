@@ -27,6 +27,20 @@
 
 type visibility = Visible of { cmx_guaranteed : bool } | Hidden
 
+(** A file located in the load path. Files are contributed either by
+    directories (-I, -H) or by manifest entries (-I-manifest, -H-manifest);
+    for the latter, [manifest_location] is the entry's location, that is the
+    file's path relative to the manifest files root
+    ([$MANIFEST_FILES_ROOT]). *)
+type found =
+  { path : string;
+    visibility : visibility;
+    manifest_location : string option }
+
+val resolve_manifest_location : string -> string option
+(** The path of the file at the given location relative to the manifest files
+    root, or [None] if no root is set. *)
+
 val add_dir : visibility -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)
 
@@ -91,9 +105,17 @@ val find_normalized : string -> string
     {!Misc.normalized_unit_filename}), i.e. if name is [Foo.ml], allow
     [/path/Foo.ml] and [/path/foo.ml] to match. *)
 
-val find_normalized_with_visibility : string -> string * visibility
+val find_normalized_with_visibility :
+  ?allow_hidden:bool -> string -> string * visibility
 (** Same as [find_normalized], but also reports whether the cmi was found in a
-    -I directory (Visible) or a -H directory (Hidden) *)
+    -I directory (Visible) or a -H directory (Hidden). If [allow_hidden] is
+    [false] (default [true]), pending hidden manifests are not loaded, since
+    they can only contribute [Hidden] results; entries already known from
+    directories may still be reported as [Hidden]. *)
+
+val find_normalized_with_origin : ?allow_hidden:bool -> string -> found
+(** Same as [find_normalized_with_visibility], also reporting the manifest
+    location if the file was found through a manifest entry. *)
 
 val[@deprecated] add : Dir.t -> unit
 (** Old name for {!append_dir} *)
