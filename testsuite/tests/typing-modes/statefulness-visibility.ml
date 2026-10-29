@@ -1963,7 +1963,8 @@ Error: Signature mismatch:
        which is "read"
        because it is a record whose field "write" is the expression at line 4, characters 41-42
        which is "read"
-       because it is an element of the tuple at file "_none_", line 1
+       because it is an element of the tuple at line 4, characters 17-44
+       which is "read"
 |}]
 
 module _ : sig
