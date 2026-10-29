@@ -37,7 +37,9 @@ open! Jsoo_imports.Import
 
 type t
 
-(** Create a new result structure. It is not initialised with any blocks. *)
+(** Create a new result structure. It is not initialised with any blocks.
+    [reachable_names] are the names of this unit that other compilation units
+    may refer to. *)
 val create : reachable_names:Name_occurrences.t -> t
 
 (** Add a [Jsir.instr] to the top of the stack of current blocks and return the
@@ -99,10 +101,6 @@ val get_public_method :
     the symbol table). This is used to inform Js_of_ocaml that the compilation
     unit must be linked before this one. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
-
-(** The variable holding the JSOO global data table, bound at the start of the
-    entry block. *)
-val global_data_var : t -> t * Jsir.Var.t
 
 (** Register [var] as the value of [symbol] in the global symbol table, so that
     other compilation units can fetch it. Does nothing for symbols that no other

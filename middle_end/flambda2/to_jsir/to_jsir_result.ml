@@ -64,7 +64,7 @@ type t =
         (** The events to put around the calls added by [add_call_exn], set by
             [with_debuginfo_exn]. *)
     reachable_names : Name_occurrences.t
-        (** The names of this unit that other compilation units may refer to
+        (** The names of this unit that other compilation units may refer to.
             Only these symbols need to be in the global symbol table. *)
   }
 
@@ -277,7 +277,8 @@ let register_symbol t symbol var =
     t
   else if not (Name_occurrences.mem_symbol t.reachable_names symbol)
   then
-    (* No other compilation unit can refer to this symbol, as it is not exported *)
+    (* No other compilation unit can refer to this symbol, as it is not
+       exported *)
     t
   else
     let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
