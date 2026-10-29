@@ -36,6 +36,7 @@ type unit_link_info = Linkenv.unit_link_info =
     file_name : string;
     crc : Digest.t;
     imports_cmx : Import_info.t list;
+    need_stdlib : bool;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -74,6 +75,10 @@ let emit_ocamlrunparam ~ppf_dump =
 
 let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     cached_gen =
+  let need_stdlib =
+    let needs_stdlib { need_stdlib; _ } = need_stdlib in
+    List.exists needs_stdlib units
+  in
   Location.input_name := "caml_startup";
   (* set name of "current" input *)
   let startup_comp_unit =
@@ -104,6 +109,16 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   Array.iteri
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
+  if need_stdlib
+  then begin
+    let standard_library_default =
+      Option.value ~default:Config.standard_library_default
+        !Clflags.standard_library_default
+    in
+    compile_phrase
+      (Cmm_helpers.emit_global_string_constant "caml_standard_library_nat"
+         standard_library_default)
+  end;
   compile_phrase (Cmm_helpers.global_table init_name_list);
   let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);

@@ -1127,6 +1127,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       | Ostype_win32 -> "ostype_win32"
       | Ostype_cygwin -> "ostype_cygwin"
       | Backend_type -> "backend_type"
+      | Standard_library_default -> "standard_library_default"
       | Arch_amd64 -> "arch_amd64"
       | Arch_arm64 -> "arch_arm64"
     in

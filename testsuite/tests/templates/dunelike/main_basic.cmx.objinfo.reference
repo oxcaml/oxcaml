@@ -47,3 +47,4 @@ Apply functions:
 Send functions:
 Force link: no
 Static data: Main_basic//0[ (missing); ]
+Requires caml_standard_library_nat: no

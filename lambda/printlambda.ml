@@ -645,6 +645,7 @@ let primitive ppf = function
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
        | Backend_type -> "backend_type"
+       | Standard_library_default -> "standard_library_default"
        | Arch_amd64 -> "arch_amd64"
        | Arch_arm64 -> "arch_arm64" in
      fprintf ppf "sys.constant_%s" const_name

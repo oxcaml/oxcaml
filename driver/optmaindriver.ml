@@ -124,7 +124,7 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
         assert (P.is_compilation_pass p);
-        Printf.ksprintf Compenv.fatal
+        Compenv.fatalf
           "Options -i and -stop-after (%s) \
            are  incompatible with -pack, -a, -shared, -output-obj"
           (String.concat "|"
