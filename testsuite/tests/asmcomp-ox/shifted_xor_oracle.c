@@ -33,3 +33,13 @@ CAMLprim value shifted_xor_raw_oracle(value a, value b, value shift,
   memcpy(&result, &bits, sizeof result);
   CAMLreturn(caml_copy_int64(result));
 }
+
+CAMLprim value shifted_xor_raw_left_oracle(value a, value b, value shift)
+{
+  CAMLparam3(a, b, shift);
+  unsigned k = (unsigned)Long_val(shift);
+  uint64_t bits = (uint64_t)Int64_val(a) ^ ((uint64_t)Int64_val(b) << k);
+  int64_t result;
+  memcpy(&result, &bits, sizeof result);
+  CAMLreturn(caml_copy_int64(result));
+}

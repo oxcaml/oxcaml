@@ -92,6 +92,7 @@ type specific_operation =
 and arith_operation =
     Ishiftadd
   | Ishiftsub
+  | Ishiftxor (* ACTUAL COMPILER: negative shifts are logical, unlike add/sub *)
 
 (* Sizes, endianness *)
 
@@ -203,11 +204,15 @@ let print_specific_operation printreg op ppf arg =
   | Ishiftarith(op, shift) ->
       let op_name = function
       | Ishiftadd -> "+"
-      | Ishiftsub -> "-" in
+      | Ishiftsub -> "-"
+      | Ishiftxor -> "xor" in
       let shift_mark =
        if shift >= 0
        then sprintf "<< %i" shift
-       else sprintf ">> %i" (-shift) in
+       else
+         match op with
+         | Ishiftxor -> sprintf ">>u %i" (-shift)
+         | Ishiftadd | Ishiftsub -> sprintf ">> %i" (-shift) in
       fprintf ppf "%a %s %a %s"
        printreg arg.(0) (op_name op) printreg arg.(1) shift_mark
   | Imuladd ->
@@ -275,11 +280,15 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Ishiftarith (op, shift) ->
       let op_name = function
         | Ishiftadd -> "+"
-        | Ishiftsub -> "-" in
+        | Ishiftsub -> "-"
+        | Ishiftxor -> "xor" in
       let shift_mark =
         if shift >= 0
         then sprintf "<< %i" shift
-        else sprintf ">> %i" (-shift) in
+        else
+          match op with
+          | Ishiftxor -> sprintf ">>u %i" (-shift)
+          | Ishiftadd | Ishiftsub -> sprintf ">> %i" (-shift) in
       Printf.sprintf "%s %s" (op_name op) shift_mark
   | Imuladd -> "muladd"
   | Imulsub -> "mulsub"
@@ -308,7 +317,8 @@ let equal_arith_operation left right =
   match left, right with
   | Ishiftadd, Ishiftadd -> true
   | Ishiftsub, Ishiftsub -> true
-  | (Ishiftadd | Ishiftsub), _ -> false
+  | Ishiftxor, Ishiftxor -> true
+  | (Ishiftadd | Ishiftsub | Ishiftxor), _ -> false
 
 let equal_specific_operation left right =
   match left, right with

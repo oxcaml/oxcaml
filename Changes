@@ -19,6 +19,9 @@ OCaml 5.4.1
 - ACTUAL COMPILER: Simplify tagged integer self-XOR with a constant left
   shift while preserving wrapping and tag bits. (max)
 
+- ACTUAL COMPILER: Select shifted EOR instructions for simple operands
+  on arm64, including logical right shifts. (max)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 

@@ -1,12 +1,13 @@
 (* TEST
  modules = "shifted_xor_oracle.c";
+ include stdlib_upstream_compatible;
  compare_programs = "false";
  arch64;
  {
-   flags = "-O2";
+   flags = "-O2 -extension-universe beta";
    native;
  } {
-   flags = "-O3";
+   flags = "-O3 -extension-universe beta";
    native;
  }
 *)
@@ -21,6 +22,19 @@ external oracle : int -> int -> int -> bool -> int -> int
 
 external raw_oracle : int64 -> int64 -> int -> bool -> int64
   = "shifted_xor_raw_oracle"
+
+external raw_left_oracle : int64 -> int64 -> int -> int64
+  = "shifted_xor_raw_left_oracle"
+
+module I = Stdlib_upstream_compatible.Int64_u
+
+type unboxed_case = {
+  raw_name : string;
+  raw_shift : int;
+  raw_right : bool;
+  raw_same : bool;
+  raw_apply : int64 -> int64 -> int64;
+}
 
 type case = {
   name : string;
@@ -194,6 +208,132 @@ let cases = [|
   { name = "right_different_rl_63"; shift = 63; right = true; same = false; apply = right_different_rl_63 };
 |]
 
+(* Unboxed inputs force register-valued Cmm operands. The boxed adapters
+   let the test runner store the workers in an ordinary array. *)
+let[@inline never] unboxed_left_same_lr_0 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor a (I.shift_left a 0)
+let[@inline never] unboxed_left_same_rl_0 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor (I.shift_left a 0) a
+let[@inline never] unboxed_left_different_lr_0 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor a (I.shift_left b 0)
+let[@inline never] unboxed_left_different_rl_0 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor (I.shift_left b 0) a
+let[@inline never] unboxed_left_same_lr_13 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor a (I.shift_left a 13)
+let[@inline never] unboxed_left_same_rl_13 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor (I.shift_left a 13) a
+let[@inline never] unboxed_left_different_lr_13 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor a (I.shift_left b 13)
+let[@inline never] unboxed_left_different_rl_13 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor (I.shift_left b 13) a
+let[@inline never] unboxed_left_same_lr_63 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor a (I.shift_left a 63)
+let[@inline never] unboxed_left_same_rl_63 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor (I.shift_left a 63) a
+let[@inline never] unboxed_left_different_lr_63 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor a (I.shift_left b 63)
+let[@inline never] unboxed_left_different_rl_63 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor (I.shift_left b 63) a
+let[@inline never] unboxed_right_same_lr_0 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor a (I.shift_right_logical a 0)
+let[@inline never] unboxed_right_same_rl_0 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor (I.shift_right_logical a 0) a
+let[@inline never] unboxed_right_different_lr_0 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor a (I.shift_right_logical b 0)
+let[@inline never] unboxed_right_different_rl_0 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor (I.shift_right_logical b 0) a
+let[@inline never] unboxed_right_same_lr_7 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor a (I.shift_right_logical a 7)
+let[@inline never] unboxed_right_same_rl_7 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor (I.shift_right_logical a 7) a
+let[@inline never] unboxed_right_different_lr_7 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor a (I.shift_right_logical b 7)
+let[@inline never] unboxed_right_different_rl_7 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor (I.shift_right_logical b 7) a
+let[@inline never] unboxed_right_same_lr_63 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor a (I.shift_right_logical a 63)
+let[@inline never] unboxed_right_same_rl_63 (a : int64_u) (_b : int64_u) : int64_u =
+  I.logxor (I.shift_right_logical a 63) a
+let[@inline never] unboxed_right_different_lr_63 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor a (I.shift_right_logical b 63)
+let[@inline never] unboxed_right_different_rl_63 (a : int64_u) (b : int64_u) : int64_u =
+  I.logxor (I.shift_right_logical b 63) a
+
+let unboxed_cases = [|
+  { raw_name = "unboxed_left_same_lr_0"; raw_shift = 0; raw_right = false;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_same_lr_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_same_rl_0"; raw_shift = 0; raw_right = false;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_same_rl_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_different_lr_0"; raw_shift = 0; raw_right = false;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_different_lr_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_different_rl_0"; raw_shift = 0; raw_right = false;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_different_rl_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_same_lr_13"; raw_shift = 13; raw_right = false;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_same_lr_13 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_same_rl_13"; raw_shift = 13; raw_right = false;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_same_rl_13 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_different_lr_13"; raw_shift = 13; raw_right = false;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_different_lr_13 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_different_rl_13"; raw_shift = 13; raw_right = false;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_different_rl_13 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_same_lr_63"; raw_shift = 63; raw_right = false;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_same_lr_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_same_rl_63"; raw_shift = 63; raw_right = false;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_same_rl_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_different_lr_63"; raw_shift = 63; raw_right = false;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_different_lr_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_left_different_rl_63"; raw_shift = 63; raw_right = false;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_left_different_rl_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_same_lr_0"; raw_shift = 0; raw_right = true;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_same_lr_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_same_rl_0"; raw_shift = 0; raw_right = true;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_same_rl_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_different_lr_0"; raw_shift = 0; raw_right = true;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_different_lr_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_different_rl_0"; raw_shift = 0; raw_right = true;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_different_rl_0 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_same_lr_7"; raw_shift = 7; raw_right = true;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_same_lr_7 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_same_rl_7"; raw_shift = 7; raw_right = true;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_same_rl_7 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_different_lr_7"; raw_shift = 7; raw_right = true;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_different_lr_7 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_different_rl_7"; raw_shift = 7; raw_right = true;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_different_rl_7 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_same_lr_63"; raw_shift = 63; raw_right = true;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_same_lr_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_same_rl_63"; raw_shift = 63; raw_right = true;
+    raw_same = true;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_same_rl_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_different_lr_63"; raw_shift = 63; raw_right = true;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_different_lr_63 (I.of_int64 a) (I.of_int64 b))) };
+  { raw_name = "unboxed_right_different_rl_63"; raw_shift = 63; raw_right = true;
+    raw_same = false;
+    raw_apply = (fun a b -> I.to_int64 (unboxed_right_different_rl_63 (I.of_int64 a) (I.of_int64 b))) };
+|]
+
 let[@inline never] offset_plus a = a lxor ((a lsl 13) + 1)
 let[@inline never] offset_minus a = ((a lsl 17) - 1) lxor a
 let[@inline never] dynamic a k = a lxor (a lsl k)
@@ -229,6 +369,29 @@ let[@inline never] different_effect log a b =
   let y = observe log 2 b in
   (y lsl 13) lxor x
 
+(* Operand evaluation order is not specified here; the number of evaluations
+   and the returned value are specified. *)
+let[@inline never] nested_left log a b =
+  (observe log 1 a) lxor ((observe log 2 b) lsl (observe log 3 13))
+
+let[@inline never] nested_left_reversed log a b =
+  ((observe log 2 b) lsl (observe log 3 13)) lxor (observe log 1 a)
+
+let[@inline never] nested_right log a b =
+  (observe log 1 a) lxor ((observe log 2 b) lsr (observe log 3 7))
+
+exception Expected_raise
+
+let[@inline never] raise_marker log =
+  log := 9 :: !log;
+  raise Expected_raise
+
+let[@inline never] nested_raise_shift log a b =
+  (observe log 1 a) lxor ((observe log 2 b) lsl (raise_marker log))
+
+let[@inline never] nested_raise_data log a =
+  (observe log 1 a) lxor ((raise_marker log) lsl (observe log 2 13))
+
 let input_words () =
   let values = ref [0L; 1L; -1L; 2L; -2L; 3L; -3L;
     Int64.min_int; Int64.max_int; Int64.succ Int64.min_int;
@@ -257,6 +420,20 @@ let () =
   let words = input_words () in
   let tagged = Array.map Int64.to_int words in
   let n = Array.length tagged in
+  Array.iter (fun c ->
+    Array.iteri (fun i a ->
+      let b = words.((i * 73 + 19) mod n) in
+      let rhs = if c.raw_same then a else b in
+      let expected =
+        if c.raw_right then raw_oracle a rhs c.raw_shift false
+        else raw_left_oracle a rhs c.raw_shift
+      in
+      let actual = c.raw_apply a b in
+      if actual <> expected then
+        failwith (Printf.sprintf "%s: got %Lx, expected %Lx"
+          c.raw_name actual expected)
+    ) words
+  ) unboxed_cases;
   Array.iter (fun c ->
     Array.iteri (fun i a ->
       let b = tagged.((i * 73 + 19) mod n) in
@@ -299,5 +476,26 @@ let () =
     assert (List.rev !log = [1]);
     log := [];
     check "different effect" (different_effect log a b) (oracle a b 13 false 0);
-    assert (List.rev !log = [1; 2])
+    assert (List.rev !log = [1; 2]);
+    let check_nested name f shift right =
+      log := [];
+      check name (f log a b) (oracle a b shift right 0);
+      assert (List.sort compare !log = [1; 2; 3])
+    in
+    check_nested "nested left" nested_left 13 false;
+    check_nested "nested left reversed" nested_left_reversed 13 false;
+    check_nested "nested right" nested_right 7 true;
+    let check_raise f =
+      log := [];
+      let raised =
+        try ignore (f ()); false with Expected_raise -> true
+      in
+      assert raised;
+      let count marker = List.length (List.filter ((=) marker) !log) in
+      assert (count 9 = 1);
+      assert (count 1 <= 1 && count 2 <= 1);
+      assert (List.for_all (fun marker -> marker = 1 || marker = 2 || marker = 9) !log)
+    in
+    check_raise (fun () -> nested_raise_shift log a b);
+    check_raise (fun () -> nested_raise_data log a)
   ) tagged

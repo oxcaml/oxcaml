@@ -69,6 +69,7 @@ type specific_operation =
 and arith_operation =
     Ishiftadd
   | Ishiftsub
+  | Ishiftxor (* ACTUAL COMPILER: negative shifts are logical, unlike add/sub *)
 
 val equal_specific_operation : specific_operation -> specific_operation -> bool
 
