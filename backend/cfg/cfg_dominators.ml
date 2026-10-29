@@ -24,10 +24,9 @@ type dominator_tree =
   }
 
 type t =
-  { entry_label : Label.t;
-    doms : doms;
+  { doms : doms;
     dominance_frontiers : dominance_frontiers;
-    dominator_forest : dominator_tree list
+    dominator_tree : dominator_tree
   }
 
 let rec is_dominating (doms : doms) left right =
@@ -53,12 +52,17 @@ let invariant_doms : Cfg.t -> doms -> unit =
     cfg.blocks;
   (* Check that (i) the immediate dominator is a strict dominator, and (ii)
      there is no other intermediate strict dominator - except for the entry
-     block and unreachable blocks, which all have (by convention) themselves as
-     immediate dominators. *)
+     block, which is its own immediate dominator by convention. *)
   Label.Tbl.iter
     (fun n idom_n ->
-      if not (Label.equal n idom_n)
+      if Label.equal n cfg.entry_label
       then (
+        if not (Label.equal n idom_n)
+        then
+          fatal
+            "Cfg_dominators.invariant_doms: entry is not its own immediate \
+             dominator")
+      else (
         if not (is_strictly_dominating doms idom_n n)
         then
           fatal
@@ -78,113 +82,22 @@ let invariant_doms : Cfg.t -> doms -> unit =
           doms))
     doms
 
-module DFSUtils : sig
-  type component
-  (* Identifier of a "component", which is the set of blocks reachable from a
-     given (pseudo-)entry (i.e. a block with no predecessors). *)
-
-  val equal_component : component -> component -> bool
-
-  type components
-  (* Map from block labels to component identifier. *)
-
-  val find_component : components -> Label.t -> component
-  (* [find_component components label] return the component identifier for
-     [label] in [components] - cannot raise. *)
-
-  val iter_blocks : Cfg.t -> f:(Cfg.basic_block -> unit) -> components
-  (* [iter_blocks cfg ~f] iterates over the blocks of [cfg] in depth-first
-     order, calling [f] on each node. In order to visit all blocks, even the
-     ones actually dead, it first iterates from the entry point of [cfg], and
-     then does the same from each pseudo-entry. The entry, and then each
-     pseudo-entry, defines a component (set of blocks reachable from that
-     origin), and the returned value is a (total) map from block labels to
-     components. *)
-end = struct
-  type component = int
-
-  let equal_component = Int.equal
-
-  type components = component Label.Tbl.t
-
-  let find_component components label =
-    match Label.Tbl.find_opt components label with
-    | None ->
-      Misc.fatal_errorf "no component identifier for label %a" Label.format
-        label
-    | Some component -> component
-
-  let iter_blocks_from :
-      Cfg.t ->
-      from:Label.t ->
-      f:(Cfg.basic_block -> unit) ->
-      component:component ->
-      components:components ->
-      unit =
-   fun cfg ~from ~f ~component ~components ->
-    let rec iter (label : Label.t) : unit =
-      if not (Label.Tbl.mem components label)
-      then (
-        Label.Tbl.replace components label component;
-        let block = Cfg.get_block_exn cfg label in
-        Label.Set.iter
-          (fun succ_label -> iter succ_label)
-          (Cfg.successor_labels ~normal:true ~exn:true block);
-        f block)
-    in
-    iter from
-
-  exception Found of Label.t
-
-  let find_pseudo_entry : Cfg.t -> components:components -> Label.t =
-   fun cfg ~components ->
-    try
-      Cfg.iter_blocks cfg ~f:(fun label block ->
-          if
-            (not (Label.Tbl.mem components label))
-            && Label.Set.is_empty block.predecessors
-          then raise (Found label));
-      (* CR-someday xclerc for xclerc: this fatals on an isolated unreachable
-         cycle (a dead strongly-connected component in which every block has a
-         predecessor inside the component), so no unvisited block then has an
-         empty predecessor set. Cfg_reducibility tolerates the analogous case;
-         consider a clearer diagnostic, or falling back to an arbitrary
-         unvisited block as the component root. Not known to occur today. Note
-         however, that if all dead block are deleted, this should not happen,
-         and we are guaranteed to have a tree rather than a forest. *)
-      Misc.fatal_error "did not find a block with no predecessors"
-    with Found label -> label
-
-  let rec iter_blocks_pseudo_entries :
-      Cfg.t ->
-      f:(Cfg.basic_block -> unit) ->
-      component:component ->
-      components:components ->
-      unit =
-   fun cfg ~f ~component ~components ->
-    if Label.Tbl.length components < Label.Tbl.length cfg.blocks
-    then (
-      let from = find_pseudo_entry cfg ~components in
-      iter_blocks_from cfg ~from ~f ~component ~components;
-      iter_blocks_pseudo_entries cfg ~f ~component:(succ component) ~components)
-
-  let iter_blocks : Cfg.t -> f:(Cfg.basic_block -> unit) -> components =
-   fun cfg ~f ->
-    let components = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-    iter_blocks_from cfg ~from:cfg.entry_label ~f ~component:0 ~components;
-    iter_blocks_pseudo_entries cfg ~f ~component:1 ~components;
-    components
-end
-
 type post_order_stack = Cfg.basic_block Stack.t
 
-let build_reverse_post_order : Cfg.t -> post_order_stack * DFSUtils.components =
+let build_reverse_post_order : Cfg.t -> post_order_stack =
  fun cfg ->
-  let stack : Cfg.basic_block Stack.t = Stack.create () in
-  let components =
-    DFSUtils.iter_blocks cfg ~f:(fun block -> Stack.push block stack)
+  let stack = Stack.create () in
+  let visited = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
+  let rec visit label =
+    if not (Label.Tbl.mem visited label)
+    then (
+      Label.Tbl.add visited label ();
+      let block = Cfg.get_block_exn cfg label in
+      Label.Set.iter visit (Cfg.successor_labels ~normal:true ~exn:true block);
+      Stack.push block stack)
   in
-  stack, components
+  visit cfg.entry_label;
+  stack
 
 let iter_stack : post_order_stack -> f:(Cfg.basic_block -> unit) -> unit =
  fun post_order_stack ~f ->
@@ -196,18 +109,18 @@ let iter_stack : post_order_stack -> f:(Cfg.basic_block -> unit) -> unit =
 
 type order = int Label.Tbl.t
 
-let build_order : Cfg.t -> post_order_stack * order * DFSUtils.components =
+let build_order : Cfg.t -> post_order_stack * order =
  fun cfg ->
   let order = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-  let stack, components = build_reverse_post_order cfg in
+  let stack = build_reverse_post_order cfg in
   iter_stack stack ~f:(fun (block : Cfg.basic_block) ->
       let label = block.start in
       Label.Tbl.replace order label (Label.Tbl.length order));
-  stack, order, components
+  stack, order
 
 (* See Figure 3 in the cited article. The only difference is the comparison,
-   which is reversed because of the way we distribute the idenfier when we build
-   `post_order`. Both labels are in the same component. *)
+   which is reversed because of the way we distribute the identifiers when we
+   build [post_order]. *)
 let intersect : doms -> order -> Label.t -> Label.t -> Label.t =
  fun doms post_order b1 b2 ->
   let finger1 = ref b1 in
@@ -233,61 +146,33 @@ let intersect : doms -> order -> Label.t -> Label.t -> Label.t =
   done;
   !finger1
 
-(* See Figure 3 in the cited article. There are two differences:
-
-   - a minor one: "Undefined", which is encoded here as a missing key;
-
-   - a major one: we perform the computation "per-component", in order to handle
-   dead code. *)
+(* See Figure 3 in the cited article. "Undefined" is encoded here as a missing
+   key. *)
 let compute_doms : Cfg.t -> doms =
  fun cfg ->
   let doms = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-  Cfg.iter_blocks cfg ~f:(fun label block ->
-      if Label.Set.is_empty block.predecessors
-      then Label.Tbl.replace doms label label);
-  (* CR-someday xclerc for xclerc: the entry is seeded as self-dominating only
-     via the no-predecessor rule above, so the assertion below also requires the
-     entry block to have no predecessors. Per the dominance definition the entry
-     is always its own immediate dominator; consider seeding it unconditionally
-     (Label.Tbl.replace doms cfg.entry_label cfg.entry_label) and dropping the
-     assertion, so this stays correct even if the entry ever gained a
-     predecessor (e.g. a Tailcall_self back-edge, which cfg_invariants permits
-     to target the entry block). *)
-  (match Label.Tbl.find_opt doms cfg.entry_label with
-  | None -> assert false
-  | Some label -> assert (Label.equal label cfg.entry_label));
-  let stack, order, components = build_order cfg in
+  (* The entry is its own immediate dominator, even with incoming self tail
+     calls. All other blocks are reachable from it. *)
+  Label.Tbl.add doms cfg.entry_label cfg.entry_label;
+  let stack, order = build_order cfg in
   let changed = ref true in
   while !changed do
     changed := false;
     iter_stack stack ~f:(fun (block : Cfg.basic_block) ->
         let label = block.start in
-        let same =
-          match Label.Tbl.find_opt doms label with
-          | None -> false
-          | Some label' -> Label.equal label label'
-        in
-        if not same
+        if not (Label.equal label cfg.entry_label)
         then (
-          let label_component = DFSUtils.find_component components label in
           let new_idom = ref None in
           let predecessor_labels = Cfg.predecessor_labels block in
           List.iter predecessor_labels ~f:(fun predecessor_label ->
-              let predecessor_component =
-                DFSUtils.find_component components predecessor_label
-              in
-              if DFSUtils.equal_component label_component predecessor_component
+              if Label.Tbl.mem doms predecessor_label
               then
-                match Label.Tbl.find_opt doms predecessor_label with
-                | None -> ()
-                | Some _ -> (
-                  match !new_idom with
-                  | None -> new_idom := Some predecessor_label
-                  | Some new_idom_pred ->
-                    new_idom
-                      := Some
-                           (intersect doms order predecessor_label new_idom_pred)
-                  ));
+                new_idom
+                  := Some
+                       (match !new_idom with
+                       | None -> predecessor_label
+                       | Some new_idom_pred ->
+                         intersect doms order predecessor_label new_idom_pred));
           let new_idom =
             match !new_idom with
             | None ->
@@ -335,10 +220,9 @@ let invariant_dominance_frontiers : Cfg.t -> doms -> dominance_frontiers -> unit
         frontier_labels)
     dominance_frontiers
 
-(* See Figure 5 in the cited article, the only difference is that because of
-   dead code, there is a second condition to the while loop: the loop stops if
-   it reaches a block which is its own immediate dominator (this means we have
-   reached a "dead" entry point). *)
+(* See Figure 5 in the cited article. Incoming edges to the entry are treated as
+   joins with the implicit function-entry edge. Since the entry is its own
+   immediate dominator by convention, add it to its own frontier separately. *)
 let compute_dominance_frontiers (cfg : Cfg.t) (doms : doms) :
     dominance_frontiers =
   let res = Label.Tbl.create (Label.Tbl.length doms) in
@@ -349,24 +233,22 @@ let compute_dominance_frontiers (cfg : Cfg.t) (doms : doms) :
     (fun label idom ->
       let block = Cfg.get_block_exn cfg label in
       let predecessor_labels = Cfg.predecessor_labels block in
+      let is_entry = Label.equal label cfg.entry_label in
       match predecessor_labels with
-      | [] | [_] -> ()
-      | _ :: _ :: _ ->
+      | [] -> ()
+      | [_] when not is_entry -> ()
+      | _ ->
         List.iter predecessor_labels ~f:(fun predecessor_label ->
             let runner = ref predecessor_label in
-            let continue = ref true in
-            while (not (Label.equal !runner idom)) && !continue do
-              let curr =
-                match Label.Tbl.find_opt res !runner with
-                | None -> Label.Set.empty
-                | Some set -> set
-              in
+            while not (Label.equal !runner idom) do
+              let curr = Label.Tbl.find res !runner in
               Label.Tbl.replace res !runner (Label.Set.add label curr);
-              let next_runner = Label.Tbl.find doms !runner in
-              if Label.equal !runner next_runner
-              then continue := false
-              else runner := next_runner
-            done))
+              runner := Label.Tbl.find doms !runner
+            done);
+        if is_entry
+        then
+          Label.Tbl.replace res label
+            (Label.Set.add label (Label.Tbl.find res label)))
     doms;
   if debug then invariant_dominance_frontiers cfg doms res;
   res
@@ -382,12 +264,11 @@ let iter_breadth_dominator_tree : dominator_tree -> f:(Label.t -> unit) -> unit
     List.iter dom_tree.children ~f:(fun child -> Queue.add child queue)
   done
 
-let invariant_dominator_forest : Cfg.t -> doms -> dominator_tree list -> unit =
- fun cfg doms dominator_forest ->
+let invariant_dominator_tree : Cfg.t -> doms -> dominator_tree -> unit =
+ fun cfg doms dominator_tree ->
   let seen_by_iter = ref Label.Set.empty in
-  List.iter dominator_forest ~f:(fun dominator_tree ->
-      iter_breadth_dominator_tree dominator_tree ~f:(fun label ->
-          seen_by_iter := Label.Set.add label !seen_by_iter));
+  iter_breadth_dominator_tree dominator_tree ~f:(fun label ->
+      seen_by_iter := Label.Set.add label !seen_by_iter);
   let seen_by_cfg =
     Cfg.fold_blocks cfg ~init:Label.Set.empty
       ~f:(fun label _block seen_by_cfg -> Label.Set.add label seen_by_cfg)
@@ -395,30 +276,24 @@ let invariant_dominator_forest : Cfg.t -> doms -> dominator_tree list -> unit =
   if not (Label.Set.equal !seen_by_iter seen_by_cfg)
   then
     fatal
-      "Cfg_dominators.invariant_dominator_forest: iterator did not see all \
-       blocks";
+      "Cfg_dominators.invariant_dominator_tree: iterator did not see all blocks";
+  if not (Label.equal dominator_tree.label cfg.entry_label)
+  then fatal "Cfg_dominators.invariant_dominator_tree: root is not the entry";
   let rec check_parent ~parent tree =
-    let immediate_dominator : Label.t option =
-      match Label.Tbl.find_opt doms tree.label with
-      | None -> None
-      | Some idom -> if Label.equal idom tree.label then None else Some idom
-    in
-    if not (Option.equal Label.equal immediate_dominator parent)
+    let immediate_dominator = Label.Tbl.find doms tree.label in
+    if not (Label.equal immediate_dominator parent)
     then
       fatal
-        "Cfg_dominators.invariant_dominator_forest: unexpected parent (%s) for \
+        "Cfg_dominators.invariant_dominator_tree: unexpected parent %a for \
          label %a"
-        (Option.fold ~none:"none" ~some:Label.to_string parent)
-        Label.format tree.label;
+        Label.format parent Label.format tree.label;
     List.iter tree.children ~f:(fun child ->
-        check_parent ~parent:(Some tree.label) child)
+        check_parent ~parent:tree.label child)
   in
-  List.iter dominator_forest ~f:(fun dominator_tree ->
-      check_parent ~parent:None dominator_tree)
+  check_parent ~parent:cfg.entry_label dominator_tree
 
-let compute_dominator_forest : Cfg.t -> doms -> dominator_tree list =
+let compute_dominator_tree : Cfg.t -> doms -> dominator_tree =
  fun cfg doms ->
-  let roots = ref [] in
   let children = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
   let rec build_tree (label : Label.t) : dominator_tree =
     let children_labels =
@@ -429,33 +304,30 @@ let compute_dominator_forest : Cfg.t -> doms -> dominator_tree list =
     { label; children = List.map children_labels ~f:build_tree }
   in
   Cfg.iter_blocks cfg ~f:(fun label _block ->
-      match Label.Tbl.find_opt doms label with
-      | None -> assert false
-      | Some immediate_dominator ->
-        if Label.equal label immediate_dominator
-        then roots := label :: !roots
-        else
-          let current =
-            match Label.Tbl.find_opt children immediate_dominator with
-            | None -> []
-            | Some children -> children
-          in
-          Label.Tbl.replace children immediate_dominator (label :: current));
-  let res = List.map !roots ~f:build_tree in
-  if debug then invariant_dominator_forest cfg doms res;
+      if not (Label.equal label cfg.entry_label)
+      then
+        let immediate_dominator = Label.Tbl.find doms label in
+        let current =
+          match Label.Tbl.find_opt children immediate_dominator with
+          | None -> []
+          | Some children -> children
+        in
+        Label.Tbl.replace children immediate_dominator (label :: current));
+  let res = build_tree cfg.entry_label in
+  if debug then invariant_dominator_tree cfg doms res;
   res
 
 let build : Cfg.t -> t =
  fun cfg ->
   let doms = compute_doms cfg in
   let dominance_frontiers = compute_dominance_frontiers cfg doms in
-  let dominator_forest = compute_dominator_forest cfg doms in
+  let dominator_tree = compute_dominator_tree cfg doms in
   if !Oxcaml_flags.cfg_dominators_validate
   then
     Profile.record ~accumulate:true "validate_dominators"
       (Cfg_dominators_validate.validate_idom cfg)
       doms;
-  { entry_label = cfg.entry_label; doms; dominance_frontiers; dominator_forest }
+  { doms; dominance_frontiers; dominator_tree }
 
 let is_dominating t left right = is_dominating t.doms left right
 
@@ -469,20 +341,4 @@ let find_dominance_frontier t label =
     fatal "Cfg_dominators.find_dominance_frontier: no frontier for label %a"
       Label.format label
 
-let dominator_forest t = t.dominator_forest
-
-let dominator_tree_for_entry_point t =
-  match
-    List.find_opt t.dominator_forest ~f:(fun tree ->
-        Label.equal tree.label t.entry_label)
-  with
-  | None ->
-    fatal
-      "Cfg_dominators.dominator_tree_for_entry_point: no tree for entry point \
-       (label %a)"
-      Label.format t.entry_label
-  | Some tree -> tree
-
-let iter_breadth_dominator_forest t ~f =
-  List.iter t.dominator_forest ~f:(fun dominator_tree ->
-      iter_breadth_dominator_tree dominator_tree ~f)
+let dominator_tree t = t.dominator_tree

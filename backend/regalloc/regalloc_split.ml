@@ -119,12 +119,11 @@ let compute_substitutions : State.t -> Cfg_with_infos.t -> Substitution.map =
     log "compute_substitutions";
     indent ());
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  let dom_forest =
-    Cfg_dominators.dominator_forest (Cfg_with_infos.dominators cfg_with_infos)
+  let dom_tree =
+    Cfg_dominators.dominator_tree (Cfg_with_infos.dominators cfg_with_infos)
   in
   let substs = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-  List.iter dom_forest ~f:(fun dom_tree ->
-      compute_substitution_tree state substs Reg.Map.empty dom_tree);
+  compute_substitution_tree state substs Reg.Map.empty dom_tree;
   if debug then dedent ();
   substs
 
@@ -487,7 +486,7 @@ let split_at_destruction_points :
   then (
     let doms = Cfg_with_infos.dominators cfg_with_infos in
     log_dominance_frontier (Cfg_with_infos.cfg cfg_with_infos) doms;
-    log_dominator_forest (Cfg_dominators.dominator_forest doms));
+    log_dominator_tree (Cfg_dominators.dominator_tree doms));
   match Label.Map.is_empty (State.definitions_at_beginning state) with
   | true ->
     log "renaming_infos is empty (no new names introduced)";
