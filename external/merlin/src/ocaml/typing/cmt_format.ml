@@ -568,8 +568,8 @@ let save_cmt target cu binary_annots initial_env cmi shape =
              { incl with
                Clflags.path = Location.rewrite_absolute_path incl.path }
            in
-           { Load_path.visible = List.map rewrite visible;
-             hidden = List.map rewrite hidden } in
+           { Load_path.visible = List.map ~f:rewrite visible;
+             hidden = List.map ~f:rewrite hidden } in
          let cmt = {
            cmt_modname = cu;
            cmt_annots;
