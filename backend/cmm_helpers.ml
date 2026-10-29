@@ -4653,11 +4653,35 @@ let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
 let or_int_caml arg1 arg2 dbg = or_int arg1 arg2 dbg
 
 let xor_int_caml arg1 arg2 dbg =
-  Cop
-    ( Cor,
-      [ xor_int (ignore_low_bit_int arg1) (ignore_low_bit_int arg2) dbg;
-        Cconst_int (1, dbg) ],
-      dbg )
+  let default () =
+    Cop
+      ( Cor,
+        [ xor_int (ignore_low_bit_int arg1) (ignore_low_bit_int arg2) dbg;
+          Cconst_int (1, dbg) ],
+        dbg )
+  in
+  match arg1, arg2 with
+  | ( (Cvar v as tagged),
+      Cop (Caddi, [Cop (Clsl, [Cvar v'; Cconst_int (k, _)], _); offset], _) )
+  | ( Cop (Caddi, [Cop (Clsl, [Cvar v'; Cconst_int (k, _)], _); offset], _),
+      (Cvar v as tagged) )
+    when V.same v v' && k > 0 && k < arch_bits - 1 ->
+    let bit = Nativeint.shift_left 1n k in
+    let expected_offset = Nativeint.sub 1n bit in
+    let matches_offset =
+      match get_const offset with
+      | Some n -> Nativeint.equal n expected_offset
+      | None -> false
+    in
+    if matches_offset
+    then
+      (* ACTUAL COMPILER: [tagged] is an odd word. For a left shift of the same
+         variable, ((tagged - 1) << k) = (tagged << k) xor (1 << k), modulo the
+         machine word width. The result is already odd. Restrict the match to
+         variables to preserve effects. *)
+      xor_const (xor_int tagged (lsl_const tagged k dbg) dbg) bit dbg
+    else default ()
+  | _ -> default ()
 
 type ternary_primitive =
   expression -> expression -> expression -> Debuginfo.t -> expression
