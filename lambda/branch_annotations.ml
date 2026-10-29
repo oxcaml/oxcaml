@@ -26,20 +26,35 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type t = { likelihood : Likelihood.t } [@@unboxed]
+type t =
+  { likelihood : Likelihood.t;
+    fdo_annotation : Fdo_annotation.t
+  }
 
-let from_likelihood likelihood = { likelihood }
+let create ~likelihood ~fdo_annotation = { likelihood; fdo_annotation }
+
+let from_likelihood likelihood =
+  { likelihood; fdo_annotation = Fdo_annotation.empty }
 
 let default = from_likelihood Likelihood.default
 
 let cold = from_likelihood Likelihood.cold
 
-let likelihood { likelihood } = likelihood
+let likelihood { likelihood; _ } = likelihood
 
-let with_likelihood _ likelihood = { likelihood }
+let with_likelihood t likelihood = { t with likelihood }
+
+let fdo_annotation { fdo_annotation; _ } = fdo_annotation
+
+let with_fdo_annotation t fdo_annotation = { t with fdo_annotation }
 
 let sum_list annots =
-  Likelihood.sum_list (List.map likelihood annots) |> from_likelihood
+  let likelihood = Likelihood.sum_list (List.map likelihood annots) in
+  let fdo_annotation =
+    List.fold_left
+      (fun acc annot -> Fdo_annotation.combine acc annot.fdo_annotation)
+      Fdo_annotation.empty annots
+  in
+  create ~likelihood ~fdo_annotation
 
-let add { likelihood = likelihood1 } { likelihood = likelihood2 } =
-  from_likelihood (Likelihood.sum_list [likelihood1 ;likelihood2])
+let add t1 t2 = sum_list [t1; t2]

@@ -682,7 +682,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             is_tupled;
             stub;
             loopify;
-            result_mode
+            result_mode;
+            fdo_entry_annotation
           } ->
         let code_id = find_code_id env id in
         let newer_version_of = Option.map (find_code_id env) newer_version_of in
@@ -820,7 +821,10 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~inlining_arguments:(Inlining_arguments.create ~round:0)
             ~poll_attribute:Default ~regalloc_attribute:Default_regalloc
             ~regalloc_param_attribute:Default_regalloc_params ~cold:false
-            ~dbg:Debuginfo.none ~is_tupled ~is_my_closure_used
+            ~dbg:Debuginfo.none
+            ~fdo_entry_annotation:
+              (Option.value fdo_entry_annotation ~default:Fdo_annotation.empty)
+            ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
               (Inlining_history.Absolute.empty (Current_unit.get_cu_exn ()))
@@ -952,8 +956,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
         ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
-        ~inlined ~inlining_state ~probe:None ~position:Normal
-        ~relative_history:Inlining_history.Relative.empty
+        ~callsite_counter:None ~inlined ~inlining_state ~probe:None
+        ~position:Normal ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
   | Invalid -> acc, Flambda.Expr.create_invalid (Message "Invalid from fexpr")

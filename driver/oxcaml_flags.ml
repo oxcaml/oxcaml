@@ -193,6 +193,8 @@ let llvm_path = ref None (* -llvm-path *)
 
 let llvm_flags = ref "" (* -llvm-flags *)
 
+let fdo_counters = ref false (* -fdo-counters *)
+
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
   let reaper_debug_flags = ref [] (* -reaper-debug-flags *)
