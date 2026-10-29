@@ -1,26 +1,7 @@
 (include_subdirs unqualified)
 
-(library
- (name flambda2_algorithms)
- (wrapped true)
- (instrumentation (backend bisect_ppx))
- (foreign_stubs
-  (language c)
-  (names builtin_stubs)
-  (flags
-   ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
-    (:include %{project_root}/sharedlib_cflags.sexp)
-    (:include %{project_root}/oc_cppflags.sexp))))
- (ocamlopt_flags
-  (:standard
-   (:include %{project_root}/ocamlopt_flags.sexp)
-   -O3
-   -open
-   Int_replace_polymorphic_compare))
- (libraries ocamlfrontend))
-
-(install
- (files
-  (dllflambda2_algorithms_stubs.so as stublibs/dllflambda2_algorithms_stubs.so))
- (section lib)
- (package ocaml))
+; The library + C-stub definitions are generated into stub_dll.inc (from
+; stub_dll.dune.in) by Makefile.common-ox, which bakes the runtime-id suffix
+; into the C stub library name (a build-config value dune can't express as an
+; (archive_name)/(foreign_archives) atom).
+(include stub_dll.inc)

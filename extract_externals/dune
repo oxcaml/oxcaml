@@ -14,6 +14,9 @@
  (name extract_externals)
  (modes byte native)
  (modules extract_externals)
+ ; Dual-mode: bytecode-only launcher flags via ocamlc_flags (see tools/dune).
+ (ocamlc_flags
+  (:standard (:include %{project_root}/bytecode_launcher_flags.sexp)))
  (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
 
 (install

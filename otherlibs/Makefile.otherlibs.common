@@ -35,6 +35,9 @@ ifeq "$(FLAMBDA)" "true"
 OPTCOMPFLAGS += -O3
 endif
 MKLIB=$(OCAMLRUN) $(ROOTDIR)/tools/ocamlmklib$(EXE)
+ifeq "$(SUFFIXING)" "true"
+MKLIB += -suffixed
+endif
 
 # Variables that must be defined by individual libraries:
 # LIBNAME
@@ -52,8 +55,13 @@ CAMLOBJS_NAT ?= $(CAMLOBJS:.cmo=.cmx)
 CLIBNAME ?= $(LIBNAME)
 
 ifeq "$(C_SOURCES)" ""
-STUBSLIB=
+
+STUBSLIB_BYTECODE=
+STUBSLIB_NATIVE=
+STUBSDLL=
+
 else
+
 COBJS_BYTECODE = $(C_SOURCES:.c=.b.$(O))
 COBJS_NATIVE = $(C_SOURCES:.c=.n.$(O))
 COBJS = $(COBJS_BYTECODE) $(COBJS_NATIVE)
@@ -62,6 +70,12 @@ CLIBNAME_BYTECODE=$(CLIBNAME)byt
 CLIBNAME_NATIVE=$(CLIBNAME)nat
 STUBSLIB_BYTECODE=lib$(CLIBNAME_BYTECODE).$(A)
 STUBSLIB_NATIVE=lib$(CLIBNAME_NATIVE).$(A)
+
+ifeq "$(SUFFIXING)" "true"
+STUBSDLL=dll$(CLIBNAME_BYTECODE)-$(TARGET)-$(BYTECODE_RUNTIME_ID)$(EXT_DLL)
+else
+STUBSDLL=dll$(CLIBNAME_BYTECODE)$(EXT_DLL)
+endif
 endif
 
 .PHONY: all allopt opt.opt # allopt and opt.opt are synonyms
@@ -100,10 +114,10 @@ INSTALL_LIBDIR_LIBNAME = $(INSTALL_LIBDIR)/$(LIBNAME)
 INSTALL_LIBDIR_LIBNAME = $(INSTALL_LIBDIR)/$(LIBNAME)
 
 install::
-ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
-	$(INSTALL_PROG) dll$(CLIBNAME_BYTECODE)$(EXT_DLL) "$(INSTALL_STUBLIBDIR)"
-endif
 ifneq "$(STUBSLIB_BYTECODE)" ""
+ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
+	$(INSTALL_PROG) $(STUBSDLL) "$(INSTALL_STUBLIBDIR)"
+endif
 	$(INSTALL_DATA) $(STUBSLIB_BYTECODE) "$(INSTALL_LIBDIR)/"
 endif
 # If installing over a previous OCaml version, ensure the library is removed
@@ -133,9 +147,10 @@ installopt:
 	if test -f $(LIBNAME).cmxs; then \
 	  $(INSTALL_PROG) $(LIBNAME).cmxs "$(INSTALL_LIBDIR_LIBNAME)"; \
 	fi
-ifeq "$(SUPPORTS_SHARED_LIBRARIES)" "true"
-	$(INSTALL_PROG) dll$(CLIBNAME_NATIVE)$(EXT_DLL) "$(INSTALL_STUBLIBDIR)"
-endif
+	if test -f dll$(CLIBNAME_NATIVE)$(EXT_DLL); then \
+	  $(INSTALL_PROG) \
+	    dll$(CLIBNAME_NATIVE)$(EXT_DLL) "$(INSTALL_STUBLIBDIR)"; \
+	fi
 ifneq "$(STUBSLIB_NATIVE)" ""
 	$(INSTALL_DATA) $(STUBSLIB_NATIVE) "$(INSTALL_LIBDIR)/"
 endif

@@ -1,0 +1,13 @@
+; Byte-only build of memtrace linking the runtime-id-suffixed unix_byte instead
+; of the plain-stubbed unix, so the installed bytecode ocamlopt (oxcaml_main.bc)
+; loads only this version's dllunix_stubs. wrapped false keeps the public module
+; name Memtrace (none of memtrace's module names clash with the compiler libs).
+
+(copy_files ../*.ml)
+(copy_files ../*.mli)
+
+(library
+ (name memtrace_byte)
+ (wrapped false)
+ (modes byte)
+ (libraries unix_byte))
