@@ -124,15 +124,18 @@ let add_call_exn t instr =
         match end_ with None -> body | Some end_ -> push_event end_ body)
 
 let with_debuginfo_exn t dbg ~event_after ~f =
-  match parse_info_of_debuginfo dbg ~pos:`Start with
-  | None -> f t
-  | Some start ->
-    let end_ =
-      if event_after then parse_info_of_debuginfo dbg ~pos:`End else None
-    in
-    let outer_call_events = t.call_events in
-    let x, t = f { t with call_events = Some { start; end_ } } in
-    x, { t with call_events = outer_call_events }
+  let call_events =
+    match parse_info_of_debuginfo dbg ~pos:`Start with
+    | None -> None
+    | Some start ->
+      let end_ =
+        if event_after then parse_info_of_debuginfo dbg ~pos:`End else None
+      in
+      Some { start; end_ }
+  in
+  let outer_call_events = t.call_events in
+  let x, t = f { t with call_events } in
+  x, { t with call_events = outer_call_events }
 
 let new_block t ~params =
   let new_block = { params; body = []; addr = t.next_addr } in
