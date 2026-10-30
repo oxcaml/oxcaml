@@ -67,15 +67,14 @@ Format.formatter -> Clflags.profile_column list -> timings_precision:int -> unit
 val with_action_trace :
   gettimeofday:(unit -> float) -> name:string -> (unit -> 'a) -> 'a
 (** When Dune action tracing is enabled, write a trace with a span covering
-    the call and a span for each row that [print] would output with every
-    column selected, including the "other" rows and rows too small to
-    display. A row usually accumulates several intervals, so its span starts
-    at the start of the first one and lasts for their total wall-clock
-    duration; "other" rows start with their parent. Spans have these
-    counters: [time] (nanoseconds on the recording's selected clock), [calls]
-    (the number of CPU-clock reads), [alloc], [top-heap] (the increase in top
-    heap size), [absolute-top-heap] (all in bytes), and any counters from
-    [counter_f]. Each span's [path] argument lists the names of the spans
+    the call and a span for each row that [-dtimings] would output, including
+    the "other" rows and rows too small to display. A row usually accumulates
+    several intervals, so its span starts at the start of the first one and
+    lasts for their total wall-clock duration; "other" rows start with their
+    parent. Spans have these counters: [time] (nanoseconds on the recording's
+    selected clock) and [calls] (the number of CPU-clock reads). Unlike
+    [-dprofile], no memory measurements or counters from [counter_f] are
+    recorded. Each span's [path] argument lists the names of the spans
     enclosing it, from the outermost (the one covering the call) down to the
     span itself. Pass [Unix.gettimeofday] as the clock; compiler-libs itself
     does not depend on [Unix]. *)

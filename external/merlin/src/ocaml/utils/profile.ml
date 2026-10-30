@@ -157,8 +157,7 @@ let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
     | Some counter_f ->
         fun () ->
           let result = f () in
-          if List.mem `Counters !Clflags.profile_columns
-             || Option.is_some !wall_clock then
+          if List.mem `Counters !Clflags.profile_columns then
             counters := counter_f result;
           result
     | None -> f
@@ -359,18 +358,9 @@ let column_values columns ~timings_precision (p : Measure_diff.t)
     | `Counters -> counters_display p.counters
   ) columns
 
-let write_action_trace_span ~name ~path
-    ((p : Measure_diff.t), top_heap_words) =
+let write_action_trace_span ~name ~path (p : Measure_diff.t) =
   let nanoseconds seconds = int_of_float (seconds *. 1e9) in
-  let bytes words = words * (Sys.word_size / 8) in
-  let counters =
-    ("time", nanoseconds p.duration)
-    :: ("calls", p.calls)
-    :: ("alloc", bytes (int_of_float p.allocated_words))
-    :: ("top-heap", bytes p.top_heap_words_increase)
-    :: ("absolute-top-heap", bytes top_heap_words)
-    :: String.Map.bindings p.counters
-  in
+  let counters = ["time", nanoseconds p.duration; "calls", p.calls] in
   let args =
     ["path", Json.Array (List.rev_map (fun name -> Json.String name) path)]
   in
@@ -393,16 +383,14 @@ let emit_action_trace ~name (start_measure : Measure.t)
   in
   let rows =
     rows_of_hierarchy (snd !hierarchy) total initial_measure
-      ~values:(fun p ~top_heap_words ~prev_top_heap_words:_ ->
-        p, top_heap_words)
+      ~values:(fun p ~top_heap_words:_ ~prev_top_heap_words:_ -> p)
   in
   let rec write_spans ~parent_path (R (name, value, rows)) =
     let path = name :: parent_path in
     write_action_trace_span ~name ~path value;
     List.iter (write_spans ~parent_path:path) rows
   in
-  write_spans ~parent_path:[]
-    (R (name, (total, end_measure.top_heap_words), rows))
+  write_spans ~parent_path:[] (R (name, total, rows))
 
 let with_action_trace ~gettimeofday ~name f =
   (* [Action_trace] does nothing unless this is set, so avoid the cost of
