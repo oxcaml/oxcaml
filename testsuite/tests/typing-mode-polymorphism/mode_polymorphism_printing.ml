@@ -414,8 +414,6 @@ module Foo :
   end
 |}]
 
-(* CR zeisbach: Why do we print [stateful dynamic] only at the very end, here?
-   Are they the same ['m]s here? *)
 module Foo : sig
   type t
 

@@ -8691,7 +8691,7 @@ and type_expect_
       let (ty, exp_extra) =
         let mode_with_locality =
           Mode.With_locality.Const.Option.value
-            (Typemode.apply_mode_implications modes.mode_modes)
+            (Mode.Const.apply_implications modes.mode_modes)
             ~default:Mode.With_locality.Const.legacy
         in
         type_constraint env sty mode_with_locality
@@ -9837,7 +9837,7 @@ and type_constraint_expect
   let ret, ty, exp_extra =
     let type_mode =
       With_locality.Const.Option.value ~default:With_locality.Const.legacy
-        (Typemode.apply_mode_implications type_mode)
+        (Mode.Const.apply_implications type_mode)
     in
     match constraint_ with
     | Pcoerce (ty_constrain, ty_coerce) ->
