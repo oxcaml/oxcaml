@@ -32,7 +32,7 @@ end
 [%%expect{|
 
 module type Constants  =
-  sig val f : 'a @ [< portable & many] -> 'a @ [> local | once] end;;
+  sig val f : 'a @ [< portable many] -> 'a @ [> local | once] end;;
 >> Fatal error: Line 2, characters 15-32: mode variables and mode bounds are not yet supported
 Uncaught exception: Misc.Fatal_error
 
@@ -44,8 +44,7 @@ end
 [%%expect{|
 
 module type Constants_after_variables  =
-  sig
-    val f : 'a @ [< 'm & portable & many] -> 'a @ [> 'm | aliased | dynamic]
+  sig val f : 'a @ [< 'm & portable many] -> 'a @ [> 'm | aliased dynamic]
   end;;
 >> Fatal error: Line 2, characters 15-37: mode variables and mode bounds are not yet supported
 Uncaught exception: Misc.Fatal_error
@@ -62,8 +61,8 @@ end
 module type Constants_after_mod  =
   sig
     val f :
-      'a @ [< 'm mod portable contended & global & many] ->
-        'a @ [> 'm mod aliased dynamic | local | once]
+      'a @ [< 'm mod portable contended & global many] ->
+        'a @ [> 'm mod aliased dynamic | local once]
   end;;
 >> Fatal error: Line 3, characters 9-52: mode variables and mode bounds are not yet supported
 Uncaught exception: Misc.Fatal_error
@@ -129,7 +128,7 @@ module type Morphisms_and_mod  =
   sig
     val f :
       'a @ [< 'm mod portable contended & past('n) mod global] ->
-        'a @ [> close('m) mod many aliased | past('n) | local | once]
+        'a @ [> close('m) mod many aliased | past('n) | local once]
   end;;
 >> Fatal error: Line 3, characters 9-60: mode variables and mode bounds are not yet supported
 Uncaught exception: Misc.Fatal_error

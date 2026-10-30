@@ -877,9 +877,9 @@ let default_iterator =
     mode = (fun this { txt; loc } ->
       (match txt with
        | Pmode _ | Pmode_var _ -> ()
-       | Pmode_bounded { upper; lower } ->
-         this.mode_bound this upper;
-         this.mode_bound this lower);
+       | Pmode_bounded { pmode_upper; pmode_lower } ->
+         this.mode_bound this pmode_upper;
+         this.mode_bound this pmode_lower);
       this.location this loc
     );
 
@@ -887,14 +887,14 @@ let default_iterator =
       List.iter
         (function
           | Pbound_var v -> this.mode_bound_var this v
-          | Pbound_const c -> iter_loc this c)
+          | Pbound_const cs -> List.iter (iter_loc this) cs)
         elems
     );
 
-    mode_bound_var = (fun this { elem_morph; elem_var; elem_mod } ->
-      Option.iter (iter_loc this) elem_morph;
-      iter_loc this elem_var;
-      List.iter (iter_loc this) elem_mod
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      Option.iter (iter_loc this) pbound_morph;
+      iter_loc this pbound_var;
+      List.iter (iter_loc this) pbound_mod
     );
 
     modalities = (fun this m ->

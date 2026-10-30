@@ -20,20 +20,20 @@ type mode = Shim.Mode.t =
   | Pmode_bounded of mode_bounded
 
 and mode_bounded = Shim.Mode.bounded =
-  { upper : mode_bound
-  ; lower : mode_bound
+  { pmode_upper : mode_bound
+  ; pmode_lower : mode_bound
   }
 
 and mode_bound = mode_bound_elem list
 
 and mode_bound_elem = Shim.Mode.bound_elem =
   | Pbound_var of mode_bound_var
-  | Pbound_const of string Location.loc
+  | Pbound_const of string Location.loc list
 
 and mode_bound_var = Shim.Mode.bound_var =
-  { elem_morph : string Location.loc option
-  ; elem_var : string Location.loc
-  ; elem_mod : string Location.loc list
+  { pbound_morph : string Location.loc option
+  ; pbound_var : string Location.loc
+  ; pbound_mod : string Location.loc list
   }
 
 type modes = Shim.Modes.t

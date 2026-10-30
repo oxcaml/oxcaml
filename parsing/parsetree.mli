@@ -77,20 +77,20 @@ type mode =
   | Pmode_bounded of mode_bounded
 
 and mode_bounded =
-  { upper : mode_bound;
-    lower : mode_bound;
+  { pmode_upper : mode_bound;
+    pmode_lower : mode_bound;
   }
 
 and mode_bound = mode_bound_elem list
 
 and mode_bound_elem =
   | Pbound_var of mode_bound_var
-  | Pbound_const of mode_const loc
+  | Pbound_const of mode_const loc list
 
 and mode_bound_var =
-  { elem_morph : mode_morph loc option;
-    elem_var : mode_var loc;
-    elem_mod : mode_const loc list;
+  { pbound_morph : mode_morph loc option;
+    pbound_var : mode_var loc;
+    pbound_mod : mode_const loc list;
   }
 
 type modes = mode loc list

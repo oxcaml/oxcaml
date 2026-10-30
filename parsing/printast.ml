@@ -154,15 +154,15 @@ let modality i ppf modality =
 let modalities i ppf modalities =
   List.iter (fun m -> modality i ppf m) modalities
 
-let mode_bound_var i ppf { elem_morph; elem_var; elem_mod } =
+let mode_bound_var i ppf { pbound_morph; pbound_var; pbound_mod } =
   line i ppf "mode_bound_var\n";
-  option (i+1) string_loc ppf elem_morph;
-  string_loc (i+1) ppf elem_var;
-  list (i+1) string_loc ppf elem_mod
+  option (i+1) string_loc ppf pbound_morph;
+  string_loc (i+1) ppf pbound_var;
+  list (i+1) string_loc ppf pbound_mod
 
 let mode_bound_elem i ppf = function
   | Pbound_var v -> mode_bound_var i ppf v
-  | Pbound_const c -> string_loc i ppf c
+  | Pbound_const cs -> list i string_loc ppf cs
 
 let mode_bound i ppf elems =
   list i mode_bound_elem ppf elems
@@ -174,13 +174,13 @@ let mode i ppf (mode : mode loc) =
   | Pmode_var v ->
     line i ppf "mode %a\n" fmt_location mode.loc;
     line (i+1) ppf "Pmode_var \"%s\"\n" v
-  | Pmode_bounded { upper; lower } ->
+  | Pmode_bounded { pmode_upper; pmode_lower } ->
     line i ppf "mode %a\n" fmt_location mode.loc;
     line (i+1) ppf "Pmode_bounded\n";
-    line (i+2) ppf "upper\n";
-    mode_bound (i+3) ppf upper;
-    line (i+2) ppf "lower\n";
-    mode_bound (i+3) ppf lower
+    line (i+2) ppf "pmode_upper\n";
+    mode_bound (i+3) ppf pmode_upper;
+    line (i+2) ppf "pmode_lower\n";
+    mode_bound (i+3) ppf pmode_lower
 
 let modes i ppf modes =
   List.iter (fun m -> mode i ppf m) modes

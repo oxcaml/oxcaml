@@ -1049,10 +1049,10 @@ let default_mapper =
       let txt =
         match txt with
         | (Pmode _ | Pmode_var _) as mode -> mode
-        | Pmode_bounded { upper; lower } ->
+        | Pmode_bounded { pmode_upper; pmode_lower } ->
           Pmode_bounded
-            { upper = this.mode_bound this upper;
-              lower = this.mode_bound this lower
+            { pmode_upper = this.mode_bound this pmode_upper;
+              pmode_lower = this.mode_bound this pmode_lower
             }
       in
       { txt; loc = this.location this loc });
@@ -1061,13 +1061,13 @@ let default_mapper =
       List.map
         (function
           | Pbound_var v -> Pbound_var (this.mode_bound_var this v)
-          | Pbound_const c -> Pbound_const (map_loc this c))
+          | Pbound_const cs -> Pbound_const (List.map (map_loc this) cs))
         elems);
 
-    mode_bound_var = (fun this { elem_morph; elem_var; elem_mod } ->
-      { elem_morph = Option.map (map_loc this) elem_morph;
-        elem_var = map_loc this elem_var;
-        elem_mod = List.map (map_loc this) elem_mod
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      { pbound_morph = Option.map (map_loc this) pbound_morph;
+        pbound_var = map_loc this pbound_var;
+        pbound_mod = List.map (map_loc this) pbound_mod
       });
 
     modalities = (fun this m ->
