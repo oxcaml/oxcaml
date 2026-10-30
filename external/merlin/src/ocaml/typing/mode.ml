@@ -7731,6 +7731,64 @@ module Const = struct
       staticity
     }
 
+  let implied_forkable : Locality.Const.t -> Forkable.Const.t = function
+    | Global -> Forkable
+    | Local -> Unforkable
+
+  let implied_yielding : Locality.Const.t -> Yielding.Const.t = function
+    | Global -> Unyielding
+    | Local -> Yielding
+
+  let implied_contention : Visibility.Const.t -> Contention.Const.t = function
+    | Immutable -> Contended
+    | Read -> Shared
+    | Write -> Corrupted
+    | Read_write -> Uncontended
+
+  let implied_portability : Statefulness.Const.t -> Portability.Const.t =
+    function
+    | Stateless -> Portable
+    | Reading -> Shareable
+    | Writing -> Corruptible
+    | Stateful -> Nonportable
+
+  let apply_implications (m : With_locality.Const.Option.t) :
+      With_locality.Const.Option.t =
+    let imply implied source target =
+      match target, source with
+      | Some _, _ | None, None -> target
+      | None, Some source -> Some (implied source)
+    in
+    { m with
+      forkable = imply implied_forkable m.areality m.forkable;
+      yielding = imply implied_yielding m.areality m.yielding;
+      contention = imply implied_contention m.visibility m.contention;
+      portability = imply implied_portability m.statefulness m.portability
+    }
+
+  let erase_implications (m : With_locality.Const.t) :
+      With_locality.Const.Option.t =
+    let erase equal implied source target =
+      if equal (implied source) target then None else Some target
+    in
+    { areality = Some m.areality;
+      linearity = Some m.linearity;
+      uniqueness = Some m.uniqueness;
+      portability =
+        erase Portability.Const.equal implied_portability m.statefulness
+          m.portability;
+      contention =
+        erase Contention.Const.equal implied_contention m.visibility
+          m.contention;
+      forkable =
+        erase Forkable.Const.equal implied_forkable m.areality m.forkable;
+      yielding =
+        erase Yielding.Const.equal implied_yielding m.areality m.yielding;
+      statefulness = Some m.statefulness;
+      visibility = Some m.visibility;
+      staticity = Some m.staticity
+    }
+
   module Axis = struct
     let is_areality (type a) :
         a With_locality.Axis.t ->

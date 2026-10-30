@@ -2806,7 +2806,7 @@ and transl_recmodule_modtypes env ~sig_modalities ~md_mode sdecls =
             let tmmode = Typemode.transl_mode_annots smmode in
             let mmode =
               tmmode.mode_modes
-              |> Typemode.apply_mode_implications
+              |> Mode.Const.apply_implications
               (* CR zqian: mode annotations on rec modules default to legacy for
               now. We can remove this workaround once [module type of] doesn't
               require zapping. *)
@@ -5548,8 +5548,16 @@ let report_error ~loc _env = function
          Names must be unique in a given structure or signature.@]"
         (Sig_component_kind.to_string kind) Style.inline_code name
   | Non_generalizable { vars; expression } ->
+<<<<<<< Merlin:ageorges/improve-mode-printing-implementation
       let manual_ref = [ 6; 1; 2 ] in
       Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
+||||||| Compiler:last-imported
+      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
+=======
+      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
+      Out_type.prepare_for_printing vars;
+>>>>>>> Compiler:HEAD
       Out_type.add_type_to_preparation expression;
       Location.errorf ~loc
         "@[The type of this expression,@ %a,@ \
@@ -5559,8 +5567,16 @@ let report_error ~loc _env = function
            (Style.as_inline_code Out_type.prepared_type_scheme)) vars
         Misc.print_see_manual manual_ref
   | Non_generalizable_module { vars; mty; item } ->
+<<<<<<< Merlin:ageorges/improve-mode-printing-implementation
       let manual_ref = [ 6; 1; 2 ] in
       Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
+||||||| Compiler:last-imported
+      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
+      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy vars;
+=======
+      let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2 ] in
+      Out_type.prepare_for_printing vars;
+>>>>>>> Compiler:HEAD
       Out_type.add_type_to_preparation item.val_type;
       Location.errorf ~loc
         "@[The type of this module,@ %a,@ \

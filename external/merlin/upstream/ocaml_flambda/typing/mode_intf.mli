@@ -1102,6 +1102,12 @@ module type S = sig
 
     val value_to_alloc_r2l : With_regionality.Const.t -> With_locality.Const.t
 
+    val apply_implications :
+      With_locality.Const.Option.t -> With_locality.Const.Option.t
+
+    val erase_implications :
+      With_locality.Const.t -> With_locality.Const.Option.t
+
     module Axis : sig
       val with_locality_as_regionality :
         With_locality.Axis.packed -> With_regionality.Axis.packed

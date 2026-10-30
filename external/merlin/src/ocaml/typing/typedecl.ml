@@ -4794,7 +4794,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modes = Typemode.transl_mode_annots modes in
         let mode =
           modes.mode_modes
-          |> Typemode.apply_mode_implications
+          |> Mode.Const.apply_implications
           |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Const.with_locality_as_regionality
@@ -5421,8 +5421,7 @@ let explain_unbound_gen ppf tv tl typ kwd pr =
     let ti = List.find (fun ti -> Ctype.deep_occur tv (typ ti)) tl in
     let ty0 = (* Hack to force aliasing when needed *)
       Btype.newgenty (Tobject(tv, ref None)) in
-    Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-      [typ ti; ty0];
+    Out_type.prepare_for_printing [typ ti; ty0];
     fprintf ppf
       ".@ @[<hov2>In %s@ %a@;<1 -2>the variable %a is unbound@]"
       kwd (Style.as_inline_code pr) ti
@@ -5658,8 +5657,7 @@ let variance_error ~loc ~v1 ~v2 =
          lacks the [env]. Therefore, we clear [Ident_names] manually.
          It'd be good to come up with a better solution. *)
       Out_type.Ident_names.reset ();
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-        [ variable ];
+      Out_type.prepare_for_printing [ variable ];
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
         (variance_variable_error ~v1 ~v2 variable error)
@@ -5754,7 +5752,7 @@ let report_error ~loc = function
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
       let base = Mode.With_locality.Const.legacy in
-      Out_type.prepare_for_printing ~base [used_as; defined_as];
+      Out_type.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Out_type.Ident_names.reset ();
       Location.errorf ~loc

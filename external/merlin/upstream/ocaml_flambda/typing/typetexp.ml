@@ -2027,7 +2027,7 @@ let report_error_doc loc env = function
   | Constructor_mismatch (ty, ty') ->
       wrap_printing_env ~error:true env (fun ()  ->
         let base = Mode.With_locality.Const.legacy in
-        Out_type.prepare_for_printing ~base [ty; ty'];
+        Out_type.prepare_for_printing [ty; ty'];
         Location.errorf ~loc
           "This variant type contains a constructor %a@ \
            which should be@ %a"
