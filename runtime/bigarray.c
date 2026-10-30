@@ -595,17 +595,11 @@ CAMLexport uintnat caml_ba_deserialize(void * dst)
   int num_dims = caml_deserialize_uint_4();
   if (num_dims < 0 || num_dims > CAML_BA_MAX_NUM_DIMS)
     caml_deserialize_error("input_value: wrong number of bigarray dimensions");
-<<<<<<< OxCaml
-  b->flags = (caml_deserialize_uint_4() & ~CAML_BA_STACK) | CAML_BA_MANAGED;
-||||||| Upstream OCaml
-  b->flags = caml_deserialize_uint_4() | CAML_BA_MANAGED;
-=======
   descriptor_size = SIZEOF_BA_ARRAY + num_dims * sizeof(intnat);
   if (descriptor_size > Bsize_custom_data(dst))
     caml_deserialize_error("input_value: bigarray buffer overflow");
   b->num_dims = num_dims;
-  b->flags = caml_deserialize_uint_4() | CAML_BA_MANAGED;
->>>>>>> ocaml/ocaml@3aa27e4d2522
+  b->flags = (caml_deserialize_uint_4() & ~CAML_BA_STACK) | CAML_BA_MANAGED;
   b->proxy = NULL;
   for (int i = 0; i < b->num_dims; i++) {
     intnat len = caml_deserialize_uint_2();

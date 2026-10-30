@@ -152,7 +152,8 @@ void caml_free_intern_state (void)
   }
 }
 
-CAMLnoret static void intern_cleanup_failwith(struct caml_intern_state* s, const char * msg);
+CAMLnoret static void intern_cleanup_failwith(struct caml_intern_state* s,
+                                              const char * msg);
 static char * intern_resolve_code_pointer(unsigned char digest[16],
                                           asize_t offset);
 
