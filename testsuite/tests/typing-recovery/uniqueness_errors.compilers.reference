@@ -1,0 +1,60 @@
+File "uniqueness_errors.ml", line 1:
+Error: Multiple errors were encountered
+File "uniqueness_errors.ml", line 16, characters 13-14:
+16 |   unique_use x
+                  ^
+  This value is used here, but it has already been used as unique at:
+File "uniqueness_errors.ml", line 15, characters 13-14:
+15 |   unique_use x;
+                  ^
+  
+File "uniqueness_errors.ml", line 20, characters 17-26:
+20 |   let _y0, _y1 = borrow_ y, borrow_ y in
+                      ^^^^^^^^^
+  The borrow_ operator must appear directly in a valid borrowing context:
+  - As an argument to a function application
+  - On the right-hand side of a let binding
+  - As the scrutinee of a pattern match
+File "uniqueness_errors.ml", line 20, characters 28-37:
+20 |   let _y0, _y1 = borrow_ y, borrow_ y in
+                                 ^^^^^^^^^
+  The borrow_ operator must appear directly in a valid borrowing context:
+  - As an argument to a function application
+  - On the right-hand side of a let binding
+  - As the scrutinee of a pattern match
+File "uniqueness_errors.ml", line 24, characters 51-62:
+24 | let borrow_used_uniquely (y @ unique) = unique_use (borrow_ y)
+                                                        ^^^^^^^^^^^
+  This value is aliased because it is borrowed,
+  but it is expected to be unique.
+File "uniqueness_errors.ml", line 29, characters 13-14:
+29 |   unique_use y
+                  ^
+  This value is used as unique here, but it is being borrowed.
+File "uniqueness_errors.ml", line 28, characters 11-20:
+28 |   let _x = borrow_ y in
+                ^^^^^^^^^
+  The value is being borrowed
+File "uniqueness_errors.ml", lines 28-29, characters 2-14:
+28 | ..let _x = borrow_ y in
+29 |   unique_use y
+  during this borrow context
+File "uniqueness_errors.ml", line 35, characters 12-26:
+35 |     let y = (x : @ unique)
+                 ^^^^^^^^^^^^^^
+This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+File "uniqueness_errors.ml", line 44, characters 34-35:
+44 |   | B s as v -> overwrite_ v with A s
+                                       ^
+  Overwrite may not change the tag to A.
+Hint: The old tag of this allocation is B.
+File "uniqueness_errors.ml", line 43, characters 34-35:
+43 |   | A s as v -> overwrite_ v with B s
+                                       ^
+  Overwrite may not change the tag to B.
+Hint: The old tag of this allocation is A.
+File "uniqueness_errors.ml", line 54, characters 17-19:
+54 | let t : string = 10
+                      ^^
+  The constant 10 has type int but an expression was expected of type string
