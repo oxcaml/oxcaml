@@ -110,6 +110,7 @@ type ('a, 'variety) elt =
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
   | Mode_mismatch :
       arrow_position * Mode.With_locality.error -> ('a, comparison) elt
+  | Weaken_sort : { pat: type_expr; subj: type_expr } -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
