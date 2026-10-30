@@ -239,7 +239,9 @@ class ConfigurationResult:
     execution: CommandResult | None
 
 def source_filename(configuration: Configuration, seed: int) -> str:
-    # Vary compilation-unit names without depending on scheduling or the case RNG.
+    # Some compiler bugs depend on the source filename or compilation-unit name.
+    # Vary names across configurations so output comparisons can expose them,
+    # without depending on scheduling or the case RNG.
     digest = hashlib.sha256(f"{seed}:{configuration.name}".encode()).hexdigest()
     return f"program_{digest[:16]}.ml"
 
