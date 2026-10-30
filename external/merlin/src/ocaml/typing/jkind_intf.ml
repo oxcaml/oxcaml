@@ -56,6 +56,12 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
+  type level_error = Rigid
+
+  type error =
+    | Incompatible
+    | Level of level_error
+
   module Const : sig
     (* Note [Addressable kinds]
        ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -261,7 +267,7 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  val equate : allow_mutation:bool -> t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> (unit, error) result
 
   val format : Format_doc.formatter -> t -> unit
 
@@ -338,7 +344,7 @@ module type Sort = sig
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
 
-  val update_level : int -> t -> unit
+  val update_level : int -> t -> (unit, level_error) result
 
   val get_level : t -> int
 

@@ -223,6 +223,22 @@ module Stdlib = struct
       in
       aux l 0 []
 
+    let rec fold_left_result f acc = function
+      | [] -> Ok acc
+      | x :: xs ->
+        match f acc x with
+        | Ok acc -> fold_left_result f acc xs
+        | Error e -> Error e
+
+    let rec fold_left2_result ~unequal_lengths f acc xs ys =
+      match xs, ys with
+      | [], [] -> Ok acc
+      | [], _ :: _ | _ :: _, [] -> Error unequal_lengths
+      | x :: xs, y :: ys ->
+        match f acc x y with
+        | Ok acc -> fold_left2_result ~unequal_lengths f acc xs ys
+        | Error e -> Error e
+
     let split_at n l =
       let rec aux n acc l =
         if n = 0

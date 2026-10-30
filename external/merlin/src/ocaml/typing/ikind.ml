@@ -1794,12 +1794,12 @@ let fast_sub_of_sort_super : type r.
     bool =
  fun super_sort mod_bounds sub ->
   match sub.jkind.base with
-  | Types.Layout (Jkind_types.Layout.Sort (sub_sort, _) as sub_layout) ->
-    if not (Jkind_types.Sort.equate ~allow_mutation:true sub_sort super_sort)
-    then false
-    else
+  | Types.Layout (Jkind_types.Layout.Sort (sub_sort, _) as sub_layout) -> (
+    match Jkind_types.Sort.equate ~allow_mutation:true sub_sort super_sort with
+    | Ok () ->
       fast_sub_of_layout_sub ~sub ~sub_layout
         ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+    | Error _ -> false)
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub : type r1 l2.
@@ -1893,7 +1893,7 @@ let sub_or_intersect ?origin
           ~outcome:"May_have_intersection" ();
         let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
           match axis_disagreement_reasons violating_axes with
-          | [] -> [Jkind.Sub_failure_reason.Layout_disagreement]
+          | [] -> [Jkind.Sub_failure_reason.Layout_disagreement Incompatible]
           | hd :: tl -> hd :: tl
         in
         Jkind.May_have_intersection reasons)
