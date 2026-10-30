@@ -306,7 +306,7 @@ let untransl_modality =
 
    Implied modalities can be overriden. *)
 (* CR zqian: remove [1] and [2] *)
-let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
+let[@warning "-18"] mutable_implied_modalities ~include_comonadic mut =
   let comonadic : Modality.atom list =
     [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
       Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
@@ -319,15 +319,29 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
       Atom (Monadic Visibility, Join_const Visibility.Const.legacy);
       Atom (Monadic Staticity, Join_const Staticity.Const.legacy) ]
   in
-  if mut
-  then if for_mutable_variable then monadic else monadic @ comonadic
-  else []
+  if mut then if include_comonadic then monadic @ comonadic else monadic else []
 
-let mutable_implied_modalities ~for_mutable_variable mut =
-  let l = mutable_implied_modalities ~for_mutable_variable mut in
+let modality_of_atoms l =
   List.fold_left
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
+
+(* The contents of an address get the same monadic modalities as a field of the
+   same mutability. We don't apply comonadic modalities to ensure ['a addr_imm]
+   can be converted to an ['a addr @ read] at all modes, like:
+   {[
+     val of_imm_local : 'a addr_imm @ local -> 'a addr @ local read
+   ]}
+   This does mean that the modal kind ['a addr] is slightly worse than that of
+   ['a ref] because the with-bound [with 'a] applies no comonadic modality. This
+   will no longer be the case when [mutable] doesn't imply [global] and [many].
+*)
+let address_modalities mut =
+  mutable_implied_modalities ~include_comonadic:false (Types.is_mutable mut)
+  |> modality_of_atoms
+
+let mutable_implied_modalities ~include_comonadic mut =
+  modality_of_atoms (mutable_implied_modalities ~include_comonadic mut)
 
 let idx_expected_modalities ~(mut : bool) =
   (* There are two design constraints on what modalities we allow in an index
@@ -342,7 +356,7 @@ let idx_expected_modalities ~(mut : bool) =
       (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
       Modality.Const.id l
   in
-  let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
+  let expected1 = mutable_implied_modalities mut ~include_comonadic:true in
   let expected2 =
     if mut
     then
@@ -369,8 +383,7 @@ let idx_expected_modalities ~(mut : bool) =
 
 let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
   let baseline =
-    mutable_implied_modalities ~for_mutable_variable:false
-      (Types.is_mutable mut)
+    mutable_implied_modalities ~include_comonadic:true (Types.is_mutable mut)
   in
   let annotated = Modality.Const.(diff baseline t) in
   let implied = List.concat_map implied_modalities annotated in
@@ -507,17 +520,17 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
   { moda_modalities = modalities; moda_desc = annots }
 
 let mutable_modalities mut =
-  mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
+  mutable_implied_modalities (Types.is_mutable mut) ~include_comonadic:true
 
 let transl_modalities ~maturity mut annots =
   let default = mutable_modalities mut in
   transl_modalities_with_default ~maturity ~default annots
 
 let let_mutable_modalities =
-  mutable_implied_modalities true ~for_mutable_variable:true
+  mutable_implied_modalities true ~include_comonadic:false
 
 let atomic_mutable_modalities =
-  mutable_implied_modalities true ~for_mutable_variable:false
+  mutable_implied_modalities true ~include_comonadic:true
 
 let sort_dedup_modalities modalities =
   (* CR-someday lstevenson: Improve this. It's not great that we're just passing

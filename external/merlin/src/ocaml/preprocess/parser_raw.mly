@@ -1089,6 +1089,8 @@ let merloc startpos ?endpos x =
    string that will not trigger a syntax error; see how [not_expecting]
    is used in the definition of [type_variance]. */
 
+%token ADDR [@symbol "addr_"]
+%token ADDR_IMM [@symbol "addr_imm_"]
 %token AMPERAMPER [@symbol "&&"]
 %token AMPERSAND [@symbol "&"]
 %token AND [@symbol "and"]
@@ -4006,6 +4008,8 @@ pattern_gen:
     | name_tag pattern %prec prec_constr_appl
         { Ppat_variant($1, Some $2) }
     ) { $1 }
+  | addr_pattern_keyword ext_attributes simple_pattern
+      { mkpat_attrs ~loc:$sloc (Ppat_addr ($1, $3)) $2}
   | LAZY ext_attributes simple_pattern
       { mkpat_attrs ~loc:$sloc (Ppat_lazy $3) $2}
 ;
@@ -5574,6 +5578,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+%inline addr_pattern_keyword:
+    ADDR                                        { Mutable }
+  | ADDR_IMM                                    { Immutable }
+;
 poly_flag:
     /* empty */                                 { false }
   | POLY                                        { true }
@@ -5651,6 +5659,8 @@ optlabel:
 single_attr_id:
     LIDENT { $1 }
   | UIDENT { $1 }
+  | ADDR { "addr_" }
+  | ADDR_IMM { "addr_imm_" }
   | AND { "and" }
   | AS { "as" }
   | ASSERT { "assert" }

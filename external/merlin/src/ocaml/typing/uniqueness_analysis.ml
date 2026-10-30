@@ -1649,6 +1649,10 @@ module Paths : sig
       where [gf] is the appropriate modality for mutability [mut]. *)
   val array_index : Types.mutability -> int -> t -> t
 
+  (** [address_load mut t] are the paths of the value loaded from an address
+      with paths [t] and mutability [mut]. *)
+  val address_load : Types.mutability -> t -> t
+
   (** [memory_address t] is [child Projection.Memory_address t]. *)
   val memory_address : t -> t
 
@@ -1683,14 +1687,17 @@ end = struct
 
   let child proj t = List.map (UF.Path.child proj) t
 
-  let modal_child modalities proj t =
+  let tracked_under modalities =
     (* CR zqian: Instead of just ignoring such children, we should add modality
        to [Projection.t] and add corresponding logic in [UsageTree]. *)
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Join_const Aliased, Meet_const Many -> untracked
-    | _ -> child proj t
+    | Join_const Aliased, Meet_const Many -> false
+    | _ -> true
+
+  let modal_child modalities proj t =
+    if tracked_under modalities then child proj t else untracked
 
   let tuple_field i t = child (Projection.Tuple_field i) t
 
@@ -1707,6 +1714,10 @@ end = struct
   let array_index mut i t =
     let modality = Typemode.mutable_modalities mut in
     modal_child modality (Projection.Array_index i) t
+
+  let address_load mut t =
+    let modality = Typemode.address_modalities mut in
+    if tracked_under modality then t else untracked
 
   let memory_address t = child Projection.Memory_address t
 
@@ -2080,6 +2091,7 @@ and pattern_match_barrier pat paths : UF.t =
     (* Lazy patterns consume their memory anyway since
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
+  | Tpat_addr _ -> borrow_memory_address ()
   | Tpat_tuple _ -> borrow_memory_address ()
   | Tpat_unboxed_unit ->
     (* unboxed units are not allocations *)
@@ -2163,6 +2175,9 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let uf_force = Paths.mark_aliased occ Lazy paths in
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
+    | Tpat_addr (mut, _, arg) ->
+      let paths = Paths.address_load mut paths in
+      pattern_match_single arg paths
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg, _) ->

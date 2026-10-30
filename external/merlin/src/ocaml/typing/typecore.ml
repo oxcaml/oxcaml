@@ -2320,7 +2320,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -2735,6 +2735,21 @@ let solve_Ppat_lazy loc env expected_ty =
   unify_pat_types_penv loc env (Predef.type_lazy_t nv)
     (generic_instance expected_ty);
   nv
+
+let solve_Ppat_addr loc env (mutability : mutable_flag) expected_ty =
+  let addr_type =
+    match mutability with
+    | Mutable -> Predef.type_addr
+    | Immutable -> Predef.type_addr_imm
+  in
+  let jkind, arg_sort =
+    Jkind.of_new_sort_var ~why:Address_contents
+      ~level:(Ctype.get_current_level ())
+  in
+  let ty_arg = newgenvar jkind in
+  unify_pat_types_penv loc env (addr_type ty_arg)
+    (generic_instance expected_ty);
+  ty_arg, arg_sort
 
 let solve_Ppat_constraint tps loc env mode sty expected_ty =
   let cty, ty, force =
@@ -3573,6 +3588,7 @@ let rec has_literal_pattern p =
   | Ppat_construct (_, Some (_, p))
   | Ppat_constraint (p, _, _)
   | Ppat_alias (p, _)
+  | Ppat_addr (_, p)
   | Ppat_lazy p
   | Ppat_open (_, p) ->
      has_literal_pattern p
@@ -4338,6 +4354,34 @@ and type_pat_aux
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+  | Ppat_addr (mut, sp1) ->
+      let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
+      let mutability =
+        match mut with
+        | Mutable -> Mutable {
+          mode = With_regionality.Comonadic.legacy;
+          atomic = Nonatomic
+        }
+        | Immutable -> Immutable
+      in
+      let modalities = Typemode.address_modalities mutability in
+      check_project_mutability ~loc ~env:!!penv Address_contents mutability
+        pat_mode.mode;
+      let is_contained_by : Mode.Hint.is_contained_by =
+        { containing = Address Modality; container = (loc, Pattern) }
+      in
+      let mode =
+        apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
+      in
+      let pat_mode = simple_pat_mode mode in
+      let p1 = type_pat ~pat_mode tps Value sp1 ty_arg arg_sort in
+      rvp {
+        pat_desc = Tpat_addr (mutability, arg_sort, p1);
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
       let type_modes = Typemode.transl_mode_with_locality ms in
@@ -4555,7 +4599,8 @@ let rec pat_tuple_arity spat =
   | Ppat_constant _ | Ppat_unboxed_unit | Ppat_unboxed_bool _
   | Ppat_interval _ | Ppat_construct _ | Ppat_variant _
   | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _ | Ppat_type _
-  | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _ | Ppat_effect _ ->
+  | Ppat_addr _ | Ppat_lazy _ | Ppat_unpack _ | Ppat_extension _
+  | Ppat_effect _ ->
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
       combine_pat_tuple_arity (pat_tuple_arity sp1) (pat_tuple_arity sp2)
@@ -4919,6 +4964,18 @@ let rec check_counter_example_pat
       (* do not explode under lazy: PR#7421 *)
       check_rec ~info:(no_explosion info) tp1 nv
         (fun p1 -> mkp k (Tpat_lazy p1))
+  | Tpat_addr (mutability, original_arg_sort, tp1) ->
+      let mut : mutable_flag =
+        match mutability with
+        | Mutable _ -> Mutable
+        | Immutable -> Immutable
+      in
+      let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
+      assert (
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort
+        |> Result.is_ok);
+      check_rec tp1 ty_arg
+        (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
@@ -6401,7 +6458,8 @@ let shallow_iter_ppat f p =
   | Ppat_construct (_, Some (_, p))
   | Ppat_exception p | Ppat_alias (p,_)
   | Ppat_open (_,p)
-  | Ppat_constraint (p,_,_) | Ppat_lazy p -> f p
+  | Ppat_constraint (p,_,_)
+  | Ppat_addr (_, p) | Ppat_lazy p -> f p
   | Ppat_record (args, _flag) | Ppat_record_unboxed_product (args, _flag) ->
     List.iter (fun (_,p) -> f p) args
 

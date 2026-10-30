@@ -1887,3 +1887,77 @@ Line 1, characters 21-34:
                          ^^^^^^^^^^^^^
 Error: Exclave expression should only be in tail position of the current region.
 |}]
+
+(*********************)
+(* Address patterns *)
+
+type addr_variant = K of u addr | L of u addr_imm
+[%%expect{|
+type addr_variant = K of u addr | L of u addr_imm
+|}]
+
+let f = function
+  | K addr_ (A foo) -> foo
+  | K addr_ (B _ | C _ | D) -> ()
+  | L _ -> ()
+[%%expect{|
+val f : addr_variant -> unit = <fun>
+|}]
+
+let f (addr_ x) = x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
+|}]
+
+let f (addr_ (addr_ x)) = x
+[%%expect{|
+val f : 'a addr addr -> 'a = <fun>
+|}]
+
+let f (addr_ x : int addr) = x
+[%%expect{|
+val f : int addr -> int = <fun>
+|}]
+
+let f (addr_ x : string addr @ local) = x
+[%%expect{|
+val f : string addr @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_ x = a in x
+[%%expect{|
+val f : 'a addr -> 'a = <fun>
+|}]
+
+let f = function
+  | L addr_imm_ (A foo) -> foo
+  | L addr_imm_ (B _ | C _ | D) -> ()
+  | K _ -> ()
+[%%expect{|
+val f : addr_variant -> unit = <fun>
+|}]
+
+let f (addr_imm_ x) = x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ (addr_imm_ x)) = x
+[%%expect{|
+val f : 'a addr_imm addr_imm -> 'a = <fun>
+|}]
+
+let f (addr_imm_ x : int addr_imm) = x
+[%%expect{|
+val f : int addr_imm -> int = <fun>
+|}]
+
+let f (addr_imm_ x : string addr_imm @ local) = x
+[%%expect{|
+val f : string addr_imm @ local -> string @ local = <fun>
+|}]
+
+let f a = let addr_imm_ x = a in x
+[%%expect{|
+val f : 'a addr_imm -> 'a = <fun>
+|}]
