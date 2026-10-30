@@ -5868,7 +5868,7 @@ let discontinue ~dbg ~cont ~exn ~returns =
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
 
-let discontinue_with_backtrace ~dbg ~cont ~exn ~returns ~bt =
+let discontinue_with_backtrace ~dbg ~cont ~exn ~bt ~returns =
   let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
   Cop
     ( Capply

@@ -441,7 +441,8 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     Misc.fatal_error
       "Simplify_terminator.evaluate_terminator: unexpected Never terminator"
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+  | Call_no_return _ | External_call_no_return _ | Call _ | Prim _ | Invalid _
+    ->
     None
 
 let block_known_values (cfg : Cfg.t) (block : C.basic_block)
@@ -536,7 +537,8 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+          | Tailcall_func _ | Call_no_return _ | External_call_no_return _
+          | Call _ | Prim _ | Invalid _ ->
             false)
     else false
   | Never ->
@@ -564,7 +566,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       simplify_switch block labels;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ | Invalid _ ->
+  | External_call_no_return _ | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =

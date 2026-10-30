@@ -441,8 +441,9 @@ type operation =
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
         returns : bool
-            (* Used for machtype-checking. [true] is the conservative
-               default. *)
+            (* [false] means the call never returns normally (it may still
+               raise); instruction selection relies on this. [true] is the
+               conservative default. *)
       }
   | Cextcall of
       { func : string;

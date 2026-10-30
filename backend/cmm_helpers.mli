@@ -1288,8 +1288,8 @@ val discontinue_with_backtrace :
   dbg:Debuginfo.t ->
   cont:expression ->
   exn:expression ->
-  returns:bool ->
   bt:expression ->
+  returns:bool ->
   expression
 
 val reperform :

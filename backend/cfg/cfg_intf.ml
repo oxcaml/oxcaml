@@ -144,8 +144,8 @@ module S = struct
     | Raise of Lambda.raise_kind
     | Tailcall_self of { destination : Label.t }
     | Tailcall_func of func_call_operation
-    | Call_no_return of external_call_operation
-    (* CR mshinwell: [Call_no_return] should have "external" in the name *)
+    | Call_no_return of func_call_operation
+    | External_call_no_return of external_call_operation
     | Invalid of
         { message : string;
           stack_ofs : int;

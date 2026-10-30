@@ -178,7 +178,9 @@ let linearize_terminator (func : string)
             (Ltailcall_imm { func = { sym_name = func; sym_global = Local } })
         ],
         Some destination )
-    | Call_no_return
+    | Call_no_return (Indirect _) -> single (L.Lcall_op Lcall_ind)
+    | Call_no_return (Direct func) -> single (L.Lcall_op (Lcall_imm { func }))
+    | External_call_no_return
         { func_symbol;
           alloc;
           ty_args;
@@ -417,7 +419,8 @@ let need_starting_label (block : Cfg.basic_block)
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
       | Call _ | Prim _ | Invalid _ ->
         false
-      | Return | Raise _ | Tailcall_func _ | Call_no_return _ ->
+      | Return | Raise _ | Tailcall_func _ | Call_no_return _
+      | External_call_no_return _ ->
         (* Unreachable for a consistent CFG: these terminators have no normal
            successors, and their exceptional successors are trap handlers,
            handled above. *)

@@ -33,9 +33,10 @@ open Ssa.Export
 open Ssa_reducer
 
 (** Detects [Call] terminators whose continuation does nothing but [Return] the
-    call's results, and whose enclosing block has an empty trap stack. Rewrites
-    them as a self-recursive [Continue (Goto entry)] back-edge (when the callee
-    is the current function by name) or a tail [Call] (continuation [Return]).
+    call's results or is [Unreachable] (the callee never returns), and whose
+    enclosing block has an empty trap stack. Rewrites them as a self-recursive
+    [Continue (Goto entry)] back-edge (when the callee is the current function
+    by name) or a tail [Call] (continuation [Return]).
 
     The per-call predicates (empty trap stack, [stack_offsets_zero], no stack
     check for self-calls) are equivalent to the checks in
@@ -83,41 +84,50 @@ module Tail_call_reducer : Reducer = struct
     let _, stack_ofs_res = Proc.loc_results_call ret_ty in
     stack_ofs_args = 0 && stack_ofs_res = 0
 
+  let tail_call_result_type : finished Ssa.continuation -> Cmm.machtype option =
+    function
+    | Goto cont when returns_args_unchanged cont ->
+      Some (Block.params_machtype cont)
+    | Unreachable -> Some Cmm.typ_void
+    | Goto _ | Return | Raise _ -> None
+
   let visit_terminator ctx (block : finished Block.t) =
     match Block.terminator block with
     | Call
         ({ op = (Direct _ | Indirect _) as call_op;
            args;
-           continuation = Goto cont;
+           continuation;
            may_raise = _;
            nontail = false
          } as operation)
-      when List.is_empty (Block.block_end_trap_stack block)
-           && returns_args_unchanged cont -> (
-      let dbg = Block.terminator_dbg block in
-      match call_op with
-      | Direct func
-        when String.equal func.sym_name
-               (Ssa.function_info (in_graph ctx)).sym_name ->
-        (* A self-recursive tail call is a back-edge to the entry block. Build
-           it over input values/blocks and let [map_terminator] translate it. *)
-        Reduce
-          (fun _c ->
-            ( dbg,
-              Context.map_terminator ctx
-                (Continue
-                   { continuation = Goto (Ssa.entry (in_graph ctx));
-                     args = Array.map (fun arg -> Terminator.Arg arg) args
-                   }) ))
-      | (Direct _ | Indirect _)
-        when stack_offsets_zero call_op args (Block.params_machtype cont) ->
-        Reduce
-          (fun _c ->
-            ( dbg,
-              Context.map_terminator ctx
-                (Call { operation with continuation = Return }) ))
-      | Direct _ | Indirect _ -> Unchanged
-      | External _ | Probe _ -> Misc.fatal_error "excluded by match above")
+      when List.is_empty (Block.block_end_trap_stack block) -> (
+      match tail_call_result_type continuation with
+      | None -> Unchanged
+      | Some ret_ty -> (
+        let dbg = Block.terminator_dbg block in
+        match call_op with
+        | Direct func
+          when String.equal func.sym_name
+                 (Ssa.function_info (in_graph ctx)).sym_name ->
+          (* A self-recursive tail call is a back-edge to the entry block. Build
+             it over input values/blocks and let [map_terminator] translate
+             it. *)
+          Reduce
+            (fun _c ->
+              ( dbg,
+                Context.map_terminator ctx
+                  (Continue
+                     { continuation = Goto (Ssa.entry (in_graph ctx));
+                       args = Array.map (fun arg -> Terminator.Arg arg) args
+                     }) ))
+        | (Direct _ | Indirect _) when stack_offsets_zero call_op args ret_ty ->
+          Reduce
+            (fun _c ->
+              ( dbg,
+                Context.map_terminator ctx
+                  (Call { operation with continuation = Return }) ))
+        | Direct _ | Indirect _ -> Unchanged
+        | External _ | Probe _ -> Misc.fatal_error "excluded by match above"))
     | Call
         { op = External _ | Probe _ | Direct _ | Indirect _;
           continuation = Return | Raise _ | Unreachable | Goto _;
