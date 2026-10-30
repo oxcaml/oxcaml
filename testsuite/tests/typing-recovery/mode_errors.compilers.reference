@@ -1,0 +1,8 @@
+File "mode_errors.ml", line 13, characters 4-5:
+13 | let x = stack_ (1, 2)
+         ^
+Error: The expression is local because it is stack_-allocated.
+       However, the expression highlighted is expected to be global
+         because it is the value x in the structure at file "mode_errors.ml", lines 13-30, characters 0-19
+         which is expected to be global
+         because modules always need to be allocated on the heap.
