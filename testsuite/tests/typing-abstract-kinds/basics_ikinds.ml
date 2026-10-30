@@ -2010,9 +2010,27 @@ let x_letmodule =
   end in
   M.r
 [%%expect{|
->> Fatal error: Ctype.lower_nongen: kind escape
-Uncaught exception: Misc.Fatal_error
-
+Lines 2-6, characters 2-5:
+2 | ..let module M = struct
+3 |     kind_ k
+4 |     let r = ref (None : (_ : k) id option)
+5 |   end in
+6 |   M.r
+Error: The type of this module,
+       sig kind_ k val r : '_weak6 id option ref end,
+       contains a non-generalized variable "'_weak6" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+Lines 2-6, characters 2-5:
+2 | ..let module M = struct
+3 |     kind_ k
+4 |     let r = ref (None : (_ : k) id option)
+5 |   end in
+6 |   M.r
+Error: The type of this module,
+       sig kind_ k val r : '_weak4 id option ref end,
+       contains a non-generalized variable "'_weak4" of kind "k".
+       The kind constructor "k" would escape its scope.
 |}]
 
 (* [k] has a manifest, so the variable can be given its expansion, and [r] and
@@ -2025,9 +2043,33 @@ end
 let () = M_manifest_local.r := (None : int id option)
 let (_ : bool id option) = M_manifest_local.get ()
 [%%expect{|
->> Fatal error: Ctype.lower_nongen: kind escape
-Uncaught exception: Misc.Fatal_error
-
+Lines 1-5, characters 0-3:
+1 | module M_manifest_local = struct
+2 |   kind_ k = value
+3 |   let r = ref (None : (_ : k) id option)
+4 |   let get () = !r
+5 | end
+Error: The type of this module,
+       sig
+         kind_ k = value
+         val r : '_weak7 id option ref
+         val get : unit -> '_weak7 id option
+       end, contains a non-generalized variable "'_weak7" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+Lines 1-5, characters 0-3:
+1 | module M_manifest_local = struct
+2 |   kind_ k = value
+3 |   let r = ref (None : (_ : k) id option)
+4 |   let get () = !r
+5 | end
+Error: The type of this module,
+       sig
+         kind_ k = value
+         val r : '_weak5 id option ref
+         val get : unit -> '_weak5 id option
+       end, contains a non-generalized variable "'_weak5" of kind "k".
+       The kind constructor "k" would escape its scope.
 |}]
 
 module M_abstract_local = struct
@@ -2037,9 +2079,27 @@ module M_abstract_local = struct
 end
 let () = M_abstract_local.r := (None : M_abstract_local.t id option)
 [%%expect{|
->> Fatal error: Ctype.lower_nongen: kind escape
-Uncaught exception: Misc.Fatal_error
-
+Lines 1-5, characters 0-3:
+1 | module M_abstract_local = struct
+2 |   kind_ k
+3 |   type t : k
+4 |   let r = ref (None : (_ : k) id option)
+5 | end
+Error: The type of this module,
+       sig kind_ k type t : k val r : '_weak8 id option ref end,
+       contains a non-generalized variable "'_weak8" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+Lines 1-5, characters 0-3:
+1 | module M_abstract_local = struct
+2 |   kind_ k
+3 |   type t : k
+4 |   let r = ref (None : (_ : k) id option)
+5 | end
+Error: The type of this module,
+       sig kind_ k type t : k val r : '_weak6 id option ref end,
+       contains a non-generalized variable "'_weak6" of kind "k".
+       The kind constructor "k" would escape its scope.
 |}]
 
 module G_local (X : sig kind_ ka end) = struct
@@ -2057,9 +2117,33 @@ end
 let () = M_include_functor.c := (None : int id option)
 let (_ : bool id option) = M_include_functor.get ()
 [%%expect{|
->> Fatal error: Ctype.lower_nongen: kind escape
-Uncaught exception: Misc.Fatal_error
-
+Lines 1-4, characters 0-3:
+1 | module G_local (X : sig kind_ ka end) = struct
+2 |   let c = ref (None : (_ : X.ka) id option)
+3 |   let get () = !c
+4 | end
+Error: The type of this module,
+       functor (X : sig kind_ ka end) ->
+         sig
+           val c : '_weak9 id option ref
+           val get : unit -> '_weak9 id option
+         end,
+       contains a non-generalized variable "'_weak9" of kind "X.ka".
+       The kind constructor "X.ka" would escape its scope.
+|}, Principal{|
+Lines 1-4, characters 0-3:
+1 | module G_local (X : sig kind_ ka end) = struct
+2 |   let c = ref (None : (_ : X.ka) id option)
+3 |   let get () = !c
+4 | end
+Error: The type of this module,
+       functor (X : sig kind_ ka end) ->
+         sig
+           val c : '_weak7 id option ref
+           val get : unit -> '_weak7 id option
+         end,
+       contains a non-generalized variable "'_weak7" of kind "X.ka".
+       The kind constructor "X.ka" would escape its scope.
 |}]
 
 module type Empty = sig end
@@ -2070,9 +2154,26 @@ let p_package =
   end : Empty)
 [%%expect{|
 module type Empty = sig end
->> Fatal error: Ctype.lower_nongen: kind escape
-Uncaught exception: Misc.Fatal_error
-
+Lines 3-6, characters 10-5:
+3 | ..........struct
+4 |     kind_ k
+5 |     let r = ref (None : (_ : k) id option)
+6 |   end.........
+Error: The type of this module,
+       sig kind_ k val r : '_weak10 id option ref end,
+       contains a non-generalized variable "'_weak10" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+module type Empty = sig end
+Lines 3-6, characters 10-5:
+3 | ..........struct
+4 |     kind_ k
+5 |     let r = ref (None : (_ : k) id option)
+6 |   end.........
+Error: The type of this module,
+       sig kind_ k val r : '_weak8 id option ref end,
+       contains a non-generalized variable "'_weak8" of kind "k".
+       The kind constructor "k" would escape its scope.
 |}]
 
 (*********************************************************************)
@@ -2093,12 +2194,12 @@ let (_ : bool id option) = A_anon.get ()
 [%%expect{|
 module K_anon : sig kind_ ka = value end
 module A_anon :
-  sig val c : '_weak6 id option ref val get : unit -> '_weak7 id option end
+  sig val c : '_weak11 id option ref val get : unit -> '_weak12 id option end
 - : bool id option = None
 |}, Principal{|
 module K_anon : sig kind_ ka = value end
 module A_anon :
-  sig val c : '_weak4 id option ref val get : unit -> '_weak5 id option end
+  sig val c : '_weak9 id option ref val get : unit -> '_weak10 id option end
 - : bool id option = None
 |}]
 
