@@ -459,7 +459,9 @@ let mode f { txt; _ } =
   | Pmode_bounded { pmode_upper = []; pmode_lower } ->
       pp f "[> %a]" (mode_bound " | ") pmode_lower
   | Pmode_bounded { pmode_upper; pmode_lower } ->
-      pp f "[< %a > %a]" (mode_bound " & ") pmode_upper (mode_bound " | ") pmode_lower
+      pp f "[< %a > %a]"
+        (mode_bound " & ") pmode_upper
+        (mode_bound " | ") pmode_lower
 
 let modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
