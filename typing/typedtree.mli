@@ -273,14 +273,13 @@ and 'k pattern_desc =
       mode: Mode.With_regionality.l;
       (** the mode of the layout function body *)
       lpoly: Types.Lpoly.t;
-      (** The sort variables abstracted over by this compile-time function, and
-      the allocation mode of the captured environment. [pending] during
-      type-checking; guaranteed [determined] of a non-empty list of generic sort
-      variables after [type_let] returns. *)
+      (** The sort variables abstracted over by this compile-time function.
+      [pending] during type-checking; guaranteed [determined] of a non-empty
+      list of generic sort variables after [type_let] returns. *)
     } -> value pattern_desc
         (** [let poly_ f = exp] creates a compile-time function [f] abstracted
-        over the layouts in [lpoly], and returns [exp] at [ret_sort] and
-        [ret_mode]. Note that [exp] is not necessarily a function. *)
+        over the layouts in [lpoly], and returns [exp] at [sort] and [mode].
+        Note that [exp] is necessarily a function. *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
