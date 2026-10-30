@@ -153,6 +153,18 @@ jobs:
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@8251c103ac8c1d761882c86aba1412c7f583c844 # v1.0.213
+        env:
+          # The session is non-interactive: it ends as soon as Claude ends its
+          # turn. If Claude starts a build or test with Bash run_in_background
+          # and then ends its turn to wait for it, the session finishes there,
+          # reports success with its checklist half done, and job cleanup kills
+          # the still-running build. Disabling background tasks removes
+          # run_in_background, so long commands run in the foreground instead.
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
+          # Foreground Bash commands are capped at 10 minutes by default, which
+          # a compiler build or test run can exceed. Raise the cap to 80
+          # minutes, leaving headroom under the job's timeout-minutes.
+          BASH_MAX_TIMEOUT_MS: "4800000"
         with:
           # Workload Identity Federation identifiers, not credentials (see the
           # WIF section in .github/claude-code-security.md).
@@ -225,6 +237,13 @@ jobs:
             otherwise. Do not claim you cannot build or test because of environment
             limits or missing permissions; if a build or test actually fails,
             report the real error output.
+
+            RUN COMMANDS IN THE FOREGROUND. Your session ends as soon as you
+            stop calling tools, and nothing will wake you up again: there are no
+            background task notifications here. Run builds and tests as ordinary
+            foreground Bash commands, passing a timeout long enough for them to
+            finish (a compiler build and a test directory can each take many
+            minutes), and wait for their output before you continue.
 
             NO PUSH. The GitHub token in this job is read-only. The task prompt
             tells you to commit and push your changes to the PR branch: ignore
