@@ -432,6 +432,47 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Record_variable _ | Record_dummy _ ->
           Misc.fatal_error "variable or dummy record representation"
 
+    type accessed_field =
+      | Field of t
+      | Void_field
+      | Abstract_field
+
+    (* The field at position [pos] of [obj], whose representation is [rep] *)
+    let access_field rep obj pos =
+      match rep with
+      | Outval_record_unboxed -> Field obj
+      | Outval_record_immediate ->
+          (* an immediate constructor's fields are all void. (This is
+             unreachable due to eager sort checks elsewhere in the file, and
+             should be fixed once we print concrete unboxed values) *)
+          Void_field
+      | Outval_record_boxed ->
+          Field
+            (if O.tag obj = O.double_array_tag then
+               O.repr (O.double_field obj pos)
+             else
+               O.field obj pos)
+      | Outval_record_mixed shape ->
+          begin match
+            Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
+          with
+          | Void -> Void_field
+          | Unboxed_product | Singleton _
+            when not (Clflags.target_is_native ()) ->
+              (* Only native code reorders a mixed block's fields; bytecode
+                 lays them out uniformly. *)
+              Field (O.field obj pos)
+          | Unboxed_product -> Abstract_field
+          | Singleton { element; offset_in_words } ->
+              match element with
+              | Value _ -> Field (O.field obj offset_in_words)
+              | Float_boxed () | Float64 ->
+                  Field (O.repr (O.double_field obj offset_in_words))
+              | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+              | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+                  Abstract_field
+          end
+
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
       if not @@ Types.Lpoly.is_empty_exn lpoly then Oval_stuff "<lpoly>"
       else
@@ -606,21 +647,28 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         else match check_depth depth obj ty with
           | Some x -> x
           | None ->
-              let rec tree_of_conses tree_list depth obj ty_arg =
+              let rec tree_of_conses tree_list rep depth obj list_ty =
                 if !printer_steps < 0 || depth < 0 then
                   Oval_ellipsis :: tree_list
                 else if is_real_block obj then
-                  let tree = nest tree_of_val (depth - 1)
-                                (O.field obj 0) ty_arg
+                  let tree = tree_of_field rep obj 0 depth ty_arg in
+                  let next_obj =
+                    match access_field rep obj 1 with
+                    | Field next_obj -> next_obj
+                    | Void_field | Abstract_field ->
+                        fatal_error "Printval.tree_of_list: non-value tail"
                   in
-                  let next_obj = O.field obj 1 in
                   nest_gen (Oval_stuff "<cycle>" :: tree :: tree_list)
-                    (tree_of_conses (tree :: tree_list))
-                    depth next_obj ty_arg
+                    (tree_of_conses (tree :: tree_list) rep)
+                    depth next_obj list_ty
                 else tree_list
               in
-              Oval_list
-                  (List.rev (tree_of_conses [] depth obj ty_arg))
+              let list_ty = Predef.type_list ty_arg in
+              let field_types () = [ty_arg; list_ty] in
+              match outval_rep_of_field_types env field_types with
+              | None -> Oval_stuff "<abstr>"
+              | Some rep ->
+                  Oval_list (List.rev (tree_of_conses [] rep depth obj list_ty))
 
       and tree_of_generic_array am depth obj ty_arg =
         let obj_block = Obj.Uniform_or_mixed.of_block (O.obj obj) in
@@ -854,40 +902,19 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         Oval_record (tree_of_fields (pos = 0) pos lbl_list)
 
       and tree_of_field rep obj pos depth ty_arg =
-        let nested fld = nest tree_of_val (depth - 1) fld ty_arg in
         match rep with
         | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
-        | Outval_record_immediate ->
-            (* an immediate constructor's fields are all void. (This is
-               unreachable due to eager sort checks elsewhere in the file, and
-               should be fixed once we print concrete unboxed values) *)
-            Oval_stuff "<void>"
-        | Outval_record_boxed ->
-            nested
-              (if O.tag obj = O.double_array_tag then
-                 O.repr (O.double_field obj pos)
-               else
-                 O.field obj pos)
-        | Outval_record_mixed shape ->
-            begin match
-              Mixed_block_shape.Field_for_printing.of_shape shape ~index:pos
-            with
-            | Void -> Oval_stuff "<void>"
-            | Unboxed_product | Singleton _
-              when not (Clflags.target_is_native ()) ->
-                (* Only native code reorders a mixed block's fields; bytecode
-                   lays them out uniformly. *)
-                nested (O.field obj pos)
-            | Unboxed_product -> Oval_stuff "<abstr>"
-            | Singleton { element; offset_in_words } ->
-                match element with
-                | Value _ -> nested (O.field obj offset_in_words)
-                | Float_boxed () | Float64 ->
-                    nested (O.repr (O.double_field obj offset_in_words))
-                | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-                | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-                    Oval_stuff "<abstr>"
-            end
+        | _ ->
+            (* Count against the limits, as [tree_of_val] would *)
+            let opaque msg =
+              decr printer_steps;
+              if !printer_steps < 0 || depth - 1 < 0 then Oval_ellipsis
+              else Oval_stuff msg
+            in
+            match access_field rep obj pos with
+            | Field fld -> nest tree_of_val (depth - 1) fld ty_arg
+            | Void_field -> opaque "<void>"
+            | Abstract_field -> opaque "<abstr>"
 
       (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params

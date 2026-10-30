@@ -679,12 +679,55 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   in
   let i = Scalar.integral in
   let f = Scalar.floating in
+  let int_layout = Pvalue { raw_kind = Pintval; nullable = Non_nullable } in
   let get_arg_layouts () =
     List.map
       (fun (_, repr) -> Lambda.layout_of_extern_repr repr)
       lambda_prim.prim_native_repr_args
   in
-  let int_layout = Pvalue { raw_kind = Pintval; nullable = Non_nullable } in
+  let get_res_layout () =
+    let _, repr = lambda_prim.prim_native_repr_res in
+    Lambda.layout_of_extern_repr repr
+  in
+  let mixed_block_shape_of_layouts layouts =
+    if List.for_all (function Pvalue _ -> true | _ -> false) layouts
+    then None
+    else Some (List.map mixed_block_element_of_layout layouts |> Array.of_list)
+  in
+  let get_shape_of_all_args () =
+    match get_arg_layouts () |> mixed_block_shape_of_layouts with
+    | None -> All_value
+    | Some shape -> Shape shape
+  in
+  let field0_singleton sem =
+    let mixed_block_shape =
+      (* Since this primitive only works for a block with one field, we can get
+         the whole block shape from the layout of the result. *)
+      [ get_res_layout () ] |> mixed_block_shape_of_layouts
+    in
+    let prim =
+      match mixed_block_shape with
+      | None -> Pfield (0, Pointer, sem)
+      | Some shape -> Pmixedfield ([0], shape, sem)
+    in
+    Primitive (prim, 1)
+  in
+  let setfield0_singleton () =
+    let mixed_block_shape =
+      (* Since this primitive only works for a block with one field, we can get
+         the whole block shape from the layout of the second argument (the new
+         value for the field). *)
+      let second_arg_layout = List.nth (get_arg_layouts ()) 1 in
+      [ second_arg_layout ] |> mixed_block_shape_of_layouts
+    in
+    let prim =
+      let mode = get_first_arg_mode () in
+      match mixed_block_shape with
+      | None -> Psetfield (0, Pointer, Assignment mode)
+      | Some shape -> Psetmixedfield ([0], shape, Assignment mode)
+    in
+    Primitive (prim, 2)
+  in
   let prim = match p.prim_name with
     | "%identity" -> Identity
     | "%bytes_to_string" -> Primitive (Pbytes_to_string, 1)
@@ -700,18 +743,21 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%loc_FUNCTION" -> Loc Loc_FUNCTION
     | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
     | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
+    | "%field0_singleton" -> field0_singleton Reads_vary
     | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
     | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
+    | "%field0_singleton_immut" -> field0_singleton Reads_agree
     | "%setfield0" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
+    | "%setfield0_singleton" -> setfield0_singleton ()
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Immutable, get_shape_of_all_args (), mode)), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Mutable, get_shape_of_all_args (), mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1847,6 +1893,19 @@ let specialize_primitive env loc ty ~has_constant_constructor ~poly_sort
         | None -> Pointer
         | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
       Some (Primitive (Pfield (n, is_int, mut), arity))
+  | Primitive (Psetmixedfield ([0], [| elt |], init), arity), [_; p2] ->
+      (* CR-someday lmaurer: What's really important here is to find out whether
+         we can skip the [caml_modify], and for that we could just see whether
+         each value leaf [Ctype.is_always_gc_ignorable]. *)
+      let elt = refine_mixed_block_element env (to_location loc) p2 elt in
+      Some (Primitive (Psetmixedfield ([0], [| elt |], init), arity))
+  | Primitive (Pmixedfield ([0], [| elt |], sem), arity), _ -> begin
+      match is_function_type env ty with
+      | None -> None
+      | Some (_p1, rhs) ->
+        let elt = refine_mixed_block_element env (to_location loc) rhs elt in
+        Some (Primitive (Pmixedfield ([0], [| elt |], sem), arity))
+    end
   | Primitive (Parraylength t, arity), [p] -> begin
       let loc = to_location loc in
       let array_type =

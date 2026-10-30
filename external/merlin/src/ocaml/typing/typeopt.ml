@@ -778,9 +778,11 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
 
-and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : unit Lambda.mixed_block_element) ty
-  : int * unit Lambda.mixed_block_element =
+and value_kind_mixed_block_field
+  : 'a. Env.t -> loc:Location.t -> visited:Numbers.Int.Set.t -> depth:int
+    -> num_nodes_visited:int -> 'a Lambda.mixed_block_element
+    -> type_expr option -> int * 'a Lambda.mixed_block_element =
+  fun env ~loc ~visited ~depth ~num_nodes_visited field ty ->
   match field with
   | Value original_kind ->
     begin match ty with
@@ -854,7 +856,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | ( Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | ( Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
     | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
     | Splice_variable _ ) as field ->
     num_nodes_visited, field
