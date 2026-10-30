@@ -1,0 +1,4 @@
+File "jkind_errors.ml", line 13, characters 28-33:
+13 | type t1 : value non_pointer bogus
+                                 ^^^^^
+Error: Unknown kind modifier bogus
