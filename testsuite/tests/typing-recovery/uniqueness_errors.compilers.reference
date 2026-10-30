@@ -1,0 +1,8 @@
+File "uniqueness_errors.ml", line 16, characters 13-14:
+16 |   unique_use x
+                  ^
+Error: This value is used here, but it has already been used as unique at:
+File "uniqueness_errors.ml", line 15, characters 13-14:
+15 |   unique_use x;
+                  ^
+  
