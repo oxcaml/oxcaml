@@ -104,6 +104,8 @@ val ids_for_export_continuation_map : ('a -> t) -> 'a Continuation.Map.t -> t
 val ids_for_export_code_id_or_name_map :
   ('a -> t) -> 'a Code_id_or_name.Map.t -> t
 
+val ids_for_export_field_map : ('a -> t) -> 'a Field.Map.t -> t
+
 (** Tables of int_ids. *)
 module Table_data : sig
   type ids := t
