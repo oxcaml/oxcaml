@@ -177,6 +177,8 @@ val make_package : bool ref
 val for_package : string option ref
 val error_size : int ref
 val float_const_prop : bool ref
+(* Implicit multiply-add/subtract contraction, currently used on arm64. *)
+val fp_contract : bool ref
 val no_alias_deps : bool ref
 val unique_ids : bool ref
 val canonical_ids : bool ref

@@ -2596,6 +2596,21 @@ module Extra_params = struct
       true
     in
     match name with
+    | "ffp-contract" -> (
+        match v with
+        | "on" ->
+            Clflags.fp_contract := true;
+            true
+        | "off" ->
+            Clflags.fp_contract := false;
+            true
+        | _ ->
+            raise
+              (Arg.Bad
+                 (Printf.sprintf
+                    "invalid OCAMLPARAM ffp-contract value %S (expected on or \
+                     off)"
+                    v)))
     | "use-ssa" -> set' Oxcaml_flags.use_ssa
     | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
     | "ssa-validate" -> set' Oxcaml_flags.ssa_validate

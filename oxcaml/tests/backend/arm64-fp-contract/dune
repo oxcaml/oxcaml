@@ -1,0 +1,7 @@
+; ACTUAL COMPILER: arm64 contraction policy regression.
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main") (= %{architecture} "arm64")))
+ (deps check.sh numeric.ml)
+ (action (run sh check.sh %{bin:ocamlopt.opt} numeric.ml)))

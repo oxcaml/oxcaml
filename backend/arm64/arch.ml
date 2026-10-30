@@ -43,6 +43,15 @@ let command_line_options = [
   "-fcssc",
     Arg.Set feat_cssc,
     " Enable the Common Short Sequence Compression (CSSC) instructions."
+  ;
+
+  "-ffp-contract",
+    Arg.Symbol (["on"; "off"],
+      (function "on" -> Clflags.fp_contract := true
+              | "off" -> Clflags.fp_contract := false
+              | _ -> assert false)),
+    " Control implicit binary64 multiply-add/subtract contraction \
+     in native arm64 code (default on)."
 ]
 
 (* Addressing modes *)

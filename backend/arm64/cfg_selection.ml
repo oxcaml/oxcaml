@@ -207,13 +207,13 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     | [Cop (Cmulf Float64, args, _)] -> Rewritten (specific Inegmulf, args)
     | _ -> Use_default)
   (* Recognize floating-point multiply and add/sub *)
-  | Caddf Float64 -> (
+  | Caddf Float64 when !Clflags.fp_contract -> (
     match[@ocaml.warning "-fragile-match"] args with
     | [arg; Cop (Cmulf Float64, args, _)] | [Cop (Cmulf Float64, args, _); arg]
       ->
       Rewritten (specific Imuladdf, arg :: args)
     | _ -> Use_default)
-  | Csubf Float64 -> (
+  | Csubf Float64 when !Clflags.fp_contract -> (
     match[@ocaml.warning "-fragile-match"] args with
     | [arg; Cop (Cmulf Float64, args, _)] ->
       Rewritten (specific Imulsubf, arg :: args)
@@ -237,6 +237,8 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Cnegf Float32
   | Caddf Float32
   | Csubf Float32
+  | Caddf Float64
+  | Csubf Float64
   | Cextcall
       { func = _;
         ty = _;
