@@ -753,6 +753,24 @@ and jkind_declaration i ppf
   line i ppf "pjkind_manifest =\n";
   option (i+1) jkind_annotation ppf pjkind_manifest
 
+and law_declaration i ppf
+      { plaw_name; plaw_params; plaw_assumptions; plaw_conclusion;
+        plaw_attributes; plaw_loc } =
+  line i ppf "law_declaration %a %a\n" fmt_string_loc plaw_name
+       fmt_location plaw_loc;
+  attributes i ppf plaw_attributes;
+  let i = i+1 in
+  line i ppf "plaw_params =\n";
+  list (i+1) string_loc_x_core_type_option ppf plaw_params;
+  line i ppf "plaw_assumptions =\n";
+  list (i+1) expression ppf plaw_assumptions;
+  line i ppf "plaw_conclusion =\n";
+  expression (i+1) ppf plaw_conclusion
+
+and string_loc_x_core_type_option i ppf (s, ty) =
+  string_loc i ppf s;
+  option (i+1) core_type ppf ty
+
 and class_type i ppf x =
   line i ppf "class_type %a\n" fmt_location x.pcty_loc;
   attributes i ppf x.pcty_attributes;
@@ -1025,6 +1043,9 @@ and signature_item i ppf x =
   | Psig_jkind d ->
       line i ppf "Psig_kind\n";
       jkind_declaration i ppf d
+  | Psig_law d ->
+      line i ppf "Psig_law\n";
+      law_declaration i ppf d
 
 and modtype_declaration i ppf = function
   | None -> line i ppf "#abstract"
@@ -1169,6 +1190,9 @@ and structure_item i ppf x =
   | Pstr_jkind d ->
       line i ppf "Pstr_kind\n";
       jkind_declaration i ppf d
+  | Pstr_law d ->
+      line i ppf "Pstr_law\n";
+      law_declaration i ppf d
 
 and module_declaration i ppf pmd =
   str_opt_loc i ppf pmd.pmd_name;
