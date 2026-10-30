@@ -109,6 +109,23 @@ type r = { mutable f : float#; g : string; }
 val in_element : r -> 'a -> float# addr = <fun>
 |}]
 
+(* ...including below [@@unboxed] records *)
+type u = { u : string } [@@unboxed]
+let in_unboxed_element x y = match x, y with ({ u = deref_ a }, _) -> a
+[%%expect{|
+0
+type u = { u : string; } [@@unboxed]
+(let
+  (in_unboxed_element =
+     (function {nlocal = 0} x y? : #(?, int64)
+       (let (*match* = (makeblock 0 (*,?) x y))
+         (make_unboxed_product #(?, int64) *match*
+           (idx_mixed_field  (?,?) 0 )))))
+  (apply (field_imm 1 (global Toploop!)) "in_unboxed_element"
+    in_unboxed_element))
+val in_unboxed_element : u -> 'a -> string addr_imm = <fun>
+|}]
+
 (* Tupled functions are not flattened *)
 let tupled (deref_ a, _) = a
 [%%expect{|
