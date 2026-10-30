@@ -1,4 +1,39 @@
+File "jkind_errors.ml", line 1:
+Error: Multiple errors were encountered
 File "jkind_errors.ml", line 13, characters 28-33:
 13 | type t1 : value non_pointer bogus
                                  ^^^^^
-Error: Unknown kind modifier bogus
+  Unknown kind modifier bogus
+File "jkind_errors.ml", line 16, characters 12-15:
+16 | type t2 : k box
+                 ^^^
+  The kind constructor box cannot yet be applied to the abstract kind k.
+File "jkind_errors.ml", line 19, characters 10-19:
+19 | type t3 : k & value
+               ^^^^^^^^^
+  Abstract kinds are not yet supported in products.
+File "jkind_errors.ml", line 22, characters 31-34:
+22 | type ('a : immutable_data with int) t4
+                                    ^^^
+  'with' syntax is not allowed on a right kind.
+File "jkind_errors.ml", line 23, characters 42-44:
+23 | let f4 (x : ('a : value mod portable with 'b)) (y : 'b) = ()
+                                               ^^
+  'with' syntax is not allowed on a right kind.
+File "jkind_errors.ml", line 26, characters 0-35:
+26 | type t5 : value = int [@@immediate]
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  A type declaration's layout can be given at most once.
+  This declaration has an layout annotation (value) and a layout attribute ([@@immediate]).
+File "jkind_errors.ml", line 30, characters 10-22:
+30 | type t6 : kind_of_ int
+               ^^^^^^^^^^^^
+  Unimplemented kind syntax
+File "jkind_errors.ml", line 31, characters 10-11:
+31 | type t7 : _
+               ^
+  Unimplemented kind syntax
+File "jkind_errors.ml", line 42, characters 17-19:
+42 | let t : string = 10
+                      ^^
+  The constant 10 has type int but an expression was expected of type string

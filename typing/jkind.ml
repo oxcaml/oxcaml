@@ -690,7 +690,7 @@ end
 (******************************)
 (*** user errors ***)
 
-module Error = struct
+module Error : sig
   type t =
     | Insufficient_level :
         { jkind : Parsetree.jkind_annotation;
@@ -707,10 +707,71 @@ module Error = struct
     | Abstract_kind_in_product
     | Box_on_abstract_kind of Path.t
 
-  exception User_error of Location.t * t
-end
+  type exn += private In_context of Location.t * t
 
-let raise ~loc err = raise (Error.User_error (loc, err))
+  module Result : sig
+    type e
+
+    type error := t
+
+    type 'a t = ('a, e) result
+
+    val error : loc:Location.t -> error -> _ t
+
+    (** Convert the result to an option. In the error case, always record an
+        exception. If type recovery is off, the error is raised. If on, it is
+        logged, and [None] is returned. *)
+    val to_opt_exn : 'a t -> 'a option
+  end
+
+  val log_or_raise : loc:Location.t -> t -> unit
+
+  val log_and_raise : loc:Location.t -> t -> 'a
+end = struct
+  type t =
+    | Insufficient_level :
+        { jkind : Parsetree.jkind_annotation;
+          required_layouts_level : Language_extension.maturity
+        }
+        -> t
+    | Multiple_jkinds of
+        { from_annotation : Parsetree.jkind_annotation;
+          from_attribute : Builtin_attributes.jkind_attribute Location.loc
+        }
+    | Unknown_kind_modifier of string
+    | Unimplemented_syntax
+    | With_on_right : (_ * allowed) History.annotation_context -> t
+    | Abstract_kind_in_product
+    | Box_on_abstract_kind of Path.t
+
+  exception In_context of Location.t * t
+
+  let log_and_raise ~loc err =
+    Typing_recovery.log_and_raise (In_context (loc, err))
+
+  let log_or_raise ~loc err =
+    Typing_recovery.log_or_raise (In_context (loc, err))
+
+  module Result = struct
+    type e = Location.t * t
+
+    type 'a t = ('a, e) result
+
+    let to_opt_exn (t : _ t) =
+      match t with
+      | Ok x -> Some x
+      | Error (loc, err) ->
+        log_or_raise ~loc err;
+        None
+
+    let error ~loc err : _ t = Error (loc, err)
+  end
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 (******************************)
 module Mod_bounds = struct
@@ -2093,11 +2154,12 @@ module Const = struct
   let apply_box ~loc (t : _ jkind_const_desc) =
     match t.base with
     | Layout layout ->
-      { base = Layout (Layout.Const.box layout Scannable_axes.max);
-        mod_bounds = box_mod_bounds t.mod_bounds;
-        with_bounds = t.with_bounds
-      }
-    | Kconstr (p, _, _) -> raise ~loc (Box_on_abstract_kind p)
+      Ok
+        { base = Layout (Layout.Const.box layout Scannable_axes.max);
+          mod_bounds = box_mod_bounds t.mod_bounds;
+          with_bounds = t.with_bounds
+        }
+    | Kconstr (p, _, _) -> Error.Result.error ~loc (Box_on_abstract_kind p)
 
   let apply_addressable (t : _ jkind_const_desc) =
     match t.base with
@@ -2529,7 +2591,9 @@ module Const = struct
         (* CR layouts: The [Kconstr] case here is pretty sad - see internal
            ticket 5769 *)
         match base with
-        | Kconstr _ -> raise ~loc Abstract_kind_in_product
+        | Kconstr (_, sa, _) ->
+          Error.log_or_raise ~loc Abstract_kind_in_product;
+          Layout.Const.any sa
         | Layout l -> l
       in
       ( layout :: layouts_acc,
@@ -2545,25 +2609,26 @@ module Const = struct
     }
 
   let transl_kind_operator ({ txt; loc } : string Location.loc) :
-      Kind_operator.t Location.loc =
+      (Kind_operator.t Location.loc, _) result =
     let scannable_axis axis = Kind_operator.Scannable_axis axis in
     match txt with
     | "non_pointer" ->
-      Location.mkloc (scannable_axis (Separability Non_pointer)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Non_pointer)) loc)
     | "non_pointer64" ->
-      Location.mkloc (scannable_axis (Separability Non_pointer64)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Non_pointer64)) loc)
     | "non_float" ->
-      Location.mkloc (scannable_axis (Separability Non_float)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Non_float)) loc)
     | "separable" ->
-      Location.mkloc (scannable_axis (Separability Separable)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Separable)) loc)
     | "maybe_separable" ->
-      Location.mkloc (scannable_axis (Separability Maybe_separable)) loc
-    | "non_null" -> Location.mkloc (scannable_axis (Nullability Non_null)) loc
+      Ok (Location.mkloc (scannable_axis (Separability Maybe_separable)) loc)
+    | "non_null" ->
+      Ok (Location.mkloc (scannable_axis (Nullability Non_null)) loc)
     | "maybe_null" ->
-      Location.mkloc (scannable_axis (Nullability Maybe_null)) loc
-    | "addressable" -> Location.mkloc Kind_operator.Addressable loc
-    | "box" -> Location.mkloc Kind_operator.Box loc
-    | _ -> raise ~loc (Unknown_kind_modifier txt)
+      Ok (Location.mkloc (scannable_axis (Nullability Maybe_null)) loc)
+    | "addressable" -> Ok (Location.mkloc Kind_operator.Addressable loc)
+    | "box" -> Ok (Location.mkloc Kind_operator.Box loc)
+    | _ -> Error.Result.error ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2607,7 +2672,11 @@ module Const = struct
           env context base
       in
       let ops =
-        List.map (fun name -> name, transl_kind_operator name) op_annot
+        List.filter_map
+          (fun name ->
+            transl_kind_operator name |> Error.Result.to_opt_exn
+            |> Option.map (fun operator -> name, operator))
+          op_annot
       in
       let jkind, _ =
         List.fold_left
@@ -2617,20 +2686,24 @@ module Const = struct
             let jkind = Base_and_axes.fully_expand_aliases_const env jkind in
             let jkind' =
               match op.txt with
-              | Scannable_axis axis -> apply_scannable_axis axis jkind
-              | Addressable -> apply_addressable jkind
+              | Scannable_axis axis -> Ok (apply_scannable_axis axis jkind)
+              | Addressable -> Ok (apply_addressable jkind)
               | Box -> apply_box ~loc:op.loc jkind
             in
-            (* Operators never change the with-bounds *)
-            (if warn && equal_ignoring_with_bounds jkind jkind'
-             then
-               match op.txt, jkind.base with
-               | Scannable_axis _, Layout l
-                 when Option.is_none (Layout.Const.get_root_scannable_axes l) ->
-                 warn_ignored_kind_modifier ~loc:op.loc name.txt base
-               | (Scannable_axis _ | Addressable | Box), _ ->
-                 warn_redundant_kind_modifier ~loc:op.loc (base, rev_ops));
-            jkind', name :: rev_ops)
+            match Error.Result.to_opt_exn jkind' with
+            | None -> jkind, name :: rev_ops
+            | Some jkind' ->
+              (* Operators never change the with-bounds *)
+              (if warn && equal_ignoring_with_bounds jkind jkind'
+               then
+                 match op.txt, jkind.base with
+                 | Scannable_axis _, Layout l
+                   when Option.is_none (Layout.Const.get_root_scannable_axes l)
+                   ->
+                   warn_ignored_kind_modifier ~loc:op.loc name.txt base
+                 | (Scannable_axis _ | Addressable | Box), _ ->
+                   warn_redundant_kind_modifier ~loc:op.loc (base, rev_ops));
+              jkind', name :: rev_ops)
           (base_jkind, []) ops
       in
       jkind
@@ -2648,7 +2721,9 @@ module Const = struct
           env context base
       in
       match context with
-      | Right_jkind c -> raise ~loc:type_.ptyp_loc (With_on_right c)
+      | Right_jkind c ->
+        Error.log_or_raise ~loc:type_.ptyp_loc (With_on_right c);
+        base
       | Left_jkind (transl_type, _) -> (
         match transl_type with
         | Transl_type transl_type ->
@@ -2685,7 +2760,7 @@ module Const = struct
             with_bounds = expanded.with_bounds
           }))
     | Pjk_default | Pjk_kind_of _ ->
-      raise ~loc:jkind.pjka_loc Unimplemented_syntax
+      Error.log_and_raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
   (* The [annotation_context] parameter can be used to allow annotations / kinds
      in different contexts to be enabled with different extension settings.
@@ -2729,7 +2804,7 @@ module Const = struct
     let required_layouts_level = get_required_layouts_level context const in
     if not (Language_extension.is_at_least Layouts required_layouts_level)
     then
-      raise ~loc:annot.pjka_loc
+      Error.log_or_raise ~loc:annot.pjka_loc
         (Insufficient_level { jkind = annot; required_layouts_level });
     const
 
@@ -2891,9 +2966,10 @@ let of_type_decl_gen ?(use_abstract_jkinds = true) ?(warn = true) ~context
   | None, None -> None
   | Some (jkind, annot), None -> Some (jkind, Some annot)
   | None, Some (jkind_with_annot, _) -> Some jkind_with_annot
-  | Some (_, from_annotation), Some (_, from_attribute) ->
-    raise ~loc:decl.ptype_loc
-      (Multiple_jkinds { from_annotation; from_attribute })
+  | Some (jkind_from_annot, from_annotation), Some (_, from_attribute) ->
+    Error.log_or_raise ~loc:decl.ptype_loc
+      (Multiple_jkinds { from_annotation; from_attribute });
+    Some (jkind_from_annot, Some from_annotation)
 
 let of_type_decl ?use_abstract_jkinds ?warn ~context ~transl_type env decl =
   of_type_decl_gen ?use_abstract_jkinds ?warn ~context
@@ -5028,5 +5104,5 @@ let report_error ~loc : Error.t -> _ = function
 
 let () =
   Location.register_error_of_exn (function
-    | Error.User_error (loc, err) -> Some (report_error ~loc err)
+    | Error.In_context (loc, err) -> Some (report_error ~loc err)
     | _ -> None)
