@@ -1077,14 +1077,11 @@ end = struct
   type t = #{ a : int; b : int }
 end
 type has_private_u = { mutable pu : Private_u.t }
-let bad () = (.pu.#Private_u.a)
+let ok () = (.pu.#Private_u.a)
 [%%expect{|
 module Private_u : sig type t = private #{ a : int; b : int; } end
 type has_private_u = { mutable pu : Private_u.t; }
-Line 7, characters 19-30:
-7 | let bad () = (.pu.#Private_u.a)
-                       ^^^^^^^^^^^
-Error: Block indices do not support private types in mutable positions.
+val ok : unit -> (has_private_u, int) idx_mut = <fun>
 |}]
 
 type has_private_u_imm = { ipu : Private_u.t }
@@ -1094,13 +1091,10 @@ type has_private_u_imm = { ipu : Private_u.t; }
 val ok : unit -> (has_private_u_imm, int) idx_imm = <fun>
 |}]
 
-let bad () =
+let ok () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
 [%%expect{|
-Line 2, characters 49-60:
-2 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#Private_u.a)
-                                                     ^^^^^^^^^^^
-Error: Block indices do not support private types in mutable positions.
+val ok : unit -> (Private_u.t array, int) idx_mut = <fun>
 |}]
 
 (****************)
