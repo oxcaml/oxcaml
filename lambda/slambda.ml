@@ -751,8 +751,9 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     (* Mutable variables have no static part. *)
     let new_layout = eval_layout env old_layout in
     let new_def = eval_dynamic ctx env old_def in
-    let body_env = Env.add_ident env id new_layout Missing in
-    let new_body = eval_lam ?name ctx body_env old_body in
+    (* Don't bind [id] in the environment as slambda should never capture a
+       mutable variable and a fatal error is better than a miscompilation. *)
+    let new_body = eval_lam ?name ctx env old_body in
     { slv_comptime = new_body.slv_comptime;
       slv_runtime =
         (if
