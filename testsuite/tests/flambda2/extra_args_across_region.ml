@@ -10,6 +10,8 @@
 *)
 
 let f () =
-  let k x = if Some 0 = Some (Sys.opaque_identity 0) then Char.chr x else 'x' in
+  let[@local] k x =
+    if Some 0 = Some (Sys.opaque_identity 0) then Char.chr x else 'x'
+  in
   let r = ref 65 (* 'A' *) in k !r
 let () = print_char (f ())
