@@ -768,14 +768,32 @@ module A = P.N
    projecting [N] out of [P]. *)
 module A : Inner = P.N
 [%%expect{|
->> Fatal error: expected representable type
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 19-22:
+1 | module A : Inner = P.N
+                       ^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]
 
 module M : sig module A : Inner end = struct module A = P.N end
 [%%expect{|
->> Fatal error: expected representable type
-Uncaught exception: Misc.Fatal_error
-
+Line 1, characters 38-63:
+1 | module M : sig module A : Inner end = struct module A = P.N end
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
 |}]

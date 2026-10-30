@@ -738,7 +738,11 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             match strengthened_modtypes ~core ~direction ~loc ~aliasable:true
                     env subst ~modes md.md_type p1 mty2 orig_shape
             with
-            | Ok _ as x -> x
+            | Ok _ as x ->
+              (* [Typemod.type_module_path_aux] normally enforces that module
+                 paths are representable, but it skips this check for aliases *)
+                Env.check_module_path_representable ~loc p1 env;
+                x
             | Error reason -> Error (Error.After_alias_expansion reason)
           end
         | exception Not_found ->
@@ -1087,7 +1091,14 @@ and signature_components :
                 | Mp_present, Mp_present, _ -> true, item
                 | _, Mp_absent, _ -> false, item
                 | Mp_absent, Mp_present, Mty_alias p1 ->
-                    true, Result.map (fun i -> Tcoerce_alias (env, p1, i)) item
+                    let materialize_alias cc =
+                      (* [Typemod.type_module_path_aux] normally enforces that
+                         module paths are representable, but it skips this
+                         check for aliases *)
+                      Env.check_module_path_representable ~loc p1 env;
+                      Tcoerce_alias (env, p1, cc)
+                    in
+                    true, Result.map materialize_alias item
                 | Mp_absent, Mp_present, _ -> assert false
               in
               let item = mark_error_as_unrecoverable item in
