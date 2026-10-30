@@ -268,42 +268,56 @@ Caml_inline void readblock(struct caml_intern_state* s,
   s->intern_src += len;
 }
 
-/* Well-formedness checks on a closure */
+/* Well-formedness checks on a closure.
+
+   The slot grammar mirrors [extern_closure_up_to_env] in extern.c:
+   each slot is a code pointer and a closure info, plus a direct entry
+   point when the arity is neither 0 nor 1; slots after the first are
+   preceded by optional Val_long(0) padding and an infix header; the
+   last slot is marked by [Is_last_closinfo]. Unboxed (non-scanned)
+   environment words may follow the last slot, up to the scanned
+   environment at [Start_env_closinfo]. */
 
 static bool well_formed_closure(value v)
 {
-  asize_t sz, envofs, i;
-  value cinfo;
+  asize_t sz, startenv, slot, i;
+  value info;
 #define CHECK(b) if (! (b)) return false
   sz = Wosize_val(v);
   CHECK(sz >= 2);
-  // Check the first closure
-  cinfo = Closinfo_val(v);
-  CHECK(Is_long(cinfo));
-  envofs = Start_env_closinfo(cinfo);
-  CHECK(envofs >= 2 && envofs <= sz);
-  // Check the infix closures that can follow
+  info = Closinfo_val(v);
+  CHECK(Is_long(info));
+  startenv = Start_env_closinfo(info);
+  CHECK(startenv >= 2 && startenv <= sz);
   i = 0;
-  while (1) {
-    // Skip to the next closure
-    int arity = Arity_closinfo(cinfo);
-    if (arity == 0 || arity == 1)
-      i += 3; // bytecode closure or native closure with arity 1
-    else
-      i += 4; // native closure with arity != 1: one extra entry points
-    if (i >= envofs) break;
-    if (i + 1 >= sz) return false;
-    // Check infix header and closure info
-    header_t h = (header_t) Field(v, i - 1);
-    CHECK(Tag_hd(h) == Infix_tag && Wosize_hd(h) == i);
-    cinfo = Field(v, i + 1);
-    CHECK(Is_long(cinfo));
-    CHECK(Start_env_closinfo(cinfo) + i == envofs);
-  }
-  i -= 1;
-  CHECK(i == envofs);
-  // Check that the environment part of the closure contains no code pointers
-  for (; i < sz; i++) {
+  do {
+    if (i > 0) {
+      /* The padding before an infix header */
+      while (i < startenv && Field(v, i) == Val_long(0)) i++;
+      /* The infix header; the infix pointer aims at the next word */
+      CHECK(i < startenv);
+      header_t h = (header_t) Field(v, i);
+      CHECK(Tag_hd(h) == Infix_tag && Wosize_hd(h) == i + 1);
+      i++;
+    }
+    slot = i;
+    CHECK(i + 1 < startenv);  /* room for code pointer and closure info */
+    i++;                      /* the default entry point */
+    info = Field(v, i++);     /* the closure info */
+    CHECK(Is_long(info));
+    CHECK(Start_env_closinfo(info) + slot == startenv);
+    /* The direct entry point if arity is neither 0 nor 1 */
+    if (Arity_closinfo(info) != 0 && Arity_closinfo(info) != 1) {
+      CHECK(i < startenv);
+      i++;
+    }
+  } while (!Is_last_closinfo(info));
+  /* Words from [i] to [startenv] are unboxed environment entries; they
+     are never scanned, so any bits are acceptable there. */
+  CHECK(i <= startenv);
+  /* Check that the scanned part of the environment contains no code
+     pointers */
+  for (i = startenv; i < sz; i++) {
     value vi = Field(v, i);
     if (Is_block(vi))
       CHECK(caml_find_code_fragment_by_pc((char *) vi) == NULL);
