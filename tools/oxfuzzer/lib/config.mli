@@ -51,6 +51,8 @@ val unboxed_tuple_probability : int
 
 val match_in_match_probability : int
 
+val assert_false_probability : int
+
 val nested_record_probability : int
 
 val mutable_binding_probability : int

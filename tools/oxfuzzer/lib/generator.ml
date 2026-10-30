@@ -172,6 +172,50 @@ let random_int_in_range (st : State.t) ~min ~max =
 let with_probability (st : State.t) ~probability =
   Random.State.int st.random_state 100 < probability
 
+let maybe_assert (st : State.t) ~f =
+  match st.swarm.assertions with
+  | Disabled | Unreachable_only -> f ()
+  | May_raise ->
+    if with_probability st ~probability:Config.assert_false_probability
+    then Expr.Assert_false
+    else f ()
+
+(* Make assertion outcomes independent of OCaml's unspecified operand order. *)
+let bind_operand (st : State.t) expr ~f =
+  match st.swarm.assertions with
+  | Disabled | Unreachable_only -> f expr
+  | May_raise ->
+    let name = State.fresh st in
+    Expr.Let { name; expr; body = f (Expr.Read (Place.Variable name)) }
+
+(* Evaluate strict operands right-to-left. *)
+let rec bind_operands st operands ~f =
+  match operands with
+  | [] -> f []
+  | expr :: rest ->
+    bind_operands st rest ~f:(fun rest ->
+        bind_operand st expr ~f:(fun expr -> f (expr :: rest)))
+
+let bin_op st ty (op : Bin_op.t) ~lhs ~rhs =
+  let make lhs rhs = Expr.Bin_op { ty; op; lhs; rhs } in
+  match op with
+  | And | Or -> make lhs rhs
+  | Add | Sub | Mul | Bit_and | Bit_or | Bit_xor | Shift_left | Shift_right
+  | Shift_right_logical | Eq | Lt | Le | Gt | Ge ->
+    bind_operand st rhs ~f:(fun rhs ->
+        bind_operand st lhs ~f:(fun lhs -> make lhs rhs))
+
+let assign (st : State.t) ty target expr =
+  match st.swarm.assertions with
+  | Disabled | Unreachable_only -> Statement.Assign (target, expr)
+  | May_raise ->
+    (* Evaluate the value before reading the target's mutable containers. *)
+    let binding = { Binding.name = State.fresh st; ty; is_mutable = false } in
+    Statement.Let
+      ( binding,
+        expr,
+        Statement.Assign (target, Expr.Read (Place.Variable binding.name)) )
+
 let maybe_opaque st ~enabled ~probability expr =
   if enabled && with_probability st ~probability then Expr.Opaque expr else expr
 
@@ -684,18 +728,18 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
               | _ -> true)
           |> random_element st
         in
-        let lhs = gen_number st env inner_ty in
+        let lhs = gen_value st env (Ty.Number inner_ty) in
         let rhs =
           match binop with
           | Bin_op.Shift_left | Bin_op.Shift_right | Bin_op.Shift_right_logical
             ->
             gen_shift_count st inner_ty
-          | _ -> gen_number st env inner_ty
+          | _ -> gen_value st env (Ty.Number inner_ty)
         in
         Expr.Convert
           { from = inner_ty;
             to_ = nty;
-            expr = Expr.Bin_op { ty = Ty.Number inner_ty; op = binop; lhs; rhs }
+            expr = bin_op st (Ty.Number inner_ty) binop ~lhs ~rhs
           })
   in
   let leaf =
@@ -711,11 +755,11 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
          1, gen_match st env (Ty.Number nty) ])
 
 (* CR-someday xclerc: These function calls can have side effects, because of
-   mutable records. Currently we rely on a de facto right-to-left evaluation
-   order, which holds in many cases but is not specified. We should either do
-   some sort of effect analysis in the style of Efftester, make sure we pull
-   function calls out of expressions into let-bindings for example. Or we can
-   just decide that we treat an evaluation order violation as a bug. *)
+   mutable records. Outside [May_raise] mode we rely on a de facto right-to-left
+   evaluation order, which holds in many cases but is not specified. We should
+   either do some sort of effect analysis in the style of Efftester, make sure
+   we pull function calls out of expressions into let-bindings for example. Or
+   we can just decide that we treat an evaluation order violation as a bug. *)
 
 (* Generates a function call, possibly by creating a new function. This amounts
    to lazy function generation. Note that once [Config.max_function_count] have
@@ -746,8 +790,9 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
         (fun () ->
           let function_ = random_element st functions in
           let args = gen_arguments function_.params in
-          convert_value st function_.return_ty return_ty
-            (Expr.Call_toplevel { fun_name = function_.name; args }))
+          bind_operands st args ~f:(fun args ->
+              convert_value st function_.return_ty return_ty
+                (Expr.Call_toplevel { fun_name = function_.name; args })))
     in
     let new_function =
       Gen.create (fun () ->
@@ -792,7 +837,7 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
              fuzzing. *)
           let result =
             match gen_existing st callee_env return_ty with
-            | Some generate -> generate ()
+            | Some generate -> maybe_assert st ~f:generate
             | None -> gen_value st callee_env return_ty
           in
           let function_ =
@@ -803,7 +848,8 @@ and gen_fun_call (st : State.t) (caller_env : Env.t) return_ty =
              added to [st.top_level_functions]. This means that functions are
              topologically sorted by construction. *)
           st.top_level_functions <- function_ :: st.top_level_functions;
-          Expr.Call_toplevel { fun_name = name; args })
+          bind_operands st args ~f:(fun args ->
+              Expr.Call_toplevel { fun_name = name; args }))
     in
     Gen.weighted st.random_state [2, existing_function; 1, new_function]
 
@@ -812,11 +858,11 @@ and gen_bool (st : State.t) env =
     Gen.create (fun () ->
         let lhs = gen_arg () in
         let rhs = gen_arg () in
-        Expr.Bin_op { ty = arg_ty; op; lhs; rhs })
+        bin_op st arg_ty op ~lhs ~rhs)
   in
   let nty = random_number_ty st in
-  let gen_number_arg () = gen_number st env nty in
-  let gen_bool_arg () = gen_bool st env in
+  let gen_number_arg () = gen_value st env (Ty.Number nty) in
+  let gen_bool_arg () = gen_value st env Ty.Bool in
   let gen_bool_binop op = gen_binop op Ty.Bool gen_bool_arg in
   let comparison = random_element st Bin_op.[Eq; Lt; Le; Gt; Ge] in
   Gen.run_exn
@@ -862,60 +908,66 @@ and gen_try_expr (st : State.t) (env : Env.t) ty =
       Expr.Try { ty; body; handlers })
 
 and gen_value (st : State.t) env ty =
-  match ty with
-  | Ty.Number nty -> gen_number st env nty
-  | Ty.Bool -> gen_bool st env
-  | Ty.Array (nty, dimensions) ->
-    Gen.run_exn
-      (Gen.weighted st.random_state
-         [ 3, gen_existing st env ty;
-           2, Gen.create (fun () -> gen_array st env nty dimensions);
-           1, gen_fun_call st env ty;
-           1, gen_try_expr st env ty;
-           1, gen_match st env ty ])
-  | Ty.Unboxed_tuple components ->
-    let construct =
-      Gen.create (fun () ->
-          Expr.Unboxed_tuple
-            (List.map
-               (fun ty ->
-                 let name = State.fresh st in
-                 name, gen_value st env ty)
-               components))
-    in
-    Gen.run_exn
-      (Gen.weighted st.random_state
-         [ 3, gen_existing st env ty;
-           2, construct;
-           1, gen_fun_call st env ty;
-           1, gen_try_expr st env ty;
-           1, gen_match st env ty ])
-  | Ty.Record record ->
-    let existing = gen_existing st env ty in
-    let construct =
-      Gen.create (fun () ->
-          Expr.Record
-            ( record,
-              List.map
-                (fun (field : Ty.field) -> gen_value st env field.ty)
-                record.fields ))
-    in
-    let update =
-      Gen.map existing ~f:(fun base ->
-          let field = random_element st record.fields in
-          Expr.Record_update (record, base, field, gen_value st env field.ty))
-      |> Gen.only_if st.swarm.record_updates
-    in
-    Gen.run_exn
-      (Gen.weighted st.random_state
-         [ 3, existing;
-           2, construct;
-           1, update;
-           1, gen_fun_call st env ty;
-           1, gen_try_expr st env ty;
-           1, gen_match st env ty ])
-  | Ty.Variant variant -> gen_sum_value st env (Sum.Variant variant)
-  | Ty.Or_null payload -> gen_sum_value st env (Sum.Or_null payload)
+  maybe_assert st ~f:(fun () ->
+      match ty with
+      | Ty.Number nty -> gen_number st env nty
+      | Ty.Bool -> gen_bool st env
+      | Ty.Array (nty, dimensions) ->
+        Gen.run_exn
+          (Gen.weighted st.random_state
+             [ 3, gen_existing st env ty;
+               2, Gen.create (fun () -> gen_array st env nty dimensions);
+               1, gen_fun_call st env ty;
+               1, gen_try_expr st env ty;
+               1, gen_match st env ty ])
+      | Ty.Unboxed_tuple components ->
+        let construct =
+          Gen.create (fun () ->
+              Expr.Unboxed_tuple
+                (List.map
+                   (fun ty ->
+                     let name = State.fresh st in
+                     name, gen_value st env ty)
+                   components))
+        in
+        Gen.run_exn
+          (Gen.weighted st.random_state
+             [ 3, gen_existing st env ty;
+               2, construct;
+               1, gen_fun_call st env ty;
+               1, gen_try_expr st env ty;
+               1, gen_match st env ty ])
+      | Ty.Record record ->
+        let existing = gen_existing st env ty in
+        let construct =
+          Gen.create (fun () ->
+              let values =
+                List.map
+                  (fun (field : Ty.field) -> gen_value st env field.ty)
+                  record.fields
+              in
+              bind_operands st values ~f:(fun values ->
+                  Expr.Record (record, values)))
+        in
+        let update =
+          Gen.map existing ~f:(fun base ->
+              let field = random_element st record.fields in
+              let value = gen_value st env field.ty in
+              bind_operand st value ~f:(fun value ->
+                  bind_operand st base ~f:(fun base ->
+                      Expr.Record_update (record, base, field, value))))
+          |> Gen.only_if st.swarm.record_updates
+        in
+        Gen.run_exn
+          (Gen.weighted st.random_state
+             [ 3, existing;
+               2, construct;
+               1, update;
+               1, gen_fun_call st env ty;
+               1, gen_try_expr st env ty;
+               1, gen_match st env ty ])
+      | Ty.Variant variant -> gen_sum_value st env (Sum.Variant variant)
+      | Ty.Or_null payload -> gen_sum_value st env (Sum.Or_null payload))
 
 and gen_sum_value (st : State.t) env sum =
   Gen.run_exn
@@ -988,7 +1040,10 @@ and gen_match (st : State.t) env result_ty =
           let reachable_constructors =
             List.map output_constructor (Sum.constructors input_sum)
           in
-          let input = Expr.Opaque (gen_sum st env input_sum) in
+          let input =
+            Expr.Opaque
+              (maybe_assert st ~f:(fun () -> gen_sum st env input_sum))
+          in
           (* Hide the input tag, but preserve the produced tags so that the
              outer match can be specialized at the producer's branch exits. *)
           let scrutinee =
@@ -997,7 +1052,9 @@ and gen_match (st : State.t) env result_ty =
                 gen_constructor st env sum (output_constructor constructor))
           in
           scrutinee, reachable_constructors)
-        else Expr.Opaque (gen_sum st env sum), Sum.constructors sum
+        else
+          ( Expr.Opaque (maybe_assert st ~f:(fun () -> gen_sum st env sum)),
+            Sum.constructors sum )
       in
       gen_match_expr st env sum scrutinee
         ~branch:(fun env (constructor : Ty.constructor) ->
@@ -1047,11 +1104,11 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let ty, make = random_element st targets in
             let target = make () in
             let expr = gen_value st env ty in
-            continue env (Statement.Assign (target, expr)))
+            continue env (assign st ty target expr))
       in
       let gen_if =
         Gen.when_ st.swarm.conditionals (fun () ->
-            let condition = gen_bool st env in
+            let condition = gen_value st env Ty.Bool in
             let _env_l, left = gen_fun_body st env (depth + 1) in
             let _env_r, right = gen_fun_body st env (depth + 1) in
             continue env (Statement.If (condition, left, right)))
