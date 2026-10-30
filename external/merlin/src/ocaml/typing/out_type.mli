@@ -306,6 +306,13 @@ module Variable_names: sig
   val add_subst: (type_expr * type_expr) list -> unit
 
   (** [reserve ~base ty] registers the variable names appearing in [ty] *)
+  (* CR zeisbach: [reserve] now does a lot more interesting stuff. The doc
+     comment here deserves to be updated. Perhaps the signature in [out_type.ml]
+     could be too/instead (based on the extent to which you believe
+     implementation details would be leaked if included in this interface).
+
+     In particular, the (persistent!) side-effects that this function performs
+     should be made clear in its purpose statement. *)
   val reserve: base:Mode.With_locality.Const.t -> type_expr -> unit
 end
 

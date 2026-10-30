@@ -406,12 +406,8 @@ module Lattices = struct
   [@@inline]
 
   module type Diamond = sig
-    (** A lattice is a partial order, if for any [a] [b], either:
-        - [a <= b] or [b <= a]
-        - [a] and [b] are incomparable.
-
-        This interface and the [Diamond] functor below are specialized to
-        partial lattices of the form
+    (** This interface and the [Diamond] functor below are specialized to
+        lattices of the following form
         {v
             Max
             / \
@@ -4871,9 +4867,10 @@ module Report = struct
           print the remaining chain. *)
     then (fun _ppf Modality -> ()), pp
     else
-      (* if the modality change the bound, we signal that. Moreover, since each
-         axis is total ordering, the modality is solely responsible for the
-         bound, and we omit the remaining chain. *)
+      (* if the modality does change the bound, we signal that. Moreover, since
+         each axis is total or diamond-shaped (with incomparable elements
+         joining to max and meeting to min), the modality is solely responsible
+         for the bound, and we omit the remaining chain. *)
       (* CR-someday zqian: print the modality on the offending axis. *)
       ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
         (Location.none, Unknown : pinpoint) )
@@ -8522,7 +8519,7 @@ module Crossing = struct
         (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
     let apply_right_unhint (Modality (Join_const c)) m =
-      (* The right adjoint of join is a restriction of identity *)
+      (* On the image of join, identity is its right adjoint *)
       Mode.join_const_unhint c m
 
     let apply_right_with_locality t m =
@@ -8628,7 +8625,7 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left_unhint (Modality (Meet_const c)) m =
-      (* The left adjoint of meet is a restriction of identity *)
+      (* On the image of meet, identity is its left adjoint *)
       Mode.meet_const_unhint c m
 
     let apply_left_with_locality t m =

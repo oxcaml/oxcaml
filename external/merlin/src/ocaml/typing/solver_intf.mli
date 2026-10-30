@@ -107,39 +107,10 @@ module type Lattices_mono = sig
   val compose :
     'c obj -> ('b, 'c, 'd) morph -> ('a, 'b, 'd) morph -> ('a, 'c, 'd) morph
 
-  (* Usual notion of adjunction:
-     Given two morphisms [f : A -> B] and [g : B -> A], we require [f a <= b]
-      iff [a <= g b] for each [a \in A] and [b \in B].
+  (* Definition (adjunction): Two morphisms [f : A -> B] and [g : B -> A], are
+     adjoint whenever [f a <= b] iff [a <= g b] for all [a \in A] and [b \in B].
 
-     Our solver accepts a wider notion of adjunction: Given two morphisms [f : A
-     -> B] and [g : B -> A], we require [f a <= b] iff [a <= g b] for each [a]
-      in the downward closure of [g]'s image and [b \in B].
-
-     We say [f] is a partial left adjoint of [g], because [f] is only
-     constrained in part of its domain. As a result, [f] is not unique, since
-     its valuation out of the constrained range can be arbitrarily chosen.
-
-     Dually, we can define the concept of partial right adjoint. Since partial
-     adjoints are not unique, they don't form a pair: i.e., a partial left
-     joint of a partial right adjoint of [f] is not [f] in general.
-
-     Concretely, the solver provides/requires the following guarantees
-     (continuing the example above):
-
-     For the user of the [Solvers_polarized].
-     - [g] applied to a right mode [m] can be used as a right mode without
-     any restriction.
-     - [f] applied to to a left mode [m] can be used as a left mode, given that
-     the [m] is fully within the downward closure of [g]. This is unfortunately
-     not enforcable by the ocaml type system, and we have to rely on user's
-     caution.
-
-     For the supplier of the [Lattices_mono]:
-     - The result of [left_adjoint g] is applied only on the downward closure of
-     [g]'s image.
-  *)
-
-  (* Note that [left_adjoint] and [right_adjoint] returns a [morph] weaker than
+     Note that [left_adjoint] and [right_adjoint] returns a [morph] weaker than
      what we want, which is "\exists r. allowed * r". But ocaml doesn't like
      existentials, and this weaker version is good enough for us *)
 
@@ -522,6 +493,10 @@ module type Solver_mono = sig
     val apply :
       'b obj -> ('a, 'b, 'l * 'r) morph -> ('a, 'l * 'r) t -> ('b, 'l * 'r) t
   end
+
+  (* CR zeisbach: a lot of printing interacts with the description of a mode
+     variable and not a mode variable itself. As such, it seems appropriate to
+     document this inferface better, as well as perhaps [desc] below. *)
 
   (** The exposed description of modes *)
   module Desc : sig
