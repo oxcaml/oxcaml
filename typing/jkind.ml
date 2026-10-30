@@ -709,19 +709,6 @@ type error =
 module Error : sig
   type exn += private In_context of Location.t * error
 
-  module Result : sig
-    type e
-
-    type 'a t = ('a, e) result
-
-    val error : loc:Location.t -> error -> _ t
-
-    (** Convert the result to an option. In the error case, always record an
-        exception. If type recovery is off, the error is raised. If on, it is
-        logged, and [None] is returned. *)
-    val to_opt_exn : 'a t -> 'a option
-  end
-
   val log_or_raise : loc:Location.t -> error -> unit
 
   val log_and_raise : loc:Location.t -> error -> 'a
@@ -733,21 +720,6 @@ end = struct
 
   let log_or_raise ~loc err =
     Typing_recovery.log_or_raise (In_context (loc, err))
-
-  module Result = struct
-    type e = Location.t * error
-
-    type 'a t = ('a, e) result
-
-    let to_opt_exn (t : _ t) =
-      match t with
-      | Ok x -> Some x
-      | Error (loc, err) ->
-        log_or_raise ~loc err;
-        None
-
-    let error ~loc err : _ t = Error (loc, err)
-  end
 
   let () =
     Typing_recovery.register_recoverable (function
@@ -2136,12 +2108,14 @@ module Const = struct
   let apply_box ~loc (t : _ jkind_const_desc) =
     match t.base with
     | Layout layout ->
-      Ok
+      Some
         { base = Layout (Layout.Const.box layout Scannable_axes.max);
           mod_bounds = box_mod_bounds t.mod_bounds;
           with_bounds = t.with_bounds
         }
-    | Kconstr (p, _, _) -> Error.Result.error ~loc (Box_on_abstract_kind p)
+    | Kconstr (p, _, _) ->
+      Error.log_or_raise ~loc (Box_on_abstract_kind p);
+      None
 
   let apply_addressable (t : _ jkind_const_desc) =
     match t.base with
@@ -2591,26 +2565,28 @@ module Const = struct
     }
 
   let transl_kind_operator ({ txt; loc } : string Location.loc) :
-      (Kind_operator.t Location.loc, _) result =
+      Kind_operator.t Location.loc option =
     let scannable_axis axis = Kind_operator.Scannable_axis axis in
     match txt with
     | "non_pointer" ->
-      Ok (Location.mkloc (scannable_axis (Separability Non_pointer)) loc)
+      Some (Location.mkloc (scannable_axis (Separability Non_pointer)) loc)
     | "non_pointer64" ->
-      Ok (Location.mkloc (scannable_axis (Separability Non_pointer64)) loc)
+      Some (Location.mkloc (scannable_axis (Separability Non_pointer64)) loc)
     | "non_float" ->
-      Ok (Location.mkloc (scannable_axis (Separability Non_float)) loc)
+      Some (Location.mkloc (scannable_axis (Separability Non_float)) loc)
     | "separable" ->
-      Ok (Location.mkloc (scannable_axis (Separability Separable)) loc)
+      Some (Location.mkloc (scannable_axis (Separability Separable)) loc)
     | "maybe_separable" ->
-      Ok (Location.mkloc (scannable_axis (Separability Maybe_separable)) loc)
+      Some (Location.mkloc (scannable_axis (Separability Maybe_separable)) loc)
     | "non_null" ->
-      Ok (Location.mkloc (scannable_axis (Nullability Non_null)) loc)
+      Some (Location.mkloc (scannable_axis (Nullability Non_null)) loc)
     | "maybe_null" ->
-      Ok (Location.mkloc (scannable_axis (Nullability Maybe_null)) loc)
-    | "addressable" -> Ok (Location.mkloc Kind_operator.Addressable loc)
-    | "box" -> Ok (Location.mkloc Kind_operator.Box loc)
-    | _ -> Error.Result.error ~loc (Unknown_kind_modifier txt)
+      Some (Location.mkloc (scannable_axis (Nullability Maybe_null)) loc)
+    | "addressable" -> Some (Location.mkloc Kind_operator.Addressable loc)
+    | "box" -> Some (Location.mkloc Kind_operator.Box loc)
+    | _ ->
+      Error.log_or_raise ~loc (Unknown_kind_modifier txt);
+      None
 
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
@@ -2656,8 +2632,7 @@ module Const = struct
       let ops =
         List.filter_map
           (fun name ->
-            transl_kind_operator name |> Error.Result.to_opt_exn
-            |> Option.map (fun operator -> name, operator))
+            Option.map (fun op -> name, op) (transl_kind_operator name))
           op_annot
       in
       let jkind, _ =
@@ -2668,11 +2643,11 @@ module Const = struct
             let jkind = Base_and_axes.fully_expand_aliases_const env jkind in
             let jkind' =
               match op.txt with
-              | Scannable_axis axis -> Ok (apply_scannable_axis axis jkind)
-              | Addressable -> Ok (apply_addressable jkind)
+              | Scannable_axis axis -> Some (apply_scannable_axis axis jkind)
+              | Addressable -> Some (apply_addressable jkind)
               | Box -> apply_box ~loc:op.loc jkind
             in
-            match Error.Result.to_opt_exn jkind' with
+            match jkind' with
             | None -> jkind, name :: rev_ops
             | Some jkind' ->
               (* Operators never change the with-bounds *)
