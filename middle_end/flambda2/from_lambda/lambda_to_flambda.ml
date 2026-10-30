@@ -334,7 +334,6 @@ let apply_cont_with_extra_args acc env ccenv ~dbg cont traps args =
       CC.close_apply_cont acc ~dbg ccenv cont traps (args @ extra_args))
 
 let wrap_return_continuation acc env ccenv (apply : IR.apply) =
-  let extra_args = Env.extra_args_for_continuation env apply.continuation in
   let close_current_region_early, region, ghost_region =
     match apply.region_close with
     | Rc_normal | Rc_nontail -> false, apply.region, apply.ghost_region
@@ -354,6 +353,7 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
           Some (Env.Region_stack_element.ghost_region region_stack_elt) ))
   in
   let body acc ccenv continuation =
+    let extra_args = Env.extra_args_for_continuation env continuation in
     match extra_args with
     | [] ->
       CC.close_apply acc ccenv { apply with continuation; region; ghost_region }
