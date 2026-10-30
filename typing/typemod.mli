@@ -206,6 +206,8 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Non_generalizable_escape of
+      { var : type_expr; mty: module_type; kind : Path.t }
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t
