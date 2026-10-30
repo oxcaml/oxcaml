@@ -13,7 +13,20 @@ Entry point: 0
   v6 = imm{tag=248; 0 = v2; 1 = v4}
   v7 = "caml_register_symbol"("Events"j, "camlEvents__E_3"j, v6) 
   v9 = fun(v8){2 ()} [hint:(int)->float never_inline]
-  branch 3 (v9)
+  v14 = "caml_register_symbol"("Events"j, "camlEvents__arith_4"j, v9) 
+  v17 = fun(v15, v16){3 ()} [hint:(value,value)->int never_inline]
+  v22 = "caml_register_symbol"("Events"j, "camlEvents__non_tail_5"j, v17) 
+  v25 = fun(v23, v24){5 ()} [hint:(value,value)->value never_inline]
+  v28 = "caml_register_symbol"("Events"j, "camlEvents__tail_6"j, v25) 
+  v30 = fun(v29){6 ()} [hint:(int)->value never_inline]
+  v33 = "caml_register_symbol"("Events"j, "camlEvents__c_call_7"j, v30) 
+  v35 = fun(v34){7 ()} [hint:(int)->int never_inline]
+  v39 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v35) 
+  v41 = CONST{1}
+  event events.ml:36:17
+  v42 = v9(v41)
+  event events.ml:36:26
+  branch 10 (v42)
 
 ==== 2 () ====
   event events.ml:21:25
@@ -25,115 +38,81 @@ Entry point: 0
   event events.ml:21:56
   return v12
 
-==== 3 (v13) ====
-  v14 = "caml_register_symbol"("Events"j, "camlEvents__arith_4"j, v13) 
-  v17 = fun(v15, v16){4 ()} [hint:(value,value)->int never_inline]
-  branch 6 (v17)
-
-==== 4 () ====
+==== 3 () ====
   event events.ml:24:34
   v19 = v15(v16)
   event events.ml:24:37
-  branch 5 (v19)
+  branch 4 (v19)
 
-==== 5 (v18) ====
+==== 4 (v18) ====
   v20 = v18 + 1
   return v20
 
-==== 6 (v21) ====
-  v22 = "caml_register_symbol"("Events"j, "camlEvents__non_tail_5"j, v21) 
-  v25 = fun(v23, v24){7 ()} [hint:(value,value)->value never_inline]
-  branch 8 (v25)
-
-==== 7 () ====
+==== 5 () ====
   event events.ml:27:30
   v26 = v23(v24)
   return v26
 
-==== 8 (v27) ====
-  v28 = "caml_register_symbol"("Events"j, "camlEvents__tail_6"j, v27) 
-  v30 = fun(v29){9 ()} [hint:(int)->value never_inline]
-  branch 10 (v30)
-
-==== 9 () ====
+==== 6 () ====
   event events.ml:30:31
   v31 = "caml_sys_getenv"(v1) 
   return v31
 
-==== 10 (v32) ====
-  v33 = "caml_register_symbol"("Events"j, "camlEvents__c_call_7"j, v32) 
-  v35 = fun(v34){11 ()} [hint:(int)->int never_inline]
-  branch 14 (v35)
-
-==== 11 () ====
+==== 7 () ====
   event events.ml:33:27
   v36 = v34 === 3
-  if v36 then 12 () else 13 ()
+  if v36 then 8 () else 9 ()
 
-==== 12 () ====
+==== 8 () ====
   v37 = imm{tag=0; 0 = v6; 1 = v34}
   event events.ml:33:49
   raise v37
 
-==== 13 () ====
+==== 9 () ====
   return v34
 
-==== 14 (v38) ====
-  v39 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v38) 
-  v41 = CONST{1}
-  event events.ml:36:17
-  v42 = v13(v41)
-  event events.ml:36:26
-  branch 15 (v42)
+==== 10 (v40) ====
+  v45 = fun(v44){12 ()} [hint:(int)->int]
+  v48 = CONST{2}
+  event events.ml:37:17
+  v49 = v17(v45, v48)
+  event events.ml:37:46
+  branch 11 (v49)
 
-==== 15 (v40) ====
-  v45 = fun(v44){17 ()} [hint:(int)->int]
-  branch 18 (v45)
+==== 11 (v43) ====
+  v52 = fun(v51){14 ()} [hint:(int)->int]
+  v55 = CONST{3}
+  event events.ml:38:17
+  v56 = v25(v52, v55)
+  event events.ml:38:42
+  branch 13 (v56)
 
-==== 16 (v43) ====
-  v52 = fun(v51){20 ()} [hint:(int)->int]
-  branch 21 (v52)
-
-==== 17 () ====
+==== 12 () ====
   event events.ml:37:27
   v46 = v44 + 1
   return v46
 
-==== 18 (v47) ====
-  v48 = CONST{2}
-  event events.ml:37:17
-  v49 = v21(v47, v48)
-  event events.ml:37:46
-  branch 16 (v49)
-
-==== 19 (v50) ====
+==== 13 (v50) ====
   v58 = CONST{0}
   event events.ml:39:17
-  v59 = v32(v58)
+  v59 = v30(v58)
   event events.ml:39:28
-  branch 22 (v59)
+  branch 15 (v59)
 
-==== 20 () ====
+==== 14 () ====
   event events.ml:38:23
   v53 = v51 + 2
   return v53
 
-==== 21 (v54) ====
-  v55 = CONST{3}
-  event events.ml:38:17
-  v56 = v27(v54, v55)
-  event events.ml:38:42
-  branch 19 (v56)
-
-==== 22 (v57) ====
+==== 15 (v57) ====
   v61 = CONST{4}
   event events.ml:40:17
-  v62 = v38(v61)
+  v62 = v35(v61)
   event events.ml:40:28
-  branch 23 (v62)
+  branch 16 (v62)
 
-==== 23 (v60) ====
-  v63 = imm{tag=0; 0 = v6; 1 = v13; 2 = v21; 3 = v27; 4 = v32; 5 = v38}
+==== 16 (v60) ====
+  v63 = imm{tag=0; 0 = v6; 1 = v9; 2 = v17; 3 = v25; 4 = v30; 5 = v35}
   v64 = "caml_register_global"(v63, "Events"j)
   stop
 

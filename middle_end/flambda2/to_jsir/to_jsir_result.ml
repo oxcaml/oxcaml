@@ -57,9 +57,9 @@ type t =
     external_symbols : Jsir.Var.t Symbol.Map.t;
         (** The variables bound in [entry_prelude] to symbols from other
             compilation units. *)
-    late_bound_vars : Jsir.Var.Set.t;
-        (** Variables created ahead of their definition and since bound with
-            [To_jsir_shared.bind_vars]. *)
+    var_aliases : Jsir.Var.t Jsir.Var.Map.t;
+        (** A mapping of variables created ahead of their definition to their
+            materialised variables. *)
     call_events : call_events option;
         (** The events to put around the calls added by [add_call_exn], set by
             [with_debuginfo_exn]. *)
@@ -84,7 +84,7 @@ let create ~reachable_names =
     entry_prelude = [];
     global_data_var = None;
     external_symbols = Symbol.Map.empty;
-    late_bound_vars = Jsir.Var.Set.empty;
+    var_aliases = Jsir.Var.Map.empty;
     call_events = None;
     reachable_names
   }
@@ -234,15 +234,51 @@ let import_compilation_unit t compilation_unit =
         Compilation_unit.Set.add compilation_unit t.imported_compilation_units
     }
 
-let add_late_bound_var_exn t var =
-  if Jsir.Var.Set.mem var t.late_bound_vars
+let add_var_alias_exn t ~bound_var ~defining_var =
+  if Jsir.Var.Map.mem bound_var t.var_aliases
   then
     Misc.fatal_errorf
       "JSIR variable %a is bound twice. This usually means that a function or \
        value slot appears in more than one set of closures, which the JSIR \
        translation does not support."
-      Jsir.Var.print var;
-  { t with late_bound_vars = Jsir.Var.Set.add var t.late_bound_vars }
+      Jsir.Var.print bound_var;
+  { t with var_aliases = Jsir.Var.Map.add bound_var defining_var t.var_aliases }
+
+type var_binding =
+  { bound_var : Jsir.Var.t;
+    defining_var : Jsir.Var.t
+  }
+
+let add_var_aliases_exn t bindings =
+  List.fold_left
+    (fun t { bound_var; defining_var } ->
+      add_var_alias_exn t ~bound_var ~defining_var)
+    t bindings
+
+(* Follow the chain of aliases to find the variable that defines an alias. *)
+let resolve_var_aliases var_aliases =
+  let rec resolve ~visiting resolved var =
+    match Jsir.Var.Map.find_opt var resolved with
+    | Some defining_var -> resolved, defining_var
+    | None -> (
+      match Jsir.Var.Map.find_opt var var_aliases with
+      | None -> resolved, var
+      | Some defining_var ->
+        if Jsir.Var.Set.mem var visiting
+        then
+          Misc.fatal_errorf "Cycle of JSIR variable aliases through %a"
+            Jsir.Var.print var;
+        let resolved, defining_var =
+          resolve
+            ~visiting:(Jsir.Var.Set.add var visiting)
+            resolved defining_var
+        in
+        Jsir.Var.Map.add var defining_var resolved, defining_var)
+  in
+  Jsir.Var.Map.fold
+    (fun var _ resolved ->
+      resolve ~visiting:Jsir.Var.Set.empty resolved var |> fst)
+    var_aliases Jsir.Var.Map.empty
 
 let add_entry_prelude_instr t instr =
   { t with entry_prelude = instr :: t.entry_prelude }
@@ -370,7 +406,7 @@ let to_program_exn
       entry_prelude;
       global_data_var = _;
       external_symbols = _;
-      late_bound_vars = _;
+      var_aliases;
       call_events = _;
       reachable_names = _
     } =
@@ -396,5 +432,10 @@ let to_program_exn
   let free_pc = (Jsir.Addr.Map.max_binding complete_blocks |> fst) + 1 in
   let program =
     { Jsir.start = Jsir.Addr.zero; blocks = complete_blocks; free_pc }
+  in
+  let program =
+    Jsir_subst.Excluding_Binders.program
+      (Jsir_subst.from_map (resolve_var_aliases var_aliases))
+      program
   in
   { program; imported_compilation_units }

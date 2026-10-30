@@ -2,7 +2,7 @@
 ; js_of_ocaml subtree (external/js_of_ocaml/compiler/lib).
 
 (copy_files#
- %{project_root}/external/js_of_ocaml/compiler/lib/{code,debug,int_set,int_trie,optimization_hint,parse_info,reserved,sizable_int,stdlib,targetint,targetnativeint,timer,warning}.{ml,mli})
+ %{project_root}/external/js_of_ocaml/compiler/lib/{code,debug,int_set,int_trie,optimization_hint,parse_info,reserved,sizable_int,stdlib,subst,targetint,targetnativeint,timer,warning}.{ml,mli})
 
 (copy_files
  %{project_root}/external/js_of_ocaml/compiler/lib/float32_stubs.c)

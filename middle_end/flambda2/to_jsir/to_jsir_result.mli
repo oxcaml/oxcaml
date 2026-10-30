@@ -115,10 +115,19 @@ val register_symbol : t -> Symbol.t -> Jsir.Var.t -> t
     compilation unit of the symbol is recorded as an import. *)
 val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
 
-(** Record that [var], a variable created ahead of its definition (one standing
-    for a function slot, value slot or symbol), has been bound by
-    [To_jsir_shared.bind_vars]. Raises if it has already been bound. *)
-val add_late_bound_var_exn : t -> Jsir.Var.t -> t
+(** Record that [bound_var], a variable created ahead of its definition, refers
+    to [defining_var]. All instances of [bound_var] will later be substituted
+    with [defining_var] (or following the chain of aliases if [defining_var] is
+    an alias itself. ). Raises if [bound_var] was already registered. *)
+val add_var_alias_exn :
+  t -> bound_var:Jsir.Var.t -> defining_var:Jsir.Var.t -> t
+
+type var_binding =
+  { bound_var : Jsir.Var.t;
+    defining_var : Jsir.Var.t
+  }
+
+val add_var_aliases_exn : t -> var_binding list -> t
 
 type program =
   { program : Jsir.program;
