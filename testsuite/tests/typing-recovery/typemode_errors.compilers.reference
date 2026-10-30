@@ -1,4 +1,30 @@
+File "typemode_errors.ml", line 1:
+Error: Multiple errors were encountered
 File "typemode_errors.ml", line 11, characters 11-16:
 11 | let f (x @ bogus) = x
                 ^^^^^
-Error: Unrecognized mode bogus.
+  Unrecognized mode bogus.
+File "typemode_errors.ml", line 14, characters 17-22:
+14 | let g (x @ local local) = x
+                      ^^^^^
+  The locality axis has already been specified.
+File "typemode_errors.ml", line 17, characters 22-27:
+17 | type r = { a : int @@ bogus }
+                           ^^^^^
+  Unrecognized modality bogus.
+File "typemode_errors.ml", line 20, characters 26-39:
+20 | type s = { b : int ref @@ global unique }
+                               ^^^^^^^^^^^^^
+The modality global can't be used together with unique
+File "typemode_errors.ml", line 23, characters 19-24:
+23 | type t : value mod bogus
+                        ^^^^^
+  Unrecognized modifier bogus.
+File "typemode_errors.ml", line 26, characters 28-36:
+26 | type u : value mod portable portable
+                                 ^^^^^^^^
+  The portability axis has already been specified.
+File "typemode_errors.ml", line 37, characters 17-19:
+37 | let t : string = 10
+                      ^^
+  The constant 10 has type int but an expression was expected of type string
