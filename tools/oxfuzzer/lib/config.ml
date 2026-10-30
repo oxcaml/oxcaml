@@ -81,6 +81,11 @@ let raise_notrace_probability = 50
 
 let callee_raises_probability = 50
 
+type assertion_mode =
+  | Disabled
+  | Unreachable_only
+  | May_raise
+
 module Swarm = struct
   type t =
     { floats : bool;
@@ -93,7 +98,7 @@ module Swarm = struct
       variants : bool;
       or_null : bool;
       matches : bool;
-      unreachable_assertions : bool;
+      assertions : assertion_mode;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
@@ -122,7 +127,9 @@ module Swarm = struct
       variants = Random.State.bool random_state;
       or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
-      unreachable_assertions = Random.State.bool random_state;
+      (* Reachable assertion generation is not enabled yet. *)
+      assertions =
+        (if Random.State.bool random_state then Unreachable_only else Disabled);
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;
@@ -151,7 +158,6 @@ module Swarm = struct
       "variants", t.variants;
       "or_null", t.or_null;
       "matches", t.matches;
-      "unreachable_assertions", t.unreachable_assertions;
       "record_updates", t.record_updates;
       "record_representation_conversions", t.record_representation_conversions;
       "mutable_bindings", t.mutable_bindings;
@@ -168,6 +174,12 @@ module Swarm = struct
       "opaque_loop_bounds", t.opaque_loop_bounds;
       "exceptions", t.exceptions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
+    |> List.cons
+         (Format.sprintf "  assertions = %s"
+            (match t.assertions with
+            | Disabled -> "disabled"
+            | Unreachable_only -> "unreachable_only"
+            | May_raise -> "may_raise"))
     |> String.concat "\n"
 
   let number_types t =
