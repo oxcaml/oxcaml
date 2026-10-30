@@ -133,6 +133,7 @@ val trees_of_type_expansion:
 val trees_of_type_expansion':
   var_jkinds:bool -> type_or_scheme -> Errortrace.expanded_type -> out_type diff
 val prepare_expansion: Errortrace.expanded_type -> Errortrace.expanded_type
+val reserve_fresh_modes_of_expansion: Errortrace.expanded_type -> unit
 val pp_type_expansion: out_type diff printer
 val hide_variant_name: Types.type_expr -> Types.type_expr
 
