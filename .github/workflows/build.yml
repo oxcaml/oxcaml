@@ -29,6 +29,7 @@ jobs:
             build_debug: true
             build_ast_dependent_libs: true
             check_installed: true
+            run_oxfuzzer: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
@@ -64,6 +65,7 @@ jobs:
             config: --enable-dev --enable-keyword-edition=5.2
             os: warp-ubuntu-latest-x64-8x
             install_path: _custom_install
+            run_oxfuzzer: true
             sysdeps: gdb
 
           - name: debug stack-checks (x86_64-linux)
@@ -443,6 +445,22 @@ jobs:
           OCAMLPARAM: ${{ matrix.ocamlparam }}
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run oxfuzzer
+        if: matrix.run_oxfuzzer == true && steps.build.conclusion == 'success' && always()
+        run: |
+          python3 tools/oxfuzzer/oxfuzzer.py \
+            -o "$GITHUB_WORKSPACE/_oxfuzzer" --iterations 1000 --jobs "$J" \
+            --seed "$GITHUB_RUN_ID"
+
+      - name: Upload oxfuzzer failures
+        if: failure() && matrix.run_oxfuzzer == true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: oxfuzzer-failures-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ github.workspace }}/_oxfuzzer/seed-*
+          if-no-files-found: ignore
 
       - name: Check installed library metadata
         if: matrix.check_installed == true
