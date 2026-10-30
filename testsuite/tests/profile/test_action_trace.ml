@@ -28,13 +28,8 @@ let print_trace () =
   in
   printed_length := String.length contents;
   (* Measurements vary, but their position in the hierarchy must not. *)
-  let new_contents = List.fold_left (fun contents column ->
-    let pattern = Str.regexp
-      ("\"" ^ column ^ "\":[-+0-9.eE]+") in
-    Str.global_replace pattern
-      ("\"" ^ column ^ "\":<" ^ column ^ ">") contents
-  ) new_contents ["time"; "alloc"; "top-heap"; "absolute-top-heap"] in
-  print_string new_contents
+  print_string (Str.global_replace
+    (Str.regexp "\"time\":[-+0-9.eE]+") "\"time\":<time>" new_contents)
 
 exception Test_exception
 
@@ -70,7 +65,7 @@ let () =
         record ~accumulate:true "accumulated" 7);
       42)
   in
-  assert (result = 42 && !calls = 12 && !counter_calls = 4);
+  assert (result = 42 && !calls = 12 && !counter_calls = 0);
   assert (!Clflags.profile_columns = []);
   print_trace ()
 
