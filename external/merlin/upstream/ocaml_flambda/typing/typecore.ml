@@ -4960,7 +4960,8 @@ let rec check_counter_example_pat
       in
       let ty_arg, arg_sort = solve_Ppat_addr loc penv mut expected_ty in
       assert (
-        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort
+        |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
 
