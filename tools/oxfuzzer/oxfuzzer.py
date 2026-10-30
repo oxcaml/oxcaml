@@ -8,6 +8,7 @@ if sys.version_info < (3, 11):
 import asyncio
 import argparse
 import errno
+import hashlib
 import os
 from pathlib import Path
 import platform
@@ -237,6 +238,14 @@ class ConfigurationResult:
     compilation: CommandResult
     execution: CommandResult | None
 
+def source_filename(configuration: Configuration, seed: int) -> str:
+    # Some compiler bugs depend on the source filename or compilation-unit name.
+    # Vary names across configurations so output comparisons can expose them,
+    # without depending on scheduling or the case RNG.
+    digest = hashlib.sha256(f"{seed}:{configuration.name}".encode()).hexdigest()
+    return f"program_{digest[:16]}.ml"
+
+
 def compile_command(
     configuration: Configuration, *, source: Path, executable: Path
 ) -> list[str]:
@@ -289,13 +298,14 @@ async def run(executable: Path) -> CommandResult:
 async def run_configuration(
         configuration: Configuration,
         *,
+        seed: int,
         program: bytes,
         work_dir: Path,
         slots: asyncio.Semaphore,
 ) -> ConfigurationResult:
     async with slots:
         work_dir.mkdir(parents=True)
-        source = work_dir / "program.ml"
+        source = work_dir / source_filename(configuration, seed)
         source.write_bytes(program)
         executable = work_dir / "program.exe"
         compilation = await compile(
@@ -486,8 +496,9 @@ def reproduction_script(
         candidate for candidate in relative_toolchain.configurations
         if candidate.name == configuration.name
     )
+    source = Path(source_filename(configuration, seed))
     command = compile_command(
-        configuration, source=Path("../program.ml"), executable=Path("program.exe")
+        configuration, source=source, executable=Path("program.exe")
     )
     # CR-soon xclerc: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
     # which are inherited by compilation and execution by default, but may differ
@@ -499,6 +510,8 @@ def reproduction_script(
             "set -eu",
             'cd "$(dirname "$0")"',
             f"export OCAMLLIB={shlex.quote(str(configuration.ocamllib))}",
+            # Keep program.ml editable for minimization, but preserve the basename.
+            shlex.join(["cp", "../program.ml", str(source)]),
             shlex.join(command),
             "./program.exe",
             "",
@@ -646,6 +659,7 @@ async def run_case(
             *(
                 run_configuration(
                     configuration,
+                    seed=seed,
                     program=program,
                     work_dir=case_dir / configuration.name,
                     slots=slots,
@@ -677,6 +691,7 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
         *(
             run_configuration(
                 configuration,
+                seed=SELF_CHECK_SEED,
                 program=program,
                 work_dir=run_dir / "self-check" / configuration.name,
                 slots=slots,
