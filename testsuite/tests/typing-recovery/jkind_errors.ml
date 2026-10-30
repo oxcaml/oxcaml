@@ -38,5 +38,9 @@ type u4 = int t4
 let _ = f4
 type u5 = t5
 
+(* Recovery drops the with-bound on [f4]. The recovered kind of ['a] must
+   still accept this application. *)
+let _ = f4 (fun () -> ()) (fun () -> ())
+
 (* This error should still be raised, despite the prior errors. *)
 let t : string = 10

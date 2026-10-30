@@ -33,7 +33,15 @@ File "jkind_errors.ml", line 31, characters 10-11:
 31 | type t7 : _
                ^
   Unimplemented kind syntax
-File "jkind_errors.ml", line 42, characters 17-19:
-42 | let t : string = 10
+File "jkind_errors.ml", line 43, characters 11-25:
+43 | let _ = f4 (fun () -> ()) (fun () -> ())
+                ^^^^^^^^^^^^^^
+  
+  The kind of 'a -> 'b is value non_float mod aliased immutable
+    because it's a function type.
+  But the kind of 'a -> 'b must be a subkind of value mod portable
+    because of the definition of f4 at file "jkind_errors.ml", line 23, characters 7-60.
+File "jkind_errors.ml", line 46, characters 17-19:
+46 | let t : string = 10
                       ^^
   The constant 10 has type int but an expression was expected of type string
