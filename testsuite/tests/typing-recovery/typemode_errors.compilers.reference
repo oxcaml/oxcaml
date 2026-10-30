@@ -1,0 +1,4 @@
+File "typemode_errors.ml", line 11, characters 11-16:
+11 | let f (x @ bogus) = x
+                ^^^^^
+Error: Unrecognized mode bogus.
