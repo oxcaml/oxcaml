@@ -1145,8 +1145,8 @@ end = struct
 
   (** The name of polymorphic mode variables will be
   determined by two variables and morphism pair. The object
-  types are irrelevant, and are thus forgotten. See [edge]
-  for more explanation *)
+  types are irrelevant, and are thus forgotten. See the
+  [name] field of [simple_edge] for more explanation *)
   type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
   type monadic_morph =
     (With_locality.Monadic.Const.t, With_locality.Monadic.Const.t) morphl
@@ -1368,7 +1368,6 @@ end = struct
 
     The former are registered in a VarTbl, the latter
     in a list of mode descriptions
-    We also use this step to register mode aliases
   *)
   let add_visible : type a. a C.obj -> (a, (allowed * allowed)) Desc.t -> unit =
     fun dst desc ->
@@ -1538,8 +1537,8 @@ end = struct
       each visible mode in a signature is a pair of variables: a monadic
       variable and a comonadic variable. [add_visible_paths] finds the paths
       from monadic variables to monadic variables, the paths from comonadic
-      variables to comonadic variables, and finally the paths from monadic
-      variables to comonadic variables. *)
+      variables to comonadic variables, and finally the paths from comonadic
+      variables to monadic variables. *)
   let add_visible_paths () =
     List.iter
       (fun { monadic; comonadic } ->
@@ -1562,11 +1561,13 @@ end = struct
         (** When printing, we name edges rather than
         nodes, such that we can print monadic and
         comonadic constraints in different bounds, thus
-        only printing left_only morphisms. By default,
-        the name is determined by the comonadic
-        morphism, but if this morphism is trivial (i.e.
-        the bounds can determine it), we use the
-        monadic morphism instead. *)
+        only printing left_only morphisms. A name is
+        identified by its two endpoint variables and
+        the morphisms in [via], so edges with the same
+        endpoints and morphisms share a printed name.
+        The endpoints are the comonadic variables of
+        the two modes when both are variables, and
+        their monadic variables otherwise. *)
     }
 
   type comonadic_edge =
