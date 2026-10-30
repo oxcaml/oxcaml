@@ -24,3 +24,8 @@ val simplify_as_recursive_let_cont :
   simplify_expr:Expr.t Simplify_common.expr_simplifier ->
   (Expr.t * Continuation_handler.t Continuation.Lmap.t)
   Simplify_common.expr_simplifier
+
+val rebuild_let_cont :
+  rebuild_body:'a Simplify_common.rebuild ->
+  rebuild_expr:Simplified_expr.t Simplify_common.rebuild ->
+  (Simplified_expr.simplified_let_cont_handlers * 'a) Simplify_common.rebuild

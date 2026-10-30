@@ -25,6 +25,9 @@ val scrape_alias: Env.t -> module_type -> module_type
         (* Expand toplevel module type abbreviations and aliases
            till hitting a "hard" module type (signature, functor,
            or abstract module type ident. *)
+val scrape_alias_lazy:
+  Env.t -> Subst.Lazy.module_type -> Subst.Lazy.module_type
+        (* Preserves physical identity if no reduction is possible. *)
 val reduce_lazy:
   Env.t -> Subst.Lazy.module_type -> Subst.Lazy.module_type option
 val reduce_alias_lazy:

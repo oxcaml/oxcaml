@@ -195,7 +195,7 @@ val make_update :
 val check_arity : _ Flambda_arity.t -> _ list -> bool
 
 val extended_machtype_of_return_arity :
-  [`Unarized] Flambda_arity.t -> Cmm_helpers.Extended_machtype.t
+  _ Flambda_arity.t -> Cmm_helpers.Extended_machtype.t
 
 val alloc_mode_for_applications_to_cmx :
   Alloc_mode.For_applications.t -> Cmx_format.return_mode

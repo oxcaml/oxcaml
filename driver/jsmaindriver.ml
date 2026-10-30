@@ -16,7 +16,7 @@
 module Options = Main_args.Make_jscomp_options (Main_args.Default.Jsmain)
 
 let main argv ppf =
-  Clflags.jsir := true;
+  Clflags.set_target Clflags.Target.Js_of_ocaml;
   let program = "ocamlj" in
   let columns =
     match Sys.getenv "COLUMNS" with

@@ -397,7 +397,7 @@ type input =
   }
 
 let open_in name =
-  let ch = open_in_bin name in
+  let ch = open_in_bin (Dune_manifests_reader.resolve name) in
   let len = in_channel_length ch in
   let find_directory_end offset =
     seek_in ch (len - 22 - offset);

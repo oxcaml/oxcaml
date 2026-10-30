@@ -317,7 +317,7 @@ let select_store' ~is_assign addr (exp : Cmm.expression) :
   | Cname_for_debugger _ | Ctuple _
   | Cop (_, _, _)
   | Csequence (_, _)
-  | Cifthenelse (_, _, _, _, _, _)
+  | Cifthenelse (_, _, _, _, _, _, _, _)
   | Cswitch (_, _, _, _)
   | Ccatch (_, _, _)
   | Cexit (_, _, _)
@@ -433,8 +433,14 @@ let select_operation'
   (* Recognize store instructions *)
   | Cstore (((Word_int | Word_val) as chunk), _init) -> (
     match[@ocaml.warning "-fragile-match"] args with
-    | [loc; Cop (Caddi, [Cop (Cload _, [loc'], _); Cconst_int (n, _dbg)], _)]
-      when Stdlib.( = ) loc loc' && int_is_immediate n ->
+    | [ loc;
+        Cop
+          ( Caddi,
+            [ Cop (Cload { memory_chunk = Word_int | Word_val; _ }, [loc'], _);
+              Cconst_int (n, _dbg) ],
+            _ ) ]
+      when Cmm_peephole_engine.Cmm_comparator.equivalent loc loc'
+           && int_is_immediate n ->
       let addr, arg = select_addressing chunk loc in
       Rewritten (specific (Ioffset_loc (n, addr)), [arg])
     | _ -> Use_default)
@@ -576,3 +582,10 @@ let insert_op_debug env sub_cfg op dbg rs rd :
   if !Clflags.llvm_backend
   then Use_default
   else insert_op_debug' env sub_cfg op dbg rs rd
+
+let pseudoregs_for_operation op rs rd :
+    Cfg_selectgen_target_intf.pseudoregs_for_operation_result =
+  try
+    let rsrc, rdst = pseudoregs_for_operation op rs rd in
+    Constrained (rsrc, rdst)
+  with Use_default_exn -> Use_default_regs

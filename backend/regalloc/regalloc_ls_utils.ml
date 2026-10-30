@@ -4,7 +4,7 @@ open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 module DLL = Doubly_linked_list
 
-let log_function = lazy (make_log_function ~label:"ls")
+let log_function = Param.make (fun () -> make_log_function ~label:"ls")
 
 let equal_list_dll eq list dll =
   let rec aux eq list cell =
@@ -17,14 +17,14 @@ let equal_list_dll eq list dll =
   in
   aux eq list (DLL.hd_cell dll)
 
-let indent () = (Lazy.force log_function).indent ()
+let indent () = (Param.get log_function).indent ()
 
-let dedent () = (Lazy.force log_function).dedent ()
+let dedent () = (Param.get log_function).dedent ()
 
-let reset_indentation () = (Lazy.force log_function).reset_indentation ()
+let reset_indentation () = (Param.get log_function).reset_indentation ()
 
 let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
- fun ?no_eol fmt -> (Lazy.force log_function).log ?no_eol fmt
+ fun ?no_eol fmt -> (Param.get log_function).log ?no_eol fmt
 
 let instr_prefix (instr : Cfg.basic Cfg.instruction) =
   Printf.sprintf "#%04d" (InstructionId.to_int_unsafe instr.id)
@@ -46,12 +46,12 @@ let log_body_and_terminator :
     liveness ->
     unit =
  fun body terminator liveness ->
-  make_log_body_and_terminator (Lazy.force log_function) ~instr_prefix
+  make_log_body_and_terminator (Param.get log_function) ~instr_prefix
     ~term_prefix body terminator liveness
 
 let log_cfg_with_infos : Cfg_with_infos.t -> unit =
  fun cfg_with_infos ->
-  make_log_cfg_with_infos (Lazy.force log_function) ~instr_prefix ~term_prefix
+  make_log_cfg_with_infos (Param.get log_function) ~instr_prefix ~term_prefix
     cfg_with_infos
 
 let log_body_and_terminator_with_ls_order :
@@ -61,7 +61,7 @@ let log_body_and_terminator_with_ls_order :
     liveness ->
     unit =
  fun ls_order_mapping body terminator liveness ->
-  make_log_body_and_terminator (Lazy.force log_function)
+  make_log_body_and_terminator (Param.get log_function)
     ~instr_prefix:(instr_prefix_with_ls_order ls_order_mapping)
     ~term_prefix:(term_prefix_with_ls_order ls_order_mapping)
     body terminator liveness
@@ -69,7 +69,7 @@ let log_body_and_terminator_with_ls_order :
 let log_cfg_with_infos_with_ls_order :
     (InstructionId.t -> int) -> Cfg_with_infos.t -> unit =
  fun ls_order_mapping cfg_with_infos ->
-  make_log_cfg_with_infos (Lazy.force log_function)
+  make_log_cfg_with_infos (Param.get log_function)
     ~instr_prefix:(instr_prefix_with_ls_order ls_order_mapping)
     ~term_prefix:(term_prefix_with_ls_order ls_order_mapping)
     cfg_with_infos

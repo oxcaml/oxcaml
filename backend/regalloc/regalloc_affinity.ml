@@ -86,7 +86,7 @@ let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
  fun cfg_with_infos phi_moves ->
   let classes = Classes.make () in
   let affinity = Reg.Tbl.create 17 in
-  match Lazy.force Regalloc_utils.affinity with
+  match Regalloc_utils.Param.get Regalloc_utils.affinity with
   | false -> { classes; affinity }
   | true ->
     List.iter

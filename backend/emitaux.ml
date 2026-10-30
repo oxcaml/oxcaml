@@ -47,12 +47,15 @@ type frame_descr =
     fd_live_offset : int list; (* Offsets/regs of live addresses *)
     fd_debuginfo : frame_debuginfo; (* Location, if any *)
     fd_long : bool; (* Use 32 instead of 16 bit format. *)
-    fd_section : int
+    fd_section : int;
         (* Identifies the text section the return address lives in. A "short"
            descriptor's delta is the difference between two return-address
            labels, which is only an assembly-time constant when both labels are
            in the same section; descriptors whose section differs from the
            previous one escape. *)
+    fd_link_symbol : string option
+        (* Under [-frametable-sections], the symbol whose section the
+           descriptor's frametable piece is linked to. *)
   }
 
 let frame_descriptors = ref ([] : frame_descr list)
@@ -65,7 +68,10 @@ let frame_section_epoch = ref 0
 
 let current_code_section = ref ""
 
-let enter_code_section name =
+let current_link_symbol = ref None
+
+let enter_code_section ?link_symbol name =
+  current_link_symbol := link_symbol;
   if not (String.equal name !current_code_section)
   then (
     current_code_section := name;
@@ -114,7 +120,8 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
          fd_live_offset = List.sort_uniq ( - ) live_offset;
          fd_debuginfo = debuginfo;
          fd_long;
-         fd_section = !frame_section_epoch
+         fd_section = !frame_section_epoch;
+         fd_link_symbol = !current_link_symbol
        }
        :: !frame_descriptors
 
@@ -136,7 +143,7 @@ type emit_frame_actions =
     efa_def_label : Label.t -> unit
   }
 
-let emit_frames ~debug_strings_section a =
+let emit_frames ~debug_strings_section ~code_begin ~code_end a =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
   let module Asm_section = Asm_targets.Asm_section in
@@ -545,7 +552,6 @@ let emit_frames ~debug_strings_section a =
      is emitted), so the prepended list is in decreasing order. Reverse it to
      emit the frame table in increasing return-address order. *)
   let descrs = List.rev !frame_descriptors in
-  a.efa_word (List.length descrs);
   (* Emit each descriptor preceded by retaddr delta. The first descriptor of the
      frametable, and any descriptor that does not fit the short format, escapes:
      a 0 delta byte followed by the existing normal/long descriptor (which
@@ -575,7 +581,54 @@ let emit_frames ~debug_strings_section a =
            (no same-section previous return address for a delta): escape. *)
         escape ()
   in
-  ignore (List.fold_left emit_descr None descrs);
+  (if not !Oxcaml_flags.frametable_sections
+   then (
+     a.efa_word (List.length descrs);
+     ignore (List.fold_left emit_descr None descrs))
+   else
+     (* The unit's table is a header: a -1 tag (a count-prefixed table starts
+        with a nonnegative count), the descriptor count, and self-relative
+        offsets to the start and end of the unit's pieces. Each run of
+        descriptors with the same link symbol goes in a piece linked to that
+        symbol's section, so that the linker drops the piece along with the
+        code, and starts with an escape. The zero-size marker pieces bracketing
+        the runs are linked to [code_begin] and [code_end], so the linker places
+        them around all of the unit's pieces. *)
+     let begin_lbl = Cmm.new_label () in
+     let end_lbl = Cmm.new_label () in
+     a.efa_word (-1);
+     a.efa_word (List.length descrs);
+     a.efa_label_rel begin_lbl 0l;
+     a.efa_label_rel end_lbl 0l;
+     let switch_to_piece link_symbol =
+       D.switch_to_section (Asm_section.Frametable_piece { link_symbol })
+     in
+     let link_symbol fd =
+       match fd.fd_link_symbol with
+       | Some link_symbol -> link_symbol
+       | None ->
+         Misc.fatal_error
+           "Frame descriptor outside a -frametable-sections piece"
+     in
+     switch_to_piece code_begin;
+     a.efa_def_label begin_lbl;
+     ignore
+       (List.fold_left
+          (fun prev fd ->
+            let prev =
+              match prev with
+              | Some prev_fd
+                when String.equal (link_symbol prev_fd) (link_symbol fd) ->
+                prev
+              | Some _ | None ->
+                switch_to_piece (link_symbol fd);
+                None
+            in
+            emit_descr prev fd)
+          None descrs);
+     switch_to_piece code_end;
+     a.efa_def_label end_lbl;
+     D.switch_to_section Asm_section.Read_only_data);
   Label_table.iter emit_debuginfo debuginfos;
   (* The name structs are kept near the debuginfo words that reference them (a
      23-bit, 32 MB offset; bit 25 above it flags a suffix-sharing jump word).
@@ -623,12 +676,14 @@ let with_snapshot ~f =
   let saved_frame_descriptors = !frame_descriptors in
   let saved_frame_section_epoch = !frame_section_epoch in
   let saved_current_code_section = !current_code_section in
+  let saved_current_link_symbol = !current_link_symbol in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
   frame_section_epoch := saved_frame_section_epoch;
   current_code_section := saved_current_code_section;
+  current_link_symbol := saved_current_link_symbol;
   result
 
 let get_file_num ~file_emitter file_name =
@@ -729,7 +784,6 @@ module Dwarf_helpers = struct
       let code_layout : Dwarf_state.code_layout =
         if
           !Clflags.function_sections
-          || !Oxcaml_flags.basic_block_sections
           || !Oxcaml_flags.module_entry_functions_section
         then
           (* Use Function_sections mode - ranges will be recorded via
@@ -829,8 +883,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
         | Specific _ | Name_for_debugger _ | Alloc _ )
     | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
-    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
-    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
+    | Lreloadretaddr | Lreturn | Llabel_for_jump_target _ | Llabel_for_dwarf _
+    | Lbranch _ | Lcondbranch _ | Lcondbranch3 _ | Lswitch _ | Lentertrap
+    | Lraise _ ->
       loop i.next fs max_fs nontail_flag
     | Lstackcheck _ ->
       (* should not be already present *)
@@ -841,32 +896,33 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
 
 let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     ~stack_threshold_size ~trap_size =
-  if Config.no_stack_checks
-  then fundecl
-  else
-    let frame_size =
-      Proc.frame_size ~stack_offset ~num_stack_slots:fundecl.fun_num_stack_slots
-        ~contains_calls:fundecl.fun_contains_calls
-    in
-    let { max_frame_size; contains_nontail_calls } =
-      preproc_stack_check ~fun_body:fundecl.fun_body ~frame_size ~trap_size
-    in
-    let insert_stack_check =
-      contains_nontail_calls || max_frame_size >= stack_threshold_size
-    in
-    if insert_stack_check
+  let frame_size =
+    Proc.frame_size ~stack_offset ~num_stack_slots:fundecl.fun_num_stack_slots
+      ~contains_calls:fundecl.fun_contains_calls
+  in
+  let { max_frame_size; contains_nontail_calls } =
+    preproc_stack_check ~fun_body:fundecl.fun_body ~frame_size ~trap_size
+  in
+  let insert_stack_check =
+    if Config.no_stack_checks
     then
-      let fun_body =
-        (* CR mshinwell: These availability sets aren't taking into account any
-           potential clobbers by the stack check. *)
-        Linear.instr_cons
-          (Lstackcheck { max_frame_size_bytes = max_frame_size })
-          [||] [||] ~available_before:fundecl.fun_body.available_before
-          ~available_across:fundecl.fun_body.available_across fundecl.fun_body
-          ~phantom_available_before:fundecl.fun_body.phantom_available_before
-      in
-      { fundecl with fun_body }
-    else fundecl
+      Domainstate.stack_guard_stride > 0
+      && max_frame_size >= Domainstate.stack_guard_stride
+    else contains_nontail_calls || max_frame_size >= stack_threshold_size
+  in
+  if insert_stack_check
+  then
+    let fun_body =
+      (* CR mshinwell: These availability sets aren't taking into account any
+         potential clobbers by the stack check. *)
+      Linear.instr_cons
+        (Lstackcheck { max_frame_size_bytes = max_frame_size })
+        [||] [||] ~available_before:fundecl.fun_body.available_before
+        ~available_across:fundecl.fun_body.available_across fundecl.fun_body
+        ~phantom_available_before:fundecl.fun_body.phantom_available_before
+    in
+    { fundecl with fun_body }
+  else fundecl
 
 let stapsdt_base_emitted = ref false
 

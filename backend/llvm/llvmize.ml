@@ -1320,7 +1320,11 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
   match i.desc with
   | Op op -> basic_op t i op
   | Prologue | Epilogue | Reloadretaddr -> () (* LLVM handles these for us *)
-  | Stack_check _ -> fail_msg "unexpected instruction: stack check"
+  | Stack_check { max_frame_size_bytes } ->
+    (* Large frames are probed when stack checks are disabled, so they cannot
+       step over the stack's guard page; llvmize does not emit the probes. *)
+    fail_msg "stack probes for large frame (%d bytes) not supported"
+      max_frame_size_bytes
   | Poptrap { lbl_handler } -> (
     match Label.Tbl.find_opt (get_fun_info t).trap_blocks lbl_handler with
     | None -> fail_msg "unbalanced trap pop"

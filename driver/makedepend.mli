@@ -15,5 +15,7 @@
 
 val main : unit -> unit
 
+val run_main : string array -> int
+
 (* entry point when called from the -depend option of ocamlc/ocamlopt *)
 val main_from_option : unit -> unit

@@ -253,34 +253,37 @@ let initialize_array0 env loc ~length array_set_kind width ~init creation_expr =
     match width with
     | Sixty_four_or_more -> L.lambda_unit
     | Thirty_two_or_less { width; zero_init } ->
-      let elements_per_word =
-        match width with Eight -> 8 | Sixteen -> 4 | Thirty_two -> 2
-      in
-      let zero_init_last_field =
-        L.Lprim
-          ( Parraysetu (array_set_kind, Ptagged_int_index),
-            (* [Popaque] is used to conceal the out-of-bounds write. *)
-            [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
-              Lvar length;
-              zero_init ],
-            loc )
-      in
-      let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
-        L.Lprim
-          ( Psequand,
-            [ L.icmp ~loc Cgt L.int (Lvar length) (L.tagged_immediate 0);
-              L.icmp ~loc Cne L.int
-                (L.and_ L.int (Lvar length)
-                   (L.tagged_immediate (elements_per_word - 1))
-                   ~loc)
-                (L.tagged_immediate 0) ],
-            loc )
-      in
-      L.Lifthenelse
-        ( length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word,
-          zero_init_last_field,
-          L.lambda_unit,
-          L.layout_unit )
+      if Clflags.target_is_jsir ()
+      then L.lambda_unit
+      else
+        let elements_per_word =
+          match width with Eight -> 8 | Sixteen -> 4 | Thirty_two -> 2
+        in
+        let zero_init_last_field =
+          L.Lprim
+            ( Parraysetu (array_set_kind, Ptagged_int_index),
+              (* [Popaque] is used to conceal the out-of-bounds write. *)
+              [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
+                Lvar length;
+                zero_init ],
+              loc )
+        in
+        let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
+          L.Lprim
+            ( Psequand,
+              [ L.icmp ~loc Cgt L.int (Lvar length) (L.tagged_immediate 0);
+                L.icmp ~loc Cne L.int
+                  (L.and_ L.int (Lvar length)
+                     (L.tagged_immediate (elements_per_word - 1))
+                     ~loc)
+                  (L.tagged_immediate 0) ],
+              loc )
+        in
+        L.Lifthenelse
+          ( length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word,
+            zero_init_last_field,
+            L.lambda_unit,
+            L.layout_unit )
   in
   let env, initialize =
     let index = Ident.create_local "index" in
@@ -320,15 +323,15 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
       Printf.sprintf "caml_make%s_%s_vect%s"
         (match mode with
         | Alloc_heap -> ""
-        | Alloc_local when !Clflags.jsir -> ""
+        | Alloc_local when Clflags.target_is_jsir () -> ""
         | Alloc_local -> "_local")
         name
-        (if !Clflags.jsir then "_bytecode" else "")
+        (if Clflags.target_is_jsir () then "_bytecode" else "")
     else if
       (* For regular (boxed) arrays, use the new #13003 names. JSOO doesn't have
          the new names yet, so we fall back to the old ones. It also doesn't
          discriminate between local and heap allocations. *)
-      !Clflags.jsir
+      Clflags.target_is_jsir ()
     then "caml_make_vect"
     else
       match mode with
@@ -1109,7 +1112,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
           "Lambda_to_flambda.transform_primitive: Pbigarrayset with unknown \
            layout and elements should only have dimensions between 1 and 3 \
            (see translprim).")
-  | Pctconst const, _ when !Clflags.jsir ->
+  | Pctconst const, _ when Clflags.target_is_jsir () ->
     let name =
       match const with
       | Big_endian -> "big_endian"

@@ -91,6 +91,11 @@ module Relations : sig
 
   val any_source : Code_id_or_name.t term -> _ atom
 
+  (** [any_source_if_used ~if_used x] means [any_source x], but only if
+      [if_used] has [any_usage]. *)
+  val any_source_if_used :
+    if_used:Code_id_or_name.t term -> Code_id_or_name.t term -> _ atom
+
   (* [zero_alloc_source x] means that [x] has any source, but furthermore, that
      all fields read from [x] are themselves [zero_alloc_source] (and hence
      [any_source]), even if they are local fields. This is not fully tracked,
@@ -142,6 +147,9 @@ val add_alias_if_any_source_dep :
 val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val add_any_source : graph -> Code_id_or_name.t -> unit
+
+val add_any_source_if_used :
+  graph -> if_used:Code_id_or_name.t -> Code_id_or_name.t -> unit
 
 val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
 

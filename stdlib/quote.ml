@@ -30,6 +30,7 @@
 
 #syntax quotations on
 
+open! Stdlib
 open CamlinternalQuote
 
 module Expr = struct

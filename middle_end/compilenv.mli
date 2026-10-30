@@ -77,13 +77,11 @@ val write_unit_info: unit_infos -> string -> unit
         (* Save the given infos in the given file *)
 val build_unit_info:
   main_module_block_format:Lambda.main_module_block_format ->
-  arg_descr:Lambda.arg_descr option ->
   static_data:Slambdaeval.CU_data.t ->
   unit_infos
         (* Build the infos for the current unit. *)
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
-  arg_descr:Lambda.arg_descr option ->
   static_data:Slambdaeval.CU_data.t ->
   unit
         (* Save the infos for the current unit in the given file *)

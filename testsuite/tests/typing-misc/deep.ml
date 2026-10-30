@@ -62,11 +62,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'c list * 'd option -> int end
+         sig val f : 'c ('d : any). 'c list * 'd option -> int end
        is not included in
          sig val f : 'a list * 'b list -> int end
        Values do not match:
-         val f : 'c list * 'd option -> int
+         val f : 'c ('d : any). 'c list * 'd option -> int
        is not included in
          val f : 'a list * 'b list -> int
        The type "'a list * 'b option -> int" is not compatible with the type

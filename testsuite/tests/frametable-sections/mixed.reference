@@ -1,0 +1,8 @@
+caught Deep 6
+Raised at Mixed_lib.frame3 in file "mixed_lib.ml", line 3, characters 45-59
+Called from Mixed_lib.frame2 in file "mixed_lib.ml", line 5, characters 30-44
+Called from Mixed_lib.frame1 in file "mixed_lib.ml", line 7, characters 30-44
+Called from Mixed_lib.raise_deep in file "mixed_lib.ml", line 9, characters 41-51
+Called from Mixed.via_main in file "mixed.ml", line 67, characters 2-30
+Called from Mixed in file "mixed.ml", line 77, characters 14-26
+deep 1400

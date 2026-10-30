@@ -1,0 +1,8 @@
+2 105 10
+function pieces: some
+plain pieces: 0
+begin marker pieces: 1
+end marker pieces: 1
+tagged headers: 1
+object pieces: some
+unlinked object pieces: 0

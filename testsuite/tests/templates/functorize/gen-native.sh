@@ -27,6 +27,7 @@ s/ocamlc/ocamlopt/g
 s/ocamlopt_native/ocamlopt_byte/g
 s/\.cmo/.cmx/g
 s/\.bc/.exe/g
+s/\.cma/.cmxa/g
 ' "$INPUT" | sed "s|TEST|TEST (* DO NOT EDIT. Instead edit $INPUT and run gen-native.sh. *)|" \
   > "$TARGET"
   if [ -n "$CHECKING" ]; then
@@ -49,3 +50,4 @@ gen_native complete_arg/test_byte.ml complete_arg/test_native.ml
 gen_native nested_static/test_byte.ml nested_static/test_native.ml
 gen_native shared_dep/test_byte.ml shared_dep/test_native.ml
 gen_native instance_arg/test_byte.ml instance_arg/test_native.ml
+gen_native archive_deps/test_byte.ml archive_deps/test_native.ml

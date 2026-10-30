@@ -21,10 +21,13 @@ module type S = sig
 
   module Memory : sig
     val allocate :
-         tag:int
-      -> deadcode_sentinal:Code.Var.t
-      -> [ `Expr of Wasm_ast.expression | `Var of Wasm_ast.var ] list
+         ?safepoint_friendly_array_init:bool
+      -> tag:int
+      -> Wasm_ast.expression list Code_generation.t
       -> expression
+
+    val allocate_float_array :
+      ?safepoint_friendly_array_init:bool -> Wasm_ast.expression list Code_generation.t -> expression
 
     val load_function_pointer :
          cps:bool
@@ -83,6 +86,10 @@ module type S = sig
 
     val unbox_float : expression -> expression
 
+    val box_float32 : expression -> expression
+
+    val unbox_float32 : expression -> expression
+
     val box_int32 : expression -> expression
 
     val unbox_int32 : expression -> expression
@@ -123,9 +130,11 @@ module type S = sig
 
     val le : expression -> expression -> expression
 
-    val eq : expression -> expression -> expression
+    val js_eqeqeq : negate:bool -> expression -> expression -> expression
 
-    val neq : expression -> expression -> expression
+    val phys_eq : expression -> expression -> expression
+
+    val phys_neq : expression -> expression -> expression
 
     val ult : expression -> expression -> expression
 
@@ -162,8 +171,58 @@ module type S = sig
     val as_block : expression -> expression
   end
 
+  module Value64 : sig
+    val val_int : expression -> expression
+
+    val int_val : expression -> expression
+
+    val check_is_not_zero : expression -> expression
+    (** Returns an int32 value *)
+
+    val check_is_int : expression -> expression
+    (** Returns an int32 value *)
+
+    val not : expression -> expression
+
+    val lt : expression -> expression -> expression
+
+    val le : expression -> expression -> expression
+
+    val js_eqeqeq : negate:bool -> expression -> expression -> expression
+
+    val phys_eq : expression -> expression -> expression
+
+    val phys_neq : expression -> expression -> expression
+
+    val ult : expression -> expression -> expression
+
+    val int_add : expression -> expression -> expression
+
+    val int_sub : expression -> expression -> expression
+
+    val int_mul : expression -> expression -> expression
+
+    val int_div : expression -> expression -> expression
+
+    val int_mod : expression -> expression -> expression
+
+    val int_neg : expression -> expression
+
+    val int_or : expression -> expression -> expression
+
+    val int_and : expression -> expression -> expression
+
+    val int_xor : expression -> expression -> expression
+
+    val int_lsl : expression -> expression -> expression
+
+    val int_lsr : expression -> expression -> expression
+
+    val int_asr : expression -> expression -> expression
+  end
+
   module Constant : sig
-    val translate : Code.constant -> expression
+    val translate : unboxed:bool -> Code.constant -> expression
   end
 
   module Closure : sig
@@ -171,6 +230,7 @@ module type S = sig
          context:Code_generation.context
       -> closures:Closure_conversion.closure Code.Var.Map.t
       -> cps:bool
+      -> no_code_pointer:bool
       -> Code.Var.t
       -> expression
 
@@ -178,6 +238,7 @@ module type S = sig
          context:Code_generation.context
       -> closures:Closure_conversion.closure Code.Var.Map.t
       -> cps:bool
+      -> no_code_pointer:bool
       -> Code.Var.t
       -> unit Code_generation.t
 
@@ -248,8 +309,27 @@ module type S = sig
     val power : expression -> expression -> expression
 
     val fmod : expression -> expression -> expression
+  end
 
-    val round : expression -> expression
+  module Bigarray : sig
+    val get :
+         bound_error_index:int
+      -> unsafe:bool
+      -> kind:Optimization_hint.Bigarray.kind
+      -> layout:Optimization_hint.Bigarray.layout
+      -> expression
+      -> indices:expression list
+      -> expression
+
+    val set :
+         bound_error_index:int
+      -> unsafe:bool
+      -> kind:Optimization_hint.Bigarray.kind
+      -> layout:Optimization_hint.Bigarray.layout
+      -> expression
+      -> indices:expression list
+      -> expression
+      -> expression
   end
 
   val internal_primitives :
@@ -277,7 +357,7 @@ module type S = sig
        param_names:Wasm_ast.var list
     -> locals:(Wasm_ast.var * Wasm_ast.value_type) list
     -> Wasm_ast.instruction list
-    -> Wasm_ast.instruction list
+    -> (Wasm_ast.var * Wasm_ast.value_type) list * Wasm_ast.instruction list
 
   val entry_point :
        toplevel_fun:Wasm_ast.var

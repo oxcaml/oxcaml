@@ -17,17 +17,14 @@
 
 /* The bytecode interpreter */
 #include <stdio.h>
-#include "caml/alloc.h"
 #include "caml/backtrace.h"
 #include "caml/callback.h"
-#include "caml/codefrag.h"
 #include "caml/debugger.h"
 #include "caml/fail.h"
 #include "caml/fix_code.h"
 #include "caml/instrtrace.h"
 #include "caml/instruct.h"
 #include "caml/interp.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
@@ -36,8 +33,6 @@
 #include "caml/fiber.h"
 #include "caml/dynamic.h"
 #include "caml/domain.h"
-#include "caml/globroots.h"
-#include "caml/startup.h"
 #include "caml/startup_aux.h"
 
 /* Registers for the abstract machine:
@@ -627,7 +622,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
         domain_state->current_stack = parent_stack;
         sp = domain_state->current_stack->sp;
         caml_free_stack(old_stack);
-        caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+        caml_fiber_switched();
 
         domain_state->trap_sp_off = Long_val(sp[0]);
         extra_args = Long_val(sp[1]);
@@ -1047,7 +1042,7 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
           old_stack->sp = sp;
           domain_state->current_stack = parent_stack;
           sp = domain_state->current_stack->sp;
-          caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+          caml_fiber_switched();
           caml_free_stack(old_stack);
 
           domain_state->trap_sp_off = Long_val(sp[0]);
@@ -1356,7 +1351,7 @@ do_resume: {
       domain_state->current_stack->sp = sp;
       domain_state->current_stack = stk;
       sp = domain_state->current_stack->sp;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+      caml_fiber_switched();
 
       domain_state->trap_sp_off = Long_val(sp[0]);
       switch (resume_action) {
@@ -1509,7 +1504,7 @@ do_resume: {
 
       old_stack->sp = sp;
       domain_state->current_stack = parent_stack;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+      caml_fiber_switched();
       sp = parent_stack->sp;
       Stack_parent(old_stack) = NULL;
       Field(cont, 0) = Val_ptr(old_stack);
@@ -1556,7 +1551,7 @@ do_resume: {
       self->sp = sp;
       domain_state->current_stack = parent;
       sp = parent->sp;
-      caml_dynamic_cache_flush(domain_state->dynamic_bindings);
+      caml_fiber_switched();
 
       CAMLassert(Stack_parent(cont_tail) == NULL);
       Stack_parent(self) = NULL;

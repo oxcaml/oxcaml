@@ -97,6 +97,8 @@ module type S = sig
 
   val map_sharing : ('a -> 'a) -> 'a t -> 'a t
 
+  val map_keys : (key -> key) -> 'a t -> 'a t
+
   val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
 
   val to_seq : 'a t -> (key * 'a) Seq.t

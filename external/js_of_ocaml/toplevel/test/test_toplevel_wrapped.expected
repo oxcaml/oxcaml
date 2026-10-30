@@ -1,0 +1,39 @@
+=== ok ===
+Success, 0 warning(s)
+=== warning ===
+Success, 1 warning(s)
+  warning contains "": true
+  loc: (1,15)-(1,16)
+=== type-error ===
+Error, 0 warning(s)
+  error contains "Unbound value": true
+  loc: (1,8)-(1,12)
+=== syntax-error ===
+Error, 0 warning(s)
+  error contains "Syntax error": true
+  loc: (1,4)-(1,5)
+=== check-ok ===
+Success, 0 warning(s)
+=== use-mod ===
+Success, 0 warning(s)
+=== check-setenv ===
+Success, 0 warning(s)
+=== execute-blocked ===
+Error, 0 warning(s)
+  error contains "scratch typing environment": true
+=== execute-after-clear ===
+Success, 0 warning(s)
+=== scratch-dropped ===
+Error, 0 warning(s)
+  error contains "Unbound value": true
+  loc: (1,8)-(1,20)
+=== executed-kept ===
+Success, 0 warning(s)
+=== step ===
+phrase ok=true
+error contains "Unbound value": true
+phrase ok=true
+eof
+=== re-eval warning ===
+leading blank: false
+outcome leading blank: false

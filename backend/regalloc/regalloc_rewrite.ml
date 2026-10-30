@@ -137,7 +137,7 @@ let rewrite_gen : type s.
  fun (module State : State with type t = s) (module Utils) state cfg_with_infos
      ~spilled_nodes ~block_temporaries ->
   let should_coalesce_temp_spills_and_reloads =
-    Lazy.force Regalloc_utils.block_temporaries && block_temporaries
+    Param.get Regalloc_utils.block_temporaries && block_temporaries
   in
   if debug
   then (
@@ -363,10 +363,13 @@ let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
               else critical_edges)
             successor_labels critical_edges))
 
-(* A destruction edge is an edge following a destruction point. We are inserting
-   blocks on such edges to work around a bug in the split processing phase where
-   such an edge points to a block with another predecessor and that predecessor
-   has not spilled the temporaries destroyed at the destruction point. *)
+(* To work around a bug in split processing (see #4685), we ensure that there
+   are no edges from blocks ending in destruction points to blocks having
+   multiple predecessors, by inserting an extra block along any such edges.
+
+   (The bug involves a second predecessor of the target block which has not
+   spilled temporaries destroyed by the destruction point, and we avoid it by
+   ensuring there is no such second predecessor) *)
 let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
  fun cfg ->
   Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
@@ -379,9 +382,13 @@ let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
         in
         Label.Set.fold
           (fun successor_label critical_edges ->
-            Cfg_edge.Set.add
-              { Cfg_edge.src = label; dst = successor_label }
-              critical_edges)
+            let successor_block = Cfg.get_block_exn cfg successor_label in
+            if Label.Set.cardinal successor_block.predecessors = 1
+            then critical_edges
+            else
+              Cfg_edge.Set.add
+                { Cfg_edge.src = label; dst = successor_label }
+                critical_edges)
           successor_labels critical_edges)
 
 let prelude :
@@ -411,7 +418,7 @@ let prelude :
     | params ->
       Utils.log "function_specific_params: %s" (String.concat ", " params));
   Reg.reinit_relocatable_regs ();
-  if debug && Lazy.force invariants
+  if debug && Param.get invariants
   then (
     Utils.log "precondition";
     Regalloc_invariants.precondition cfg_with_layout);
@@ -448,7 +455,7 @@ let prelude :
       num_temporaries >= threshold_split_live_ranges
       || Flambda2_ui.Flambda_features.classic_mode ()
     then cfg_infos, Regalloc_stack_slots.make (), []
-    else if Lazy.force Regalloc_split_utils.split_live_ranges
+    else if Param.get Regalloc_split_utils.split_live_ranges
     then
       let { Regalloc_split.stack_slots; phi_moves } =
         Profile.record ~accumulate:true "split"
@@ -489,7 +496,7 @@ let postlude : type s.
   update_live_fields cfg_with_layout (Cfg_with_infos.liveness cfg_with_infos);
   f ();
   (Cfg_with_layout.cfg cfg_with_layout).register_locations_are_set <- true;
-  if debug && Lazy.force invariants
+  if debug && Param.get invariants
   then (
     Utils.log "postcondition";
     Regalloc_invariants.postcondition_liveness cfg_with_infos)

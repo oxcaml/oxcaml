@@ -17,8 +17,6 @@
 
 #include "caml/alloc.h"
 #include "caml/custom.h"
-#include "caml/finalise.h"
-#include "caml/gc.h"
 #include "caml/gc_ctrl.h"
 #include "caml/gc_stats.h"
 #include "caml/major_gc.h"
@@ -34,7 +32,6 @@
 #endif
 #include "caml/domain.h"
 #include "caml/fiber.h"
-#include "caml/globroots.h"
 #include "caml/signals.h"
 #include "caml/startup.h"
 #include "caml/fail.h"
@@ -49,8 +46,6 @@ uintnat caml_fiber_wsz;
 /* TODO: turn these into atomics to avoid data races */
 extern uintnat caml_custom_work_max_multiplier; /* see major_gc.c */
 extern uintnat caml_prelinking_in_use;    /* see startup_nat.c */
-extern uintnat caml_compaction_algorithm; /* see shared_heap.c */
-extern uintnat caml_compact_unmap;        /* see shared_heap.c */
 extern uintnat caml_pool_min_chunk_bsz;  /* see shared_heap.c */
 extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
@@ -460,8 +455,6 @@ static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
   { "small_heap_limit", &caml_small_heap_limit, 0 },
   { "prelinking_in_use", &caml_prelinking_in_use, 0 },
-  { "compaction", &caml_compaction_algorithm, 0 },
-  { "compact_unmap", &caml_compact_unmap, 0 },
   { "pool_min_chunk_size", &caml_pool_min_chunk_bsz, 0 },
   { "main_stack_size", &caml_init_main_stack_wsz, 0 },
   { "thread_stack_size", &caml_init_thread_stack_wsz, 0 },

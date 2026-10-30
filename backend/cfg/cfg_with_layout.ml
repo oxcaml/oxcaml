@@ -33,13 +33,20 @@ module DLL = Doubly_linked_list
 
 type layout = Label.t DLL.t
 
+type layout_index = Label.t DLL.cell Label.Tbl.t
+
 type t =
   { cfg : Cfg.t;
     mutable layout : layout;
-    sections : (Label.t, string) Hashtbl.t
+    mutable index : layout_index
   }
 
-let create cfg ~layout = { cfg; layout; sections = Hashtbl.create 3 }
+let make_index layout =
+  let tbl = Label.Tbl.create (DLL.length layout) in
+  DLL.iter_cell layout ~f:(fun c -> Label.Tbl.replace tbl (DLL.value c) c);
+  tbl
+
+let create cfg ~layout = { cfg; layout; index = make_index layout }
 
 let cfg t = t.cfg
 
@@ -65,22 +72,8 @@ let set_layout t layout =
        Misc.fatal_error
          "Cfg set_layout: new layout is not a permutation of the current \
           layout, or first label is not entry");
-  t.layout <- layout
-
-let assign_blocks_to_section t labels name =
-  List.iter
-    (fun label ->
-      match Hashtbl.find_opt t.sections label with
-      | Some new_name ->
-        Misc.fatal_errorf
-          "Cannot add %a->%s section mapping, already have %a->%s" Label.format
-          label name Label.format label new_name
-      | None -> Hashtbl.replace t.sections label name)
-    labels
-
-let get_section t label = Hashtbl.find_opt t.sections label
-
-exception Found_all
+  t.layout <- layout;
+  t.index <- make_index layout
 
 let remove_blocks t labels_to_remove =
   let num_to_remove = Label.Set.cardinal labels_to_remove in
@@ -89,40 +82,24 @@ let remove_blocks t labels_to_remove =
     (* remove from cfg *)
     Cfg.remove_blocks t.cfg labels_to_remove;
     (* remove from layout *)
-    let num_removed = ref 0 in
-    (try
-       DLL.iter_cell t.layout ~f:(fun cell ->
-           if !num_removed = num_to_remove then raise_notrace Found_all;
-           let l = DLL.value cell in
-           if Label.Set.mem l labels_to_remove
-           then (
-             DLL.delete_curr cell;
-             incr num_removed))
-     with Found_all -> ());
-    if !num_removed <> num_to_remove
-    then
-      Misc.fatal_errorf
-        "Cfg_with_layout.remove_blocks: %d block(s) to remove were not found \
-         in the layout"
-        (num_to_remove - !num_removed);
-    (* remove from the section table, which is also keyed by label *)
-    Label.Set.iter
-      (fun label -> Hashtbl.remove t.sections label)
-      labels_to_remove)
+    labels_to_remove
+    |> Label.Set.iter (fun lbl ->
+        let cell =
+          try Label.Tbl.find t.index lbl
+          with Not_found ->
+            Misc.fatal_error "Cfg_with_layout.remove_blocks: unknown block"
+        in
+        DLL.delete_curr cell;
+        Label.Tbl.remove t.index lbl))
 
 let add_block t (block : Cfg.basic_block) ~after =
-  match
-    DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
-  with
-  | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell -> (
-    DLL.insert_after cell block.start;
-    Cfg.add_block_exn t.cfg block;
-    (* The new block inherits the section of the [after] block, so that the
-       section table remains total on blocks when sections are in use. *)
-    match Hashtbl.find_opt t.sections after with
-    | None -> ()
-    | Some section_name -> Hashtbl.replace t.sections block.start section_name)
+  match Label.Tbl.find t.index after with
+  | exception Not_found ->
+    Misc.fatal_error "Cfg_with_layout.add_block: 'after' block is not present"
+  | cell ->
+    let new_cell = DLL.insert_and_return_after cell block.start in
+    Label.Tbl.replace t.index block.start new_cell;
+    Cfg.add_block_exn t.cfg block
 
 let is_trap_handler t label =
   let block = Cfg.get_block_exn t.cfg label in

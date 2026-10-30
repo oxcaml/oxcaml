@@ -71,7 +71,7 @@ let raw_info_printer : raw_info -> _ = function
    Code taken from [uTop](https://github.com/diml/utop
    with permission from Jeremie Dimino. *)
 let lookup_env f x env =
-  try Some (f x env) with Not_found | Env.Error _ -> None
+  try Some (f x env) with Not_found | Env.Error.In_context _ -> None
 
 let rec methods_of_type env ?(acc = []) type_expr =
   let open Types in

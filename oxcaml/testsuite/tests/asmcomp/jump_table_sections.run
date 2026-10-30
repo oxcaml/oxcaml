@@ -1,0 +1,20 @@
+#!/bin/sh
+
+exec > "${output}" 2>&1
+
+# first, run the program to make sure the switches dispatch correctly
+${program}
+
+# now check the assembly file produced during compilation
+asm=${test_build_directory}/jump_table_sections.s
+
+# there must be no per-unit jump-table section
+grep -c "__jump_tables" "$asm"
+
+# for each jump-table row, print the section it lives in and the section of
+# the case label it refers to
+awk '
+/^\t\.section / { sec = $2; sub(/,.*/, "", sec); sub(/_[0-9_]+_code/, "", sec) }
+/^\.L[0-9]+:$/ && NR == FNR { lbl = $1; sub(/:$/, "", lbl); where[lbl] = sec }
+/^\t\.4byte\t\.L[0-9]+ - \.L[0-9]+$/ && NR != FNR { print sec, "->", where[$2] }
+' "$asm" "$asm" | uniq -c | sed 's/^ *//'

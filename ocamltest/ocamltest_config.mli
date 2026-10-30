@@ -140,6 +140,9 @@ val function_sections : bool
 (** Whether the compiler was configured to generate
     each function in a separate section *)
 
+val frametable_sections : bool
+(** Whether the compiler supports [-frametable-sections] *)
+
 val instrumented_runtime : bool
 (** Whether the instrumented runtime is available *)
 

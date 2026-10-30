@@ -63,6 +63,7 @@ let flat_float_array = true
 let align_double = true
 let align_int64 = true
 let function_sections = false
+let frametable_sections = false
 let afl_instrument = false
 let native_compiler = false
 let tsan = false

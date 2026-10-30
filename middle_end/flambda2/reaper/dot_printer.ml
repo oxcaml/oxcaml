@@ -60,26 +60,26 @@ let print_dep dep =
   print_graph ~lazy_ppf:dep_graph_ppf ~graph:dep
     ~print:(print ~iter_edges:Graph.print_iter_edges ~print_color:white_color)
 
-let print_solved_dep (result : Analysis.result) dep =
+let print_solved_dep (result : Unboxing_analysis.result) dep =
   let print_color v =
     let red =
-      if Option.is_some (Analysis.get_unboxed_fields result v)
+      if Code_id_or_name.Map.mem v result.unboxed_fields
       then "22"
-      else if Option.is_some (Analysis.get_changed_representation result v)
+      else if Code_id_or_name.Map.mem v result.changed_representation
       then "88"
       else "ff"
     in
     let green =
-      if Analysis.any_usage result v
+      if Points_to_analysis.any_usage result.db v
       then "22"
-      else if Analysis.has_use result v
+      else if Points_to_analysis.has_use result.db v
       then "88"
       else "ff"
     in
     let blue =
-      if Analysis.any_source result v
+      if Points_to_analysis.any_source result.db v
       then "22"
-      else if Analysis.has_source result v
+      else if Points_to_analysis.has_source_query result.db v
       then "88"
       else "ff"
     in

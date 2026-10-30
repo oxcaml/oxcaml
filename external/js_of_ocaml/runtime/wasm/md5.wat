@@ -16,6 +16,11 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+   (@if $portable-int
+   (@then
+      (import "portableint" "int_val_32_exn"
+         (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
+   ))
    (import "io" "caml_getblock"
       (func $caml_getblock
          (param (ref eq)) (param (ref $bytes)) (param i32) (param i32)
@@ -27,18 +32,30 @@
 
    (type $context
       (struct
-         (field (ref $int_array)) ;; w
-         (field (mut i64))        ;; len
-         (field (ref $int_array)) ;; buffer
-         (field (ref $bytes))))  ;; intermediate buffer
+         (field $w (ref $int_array)) ;; w
+         (field $len (mut i64))        ;; len
+         (field $buffer (ref $int_array)) ;; buffer
+         (field $intermediate (ref $bytes))))  ;; intermediate buffer
+
+   (@string $md5_range "Digest.substring")
 
    (func (export "caml_md5_string") (export "caml_md5_bytes")
-      (param (ref eq)) (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (param $vs (ref eq)) (param $vofs (ref eq)) (param $vlen (ref eq)) (result (ref eq))
       (local $ctx (ref $context))
       (local.set $ctx (call $MD5Init))
-      (call $MD5Update (local.get $ctx) (ref.cast (ref $bytes) (local.get 0))
-         (i31.get_u (ref.cast (ref i31) (local.get 1)))
-         (i31.get_u (ref.cast (ref i31) (local.get 2))))
+      (call $MD5Update (local.get $ctx) (ref.cast (ref $bytes) (local.get $vs))
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $vofs) (global.get $md5_range)))
+         (@else
+         (i31.get_u (ref.cast (ref i31) (local.get $vofs)))
+         ))
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $vlen) (global.get $md5_range)))
+         (@else
+         (i31.get_u (ref.cast (ref i31) (local.get $vlen))))
+         ))
       (return_call $MD5Final (local.get $ctx)))
 
    (func (export "caml_md5_chan")
@@ -46,7 +63,13 @@
       (local $len i32) (local $read i32)
       (local $buf (ref $bytes))
       (local $ctx (ref $context))
+      (@if $portable-int
+      (@then
+         (local.set $len (call $int_val_32_exn (local.get $vlen)
+                            (global.get $md5_range))))
+      (@else
       (local.set $len (i31.get_s (ref.cast (ref i31) (local.get $vlen))))
+      ))
       (local.set $buf (array.new $bytes (i32.const 0) (i32.const 4096)))
       (local.set $ctx (call $MD5Init))
       (if (i32.lt_s (local.get $len) (i32.const 0))
@@ -449,13 +472,13 @@
                (then
                   (array.copy $bytes $bytes
                      (struct.get $context 3 (local.get $ctx))
-                     (local.get $missing)
+                     (local.get $in_buf)
                      (local.get $input) (local.get $input_pos)
                      (local.get $input_len))
                   (return)))
             (array.copy $bytes $bytes
                (struct.get $context 3 (local.get $ctx))
-               (local.get $missing)
+               (local.get $in_buf)
                (local.get $input) (local.get $input_pos) (local.get $missing))
             (call $MD5Transform (struct.get $context 0 (local.get $ctx))
                (struct.get $context 2 (local.get $ctx))

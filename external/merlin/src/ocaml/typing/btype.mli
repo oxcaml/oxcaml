@@ -61,16 +61,22 @@ end
 
 val generic_level: int
         (* level of polymorphic variables; = Ident.highest_scope *)
+val subject_level: int
+        (* level of the subject of moregen; = generic_level - 1*)
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
 
-val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
-        (* [with_new_pool ~level f] executes [f] and returns the nodes
-           that were created at level [level] and above *)
+val with_new_pool:
+  level:int -> (unit -> 'a)
+  -> 'a * transient_expr list * Jkind_types.Sort.t list
+        (* [with_new_pool ~level f] executes [f] and returns the type and sort
+           nodes that were created at level [level] and above *)
 val add_to_pool: level:int -> transient_expr -> unit
         (* Add a type node to the pool associated to the level (which should
            be the level of the type node).
            Do nothing if [level = generic_level] or [level = lowest_level]. *)
+val add_to_sort_pool: level:int -> Jkind_types.Sort.t -> unit
+        (* Like [add_to_pool], but adds a sort to the pool. *)
 
 val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
@@ -93,6 +99,8 @@ val new_quote_eval_ty: type_expr -> type_expr
         (* Quote-eval a type expression *)
 val new_box_ty: type_expr -> type_expr
         (* Box a type expression *)
+
+val new_sort_var: level:int -> Jkind_types.Sort.var
 
 (**** Types ****)
 

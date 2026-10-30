@@ -15,9 +15,7 @@ let () =
       | "relocation_table", ".mli"
       | "symbol_entry", ".mli"
       | "symbol_utils", ".mli"
-      | "optmaindriver", ".cmx"
-      | "relocation_table", (".cmt" | ".cmi" | ".cmti" | ".cmx")
-      | "symbol_entry", (".cmt" | ".cmi" | ".cmti" | ".cmx") ->
+      | "optmaindriver", ".cmx" ->
         None
       | "zero_alloc_checker", ".mli" -> Some "mach_checks"
       | "cSE", (".cmi" | ".cmt" | ".cmx") -> Some "CSE"

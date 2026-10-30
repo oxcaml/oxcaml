@@ -62,15 +62,18 @@ let voids (r : unit# t) = r
 (let
   (voids =
      (function {nlocal = 0}
-       r[value<(consts ()) (non_consts ([0: product , value<int>]))>]
-       : (consts ()) (non_consts ([0: product , value<int>])) r))
+       r[value<(consts ()) (non_consts ([0: void, value<int>]))>]
+       : (consts ()) (non_consts ([0: void, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "voids" voids))
 val voids : unit# t -> unit# t = <fun>
 |}]
 
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
-(let (opaque = (function {nlocal = 0} r r))
+(let
+  (opaque =
+     (function {nlocal = 0} r[value<(consts ()) (non_consts ([0: ?]))>]
+       : (consts ()) (non_consts ([0: ?])) r))
   (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]
@@ -97,9 +100,8 @@ let all_void (r : unit# single) = r
 [%%expect{|
 (let
   (all_void =
-     (function {nlocal = 0}
-       r[value<(consts ()) (non_consts ([0: product ]))>]
-       : (consts ()) (non_consts ([0: product ])) r))
+     (function {nlocal = 0} r[value<(consts ()) (non_consts ([0: void]))>]
+       : (consts ()) (non_consts ([0: void])) r))
   (apply (field_imm 1 (global Toploop!)) "all_void" all_void))
 val all_void : unit# single -> unit# single = <fun>
 |}]

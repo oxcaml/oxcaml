@@ -1,0 +1,16 @@
+; Uses only what the compiler package ships: the js_of_ocaml and
+; wasm_of_ocaml executables, the js_of_ocaml library and its PPX.
+
+(executable
+ (name main)
+ (modes js wasm)
+ (libraries js_of_ocaml)
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (run node %{dep:main.bc.js})
+   (run node %{dep:main.bc.wasm.js}))))

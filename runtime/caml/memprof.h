@@ -21,6 +21,9 @@
 #include "config.h"
 #include "mlvalues.h"
 #include "roots.h"
+#include <stddef.h>
+#include "domain_state.h"
+#include "misc.h"
 
 /*** Sample allocations ***/
 

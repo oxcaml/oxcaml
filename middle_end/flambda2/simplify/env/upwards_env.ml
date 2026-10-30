@@ -16,7 +16,10 @@
 
 type t =
   { continuations : Continuation_in_env.t Continuation.Map.t;
+    cold_continuations : Continuation.Set.t;
     continuation_shortcuts : Continuation_shortcut.t Continuation.Map.t;
+    unique_handlers_map :
+      Continuation.t Rebuilt_expr.Unique_continuation_handlers.t;
     apply_cont_rewrites : Apply_cont_rewrite.t Continuation.Map.t;
     (* this [are_rebuilding_terms] is **only** used for printing *)
     are_rebuilding_terms : Are_rebuilding_terms.t;
@@ -25,7 +28,9 @@ type t =
 
 let create are_rebuilding_terms ~machine_width =
   { continuations = Continuation.Map.empty;
+    cold_continuations = Continuation.Set.empty;
     continuation_shortcuts = Continuation.Map.empty;
+    unique_handlers_map = Rebuilt_expr.Unique_continuation_handlers.empty;
     apply_cont_rewrites = Continuation.Map.empty;
     are_rebuilding_terms;
     machine_width
@@ -34,16 +39,18 @@ let create are_rebuilding_terms ~machine_width =
 let machine_width t = t.machine_width
 
 let [@ocamlformat "disable"] print ppf
-    { continuations;
+    { continuations; cold_continuations; unique_handlers_map = _;
       apply_cont_rewrites; are_rebuilding_terms ;
       continuation_shortcuts; machine_width = _ } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(continuations@ %a)@]@ \
+      @[<hov 1>(cold_continuations@ %a)@]@ \
       @[<hov 1>(continuation_shortcuts@ %a)@]@ \
       @[<hov 1>(apply_cont_rewrites@ %a)@]\
       )@]"
     (Continuation.Map.print (Continuation_in_env.print are_rebuilding_terms))
     continuations
+    Continuation.Set.print cold_continuations
     (Continuation.Map.print Continuation_shortcut.print)
     continuation_shortcuts
     (Continuation.Map.print Apply_cont_rewrite.print)
@@ -57,6 +64,8 @@ let find_continuation t cont =
   | cont_in_env -> cont_in_env
 
 let mem_continuation t cont = Continuation.Map.mem cont t.continuations
+
+let is_cold_continuation t cont = Continuation.Set.mem cont t.cold_continuations
 
 let check_shortcut_transitivity t cont shortcut_to =
   if
@@ -77,11 +86,47 @@ let find_continuation_shortcut t cont =
       (Continuation_shortcut.continuation shortcut_to);
     Some shortcut_to
 
+let find_unique_continuation_handler are_rebuilding_terms t ~params ~handler
+    ~is_exn_handler ~free_names_without_params =
+  Rebuilt_expr.Unique_continuation_handlers.find_opt are_rebuilding_terms params
+    handler t.unique_handlers_map ~is_exn_handler ~free_names_without_params
+
 let add_continuation0 t cont cont_in_env =
   let continuations = Continuation.Map.add cont cont_in_env t.continuations in
   { t with continuations }
 
-let add_non_inlinable_continuation t cont ~params ~handler =
+let add_unique_continuation_handler are_rebuilding_terms t cont ~params ~handler
+    ~is_exn_handler ~free_names_without_params =
+  if !Dwarf_flags.gdwarf_may_alter_codegen
+  then t
+  else
+    let unique_handlers_map =
+      Rebuilt_expr.Unique_continuation_handlers.add are_rebuilding_terms params
+        handler cont t.unique_handlers_map ~is_exn_handler
+        ~free_names_without_params
+    in
+    { t with unique_handlers_map }
+
+let add_cold_continuation t cont =
+  let cold_continuations = Continuation.Set.add cont t.cold_continuations in
+  { t with cold_continuations }
+
+let add_non_inlinable_continuation are_rebuilding_terms t cont ~is_cold ~params
+    ~handler =
+  let t = if is_cold then add_cold_continuation t cont else t in
+  let t, handler =
+    match (handler : _ Or_unknown.t) with
+    | Known (handler, ~is_exn_handler, ~free_names_without_params)
+      when not is_cold ->
+      (* CR-someday bclement: support deduplication of cold handlers, but don't
+         merge cold and hot handlers. At the moment, we can deduplicate a cold
+         handler into a hot handler in scope, but not conversely, which would be
+         bad without proper tracking of temperature in shortcuts. *)
+      ( add_unique_continuation_handler are_rebuilding_terms t cont ~params
+          ~handler ~is_exn_handler ~free_names_without_params,
+        Or_unknown.Known handler )
+    | Known _ | Unknown -> t, Or_unknown.Unknown
+  in
   if Bound_parameters.is_empty params
   then add_continuation0 t cont (Non_inlinable_zero_arity { handler })
   else
@@ -137,7 +182,8 @@ let add_linearly_used_inlinable_continuation t cont ~params ~handler
     (Linearly_used_and_inlinable
        { handler; free_names_of_handler; params; cost_metrics_of_handler })
 
-let add_function_return_or_exn_continuation t cont arity =
+let add_function_return_or_exn_continuation t cont ~is_cold arity =
+  let t = if is_cold then add_cold_continuation t cont else t in
   add_continuation0 t cont
     (Toplevel_or_function_return_or_exn_continuation { arity })
 

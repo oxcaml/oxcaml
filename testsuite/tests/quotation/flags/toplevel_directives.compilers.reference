@@ -1,0 +1,10 @@
+Line 8, characters 6-7:
+8 | let ( $ ) f x = f x;;
+          ^
+Error: Syntax error: operator expected.
+val ( $ ) : ('a -> 'b) -> 'a -> 'b = <fun>
+- : int = 2
+val used : int = 11
+val quoted : int = 20
+- : int = 3
+

@@ -191,14 +191,19 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
+let bytecode_block_size shape =
+  match singleton_product_shape_for_bytecode shape with
+  | Some elements -> Array.length elements
+  | None -> Array.length shape
+
 let compute_mixed_block_size shape =
-  if !Clflags.native_code then
+  if Clflags.target_is_native () then
     let bytes = Mixed_product_bytes.count (Product shape) in
     let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
     let size = Mixed_product_bytes.size_in_words bytes in
     { size; value_prefix_len }
   else
-    let size = Array.length shape in
+    let size = bytecode_block_size shape in
     { size; value_prefix_len = size }
 
 let compute_static_size lam =
@@ -295,10 +300,10 @@ let compute_static_size lam =
      number of value fields only. In bytecode, void fields are kept, so the
      block size includes all fields. *)
   and all_value_mixed_block_size shape =
-    if !Clflags.native_code then
+    if Clflags.target_is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
-    else Array.length shape
+    else bytecode_block_size shape
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
   and size_of_primitive env loc p args =
@@ -351,11 +356,6 @@ let compute_static_size lam =
     | Patomic_land_idx
     | Patomic_lor_idx
     | Patomic_lxor_idx
-    | Patomic_add_ptr
-    | Patomic_sub_ptr
-    | Patomic_land_ptr
-    | Patomic_lor_ptr
-    | Patomic_lxor_ptr
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -512,12 +512,6 @@ let compute_static_size lam =
     | Patomic_compare_exchange_idx _
     | Patomic_compare_set_idx _
     | Patomic_fetch_add_idx
-    | Patomic_load_ptr _
-    | Patomic_set_ptr _
-    | Patomic_exchange_ptr _
-    | Patomic_compare_exchange_ptr _
-    | Patomic_compare_set_ptr _
-    | Patomic_fetch_add_ptr
     | Popaque _
     | Pdls_get
     | Ptls_get
@@ -596,7 +590,9 @@ let compute_static_size lam =
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Preinterpret_boxed_vector_as_tuple _
-    | Preinterpret_tuple_as_boxed_vector _ ->
+    | Preinterpret_tuple_as_boxed_vector _
+    | Pbox _
+    | Punbox _ ->
         dynamic_size lam
   in
   compute_expression_size Ident.Map.empty lam

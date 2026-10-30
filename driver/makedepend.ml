@@ -320,6 +320,7 @@ let read_and_approximate inputfile =
     Location.input_name := inputfile;
     let lexbuf = Lexing.from_channel ic in
     Location.init lexbuf inputfile;
+    Lexer.reset_syntax_mode ();
     lexical_approximation lexbuf
   with exn ->
     report_err exn
@@ -692,6 +693,12 @@ let run_main argv =
         " Sort files according to their dependencies";
      "-strict", Arg.Set strict,
        " Fail if an input file does not exist";
+      "-syntax-quotations", Arg.Set Clflags.syntax_quotations,
+        " Lex quotation syntax in files that do not use the #syntax \
+         quotations directive (see ocamlc)";
+      "-no-syntax-quotations", Arg.Clear Clflags.syntax_quotations,
+        " Do not lex quotation syntax in files that do not use the #syntax \
+         quotations directive (see ocamlc)";
       "-version", Arg.Unit print_version,
         " Print version and exit";
       "-vnum", Arg.Unit print_version_num,

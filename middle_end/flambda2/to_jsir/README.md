@@ -1,6 +1,7 @@
 # Flambda 2 to js_of_ocaml IR translation pass
 
-The `to_jsir` pass is responsible for translating the Flambda 2 IR to `js_of_ocaml`'s IR ([JSIR](jsoo_imports/code.mli)). This translation enables OCaml code compiled with Flambda 2 optimisations to be executed in JavaScript environments via `js_of_ocaml`, instead of compiling through bytecode. The entry point is [`To_jsir.unit`](to_jsir.mli).
+The `to_jsir` pass is responsible for translating the Flambda 2 IR to `js_of_ocaml`'s IR ([JSIR](../../../external/js_of_ocaml/compiler/lib/code.mli), compiled into
+the compiler by [jsoo_imports/dune](jsoo_imports/dune)). This translation enables OCaml code compiled with Flambda 2 optimisations to be executed in JavaScript environments via `js_of_ocaml`, instead of compiling through bytecode. The entry point is [`To_jsir.unit`](to_jsir.mli).
 
 ## Number representations
 | Flambda kind       | JSIR representation                                                                                                                                                                                                |

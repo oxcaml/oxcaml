@@ -83,95 +83,43 @@ end
 Exception: Assert_failure ("", 4, 12).
 |}];;
 
-(*************************************)
-(* Test 4: No putting them in tuples *)
+(**********************************)
+(* Test 4: Putting them in tuples *)
 
 let f4_1 (x : t_bits16) = x, false;;
 [%%expect{|
-Line 1, characters 26-27:
-1 | let f4_1 (x : t_bits16) = x, false;;
-                              ^
-Error: The value "x" has type "t_bits16" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_bits16 is bits16
-         because of the definition of t_bits16 at line 1, characters 0-22.
-       But the layout of t_bits16 must be a value layout
-         because it's the type of a tuple element.
+val f4_1 : t_bits16 -> t_bits16 * bool = <fun>
 |}];;
 
 let f4_2 (x : 'a t_bits16_id) = x, false;;
 [%%expect{|
-Line 1, characters 32-33:
-1 | let f4_2 (x : 'a t_bits16_id) = x, false;;
-                                    ^
-Error: The value "x" has type "'a t_bits16_id" = "('a : bits16)"
-       but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_bits16_id is bits16
-         because of the definition of t_bits16_id at line 2, characters 0-35.
-       But the layout of 'a t_bits16_id must be a value layout
-         because it's the type of a tuple element.
+val f4_2 : ('a : bits16). 'a t_bits16_id -> 'a t_bits16_id * bool = <fun>
 |}];;
 
 let f4_3 (x : int16#) = x, false;;
 [%%expect{|
-Line 1, characters 24-25:
-1 | let f4_3 (x : int16#) = x, false;;
-                            ^
-Error: The value "x" has type "int16#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int16# is bits16
-         because it is the unboxed version of the primitive type int16.
-       But the layout of int16# must be a value layout
-         because it's the type of a tuple element.
+val f4_3 : int16# -> int16# * bool = <fun>
 |}];;
 
 type t4_4 = t_bits16 * string;;
 [%%expect{|
-Line 1, characters 12-20:
-1 | type t4_4 = t_bits16 * string;;
-                ^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_bits16" is bits16
-         because of the definition of t_bits16 at line 1, characters 0-22.
-       But the layout of "t_bits16" must be a value layout
-         because it's the type of a tuple element.
+type t4_4 = t_bits16 * string
 |}];;
 
 type t4_5 = int * int16#;;
 [%%expect{|
-Line 1, characters 18-24:
-1 | type t4_5 = int * int16#;;
-                      ^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "int16#" is bits16
-         because it is the unboxed version of the primitive type int16.
-       But the layout of "int16#" must be a value layout
-         because it's the type of a tuple element.
+type t4_5 = int * int16#
 |}];;
 
 type ('a : bits16) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 26-28:
-1 | type ('a : bits16) t4_6 = 'a * 'a
-                              ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is bits16
-         because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : bits16) t4_6 = 'a * 'a
 |}];;
 
 (* check for layout propagation *)
 type ('a : bits16, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 45-47:
-1 | type ('a : bits16, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                                 ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is bits16
-         because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : bits16, 'b) t4_7 = 'a -> 'a * 'a constraint 'b = 'a
 |}]
 
 (*********************************************************)
@@ -399,7 +347,9 @@ val f9_3 : unit -> int16# t_bits16_id = <fun>
    - if using a non-value layout in an external, you must supply separate
      bytecode and native code implementations,
    - [@unboxed] is allowed on unboxed types but has no effect. Same is not
-     true for [@untagged].
+     true for [@untagged]. Since [int16] is not upstream compatible, there is no
+     reason to write [int16#[@unboxed]], and because of [[@unsafe_unextended]],
+     this isn't even possible for C stub parameters.
 *)
 
 external f10_1 : int -> bool -> int16# = "foo";;
@@ -422,7 +372,37 @@ Error: The native code version of the primitive is mandatory
 
 external f10_6 : (int16#[@unboxed]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-external f10_6 : int16# -> bool -> string = "foo" "bar"
+Line 1, characters 17-53:
+1 | external f10_6 : (int16#[@unboxed]) -> bool -> string  = "foo" "bar";;
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Arguments with layout bits8 or bits16 are not allowed in C stubs
+      except in "[@@builtin]"s. You may also annotate such an argument with
+      "[@unsafe_unextended]" if you are absolutely sure your C stub does not read
+      the garbage upper bits.
+|}];;
+
+external f10_6_1 : (int16#[@unboxed][@unsafe_unextended]) -> unit
+  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 28-35:
+1 | external f10_6_1 : (int16#[@unboxed][@unsafe_unextended]) -> unit
+                                ^^^^^^^
+Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]"/"[@@unsafe_unextended]" attributes
+|}];;
+
+external f10_6_2 : (#(int16# * int)[@unpacked]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 19-65:
+1 | external f10_6_2 : (#(int16# * int)[@unpacked]) -> bool -> string  = "foo" "bar";;
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Arguments with layout bits8 or bits16 are not allowed in C stubs
+      except in "[@@builtin]"s. You may also annotate such an argument with
+      "[@unsafe_unextended]" if you are absolutely sure your C stub does not read
+      the garbage upper bits.
 |}];;
 
 external f10_7 : string -> (int16#[@unboxed])  = "foo" "bar";;
@@ -451,6 +431,37 @@ Line 1, characters 29-35:
                                  ^^^^^^
 Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
+|}];;
+
+external f10_11 : string -> (int16#[@unsafe_unextended])  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 18-56:
+1 | external f10_11 : string -> (int16#[@unsafe_unextended])  = "foo" "bar";;
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: The "[@unsafe_unextended]" attribute is not allowed on C stub returns.
+|}];;
+
+type t10 : bits16 addressable
+
+external f10_12 : t10 -> unit = "foo" "bar";;
+[%%expect{|
+type t10 : bits16 addressable
+Line 3, characters 18-29:
+3 | external f10_12 : t10 -> unit = "foo" "bar";;
+                      ^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Arguments with layout bits8 or bits16 are not allowed in C stubs
+      except in "[@@builtin]"s. You may also annotate such an argument with
+      "[@unsafe_unextended]" if you are absolutely sure your C stub does not read
+      the garbage upper bits.
+|}];;
+
+external f10_13 : (t10 [@unsafe_unextended]) -> unit = "foo" "bar";;
+[%%expect{|
+external f10_13 : (t10 [@unsafe_unextended]) -> unit = "foo" "bar"
 |}];;
 
 (*************************************************)

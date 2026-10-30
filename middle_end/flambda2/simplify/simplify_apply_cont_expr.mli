@@ -15,3 +15,8 @@
 (**************************************************************************)
 
 val simplify_apply_cont : Flambda.Apply_cont.t Simplify_common.expr_simplifier
+
+val rebuild_apply_cont :
+  args:Simple.t list ->
+  rewrite_id:Apply_cont_rewrite_id.t ->
+  Apply_cont_expr.t Simplify_common.rebuild

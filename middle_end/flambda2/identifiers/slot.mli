@@ -19,12 +19,9 @@ module type S = sig
 
   module Lmap : Lmap.S with type key = t
 
-  val create :
-    Compilation_unit.t ->
-    name:string ->
-    is_always_immediate:bool ->
-    Flambda_kind.t ->
-    t
+  type payload
+
+  val create : Compilation_unit.t -> name:string -> payload -> t
 
   val get_compilation_unit : t -> Compilation_unit.t
 
@@ -38,13 +35,15 @@ module type S = sig
 
   val canonical_name : t -> string
 
-  val kind : t -> Flambda_kind.t
-
-  val is_always_immediate : t -> bool
+  val payload : t -> payload
 
   val rename : t -> t
 end
 
-module Make (_ : sig
+module Make (P : sig
   val colour : Format.formatter -> unit
-end) : S
+
+  type payload
+
+  val print_payload : Format.formatter -> payload -> unit
+end) : S with type payload := P.payload

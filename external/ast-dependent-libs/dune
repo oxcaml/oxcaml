@@ -1,0 +1,63 @@
+; Dune root for the libraries that depend on the compiler's AST, built against
+; the installed compiler (see the top-level Makefile). The symlinks next to
+; this file point at sources vendored in external/; those under deps/ are
+; created by make from nix-provided sources.
+
+; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
+(vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
+
+; A separate project, built against the installed compiler package (see
+; mkJsooSmokeTest in default.nix).
+(data_only_dirs smoke)
+
+; Each alias depends on the .install files of its packages, which builds
+; everything they install. Keep in sync with PPXLIB_PACKAGES and
+; JSOO_PACKAGES in the top-level Makefile.
+
+(alias
+ (name ppxlib-libs)
+ (deps
+  ocaml-compiler-libs/ocaml-compiler-libs.install
+  deps/ppx_derivers/ppx_derivers.install
+  deps/sexp_type/sexp_type.install
+  deps/stdlib-shims/stdlib-shims.install
+  ppxlib/ppxlib_ast.install
+  ppxlib/ppxlib.install
+  ppxlib_jane/ppxlib_jane.install))
+
+(alias
+ (name jsoo-libs)
+ (deps
+  (alias ppxlib-libs)
+  deps/gen/gen.install
+  deps/sedlex/sedlex.install
+  deps/cmdliner/cmdliner.install
+  deps/menhir/menhirLib.install
+  deps/menhir/menhirSdk.install
+  deps/yojson/yojson.install
+  js_of_ocaml/js_of_ocaml-compiler.install
+  js_of_ocaml/wasm_of_ocaml-compiler.install
+  js_of_ocaml/js_of_ocaml-ppx.install
+  js_of_ocaml/js_of_ocaml-runtime.install
+  js_of_ocaml/js_of_ocaml.install))
+
+; For js_of_ocaml's dune-workspace, which defines runtest-js and runtest-wasm.
+(alias
+ (name jsoo-test)
+ (deps
+  (alias_rec js_of_ocaml/compiler/tests-compiler/runtest)
+  (alias_rec js_of_ocaml/compiler/lib-runtime-files/tests/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-ppx-expect-light/runtest-wasm)
+  (alias_rec js_of_ocaml/compiler/tests-jsoo/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-jsoo/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-jsoo/runtest-wasm)
+  (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-wasm_of_ocaml/runtest-wasm)
+  (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest)
+  (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-js)
+  (alias_rec js_of_ocaml/compiler/tests-oxcaml/runtest-wasm)
+  (alias_rec js_of_ocaml/lib/tests/runtest-js)
+  (alias_rec js_of_ocaml/lib/tests/runtest-wasm)))

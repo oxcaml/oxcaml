@@ -924,9 +924,10 @@ let lower_nongen nglev mty =
     let super = type_iterators mark in
     let it_do_type_expr it ty =
       match get_desc ty with
-        Tvar _ ->
+        Tvar { jkind } ->
           let level = get_level ty in
-          if level < generic_level && level > nglev then set_level ty nglev
+          if level < generic_level && level > nglev then (
+            set_level ty nglev; Jkind.update_level nglev jkind)
       | _ ->
           super.it_do_type_expr it ty
     in

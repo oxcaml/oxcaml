@@ -158,12 +158,12 @@ let example_3 () =
                                            [0: ?]))>]))>]
               [0: 1 [0: 1]]
             *match*/4 =o? *input/2)
-           (if (field_imm 0 *match*/4)
-             (switch* (field_imm 1 *match*/4)
+           (if (mixedfield 0  (?,?) *match*/4)
+             (switch* (mixedfield 1  (?,?) *match*/4)
               case tag 0:
                (if (seq (assign input/2 [0: 1 [1: 3]]) 0) [1: 3]
                  (makeblock 0 (value<int>)
-                   (field_imm 0 (field_imm 1 *match*/4))))
+                   (field_imm 0 (mixedfield 1  (?,?) *match*/4))))
               case tag 1: [1: 2])
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_3" example_3/0))

@@ -9,6 +9,12 @@ type id =
   | Addss
   | Addsubpd
   | Addsubps
+  | Aesdec
+  | Aesdeclast
+  | Aesenc
+  | Aesenclast
+  | Aesimc
+  | Aeskeygenassist
   | Andn_r32_r32_r32m32
   | Andn_r64_r64_r64m64
   | Andnpd
@@ -4487,6 +4493,60 @@ let addsubps = {
   ; mnemonic = "addsubps"
   ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 208 }
 }
+let aesdec = {
+    id = Aesdec
+  ; ext = [|AES|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Arg [|0|]
+  ; imm = Imm_none
+  ; mnemonic = "aesdec"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 222 }
+}
+let aesdeclast = {
+    id = Aesdeclast
+  ; ext = [|AES|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Arg [|0|]
+  ; imm = Imm_none
+  ; mnemonic = "aesdeclast"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 223 }
+}
+let aesenc = {
+    id = Aesenc
+  ; ext = [|AES|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Arg [|0|]
+  ; imm = Imm_none
+  ; mnemonic = "aesenc"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 220 }
+}
+let aesenclast = {
+    id = Aesenclast
+  ; ext = [|AES|]
+  ; args = [|{ loc = Temp [|XMM|]; enc = RM_r };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Arg [|0|]
+  ; imm = Imm_none
+  ; mnemonic = "aesenclast"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 221 }
+}
+let aesimc = {
+    id = Aesimc
+  ; ext = [|AES|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_none
+  ; mnemonic = "aesimc"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 219 }
+}
+let aeskeygenassist = {
+    id = Aeskeygenassist
+  ; ext = [|AES|]
+  ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
+  ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
+  ; imm = Imm_spec
+  ; mnemonic = "aeskeygenassist"
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 223 }
+}
 let andn_r32_r32_r32m32 = {
     id = Andn_r32_r32_r32m32
   ; ext = [|BMI|]
@@ -8467,7 +8527,7 @@ let vaddsubps_Y_Y_Ym256 = {
 }
 let vaesdec = {
     id = Vaesdec
-  ; ext = [|AVX|]
+  ; ext = [|AES;AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
@@ -8476,7 +8536,7 @@ let vaesdec = {
 }
 let vaesdeclast = {
     id = Vaesdeclast
-  ; ext = [|AVX|]
+  ; ext = [|AES;AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
@@ -8485,7 +8545,7 @@ let vaesdeclast = {
 }
 let vaesenc = {
     id = Vaesenc
-  ; ext = [|AVX|]
+  ; ext = [|AES;AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
@@ -8494,7 +8554,7 @@ let vaesenc = {
 }
 let vaesenclast = {
     id = Vaesenclast
-  ; ext = [|AVX|]
+  ; ext = [|AES;AVX|]
   ; args = [|{ loc = Temp [|XMM|]; enc = Vex_v };{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
@@ -8503,7 +8563,7 @@ let vaesenclast = {
 }
 let vaesimc = {
     id = Vaesimc
-  ; ext = [|AVX|]
+  ; ext = [|AES;AVX|]
   ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
@@ -8512,7 +8572,7 @@ let vaesimc = {
 }
 let vaeskeygenassist = {
     id = Vaeskeygenassist
-  ; ext = [|AVX|]
+  ; ext = [|AES;AVX|]
   ; args = [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec

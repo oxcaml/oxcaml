@@ -21,7 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
-  native_code := true;
+  Clflags.set_target Clflags.Target.Native;
   let columns =
     match Sys.getenv "COLUMNS" with
     | exception Not_found -> None
@@ -68,7 +68,7 @@ let main unix argv ppf ~flambda2 =
        Target_system.is_macos () then
       Clflags.dwarf_fission := Clflags.Fission_dsymutil;
     (* Set up DWARF compression for C compiler invocations *)
-    if !Clflags.debug && !Clflags.native_code then
+    if !Clflags.debug && Clflags.target_is_native () then
       Clflags.dwarf_c_toolchain_flag :=
         Dwarf_flags.get_dwarf_c_toolchain_flag ();
     if !Oxcaml_flags.gc_timings then Gc_timings.start_collection ();
@@ -82,6 +82,22 @@ let main unix argv ppf ~flambda2 =
       && not Language_extension.(is_enabled Runtime_metaprogramming) then
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
+    if !Oxcaml_flags.frametable_sections then begin
+      if not Config.frametable_sections then
+        Compenv.fatal "OCaml has been configured without support for \
+                       -frametable-sections";
+      if not !Clflags.function_sections then
+        Compenv.fatal "-frametable-sections requires -function-sections";
+      if !Oxcaml_flags.internal_assembler then
+        Compenv.fatal "-frametable-sections is not supported with \
+                       -internal-assembler";
+      if !Oxcaml_flags.verify_binary_emitter then
+        Compenv.fatal "-frametable-sections is not supported with \
+                       -verify-binary-emitter";
+      if !Clflags.llvm_backend then
+        Compenv.fatal "-frametable-sections is not supported with \
+                       -llvm-backend"
+    end;
     let (module Compiler : Optcompile.S) =
       Optcompile.native unix ~flambda2
     in

@@ -206,17 +206,18 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   let slots_used_in_typing_env =
     TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
+  let is_local = Current_unit.is_current in
   let exported_offsets =
     exported_offsets
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             free_slots_of_all_code)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode free_slots_of_all_code)
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             slots_used_in_typing_env)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode
             slots_used_in_typing_env)
   in
@@ -228,12 +229,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
 
 let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     ~exported_offsets ~sections all_code =
-  match final_typing_env with
-  | None ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some _ when Flambda_features.opaque () ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some final_typing_env ->
+  if Flambda_features.opaque ()
+  then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
+  else
     let typing_env, canonicalise =
       TE.Pre_serializable.create final_typing_env ~used_value_slots
     in

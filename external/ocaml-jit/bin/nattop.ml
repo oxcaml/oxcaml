@@ -1,5 +1,5 @@
 let () =
-  Clflags.native_code := true;
+  Clflags.set_target Clflags.Target.Native;
   Opttoploop.set_paths ();
   Opttoploop.initialize_toplevel_env ();
   Clitop.main ~name:"nattop" ~eval_phrase:Opttoploop.execute_phrase

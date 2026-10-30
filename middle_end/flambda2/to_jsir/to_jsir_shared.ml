@@ -45,8 +45,8 @@ let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
   in
   let targetint =
     match repr with
-    | Int32 int32 -> Targetint.of_int32 int32
-    | Int64 int64 -> Targetint.of_int64 int64
+    | Int32 int32 -> Targetint.of_int32_exn int32
+    | Int64 int64 -> Targetint.of_int64_exn int64
   in
   Int targetint
 
@@ -62,10 +62,10 @@ let float_to_jsir_const float : Jsir.constant =
   Float (Numeric_types.Float_by_bit_pattern.to_bits float)
 
 let int8_to_jsir_const int8 : Jsir.constant =
-  Int (Targetint.of_int (Numeric_types.Int8.to_int int8))
+  Int (Targetint.of_int_exn (Numeric_types.Int8.to_int int8))
 
 let int16_to_jsir_const int16 : Jsir.constant =
-  Int (Targetint.of_int (Numeric_types.Int16.to_int int16))
+  Int (Targetint.of_int_exn (Numeric_types.Int16.to_int int16))
 
 let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
 
@@ -83,7 +83,7 @@ let rec reg_width_const const : Jsir.constant =
   | Naked_int32 int32 -> int32_to_jsir_const int32
   | Naked_int64 int64 -> int64_to_jsir_const int64
   | Naked_nativeint nativeint -> nativeint_to_jsir_const nativeint
-  | Null -> Jsir.Null
+  | Null -> Jsir.Null_
   | Poison (kind, name) ->
     reg_width_const
       (Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit kind

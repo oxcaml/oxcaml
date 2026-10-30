@@ -1,5 +1,6 @@
 (* TEST
  only-default-codegen;
+ flags += " -g -gdwarf-inlined-frames";
  expect.opt;
 *)
 

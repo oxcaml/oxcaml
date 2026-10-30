@@ -719,7 +719,11 @@ val setfield_computed :
 
 (** [transl_switch_clambda loc kind arg index cases] *)
 val transl_switch_clambda :
-  Debuginfo.t -> expression -> int array -> expression array -> expression
+  Debuginfo.t ->
+  expression ->
+  int array ->
+  (expression * Branch_annotations.t) array ->
+  expression
 
 (** Method call : [send kind met obj args dbg]
 
@@ -878,8 +882,10 @@ val sequence : expression -> expression -> expression
 val ite :
   dbg:Debuginfo.t ->
   then_dbg:Debuginfo.t ->
+  then_annots:Branch_annotations.t ->
   then_:expression ->
   else_dbg:Debuginfo.t ->
+  else_annots:Branch_annotations.t ->
   else_:expression ->
   expression ->
   expression
@@ -1230,6 +1236,8 @@ val apply_function :
   Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
+
+val emit_divide_by_zero_message : unit -> Cmm.phrase list
 
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 

@@ -49,10 +49,10 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
         | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_4)
     where k2 =
       ((let Pfield = %block_load.[`0`] (b) in
-        let Pfield_1 = %block_load.[`0`] (Pfield) in
+        let Pmixedfield = %block_load.[`0`] (Pfield) in
         let Popaque = %opaque (0) in
         let Pobj_magic = %opaque (Popaque) in
-        apply &my_alloc_region Pobj_magic (Pfield_1) -> k3 * k1
+        apply &my_alloc_region Pobj_magic (Pmixedfield) -> k3 * k1
           where k3 (param : [ 0 |1 ]) =
             let unboxed_field = %untag_imm (param) in
             cont k2 (unboxed_field))
@@ -68,11 +68,11 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
                     | 1 -> k3)
                    where k3 =
                      let Pfield = %block_load.[`0`] (b) in
-                     let Pfield_1 = %block_load.[`1`] (Pfield) in
+                     let Pmixedfield = %block_load.[`1`] (Pfield) in
                      let Popaque = %opaque (0) in
                      let Pobj_magic = %opaque (Popaque) in
                      let Pmakeblock =
-                       %block.[`0`].my_alloc_region (Pobj_magic, Pfield_1)
+                       %block.[`0`].my_alloc_region (Pobj_magic, Pmixedfield)
                      in
                      let Pmakeblock_1 =
                        %block.[`1`].my_alloc_region (Pmakeblock)
@@ -80,11 +80,11 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
                      cont k (Pmakeblock_1)
                    where k2 =
                      let Pfield = %block_load.[`0`] (b) in
-                     let Pfield_1 = %block_load.[`1`] (Pfield) in
+                     let Pmixedfield = %block_load.[`1`] (Pfield) in
                      let Popaque = %opaque (0) in
                      let Pobj_magic = %opaque (Popaque) in
                      let Pmakeblock =
-                       %block.[`0`].my_alloc_region (Pobj_magic, Pfield_1)
+                       %block.[`0`].my_alloc_region (Pobj_magic, Pmixedfield)
                      in
                      let Pmakeblock_1 =
                        %block.[`0`].my_alloc_region (Pmakeblock)
@@ -102,14 +102,14 @@ let code loopify(never) size(14) newer_version_of(inv_bornes_2)
         : [ 0 of [ 0 |1 | 0 of val |1 of val ] *
               [ 0 |1 | 0 of val |1 of val ] ] =
   let u = %block_load.[`1`] (param) in
-  (let Pfield = %block_load.[`0`] (param) in
+  (let Pmixedfield = %block_load.[`0`] (param) in
    apply direct(inv_borne_sup_1_1 &my_alloc_region)
      ($camlAlt_ergo__inv_borne_sup_10
       : _ ->
         [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
         |1 of [ 0 of imm tagged * imm tagged ] ]
       )
-       (u, is_int, Pfield)
+       (u, is_int, Pmixedfield)
        -> k2 * k1)
     where k2
             (apply_result :
@@ -138,10 +138,10 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
          | 1 -> k2
          where k2 =
            let `*match*` = %block_load.[`0`] (param) in
-           ((let Pfield_1 = %block_load.[`1`] (`*match*`) in
-             let Pfield_2 = %block_load.[`0`] (`*match*`) in
+           ((let Pmixedfield = %block_load.[`1`] (`*match*`) in
+             let Pmixedfield_1 = %block_load.[`0`] (`*match*`) in
              let Pmakeblock =
-               %block.[`0`].my_alloc_region (Pfield_2, Pfield_1)
+               %block.[`0`].my_alloc_region (Pmixedfield_1, Pmixedfield)
              in
              apply direct(inv_bornes_2_1 &my_alloc_region)
                ($camlAlt_ergo__inv_bornes_11

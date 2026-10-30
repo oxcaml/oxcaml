@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
@@ -31,7 +30,6 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/fiber.h"
-#include "caml/fail.h"
 
 /* Returns the next frame descriptor (or NULL if none is available),
    and updates *pc and *sp to point to the following one.  */
@@ -148,19 +146,12 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, const char* trapsp)
   }
 }
 
+/* With guard pages and a stack overflow, the stack pointer may have
+   been fixed to point to Stack_base, in which case this is going to
+   produce a dodgy backtrace. There's nothing to be done about that,
+   and at least it's readable. */
 void caml_stash_backtrace_wrapper(value exn, char* rsp, char* trapsp)
 {
-#ifdef STACK_GUARD_PAGES
-  /* If we get an rsp that lies in the guard page, just do nothing - using rsp
-   * would trigger another segfault, and we are probably in the process of
-   * raising the exception from a segfault. */
-  struct stack_info *block = Caml_state->current_stack;
-  char* protected_low = Protected_stack_page(block);
-  char* protected_high = protected_low + caml_plat_pagesize;
-  if ((rsp >= protected_low) && (rsp < protected_high)) {
-    return;
-  }
-#endif
   char* pc;
   char* sp;
 #ifdef WITH_FRAME_POINTERS
@@ -324,7 +315,7 @@ Caml_inline debuginfo debuginfo_resolve_jumps(debuginfo dbg)
 static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
 {
   unsigned char* infoptr;
-  uint32_t debuginfo_offset;
+  int32_t debuginfo_offset;
   struct frame_descr_decoded dec;
 
   /* The special frames marking returns from Caml to C are never
@@ -363,7 +354,7 @@ static debuginfo debuginfo_extract(frame_descr *d, ptrdiff_t alloc_idx)
     CAMLassert(alloc_idx == -1);
   }
   /* read offset to debuginfo */
-  debuginfo_offset = caml_read_unaligned_uint32(infoptr);
+  debuginfo_offset = caml_read_unaligned_int32(infoptr);
   return debuginfo_resolve_jumps((debuginfo)(infoptr + debuginfo_offset));
 }
 

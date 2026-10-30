@@ -194,11 +194,23 @@ let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
 (* Syntax mode configuration for the #syntax directive *)
 module Syntax_mode = struct
-  let quotations = ref Config.syntax_quotations
+  (* [None] while no [#syntax quotations] directive has been seen since the
+     last reset; the invocation default [!Clflags.syntax_quotations] then
+     applies. *)
+  let quotations : bool option ref = ref None
+
+  let quotations_enabled () =
+    match !quotations with
+    | Some enabled -> enabled
+    | None -> !Clflags.syntax_quotations
 end
 
 let reset_syntax_mode () =
-  Syntax_mode.quotations := Config.syntax_quotations
+  Syntax_mode.quotations := None
+
+let protect_syntax_mode f =
+  Misc.protect_refs
+    [ Misc.R (Syntax_mode.quotations, !Syntax_mode.quotations) ] f
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
@@ -871,7 +883,7 @@ rule token = parse
   | ","  { COMMA }
   | "->" { MINUSGREATER }
   | "$" {
-      if !(Syntax_mode.quotations) then
+      if Syntax_mode.quotations_enabled () then
         DOLLAR
       else
         INFIXOP0 "$"
@@ -888,7 +900,7 @@ rule token = parse
   | ";;" { SEMISEMI }
   | "<"  { LESS }
   | "<[" {
-      if !(Syntax_mode.quotations) then
+      if Syntax_mode.quotations_enabled () then
         LESSLBRACKET
       else
         (* Put back the '[' and return just LESS *)
@@ -903,7 +915,7 @@ rule token = parse
   | "[>" { LBRACKETGREATER }
   | "]"  { RBRACKET }
   | "]>" {
-      if !(Syntax_mode.quotations) then
+      if Syntax_mode.quotations_enabled () then
         RBRACKETGREATER
       else
         (* Put back the '>' and return just RBRACKET *)
@@ -1015,7 +1027,7 @@ and directive already_consumed = parse
         in
         match mode with
         | "quotations" ->
-            Syntax_mode.quotations := toggle;
+            Syntax_mode.quotations := Some toggle;
             let tok = token lexbuf in
             enqueue_token_from_end_of_lexbuf_window lexbuf SEMISEMI ~len:0;
             tok

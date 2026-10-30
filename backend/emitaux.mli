@@ -57,8 +57,10 @@ val record_frame_descr :
     whose return addresses are deltas from the previous descriptor -- an
     assembly-time constant only when both lie in the same section, so
     descriptors at a section boundary escape to the full format. Re-entering the
-    current section does not bump the epoch. *)
-val enter_code_section : string -> unit
+    current section does not bump the epoch. [link_symbol] (already encoded)
+    names the symbol whose section the frametable piece of descriptors in this
+    section is linked to under [-frametable-sections]. *)
+val enter_code_section : ?link_symbol:string -> string -> unit
 
 (* When set before [emit_frames], every frame descriptor escapes to the normal
    format instead of the short encoding. Backends set this when the short format
@@ -89,9 +91,17 @@ type emit_frame_actions =
    [Read_only_data]. Debuginfo strings go in [debug_strings_section]: pass
    [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, or
    [Read_only_data] to keep them inline in the frametable (the binary emitter
-   needs this, having no relocations that can target the mergeable section). *)
+   needs this, having no relocations that can target the mergeable section).
+   Under [-frametable-sections], the descriptors go in [Frametable_piece]s
+   instead, bracketed by marker pieces linked to the (encoded) [code_begin] and
+   [code_end] symbols. The [efa_label_rel] and [efa_def_label] actions must then
+   tag labels with the current section. *)
 val emit_frames :
-  debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
+  debug_strings_section:Asm_targets.Asm_section.t ->
+  code_begin:string ->
+  code_end:string ->
+  emit_frame_actions ->
+  unit
 
 val is_generic_function : string -> bool
 

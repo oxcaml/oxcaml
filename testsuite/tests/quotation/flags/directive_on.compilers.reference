@@ -1,0 +1,4 @@
+File "directive_on.ml", line 12, characters 6-7:
+12 | let ( $ ) f x = f x
+           ^
+Error: Syntax error: operator expected.

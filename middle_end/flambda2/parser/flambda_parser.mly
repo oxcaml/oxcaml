@@ -505,7 +505,9 @@ nonconst_ctors_nonempty:
   | ctors = separated_nonempty_list(PIPE, nonconst_ctor) { ctors }
 ;
 nonconst_ctor:
-  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty { tag, kinds }
+  | tag = tag; KWD_OF; kinds = kinds_with_subkinds_nonempty
+      { tag, Some kinds }
+  | tag = tag; KWD_OF; KWD_ANY { tag, None }
 ;
 return_arity:
   | { None }
@@ -562,9 +564,9 @@ inlined_expr:
 ;
 
 atomic_expr:
-  | KWD_HCF { Invalid { message = "halt-and-catch-fire" } }
-  | KWD_UNREACHABLE { Invalid { message =  "treat-as-unreachable" } }
-  | KWD_INVALID; message = STRING { Invalid { message } }
+  | KWD_HCF { Invalid }
+  | KWD_UNREACHABLE { Invalid }
+  | KWD_INVALID { Invalid }
   | KWD_CONT; ac = apply_cont_expr { Apply_cont ac }
   | KWD_APPLY e = apply_expr { Apply e }
   | LPAREN; e = expr; RPAREN { e }

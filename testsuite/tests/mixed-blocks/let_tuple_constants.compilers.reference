@@ -1,0 +1,9 @@
+(let
+  (uniform/0 =
+     (function {nlocal = 0} param/0[value<int>] : int
+       (let (y/0 =[value<int>] 2 _x/0 =[value<int>] 1) y/0))
+   mixed_nonconstant/0 = (function {nlocal = 0} a/0? : unboxed_float #2.0)
+   mixed_constant/0 =
+     (function {nlocal = 0} param/1[value<int>] : int
+       (let (y/1 =[value<int>] 2 _x/1 =[float] #1.0) y/1)))
+  (makeblock 0 uniform/0 mixed_nonconstant/0 mixed_constant/0))

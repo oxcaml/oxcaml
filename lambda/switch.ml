@@ -26,14 +26,15 @@ type ('a, 'ctx) t_store =
 module type Stored = sig
   type t
   type key
+  val with_annotations : t -> Branch_annotations.t -> t
   val compare_key : key -> key -> int
-  val make_key : t -> key option
+  val make_key : t -> (key * Branch_annotations.t) option
 end
 
 module type CtxStored = sig
   include Stored
   type context
-  val make_key : context -> t -> key option
+  val make_key : context -> t -> (key * Branch_annotations.t) option
 end
 
 module CtxStore(A:CtxStored) = struct
@@ -41,7 +42,7 @@ module CtxStore(A:CtxStored) = struct
     Map.Make(struct type t = A.key let compare = A.compare_key end)
 
   type intern =
-    { mutable map : (bool * int)  AMap.t ;
+    { mutable map : (bool * Branch_annotations.t * int)  AMap.t ;
       mutable next : int ;
       mutable acts : (bool * A.t) list; }
 
@@ -58,14 +59,15 @@ module CtxStore(A:CtxStored) = struct
       i in
 
     let store mustshare ctx act = match A.make_key ctx act with
-      | Some key ->
+      | Some (key, weight) ->
           begin try
-            let (shared,i) = AMap.find key st.map in
-            if not shared then st.map <- AMap.add key (true,i) st.map ;
+            let (_shared,total,i) = AMap.find key st.map in
+            let total = Branch_annotations.add weight total in
+            st.map <- AMap.add key (true,total,i) st.map ;
             i
           with Not_found ->
             let i = add mustshare act in
-            st.map <- AMap.add key (mustshare,i) st.map ;
+            st.map <- AMap.add key (mustshare,weight,i) st.map ;
             i
           end
       | None ->
@@ -81,9 +83,9 @@ module CtxStore(A:CtxStored) = struct
                 if shared then Shared act else Single act)
              st.acts) in
       AMap.iter
-        (fun _ (shared,i) ->
+        (fun _ (shared,annots,i) ->
            if shared then match acts.(i) with
-             | Single act -> acts.(i) <- Shared act
+             | Single act -> acts.(i) <- Shared (A.with_annotations act annots)
              | Shared _ -> ())
         st.map ;
       acts in
@@ -133,8 +135,9 @@ sig
   val make_if : layout -> test -> act -> act -> act
   val make_switch : loc -> layout -> arg -> int array -> act array -> act
 
-  val make_catch : layout -> act -> Static_label.t * (act -> act)
-  val make_exit : Static_label.t -> act
+  val make_catch :
+    layout -> act -> Static_label.t * Branch_annotations.t * (act -> act)
+  val make_exit : Static_label.t -> Branch_annotations.t -> act
 end
 
 (* The module will ``produce good code for the case statement''
@@ -988,10 +991,10 @@ let rec pkey chan  = function
         (fun act -> match  act with
            | Single act -> act
            | Shared act ->
-               let i,h = Arg.make_catch kind act in
+               let i,a,h = Arg.make_catch kind act in
                let oh = !handlers in
                handlers := (fun act -> h (oh act)) ;
-               Arg.make_exit i)
+               Arg.make_exit i a)
         actions in
     !handlers,actions
 

@@ -26,6 +26,8 @@ module Function_call : sig
         (** If a [Code_id.Set.t] is provided, only the provided functions (or a
             simplified version thereof) can be called, but we don't statically
             know which. *)
+
+  val indirect_known_arity : code_ids:Code_id.Set.t Or_unknown.t -> t
 end
 
 module Method_kind : sig

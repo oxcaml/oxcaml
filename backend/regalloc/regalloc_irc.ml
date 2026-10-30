@@ -265,7 +265,7 @@ let freeze : State.t -> unit =
 let select_spilling_register_using_heuristics : State.t -> SpillCosts.t -> Reg.t
     =
  fun state costs ->
-  match Lazy.force Spilling_heuristics.value with
+  match Param.get Spilling_heuristics.value with
   | Flat_uses | Hierarchical_uses -> (
     (* note: this assumes that `Reg.spill_cost` has been updated as needed (only
        when `rewrite` is called); the value computed here can however not be
@@ -305,7 +305,7 @@ let select_spill : State.t -> SpillCosts.t -> unit =
   if debug
   then
     log "chose %a using heuristics %S" Printreg.reg reg
-      Spilling_heuristics.(to_string @@ Lazy.force value);
+      Spilling_heuristics.(to_string @@ Param.get value);
   State.remove_spill_work_list state reg;
   State.add_simplify_work_list state reg;
   freeze_moves state reg;
@@ -454,7 +454,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
   build state cfg_with_infos;
   if round = 1
   then
-    begin match Lazy.force Interf_threshold.value with
+    begin match Param.get Interf_threshold.value with
     | None -> ()
     | Some threshold ->
       if State.get_max_degree state > threshold
@@ -490,7 +490,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
         | Some costs -> costs
         | None ->
           let costs =
-            match Lazy.force Spilling_heuristics.value with
+            match Param.get Spilling_heuristics.value with
             | Flat_uses -> SpillCosts.compute cfg_with_infos ~flat:true ()
             | Hierarchical_uses ->
               SpillCosts.compute cfg_with_infos ~flat:false ()

@@ -216,7 +216,9 @@ end = struct
       | [], [] -> db
       | from_table :: from_tables, to_table :: to_tables ->
         let db =
-          Datalog.set_table to_table (Datalog.get_table from_table db) db
+          Datalog.set_table_or_null to_table
+            (Datalog.get_table_or_null from_table db)
+            db
         in
         copy from_tables to_tables db
 
@@ -345,7 +347,8 @@ end = struct
     let body = g y in
     Now
       ( Seq (Run schedule, body),
-        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+        fun db ->
+          Datalog.set_table_or_null y (Datalog.get_table_or_null x db) db )
 
   let fix' x f =
     let y = Table.locals x in
@@ -372,7 +375,8 @@ end = struct
     let schedule = Datalog.Schedule.saturate (f y) in
     Now
       ( Map (Run schedule, fun db () -> Datalog.get_table y db),
-        fun db -> Datalog.set_table y (Datalog.get_table x db) db )
+        fun db ->
+          Datalog.set_table_or_null y (Datalog.get_table_or_null x db) db )
 
   let ( let@ ) f x = f x
 end

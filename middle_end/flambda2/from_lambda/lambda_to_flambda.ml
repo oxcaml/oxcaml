@@ -359,7 +359,7 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
       CC.close_apply acc ccenv { apply with continuation; region; ghost_region }
     | _ :: _ ->
       let wrapper_cont = Continuation.create () in
-      let return_kinds = Flambda_arity.unarized_components apply.return_arity in
+      let return_kinds = Flambda_arity.unarize apply.return_arity in
       let return_value_components =
         List.mapi
           (fun i _ -> Ident.create_local (Printf.sprintf "return_val%d" i))
@@ -634,13 +634,10 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                     Flambda_kind.With_subkind
                     .from_lambda_values_and_unboxed_numbers_only layout
                       ~machine_width:(Acc.machine_width acc) ) ] )
-            | Punboxed_product layouts ->
+            | Pvoid | Punboxed_product _ ->
               let arity_component =
-                Flambda_arity.Component_for_creation.Unboxed_product
-                  (List.map
-                     (Flambda_arity.Component_for_creation.from_lambda
-                        ~machine_width:(Acc.machine_width acc))
-                     layouts)
+                Flambda_arity.Component_for_creation.from_lambda layout
+                  ~machine_width:(Acc.machine_width acc)
               in
               let arity = Flambda_arity.create [arity_component] in
               let fields =
@@ -776,7 +773,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       let result_layout = L.primitive_result_layout prim in
       (match result_layout with
       | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ ->
+      | Punboxed_vector _ | Punboxed_mask | Pvoid | Punboxed_product _ ->
         ()
       | Ptop | Pbottom ->
         Misc.fatal_errorf "Invalid result layout %a for primitive %a"
@@ -916,11 +913,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         alloc_region = current_alloc_region;
                         args_arity = Flambda_arity.create args_arity;
                         return_arity =
-                          Flambda_arity.unarize_t
-                            (Flambda_arity.create
-                               [ Flambda_arity.Component_for_creation.from_lambda
-                                   layout ~machine_width:(Acc.machine_width acc)
-                               ])
+                          Flambda_arity.create
+                            [ Flambda_arity.Component_for_creation.from_lambda
+                                layout ~machine_width:(Acc.machine_width acc) ]
                       }
                     in
                     wrap_return_continuation acc env ccenv apply))
@@ -1278,10 +1273,9 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               alloc_region = Env.current_alloc_region env;
               args_arity = Flambda_arity.create args_arity;
               return_arity =
-                Flambda_arity.unarize_t
-                  (Flambda_arity.create
-                     [ Flambda_arity.Component_for_creation.from_lambda
-                         ap_return ~machine_width:(Acc.machine_width acc) ])
+                Flambda_arity.create
+                  [ Flambda_arity.Component_for_creation.from_lambda ap_return
+                      ~machine_width:(Acc.machine_width acc) ]
             }
           in
           wrap_return_continuation acc env ccenv apply)
@@ -1406,6 +1400,10 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     List.length params
     - match kind with Curried { nlocal } -> nlocal | Tupled -> 0
   in
+  let function_slot_size =
+    Function_slot.size_from_arity ~num_complex_params:(List.length params)
+      ~is_tupled:(match kind with Tupled -> true | Curried _ -> false)
+  in
   let unboxing_kind (layout : Lambda.layout) :
       Function_decl.unboxing_kind option =
     match[@warning "-fragile-match"] layout with
@@ -1473,7 +1471,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         }
     | Pvalue { nullable = Nullable; raw_kind = _ }
     | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-    | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ ->
+    | Punboxed_vector _ | Punboxed_mask | Pvoid | Punboxed_product _ ->
       Location.prerr_warning
         (Debuginfo.Scoped_location.to_location loc)
         Warnings.Unboxing_impossible;
@@ -1502,7 +1500,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         Function_slot.create
           (Current_unit.get_cu_exn ())
           ~name:(Ident.name fid ^ "_unboxed")
-          ~is_always_immediate:false Flambda_kind.value
+          ~size:
+            (Function_slot.size_from_arity ~num_complex_params:1
+               ~is_tupled:false)
       in
       let return_unboxing =
         match unboxing_kind return, attr.unbox_return with
@@ -1586,7 +1586,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
-      ~name:(Ident.name fid) ~is_always_immediate:false Flambda_kind.value
+      ~name:(Ident.name fid) ~size:function_slot_size
   in
   let unboxed_products = ref Ident.Map.empty in
   let params =
@@ -1628,10 +1628,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let unboxed_products = !unboxed_products in
   let removed_params = Ident.Map.keys unboxed_products in
   let return =
-    Flambda_arity.unarize_t
-      (Flambda_arity.create
-         [ Flambda_arity.Component_for_creation.from_lambda return
-             ~machine_width:(Env.machine_width env) ])
+    Flambda_arity.create
+      [ Flambda_arity.Component_for_creation.from_lambda return
+          ~machine_width:(Env.machine_width env) ]
   in
   (* CR ncourant: now that the following two statements are in this order, I
      believe we can remove [removed_params]. *)

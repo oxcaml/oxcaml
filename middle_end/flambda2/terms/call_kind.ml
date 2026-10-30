@@ -22,6 +22,8 @@ module Function_call = struct
     | Indirect_unknown_arity
     | Indirect_known_arity of Code_id.Set.t Or_unknown.t
 
+  let indirect_known_arity ~code_ids = Indirect_known_arity code_ids
+
   let print ppf call =
     match call with
     | Direct code_id ->
@@ -333,7 +335,7 @@ let indirect_function_call_unknown_arity =
   Function { function_call = Indirect_unknown_arity }
 
 let indirect_function_call_known_arity ~code_ids =
-  Function { function_call = Indirect_known_arity code_ids }
+  Function { function_call = Function_call.indirect_known_arity ~code_ids }
 
 let method_call kind ~obj = Method { kind; obj }
 

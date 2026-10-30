@@ -688,11 +688,7 @@ val save_signature_with_imports:
 
 (** See [Persistent_env.find_import]. *)
 val find_import:
-  chain:Compilation_unit.Name.t list ->
-  Compilation_unit.Name.t ->
-  Compilation_unit.t option
-  * Global_module.Parameter_name.t list
-  * Signature_with_global_bindings.t
+  chain:Global_module.t list -> Compilation_unit.Name.t -> Persistent_env.import
 
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
@@ -727,11 +723,6 @@ val register_import_as_opaque: Compilation_unit.Name.t -> unit
    -as-parameter *)
 val is_parameter_unit: Global_module.Name.t -> bool
 
-(* [implemented_parameter md] is the argument given to -as-argument-for when
-   [md] was compiled *)
-val implemented_parameter:
-  Global_module.Name.t -> Global_module.Parameter_name.t option
-
 (* [is_imported_parameter md] is true if [md] has been imported and is a
    parameter to this module *)
 val is_imported_parameter: Global_module.Name.t -> bool
@@ -765,12 +756,17 @@ type error =
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
       { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+        chain : Global_module.t list;
             (** Dependency chain leading to [modname], in reversed order
                 (most-recent loader first). *)
       }
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
+
+  val log_or_raise : error -> unit
+  val log_and_raise : error -> 'a
+end
 
 val in_signature: bool -> t -> t
 
@@ -885,10 +881,6 @@ val add_merlin_extension_module: Ident.t -> module_type -> t -> t
 val cleanup_functor_caches : stamp:int -> unit
 val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
 val cleanup_usage_tables : stamp:int -> unit
-
-(** This value should be filled in with [Msupport.raise_error]. [Env] cannot use this
-    function directly because [Msupport] depends on [Env] *)
-val msupport_raise_error : (?ignore_unify:bool -> exn -> unit) ref
 
 type 'acc fold_all_labels_f = {
   fold_all_labels_f : 'rcd. 'rcd record_form -> 'rcd gen_label_description -> 'acc -> 'acc

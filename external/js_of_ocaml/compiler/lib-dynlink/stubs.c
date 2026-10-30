@@ -1,21 +1,17 @@
-#include <stdlib.h>
-#include <stdio.h>
-void jsoo_get_bytecode_sections () {
-  fprintf(stderr, "Unimplemented Javascript primitive jsoo_get_bytecode_sections!\n");
-  exit(1);
+#include <caml/misc.h>
+
+CAMLweakdef void jsoo_get_bytecode_sections () {
+  caml_fatal_error("Unimplemented Javascript primitive jsoo_get_bytecode_sections!");
 }
 
-void jsoo_get_runtime_aliases () {
-  fprintf(stderr, "Unimplemented Javascript primitive jsoo_get_runtime_aliases!\n");
-  exit(1);
+CAMLweakdef void jsoo_get_runtime_aliases () {
+  caml_fatal_error("Unimplemented Javascript primitive jsoo_get_runtime_aliases!");
 }
 
-void jsoo_toplevel_init_compile () {
-  fprintf(stderr, "Unimplemented Javascript primitive jsoo_toplevel_init_compile!\n");
-  exit(1);
+CAMLweakdef void jsoo_toplevel_init_compile () {
+  caml_fatal_error("Unimplemented Javascript primitive jsoo_toplevel_init_compile!");
 }
 
-void jsoo_toplevel_init_reloc () {
-  fprintf(stderr, "Unimplemented Javascript primitive jsoo_toplevel_init_reloc!\n");
-  exit(1);
+CAMLweakdef void jsoo_toplevel_init_reloc () {
+  caml_fatal_error("Unimplemented Javascript primitive jsoo_toplevel_init_reloc!");
 }

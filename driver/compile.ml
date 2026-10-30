@@ -34,19 +34,11 @@ let interface ~source_file ~output_prefix =
 
 (** Bytecode compilation backend for .ml files. *)
 
-let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
-  match param, arg_block_idx with
-  | Some arg_param, Some arg_block_idx ->
-    Some { arg_param; arg_block_idx }
-  | None, None -> None
-  | Some _, None -> Misc.fatal_error "No argument field"
-  | None, Some _ -> Misc.fatal_error "Unexpected argument field"
-
-let tlambda_to_bytecode i tlambda ~as_arg_for =
+let tlambda_to_bytecode i tlambda =
   tlambda
   |> Profile.(record ~accumulate:true generate)
-    (fun { Lambda.code = tlambda; required_globals; main_module_block_format;
-           arg_block_idx }  ->
+    (fun { Lambda.code = tlambda; required_globals;
+           main_module_block_format }  ->
        Builtin_attributes.warn_unused ();
        tlambda
        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
@@ -70,8 +62,7 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        |> Bytegen.compile_implementation i.module_name
        |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
        |> fun bytecode ->
-          let arg_descr = make_arg_descr ~param:as_arg_for ~arg_block_idx in
-          bytecode, required_globals, main_module_block_format, arg_descr
+          bytecode, required_globals, main_module_block_format
     )
 
 let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
@@ -88,17 +79,17 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
   |> tlambda_to_bytecode i
 
 let emit_bytecode i
-      (bytecode, required_globals, main_module_block_format, arg_descr) =
+      (bytecode, required_globals, main_module_block_format) =
   let cmo = Unit_info.cmo i.target in
   Misc.protect_output_to_file (Unit_info.Artifact.filename cmo) (fun oc ->
        bytecode
        |> Profile.(record ~accumulate:true generate)
          (Emitcode.to_file oc i.module_name cmo ~required_globals
-            ~main_module_block_format ~arg_descr);
+            ~main_module_block_format);
     )
 
 let emit_lambda_program info program =
-  let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+  let bytecode = tlambda_to_bytecode info program in
   if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
   then emit_bytecode info bytecode
 
@@ -107,7 +98,6 @@ type starting_point =
   | Instantiation of {
       runtime_args : Translmod.runtime_arg list;
       main_module_block_repr : Lambda.module_representation;
-      arg_descr : Lambda.arg_descr option;
     }
 
 let starting_point_of_compiler_pass start_from =
@@ -127,18 +117,14 @@ let implementation_aux ~start_from ~source_file ~output_prefix
   match start_from with
   | Parsing ->
     let backend info typed =
-      let as_arg_for =
-        !Clflags.as_argument_for
-        |> Option.map Global_module.Parameter_name.of_string
-      in
-      let bytecode = to_bytecode info typed ~as_arg_for in
+      let bytecode = to_bytecode info typed in
       emit_bytecode info bytecode
     in
     Compile_common.implementation
       ~hook_parse_tree:Fun.id
       ~hook_typed_tree:ignore
       info ~backend
-  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
+  | Instantiation { runtime_args; main_module_block_repr } ->
     begin
       match !Clflags.as_argument_for with
       | Some _ ->
@@ -147,16 +133,11 @@ let implementation_aux ~start_from ~source_file ~output_prefix
           "-as-argument-for is not allowed (and not needed) with -instantiate"
       | None -> ()
     end;
-    let as_arg_for, arg_block_idx =
-      match (arg_descr : Lambda.arg_descr option) with
-      | Some { arg_param; arg_block_idx } -> Some arg_param, Some arg_block_idx
-      | None -> None, None
-    in
     let impl =
       Translmod.transl_instance info.module_name ~runtime_args
-        ~main_module_block_repr ~arg_block_idx
+        ~main_module_block_repr
     in
-    let bytecode = tlambda_to_bytecode info impl ~as_arg_for in
+    let bytecode = tlambda_to_bytecode info impl in
     emit_bytecode info bytecode
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
@@ -165,9 +146,9 @@ let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
     ~compilation_unit:Inferred_from_output_prefix
 
 let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+    ~main_module_block_repr ~keep_symbol_tables =
   let start_from =
-    Instantiation { runtime_args; main_module_block_repr; arg_descr }
+    Instantiation { runtime_args; main_module_block_repr }
   in
   implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
     ~compilation_unit:(Exactly compilation_unit)
