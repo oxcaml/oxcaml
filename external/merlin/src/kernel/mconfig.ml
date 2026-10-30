@@ -714,6 +714,7 @@ let ocaml_ignored_flags =
     "-no-ssa-simplify";
     "-ssa-validate";
     "-no-ssa-validate";
+    "-ssa-delete-empty-loops";
     "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
