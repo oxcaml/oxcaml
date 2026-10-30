@@ -28,6 +28,8 @@
    [@inlined never] on the call is a workaround; [@zero_alloc assume] on the
    definition of [matches] is not. *)
 
+[@@@ocaml.flambda_o3]
+
 type 'a t =
   | Base of 'a
   | And of 'a t * 'a t

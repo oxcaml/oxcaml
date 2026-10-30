@@ -1,18 +1,18 @@
-File "inlined_closure_dbg.ml", line 39, characters 5-15:
-39 | let[@zero_alloc] f t x = matches t ~x
+File "inlined_closure_dbg.ml", line 41, characters 5-15:
+41 | let[@zero_alloc] f t x = matches t ~x
           ^^^^^^^^^^
 Error: Annotation check for zero_alloc failed on function Inlined_closure_dbg.f (camlInlined_closure_dbg__f_3_7).
 
-File "inlined_closure_dbg.ml", line 37, characters 19-50:
-37 | let matches t ~x = eval t (fun y -> Int.equal y x)
+File "inlined_closure_dbg.ml", line 39, characters 19-50:
+39 | let matches t ~x = eval t (fun y -> Int.equal y x)
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: called function may allocate (direct tailcall camlInlined_closure_dbg__eval_0_4)
 inlined from
-inlined_closure_dbg.ml:39,25--37[Inlined_closure_dbg.f]
+inlined_closure_dbg.ml:41,25--37[Inlined_closure_dbg.f]
 
-File "inlined_closure_dbg.ml", line 37, characters 26-50:
-37 | let matches t ~x = eval t (fun y -> Int.equal y x)
+File "inlined_closure_dbg.ml", line 39, characters 26-50:
+39 | let matches t ~x = eval t (fun y -> Int.equal y x)
                                ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: allocation of 32 bytes for closure
 inlined from
-inlined_closure_dbg.ml:39,25--37[Inlined_closure_dbg.f]
+inlined_closure_dbg.ml:41,25--37[Inlined_closure_dbg.f]

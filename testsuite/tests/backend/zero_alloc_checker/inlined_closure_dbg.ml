@@ -23,6 +23,8 @@
        inlined_closure_dbg.ml
      llvm-dwarfdump --debug-info inlined_closure_dbg.o *)
 
+[@@@ocaml.flambda_o3]
+
 type 'a t =
   | Base of 'a
   | And of 'a t * 'a t
