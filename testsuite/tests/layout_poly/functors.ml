@@ -469,9 +469,11 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Recursive functor. This is more broken that it initially looks.
-   [Recursive.M12.id]'s first argument is [value_or_null] even though it should
-   be polymorphic. *)
+(* Recursive functor. This is more broken than it initially looks.
+   [Recursive.M12.id]'s first argument ends up with the kind [value_or_null]
+   even though it should be polymorphic. The missing value error is coming from
+   how recursive modules are compiled: this ends up as calls to CamlinternalMod
+   which slambda eval can't see through. *)
 let x12 =
  let module Recursive = struct
     module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =

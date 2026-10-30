@@ -25,7 +25,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-[@@@warning "+9"]
+[@@@warning "+missing-record-field-pattern"]
 
 open Lambda
 module Fmt = Format_doc
@@ -142,13 +142,28 @@ end = struct
     | Vrecord of record
     | Vclosure of Template_id.t
 
-  let print_closure ppf { clo_template; clo_runtime_env = _; clo_env = _ } =
+  let print_closure ppf { clo_template; clo_runtime_env; clo_env = _ } =
     let body =
       match clo_template with
       | Kind template -> Lkindtemplate template
       | Value template -> Ltemplate template
     in
-    Fmt.fprintf ppf "@[<2>(closure ⟨env⟩@ %a)@]"
+    let pp_runtime_env ppf env =
+      let pp_item ppf (id, layout) =
+        Fmt.fprintf ppf "%a: %a"
+          (Fmt.deprecated Ident.print)
+          id
+          (Fmt.deprecated Printlambda.layout)
+          layout
+      in
+      Fmt.fprintf ppf "@[<hov 1>[%a]@]"
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ";@ ")
+           pp_item)
+        env
+    in
+    Fmt.fprintf ppf "@[<2>(@[<hv>closure@ %a@]@ %a)@]" pp_runtime_env
+      clo_runtime_env
       (Fmt.deprecated Printlambda.lambda)
       body
 
@@ -268,7 +283,7 @@ end = struct
   let symbol_arg_of_value (v : Types.value Or_missing.t) =
     match v with
     | Missing ->
-      (* [Missing] means the value has no static part, see [make_record] for a
+      (* [Missing] means the value has no static part, see [make_record] for
          when we'd actually pass it as an argument. *)
       "missing"
     | Present (Vlayout l) -> symbol_arg_of_layout l
@@ -609,8 +624,13 @@ and eval_constructor_shape env old_constructor_shape =
 let dynamic slv_runtime = { slv_comptime = Missing; slv_runtime }
 
 (* A record with all-Missing fields carries no static information. Use [Missing]
-   instead of a fresh identity so they are all identical to this evaluator and
-   therefore don't cause needless template specializations. *)
+   instead of a fresh identity so any record with this shape looks identical to
+   this evaluator and therefore don't cause needless template specializations.
+
+   We could extend this idea further and represent all records with their
+   contents, this has the potential to reduce the number of instantiations,
+   however we need to mangle these and the mangled names would get arbitrarily
+   large, so for now this is the only optimisation we do. *)
 let make_record ?name ctx fields : value Or_missing.t =
   if
     List.for_all
@@ -1451,7 +1471,7 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       (fun (_, layout) -> mixed_block_element_of_layout layout)
       clo_runtime_env
   in
-  let close_function env ~env_mode
+  let build_function env ~env_mode
       { kind = old_kind;
         params = old_params;
         return = old_return;
@@ -1514,7 +1534,7 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       } ->
     let env = bind_params (Array.of_list ktmpl_params) in
     let new_body = eval_dynamic ctx env old_func.body in
-    dynamic (close_function env ~env_mode:ktmpl_env_mode old_func new_body)
+    dynamic (build_function env ~env_mode:ktmpl_env_mode old_func new_body)
   | Value { tmpl_func = old_func; tmpl_env = _ } ->
     let static_params =
       Misc.Stdlib.Array.of_list_map
@@ -1525,7 +1545,7 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
     let new_body = eval_lam ctx env old_func.body in
     { slv_comptime = new_body.slv_comptime;
       slv_runtime =
-        close_function env ~env_mode:old_func.mode old_func new_body.slv_runtime
+        build_function env ~env_mode:old_func.mode old_func new_body.slv_runtime
     }
 
 (* Check that expansion left no unresolved layouts or templates. *)
@@ -1685,7 +1705,7 @@ let eval ~cu_static_data template_lam =
         && not (template_lam == lambda)
       then
         Misc.fatal_error
-          "Value eval did something non-trivial but layout poly is disabled.";
+          "Static eval did something non-trivial but layout poly is disabled.";
       { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, lambda)
 
 let report_error_doc ppf = function

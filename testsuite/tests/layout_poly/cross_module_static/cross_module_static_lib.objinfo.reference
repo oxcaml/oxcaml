@@ -24,16 +24,16 @@ Static data:
     Cross_module_static_lib/Stamper/3;
   ]
   (Cross_module_static_lib/counted_id/2
-    (closure ⟨env⟩
+    (closure [calls/354: *]
       (ktemplate {} layout_17
         (function {nlocal = 0} x/326[$layout_17] : $layout_17
           (seq (+:=1 calls/354) x/326)))))
   (Cross_module_static_lib/id/0
-    (closure ⟨env⟩
+    (closure []
       (ktemplate {} layout_2
         (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))))
   (Cross_module_static_lib/Stamper/3
-    (closure ⟨env⟩
+    (closure [calls/353: *]
       (template {} {nlocal = 0} X/352 is_a_functor never_inline never_loop
         (let
           (X/329 =a X/352
@@ -50,7 +50,7 @@ Static data:
                      x/333)))))
           (makeblock 0 initial/330 with_stamp/331)))))
   (Cross_module_static_lib/pair/1
-    (closure ⟨env⟩
+    (closure []
       (ktemplate {} layout_5 layout_7
         (function {nlocal = 0} x/321[$layout_5] y/322[$layout_7]
           : #($layout_5, $layout_7)
