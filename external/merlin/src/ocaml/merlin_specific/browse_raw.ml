@@ -436,7 +436,8 @@ let rec of_expression_desc loc = function
   | Texp_unboxed_unit
   | Texp_new _
   | Texp_src_pos
-  | Texp_typed_hole -> id_fold
+  | Texp_typed_hole
+  | Texp_break _ -> id_fold
   | Texp_let (_, vbs, e) -> of_expression e ** list_fold of_value_binding vbs
   | Texp_letmutable (vb, e) -> of_expression e ** of_value_binding vb
   | Texp_function { params; body; ret_mode; _ } ->
