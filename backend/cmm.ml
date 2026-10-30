@@ -165,6 +165,14 @@ type exttype =
   | XVec128
   | XVec256
   | XVec512
+  | XDummy_int
+  | XDummy_float
+
+let is_dummy_exttype = function
+  | XDummy_int | XDummy_float -> true
+  | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
+  | XVec256 | XVec512 ->
+    false
 
 let machtype_of_exttype = function
   | XInt ->
@@ -180,6 +188,8 @@ let machtype_of_exttype = function
   | XVec128 -> typ_vec128
   | XVec256 -> typ_vec256
   | XVec512 -> typ_vec512
+  | XDummy_int -> typ_int
+  | XDummy_float -> typ_float
 
 let machtype_of_exttype_list xtl =
   Array.concat (List.map machtype_of_exttype xtl)
@@ -587,6 +597,7 @@ type operation =
   | Cand
   | Cor
   | Cxor
+  | Cnot
   | Clsl
   | Clsr
   | Casr
@@ -805,7 +816,7 @@ let iter_shallow_tail f = function
   | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
       ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
         | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
         | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
         | Capply _ | Cextcall _ | Cload _
@@ -843,7 +854,7 @@ let map_shallow_tail f = function
     | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
         ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
           | Capply _ | Cextcall _ | Cload _
@@ -950,7 +961,7 @@ let equal_machtype left right =
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-     | XVec256 | XVec512 ) as left) right =
+     | XVec256 | XVec512 | XDummy_int | XDummy_float ) as left) right =
   (* we can use polymorphic compare as long as exttype is all constant
      constructors *)
   Stdlib.( = ) left right

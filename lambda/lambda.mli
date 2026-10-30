@@ -500,9 +500,15 @@ type primitive =
   | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
-    compiled away. *)
+    compiled away.
+
+    [Unpacked_product] (from [@unpacked]) and a [Same_as_ocaml_repr] product
+    differ only in native-code calling convention: the former's components
+    are passed as separate C arguments, and the latter is passed as the
+    corresponding C struct. *)
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
+  | Unpacked_product of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_mask

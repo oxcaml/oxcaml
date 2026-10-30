@@ -405,6 +405,13 @@ Hint: Arguments with layout bits8 or bits16 are not allowed in C stubs
       the garbage upper bits.
 |}];;
 
+(* Without [@unpacked] the components are passed as C struct members, so the
+   restriction does not apply. *)
+external f10_6_3 : #(int16# * int) -> bool -> string = "foo" "bar";;
+[%%expect{|
+external f10_6_3 : #(int16# * int) -> bool -> string = "foo" "bar"
+|}];;
+
 external f10_7 : string -> (int16#[@unboxed])  = "foo" "bar";;
 [%%expect{|
 external f10_7 : string -> int16# = "foo" "bar"

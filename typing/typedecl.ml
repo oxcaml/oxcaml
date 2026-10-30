@@ -963,7 +963,7 @@ let check_imprecise_type_param_annotation env (cty, _) annotated_jkind =
   match cty.ctyp_desc, get_desc cty.ctyp_type, annotated_jkind with
   | Ttyp_var (name_opt, Some _), Tvar { jkind; _ }, Some annotated_jkind
     when not (Jkind.History.has_warned jkind) ->
-    if not (Jkind.equate env jkind annotated_jkind) then begin
+    if Result.is_error (Jkind.equate env jkind annotated_jkind) then begin
       let format_jkind jkind =
         Format_doc.asprintf "%a" !Oprint.out_jkind
           (Out_type.out_jkind_of_jkind env jkind)
@@ -5724,7 +5724,7 @@ let report_error ~loc = function
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
       | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
       | Function_label_mismatch _ | Tuple_label_mismatch _
-      | First_class_module _ -> None
+      | First_class_module _ | Weaken_sort _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->

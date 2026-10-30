@@ -30,6 +30,8 @@ module type Common_options = sig
   val _H : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
+  val _H_file : string -> unit
+  val _Hx_file : string -> unit
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit

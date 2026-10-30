@@ -1919,6 +1919,6 @@ let jkind_declarations ~loc env name
   | _, None -> None
   | None, Some _ -> Some Manifest_missing
   | Some k1, Some k2 ->
-    if Jkind.Const.equal env k1 k2
-    then None
-    else Some Manifest_mismatch
+    match Jkind.Const.equal env k1 k2 with
+    | Ok () -> None
+    | Error _ -> Some Manifest_mismatch

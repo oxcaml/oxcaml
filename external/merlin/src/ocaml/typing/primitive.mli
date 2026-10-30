@@ -155,9 +155,7 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
 val prim_can_contain_layout_any : description -> bool
 
 type wrong_repr_error =
-  | Product_arg
   | Expected_value_prim
-  | Product_return
   | Unpacked_product_return
   | Unextended_return
   | Small_int_arg

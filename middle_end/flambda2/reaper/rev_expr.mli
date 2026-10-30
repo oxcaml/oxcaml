@@ -53,11 +53,6 @@ and rev_static_const =
       (** The [Set_of_closures] case in [Static_const] is not allowed in
           conjunction with [Other]. *)
 
-and rev_code =
-  { params_and_body : rev_params_and_body;
-    free_names_of_params_and_body : Name_occurrences.t
-  }
-
 and rev_params_and_body =
   { return_continuation : Continuation.t;
     exn_continuation : Continuation.t;
@@ -86,3 +81,18 @@ and rev_expr =
   }
 
 type t = rev_expr
+
+val ids_for_export : t -> Ids_for_export.t
+
+val apply_renaming : t -> Renaming.t -> t
+
+module Rev_code : sig
+  type t =
+    { params_and_body : rev_params_and_body;
+      free_names_of_params_and_body : Name_occurrences.t
+    }
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+end

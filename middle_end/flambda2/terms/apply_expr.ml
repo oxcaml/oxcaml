@@ -46,8 +46,10 @@ module Result_continuation = struct
 
   let apply_renaming t renaming =
     match t with
-    | Return k -> Return (Renaming.apply_continuation renaming k)
-    | Never_returns -> Never_returns
+    | Return k ->
+      let k' = Renaming.apply_continuation renaming k in
+      if k == k' then t else Return k'
+    | Never_returns -> t
 
   let ids_for_export t =
     match t with
@@ -164,7 +166,7 @@ let invariant
        exn_continuation = _;
        args;
        args_arity;
-       return_arity;
+       return_arity = _;
        call_kind;
        return_mode = _;
        dbg = _;
@@ -183,7 +185,9 @@ let invariant
   (match call_kind with
   | Function _ | Method _ -> ()
   | C_call _ -> (
-    (match callee with
+    (* The return arity may be an unboxed product of any shape; unsupported ones
+       are rejected in [To_cmm_extcall]. *)
+    match callee with
     | Some callee when Simple.is_symbol callee -> ()
     | None | Some _ ->
       (* CR-someday mshinwell: We could expose indirect C calls at the source
@@ -191,14 +195,7 @@ let invariant
       Misc.fatal_errorf
         "For [C_call] applications the callee must be directly specified as a \
          [Symbol]:@ %a"
-        print t);
-    match Flambda_arity.unarize return_arity with
-    | [] | [_] | [_; _] ->
-      (* CR xclerc: we currently support only pairs as unboxed return values. *)
-      ()
-    | _ :: _ :: _ ->
-      Misc.fatal_errorf "Illegal return arity for C call:@ %a"
-        Flambda_arity.print return_arity)
+        print t)
   | Effect _ -> (
     match callee, args with
     | None, [] -> ()
