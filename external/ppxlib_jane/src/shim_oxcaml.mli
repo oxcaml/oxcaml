@@ -28,20 +28,20 @@ module Mode : sig
     | Pmode_bounded of bounded
 
   and bounded = mode_bounded =
-    { upper : bound
-    ; lower : bound
+    { pmode_upper : bound
+    ; pmode_lower : bound
     }
 
   and bound = bound_elem list
 
   and bound_elem = mode_bound_elem =
     | Pbound_var of bound_var
-    | Pbound_const of string loc
+    | Pbound_const of string loc list
 
   and bound_var = mode_bound_var =
-    { elem_morph : string loc option
-    ; elem_var : string loc
-    ; elem_mod : string loc list
+    { pbound_morph : string loc option
+    ; pbound_var : string loc
+    ; pbound_mod : string loc list
     }
 end
 

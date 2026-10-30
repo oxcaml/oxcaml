@@ -83,20 +83,20 @@ and mode = Parsetree.mode =
   | Pmode_bounded of mode_bounded
 
 and mode_bounded = Parsetree.mode_bounded = {
-  upper : mode_bound;
-  lower : mode_bound;
+  pmode_upper : mode_bound;
+  pmode_lower : mode_bound;
 }
 
 and mode_bound = mode_bound_elem list
 
 and mode_bound_elem = Parsetree.mode_bound_elem =
   | Pbound_var of mode_bound_var
-  | Pbound_const of mode_const loc
+  | Pbound_const of mode_const loc list
 
 and mode_bound_var = Parsetree.mode_bound_var = {
-  elem_morph : mode_morph loc option;
-  elem_var : mode_var loc;
-  elem_mod : mode_const loc list;
+  pbound_morph : mode_morph loc option;
+  pbound_var : mode_var loc;
+  pbound_mod : mode_const loc list;
 }
 
 and modes = mode loc list
@@ -1455,10 +1455,10 @@ class virtual map =
         | Pmode_bounded a ->
             let a = self#mode_bounded a in Pmode_bounded a
     method mode_bounded : mode_bounded -> mode_bounded=
-      fun { upper; lower } ->
-        let upper = self#mode_bound upper in
-        let lower = self#mode_bound lower in
-        { upper; lower }
+      fun { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound pmode_upper in
+        let pmode_lower = self#mode_bound pmode_lower in
+        { pmode_upper; pmode_lower }
     method mode_bound : mode_bound -> mode_bound=
       self#list self#mode_bound_elem
     method mode_bound_elem : mode_bound_elem -> mode_bound_elem=
@@ -1467,13 +1467,13 @@ class virtual map =
         | Pbound_var a ->
             let a = self#mode_bound_var a in Pbound_var a
         | Pbound_const a ->
-            let a = self#loc self#mode_const a in Pbound_const a
+            let a = self#list (self#loc self#mode_const) a in Pbound_const a
     method mode_bound_var : mode_bound_var -> mode_bound_var=
-      fun { elem_morph; elem_var; elem_mod } ->
-        let elem_morph = self#option (self#loc self#mode_morph) elem_morph in
-        let elem_var = self#loc self#mode_var elem_var in
-        let elem_mod = self#list (self#loc self#mode_const) elem_mod in
-        { elem_morph; elem_var; elem_mod }
+      fun { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) pbound_morph in
+        let pbound_var = self#loc self#mode_var pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) pbound_mod in
+        { pbound_morph; pbound_var; pbound_mod }
     method modes : modes -> modes= self#list (self#loc self#mode)
     method include_kind : include_kind -> include_kind= fun x -> x
     method loc : 'a . ('a -> 'a) -> 'a loc -> 'a loc=
@@ -2707,21 +2707,21 @@ class virtual iter =
         | Pmode_bounded a ->
             self#mode_bounded a
     method mode_bounded : mode_bounded -> unit=
-      fun { upper; lower } ->
-        self#mode_bound upper;
-        self#mode_bound lower
+      fun { pmode_upper; pmode_lower } ->
+        self#mode_bound pmode_upper;
+        self#mode_bound pmode_lower
     method mode_bound : mode_bound -> unit=
       self#list self#mode_bound_elem
     method mode_bound_elem : mode_bound_elem -> unit=
       fun x ->
         match x with
         | Pbound_var a -> self#mode_bound_var a
-        | Pbound_const a -> self#loc self#mode_const a
+        | Pbound_const a -> self#list (self#loc self#mode_const) a
     method mode_bound_var : mode_bound_var -> unit=
-      fun { elem_morph; elem_var; elem_mod } ->
-        self#option (self#loc self#mode_morph) elem_morph;
-        self#loc self#mode_var elem_var;
-        self#list (self#loc self#mode_const) elem_mod
+      fun { pbound_morph; pbound_var; pbound_mod } ->
+        self#option (self#loc self#mode_morph) pbound_morph;
+        self#loc self#mode_var pbound_var;
+        self#list (self#loc self#mode_const) pbound_mod
     method modes : modes -> unit= self#list (self#loc self#mode)
     method include_kind : include_kind -> unit= fun _ -> ()
     method loc : 'a . ('a -> unit) -> 'a loc -> unit=
@@ -3591,9 +3591,9 @@ class virtual ['acc] fold =
         | Pmode_bounded a ->
             self#mode_bounded a acc
     method mode_bounded : mode_bounded -> 'acc -> 'acc=
-      fun { upper; lower } acc ->
-        let acc = self#mode_bound upper acc in
-        let acc = self#mode_bound lower acc in
+      fun { pmode_upper; pmode_lower } acc ->
+        let acc = self#mode_bound pmode_upper acc in
+        let acc = self#mode_bound pmode_lower acc in
         acc
     method mode_bound : mode_bound -> 'acc -> 'acc=
       self#list self#mode_bound_elem
@@ -3601,12 +3601,12 @@ class virtual ['acc] fold =
       fun x acc ->
         match x with
         | Pbound_var a -> self#mode_bound_var a acc
-        | Pbound_const a -> self#loc self#mode_const a acc
+        | Pbound_const a -> self#list (self#loc self#mode_const) a acc
     method mode_bound_var : mode_bound_var -> 'acc -> 'acc=
-      fun { elem_morph; elem_var; elem_mod } acc ->
-        let acc = self#option (self#loc self#mode_morph) elem_morph acc in
-        let acc = self#loc self#mode_var elem_var acc in
-        let acc = self#list (self#loc self#mode_const) elem_mod acc in
+      fun { pbound_morph; pbound_var; pbound_mod } acc ->
+        let acc = self#option (self#loc self#mode_morph) pbound_morph acc in
+        let acc = self#loc self#mode_var pbound_var acc in
+        let acc = self#list (self#loc self#mode_const) pbound_mod acc in
         acc
     method modes : modes -> 'acc -> 'acc= self#list (self#loc self#mode)
     method include_kind : include_kind -> 'acc -> 'acc= fun _ acc -> acc
@@ -4712,10 +4712,10 @@ class virtual ['acc] fold_map =
         | Pmode_bounded a ->
             let (a, acc) = self#mode_bounded a acc in ((Pmode_bounded a), acc)
     method mode_bounded : mode_bounded -> 'acc -> (mode_bounded * 'acc)=
-      fun { upper; lower } acc ->
-        let (upper, acc) = self#mode_bound upper acc in
-        let (lower, acc) = self#mode_bound lower acc in
-        ({ upper; lower }, acc)
+      fun { pmode_upper; pmode_lower } acc ->
+        let (pmode_upper, acc) = self#mode_bound pmode_upper acc in
+        let (pmode_lower, acc) = self#mode_bound pmode_lower acc in
+        ({ pmode_upper; pmode_lower }, acc)
     method mode_bound : mode_bound -> 'acc -> (mode_bound * 'acc)=
       self#list self#mode_bound_elem
     method mode_bound_elem : mode_bound_elem -> 'acc -> (mode_bound_elem * 'acc)=
@@ -4724,13 +4724,13 @@ class virtual ['acc] fold_map =
         | Pbound_var a ->
             let (a, acc) = self#mode_bound_var a acc in ((Pbound_var a), acc)
         | Pbound_const a ->
-            let (a, acc) = self#loc self#mode_const a acc in ((Pbound_const a), acc)
+            let (a, acc) = self#list (self#loc self#mode_const) a acc in ((Pbound_const a), acc)
     method mode_bound_var : mode_bound_var -> 'acc -> (mode_bound_var * 'acc)=
-      fun { elem_morph; elem_var; elem_mod } acc ->
-        let (elem_morph, acc) = self#option (self#loc self#mode_morph) elem_morph acc in
-        let (elem_var, acc) = self#loc self#mode_var elem_var acc in
-        let (elem_mod, acc) = self#list (self#loc self#mode_const) elem_mod acc in
-        ({ elem_morph; elem_var; elem_mod }, acc)
+      fun { pbound_morph; pbound_var; pbound_mod } acc ->
+        let (pbound_morph, acc) = self#option (self#loc self#mode_morph) pbound_morph acc in
+        let (pbound_var, acc) = self#loc self#mode_var pbound_var acc in
+        let (pbound_mod, acc) = self#list (self#loc self#mode_const) pbound_mod acc in
+        ({ pbound_morph; pbound_var; pbound_mod }, acc)
     method modes : modes -> 'acc -> (modes * 'acc)=
       self#list (self#loc self#mode)
     method include_kind : include_kind -> 'acc -> (include_kind * 'acc)=
@@ -6276,10 +6276,10 @@ class virtual ['ctx] map_with_context =
         | Pmode_bounded a ->
             let a = self#mode_bounded ctx a in Pmode_bounded a
     method mode_bounded : 'ctx -> mode_bounded -> mode_bounded=
-      fun ctx { upper; lower } ->
-        let upper = self#mode_bound ctx upper in
-        let lower = self#mode_bound ctx lower in
-        { upper; lower }
+      fun ctx { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound ctx pmode_upper in
+        let pmode_lower = self#mode_bound ctx pmode_lower in
+        { pmode_upper; pmode_lower }
     method mode_bound : 'ctx -> mode_bound -> mode_bound=
       self#list self#mode_bound_elem
     method mode_bound_elem : 'ctx -> mode_bound_elem -> mode_bound_elem=
@@ -6288,13 +6288,13 @@ class virtual ['ctx] map_with_context =
         | Pbound_var a ->
             let a = self#mode_bound_var ctx a in Pbound_var a
         | Pbound_const a ->
-            let a = self#loc self#mode_const ctx a in Pbound_const a
+            let a = self#list (self#loc self#mode_const) ctx a in Pbound_const a
     method mode_bound_var : 'ctx -> mode_bound_var -> mode_bound_var=
-      fun ctx { elem_morph; elem_var; elem_mod } ->
-        let elem_morph = self#option (self#loc self#mode_morph) ctx elem_morph in
-        let elem_var = self#loc self#mode_var ctx elem_var in
-        let elem_mod = self#list (self#loc self#mode_const) ctx elem_mod in
-        { elem_morph; elem_var; elem_mod }
+      fun ctx { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) ctx pbound_morph in
+        let pbound_var = self#loc self#mode_var ctx pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) ctx pbound_mod in
+        { pbound_morph; pbound_var; pbound_mod }
     method modes : 'ctx -> modes -> modes= self#list (self#loc self#mode)
     method include_kind : 'ctx -> include_kind -> include_kind=
       fun _ctx x -> x
@@ -7616,10 +7616,10 @@ class virtual ['res] lift =
         | Pmode_bounded a ->
             let a = self#mode_bounded a in self#constr "Pmode_bounded" [a]
     method mode_bounded : mode_bounded -> 'res=
-      fun { upper; lower } ->
-        let upper = self#mode_bound upper in
-        let lower = self#mode_bound lower in
-        self#record [("upper", upper); ("lower", lower)]
+      fun { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound pmode_upper in
+        let pmode_lower = self#mode_bound pmode_lower in
+        self#record [("pmode_upper", pmode_upper); ("pmode_lower", pmode_lower)]
     method mode_bound : mode_bound -> 'res= self#list self#mode_bound_elem
     method mode_bound_elem : mode_bound_elem -> 'res=
       fun x ->
@@ -7627,13 +7627,13 @@ class virtual ['res] lift =
         | Pbound_var a ->
             let a = self#mode_bound_var a in self#constr "Pbound_var" [a]
         | Pbound_const a ->
-            let a = self#loc self#mode_const a in self#constr "Pbound_const" [a]
+            let a = self#list (self#loc self#mode_const) a in self#constr "Pbound_const" [a]
     method mode_bound_var : mode_bound_var -> 'res=
-      fun { elem_morph; elem_var; elem_mod } ->
-        let elem_morph = self#option (self#loc self#mode_morph) elem_morph in
-        let elem_var = self#loc self#mode_var elem_var in
-        let elem_mod = self#list (self#loc self#mode_const) elem_mod in
-        self#record [("elem_morph", elem_morph); ("elem_var", elem_var); ("elem_mod", elem_mod)]
+      fun { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) pbound_morph in
+        let pbound_var = self#loc self#mode_var pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) pbound_mod in
+        self#record [("pbound_morph", pbound_morph); ("pbound_var", pbound_var); ("pbound_mod", pbound_mod)]
     method modes : modes -> 'res= self#list (self#loc self#mode)
     method include_kind : include_kind -> 'res=
       fun x ->
@@ -9203,11 +9203,11 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#mode_bounded ctx a in
             ((Pmode_bounded (Stdlib.fst a)), (self#constr ctx "Pmode_bounded" [Stdlib.snd a]))
     method mode_bounded : 'ctx -> mode_bounded -> (mode_bounded * 'res)=
-      fun ctx { upper; lower } ->
-        let upper = self#mode_bound ctx upper in
-        let lower = self#mode_bound ctx lower in
-        ({ upper = (Stdlib.fst upper); lower = (Stdlib.fst lower) },
-          (self#record ctx [("upper", (Stdlib.snd upper)); ("lower", (Stdlib.snd lower))]))
+      fun ctx { pmode_upper; pmode_lower } ->
+        let pmode_upper = self#mode_bound ctx pmode_upper in
+        let pmode_lower = self#mode_bound ctx pmode_lower in
+        ({ pmode_upper = (Stdlib.fst pmode_upper); pmode_lower = (Stdlib.fst pmode_lower) },
+          (self#record ctx [("pmode_upper", (Stdlib.snd pmode_upper)); ("pmode_lower", (Stdlib.snd pmode_lower))]))
     method mode_bound : 'ctx -> mode_bound -> (mode_bound * 'res)=
       self#list self#mode_bound_elem
     method mode_bound_elem : 'ctx -> mode_bound_elem -> (mode_bound_elem * 'res)=
@@ -9217,15 +9217,15 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#mode_bound_var ctx a in
             ((Pbound_var (Stdlib.fst a)), (self#constr ctx "Pbound_var" [Stdlib.snd a]))
         | Pbound_const a ->
-            let a = self#loc self#mode_const ctx a in
+            let a = self#list (self#loc self#mode_const) ctx a in
             ((Pbound_const (Stdlib.fst a)), (self#constr ctx "Pbound_const" [Stdlib.snd a]))
     method mode_bound_var : 'ctx -> mode_bound_var -> (mode_bound_var * 'res)=
-      fun ctx { elem_morph; elem_var; elem_mod } ->
-        let elem_morph = self#option (self#loc self#mode_morph) ctx elem_morph in
-        let elem_var = self#loc self#mode_var ctx elem_var in
-        let elem_mod = self#list (self#loc self#mode_const) ctx elem_mod in
-        ({ elem_morph = (Stdlib.fst elem_morph); elem_var = (Stdlib.fst elem_var); elem_mod = (Stdlib.fst elem_mod) },
-          (self#record ctx [("elem_morph", (Stdlib.snd elem_morph)); ("elem_var", (Stdlib.snd elem_var)); ("elem_mod", (Stdlib.snd elem_mod))]))
+      fun ctx { pbound_morph; pbound_var; pbound_mod } ->
+        let pbound_morph = self#option (self#loc self#mode_morph) ctx pbound_morph in
+        let pbound_var = self#loc self#mode_var ctx pbound_var in
+        let pbound_mod = self#list (self#loc self#mode_const) ctx pbound_mod in
+        ({ pbound_morph = (Stdlib.fst pbound_morph); pbound_var = (Stdlib.fst pbound_var); pbound_mod = (Stdlib.fst pbound_mod) },
+          (self#record ctx [("pbound_morph", (Stdlib.snd pbound_morph)); ("pbound_var", (Stdlib.snd pbound_var)); ("pbound_mod", (Stdlib.snd pbound_mod))]))
     method modes : 'ctx -> modes -> (modes * 'res)=
       self#list (self#loc self#mode)
     method include_kind : 'ctx -> include_kind -> (include_kind * 'res)=

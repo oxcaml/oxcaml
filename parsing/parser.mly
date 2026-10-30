@@ -4797,37 +4797,37 @@ strict_function_or_labeled_tuple_type:
 ;
 
 mode_bound_var:
-  | elem_var = mode_var
-    elem_mod = iloption(preceded(MOD, mode_consts))
-      { { elem_morph = None; elem_var; elem_mod } }
-  | elem_morph = mode_morph LPAREN elem_var = mode_var RPAREN
-    elem_mod = iloption(preceded(MOD, mode_consts))
-      { { elem_morph = Some elem_morph; elem_var; elem_mod } }
+  | pbound_var = mode_var
+    pbound_mod = iloption(preceded(MOD, mode_consts))
+      { { pbound_morph = None; pbound_var; pbound_mod } }
+  | pbound_morph = mode_morph LPAREN pbound_var = mode_var RPAREN
+    pbound_mod = iloption(preceded(MOD, mode_consts))
+      { { pbound_morph = Some pbound_morph; pbound_var; pbound_mod } }
 ;
 
-mode_bound_elems:
+mode_bound_elem:
   | v = mode_bound_var
-      { [Pbound_var v] }
+      { Pbound_var v }
   | consts = mode_consts
-      { List.map (fun c -> Pbound_const c) consts }
+      { Pbound_const consts }
 ;
 
 mode_bound(SEP):
-  | elems = separated_nonempty_list(SEP, mode_bound_elems)
-      { List.concat elems }
+  | elems = separated_nonempty_list(SEP, mode_bound_elem)
+      { elems }
 ;
 
 mode_bounded:
-  | LBRACKETLESS upper = mode_bound(AMPERSAND) RBRACKET
-      { { upper; lower = [] } }
-  | LBRACKETLESS upper = mode_bound(AMPERSAND) GREATER
-    lower = mode_bound(BAR) RBRACKET
-      { { upper; lower } }
-  | LBRACKETGREATER lower = mode_bound(BAR) RBRACKET
-      { { upper = []; lower } }
-  | LBRACKETGREATER lower = mode_bound(BAR) LESS
-    upper = mode_bound(AMPERSAND) RBRACKET
-      { { upper; lower } }
+  | LBRACKETLESS pmode_upper = mode_bound(AMPERSAND) RBRACKET
+      { { pmode_upper; pmode_lower = [] } }
+  | LBRACKETLESS pmode_upper = mode_bound(AMPERSAND) GREATER
+    pmode_lower = mode_bound(BAR) RBRACKET
+      { { pmode_upper; pmode_lower } }
+  | LBRACKETGREATER pmode_lower = mode_bound(BAR) RBRACKET
+      { { pmode_upper = []; pmode_lower } }
+  | LBRACKETGREATER pmode_lower = mode_bound(BAR) LESS
+    pmode_upper = mode_bound(AMPERSAND) RBRACKET
+      { { pmode_upper; pmode_lower } }
 ;
 
 %inline mode:
