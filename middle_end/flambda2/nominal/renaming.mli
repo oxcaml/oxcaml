@@ -107,6 +107,8 @@ val apply_code_id_or_name_map :
 (* This is only used by the importing code. We don't permute fields. *)
 val apply_field : t -> Field.t -> Field.t
 
+val apply_field_map : ('a -> t -> 'a) -> t -> 'a Field.Map.t -> 'a Field.Map.t
+
 (* This is only used by the importing code. We don't permute constants. *)
 val apply_const : t -> Reg_width_const.t -> Reg_width_const.t
 

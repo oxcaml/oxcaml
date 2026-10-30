@@ -801,13 +801,13 @@ module Rewriter = struct
       in
       List.iter
         (function
-          | UA.Closure_representation (vs, fs, _) ->
+          | UA.Changed_representation.Closure_representation (vs, fs, _) ->
             if vs != value_slots_reprs || fs != function_slots_reprs
             then
               Misc.fatal_errorf
                 "In set of closures, all closures do not have the same \
                  representation changes."
-          | UA.Block_representation _ ->
+          | UA.Changed_representation.Block_representation _ ->
             Misc.fatal_errorf
               "Changed representation of a closure with [Block_representation]")
         changed_representation;
