@@ -918,6 +918,9 @@ let scrape_for_type_of ~remove_aliases env mty =
 
 (* Lower non-generalizable type variables *)
 
+type escape = { var : type_expr; kind : Path.t }
+exception Escape of escape
+
 let lower_nongen nglev mty =
   let open Btype in
   with_type_mark begin fun mark ->
@@ -932,8 +935,8 @@ let lower_nongen nglev mty =
             | Ok () -> ()
             | Error Rigid ->
               Misc.fatal_error "Ctype.lower_nongen: rigid sort variable"
-            | Error (Escape _) ->
-              Misc.fatal_error "Ctype.lower_nongen: kind escape")
+            | Error (Escape kind) ->
+              raise (Escape { var = ty; kind }))
       | _ ->
           super.it_do_type_expr it ty
     in
@@ -942,5 +945,6 @@ let lower_nongen nglev mty =
       Mode.With_locality.update_level nglev m
   in
   let it = {super with it_do_type_expr; it_mode_expr} in
-  it.it_module_type it mty
+  try it.it_module_type it mty; Ok ()
+  with Escape { var; kind } -> Error { var; kind }
   end
