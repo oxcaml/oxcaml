@@ -46,6 +46,8 @@ let class_of_operation (op : Operation.t)
       | Inegmulsubf
       | Isqrtf
       | Ibswap _
+      | Imove8
+      | Imove16
       | Imove32
       | Isignext _ -> Op_pure
       | Isimd op -> of_simd_class (Simd.class_of_operation op)
