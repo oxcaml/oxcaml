@@ -690,29 +690,27 @@ end
 (******************************)
 (*** user errors ***)
 
-module Error : sig
-  type t =
-    | Insufficient_level :
-        { jkind : Parsetree.jkind_annotation;
-          required_layouts_level : Language_extension.maturity
-        }
-        -> t
-    | Multiple_jkinds of
-        { from_annotation : Parsetree.jkind_annotation;
-          from_attribute : Builtin_attributes.jkind_attribute Location.loc
-        }
-    | Unknown_kind_modifier of string
-    | Unimplemented_syntax
-    | With_on_right : (_ * allowed) History.annotation_context -> t
-    | Abstract_kind_in_product
-    | Box_on_abstract_kind of Path.t
+type error =
+  | Insufficient_level :
+      { jkind : Parsetree.jkind_annotation;
+        required_layouts_level : Language_extension.maturity
+      }
+      -> error
+  | Multiple_jkinds of
+      { from_annotation : Parsetree.jkind_annotation;
+        from_attribute : Builtin_attributes.jkind_attribute Location.loc
+      }
+  | Unknown_kind_modifier of string
+  | Unimplemented_syntax
+  | With_on_right : (_ * allowed) History.annotation_context -> error
+  | Abstract_kind_in_product
+  | Box_on_abstract_kind of Path.t
 
-  type exn += private In_context of Location.t * t
+module Error : sig
+  type exn += private In_context of Location.t * error
 
   module Result : sig
     type e
-
-    type error := t
 
     type 'a t = ('a, e) result
 
@@ -724,27 +722,11 @@ module Error : sig
     val to_opt_exn : 'a t -> 'a option
   end
 
-  val log_or_raise : loc:Location.t -> t -> unit
+  val log_or_raise : loc:Location.t -> error -> unit
 
-  val log_and_raise : loc:Location.t -> t -> 'a
+  val log_and_raise : loc:Location.t -> error -> 'a
 end = struct
-  type t =
-    | Insufficient_level :
-        { jkind : Parsetree.jkind_annotation;
-          required_layouts_level : Language_extension.maturity
-        }
-        -> t
-    | Multiple_jkinds of
-        { from_annotation : Parsetree.jkind_annotation;
-          from_attribute : Builtin_attributes.jkind_attribute Location.loc
-        }
-    | Unknown_kind_modifier of string
-    | Unimplemented_syntax
-    | With_on_right : (_ * allowed) History.annotation_context -> t
-    | Abstract_kind_in_product
-    | Box_on_abstract_kind of Path.t
-
-  exception In_context of Location.t * t
+  type exn += In_context of Location.t * error
 
   let log_and_raise ~loc err =
     Typing_recovery.log_and_raise (In_context (loc, err))
@@ -753,7 +735,7 @@ end = struct
     Typing_recovery.log_or_raise (In_context (loc, err))
 
   module Result = struct
-    type e = Location.t * t
+    type e = Location.t * error
 
     type 'a t = ('a, e) result
 
@@ -5055,7 +5037,7 @@ module Debug_printers = struct
 end
 
 (*** formatting user errors ***)
-let report_error ~loc : Error.t -> _ = function
+let report_error ~loc : error -> _ = function
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\
