@@ -659,6 +659,10 @@ static void intern_rec(struct caml_intern_state* s,
         intern_record_obj(s, v);
         switch(tag) {
         default:   // below Forcing_tag + Forcing_tag, Lazy_tag, Forward_tag
+          /* Lazy-family blocks are always a single word; the GC's
+             forwarding short-circuit relies on it. */
+          if (CAMLunlikely(tag >= Forcing_tag && size != 1))
+            intern_cleanup_failwith2(s, fun_name, "bad lazy block");
           /* Read the contents of the block */
           ReadItems(s, sp, &Field(v, 0), size);
           break;
