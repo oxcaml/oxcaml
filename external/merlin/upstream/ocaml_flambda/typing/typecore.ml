@@ -1720,17 +1720,10 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
     Typemode.block_path_expected_modalities mutability
   in
   let check_label_access lid (label : _ gen_label_description) =
-    if Types.is_mutable mutability then begin
-      (* Mutable paths through private types would allow writing into them,
-         but reading from them is fine. *)
-      (match label.lbl_private with
-       | Private -> error lid (Block_path_bad_type (kind, Private_declaration))
-       | Public -> ());
-      (* Mutable paths to polymorphic fields would allow writing
-         non-polymorphic values. *)
-      if is_poly_Tpoly label.lbl_arg then
-        error lid (Block_path_polymorphic_field (kind, lid.txt))
-    end
+    (* Mutable paths to polymorphic fields would allow writing
+       non-polymorphic values. *)
+    if Types.is_mutable mutability && is_poly_Tpoly label.lbl_arg then
+      error lid (Block_path_polymorphic_field (kind, lid.txt))
   in
   let check_boxed_access = function
     | Baccess_field (lid, label, _) ->
@@ -1749,6 +1742,14 @@ let check_block_path ~loc ~env kind ~mutability ba uas =
       | Record_dummy _ ->
         Misc.fatal_error
           "Typecore.check_block_path: dummy representation"
+      end;
+      (* Mutable paths through private types would allow writing into them, but
+         reading from them is fine. This check should eventually be applied to
+         unboxed private accesses, too. *)
+      begin match label.lbl_private with
+      | Private when Types.is_mutable mutability ->
+        bad_type Private_declaration
+      | Private | Public -> ()
       end;
       check_label_access lid label
     | Baccess_block _ -> ()
