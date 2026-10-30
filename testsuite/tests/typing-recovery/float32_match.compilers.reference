@@ -1,0 +1,2 @@
+File "float32_match.ml", line 1:
+Error: float32 literal patterns are not supported.
