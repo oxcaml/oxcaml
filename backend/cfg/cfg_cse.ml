@@ -479,18 +479,14 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     let visited = ref Label.Set.empty in
     let to_visit : (numbering * Cfg.basic_block) Queue.t = Queue.create () in
     (* For control structures, we set the numbering to empty at every join
-       point, but propagate the current numbering across fork points. This is
-       why blocks with zero or several predecessors and exception handlers start
-       with an empty numbering: zero predecessors means we have an entry point
-       (or dead code), and several predecessors means we have an entry point. *)
-    Cfg.iter_blocks cfg ~f:(fun _label block ->
+       point, but propagate the current numbering across fork points. The
+       function entry, exception handlers and join points therefore start with
+       an empty numbering. *)
+    Cfg.iter_blocks cfg ~f:(fun label block ->
         let to_add =
-          block.is_trap_handler
-          ||
-          match Label.Set.cardinal block.predecessors with
-          | 0 -> true
-          | 1 -> false
-          | _ -> true
+          Label.equal label cfg.entry_label
+          || block.is_trap_handler
+          || Label.Set.cardinal block.predecessors > 1
         in
         if to_add then Queue.add (empty_numbering, block) to_visit);
     while not (Queue.is_empty to_visit) do
@@ -509,12 +505,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
           (fun successor_label ->
             let successor_block = Cfg.get_block_exn cfg successor_label in
             let to_add =
-              (* This condition is defensive / redundant, but avoids thinking
-                 too hard about weird corner cases like for instance an
-                 unreachable loop. (That particular case would actually be fine
-                 since the blocks from said loop would never be visited, meaning
-                 there is no risk they would prevent the loop from
-                 terminating.) *)
+              (* The entry may have a single predecessor from a self tail
+                 call. *)
               (not (Label.Set.mem successor_label !visited))
               && Label.Set.cardinal successor_block.predecessors = 1
             in
@@ -526,9 +518,6 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
             if to_add then Queue.add (numbering, successor_block) to_visit)
           successor_labels)
     done;
-    (* The following assertion may fail if there is an unreachable loop, since
-       (as noted in the comment above), the blocks of such a loop would not be
-       visited. *)
     if debug
     then assert (Label.Set.cardinal !visited = Label.Tbl.length cfg.blocks)
 
