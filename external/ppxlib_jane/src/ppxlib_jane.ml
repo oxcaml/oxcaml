@@ -13,7 +13,29 @@ include Common
 
 type modality = Shim.Modality.t = Modality of string [@@unboxed]
 type modalities = Shim.Modalities.t
-type mode = Shim.Mode.t = Mode of string [@@unboxed]
+
+type mode = Shim.Mode.t =
+  | Pmode of string
+  | Pmode_var of string
+  | Pmode_bounded of mode_bounded
+
+and mode_bounded = Shim.Mode.bounded =
+  { pmode_upper : mode_bound
+  ; pmode_lower : mode_bound
+  }
+
+and mode_bound = mode_bound_elem list
+
+and mode_bound_elem = Shim.Mode.bound_elem =
+  | Pbound_var of mode_bound_var
+  | Pbound_const of string Location.loc list
+
+and mode_bound_var = Shim.Mode.bound_var =
+  { pbound_morph : string Location.loc option
+  ; pbound_var : string Location.loc
+  ; pbound_mod : string Location.loc list
+  }
+
 type modes = Shim.Modes.t
 
 type arrow_result = Shim.arrow_result =

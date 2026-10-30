@@ -110,7 +110,7 @@ module Example = struct
           );
     }
 
-  let mode = { Location.txt = (Parsetree.Mode "global"); loc }
+  let mode = { Location.txt = (Parsetree.Pmode "global"); loc }
 end
 
 let print_test_header name =

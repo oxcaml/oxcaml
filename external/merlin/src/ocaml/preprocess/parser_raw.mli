@@ -422,6 +422,8 @@ module MenhirInterpreter : sig
     | N_separated_or_terminated_nonempty_list_SEMI_pattern_ : (Parsetree.pattern list) nonterminal
     | N_separated_or_terminated_nonempty_list_SEMI_object_expr_field_ : ((string Location.loc * Parsetree.expression) list) nonterminal
     | N_separated_or_terminated_nonempty_list_SEMI_expr_ : (Parsetree.expression list) nonterminal
+    | N_separated_nonempty_list_BAR_mode_bound_elem_ : (Parsetree.mode_bound) nonterminal
+    | N_separated_nonempty_list_AMPERSAND_mode_bound_elem_ : (Parsetree.mode_bound) nonterminal
     | N_row_field : (Parsetree.row_field) nonterminal
     | N_reversed_separated_nontrivial_llist_COMMA_one_type_parameter_of_several_ : (Parsetree.core_type list) nonterminal
     | N_reversed_separated_nonempty_llist_STAR_labeled_tuple_typ_element_ : ((string option * Parsetree.core_type) list) nonterminal
@@ -505,6 +507,7 @@ module MenhirInterpreter : sig
     | N_nonempty_list_raw_string_ : (string list) nonterminal
     | N_nonempty_list_newtype_ : ((string Location.loc * Parsetree.jkind_annotation option) list) nonterminal
     | N_nonempty_list_mode_legacy_ : (Parsetree.modes) nonterminal
+    | N_nonempty_list_mode_const_ : (string Location.loc list) nonterminal
     | N_nonempty_list_mode_ : (Parsetree.modes) nonterminal
     | N_nonempty_list_modality_ : (Parsetree.modalities) nonterminal
     | N_nonempty_list_mkrhs_LIDENT__ : (string Location.loc list) nonterminal
@@ -527,6 +530,11 @@ module MenhirInterpreter : sig
     | N_module_declaration_body_module_type_with_optional_modes_ : (Parsetree.module_type * Parsetree.modes) nonterminal
     | N_module_declaration_body___anonymous_8_ : (Parsetree.module_type * Parsetree.modalities) nonterminal
     | N_module_binding_body : (Parsetree.module_expr) nonterminal
+    | N_mode_bounded : (Parsetree.mode_bounded) nonterminal
+    | N_mode_bound_var : (Parsetree.mode_bound_var) nonterminal
+    | N_mode_bound_elem : (Parsetree.mode_bound_elem) nonterminal
+    | N_mode_bound_BAR_ : (Parsetree.mode_bound) nonterminal
+    | N_mode_bound_AMPERSAND_ : (Parsetree.mode_bound) nonterminal
     | N_mod_longident : (Longident.t) nonterminal
     | N_mod_ext_longident : (Longident.t) nonterminal
     | N_mk_longident_mod_longident_val_ident_ : (Longident.t) nonterminal

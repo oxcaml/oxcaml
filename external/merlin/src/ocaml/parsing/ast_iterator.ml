@@ -28,6 +28,9 @@ type iterator = {
   attribute: iterator -> attribute -> unit;
   attributes: iterator -> attribute list -> unit;
   modes : iterator -> modes -> unit;
+  mode : iterator -> mode Location.loc -> unit;
+  mode_bound : iterator -> mode_bound -> unit;
+  mode_bound_var : iterator -> mode_bound_var -> unit;
   modalities : iterator -> modalities -> unit;
   binding_op: iterator -> binding_op -> unit;
   case: iterator -> case -> unit;
@@ -868,7 +871,30 @@ let default_iterator =
 
     (* Location inside a mode expression needs to be traversed. *)
     modes = (fun this m ->
-      List.iter (iter_loc this) m
+      List.iter (this.mode this) m
+    );
+
+    mode = (fun this { txt; loc } ->
+      (match txt with
+       | Pmode _ | Pmode_var _ -> ()
+       | Pmode_bounded { pmode_upper; pmode_lower } ->
+         this.mode_bound this pmode_upper;
+         this.mode_bound this pmode_lower);
+      this.location this loc
+    );
+
+    mode_bound = (fun this elems ->
+      List.iter
+        (function
+          | Pbound_var v -> this.mode_bound_var this v
+          | Pbound_const cs -> List.iter (iter_loc this) cs)
+        elems
+    );
+
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      Option.iter (iter_loc this) pbound_morph;
+      iter_loc this pbound_var;
+      List.iter (iter_loc this) pbound_mod
     );
 
     modalities = (fun this m ->
