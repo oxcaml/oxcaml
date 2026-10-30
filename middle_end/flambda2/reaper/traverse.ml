@@ -539,7 +539,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
   let make_set_of_closures set_of_closures =
     let function_decls = Set_of_closures.function_decls set_of_closures in
     let value_slots = Set_of_closures.value_slots set_of_closures in
-    { function_decls; value_slots }
+    let dbg = Set_of_closures.debuginfo set_of_closures in
+    { function_decls; value_slots; dbg }
   in
   let named : rev_named =
     match defining_expr with

@@ -665,31 +665,12 @@ let layout_for_set_of_closures env set =
     (Set_of_closures.function_decls set |> Function_declarations.funs_in_order)
     (Set_of_closures.value_slots set)
 
-(* CR vlaviron/gbury: This function should not exist; the set of closures itself
-   should have an associated debuginfo *)
-let debuginfo_for_set_of_closures env set =
-  let dbgs =
-    Set_of_closures.function_decls set
-    |> Function_declarations.funs |> Function_slot.Map.data
-    |> List.map
-         (fun
-           (code_id : Function_declarations.code_id_in_function_declaration) ->
-           match code_id with
-           | Deleted { dbg; _ } -> dbg
-           | Code_id { code_id; only_full_applications = _ } ->
-             Code_metadata.dbg (Env.get_code_metadata env code_id))
-    |> List.sort Debuginfo.compare
-  in
-  (* Choose the debuginfo with the earliest source location. *)
-  let dbg = match dbgs with [] -> Debuginfo.none | dbg :: _ -> dbg in
-  Env.add_inlined_debuginfo env dbg
-
 let let_static_set_of_closures0 env res closure_symbols
     (layout : Slot_offsets.Layout.t) set ~prev_updates =
   let fun_decls = Set_of_closures.function_decls set in
   let decls = Function_declarations.funs fun_decls in
   let value_slots = Set_of_closures.value_slots set in
-  let dbg = debuginfo_for_set_of_closures env set in
+  let dbg = Env.add_inlined_debuginfo env (Set_of_closures.debuginfo set) in
   (* Pick one of the closure symbols to do any updates relative to (see
      above). *)
   let function_slot_offset_for_updates, closure_symbol_for_updates =
@@ -763,7 +744,7 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
   let comp_unit = Current_unit.get_cu_exn () in
-  let dbg = debuginfo_for_set_of_closures env set in
+  let dbg = Env.add_inlined_debuginfo env (Set_of_closures.debuginfo set) in
   let cids =
     Function_declarations.funs_in_order (Set_of_closures.function_decls set)
     |> Function_slot.Lmap.keys
@@ -812,7 +793,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   let fun_decls = Set_of_closures.function_decls set in
   let decls = Function_declarations.funs_in_order fun_decls in
   let value_slots = Set_of_closures.value_slots set in
-  let dbg = debuginfo_for_set_of_closures env set in
+  let dbg = Env.add_inlined_debuginfo env (Set_of_closures.debuginfo set) in
   let effs : Ece.t =
     ( Only_generative_effects Immutable,
       (match closure_alloc_mode with

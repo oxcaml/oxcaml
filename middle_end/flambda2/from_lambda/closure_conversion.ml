@@ -3434,7 +3434,31 @@ let close_functions acc external_env ~current_alloc_region ~current_region
       (Function_decls.alloc_mode function_declarations)
       ~current_alloc_region ~current_region
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let dbg =
+    (* Choose the debuginfo with the earliest source location. *)
+
+    (* CR mshinwell: This choice is somewhat arbitrary, and has a known problem
+       with zero_alloc. The location of a function carries that function's own
+       definition-site [@zero_alloc assume] (see [transl_function]), and the
+       zero_alloc checker consults the debuginfo of allocations. So the
+       allocation of the set, which happens in the enclosing function, is hidden
+       from the check of the enclosing function if the earliest function in the
+       set is marked [assume], but not if a later one is. Taking the assume from
+       the scopes enclosing the set's functions (the same for all members) would
+       remove both the leak and the order dependence. Unioning the members'
+       debuginfo might also be better for the source locations. Needs
+       thought. *)
+    List.map
+      (fun decl -> Debuginfo.from_location (Function_decl.loc decl))
+      func_decl_list
+    |> List.sort Debuginfo.compare
+    |> function
+    | [] -> Debuginfo.none
+    | dbg :: _ -> dbg
+  in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   let acc =
     Acc.add_set_of_closures_offsets ~is_phantom:false acc set_of_closures
   in
