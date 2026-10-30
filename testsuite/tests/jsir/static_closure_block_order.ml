@@ -10,9 +10,9 @@
  }
 *)
 
-(* Lifted closures and lifted blocks can refer to each other, and in classic
-   mode they can even form static cycles. Each JSIR variable standing for such
-   a constant must be bound before it is read. *)
+(* Lifted closures and lifted blocks can refer to each other and potentially
+   form cycles. Each JSIR variable standing for such a constant must be bound
+   before it is read. *)
 
 let[@inline never] hd = function x :: _ -> x | [] -> assert false
 
