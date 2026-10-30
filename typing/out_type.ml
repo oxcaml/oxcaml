@@ -1533,7 +1533,7 @@ end = struct
               fatal_error "Out_type.find_path_from_description"
           ) paths
 
-  (** [add_visible_paths] expensive and should be called once during
+  (** [add_visible_paths] is expensive and should be called once during
       preprocessing. It finds all paths between visible variables. Recall that
       each visible mode in a signature is a pair of variables: a monadic
       variable and a comonadic variable. [add_visible_paths] finds the paths
@@ -1645,7 +1645,7 @@ end = struct
 
   (** [construct_morphs] returns a list of morphisms from [src_descr] to
       [target_descr], where each morphism [f] in the list satisfies
-      [f target_descr < src_descr]. *)
+      [f target_descr <= src_descr]. *)
   let construct_morphs :
       type a. (a, a) Paths.table
         -> (a, (allowed * allowed)) Desc.t
