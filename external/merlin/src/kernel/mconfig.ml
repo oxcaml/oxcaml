@@ -633,6 +633,8 @@ let ocaml_ignored_flags =
     "-fno-lrcpc2";
     "-flse";
     "-fno-lse";
+    "-fbarrier-store";
+    "-fstore-release";
     "-no-auto-include-otherlibs";
     "-fbmi2";
     "-fno-bmi2";
