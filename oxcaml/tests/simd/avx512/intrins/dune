@@ -86,7 +86,7 @@
    %{bin-available:clang}))
  (action
   (progn
-   (run clang -c -O2 -mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd
+   (run clang -c -O2 -fPIC -mavx512f -mavx512vl -mavx512dq -mavx512bw -mavx512cd
      -I %{workspace_root}/runtime helpers.c gen512_stubs.c)
    (run ar rcs %{targets} helpers.o gen512_stubs.o))))
 
@@ -101,7 +101,7 @@
    (not %{bin-available:clang})))
  (action
   (progn
-   (run %{cc} -c -I %{workspace_root}/runtime helpers.c gen512_stubs.c)
+   (run %{cc} -c -fPIC -I %{workspace_root}/runtime helpers.c gen512_stubs.c)
    (run ar rcs %{targets} helpers.o gen512_stubs.o))))
 
 (library

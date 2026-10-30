@@ -1253,7 +1253,7 @@ module Generated = struct
         | Some cur when sae = round_current -> instr (bind cur) ?i args
         | Some _ | None -> bad_immediate op)
     | With_sae_imm { arity; bind = b; cur; args = ops } ->
-      let i, args = extract_constant args op ~max:255 in
+      let i, args = extract_constant args op ~max:15 in
       let args = operands op ~arity ops args in
       (* The instruction ignores bit 3 of its immediate, _MM_FROUND_NO_EXC. *)
       if i land 8 <> 0

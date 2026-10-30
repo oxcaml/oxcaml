@@ -790,8 +790,7 @@ let imm_values ~er p =
   match p.immtype with
   | Some "_CMP_" -> List.init 32 Fun.id
   | Some "_MM_CMPINT" -> List.init 8 Fun.id
-  | Some "_MM_FROUND" ->
-    if er then [8; 9; 10; 11; 4] else [0; 1; 2; 3; 4; 8; 9; 10; 11; 12]
+  | Some "_MM_FROUND" -> if er then [8; 9; 10; 11; 4] else List.init 16 Fun.id
   | Some "_MM_FROUND_SAE" -> [8; 12; 4]
   | Some "_MM_INDEX_SCALE" -> [1; 2; 4; 8]
   | Some "_MM_MANTISSA_NORM" -> [0; 1; 2; 3]

@@ -1,4 +1,6 @@
-<!-- Local correction: VPMOVM2* and VPBROADCASTM* forms include their k source. -->
+<!-- Local corrections: VPMOVM2* and VPBROADCASTM* forms include their k source;
+     missing AVX512VL VCVTUDQ2PS/VCVTPS2PD forms are included; immediate widths
+     for VPSRAD, VPSRAQ, VPALIGNR and VCVTPS2PH are consistent across variants. -->
 <intrinsics_list version="3.6.9" date="07/12/2024">
 <intrinsic name="_addcarryx_u32" tech="Other">
 	<return etype="UI8" type="unsigned char" varname="dst" />
@@ -23034,7 +23036,7 @@ dst[MAX:512] := 0
 	<return etype="UI8" type="__m512i" varname="dst" />
 	<parameter etype="UI8" type="__m512i" varname="a" />
 	<parameter etype="UI8" type="__m512i" varname="b" />
-	<parameter etype="IMM" immwidth="5" type="const int" varname="imm8" />
+	<parameter etype="IMM" immwidth="8" type="const int" varname="imm8" />
 	<description>Concatenate pairs of 16-byte blocks in "a" and "b" into a 32-byte temporary result, shift the result right by "imm8" bytes, and store the low 16 bytes in "dst".</description>
 	<operation>
 FOR j := 0 to 3
@@ -62834,7 +62836,7 @@ dst[MAX:128] := 0
 	<parameter etype="UI16" type="__m128i" varname="src" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m256" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 7
@@ -62859,7 +62861,7 @@ dst[MAX:128] := 0
 	<parameter etype="UI16" type="__m128i" varname="src" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m256" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 7
@@ -62883,7 +62885,7 @@ dst[MAX:128] := 0
 	<return etype="UI16" type="__m128i" varname="dst" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m256" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 7
@@ -62907,7 +62909,7 @@ dst[MAX:128] := 0
 	<return etype="UI16" type="__m128i" varname="dst" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m256" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 7
@@ -62932,7 +62934,7 @@ dst[MAX:128] := 0
 	<parameter etype="UI16" type="__m128i" varname="src" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m128" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 3
@@ -62957,7 +62959,7 @@ dst[MAX:64] := 0
 	<parameter etype="UI16" type="__m128i" varname="src" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m128" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 3
@@ -62981,7 +62983,7 @@ dst[MAX:64] := 0
 	<return etype="UI16" type="__m128i" varname="dst" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m128" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 3
@@ -63005,7 +63007,7 @@ dst[MAX:64] := 0
 	<return etype="UI16" type="__m128i" varname="dst" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="FP32" type="__m128" varname="a" />
-	<parameter etype="IMM" immtype="_MM_ROUND_MODE" type="int" varname="imm8" />
+	<parameter etype="IMM" immwidth="4" immtype="_MM_FROUND" type="int" varname="imm8" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set). [round_imm_note]</description>
 	<operation>
 FOR j := 0 to 3
@@ -73234,7 +73236,7 @@ dst[MAX:128] := 0
 	<return etype="UI32" type="__m128i" varname="dst" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="SI32" type="__m128i" varname="a" />
-	<parameter etype="IMM" immwidth="6" type="unsigned int" varname="imm8" />
+	<parameter etype="IMM" immwidth="8" type="unsigned int" varname="imm8" />
 	<description>Shift packed 32-bit integers in "a" right by "imm8" while shifting in sign bits, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set).</description>
 	<operation>
 FOR j := 0 to 3
@@ -73498,7 +73500,7 @@ dst[MAX:128] := 0
 	<return etype="UI64" type="__m128i" varname="dst" />
 	<parameter etype="MASK" type="__mmask8" varname="k" />
 	<parameter etype="SI64" type="__m128i" varname="a" />
-	<parameter etype="IMM" immwidth="7" type="unsigned int" varname="imm8" />
+	<parameter etype="IMM" immwidth="8" type="unsigned int" varname="imm8" />
 	<description>Shift packed 64-bit integers in "a" right by "imm8" while shifting in sign bits, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set).</description>
 	<operation>
 FOR j := 0 to 1
@@ -73546,7 +73548,7 @@ dst[MAX:128] := 0
 	<intrinsic name="_mm_srai_epi64" tech="AVX-512">
 	<return etype="UI64" type="__m128i" varname="dst" />
 	<parameter etype="SI64" type="__m128i" varname="a" />
-	<parameter etype="IMM" immwidth="7" type="unsigned int" varname="imm8" />
+	<parameter etype="IMM" immwidth="8" type="unsigned int" varname="imm8" />
 	<description>Shift packed 64-bit integers in "a" right by "imm8" while shifting in sign bits, and store the results in "dst".</description>
 	<operation>
 FOR j := 0 to 1
@@ -91693,6 +91695,100 @@ dst[MAX:512] := 0
 	<header>immintrin.h</header>
 	<category>Convert</category>
 	</intrinsic>
+	<intrinsic name="_mm_mask_cvtps_pd" tech="AVX-512">
+	<return etype="FP64" type="__m128d" varname="dst" />
+	<parameter etype="FP64" type="__m128d" varname="src" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="FP32" type="__m128" varname="a" />
+	<description>Convert the low two packed single-precision (32-bit) floating-point elements in "a" to packed double-precision (64-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 1
+	i := 64*j
+	l := 32*j
+	IF k[j]
+		dst[i+63:i] := Convert_FP32_To_FP64(a[l+31:l])
+	ELSE
+		dst[i+63:i] := src[i+63:i]
+	FI
+ENDFOR
+dst[MAX:128] := 0
+	</operation>
+	<instruction form="xmm {k}, xmm" name="VCVTPS2PD" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm_maskz_cvtps_pd" tech="AVX-512">
+	<return etype="FP64" type="__m128d" varname="dst" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="FP32" type="__m128" varname="a" />
+	<description>Convert the low two packed single-precision (32-bit) floating-point elements in "a" to packed double-precision (64-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 1
+	i := 64*j
+	l := 32*j
+	IF k[j]
+		dst[i+63:i] := Convert_FP32_To_FP64(a[l+31:l])
+	ELSE
+		dst[i+63:i] := 0
+	FI
+ENDFOR
+dst[MAX:128] := 0
+	</operation>
+	<instruction form="xmm {z}, xmm" name="VCVTPS2PD" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm256_mask_cvtps_pd" tech="AVX-512">
+	<return etype="FP64" type="__m256d" varname="dst" />
+	<parameter etype="FP64" type="__m256d" varname="src" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="FP32" type="__m128" varname="a" />
+	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed double-precision (64-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 3
+	i := 64*j
+	l := 32*j
+	IF k[j]
+		dst[i+63:i] := Convert_FP32_To_FP64(a[l+31:l])
+	ELSE
+		dst[i+63:i] := src[i+63:i]
+	FI
+ENDFOR
+dst[MAX:256] := 0
+	</operation>
+	<instruction form="ymm {k}, xmm" name="VCVTPS2PD" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm256_maskz_cvtps_pd" tech="AVX-512">
+	<return etype="FP64" type="__m256d" varname="dst" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="FP32" type="__m128" varname="a" />
+	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed double-precision (64-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 3
+	i := 64*j
+	l := 32*j
+	IF k[j]
+		dst[i+63:i] := Convert_FP32_To_FP64(a[l+31:l])
+	ELSE
+		dst[i+63:i] := 0
+	FI
+ENDFOR
+dst[MAX:256] := 0
+	</operation>
+	<instruction form="ymm {z}, xmm" name="VCVTPS2PD" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
 	<intrinsic name="_mm512_cvtps_pd" tech="AVX-512">
 	<return etype="FP64" type="__m512d" varname="dst" />
 	<parameter etype="FP32" type="__m256" varname="a" />
@@ -91805,7 +91901,7 @@ dst[MAX:512] := 0
 	<intrinsic name="_mm512_cvt_roundps_ph" tech="AVX-512">
 	<return etype="UI16" type="__m256i" varname="dst" />
 	<parameter etype="FP32" type="__m512" varname="a" />
-	<parameter etype="IMM" hint="TRUE" immtype="_MM_FROUND" type="int" varname="rounding" />
+	<parameter etype="IMM" hint="TRUE" immwidth="4" immtype="_MM_FROUND" type="int" varname="rounding" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst". [round2_note]</description>
 	<operation>
 FOR j := 0 to 15
@@ -91823,7 +91919,7 @@ dst[MAX:256] := 0
 	<intrinsic name="_mm512_cvtps_ph" tech="AVX-512">
 	<return etype="UI16" type="__m256i" varname="dst" />
 	<parameter etype="FP32" type="__m512" varname="a" />
-	<parameter etype="IMM" hint="TRUE" immtype="_MM_FROUND" type="int" varname="rounding" />
+	<parameter etype="IMM" hint="TRUE" immwidth="4" immtype="_MM_FROUND" type="int" varname="rounding" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst". [round2_note]</description>
 	<operation>
 FOR j := 0 to 15
@@ -91843,7 +91939,7 @@ dst[MAX:256] := 0
 	<parameter etype="UI16" type="__m256i" varname="src" />
 	<parameter etype="MASK" type="__mmask16" varname="k" />
 	<parameter etype="FP32" type="__m512" varname="a" />
-	<parameter etype="IMM" hint="TRUE" immtype="_MM_FROUND" type="int" varname="rounding" />
+	<parameter etype="IMM" hint="TRUE" immwidth="4" immtype="_MM_FROUND" type="int" varname="rounding" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set). [round2_note]</description>
 	<operation>
 FOR j := 0 to 15
@@ -91867,7 +91963,7 @@ dst[MAX:256] := 0
 	<parameter etype="UI16" type="__m256i" varname="src" />
 	<parameter etype="MASK" type="__mmask16" varname="k" />
 	<parameter etype="FP32" type="__m512" varname="a" />
-	<parameter etype="IMM" hint="TRUE" immtype="_MM_FROUND" type="int" varname="rounding" />
+	<parameter etype="IMM" hint="TRUE" immwidth="4" immtype="_MM_FROUND" type="int" varname="rounding" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set). [round2_note]</description>
 	<operation>
 FOR j := 0 to 15
@@ -91890,7 +91986,7 @@ dst[MAX:256] := 0
 	<return etype="UI16" type="__m256i" varname="dst" />
 	<parameter etype="MASK" type="__mmask16" varname="k" />
 	<parameter etype="FP32" type="__m512" varname="a" />
-	<parameter etype="IMM" hint="TRUE" immtype="_MM_FROUND" type="int" varname="rounding" />
+	<parameter etype="IMM" hint="TRUE" immwidth="4" immtype="_MM_FROUND" type="int" varname="rounding" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set). [round2_note]</description>
 	<operation>
 FOR j := 0 to 15
@@ -91913,7 +92009,7 @@ dst[MAX:256] := 0
 	<return etype="UI16" type="__m256i" varname="dst" />
 	<parameter etype="MASK" type="__mmask16" varname="k" />
 	<parameter etype="FP32" type="__m512" varname="a" />
-	<parameter etype="IMM" hint="TRUE" immtype="_MM_FROUND" type="int" varname="rounding" />
+	<parameter etype="IMM" hint="TRUE" immwidth="4" immtype="_MM_FROUND" type="int" varname="rounding" />
 	<description>Convert packed single-precision (32-bit) floating-point elements in "a" to packed half-precision (16-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set). [round2_note]</description>
 	<operation>
 FOR j := 0 to 15
@@ -93525,6 +93621,130 @@ dst[MAX:512] := 0
 	</operation>
 	<instruction form="zmm, zmm {er}" name="VCVTUDQ2PS" xed="VCVTUDQ2PS_ZMMf32_MASKmskw_ZMMu32_AVX512" />
 	<CPUID>AVX512F</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm_cvtepu32_ps" tech="AVX-512">
+	<return etype="FP32" type="__m128" varname="dst" />
+	<parameter etype="UI32" type="__m128i" varname="a" />
+	<description>Convert packed unsigned 32-bit integers in "a" to packed single-precision (32-bit) floating-point elements, and store the results in "dst".</description>
+	<operation>
+FOR j := 0 to 3
+	i := 32*j
+	dst[i+31:i] := Convert_UnsignedInt32_To_FP32(a[i+31:i])
+ENDFOR
+dst[MAX:128] := 0
+	</operation>
+	<instruction form="xmm, xmm" name="VCVTUDQ2PS" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm_mask_cvtepu32_ps" tech="AVX-512">
+	<return etype="FP32" type="__m128" varname="dst" />
+	<parameter etype="FP32" type="__m128" varname="src" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="UI32" type="__m128i" varname="a" />
+	<description>Convert packed unsigned 32-bit integers in "a" to packed single-precision (32-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 3
+	i := 32*j
+	IF k[j]
+		dst[i+31:i] := Convert_UnsignedInt32_To_FP32(a[i+31:i])
+	ELSE
+		dst[i+31:i] := src[i+31:i]
+	FI
+ENDFOR
+dst[MAX:128] := 0
+	</operation>
+	<instruction form="xmm {k}, xmm" name="VCVTUDQ2PS" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm_maskz_cvtepu32_ps" tech="AVX-512">
+	<return etype="FP32" type="__m128" varname="dst" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="UI32" type="__m128i" varname="a" />
+	<description>Convert packed unsigned 32-bit integers in "a" to packed single-precision (32-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 3
+	i := 32*j
+	IF k[j]
+		dst[i+31:i] := Convert_UnsignedInt32_To_FP32(a[i+31:i])
+	ELSE
+		dst[i+31:i] := 0
+	FI
+ENDFOR
+dst[MAX:128] := 0
+	</operation>
+	<instruction form="xmm {z}, xmm" name="VCVTUDQ2PS" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm256_cvtepu32_ps" tech="AVX-512">
+	<return etype="FP32" type="__m256" varname="dst" />
+	<parameter etype="UI32" type="__m256i" varname="a" />
+	<description>Convert packed unsigned 32-bit integers in "a" to packed single-precision (32-bit) floating-point elements, and store the results in "dst".</description>
+	<operation>
+FOR j := 0 to 7
+	i := 32*j
+	dst[i+31:i] := Convert_UnsignedInt32_To_FP32(a[i+31:i])
+ENDFOR
+dst[MAX:256] := 0
+	</operation>
+	<instruction form="ymm, ymm" name="VCVTUDQ2PS" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm256_mask_cvtepu32_ps" tech="AVX-512">
+	<return etype="FP32" type="__m256" varname="dst" />
+	<parameter etype="FP32" type="__m256" varname="src" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="UI32" type="__m256i" varname="a" />
+	<description>Convert packed unsigned 32-bit integers in "a" to packed single-precision (32-bit) floating-point elements, and store the results in "dst" using writemask "k" (elements are copied from "src" when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 7
+	i := 32*j
+	IF k[j]
+		dst[i+31:i] := Convert_UnsignedInt32_To_FP32(a[i+31:i])
+	ELSE
+		dst[i+31:i] := src[i+31:i]
+	FI
+ENDFOR
+dst[MAX:256] := 0
+	</operation>
+	<instruction form="ymm {k}, ymm" name="VCVTUDQ2PS" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
+	<header>immintrin.h</header>
+	<category>Convert</category>
+	</intrinsic>
+	<intrinsic name="_mm256_maskz_cvtepu32_ps" tech="AVX-512">
+	<return etype="FP32" type="__m256" varname="dst" />
+	<parameter etype="MASK" type="__mmask8" varname="k" />
+	<parameter etype="UI32" type="__m256i" varname="a" />
+	<description>Convert packed unsigned 32-bit integers in "a" to packed single-precision (32-bit) floating-point elements, and store the results in "dst" using zeromask "k" (elements are zeroed out when the corresponding mask bit is not set).</description>
+	<operation>
+FOR j := 0 to 7
+	i := 32*j
+	IF k[j]
+		dst[i+31:i] := Convert_UnsignedInt32_To_FP32(a[i+31:i])
+	ELSE
+		dst[i+31:i] := 0
+	FI
+ENDFOR
+dst[MAX:256] := 0
+	</operation>
+	<instruction form="ymm {z}, ymm" name="VCVTUDQ2PS" />
+	<CPUID>AVX512F</CPUID>
+	<CPUID>AVX512VL</CPUID>
 	<header>immintrin.h</header>
 	<category>Convert</category>
 	</intrinsic>
@@ -108337,7 +108557,7 @@ dst[MAX:512] := 0
 	<intrinsic name="_mm512_srai_epi32" tech="AVX-512">
 	<return etype="UI32" type="__m512i" varname="dst" />
 	<parameter etype="SI32" type="__m512i" varname="a" />
-	<parameter etype="IMM" immwidth="6" type="unsigned int" varname="imm8" />
+	<parameter etype="IMM" immwidth="8" type="unsigned int" varname="imm8" />
 	<description>Shift packed 32-bit integers in "a" right by "imm8" while shifting in sign bits, and store the results in "dst".</description>
 	<operation>
 FOR j := 0 to 15
