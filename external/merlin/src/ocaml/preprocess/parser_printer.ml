@@ -228,6 +228,8 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_separated_or_terminated_nonempty_list_SEMI_pattern_) -> "separated_or_terminated_nonempty_list_SEMI_pattern_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_separated_or_terminated_nonempty_list_SEMI_object_expr_field_) -> "separated_or_terminated_nonempty_list_SEMI_object_expr_field_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_separated_or_terminated_nonempty_list_SEMI_expr_) -> "separated_or_terminated_nonempty_list_SEMI_expr_"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_separated_nonempty_list_BAR_mode_bound_elem_) -> "separated_nonempty_list_BAR_mode_bound_elem_"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_separated_nonempty_list_AMPERSAND_mode_bound_elem_) -> "separated_nonempty_list_AMPERSAND_mode_bound_elem_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_row_field) -> "row_field"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_separated_nontrivial_llist_COMMA_one_type_parameter_of_several_) -> "reversed_separated_nontrivial_llist_COMMA_one_type_parameter_of_several_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_reversed_separated_nonempty_llist_STAR_labeled_tuple_typ_element_) -> "reversed_separated_nonempty_llist_STAR_labeled_tuple_typ_element_"
@@ -310,6 +312,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_raw_string_) -> "nonempty_list_raw_string_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_newtype_) -> "nonempty_list_newtype_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mode_legacy_) -> "nonempty_list_mode_legacy_"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mode_const_) -> "nonempty_list_mode_const_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mode_) -> "nonempty_list_mode_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_modality_) -> "nonempty_list_modality_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mkrhs_LIDENT__) -> "nonempty_list_mkrhs_LIDENT__"
@@ -332,6 +335,11 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_module_declaration_body_module_type_with_optional_modes_) -> "module_declaration_body_module_type_with_optional_modes_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_module_declaration_body___anonymous_8_) -> "module_declaration_body___anonymous_8_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_module_binding_body) -> "module_binding_body"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mode_bounded) -> "mode_bounded"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mode_bound_var) -> "mode_bound_var"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mode_bound_elem) -> "mode_bound_elem"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mode_bound_BAR_) -> "mode_bound_BAR_"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mode_bound_AMPERSAND_) -> "mode_bound_AMPERSAND_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mod_longident) -> "mod_longident"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mod_ext_longident) -> "mod_ext_longident"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_mk_longident_mod_longident_val_ident_) -> "mk_longident_mod_longident_val_ident_"
@@ -668,6 +676,8 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_separated_or_terminated_nonempty_list_SEMI_pattern_ -> (fun _ -> "separated_or_terminated_nonempty_list_SEMI_pattern_")
   | MenhirInterpreter.N MenhirInterpreter.N_separated_or_terminated_nonempty_list_SEMI_object_expr_field_ -> (fun _ -> "separated_or_terminated_nonempty_list_SEMI_object_expr_field_")
   | MenhirInterpreter.N MenhirInterpreter.N_separated_or_terminated_nonempty_list_SEMI_expr_ -> (fun _ -> "separated_or_terminated_nonempty_list_SEMI_expr_")
+  | MenhirInterpreter.N MenhirInterpreter.N_separated_nonempty_list_BAR_mode_bound_elem_ -> (fun _ -> "separated_nonempty_list_BAR_mode_bound_elem_")
+  | MenhirInterpreter.N MenhirInterpreter.N_separated_nonempty_list_AMPERSAND_mode_bound_elem_ -> (fun _ -> "separated_nonempty_list_AMPERSAND_mode_bound_elem_")
   | MenhirInterpreter.N MenhirInterpreter.N_row_field -> (fun _ -> "row_field")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_separated_nontrivial_llist_COMMA_one_type_parameter_of_several_ -> (fun _ -> "reversed_separated_nontrivial_llist_COMMA_one_type_parameter_of_several_")
   | MenhirInterpreter.N MenhirInterpreter.N_reversed_separated_nonempty_llist_STAR_labeled_tuple_typ_element_ -> (fun _ -> "reversed_separated_nonempty_llist_STAR_labeled_tuple_typ_element_")
@@ -750,6 +760,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_raw_string_ -> (fun _ -> "nonempty_list_raw_string_")
   | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_newtype_ -> (fun _ -> "nonempty_list_newtype_")
   | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mode_legacy_ -> (fun _ -> "nonempty_list_mode_legacy_")
+  | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mode_const_ -> (fun _ -> "nonempty_list_mode_const_")
   | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mode_ -> (fun _ -> "nonempty_list_mode_")
   | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_modality_ -> (fun _ -> "nonempty_list_modality_")
   | MenhirInterpreter.N MenhirInterpreter.N_nonempty_list_mkrhs_LIDENT__ -> (fun _ -> "nonempty_list_mkrhs_LIDENT__")
@@ -772,6 +783,11 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_module_declaration_body_module_type_with_optional_modes_ -> (fun _ -> "module_declaration_body_module_type_with_optional_modes_")
   | MenhirInterpreter.N MenhirInterpreter.N_module_declaration_body___anonymous_8_ -> (fun _ -> "module_declaration_body___anonymous_8_")
   | MenhirInterpreter.N MenhirInterpreter.N_module_binding_body -> (fun _ -> "module_binding_body")
+  | MenhirInterpreter.N MenhirInterpreter.N_mode_bounded -> (fun _ -> "mode_bounded")
+  | MenhirInterpreter.N MenhirInterpreter.N_mode_bound_var -> (fun _ -> "mode_bound_var")
+  | MenhirInterpreter.N MenhirInterpreter.N_mode_bound_elem -> (fun _ -> "mode_bound_elem")
+  | MenhirInterpreter.N MenhirInterpreter.N_mode_bound_BAR_ -> (fun _ -> "mode_bound_BAR_")
+  | MenhirInterpreter.N MenhirInterpreter.N_mode_bound_AMPERSAND_ -> (fun _ -> "mode_bound_AMPERSAND_")
   | MenhirInterpreter.N MenhirInterpreter.N_mod_longident -> (fun _ -> "mod_longident")
   | MenhirInterpreter.N MenhirInterpreter.N_mod_ext_longident -> (fun _ -> "mod_ext_longident")
   | MenhirInterpreter.N MenhirInterpreter.N_mk_longident_mod_longident_val_ident_ -> (fun _ -> "mk_longident_mod_longident_val_ident_")
