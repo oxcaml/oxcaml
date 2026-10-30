@@ -553,15 +553,15 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
   | Op(Intop_atomic _) ->
     destroyed_at_small_memory_op
-  | Op(Store( (Word_int | Word_mask | Word_val | Double |
-               Onetwentyeight_aligned | Onetwentyeight_unaligned |
-               Twofiftysix_aligned | Twofiftysix_unaligned |
-               Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
+  | Op(Store(Cmm.(Word_int | Sixtyfour | Word_mask | Word_val | Double |
+                  Onetwentyeight_aligned | Onetwentyeight_unaligned |
+                  Twofiftysix_aligned | Twofiftysix_unaligned |
+                  Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
   | Op(Load { memory_chunk =
-                (Word_int | Word_mask | Word_val | Double |
-                 Onetwentyeight_aligned | Onetwentyeight_unaligned |
-                 Twofiftysix_aligned | Twofiftysix_unaligned |
-                 Fivetwelve_aligned | Fivetwelve_unaligned); _})
+                Cmm.(Word_int | Sixtyfour | Word_mask | Word_val | Double |
+                     Onetwentyeight_aligned | Onetwentyeight_unaligned |
+                     Twofiftysix_aligned | Twofiftysix_unaligned |
+                     Fivetwelve_aligned | Fivetwelve_unaligned); _})
   | Op(Specific (Istore_int _))
   | Op(Specific (Ifloatarithmem (Float64, _, _)))
   | Op(Specific (Iprefetch _ | Icldemote _)) ->

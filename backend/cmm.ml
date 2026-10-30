@@ -410,6 +410,7 @@ type memory_chunk =
   | Thirtytwo_unsigned
   | Thirtytwo_signed
   | Word_int
+  | Sixtyfour
   | Word_mask
   | Word_val
   | Single of { reg : float_width }
@@ -425,7 +426,7 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Byte_unsigned | Byte_signed -> 1
   | Sixteen_unsigned | Sixteen_signed -> 2
   | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> 4
-  | Word_int | Word_mask | Word_val | Double -> 8
+  | Word_int | Sixtyfour | Word_mask | Word_val | Double -> 8
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
@@ -1095,6 +1096,7 @@ let equal_memory_chunk left right =
   | Thirtytwo_unsigned, Thirtytwo_unsigned -> true
   | Thirtytwo_signed, Thirtytwo_signed -> true
   | Word_int, Word_int -> true
+  | Sixtyfour, Sixtyfour -> true
   | Word_mask, Word_mask -> true
   | Word_val, Word_val -> true
   | Single { reg = regl }, Single { reg = regr } -> equal_float_width regl regr
@@ -1107,98 +1109,110 @@ let equal_memory_chunk left right =
   | Fivetwelve_aligned, Fivetwelve_aligned -> true
   | ( Byte_unsigned,
       ( Byte_signed | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Byte_signed,
       ( Byte_unsigned | Sixteen_unsigned | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_signed | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Sixteen_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Thirtytwo_unsigned
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_unsigned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_signed | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Thirtytwo_signed,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Word_int | Word_mask | Word_val | Single _ | Double
-      | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Word_int | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_int,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Sixtyfour | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
+  | ( Sixtyfour,
+      ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_mask,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_val
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Word_val,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Single _
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Double,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) )
   | ( Onetwentyeight_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_aligned | Twofiftysix_unaligned
-      | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_aligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Onetwentyeight_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Twofiftysix_unaligned
-      | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Twofiftysix_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_aligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Twofiftysix_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Fivetwelve_unaligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Fivetwelve_unaligned
+      | Fivetwelve_aligned ) )
   | ( Fivetwelve_unaligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_aligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_aligned ) )
   | ( Fivetwelve_aligned,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
-      | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned ) )
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Single _ | Double | Onetwentyeight_unaligned
+      | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+      | Fivetwelve_unaligned ) )
   | ( Single _,
       ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask | Word_val
-      | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+      | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Sixtyfour | Word_mask
+      | Word_val | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
       | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
       | Fivetwelve_aligned ) ) ->
     false

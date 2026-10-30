@@ -304,12 +304,13 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Load
           {memory_chunk=(Byte_unsigned|Byte_signed|Sixteen_unsigned|
                          Sixteen_signed|Thirtytwo_unsigned|Thirtytwo_signed|
-                         Word_int|Word_mask|Word_val|Double|
+                         Word_int|Sixtyfour|Word_mask|Word_val|Double|
                          Onetwentyeight_unaligned|Onetwentyeight_aligned);
            _ })
   | Op (Store
           ((Byte_unsigned|Byte_signed|Sixteen_unsigned|Sixteen_signed|
-            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_mask|Word_val|
+            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Sixtyfour|
+            Word_mask|Word_val|
             Double|Onetwentyeight_unaligned|Onetwentyeight_aligned),
            _, _))
     -> [||]

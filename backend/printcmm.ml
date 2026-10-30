@@ -153,6 +153,7 @@ let chunk = function
   | Fivetwelve_unaligned -> "unaligned vec512"
   | Fivetwelve_aligned -> "aligned vec512"
   | Word_int -> "int"
+  | Sixtyfour -> "int64"
   | Word_mask -> "mask"
   | Word_val -> "val"
   | Single { reg = Float64 } -> "float32_as_float64"
