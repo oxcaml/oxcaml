@@ -2702,45 +2702,45 @@ module Const = struct
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
           env context base
       in
+      let overapproximate_to_top () =
+        (* A with-bound weakens the mod-bounds, so a safe approximation is to
+           drop the with-bounds and raise the mod-bounds to [max]. *)
+        let expanded = Base_and_axes.fully_expand_aliases_const env base in
+        let base =
+          match expanded.base with
+          | Layout _ as b -> b
+          | Kconstr (_, sa, op) ->
+            (* However, we can't raise the mod-bounds of a truly-abstract
+               [Kconstr] because its mod-bounds can be further narrowed by
+               substitution. Instead, we approximate the layout as [any] (with
+               the same scannable axes/addressability). *)
+            Base_and_axes.apply_operator (Layout (Layout.Const.any sa)) op
+        in
+        { base;
+          mod_bounds = Mod_bounds.max;
+          with_bounds = expanded.with_bounds
+        }
+      in
       match context with
       | Right_jkind c ->
         Error.log_or_raise ~loc:type_.ptyp_loc (With_on_right c);
-        base
-      | Left_jkind (transl_type, _) -> (
-        match transl_type with
-        | Transl_type transl_type ->
-          let type_ = transl_type type_ in
-          let modality, externality =
-            Typemode.transl_with_bound_modifiers modalities
-          in
-          let bounds_mask =
-            let bounds = Mod_bounds.mask_of_modality ~modality in
-            match externality with
-            | None -> bounds
-            | Some ext -> Bounds_mask.meet_externality ext bounds
-          in
-          { base = base.base;
-            mod_bounds = base.mod_bounds;
-            with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
-          }
-        | Overapproximate_to_top ->
-          (* A with-bound weakens the mod-bounds, so a safe approximation is to
-             drop the with-bounds and raise the mod-bounds to [max]. *)
-          let expanded = Base_and_axes.fully_expand_aliases_const env base in
-          let base =
-            match expanded.base with
-            | Layout _ as b -> b
-            | Kconstr (_, sa, op) ->
-              (* However, we can't raise the mod-bounds of a truly-abstract
-                 [Kconstr] because its mod-bounds can be further narrowed by
-                 substitution. Instead, we approximate the layout as [any] (with
-                 the same scannable axes/addressability). *)
-              Base_and_axes.apply_operator (Layout (Layout.Const.any sa)) op
-          in
-          { base;
-            mod_bounds = Mod_bounds.max;
-            with_bounds = expanded.with_bounds
-          }))
+        overapproximate_to_top ()
+      | Left_jkind (Overapproximate_to_top, _) -> overapproximate_to_top ()
+      | Left_jkind (Transl_type transl_type, _) ->
+        let type_ = transl_type type_ in
+        let modality, externality =
+          Typemode.transl_with_bound_modifiers modalities
+        in
+        let bounds_mask =
+          let bounds = Mod_bounds.mask_of_modality ~modality in
+          match externality with
+          | None -> bounds
+          | Some ext -> Bounds_mask.meet_externality ext bounds
+        in
+        { base = base.base;
+          mod_bounds = base.mod_bounds;
+          with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
+        })
     | Pjk_default | Pjk_kind_of _ ->
       Error.log_and_raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
