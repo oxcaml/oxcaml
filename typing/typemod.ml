@@ -273,6 +273,21 @@ let extract_sig_open env loc mty =
       Error.log_and_raise loc env (Cannot_scrape_alias path)
   | mty -> Error.log_and_raise loc env (Structure_expected mty)
 
+let resolve_value_sorts ~why ~error ~loc env sg =
+  let sort_env = Env.add_signature sg env in
+  List.map (fun item ->
+    match
+      Env.sort_of_signature_item ~why sort_env
+        (Subst.Lazy.of_signature_item item),
+      item
+    with
+    | Ok (Some sort),
+      Sig_value (id, ({ val_kind = Val_reg Unrepresentable; _ } as vd), vis) ->
+      Sig_value (id, { vd with val_kind = Val_reg (Representable sort) }, vis)
+    | Ok _, _ -> item
+    | Error unrep, _ -> Error.log_and_raise loc sort_env (error unrep))
+    sg
+
 let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
   if funct_body then
     match Mtype.Contains_type_or_jkind.check env mty with
@@ -3910,10 +3925,12 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     in
     let mode = mode_without_locks_exn md.mod_mode in
     let scope = Ctype.create_scope () in
-    let sg, newenv =
-      Env.enter_signature ~scope ~mod_shape
-        (extract_sig_open env md.mod_loc md.mod_type) ~mode env
+    let sg =
+      resolve_value_sorts ~why:Module_open ~loc env
+        (extract_sig_open env md.mod_loc md.mod_type)
+        ~error:(fun unrep -> Unrepresentable_open unrep)
     in
+    let sg, newenv = Env.enter_signature ~scope ~mod_shape sg ~mode env in
     let info, visibility =
       match toplevel with
       | Some false | None -> Some `From_open, Hidden
@@ -3934,19 +3951,10 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
         | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
       ) sg
     in
-    let open_items_repr =
-      match
-        Env.sorts_of_signature_items ~why:Module_open newenv
-          (List.map Subst.Lazy.of_signature_item sg)
-      with
-      | Ok repr -> repr
-      | Error unrep ->
-        Error.log_and_raise loc newenv (Unrepresentable_open unrep)
-    in
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
-      open_items_repr;
+      open_items_repr = expect_fixed_representation sg;
       open_override = od.popen_override;
       open_env = newenv;
       open_loc = loc;
@@ -3981,6 +3989,14 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
           (Typedtree.mode_without_locks_exn modl.mod_mode)
     in
+    (* The included items are bound in this structure, so their sorts must be known.
+       Why rewrite [sg] in addition to storing the computed sorts in [incl_repr]?
+       Because some things in transl (e.g., [extract_free_var_env]) don't check
+       [incl_repr] and expect to find the sorts in their environment. *)
+    let sg =
+      resolve_value_sorts ~why:Module_inclusion ~loc env sg
+        ~error:(fun unrep -> Unrepresentable_include unrep)
+    in
     (* Rename all identifiers bound by this signature to avoid clashes *)
     let sg, shape, new_env =
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
@@ -3990,19 +4006,10 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
     in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
-    let incl_repr =
-      match
-        Env.sorts_of_signature_items ~why:Module_inclusion new_env
-          (List.map Subst.Lazy.of_signature_item sg)
-      with
-      | Ok repr -> repr
-      | Error unrep ->
-        Error.log_and_raise loc new_env (Unrepresentable_include unrep)
-    in
     let incl =
       { incl_mod = modl;
         incl_type = sg;
-        incl_repr;
+        incl_repr = expect_fixed_representation sg;
         incl_kind;
         incl_attributes = sincl.pincl_attributes;
         incl_loc = sincl.pincl_loc;

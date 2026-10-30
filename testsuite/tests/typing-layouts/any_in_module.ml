@@ -311,9 +311,10 @@ module F (V : Value_witness) (M : S with type t = V.t) = struct
   let poly_ g y = (x, y)
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig type t = V.t val x : t val y : int val poly_ g : 'a -> t * 'a end
 |}]
 
 module F (V : Value_witness) (M : S with type t = V.t) = struct
@@ -321,9 +322,15 @@ module F (V : Value_witness) (M : S with type t = V.t) = struct
   module G (X : sig end @ static) = struct let y = x end
 end
 [%%expect{|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig
+      type t = V.t
+      val x : t
+      val y : int
+      module G : functor (X : sig end @ static) -> sig val y : t end
+    end
 |}]
 
 (* Same for [open]ed values. *)
@@ -356,9 +363,10 @@ module F (V : Value_witness) (M : S with type t = V.t) = struct
   let poly_ g y = (x, y)
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig val poly_ g : 'a -> V.t * 'a end
 |}]
 
 module F (V : Value_witness) (M : S with type t = V.t) = struct
@@ -366,9 +374,10 @@ module F (V : Value_witness) (M : S with type t = V.t) = struct
   module G (X : sig end @ static) = struct let y = x end
 end
 [%%expect {|
->> Fatal error: unrepresentable signature item
-Uncaught exception: Misc.Fatal_error
-
+module F :
+  functor (V : Value_witness)
+    (M : sig type t = V.t val x : t val y : int end) ->
+    sig module G : functor (X : sig end @ static) -> sig val y : V.t end end
 |}]
 
 (* In general, we can't open a module without knowing its representation. *)

@@ -1,5 +1,5 @@
-(* [x]'s type is representable here, but its declaration in [S] isn't, so its
-   layout isn't recorded in this unit's inferred signature. *)
+(* [x]'s declaration in [S] isn't representable, but its type is representable
+   here, so [include] records its layout in this unit's inferred signature. *)
 module type S = sig
   type t : any
   val x : t

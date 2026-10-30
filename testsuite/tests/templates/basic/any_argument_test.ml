@@ -3,7 +3,7 @@
  readonly_files = "\
    unrepresentable_param.mli \
    any_argument.mli any_argument.reference \
-   included_argument.ml included_argument.reference \
+   included_argument.ml \
  ";
 
  setup-ocamlopt.byte-build-env;
@@ -23,9 +23,6 @@
 
  module = "included_argument.ml";
  compiler_output = "included_argument.output";
- ocamlopt_byte_exit_status = "2";
+ ocamlopt_byte_exit_status = "0";
  ocamlopt.byte;
-
- compiler_reference = "included_argument.reference";
- check-ocamlopt.byte-output;
 *)
