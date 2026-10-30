@@ -49,7 +49,49 @@ type error =
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
 
-exception Error of Location.t * error
+module Error : sig
+  type exn += private In_context of Location.t * error
+
+  module Result : sig
+    type e
+
+    type 'a t = ('a, e) result
+
+    val error : Location.t -> error -> _ t
+
+    (** Convert the result to an option. In the error case, always record an
+        exception. If type recovery is off, the error is raised. If on, it is
+        logged, and [None] is returned. *)
+    val to_opt_exn : 'a t -> 'a option
+  end
+
+  val log_or_raise : Location.t -> error -> unit
+end = struct
+  type exn += In_context of Location.t * error
+
+  let log_or_raise loc err =
+    Typing_recovery.log_or_raise (In_context (loc, err))
+
+  module Result = struct
+    type e = Location.t * error
+
+    type 'a t = ('a, e) result
+
+    let to_opt_exn (t : _ t) =
+      match t with
+      | Ok x -> Some x
+      | Error (loc, err) ->
+        log_or_raise loc err;
+        None
+
+    let error loc err : _ t = Error (loc, err)
+  end
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 module Mode_axis_pair = struct
   type t = Mode.With_locality.atom
@@ -202,7 +244,7 @@ let enforce_forbidden_modalities ~loc annot_type m =
   with
   | ( Meet_const Global,
       Modality.Monadic.Atom.Join_const Mode.Uniqueness.Const.Unique ) ->
-    raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
+    Error.log_or_raise loc (Forbidden_modality (annot_type, Global_and_unique))
   | _ -> ()
 
 let apply_mode_implications (annots : With_locality.Const.Option.t) =
@@ -246,17 +288,20 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
 
 let transl_mode_annots annots =
   let annots =
-    List.map
+    List.filter_map
       (fun { txt = Parsetree.Mode txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-        try { txt = Mode_axis_pair.of_string ~loc txt; loc }
+        try Some { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
-          raise (Error (loc, Unrecognized_modifier (Mode, txt))))
+          Error.log_or_raise loc (Unrecognized_modifier (Mode, txt));
+          None)
       annots
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
-    then raise (Error (loc, Duplicated_axis (Mode, ax)))
+    then (
+      Error.log_or_raise loc (Duplicated_axis (Mode, ax));
+      modes_so_far)
     else With_locality.Const.Option.set ax (Some mode) modes_so_far
   in
   let modes = List.fold_left step With_locality.Const.Option.none annots in
@@ -285,12 +330,15 @@ let mode_annot_to_modality_annot mode_annot =
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
   let mode =
-    try Mode_axis_pair.(of_string ~loc modality)
+    try Ok Mode_axis_pair.(of_string ~loc modality)
     with Not_found ->
-      raise (Error (loc, Unrecognized_modifier (Modality, modality)))
+      Error.Result.error loc (Unrecognized_modifier (Modality, modality))
   in
-  let mode_annot = { txt = mode; loc } in
-  mode_annot_to_modality_annot mode_annot
+  Result.map
+    (fun mode ->
+      let mode_annot = { txt = mode; loc } in
+      mode_annot_to_modality_annot mode_annot)
+    mode
 
 let untransl_modality =
   Location.map (fun (Atom (ax, t) : Modality.atom) : Parsetree.modality ->
@@ -454,7 +502,11 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
     | [] -> Location.none
     | _ :: _ as locs -> Location.merge locs
   in
-  let annots = List.map (transl_modality ~maturity) annots in
+  let annots =
+    List.filter_map
+      (fun annot -> transl_modality ~maturity annot |> Error.Result.to_opt_exn)
+      annots
+  in
   let open Modality in
   (* - default is applied before explicit modalities.
      - explicit modalities can override default.
@@ -539,7 +591,8 @@ let transl_with_bound_modifiers annots =
           match Nonmodal_axis_pair.of_string modality with
           | P (Externality, (value : Externality.t)) -> modal_annots, Some value
           | exception Not_found ->
-            raise (Error (loc, Unrecognized_modifier (Modality, modality)))))
+            Error.log_or_raise loc (Unrecognized_modifier (Modality, modality));
+            modal_annots, externality))
       ([], None) annots
   in
   let modality =
@@ -589,9 +642,9 @@ let transl_mod_bounds ?(warn = true) annots =
   let raise_dup_modal loc (Modality.Atom (ax, _)) =
     match[@warning "-18"] ax with
     | Comonadic ax ->
-      raise (Error (loc, Duplicated_axis (Modifier, Modal (Comonadic ax))))
+      Error.log_or_raise loc (Duplicated_axis (Modifier, Modal (Comonadic ax)))
     | Monadic ax ->
-      raise (Error (loc, Duplicated_axis (Modifier, Modal (Monadic ax))))
+      Error.log_or_raise loc (Duplicated_axis (Modifier, Modal (Monadic ax)))
   in
   let transl_nonmodal_modifier ~loc txt nonmodal =
     match Nonmodal_axis_pair.of_string txt with
@@ -604,7 +657,7 @@ let transl_mod_bounds ?(warn = true) annots =
           (Warnings.Redundant_modifier
              { modifier = txt; reason = Default_bound });
       if Option.is_some (Nonmodal_bounds.get ax nonmodal)
-      then raise (Error (loc, Duplicated_axis (Modifier, axis)));
+      then Error.log_or_raise loc (Duplicated_axis (Modifier, axis));
       Nonmodal_bounds.set ax (Some { txt = mode; loc }) nonmodal
     | exception Not_found -> (
       match txt with
@@ -630,15 +683,14 @@ let transl_mod_bounds ?(warn = true) annots =
       | "everything" ->
         if Option.is_some (Nonmodal_bounds.get Externality nonmodal)
         then
-          raise
-            (Error
-               ( loc,
-                 Duplicated_axis
-                   (Modifier, Axis.Nonmodal Axis.Nonmodal.Externality) ));
+          Error.log_or_raise loc
+            (Duplicated_axis (Modifier, Axis.Nonmodal Axis.Nonmodal.Externality));
         Nonmodal_bounds.set Externality
           (Some { txt = Externality.min; loc })
           nonmodal
-      | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
+      | _ ->
+        Error.log_or_raise loc (Unrecognized_modifier (Modifier, txt));
+        nonmodal)
   in
   (* [everything] specifies every modal axis except staticity, so it conflicts
      with any non-staticity modal modifier on either side. *)
@@ -797,5 +849,6 @@ let report_error ppf =
 
 let () =
   Location.register_error_of_exn (function
-    | Error (loc, err) -> Some (Location.error_of_printer ~loc report_error err)
+    | Error.In_context (loc, err) ->
+      Some (Location.error_of_printer ~loc report_error err)
     | _ -> None)
