@@ -130,6 +130,9 @@ module Stdlib = struct
       | [] -> true
       | _ :: _ -> false
 
+    let count p l =
+      List.fold_left (fun n x -> if p x then n + 1 else n) 0 l
+
     let rec compare cmp l1 l2 =
       match l1, l2 with
       | [], [] -> 0

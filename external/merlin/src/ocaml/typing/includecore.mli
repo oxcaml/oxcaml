@@ -30,6 +30,7 @@ type primitive_mismatch =
   | Native_name
   | Result_repr
   | Argument_repr of int
+  | Elided_args
   | Layout_poly_attr
 
 type value_mismatch =

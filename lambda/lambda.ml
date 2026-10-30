@@ -512,7 +512,8 @@ and extern_repr =
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
-and external_call_description = extern_repr Primitive.description_gen
+and external_call_description =
+  (extern_repr, extern_repr) Primitive.description_gen
 
 and nullable =
   | Nullable
