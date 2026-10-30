@@ -65,11 +65,9 @@ let scrape_ty env ty =
       begin match get_desc ty with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-          | Some _ -> begin
-            match (Ctype.get_unboxed_type_approximation env ty) with
-            | { ty; or_null = None; modality = _ } ->
-              Some ty
-            | _ -> Some ty end
+          | Some _ ->
+            (* Keep any [or_null], to preserve the nullability of [ty] *)
+            Some (Ctype.unwrap_until_or_null env ty)
           | None -> Some ty
           | exception Not_found -> None
           end
