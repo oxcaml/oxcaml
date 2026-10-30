@@ -2491,7 +2491,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Intop_imm (op, n)) ->
     (* We have i.arg.(0) = i.res.(0) *)
     instr_for_intop op (int n) (res i 0)
-  | Lop (Intop_atomic { op; size; addr }) -> emit_atomic i op size addr
+  | Lop (Intop_atomic { op; size; Operation.addr }) ->
+    emit_atomic i op size addr
   | Lop (Floatop (Float64, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r1 = res i 0, res i 1 in
@@ -2683,7 +2684,7 @@ let emit_instr ~first ~last ~fallthrough i =
        the correct place and managing the spilling/reloading of live registers.
        See [emit_probe_handler_wrapper] below. *)
     emit_call_probe_handler_wrapper i ~enabled_at_init ~probe_label
-  | Lop (Probe_is_enabled { name; enabled_at_init }) ->
+  | Lop (Probe_is_enabled { Operation.name; enabled_at_init }) ->
     let semaphore_sym =
       Probe_emission.find_or_add_semaphore name enabled_at_init i.dbg
     in

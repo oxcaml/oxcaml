@@ -1,0 +1,3 @@
+(tests
+ (names loop_comparisons_facts loop_analysis)
+ (libraries ocamloptcomp))

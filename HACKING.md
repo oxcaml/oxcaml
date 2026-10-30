@@ -22,6 +22,7 @@ want to modify OxCaml.  Jump to:
   - [How to add a new command line option](#how-to-add-a-new-command-line-option)
   - [Installation tree comparison script](#installation-tree-comparison-script)
   - [Updating Merlin](#updating-merlin)
+  - [Rocq models of compiler passes](#rocq-models-of-compiler-passes)
 
 ## Branches, pull requests, etc.
 
@@ -479,3 +480,12 @@ and branch the runner should use for the tests.
 ## Updating Merlin
 
 This repository contains Merlin, a library and CLI for editor support for OCaml, in [`external/merlin`](./external/merlin). Merlin vendors the frontend code of the compiler, but makes some modifications to it. As a result, when we make a change to the compiler’s frontend, we must update Merlin accordingly (a GitHub CI check asserts that we do so). Take a look at [`external/merlin/HACKING.jst.md`](external/merlin/HACKING.jst.md) for more information.
+
+## Rocq models of compiler passes
+
+Some analyses (currently the loop analyses behind `-ssa-delete-empty-loops`)
+are defined and proved in Rocq, and the OCaml the compiler builds is extracted
+from the models and committed. See [`rocq/HACKING.md`](rocq/HACKING.md) for
+how the models are laid out, how to rebuild them (`make -C rocq all`) and what
+is trusted, and [`ROCQ-REVIEW-GUIDE.md`](ROCQ-REVIEW-GUIDE.md) for how to review
+them and what remains to be checked by inspection.

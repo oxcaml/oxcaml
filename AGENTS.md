@@ -60,6 +60,10 @@ Configuration is needed after changing `.in` files or the autoconf script.
 
 Merlin (`external/merlin/`) vendors the compiler's frontend. Any frontend change — approximately `parsing/`, `typing/`, and the files in `file_formats/` and `utils/` they use — must be imported into Merlin; a CI check verifies this. Import by running `external/merlin/scripts/import-ocaml-source.sh` (never hand-merge compiler changes into `external/merlin`, and never manually modify `external/merlin/upstream/ocaml_flambda` except for `external/merlin/upstream/ocaml_flambda/.gitattributes`), then get `make merlin-test` passing. This is what the user is asking you to do if they say something like "Update Merlin", "Fix Merlin", or "Merge compiler/frontend/typing/type-checker changes into Merlin". New compiler flags (even backend-only ones) also require a Merlin update. Don't do anything before reading the full documentation: `external/merlin/HACKING.jst.md`.
 
+## Rocq Models of Compiler Passes
+
+Some analyses (the loop analyses under `backend/ssa/loop/`) are defined and proved in Rocq; the `.v` files live in `rocq/`, `backend/rocq/`, `backend/ssa/rocq/` and `backend/ssa/loop/rocq/`, and the `.ml`/`.mli` files next to them are extracted from the models and committed. They are the implementation: never edit them by hand. After any change to a `.v` file run `make -C rocq all` (checks the proofs and regenerates the extracted files), then `make -s boot-compiler` and the tests, and commit the sources and the regenerated files together. Read `rocq/HACKING.md` before working on a model: it gives the layout of a model file, how OxCaml types and compiler data are modelled, what is trusted, and the extraction pitfalls. `ROCQ-REVIEW-GUIDE.md` says how to review the models and what has to be checked by inspection.
+
 ## Development Guidelines
 - Always verify changes build with `make -s boot-compiler`
 - Run `make -s fmt` to ensure code formatting
