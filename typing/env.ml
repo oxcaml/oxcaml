@@ -4932,6 +4932,20 @@ let check_module_path_representable ~loc path env =
   check_representable ~errors:true ~loc ~env
     (fun () -> find_module_address path env)
 
+let fatal_if_unrepresentable find path env =
+  match find path env with
+  | address -> address
+  | exception Unrepresentable_type (_, _, _, _) ->
+    (* the type checker should have already checked that the address's
+       enlcosing modules are representable *)
+    Misc.fatal_error "expected representable type"
+
+let find_value_address = fatal_if_unrepresentable find_value_address
+let find_module_address = fatal_if_unrepresentable find_module_address
+let find_class_address = fatal_if_unrepresentable find_class_address
+let find_constructor_address =
+  fatal_if_unrepresentable find_constructor_address
+
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in
   path, desc, vmode

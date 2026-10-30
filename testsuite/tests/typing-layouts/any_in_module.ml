@@ -768,12 +768,14 @@ module A = P.N
    projecting [N] out of [P]. *)
 module A : Inner = P.N
 [%%expect{|
-Uncaught exception: Env.Unrepresentable_type(_, _, _, _)
+>> Fatal error: expected representable type
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
 module M : sig module A : Inner end = struct module A = P.N end
 [%%expect{|
-Uncaught exception: Env.Unrepresentable_type(_, _, _, _)
+>> Fatal error: expected representable type
+Uncaught exception: Misc.Fatal_error
 
 |}]
