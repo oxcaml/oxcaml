@@ -1,0 +1,15 @@
+(rule
+ (enabled_if
+  (and (= %{context_name} "main") (= %{architecture} "arm64")))
+ (targets accesses.cmi accesses.cmx accesses.o accesses.s)
+ (deps accesses.ml)
+ (action
+  (setenv OCAMLPARAM ""
+   (run %{bin:ocamlopt.opt} -O3 -S -extension simd -c accesses.ml))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main") (= %{architecture} "arm64")))
+ (deps check.sh accesses.s)
+ (action (run bash check.sh accesses.s)))

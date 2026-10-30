@@ -1542,6 +1542,44 @@ let consider_inlining_effectful_expressions p =
   | Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _ ->
     None
 
+let byte_vector_index ~dbg env simple (index : Env.expr_with_info) =
+  (* ACTUAL COMPILER: A defined Bytes128 access requires [0 <= index <=
+     Bytes.length bytes - 16], even for unsafe accesses. [c] may be any signed
+     machine word; its producer need not be known. For an even nonnegative [n],
+     [(c + n) asr 1] differs from [(c asr 1) + (n / 2)] only when the addition
+     overflows, in which case the wrapped index is negative. Distribute only at
+     this access: the original bounds check and other uses of the converted
+     integer must retain wrapping semantics. A variable base cannot duplicate
+     effects. Keep the original free variables as well as the exposed base so
+     delayed bindings remain live when the conversion is shared. *)
+  let rewrite cmm =
+    match[@ocaml.warning "-4"] cmm with
+    | Cmm.Cop
+        ( Casr,
+          [ Cop (Caddi, [(Cvar base as c); Cconst_int (n, _)], _);
+            Cconst_int (1, _) ],
+          _ )
+      when n >= 0 && n land 1 = 0 ->
+      let cmm =
+        C.add_int
+          (C.asr_int c (Cconst_int (1, dbg)) dbg)
+          (Cconst_int (n / 2, dbg))
+          dbg
+      in
+      Some
+        { index with cmm; free_vars = Backend_var.Set.add base index.free_vars }
+    | _ -> None
+  in
+  match rewrite index.cmm with
+  | Some index -> index
+  | None -> (
+    match[@ocaml.warning "-4"] index.cmm, Simple.must_be_var simple with
+    | Cvar _, Some (var, _) -> (
+      match Env.find_pure_bound_cmm_expr env var with
+      | Some cmm -> Option.value (rewrite cmm) ~default:index
+      | None -> index)
+    | _ -> index)
+
 let prim_simple env res dbg p =
   let consider_inlining_effectful_expressions =
     consider_inlining_effectful_expressions p
@@ -1574,6 +1612,12 @@ let prim_simple env res dbg p =
   | Binary (binary, x, y) ->
     let To_cmm_env.{ env; res; expr = x' } = arg env res x in
     let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let y' =
+      match[@ocaml.warning "-4"] binary with
+      | String_or_bigstring_load (Bytes, One_twenty_eight _) ->
+        byte_vector_index ~dbg env y y'
+      | _ -> y'
+    in
     let free_vars = Backend_var.Set.union x'.free_vars y'.free_vars in
     let effs = Ece.join x'.effs y'.effs in
     let expr =
@@ -1583,6 +1627,12 @@ let prim_simple env res dbg p =
   | Ternary (ternary, x, y, z) ->
     let To_cmm_env.{ env; res; expr = x' } = arg env res x in
     let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let y' =
+      match[@ocaml.warning "-4"] ternary with
+      | Bytes_or_bigstring_set (Bytes, One_twenty_eight _) ->
+        byte_vector_index ~dbg env y y'
+      | _ -> y'
+    in
     let To_cmm_env.{ env; res; expr = z' } = arg env res z in
     let free_vars =
       Backend_var.Set.union
