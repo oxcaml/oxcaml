@@ -727,9 +727,28 @@ rule token state = parse
   | "?" raw_ident_escape (lowercase identchar * as name) ':'
       { return (OPTLABEL name) }
   | "?" (lowercase identchar * as name) ':'
+<<<<<<< Merlin:pbt-laws-parsing
       { oPTLABEL (check_label_name lexbuf name) }
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf; return (OPTLABEL name) }
+||||||| Compiler:last-imported
+      { check_label_name lexbuf name;
+        OPTLABEL name }
+  | "?" (raw_ident_escape? as escape) (ident_ext as raw_name) ':'
+      { let name = ident_for_extended lexbuf raw_name in
+        check_label_name ~raw_escape:(escape<>"") lexbuf name;
+        OPTLABEL name
+      }
+=======
+      { check_label_name lexbuf name;
+        OPTLABEL name }
+  | "?" (raw_ident_escape? as escape) (ident_ext as raw_name) ':'
+      { let name = ident_for_extended lexbuf raw_name in
+        check_label_name ~raw_escape:(escape<>"") lexbuf name;
+        OPTLABEL name
+      }
+  | "law?" { LAWQUESTION }
+>>>>>>> Compiler:HEAD
   (* Lowercase identifiers are split into 3 cases, and the order matters
      (longest to shortest).
   *)
@@ -916,6 +935,7 @@ rule token state = parse
         (* Put back the '[' and return just LESS *)
         produce_and_backtrack lexbuf LESS 1
     }
+<<<<<<< Merlin:pbt-laws-parsing
   | "<-" { return LESSMINUS }
   | "="  { return EQUAL }
   | "["  { return LBRACKET }
@@ -924,6 +944,26 @@ rule token state = parse
   | "[<" { return LBRACKETLESS }
   | "[>" { return LBRACKETGREATER }
   | "]"  { return RBRACKET }
+||||||| Compiler:last-imported
+  | "<-" { LESSMINUS }
+  | "="  { EQUAL }
+  | "["  { LBRACKET }
+  | "[|" { LBRACKETBAR }
+  | "[:" { LBRACKETCOLON }
+  | "[<" { LBRACKETLESS }
+  | "[>" { LBRACKETGREATER }
+  | "]"  { RBRACKET }
+=======
+  | "<-" { LESSMINUS }
+  | "="  { EQUAL }
+  | "===>" { IMPLIES }
+  | "["  { LBRACKET }
+  | "[|" { LBRACKETBAR }
+  | "[:" { LBRACKETCOLON }
+  | "[<" { LBRACKETLESS }
+  | "[>" { LBRACKETGREATER }
+  | "]"  { RBRACKET }
+>>>>>>> Compiler:HEAD
   | "]>" {
       if Syntax_mode.quotations_enabled () then
         return RBRACKETGREATER
