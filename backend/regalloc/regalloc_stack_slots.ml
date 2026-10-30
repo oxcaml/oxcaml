@@ -301,7 +301,96 @@ let optimization_enabled (t : t) : bool =
   | 0 -> false
   | total_num_slots -> total_num_slots < Param.get stack_slots_threshold
 
+(* Removes the slots that no instruction references, renumbering the remaining
+   ones so that slot indices stay contiguous, and updates [t] accordingly.
+
+   Such slots appear when [Cfg_deadcode] (run at the end of the split pass)
+   deletes a spill whose every reload was replaced by a rematerialization: the
+   slot was allocated for the spill, but nothing reads or writes it anymore. The
+   only registers still located in such a slot are the stack twins of the
+   deleted spills, which no instruction references either; they are given the
+   [Unknown] location and dropped from [t.stack_slots], so that they cannot
+   alias a renumbered slot.
+
+   This runs whether or not [optimization_enabled] holds:
+   [Regalloc_invariants.postcondition_layout] requires every slot of
+   [fun_num_stack_slots] to be used, and the bucket optimization below relies on
+   every slot having a non-empty interval. *)
+let remove_unused_slots (t : t) (cfg_with_infos : Cfg_with_infos.t) : unit =
+  let used : bool array Stack_class.Tbl.t =
+    Stack_class.Tbl.init ~f:(fun stack_class ->
+        Array.make (Stack_class.Tbl.find t.num_stack_slots stack_class) false)
+  in
+  let mark (regs : Reg.t array) : unit =
+    Array.iter regs ~f:(fun (reg : Reg.t) ->
+        apply_reg_stack_local reg ~f:(fun slot_index ->
+            let used_in_class =
+              Stack_class.Tbl.find used (Stack_class.of_machtype reg.typ)
+            in
+            used_in_class.(slot_index) <- true))
+  in
+  Cfg_with_layout.iter_instructions
+    (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+    ~instruction:(fun (instr : Cfg.basic Cfg.instruction) ->
+      mark instr.arg;
+      mark instr.res)
+    ~terminator:(fun (term : Cfg.terminator Cfg.instruction) ->
+      mark term.arg;
+      mark term.res);
+  if
+    Stack_class.Tbl.exists used ~f:(fun _stack_class used_in_class ->
+        Array.exists used_in_class ~f:not)
+  then (
+    (* [renumbering] maps each old slot index to its new one, or to [-1] for an
+       unused slot. *)
+    let renumbering : int array Stack_class.Tbl.t =
+      Stack_class.Tbl.init ~f:(fun stack_class ->
+          let next = ref 0 in
+          Array.map (Stack_class.Tbl.find used stack_class) ~f:(fun is_used ->
+              if is_used
+              then (
+                let new_index = !next in
+                incr next;
+                new_index)
+              else -1))
+    in
+    let new_index_of (reg : Reg.t) (slot_index : int) : int =
+      let stack_class = Stack_class.of_machtype reg.typ in
+      (Stack_class.Tbl.find renumbering stack_class).(slot_index)
+    in
+    List.iter (Reg.all_relocatable_regs ()) ~f:(fun (reg : Reg.t) ->
+        apply_reg_stack_local reg ~f:(fun slot_index ->
+            let new_index = new_index_of reg slot_index in
+            if debug
+            then
+              Format.eprintf "slot %d of %a (class %a) ~> %d\n%!" slot_index
+                Printreg.reg reg Stack_class.print
+                (Stack_class.of_machtype reg.typ)
+                new_index;
+            if new_index < 0
+            then Reg.set_loc reg Unknown
+            else if new_index <> slot_index
+            then Reg.set_loc reg (Stack (Local new_index))));
+    Reg.Tbl.filter_map_inplace
+      (fun (reg : Reg.t) slot_index ->
+        let new_index = new_index_of reg slot_index in
+        if new_index < 0 then None else Some new_index)
+      t.stack_slots;
+    Stack_class.Tbl.iter used ~f:(fun stack_class used_in_class ->
+        let num_used =
+          Array.fold_left used_in_class ~init:0 ~f:(fun acc is_used ->
+              if is_used then succ acc else acc)
+        in
+        if debug
+        then
+          Format.eprintf "stack_class %a: %d unused slot(s) removed\n%!"
+            Stack_class.print stack_class
+            (Array.length used_in_class - num_used);
+        Stack_class.Tbl.replace t.num_stack_slots stack_class num_used);
+    Cfg_with_infos.invalidate_liveness cfg_with_infos)
+
 let optimize (t : t) (cfg_with_infos : Cfg_with_infos.t) : unit =
+  remove_unused_slots t cfg_with_infos;
   if optimization_enabled t
   then (
     (* First, compute the intervals for all stack slots *)

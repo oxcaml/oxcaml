@@ -286,29 +286,30 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       ~block_temporaries:(round = 1);
     main ~round:(succ round) state cfg_with_infos)
 
-let run : Cfg_with_infos.t -> Cfg_with_infos.t =
- fun cfg_with_infos ->
+let on_fatal_callback cfg_with_infos () =
+  Option.iter
+    (fun (intervals, active) ->
+      Format.eprintf "Regalloc_ls.run (on_fatal):";
+      Format.eprintf "\n\nactives:\n";
+      Regs.Reg_class_tbl.iter active ~f:(fun reg_class a ->
+          Format.eprintf "class %a:\n %a\n" Regs.Reg_class.print reg_class
+            ClassIntervals.print a);
+      Format.eprintf "\n\nintervals:\n";
+      DLL.iter intervals ~f:(fun i -> Format.eprintf "- %a\n" Interval.print i);
+      Format.eprintf "\n%!")
+    !snapshot_for_fatal;
+  save_cfg "ls" (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+
+let run_after_prelude
+    { Regalloc_rewrite.cfg_with_infos;
+      cfg_infos = _;
+      stack_slots;
+      affinity;
+      rematerializations
+    } =
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let (_ : cfg_infos), stack_slots, affinity =
-    Regalloc_rewrite.prelude
-      (module Utils)
-      ~on_fatal_callback:(fun () ->
-        Option.iter
-          (fun (intervals, active) ->
-            Format.eprintf "Regalloc_ls.run (on_fatal):";
-            Format.eprintf "\n\nactives:\n";
-            Regs.Reg_class_tbl.iter active ~f:(fun reg_class a ->
-                Format.eprintf "class %a:\n %a\n" Regs.Reg_class.print reg_class
-                  ClassIntervals.print a);
-            Format.eprintf "\n\nintervals:\n";
-            DLL.iter intervals ~f:(fun i ->
-                Format.eprintf "- %a\n" Interval.print i);
-            Format.eprintf "\n%!")
-          !snapshot_for_fatal;
-        save_cfg "ls" cfg_with_layout)
-      cfg_with_infos
-  in
+  on_fatal ~f:(on_fatal_callback cfg_with_infos);
   let state = State.make ~stack_slots ~affinity in
   main ~round:1 state cfg_with_infos;
   Regalloc_rewrite.postlude
@@ -328,4 +329,14 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
               block.terminator liveness);
         dedent ()))
     cfg_with_infos;
-  cfg_with_infos
+  cfg_with_infos, rematerializations
+
+let run cfg_with_infos =
+  if debug then reset_indentation ();
+  let prepared =
+    Regalloc_rewrite.prelude
+      (module Utils)
+      ~on_fatal_callback:(on_fatal_callback cfg_with_infos)
+      cfg_with_infos
+  in
+  run_after_prelude prepared

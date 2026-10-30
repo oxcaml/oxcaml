@@ -41,13 +41,23 @@ val rewrite_gen :
   block_temporaries:bool ->
   Reg.t list * Reg.t list * bool
 
-(* Runs the first steps common to register allocators, reinitializing registers,
-   checking preconditions, and collecting information from the CFG. *)
+(** The prepared CFG and its allocation metadata. IRC may pass this to linear
+    scan when it gives up before changing the prepared CFG. *)
+type prelude_result =
+  { cfg_with_infos : Cfg_with_infos.t;
+    cfg_infos : cfg_infos;
+    stack_slots : Regalloc_stack_slots.t;
+    affinity : Regalloc_affinity.t;
+    rematerializations : Regalloc_rematerializations.t
+  }
+
+(** Runs the common preparation once: reinitializes registers, splits live
+    ranges, and collects allocation metadata. *)
 val prelude :
   (module Utils) ->
   on_fatal_callback:(unit -> unit) ->
   Cfg_with_infos.t ->
-  cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t
+  prelude_result
 
 (* Runs the last steps common to register allocators, updating the CFG (stack
    slots, live fields, and prologue), running [f], and checking
