@@ -93,6 +93,7 @@ module Swarm = struct
       variants : bool;
       or_null : bool;
       matches : bool;
+      unreachable_assertions : bool;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
@@ -121,6 +122,7 @@ module Swarm = struct
       variants = Random.State.bool random_state;
       or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
+      unreachable_assertions = Random.State.bool random_state;
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;
@@ -149,6 +151,7 @@ module Swarm = struct
       "variants", t.variants;
       "or_null", t.or_null;
       "matches", t.matches;
+      "unreachable_assertions", t.unreachable_assertions;
       "record_updates", t.record_updates;
       "record_representation_conversions", t.record_representation_conversions;
       "mutable_bindings", t.mutable_bindings;

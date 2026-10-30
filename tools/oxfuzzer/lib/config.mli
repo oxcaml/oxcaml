@@ -91,6 +91,7 @@ module Swarm : sig
       variants : bool;
       or_null : bool;
       matches : bool;
+      unreachable_assertions : bool;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
