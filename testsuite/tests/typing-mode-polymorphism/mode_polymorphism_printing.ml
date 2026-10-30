@@ -609,3 +609,16 @@ Line 2, characters 12-17:
                 ^^^^^
 Error: This expression has type "'a -> 'b" which is not a record type.
 |}]
+
+let call_and_return f x = f x, f
+[%%expect{|
+val call_and_return :
+  ('a @ ([> 'o] as 'p) -> 'b @ ([< 'm & global] as 'n)) @ [< past('q) & global many] ->
+  'a @ [< 'o] ->
+  'b * ('a @ 'p -> 'b @ 'n) @ [> 'm | past('q) | aliased dynamic] = <fun>
+|}, Principal{|
+val call_and_return :
+  ('a @ ([> 'o] as 'p) -> 'b @ ([< 'm & global] as 'n)) @ [< 'q & global many] ->
+  'a @ [< 'o] -> 'b * ('a @ 'p -> 'b @ 'n) @ [> 'm | 'q | aliased dynamic] =
+  <fun>
+|}]
