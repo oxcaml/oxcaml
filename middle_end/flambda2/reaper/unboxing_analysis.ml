@@ -164,6 +164,28 @@ module Unboxed_fields = struct
          (fun (f1, fields1) (f2, fields2) ->
            Field.equal f1 f2 && equal_shape_u fields1 fields2)
          bindings1 bindings2
+
+  let rec ids_for_export ids_for_export_elem fields =
+    Field.Map.fold
+      (fun field uf ids ->
+        let ids = Ids_for_export.add_field ids field in
+        match uf with
+        | Not_unboxed x -> Ids_for_export.union ids (ids_for_export_elem x)
+        | Unboxed fields ->
+          Ids_for_export.union ids (ids_for_export ids_for_export_elem fields))
+      fields Ids_for_export.empty
+
+  let rec apply_renaming fields renaming apply_renaming_elem =
+    Field.Map.fold
+      (fun field uf fields ->
+        let uf =
+          match uf with
+          | Not_unboxed x -> Not_unboxed (apply_renaming_elem x renaming)
+          | Unboxed uf_fields ->
+            Unboxed (apply_renaming uf_fields renaming apply_renaming_elem)
+        in
+        Field.Map.add (Renaming.apply_field renaming field) uf fields)
+      fields Field.Map.empty
 end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
@@ -176,16 +198,40 @@ end
    - For symbols, this could break dominator scoping. *)
 type unboxed = Variable.t Unboxed_fields.t
 
-type changed_representation =
-  (* CR ncourant: [Block_representation] is currently never produced, because we
-     need to rewrite the value_kinds to account for changed representations
-     before enabling it *)
-  | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
-  | Closure_representation of
-      Value_slot.t Unboxed_fields.t
-      * Function_slot.t Function_slot.Map.t (* old -> new *)
-      * Function_slot.t (* OLD current function slot *)
+module Changed_representation = struct
+  type t =
+    (* CR ncourant: [Block_representation] is currently never produced, because
+       we need to rewrite the value_kinds to account for changed representations
+       before enabling it *)
+    | Block_representation of
+        (int * Flambda_primitive.Block_access_kind.t) Unboxed_fields.t * int
+    | Closure_representation of
+        Value_slot.t Unboxed_fields.t
+        * Function_slot.t Function_slot.Map.t (* old -> new *)
+        * Function_slot.t (* OLD current function slot *)
+
+  (* [size], [function_slots], [current_function_slot] and the leaves of the
+     [fields] do not contain hashconsed identifiers. *)
+  let ids_for_export t =
+    match t with
+    | Block_representation (fields, _size) ->
+      Unboxed_fields.ids_for_export (fun _ -> Ids_for_export.empty) fields
+    | Closure_representation (fields, _function_slots, _current_function_slot)
+      ->
+      Unboxed_fields.ids_for_export (fun _ -> Ids_for_export.empty) fields
+
+  let apply_renaming t renaming =
+    let keep_leaf leaf _renaming = leaf in
+    match t with
+    | Block_representation (fields, size) ->
+      Block_representation
+        (Unboxed_fields.apply_renaming fields renaming keep_leaf, size)
+    | Closure_representation (fields, function_slots, current_function_slot) ->
+      Closure_representation
+        ( Unboxed_fields.apply_renaming fields renaming keep_leaf,
+          function_slots,
+          current_function_slot )
+end
 
 type param_decision =
   | Keep of Variable.t * Flambda_kind.With_subkind.t
@@ -205,7 +251,8 @@ let print_param_decision ppf param_decision =
   | Unbox fields ->
     Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
-let pp_changed_representation ff = function
+let pp_changed_representation ff (repr : Changed_representation.t) =
+  match repr with
   | Block_representation (fields, size) ->
     Format.fprintf ff "(fields %a) (size %d)"
       (Unboxed_fields.print (fun ff (field, _) -> Format.pp_print_int ff field))
@@ -563,7 +610,7 @@ type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (Changed_representation.t * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
 type calling_convention_change =
@@ -781,7 +828,7 @@ let perform_analysis0 ?stats db ~analysis_scope =
             if Code_id_or_name.Map.mem code_id_or_name !changed_representation
             then ()
             else
-              let add_to_s repr alloc_point =
+              let add_to_s (repr : Changed_representation.t) alloc_point =
                 Datalog.Cursor.iter_with_parameters query_dominated_by
                   [alloc_point] db ~f:(fun [c] ->
                     changed_representation
@@ -892,7 +939,76 @@ type code_change =
     code_metadata : Code_metadata.t
   }
 
-type code_changes = code_change Code_id.Map.t
+module Code_changes = struct
+  type t = code_change Code_id.Map.t
+
+  let ids_for_export t =
+    let decision_ids (decision : param_decision) =
+      match decision with
+      | Delete -> Ids_for_export.empty
+      | Keep (var, _kind) -> Ids_for_export.singleton_variable var
+      | Unbox fields ->
+        Unboxed_fields.ids_for_export Ids_for_export.singleton_variable fields
+    in
+    Code_id.Map.fold
+      (fun code_id { calling_convention_change; code_metadata } ids ->
+        let ids = Ids_for_export.add_code_id ids code_id in
+        let ids =
+          Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata)
+        in
+        match calling_convention_change with
+        | Not_changing_calling_convention -> ids
+        | Changing_calling_convention
+            { my_closure_decision; params_decisions; return_decisions } ->
+          let ids =
+            match my_closure_decision with
+            | Keep_my_closure -> ids
+            | Unbox_my_closure fields ->
+              Ids_for_export.union ids
+                (Unboxed_fields.ids_for_export Ids_for_export.singleton_variable
+                   fields)
+          in
+          Ids_for_export.union_list
+            (ids :: List.map decision_ids (params_decisions @ return_decisions)))
+      t Ids_for_export.empty
+
+  let apply_renaming t renaming =
+    let rename_var var renaming = Renaming.apply_variable renaming var in
+    let rename_decision (decision : param_decision) : param_decision =
+      match decision with
+      | Delete -> Delete
+      | Keep (var, kind) -> Keep (rename_var var renaming, kind)
+      | Unbox fields ->
+        Unbox (Unboxed_fields.apply_renaming fields renaming rename_var)
+    in
+    Code_id.Map.fold
+      (fun code_id { calling_convention_change; code_metadata } t ->
+        let calling_convention_change =
+          match calling_convention_change with
+          | Not_changing_calling_convention -> Not_changing_calling_convention
+          | Changing_calling_convention
+              { my_closure_decision; params_decisions; return_decisions } ->
+            let my_closure_decision =
+              match my_closure_decision with
+              | Keep_my_closure -> Keep_my_closure
+              | Unbox_my_closure fields ->
+                Unbox_my_closure
+                  (Unboxed_fields.apply_renaming fields renaming rename_var)
+            in
+            Changing_calling_convention
+              { my_closure_decision;
+                params_decisions = List.map rename_decision params_decisions;
+                return_decisions = List.map rename_decision return_decisions
+              }
+        in
+        Code_id.Map.add
+          (Renaming.apply_code_id renaming code_id)
+          { calling_convention_change;
+            code_metadata = Code_metadata.apply_renaming code_metadata renaming
+          }
+          t)
+      t Code_id.Map.empty
+end
 
 let arity_of_decisions params_decisions =
   let arity =

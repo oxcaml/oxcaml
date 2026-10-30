@@ -51,7 +51,7 @@ type should_preserve_direct_calls =
 
 type 'f env =
   { machine_width : Target_system.Machine_width.t;
-    solution : 'f Analysis.solution;
+    solution : 'f Analysis.Solution.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
     cont_params_to_keep :
@@ -2359,7 +2359,7 @@ type 'f result =
   }
 
 let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
-    ~(solution : f Analysis.solution) =
+    ~(solution : f Analysis.Solution.t) =
   let { Traverse.Skeleton.toplevel_expr;
         code;
         ordered_code_ids;
