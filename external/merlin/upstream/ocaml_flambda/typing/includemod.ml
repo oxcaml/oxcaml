@@ -126,6 +126,7 @@ module Error = struct
     | Module_type_declaration of
         (modtype_declaration, module_type_declaration_symptom) diff
     | Module_type of module_type_diff
+    | Visibility of visibility core_diff
 
   and module_type_declaration_symptom =
     | Illegal_permutation of Typedtree.module_coercion
@@ -495,7 +496,7 @@ let build_component_table pos_rep sg =
       | Hidden ->
           (* do not pair private items. *)
           build_table nb_exported nextpos tbl rem
-      | Exported ->
+      | Exported | Unmentionable ->
           let (id, _loc, name) = item_ident_name item in
           build_table (nb_exported + 1) nextpos
             (FieldMap.add name (id, item, pos_rep pos id) tbl) rem
@@ -939,7 +940,11 @@ and signatures ~core ~direction ~loc env subst ~modes sig1 sig2 mod_shape =
   in
   let exported_len2, runtime_len2 =
     List.fold_left (fun (el, rl) i ->
-      let el = match item_visibility i with Hidden -> el | Exported -> el + 1 in
+      let el =
+        match item_visibility i with
+        | Hidden -> el
+        | Exported | Unmentionable -> el + 1
+      in
       let rl = if is_runtime_component i then rl + 1 else rl in
       el, rl
     ) (0, 0) sig2
@@ -1102,6 +1107,30 @@ and signature_components :
            id1, item, (jd1.jkind_uid, jd2.jkind_uid), shape_map, false
         | _ ->
             assert false
+      in
+      let item =
+        match item with
+        | Error _ -> item
+        | Ok _ ->
+          match item_visibility sigi1, item_visibility sigi2 with
+          | Hidden, _ ->
+              (* [build_component_table] never pairs hidden items of [sig1]. *)
+              Misc.fatal_errorf
+                "Includemod.signature_components: hidden item %a was paired"
+                Ident.print id
+          | _, Hidden ->
+              (* [Signature_names.simplify] removes hidden items from every
+                 module type, so they never occur in [sig2]. *)
+              Misc.fatal_errorf
+                "Includemod.signature_components: hidden item %a in the \
+                 expected signature"
+                Ident.print id
+          | (Unmentionable as implementation), (Exported as interface) ->
+              let error =
+                Error.(Visibility (diff implementation interface ()))
+              in
+              Error { error; recoverable = true }
+          | (Exported | Unmentionable), (Exported | Unmentionable) -> item
       in
       let deep_modifications = !shape_modified in
       let first =

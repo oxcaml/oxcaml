@@ -1,0 +1,4 @@
+File "main_open_dep_directly.ml", line 6, characters 5-15:
+6 | open Inst.Foo__
+         ^^^^^^^^^^
+Error: The module Inst.Foo__ cannot be referenced by name.

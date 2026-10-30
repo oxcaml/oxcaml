@@ -1,0 +1,10 @@
+File "main_ascribe_dep.ml", line 11, characters 2-29:
+11 |   Bundle_foo_lib.Make (P_int) ()
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         Bundle_foo_lib.Intf(P_int).S
+       is not included in
+         sig module Foo__A : sig val hello : P_int.t -> string end end
+       Foo__A is unmentionable in the implementation,
+       but the interface requires it to be exported
