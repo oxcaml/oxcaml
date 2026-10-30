@@ -88,8 +88,7 @@ module General : sig
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
-    | `Deref of
-        mutability * deref block_access * deref unboxed_access list * pattern
+    | `Deref of mutability * pattern
   ]
   type pattern = view pattern_data
 

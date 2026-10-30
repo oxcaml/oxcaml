@@ -1346,7 +1346,7 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
-  | Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p
+  | Tpat_addr (_, _, p) | Tpat_deref (_, p) | Tpat_lazy p
     -> has_instance p
 
 and has_instances = function
@@ -2278,7 +2278,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
-| Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p
+| Tpat_addr (_, _, p) | Tpat_deref (_, p) | Tpat_lazy p
     ->
     collect_paths_from_pat r p
 
@@ -2562,7 +2562,7 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
         (simpl head_bound_variables varsets p2 ps k)
     (* A dereference pattern binds the address at the head and leaves the
        value unconstrained *)
-    | `Deref (_, _, _, { pat_desc = Tpat_var { id; _ }; _ }) ->
+    | `Deref (_, { pat_desc = Tpat_var { id; _ }; _ }) ->
       simpl (Ident.Set.add id head_bound_variables) varsets Patterns.omega ps k
     | `Deref _ -> simpl head_bound_variables varsets Patterns.omega ps k
     | #Patterns.Simple.view as view ->

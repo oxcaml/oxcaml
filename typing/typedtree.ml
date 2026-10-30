@@ -273,9 +273,7 @@ and 'k pattern_desc =
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
   | Tpat_addr :
       mutability * Jkind.sort * value general_pattern -> value pattern_desc
-  | Tpat_deref :
-      mutability * deref block_access * deref unboxed_access list
-      * value general_pattern -> value pattern_desc
+  | Tpat_deref : mutability * value general_pattern -> value pattern_desc
   | Tpat_lazy : value general_pattern -> value pattern_desc
   (* computation patterns *)
   | Tpat_value : tpat_value_argument -> computation pattern_desc
@@ -1237,7 +1235,7 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
-  | Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p -> f.f p
+  | Tpat_addr (_, _, p) | Tpat_deref (_, p) | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
   | Tpat_constant _
@@ -1273,7 +1271,7 @@ let shallow_map_pattern_desc
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_addr (mut, arg_sort, p1) -> Tpat_addr (mut, arg_sort, f.f p1)
-  | Tpat_deref (mut, ba, uas, p1) -> Tpat_deref (mut, ba, uas, f.f p1)
+  | Tpat_deref (mut, p1) -> Tpat_deref (mut, f.f p1)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
@@ -1403,7 +1401,7 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
-      | Tpat_addr (_, _, p) | Tpat_deref (_, _, _, p) | Tpat_lazy p
+      | Tpat_addr (_, _, p) | Tpat_deref (_, p) | Tpat_lazy p
       | Tpat_exception p -> loop f p
       | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
         ()

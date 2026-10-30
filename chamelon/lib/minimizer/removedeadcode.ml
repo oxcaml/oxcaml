@@ -112,7 +112,7 @@ let rec var_from_pat pat_desc acc =
     List.fold_left (fun l (_, _, pat) -> var_from_pat pat.pat_desc l) acc r
   | O (Tpat_or (p1, p2, _)) ->
     var_from_pat p1.pat_desc (var_from_pat p2.pat_desc acc)
-  | O (Tpat_addr (_, _, pat) | Tpat_deref (_, _, _, pat) | Tpat_lazy pat) ->
+  | O (Tpat_addr (_, _, pat) | Tpat_deref (_, pat) | Tpat_lazy pat) ->
     var_from_pat pat.pat_desc acc
   | O (Tpat_fun_layout { id; _ }) -> id :: acc
   | O
@@ -194,10 +194,8 @@ let rec rem_in_pat str pat should_remove =
     { pat with
       pat_desc = Tpat_addr (mut, arg_sort, rem_in_pat str pat should_remove)
     }
-  | O (Tpat_deref (mut, ba, uas, pat)) ->
-    { pat with
-      pat_desc = Tpat_deref (mut, ba, uas, rem_in_pat str pat should_remove)
-    }
+  | O (Tpat_deref (mut, pat)) ->
+    { pat with pat_desc = Tpat_deref (mut, rem_in_pat str pat should_remove) }
   | O (Tpat_lazy pat) ->
     { pat with pat_desc = Tpat_lazy (rem_in_pat str pat should_remove) }
   | O (Tpat_fun_layout { id; _ }) ->

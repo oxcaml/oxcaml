@@ -103,8 +103,7 @@ module General = struct
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
-    | `Deref of
-        mutability * deref block_access * deref unboxed_access list * pattern
+    | `Deref of mutability * pattern
   ]
   type pattern = view pattern_data
 
@@ -140,7 +139,7 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
-    | Tpat_deref (mut, ba, uas, p) -> `Deref (mut, ba, uas, p)
+    | Tpat_deref (mut, p) -> `Deref (mut, p)
     | Tpat_lazy p -> `Lazy p
 
   let view p : pattern =
@@ -172,7 +171,7 @@ module General = struct
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
-    | `Deref (mut, ba, uas, p) -> Tpat_deref (mut, ba, uas, p)
+    | `Deref (mut, p) -> Tpat_deref (mut, p)
     | `Lazy p -> Tpat_lazy p
 
   let erase p : Typedtree.pattern =

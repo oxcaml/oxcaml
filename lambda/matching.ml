@@ -361,7 +361,7 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
-      | `Deref (_, _, _, q) ->
+      | `Deref (_, q) ->
           let action =
             match deref_binder q with
             | None -> action

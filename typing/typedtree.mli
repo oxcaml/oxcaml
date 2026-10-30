@@ -386,13 +386,12 @@ and 'k pattern_desc =
         (** addr_ P        (flag = Mutable)
             addr_imm_ P    (flag = Immutable) *)
   | Tpat_deref :
-      Types.mutability * deref block_access * deref unboxed_access list
-      * value general_pattern ->
-      value pattern_desc
+      Types.mutability * value general_pattern -> value pattern_desc
         (** deref_ P
 
-            Invariants: the pattern is a variable, and the access descriptors
-            must correspond to the surrounding patterns. *)
+            P is a variable. Its position is given by the enclosing patterns:
+            a field of a boxed record, an element of a boxed tuple or the
+            value at an address, possibly below unboxed products. *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)
@@ -879,7 +878,8 @@ and ident_kind =
 (* The start of a path to a position in a block, as used by block indices and
    dereference patterns. A path starts with a boxed value, an index (when
    constructing a block index expression), or an address (when constructing a
-   dereference pattern). *)
+   dereference pattern). Only [index] accesses are stored in the tree; [deref]
+   accesses exist for [Typecore] to check the path of a dereference pattern. *)
 and 'k block_access =
   | Baccess_field :
       Longident.t loc * Data_types.label_description

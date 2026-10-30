@@ -2314,7 +2314,7 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
       let base_paths = Paths.choose paths (Paths.memory_address paths) in
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
-    | Tpat_deref (_, _, _, arg) ->
+    | Tpat_deref (_, arg) ->
       let paths =
         match base_paths with
         | None ->

@@ -4650,7 +4650,7 @@ and type_pat_aux
           addr_sort
       in
       rvp {
-        pat_desc = Tpat_deref (position_mutability, base, unboxed, p1);
+        pat_desc = Tpat_deref (position_mutability, p1);
         pat_loc = loc; pat_extra=[];
         pat_type = instance expected_ty;
         pat_attributes = sp.ppat_attributes;
@@ -5186,10 +5186,10 @@ let rec check_counter_example_pat
         Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref (mutability, ba, uas, tp1) ->
+  | Tpat_deref (mutability, tp1) ->
       let ty_addr, _ = solve_Ppat_deref !!penv mutability expected_ty in
       check_rec tp1 ty_addr
-        (fun p1 -> mkp k (Tpat_deref (mutability, ba, uas, p1)))
+        (fun p1 -> mkp k (Tpat_deref (mutability, p1)))
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
