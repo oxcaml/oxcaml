@@ -1303,8 +1303,26 @@ and simple_expr ctxt f x =
         let expression = expression ctxt in
         pp f fmt (pattern ctxt) s expression e1 direction_flag
           df expression e2 expression e3
+<<<<<<< Merlin:jwshii-add-breaks-to-loops
     | Pexp_hole -> pp f "_"
     | _ ->  paren true (expression ctxt) f x
+||||||| Compiler:last-imported
+    | _ ->  paren true (expression ctxt) f x
+=======
+    | Pexp_break -> pp f "break_"
+    | Pexp_let _ | Pexp_function _ | Pexp_apply _ | Pexp_match _ | Pexp_try _
+    | Pexp_construct _ | Pexp_variant (_, Some _)
+    | Pexp_field _ | Pexp_unboxed_field _ | Pexp_setfield _
+    | Pexp_ifthenelse _ | Pexp_sequence _
+    | Pexp_send _ | Pexp_new _ | Pexp_setvar _ | Pexp_override _
+    | Pexp_letmodule _ | Pexp_letexception _ | Pexp_assert _ | Pexp_lazy _
+    | Pexp_poly _ | Pexp_object _ | Pexp_newtype _ | Pexp_open _
+    | Pexp_letop _ | Pexp_extension _ | Pexp_unreachable | Pexp_stack _
+    | Pexp_overwrite _ | Pexp_quote _ | Pexp_splice _ | Pexp_hole
+    | Pexp_borrow _ ->
+        paren true (expression ctxt) f x
+
+>>>>>>> Compiler:HEAD
 
 and attributes ctxt f l =
   List.iter (attribute ctxt f) l
