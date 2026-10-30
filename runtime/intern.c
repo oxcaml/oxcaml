@@ -723,6 +723,12 @@ static void intern_rec(struct caml_intern_state* s,
         break;
 #endif
       case CODE_UNBOXED_INT64:
+        /* Extern only emits unboxed int64s for the non-scanned part of a
+           closure environment; a raw word anywhere else would be scanned
+           by the GC. */
+        if (iop != OReadItemsOrCodePointers)
+          intern_cleanup_failwith2(s, fun_name,
+                                   "unboxed int64 outside closure");
 #ifdef ARCH_SIXTYFOUR
         v = (intnat) (read64u(s));
         break;
