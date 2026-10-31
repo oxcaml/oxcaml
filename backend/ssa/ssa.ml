@@ -373,6 +373,13 @@ module Block = struct
     assert (block.dominator_info.depth >= 0);
     block.dominator_info.dominator
 
+  let strict_dominators (block : finished t) : finished t list =
+    let rec walk (block : finished t) acc =
+      let idom = immediate_dominator block in
+      if equal idom block then List.rev acc else walk idom (idom :: acc)
+    in
+    walk block []
+
   let dominator_depth (block : finished t) : int =
     assert (block.dominator_info.depth >= 0);
     block.dominator_info.depth

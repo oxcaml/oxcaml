@@ -65,6 +65,12 @@
 
 (copy_files# backend/ssa/*.ml{,i})
 
+(copy_files# backend/ssa/rocq/*.ml{,i})
+
+(copy_files# backend/ssa/loop/*.ml{,i})
+
+(copy_files# backend/ssa/loop/rocq/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -711,11 +717,31 @@
   ;; backend/ssa/
   ssa
   ssa_print
+  ssa_expect
   ssa_reducer
   ssa_simplify
   ssa_tail_call
   ssa_of_cmm
   cfg_of_ssa
+  ;; backend/ssa/rocq/ (extracted from Rocq by rocq/Makefile)
+  SsaModel
+  SsaGraph
+  SsaDominance
+  SsaSemantics
+  ;; backend/ssa/loop/rocq/ (extracted from Rocq by rocq/Makefile)
+  OxCamlList
+  IntArith
+  FourierMotzkin
+  LoopComparisons
+  AffineExpr
+  NaturalLoop
+  AffineSsa
+  InductionVar
+  LoopTermination
+  DeadInductionVar
+  DeleteEmptyLoops
+  ;; backend/ssa/loop/
+  delete_empty_loops
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

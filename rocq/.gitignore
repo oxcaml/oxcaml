@@ -1,0 +1,10 @@
+# Rocq build products.
+*.vo
+*.vos
+*.vok
+*.glob
+.*.aux
+.lia.cache
+.coq-native/
+.rocqdeps.d
+.nia.cache

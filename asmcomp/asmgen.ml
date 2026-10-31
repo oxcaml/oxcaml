@@ -601,6 +601,20 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
+  let ssa, summary =
+    if !Oxcaml_flags.ssa_delete_empty_loops
+    then begin
+      let ssa, deleted = Delete_empty_loops.run ~ppf_dump ssa in
+      if !Oxcaml_flags.dump_ssa && deleted > 0
+      then
+        Format.fprintf ppf_dump
+          "*** SSA after Delete_empty_loops (%d deleted)@.@.%a" deleted
+          Ssa_print.print ssa;
+      ssa, [Printf.sprintf "Delete_empty_loops: %d deleted" deleted]
+    end
+    else ssa, []
+  in
+  Ssa_expect.record ~summary ssa;
   try
     (* Before creating the final CFG that will actually go through register
        allocation, make sure to clear the global list of relocatable registers
@@ -789,6 +803,7 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
             then None
             else Some (Cmm.global_symbol (Primitive.native_name prim)))
           !Translmod.primitive_declarations));
+  Ssa_expect.invoke_callbacks ();
   emit_end_assembly ~sourcefile ()
 
 type direct_to_cmm =

@@ -49,6 +49,10 @@ val register_assembly_callback : ((string -> unit) -> unit) option ref
     trailing out-of-line code. *)
 val set_assembly_whole_function : (bool -> unit) option ref
 
+(** Hook to capture the SSA of each function for [%%expect_ssa]. This function
+    should be set by expectnat.ml. *)
+val register_ssa_callback : ((string -> unit) -> unit) option ref
+
 (** Hook to capture phrase compilation unit for [%%expect_fexpr]. This
     function should be set by expectnat.ml. *)
 val register_compilation_unit_callback :
