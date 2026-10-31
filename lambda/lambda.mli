@@ -1682,7 +1682,9 @@ val count_initializers_array_kind : array_kind -> int
 val ignorable_product_element_kind_involves_int :
   ignorable_product_element_kind -> bool
 
-(** This function currently assumes a 64-bit target. *)
+(** This function currently assumes a 64-bit target. When targeting JSIR,
+    every unarised element counts as 8 bytes (in particular, arrays are not
+    packed). *)
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)

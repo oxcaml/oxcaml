@@ -74,7 +74,10 @@ let identity ~env ~res x =
 
 let unit ~env ~res =
   let var = Jsir.Var.fresh () in
-  Some var, env, To_jsir_result.add_instr_exn res (Let (var, Constant Null_))
+  ( Some var,
+    env,
+    To_jsir_result.add_instr_exn res (Let (var, Constant (Int Targetint.zero)))
+  )
 
 let use_prim0 ~env ~res prim args =
   let expr : Jsir.expr = Prim (prim, args) in
@@ -116,6 +119,42 @@ let sign_extend ~env ~res ~bits (x : Jsir.prim_arg) =
 let zero_extend ~env ~res ~bits (x : Jsir.prim_arg) =
   let mask = int_const ((1 lsl bits) - 1) in
   use_prim0 ~env ~res (Extern ("%int_and", None)) [x; mask]
+
+(* Flambda lowers block index accesses to a (naked int64) byte offset from the
+   first field of a block, where every unarised field is 8 bytes wide (see
+   [Lambda.array_element_size_in_bytes]). JSIR blocks have one slot per field,
+   so the field index is the byte offset divided by 8.
+
+   The base may be null, in which case the offset is a raw address (an external
+   pointer). As in bytecode, this is unsupported and raises [Failure] at
+   runtime; see [caml_check_idx_base] in the JS runtime. *)
+let field_index_of_byte_offset ~env ~res offset =
+  let offset, res = prim_arg ~env ~res offset in
+  let offset, env, res =
+    use_prim0 ~env ~res (Extern ("caml_int64_to_int", None)) [offset]
+  in
+  use_prim0 ~env ~res (Extern ("%int_lsr", None)) [Pv offset; int_const 3]
+
+let checked_block_index_base ~env ~res base =
+  let base, res = prim_arg ~env ~res base in
+  use_prim0 ~env ~res (Extern ("caml_check_idx_base", None)) [base]
+
+let atomic_field ~env ~res
+    (offset_units : Flambda_primitive.atomic_offset_units) extern_name ~base
+    ~offset rest =
+  let (base : Jsir.prim_arg), (offset : Jsir.prim_arg), env, res =
+    match offset_units with
+    | Field_index ->
+      let base, res = prim_arg ~env ~res base in
+      let offset, res = prim_arg ~env ~res offset in
+      base, offset, env, res
+    | Byte_offset ->
+      let base, env, res = checked_block_index_base ~env ~res base in
+      let index, env, res = field_index_of_byte_offset ~env ~res offset in
+      Pv base, Pv index, env, res
+  in
+  let rest, res = prim_args ~env ~res rest in
+  use_prim ~env ~res (Extern (extern_name, None)) (base :: offset :: rest)
 
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
@@ -636,18 +675,19 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Float32 -> "caml_float32_compare")
     in
     use_prim' (Extern (extern_name, None))
-  | Atomic_load (Field_index, _) ->
-    use_prim' (Extern ("caml_atomic_load_field", None))
+  | Atomic_load (offset_units, _) ->
+    atomic_field ~env ~res offset_units "caml_atomic_load_field" ~base:x
+      ~offset:y []
   | Bigarray_get_alignment _ ->
     (* Only used for SIMD *)
     raise Primitive_not_supported
   | Poke _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Atomic_load (Byte_offset, _) | Read_offset _ ->
-    (* CR selee: This is for block indices, which likely requires changes to
-       JSOO to support. We will leave this for now. *)
-    raise Primitive_not_supported
+  | Read_offset _ ->
+    let base, env, res = checked_block_index_base ~env ~res x in
+    let index, env, res = field_index_of_byte_offset ~env ~res y in
+    use_prim ~env ~res Array_get [Pv base; Pv index]
 
 let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   let use_prim' prim = use_prim' ~env ~res prim [x; y; z] in
@@ -698,7 +738,7 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     (* The index calculation is already done in Flambda, so we are free to
        ignore the parameters. *)
     use_prim' (Extern ("caml_ba_set_raw_unsafe", None))
-  | Atomic_int_arith (Field_index, op) ->
+  | Atomic_int_arith (offset_units, op) ->
     let extern_name =
       match op with
       | Fetch_add -> "caml_atomic_fetch_add_field"
@@ -708,33 +748,34 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Or -> "caml_atomic_lor_field"
       | Xor -> "caml_atomic_lxor_field"
     in
-    use_prim' (Extern (extern_name, None))
-  | Atomic_set (Field_index, _, _) ->
+    atomic_field ~env ~res offset_units extern_name ~base:x ~offset:y [z]
+  | Atomic_set (offset_units, _, _) ->
     let _var, env, res =
-      use_prim' (Extern ("caml_atomic_exchange_field", None))
+      atomic_field ~env ~res offset_units "caml_atomic_exchange_field" ~base:x
+        ~offset:y [z]
     in
     unit ~env ~res
-  | Atomic_exchange (Field_index, _, _) ->
-    use_prim' (Extern ("caml_atomic_exchange_field", None))
-  | Atomic_int_arith (Byte_offset, _)
-  | Atomic_set (Byte_offset, _, _)
-  | Atomic_exchange (Byte_offset, _, _)
+  | Atomic_exchange (offset_units, _, _) ->
+    atomic_field ~env ~res offset_units "caml_atomic_exchange_field" ~base:x
+      ~offset:y [z]
   | Write_offset _ ->
-    (* CR selee: This is for block indices, which likely requires changes to
-       JSOO to support. We will leave this for now. *)
-    raise Primitive_not_supported
+    let base, env, res = checked_block_index_base ~env ~res x in
+    let index, env, res = field_index_of_byte_offset ~env ~res y in
+    let new_value, res = To_jsir_shared.simple ~env ~res z in
+    let res =
+      To_jsir_result.add_instr_exn res (Array_set (base, index, new_value))
+    in
+    unit ~env ~res
 
 let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
     z =
-  let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
   match f with
-  | Atomic_compare_and_set (Field_index, _, _) ->
-    use_prim' (Extern ("caml_atomic_cas_field", None))
-  | Atomic_compare_exchange { offset_units = Field_index; _ } ->
-    use_prim' (Extern ("caml_atomic_compare_exchange_field", None))
-  | Atomic_compare_and_set (Byte_offset, _, _)
-  | Atomic_compare_exchange { offset_units = Byte_offset; _ } ->
-    raise Primitive_not_supported
+  | Atomic_compare_and_set (offset_units, _, _) ->
+    atomic_field ~env ~res offset_units "caml_atomic_cas_field" ~base:w
+      ~offset:x [y; z]
+  | Atomic_compare_exchange { offset_units; _ } ->
+    atomic_field ~env ~res offset_units "caml_atomic_compare_exchange_field"
+      ~base:w ~offset:x [y; z]
 
 let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   match f with
