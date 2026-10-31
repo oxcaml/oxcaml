@@ -74,11 +74,11 @@ struct
 
   let add t elt =
     let id = Id.create (E.hash elt) E.flags in
-    match HT.find t id with
-    | exception Not_found ->
+    match HT.find_opt t id with
+    | None ->
       HT.add t id elt;
       id
-    | existing_elt -> (
+    | Some existing_elt -> (
       if E.equal elt existing_elt
       then id
       else
