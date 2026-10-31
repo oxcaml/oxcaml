@@ -514,7 +514,8 @@ and extern_repr =
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
-and external_call_description = extern_repr Primitive.description_gen
+and external_call_description =
+  (extern_repr, extern_repr) Primitive.description_gen
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -1342,7 +1343,7 @@ val layout_instance_var : layout
 val layout_method : layout
 val layout_initializer : layout
 val layout_array_comprehension_element : layout
-val layout_list_element : layout
+val layout_list_comprehension_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
 val layout_block_idx : layout

@@ -74,11 +74,11 @@
   {
     "class": "return",
     "value": "sig
-    type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list
+    type ('a : any) t = 'a list = [] | (::) of 'a * 'a list
     val length : 'a list -> int @@ portable
     val compare_lengths : 'a list -> 'b list -> int @@ portable
     val compare_length_with : 'a list -> int -> int @@ portable
-    val is_empty : 'a list -> bool @@ portable
+    val is_empty : ('a : any). 'a list -> bool @@ portable
     val cons : 'a -> 'a list -> 'a list @@ portable
     val singleton : 'a -> 'a list @@ portable
     val hd : 'a list -> 'a @@ portable

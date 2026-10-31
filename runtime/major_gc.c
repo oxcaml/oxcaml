@@ -1657,7 +1657,7 @@ void caml_darken_cont(value cont)
           atomic_compare_exchange_strong(
               Hp_atomic_val(cont), &hd,
               With_status_hd(hd, NOT_MARKABLE))) {
-        value stk = Field(cont, 0);
+        value stk = Cont_fiber(cont);
         if (Ptr_val(stk) != NULL) {
           value *gc_regs =
             /* Note this is NULL if the continuation is not a preemption. That's
@@ -2051,6 +2051,13 @@ static void stw_cycle_all_domains(
   if (compacting) {
     caml_compact_heap(domain, participating_count, participating);
   }
+
+#ifdef STACK_GUARD_PAGES
+  /* Release cached stack mappings that have gone unused for a whole
+     major cycle. (After a compaction this is a no-op: compaction
+     released them all.) */
+  if (participating[0] == domain) caml_stack_cache_trim_from_stw_single();
+#endif
 
   /* Update GC stats (these could have significantly changed e.g. due
    * to compaction). */

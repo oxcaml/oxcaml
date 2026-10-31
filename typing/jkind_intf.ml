@@ -56,6 +56,12 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
+  type level_error = Rigid
+
+  type error =
+    | Incompatible
+    | Level of level_error
+
   module Const : sig
     (* Note [Addressable kinds]
        ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -177,7 +183,7 @@ module type Sort = sig
 
     val for_array_comprehension_element : t
 
-    val for_list_element : t
+    val for_list_comprehension_element : t
 
     (** These are sorts for the types of ocaml expressions that we expect will
         always be "value". These names are used in the translation to lambda to
@@ -261,7 +267,7 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  val equate : allow_mutation:bool -> t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> (unit, error) result
 
   val format : Format_doc.formatter -> t -> unit
 
@@ -338,7 +344,7 @@ module type Sort = sig
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
 
-  val update_level : int -> t -> unit
+  val update_level : int -> t -> (unit, level_error) result
 
   val get_level : t -> int
 
@@ -439,6 +445,7 @@ module History = struct
     | Recmod_fun_arg
     | Array_comprehension_element
     | Array_comprehension_iterator_element
+    | List_comprehension_element
     | Idx_base
 
   type value_creation_reason =

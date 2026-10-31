@@ -1108,7 +1108,7 @@ Error: The value "x" has type "'a option_alias" = "'a option"
 let required_list (x : 'a list require_portable) = x
 [%%expect{|
 val required_list :
-  ('a : value_or_null mod portable).
+  ('a : any mod portable).
     'a list require_portable -> 'a list require_portable =
   <fun>
 |}, Principal{|

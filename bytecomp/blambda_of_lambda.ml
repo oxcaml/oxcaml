@@ -977,7 +977,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          into inline records are disallowed. *)
       | Record_boxed | Record_float | Record_ufloat | Record_unboxed ->
         unary (Ccall "caml_obj_dup"))
-    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
+    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_apply_arity
     | Pperform -> context_switch Perform ~arity:1
     | Poffsetref n -> unary (Offsetref n)
     | Pstringlength -> unary (Ccall "caml_ml_string_length")

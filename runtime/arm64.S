@@ -223,6 +223,7 @@ G(name):
  */
 #define Cont_fiber(reg)      [reg]
 #define Cont_last_fiber(reg) [reg, #8]
+#define Stack_idled_from_high(reg) [reg, #112]
 #define Cont_gc_regs(reg)    [reg, #16]
 
 .macro WOSIZE_BLOCK_VAL dst, src
@@ -1361,7 +1362,9 @@ L(preemption_unhandled):
        redoing the interrupted allocation, restoring registers, and
        returning to user code. */
         b       L(resume_preemption)
-2:      ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+2:
+L(raise_resume_failure):
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_resume_failure)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_perform)
@@ -1371,6 +1374,38 @@ FUNCTION(caml_reperform)
     /*  x0: effect to reperform
         x1: continuation
         x2: last_fiber */
+
+     /* An already-consumed continuation (NULL stack) is left for the
+        unhandled path to report. */
+        ldr     TMP, Cont_fiber(x1)
+        sub     TMP, TMP, 1                   /* TMP := Ptr_val(fiber) */
+        cbz     TMP, 1f
+
+     /* If a minor collection idled the continuation's stacks during this
+        perform (moving them), x2 is stale: wake the stacks in place
+        and reload the last fiber from the continuation. */
+        ldr     TMP2, Stack_idled_from_high(TMP)
+        cbz     TMP2, 1f
+
+        mov     x19, x0                       /* save the effect */
+        mov     x20, x1                       /* save the continuation */
+        mov     x21, x30                      /* [bl] below clobbers the
+                                                 perform-site return
+                                                 address, which do_perform
+                                                 saves at the switch */
+        mov     C_ARG_1, x1
+        SWITCH_OCAML_TO_C
+        bl      G(caml_cont_wake_stacks)
+    /* TMP2 := zero if the stacks could not be woken, in which case the
+       last fiber is still stale and must not be used. */
+        mov     TMP2, x0
+        SWITCH_C_TO_OCAML
+        mov     x30, x21
+        mov     x0, x19
+        mov     x1, x20
+        cbz     TMP2, L(raise_resume_failure) /* could not wake: raise */
+        ldr     x2, Cont_last_fiber(x1)       /* the woken last fiber */
+1:
         ldr     TMP, Stack_handler_from_cont(x2)
         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
         str     x2, Handler_parent(TMP) /* Append to last_fiber */
@@ -1394,7 +1429,7 @@ END_FUNCTION(caml_reperform)
         stp     x29, x30, [sp, -16]!
         CFI_ADJUST(16)
         add     x29, sp, #0
-        ldr     x23, Cont_last_fiber(x0)      /* x23 := last_fiber */
+        mov     x24, x0                       /* x24 := the continuation */
     /* Check if this is a preemption continuation (wosize == 3) */
         WOSIZE_BLOCK_VAL TMP, x0
         cmp     TMP, #3
@@ -1408,6 +1443,9 @@ END_FUNCTION(caml_reperform)
         sub     x0, x0, 1 /* x0 (new stack) = Ptr_val(x0) */
     /* Check if stack null, then already used */
         cbz     x0, L(continuation_already_resumed)
+    /* Waking may have moved the stacks and updated the last-fiber
+       field: it can only be read now. */
+        ldr     x23, Cont_last_fiber(x24)     /* x23 := last_fiber */
 #if defined(WITH_THREAD_SANITIZER)
     /* Save non-callee-saved registers x0, x1, x2, x3 and x4 */
         stp     x0, x1, [sp, -16]!
@@ -1487,7 +1525,7 @@ L(continuation_already_resumed):
        caml_c_call records as the return address for use during scanning. */
         ldp     x29, x30, [sp], 16
         CFI_ADJUST(-16)
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_continuation_already_resumed)
+        ADDRGLOBAL(ADDITIONAL_ARG, caml_raise_resume_failure)
         b       G(caml_c_call)
         CFI_ENDPROC
 END_FUNCTION(caml_continue)
