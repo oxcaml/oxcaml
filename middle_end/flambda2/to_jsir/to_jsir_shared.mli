@@ -84,6 +84,13 @@ val simples :
 val bound_parameters :
   env:To_jsir_env.t -> Bound_parameters.t -> Jsir.Var.t list * To_jsir_env.t
 
+(** The optimisation hint for a closure of code with metadata [code_metadata],
+    whose JSIR parameters are [params]. *)
+val closure_hint :
+  Code_metadata.t ->
+  params:Jsir.Var.t list ->
+  Optimization_hint.closure_hint option
+
 (** Make a new block. *)
 val block :
   env:To_jsir_env.t ->

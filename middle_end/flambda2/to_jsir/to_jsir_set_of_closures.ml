@@ -57,7 +57,7 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
       match (decl : Function_declarations.code_id_in_function_declaration) with
       | Deleted _ -> env, res
       | Code_id { code_id; only_full_applications = _ } ->
-        let ({ addr; params; closure = fn_var; closure_bound_with_code }
+        let ({ addr; params; closure = fn_var; closure_bound_with_code; hint }
               : To_jsir_env.code_id) =
           To_jsir_env.get_code_id_exn env code_id
         in
@@ -68,7 +68,7 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
                code, so we reuse it here instead of allocating another one. *)
             res
           else
-            let expr : Jsir.expr = Closure (params, (addr, []), (None, None)) in
+            let expr : Jsir.expr = Closure (params, (addr, []), (hint, None)) in
             To_jsir_result.add_instr_exn res (Let (fn_var, expr))
         in
         (* If this function slot is used, its corresponding variable should've

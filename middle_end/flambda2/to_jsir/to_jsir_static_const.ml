@@ -269,15 +269,18 @@ let prepare_code ~env ~res ~code_id code =
         && Value_slot.Set.is_empty
              (Name_occurrences.value_slots_in_normal_projections free_names)
       in
+      let hint =
+        To_jsir_shared.closure_hint (Code0.code_metadata code) ~params
+      in
       let env =
         To_jsir_env.add_code_id env code_id ~addr ~params ~closure
-          ~closure_bound_with_code
+          ~closure_bound_with_code ~hint
       in
       let res =
         if closure_bound_with_code
         then
           To_jsir_result.add_instr_exn res
-            (Let (closure, Closure (params, (addr, []), (None, None))))
+            (Let (closure, Closure (params, (addr, []), (hint, None))))
         else res
       in
       let function_slots =
@@ -319,7 +322,12 @@ let code ~env ~res ~translate_body ~code_id code =
       ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)
-      let ({ addr; params = params_jvar; closure; closure_bound_with_code = _ }
+      let ({ addr;
+             params = params_jvar;
+             closure;
+             closure_bound_with_code = _;
+             hint = _
+           }
             : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
