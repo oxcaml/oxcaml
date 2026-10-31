@@ -3,6 +3,21 @@
 ;; Write an empty file in an unconfigured tree
 (rule (target META) (mode fallback) (action (write-file %{target} "")))
 
+(rule
+  (targets runtime-launch-info)
+  (deps
+    Makefile
+    StdlibModules
+    .depend
+    header.c
+    ../Makefile.common
+    ../Makefile.config_if_required
+    ../Makefile.build_config
+    ../Makefile.config
+    (glob_files ../runtime/caml/*.h))
+  (action
+    (run make -s COMPUTE_DEPS=false runtime-launch-info)))
+
 ;; We're trying to copy a few files around, but copy_files triggers a bug
 ;; in dependency cycle detection when in a statically visible dune stanza.
 ;; So here's a weird workaround, to hide copy_files inside dynamic_include.

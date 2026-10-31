@@ -1,0 +1,37 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                     David Allsopp, Tarides                             *
+;*                                                                        *
+;*   Copyright 2024 David Allsopp Ltd.                                    *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+; Byte-only "internal" build of str with NO C stubs, whose .cma records the
+; runtime-id suffixed stub name (see ../../unix/byte/dune for the rationale).
+; Linked by the byte-only ocamldoc chain; the C stubs (.a and .so) come from the
+; sibling str library.
+
+(copy_files ../str.mli)
+(copy_files ../str.ml)
+
+(library
+ (name str_byte)
+ (wrapped false)
+ (modes byte)
+ (flags (
+   :standard
+   -strict-sequence -absname -w +67+70
+   -bin-annot -safe-string -strict-formats
+ ))
+ (modules str)
+ (library_flags
+  (:standard -linkall -dllib-suffixed -lstr_stubs -cclib -lstr_stubs)))
+
+; Builds the suffixed dllstr_stubs-<target>-<id>.so (see ../../unix/byte/dune).
+(include stubdll.inc)

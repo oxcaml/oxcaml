@@ -400,6 +400,7 @@ static void do_print_config(void)
   printf("word_size: %d\n", 8 * (int)sizeof(value) - 1);
   printf("os_type: %s\n", OCAML_OS_TYPE);
   printf("host: %s\n", HOST);
+  printf("bytecode_runtime_id: %s\n", BYTECODE_RUNTIME_ID);
   printf("flat_float_array: %s\n",
 #ifdef FLAT_FLOAT_ARRAY
          "true");

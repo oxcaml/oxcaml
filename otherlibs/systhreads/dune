@@ -19,7 +19,7 @@
 
 (install
  (files
-  (byte/threads.cma as threads/threads.cma)
+  (byte/threads_reloc.cma as threads/threads.cma)
   (native/threadsnat.cmxa as threads/threads.cmxa)
   (native/threadsnat.a as threads/threads.a)
   (byte/libthreads_stubs.a as libthreads_stubs.a)
