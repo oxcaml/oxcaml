@@ -14,6 +14,12 @@ OCaml 5.4.1
   (when empty) not to be equal to `[||]`.
   (Marc Lasson, review by Gabriel Scherer)
 
+### Code generation and optimizations:
+
+- ACTUAL COMPILER: Add `-ffp-contract=on|off` and the `ffp-contract`
+  OCAMLPARAM key to control implicit binary64 multiply-add/subtract
+  contraction on arm64. The default remains on. (max)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
