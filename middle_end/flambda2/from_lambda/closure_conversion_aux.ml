@@ -71,6 +71,7 @@ module IR = struct
       exn_continuation : exn_continuation;
       loc : Lambda.scoped_location;
       region_close : Lambda.region_close;
+      yielding : Lambda.yielding_kind;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
       mode : Lambda.return_mode;

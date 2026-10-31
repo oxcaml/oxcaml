@@ -1,5 +1,7 @@
 (* TEST
   flags += "-keywords 5.3";
+  { bytecode; }
+  { native; }
 *)
 
 (* Tests RESUMETERM with extra_args != 0 in bytecode,
