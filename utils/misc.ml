@@ -865,13 +865,17 @@ module Utf8_lexeme = struct
       | Some(Lower u') -> u'
       | _ -> u
 
+  let is_ascii s = String.for_all (fun c -> Char.code c < 128) s
+
   let capitalize s =
+    if is_ascii s then Ok (String.capitalize_ascii s) else
     let first = ref true in
     normalize_generic ~keep_ascii:false
       (fun u -> if !first then (first := false; uchar_uppercase u) else u)
       s
 
   let uncapitalize s =
+    if is_ascii s then Ok (String.uncapitalize_ascii s) else
     let first = ref true in
     normalize_generic ~keep_ascii:false
       (fun u -> if !first then (first := false; uchar_lowercase u) else u)
