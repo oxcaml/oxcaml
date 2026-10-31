@@ -1881,32 +1881,333 @@ val foo : ('a : any). 'a id -> 'a id = <fun>
 
 let cell = ref (None : (_ : any) id option)
 
-(* When G is applied to an anonymous argument, nondep will copy the weak type
-   variable in its output, but this test confirms that the subsequent inclusion
-   check unifies it back with the original. *)
 module G (X : sig kind_ ka end) = struct
   let c = (cell : (_ : X.ka) id option ref)
 end
-
-module A = G (struct kind_ ka = value end)
-module B = G (struct kind_ ka = value end)
 [%%expect{|
 val cell : '_weak1 id option ref = {contents = None}
-module G :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
-module A : sig val c : '_weak1 id option ref end
-module B : sig val c : '_weak1 id option ref end
+Line 4, characters 11-15:
+4 |   let c = (cell : (_ : X.ka) id option ref)
+               ^^^^
+Error: The value "cell" has type "'weak1 id option ref"
+       but an expression was expected of type "'a id option ref"
+       The kind constructor "X.ka" would escape its scope
 |}]
 
-let () = A.c := (None : int id option)
-let () = B.c := (None : bool id option)
+(*******************************************************************)
+(* Test: A kind that escapes its scope is replaced by its expansion *)
+
+let cell_manifest = ref (None : (_ : any) id option)
+
+module G_manifest (X : sig end) = struct
+  kind_ k = immediate
+  let c = (cell_manifest : (_ : k) id option ref)
+end
 [%%expect{|
-Line 2, characters 16-39:
-2 | let () = B.c := (None : bool id option)
-                    ^^^^^^^^^^^^^^^^^^^^^^^
+val cell_manifest : '_weak2 id option ref = {contents = None}
+module G_manifest :
+  functor (X : sig end) ->
+    sig kind_ k = immediate val c : '_weak2 id option ref end
+|}]
+
+(* [k] is out of scope here, so the kind of [cell_manifest]'s variable should
+   be [immediate]. *)
+let require_immediate (_ : ('a : immediate) id option ref) = ()
+let () = require_immediate cell_manifest
+[%%expect{|
+val require_immediate : ('a : immediate). 'a id option ref -> unit = <fun>
+Line 2, characters 27-40:
+2 | let () = require_immediate cell_manifest
+                               ^^^^^^^^^^^^^
+Error: The value "cell_manifest" has type "'weak2 id option ref"
+       but an expression was expected of type "'a id option ref"
+       The layout of 'a is value non_pointer
+         because of the definition of require_immediate at line 1, characters 22-63.
+       But the layout of 'a must overlap with the abstract kind k
+         because of the annotation on the wildcard _ at line 5, characters 27-34.
+       No .cmi file found containing k.
+       Note: The layout of immediate is value non_pointer.
+|}, Principal{|
+val require_immediate : ('a : immediate). 'a id option ref -> unit = <fun>
+|}]
+
+module A_manifest = G_manifest (struct end)
+module B_manifest = G_manifest (struct end)
+let () = A_manifest.c := (None : int id option)
+let () = B_manifest.c := (None : bool id option)
+[%%expect{|
+module A_manifest : sig kind_ k = immediate val c : '_weak3 id option ref end
+module B_manifest : sig kind_ k = immediate val c : '_weak4 id option ref end
+|}, Principal{|
+module A_manifest : sig kind_ k = immediate val c : '_weak2 id option ref end
+module B_manifest : sig kind_ k = immediate val c : '_weak2 id option ref end
+Line 4, characters 25-48:
+4 | let () = B_manifest.c := (None : bool id option)
+                             ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "bool id option"
        but an expression was expected of type "int id option"
        Type "bool" is not compatible with type "int"
+|}]
+
+(************************************************************************)
+(* Test: Refining the kind of an outer variable can't make a kind escape *)
+
+let cell_refine = ref (None : (_ : any) id option)
+
+(* Unification gives [cell_refine]'s variable the kind of the inner variable,
+   rather than lowering the level of the inner variable. *)
+module G_refine (X : sig kind_ ka end) = struct
+  let () = cell_refine := (None : (_ : X.ka) id option)
+  let c = cell_refine
+end
+module K_refine = struct kind_ ka = value end
+module A_refine = G_refine (K_refine)
+module B_refine = G_refine (K_refine)
+let () = A_refine.c := (None : int id option)
+let () = B_refine.c := (None : bool id option)
+[%%expect{|
+val cell_refine : '_weak5 id option ref = {contents = None}
+Line 6, characters 26-55:
+6 |   let () = cell_refine := (None : (_ : X.ka) id option)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'weak5 id option"
+       The kind of 'weak5 is any
+         because of the annotation on the wildcard _ at line 1, characters 30-39.
+       But the kind of 'weak5 must be a subkind of X.ka
+         because of the annotation on the wildcard _ at line 6, characters 34-44.
+|}, Principal{|
+val cell_refine : '_weak3 id option ref = {contents = None}
+Line 6, characters 26-55:
+6 |   let () = cell_refine := (None : (_ : X.ka) id option)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'weak3 id option"
+       The kind of 'weak3 is any
+         because of the annotation on the wildcard _ at line 1, characters 30-39.
+       But the kind of 'weak3 must be a subkind of X.ka
+         because of the annotation on the wildcard _ at line 6, characters 34-44.
+|}]
+
+let f_refine (x : (_ : any) id option ref) =
+  let module G (X : sig kind_ ka end) = struct
+    let () = x := (None : (_ : X.ka) id option)
+  end in
+  ()
+[%%expect{|
+Line 3, characters 18-47:
+3 |     let () = x := (None : (_ : X.ka) id option)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'b id option"
+       The kind of 'a is any
+         because of the annotation on the wildcard _ at line 1, characters 18-27.
+       But the kind of 'a must be a subkind of X.ka
+         because of the annotation on the wildcard _ at line 3, characters 26-36.
+|}]
+
+(*************************************************************************)
+(* Test: Non-generalizable variables in the type of a module can't have its
+   local kinds *)
+
+let x_letmodule =
+  let module M = struct
+    kind_ k
+    let r = ref (None : (_ : k) id option)
+  end in
+  M.r
+[%%expect{|
+Lines 2-6, characters 2-5:
+2 | ..let module M = struct
+3 |     kind_ k
+4 |     let r = ref (None : (_ : k) id option)
+5 |   end in
+6 |   M.r
+Error: The type of this module,
+       sig kind_ k val r : '_weak6 id option ref end,
+       contains a non-generalized variable "'_weak6" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+Lines 2-6, characters 2-5:
+2 | ..let module M = struct
+3 |     kind_ k
+4 |     let r = ref (None : (_ : k) id option)
+5 |   end in
+6 |   M.r
+Error: The type of this module,
+       sig kind_ k val r : '_weak4 id option ref end,
+       contains a non-generalized variable "'_weak4" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+(* [k] has a manifest, so the variable can be given its expansion, and [r] and
+   [get] must keep sharing it. *)
+module M_manifest_local = struct
+  kind_ k = value
+  let r = ref (None : (_ : k) id option)
+  let get () = !r
+end
+let () = M_manifest_local.r := (None : int id option)
+let (_ : bool id option) = M_manifest_local.get ()
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module M_manifest_local = struct
+2 |   kind_ k = value
+3 |   let r = ref (None : (_ : k) id option)
+4 |   let get () = !r
+5 | end
+Error: The type of this module,
+       sig
+         kind_ k = value
+         val r : '_weak7 id option ref
+         val get : unit -> '_weak7 id option
+       end, contains a non-generalized variable "'_weak7" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+Lines 1-5, characters 0-3:
+1 | module M_manifest_local = struct
+2 |   kind_ k = value
+3 |   let r = ref (None : (_ : k) id option)
+4 |   let get () = !r
+5 | end
+Error: The type of this module,
+       sig
+         kind_ k = value
+         val r : '_weak5 id option ref
+         val get : unit -> '_weak5 id option
+       end, contains a non-generalized variable "'_weak5" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+module M_abstract_local = struct
+  kind_ k
+  type t : k
+  let r = ref (None : (_ : k) id option)
+end
+let () = M_abstract_local.r := (None : M_abstract_local.t id option)
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module M_abstract_local = struct
+2 |   kind_ k
+3 |   type t : k
+4 |   let r = ref (None : (_ : k) id option)
+5 | end
+Error: The type of this module,
+       sig kind_ k type t : k val r : '_weak8 id option ref end,
+       contains a non-generalized variable "'_weak8" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+Lines 1-5, characters 0-3:
+1 | module M_abstract_local = struct
+2 |   kind_ k
+3 |   type t : k
+4 |   let r = ref (None : (_ : k) id option)
+5 | end
+Error: The type of this module,
+       sig kind_ k type t : k val r : '_weak6 id option ref end,
+       contains a non-generalized variable "'_weak6" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+module G_local (X : sig kind_ ka end) = struct
+  let c = ref (None : (_ : X.ka) id option)
+  let get () = !c
+end
+module K_local = struct kind_ ka = value end
+module A_local = G_local (K_local)
+let () = A_local.c := (None : int id option)
+let (_ : bool id option) = A_local.get ()
+module M_include_functor = struct
+  kind_ ka = value
+  include functor G_local
+end
+let () = M_include_functor.c := (None : int id option)
+let (_ : bool id option) = M_include_functor.get ()
+[%%expect{|
+Lines 1-4, characters 0-3:
+1 | module G_local (X : sig kind_ ka end) = struct
+2 |   let c = ref (None : (_ : X.ka) id option)
+3 |   let get () = !c
+4 | end
+Error: The type of this module,
+       functor (X : sig kind_ ka end) ->
+         sig
+           val c : '_weak9 id option ref
+           val get : unit -> '_weak9 id option
+         end,
+       contains a non-generalized variable "'_weak9" of kind "X.ka".
+       The kind constructor "X.ka" would escape its scope.
+|}, Principal{|
+Lines 1-4, characters 0-3:
+1 | module G_local (X : sig kind_ ka end) = struct
+2 |   let c = ref (None : (_ : X.ka) id option)
+3 |   let get () = !c
+4 | end
+Error: The type of this module,
+       functor (X : sig kind_ ka end) ->
+         sig
+           val c : '_weak7 id option ref
+           val get : unit -> '_weak7 id option
+         end,
+       contains a non-generalized variable "'_weak7" of kind "X.ka".
+       The kind constructor "X.ka" would escape its scope.
+|}]
+
+module type Empty = sig end
+let p_package =
+  (module struct
+    kind_ k
+    let r = ref (None : (_ : k) id option)
+  end : Empty)
+[%%expect{|
+module type Empty = sig end
+Lines 3-6, characters 10-5:
+3 | ..........struct
+4 |     kind_ k
+5 |     let r = ref (None : (_ : k) id option)
+6 |   end.........
+Error: The type of this module,
+       sig kind_ k val r : '_weak10 id option ref end,
+       contains a non-generalized variable "'_weak10" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}, Principal{|
+module type Empty = sig end
+Lines 3-6, characters 10-5:
+3 | ..........struct
+4 |     kind_ k
+5 |     let r = ref (None : (_ : k) id option)
+6 |   end.........
+Error: The type of this module,
+       sig kind_ k val r : '_weak8 id option ref end,
+       contains a non-generalized variable "'_weak8" of kind "k".
+       The kind constructor "k" would escape its scope.
+|}]
+
+(*********************************************************************)
+(* Test: Applying an anonymous functor doesn't split a weak variable *)
+
+(* Unlike the tests above, no kind escapes its scope here, so the scope checks
+   won't fix this one and it will probably need an additional fix. Applying the
+   functor substitutes [K_anon] for [X] in its result, and [Subst] copies the
+   weak variable separately for [c] and [get]. *)
+module K_anon = struct kind_ ka = value end
+module A_anon =
+  (functor (X : sig kind_ ka end) -> struct
+    let c = ref (None : (_ : X.ka) id option)
+    let get () = !c
+  end) (K_anon)
+let () = A_anon.c := (None : int id option)
+let (_ : bool id option) = A_anon.get ()
+[%%expect{|
+module K_anon : sig kind_ ka = value end
+module A_anon :
+  sig val c : '_weak11 id option ref val get : unit -> '_weak12 id option end
+- : bool id option = None
+|}, Principal{|
+module K_anon : sig kind_ ka = value end
+module A_anon :
+  sig val c : '_weak9 id option ref val get : unit -> '_weak10 id option end
+- : bool id option = None
 |}]
 
 (*****************************************************)

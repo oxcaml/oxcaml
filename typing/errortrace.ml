@@ -42,8 +42,10 @@ let map_diff f r =
 
 let swap_diff x = { got = x.expected; expected = x.got }
 
+type escape_constructor_kind = Type | Kind
+
 type 'a escape_kind =
-  | Constructor of Path.t
+  | Constructor of escape_constructor_kind * Path.t
   | Univ of type_expr
   (* The type_expr argument of [Univ] is always a [Tunivar _],
      we keep a [type_expr] to track renaming in {!Printtyp} *)

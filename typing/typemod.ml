@@ -103,6 +103,8 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Non_generalizable_escape of
+      { var : type_expr; mty: module_type; kind : Path.t }
 
 
 exception Error_forward of Location.error
@@ -4126,7 +4128,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         in
         let md_shape = Shape.set_uid_if_none md_shape md_uid in
         (*prerr_endline (Ident.unique_toplevel_name id);*)
-        Mtype.lower_nongen outer_scope md.md_type;
+        begin match Mtype.lower_nongen outer_scope md.md_type with
+        | Ok () -> ()
+        | Error { var; kind } ->
+          Error.log_and_raise loc env
+            (Non_generalizable_escape { mty = md.md_type; var; kind })
+        end;
         let id, newenv, sg =
           match name.txt with
           | None -> None, env, []
@@ -4539,7 +4546,12 @@ let type_package env m pack =
       end
     end
   in
-  Mtype.lower_nongen outer_scope modl.mod_type;
+  begin match Mtype.lower_nongen outer_scope modl.mod_type with
+  | Ok () -> ()
+  | Error { var; kind } ->
+    Error.log_and_raise modl.mod_loc env
+      (Non_generalizable_escape { mty = modl.mod_type; var; kind })
+  end;
   let fl', env =
     match pack.pack_cstrs with
     | [] -> [], env
@@ -5662,6 +5674,17 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Non_generalizable_escape { mty; var; kind } ->
+      Out_type.add_type_to_preparation var;
+      Location.errorf ~loc
+        "The type of this module,@ %a,@ \
+         contains a non-generalized variable %a of kind@;<1 2>%a.@ \
+         The kind constructor@;<1 2>%a@ would escape its scope."
+        modtype mty
+        (Style.as_inline_code Out_type.prepared_type_scheme) var
+        (Style.as_inline_code path) kind
+        (Style.as_inline_code path) kind
+
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
