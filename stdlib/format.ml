@@ -954,7 +954,7 @@ let display_indent = display_blanks
 (* Setting a formatter basic output functions as printing to a given
    [Stdlib.out_channel] value. *)
 let pp_set_formatter_out_channel state oc =
-  state.pp_out_string <- output_substring oc;
+  state.pp_out_string <- (fun s i n -> output_substring oc s i n);
   state.pp_out_flush <- (fun () -> flush oc);
   state.pp_out_newline <- display_newline state;
   state.pp_out_spaces <- display_blanks state;
@@ -1057,7 +1057,7 @@ let make_formatter output flush =
 
 (* Make a formatter writing to a given [Stdlib.out_channel] value. *)
 let formatter_of_out_channel oc =
-  make_formatter (output_substring oc) (fun () -> flush oc)
+  make_formatter (fun s i n -> output_substring oc s i n) (fun () -> flush oc)
 
 
 (* Make a formatter writing to a given [Buffer.t] value. *)

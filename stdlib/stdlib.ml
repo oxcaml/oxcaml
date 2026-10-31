@@ -212,7 +212,8 @@ external classify_float : (float [@unboxed]) -> fpclass @@ portable =
 (* String and byte sequence operations -- more in modules String and Bytes *)
 
 external string_length : string @ local -> int @@ portable = "%string_length"
-external bytes_length : bytes @ local -> int @@ portable = "%bytes_length"
+external bytes_length :
+  bytes @ local immutable -> int @@ portable = "%bytes_length"
 external bytes_create : int -> bytes @@ portable = "caml_create_bytes"
 external string_blit : string -> int -> bytes -> int -> int -> unit @@ portable
                      = "caml_blit_string" [@@noalloc]
@@ -266,8 +267,10 @@ type ('a : any, 'b : any) result = Ok of 'a | Error of 'b
 
 (* String conversion functions *)
 
-external format_int : string -> int -> string @@ portable = "caml_format_int"
-external format_float : string -> float -> string @@ portable = "caml_format_float"
+external format_int :
+  string @ local -> int -> string @@ portable = "caml_format_int"
+external format_float :
+  string @ local -> float @ local -> string @@ portable = "caml_format_float"
 
 let string_of_bool b =
   if b then "true" else "false"
@@ -292,7 +295,8 @@ let int_of_string_opt s =
   try Some (int_of_string s)
   with Failure _ -> None
 
-external string_get : string -> int -> char @@ portable = "%string_safe_get"
+external string_get : string @ local -> int -> char @@ portable =
+  "%string_safe_get"
 
 let valid_float_lexem s =
   let l = string_length s in
@@ -306,7 +310,8 @@ let valid_float_lexem s =
 
 let string_of_float f = valid_float_lexem (format_float "%.12g" f)
 
-external float_of_string : string -> float @@ portable = "caml_float_of_string"
+external float_of_string :
+  string @ local -> float @@ portable = "caml_float_of_string"
 
 let float_of_string_opt s =
   (* Trashes current backtrace *)
@@ -327,9 +332,10 @@ let[@tail_mod_cons] rec ( @ ) l1 l2 =
 type in_channel : value mod portable contended
 type out_channel : value mod portable contended
 
-external open_descriptor_out : int -> out_channel @@ portable
-                             = "caml_ml_open_descriptor_out"
-external open_descriptor_in : int -> in_channel @@ portable = "caml_ml_open_descriptor_in"
+external open_descriptor_out :
+  int -> out_channel @ unique @@ portable = "caml_ml_open_descriptor_out"
+external open_descriptor_in :
+  int -> in_channel @ unique @@ portable = "caml_ml_open_descriptor_in"
 
 let stdin = open_descriptor_in 0
 let stdout = open_descriptor_out 1
@@ -344,12 +350,12 @@ type open_flag =
 
 external open_desc : string -> open_flag list -> int -> int @@ portable = "caml_sys_open"
 
-external set_out_channel_name: out_channel -> string -> unit @@ portable =
-  "caml_ml_set_channel_name"
+external set_out_channel_name:
+  out_channel @ local -> string -> unit @@ portable = "caml_ml_set_channel_name"
 
 let open_out_gen mode perm name =
   let c = open_descriptor_out(open_desc name mode perm) in
-  set_out_channel_name c name;
+  set_out_channel_name (borrow_ c) name;
   c
 
 let open_out name =
@@ -358,7 +364,7 @@ let open_out name =
 let open_out_bin name =
   open_out_gen [Open_wronly; Open_creat; Open_trunc; Open_binary] 0o666 name
 
-external flush : out_channel -> unit @@ portable = "caml_ml_flush"
+external flush : out_channel @ local -> unit @@ portable = "caml_ml_flush"
 
 external out_channels_list : unit -> out_channel list @@ portable
                            = "caml_ml_out_channels_list"
@@ -375,15 +381,17 @@ let flush_all () =
         iter l
   in iter (out_channels_list ())
 
-external unsafe_output : out_channel -> bytes @ local -> int -> int -> unit
+external unsafe_output :
+  out_channel @ local -> bytes @ local read -> int -> int -> unit
   @@ portable
   = "caml_ml_output_bytes"
 
 external unsafe_output_string :
-  out_channel -> string @ local -> int -> int -> unit @@ portable
+  out_channel @ local -> string @ local -> int -> int -> unit @@ portable
   = "caml_ml_output"
 
-external output_char : out_channel -> char -> unit @@ portable = "caml_ml_output_char"
+external output_char :
+  out_channel @ local -> char -> unit @@ portable = "caml_ml_output_char"
 
 let output_bytes oc s =
   unsafe_output oc s 0 (bytes_length s)
@@ -401,32 +409,41 @@ let output_substring oc s ofs len =
   then invalid_arg "output_substring"
   else unsafe_output_string oc s ofs len
 
-external output_byte : out_channel -> int -> unit @@ portable = "caml_ml_output_char"
-external output_binary_int : out_channel -> int -> unit @@ portable = "caml_ml_output_int"
+external output_byte :
+  out_channel @ local -> int -> unit @@ portable = "caml_ml_output_char"
+external output_binary_int :
+  out_channel @ local -> int -> unit @@ portable = "caml_ml_output_int"
 
-external marshal_to_channel : ('a : value_or_null) . out_channel -> 'a -> unit list -> unit @@ portable
-     = "caml_output_value"
+external marshal_to_channel
+  :  ('a : value_or_null).out_channel @ local
+  -> 'a @ local read
+  -> unit list
+  -> unit @@ portable = "caml_output_value"
 let output_value chan v = marshal_to_channel chan v []
 
-external seek_out : out_channel -> int -> unit @@ portable = "caml_ml_seek_out"
-external pos_out : out_channel -> int @@ portable = "caml_ml_pos_out"
-external out_channel_length : out_channel -> int @@ portable = "caml_ml_channel_size"
-external close_out_channel : out_channel -> unit @@ portable = "caml_ml_close_channel"
+external seek_out :
+  out_channel @ local -> int -> unit @@ portable = "caml_ml_seek_out"
+external pos_out :
+  out_channel @ local -> int @@ portable = "caml_ml_pos_out"
+external out_channel_length :
+  out_channel @ local -> int @@ portable = "caml_ml_channel_size"
+external close_out_channel :
+  out_channel @ local -> unit @@ portable = "caml_ml_close_channel"
 let close_out oc = flush oc; close_out_channel oc
 let close_out_noerr oc =
   (try flush oc with _ -> ());
   (try close_out_channel oc with _ -> ())
-external set_binary_mode_out : out_channel -> bool -> unit @@ portable
-                             = "caml_ml_set_binary_mode"
+external set_binary_mode_out :
+  out_channel @ local -> bool -> unit @@ portable = "caml_ml_set_binary_mode"
 
 (* General input functions *)
 
-external set_in_channel_name: in_channel -> string -> unit @@ portable =
+external set_in_channel_name: in_channel @ local -> string -> unit @@ portable =
   "caml_ml_set_channel_name"
 
 let open_in_gen mode perm name =
   let c = open_descriptor_in(open_desc name mode perm) in
-  set_in_channel_name c name;
+  set_in_channel_name (borrow_ c) name;
   c
 
 let open_in name =
@@ -435,10 +452,12 @@ let open_in name =
 let open_in_bin name =
   open_in_gen [Open_rdonly; Open_binary] 0 name
 
-external input_char : in_channel -> char @@ portable = "caml_ml_input_char"
+external input_char :
+  in_channel @ local -> char @@ portable = "caml_ml_input_char"
 
-external unsafe_input : in_channel -> bytes -> int -> int -> int @@ portable
-                      = "caml_ml_input"
+external unsafe_input :
+  in_channel @ local -> bytes @ local -> int -> int -> int @@ portable
+  = "caml_ml_input"
 
 let input ic s ofs len =
   if ofs < 0 || len < 0 || ofs > bytes_length s - len
@@ -463,7 +482,8 @@ let really_input_string ic len =
   really_input ic s 0 len;
   bytes_unsafe_to_string s
 
-external input_scan_line : in_channel -> int @@ portable = "caml_ml_input_scan_line"
+external input_scan_line :
+  in_channel @ local -> int @@ portable = "caml_ml_input_scan_line"
 
 let input_line chan =
   let rec build_result buf pos = function
@@ -493,16 +513,23 @@ let input_line chan =
     end
   in bytes_unsafe_to_string (scan [] 0)
 
-external input_byte : in_channel -> int @@ portable = "caml_ml_input_char"
-external input_binary_int : in_channel -> int @@ portable = "caml_ml_input_int"
-external input_value : ('a : value_or_null) . in_channel -> 'a @@ portable = "caml_input_value"
-external seek_in : in_channel -> int -> unit @@ portable = "caml_ml_seek_in"
-external pos_in : in_channel -> int @@ portable = "caml_ml_pos_in"
-external in_channel_length : in_channel -> int @@ portable = "caml_ml_channel_size"
-external close_in : in_channel -> unit @@ portable = "caml_ml_close_channel"
+external input_byte :
+  in_channel @ local -> int @@ portable = "caml_ml_input_char"
+external input_binary_int :
+  in_channel @ local -> int @@ portable = "caml_ml_input_int"
+external input_value : ('a : value_or_null) .
+  in_channel @ local -> 'a @@ portable = "caml_input_value"
+external seek_in :
+  in_channel @ local -> int -> unit @@ portable = "caml_ml_seek_in"
+external pos_in :
+  in_channel @ local -> int @@ portable = "caml_ml_pos_in"
+external in_channel_length :
+  in_channel @ local -> int @@ portable = "caml_ml_channel_size"
+external close_in :
+  in_channel @ local -> unit @@ portable = "caml_ml_close_channel"
 let close_in_noerr ic = (try close_in ic with _ -> ())
-external set_binary_mode_in : in_channel -> bool -> unit @@ portable
-                            = "caml_ml_set_binary_mode"
+external set_binary_mode_in :
+  in_channel @ local -> bool -> unit @@ portable = "caml_ml_set_binary_mode"
 
 (* Output functions on standard output *)
 
@@ -538,13 +565,20 @@ let read_float_opt () = float_of_string_opt(read_line())
 
 module LargeFile =
   struct
-    external seek_out : out_channel -> int64 -> unit @@ portable = "caml_ml_seek_out_64"
-    external pos_out : out_channel -> int64 @@ portable = "caml_ml_pos_out_64"
-    external out_channel_length : out_channel -> int64 @@ portable
-                                = "caml_ml_channel_size_64"
-    external seek_in : in_channel -> int64 -> unit @@ portable = "caml_ml_seek_in_64"
-    external pos_in : in_channel -> int64 @@ portable = "caml_ml_pos_in_64"
-    external in_channel_length : in_channel -> int64 @@ portable = "caml_ml_channel_size_64"
+    external seek_out :
+      out_channel @ local -> int64 @ local -> unit @@ portable
+      = "caml_ml_seek_out_64"
+    external pos_out :
+      out_channel @ local -> int64 @@ portable = "caml_ml_pos_out_64"
+    external out_channel_length :
+      out_channel @ local -> int64 @@ portable = "caml_ml_channel_size_64"
+    external seek_in :
+      in_channel @ local -> int64 @ local -> unit @@ portable
+      = "caml_ml_seek_in_64"
+    external pos_in :
+      in_channel @ local -> int64 @@ portable = "caml_ml_pos_in_64"
+    external in_channel_length :
+      in_channel @ local -> int64 @@ portable = "caml_ml_channel_size_64"
   end
 
 (* Formats *)
