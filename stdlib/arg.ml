@@ -67,7 +67,7 @@ open Printf
 let rec assoc3 x l =
   match l with
   | [] -> raise Not_found
-  | (y1, y2, _) :: _ when y1 = x -> y2
+  | (y1, y2, _) :: _ when String.equal y1 x -> y2
   | _ :: t -> assoc3 x t
 
 
