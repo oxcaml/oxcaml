@@ -138,6 +138,82 @@ module _ = Bytes(struct
   ;;
 end)
 
+module Bytes_constant_offsets = struct
+  module Bytes = Stdlib.Bytes
+
+  external get : bytes -> int -> int8x16 = "%caml_bytes_getu128"
+  external get_unsafe : bytes -> int -> int8x16 = "%caml_bytes_getu128u"
+  external set : bytes -> int -> int8x16 -> unit = "%caml_bytes_setu128"
+  external set_unsafe : bytes -> int -> int8x16 -> unit = "%caml_bytes_setu128u"
+
+  (* Keep these offsets constant at instruction selection.  On arm64, 1
+     uses the unscaled encoding, 65520 is the largest scaled offset, and
+     65536 must be materialized separately. *)
+  let[@inline never] get0 b = get b 0
+  let[@inline never] get16 b = get b 16
+  let[@inline never] get1 b = get b 1
+  let[@inline never] get65520 b = get b 65520
+  let[@inline never] get65536 b = get b 65536
+  let[@inline never] get0_unsafe b = get_unsafe b 0
+  let[@inline never] get16_unsafe b = get_unsafe b 16
+  let[@inline never] get1_unsafe b = get_unsafe b 1
+  let[@inline never] get65520_unsafe b = get_unsafe b 65520
+  let[@inline never] get65536_unsafe b = get_unsafe b 65536
+  let[@inline never] set0 b v = set b 0 v
+  let[@inline never] set16 b v = set b 16 v
+  let[@inline never] set1 b v = set b 1 v
+  let[@inline never] set65520 b v = set b 65520 v
+  let[@inline never] set65536 b v = set b 65536 v
+  let[@inline never] set0_unsafe b v = set_unsafe b 0 v
+  let[@inline never] set16_unsafe b v = set_unsafe b 16 v
+  let[@inline never] set1_unsafe b v = set_unsafe b 1 v
+  let[@inline never] set65520_unsafe b v = set_unsafe b 65520 v
+  let[@inline never] set65536_unsafe b v = set_unsafe b 65536 v
+
+  let check offset get set =
+    let b = Bytes.init 65552 (fun i ->
+      Char.chr ((i * 17 + i / 256 + i / 65536) land 255)) in
+    let v = get b in
+    assert (int8x16_low_int64 v = Bytes.get_int64_le b offset);
+    assert (int8x16_high_int64 v = Bytes.get_int64_le b (offset + 8));
+    let low = 0x0123456789abcdefL in
+    let high = 0xfedcba9876543210L in
+    let expected = Bytes.copy b in
+    Bytes.set_int64_le expected offset low;
+    Bytes.set_int64_le expected (offset + 8) high;
+    set b (int8x16_of_int64s low high);
+    assert (Bytes.equal b expected)
+
+  let () =
+    check 0 get0 set0;
+    check 16 get16 set16;
+    check 1 get1 set1;
+    check 65520 get65520 set65520;
+    check 65536 get65536 set65536;
+    check 0 get0_unsafe set0_unsafe;
+    check 16 get16_unsafe set16_unsafe;
+    check 1 get1_unsafe set1_unsafe;
+    check 65520 get65520_unsafe set65520_unsafe;
+    check 65536 get65536_unsafe set65536_unsafe
+end
+
+module String_constant_base = struct
+  external get : string -> int -> int8x16 = "%caml_string_getu128u"
+
+  (* Static strings need only be word-aligned.  On arm64, their address
+     must be materialized rather than using a scaled 128-bit relocation. *)
+  let[@inline never] get0 () = get "0123456789abcdefABCDEFGHIJKLMNOP" 0
+  let[@inline never] get16 () = get "0123456789abcdefABCDEFGHIJKLMNOP" 16
+
+  let () =
+    let v = get0 () in
+    assert (int8x16_low_int64 v = 0x3736353433323130L);
+    assert (int8x16_high_int64 v = 0x6665646362613938L);
+    let v = get16 () in
+    assert (int8x16_low_int64 v = 0x4847464544434241L);
+    assert (int8x16_high_int64 v = 0x504f4e4d4c4b4a49L)
+end
+
 module _ = Bytes(struct
   external get_int8x16_unaligned_prim : bytes -> int8# -> int8x16 = "%caml_bytes_getu128_indexed_by_int8#"
   let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)

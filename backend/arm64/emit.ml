@@ -1648,20 +1648,15 @@ let emit_instr env i =
     | Single { reg = Float32 } ->
       A.ins2 LDR_simd_and_fp (H.reg_s dst) addressing
     | Onetwentyeight_aligned -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addressing
-    | Onetwentyeight_unaligned ->
-      (match addressing_mode with
-      | Iindexed v ->
-        let n = Validated_mem_offset.offset v in
-        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(0)) n
+    | Onetwentyeight_unaligned -> (
+      match addressing_mode with
+      | Iindexed _ -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addressing
       | Ibased (s, offset) ->
-        assert (not !Clflags.dlcode);
-        (* see selection_utils.ml *)
-        A.ins2 ADRP reg_x_tmp1
-          (symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
+        (* The symbol need not be aligned for a scaled Q-load relocation. *)
         A.ins4 ADD_immediate reg_x_tmp1 reg_x_tmp1
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
-          O.optional_none);
-      A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base)
+          O.optional_none;
+        A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base))
     | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
     | Fivetwelve_aligned | Fivetwelve_unaligned ->
       Misc.fatal_error "arm64: got 256/512 bit vector or mask")
@@ -1697,15 +1692,9 @@ let emit_instr env i =
     | Onetwentyeight_aligned -> A.ins2 STR_simd_and_fp (H.reg_q src) addressing
     | Onetwentyeight_unaligned -> (
       match addr with
-      | Iindexed v ->
-        let n = Validated_mem_offset.offset v in
-        emit_addimm reg_x_tmp1 (H.reg_x i.arg.(1)) n;
-        A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base)
+      | Iindexed _ -> A.ins2 STR_simd_and_fp (H.reg_q src) addressing
       | Ibased (s, offset) ->
-        assert (not !Clflags.dlcode);
-        (* see selection_utils.ml *)
-        A.ins2 ADRP reg_x_tmp1
-          (symbol_or_label_for_data ~offset (Needs_reloc PAGE) s);
+        (* The symbol need not be aligned for a scaled Q-store relocation. *)
         A.ins4 ADD_immediate reg_x_tmp1 reg_x_tmp1
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none;

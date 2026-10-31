@@ -3,6 +3,7 @@ backend/vectorizer/test_int64_unboxed.ml
 backend/vectorizer/test_float_unboxed.ml
 backend/vectorizer/test_int32_unboxed.ml
 backend/vectorizer/test_float32_unboxed.ml
+backend/arm64-vec128-addressing/accesses.ml
 simd/int128.ml
 simd/*_u.ml
 simd/avx512/*_u.ml
