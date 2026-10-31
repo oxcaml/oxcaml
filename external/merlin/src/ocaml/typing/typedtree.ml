@@ -236,7 +236,6 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.With_regionality.l;
       lpoly: Lpoly.t;
-      env_locality_mode: locality_mode_r;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
