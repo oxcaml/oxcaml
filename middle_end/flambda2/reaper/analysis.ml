@@ -399,6 +399,31 @@ let find_code_metadata (solution : _ Solution.t) code_id =
 
 let slot_offsets (solution : _ Solution.t) = solution.slot_offsets
 
+let offsets_for_free_names (solution : _ Solution.t) free_names =
+  let solved = solution.slot_offsets.exported_offsets in
+  let offsets =
+    Function_slot.Set.fold
+      (fun function_slot offsets ->
+        match Exported_offsets.function_slot_offset solved function_slot with
+        | Some info ->
+          Exported_offsets.add_function_slot_offset offsets function_slot info
+        | None ->
+          Misc.fatal_errorf "Reaper: no solved offset for function slot %a"
+            Function_slot.print function_slot)
+      (Name_occurrences.all_function_slots_at_normal_mode free_names)
+      Exported_offsets.empty
+  in
+  Value_slot.Set.fold
+    (fun value_slot offsets ->
+      match Exported_offsets.value_slot_offset solved value_slot with
+      | Some info ->
+        Exported_offsets.add_value_slot_offset offsets value_slot info
+      | None ->
+        Misc.fatal_errorf "Reaper: no solved offset for value slot %a"
+          Value_slot.print value_slot)
+    (Name_occurrences.all_value_slots_at_normal_mode free_names)
+    offsets
+
 let rewrite_kind_with_subkind (solution : _ Solution.t) =
   rewrite_kind_with_subkind solution.types_rewrite_context
 
