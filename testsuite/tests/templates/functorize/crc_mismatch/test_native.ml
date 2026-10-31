@@ -5,7 +5,7 @@
        the linker catches the inconsistency.
     2. Dep cmi changed: [basic_pq__.cmi] is recompiled with fewer
        parameters after [User_pq] was compiled against the older CRC —
-       Consistbl catches it at functorize time. *)
+       the functorizer reports the parameter mismatch. *)
 
  readonly_files = "\
    main_crc_mismatch.ml \

@@ -52,13 +52,13 @@ Direct reference
   > let _ = Dep_tag.add
   > EOF
 
-Setup creates a partial build, we expect inconsistencies
+Setup creates a partial build. Interfaces are not checked for consistency
+against each other, so it typechecks.
   $ locate direct.ml 2:18
-  return: Not in environment 'Dep_tag.add'
+  return: found
   $ errors direct.ml
-  2:8 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
-The rebuild finishes. Locate should work and the error should be gone.
+The rebuild finishes. Locate should still work.
   $ build dep_tag 'val add : Dep_base.t -> unit' 3
   $ locate direct.ml 2:18
   return: found
@@ -91,13 +91,13 @@ Through an alias module
   > let _ = Schedule_tag.add
   > EOF
 
-Setup creates a partial build, we expect inconsistencies
+Setup creates a partial build. Interfaces are not checked for consistency
+against each other, so it typechecks.
   $ locate alias.ml 3:23
-  error: The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
+  return: found
   $ errors alias.ml
-  0:-1 The files $DIR/dep/dep_base.cmi and $DIR/dep/dep_tag.cmi make inconsistent assumptions over interface Dep_base
 
-The rebuild finishes. Locate should work and the error should be gone.
+The rebuild finishes. Locate should still work.
   $ build dep_tag 'val add : Dep_base.t -> unit' 4
   $ locate alias.ml 3:23
   return: found

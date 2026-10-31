@@ -16,18 +16,9 @@
 
 open Misc
 
-module Consistbl_data = Import_info.Intf.Nonalias.Kind
-
-module Consistbl : module type of struct
-  include Consistbl.Make (Compilation_unit.Name) (Consistbl_data)
-end
-
 type error =
   | Illegal_renaming of Compilation_unit.Name.t * Compilation_unit.Name.t * filepath
-  | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
   | Need_recursive_types of Compilation_unit.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * Compilation_unit.t * Compilation_unit.t
   | Direct_reference_from_wrong_package of
       Compilation_unit.t * filepath * Compilation_unit.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -69,7 +60,9 @@ type import = private {
   imp_filename : string;
   imp_uid : Shape.Uid.t;
   imp_visibility: Load_path.visibility;
-  imp_crcs : Import_info.Intf.t array;
+  imp_crc : Digest.t;
+  imp_imports : Compilation_unit.Name.t array;
+  imp_alias_imports : Compilation_unit.Name.t array;
   imp_flags : Cmi_format.pers_flags list;
 }
 
@@ -188,7 +181,8 @@ val make_cmi : 'a t
   -> alerts
   -> Cmi_format.cmi_infos_lazy
 
-val save_cmi : 'a t -> Persistent_signature.t -> unit
+(* Returns the written interface with its [cmi_crc] filled in *)
+val save_cmi : 'a t -> Persistent_signature.t -> Cmi_format.cmi_infos_lazy
 
 val can_load_cmis : 'a t -> can_load_cmis
 val set_can_load_cmis : 'a t -> can_load_cmis -> unit
@@ -196,12 +190,17 @@ val without_cmis : 'a t -> ('b -> 'c) -> 'b -> 'c
 (* [without_cmis penv f arg] applies [f] to [arg], but does not
     allow [penv] to openi cmis during its execution *)
 
-(* may raise Consistbl.Inconsistency *)
-val import_crcs : 'a t -> source:filepath ->
-  Import_info.Intf.t array -> unit
-
 (* Return the set of compilation units imported, with their CRC *)
+(* CR-soon zqian: keep the current unit's own CRC out of [imports]; the
+   writers of .cmo/.cmx files should add it themselves. *)
+(* CR-soon zqian: the linkers only need the units whose .cmi was loaded (those
+   with a CRC); the units imported transitively or by alias only are listed
+   without CRC for backward compatibility and will be removed. *)
 val imports : 'a t -> Import_info.Intf.t list
+
+(* Return the names of all the compilation units whose interface was read,
+   directly or not; units only referred to by alias are not included *)
+val import_names : 'a t -> Compilation_unit.Name.t list
 
 (* Require that the provided interface will be available at quotation
    compile time. *)

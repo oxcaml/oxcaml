@@ -35,7 +35,13 @@ type 'sg cmi_infos_generic = {
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg * Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
-    cmi_crcs : Import_info.t array;
+    cmi_crc : Digest.t;
+    (* [cmi_imports] lists the interfaces read to compile this one, directly
+       or not; dependents inherit them. [cmi_alias_imports] lists the units
+       only referred to by alias, whose interface was not read; dependents
+       do not inherit them. *)
+    cmi_imports : Compilation_unit.Name.t array;
+    cmi_alias_imports : Compilation_unit.Name.t array;
     cmi_flags : pers_flags list;
 }
 

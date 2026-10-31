@@ -5283,7 +5283,7 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
         let cmi =
           Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
             (sg, Staticity.Dynamic) name kind (Unit_info.cmi unit_info)
-            (Array.of_list (Env.imports ()))
+            (Array.of_list (Env.import_names ()))
         in
         save_cmt_cms (Some cmi);
         Tcoerce_none
@@ -5389,10 +5389,8 @@ let package_units initial_env objfiles target_cmi modulename =
     (* Determine imports *)
     let unit_names = List.map fst units in
     let imports =
-      List.filter (fun import ->
-          let name = Import_info.name import in
-          not (List.mem name unit_names))
-        (Env.imports()) in
+      List.filter (fun name -> not (List.mem name unit_names))
+        (Env.import_names ()) in
     (* Write packaged signature *)
     if not !Clflags.dont_write_files then begin
       let cmi_arg_signature =
