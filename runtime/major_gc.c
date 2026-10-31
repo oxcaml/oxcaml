@@ -1419,7 +1419,8 @@ Caml_inline header_t mark_header(value block, header_t hd, status marked)
   header_t marked_hd;
 again:
   marked_hd = With_status_hd(hd, marked);
-  if (Tag_hd(hd) == Lazy_tag || Tag_hd(hd) == Forcing_tag) {
+  if (CAMLunlikely(Tag_hd(hd) == Lazy_tag)
+      || CAMLunlikely(Tag_hd(hd) == Forcing_tag)) {
     /* To detect and mitigate a race against some other domain
      * short-circuiting a lazy block, we compare-and-swap */
     if (!atomic_compare_exchange_strong(Hp_atomic_val(block), &hd, marked_hd)) {
@@ -1696,9 +1697,9 @@ void caml_darken(void* state, value v, volatile value* ignored) {
       hd = mark_header(v, hd, caml_global_heap_state.MARKED);
       if (Scannable_hd(hd)) {
         mark_stack_push_block(domain_state->mark_stack, v);
-        Caml_state->mark_work_done_between_slices += 1; /* just the header */
+        domain_state->mark_work_done_between_slices += 1; /* just the header */
       } else {
-        Caml_state->mark_work_done_between_slices += Whsize_hd(hd);
+        domain_state->mark_work_done_between_slices += Whsize_hd(hd);
       }
     }
   }
