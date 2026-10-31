@@ -1,6 +1,7 @@
 (* TEST
    { bytecode; }
    { native; }
+   { jsir; }
 *)
 
 let f x =

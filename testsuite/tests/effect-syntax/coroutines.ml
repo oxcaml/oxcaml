@@ -1,5 +1,10 @@
 (* TEST
   flags += "-keywords 5.3";
+  {
+    bytecode;
+  }{
+    native;
+  }
 *)
 
 open Printf

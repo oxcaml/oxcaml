@@ -28,4 +28,9 @@ let () =
  modules = "backtrace_c_exn_.c";
  flags = "-g";
  ocamlrunparam += ",b=1";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)

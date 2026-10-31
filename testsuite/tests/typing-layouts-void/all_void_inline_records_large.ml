@@ -2,6 +2,7 @@
  flambda2;
  flags = "-extension layouts_beta";
  { bytecode; native; }
+ { jsir; }
  { flags += " -Oclassic"; native; }
  { flags += " -O3"; native; }
 *)

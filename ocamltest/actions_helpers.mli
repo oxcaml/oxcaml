@@ -52,10 +52,14 @@ val run_cmd :
   ?timeout : int ->
   out_channel -> Environments.t -> string list -> int
 
-val run : string -> bool -> bool -> Variables.t
+val run : ?interpreter:string -> string -> bool -> bool -> Variables.t
                  -> Variables.t option -> Actions.code
 
 val run_program : Actions.code
+
+(** Like [run_program], but runs the program through [interpreter]
+    (e.g. node for JavaScript programs) *)
+val run_program_with : interpreter:string -> Actions.code
 
 val run_script : Actions.code
 

@@ -54,6 +54,14 @@ let ocamlopt_dot_opt =
 let ocamlnat =
   Filename.make_path [Ocaml_directories.srcdir; Filename.mkexe "ocamlnat"]
 
+let js_of_ocaml =
+  Filename.make_path
+    [Ocaml_directories.srcdir; Filename.mkexe "js_of_ocaml"]
+
+let jsir_available = Sys.file_exists js_of_ocaml
+
+let node = Sys.getenv_with_default_value "NODE" "node"
+
 let cmpbyt =
   Filename.make_path
     [Ocaml_directories.srcdir; "tools"; Filename.mkexe "cmpbyt"]

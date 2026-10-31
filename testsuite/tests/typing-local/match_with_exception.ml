@@ -1,5 +1,9 @@
 (* TEST
- native;
+ {
+   native;
+ }{
+   jsir;
+ }
 *)
 
 let[@inline never] f x =

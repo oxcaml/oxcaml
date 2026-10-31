@@ -1,5 +1,10 @@
 (* TEST
   include ocamlcommon;
+  {
+    bytecode;
+  }{
+    native;
+  }
 *)
 
 let buffer = lazy (Buffer.create 16)

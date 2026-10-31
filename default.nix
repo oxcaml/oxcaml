@@ -905,8 +905,10 @@ stdenv.mkDerivation {
           "  make jsoo-build          - Build js_of_ocaml, wasm_of_ocaml and the JSIR stdlib\n"
           + "  make jsoo-install        - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
           + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
+          + "  make test-without-jsir   - Run all tests but the JSIR ones\n"
         else
-          "  (make jsoo-* targets need this shell built with withJsoo=true)\n";
+          "  (make jsoo-* targets, and the JSIR tests of make test, need this shell\n"
+          + "   built with withJsoo=true)\n";
       merlinCommands =
         if withMerlin then
           "  make merlin-build        - Build Merlin\n"
@@ -955,6 +957,7 @@ stdenv.mkDerivation {
 
   env =
     lib.optionalAttrs (withJsoo && gitRev != null) { JSOO_GIT_VERSION = "ox-${gitRev}"; }
+    // lib.optionalAttrs withJsoo { OXCAML_WITH_JSIR = "true"; }
     // lib.optionalAttrs needsPpxlibSources ppxlibSources
     // lib.optionalAttrs withJsoo jsooSources
     // lib.optionalAttrs (withJsoo && withJsooTestSources) jsooTestSources;

@@ -2,6 +2,7 @@
    flambda2;
    flags += "-flambda2-reaper";
    { native; }
+   { jsir; }
  *)
 
 (* This test is concerned about the case where an argument of an
