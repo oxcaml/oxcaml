@@ -429,8 +429,14 @@ end
 
 (** Allocations *)
 
-(** Allocate a block of regular values with the given tag *)
+(** Allocate a block of regular values with the given tag.
+
+    When [strict_init] is true, the result of the allocation is not allowed to
+    be exposed to the GC before initialization is complete. This is currently
+    used for closures, where the start-of-env field has to be set to its correct
+    value before the block is published. *)
 val make_alloc :
+  strict_init:bool ->
   mode:Cmm.Alloc_mode.t ->
   Debuginfo.t ->
   tag:int ->
@@ -462,8 +468,11 @@ val make_closure_alloc :
 
 (** Allocate an mixed block of the corresponding tag and scannable prefix size.
     The [memory_chunk] list should give the memory_chunk corresponding to each
-    element from the [expression] list. *)
+    element from the [expression] list.
+
+    See {!make_alloc} for information about [~strict_init]. *)
 val make_mixed_alloc :
+  strict_init:bool ->
   mode:Cmm.Alloc_mode.t ->
   Debuginfo.t ->
   tag:int ->
