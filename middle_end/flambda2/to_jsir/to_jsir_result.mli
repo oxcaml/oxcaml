@@ -37,8 +37,10 @@ open! Jsoo_imports.Import
 
 type t
 
-(** Create a new result structure. It is not initialised with any blocks. *)
-val create : unit -> t
+(** Create a new result structure. It is not initialised with any blocks.
+    [reachable_names] are the names of this unit that other compilation units
+    may refer to. *)
+val create : reachable_names:Name_occurrences.t -> t
 
 (** Add a [Jsir.instr] to the top of the stack of current blocks and return the
     address of the new block. This function raises if there are no blocks being
@@ -99,10 +101,19 @@ val get_public_method :
     the symbol table). This is used to inform Js_of_ocaml that the compilation
     unit must be linked before this one. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
-(* CR selee: Eventually we should do something similar for symbols too, so that
-   we don't put unused symbols in the symbol table. *)
 
-val global_data_var : t -> t * Jsir.Var.t
+(** Register [var] as the value of [symbol] in the global symbol table, so that
+    other compilation units can fetch it. Does nothing for symbols that no other
+    unit can refer to (those not in [reachable_names]), nor for module symbols,
+    which are fetched from the JSOO global data instead. *)
+val register_symbol : t -> Symbol.t -> Jsir.Var.t -> t
+
+(** The variable holding the value of [symbol], which must be from another
+    compilation unit. On the first call for a given symbol, the expression
+    fetching it is bound to a fresh variable at the start of the entry block.
+    Later calls return the same variable without emitting anything. The
+    compilation unit of the symbol is recorded as an import. *)
+val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
 
 (** Record that [var], a variable created ahead of its definition (one standing
     for a function slot, value slot or symbol), has been bound by
