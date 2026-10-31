@@ -38,6 +38,18 @@ let bind_expr_to_var ~env ~res fvar expr =
   let _jvar, env, res = bind_expr_to_var' ~env ~res fvar expr in
   env, res
 
+let bind_vars ~res bindings =
+  match bindings with
+  | [] -> res
+  | _ :: _ ->
+    let params, args = List.split bindings in
+    let res = List.fold_left To_jsir_result.add_late_bound_var_exn res params in
+    let res, addr = To_jsir_result.reserve_address res in
+    let res =
+      To_jsir_result.end_block_with_last_exn res (Branch (addr, args))
+    in
+    To_jsir_result.new_block_with_addr_exn res ~params ~addr
+
 let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
   let repr =
     Target_ocaml_int.to_targetint Thirty_two_no_gc_tag_bit targetint
