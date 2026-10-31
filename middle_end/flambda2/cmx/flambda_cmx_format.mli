@@ -16,6 +16,31 @@
 
 (** Contents of middle-end-specific portion of .cmx files when using Flambda. *)
 
+(** Tables of int_ids. *)
+module Table_data : sig
+  type t
+
+  val create : Ids_for_export.t -> t
+
+  val create_import_map :
+    t ->
+    used_value_slots:Value_slot.Set.t ->
+    original_compilation_unit:Compilation_unit.t ->
+    Renaming.t
+end
+
+(** Snapshots of the stamp counters used to create identifiers. *)
+module Id_stamp_counters : sig
+  type t
+
+  val save : unit -> t
+
+  (** Restore all stamp counters to the values they had when [save] was called
+      in the process that serialised this value. This can only be called once,
+      before any stamps have been created, and will error otherwise. *)
+  val restore : t -> unit
+end
+
 type t
 
 type raw
