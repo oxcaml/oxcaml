@@ -131,6 +131,27 @@ val r5m : int = 2
 val r5m' : float = 4.
 |}]
 
+(* The argument to [F] has no static content, so it is statically [Missing]
+   and all three applications share one instance. But at runtime, the
+   applications _of_ that instance must _not_ be shared. *)
+let (missing_calls, missing_first, missing_second, missing_again) =
+  let calls = ref 0 in
+  let module F = functor[@inline never] (X : S @ static) -> struct
+    let z = incr calls; X.y + !calls
+  end in
+  let module A = struct let y = 10 end in
+  let module B = struct let y = 20 end in
+  let module R1 = F (A) in
+  let module R2 = F (B) in
+  let module R3 = F (A) in
+  (!calls, R1.z, R2.z, R3.z)
+[%%expect{|
+val missing_calls : int = 3
+val missing_first : int = 11
+val missing_second : int = 22
+val missing_again : int = 13
+|}]
+
 (* A static parameter the body never uses. *)
 let r6 =
   let module F (M : Id @ static) = struct let z = 9 end in
@@ -448,15 +469,23 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Recursive functor *)
-module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
-  functor (X : Id @ static) -> struct
-    let poly_ id x = M12.id x
-  end
-and M12 : Id @ static = struct
-  module Y = F12 (M12)
-  let poly_ id x = Y.id x
-end
+(* Recursive functor. This is more broken than it initially looks.
+   [Recursive.M12.id]'s first argument ends up with the kind [value_or_null]
+   even though it should be polymorphic. The missing value error is coming from
+   how recursive modules are compiled: this ends up as calls to CamlinternalMod
+   which slambda eval can't see through. *)
+let x12 =
+ let module Recursive = struct
+    module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
+      functor (X : Id @ static) -> struct
+        let poly_ id x = M12.id x
+      end
+    and M12 : Id @ static = struct
+      module Y = F12 (M12)
+      let poly_ id x = Y.id x
+    end
+  end in
+  Recursive.M12.id 7
 [%%expect{|
 >> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
