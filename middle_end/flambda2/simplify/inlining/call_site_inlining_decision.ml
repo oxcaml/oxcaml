@@ -457,7 +457,25 @@ let make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
 
 let make_decision dacc ~simplify_expr ~rebuild_expr ~function_type ~apply
     ~return_arity : Call_site_inlining_decision_type.t =
-  if Clflags.target_is_jsir ()
+  (* This check must happen before [make_decision0], since [@inlined],
+     [@unrolled] and stubs do not consult the decision made at the function
+     definition. *)
+  let jsir_forbids_inlining =
+    Clflags.target_is_jsir ()
+    && (match Apply.inlined apply with
+      | Never_inlined | Forward_inlined ->
+        (* Let [make_decision0] report the attribute as the reason. *)
+        false
+      | Default_inlined | Unroll _ | Always_inlined _ | Hint_inlined -> true)
+    &&
+    match DE.find_code_exn (DA.denv dacc) (FT.code_id function_type) with
+    | exception Not_found -> false (* [make_decision0] will handle this *)
+    | code_or_metadata -> (
+      match Code_or_metadata.view code_or_metadata with
+      | Metadata_only _ -> false
+      | Code_present code -> not (Code.can_be_inlined_for_jsir code))
+  in
+  if jsir_forbids_inlining
   then Jsir_inlining_disabled
   else
     make_decision0 dacc ~simplify_expr ~rebuild_expr ~function_type ~apply

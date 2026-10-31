@@ -230,8 +230,9 @@ let rec report_reason fmt t =
       (if is_a_functor then "functor" else "function")
       Cost_metrics.print cost_metrics evaluated_to threshold
   | Jsir_inlining_disabled ->
-    Format.fprintf fmt
-      "function@ inlining@ is@ disabled@ for@ Js_of_ocaml@ translation"
+    Format.pp_print_text fmt
+      "the function's body refers to closure slots, which cannot be moved into \
+       another function when compiling to Js_of_ocaml"
 
 let report fmt t =
   Format.fprintf fmt

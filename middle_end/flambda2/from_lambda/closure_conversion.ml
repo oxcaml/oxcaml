@@ -362,7 +362,7 @@ module Inlining = struct
     | None | Some (Unknown _) ->
       Inlining_report.record_decision_at_call_site_for_unknown_function ~tracker
         ~apply ~pass:After_closure_conversion ();
-      Not_inlinable
+      Not_inlinable { disabled_for_jsir = false }
     | Some (Value_symbol _)
     | Some (Value_const _)
     | Some (Block_approximation _) ->
@@ -382,7 +382,7 @@ module Inlining = struct
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
           ~are_rebuilding_terms ~inlined_forwarded_from:None
           Definition_says_not_to_inline;
-        Not_inlinable)
+        Not_inlinable { disabled_for_jsir = false })
       else
         (* These calculations are all in terms of non-unarized parameters. *)
         let params_length_from_code_metadata =
@@ -405,7 +405,18 @@ module Inlining = struct
           match inlined_call with
           | Never_inlined ->
             ( Call_site_inlining_decision_type.Never_inlined_attribute,
-              Not_inlinable )
+              Not_inlinable { disabled_for_jsir = false } )
+          | Always_inlined _ | Hint_inlined | Default_inlined | Forward_inlined
+          | Unroll _
+            when Clflags.target_is_jsir ()
+                 && not (Code.can_be_inlined_for_jsir code) ->
+            (* Normally [close_one_function] gives [Jsir_inlining_disabled] to
+               code using slots, so such code should not be present here.
+               However for code imported from other units
+               [Acc.approximation_for_external_symbol] recomputes the decision
+               from [inline] and [cost_metrics] without the JSIR restriction. *)
+            ( Call_site_inlining_decision_type.Jsir_inlining_disabled,
+              Not_inlinable { disabled_for_jsir = true } )
           | Always_inlined _ | Hint_inlined ->
             Call_site_inlining_decision_type.Attribute_always, Inlinable code
           | Default_inlined | Forward_inlined | Unroll _ ->
@@ -1995,35 +2006,28 @@ let close_exact_or_unknown_apply acc env
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
     in
-    if Flambda_features.classic_mode ()
-    then
-      if Clflags.target_is_jsir ()
-      then
+    if not (Flambda_features.classic_mode ())
+    then Expr_with_acc.create_apply acc apply
+    else
+      match Inlining.inlinable env apply callee_approx with
+      | Not_inlinable { disabled_for_jsir } ->
         let apply =
           Apply.with_inlined_attribute apply
             (Inlined_attribute.with_use_info (Apply.inlined apply)
-               Jsir_inlining_disabled)
+               (if disabled_for_jsir
+                then Jsir_inlining_disabled
+                else Unused_because_function_unknown))
         in
         Expr_with_acc.create_apply acc apply
-      else
-        match Inlining.inlinable env apply callee_approx with
-        | Not_inlinable ->
-          let apply =
-            Apply.with_inlined_attribute apply
-              (Inlined_attribute.with_use_info (Apply.inlined apply)
-                 Unused_because_function_unknown)
-          in
-          Expr_with_acc.create_apply acc apply
-        | Inlinable func_desc ->
-          let acc = Acc.mark_continuation_as_untrackable continuation acc in
-          let acc =
-            Acc.mark_continuation_as_untrackable
-              (Exn_continuation.exn_handler apply_exn_continuation)
-              acc
-          in
-          Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
-            ~func_desc
-    else Expr_with_acc.create_apply acc apply
+      | Inlinable func_desc ->
+        let acc = Acc.mark_continuation_as_untrackable continuation acc in
+        let acc =
+          Acc.mark_continuation_as_untrackable
+            (Exn_continuation.exn_handler apply_exn_continuation)
+            acc
+        in
+        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
+          ~func_desc
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
@@ -2497,9 +2501,9 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
     code_id main_code_id decl loc external_env recursive
     contains_no_escaping_local_allocs cost_metrics dbg is_tupled
-    inlining_decision absolute_history relative_history main_code
-    by_function_slot function_code_ids unboxed_function_slot unboxed_params
-    unboxed_return =
+    inlining_decision ~wrapper_inlining_decision absolute_history
+    relative_history main_code by_function_slot function_code_ids
+    unboxed_function_slot unboxed_params unboxed_return =
   (* The outside caller gave us the function slot and code ID meant for the
      boxed function, which will be a wrapper. So in this branch everything
      starting with 'main_' refers to the version with unboxed return/params. *)
@@ -2746,8 +2750,9 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~is_tupled ~is_my_closure_used:true ~inlining_decision
-      ~absolute_history ~relative_history ~loopify:Never_loopify
+      ~dbg ~is_tupled ~is_my_closure_used:true
+      ~inlining_decision:wrapper_inlining_decision ~absolute_history
+      ~relative_history ~loopify:Never_loopify
   in
   let main_approx =
     let code = Code_or_metadata.create main_code in
@@ -3070,6 +3075,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
+  let free_names_of_body = Acc.free_names acc in
   let inline : Inline_attribute.t =
     (* We make a decision based on [fallback_inlining_heuristic] here to try to
        mimic Closure's behaviour as closely as possible, particularly when there
@@ -3086,7 +3092,20 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
-  let free_names_of_body = Acc.free_names acc in
+  let jsir_forbids_inlining =
+    (* In classic mode the decision made below is the only inlining decision
+       that will ever be made for this function, so it must take the JSIR
+       restriction into account. In simplify mode we don't do this, as at this
+       point free variables that will later be lifted to symbols (e.g. other
+       top-level functions of the same module) still appear as value slots,
+       which makes this check too conservative. Instead the decision is
+       recomputed from the simplified body on each round (see
+       [Function_decl_inlining_decision]) and in its call sites (see
+       [Call_site_inlining_decision]). *)
+    Flambda_features.classic_mode ()
+    && Clflags.target_is_jsir ()
+    && Name_occurrences.contains_function_or_value_slots free_names_of_body
+  in
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
@@ -3120,7 +3139,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let inlining_decision =
     if Flambda_features.classic_mode ()
-    then Inlining.definition_inlining_decision inline cost_metrics
+    then
+      if jsir_forbids_inlining
+      then Function_decl_inlining_decision_type.Jsir_inlining_disabled
+      else Inlining.definition_inlining_decision inline cost_metrics
     else if stub
     then Function_decl_inlining_decision_type.Stub
     else Function_decl_inlining_decision_type.Not_yet_decided
@@ -3173,23 +3195,34 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~inlining_decision ~absolute_history ~relative_history ~loopify
   in
   let function_code_ids = (function_slot, code_id) :: function_code_ids in
-  let code, by_function_slot, function_code_ids, acc =
+  let code, inlining_decision, by_function_slot, function_code_ids, acc =
     match calling_convention with
     | Normal_calling_convention ->
-      main_code, by_function_slot, function_code_ids, acc
+      main_code, inlining_decision, by_function_slot, function_code_ids, acc
     | Unboxed_calling_convention
         { params_unboxing;
           return_unboxing;
           unboxed_function_slot;
           needs_region_wrapper = _
         } ->
-      make_unboxed_function_wrapper acc function_slot ~unarized_params
-        params_arity ~unarized_param_modes return result_arity_main_code code_id
-        main_code_id decl loc external_env recursive
-        contains_no_escaping_local_allocs cost_metrics dbg is_tupled
-        inlining_decision absolute_history relative_history main_code
-        by_function_slot function_code_ids unboxed_function_slot params_unboxing
-        return_unboxing
+      let wrapper_inlining_decision =
+        (* The wrapper projects the main function's slot from its own closure,
+           so it can never be inlined when compiling to JSIR (see
+           [Code.can_be_inlined_for_jsir]). *)
+        if Flambda_features.classic_mode () && Clflags.target_is_jsir ()
+        then Function_decl_inlining_decision_type.Jsir_inlining_disabled
+        else inlining_decision
+      in
+      let code, by_function_slot, function_code_ids, acc =
+        make_unboxed_function_wrapper acc function_slot ~unarized_params
+          params_arity ~unarized_param_modes return result_arity_main_code
+          code_id main_code_id decl loc external_env recursive
+          contains_no_escaping_local_allocs cost_metrics dbg is_tupled
+          inlining_decision ~wrapper_inlining_decision absolute_history
+          relative_history main_code by_function_slot function_code_ids
+          unboxed_function_slot params_unboxing return_unboxing
+      in
+      code, wrapper_inlining_decision, by_function_slot, function_code_ids, acc
   in
   let approx =
     let code = Code_or_metadata.create code in

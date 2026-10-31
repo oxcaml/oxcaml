@@ -60,6 +60,20 @@ The following are not yet supported in JSIR translation, and will raise an excep
 The produced JSIR is not suitable for WASM compilation via `wasm_of_ocaml`, despite the two sharing the same IR.
 In particular, there are places within the `to_jsir` code that assumes JavaScript - these are marked with comments.
 
+## Inlining
+Each function slot and value slot is translated to a single JavaScript variable, which is bound where the
+corresponding set of closures is created and read wherever the slot is projected. A function body that mentions
+slots, either because it projects from a closure (its own or any other one) or because it defines a set of
+closures, therefore cannot be copied into another function. As such, when compiling to JSIR, Flambda only inlines
+a function if its body contains no function or value slots at all (see `Code.can_be_inlined_for_jsir`).
+
+For functions that do mention slots, `[@inline]`, `[@inlined]`, `[@inlined hint]` and `[@unrolled n]` are ignored.
+`[@inline never]` and `[@inlined never]` work as usual.
+
+In classic mode the decision is made once, during closure conversion, and is therefore more conservative than in
+simplify mode: for example, a function that defines a constant local closure which is later lifted to a symbol is
+still never inlined.
+
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.
 However, when **unboxed products** are involved (as arguments or return type), we instead use the **native** name. In this case, we use a slightly different convention to that of both existing JS/bytecode stubs and native C stubs:
