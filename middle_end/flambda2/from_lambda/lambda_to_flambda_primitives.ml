@@ -3106,7 +3106,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Config.architecture "arm64")) ]
-      | Backend_type -> [Simple (Simple.const_zero machine_width)])
+      | Backend_type -> [Simple (Simple.const_zero machine_width)]
+      | Standard_library_default ->
+        let symbol =
+          Symbol.create
+            (Symbol.external_symbols_compilation_unit ())
+            (Linkage_name.of_string "caml_standard_library_nat")
+        in
+        [Simple (Simple.symbol symbol)])
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
