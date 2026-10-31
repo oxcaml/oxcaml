@@ -41,7 +41,7 @@ let code loopify(never) size(19) newer_version_of(exit_3)
      where k3 (param : imm tagged) =
        cont k2)
     where k2 =
-      apply ccall
+      apply ccall &my_alloc_region
         ($`*extern*`.caml_sys_exit : val -> val) (retcode) -> k * k1
 in
 let $camlLet_symbol_order_atexit__exit_4 = closure exit_3_1 @exit &toplevel

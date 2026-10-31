@@ -15,13 +15,13 @@ let code loopify(never) size(57) newer_version_of(f_0)
       f_0_1 (x : float boxed, foo : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply ccall
+  apply ccall &my_alloc_region
     ($`*extern*`.caml_gc_minor_words_unboxed : val -> float) (0) -> k2 * k1
     where k2 (before : float) =
       let prim = %unbox_num.`float` (x) in
       let prim_1 = %bfloat_arith.mul (prim, 0x1p+1) in
       let y = %box_num.`float`.my_alloc_region (prim_1) in
-      (apply ccall
+      (apply ccall &my_alloc_region
          ($`*extern*`.caml_gc_minor_words_unboxed : val -> float)
            (0)
            -> k2 * k1

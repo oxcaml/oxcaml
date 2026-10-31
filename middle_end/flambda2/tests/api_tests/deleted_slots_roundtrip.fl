@@ -1,0 +1,30 @@
+(* ACTUAL COMPILER: exercise the parser/printer with the same closure layout
+   in static, dynamic heap and dynamic local allocations. *)
+let code size(1) live_a (x) ca &ar my_depth -> ret * ex =
+  cont ret (x)
+and code size(1) live_b (x) cb &ar my_depth -> ret * ex =
+  cont ret (x)
+and code size(1) maker (x) cm &ar &reg &ghost my_depth -> ret * ex : val stack =
+  let heap_a = closure live_a @slot_a &ar
+  and heap_dead2 = closure deleted slot_dead2(2) &ar
+  and heap_b = closure live_b @slot_b &ar
+  and heap_dead3 = closure deleted slot_dead3(3) &ar
+  with { payload = x }
+  in
+  let local_a = closure live_a @slot_a &ar &reg
+  and local_dead2 = closure deleted slot_dead2(2) &ar &reg
+  and local_b = closure live_b @slot_b &ar &reg
+  and local_dead3 = closure deleted slot_dead3(3) &ar &reg
+  with { payload = x }
+  in cont ret (local_a)
+in
+let set_of_closures
+  $Static_a = closure live_a @slot_a &toplevel
+  and $Static_dead2 = closure deleted slot_dead2(2) &toplevel
+  and $Static_b = closure live_b @slot_b &toplevel
+  and $Static_dead3 = closure deleted slot_dead3(3) &toplevel
+  with { payload = 0 }
+end
+in
+let $Result = Block 0 () in
+cont done ($Result)

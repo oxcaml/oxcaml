@@ -118,9 +118,23 @@ let enter_code env =
   }
 
 let chop_stamp name =
-  match String.split_on_char '/' name with
-  | [] | _ :: _ :: _ :: _ -> Misc.fatal_errorf "invalid id '%s'" name
-  | [name] | [name; _] -> name
+  (* ACTUAL COMPILER: a quoted name may itself contain slashes; only strip the
+     final decimal stamp emitted after a slash. *)
+  match String.rindex_opt name '/' with
+  | None -> name
+  | Some slash ->
+    let length = String.length name in
+    let rec all_digits i =
+      if Stdlib.( = ) i length
+      then true
+      else match name.[i] with '0' .. '9' -> all_digits (i + 1) | _ -> false
+    in
+    if
+      Stdlib.( > ) slash 0
+      && Stdlib.( < ) (slash + 1) length
+      && all_digits (slash + 1)
+    then String.sub name 0 slash
+    else name
 
 let fresh_cont env { Fexpr.txt = name; loc = _ } ~sort ~arity =
   let c = Continuation.create ~sort ~name:(chop_stamp name) () in

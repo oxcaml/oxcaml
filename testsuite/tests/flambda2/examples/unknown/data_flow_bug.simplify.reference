@@ -72,7 +72,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                 | 0 -> k1
                                 | 1 -> k
                                 where k1 =
-                                  (apply ccall noalloc
+                                  (apply ccall noalloc &toplevel
                                      ($`*extern*`.caml_string_notequal
                                       : val * val -> val)
                                        (Popaque,
@@ -130,6 +130,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                                (param)
                                                            in
                                                            (apply ccall
+                                                                   &toplevel
                                                                    inlining_state(depth(10))
                                                               ($`*extern*`.caml_compare
                                                                : val * val ->

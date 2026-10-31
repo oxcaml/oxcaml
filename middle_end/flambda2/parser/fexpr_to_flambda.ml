@@ -267,24 +267,34 @@ module Acc = struct
       } )
 end
 
+let function_slot_of_fun_decl (decl : Fexpr.fun_decl) =
+  match decl.code with
+  | Code_id { code_id; function_slot } ->
+    Option.value function_slot ~default:code_id
+  | Deleted { function_slot; function_slot_size = _ } -> function_slot
+
 let set_of_closures env fun_decls value_slots =
   let fun_decls : Function_declarations.t =
     let translate_fun_decl (fun_decl : Fexpr.fun_decl) :
-        Function_slot.t * Code_id.t =
-      let code_id = find_code_id env fun_decl.code_id in
+        Function_slot.t * Function_declarations.code_id_in_function_declaration
+        =
       let function_slot =
-        (* By default, pun the code id as the function slot *)
-        fun_decl.function_slot |> Option.value ~default:fun_decl.code_id
+        find_function_slot env (function_slot_of_fun_decl fun_decl)
       in
-      let function_slot = find_function_slot env function_slot in
-      function_slot, code_id
+      let code : Function_declarations.code_id_in_function_declaration =
+        match fun_decl.code with
+        | Code_id { code_id; function_slot = _ } ->
+          Code_id
+            { code_id = find_code_id env code_id;
+              only_full_applications = false
+            }
+        | Deleted { function_slot = _; function_slot_size } ->
+          Deleted { function_slot_size; dbg = Debuginfo.none }
+      in
+      function_slot, code
     in
     List.map translate_fun_decl fun_decls
-    |> Function_slot.Lmap.of_list
-    |> Function_slot.Lmap.map
-         (fun code_id : Function_declarations.code_id_in_function_declaration ->
-           Code_id { code_id; only_full_applications = false })
-    |> Function_declarations.create
+    |> Function_slot.Lmap.of_list |> Function_declarations.create
   in
   let value_slots = Option.value value_slots ~default:[] in
   let value_slots : Simple.t Value_slot.Map.t =
@@ -552,12 +562,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           Bound_static.Pattern.block_like symbol, env
         | Set_of_closures soc ->
           let closure_binding env
-              ({ symbol; fun_decl = { function_slot; code_id; _ } } :
-                Fexpr.static_closure_binding) =
+              ({ symbol; fun_decl } : Fexpr.static_closure_binding) =
             let symbol = declare_symbol env symbol in
-            let function_slot =
-              function_slot |> Option.value ~default:code_id
-            in
+            let function_slot = function_slot_of_fun_decl fun_decl in
             let function_slot = find_function_slot env function_slot in
             (function_slot, symbol), env
           in
@@ -977,9 +984,13 @@ and inlined_goto env acc (handler_body : Fexpr.expr) =
 
 let bind_all_code_ids_and_function_slots env (unit : Fexpr.flambda_unit) =
   let add_code_id_of_slot code_ids_of_slots (fun_decl : Fexpr.fun_decl) =
-    ( fun_decl.code_id,
-      Option.value fun_decl.function_slot ~default:fun_decl.code_id )
-    :: code_ids_of_slots
+    let size_or_code =
+      match fun_decl.code with
+      | Code_id { code_id; function_slot = _ } -> `Code_id code_id
+      | Deleted { function_slot = _; function_slot_size } ->
+        `Size function_slot_size
+    in
+    (size_or_code, function_slot_of_fun_decl fun_decl) :: code_ids_of_slots
   in
   let rec go env fs_size_of_code_ids code_ids_of_slots (e : Fexpr.expr) =
     match e with
@@ -1051,10 +1062,27 @@ let bind_all_code_ids_and_function_slots env (unit : Fexpr.flambda_unit) =
     go env Code_id.Map.empty [] unit.body
   in
   List.fold_left
-    (fun env (code_id, function_slot) ->
-      let code_id = find_code_id env code_id in
-      let size = Code_id.Map.find code_id fs_size_of_code_ids in
-      let _ = fresh_or_existing_function_slot env function_slot ~size in
+    (fun env (size_or_code, function_slot) ->
+      let size =
+        match size_or_code with
+        | `Code_id code_id ->
+          let code_id = find_code_id env code_id in
+          Code_id.Map.find code_id fs_size_of_code_ids
+        | `Size size ->
+          if size <> 2 && size <> 3
+          then Misc.fatal_error "Deleted function slots must have size 2 or 3";
+          size
+      in
+      let slot = fresh_or_existing_function_slot env function_slot ~size in
+      (* ACTUAL COMPILER: each occurrence names the same layout slot, so live
+         and deleted declarations must agree on its size. Check this here,
+         rather than in [fresh_or_existing_function_slot], since projections may
+         request an existing slot using the dummy size zero. *)
+      let previous_size = Function_slot.size slot in
+      if previous_size <> size
+      then
+        Misc.fatal_errorf "Inconsistent sizes for function slot %a: %d and %d"
+          Function_slot.print slot previous_size size;
       env)
     env code_ids_of_slots
 

@@ -4,7 +4,7 @@ let code loopify(never) size(12) newer_version_of(f_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm array =
-  apply ccall
+  apply ccall &my_alloc_region
     ($`*extern*`.caml_array_make : val * val -> val) (42, 0) -> k2 * k1
     where k2 (a) =
       let Parraysetu = %array_set.gc_ign (a, 0, x) in

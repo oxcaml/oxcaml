@@ -620,11 +620,17 @@ value_slot:
     { { var; value; kind = Some kind } }
 ;
 
+(* ACTUAL COMPILER: deleted declarations retain their slot name and size. *)
 fun_decl:
   | KWD_CLOSURE; code_id = code_id;
     function_slot = function_slot_opt;
     alloc = alloc_mode_for_allocations;
-    { { code_id; function_slot; alloc; } }
+    { { code = Code_id { code_id; function_slot }; alloc } }
+  | KWD_CLOSURE; KWD_DELETED;
+    function_slot = function_slot;
+    LPAREN; function_slot_size = plain_int; RPAREN;
+    alloc = alloc_mode_for_allocations;
+    { { code = Deleted { function_slot; function_slot_size }; alloc } }
 ;
 
 apply_expr:
@@ -662,10 +668,10 @@ call_kind:
       alloc = alloc_mode_for_applications;
     RPAREN
     { (Function (Direct { code_id; function_slot; }), alloc) }
-  | KWD_CCALL; noalloc = boption(KWD_NOALLOC); AMP; alloc_region = region
-    { (C_call { alloc = not noalloc },
-      (Not_alloc_stack { alloc_region }
-        : region alloc_mode_for_applications)) }
+  (* ACTUAL COMPILER: C calls may return either on the heap or locally. *)
+  | KWD_CCALL; noalloc = boption(KWD_NOALLOC);
+    alloc = alloc_mode_for_applications
+    { (C_call { alloc = not noalloc }, alloc) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
       AMP; alloc_region = region
     { (Method { kind; obj },

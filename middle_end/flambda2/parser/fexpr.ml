@@ -363,9 +363,19 @@ and named =
   | Closure of fun_decl
   | Rec_info of rec_info
 
+(* ACTUAL COMPILER: deleted code still occupies a named function slot. *)
+and fun_decl_code =
+  | Code_id of
+      { code_id : code_id;
+        function_slot : function_slot option (* defaults to the code id *)
+      }
+  | Deleted of
+      { function_slot : function_slot;
+        function_slot_size : int
+      }
+
 and fun_decl =
-  { code_id : code_id;
-    function_slot : function_slot option (* defaults to same name as code id *);
+  { code : fun_decl_code;
     alloc : alloc_mode_for_allocations
         (* alloc mode for set of closures (ignored except on first binding) *)
   }

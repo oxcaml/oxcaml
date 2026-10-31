@@ -1,3 +1,4 @@
+# ACTUAL COMPILER: parser diagnostics for the fexpr grammar.
 # CR-soon lmaurer: This is all painfully out-of-date. Notably, the maintenance
 # burden of a messages file for a large grammar is ... substantial. As of this
 # writing, there should be 175 messages in this file.
@@ -3708,17 +3709,6 @@ flambda_unit: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-flambda_unit: KWD_APPLY KWD_CCALL AMP TILDE
-##
-## Ends in an error in state: 551.
-##
-## call_kind -> KWD_CCALL boption(KWD_NOALLOC) AMP . region [ SYMBOL MINUSGREATER LPAREN KWD_UNROLL KWD_POISON KWD_NULL KWD_INLINING_STATE KWD_INLINED INT IDENT FLOAT ]
-##
-## The known suffix of the stack is as follows:
-## KWD_CCALL boption(KWD_NOALLOC) AMP
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
 
 flambda_unit: KWD_APPLY AMP IDENT RPAREN
 ##

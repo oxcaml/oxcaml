@@ -16,7 +16,7 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply ccall noalloc
+  apply ccall noalloc &my_alloc_region
     ($`*extern*`.caml_string_notequal : val * val -> val)
       (str, $camlString_switch__immstring_0)
       -> k2 * k1
@@ -26,7 +26,7 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
           | 0 -> k (1)
           | 1 -> k2)
          where k2 =
-           (apply ccall noalloc
+           (apply ccall noalloc &my_alloc_region
               ($`*extern*`.caml_string_notequal : val * val -> val)
                 (str, $camlString_switch__immstring_1)
                 -> k2 * k1
@@ -36,7 +36,7 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
                     | 0 -> k (2)
                     | 1 -> k2)
                    where k2 =
-                     (apply ccall noalloc
+                     (apply ccall noalloc &my_alloc_region
                         ($`*extern*`.caml_string_notequal : val * val -> val)
                           (str, $camlString_switch__immstring_2)
                           -> k2 * k1
@@ -46,7 +46,7 @@ let code loopify(never) size(60) newer_version_of(of_string_0)
                               | 0 -> k (3)
                               | 1 -> k2)
                              where k2 =
-                               (apply ccall noalloc
+                               (apply ccall noalloc &my_alloc_region
                                   ($`*extern*`.caml_string_notequal
                                    : val * val -> val)
                                     (str, $camlString_switch__immstring_3)
