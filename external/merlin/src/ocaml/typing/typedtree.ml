@@ -404,7 +404,8 @@ and expression_desc =
   | Texp_while of {
       wh_cond : expression;
       wh_body : expression;
-      wh_body_sort : Jkind.sort
+      wh_body_sort : Jkind.sort;
+      loop_label : Ident.t;
     }
   | Texp_for of {
       for_id  : Ident.t;
@@ -415,6 +416,7 @@ and expression_desc =
       for_dir  : direction_flag;
       for_body : expression;
       for_body_sort : Jkind.sort;
+      loop_label : Ident.t;
     }
   | Texp_send of expression * meth * apply_position
   | Texp_new of
@@ -454,6 +456,7 @@ and expression_desc =
   | Texp_quote of expression
   | Texp_splice of expression
   | Texp_typed_hole
+  | Texp_break of Ident.t
 
 and ident_kind =
   | Id_value

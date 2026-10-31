@@ -80,6 +80,7 @@ let expr_tail_positions = function
   | Texp_extension_constructor _
   | Texp_letop _
   | Texp_typed_hole
+  | Texp_break _
   | Texp_list_comprehension _
   | Texp_array_comprehension _
   | Texp_probe _

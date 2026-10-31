@@ -1101,6 +1101,7 @@ let merloc startpos ?endpos x =
 %token BARRBRACKET [@symbol "|]"]
 %token BEGIN [@symbol "begin"]
 %token BORROW [@symbol "borrow_"]
+%token BREAK [@symbol "break_"]
 %token <char> CHAR [@cost 2] [@recovery '_']
 %token <char> HASH_CHAR [@cost 2] [@recovery '_']
 %token CLASS [@symbol "class"]
@@ -1330,7 +1331,7 @@ The precedences must be listed from low to high.
           HASH_CHAR HASH_FLOAT HASH_INT
           LBRACKETCOLON LESSLBRACKET DOLLAR
           HASHLBRACE HASHLPAREN UNDERSCORE
-          HASHFALSE HASHTRUE
+          HASHFALSE HASHTRUE BREAK
           DOTLESS DOTTILDE GREATERDOT
 
 /* Entry points */
@@ -3447,6 +3448,8 @@ block_access:
   /* END AVOID */
   | UNDERSCORE
       { Pexp_hole }
+  | BREAK
+      { Pexp_break }
 ;
 labeled_simple_expr:
     simple_expr %prec below_HASH
