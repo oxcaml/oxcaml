@@ -1087,6 +1087,7 @@
   ; so this is a bit more repetitive than it could be. Also, as far as I can
   ; tell, (glob_files_rec) simply doesn't work.
   (glob_files *.mli)
+  (glob_files *.ml)
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmo,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/native/*.cmx)
   (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmo,cmt,cmti})

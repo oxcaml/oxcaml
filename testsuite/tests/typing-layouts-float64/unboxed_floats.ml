@@ -5,6 +5,11 @@
  {
    native;
  }{
+   (* Under js_of_ocaml, float# fields are JavaScript numbers, like boxed
+      floats, so Test 11 finds the two records equal. *)
+   reference = "${test_source_directory}/unboxed_floats.jsir-output.reference";
+   jsir;
+ }{
    bytecode;
  }{
    flags = "-extension layouts_alpha";

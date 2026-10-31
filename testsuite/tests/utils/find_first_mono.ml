@@ -2,7 +2,8 @@
  include config;
  include testing;
  binary_modules = "config build_path_prefix_map format_doc misc";
- bytecode;
+ { bytecode; }
+ { jsir; }
 *)
 
 let check_and_count_calls n =

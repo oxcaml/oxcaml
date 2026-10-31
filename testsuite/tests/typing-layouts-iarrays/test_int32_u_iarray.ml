@@ -9,6 +9,8 @@
  }{
    native;
  }{
+   jsir;
+ }{
    flags = "-O3";
    native;
  }{

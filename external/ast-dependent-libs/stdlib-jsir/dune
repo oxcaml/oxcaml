@@ -1,12 +1,22 @@
-; The standard library for JSIR. This lives here rather than in the compiler's
-; build because compiler in JSIR mode runs js_of_ocaml, which is not available
-; when building the compiler.
+; The standard library and the other libraries of the compiler distribution
+; for JSIR. This lives here rather than in the compiler's build because the
+; compiler in JSIR mode runs js_of_ocaml, which is not available when building
+; the compiler.
+;
+; The libraries other than the standard library are compiled with the
+; optimisation flags of their native builds, which the top-level Makefile puts
+; in STDLIB_JSIR_OCAMLOPT_FLAGS in the dune workspace.
 
 (copy_files# ../stdlib/dune_rules/gen.ml)
 
 (executable
  (name gen)
  (modules gen)
+ (modes native))
+
+(executable
+ (name gen_jsir_lib)
+ (modules gen_jsir_lib)
  (modes native))
 
 (rule
@@ -62,12 +72,231 @@
  build
  (dynamic_include ../stdlib_jsir.dune))
 
+(rule
+ (target stdlib_upstream_compatible.dune)
+ (deps
+  (glob_files %{ocaml_where}/stdlib_upstream_compatible/*.ml)
+  %{ocaml_where}/stdlib_upstream_compatible/stdlib_upstream_compatible.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    stdlib_upstream_compatible
+    --cmxa
+    %{ocaml_where}/stdlib_upstream_compatible/stdlib_upstream_compatible.cmxa
+    ; keep in sync with otherlibs/stdlib_upstream_compatible/dune
+    --flags
+    "-extension-universe upstream_compatible"))))
+
+(rule
+ (target stdlib_stable.dune)
+ (deps
+  (glob_files %{ocaml_where}/stdlib_stable/*.ml)
+  %{ocaml_where}/stdlib_stable/stdlib_stable.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    stdlib_stable
+    --cmxa
+    %{ocaml_where}/stdlib_stable/stdlib_stable.cmxa))))
+
+(rule
+ (target stdlib_beta.dune)
+ (deps
+  (glob_files %{ocaml_where}/stdlib_beta/*.ml)
+  %{ocaml_where}/stdlib_beta/stdlib_beta.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    stdlib_beta
+    --cmxa
+    %{ocaml_where}/stdlib_beta/stdlib_beta.cmxa
+    ; keep in sync with otherlibs/stdlib_beta/dune
+    --flags
+    "-extension-universe beta -extension small_numbers_beta"))))
+
+(rule
+ (target stdlib_alpha.dune)
+ (deps
+  (glob_files %{ocaml_where}/stdlib_alpha/*.ml)
+  %{ocaml_where}/stdlib_alpha/stdlib_alpha.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    stdlib_alpha
+    --cmxa
+    %{ocaml_where}/stdlib_alpha/stdlib_alpha.cmxa
+    ; keep in sync with otherlibs/stdlib_alpha/dune
+    --flags
+    "-extension-universe alpha"))))
+
+(rule
+ (target unix.dune)
+ (deps
+  (glob_files %{ocaml_where}/unix/*.ml)
+  %{ocaml_where}/unix/unix.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    unix
+    --cmxa
+    %{ocaml_where}/unix/unix.cmxa
+    ; keep in sync with otherlibs/unix/dune
+    --flags
+    "-nolabels"))))
+
+(rule
+ (target str.dune)
+ (deps
+  (glob_files %{ocaml_where}/str/*.ml)
+  %{ocaml_where}/str/str.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    str
+    --cmxa
+    %{ocaml_where}/str/str.cmxa
+    ; keep in sync with otherlibs/str/dune
+    --flags
+    "-w +67+70"))))
+
+(rule
+ (target ocamlcommon.dune)
+ (deps
+  (glob_files %{ocaml_where}/compiler-libs/*.ml)
+  %{ocaml_where}/compiler-libs/ocamlcommon.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    ocamlcommon
+    --cmxa
+    %{ocaml_where}/compiler-libs/ocamlcommon.cmxa
+    ; keep in sync with the ocamlcommon library in the root dune file
+    --flags
+    "-w -67-47"))))
+
+(rule
+ (target ocamlfrontend.dune)
+ (deps
+  (glob_files %{ocaml_where}/compiler-libs/*.ml)
+  %{ocaml_where}/compiler-libs/ocamlcommon.cmxa
+  %{ocaml_where}/compiler-libs/ocamlfrontend.cmxa)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{exe:gen_jsir_lib.exe}
+    --ocaml-bin
+    %{ocaml_bin}
+    --ocaml-where
+    %{ocaml_where}
+    --flags
+    %{env:STDLIB_JSIR_OCAMLOPT_FLAGS=}
+    --name
+    ocamlfrontend
+    --cmxa
+    %{ocaml_where}/compiler-libs/ocamlfrontend.cmxa
+    ; keep in sync with the ocamlfrontend library in the root dune file
+    --flags
+    "-w -47"
+    --dep
+    .=%{ocaml_where}/compiler-libs/ocamlcommon.cmxa))))
+
+(subdir
+ build/stdlib_upstream_compatible
+ (dynamic_include ../../stdlib_upstream_compatible.dune))
+
+(subdir
+ build/stdlib_stable
+ (dynamic_include ../../stdlib_stable.dune))
+
+(subdir
+ build/stdlib_beta
+ (dynamic_include ../../stdlib_beta.dune))
+
+(subdir
+ build/stdlib_alpha
+ (dynamic_include ../../stdlib_alpha.dune))
+
+(subdir
+ build/unix
+ (dynamic_include ../../unix.dune))
+
+(subdir
+ build/str
+ (dynamic_include ../../str.dune))
+
+(subdir
+ build/compiler-libs
+ (dynamic_include ../../ocamlcommon.dune)
+ (dynamic_include ../../ocamlfrontend.dune))
+
 (install
  (package stdlib-jsir)
  (section lib_root)
  (files
-  (glob_files
-   (build/*.cmjx with_prefix ocaml))
-  (build/stdlib.cmjxa as ocaml/stdlib.cmjxa)
-  (build/stdlib.cmja as ocaml/stdlib.cmja)
+  (glob_files_rec
+   (build/*.{cmjx,cmjxa,cmja} with_prefix ocaml))
   (build/std_exit.cmjo as ocaml/std_exit.cmjo)))

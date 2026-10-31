@@ -1,11 +1,6 @@
 (* TEST
    include stdlib_stable;
    modules = "test_smallint.ml";
-   {
-     bytecode;
-   }{
-     native;
-   }
 *)
 
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
