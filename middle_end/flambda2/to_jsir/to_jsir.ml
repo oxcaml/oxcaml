@@ -61,7 +61,7 @@ let apply_fn ~res ~f ~args ~exact ~(yielding : Apply_expr.Yielding.t) =
   in
   let apply : Jsir.expr = Apply { f; args; exact; yielding } in
   let var = Jsir.Var.fresh () in
-  let res = To_jsir_result.add_instr_exn res (Let (var, apply)) in
+  let res = To_jsir_result.add_call_exn res (Let (var, apply)) in
   var, res
 
 (** For exception continuations with multiple arguments. See comment in
@@ -126,7 +126,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       create_let_simple ~env ~res fvar s
     | Singleton v, Prim (p, dbg) ->
       let fvar = Bound_var.var v in
-      To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
+      To_jsir_result.with_debuginfo_exn res dbg ~event_after:true ~f:(fun res ->
           create_let_prim ~env ~res fvar p)
     | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode) ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
@@ -342,179 +342,187 @@ and apply_expr ~env ~res e =
       (Exn_continuation.exn_handler exn_continuation)
       extra_args
   in
+  let continuation =
+    match Apply_expr.continuation e with
+    | Never_returns -> `Return
+    | Return cont ->
+      if Continuation.equal (To_jsir_env.return_continuation env) cont
+      then `Return
+      else `Branch cont
+  in
+  let return_var, res =
+    To_jsir_result.with_debuginfo_exn res (Apply_expr.dbg e)
+      ~event_after:
+        (match continuation with `Return -> false | `Branch _ -> true)
+      ~f:(fun res -> apply_expr0 ~env ~res e)
+  in
+  match continuation with
+  | `Return ->
+    env, To_jsir_result.end_block_with_last_exn res (Return return_var)
+  | `Branch cont ->
+    let addr = To_jsir_env.get_continuation_exn env cont in
+    let arity = Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized in
+    let return_vars, res =
+      match arity with
+      | 0 -> [], res
+      | 1 -> [return_var], res
+      | _ as arity ->
+        let return_vars = List.init arity (fun i -> i, Jsir.Var.fresh ()) in
+        let res =
+          List.fold_left
+            (fun res (i, var) ->
+              let field : Jsir.expr =
+                (* CR-soon selee: [Non_float] is ok for javascript because it
+                   doesn't change anything (see
+                   [js_of_ocaml/compiler/lib/generate.ml]), but will need
+                   changing for WASM. *)
+                Field (return_var, i, Non_float)
+              in
+              To_jsir_result.add_instr_exn res (Let (var, field)))
+            res return_vars
+        in
+        List.map snd return_vars, res
+    in
+    env, To_jsir_result.end_block_with_last_exn res (Branch (addr, return_vars))
+
+(** Translate the call itself, returning the variable bound to its result. *)
+and apply_expr0 ~env ~res e =
   let args = Apply_expr.args e in
   let yielding = Apply_expr.yielding e in
-  let return_var, res =
-    match Apply_expr.callee e, Apply_expr.call_kind e with
-    | Some _, Effect _ ->
-      Misc.fatal_error "Received a nonempty callee for effects"
-    | ( None,
-        ( Function
-            { function_call = Indirect_unknown_arity | Indirect_known_arity _ }
-        | Method _ | C_call _ ) ) ->
-      Misc.fatal_errorf
-        "Missing callee for indirect function, method or C call: %a"
-        Apply_expr.print e
-    | Some callee, Function _ ->
-      let args, res = To_jsir_shared.simples ~env ~res args in
-      let f, res = To_jsir_shared.simple ~env ~res callee in
-      (* Setting [exact = false] here is ok - it's more general, and the JSOO
-         simplifier also knows how to change this to [true] if it knows that the
-         argument numbers match up *)
-      apply_fn ~res ~f ~args ~exact:false ~yielding
-    | None, Function { function_call = Direct code_id } ->
-      let args, res = To_jsir_shared.simples ~env ~res args in
-      let ({ closure;
-             addr = _;
-             params = _;
-             closure_bound_with_code = _;
-             hint = _
-           }
-            : To_jsir_env.code_id) =
-        To_jsir_env.get_code_id_exn env code_id
+  match Apply_expr.callee e, Apply_expr.call_kind e with
+  | Some _, Effect _ ->
+    Misc.fatal_error "Received a nonempty callee for effects"
+  | ( None,
+      ( Function
+          { function_call = Indirect_unknown_arity | Indirect_known_arity _ }
+      | Method _ | C_call _ ) ) ->
+    Misc.fatal_errorf
+      "Missing callee for indirect function, method or C call: %a"
+      Apply_expr.print e
+  | Some callee, Function _ ->
+    let args, res = To_jsir_shared.simples ~env ~res args in
+    let f, res = To_jsir_shared.simple ~env ~res callee in
+    (* Setting [exact = false] here is ok - it's more general, and the JSOO
+       simplifier also knows how to change this to [true] if it knows that the
+       argument numbers match up *)
+    apply_fn ~res ~f ~args ~exact:false ~yielding
+  | None, Function { function_call = Direct code_id } ->
+    let args, res = To_jsir_shared.simples ~env ~res args in
+    let ({ closure;
+           addr = _;
+           params = _;
+           closure_bound_with_code = _;
+           hint = _;
+           loc = _
+         }
+          : To_jsir_env.code_id) =
+      To_jsir_env.get_code_id_exn env code_id
+    in
+    apply_fn ~res ~f:closure ~args ~exact:false ~yielding
+  | None, Effect effect_ ->
+    if List.length args <> 0
+    then Misc.fatal_error "Found non-empty argument list for effects";
+    (* A continuation is the block [{ stack; last_fiber }], but JSOO's effect
+       primitives take the two parts separately. *)
+    let use_continuation ~res cont =
+      let open Jsir in
+      let cont, res = To_jsir_shared.simple ~env ~res cont in
+      let last = Var.fresh () in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Let (last, Field (cont, 1, Non_float)))
       in
-      apply_fn ~res ~f:closure ~args ~exact:false ~yielding
-    | None, Effect effect_ ->
-      if List.length args <> 0
-      then Misc.fatal_error "Found non-empty argument list for effects";
-      (* A continuation is the block [{ stack; last_fiber }], but JSOO's effect
-         primitives take the two parts separately. *)
-      let use_continuation ~res cont =
-        let open Jsir in
+      let stack = Var.fresh () in
+      let res =
+        To_jsir_result.add_instr_exn res
+          (Let
+             ( stack,
+               Prim (Extern ("caml_continuation_use_noexc", None), [Pv cont]) ))
+      in
+      stack, last, res
+    in
+    let prim_name, args, res =
+      let open Jsir in
+      match effect_ with
+      | Perform { eff } ->
+        let eff, res = To_jsir_shared.simple ~env ~res eff in
+        "%perform", [Pv eff], res
+      | Reperform { eff; cont; last_fiber } ->
+        let eff, res = To_jsir_shared.simple ~env ~res eff in
         let cont, res = To_jsir_shared.simple ~env ~res cont in
-        let last = Var.fresh () in
+        let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
+        "%reperform", [Pv eff; Pv cont; Pv last_fiber], res
+      | With_stack { valuec; exnc; effc; f; arg } ->
+        let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+        let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+        let effc, res = To_jsir_shared.simple ~env ~res effc in
+        let f, res = To_jsir_shared.simple ~env ~res f in
+        let arg, res = To_jsir_shared.simple ~env ~res arg in
+        "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg], res
+      | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
+        let valuec, res = To_jsir_shared.simple ~env ~res valuec in
+        let exnc, res = To_jsir_shared.simple ~env ~res exnc in
+        let effc, res = To_jsir_shared.simple ~env ~res effc in
+        let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
+        let f, res = To_jsir_shared.simple ~env ~res f in
+        let arg, res = To_jsir_shared.simple ~env ~res arg in
+        ( "%with_stack_preemptible",
+          [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg],
+          res )
+      | Continue { cont; value } ->
+        let stack, last, res = use_continuation ~res cont in
+        let value, res = To_jsir_shared.simple ~env ~res value in
+        "%continue", [Pv stack; Pv value; Pv last], res
+      | Discontinue { cont; exn } ->
+        let stack, last, res = use_continuation ~res cont in
+        let exn, res = To_jsir_shared.simple ~env ~res exn in
+        "%discontinue", [Pv stack; Pv exn; Pv last], res
+      | Discontinue_with_backtrace { cont; exn; bt } ->
+        let stack, last, res = use_continuation ~res cont in
+        let exn, res = To_jsir_shared.simple ~env ~res exn in
+        let bt, res = To_jsir_shared.simple ~env ~res bt in
+        "%discontinue_with_backtrace", [Pv stack; Pv exn; Pv bt; Pv last], res
+    in
+    let prim : Jsir.expr = Prim (Extern (prim_name, None), args) in
+    let var = Jsir.Var.fresh () in
+    let res = To_jsir_result.add_call_exn res (Let (var, prim)) in
+    var, res
+  | Some callee, Method { obj; kind } ->
+    let args, res = To_jsir_shared.simples ~env ~res args in
+    let obj, res = To_jsir_shared.simple ~env ~res obj in
+    let field, res = To_jsir_shared.simple ~env ~res callee in
+    let res, f =
+      match kind with
+      | Public -> To_jsir_result.get_public_method res ~obj ~field
+      | Self ->
+        let methods = Jsir.Var.fresh () in
         let res =
           To_jsir_result.add_instr_exn res
-            (Let (last, Field (cont, 1, Non_float)))
+            (Let (methods, Field (obj, 0, Non_float)))
         in
-        let stack = Var.fresh () in
+        let f = Jsir.Var.fresh () in
         let res =
           To_jsir_result.add_instr_exn res
-            (Let
-               ( stack,
-                 Prim (Extern ("caml_continuation_use_noexc", None), [Pv cont])
-               ))
+            (Let (f, Prim (Array_get, [Pv methods; Pv field])))
         in
-        stack, last, res
-      in
-      let prim_name, args, res =
-        let open Jsir in
-        match effect_ with
-        | Perform { eff } ->
-          let eff, res = To_jsir_shared.simple ~env ~res eff in
-          "%perform", [Pv eff], res
-        | Reperform { eff; cont; last_fiber } ->
-          let eff, res = To_jsir_shared.simple ~env ~res eff in
-          let cont, res = To_jsir_shared.simple ~env ~res cont in
-          let last_fiber, res = To_jsir_shared.simple ~env ~res last_fiber in
-          "%reperform", [Pv eff; Pv cont; Pv last_fiber], res
-        | With_stack { valuec; exnc; effc; f; arg } ->
-          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
-          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
-          let effc, res = To_jsir_shared.simple ~env ~res effc in
-          let f, res = To_jsir_shared.simple ~env ~res f in
-          let arg, res = To_jsir_shared.simple ~env ~res arg in
-          "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg], res
-        | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
-          let valuec, res = To_jsir_shared.simple ~env ~res valuec in
-          let exnc, res = To_jsir_shared.simple ~env ~res exnc in
-          let effc, res = To_jsir_shared.simple ~env ~res effc in
-          let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
-          let f, res = To_jsir_shared.simple ~env ~res f in
-          let arg, res = To_jsir_shared.simple ~env ~res arg in
-          ( "%with_stack_preemptible",
-            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg],
-            res )
-        | Continue { cont; value } ->
-          let stack, last, res = use_continuation ~res cont in
-          let value, res = To_jsir_shared.simple ~env ~res value in
-          "%continue", [Pv stack; Pv value; Pv last], res
-        | Discontinue { cont; exn } ->
-          let stack, last, res = use_continuation ~res cont in
-          let exn, res = To_jsir_shared.simple ~env ~res exn in
-          "%discontinue", [Pv stack; Pv exn; Pv last], res
-        | Discontinue_with_backtrace { cont; exn; bt } ->
-          let stack, last, res = use_continuation ~res cont in
-          let exn, res = To_jsir_shared.simple ~env ~res exn in
-          let bt, res = To_jsir_shared.simple ~env ~res bt in
-          "%discontinue_with_backtrace", [Pv stack; Pv exn; Pv bt; Pv last], res
-      in
-      let prim : Jsir.expr = Prim (Extern (prim_name, None), args) in
-      let var = Jsir.Var.fresh () in
-      let res = To_jsir_result.add_instr_exn res (Let (var, prim)) in
-      var, res
-    | Some callee, Method { obj; kind } ->
-      let args, res = To_jsir_shared.simples ~env ~res args in
-      let obj, res = To_jsir_shared.simple ~env ~res obj in
-      let field, res = To_jsir_shared.simple ~env ~res callee in
-      let res, f =
-        match kind with
-        | Public -> To_jsir_result.get_public_method res ~obj ~field
-        | Self ->
-          let methods = Jsir.Var.fresh () in
-          let res =
-            To_jsir_result.add_instr_exn res
-              (Let (methods, Field (obj, 0, Non_float)))
-          in
-          let f = Jsir.Var.fresh () in
-          let res =
-            To_jsir_result.add_instr_exn res
-              (Let (f, Prim (Array_get, [Pv methods; Pv field])))
-          in
-          res, f
-        | Cached ->
-          (* [meth_kind = Cached] generation in Lambda is disabled for
-             non-native backends *)
-          Misc.fatal_errorf "Found cached method invocation for Apply_expr %a"
-            Apply_expr.print e
-      in
-      apply_fn ~res ~f ~args:(obj :: args) ~exact:false ~yielding
-    | Some callee, C_call _ ->
-      let symbol =
-        match Simple.must_be_symbol callee with
-        | Some (symbol, _coercion) -> symbol
-        | None ->
-          Misc.fatal_errorf
-            "Expected callee to be a symbol for C calls, instead found %a"
-            Simple.print callee
-      in
-      To_jsir_primitive.extern ~env ~res symbol args
-  in
-  match Apply_expr.continuation e with
-  | Never_returns ->
-    env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-  | Return cont ->
-    if Continuation.equal (To_jsir_env.return_continuation env) cont
-    then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-    else
-      let addr = To_jsir_env.get_continuation_exn env cont in
-      let arity =
-        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
-      in
-      let return_vars, res =
-        match arity with
-        | 0 -> [], res
-        | 1 -> [return_var], res
-        | _ as arity ->
-          let return_vars = List.init arity (fun i -> i, Jsir.Var.fresh ()) in
-          let res =
-            List.fold_left
-              (fun res (i, var) ->
-                let field : Jsir.expr =
-                  (* CR selee: [Non_float] is ok for javascript because it
-                     doesn't change anything (see
-                     [js_of_ocaml/compiler/lib/generate.ml]), but will need
-                     changing for WASM. *)
-                  Field (return_var, i, Non_float)
-                in
-                To_jsir_result.add_instr_exn res (Let (var, field)))
-              res return_vars
-          in
-          List.map snd return_vars, res
-      in
-      ( env,
-        To_jsir_result.end_block_with_last_exn res (Branch (addr, return_vars))
-      )
+        res, f
+      | Cached ->
+        (* [meth_kind = Cached] generation in Lambda is disabled for non-native
+           backends *)
+        Misc.fatal_errorf "Found cached method invocation for Apply_expr %a"
+          Apply_expr.print e
+    in
+    apply_fn ~res ~f ~args:(obj :: args) ~exact:false ~yielding
+  | Some callee, C_call _ ->
+    let symbol =
+      match Simple.must_be_symbol callee with
+      | Some (symbol, _coercion) -> symbol
+      | None ->
+        Misc.fatal_errorf
+          "Expected callee to be a symbol for C calls, instead found %a"
+          Simple.print callee
+    in
+    To_jsir_primitive.extern ~env ~res symbol args
 
 and apply_cont0 ~env ~res apply_cont =
   let args, res =
@@ -610,6 +618,11 @@ and apply_cont0 ~env ~res apply_cont =
         let res =
           assign_extra_args ~env ~res exn_handler
             (List.map Option.some extra_args)
+        in
+        let res =
+          To_jsir_result.add_event_exn res
+            (Apply_cont.debuginfo apply_cont)
+            ~pos:`Start
         in
         Raise (exn, raise_kind), res)
   in
