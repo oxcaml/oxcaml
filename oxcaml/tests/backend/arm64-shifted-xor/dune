@@ -1,0 +1,51 @@
+; ACTUAL COMPILER: ARM64 shifted XOR assembly selection.
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (targets shifted_xor.cmi shifted_xor.cmx shifted_xor.o shifted_xor.s)
+ (deps shifted_xor.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run %{bin:ocamlopt.opt} -O3 -S -c shifted_xor.ml))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (targets
+  shifted_xor_ssa.cmi
+  shifted_xor_ssa.cmx
+  shifted_xor_ssa.o
+  shifted_xor_ssa.s)
+ (deps shifted_xor.ml)
+ (action
+  (setenv
+   OCAMLPARAM
+   ""
+   (run
+    %{bin:ocamlopt.opt}
+    -O3
+    -experimental-optimizations
+    -S
+    -c
+    -o
+    shifted_xor_ssa.cmx
+    shifted_xor.ml))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "arm64")))
+ (deps check.sh shifted_xor.s shifted_xor_ssa.s)
+ (action
+  (progn
+   (run bash check.sh shifted_xor.s)
+   (run bash check.sh shifted_xor_ssa.s))))

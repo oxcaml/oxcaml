@@ -182,6 +182,28 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
     | [arg1; Cop (Cmuli, args2, dbg)] ->
       rewrite_multiply_add_or_sub Ishiftsub Imulsub ~arg1 ~args2 dbg
     | _ -> Use_default)
+  (* ACTUAL COMPILER: shifted XOR. Keep the matched operands simple: no
+     evaluation of a load, call or other expression is moved or duplicated. *)
+  | Cxor -> (
+    let simple (arg : Cmm.expression) =
+      match[@ocaml.warning "-fragile-match"] arg with
+      | Cvar _ | Cconst_int _ | Cconst_natint _ -> true
+      | _ -> false
+    in
+    match[@ocaml.warning "-fragile-match"] args with
+    | [arg1; Cop (Clsl, [arg2; Cconst_int (n, _)], _)]
+      when n > 0 && n < 64 && simple arg1 && simple arg2 ->
+      Rewritten (specific (Ishiftarith (Ishiftxor, n)), [arg1; arg2])
+    | [Cop (Clsl, [arg2; Cconst_int (n, _)], _); arg1]
+      when n > 0 && n < 64 && simple arg1 && simple arg2 ->
+      Rewritten (specific (Ishiftarith (Ishiftxor, n)), [arg1; arg2])
+    | [arg1; Cop (Clsr, [arg2; Cconst_int (n, _)], _)]
+      when n > 0 && n < 64 && simple arg1 && simple arg2 ->
+      Rewritten (specific (Ishiftarith (Ishiftxor, -n)), [arg1; arg2])
+    | [Cop (Clsr, [arg2; Cconst_int (n, _)], _); arg1]
+      when n > 0 && n < 64 && simple arg1 && simple arg2 ->
+      Rewritten (specific (Ishiftarith (Ishiftxor, -n)), [arg1; arg2])
+    | _ -> Use_default)
   (* Recognize sign extension *)
   | Casr -> (
     match[@ocaml.warning "-fragile-match"] args with
@@ -248,9 +270,9 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
         coeffects = _
       }
   | Capply _ | Calloc _ | Cstore _ | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr
-  | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
-  | Cabsf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+  | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cnot | Clsl | Clsr | Ccsel _
+  | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Cabsf _
+  | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
   | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cbeginregion
   | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
   | Cpause ->

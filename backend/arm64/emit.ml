@@ -1883,7 +1883,7 @@ let emit_instr env i =
     | D_regs (rd, rn, rm, ra) -> A.ins4 FNMSUB rd rn rm ra)
   | Lop Opaque ->
     assert (Array.equal (fun a b -> Reg.equal_location a.loc b.loc) i.arg i.res)
-  | Lop (Specific (Ishiftarith (op, shift))) ->
+  | Lop (Specific (Ishiftarith (op, shift))) -> (
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     let emit_shift_arith instr kind amount =
       A.ins4 instr rd rn rm (O.optional_shift ~kind ~amount)
@@ -1892,10 +1892,14 @@ let emit_instr env i =
       match op with
       | Ishiftadd -> ADD_shifted_register
       | Ishiftsub -> SUB_shifted_register
+      | Ishiftxor -> EOR_shifted_register (* ACTUAL COMPILER: shifted XOR *)
     in
     if shift >= 0
     then emit_shift_arith instr LSL shift
-    else emit_shift_arith instr ASR (-shift)
+    else
+      match op with
+      | Ishiftxor -> emit_shift_arith instr LSR (-shift)
+      | Ishiftadd | Ishiftsub -> emit_shift_arith instr ASR (-shift))
   | Lop (Specific Imuladd) ->
     let rd, rn, rm, ra = i.res.(0), i.arg.(0), i.arg.(1), i.arg.(2) in
     A.ins4 MADD (H.reg_x rd) (H.reg_x rn) (H.reg_x rm) (H.reg_x ra)

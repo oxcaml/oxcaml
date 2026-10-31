@@ -14,6 +14,14 @@ OCaml 5.4.1
   (when empty) not to be equal to `[||]`.
   (Marc Lasson, review by Gabriel Scherer)
 
+### Code generation and optimizations:
+
+- ACTUAL COMPILER: Simplify tagged integer self-XOR with a constant left
+  shift while preserving wrapping and tag bits. (max)
+
+- ACTUAL COMPILER: Select shifted EOR instructions for simple operands
+  on arm64, including logical right shifts. (max)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
