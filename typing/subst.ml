@@ -373,8 +373,9 @@ let attrs s x =
   | No_action -> x
 
 let rec module_path s path =
-  try Path.Map.find path s.modules
-  with Not_found ->
+  match Path.Map.find_opt path s.modules with
+  | Some p -> p
+  | None ->
     match path with
     | Pident _ -> path
     | Pdot(p, n) ->
