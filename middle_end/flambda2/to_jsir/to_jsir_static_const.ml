@@ -33,7 +33,7 @@ let static_const_not_supported const =
     Static_const.print const
 
 let bind_expr_to_symbol ~env ~res symbol expr =
-  (* This should already be populated by To_jsir.let_expr_normal *)
+  (* The static group's symbols have already been added to the environment. *)
   let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
   env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
 
@@ -41,10 +41,12 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
   match x with
   | Const c -> bind_expr_to_symbol ~env ~res symbol (Constant (to_jsir_const c))
   | Var (v, _dbg) ->
-    (* This should already be populated by To_jsir.let_expr_normal *)
+    (* The static group's symbols have already been added to the environment. *)
     let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
     let value_var = To_jsir_env.get_var_exn env v in
-    env, To_jsir_shared.bind_vars ~res [symbol_var, value_var]
+    ( env,
+      To_jsir_result.add_var_alias_exn res ~bound_var:symbol_var
+        ~defining_var:value_var )
 
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
@@ -231,6 +233,75 @@ let block_like ~env ~res symbol (const : Static_const.t) =
   | Immutable_string value ->
     bind_expr_to_symbol ~env ~res symbol (Constant (String value))
 
+let cyclic_block_fields symbol (const : Static_const.t) =
+  match const with
+  | Block (tag, _mut, _shape, fields) ->
+    ( Tag.to_int (Tag.Scannable.to_tag tag),
+      (NotArray : Jsir.array_or_not),
+      List.map Simple.With_debuginfo.simple fields )
+  | Immutable_value_array fields ->
+    ( Tag.to_int Tag.zero,
+      (Array : Jsir.array_or_not),
+      List.map Simple.With_debuginfo.simple fields )
+  | Set_of_closures _ ->
+    Misc.fatal_errorf "Expected a block-like static constant for %a"
+      Symbol.print symbol
+  | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
+  | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
+  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
+  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
+  | Immutable_nativeint_array _ | Immutable_vec128_array _
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
+  | Empty_array _ | Immutable_string _ ->
+    Misc.fatal_errorf
+      "The static constant %a bound to %a cannot refer to other symbols, so \
+       should not be part of a cycle of static definitions"
+      Static_const.print const Symbol.print symbol
+
+let preallocate_block_like ~env ~res symbol const =
+  let tag, array_or_not, fields = cyclic_block_fields symbol const in
+  let placeholder = Jsir.Var.fresh () in
+  let res =
+    To_jsir_result.add_instr_exn res
+      (Let (placeholder, Constant (Int Targetint.zero)))
+  in
+  (* Constant fields can be filled in right now, and the others will be set by
+     [initialise_block_like]. *)
+  let fields, res =
+    List.fold_right
+      (fun field (fields, res) ->
+        if Simple.is_const field
+        then
+          let var, res = To_jsir_shared.simple ~env ~res field in
+          var :: fields, res
+        else placeholder :: fields, res)
+      fields ([], res)
+  in
+  let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
+  (* The block is mutated by [initialise_block_like], and so cannot be
+     [Immutable]. *)
+  To_jsir_result.add_instr_exn res
+    (Let (jvar, Block (tag, Array.of_list fields, array_or_not, Maybe_mutable)))
+
+let initialise_block_like ~env ~res symbol const =
+  let _tag, _array_or_not, fields = cyclic_block_fields symbol const in
+  let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
+  let _index, res =
+    let set_field res index field =
+      if Simple.is_const field
+      then res
+      else
+        let var, res = To_jsir_shared.simple ~env ~res field in
+        To_jsir_result.add_instr_exn res
+          (Set_field (jvar, index, Non_float, var))
+    in
+    List.fold_left
+      (fun (index, res) field -> index + 1, set_field res index field)
+      (0, res) fields
+  in
+  res
+
 let prepare_code ~env ~res ~code_id code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
@@ -253,11 +324,9 @@ let prepare_code ~env ~res ~code_id code =
       let closure = Jsir.Var.fresh () in
       let free_names = Code0.free_names code in
       (* Code that does not use [my_closure] or project from any closure can
-         share a single closure, which we bind here. This also provides a
+         share a single closure, bound by [code_closure]. This also provides a
          binding when the reaper unboxes a closure and deletes its
-         [Set_of_closures]. It must be bound in [prepare_code], as a static
-         group may list a [Set_of_closures] before the code it uses, and JSIR
-         expects variables to be defined before they are used. *)
+         [Set_of_closures]. *)
       let closure_bound_with_code =
         (not (Code0.is_my_closure_used code))
         && Function_slot.Set.is_empty
@@ -276,13 +345,6 @@ let prepare_code ~env ~res ~code_id code =
       let env =
         To_jsir_env.add_code_id env code_id ~addr ~params ~closure
           ~closure_bound_with_code ~hint ~loc
-      in
-      let res =
-        if closure_bound_with_code
-        then
-          To_jsir_result.add_instr_exn res
-            (Let (closure, Closure (params, (addr, []), (hint, loc))))
-        else res
       in
       let function_slots =
         Name_occurrences.all_function_slots_at_normal_mode free_names
@@ -307,6 +369,17 @@ let prepare_code ~env ~res ~code_id code =
       in
       env, res)
 
+let code_closure ~env ~res code_id =
+  let ({ addr; params; closure; closure_bound_with_code; hint; loc }
+        : To_jsir_env.code_id) =
+    To_jsir_env.get_code_id_exn env code_id
+  in
+  if closure_bound_with_code
+  then
+    To_jsir_result.add_instr_exn res
+      (Let (closure, Closure (params, (addr, []), (hint, loc))))
+  else res
+
 let code ~env ~res ~translate_body ~code_id code =
   let params_and_body = Code0.params_and_body code in
   Flambda.Function_params_and_body.pattern_match params_and_body
@@ -321,8 +394,7 @@ let code ~env ~res ~translate_body ~code_id code =
         ~my_depth:_
         ~free_names_of_body:_
       ->
-      (* This has already been populated by the first phase of the [Static] arm
-         of [To_jsir.let_expr_normal] *)
+      (* All code in this static group has already been prepared. *)
       let ({ addr;
              params = params_jvar;
              closure;

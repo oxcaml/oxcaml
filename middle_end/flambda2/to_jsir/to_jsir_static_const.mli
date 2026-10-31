@@ -38,16 +38,44 @@ val block_like :
   Static_const.t ->
   To_jsir_env.t * To_jsir_result.t
 
+(** For a block-like constant that is part of a cycle of static definitions,
+    bind the symbol (which must already be in the environment) to a mutable
+    block of the right tag and size, whose non-constant fields hold
+    placeholders. [initialise_block_like] must later be called with the same
+    arguments, once all the fields' values are defined. Raises for constants
+    other than [Block] and [Immutable_value_array]. *)
+val preallocate_block_like :
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  Symbol.t ->
+  Static_const.t ->
+  To_jsir_result.t
+
+(** Set the non-constant fields of a block allocated by [preallocate_block_like]
+    to their values. *)
+val initialise_block_like :
+  env:To_jsir_env.t ->
+  res:To_jsir_result.t ->
+  Symbol.t ->
+  Static_const.t ->
+  To_jsir_result.t
+
 (** Prepare a static block of code to be translated: reserve its address and
     parameter variables, and add them and any used value or function slots to
-    the environment. If the code does not depend on its closure, also bind its
-    shared closure in the enclosing block. *)
+    the environment. This does not emit any instructions (see [code_closure]).
+*)
 val prepare_code :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
   code_id:Code_id.t ->
   Flambda.function_params_and_body Code0.t ->
   To_jsir_env.t * To_jsir_result.t
+
+(** If the code does not depend on its closure, bind its shared closure (see
+    [To_jsir_env.code_id]) in the current block; otherwise, do nothing. The code
+    must have been prepared with [prepare_code]. *)
+val code_closure :
+  env:To_jsir_env.t -> res:To_jsir_result.t -> Code_id.t -> To_jsir_result.t
 
 (** Translate a static block of code. *)
 val code :
