@@ -123,7 +123,7 @@ let is_mutating_label_usage = function
 let label_usages () =
   {lu_projection = false; lu_mutation = false; lu_construct = false}
 
-let label_usage_complaint priv mut lu
+let label_usage_complaint (type rep) (record_form : rep record_form) priv mut lu
   : Warnings.field_usage_warning option =
   match priv, mut with
   | Asttypes.Private, _ ->
@@ -140,7 +140,13 @@ let label_usage_complaint priv mut lu
       | true, true, _ -> None
       | false, false, false -> Some Unused
       | false, _, _ -> Some Not_read
-      | true, false, _ -> Some Not_mutated
+      | true, false, _ ->
+        (* Unboxed record fields can't (currently) be mutated in place,
+           so don't complain that a [mutable] one never is. *)
+        begin match record_form with
+        | Legacy -> Some Not_mutated
+        | Unboxed_product -> None
+        end
     end
 
 let stamped_used_labels = s_table local_stamped 32
@@ -2836,7 +2842,7 @@ and store_label
                    Location.prerr_warning
                      loc
                      (Warnings.Unused_field { form; field = name; complaint }))
-              (label_usage_complaint priv mut used))
+              (label_usage_complaint record_form priv mut used))
   end);
   Builtin_attributes.mark_alerts_used lbl.lbl_attributes;
   begin match lbl.lbl_mut with

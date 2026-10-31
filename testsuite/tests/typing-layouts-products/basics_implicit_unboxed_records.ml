@@ -159,18 +159,46 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Mutable fields cannot be read from
-   (this test is for the possible future where the normal record
-   set operator works for unboxed records too) *)
-type mut = { mutable i : int }
-let f (x : mut#) = x.i <-  5
+(* Unboxed versions of mutable fields are mutable, but can't be mutated *)
+
+(* Unboxed "mutable" records can't be mutated in place yet, but for forward
+   compatibility, reading their [mutable] fields still requires [shared]. *)
+type doesn't_cross_contention = { mutable r : int ref; k : int }
+let project (x : doesn't_cross_contention# @ contended) =
+  match x with #{ r = _; k } -> k
 [%%expect{|
-type mut = { mutable i : int; }
-Line 2, characters 19-20:
-2 | let f (x : mut#) = x.i <-  5
-                       ^
-Error: This expression has type "mut#",
-       which is an unboxed record rather than a boxed one.
+type doesn't_cross_contention = { mutable r : int ref; k : int; }
+Line 3, characters 15-28:
+3 |   match x with #{ r = _; k } -> k
+                   ^^^^^^^^^^^^^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "r" is being read.
+|}]
+
+let update (x : doesn't_cross_contention# @ contended) = #{ x with k = 1 }
+[%%expect{|
+Line 1, characters 60-61:
+1 | let update (x : doesn't_cross_contention# @ contended) = #{ x with k = 1 }
+                                                                ^
+Error: This value is "contended"
+       but is expected to be "shared" or "uncontended"
+         because its mutable field "r" is being read.
+|}]
+
+(* [mutable] fields of unboxed records can't be mutated yet, but for forward
+   compatibility, they still prevent generalization. *)
+type 'a mut_poly = { mutable l : 'a list; k : int }
+type ('a : value & value) container = { contents : 'a }
+let not_generalized : _ mut_poly# = #{ l = []; k = 0 }
+let also_not_generalized : _ mut_poly# container =
+  { contents = #{ l = []; k = 0 } }
+[%%expect{|
+type 'a mut_poly = { mutable l : 'a list; k : int; }
+type ('a : value & value) container = { contents : 'a; }
+val not_generalized : '_weak1 mut_poly# = #{l = []; k = 0}
+val also_not_generalized : '_weak2 mut_poly# container =
+  {contents = #{l = []; k = 0}}
 |}]
 
 (*********************************)
