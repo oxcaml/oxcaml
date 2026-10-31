@@ -939,7 +939,8 @@ let ocaml_ignored_parametrized_flags =
     "-jsoo-opt-compile";
     "-jsoo-opt-archive";
     "-jsoo-opt-runtime";
-    "-jsoo-opt-link"
+    "-jsoo-opt-link";
+    "-jsoo-effects"
   ]
 
 let ocaml_warnings_spec ~error =

@@ -46,13 +46,23 @@ let js_of_ocaml_program () =
     let in_bindir = Filename.concat Config.bindir "js_of_ocaml" in
     if Sys.file_exists in_bindir then in_bindir else "js_of_ocaml"
 
+let effects_args ~(phase : Clflags.Jsoo_phase.t) passthrough_args =
+  match phase with
+  | Archive | Link | All -> []
+  | Compile | Runtime ->
+    if List.exists (String.starts_with ~prefix:"--effects") passthrough_args
+    then []
+    else ["--effects=" ^ Clflags.Jsoo_effects.to_string !Clflags.jsoo_effects]
+
 let run_js_of_ocaml ?input_left_in ~(phase : Clflags.Jsoo_phase.t) subcommand
     args =
+  let passthrough_args =
+    List.rev !(Clflags.jsoo_opts All) @ List.rev !(Clflags.jsoo_opts phase)
+  in
   let args =
-    subcommand
-    :: (args
-       @ List.rev !(Clflags.jsoo_opts All)
-       @ List.rev !(Clflags.jsoo_opts phase))
+    (subcommand :: args)
+    @ effects_args ~phase passthrough_args
+    @ passthrough_args
   in
   let program = js_of_ocaml_program () in
   let cmdline = Filename.quote_command program args in

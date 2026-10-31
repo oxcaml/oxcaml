@@ -241,6 +241,18 @@ end
 
 (** The options given for a phase, most recent first. *)
 val jsoo_opts : Jsoo_phase.t -> string list ref
+
+module Jsoo_effects : sig
+  type t = Disabled | Cps | Double_translation
+
+  val all : t list
+
+  val to_string : t -> string
+
+  val of_string : string -> t option
+end
+
+val jsoo_effects : Jsoo_effects.t ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref
