@@ -83,6 +83,9 @@ val imported_offsets : unit -> t
 (** Merge the offsets from two files *)
 val merge : t -> t -> t
 
+(** Keep only the offsets of slots whose compilation unit satisfies [keep]. *)
+val filter_by_compilation_unit : t -> keep:(Compilation_unit.t -> bool) -> t
+
 (** Ensure the offsets for the given function slots are in the given exported
     offsets. Only applies to function slots whose compilation units do not
     satisfy [is_local]. *)
