@@ -63,7 +63,7 @@ jobs:
     needs: nix-matrix
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
 
     permissions:
