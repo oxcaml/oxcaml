@@ -39,16 +39,25 @@
 module Structured = struct
   let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
-  let format_anonymous_location prefix line col file_opt =
-    let file = Option.value ~default:"" file_opt in
-    Printf.sprintf "%s(%s:%d:%d)" prefix file line col
+  (* Locations can be partial, so print only what the symbol records: [@] marks
+     a character offset, as opposed to the [:line:col] of a full location. *)
+  let format_anonymous_location prefix
+      (location : Structured_mangling.location) =
+    let where =
+      match location with
+      | Unknown -> "<unknown>"
+      | File file -> file
+      | Offset (file, offset) -> Printf.sprintf "%s@%d" file offset
+      | Location (file, line, col) -> Printf.sprintf "%s:%d:%d" file line col
+    in
+    Printf.sprintf "%s(%s)" prefix where
 
   let render_path_item (item : string Structured_mangling.path_item) =
     match item with
     | Compilation_unit s | Module s | Class s | Function s -> s
-    | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
-    | Anonymous_module (l, c, f) -> format_anonymous_location "mod" l c f
-    | Partial_function (l, c, f) -> format_anonymous_location "partial" l c f
+    | Anonymous_function l -> format_anonymous_location "fn" l
+    | Anonymous_module l -> format_anonymous_location "mod" l
+    | Partial_function l -> format_anonymous_location "partial" l
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)
