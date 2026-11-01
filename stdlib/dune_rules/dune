@@ -10,7 +10,7 @@
 
 (executable
  (name gen)
- (modules gen)
+ (modules gen stdlib_flags)
  (modes native))
 
 (rule

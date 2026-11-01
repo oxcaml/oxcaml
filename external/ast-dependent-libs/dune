@@ -7,8 +7,9 @@
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
 
 ; smoke is a separate project, built against the installed compiler package
-; (see mkJsooSmokeTest in default.nix).
-(data_only_dirs smoke stdlib)
+; (see mkJsooSmokeTest in default.nix). stdlib and otherlibs are the sources
+; that stdlib-jsir compiles.
+(data_only_dirs smoke stdlib otherlibs)
 
 ; Each alias depends on the .install files of its packages, which builds
 ; everything they install. Keep in sync with PPXLIB_PACKAGES, JSOO_PACKAGES

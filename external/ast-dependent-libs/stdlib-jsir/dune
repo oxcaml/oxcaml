@@ -1,73 +1,53 @@
-; The standard library for JSIR. This lives here rather than in the compiler's
-; build because compiler in JSIR mode runs js_of_ocaml, which is not available
-; when building the compiler.
+; The standard library and the otherlibs compiled for ocamlopt -target
+; js_of_ocaml. This lives here rather than in the compiler's build because the
+; compiler in JSIR mode runs js_of_ocaml, which is not available when building
+; the compiler.
+;
+; Each library is rebuilt from its sources against the .cmi files of the
+; installed compiler, as gen_jsir.ml describes. To add one, list it below; it
+; needs a flags.sexp next to its dune file (see otherlibs/unix/dune).
 
-(copy_files# ../stdlib/dune_rules/gen.ml)
+(copy_files# ../stdlib/dune_rules/stdlib_flags.ml)
 
 (executable
- (name gen)
- (modules gen)
+ (name gen_jsir)
+ (modules gen_jsir spec library objinfo emit stdlib_flags)
  (modes native))
 
+; The installed archives and sources are read too; they change with the
+; installed compiler, which every rule depends on.
 (rule
- (target build_settings.txt)
- (action
-  (with-stdout-to
-   %{target}
-   (run
-    make
-    -s
-    -f
-    %{dep:../stdlib/StdlibModules}
-    --eval
-    "stdlib-modules: ; @echo stdlib_modules: $(STDLIB_MODULE_BASENAMES)"
-    stdlib-modules))))
-
-(rule
- (target sources.dune)
- (action
-  (with-stdout-to
-   %{target}
-   (run %{dep:gen.exe} %{dep:build_settings.txt} stdlib-jsir-sources))))
-
-(subdir
- src
- (dynamic_include ../sources.dune))
-
-(rule
- (target stdlib_module_deps.txt)
+ (targets libs.dune install.sexp)
  (deps
-  (:stdlib
-   (glob_files src/*.ml)
-   (glob_files src/*.mli)))
+  %{ocamlopt}
+  (:flags
+   (glob_files_rec ../otherlibs/flags.sexp)))
  (action
   (with-stdout-to
-   %{target}
-   (chdir
-    src
-    (run %{ocaml_bin}/ocamldep -one-line -as-map %{stdlib})))))
-
-(rule
- (target stdlib_jsir.dune)
- (action
-  (with-stdout-to
-   %{target}
+   libs.dune
    (run
-    %{dep:gen.exe}
-    %{dep:build_settings.txt}
-    stdlib-jsir
-    %{dep:stdlib_module_deps.txt}))))
+    %{dep:gen_jsir.exe}
+    -ocaml-where
+    %{ocaml_where}
+    -ocamlobjinfo
+    %{ocaml_bin}/ocamlobjinfo
+    -install
+    install.sexp
+    %{flags}
+    stdlib
+    stdlib_upstream_compatible
+    stdlib_stable
+    stdlib_beta
+    stdlib_alpha
+    unix
+    str))))
 
 (subdir
  build
- (dynamic_include ../stdlib_jsir.dune))
+ (dynamic_include ../libs.dune))
 
 (install
  (package stdlib-jsir)
  (section lib_root)
  (files
-  (glob_files
-   (build/*.cmjx with_prefix ocaml))
-  (build/stdlib.cmjxa as ocaml/stdlib.cmjxa)
-  (build/stdlib.cmja as ocaml/stdlib.cmja)
-  (build/std_exit.cmjo as ocaml/std_exit.cmjo)))
+  (include install.sexp)))
