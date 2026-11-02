@@ -33,7 +33,11 @@ File "jkind_errors.ml", line 31, characters 10-11:
 31 | type t7 : _
                ^
   Unimplemented kind syntax
-File "jkind_errors.ml", line 46, characters 17-19:
-46 | let t : string = 10
+File "jkind_errors.ml", line 47, characters 17-18:
+47 | let g (x : ('a : _)) = x
+                      ^
+  Unimplemented kind syntax
+File "jkind_errors.ml", line 50, characters 17-19:
+50 | let t : string = 10
                       ^^
   The constant 10 has type int but an expression was expected of type string

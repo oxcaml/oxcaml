@@ -42,5 +42,9 @@ type u5 = t5
    still accept this application. *)
 let _ = f4 (fun () -> ()) (fun () -> ())
 
+(* Unimplemented kind syntax in a type annotation. [x] should still be
+   bound. *)
+let g (x : ('a : _)) = x
+
 (* This error should still be raised, despite the prior errors. *)
 let t : string = 10
