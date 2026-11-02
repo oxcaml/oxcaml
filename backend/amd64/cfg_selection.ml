@@ -433,12 +433,15 @@ let select_operation'
       | Some (op, args) -> Rewritten (Basic (Op op), args)
       | None -> Use_default))
   (* Recognize store instructions *)
-  | Cstore (((Word_int | Word_val) as chunk), _init) -> (
+  | Cstore (((Word_int | Word_val | Sixtyfour) as chunk), _init) -> (
     match[@ocaml.warning "-fragile-match"] args with
     | [ loc;
         Cop
           ( Caddi,
-            [ Cop (Cload { memory_chunk = Word_int | Word_val; _ }, [loc'], _);
+            [ Cop
+                ( Cload { memory_chunk = Word_int | Word_val | Sixtyfour; _ },
+                  [loc'],
+                  _ );
               Cconst_int (n, _dbg) ],
             _ ) ]
       when Cmm_peephole_engine.Cmm_comparator.equivalent loc loc'
@@ -516,8 +519,8 @@ let select_operation'
       }
   | Cstore
       ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-        | Thirtytwo_unsigned | Thirtytwo_signed | Sixtyfour | Word_mask
-        | Single _ | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
+        | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask | Single _ | Double
+        | Onetwentyeight_unaligned | Onetwentyeight_aligned
         | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
         | Fivetwelve_aligned ),
         _ )
