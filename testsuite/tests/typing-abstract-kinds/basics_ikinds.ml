@@ -2142,6 +2142,33 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
+(****************************************************)
+(* Test: Kinds of universal variables cannot escape *)
+
+module type S = sig kind_ k type t : k end
+type ('a : any) id
+[%%expect{|
+module type S = sig kind_ k type t : k end
+type ('a : any) id
+|}]
+
+let f (module M : S) (x : ('a : M.k). 'a id -> unit) = ()
+[%%expect{|
+val f : (module S) -> (('a : M.k). 'a id -> unit) -> unit = <fun>
+|}]
+
+let f (module M : S) (x : (type : M.k) id) = ()
+[%%expect{|
+Line 1:
+Error: Values do not match:
+         val f : (module S) -> (type : M.k) id -> unit
+       is not included in
+         val f : (module S) -> (type : M.k) id -> unit
+       The type "(module S) -> (type : M.k) id -> unit"
+       is not compatible with the type "(module S) -> (type : M.k) id -> unit"
+       Type "(type : M.k)" is not compatible with type "(type : M.k)"
+|}]
+
 (*****************************************************)
 (* Test: Paths are substituted in [(type : k)] types *)
 
