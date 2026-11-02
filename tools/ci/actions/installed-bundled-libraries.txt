@@ -16,6 +16,7 @@ js_of_ocaml-compiler.private.gen
 js_of_ocaml-compiler.private.menhirLib
 js_of_ocaml-compiler.private.sedlex
 js_of_ocaml-compiler.private.yojson
+js_of_ocaml-compiler.runtime
 js_of_ocaml-compiler.runtime-files
 js_of_ocaml-ppx
 js_of_ocaml-ppx.as-lib
