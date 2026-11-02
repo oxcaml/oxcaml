@@ -1332,7 +1332,7 @@ let build_other ext env =
 let rec has_instance p = match p.pat_desc with
   | Tpat_variant (l,_,r) when is_absent l r -> false
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_unboxed_unit
-  | Tpat_fun_layout _
+  | Tpat_fun_layout _ | Tpat_deref _
   | Tpat_unboxed_bool _ | Tpat_variant (_,None,_) -> true
   | Tpat_alias { pattern = p; _ } | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
@@ -1346,7 +1346,7 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
-  | Tpat_addr (_, _, p) | Tpat_deref p | Tpat_lazy p
+  | Tpat_addr (_, _, p) | Tpat_lazy p
     -> has_instance p
 
 and has_instances = function
@@ -2257,7 +2257,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
       (if extendable_path path then add_path path r else r)
       ps
 | Tpat_any|Tpat_var _|Tpat_constant _|Tpat_unboxed_unit|Tpat_unboxed_bool _
-| Tpat_fun_layout _
+| Tpat_fun_layout _ | Tpat_deref _
 | Tpat_variant (_,None,_) -> r
 | Tpat_tuple ps
 | Tpat_unboxed_tuple ps ->
@@ -2278,7 +2278,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
-| Tpat_addr (_, _, p) | Tpat_deref p | Tpat_lazy p
+| Tpat_addr (_, _, p) | Tpat_lazy p
     ->
     collect_paths_from_pat r p
 
@@ -2562,9 +2562,8 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
         (simpl head_bound_variables varsets p2 ps k)
     (* A dereference pattern binds the address at the head and leaves the
        value unconstrained *)
-    | `Deref { pat_desc = Tpat_var { id; _ }; _ } ->
+    | `Deref (id, _, _, _, _, _) ->
       simpl (Ident.Set.add id head_bound_variables) varsets Patterns.omega ps k
-    | `Deref _ -> simpl head_bound_variables varsets Patterns.omega ps k
     | #Patterns.Simple.view as view ->
       add_column (Patterns.Head.deconstruct { p with pat_desc = view })
         { row = ps; varsets = head_bound_variables :: varsets; } k

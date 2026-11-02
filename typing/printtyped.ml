@@ -571,9 +571,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_addr %a\n" fmt_mutable_mode_flag mut;
       line i ppf "%a\n" fmt_sort arg_sort;
       pattern i ppf p;
-  | Tpat_deref p ->
-      line i ppf "Tpat_deref\n";
-      pattern i ppf p;
+  | Tpat_deref { id = s; sort; mode = m; _ } ->
+      line i ppf "Tpat_deref \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf m
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
       pattern i ppf p;

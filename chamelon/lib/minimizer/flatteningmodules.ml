@@ -133,7 +133,12 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
         Tpat_or (replace_in_pat mod_name p1, replace_in_pat mod_name p2, a1)
       | O (Tpat_addr (mut, arg_sort, pat)) ->
         Tpat_addr (mut, arg_sort, replace_in_pat mod_name pat)
-      | O (Tpat_deref pat) -> Tpat_deref (replace_in_pat mod_name pat)
+      | O (Tpat_deref d) ->
+        Tpat_deref
+          { d with
+            id = create_local (mod_name ^ "_" ^ Ident.name d.id);
+            name = { d.name with txt = mod_name ^ "_" ^ d.name.txt }
+          }
       | O (Tpat_lazy pat) -> Tpat_lazy (replace_in_pat mod_name pat)
       | O (Tpat_variant (lab, Some p, t)) ->
         Tpat_variant (lab, Some (replace_in_pat mod_name p), t)

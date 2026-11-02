@@ -392,7 +392,7 @@ let pat
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
                           lpoly; env_locality_mode }
     | Tpat_addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, sub.pat sub p)
-    | Tpat_deref p -> Tpat_deref (sub.pat sub p)
+    | Tpat_deref d -> Tpat_deref { d with name = map_loc sub d.name }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc

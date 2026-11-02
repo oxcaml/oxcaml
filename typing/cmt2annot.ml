@@ -27,6 +27,10 @@ let variables_iterator scope =
         Stypes.record (Stypes.An_ident (p.pat_loc,
                                         Ident.name id,
                                         Annot.Idef scope))
+    | Tpat_deref { id; name; _ } ->
+        Stypes.record (Stypes.An_ident (name.loc,
+                                        Ident.name id,
+                                        Annot.Idef scope))
     | _ -> ()
     end;
     super.pat sub p

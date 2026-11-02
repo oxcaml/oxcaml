@@ -2318,16 +2318,13 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
       let base_paths = Paths.with_memory_address paths in
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
-    | Tpat_deref arg ->
-      let paths =
-        match base_paths with
-        | None ->
-          Misc.fatal_error
-            "Uniqueness_analysis.pattern_match_single: dereference pattern \
-             without base paths"
-        | Some base_paths -> base_paths
-      in
-      pattern_match_single arg paths
+    | Tpat_deref { id; _ } -> (
+      match base_paths with
+      | None ->
+        Misc.fatal_error
+          "Uniqueness_analysis.pattern_match_single: dereference pattern \
+           without base paths"
+      | Some base_paths -> Ienv.Extension.singleton id base_paths, UF.unused)
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg, _) ->

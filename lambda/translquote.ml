@@ -2482,8 +2482,8 @@ let rec with_new_idents_pat pat =
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
-  | Tpat_addr (_, _, pat) | Tpat_deref pat | Tpat_lazy pat ->
-    with_new_idents_pat pat
+  | Tpat_deref { id; _ } -> with_new_idents_values [id]
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
 let rec without_idents_pat pat =
@@ -2516,8 +2516,8 @@ let rec without_idents_pat pat =
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
-  | Tpat_addr (_, _, pat) | Tpat_deref pat | Tpat_lazy pat ->
-    without_idents_pat pat
+  | Tpat_deref { id; _ } -> without_idents_values [id]
+  | Tpat_addr (_, _, pat) | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
 let with_new_param fp =
@@ -2874,9 +2874,8 @@ and quote_value_pattern ~scopes p =
     | Tpat_addr (mut, _, pat) ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.addr loc pat (Types.is_mutable mut)
-    | Tpat_deref pat ->
-      let pat = quote_value_pattern ~scopes pat in
-      Pat.deref loc pat
+    | Tpat_deref { id; _ } ->
+      Pat.deref loc (Pat.wrap (Pat.var loc (Var.Value.mk (Lvar id))))
     | Tpat_lazy pat ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.lazy_ loc pat

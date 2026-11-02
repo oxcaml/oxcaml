@@ -4632,10 +4632,12 @@ and type_pat_aux
       (* CR address-patterns: support [as deref_ x], which lifts the
          restriction below; then, print a more informative error when
          the argument is a pattern that [as deref_ x] would accept. *)
-      (match sp1.ppat_desc with
-       | Ppat_var _ -> ()
-       | _ ->
-         Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument);
+      let name =
+        match sp1.ppat_desc with
+        | Ppat_var name -> name
+        | _ ->
+          Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument
+      in
       let { position_mutability; container_mode; container_loc; base;
             rev_unboxed } =
         match deref_position with
@@ -4652,12 +4654,15 @@ and type_pat_aux
         { containing = Derived_address; container = (container_loc, Pattern) }
       in
       let mode = apply_left_is_contained_by is_contained_by container_mode in
-      let p1 =
-        type_pat ~pat_mode:(simple_pat_mode mode) tps Value sp1 ty_addr
-          addr_sort
+      let type_expr = instance ty_addr in
+      let mode = cross_left !!penv ty_addr mode in
+      let id, uid =
+        enter_variable tps name.loc name mode ~kind:(Val_reg addr_sort)
+          type_expr sp1.ppat_attributes addr_sort
       in
       rvp {
-        pat_desc = Tpat_deref p1;
+        pat_desc =
+          Tpat_deref { id; name; uid; sort = addr_sort; mode; type_expr };
         pat_loc = loc; pat_extra=[];
         pat_type = instance expected_ty;
         pat_attributes = sp.ppat_attributes;
