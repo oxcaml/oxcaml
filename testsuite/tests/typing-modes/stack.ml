@@ -551,3 +551,17 @@ Line 4, characters 6-9:
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global".
 |}]
+
+(* Type information propagates through stack_ (even though the labels are flipped, it
+   still type checks). *)
+let f () =
+  let rec g = stack_ (fun () -> h ~y:1 ~x:2)
+  and h = stack_ (fun ~x ~y -> x + y) in
+  g () [@nontail]
+[%%expect{|
+Line 3, characters 17-37:
+3 |   and h = stack_ (fun ~x ~y -> x + y) in
+                     ^^^^^^^^^^^^^^^^^^^^
+Error: This function should have type "y:int -> (x:int -> 'a) @ local"
+       but its first argument is labeled "~x" instead of "~y"
+|}]
