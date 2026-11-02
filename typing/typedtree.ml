@@ -481,12 +481,12 @@ and 'k block_access =
   | Baccess_address : Jkind.sort -> deref block_access
 
 and 'k unboxed_access =
-  | Uaccess_unboxed_field :
+  | Uaccess_record_unboxed_product_field :
       Longident.t loc * unboxed_label_description
       * Types.record_unboxed_product_representation
       -> 'k unboxed_access
   | Uaccess_unboxed_tuple_element : int -> deref unboxed_access
-  | Uaccess_unboxed_record_field :
+  | Uaccess_record_unboxed_field :
       Longident.t loc * label_description * Types.record_representation
       -> deref unboxed_access
 

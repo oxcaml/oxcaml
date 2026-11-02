@@ -1666,6 +1666,10 @@ module Paths : sig
   (** [memory_address t] is [child Projection.Memory_address t]. *)
   val memory_address : t -> t
 
+  (** [with_memory_address t] includes both the paths [t] and the paths
+      [memory_address t] of the memory storing them. *)
+  val with_memory_address : t -> t
+
   val mark : Usage.t -> Learned_tags.t -> Overwrites.t -> t -> UF.t
 
   val fresh : unit -> t
@@ -1732,6 +1736,8 @@ end = struct
     if tracked_under modality then t else untracked
 
   let memory_address t = child Projection.Memory_address t
+
+  let with_memory_address t = t @ memory_address t
 
   let mark usage learned overwrites t =
     UF.chooses (List.map (UF.singleton usage learned overwrites) t)
@@ -2019,9 +2025,10 @@ let conjuncts_pattern_match l =
   Ienv.Extension.conjuncts exts, UF.pars ufs
 
 let unboxed_access_projection : deref unboxed_access -> Projection.t = function
-  | Uaccess_unboxed_field (_, l, _) -> Record_unboxed_product_field l.lbl_name
+  | Uaccess_record_unboxed_product_field (_, l, _) ->
+    Record_unboxed_product_field l.lbl_name
   | Uaccess_unboxed_tuple_element i -> Tuple_field i
-  | Uaccess_unboxed_record_field (_, l, _) -> Record_field l.lbl_name
+  | Uaccess_record_unboxed_field (_, l, _) -> Record_field l.lbl_name
 
 (* The paths of the position reached by an unboxed access from a position with
    paths [paths]. *)
@@ -2035,7 +2042,10 @@ let field_memory_projection (l : label_description) : Projection.t option =
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _
   | Record_inlined _ | Record_undetermined | Record_variable _ ->
     Some (Record_field l.lbl_name)
-  | Record_unboxed | Record_dummy _ -> None
+  | Record_unboxed -> None
+  | Record_dummy _ ->
+    Misc.fatal_error
+      "Uniqueness_analysis.field_memory_projection: dummy record representation"
 
 (* An address ['a addr] owns both:
 
@@ -2057,9 +2067,8 @@ let field_memory_projection (l : label_description) : Projection.t option =
        | { foo = deref_ y as z } -> ...
                                     ^^^
    ]}
-   In this position, consuming the string z (i.e. [x.foo], or [Paths.child proj
-   paths] below) or the address y ([Paths.child proj (Paths.memory_address
-   paths)] below) should consume x, too.
+   In this position, consuming the string z (i.e. [x.foo]) or the address y
+   (which also owns [x.<memory>.foo]) should consume x, too.
 
    So the paths of an address are the paths of the value it points to, together
    with the paths of that part of the memory. Loading from an address
@@ -2082,8 +2091,7 @@ let field_memory_projection (l : label_description) : Projection.t option =
    had other fields, consuming [y] would not conflict with reading them, but
    it would conflict with reading [foo] again or overwriting [x]. *)
 let deref_base_paths proj paths =
-  Paths.choose (Paths.child proj paths)
-    (Paths.child proj (Paths.memory_address paths))
+  Paths.child proj (Paths.with_memory_address paths)
 
 let rec pattern_match_tuple pat values =
   match pat.pat_desc with
@@ -2273,16 +2281,13 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
         let paths = Paths.variant_field lbl paths in
         pattern_match_single arg paths
       | None -> Ienv.Extension.empty, UF.unused)
-    | Tpat_record (pats, rep, _) ->
+    | Tpat_record (pats, _, _) ->
       List.map
         (fun (_, l, pat) ->
           let base_paths =
-            match rep with
-            | Record_unboxed -> base_paths
-            | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
-            | Record_mixed _ | Record_dummy _ | Record_undetermined
-            | Record_variable _ ->
-              Some (deref_base_paths (Projection.Record_field l.lbl_name) paths)
+            match field_memory_projection l with
+            | None -> base_paths
+            | Some proj -> Some (deref_base_paths proj paths)
           in
           let paths = Paths.record_field l.lbl_modalities l.lbl_name paths in
           pattern_match_single ?base_paths pat paths)
@@ -2314,7 +2319,7 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
     | Tpat_addr (mut, _, arg) ->
       (* CR address-patterns: this is slightly imprecise. See also the comment
          on [deref_base_paths]. *)
-      let base_paths = Paths.choose paths (Paths.memory_address paths) in
+      let base_paths = Paths.with_memory_address paths in
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
     | Tpat_deref (_, _, uas, arg) ->
@@ -2750,7 +2755,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     (* All unboxed accesses are unused, but we include the below match in case
        we add new unboxed access types *)
     let _unboxed_access : index unboxed_access -> _ = function
-      | Uaccess_unboxed_field _ -> UF.unused
+      | Uaccess_record_unboxed_product_field _ -> UF.unused
     in
     block_access ba
   | Texp_ifthenelse (if_, then_, else_opt) ->

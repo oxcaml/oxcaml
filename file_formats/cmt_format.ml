@@ -210,7 +210,7 @@ let iter_on_occurrences
     | Baccess_block _ -> ()
   in
   let iter_unboxed_access exp_env : index unboxed_access -> _ = function
-    | Uaccess_unboxed_field (lid, label_desc, _) ->
+    | Uaccess_record_unboxed_product_field (lid, label_desc, _) ->
       add_label ~namespace:Unboxed_label exp_env lid label_desc
   in
   let with_constraint ~env (_path, _lid, with_constraint) =

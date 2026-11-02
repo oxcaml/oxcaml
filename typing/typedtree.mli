@@ -893,12 +893,12 @@ and 'k block_access =
 (* Unboxed accesses that might follow a block access. Some are only supported by
    deref patterns, not block indices. *)
 and 'k unboxed_access =
-  | Uaccess_unboxed_field :
+  | Uaccess_record_unboxed_product_field :
       Longident.t loc * Data_types.unboxed_label_description
       * Types.record_unboxed_product_representation
       -> 'k unboxed_access
   | Uaccess_unboxed_tuple_element : int -> deref unboxed_access
-  | Uaccess_unboxed_record_field :
+  | Uaccess_record_unboxed_field :
       Longident.t loc * Data_types.label_description
       * Types.record_representation
       -> deref unboxed_access

@@ -502,7 +502,7 @@ let block_access sub : index block_access -> Parsetree.block_access =
 
 let unboxed_access sub : index unboxed_access -> Parsetree.unboxed_access =
   function
-  | Uaccess_unboxed_field (lid, _, _) ->
+  | Uaccess_record_unboxed_product_field (lid, _, _) ->
     Uaccess_unboxed_field (map_loc sub lid)
 
 let comprehension sub comp =

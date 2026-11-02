@@ -390,7 +390,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
   let iter_unboxed_access sub : index unboxed_access -> _ = function
-    | Uaccess_unboxed_field (lid, _, _) -> iter_loc sub lid
+    | Uaccess_record_unboxed_product_field (lid, _, _) -> iter_loc sub lid
   in
   match exp_desc with
   | Texp_ident { lid; _ } -> iter_loc_lid sub lid

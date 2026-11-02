@@ -541,8 +541,8 @@ let expr sub x =
       Baccess_block (mut, sub.expr sub idx)
   in
   let map_unboxed_access sub : index unboxed_access -> _ = function
-    | Uaccess_unboxed_field (lid, ld, r) ->
-      Uaccess_unboxed_field (map_loc_lid sub lid, ld, r)
+    | Uaccess_record_unboxed_product_field (lid, ld, r) ->
+      Uaccess_record_unboxed_product_field (map_loc_lid sub lid, ld, r)
   in
   let exp_desc =
     match x.exp_desc with

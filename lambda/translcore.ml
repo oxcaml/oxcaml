@@ -2883,7 +2883,9 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
 and transl_idx ~scopes loc env ba uas =
-  let ua_to_pos (Uaccess_unboxed_field (_, lbl, _) : index unboxed_access) =
+  let ua_to_pos
+      (Uaccess_record_unboxed_product_field (_, lbl, _) : index unboxed_access)
+    =
     (* erase singleton unboxed products before lambda *)
     if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
   in
@@ -2893,7 +2895,7 @@ and transl_idx ~scopes loc env ba uas =
     let idx = transl_exp ~scopes Lambda.layout_block_idx idx in
     begin match uas with
     | [] -> idx
-    | Uaccess_unboxed_field (_, lbl, repres) :: _ ->
+    | Uaccess_record_unboxed_product_field (_, lbl, repres) :: _ ->
       let sorts =
         Array.map Jkind.Sort.default_for_transl_and_get
           (unboxed_label_all_sorts lbl repres)
@@ -2917,7 +2919,8 @@ and transl_idx ~scopes loc env ba uas =
     | Record_float | Record_ufloat ->
       (* Assert that all unboxed fields are of singleton records *)
       List.iter
-        (fun (Uaccess_unboxed_field (_, l, _) : index unboxed_access) ->
+        (fun (Uaccess_record_unboxed_product_field (_, l, _)
+              : index unboxed_access) ->
             if Array.length l.lbl_all <> 1 then
               Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
                 in non-mixed boxed record")

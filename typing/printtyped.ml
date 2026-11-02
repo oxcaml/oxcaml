@@ -1479,12 +1479,12 @@ and block_access : type k. _ -> _ -> k block_access -> _ = fun i ppf -> function
 
 and unboxed_access : type k. _ -> _ -> k unboxed_access -> _ =
   fun i ppf -> function
-  | Uaccess_unboxed_field (li, _, _) ->
-      line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
+  | Uaccess_record_unboxed_product_field (li, _, _) ->
+      line i ppf "Uaccess_record_unboxed_product_field %a\n" fmt_longident li
   | Uaccess_unboxed_tuple_element n ->
       line i ppf "Uaccess_unboxed_tuple_element %d\n" n
-  | Uaccess_unboxed_record_field (li, _, _) ->
-      line i ppf "Uaccess_unboxed_record_field %a\n" fmt_longident li
+  | Uaccess_record_unboxed_field (li, _, _) ->
+      line i ppf "Uaccess_record_unboxed_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =
   line i ppf "comprehension\n";
