@@ -1786,7 +1786,8 @@ let check_block_path
          reading from them is fine. This check should eventually be applied to
          unboxed private accesses, too. *)
       (* CR address-patterns: mutable [deref_] patterns through private types
-         should be allowed, too, by binding an address that is at most [read]. *)
+         should be allowed, too, by binding an address that is at most [read].
+      *)
       begin match label.lbl_private with
       | Private when Types.is_mutable mutability ->
         bad_type Private_declaration
