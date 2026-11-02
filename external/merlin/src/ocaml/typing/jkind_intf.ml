@@ -56,7 +56,9 @@ module type Sort = sig
   (** A sort variable that can be unified during type-checking. *)
   type var
 
-  type level_error = Rigid
+  type level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error =
     | Incompatible
