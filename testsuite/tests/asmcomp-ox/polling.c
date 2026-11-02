@@ -22,3 +22,10 @@ CAMLprim value request_minor_gc(value v) {
 CAMLprim value minor_gcs(value v) {
   return Val_long(atomic_load(&caml_minor_collections_count));
 }
+
+/* Used by poll_not_between_call_args.ml: declared as returning [void]
+   on the OCaml side, so that the call's continuation is empty. */
+CAMLprim value touch_bytes(value b, value c) {
+  Byte(b, 0) = Int_val(c);
+  return Val_unit;
+}

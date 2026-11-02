@@ -85,6 +85,16 @@ val include_dirs : visible_include list ref
 val hidden_include_dirs : string list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
+
+type hidden_include_file =
+  { visible_path : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+val hidden_include_files : hidden_include_file list ref
+val parse_hidden_include_file :
+  cmx_guaranteed:bool -> string -> (hidden_include_file, string) result
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref

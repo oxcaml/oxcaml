@@ -46,8 +46,10 @@ module Result_continuation = struct
 
   let apply_renaming t renaming =
     match t with
-    | Return k -> Return (Renaming.apply_continuation renaming k)
-    | Never_returns -> Never_returns
+    | Return k ->
+      let k' = Renaming.apply_continuation renaming k in
+      if k == k' then t else Return k'
+    | Never_returns -> t
 
   let ids_for_export t =
     match t with

@@ -346,7 +346,8 @@ let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
 let rewrite_set_of_closures env res ~(bound : Name.t list)
-    ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
+    ({ Rev_expr.function_decls; value_slots; dbg } :
+      Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
     List.exists
       (fun bound_name ->
@@ -513,7 +514,9 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
   let function_decls =
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   set_of_closures, { res with code_ids_to_remember }
 
 let rewrite_static_const env ~(bound_to : Symbol.t) (sc : SC.t) =
@@ -2273,8 +2276,8 @@ and rebuild_function_params_and_body env res code_metadata
       res )
 
 and rebuild_code env res code_id
-    ({ params_and_body; free_names_of_params_and_body = _ } : Rev_expr.rev_code)
-    =
+    ({ params_and_body; free_names_of_params_and_body = _ } :
+      Rev_expr.Rev_code.t) =
   (* At rebuild time, [code_metadata] may only be changed for fields that will
      never be read again if we perform LTO, namely, code_size and
      inlining_decisions. All other changes to [code_metadata] must be done in
@@ -2391,7 +2394,7 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
   in
   let cont_params_to_keep =
     Continuation.Map.mapi
-      (fun cont (info : Traverse_acc.continuation_info) ->
+      (fun cont (info : Traverse_acc.Continuation_info.t) ->
         List.map2 (should_keep_param cont) info.params info.arity)
       continuation_info
   in

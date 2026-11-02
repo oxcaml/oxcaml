@@ -787,7 +787,8 @@ let arity_components_of_extern_repr ~machine_width alloc_mode
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
-        prim_arity;
+        prim_type_arity = _;
+        prim_apply_arity;
         prim_alloc;
         prim_c_builtin;
         prim_effects;
@@ -916,7 +917,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (* Some C primitives have implementations within Flambda itself. *)
     let[@inline] unboxed_int64_to_and_from_unboxed_float ~src_kind ~dst_kind ~op
         =
-      if prim_arity <> 1
+      if prim_apply_arity <> 1
       then Misc.fatal_errorf "Expected arity one for %s" prim_native_name
       else
         match prim_native_repr_args, prim_native_repr_res with
@@ -1068,7 +1069,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
 
 let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
-        prim_arity = _;
+        prim_type_arity = _;
+        prim_apply_arity = _;
         prim_alloc;
         prim_c_builtin;
         prim_effects;
@@ -3434,7 +3436,31 @@ let close_functions acc external_env ~current_alloc_region ~current_region
       (Function_decls.alloc_mode function_declarations)
       ~current_alloc_region ~current_region
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let dbg =
+    (* Choose the debuginfo with the earliest source location. *)
+
+    (* CR mshinwell: This choice is somewhat arbitrary, and has a known problem
+       with zero_alloc. The location of a function carries that function's own
+       definition-site [@zero_alloc assume] (see [transl_function]), and the
+       zero_alloc checker consults the debuginfo of allocations. So the
+       allocation of the set, which happens in the enclosing function, is hidden
+       from the check of the enclosing function if the earliest function in the
+       set is marked [assume], but not if a later one is. Taking the assume from
+       the scopes enclosing the set's functions (the same for all members) would
+       remove both the leak and the order dependence. Unioning the members'
+       debuginfo might also be better for the source locations. Needs
+       thought. *)
+    List.map
+      (fun decl -> Debuginfo.from_location (Function_decl.loc decl))
+      func_decl_list
+    |> List.sort Debuginfo.compare
+    |> function
+    | [] -> Debuginfo.none
+    | dbg :: _ -> dbg
+  in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   let acc =
     Acc.add_set_of_closures_offsets ~is_phantom:false acc set_of_closures
   in

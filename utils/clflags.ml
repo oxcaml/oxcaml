@@ -75,12 +75,26 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type hidden_include_file =
+  { visible_path : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+let parse_hidden_include_file ~cmx_guaranteed entry =
+  match String.split_on_char ':' entry with
+  | [ visible_path; actual_path ] ->
+    Ok { visible_path; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<visible_path>:<actual_path>', got: " ^ entry)
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
+and hidden_include_files = (* -H-file, -Hx-file *)
+  ref ([] : hidden_include_file list)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)

@@ -17,6 +17,7 @@
      bad_instance_arg_value_wrong_type.no-alias-deps.reference \
    bad_instance_repeated_arg_name.ml bad_instance_repeated_arg_name.reference \
    bad_instance_wrong_mode.ml bad_instance_wrong_mode.reference \
+   bad_instantiate_uninstantiated_arg.reference \
    bad_instantiate_missing_arg.reference \
    bad_instantiate_no_such_param.reference \
    bad_instantiate_not_arg.reference \
@@ -414,6 +415,17 @@
            check-ocamlc.byte-output;
          }{
            module = "";
+           flags = "-instantiate monoid_utils.cmo Monoid_of_semigroup";
+           program = "monoid_utils-Monoid_of_semigroup.cmo";
+           all_modules = "";
+           compiler_output = "bad_instantiate_uninstantiated_arg.output";
+           ocamlc_byte_exit_status = "2";
+           ocamlc.byte;
+
+           compiler_reference = "bad_instantiate_uninstantiated_arg.reference";
+           check-ocamlc.byte-output;
+         }{
+           module = "";
            flags = "-instantiate";
            program = "list_monoid-Float_list_element-Int_list_element.cmo";
            all_modules = "list_monoid.cmo float_list_element.cmo int_list_element.cmo";
@@ -450,10 +462,12 @@
            all_modules = "monoid_of_semigroup.cmo string_semigroup.cmo";
            ocamlc.byte;
 
+           (* Arguments can be given as compilation unit names *)
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate monoid_utils.cmo \
+             Monoid_of_semigroup[Semigroup:String_semigroup]";
            program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmo";
-           all_modules = "monoid_utils.cmo monoid_of_semigroup-String_semigroup.cmo";
+           all_modules = "";
            ocamlc.byte;
 
            module = "";
@@ -481,9 +495,9 @@
            ocamlc.byte;
 
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate import.cmo Int_list_element String_semigroup";
            program = "import-Int_list_element-String_semigroup.cmo";
-           all_modules = "import.cmo int_list_element.cmo string_semigroup.cmo";
+           all_modules = "";
            ocamlc.byte;
 
            module = "";
@@ -914,6 +928,17 @@
            check-ocamlopt.byte-output;
          }{
            module = "";
+           flags = "-instantiate monoid_utils.cmx Monoid_of_semigroup";
+           program = "monoid_utils-Monoid_of_semigroup.cmx";
+           all_modules = "";
+           compiler_output = "bad_instantiate_uninstantiated_arg.output";
+           ocamlopt_byte_exit_status = "2";
+           ocamlopt.byte;
+
+           compiler_reference = "bad_instantiate_uninstantiated_arg.reference";
+           check-ocamlopt.byte-output;
+         }{
+           module = "";
            flags = "-instantiate";
            program = "list_monoid-Float_list_element-Int_list_element.cmx";
            all_modules = "list_monoid.cmx float_list_element.cmx int_list_element.cmx";
@@ -947,10 +972,12 @@
            all_modules = "monoid_of_semigroup.cmx string_semigroup.cmx";
            ocamlopt.byte;
 
+           (* Arguments can be given as compilation unit names *)
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate monoid_utils.cmx \
+             Monoid_of_semigroup[Semigroup:String_semigroup]";
            program = "monoid_utils-Monoid_of_semigroup--String_semigroup.cmx";
-           all_modules = "monoid_utils.cmx monoid_of_semigroup-String_semigroup.cmx";
+           all_modules = "";
            ocamlopt.byte;
 
            module = "";
@@ -978,9 +1005,9 @@
            ocamlopt.byte;
 
            module = "";
-           flags = "-instantiate";
+           flags = "-instantiate import.cmx Int_list_element String_semigroup";
            program = "import-Int_list_element-String_semigroup.cmx";
-           all_modules = "import.cmx int_list_element.cmx string_semigroup.cmx";
+           all_modules = "";
            ocamlopt.byte;
 
            module = "";

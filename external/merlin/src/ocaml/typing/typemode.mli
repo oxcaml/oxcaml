@@ -18,9 +18,6 @@ type modalities =
 val transl_mode_annots :
   Parsetree.modes -> Mode.With_locality.Const.Option.t modes
 
-val apply_mode_implications :
-  Mode.With_locality.Const.Option.t -> Mode.With_locality.Const.Option.t
-
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to

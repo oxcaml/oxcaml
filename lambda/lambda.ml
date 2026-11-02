@@ -512,7 +512,8 @@ and extern_repr =
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
-and external_call_description = extern_repr Primitive.description_gen
+and external_call_description =
+  (extern_repr, extern_repr) Primitive.description_gen
 
 and nullable =
   | Nullable
@@ -1752,7 +1753,7 @@ let layout_instance_var = nullable_value Pgenval
 let layout_method = nullable_value Pgenval
 let layout_initializer = nullable_value Pgenval
 let layout_array_comprehension_element = nullable_value Pgenval
-let layout_list_element = nullable_value Pgenval
+let layout_list_comprehension_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
 let layout_block_idx = layout_unboxed_int64
 

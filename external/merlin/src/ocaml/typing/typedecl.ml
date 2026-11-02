@@ -117,6 +117,9 @@ type error =
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
   | Multiple_native_repr_attributes
+  | Elide_void_on_non_void
+  | Elide_void_in_return_position
+  | All_external_arguments_elided
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
@@ -966,7 +969,7 @@ let check_imprecise_type_param_annotation env (cty, _) annotated_jkind =
   match cty.ctyp_desc, get_desc cty.ctyp_type, annotated_jkind with
   | Ttyp_var (name_opt, Some _), Tvar { jkind; _ }, Some annotated_jkind
     when not (Jkind.History.has_warned jkind) ->
-    if not (Jkind.equate env jkind annotated_jkind) then begin
+    if Result.is_error (Jkind.equate env jkind annotated_jkind) then begin
       let format_jkind jkind =
         Format_doc.asprintf "%a" !Oprint.out_jkind
           (Out_type.out_jkind_of_jkind env jkind)
@@ -4610,6 +4613,14 @@ let prim_const_mode m =
 
 let rec parse_native_repr_attributes env core_type ty rmode
         ~global_repr ~is_layout_poly =
+  begin match
+    Attr_helper.get_no_payload_attribute
+      "elide_void" core_type.ptyp_attributes
+  with
+  | None -> ()
+  | Some {loc; _} ->
+    Error.log_and_raise loc Elide_void_in_return_position
+  end;
   match core_type.ptyp_desc, get_desc ty,
     get_native_repr_attribute core_type.ptyp_attributes ~global_repr:None
   with
@@ -4618,10 +4629,30 @@ let rec parse_native_repr_attributes env core_type ty rmode
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
     let t1, _ = Btype.tpoly_get_poly t1 in
+    let elide_void =
+      Attr_helper.get_no_payload_attribute "elide_void" ct1.ptyp_attributes
+    in
     let repr_arg =
+      (* Global representation attributes apply only to retained arguments. *)
+      let global_repr =
+        match elide_void with
+        | None -> global_repr
+        | Some _ -> None
+      in
       make_native_repr
         env ct1 t1 ~global_repr
         ~is_layout_poly ~why:External_argument ~is_return:false
+    in
+    let repr_arg =
+      match elide_void with
+      | None -> Native_repr repr_arg
+      | Some {loc; _} ->
+        match repr_arg with
+        | Same_as_ocaml_repr (Base Void) -> Elided_void
+        | Same_as_ocaml_repr _ | Repr_poly | Unboxed_float _
+        | Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _
+        | Unpacked_product _ | Unextended_bits8 | Unextended_bits16 ->
+          Error.log_and_raise loc Elide_void_on_non_void
     in
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
@@ -4794,7 +4825,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modes = Typemode.transl_mode_annots modes in
         let mode =
           modes.mode_modes
-          |> Typemode.apply_mode_implications
+          |> Mode.Const.apply_implications
           |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Const.with_locality_as_regionality
@@ -4924,12 +4955,17 @@ let transl_value_decl env loc ~modal ~why valdecl =
          Language_extension.assert_enabled ~loc Layouts Language_extension.Alpha
        | _ -> ());
       (*
-      if prim.prim_arity = 0 &&
-         (prim.prim_name = "" || prim.prim_name.[0] <> '%') then
-         Error.log_and_raise valdecl.pval_type.ptyp_loc  Null_arity_external;
+      if prim.prim_apply_arity = 0
+         && (prim.prim_name = "" || prim.prim_name.[0] <> '%')
+      then
+        Error.log_and_raise
+          valdecl.pval_type.ptyp_loc
+          (if prim.prim_type_arity = 0
+           then Null_arity_external
+           else All_external_arguments_elided);
       *)
       if Clflags.target_is_native ()
-      && prim.prim_arity > 5
+      && prim.prim_apply_arity > 5
       && prim.prim_native_name = ""
       && not (String.starts_with ~prefix:"%" prim.prim_name)
       then
@@ -5421,8 +5457,7 @@ let explain_unbound_gen ppf tv tl typ kwd pr =
     let ti = List.find (fun ti -> Ctype.deep_occur tv (typ ti)) tl in
     let ty0 = (* Hack to force aliasing when needed *)
       Btype.newgenty (Tobject(tv, ref None)) in
-    Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-      [typ ti; ty0];
+    Out_type.prepare_for_printing [typ ti; ty0];
     fprintf ppf
       ".@ @[<hov2>In %s@ %a@;<1 -2>the variable %a is unbound@]"
       kwd (Style.as_inline_code pr) ti
@@ -5658,8 +5693,7 @@ let variance_error ~loc ~v1 ~v2 =
          lacks the [env]. Therefore, we clear [Ident_names] manually.
          It'd be good to come up with a better solution. *)
       Out_type.Ident_names.reset ();
-      Out_type.prepare_for_printing ~base:Mode.With_locality.Const.legacy
-        [ variable ];
+      Out_type.prepare_for_printing [ variable ];
       let intro = variance_context context in
       Location.errorf ~loc "%a%t" pp_doc intro
         (variance_variable_error ~v1 ~v2 variable error)
@@ -5731,7 +5765,7 @@ let report_error ~loc = function
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
       | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
       | Function_label_mismatch _ | Tuple_label_mismatch _
-      | First_class_module _ -> None
+      | First_class_module _ | Weaken_sort _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->
@@ -5754,7 +5788,7 @@ let report_error ~loc = function
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
       let base = Mode.With_locality.Const.legacy in
-      Out_type.prepare_for_printing ~base [used_as; defined_as];
+      Out_type.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Out_type.Ident_names.reset ();
       Location.errorf ~loc
@@ -5871,6 +5905,17 @@ let report_error ~loc = function
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
         Style.inline_code "[@@unsafe_unextended]"
+  | Elide_void_on_non_void ->
+      Location.errorf ~loc
+        "Only external arguments of layout void can be marked %a."
+        Style.inline_code "[@elide_void]"
+  | Elide_void_in_return_position ->
+      Location.errorf ~loc
+        "%a is not allowed in return position."
+        Style.inline_code "[@elide_void]"
+  | All_external_arguments_elided ->
+      Location.errorf ~loc
+        "An external must have at least one non-elided argument."
   | Cannot_unbox_or_untag_type Unboxed ->
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \

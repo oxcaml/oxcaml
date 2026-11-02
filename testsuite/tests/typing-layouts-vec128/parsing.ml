@@ -36,50 +36,22 @@ type t = C : int64x2# -> t
 *)
 type t = int64x2# list;;
 [%%expect {|
-Line 1, characters 9-17:
-1 | type t = int64x2# list;;
-             ^^^^^^^^
-Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
-       The layout of int64x2# is vec128
-         because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = int64x2# list
 |}];;
 
 let f (_ : int64x2# list) = ();;
 [%%expect {|
-Line 1, characters 11-19:
-1 | let f (_ : int64x2# list) = ();;
-               ^^^^^^^^
-Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
-       The layout of int64x2# is vec128
-         because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : int64x2# list -> unit = <fun>
 |}];;
 
 type t = C of int64x2# list;;
 [%%expect {|
-Line 1, characters 14-22:
-1 | type t = C of int64x2# list;;
-                  ^^^^^^^^
-Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
-       The layout of int64x2# is vec128
-         because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of int64x2# list
 |}];;
 
 type t = C : int64x2# list -> t;;
 [%%expect {|
-Line 1, characters 13-21:
-1 | type t = C : int64x2# list -> t;;
-                 ^^^^^^^^
-Error: This type "int64x2#" should be an instance of type "('a : value_or_null)"
-       The layout of int64x2# is vec128
-         because it is the unboxed version of the primitive type int64x2.
-       But the layout of int64x2# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : int64x2# list -> t
 |}];;
 
 (* Syntax: int64x2#c

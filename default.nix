@@ -846,16 +846,25 @@ stdenv.mkDerivation {
     autoconf --force
   '';
 
-  checkPhase = lib.optionalString ocamltest ''
-    # The testsuite/tests/unicode test compiles modules with non-ASCII source
-    # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
-    # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
-    # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
-    # This exercises unicode source filenames, which we don't use; drop the test
-    # so the rest of `make ci` runs.
-    rm -rf testsuite/tests/unicode
-    make ci
-  '';
+  # SHELL: the Makefile's /usr/bin/env bash does not exist in the sandbox.
+  doCheck = true;
+  checkPhase =
+    ''
+      runHook preCheck
+    ''
+    + lib.optionalString ocamltest ''
+      # The testsuite/tests/unicode test compiles modules with non-ASCII source
+      # filenames (néant.ml, 見.ml) and links them via clang. Under the 26.05
+      # toolchain the UTF-8 bytes of the object filenames reach clang octal-escaped
+      # (e.g. '$350246213.o'), so linking fails with "no such file or directory".
+      # This exercises unicode source filenames, which we don't use; drop the test
+      # so the rest of `make ci` runs.
+      rm -rf testsuite/tests/unicode
+      make SHELL="$SHELL" ci
+    ''
+    + ''
+      runHook postCheck
+    '';
 
   postInstall =
     ''
