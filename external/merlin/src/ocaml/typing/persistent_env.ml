@@ -80,27 +80,6 @@ module Persistent_signature = struct
       manifest_location : string option }
 
   let load = ref (fun ~allow_hidden ~unit_name ->
-<<<<<<< Merlin:rebase-chain
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | filename, (Visible _ as visibility) ->
-      let cmi = Cmi_cache.read filename in
-      Some { filename; cmi; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
-||||||| Compiler:last-imported
-    let unit_name = CU.Name.to_string unit_name in
-    match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
-    | filename, visibility when allow_hidden ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | filename, (Visible _ as visibility) ->
-      Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | _, Hidden
-    | exception Not_found -> None)
-=======
     let intf = CUI.Found.intf unit_name in
     let cmi_path =
       if !Clflags.use_persistent_deps then CUI.Found.cmi_path unit_name
@@ -115,7 +94,8 @@ module Persistent_signature = struct
       let filename = Load_path.resolve_manifest_location cmi_path in
       begin match filename with
       | Some filename when Sys.file_exists filename ->
-        Some { filename; cmi = read_cmi_lazy filename;
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi;
                visibility = Visible { cmx_guaranteed = false };
                manifest_location = Some cmi_path }
       | Some _ | None ->
@@ -127,15 +107,14 @@ module Persistent_signature = struct
         Load_path.find_normalized_with_origin (unit_name ^ ".cmi")
       with
       | { path = filename; visibility; manifest_location } when allow_hidden ->
-        Some { filename; cmi = read_cmi_lazy filename; visibility;
-               manifest_location }
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility; manifest_location }
       | { path = filename; visibility = (Visible _ as visibility);
           manifest_location } ->
-        Some { filename; cmi = read_cmi_lazy filename; visibility;
-               manifest_location }
+        let cmi = Cmi_cache.read filename in
+        Some { filename; cmi; visibility; manifest_location }
       | { visibility = Hidden; _ }
       | exception Not_found -> None)
->>>>>>> Compiler:HEAD
 end
 
 type can_load_cmis =
@@ -173,14 +152,6 @@ type import = {
      Merlin compares it with [==] against the [Cmi_cache] entry. *)
 }
 
-<<<<<<< Merlin:rebase-chain
-(* If a .cmi file is missing (or failed to load), we store it as Missing in the
-   cache. We use Invalid when a .cmi is present, readable, but is inconsistent.
-   *)
-||||||| Compiler:last-imported
-(* If a .cmi file is missing (or invalid), we
-   store it as Missing in the cache. *)
-=======
 (* The location to record on names resolved through [imp], if any: recording
    is enabled by -persistent-deps, and only cmis found through manifests
    have a location. *)
@@ -192,9 +163,9 @@ let record_cmi_path name imp =
   | None -> name
   | Some cmi_path -> Global_module.Name.with_head_cmi_path name cmi_path
 
-(* If a .cmi file is missing (or invalid), we
-   store it as Missing in the cache. *)
->>>>>>> Compiler:HEAD
+(* If a .cmi file is missing (or failed to load), we store it as Missing in the
+   cache. We use Invalid when a .cmi is present, readable, but is inconsistent.
+   *)
 type import_info =
   | Missing of { hidden_were_allowed : bool }
   | Found of import
@@ -293,18 +264,10 @@ let clear penv =
 
 let clear_missing {imports; _} =
   let missing_entries =
-<<<<<<< Merlin:rebase-chain
-    Hashtbl.fold
+    CUI.Tbl.fold
       (fun name r acc -> match r with
        | Missing _ -> name :: acc
        | Found _ | Invalid _ -> acc)
-||||||| Compiler:last-imported
-    Hashtbl.fold
-      (fun name r acc -> if r = Missing then name :: acc else acc)
-=======
-    CUI.Tbl.fold
-      (fun name r acc -> if r = Missing then name :: acc else acc)
->>>>>>> Compiler:HEAD
       imports []
   in
   List.iter (CUI.Tbl.remove imports) missing_entries
@@ -517,7 +480,6 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_cmi_name = found_name;
     }
   in
-<<<<<<< Merlin:rebase-chain
   begin try
   if not (CU.Name.equal modname found_name) then
     error (Illegal_renaming(modname, found_name, filename));
@@ -543,17 +505,10 @@ let acknowledge_import penv ~check modname pers_sig =
   with Error _ as exn ->
     (* Merlin needs to know that a module was found even if it is invalid to
        properly invalidate the cache. *)
-    Hashtbl.replace imports modname (Invalid import);
+    CUI.Tbl.replace imports modname (Invalid import);
     raise exn
   end;
-  Hashtbl.add imports modname (Found import);
-||||||| Compiler:last-imported
-  if check then check_consistency penv import;
-  Hashtbl.add imports modname (Found import);
-=======
-  if check then check_consistency penv import;
   CUI.Tbl.add imports modname (Found import);
->>>>>>> Compiler:HEAD
   import
 
 let read_import penv ~check modname cmi =
@@ -588,14 +543,8 @@ let find_import ~allow_hidden penv ~check modname =
             match !Persistent_signature.load ~allow_hidden ~unit_name:modname with
             | Some psig -> psig
             | None ->
-<<<<<<< Merlin:rebase-chain
-                Hashtbl.replace imports modname
+                CUI.Tbl.replace imports intf
                   (Missing { hidden_were_allowed = allow_hidden });
-||||||| Compiler:last-imported
-                if allow_hidden then Hashtbl.add imports modname Missing;
-=======
-                if allow_hidden then CUI.Tbl.add imports intf Missing;
->>>>>>> Compiler:HEAD
                 raise Not_found
           in
           add_import penv intf;
@@ -1049,14 +998,8 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_pat
       ps_canonical = true;
     }
   in
-<<<<<<< Merlin:rebase-chain
-  Hashtbl.add persistent_structures modname ps;
-  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
-||||||| Compiler:last-imported
-  Hashtbl.add persistent_structures modname ps;
-=======
   Global_module.Name.Tbl.add persistent_structures modname ps;
->>>>>>> Compiler:HEAD
+  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
   begin match binding with
   | Runtime_parameter id -> Ident.Tbl.add locals_bound_to_runtime_parameters id ()
   | Constant _ -> ()
@@ -1112,18 +1055,10 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
-<<<<<<< Merlin:rebase-chain
 let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
-||||||| Compiler:last-imported
-let check_pers_struct ~allow_hidden penv f ~loc name =
-  let name_as_string = CU.Name.to_string name.Global_module.Name.head in
-=======
-let check_pers_struct ~allow_hidden penv f ~loc name =
   let name_as_string =
     CUI.to_string (CUI.Found.intf name.Global_module.Name.head)
   in
->>>>>>> Compiler:HEAD
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
@@ -1562,12 +1497,15 @@ let with_cmis penv f x =
           (fun () -> f x))
 
 let forall ~found ~invalid ~missing t =
-  Std.Hashtbl.forall t.imports (fun name -> function
-      | Missing _ -> missing name
-      | Found import ->
-        found name import.imp_filename import.imp_cmi_name
-      | Invalid import ->
-        invalid name import.imp_filename import.imp_cmi_name
-    )
+  CUI.Tbl.fold
+    (fun name entry acc ->
+      acc
+      && (match entry with
+          | Missing _ -> missing name
+          | Found import ->
+            found name import.imp_filename import.imp_cmi_name
+          | Invalid import ->
+            invalid name import.imp_filename import.imp_cmi_name))
+    t.imports true
 
 let report_error = Format_doc.compat report_error_doc
