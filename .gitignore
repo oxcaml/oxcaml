@@ -98,6 +98,7 @@ _profile/
 /oc_cppflags.sexp
 /sharedlib_cflags.sexp
 /ocamlopt_stdlib_flags.txt
+/ox_ldflags.txt
 
 # Jane Street Merlin support
 /.local-merlin-binaries

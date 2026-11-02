@@ -204,3 +204,5 @@ TSAN=@tsan@
 # Contains TSan-specific runtime files, or nothing if TSan support is
 # disabled
 TSAN_NATIVE_RUNTIME_C_SOURCES = @tsan_native_runtime_c_sources@
+
+OX_LDFLAGS = @ox_ldflags@
