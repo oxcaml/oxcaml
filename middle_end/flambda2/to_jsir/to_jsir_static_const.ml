@@ -35,7 +35,7 @@ let static_const_not_supported const =
 let bind_expr_to_symbol ~env ~res symbol expr =
   (* The static group's symbols have already been added to the environment. *)
   let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
-  env, To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
+  To_jsir_result.add_instr_exn res (Jsir.Let (jvar, expr))
 
 let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
   match x with
@@ -44,9 +44,8 @@ let const_or_var ~env ~res ~symbol ~to_jsir_const (x : 'a Or_variable.t) =
     (* The static group's symbols have already been added to the environment. *)
     let symbol_var, res = To_jsir_env.get_symbol_exn env ~res symbol in
     let value_var = To_jsir_env.get_var_exn env v in
-    ( env,
-      To_jsir_result.add_var_alias_exn res ~bound_var:symbol_var
-        ~defining_var:value_var )
+    To_jsir_result.add_var_alias_exn res ~bound_var:symbol_var
+      ~defining_var:value_var
 
 let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
   let fields = List.map Simple.With_debuginfo.simple fields in
@@ -66,7 +65,7 @@ let simple_block_or_array ~env ~res ~symbol ~tag ~mut ~array_or_not fields =
     bind_expr_to_symbol ~env ~res symbol
       (Constant (Tuple (Tag.to_int tag, values, array_or_not)))
   else
-    let expr, env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields in
+    let expr, _env, res = To_jsir_shared.block ~env ~res ~tag ~mut ~fields in
     bind_expr_to_symbol ~env ~res symbol expr
 
 let numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not ~to_bits
@@ -259,23 +258,28 @@ let cyclic_block_fields symbol (const : Static_const.t) =
        should not be part of a cycle of static definitions"
       Static_const.print const Symbol.print symbol
 
-let preallocate_block_like ~env ~res symbol const =
+let is_deferred ~symbols_in_cycle field =
+  Simple.pattern_match' field
+    ~const:(fun _ -> false)
+    ~var:(fun _ ~coercion:_ -> false)
+    ~symbol:(fun symbol ~coercion:_ -> Symbol.Set.mem symbol symbols_in_cycle)
+
+let preallocate_block_like ~env ~res ~symbols_in_cycle symbol const =
   let tag, array_or_not, fields = cyclic_block_fields symbol const in
   let placeholder = Jsir.Var.fresh () in
   let res =
     To_jsir_result.add_instr_exn res
       (Let (placeholder, Constant (Int Targetint.zero)))
   in
-  (* Constant fields can be filled in right now, and the others will be set by
-     [initialise_block_like]. *)
+  (* Deferred fields will be set by [initialise_block_like]. *)
   let fields, res =
     List.fold_right
       (fun field (fields, res) ->
-        if Simple.is_const field
-        then
+        if is_deferred ~symbols_in_cycle field
+        then placeholder :: fields, res
+        else
           let var, res = To_jsir_shared.simple ~env ~res field in
-          var :: fields, res
-        else placeholder :: fields, res)
+          var :: fields, res)
       fields ([], res)
   in
   let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
@@ -284,17 +288,17 @@ let preallocate_block_like ~env ~res symbol const =
   To_jsir_result.add_instr_exn res
     (Let (jvar, Block (tag, Array.of_list fields, array_or_not, Maybe_mutable)))
 
-let initialise_block_like ~env ~res symbol const =
+let initialise_block_like ~env ~res ~symbols_in_cycle symbol const =
   let _tag, _array_or_not, fields = cyclic_block_fields symbol const in
   let jvar, res = To_jsir_env.get_symbol_exn env ~res symbol in
   let _index, res =
     let set_field res index field =
-      if Simple.is_const field
-      then res
-      else
+      if is_deferred ~symbols_in_cycle field
+      then
         let var, res = To_jsir_shared.simple ~env ~res field in
         To_jsir_result.add_instr_exn res
           (Set_field (jvar, index, Non_float, var))
+      else res
     in
     List.fold_left
       (fun (index, res) field -> index + 1, set_field res index field)

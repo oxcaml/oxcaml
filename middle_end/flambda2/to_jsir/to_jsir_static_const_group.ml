@@ -178,9 +178,22 @@ let dependency_graph ~env ~code_by_id definitions =
     definitions
   |> Array.to_list
 
+let symbols_defined_by definitions indices =
+  List.fold_left
+    (fun symbols index ->
+      match definitions.(index) with
+      | Code _ -> symbols
+      | Block (symbol, _) -> Symbol.Set.add symbol symbols
+      | Closure (closure_symbols, _) ->
+        Function_slot.Lmap.fold
+          (fun _ symbol symbols -> Symbol.Set.add symbol symbols)
+          closure_symbols symbols)
+    Symbol.Set.empty indices
+
 (* If [defer_initialise] is true, we first pre-allocate a mutable block, and
-   patch the values later - this is used when there is a cyclic dependency.
-   Otherwise, we allocate and initalise the block together. *)
+   patch the fields that refer to the cycle later - this is used when there is a
+   cyclic dependency. Otherwise, we allocate and initialise the block
+   together. *)
 let with_allocated_blocks ~env ~res ~defer_initialise definitions indices ~f =
   let blocks =
     List.filter_map
@@ -190,12 +203,15 @@ let with_allocated_blocks ~env ~res ~defer_initialise definitions indices ~f =
         | Code _ | Closure _ -> None)
       indices
   in
+  let symbols_in_cycle = symbols_defined_by definitions indices in
   let res =
     List.fold_left
       (fun res (symbol, const) ->
         if defer_initialise
-        then To_jsir_static_const.preallocate_block_like ~env ~res symbol const
-        else To_jsir_static_const.block_like ~env ~res symbol const |> snd)
+        then
+          To_jsir_static_const.preallocate_block_like ~env ~res
+            ~symbols_in_cycle symbol const
+        else To_jsir_static_const.block_like ~env ~res symbol const)
       res blocks
   in
   let res = f res in
@@ -203,7 +219,8 @@ let with_allocated_blocks ~env ~res ~defer_initialise definitions indices ~f =
   then
     List.fold_left
       (fun res (symbol, const) ->
-        To_jsir_static_const.initialise_block_like ~env ~res symbol const)
+        To_jsir_static_const.initialise_block_like ~env ~res ~symbols_in_cycle
+          symbol const)
       res blocks
   else res
 

@@ -118,7 +118,7 @@ val external_symbol_var : t -> Symbol.t -> t * Jsir.Var.t
 (** Record that [bound_var], a variable created ahead of its definition, refers
     to [defining_var]. All instances of [bound_var] will later be substituted
     with [defining_var] (or following the chain of aliases if [defining_var] is
-    an alias itself. ). Raises if [bound_var] was already registered. *)
+    an alias itself. Raises if [bound_var] was already registered. *)
 val add_var_alias_exn :
   t -> bound_var:Jsir.Var.t -> defining_var:Jsir.Var.t -> t
 

@@ -36,26 +36,29 @@ val block_like :
   res:To_jsir_result.t ->
   Symbol.t ->
   Static_const.t ->
-  To_jsir_env.t * To_jsir_result.t
+  To_jsir_result.t
 
 (** For a block-like constant that is part of a cycle of static definitions,
     bind the symbol (which must already be in the environment) to a mutable
-    block of the right tag and size, whose non-constant fields hold
-    placeholders. [initialise_block_like] must later be called with the same
-    arguments, once all the fields' values are defined. Raises for constants
-    other than [Block] and [Immutable_value_array]. *)
+    block of the right tag and size. Fields naming a symbol in
+    [symbols_in_cycle] (the symbols defined by the cycle) hold placeholders,
+    while all other fields are filled in. [initialise_block_like] must later be
+    called with the same arguments, once all the fields' values are defined.
+    Raises for constants other than [Block] and [Immutable_value_array]. *)
 val preallocate_block_like :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
+  symbols_in_cycle:Symbol.Set.t ->
   Symbol.t ->
   Static_const.t ->
   To_jsir_result.t
 
-(** Set the non-constant fields of a block allocated by [preallocate_block_like]
+(** Set the placeholder fields of a block allocated by [preallocate_block_like]
     to their values. *)
 val initialise_block_like :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
+  symbols_in_cycle:Symbol.Set.t ->
   Symbol.t ->
   Static_const.t ->
   To_jsir_result.t
