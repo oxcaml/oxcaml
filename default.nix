@@ -28,8 +28,9 @@
   oxcamlLldb ? false,
   syntaxQuotations ? false,
   withMerlin ? true,
-  withAstDependentLibs ? true,
-  withJsoo ? true,
+  # Temporarily off: the vendored ppxlib is reverted while it is upgraded.
+  withAstDependentLibs ? false,
+  withJsoo ? false,
   # Test-only sources for make jsoo-test; not needed to build the compiler.
   withJsooTestSources ? pkgs.lib.inNixShell,
 }:
