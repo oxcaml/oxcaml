@@ -1524,9 +1524,10 @@ let step_find_unboxed_version decl =
 
 let rec find_type_data path env seen =
   match
-    StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
+    StagedPath.Map.find_opt (path_at_current_stage env path)
+      env.local_constraints
   with
-  | decl ->
+  | Some decl ->
     {
       tda_declaration = decl;
       tda_descriptions = Type_abstract (Btype.type_origin decl);
@@ -1534,7 +1535,7 @@ let rec find_type_data path env seen =
       tda_unboxed_version_descriptions = None;
       tda_hidden = false;
     }
-  | exception Not_found -> begin
+  | None -> begin
       match path with
       | Pident id ->
           IdTbl.find_same_without_locks id env.types
