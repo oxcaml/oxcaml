@@ -837,7 +837,7 @@ let mode_region ?region mode =
 
 let enter_region_if cond ?region env expected_mode =
   if cond then
-    Env.add_region_lock env,
+    Env.add_region_lock ?region env,
     mode_region ?region (as_single_mode expected_mode),
     [(Texp_ghost_region, Location.none, [])]
   else
@@ -919,8 +919,17 @@ let mode_partial_application expected_mode =
        |> with_locality_as_regionality ~allocation)
     expected_mode
 
-let mode_trywith expected_mode =
-  { expected_mode with position = RNontail }
+(** The [expected_mode] of the body of a [try], or of the scrutinee of a
+    [match] with exception cases. For environment lookups it is a region, but
+    it is not closed on the normal path (see [Lambda_to_flambda]), so its value
+    is allowed to be local; and it has no tail, so [exclave_] is not allowed
+    in it. *)
+let mode_try_body expected_mode =
+  expected_mode
+  |> as_single_mode
+  |> with_regionality_to_locality_r2g
+  |> with_locality_as_regionality
+  |> mode_default
 
 (* Effect syntax lowers each handled computation and handler RHS into a
    generated function body wrapped with [maybe_region_layout]. Type those
@@ -994,22 +1003,39 @@ let mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app marg =
       (Ctype.get_current_level ()) marg_as_regionality
   in
   if partial_app then mode_default vmode, vmode
-  else match funct.exp_desc, index, position_and_mode.apply_position with
+  else
+  let applied_index args =
+    let rec loop (args : (_ * Primitive.native_repr_or_elided) list)
+        non_elided i =
+      match args with
+      | (_, Elided_void) :: rest ->
+        if i = index then (* This argument was elided *) None
+        else loop rest non_elided (i + 1)
+      | (_, Native_repr _) :: rest ->
+        if i = index then Some non_elided
+        else loop rest (non_elided + 1) (i + 1)
+      | [] -> (* This is an argument in an overapplication *) None
+    in
+    loop args 0 0
+  in
+  match funct.exp_desc, position_and_mode.apply_position with
   | Texp_ident { desc = {val_kind =
-      Val_prim {Primitive.prim_name = ("%sequor"|"%sequand")}};
-                kind = Id_prim _; _ }, 1, Tail ->
+      Val_prim {Primitive.prim_name = ("%sequor"|"%sequand");
+                prim_native_repr_args}};
+                kind = Id_prim _; _ }, Tail
+    when applied_index prim_native_repr_args = Some 1 ->
      (* RHS of (&&) and (||) is at the tail of function region if the
         application is. The argument mode is not constrained otherwise. *)
      { (mode_with_position vmode
           (RTail (Option.get position_and_mode.region_mode, FTail)))
        with return_from_exclave = position_and_mode.return_from_exclave },
      vmode
-  | Texp_ident { kind = Id_prim _; _ }, _, _ ->
+  | Texp_ident { kind = Id_prim _; _ }, _ ->
      (* Other primitives cannot be tail-called *)
      mode_default vmode, vmode
-  | _, _, (Nontail | Default) ->
+  | _, (Nontail | Default) ->
      mode_default vmode, vmode
-  | _, _, Tail -> begin
+  | _, Tail -> begin
     With_regionality.submode_exn
       vmode
       With_regionality.(of_const
@@ -2435,7 +2461,7 @@ let solve_Ppat_tuple ~is_unboxed ~pat_mode loc env args expected_ty =
       (fun (label, _) mode ->
          let jkind, sort =
            Jkind.of_new_sort_var ~why:Jkind.History.Tuple_element
-             ~level:(Ctype.get_current_level ())
+             ~level:(get_current_level ())
          in
         ( label,
           newgenvar jkind,
@@ -4769,7 +4795,9 @@ let rec check_counter_example_pat
     List.iter2
       (fun (_, _, orig_sort) (_, _, _, sort) ->
          (* Sanity check *)
-         assert (Jkind.Sort.equate ~allow_mutation:true orig_sort sort))
+         assert (
+          Jkind.Sort.equate ~allow_mutation:true orig_sort sort
+          |> Result.is_ok))
       tpl expected_tys;
     let tpl_ann = List.combine tpl expected_tys in
     map_fold_cont
@@ -4859,7 +4887,8 @@ let rec check_counter_example_pat
         solve_Ppat_array loc penv mut expected_ty
       in
       assert (
-        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort);
+        Jkind.Sort.equate ~allow_mutation:true original_arg_sort arg_sort
+        |> Result.is_ok);
       map_fold_cont (fun p -> check_rec p ty_elt) tpl
         (fun pl -> mkp k (Tpat_array (mutability, arg_sort, pl)))
   | Tpat_or(tp1, tp2, _) ->
@@ -5727,12 +5756,41 @@ let rec is_nonexpansive exp =
   | Texp_hole _ -> true
 
 and is_nonexpansive_prim (prim : Primitive.description) args =
-  match prim.prim_name, args with
-  | ("%raise" | "%reraise" | "%raise_notrace"), [Nolabel, Arg (e, _)] ->
-    is_nonexpansive e
-  | ("%identity" | "%obj_magic"), [Nolabel, Arg (e, _)]
+  let via_first_non_elided () =
+    let rec loop unelided_arg
+        (prim_args : (_ * Primitive.native_repr_or_elided) list) args =
+      match prim_args, args with
+      | [], [] ->
+        (* Full application with only one unelided arg *)
+        begin match unelided_arg with
+        | Some e -> is_nonexpansive e
+        | None -> false
+        end
+      | (_, Elided_void) :: prim_args,
+        ((Nolabel | Labelled _), Arg _) :: args ->
+        loop unelided_arg prim_args args
+      | (_, Native_repr _) :: prim_args,
+        ((Nolabel | Labelled _), Arg (e, _)) :: args ->
+        begin match unelided_arg with
+        | Some _ -> (* Overapplied primitive *) false
+        | None -> loop (Some e) prim_args args
+        end
+      | _, (((Optional _ | Position _), _) | (_, Omitted _)) :: _ ->
+        (* Optional and positional arguments aren't supported with these
+           primitives. *)
+        false
+      | [], _ | _, [] ->
+        (* E.g. a partial application, shouldn't get special typing. *)
+        false
+    in
+    loop None prim.prim_native_repr_args args
+  in
+  match prim.prim_name with
+  | ("%raise" | "%reraise" | "%raise_notrace") ->
+    via_first_non_elided ()
+  | ("%identity" | "%obj_magic")
     when not (Language_extension.erasable_extensions_only ()) ->
-    is_nonexpansive e
+    via_first_non_elided ()
   | _ -> false
 
 and is_nonexpansive_mod mexp =
@@ -6402,6 +6460,13 @@ let exists_ppat f p =
   | exception Found -> true
   | () -> false
 
+let has_exception_pattern p =
+  exists_ppat
+    (fun p -> match p.ppat_desc with
+       | Ppat_exception _ -> true
+       | _ -> false)
+    p
+
 let contains_polymorphic_variant p =
   exists_ppat
     (function
@@ -6909,7 +6974,9 @@ end = struct
               Ctype.type_sort ~why:sort_why ~allow_mutation:false weak_env
                 ccs_ty
             with
-            | Ok sort -> Jkind.Sort.equate ~allow_mutation:true sort ccs_sort
+            | Ok sort ->
+              Jkind.Sort.equate ~allow_mutation:true sort ccs_sort
+              |> Result.is_ok
             | Error _ -> false
           in
           if not ok then
@@ -8040,11 +8107,19 @@ and type_expect_
         | _ :: _ ->
           effect_handler_modes (loc, Effect_match) env expected_mode
       in
+      let arg_env, arg_expected_mode =
+        if List.exists (fun c -> has_exception_pattern c.pc_lhs) val_caselist
+        then
+          Env.add_region_lock ~region:(loc, Match_with_exception) env,
+          mode_try_body arg_expected_mode
+        else env, arg_expected_mode
+      in
       let arg, sort =
         with_local_level_generalize begin fun () ->
           let expected_ty, sort = new_rep_var ~why:Match () in
           let arg =
-            type_expect env arg_expected_mode sarg (mk_expected expected_ty)
+            type_expect arg_env arg_expected_mode sarg
+              (mk_expected expected_ty)
           in
           arg, sort
         end ~before_generalize:(fun (arg, _) ->
@@ -8085,23 +8160,24 @@ and type_expect_
       let exn_caselist, eff_caselist, eff_conts =
         split_cases [] [] [] caselist
       in
-      let env, arg_mode, body_mode, expected_mode =
+      let env, body_env, arg_mode, body_mode, expected_mode =
         match eff_caselist with
         | [] ->
           env,
+          Env.add_region_lock ~region:(loc, Try_body) env,
           simple_pat_mode
             With_regionality.legacy,
-          mode_trywith
+          mode_try_body
             expected_mode,
           expected_mode
         | _ :: _ ->
           let env, arg_mode, _, expected_mode =
             effect_handler_modes (loc, Effect_try) env expected_mode
           in
-          env, arg_mode, expected_mode, expected_mode
+          env, env, arg_mode, expected_mode, expected_mode
       in
       let body =
-        type_expect env body_mode sbody ty_expected_explained
+        type_expect body_env body_mode sbody ty_expected_explained
       in
       let exn_cases, _ =
         type_cases Value env arg_mode expected_mode
@@ -8661,7 +8737,7 @@ and type_expect_
       let (ty, exp_extra) =
         let mode_with_locality =
           Mode.With_locality.Const.Option.value
-            (Typemode.apply_mode_implications modes.mode_modes)
+            (Mode.Const.apply_implications modes.mode_modes)
             ~default:Mode.With_locality.Const.legacy
         in
         type_constraint env sty mode_with_locality
@@ -9807,7 +9883,7 @@ and type_constraint_expect
   let ret, ty, exp_extra =
     let type_mode =
       With_locality.Const.Option.value ~default:With_locality.Const.legacy
-        (Typemode.apply_mode_implications type_mode)
+        (Mode.Const.apply_implications type_mode)
     in
     match constraint_ with
     | Pcoerce (ty_constrain, ty_coerce) ->
@@ -9967,7 +10043,7 @@ and type_ident env ?(recarg=Rejected) lid =
        | _ -> ()
        end;
        let yielding =
-         prim_params_yielding env ty ~arity:prim.prim_arity
+         prim_params_yielding env ty ~arity:prim.prim_type_arity
        in
        [], ty,
        Id_prim (Option.map Locality.disallow_right mode, sort, yielding)
@@ -9982,7 +10058,7 @@ and type_ident env ?(recarg=Rejected) lid =
             (Staticity.of_const ~hint:Lpoly_inst Static)
        end;
        let layout_args, val_type =
-         Jkind_types.Sort.instance_with ~level:(get_current_level ())
+         Jkind.Sort.instance_with ~level:(get_current_level ())
            lvars
            (fun () -> instance desc.val_type)
        in
@@ -12581,7 +12657,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             ~on_determined:(fun () -> generalize ty)
             ~on_to_generalize:(fun loc ->
               let (), genvars =
-                Jkind_types.Sort.generalize_with (fun () -> generalize ty)
+                Jkind.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty genvars then
                 Error.log_and_raise loc env Useless_lpoly;
@@ -13160,7 +13236,11 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.type_list,
         (fun tcomp -> Texp_list_comprehension tcomp),
         comp,
-        Predef.list_argument_jkind
+        (* Although [list] takes an [any] parameter, list comprehensions
+           require value elements (see [transl_list_comprehension.ml]). *)
+        (* CR layouts: Lift this. *)
+        Jkind.Builtin.value_or_null
+          ~why:Jkind.History.List_comprehension_element
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
         | Mutable   ->

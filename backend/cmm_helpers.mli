@@ -154,6 +154,8 @@ val or_int : expression -> expression -> Debuginfo.t -> expression
 
 val xor_int : expression -> expression -> Debuginfo.t -> expression
 
+val not_int : expression -> Debuginfo.t -> expression
+
 (** Similar to [add_int] but produces a result with machtype [Addr] iff
     [ptr_out_of_heap] is [false]. *)
 val add_int_ptr :
@@ -1236,6 +1238,8 @@ val apply_function :
   Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
 
 val fail_if_called_indirectly_function : unit -> Cmm.phrase list
+
+val emit_divide_by_zero_message : unit -> Cmm.phrase list
 
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 

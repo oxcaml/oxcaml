@@ -9,8 +9,14 @@ L.[([1;2]:int list);"2";[3;4];"4";[5]];;
 open L;;
 [1;"2";3;"4";5];;
 
+(* Re-exporting [list] requires an [any] annotation, since [list] takes an
+   [any] parameter *)
 module L = struct
         type 'a t = 'a list = [] | (::) of 'a * 'a t
+end;;
+
+module L = struct
+        type ('a : any) t = 'a list = [] | (::) of 'a * 'a t
 end;;
 L.[[1];[2];[3];[4];[5]];;
 open L;;

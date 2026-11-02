@@ -87,9 +87,15 @@ module Sort : sig
 
   include With_backtracking.S with module Change := Change
 
-  val equate : allow_mutation:bool -> t -> t -> bool
+  val set_add_to_pool : (level:int -> t -> unit) -> unit
 
-  val constrain_addressable : allow_mutation:bool -> t -> bool
+  (** Use [Jkind.Sort.instance_with] instead, which passes in [new_var]. *)
+  val instance_with :
+    new_var:(unit -> var) -> var list -> (unit -> 'a) -> var list * 'a
+
+  val equate : allow_mutation:bool -> t -> t -> (unit, error) result
+
+  val constrain_addressable : allow_mutation:bool -> t -> (unit, error) result
 
   val strip_head_addressable : t -> t
 
@@ -107,7 +113,7 @@ module Sort : sig
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
-  val decompose_into_product : t -> int -> t list option
+  val decompose_into_product : t -> int -> (t list, error) result
 
   module Flat : sig
     type t =
@@ -239,8 +245,6 @@ module Layout : sig
   end
 
   val of_const : Const.t -> Sort.t t
-
-  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
 
   val get_const : Sort.t t -> Const.t option
 

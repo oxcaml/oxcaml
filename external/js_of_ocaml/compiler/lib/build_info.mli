@@ -64,6 +64,7 @@ type kind =
   | `Exe
   | `Cmo
   | `Cma
+  | `Cmj
   | `Unknown
   ]
 

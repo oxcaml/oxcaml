@@ -1393,6 +1393,8 @@ module Named = struct
 
   let apply_renaming = apply_renaming_named
 
+  let ids_for_export = ids_for_export_named
+
   let at_most_generative_effects (t : t) =
     match t with
     | Simple _ -> true

@@ -293,7 +293,7 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
 module type Total = sig
-  (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
+  (** A lattice is a total order iff for any [a] [b], [a <= b] or [b <= a].
 
       If it's also finite, then the ordering can be represented as a monotone
       injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
@@ -1101,6 +1101,12 @@ module type S = sig
       With_locality.Const.t -> With_regionality.Const.t
 
     val value_to_alloc_r2l : With_regionality.Const.t -> With_locality.Const.t
+
+    val apply_implications :
+      With_locality.Const.Option.t -> With_locality.Const.Option.t
+
+    val erase_implications :
+      With_locality.Const.t -> With_locality.Const.Option.t
 
     module Axis : sig
       val with_locality_as_regionality :

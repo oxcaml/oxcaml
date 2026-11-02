@@ -309,7 +309,7 @@ let set_of_closures env fun_decls value_slots =
     in
     List.map convert value_slots |> Value_slot.Map.of_list
   in
-  Set_of_closures.create ~value_slots fun_decls
+  Set_of_closures.create ~value_slots ~dbg:Debuginfo.none fun_decls
 
 let apply_cont env acc ({ cont; args; trap_action } : Fexpr.apply_cont) =
   let trap_action : Trap_action.t option =

@@ -642,25 +642,29 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
 
 let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
+  let same_as_ocaml_repr (sort : Jkind.Sort.Const.t) =
+    match sort with
+    | Base Void -> []
+    | Base _ ->
+      let kind =
+        Typeopt.layout_of_non_void_sort sort
+        |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
+             ~machine_width
+        |> K.With_subkind.kind
+      in
+      [{ kind; arg_transformer = None; return_transformer = None }]
+    | Univar _ -> Misc.fatal_error "unarize_extern_repr: unexpected univar"
+    | Genvar _ -> Misc.fatal_error "unarize_extern_repr: unexpected genvar"
+    | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
+    | Addressable sort ->
+      (* Addressability does not affect the non-boxed representation *)
+      unarize_const_sort_for_extern_repr sort
+  in
   match extern_repr with
-  | Same_as_ocaml_repr (Base Void) -> []
-  | Same_as_ocaml_repr (Base _ as sort) ->
-    let kind =
-      Typeopt.layout_of_non_void_sort sort
-      |> K.With_subkind.from_lambda_values_and_unboxed_numbers_only
-           ~machine_width
-      |> K.With_subkind.kind
-    in
-    [{ kind; arg_transformer = None; return_transformer = None }]
-  | Same_as_ocaml_repr (Univar _) ->
-    Misc.fatal_error "unarize_extern_repr: unexpected univar"
-  | Same_as_ocaml_repr (Genvar _) ->
-    Misc.fatal_error "unarize_extern_repr: unexpected genvar"
-  | Same_as_ocaml_repr (Product sorts) ->
-    List.concat_map unarize_const_sort_for_extern_repr sorts
-  | Same_as_ocaml_repr (Addressable sort) ->
-    (* Addressability does not affect the non-boxed representation *)
-    unarize_const_sort_for_extern_repr sort
+  | Same_as_ocaml_repr sort -> same_as_ocaml_repr sort
+  | Unpacked_product sort ->
+    (* Unarized like an ordinary unboxed product; see [Lambda.extern_repr]. *)
+    same_as_ocaml_repr sort
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -726,9 +730,65 @@ let unarize_extern_repr ~machine_width alloc_mode
         return_transformer = Some P.Tag_immediate
       } ]
 
+let rec arity_component_of_const_sort_for_extern_repr
+    (sort : Jkind.Sort.Const.t) :
+    [`Complex] Flambda_arity.Component_for_creation.t =
+  match sort with
+  | Base _ -> (
+    match unarize_const_sort_for_extern_repr sort with
+    | [] ->
+      (* Void, the nullary unboxed product. *)
+      Flambda_arity.Component_for_creation.Unboxed_product []
+    | [{ kind; _ }] ->
+      Flambda_arity.Component_for_creation.Singleton
+        (K.With_subkind.anything kind)
+    | _ :: _ :: _ ->
+      Misc.fatal_error
+        "Base sorts never unarize to more than one kind for [extern_repr] \
+         purposes")
+  | Product sorts ->
+    Flambda_arity.Component_for_creation.Unboxed_product
+      (List.map arity_component_of_const_sort_for_extern_repr sorts)
+  | Addressable sort ->
+    (* Addressability does not affect the non-boxed representation *)
+    arity_component_of_const_sort_for_extern_repr sort
+  | Univar _ ->
+    Misc.fatal_error
+      "arity_component_of_const_sort_for_extern_repr: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error
+      "arity_component_of_const_sort_for_extern_repr: unexpected genvar"
+
+(* An [@unpacked] product contributes one singleton component per unarized
+   element, and an ordinary unboxed product contributes a single product
+   component (see [Lambda.extern_repr]). *)
+let arity_components_of_extern_repr ~machine_width alloc_mode
+    (extern_repr : Lambda.extern_repr) :
+    [`Complex] Flambda_arity.Component_for_creation.t list =
+  match extern_repr with
+  | Same_as_ocaml_repr ((Product _ | Base Void | Addressable _) as sort) ->
+    [arity_component_of_const_sort_for_extern_repr sort]
+  | Unpacked_product _ ->
+    List.map
+      (fun { kind; _ } ->
+        Flambda_arity.Component_for_creation.Singleton
+          (K.With_subkind.anything kind))
+      (unarize_extern_repr ~machine_width alloc_mode extern_repr)
+  | Same_as_ocaml_repr (Base _ | Univar _ | Genvar _)
+  | Unboxed_float _ | Unboxed_vector _ | Unboxed_mask
+  | Unboxed_or_untagged_integer _ -> (
+    match unarize_extern_repr ~machine_width alloc_mode extern_repr with
+    | [{ kind; _ }] ->
+      [ Flambda_arity.Component_for_creation.Singleton
+          (K.With_subkind.anything kind) ]
+    | [] | _ :: _ :: _ ->
+      Misc.fatal_error
+        "This [extern_repr] should have unarized to exactly one kind")
+
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
-        prim_arity;
+        prim_type_arity = _;
+        prim_apply_arity;
         prim_alloc;
         prim_c_builtin;
         prim_effects;
@@ -820,14 +880,25 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       Apply_cont_expr.continuation apply_cont, false
     | _ -> Continuation.create (), true
   in
-  (* Unlike for OCaml function calls, we don't preserve unboxed product arity
-     information here, as there is no partial application etc. *)
-  let[@inline] build_arity unarized =
-    List.map (fun { kind; _ } -> K.With_subkind.anything kind) unarized
-    |> Flambda_arity.create_singletons
+  (* Unboxed products are not unarized here: [To_cmm_extcall] needs their
+     structure to lay out the corresponding C structs. *)
+  let param_arity =
+    List.concat_map
+      (fun (_mode, repr) ->
+        arity_components_of_extern_repr ~machine_width alloc_mode repr)
+      prim_native_repr_args
+    |> Flambda_arity.create
   in
-  let param_arity = build_arity unarized_params in
-  let return_arity = build_arity unarized_results in
+  let return_arity =
+    let arity =
+      arity_components_of_extern_repr ~machine_width alloc_mode
+        (snd prim_native_repr_res)
+      |> Flambda_arity.create
+    in
+    if Flambda_arity.cardinal_unarized arity = 0
+    then Flambda_arity.nullary
+    else arity
+  in
   let effects = Effects.from_lambda prim_effects in
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =
@@ -846,7 +917,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (* Some C primitives have implementations within Flambda itself. *)
     let[@inline] unboxed_int64_to_and_from_unboxed_float ~src_kind ~dst_kind ~op
         =
-      if prim_arity <> 1
+      if prim_apply_arity <> 1
       then Misc.fatal_errorf "Expected arity one for %s" prim_native_name
       else
         match prim_native_repr_args, prim_native_repr_res with
@@ -998,7 +1069,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
 
 let close_c_call acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
-        prim_arity = _;
+        prim_type_arity = _;
+        prim_apply_arity = _;
         prim_alloc;
         prim_c_builtin;
         prim_effects;
@@ -1418,7 +1490,8 @@ type simplified_block_load =
   | Block_but_cannot_simplify of Code_or_metadata.t Value_approximation.t
   | Field_contents of Simple.t
 
-let simplify_block_load acc body_env ~block ~field : simplified_block_load =
+let simplify_block_load acc body_env ~block ~field ~result_kind :
+    simplified_block_load =
   match find_value_approximation_through_symbol acc body_env block with
   | Unknown _ -> Unknown
   | Closure_approximation _ | Value_symbol _ | Value_const _ -> Not_a_block
@@ -1427,9 +1500,18 @@ let simplify_block_load acc body_env ~block ~field : simplified_block_load =
       let i = Target_ocaml_int.to_int field in
       if i >= Array.length approx then None else Some approx.(i)
     in
+    (* An unreachable match arm may project a different constructor's layout, so
+       the field may not have the kind the load expects. As for an out-of-bounds
+       field, such a load is treated as [Not_a_block] rather than propagating
+       contents of the wrong kind. *)
+    let field_contents simple ~kind =
+      if K.equal kind result_kind then Field_contents simple else Not_a_block
+    in
     match approx with
-    | Some (Value_symbol sym) -> Field_contents (Simple.symbol sym)
-    | Some (Value_const c) -> Field_contents (Simple.const c)
+    | Some (Value_symbol sym) ->
+      field_contents (Simple.symbol sym) ~kind:K.value
+    | Some (Value_const c) ->
+      field_contents (Simple.const c) ~kind:(Reg_width_const.kind c)
     | Some approx -> Block_but_cannot_simplify approx
     | None -> Not_a_block)
 
@@ -1708,7 +1790,10 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                (Bound_static.create [Bound_static.Pattern.block_like symbol]))
             defining_expr ~body
         | Prim (Unary (Block_load { field; _ }, block), _) -> (
-          match simplify_block_load acc body_env ~block ~field with
+          match
+            simplify_block_load acc body_env ~block ~field
+              ~result_kind:(K.With_subkind.kind kind)
+          with
           | Unknown -> bind acc body_env
           | Not_a_block ->
             if Flambda_features.kind_checks ()
@@ -3351,7 +3436,31 @@ let close_functions acc external_env ~current_alloc_region ~current_region
       (Function_decls.alloc_mode function_declarations)
       ~current_alloc_region ~current_region
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let dbg =
+    (* Choose the debuginfo with the earliest source location. *)
+
+    (* CR mshinwell: This choice is somewhat arbitrary, and has a known problem
+       with zero_alloc. The location of a function carries that function's own
+       definition-site [@zero_alloc assume] (see [transl_function]), and the
+       zero_alloc checker consults the debuginfo of allocations. So the
+       allocation of the set, which happens in the enclosing function, is hidden
+       from the check of the enclosing function if the earliest function in the
+       set is marked [assume], but not if a later one is. Taking the assume from
+       the scopes enclosing the set's functions (the same for all members) would
+       remove both the leak and the order dependence. Unioning the members'
+       debuginfo might also be better for the source locations. Needs
+       thought. *)
+    List.map
+      (fun decl -> Debuginfo.from_location (Function_decl.loc decl))
+      func_decl_list
+    |> List.sort Debuginfo.compare
+    |> function
+    | [] -> Debuginfo.none
+    | dbg :: _ -> dbg
+  in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   let acc =
     Acc.add_set_of_closures_offsets ~is_phantom:false acc set_of_closures
   in
@@ -4173,7 +4282,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
           let pos_str = string_of_int pos in
           let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
           let block = module_block_simple in
-          match simplify_block_load acc env ~block ~field with
+          match
+            simplify_block_load acc env ~block ~field
+              ~result_kind:(kind_of_field pos)
+          with
           | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
             Let_bound
               ( Variable.create ("field_" ^ pos_str) (kind_of_field pos),

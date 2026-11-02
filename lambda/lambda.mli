@@ -500,15 +500,22 @@ type primitive =
   | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
-    compiled away. *)
+    compiled away.
+
+    [Unpacked_product] (from [@unpacked]) and a [Same_as_ocaml_repr] product
+    differ only in native-code calling convention: the former's components
+    are passed as separate C arguments, and the latter is passed as the
+    corresponding C struct. *)
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
+  | Unpacked_product of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
-and external_call_description = extern_repr Primitive.description_gen
+and external_call_description =
+  (extern_repr, extern_repr) Primitive.description_gen
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -1336,7 +1343,7 @@ val layout_instance_var : layout
 val layout_method : layout
 val layout_initializer : layout
 val layout_array_comprehension_element : layout
-val layout_list_element : layout
+val layout_list_comprehension_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
 val layout_block_idx : layout
