@@ -1,0 +1,4 @@
+File "libd/d.ml", line 1, characters 11-12:
+1 | module M = A
+               ^
+Error: Unbound module A

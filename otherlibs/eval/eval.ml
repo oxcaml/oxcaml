@@ -174,12 +174,14 @@ let eval (expr : 'a expr) =
    then
      Persistent_env.Persistent_signature.load
        := fun ~allow_hidden:_ ~unit_name ->
+            let unit_name = Compilation_unit_intf.Found.intf unit_name in
             Option.map
               (fun cmi ->
                 { Persistent_env.Persistent_signature.filename =
                     Compilation_unit.Name.to_string unit_name;
                   cmi;
-                  visibility = Visible { cmx_guaranteed = false }
+                  visibility = Visible { cmx_guaranteed = false };
+                  manifest_location = None
                 })
               (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in
