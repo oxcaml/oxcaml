@@ -2931,7 +2931,7 @@ let bigarray_word_kind : Lambda.bigarray_kind -> memory_chunk = function
   | Pbigarray_int32 -> Thirtytwo_signed
   | Pbigarray_int64 -> Sixtyfour
   | Pbigarray_caml_int -> Sixtyfour
-  | Pbigarray_native_int -> Word_int
+  | Pbigarray_native_int -> Sixtyfour
   | Pbigarray_complex32 -> Single { reg = Float64 }
   | Pbigarray_complex64 -> Double
 
@@ -3190,7 +3190,7 @@ let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
 let unaligned_load_64 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
   then
-    Cop (mk_load_mut Word_int, [add_int_ptr ~ptr_out_of_heap ptr idx dbg], dbg)
+    Cop (mk_load_mut Sixtyfour, [add_int_ptr ~ptr_out_of_heap ptr idx dbg], dbg)
   else
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
