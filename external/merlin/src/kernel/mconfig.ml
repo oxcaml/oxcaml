@@ -532,6 +532,7 @@ let ocaml_ignored_flags =
     "-pack";
     "-remove-unused-arguments";
     "-S";
+    "-set-runtime-default";
     "-shared";
     "-unbox-closures";
     "-unboxed-types";

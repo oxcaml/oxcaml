@@ -28,6 +28,7 @@ Apply functions:
 Send functions:
 Force link: no
 Static data: Question//0[ (missing); ]
+Requires caml_standard_library_nat: no
 File question.cmx
 Name: Question
 CRC of implementation: 00000000000000000000000000000000
@@ -72,3 +73,4 @@ Apply functions:
 Send functions:
 Force link: no
 Static data: Question//0[ (missing); ]
+Requires caml_standard_library_nat: no

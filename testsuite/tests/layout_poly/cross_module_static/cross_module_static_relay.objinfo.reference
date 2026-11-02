@@ -38,3 +38,4 @@ Static data:
                               (global static Cross_module_static_lib!)))⟫ })
                     x/318)⟫ })
               { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ }))
+Requires caml_standard_library_nat: no

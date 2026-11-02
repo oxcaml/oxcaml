@@ -163,3 +163,6 @@ val tsan : bool
 
 val address_sanitizer : bool
 (** Whether AddressSanitizer support has been enabled at configure time *)
+
+val has_relative_libdir : bool
+(** Whether the compiler has been configured using --with-relative-libdir *)

@@ -21,7 +21,6 @@
 let boot_cannot_call s = "/ The boot compiler should not call " ^ s
 
 let bindir = "/tmp"
-let standard_library_default = "/tmp"
 let ccomp_type = "n/a"
 let c_compiler = boot_cannot_call "the C compiler"
 let c_compiler_vendor = ""
@@ -30,6 +29,7 @@ let c_has_debug_prefix_map = false
 let as_debug_prefix_map_flag = ""
 let as_compress_debug_sections_flag = ""
 let cc_compress_debug_sections_flag = ""
+let as_is_cc = false
 let bytecode_cflags = ""
 let bytecode_cppflags = ""
 let native_cflags = ""

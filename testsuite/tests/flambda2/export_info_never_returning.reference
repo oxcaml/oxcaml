@@ -27,3 +27,4 @@ Force link: no
 Static data: Export_info_never_returning//0[ ]
 Function summaries for static checks:
 		camlExport_info_never_returning__entry = 0x15
+Requires caml_standard_library_nat: no
