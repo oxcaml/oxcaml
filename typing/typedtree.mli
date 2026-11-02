@@ -385,14 +385,10 @@ and 'k pattern_desc =
       value pattern_desc
         (** addr_ P        (flag = Mutable)
             addr_imm_ P    (flag = Immutable) *)
-  | Tpat_deref :
-      Types.mutability * deref block_access * deref unboxed_access list
-      * value general_pattern ->
-      value pattern_desc
+  | Tpat_deref : value general_pattern -> value pattern_desc
         (** deref_ P
 
-            Invariants: the pattern is a variable, and the access descriptors
-            must correspond to the surrounding patterns. *)
+            P is a variable. *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)

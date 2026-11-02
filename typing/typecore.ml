@@ -4657,7 +4657,7 @@ and type_pat_aux
           addr_sort
       in
       rvp {
-        pat_desc = Tpat_deref (position_mutability, base, unboxed, p1);
+        pat_desc = Tpat_deref p1;
         pat_loc = loc; pat_extra=[];
         pat_type = instance expected_ty;
         pat_attributes = sp.ppat_attributes;
@@ -5198,7 +5198,7 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref (mutability, ba, uas, tp1) ->
+  | Tpat_deref _ ->
       (* CR address-patterns: deref patterns aren't always refuted. E.g. this
          case is rejected:
          {[
@@ -5207,9 +5207,7 @@ let rec check_counter_example_pat
              match x with
              | (deref_ y, ()) -> .
          ]} *)
-      let ty_addr, _ = solve_Ppat_deref !!penv mutability expected_ty in
-      check_rec tp1 ty_addr
-        (fun p1 -> mkp k (Tpat_deref (mutability, ba, uas, p1)))
+      mkp k tp.pat_desc
 
 let check_counter_example_pat ~counter_example_args penv tp expected_ty =
   (* [check_counter_example_pat] doesn't use [type_pat_state] in an interesting
