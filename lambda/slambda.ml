@@ -187,15 +187,15 @@ and Env : sig
 
   val empty : t
 
-  val add_ident : t -> Ident.t -> layout -> Types.value Or_missing.t -> t
+  val bind_value : t -> Ident.t -> layout -> Types.value Or_missing.t -> t
 
-  val add_sort_var : t -> Layout_ident.t -> layout -> t
+  val bind_layout : t -> Layout_ident.t -> layout -> t
 
   val find_value : t -> Ident.t -> Types.value Or_missing.t
 
-  val find_layout : t -> Ident.t -> layout
+  val find_layout_of_ident : t -> Ident.t -> layout
 
-  val find_sort_var : t -> Layout_ident.t -> layout
+  val find_layout : t -> Layout_ident.t -> layout
 end = struct
   type t =
     { idents : (layout * Types.value Or_missing.t) Ident.Map.t;
@@ -204,10 +204,10 @@ end = struct
 
   let empty = { idents = Ident.Map.empty; sort_vars = Layout_ident.Map.empty }
 
-  let add_ident t id layout value =
+  let bind_value t id layout value =
     { t with idents = Ident.Map.add id (layout, value) t.idents }
 
-  let add_sort_var t var layout =
+  let bind_layout t var layout =
     { t with sort_vars = Layout_ident.Map.add var layout t.sort_vars }
 
   let find_value t id =
@@ -215,14 +215,14 @@ end = struct
     | Some (_, value) -> value
     | None -> Or_missing.Missing
 
-  let find_layout t id =
+  let find_layout_of_ident t id =
     match Ident.Map.find_opt id t.idents with
     | Some (layout, _) -> layout
     | None ->
       Misc.fatal_errorf "Slambda: no layout bound for variable %a" Ident.print
         id
 
-  let find_sort_var t var =
+  let find_layout t var =
     match Layout_ident.Map.find_opt var t.sort_vars with
     | Some layout -> layout
     | None ->
@@ -563,7 +563,7 @@ and eval_mixed_block_element :
  fun env old_element ->
   match old_element with
   | Splice_variable var ->
-    Env.find_sort_var env var |> mixed_block_element_of_layout
+    Env.find_layout env var |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
@@ -576,7 +576,7 @@ and eval_mixed_block_element :
 
 and eval_layout env old_layout =
   match old_layout with
-  | Psplicevar var -> Env.find_sort_var env var
+  | Psplicevar var -> Env.find_layout env var
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -721,7 +721,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          { c = body_c; r = << let id = def_r in body_r >> } *)
     let new_def = eval_lam ~name:(Ident.name id) ctx env old_def in
     let new_layout = eval_layout env old_layout in
-    let body_env = Env.add_ident env id new_layout new_def.slv_comptime in
+    let body_env = Env.bind_value env id new_layout new_def.slv_comptime in
     let new_body = eval_lam ?name ctx body_env old_body in
     { slv_comptime = new_body.slv_comptime;
       slv_runtime =
@@ -761,7 +761,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     let body_env =
       List.fold_left
         (fun env ({ id; _ } : rec_binding) ->
-          Env.add_ident env id layout_function Missing)
+          Env.bind_value env id layout_function Missing)
         env old_bindings
     in
     let new_bindings =
@@ -842,7 +842,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
     in
     let handler_env =
       List.fold_left
-        (fun env (id, _, layout) -> Env.add_ident env id layout Missing)
+        (fun env (id, _, layout) -> Env.bind_value env id layout Missing)
         env new_params
     in
     let new_handler = eval_dynamic ctx handler_env old_handler in
@@ -858,7 +858,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Ltrywith (old_body, id, uid, old_handler, old_layout) ->
     (* Exceptions are runtime-only. *)
     let new_body = eval_dynamic ctx env old_body in
-    let handler_env = Env.add_ident env id layout_exception Missing in
+    let handler_env = Env.bind_value env id layout_exception Missing in
     let new_handler = eval_dynamic ctx handler_env old_handler in
     let new_layout = eval_layout env old_layout in
     dynamic
@@ -907,7 +907,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        need to expand the body. *)
     let new_from = eval_dynamic ctx env old_from in
     let new_to = eval_dynamic ctx env old_to in
-    let body_env = Env.add_ident env for_id layout_int Missing in
+    let body_env = Env.bind_value env for_id layout_int Missing in
     let new_body = eval_dynamic ctx body_env old_body in
     dynamic
       (if new_from == old_from && new_to == old_to && new_body == old_body
@@ -1069,7 +1069,7 @@ and eval_lfunction ctx env
   let new_params = Misc.Stdlib.List.map_sharing (eval_lparam env) old_params in
   let body_env =
     List.fold_left
-      (fun env { name; layout; _ } -> Env.add_ident env name layout Missing)
+      (fun env { name; layout; _ } -> Env.bind_value env name layout Missing)
       env new_params
   in
   let new_body = eval_dynamic ctx body_env old_body in
@@ -1412,7 +1412,7 @@ and eval_template ?name ctx env template =
   let clo_runtime_env =
     Lambda.free_variables (Lfunction func)
     |> Ident.Set.to_list
-    |> List.map (fun id -> id, Env.find_layout env id)
+    |> List.map (fun id -> id, Env.find_layout_of_ident env id)
   in
   let new_shape =
     Misc.Stdlib.Array.of_list_map
@@ -1520,8 +1520,7 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
       try
         List.fold_left2
           (fun env var arg ->
-            Env.add_sort_var env var
-              (arg |> expect_not_missing |> expect Tlayout))
+            Env.bind_layout env var (arg |> expect_not_missing |> expect Tlayout))
           clo_env ktmpl_params args
       with Invalid_argument _ ->
         Misc.fatal_error "Layout poly kind function should be fully applied."
@@ -1546,7 +1545,8 @@ and eval_apply ctx { clo_template; clo_runtime_env; clo_env } args =
     let body_env =
       try
         List.fold_left2
-          (fun env { name; layout; _ } arg -> Env.add_ident env name layout arg)
+          (fun env { name; layout; _ } arg ->
+            Env.bind_value env name layout arg)
           clo_env new_params args
       with Invalid_argument _ ->
         Misc.fatal_error
