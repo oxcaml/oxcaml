@@ -2105,9 +2105,9 @@ let () = A_anon.c := (None : int id option)
 let (_ : bool id option) = A_anon.get ()
 [%%expect{|
 module K_anon : sig kind_ ka = value end
-module A_anon :
-  sig val c : '_weak9 id option ref val get : unit -> '_weak10 id option end
-- : bool id option = None
+>> Fatal error: Subst.typexp: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* As above, but with an anonymous argument. *)
@@ -2119,14 +2119,9 @@ module A_anon_arg =
 let () = A_anon_arg.c := (None : int id option)
 let (_ : bool id option) = A_anon_arg.get ()
 [%%expect{|
-module A_anon_arg :
-  sig val c : '_weak11 id option ref val get : unit -> '_weak11 id option end
-Line 7, characters 27-44:
-7 | let (_ : bool id option) = A_anon_arg.get ()
-                               ^^^^^^^^^^^^^^^^^
-Error: This expression has type "int id option"
-       but an expression was expected of type "bool id option"
-       Type "int" is not compatible with type "bool"
+>> Fatal error: Ctype.nondep_type_rec: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* As above, but with an [include functor] application. *)
@@ -2140,13 +2135,9 @@ end
 let () = M_include_anon_functor.c := (None : int id option)
 let (_ : bool id option) = M_include_anon_functor.get ()
 [%%expect{|
-module M_include_anon_functor :
-  sig
-    kind_ ka = value
-    val c : '_weak12 id option ref
-    val get : unit -> '_weak13 id option
-  end
-- : bool id option = None
+>> Fatal error: Ctype.nondep_type_rec: weak variable copy
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (*****************************************************)
