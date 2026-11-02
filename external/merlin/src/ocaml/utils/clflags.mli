@@ -66,6 +66,8 @@ val for_package          : string option ref
 val debug                : bool ref
 val unsafe               : bool ref
 val opaque               : bool ref
+val persistent_deps      : bool ref
+val use_persistent_deps : bool ref
 val unboxed_types        : bool ref
 val all_profile_columns : profile_column list
 val profile_columns : profile_column list ref
