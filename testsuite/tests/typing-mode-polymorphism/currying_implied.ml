@@ -143,6 +143,12 @@ type 'a cell = { mutable v : 'a; }
 let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
 val store_and_call :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('p) & past('o) & global uncontended read_write] ->
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('p) mod many forkable unyielding | nonportable stateful]) @ [> past('o) mod many forkable unyielding | nonportable stateful] =
+  <fun>
+|}, Principal{|
+val store_and_call :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global uncontended read_write] ->
   ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>

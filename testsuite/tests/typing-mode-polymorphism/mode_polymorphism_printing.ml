@@ -324,6 +324,12 @@ let foo (x : intref) (f : intref @ local -> int) = f x
 [%%expect{|
 type intref = { mutable v : int; }
 val foo :
+  intref @ [< past('m) & global uncontended read_write] ->
+  ((intref @ local -> int) @ 'n -> int @ [> dynamic]) @ [> past('m) mod many portable forkable unyielding stateless | nonportable stateful] =
+  <fun>
+|}, Principal{|
+type intref = { mutable v : int; }
+val foo :
   intref @ [< global uncontended read_write] ->
   (intref @ local -> int) @ 'm -> int @ [> dynamic] = <fun>
 |}]
@@ -695,9 +701,6 @@ Error: This expression has type "('a -> 'b -> 'a) ref"
 Hint: This function application is partial, maybe some arguments are missing.
 |}]
 
-(* CR dkalinichenko: with [-principal], [past('p)] on the final closure
-   should also appear as an upper bound on [c]. *)
-
 type 'a cell = { mutable v : 'a }
 
 let store_and_read c x () =
@@ -705,6 +708,13 @@ let store_and_read c x () =
   let _ = c.v in
   ()
 [%%expect{|
+type 'a cell = { mutable v : 'a; }
+val store_and_read :
+  'a cell @ [< past('n) & past('m) & global uncontended read_write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   (unit @ 'p -> unit @ 'o) @ [> past('n) mod many forkable unyielding | nonportable stateful]) @ [> past('m) mod many forkable unyielding | nonportable stateful] =
+  <fun>
+|}, Principal{|
 type 'a cell = { mutable v : 'a; }
 val store_and_read :
   'a cell @ [< global uncontended read_write] ->

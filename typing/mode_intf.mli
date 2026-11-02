@@ -915,6 +915,9 @@ module type S = sig
 
     val meet_const_morph : 'a -> ('a, 'a, allowed * disallowed) C.morph
 
+    val monadic_to_comonadic_min_morph :
+      (Monadic.Const.t, Comonadic.Const.t, allowed * disallowed) C.morph
+
     val pretty_print_monadic_morph :
       (Fmt.formatter -> 'a -> unit) ->
       'a ->

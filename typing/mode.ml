@@ -7002,6 +7002,9 @@ module Mode_with (Areality : Areality) = struct
 
   let meet_const_morph a = C.Simple (C.Simple_morph.Meet_const a)
 
+  let monadic_to_comonadic_min_morph =
+    C.Simple (C.Simple_morph.Core C.Core_morph.Monadic_op_to_comonadic_min)
+
   (* only print the interesting parts of the monadic meet; omit max (min due to
       flipping of Monadic axis) modes *)
   let monadic_meet_atoms c =

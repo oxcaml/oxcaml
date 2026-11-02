@@ -2106,20 +2106,25 @@ end = struct
       | Simple_name { src; _ } -> mem_head heads src
       | Comonadic_name { src; _ } -> mem_head heads src
     in
+    let is_id f = eq_morph With_locality.obj_comonadic f C.id in
     List.for_all
       (function
-        | Upper_comonadic { c_name = Comonadic_name { target; _ }; _ } ->
-          mem_head curry_heads target
+        | Upper_comonadic { c_via; c_name = Comonadic_name { target; _ } } ->
+          is_id c_via && mem_head curry_heads target
         | Upper_comonadic { c_name = Simple_name _; _ } | Upper_simple _ ->
           false)
       upper
     && List.for_all
          (function
            | Lower_simple _ -> false
-           | Lower_comonadic { c_name; _ } ->
-             src_in (acc_heads @ !suppressed_curry_heads) c_name
-           | Lower_closing_over_to { cls_edge = { name; _ }; _ } ->
-             src_in acc_heads name)
+           | Lower_comonadic { c_via; c_name } ->
+             is_id c_via
+             && src_in (acc_heads @ !suppressed_curry_heads) c_name
+           | Lower_closing_over_to ({ cls_edge = { name; _ }; _ } as e) ->
+             eq_morph With_locality.obj_comonadic
+               (closing_over_composition e)
+               With_locality.monadic_to_comonadic_min_morph
+             && src_in acc_heads name)
          lower
 
   let is_suppressed_curry (m : With_locality.lr) =
