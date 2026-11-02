@@ -57,6 +57,18 @@ val unboxed_record_in_tuple :
   'a * ur -> #('a addr_imm * int addr_imm * string addr_imm) = <fun>
 |}]
 
+(* Positions extend through nested unboxed products *)
+type nested_inner = #{ ni : string; nj : int }
+type nested = { mutable nest : #(nested_inner * int) }
+let nested_unboxed { nest = #(#{ ni = deref_ a; _ }, _) } = a
+let nested_unboxed_in_tuple (_, #(_, { f = deref_ a })) = a
+[%%expect{|
+type nested_inner = #{ ni : string; nj : int; }
+type nested = { mutable nest : #(nested_inner * int); }
+val nested_unboxed : nested -> string addr = <fun>
+val nested_unboxed_in_tuple : 'a * #('b * u_record) -> int addr_imm = <fun>
+|}]
+
 (* Aliases, constraints and local opens are transparent *)
 let transparent ((deref_ a as b), (deref_ c : int), Stdlib.(deref_ d)) =
   #(a, b, c, d)
@@ -352,18 +364,12 @@ Error: Dereference patterns do not support private types in mutable positions.
 
 let private_unboxed { mu = #{ Private.pu = deref_ a; _ }; _ } = a
 [%%expect{|
-Line 1, characters 30-40:
-1 | let private_unboxed { mu = #{ Private.pu = deref_ a; _ }; _ } = a
-                                  ^^^^^^^^^^
-Error: Dereference patterns do not support private types in mutable positions.
+val private_unboxed : has_private -> string addr = <fun>
 |}]
 
 let private_attr_unboxed { ma = { Private.pa = deref_ a }; _ } = a
 [%%expect{|
-Line 1, characters 34-44:
-1 | let private_attr_unboxed { ma = { Private.pa = deref_ a }; _ } = a
-                                      ^^^^^^^^^^
-Error: Dereference patterns do not support private types in mutable positions.
+val private_attr_unboxed : has_private -> string addr = <fun>
 |}]
 
 (* Addresses to (rather than through) values of private types are fine *)
@@ -407,6 +413,18 @@ type contains_unboxed_attr_global = { ua : unboxed_attr_global; }
 Line 3, characters 39-47:
 3 | let unboxed_attr_global { ua = { uag = deref_ a } } = a
                                            ^^^^^^^^
+Error: Dereference patterns do not yet support non-default modalities. In particular,
+       immutable elements must have the identity modality, but this is aliased.
+|}]
+
+(* ...at any depth *)
+type contains_nested_unboxed_global = { nu : #(int * unboxed_global) }
+let nested_unboxed_global { nu = #(_, #{ ug = deref_ a; _ }) } = a
+[%%expect{|
+type contains_nested_unboxed_global = { nu : #(int * unboxed_global); }
+Line 2, characters 46-54:
+2 | let nested_unboxed_global { nu = #(_, #{ ug = deref_ a; _ }) } = a
+                                                  ^^^^^^^^
 Error: Dereference patterns do not yet support non-default modalities. In particular,
        immutable elements must have the identity modality, but this is aliased.
 |}]
@@ -711,6 +729,31 @@ Line 5, characters 50-51:
 
 |}]
 
+(* Nested unboxed accesses are tracked like nested projections *)
+type nested_pair = { np : #(ub * string) }
+let ok_siblings_nested (r : nested_pair @ unique) =
+  match r with
+  | { np = #(#{ u1 = deref_ a; u2 = y }, z) } ->
+    consume y; consume z; consume_addr_imm a
+[%%expect{|
+type nested_pair = { np : #(ub * string); }
+val ok_siblings_nested : nested_pair @ unique -> unit = <fun>
+|}]
+
+let bad_same_nested (r : nested_pair @ unique) =
+  match r with
+  | { np = #(#{ u1 = deref_ a; _ } as w, _) } -> consume w.#u1; use_addr_imm a
+[%%expect{|
+Line 3, characters 77-78:
+3 |   | { np = #(#{ u1 = deref_ a; _ } as w, _) } -> consume w.#u1; use_addr_imm a
+                                                                                 ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 57-62:
+3 |   | { np = #(#{ u1 = deref_ a; _ } as w, _) } -> consume w.#u1; use_addr_imm a
+                                                             ^^^^^
+
+|}]
+
 (* Addresses into a tuple expression are identified with its components... *)
 let bad_tuple_expr (x : string @ unique) =
   match (x, 0) with
@@ -821,6 +864,94 @@ let ok_consume_addr_then_record_with (r : outer @ unique) =
     consume_addr_imm a; use_aliased { r with o = { f = "x" } }
 [%%expect{|
 val ok_consume_addr_then_record_with : outer @ unique -> unit = <fun>
+|}]
+
+(* An address into a mutable field owns the memory storing the field, so it
+   conflicts with reading or writing the field... *)
+let bad_consume_addr_then_read (r : mutable_field @ unique) =
+  match r with { m = deref_ a } -> consume_addr a; use_aliased r.m
+[%%expect{|
+Line 2, characters 63-64:
+2 |   match r with { m = deref_ a } -> consume_addr a; use_aliased r.m
+                                                                   ^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 2, characters 48-49:
+2 |   match r with { m = deref_ a } -> consume_addr a; use_aliased r.m
+                                                    ^
+
+|}]
+
+let bad_consume_addr_then_write (r : mutable_field @ unique) =
+  match r with { m = deref_ a } -> consume_addr a; r.m <- ""
+[%%expect{|
+Line 2, characters 51-52:
+2 |   match r with { m = deref_ a } -> consume_addr a; r.m <- ""
+                                                       ^
+Error: This value is written to here,
+       but it has already been used as unique at:
+Line 2, characters 48-49:
+2 |   match r with { m = deref_ a } -> consume_addr a; r.m <- ""
+                                                    ^
+
+|}]
+
+(* ...but writing the field only borrows that memory *)
+let ok_write_then_consume_addr (r : mutable_field @ unique) =
+  match r with { m = deref_ a } -> r.m <- ""; consume_addr a
+[%%expect{|
+val ok_write_then_consume_addr : mutable_field @ unique -> unit = <fun>
+|}]
+
+(* The value in a mutable field is aliased, so using it doesn't conflict with
+   the address (unlike in [bad_consume_value]) *)
+let ok_use_value_then_consume_addr (r : mutable_field @ unique) =
+  match r with { m = deref_ a as y } -> use_aliased y; consume_addr a
+[%%expect{|
+val ok_use_value_then_consume_addr : mutable_field @ unique -> unit = <fun>
+|}]
+
+(* A record in a mutable field is aliased, and so are addresses into it *)
+let bad_consume_addr_in_mutable (r : outer_mut @ unique) =
+  match r with { om = { f = deref_ a } } -> consume_addr_imm a
+[%%expect{|
+Line 2, characters 61-62:
+2 |   match r with { om = { f = deref_ a } } -> consume_addr_imm a
+                                                                 ^
+Error: This value is "aliased"
+         because it is an address derived from the value at line 2, characters 22-38
+         which is "aliased"
+         because it is the field "om" (with some modality) of the record at line 2, characters 15-40.
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* A functional update reads the memory of the kept fields. For a mutable
+   field, the value isn't tracked, so only that memory conflicts with the
+   address... *)
+type mut_and_imm = { mutable mm : string; mi : string }
+let bad_consume_addr_then_keep (r : mut_and_imm @ unique) =
+  match r with
+  | { mm = deref_ a; _ } -> consume_addr a; use_aliased { r with mi = "" }
+[%%expect{|
+type mut_and_imm = { mutable mm : string; mi : string; }
+Line 4, characters 58-59:
+4 |   | { mm = deref_ a; _ } -> consume_addr a; use_aliased { r with mi = "" }
+                                                              ^
+Error: This value is read from here,
+       but it has already been used as unique at:
+Line 4, characters 41-42:
+4 |   | { mm = deref_ a; _ } -> consume_addr a; use_aliased { r with mi = "" }
+                                             ^
+
+|}]
+
+(* ...but not that of the replaced fields, even if all of them are *)
+let ok_consume_addr_then_replace_all (r : mut_and_imm @ unique) =
+  match r with
+  | { mm = deref_ a; _ } ->
+    consume_addr a; use_aliased { r with mm = ""; mi = "" } [@warning "-23"]
+[%%expect{|
+val ok_consume_addr_then_replace_all : mut_and_imm @ unique -> unit = <fun>
 |}]
 
 (*************************************)

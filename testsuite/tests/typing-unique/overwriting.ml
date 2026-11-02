@@ -1470,3 +1470,23 @@ Alert Translcore: Overwrite not implemented.
 Uncaught exception: Misc.Fatal_error
 
 |}]
+
+(* The value at an immutable position can be overwritten through a unique
+   address... *)
+type ow_inner = { oi1 : string }
+type ow_imm = { owi : ow_inner }
+type ow_mut = { mutable owm : ow_inner }
+let overwrite_through_addr_imm (r : ow_imm @ unique) =
+  match r with
+  | { owi = deref_ a } ->
+    (match a with addr_imm_ v -> overwrite_ v with { oi1 = "x" })
+[%%expect{|
+|}]
+
+(* ...but the value at a mutable position is aliased *)
+let overwrite_through_addr (r : ow_mut @ unique) =
+  match r with
+  | { owm = deref_ a } ->
+    (match a with addr_ v -> overwrite_ v with { oi1 = "x" })
+[%%expect{|
+|}]
