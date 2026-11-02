@@ -354,27 +354,42 @@ let column_values columns ~timings_precision (p : Measure_diff.t)
     | `Counters -> counters_display p.counters
   ) columns
 
-let write_action_trace_span ~name ~path
-    ((p : Measure_diff.t), top_heap_words) =
-  let nanoseconds seconds = int_of_float (seconds *. 1e9) in
-  let bytes words = words * (Sys.word_size / 8) in
+let nanoseconds seconds = int_of_float (seconds *. 1e9)
+
+(* The fields describing a single row, with its children nested inside it.
+   [wall-start] is relative to [trace_start]. A row usually accumulates
+   several intervals, so [wall-start] is the start of the first one and
+   [wall-time] is the total of all of them. *)
+let rec action_trace_fields ~trace_start
+    (R (_, ((p : Measure_diff.t), top_heap_words), rows)) =
+  let bytes words = Json.int (words * (Sys.word_size / 8)) in
   let counters =
-    ("time", nanoseconds p.duration)
-    :: ("calls", p.calls)
-    :: ("alloc", bytes (int_of_float p.allocated_words))
-    :: ("top-heap", bytes p.top_heap_words_increase)
-    :: ("absolute-top-heap", bytes top_heap_words)
-    :: String.Map.bindings p.counters
+    if Counters.is_empty p.counters then []
+    else
+      ["counters",
+       Json.Object
+         (List.map (fun (name, count) -> name, Json.int count)
+            (String.Map.bindings p.counters))]
   in
-  let args =
-    ["path", Json.Array (List.rev_map (fun name -> Json.String name) path)]
+  let children =
+    match rows with
+    | [] -> []
+    | _ :: _ ->
+      let child (R (name, _, _) as row) =
+        Json.Object
+          (("name", Json.String name)
+           :: action_trace_fields ~trace_start row)
+      in
+      ["children", Json.Array (List.map child rows)]
   in
-  (* A row usually accumulates several intervals, so the span can't match
-     them all. It starts with the first one and lasts as long as all of them
-     together. *)
-  Action_trace.write_span ~name ~counters
-    ~args ~start_in_nanoseconds:(nanoseconds p.wall_start)
-    ~finish_in_nanoseconds:(nanoseconds (p.wall_start +. p.wall_duration)) ()
+  [ "time", Json.int (nanoseconds p.duration);
+    "wall-start", Json.int (nanoseconds (p.wall_start -. trace_start));
+    "wall-time", Json.int (nanoseconds p.wall_duration);
+    "calls", Json.int p.calls;
+    "alloc", bytes (int_of_float p.allocated_words);
+    "top-heap", bytes p.top_heap_words_increase;
+    "absolute-top-heap", bytes top_heap_words ]
+  @ counters @ children
 
 let emit_action_trace ~name (start_measure : Measure.t)
     (end_measure : Measure.t) =
@@ -391,13 +406,14 @@ let emit_action_trace ~name (start_measure : Measure.t)
       ~values:(fun p ~top_heap_words ~prev_top_heap_words:_ ->
         p, top_heap_words)
   in
-  let rec write_spans ~parent_path (R (name, value, rows)) =
-    let path = name :: parent_path in
-    write_action_trace_span ~name ~path value;
-    List.iter (write_spans ~parent_path:path) rows
+  let trace_start = start_measure.wall_time in
+  let args =
+    action_trace_fields ~trace_start
+      (R (name, (total, end_measure.top_heap_words), rows))
   in
-  write_spans ~parent_path:[]
-    (R (name, (total, end_measure.top_heap_words), rows))
+  Action_trace.write_span ~name ~args
+    ~start_in_nanoseconds:(nanoseconds trace_start)
+    ~finish_in_nanoseconds:(nanoseconds end_measure.wall_time) ()
 
 let with_action_trace ~gettimeofday ~name f =
   (* [Action_trace] does nothing unless this is set, so avoid the cost of
