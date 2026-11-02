@@ -163,13 +163,20 @@ let [@ocamlformat "disable"] print ppf
       List.filter (fun level -> not (One_level.is_empty level))
         levels
     in
+    let pp_name_info ppf =
+      if not (Name.Map.is_empty name_info) then
+        Format.fprintf ppf "@ @[<hov 1>(name_info@ %a)@]"
+          (Name.Map.print (fun ppf { param_projection } ->
+               Param_projection.print ppf param_projection))
+          name_info
+    in
     Format.fprintf ppf
       "@[<hov 1>(\
          @[<hov 1>(defined_symbols@ %a)@]@ \
          @[<hov 1>(code_age_relation@ %a)@]@ \
          @[<hov 1>(levels@ %a)@]@ \
-         @[<hov 1>(aliases@ %a)@]@ \
-         @[<hov 1>(name_info@ %a)@]\
+         @[<hov 1>(aliases@ %a)@]\
+         %t\
        )@]"
       Symbol.Set.print defined_symbols
       Code_age_relation.print code_age_relation
@@ -177,9 +184,7 @@ let [@ocamlformat "disable"] print ppf
          (One_level.print ~min_binding_time))
       levels
       Aliases.print (aliases t)
-      (Name.Map.print (fun ppf { param_projection } ->
-           Param_projection.print ppf param_projection))
-      name_info
+      pp_name_info
 
 let [@ocamlformat "disable"] print_serializable ppf
     { defined_symbols_without_equations; code_age_relation; names_to_types } =
