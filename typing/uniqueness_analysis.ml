@@ -1057,7 +1057,8 @@ module Projection : sig
     | Array_index of int
     | Memory_address (* this is rendered as clubsuit in the ICFP'24 paper *)
     | Alloc
-  (* a child of [Memory_address] that guarantees the block is still allocated *)
+  (* a child of [Memory_address] that guarantees the block is still allocated.
+     Used only by [Texp_record]. *)
 
   module Map : Map.S with type key = t
 
@@ -1731,6 +1732,59 @@ end = struct
     let modality = Typemode.mutable_modalities mut in
     modal_child modality (Projection.Array_index i) t
 
+  (* Note [Loading from addresses]
+
+     The value loaded from an address has the paths of the address itself: it
+     owns both the value at the address and the memory storing it. This is
+     sound but imprecise. For example, with [x : { foo : string; bar : string }
+     @ unique], this is rejected:
+     {[
+       match x with
+       | { foo = deref_ y; _ } ->
+         let addr_imm_ s = y in
+         consume s;
+         match x with { foo = _s; _ } -> ()
+     ]}
+     Consuming [s] uses [x.<memory>.foo], which the second match reads, even
+     though [s] is just the string [x.foo].
+
+     Currently, the value at a position and the memory storing it are in
+     different subtrees, so an address owns both paths:
+     {[
+       let { deref_ foo; _ } = x in
+       (* [foo] owns [x.foo] and [x.<memory>.foo] *)
+       !foo
+       (* the loaded value owns both *)
+     ]}
+     Instead, we could put both below the position, with a [<contents>]
+     projection for the value:
+     {[
+       let { deref_ foo; _ } = x in
+       (* [foo] owns [x.foo] *)
+       !foo
+       (* the read borrows [x.foo.<memory>] and yields [x.foo.<contents>] *)
+     ]}
+     In the example from before, consuming [s] would then only use
+     [x.foo.<contents>], not the memory the second match reads, so the example
+     would be accepted.
+
+     Below an address, unboxed projections and loads would have to commute. In
+     hypothetical syntax, with [!] for loading and [&] for taking an address:
+     {[
+       val a : #(string * string) addr_imm
+       let _ = (!a).#0          (* yields [a.<contents>.0] *)
+       let _ = !(&((!a).#0))    (* yields [a.0.<contents>] *)
+     ]}
+     These are the same access, so paths would have to be normalised, e.g. by
+     moving [<contents>] past unboxed projections.
+
+     Even then, more subtle examples like this would be rejected:
+     {[
+       let swap (a : 'a addr @ unique) x =
+         let old = !a in
+         a := x;
+         #(old, a)
+     ]} *)
   let address_load mut t =
     let modality = Typemode.address_modalities mut in
     if tracked_under modality then t else untracked
@@ -2043,8 +2097,9 @@ let field_memory_projection (l : label_description) : Projection.t option =
 
    These are different. Say we have
    {[
-     val x : { foo : string } @ unique
-     let y : string addr_imm @ unique = match x with { foo = deref_ y } -> y
+     val x : { foo : string; bar : string } @ unique
+     let y : string addr_imm @ unique =
+       match x with { foo = deref_ y; _ } -> y
    ]}
    Then [y] owns both the memory the [string] is stored in, as well as one word
    of memory, initially owned by [x], that stores the address of the string.
@@ -2053,32 +2108,27 @@ let field_memory_projection (l : label_description) : Projection.t option =
    {[
      let _ =
        match x with
-       | { foo = deref_ y as z } -> ...
-                                    ^^^
+       | { foo = deref_ y as z; _ } -> ...
+                                       ^^^
    ]}
    In this position, consuming the string z (i.e. [x.foo]) or the address y
    (which also owns [x.<memory>.foo]) should consume x, too.
 
    So the paths of an address are the paths of the value it points to, together
-   with the paths of that part of the memory. Loading from an address
-   ([Paths.address_load]) returns the address' paths unchanged: the loaded
-   value keeps the memory paths of the address. This is imprecise but sound.
-   For example, this is rejected:
-   {[
-     match x with
-     | { foo = deref_ y } ->
-       let addr_imm_ s = y in
-       consume s;
-       match x with { foo = _ } -> ()
-   ]}
-   Consuming [s] uses [x.<memory>.foo], and the second match reads the memory
-   of [x], although [s] is just the string [x.foo] and does not own any of
-   [x]'s memory. With [{ foo = s }] instead of [deref_ y], it is accepted.
+   with the paths of that part of the memory.
 
    The memory of a block is tracked per field (see [field_memory_projection]):
-   [y] owns the part of [x]'s memory storing [foo], [x.<memory>.foo]. If [x]
-   had other fields, consuming [y] would not conflict with reading them, but
-   it would conflict with reading [foo] again or overwriting [x]. *)
+   [y] owns only the part of [x]'s memory storing [foo], [x.<memory>.foo].
+   Hence, consuming [y] doesn't conflict with reading other fields, or with a
+   functional update that replaces [foo]:
+   {[
+     match x with { foo = deref_ y; _ } -> consume y; ignore x.bar
+     match x with { foo = deref_ y; _ } -> consume y; { x with foo = "" }
+   ]}
+   Both would be rejected if [y] owned all of [x.<memory>]. Consuming [y] still
+   conflicts with reading [foo] again or overwriting [x].
+
+   See also Note [Loading from addresses] on [address_load]. *)
 let deref_base_paths proj paths =
   Paths.child proj (Paths.with_memory_address paths)
 
@@ -2313,9 +2363,11 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
       let ext, uf_arg = pattern_match_single arg (Paths.fresh ()) in
       ext, UF.par uf_force uf_arg
     | Tpat_addr (mut, _, arg) ->
-      (* CR address-patterns: this is slightly imprecise. See also the comment
-         on [deref_base_paths]. *)
       let base_paths = Paths.with_memory_address paths in
+      (* CR address-patterns: this is slightly imprecise. In principle, we
+         should borrow just the memory we read from and yield its contents here,
+         but the current uniqueness analysis cannot express that: it always
+         borrows and yields both. See Note [Loading from addresses]. *)
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
     | Tpat_deref { id; _ } -> (
@@ -2647,7 +2699,9 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
         let value, uf_exp = check_uniqueness_exp_as_value ienv exp in
         Unique_barrier.enable unique_barrier;
         (* The block must still be allocated, even if no field is kept: large
-           records are updated by copying the whole block. *)
+           records are updated by copying the whole block. We don't rely on the
+           GC to keep it alive to ensure compatibility with a primitive like
+           [free : 'a @ unique -> unit]. *)
         let uf_alloc =
           Value.mark_implicit_borrow_memory_address ~field:Projection.Alloc
             (Read unique_barrier) value
