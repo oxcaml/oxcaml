@@ -559,9 +559,5 @@ let f () =
   and h = stack_ (fun ~x ~y -> x + y) in
   g () [@nontail]
 [%%expect{|
-Line 3, characters 17-37:
-3 |   and h = stack_ (fun ~x ~y -> x + y) in
-                     ^^^^^^^^^^^^^^^^^^^^
-Error: This function should have type "y:int -> (x:int -> 'a) @ local"
-       but its first argument is labeled "~x" instead of "~y"
+val f : unit -> int = <fun>
 |}]
