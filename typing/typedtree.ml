@@ -883,7 +883,8 @@ and ('a, 'repr) include_infos =
 
 and include_description = (module_type, unit) include_infos
 
-and include_declaration = (module_expr, Types.module_representation) include_infos
+and include_declaration =
+  (module_expr, Types.module_representation) include_infos
 
 and with_constraint =
     Twith_type of type_declaration

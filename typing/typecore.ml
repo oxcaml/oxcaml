@@ -1829,7 +1829,9 @@ let type_continuation_pat env expected_ty sp =
       let id = Ident.create_local name.txt in
       let desc =
         { val_type = expected_ty;
-          val_kind = Val_reg (Representable Jkind.Sort.(of_const Const.for_continuation));
+          val_kind =
+            Val_reg
+              (Representable Jkind.Sort.(of_const Const.for_continuation));
           val_lpoly = Lpoly.determined [];
           Types.val_loc = loc; val_attributes = [];
           val_modalities = Modality.undefined;
@@ -2974,7 +2976,9 @@ let type_for_loop_index ~loc ~env ~param =
             let pv =
               { pv_id; pv_uid; pv_mode;
                 pv_value_kind =
-                  Val_reg (Representable Jkind.Sort.(of_const Const.for_loop_index));
+                  Val_reg
+                    (Representable
+                       Jkind.Sort.(of_const Const.for_loop_index));
                 pv_type; pv_loc;
                 pv_kind = if pv_as_var then As_var else Std_var;
                 pv_attributes;
@@ -2997,7 +3001,9 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:(Val_reg (Representable Jkind.Sort.(of_const Const.for_loop_index)))
+            ~kind:
+              (Val_reg
+                 (Representable Jkind.Sort.(of_const Const.for_loop_index)))
             tps
             pv_loc
             name

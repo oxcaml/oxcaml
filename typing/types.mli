@@ -1388,10 +1388,6 @@ val mixed_block_element_of_const_sort :
     Note: manifest primitives do not correspond to a run-time value! *)
 val bound_value_identifiers: signature -> Ident.t list
 
-(** Like [bound_value_identifiers], but also return sorts *)
-val bound_value_identifiers_and_sorts :
-  signature -> (Ident.t * Jkind_types.Sort.t) list
-
 val signature_item_id : signature_item -> Ident.t
 
 (* Info for a compilation unit that implements a parameter (that is, was

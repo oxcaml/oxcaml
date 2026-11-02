@@ -759,7 +759,8 @@ and module_repr_unforced = {
   items : Subst.Lazy.signature_item list
 }
 
-and module_repr_lazy = (module_repr_unforced, module_representation) Lazy_backtrack.t
+and module_repr_lazy =
+  (module_repr_unforced, module_representation) Lazy_backtrack.t
 
 and value_data =
   { vda_description : Subst.Lazy.value_description;
@@ -4937,7 +4938,7 @@ let fatal_if_unrepresentable find path env =
   | address -> address
   | exception Unrepresentable_type (_, _, _, _) ->
     (* the type checker should have already checked that the address's
-       enlcosing modules are representable *)
+       enclosing modules are representable *)
     Misc.fatal_error "expected representable type"
 
 let find_value_address = fatal_if_unrepresentable find_value_address
@@ -5734,7 +5735,8 @@ let report_lookup_error_doc loc env = function
             env ppf v) violation
     ] in
     Location.errorf ~loc ~sub
-      "This expression projects from a module that contains unrepresentable items."
+      "This expression projects from a module that contains unrepresentable \
+       items."
 
 let report_error_doc = function
   | Missing_module(loc, path1, path2) ->

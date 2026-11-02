@@ -1164,17 +1164,6 @@ let signature_item_id = function
   | Sig_jkind (id, _, _)
     -> id
 
-let signature_item_representation sg =
-  match sort_of_signature_item sg with
-  | Fixed sort -> Some (signature_item_id sg, sort)
-  | Absent_at_runtime -> None
-  | Unknown _ ->
-    Misc.fatal_error
-      "bound_value_identifiers_and_sorts: unrepresentable signature item"
-
-let bound_value_identifiers_and_sorts sigs =
-  List.filter_map signature_item_representation sigs
-
 type arg_signature = {
   arg_param : Global_module.Parameter_name.t;
   arg_block_idx : int;

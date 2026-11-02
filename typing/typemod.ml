@@ -3989,10 +3989,11 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
           (Typedtree.mode_without_locks_exn modl.mod_mode)
     in
-    (* The included items are bound in this structure, so their sorts must be known.
-       Why rewrite [sg] in addition to storing the computed sorts in [incl_repr]?
-       Because some things in transl (e.g., [extract_free_var_env]) don't check
-       [incl_repr] and expect to find the sorts in their environment. *)
+    (* The included items are bound in this structure, so their sorts must be
+       known. Why rewrite [sg] in addition to storing the computed sorts in
+       [incl_repr]? Because some things in transl (e.g.,
+       [extract_free_var_env]) don't check [incl_repr] and expect to find the
+       sorts in their environment. *)
     let sg =
       resolve_value_sorts ~why:Module_inclusion ~loc env sg
         ~error:(fun unrep -> Unrepresentable_include unrep)
