@@ -2117,6 +2117,45 @@ module A_anon :
 - : bool id option = None
 |}]
 
+(* As above, but with an anonymous argument. *)
+module A_anon_arg =
+  (functor (X : sig kind_ ka end) -> struct
+    let c = ref (None : (_ : X.ka) id option)
+    let get () = !c
+  end) (struct kind_ ka = value end)
+let () = A_anon_arg.c := (None : int id option)
+let (_ : bool id option) = A_anon_arg.get ()
+[%%expect{|
+module A_anon_arg :
+  sig val c : '_weak11 id option ref val get : unit -> '_weak11 id option end
+Line 7, characters 27-44:
+7 | let (_ : bool id option) = A_anon_arg.get ()
+                               ^^^^^^^^^^^^^^^^^
+Error: This expression has type "int id option"
+       but an expression was expected of type "bool id option"
+       Type "int" is not compatible with type "bool"
+|}]
+
+(* As above, but with an [include functor] application. *)
+module M_include_anon_functor = struct
+  kind_ ka = value
+  include functor (functor (X : sig kind_ ka end) -> struct
+    let c = ref (None : (_ : X.ka) id option)
+    let get () = !c
+  end)
+end
+let () = M_include_anon_functor.c := (None : int id option)
+let (_ : bool id option) = M_include_anon_functor.get ()
+[%%expect{|
+module M_include_anon_functor :
+  sig
+    kind_ ka = value
+    val c : '_weak12 id option ref
+    val get : unit -> '_weak13 id option
+  end
+- : bool id option = None
+|}]
+
 (*****************************************************)
 (* Test: Paths are substituted in [(type : k)] types *)
 
