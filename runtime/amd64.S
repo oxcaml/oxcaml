@@ -18,8 +18,11 @@
 
 /* PIC mode support based on contribution by Paul Stravers (see PR#4795) */
 
+#define CAML_INTERNALS
+
 #include "caml/m.h"
 #include "caml/asm.h"
+#include "caml/asm_offsets.h"
 
 #if defined(SYS_macosx)
 
@@ -123,14 +126,6 @@ G(name):
 #define CHECK_STACK_ALIGNMENT
 #define IF_DEBUG(...)
 #endif
-
-/* Offsets into the C structs used here (stack_info, stack_handler,
-   the dynamic-binding cache, c_stack_link), hand-maintained in
-   caml/asm_offsets.h and checked against the C definitions by static
-   assertions in fiber.c.  If you change Dynamic_cache_entries
-   (DYNAMIC_CACHE_BITS in caml/dynamic.h), you must also update
-   FLUSH_DYNAMIC_CACHE. */
-#include "caml/asm_offsets.h"
 
 #define Stack_sp                 Stack_sp_offset
 #define Stack_exception          Stack_exception_offset

@@ -18,8 +18,11 @@
 /* Asm part of the runtime system, ARM processor, 64-bit mode */
 /* Must be preprocessed by cpp */
 
+#define CAML_INTERNALS
+
 #include "caml/m.h"
 #include "caml/asm.h"
+#include "caml/asm_offsets.h"
 
 /* Special registers */
 
@@ -177,14 +180,6 @@ G(name):
 .endm
 
 /* Stack switching operations */
-
-/* Offsets into the C structs used here (stack_info, stack_handler,
-   the dynamic-binding cache, c_stack_link), hand-maintained in
-   caml/asm_offsets.h and checked against the C definitions by static
-   assertions in fiber.c.  If you change Dynamic_cache_entries
-   (DYNAMIC_CACHE_BITS in caml/dynamic.h), you must also update
-   FLUSH_DYNAMIC_CACHE. */
-#include "caml/asm_offsets.h"
 
 #define Stack_sp(reg)           [reg, #Stack_sp_offset]
 #define Stack_exception(reg)    [reg, #Stack_exception_offset]

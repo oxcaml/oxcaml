@@ -161,19 +161,16 @@ struct stack_info {
  * +------------------------+ <--- Caml_state->current_stack
  */
 
-/* The offsets of the fields of [struct c_stack_link] and of the other
-   structures in this file are shared with the assembly stubs via
-   caml/asm_offsets.h, which also defines
-   [Reserved_space_c_stack_link], used below. */
 #include "asm_offsets.h"
 
-/* This structure is used for storing the OCaml return pointer when
- * transitioning from an OCaml stack to a C stack at a C call. When an OCaml
- * stack is reallocated, this linked list is walked to update the OCaml stack
- * pointers. It is also used for DWARF backtraces. */
+/* This structure resembles a stack frame, and is used for storing the
+ * OCaml return pointer when transitioning from an OCaml stack to a C
+ * stack at a C call. When an OCaml stack is reallocated, this linked
+ * list is walked to update the OCaml stack pointers. It is also used
+ * for DWARF backtraces. */
 struct c_stack_link {
-#if Reserved_space_c_stack_link > 0
-  char reserved[Reserved_space_c_stack_link];
+#if ABI_reserve > 0
+  char reserved[ABI_resrve];
 #endif
   /* The reference to the OCaml stack */
   struct stack_info* stack;
@@ -181,7 +178,9 @@ struct c_stack_link {
   void* sp;
   struct c_stack_link* prev;
   char* async_exn_handler;
-  void* padding; /* for stack alignment in caml_start_program */
+  /* Padding to keep the whole caml_start_program stack frame,
+     including the caller's return address, 16-byte aligned */
+  void* padding;
 };
 
 /* `gc_regs` and `gc_regs_buckets`.

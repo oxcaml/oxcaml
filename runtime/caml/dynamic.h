@@ -67,8 +67,6 @@ typedef struct dynamic_binding_s {
 #define DYNAMIC_CACHE_SIZE (1 << DYNAMIC_CACHE_BITS)
 
 /* Per-thread cache of the most recently queried dynamic bindings.
-   Layout reaches the assembly-language stubs via caml/asm_offsets.h
-   (checked by the static assertions in fiber.c).
 
    TODO: Stephen Dolan's wild plan to use vector instructions to do a fully-
    associative LRU cache. */
