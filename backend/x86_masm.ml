@@ -231,6 +231,7 @@ let print_instr b = function
   | MOVSXD (arg1, arg2) -> i2 b "movsxd" arg1 arg2
   | MOVZX (arg1, arg2) -> i2 b "movzx" arg1 arg2
   | NEG arg -> i1 b "neg" arg
+  | NOT arg -> i1 b "not" arg
   | NOP -> i0 b "nop"
   | OR (arg1, arg2) -> i2 b "or" arg1 arg2
   | PAUSE -> i0 b "pause"

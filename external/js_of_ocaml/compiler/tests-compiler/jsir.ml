@@ -61,14 +61,9 @@ let () =
     caml_get_symbol: compilation unit Bar has not been initialised yet (looking up x)
     |}]
 
-(* Synthetic [.cmj] and [.cmja] files, laid out as [ocamlj] and [ocamlj -a]
-   produce them. The programs are built directly in JSIR, as the [ocamlj]
-   pipeline is not available from these tests. *)
-
-let compilation_unit name =
-  Compilation_unit.create
-    Compilation_unit.Prefix.empty
-    (Compilation_unit.Name.of_string name)
+(* Synthetic [.cmj] files, laid out as [ocamlopt -target js_of_ocaml] produces
+   them. The programs are built directly in JSIR, as that pipeline is not
+   available from these tests. *)
 
 let string s = Code.Pc (Code.String s)
 
@@ -86,6 +81,7 @@ let cmj_body ~name ~imports body : Code.cmj_body =
   ; last_var
   ; imported_compilation_units = imports
   ; exported_compilation_unit = name
+  ; force_link = false
   }
 
 let write_cmj file (body : Code.cmj_body) =
@@ -94,33 +90,13 @@ let write_cmj file (body : Code.cmj_body) =
   output_value oc body;
   close_out oc
 
-let write_cmja file bodies =
-  let oc = open_out_bin file in
-  output_string oc (Magic_number.to_string Magic_number.current_cmja);
-  let toc_pos_pos = pos_out oc in
-  output_binary_int oc 0;
-  let units =
-    List.map bodies ~f:(fun (body : Code.cmj_body) ->
-        let cu_pos = pos_out oc in
-        output_value oc body;
-        { Cmj_format.cu_name = compilation_unit body.exported_compilation_unit
-        ; cu_pos
-        ; cu_codesize = pos_out oc - cu_pos
-        })
-  in
-  let toc_pos = pos_out oc in
-  output_value oc { Cmj_format.lib_units = units };
-  seek_out oc toc_pos_pos;
-  output_binary_int oc toc_pos;
-  close_out oc
-
-let read_jsir_file file ~expected f =
+let read_cmj file =
   let ic = open_in_bin file in
   let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
-  assert (Magic_number.equal magic (Magic_number.current expected));
-  let r = f ic in
+  assert (Magic_number.equal magic Magic_number.current_cmj);
+  let unit = Parse_bytecode.from_cmj ic in
   close_in ic;
-  r
+  unit
 
 let print_unit (unit : Parse_bytecode.jsir_unit) =
   Printf.printf "unit %s\n" unit.name;
@@ -157,7 +133,7 @@ let%expect_test "Parse_bytecode.from_cmj" =
   with_temp_dir ~f:(fun () ->
       write_cmj "a.cmj" unit_a;
       Code.Var.reset ();
-      let unit = read_jsir_file "a.cmj" ~expected:`Cmj Parse_bytecode.from_cmj in
+      let unit = read_cmj "a.cmj" in
       print_unit unit;
       (* Fresh variables do not collide with the variables of the unit. *)
       Printf.printf "last_var: %d\n" unit_a.last_var;
@@ -175,12 +151,12 @@ let%expect_test "Parse_bytecode.from_cmj" =
     fresh: 3
     |}]
 
-let%expect_test "Parse_bytecode.from_cmja" =
+let%expect_test "Parse_bytecode.from_cmj keeps fresh variables disjoint across units" =
   with_temp_dir ~f:(fun () ->
-      write_cmja "lib.cmja" [ unit_a; unit_b ];
+      write_cmj "a.cmj" unit_a;
+      write_cmj "b.cmj" unit_b;
       Code.Var.reset ();
-      let units = read_jsir_file "lib.cmja" ~expected:`Cmja Parse_bytecode.from_cmja in
-      List.iter units ~f:print_unit;
+      List.iter [ "a.cmj"; "b.cmj" ] ~f:(fun file -> print_unit (read_cmj file));
       (* Fresh variables do not collide with the variables of any unit. *)
       Printf.printf "last_var: %d, %d\n" unit_a.last_var unit_b.last_var;
       Printf.printf "fresh: %d\n" (Code.Var.idx (Code.Var.fresh ())));
@@ -228,7 +204,6 @@ let setup () =
   Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
   write_cmj "a.cmj" unit_a;
   write_cmj "b.cmj" unit_b;
-  write_cmja "lib.cmja" [ unit_a; unit_b ];
   js_of_ocaml [ "build-runtime"; "-o"; "runtime.js" ] |> print_string
 
 (* [filter] selects the lines of the program's output to print. *)
@@ -279,51 +254,5 @@ let%expect_test "cmj with --include-runtime" =
     //# unitInfo: Provides: A
     //# unitInfo: Provides: B
     //# unitInfo: Requires: A
-    hello A
-    |}]
-
-let%expect_test "cmja with --include-runtime" =
-  with_temp_dir ~f:(fun () ->
-      setup ();
-      js_of_ocaml [ "--include-runtime"; "stubs.js"; "lib.cmja"; "-o"; "lib.js" ]
-      |> print_string;
-      print_unit_infos "lib.js";
-      link_and_run [ "lib.js" ]);
-  [%expect
-    {|
-    //# unitInfo: Provides:
-    //# unitInfo: Primitives: jsir_test_greet, jsir_test_print, jsir_test_unused
-    //# unitInfo: Force_link: true
-    //# unitInfo: Provides: A
-    //# unitInfo: Provides: B
-    //# unitInfo: Requires: A
-    hello A
-    |}]
-
-let%expect_test "cmja with --include-runtime and --keep-unit-names" =
-  with_temp_dir ~f:(fun () ->
-      setup ();
-      Unix.mkdir "out" 0o755;
-      js_of_ocaml
-        [ "--include-runtime"; "--keep-unit-names"; "stubs.js"; "lib.cmja"; "-o"; "out/" ]
-      |> print_string;
-      List.iter
-        (List.sort ~cmp:String.compare (Array.to_list (Sys.readdir "out")))
-        ~f:(fun f ->
-          let file = Filename.concat "out" f in
-          Printf.printf "$ %s\n" file;
-          print_unit_infos file);
-      link_and_run [ "out/runtime.js"; "out/A.js"; "out/B.js" ]);
-  [%expect
-    {|
-    $ out/A.js
-    //# unitInfo: Provides: A
-    $ out/B.js
-    //# unitInfo: Provides: B
-    //# unitInfo: Requires: A
-    $ out/runtime.js
-    //# unitInfo: Provides:
-    //# unitInfo: Primitives: jsir_test_greet, jsir_test_print, jsir_test_unused
-    //# unitInfo: Force_link: true
     hello A
     |}]

@@ -45,9 +45,19 @@ type t : value mod contended portable =
 
 let current_domain = Domain.self_index
 
+external gc_tweak_get : string -> int @@ portable = "caml_gc_tweak_get"
+
+(* Sized by [Domain.recommended_domain_count] unless overridden by the gc
+   tweak, which lets tests exercise many domains on hosts with few CPUs;
+   clamped to [Domain.max_domain_count] since [spawn] creates real domains. *)
 let domains =
+  let n =
+    match gc_tweak_get "override_max_domains_test_only_not_for_prod" with
+    | 0 -> Domain.recommended_domain_count ()
+    | n -> Int.min n Domain.max_domain_count
+  in
   Array.init
-    (Domain.recommended_domain_count ())
+    n
     (fun i ->
       { threads = Bool.to_int (i = 0)
       ; incoming = []

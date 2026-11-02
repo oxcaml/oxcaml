@@ -35,16 +35,15 @@ type t0 =
     table_data : table_data
   }
 
-type raw = File_sections.Idx.t
+type raw = t0 list File_sections.Idx.t
 
 type t = t0 list * File_sections.t
 
 let from_raw ~sections raw =
-  let t : t0 list = Obj.obj (File_sections.get sections raw) in
+  let t = File_sections.get sections raw in
   t, sections
 
-let to_raw ~sections (t : t0 list) =
-  File_sections.Builder.add sections (Obj.repr t)
+let to_raw ~sections t = File_sections.Builder.add sections t
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
@@ -65,11 +64,7 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   let table_data =
     { symbols; variables; simples; consts; code_ids; continuations; fields }
   in
-  let all_code =
-    Exported_code.to_raw
-      ~add_section:(File_sections.Builder.add sections)
-      all_code
-  in
+  let all_code = Exported_code.to_raw ~sections all_code in
   let t =
     [ { original_compilation_unit = Current_unit.get_cu_exn ();
         final_typing_env;

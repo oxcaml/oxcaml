@@ -413,11 +413,11 @@ let run
             ~link:`All
             output_file
           |> sourcemap_of_info ~base:source_map_base)
-  | (`Cmj _ | `Cmja _) as input -> (
+  | `Cmj filename ->
       let t1 = Timer.make () in
-      (* Read a file produced by the OxCaml JSIR backend: a magic number of the
-         expected kind followed by the contents read by [f]. *)
-      let read_jsir_file filename ~(expected : [ `Cmj | `Cmja ]) f =
+      (* Read a file produced by the OxCaml JSIR backend: a magic number
+         followed by a marshaled [Code.cmj_body]. *)
+      let unit =
         let ic = open_in_bin filename in
         Fun.protect
           ~finally:(fun () -> close_in ic)
@@ -425,111 +425,51 @@ let run
             let magic =
               Magic_number.of_string (really_input_string ic Magic_number.size)
             in
-            (match Magic_number.kind magic, expected with
-            | `Cmj, `Cmj | `Cmja, `Cmja -> ()
-            | (`Cmo | `Cma | `Cmj | `Cmja | `Exe | `Other _), (`Cmj | `Cmja) ->
+            (match Magic_number.kind magic with
+            | `Cmj -> ()
+            | `Cmo | `Cma | `Exe | `Other _ ->
                 raise Magic_number.(Bad_magic_number (to_string magic)));
-            let current =
-              Magic_number.current (expected :> [ `Cmo | `Cma | `Cmj | `Cmja | `Exe ])
-            in
-            if Config.Flag.check_magic () && not (Magic_number.equal magic current)
+            if Config.Flag.check_magic ()
+               && not (Magic_number.equal magic (Magic_number.current `Cmj))
             then raise Magic_number.(Bad_magic_version magic);
-            f ic)
-      in
-      let units =
-        match input with
-        | `Cmj filename ->
-            [ read_jsir_file filename ~expected:`Cmj Parse_bytecode.from_cmj ]
-        | `Cmja filename ->
-            read_jsir_file filename ~expected:`Cmja Parse_bytecode.from_cmja
+            Parse_bytecode.from_cmj ic)
       in
       if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
       (* CR-soon selee: the OxCaml JSIR backend does not produce any
          debug-related information yet. This should be updated once the [.cmj]
          file format changes. *)
-      let one (unit : Parse_bytecode.jsir_unit) : Parse_bytecode.one =
+      let one : Parse_bytecode.one =
         { code = unit.program
         ; cmis = StringSet.empty
         ; debug = Parse_bytecode.Debug.default_summary
         }
       in
-      let output_unit
-          (unit : Parse_bytecode.jsir_unit)
-          ~standalone
-          ~shapes
-          ~source_map
-          ((_, fmt) as output_file) =
-        Pretty_print.string fmt "\n";
-        Pretty_print.string fmt (Unit_info.to_string unit.info);
-        output
-          (one unit)
-          ~check_sourcemap:false
-          ~standalone
-          ~shapes
-          ~source_map
-          ~link:`Needed
-          output_file
-      in
-      let build_info =
-        match input with
-        | `Cmj _ -> Build_info.create `Cmj
-        | `Cmja _ -> Build_info.create `Cmja
-      in
-      match input, keep_unit_names with
-      | `Cmja _, true ->
-          let output_file_in_dir name =
-            match output_file with
-            | `Stdout, false -> Filename.concat "./" name
-            | `Name x, false -> Filename.concat (Filename.dirname x) name
-            | `Name x, true
-              when String.length x > 0 && Char.equal x.[String.length x - 1] '/' ->
-                Filename.concat x name
-            | `Stdout, true | `Name _, true ->
-                failwith "use [-o dirname/] or remove [--keep-unit-names]"
+      output_gen
+        ~write_shape:false
+        ~standalone:false
+        ~custom_header
+        ~build_info:(Build_info.create `Cmj)
+        ~source_map
+        (fst output_file)
+        (fun ~standalone ~shapes ~source_map ((_, fmt) as output_file) ->
+          let runtime =
+            if include_runtime
+            then [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
+            else []
           in
-          if include_runtime
-          then
-            output_gen
-              ~write_shape:false
-              ~standalone:false
-              ~custom_header
-              ~build_info:(Build_info.create `Runtime)
+          Pretty_print.string fmt "\n";
+          Pretty_print.string fmt (Unit_info.to_string unit.info);
+          let sm =
+            output
+              one
+              ~check_sourcemap:false
+              ~standalone
+              ~shapes
               ~source_map
-              (`Name (output_file_in_dir "runtime.js"))
-              (fun ~standalone ~shapes ~source_map output ->
-                output_partial_runtime ~standalone ~shapes ~source_map output
-                |> sourcemap_of_info ~base:source_map_base);
-          List.iter units ~f:(fun (unit : Parse_bytecode.jsir_unit) ->
-              output_gen
-                ~write_shape:false
-                ~standalone:false
-                ~custom_header
-                ~build_info
-                ~source_map
-                (`Name (output_file_in_dir (unit.name ^ ".js")))
-                (fun ~standalone ~shapes ~source_map output_file ->
-                  output_unit unit ~standalone ~shapes ~source_map output_file
-                  |> sourcemap_of_info ~base:source_map_base))
-      | `Cmja _, false | `Cmj _, _ ->
-          output_gen
-            ~write_shape:false
-            ~standalone:false
-            ~custom_header
-            ~build_info
-            ~source_map
-            (fst output_file)
-            (fun ~standalone ~shapes ~source_map output_file ->
-              let runtime =
-                if include_runtime
-                then
-                  [ output_partial_runtime ~standalone ~shapes ~source_map output_file ]
-                else []
-              in
-              let units =
-                List.map units ~f:(fun unit ->
-                    output_unit unit ~standalone ~shapes ~source_map output_file)
-              in
-              sourcemap_of_infos ~base:source_map_base (runtime @ units)))
+              ~link:`Needed
+              output_file
+          in
+          sourcemap_of_infos ~base:source_map_base (runtime @ [ sm ]))
   | (`Bytecode_stdin | `Bytecode_file _) as bytecode ->
       let kind, ic, close_ic, include_dirs =
         match bytecode with

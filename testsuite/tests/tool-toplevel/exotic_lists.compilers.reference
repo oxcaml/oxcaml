@@ -4,7 +4,18 @@ L.(::) ([1; 2],
  L.(::) ("2", L.(::) ([3; 4], L.(::) ("4", L.(::) ([5], L.[])))))
 - : (int, string) L.t =
 (::) (1, (::) ("2", (::) (3, (::) ("4", (::) (5, [])))))
-module L : sig type 'a t = 'a list = [] | (::) of 'a * 'a t end
+Line 5, characters 8-52:
+5 |         type 'a t = 'a list = [] | (::) of 'a * 'a t
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type 'a list
+       Constructors do not match:
+         (::) of 'a * 'a list
+       is not the same as:
+         (::) of 'a * 'a list
+       This has a fixed representation and the original doesn't.
+       Hint: Is there a type that has a representable layout in this
+         but has layout any in the original?
+module L : sig type ('a : any) t = 'a list = [] | (::) of 'a * 'a t end
 - : int L.t L.t = [[1]; [2]; [3]; [4]; [5]]
 - : int L.t = [1; 2; 3; 4; 5]
 

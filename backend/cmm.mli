@@ -102,6 +102,10 @@ type exttype =
   | XVec128  (**r 128-bit vector *)
   | XVec256  (**r 256-bit vector *)
   | XVec512  (**r 512-bit vector *)
+  | XDummy_int  (**r uses up an int register, passes nothing *)
+  | XDummy_float  (**r uses up a float register, passes nothing *)
+
+val is_dummy_exttype : exttype -> bool
 
 val machtype_of_exttype : exttype -> machtype
 
@@ -465,6 +469,7 @@ type operation =
   | Cand
   | Cor
   | Cxor
+  | Cnot
   | Clsl
   | Clsr
   | Casr

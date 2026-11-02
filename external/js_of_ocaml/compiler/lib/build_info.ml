@@ -25,11 +25,10 @@ type kind =
   | `Cmo
   | `Cma
   | `Cmj
-  | `Cmja
   | `Unknown
   ]
 
-let all = [ `Runtime; `Exe; `Cmo; `Cma; `Cmj; `Cmja; `Unknown ]
+let all = [ `Runtime; `Exe; `Cmo; `Cma; `Cmj; `Unknown ]
 
 let string_of_kind = function
   | `Runtime -> "runtime"
@@ -37,7 +36,6 @@ let string_of_kind = function
   | `Cmo -> "cmo"
   | `Cma -> "cma"
   | `Cmj -> "cmj"
-  | `Cmja -> "cmja"
   | `Unknown -> "unknown"
 
 let string_of_effects_backend : Config.effects_backend -> string = function

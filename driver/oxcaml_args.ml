@@ -1334,6 +1334,42 @@ let mk_cached_generic_functions_path f =
     "<file>  Set the path of the cached generic functions (default to \
      cached-generic-functions.o)" )
 
+let mk_target f =
+  ( "-target",
+    (* We leave out [-target native] even though we could support it, as
+       we are hoping to use this flag for cross-compilation triplets, and
+       we don't want anyone to rely on this behaviour before that is in
+       place. *)
+    Arg.Symbol ([ "js_of_ocaml" ], fun _ -> f Clflags.Target.Js_of_ocaml),
+    " Compile to JavaScript instead of native code" )
+
+let mk_jsoo_opt f =
+  let doc (phase : Clflags.Jsoo_phase.t) =
+    match phase with
+    | All -> "<opt>  Pass option <opt> to every js_of_ocaml invocation"
+    | Compile ->
+        "<opt>  Pass option <opt> to js_of_ocaml when compiling a unit \
+         (js_of_ocaml compile)"
+    | Archive ->
+        "<opt>  Pass option <opt> to js_of_ocaml when creating an archive with \
+         -a (js_of_ocaml link -a)"
+    | Runtime ->
+        "<opt>  Pass option <opt> to js_of_ocaml when building the runtime of \
+         an executable (js_of_ocaml build-runtime)"
+    | Link ->
+        "<opt>  Pass option <opt> to js_of_ocaml when linking an executable \
+         (js_of_ocaml link)"
+  in
+  List.map
+    (fun phase ->
+      ( Clflags.Jsoo_phase.flag phase,
+        Arg.String (f phase),
+        doc phase ^ " (with -target js_of_ocaml)" ))
+    Clflags.Jsoo_phase.all
+
+let mk_djsir f =
+  ("-djsir", Arg.Unit f, " Print the Js_of_ocaml IR (with -target js_of_ocaml)")
+
 let mk_x f = ("-X", Arg.String f, "(undocumented)")
 
 let set_long_frames_threshold n =
@@ -1559,6 +1595,9 @@ module type Oxcaml_options = sig
   val dreaper : unit -> unit
   val use_cached_generic_functions : unit -> unit
   val cached_generic_functions_path : string -> unit
+  val target : Clflags.Target.t -> unit
+  val jsoo_opt : Clflags.Jsoo_phase.t -> string -> unit
+  val djsir : unit -> unit
   val x : string -> unit
 end
 
@@ -1805,8 +1844,11 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dreaper F.dreaper;
       mk_use_cached_generic_functions F.use_cached_generic_functions;
       mk_cached_generic_functions_path F.cached_generic_functions_path;
+      mk_target F.target;
+      mk_djsir F.djsir;
       mk_x F.x;
     ]
+    @ mk_jsoo_opt F.jsoo_opt
 end
 
 let set_dissector_partition_size f =
@@ -2395,6 +2437,9 @@ module Oxcaml_options_impl = struct
   let cached_generic_functions_path file =
     Oxcaml_flags.cached_generic_functions_path := file
 
+  let target = Clflags.set_target
+  let jsoo_opt = Compenv.add_first_jsoo_opt
+  let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
   (* Bundle of experimental codegen optimizations enabled by
@@ -2508,7 +2553,7 @@ module Debugging_options_impl = struct
 end
 
 module Extra_params = struct
-  let read_param ppf _position name v =
+  let read_param ppf position name v =
     let set option =
       let b = Compenv.check_bool ppf name v in
       option := Oxcaml_flags.Set b;
@@ -2867,6 +2912,19 @@ module Extra_params = struct
     | "cached-generic-functions-path" ->
         Oxcaml_flags.cached_generic_functions_path := v;
         true
+    | "target" -> (
+        match v with
+        | "js_of_ocaml" ->
+            (match position with
+            | Compenv.Before_args -> Clflags.set_target Js_of_ocaml
+            | Compenv.Before_compile _ | Compenv.Before_link ->
+                (* The backend has been chosen by then. *)
+                Compenv.fatal
+                  "OCAMLPARAM: target must be given before the _ separator");
+            true
+        | _ ->
+            Printf.ksprintf Compenv.fatal
+              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml)" v)
     | "reaper" -> set Flambda2.enable_reaper
     | "reaper-preserve-direct-calls" ->
         (match String.lowercase_ascii v with
@@ -2971,5 +3029,8 @@ module Default = struct
     include Main_args.Default.Opttopmain
     include Oxcaml_options_impl
     include Debugging_options_impl
+
+    let target (_ : Clflags.Target.t) =
+      Compenv.fatal "-target is not supported by ocamlnat"
   end
 end

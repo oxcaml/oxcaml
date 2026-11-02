@@ -70,7 +70,10 @@ type legacy =
   | Quoted
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
-type region_desc = Borrow
+type region_desc =
+  | Borrow
+  | Try_body
+  | Match_with_exception
 
 type region = Location.t * region_desc
 

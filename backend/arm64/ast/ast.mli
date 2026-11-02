@@ -1187,6 +1187,14 @@ module Instruction_name : sig
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
     | NOP : (singleton, unit) t
+    | ORN_shifted_register :
+        ( quad,
+          [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Optional of [`Shift of [< `Lsl | `Lsr | `Asr] * [`Six]] option]
+        )
+        t
         (** Note: A W-form of ORR_immediate exists but is not modelled here.
             W-form logical immediates use a different bitmask encoding (N=0,
             6-bit immr/imms) than X-form (N can be 0 or 1, different valid
@@ -1993,6 +2001,11 @@ module DSL : sig
     val ins_mov_imm :
       [`Reg of [`GP of [< `X | `W]]] Operand.t ->
       [`Imm of [`Sixteen_unsigned]] Operand.t ->
+      unit
+
+    val ins_mvn :
+      [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]] Operand.t ->
+      [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]] Operand.t ->
       unit
   end
 end

@@ -290,8 +290,12 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
        in [structure] mode. *)
     iter_var s ~f:(fun v ->
       let t = of_var v in
-      if get_level t = generic_level then () else
-      update_level !current_level t;
+      if get_level t >= subject_level then () else
+      begin match update_level !current_level t with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.with_local_level_gen: rigid sort variable"
+      end;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
   result
@@ -1024,7 +1028,12 @@ let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
     begin match get_desc ty with
-    | Tvar { jkind } -> Jkind.update_level !current_level jkind
+    | Tvar { jkind } ->
+      begin match Jkind.update_level !current_level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.lower_all: rigid sort variable in generalize"
+      end
     | _ -> ()
     end;
     iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
@@ -1090,7 +1099,12 @@ let rec generalize_structure ty =
     match get_desc ty with
     | Tvar { jkind } ->
       set_level ty current_level;
-      Jkind.update_level current_level jkind
+      begin match Jkind.update_level current_level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.generalize_structure: \
+          rigid sort variable in generalize_structure"
+      end
     | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
@@ -1311,7 +1325,11 @@ let rec update_level env level expand ty =
         raise_escape_exn Self
     | Tvar { jkind } ->
       set_level ();
-      Jkind.update_level level jkind
+      begin match Jkind.update_level level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.update_level: rigid sort variable"
+      end
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1353,7 +1371,11 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar { jkind } ->
         if contra then begin
           set_level ty var_level;
-          Jkind.update_level var_level jkind
+          match Jkind.update_level var_level jkind with
+          | Ok () -> ()
+          | Error Rigid ->
+            Misc.fatal_error
+              "Ctype.lower_contravariant: rigid sort variable"
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
@@ -2985,11 +3007,17 @@ type unbox_result =
 
 (* We pass in [ty] as an [unwrapped_type_expr], which represents the state of a
    process of unwrapping before we do this extra step. This allows us to
-   backtrack in case an [or_null] we unwrap here cannot be re-applied: see
-   Note [unwrapped_type_expr backtracking for or_null].
+   backtrack in case an [or_null] we unwrap here cannot be re-applied, such as
+   for:
 
-   (In most callers of this, there is no ongoing state of unwrapping, so we just
-   use [mk_unwrapped_type_expr]). *)
+     let rec bad () : float# or_null = Null
+
+   Although this is ill-typed, we don't realize this when we typecheck it with
+   [type_approx], which we use for recursive functions. This gets us into
+   trouble when [type_approx] calls [type_jkind], which could then unwrap and
+   re-wrap an invalid application of [or_null] like the above. So, to avoid
+   needing to consider invalid applications of [or_null], we use the previous
+   [unwrapped_type_expr] as a fallback. *)
 let unbox_once env ty =
   match get_desc ty.ty with
   | Tconstr (p, args, _) ->
@@ -3160,6 +3188,12 @@ let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
   | Ok ty | Error ty -> ty
 
+let unwrap_until_or_null env ty =
+  let unwrapped_ty = get_unboxed_type_approximation env ty in
+  match unwrapped_ty.or_null with
+  | Some { prev; _ } -> prev.ty
+  | None -> unwrapped_ty.ty
+
 
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
@@ -3239,8 +3273,12 @@ let apply_jkind_wrapping_l ~env ~level
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
-let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
-      jkind =
+(* Given some unwrapped type [t] and kind [k], try to produce some [t'] and
+   [k'] such that the constraint [t : k] can be reduced to [t' : k'] (where the
+   latter implies the former).
+
+   Fails if no [t] could have kind [k]. *)
+let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty; modality; or_null } jkind =
   begin
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
@@ -3251,7 +3289,7 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
     else
       Ok jkind
   end
-  |> Result.map (Jkind.apply_modality_r modality)
+  |> Result.map (fun jkind -> ty, Jkind.apply_modality_r modality jkind)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3517,12 +3555,20 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-        Jkind.intersection_or_error ~type_equal ~context
-          ~reason:Tyvar_refinement_intersection env
-          ty's_jkind jkind
-        |> Result.map (fun jkind ->
-          Jkind.update_level (get_level ty) jkind;
-          set_var_jkind ty jkind)
+        let open Misc.Stdlib.Monad.Result.Syntax in
+        let* ty's_new_jkind =
+          Jkind.intersection_or_error ~type_equal ~context
+            ~reason:Tyvar_refinement_intersection env
+            ty's_jkind jkind
+        in
+        let+ () =
+          Jkind.update_level (get_level ty) ty's_new_jkind
+          |> Result.map_error (fun error ->
+            Jkind.Violation.of_ ~context env (
+              Not_a_subjkind (ty's_jkind, jkind,
+              [Layout_disagreement (Level error)])))
+        in
+        set_var_jkind ty ty's_new_jkind
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
@@ -3606,7 +3652,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           "Axis_disagreement("
                           ^ Jkind_axis.Axis.name axis
                           ^ ")"
-                        | Layout_disagreement -> "Layout_disagreement"
+                        | Layout_disagreement _ -> "Layout_disagreement"
                         | With_bounds_on_left -> "With_bounds_on_left"
                         | Constrain_ran_out_of_fuel ->
                           "Constrain_ran_out_of_fuel")
@@ -3639,7 +3685,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           (Jkind.Violation.of_ ~context env
                              (Not_a_subjkind
                                 (ty's_jkind, jkind, sub_failure_reasons)))
-                      | Ok jkind ->
+                      | Ok (ty, jkind) ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3651,16 +3697,15 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env
-                          unwrapped_ty.ty jkind
+                        estimate_jkind_and_loop ~fuel ~expanded:false env ty
+                          jkind
                       | _ ->
                         (* In this case, there's nothing to gain by
                            re-estimating: either it's already a product and we
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
-                          ty's_jkind jkind)
+                        loop ~fuel ~expanded:false env ty ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -3863,11 +3908,6 @@ let check_type_separability env ty sep =
 let is_always_gc_ignorable env ty =
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-
-let check_type_jkind_exn env texn ty jkind =
-  match check_type_jkind env ty jkind with
-  | Ok _ -> ()
-  | Error err -> raise_for texn (Bad_jkind (ty,err))
 
 let constrain_type_jkind_exn env texn ty jkind =
   match constrain_type_jkind env ty jkind with
@@ -4138,7 +4178,7 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal env jkind1 jkind2) then
+  if Result.is_error (Jkind.equal env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
@@ -4988,7 +5028,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind
-                when not (Jkind.equal env jkind decl_jkind) ->
+                when Result.is_error (Jkind.equal env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
@@ -6477,6 +6517,21 @@ let moregen_occur env level ty =
   occur_univar_for Moregen env ty;
   update_level_for Moregen env level ty
 
+let moregen_check_type_jkind_exn env subj pat jkind =
+  let failed_because_of_rigid_instatiation = function
+    | Jkind.Sub_failure_reason.Layout_disagreement (Level Rigid) -> true
+    | _ -> false
+  in
+  match check_type_jkind env subj jkind with
+  | Ok () -> ()
+  (* We improve the error message for rigid variables, which occur in [subj].
+     The check may fail if they are equated against something non-generic,
+     like a weak variable or a concrete layout. *)
+  | Error { violation = Not_a_subjkind (_, _, reasons) }
+    when List.exists failed_because_of_rigid_instatiation reasons ->
+    raise_for Moregen (Weaken_sort { pat; subj } )
+  | Error err -> raise_for Moregen (Bad_jkind (subj, err))
+
 type moregen_pairs =
   { invariant_pairs : TypePairs.t;
     covariant_pairs : TypePairs.t;
@@ -6689,7 +6744,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
-        check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+        moregen_check_type_jkind_exn env t2 t1
+          (Jkind.disallow_left jkind);
         link_type t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
@@ -6708,7 +6764,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
-              check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+              moregen_check_type_jkind_exn env t2 t1
+                (Jkind.disallow_left jkind);
               link_type t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
@@ -7148,10 +7205,10 @@ let all_distinct_vars_with_original_jkinds env vars =
        if TypeSet.mem ty !tys then Unification_failure { name; ty } else begin
          tys := TypeSet.add ty !tys;
          match get_desc ty with
-         | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate env inferred_jkind original_jkind
-           then All_good
-           else Jkind_mismatch { original_jkind; inferred_jkind; ty }
+         | Tvar { jkind = inferred_jkind } -> (
+           match Jkind.equate env inferred_jkind original_jkind with
+           | Ok () -> All_good
+           | Error _ -> Jkind_mismatch { original_jkind; inferred_jkind; ty })
          | _ -> Unification_failure { name; ty }
        end
   in
@@ -7205,7 +7262,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal env k1 k2)
+    if do_jkind_check && Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -7235,7 +7292,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal env k1 k2)
+      if Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in

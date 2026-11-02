@@ -75,12 +75,26 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
+type hidden_include_file =
+  { visible_path : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+let parse_hidden_include_file ~cmx_guaranteed entry =
+  match String.split_on_char ':' entry with
+  | [ visible_path; actual_path ] ->
+    Ok { visible_path; actual_path; cmx_guaranteed }
+  | _ -> Error ("Expected '<visible_path>:<actual_path>', got: " ^ entry)
+
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
+and hidden_include_files = (* -H-file, -Hx-file *)
+  ref ([] : hidden_include_file list)
 and no_std_include = ref false          (* -nostdlib *)
 and no_cwd = ref false                  (* -nocwd *)
 and print_types = ref false             (* -i *)
@@ -263,6 +277,31 @@ let[@inline] target_is_jsir () =
   match !target with
   | Js_of_ocaml -> true
   | Bytecode | Native -> false
+
+module Jsoo_phase = struct
+  type t = All | Compile | Archive | Runtime | Link
+
+  let all = [All; Compile; Archive; Runtime; Link]
+
+  let flag = function
+    | All -> "-jsoo-opt"
+    | Compile -> "-jsoo-opt-compile"
+    | Archive -> "-jsoo-opt-archive"
+    | Runtime -> "-jsoo-opt-runtime"
+    | Link -> "-jsoo-opt-link"
+end
+
+let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
+  let all = ref ([] : string list) in
+  let compile = ref [] and archive = ref [] in
+  let runtime = ref [] and link = ref [] in
+  fun (phase : Jsoo_phase.t) ->
+    match phase with
+    | All -> all
+    | Compile -> compile
+    | Archive -> archive
+    | Runtime -> runtime
+    | Link -> link
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)

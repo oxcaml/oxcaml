@@ -229,7 +229,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     compile_from_tlambda info program ~keep_symbol_tables:false
 
   let functorize input_module_names target =
-    Functorizer.functorize input_module_names target ~with_info ~impl_ext:"cmx"
+    (* [impl_ext] is the extension without its leading dot. *)
+    let impl_ext =
+      let ext = ext_flambda_obj in
+      String.sub ext 1 (String.length ext - 1)
+    in
+    Functorizer.functorize input_module_names target ~with_info ~impl_ext
       ~read_format:(fun filename ->
         let unit_info, _crc = Compilenv.read_unit_info filename in
         unit_info.ui_format)

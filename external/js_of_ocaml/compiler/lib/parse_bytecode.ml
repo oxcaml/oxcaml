@@ -3658,7 +3658,12 @@ type jsir_unit =
   }
 
 let from_cmj ic =
-  let { Code.program; last_var; imported_compilation_units; exported_compilation_unit } =
+  let { Code.program
+      ; last_var
+      ; imported_compilation_units
+      ; exported_compilation_unit
+      ; force_link
+      } =
     (Marshal.from_channel ic : Code.cmj_body)
   in
   (* Each unit is compiled one at a time, so the variables might not be disjoint.
@@ -3671,15 +3676,8 @@ let from_cmj ic =
       Unit_info.of_compilation_units
         ~exported:exported_compilation_unit
         ~imported:imported_compilation_units
+        ~force_link
   }
-
-let from_cmja ic =
-  let toc_pos = input_binary_int ic in
-  seek_in ic toc_pos;
-  let lib = (input_value ic : Ocaml_compiler.Cmj_format.library) in
-  List.map (Ocaml_compiler.Cmj_format.units lib) ~f:(fun unit ->
-      seek_in ic (Ocaml_compiler.Cmj_format.unit_pos unit);
-      from_cmj ic)
 
 let from_channel ic =
   let format =

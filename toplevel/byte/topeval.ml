@@ -154,8 +154,7 @@ let execute_phrase print_outcome ppf phr =
                                      (Types.Lpoly.determined []) exp.exp_type in
                         let ty =
                           let base = Mode.With_locality.Const.legacy in
-                          Out_type.prepare_for_printing ~base
-                            [exp.exp_type];
+                          Out_type.prepare_for_printing [exp.exp_type];
                           Out_type.tree_of_typexp ~base Type_scheme
                             exp.exp_type
                         in
