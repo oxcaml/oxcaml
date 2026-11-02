@@ -28,6 +28,16 @@
           (:include %{project_root}/sharedlib_cflags.sexp)
           (:include %{project_root}/oc_cppflags.sexp)))))
 
+; Relink str.cma with the runtime-id-suffixed stub name (see otherlibs/unix/dune),
+; installed in place of dune's.
+(rule
+ (targets str_reloc.cma)
+ (deps str.cma)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (run %{ocamlc} -a -noautolink -linkall -o %{targets} str.cma
+       -dllib-suffixed -lstr_stubs -cclib -lstr_stubs)))
+
 (install
   (files
     (.str.objs/native/str.cmx as str/str.cmx)
@@ -37,7 +47,7 @@
     (str.cmxa as str/str.cmxa)
     (str.a as str/str.a)
     (str.cmxs as str/str.cmxs)
-    (str.cma as str/str.cma)
+    (str_reloc.cma as str/str.cma)
     (str.mli as str/str.mli)
     (.str.objs/byte/str.cmi as str/str.cmi)
     (.str.objs/byte/str.cmt as str/str.cmt)

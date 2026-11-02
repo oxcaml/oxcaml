@@ -1,0 +1,33 @@
+; Generated (via Makefile.common-ox: @STUB_SUFFIX@ -> $(TARGET)-$(BYTECODE_RUNTIME_ID))
+; into stub_dll.inc, which the sibling dune (include)s. The C stub library is
+; permanently renamed with the runtime-id suffix (recorded as a plain -dllib,
+; not -dllib-suffixed) so this compiler's bytecode loads only its own
+; dllflambda2_floats_stubs; see otherlibs/unix/byte/dune for the rationale. dune
+; cannot put a build-config value in an (archive_name)/(foreign_archives) atom,
+; hence generating the stanza here.
+(foreign_library
+ (archive_name flambda2_floats_stubs-@STUB_SUFFIX@)
+ (language c)
+ (names float32_stubs)
+ (flags
+  ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
+   (:include %{project_root}/sharedlib_cflags.sexp)
+   (:include %{project_root}/oc_cppflags.sexp))))
+
+(library
+ (name flambda2_floats)
+ (wrapped true)
+ (instrumentation
+  (backend bisect_ppx))
+ (foreign_archives flambda2_floats_stubs-@STUB_SUFFIX@)
+ (ocamlopt_flags
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3)))
+
+(install
+ (files
+  (dllflambda2_floats_stubs-@STUB_SUFFIX@.so
+   as stublibs/dllflambda2_floats_stubs-@STUB_SUFFIX@.so))
+ (section lib)
+ (package ocaml))

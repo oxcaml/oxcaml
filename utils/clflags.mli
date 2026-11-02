@@ -77,7 +77,7 @@ end
 
 val objfiles : string list ref
 val ccobjs : string list ref
-val dllibs : string list ref
+val dllibs : (suffixed:bool * string) list ref
 val cmi_file : string option ref
 val compile_only : bool ref
 val output_name : string option ref
@@ -161,6 +161,9 @@ val noinit : bool ref
 val noversion : bool ref
 val use_prims : string ref
 val use_runtime : string ref
+val target_bindir : string ref
+val launch_method : Config.launch_method ref
+val search_method : Config.search_method ref
 val plugin : bool ref
 val principal : bool ref
 val print_variance : bool ref

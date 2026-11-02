@@ -205,9 +205,8 @@ let write_stdlib_dune ppf =
   copy_files ~ppf "../../Makefile.config";
   copy_files ~ppf "../../runtime/ld.conf"; 
   fprintf ppf "%s\n" {|
-  (rule (target runtime-launch-info) (action (copy ../runtime.info %{target})))
-  (rule (target target_runtime-launch-info)
-        (action (copy ../target_runtime.info %{target})))
+  (rule (target runtime-launch-info)
+        (action (copy ../runtime-launch-info %{target})))
   (alias
     (name stdlib)
     (deps
@@ -218,7 +217,7 @@ let write_stdlib_dune ppf =
        std_exit.cmo std_exit.o std_exit.cmx
        (glob_files *.{cmi,cmti,cmsi,cmo,cms,cmt,cmx})
        (glob_files caml/*.{h,tbl})
-       Makefile.config runtime-launch-info target_runtime-launch-info ld.conf
+       Makefile.config runtime-launch-info ld.conf
        stdlib/META dynlink/dynlink.cmxa))
   |}
 

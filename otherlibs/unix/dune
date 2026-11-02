@@ -139,13 +139,29 @@
            (:include %{project_root}/oc_cppflags.sexp)))
  ))
 
+; The installed unix.cma is relinked from dune's with the runtime-id *suffixed*
+; stub name (-dllib-suffixed), so this version's bytecode loads only its own
+; dllunix_stubs (the .so is renamed with the suffix in the install step; cf.
+; MKLIB -suffixed in otherlibs/Makefile.otherlibs.common). -noautolink drops
+; dune's plain -dllib/-cclib from the copy, which keeps the units and their
+; order. The compiler's own bytecode tools instead link the byte-only unix_byte
+; library (byte/dune); dune's own unix.cma keeps the plain stub name for
+; build-time byte consumers.
+(rule
+ (targets unix_reloc.cma)
+ (deps unix.cma)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (run %{ocamlc} -a -noautolink -linkall -o %{targets} unix.cma
+       -dllib-suffixed -lunix_stubs -cclib -lunix_stubs)))
+
 (install
   (files
     (.unix.objs/native/unix.cmx as unix/unix.cmx)
     (.unix.objs/native/unixLabels.cmx as unix/unixLabels.cmx)
     (unix.cmxa as unix/unix.cmxa)
     (unix.a as unix/unix.a)
-    (unix.cma as unix/unix.cma)
+    (unix_reloc.cma as unix/unix.cma)
     (.unix.objs/byte/unix.cmi as unix/unix.cmi)
     (.unix.objs/byte/unix.cmt as unix/unix.cmt)
     (.unix.objs/byte/unix.cmti as unix/unix.cmti)

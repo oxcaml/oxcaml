@@ -7,6 +7,17 @@
   (flags
    (:standard (:include %{project_root}/build_map_cflags.sexp)))))
 
+; Relink jit.cma with the runtime-id-suffixed stub name (see otherlibs/unix/dune),
+; installed in place of dune's; the .so is now installed too (dune's install was
+; missing it) and renamed with the suffix in the install step.
+(rule
+ (targets jit_reloc.cma)
+ (deps jit.cma)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (run %{ocamlc} -a -noautolink -linkall -o %{targets} jit.cma
+       -dllib-suffixed -ljit_stubs -cclib -ljit_stubs)))
+
 (install
  (files
   (META as ocaml-jit/META)
@@ -14,8 +25,9 @@
   (jit.cmxa as ocaml-jit/jit.cmxa)
   (jit.a as ocaml-jit/jit.a)
   (libjit_stubs.a as ocaml-jit/libjit_stubs.a)
+  (dlljit_stubs.so as stublibs/dlljit_stubs.so)
   (jit.cmxs as ocaml-jit/jit.cmxs)
-  (jit.cma as ocaml-jit/jit.cma)
+  (jit_reloc.cma as ocaml-jit/jit.cma)
   (.jit.objs/byte/jit.cmi as ocaml-jit/jit.cmi)
   (.jit.objs/byte/jit.cmt as ocaml-jit/jit.cmt)
   (.jit.objs/byte/jit.cmti as ocaml-jit/jit.cmti))

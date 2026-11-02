@@ -30,6 +30,17 @@
           (:include %{project_root}/sharedlib_cflags.sexp)
           (:include %{project_root}/oc_cppflags.sexp)))))
 
+; Relink runtime_events.cma with the runtime-id-suffixed stub name (see
+; otherlibs/unix/dune), installed in place of dune's.
+(rule
+ (targets runtime_events_reloc.cma)
+ (deps runtime_events.cma)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (run %{ocamlc} -a -noautolink -linkall -o %{targets} runtime_events.cma
+       -dllib-suffixed -lruntime_events_stubs
+       -cclib -lruntime_events_stubs)))
+
 (install
   (files
     (.runtime_events.objs/native/runtime_events.cmx as runtime_events/runtime_events.cmx)
@@ -39,7 +50,7 @@
     (runtime_events.cmxa as runtime_events/runtime_events.cmxa)
     (runtime_events.a as runtime_events/runtime_events.a)
     (runtime_events.cmxs as runtime_events/runtime_events.cmxs)
-    (runtime_events.cma as runtime_events/runtime_events.cma)
+    (runtime_events_reloc.cma as runtime_events/runtime_events.cma)
     (runtime_events.mli as runtime_events/runtime_events.mli)
     (.runtime_events.objs/byte/runtime_events.cmi as runtime_events/runtime_events.cmi)
     (.runtime_events.objs/byte/runtime_events.cmt as runtime_events/runtime_events.cmt)

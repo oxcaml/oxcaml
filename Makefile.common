@@ -345,8 +345,20 @@ $(eval $(call _OCAML_COMMON_BASE,$(1)))
 $(basename $(notdir $(1)))_COMMON_LINKFLAGS =
 endef # _OCAML_PROGRAM_BASE
 
+# $(ROOTDIR)/ocamlc needs -launch-method to be given explicitly as its default
+# values are those for the target (cf. --with-target-sh and TARGET_BINDIR).
+BYTECODE_LAUNCHER_FLAGS = \
+  -launch-method $(call QUOTE_SINGLE,$(LAUNCH_METHOD) $(BINDIR)) \
+  -runtime-search $(if $(RUNTIME_SEARCH),$(RUNTIME_SEARCH),disable)
+
+MAYBE_ADD_BYTECODE_LAUNCHER_FLAGS = \
+  $(if $(filter -custom, $(1)),,\
+    -use-prims $(ROOTDIR)/runtime/primitives $(BYTECODE_LAUNCHER_FLAGS))
+
 LINK_BYTECODE_PROGRAM =\
-  $(CAMLC) $(OC_COMMON_LINKFLAGS) $(OC_BYTECODE_LINKFLAGS)
+  $(CAMLC) $(OC_COMMON_LINKFLAGS) \
+    $(call MAYBE_ADD_BYTECODE_LAUNCHER_FLAGS, \
+      $(OC_COMMON_LINKFLAGS) $(OC_BYTECODE_LINKFLAGS)) $(OC_BYTECODE_LINKFLAGS)
 
 # The _OCAML_BYTECODE_PROGRAM macro defines a bytecode program but assuming
 # that _OCAML_PROGRAM_BASE has already been called. Its public counterpart
@@ -370,8 +382,12 @@ $(basename $(notdir $(1)))_BYTECODE_LINKFLAGS =
 
 $(basename $(notdir $(1)))_BYTECODE_LINKCMD = \
 $(strip \
-  $$(CAMLC) $$(OC_COMMON_LINKFLAGS) $$(OC_BYTECODE_LINKFLAGS) \
-  $$($(basename $(notdir $(1)))_COMMON_LINKFLAGS) \
+  $$(CAMLC) $$(OC_COMMON_LINKFLAGS) \
+  $$(call MAYBE_ADD_BYTECODE_LAUNCHER_FLAGS, \
+    $$(OC_COMMON_LINKFLAGS) $$(OC_BYTECODE_LINKFLAGS) \
+    $$($(basename $(notdir $(1)))_COMMON_LINKFLAGS) \
+    $$($(basename $(notdir $(1)))_BYTECODE_LINKFLAGS)) \
+  $$(OC_BYTECODE_LINKFLAGS) $$($(basename $(notdir $(1)))_COMMON_LINKFLAGS) \
   $$($(basename $(notdir $(1)))_BYTECODE_LINKFLAGS))
 
 $(1)$(EXE): $$$$($(basename $(notdir $(1)))_BCOBJS)
