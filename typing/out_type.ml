@@ -1391,9 +1391,17 @@ end = struct
     if not (List.memq px visited) then begin
       let visited = px :: visited in
       match get_desc ty with
-      | Tarrow ((_l, marg, mret), ty1, ty2, _) ->
-        register_curry_candidates ~visited
-          (curry_mode_of_occurrence ~arg:true marg) ty1;
+      | Tarrow ((l, marg, mret), ty1, ty2, _) ->
+        let arg_acc = curry_mode_of_occurrence ~arg:true marg in
+        if is_optional l then begin
+          match
+            get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
+          with
+          | Tconstr (path, [ty], _) when Path.same path Predef.path_option ->
+            register_curry_candidates ~visited arg_acc ty
+          | _ -> ()
+        end
+        else register_curry_candidates ~visited arg_acc ty1;
         let acc_mode = curry_acc acc_mode marg in
         let acc_mode =
           match get_desc ty2 with
