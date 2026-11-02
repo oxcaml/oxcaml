@@ -1284,7 +1284,19 @@ end = struct
 
   let mapi f t = mapi_aux [] f t
 
-  let rec mapi2 fu fl fo t0 t1 =
+  (* For error messages, relations are computed as if a value's memory was a
+     single node: the projections below [Memory_address] are dropped, and two
+     nodes below the same [Memory_address] are the same. [projs] is in reverse
+     order. *)
+  let relation ~below_memory mk projs =
+    let rec up_to_memory = function
+      | [] -> []
+      | Projection.Memory_address :: _ -> [Projection.Memory_address]
+      | proj :: projs -> proj :: up_to_memory projs
+    in
+    if below_memory then Self else mk (List.rev (up_to_memory (List.rev projs)))
+
+  let rec mapi2 ~below_memory fu fl fo t0 t1 =
     let usage = fu Self t0.usage t1.usage in
     let children =
       Projection.Map.merge
@@ -1294,7 +1306,10 @@ end = struct
           | None, Some c1 ->
             Some
               (mapi_aux [proj]
-                 (fun projs r -> fu (Ancestor projs) t0.usage r)
+                 (fun projs r ->
+                   fu
+                     (relation ~below_memory (fun p -> Ancestor p) projs)
+                     t0.usage r)
                  (fun r -> fl r Learned_tags.empty)
                  (fun r ->
                    fo (Overwrites.promote_mutation_to_children t0.overwrites) r)
@@ -1302,12 +1317,19 @@ end = struct
           | Some c0, None ->
             Some
               (mapi_aux [proj]
-                 (fun projs l -> fu (Descendant projs) l t1.usage)
+                 (fun projs l ->
+                   fu
+                     (relation ~below_memory (fun p -> Descendant p) projs)
+                     l t1.usage)
                  (fun l -> fl l Learned_tags.empty)
                  (fun l ->
                    fo l (Overwrites.promote_mutation_to_children t1.overwrites))
                  c0)
-          | Some c0, Some c1 -> Some (mapi2 fu fl fo c0 c1))
+          | Some c0, Some c1 ->
+            let below_memory =
+              match proj with Memory_address -> true | _ -> below_memory
+            in
+            Some (mapi2 ~below_memory fu fl fo c0 c1))
         t0.children t1.children
     in
     let learned = fl t0.learned t1.learned in
@@ -1315,7 +1337,7 @@ end = struct
     { usage; children; learned; overwrites }
 
   let lift fu fl fo t0 t1 =
-    mapi2
+    mapi2 ~below_memory:false
       (fun first_is_of_second t0 t1 ->
         try fu t0 t1
         with Usage.Cannot_force inner ->
@@ -3245,36 +3267,11 @@ let report_multi_use inner first_is_of_second =
         (* there comes first in source, so show occ (later) as main error *)
         there_occ, there_usage, occ, here_usage, "is also being", true
   in
-  (* Ensure that reads and writes of a value's memory are reported as uses of
-     the value itself. *)
-  let is_own_memory ~descendant_is_there (projs : Projection.t list) =
-    let descendant_is_access =
-      descendant_is_there
-      &&
-      match there with
-      | Usage.Maybe_aliased _ -> true
-      | Usage.Aliased t -> (
-        match Aliased.reason t with
-        | Lifted _ -> true
-        | Forced | Lazy | Array | Constant | Lifted_borrowed | In_borrowing ->
-          false)
-      | _ -> false
-    in
-    match projs with
-    | [Memory_address] -> true
-    | [(Record_field _ | Tuple_field _ | Alloc)]
-    | [(Record_field _ | Tuple_field _ | Alloc); Memory_address] ->
-      descendant_is_access
-    | _ -> false
-  in
   let first_is_of_second =
     match first_is_of_second with
-    | Self -> "it"
-    | Descendant projs
-      when is_own_memory ~descendant_is_there:second_is_occ projs ->
-      "it"
-    | Ancestor projs
-      when is_own_memory ~descendant_is_there:(not second_is_occ) projs ->
+    | Self
+    | Ancestor [Projection.Memory_address]
+    | Descendant [Projection.Memory_address] ->
       "it"
     | Descendant _ -> "part of it"
     | Ancestor _ -> "it is part of a value that"

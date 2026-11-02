@@ -548,8 +548,7 @@ let bad_consume_then_use (r : mutable_field @ unique) =
 Line 2, characters 55-56:
 2 |   match r with { m = deref_ a } -> consume r; use_addr a
                                                            ^
-Error: This value is used here,
-       but it is part of a value that has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 2, characters 43-44:
 2 |   match r with { m = deref_ a } -> consume r; use_addr a
                                                ^
@@ -811,7 +810,7 @@ Line 5, characters 18-35:
 5 |     (match q with addr_imm_ #(_, y) -> consume y)
                       ^^^^^^^^^^^^^^^^^
 Error: This value is read from here,
-       but part of it has already been used as unique at:
+       but it has already been used as unique at:
 Line 4, characters 63-64:
 4 |     (match q with addr_imm_ #(deref_ a, _) -> consume_addr_imm a);
                                                                    ^

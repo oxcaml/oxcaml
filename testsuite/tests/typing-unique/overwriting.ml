@@ -1297,8 +1297,7 @@ val consume_addr : ('a : any). 'a addr @ unique -> unit = <fun>
 Line 5, characters 52-53:
 5 |   | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
                                                         ^
-Error: This value is used here,
-       but part of it has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 5, characters 38-39:
 5 |   | { dm = deref_ a } -> consume_addr a; overwrite_ r with { dm = "x" }
                                           ^
@@ -1338,8 +1337,7 @@ let use_addr_after_overwrite (r : ow @ unique) =
 Line 5, characters 17-18:
 5 |     use_addr_imm a;
                      ^
-Error: This value is used here,
-       but it is part of a value that has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 4, characters 23-24:
 4 |     let r = overwrite_ r with { f = "x" } in
                            ^
@@ -1354,8 +1352,7 @@ let overwrite_after_use_addr (r : ow @ unique) =
 Line 3, characters 54-55:
 3 |   | { f = deref_ a; _ } -> use_addr_imm a; overwrite_ r with { f = "x" }
                                                           ^
-Error: This value is used here as unique,
-       but part of it has already been used at:
+Error: This value is used here as unique, but it has already been used at:
 Line 3, characters 40-41:
 3 |   | { f = deref_ a; _ } -> use_addr_imm a; overwrite_ r with { f = "x" }
                                             ^
@@ -1371,8 +1368,7 @@ let overwrite_other_field_after_consume_addr (r : ow @ unique) =
 Line 3, characters 58-59:
 3 |   | { f = deref_ a; _ } -> consume_addr_imm a; overwrite_ r with { g = "x" }
                                                               ^
-Error: This value is used here,
-       but part of it has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 44-45:
 3 |   | { f = deref_ a; _ } -> consume_addr_imm a; overwrite_ r with { g = "x" }
                                                 ^
@@ -1386,8 +1382,7 @@ let overwrite_tuple_after_consume_addr (t : (string * string) @ unique) =
 Line 3, characters 52-53:
 3 |   | (deref_ a, _) -> consume_addr_imm a; overwrite_ t with (_, "y")
                                                         ^
-Error: This value is used here,
-       but part of it has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 38-39:
 3 |   | (deref_ a, _) -> consume_addr_imm a; overwrite_ t with (_, "y")
                                           ^
@@ -1431,8 +1426,7 @@ type outer_unboxed = { ou : inner_unboxed; og' : string; }
 Line 7, characters 21-22:
 7 |     consume_addr_imm a;
                          ^
-Error: This value is used here,
-       but it is part of a value that has already been used as unique at:
+Error: This value is used here, but it has already been used as unique at:
 Line 6, characters 23-24:
 6 |     let r = overwrite_ r with { ou = #{ iu = "x"; iu' = "y" } } in
                            ^
@@ -1450,8 +1444,7 @@ let overwrite_with_loaded_value (r : ow @ unique) =
 Line 5, characters 15-16:
 5 |     overwrite_ r with { f = s }
                    ^
-Error: This value is used here as unique,
-       but part of it has already been used at:
+Error: This value is used here as unique, but it has already been used at:
 Line 5, characters 28-29:
 5 |     overwrite_ r with { f = s }
                                 ^
@@ -1481,6 +1474,16 @@ let overwrite_through_addr_imm (r : ow_imm @ unique) =
   | { owi = deref_ a } ->
     (match a with addr_imm_ v -> overwrite_ v with { oi1 = "x" })
 [%%expect{|
+type ow_inner = { oi1 : string; }
+type ow_imm = { owi : ow_inner; }
+type ow_mut = { mutable owm : ow_inner; }
+Line 7, characters 33-64:
+7 |     (match a with addr_imm_ v -> overwrite_ v with { oi1 = "x" })
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Alert Translcore: Overwrite not implemented.
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* ...but the value at a mutable position is aliased *)
@@ -1489,4 +1492,10 @@ let overwrite_through_addr (r : ow_mut @ unique) =
   | { owm = deref_ a } ->
     (match a with addr_ v -> overwrite_ v with { oi1 = "x" })
 [%%expect{|
+Line 4, characters 40-41:
+4 |     (match a with addr_ v -> overwrite_ v with { oi1 = "x" })
+                                            ^
+Error: This value is "aliased"
+         because it is the value (with some modality) at the address at line 4, characters 18-25.
+       However, the highlighted expression is expected to be "unique".
 |}]
