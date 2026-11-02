@@ -1887,3 +1887,14 @@ Line 1, characters 21-34:
                          ^^^^^^^^^^^^^
 Error: Exclave expression should only be in tail position of the current region.
 |}]
+
+(*****************)
+(* break_ *)
+
+let break =
+  for i = 0 to 10 do
+    if true then break_
+  done
+[%%expect{|
+val break : unit = ()
+|}]

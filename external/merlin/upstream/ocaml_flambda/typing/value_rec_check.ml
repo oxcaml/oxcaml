@@ -197,7 +197,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_for _
     | Texp_setfield _
     | Texp_while _
-    | Texp_setinstvar _ ->
+    | Texp_setinstvar _
+    | Texp_break _ ->
         (* Unit-returning expressions *)
         Static
 
@@ -1108,6 +1109,7 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_splice e ->
         expression e << Dereference
+    | Texp_break _ -> empty
 
 (* Function bodies.
     G |-{body} b : m

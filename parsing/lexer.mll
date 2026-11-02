@@ -55,6 +55,7 @@ let all_keywords =
     "assert", ASSERT, v1_6;
     "begin", BEGIN, always;
     "borrow_", BORROW, oxcaml;
+    "break_", BREAK, oxcaml;
     "class", CLASS, v1_0;
     "constraint", CONSTRAINT, v1_0;
     "do", DO, always;
