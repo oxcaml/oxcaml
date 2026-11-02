@@ -45,30 +45,30 @@ let arg ?(kind = `Mandatory) name doc action = (kind, (name, doc, action))
 let optional x = arg ~kind:`Optional x
 let many x = arg ~kind:`Many x
 
-let marg_position f =
-  Marg.param "position" (function
-    | "start" -> f `Start
-    | "end" -> f `End
-    | str -> (
-      match int_of_string str with
-      | n -> f (`Offset n)
-      | exception _ -> (
-        match
-          let offset = String.index str ':' in
-          let line = String.sub str ~pos:0 ~len:offset in
-          let col =
-            String.sub str ~pos:(offset + 1)
-              ~len:(String.length str - offset - 1)
-          in
-          `Logical (int_of_string line, int_of_string col)
-        with
-        | pos -> f pos
-        | exception _ ->
-          failwithf
-            "expecting position, got %S. position can be \
-             start|end|<offset>|<line>:<col>, where offset, line and col are \
-             numbers, lines are indexed from 1."
-            str)))
+let parse_position = function
+  | "start" -> `Start
+  | "end" -> `End
+  | str -> (
+    match int_of_string str with
+    | n -> `Offset n
+    | exception _ -> (
+      match
+        let offset = String.index str ':' in
+        let line = String.sub str ~pos:0 ~len:offset in
+        let col =
+          String.sub str ~pos:(offset + 1) ~len:(String.length str - offset - 1)
+        in
+        `Logical (int_of_string line, int_of_string col)
+      with
+      | pos -> pos
+      | exception _ ->
+        failwithf
+          "expecting position, got %S. position can be \
+           start|end|<offset>|<line>:<col>, where offset, line and col are \
+           numbers, lines are indexed from 1."
+          str))
+
+let marg_position f = Marg.param "position" (fun s -> f (parse_position s))
 
 let marg_completion_kind f =
   Marg.param "completion-kind" (function
@@ -259,17 +259,25 @@ let all_commands =
       end;
     command "enclosing"
       ~spec:
-        [ arg "-position" "<position> Position to complete"
-            (marg_position (fun pos _pos -> pos))
+        [ arg "-position" "<position> Position of the enclosing"
+            (marg_position (fun pos (_pos, stop) -> (pos, stop)));
+          arg "-end-position" "<position> End of the enclosing range"
+            (marg_position (fun stop (pos, _stop) -> (pos, stop)))
         ]
       ~doc:
         "Returns a list of locations `{'start': position, 'end': position}` in \
          increasing size of all entities surrounding the position.\n\
          (In a lisp, this would be the locations of all s-exps that contain \
-         the cursor.)" ~default:`None begin fun buffer pos ->
+         the cursor.)" ~default:(`None, `None) begin fun buffer (pos, stop) ->
       match pos with
       | `None -> failwith "-position <pos> is mandatory"
-      | #Msource.position as pos -> run buffer (Query_protocol.Enclosing pos)
+      | #Msource.position as pos ->
+        let stop =
+          match stop with
+          | `None -> None
+          | #Msource.position as stop -> Some stop
+        in
+        run buffer (Query_protocol.Enclosing (pos, stop))
       end;
     command "errors"
       ~spec:
