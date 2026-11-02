@@ -6066,6 +6066,7 @@ let rec type_approx env sexp ty_expected =
       type_tuple_approx env sexp.pexp_loc ty_expected l
   | Pexp_ifthenelse (_,e,_) -> type_approx env e ty_expected
   | Pexp_sequence (_,e) -> type_approx env e ty_expected
+  | Pexp_stack e -> type_approx env e ty_expected
   | Pexp_constraint (e, Some sty, _) ->
       let ty_expected =
         type_approx_constraint env (Pconstraint sty) ty_expected ~loc
