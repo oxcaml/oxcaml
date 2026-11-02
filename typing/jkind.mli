@@ -627,8 +627,12 @@ val default_to_scannable : 'd Types.jkind -> unit
     has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit
 
+(** Updates the levels of sort variables in the jkind.
+
+    This function only succeeds if the kind can be expanded so that an abstract
+    kind does not escape its scope. This expansion is returned. *)
 val update_level :
-  Env.t -> int -> 'd Types.jkind -> (unit, Sort.level_error) result
+  Env.t -> int -> 'd Types.jkind -> ('d Types.jkind, Sort.level_error) result
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)

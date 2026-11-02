@@ -1013,7 +1013,8 @@ let rec lower_all ty =
     begin match get_desc ty with
     | Tvar { jkind } -> (
       match Jkind.update_level Env.empty !current_level jkind with
-      | Ok () -> ()
+      | Ok jkind ->
+        set_var_jkind ty jkind
       | Error Rigid ->
         Misc.fatal_error "Ctype.lower_all: rigid sort variable in generalize"
       | Error (Escape _) ->
@@ -1084,7 +1085,8 @@ let rec generalize_structure ty =
     | Tvar { jkind } -> (
       set_level ty current_level;
       match Jkind.update_level Env.empty current_level jkind with
-      | Ok () -> ()
+      | Ok jkind ->
+        set_var_jkind ty jkind
       | Error Rigid ->
         Misc.fatal_error "Ctype.generalize_structure: rigid sort variable"
       | Error (Escape _) ->
@@ -1309,7 +1311,8 @@ let rec update_level env level expand ty =
         raise_escape_exn Self
     | Tvar { jkind } ->
       begin match Jkind.update_level env level jkind with
-      | Ok () -> ()
+      | Ok jkind ->
+        set_var_jkind ty jkind
       | Error Rigid ->
         Misc.fatal_error "Ctype.update_level: rigid sort variable"
       | Error (Escape path) ->
@@ -1358,7 +1361,8 @@ let rec lower_contravariant env var_level visited contra ty =
         if contra then begin
           set_level ty var_level;
           match Jkind.update_level env var_level jkind with
-          | Ok () -> ()
+          | Ok jkind ->
+            set_var_jkind ty jkind
           | Error Rigid ->
             Misc.fatal_error
               "Ctype.lower_contravariant: rigid sort variable"
@@ -3540,7 +3544,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             ~reason:Tyvar_refinement_intersection env
             ty's_jkind jkind
         in
-        let+ () =
+        let+ ty's_new_jkind =
           Jkind.update_level env (get_level ty) ty's_new_jkind
           |> Result.map_error (fun error ->
             Jkind.Violation.of_ ~context env (
