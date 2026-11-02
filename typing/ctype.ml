@@ -8725,7 +8725,7 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
   | (Tvar {name; jkind} | Tunivar {name; jkind}) as desc ->
     let jkind' = nondep_jkind_base env ids jkind in
     if jkind' == jkind then ty
-    else
+    else if get_level ty = generic_level then
       let desc =
         match desc with
         | Tvar _ -> Tvar {name; jkind = jkind'}
@@ -8737,6 +8737,7 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
       in
       TypeHash.add nondep_hash ty ty';
       ty'
+    else Misc.fatal_error "Ctype.nondep_type_rec: weak variable copy"
   | _ ->
     let ty' = newgenstub ~scope:(get_scope ty)
                 (Jkind.Builtin.any ~why:Dummy_jkind) in
