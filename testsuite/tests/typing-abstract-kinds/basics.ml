@@ -1960,6 +1960,7 @@ Error: This expression has type "'a id option"
          because of the annotation on the wildcard _ at line 1, characters 30-39.
        But the kind of 'weak3 must be a subkind of X.ka
          because of the annotation on the wildcard _ at line 6, characters 34-44.
+       The kind constructor X.ka would escape its scope.
 |}]
 
 let f_refine (x : (_ : any) id option ref) =
@@ -1977,6 +1978,7 @@ Error: This expression has type "'a id option"
          because of the annotation on the wildcard _ at line 1, characters 18-27.
        But the kind of 'a must be a subkind of X.ka
          because of the annotation on the wildcard _ at line 3, characters 26-36.
+       The kind constructor X.ka would escape its scope.
 |}]
 
 (*************************************************************************)

@@ -3923,6 +3923,20 @@ module Violation = struct
     *)
     match violation with
     | Not_a_subjkind (sub, super, reasons) -> (
+      begin match
+        List.find_map
+          (function
+            | Sub_failure_reason.Layout_disagreement (Level (Escape path)) ->
+              Some path
+            | _ -> None)
+          reasons
+      with
+      | Some path ->
+        fprintf ppf
+          "@;@[The kind constructor@;<1 2>%a@ would escape its scope.@]"
+          !printtyp_path path
+      | None -> ()
+      end;
       let disagreeing_axes =
         (* Collect all the axes that disagree into a set. If none disagree,
            then it is [None] *)
