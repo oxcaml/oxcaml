@@ -767,3 +767,25 @@ val shared_curry :
   ('a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)])
   list @ [> 'o] = <fun>
 |}]
+
+let labelled_curry ~g () = ignore (g == (fun x y -> x))
+[%%expect{|
+val labelled_curry :
+  g:('a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]) @ [< past('o) & global many uncontended read_write] ->
+  (unit @ 'p -> unit @ [> dynamic]) @ [> past('o) | stateful] = <fun>
+|}, Principal{|
+val labelled_curry :
+  g:('a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]) @ [< global many uncontended read_write] ->
+  unit @ 'o -> unit @ [> dynamic] = <fun>
+|}]
+
+let optional_curry ?g () = ignore (g == Some (fun x y -> x))
+[%%expect{|
+val optional_curry :
+  ?g:('a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [< past('o) & global many uncontended read_write] ->
+  (unit @ 'p -> unit @ [> dynamic]) @ [> past('o) | stateful] = <fun>
+|}, Principal{|
+val optional_curry :
+  ?g:('a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [< global many uncontended read_write] ->
+  unit @ 'o -> unit @ [> dynamic] = <fun>
+|}]
