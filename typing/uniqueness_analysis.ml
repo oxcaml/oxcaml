@@ -1338,7 +1338,8 @@ end = struct
       (fun t0 t1 ->
         try fo t0 t1
         with Overwrites.Error error ->
-          Error.log_and_raise (Overwrite_changed_tag error))
+          Error.log_or_raise (Overwrite_changed_tag error);
+          t0)
       t0 t1
 
   let choose t0 t1 =
