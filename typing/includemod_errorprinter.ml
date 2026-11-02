@@ -1172,8 +1172,8 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
   | Unrepresentable_item (ty, violation) ->
       let printer =
         Fmt.dprintf
-          "@[<v>@[Signatures containing unrepresentable items are not@ \
-           included in other signatures.@]@ %a is not representable.@ %a@]"
+          "@[<v>@[Signatures containing unrepresentable items cannot be@ \
+           coerced to other module types.@]@ %a is not representable.@ %a@]"
           Style.inline_code (Ident.name name)
           (Jkind.Violation.report_with_offender
              ~offender:(fun ppf -> Printtyp.type_expr ppf ty) env.i_env)

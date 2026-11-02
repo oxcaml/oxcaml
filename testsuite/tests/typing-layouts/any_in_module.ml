@@ -29,7 +29,7 @@ module M : S
 Line 7, characters 8-11:
 7 | let x = M.x
             ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
       ^^^^^^^^^
@@ -45,7 +45,7 @@ let y = M.y
 Line 1, characters 8-11:
 1 | let y = M.y
             ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
       ^^^^^^^^^
@@ -61,7 +61,7 @@ let f (module M : S) = M.x
 Line 1, characters 23-26:
 1 | let f (module M : S) = M.x
                            ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
       ^^^^^^^^^
@@ -77,7 +77,7 @@ let f (module M : S) = M.y
 Line 1, characters 23-26:
 1 | let f (module M : S) = M.y
                            ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
       ^^^^^^^^^
@@ -131,7 +131,7 @@ let f (module M : S2) = (module M.N : Inner)
 Line 1, characters 32-35:
 1 | let f (module M : S2) = (module M.N : Inner)
                                     ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 8, characters 2-11:
 8 |   val x : t
       ^^^^^^^^^
@@ -152,7 +152,7 @@ let f (module M : S2) = raise M.Failure
 Line 1, characters 30-39:
 1 | let f (module M : S2) = raise M.Failure
                                   ^^^^^^^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 8, characters 2-11:
 8 |   val x : t
       ^^^^^^^^^
@@ -173,7 +173,7 @@ let f (module M : S2) = new M.foo
 Line 1, characters 28-33:
 1 | let f (module M : S2) = new M.foo
                                 ^^^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 8, characters 2-11:
 8 |   val x : t
       ^^^^^^^^^
@@ -195,7 +195,7 @@ module F (M : S2) = struct module A = M.N end
 Line 1, characters 38-41:
 1 | module F (M : S2) = struct module A = M.N end
                                           ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 8, characters 2-11:
 8 |   val x : t
       ^^^^^^^^^
@@ -544,8 +544,8 @@ Line 3, characters 11-15:
                ^^^^
 Error: Modules do not match: sig type t = M.t val x : t val y : int end
      is not included in U
-     Signatures containing unrepresentable items are not
-     included in other signatures.
+     Signatures containing unrepresentable items cannot be
+     coerced to other module types.
      "x" is not representable.
      The layout of t is any
        because of the definition of t at line 2, characters 2-14.
@@ -576,8 +576,8 @@ Error: Signature mismatch:
          sig type t = M.t val x : t val y : int end
        is not included in
          sig val y : int end
-       Signatures containing unrepresentable items are not
-       included in other signatures.
+       Signatures containing unrepresentable items cannot be
+       coerced to other module types.
        "x" is not representable.
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
@@ -604,8 +604,8 @@ Error: Signature mismatch:
        is not included in
          sig val y : int end
        In module "N":
-       Signatures containing unrepresentable items are not
-       included in other signatures.
+       Signatures containing unrepresentable items cannot be
+       coerced to other module types.
        "x" is not representable.
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
@@ -666,8 +666,8 @@ Error: Signature mismatch:
          sig type t = M.t val x : t val y : int end
        is not included in
          S2
-       Signatures containing unrepresentable items are not
-       included in other signatures.
+       Signatures containing unrepresentable items cannot be
+       coerced to other module types.
        "x" is not representable.
        The layout of t is any
          because of the definition of t at line 2, characters 2-14.
@@ -771,7 +771,7 @@ module A : Inner = P.N
 Line 1, characters 19-22:
 1 | module A : Inner = P.N
                        ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
       ^^^^^^^^^
@@ -787,7 +787,7 @@ module M : sig module A : Inner end = struct module A = P.N end
 Line 1, characters 38-63:
 1 | module M : sig module A : Inner end = struct module A = P.N end
                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 3, characters 2-11:
 3 |   val x : t
       ^^^^^^^^^

@@ -5735,7 +5735,7 @@ let report_lookup_error_doc loc env = function
             env ppf v) violation
     ] in
     Location.errorf ~loc ~sub
-      "This expression projects from a module that contains unrepresentable \
+      "This path projects from a module that contains unrepresentable \
        items."
 
 let report_error_doc = function

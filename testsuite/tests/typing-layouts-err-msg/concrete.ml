@@ -213,7 +213,7 @@ end
 Line 2, characters 10-13:
 2 |   let x = M.x
               ^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 Line 1, characters 17-30:
 1 | module F(M : sig val x : t_any end) = struct
                      ^^^^^^^^^^^^^
@@ -251,8 +251,8 @@ Line 3, characters 11-15:
                ^^^^
 Error: Modules do not match: sig val x : t_any val y : int end
      is not included in U
-     Signatures containing unrepresentable items are not
-     included in other signatures.
+     Signatures containing unrepresentable items cannot be
+     coerced to other module types.
      "x" is not representable.
      The layout of t_any is any
        because of the definition of t_any at line 1, characters 0-16.

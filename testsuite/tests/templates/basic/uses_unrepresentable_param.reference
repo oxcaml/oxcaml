@@ -1,7 +1,7 @@
 File "uses_unrepresentable_param.ml", line 2, characters 8-31:
 2 | let y = Unrepresentable_param.y
             ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression projects from a module that contains unrepresentable items.
+Error: This path projects from a module that contains unrepresentable items.
 File "unrepresentable_param.mli", line 3, characters 0-9:
   x is not representable.
   The layout of t is any.
