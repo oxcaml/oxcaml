@@ -2161,19 +2161,22 @@ type ('a : any) id
 
 let f (module M : S) (x : ('a : M.k). 'a id -> unit) = ()
 [%%expect{|
-val f : (module S) -> (('a : M.k). 'a id -> unit) -> unit = <fun>
+Line 1, characters 22-51:
+1 | let f (module M : S) (x : ('a : M.k). 'a id -> unit) = ()
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "('a : M.k). 'a id -> unit"
+       but a pattern was expected which matches values of type "'b"
+       The kind constructor "M.k" would escape its scope
 |}]
 
 let f (module M : S) (x : (type : M.k) id) = ()
 [%%expect{|
-Line 1:
-Error: Values do not match:
-         val f : (module S) -> (type : M.k) id -> unit
-       is not included in
-         val f : (module S) -> (type : M.k) id -> unit
-       The type "(module S) -> (type : M.k) id -> unit"
-       is not compatible with the type "(module S) -> (type : M.k) id -> unit"
-       Type "(type : M.k)" is not compatible with type "(type : M.k)"
+Line 1, characters 21-42:
+1 | let f (module M : S) (x : (type : M.k) id) = ()
+                         ^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "(type : M.k) id"
+       but a pattern was expected which matches values of type "'a"
+       The kind constructor "M.k" would escape its scope
 |}]
 
 (*****************************************************)

@@ -1307,16 +1307,15 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
-    | Tvar { jkind } ->
-      begin match Jkind.update_level env level jkind with
+    | Tvar { jkind } | Tunivar { jkind } | Tof_kind jkind -> (
+      set_level ();
+      match Jkind.update_level env level jkind with
       | Ok jkind ->
-        set_var_jkind ty jkind
+        set_jkind ty jkind
       | Error Rigid ->
         Misc.fatal_error "Ctype.update_level: rigid sort variable"
       | Error (Escape path) ->
-        raise_escape_exn (Constructor (Kind, path))
-      end;
-      set_level ()
+        raise_escape_exn (Constructor (Kind, path)))
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
