@@ -31,7 +31,7 @@
     Metadata and profiles store only {!Position_hash.t}s, computed structurally
     from the components of each position (see {!Fdo_prehash}). *)
 
-(** A position hash. Bit 0 marks function entries for call-target lookup. *)
+(** The hash of a position, for use in hashing counters. *)
 module Position_hash : sig
   type t
 
