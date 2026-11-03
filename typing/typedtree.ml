@@ -281,6 +281,15 @@ and 'k pattern_desc =
       mode: Mode.With_regionality.l;
       type_expr: Types.type_expr;
     } -> value pattern_desc
+  | Tpat_alias_deref : {
+      pattern: value general_pattern;
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    } -> value pattern_desc
   | Tpat_lazy : value general_pattern -> value pattern_desc
   (* computation patterns *)
   | Tpat_value : tpat_value_argument -> computation pattern_desc
@@ -1207,6 +1216,7 @@ let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   | Tpat_array _ -> Value
   | Tpat_addr _ -> Value
   | Tpat_deref _ -> Value
+  | Tpat_alias_deref _ -> Value
   | Tpat_lazy _ -> Value
   | Tpat_any -> Value
   | Tpat_var _ -> Value
@@ -1242,7 +1252,8 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
-  | Tpat_addr (_, _, p) | Tpat_lazy p -> f.f p
+  | Tpat_addr (_, _, p) | Tpat_alias_deref { pattern = p; _ } | Tpat_lazy p ->
+      f.f p
   | Tpat_any
   | Tpat_var _
   | Tpat_deref _
@@ -1280,6 +1291,7 @@ let shallow_map_pattern_desc
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_addr (mut, arg_sort, p1) -> Tpat_addr (mut, arg_sort, f.f p1)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
+  | Tpat_alias_deref d -> Tpat_alias_deref { d with pattern = f.f d.pattern }
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
   | Tpat_var _
@@ -1347,6 +1359,10 @@ let rec iter_bound_idents
       f (id, s, ty, sort, uid)
   | Tpat_deref { id; name = s; uid; sort; type_expr = ty; _ } ->
       f (id, s, ty, sort, uid)
+  | Tpat_alias_deref { pattern = p; id; name = s; uid; sort; type_expr = ty;
+                       _ } ->
+      iter_bound_idents f p;
+      f (id, s, ty, sort, uid)
   | Tpat_or(p1, _, _) ->
       (* Invariant : both arguments bind the same variables *)
       iter_bound_idents f p1
@@ -1383,8 +1399,8 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
     type k . 'sort full_bound_ident_action -> k general_pattern -> _ =
     fun f pat ->
       match pat.pat_desc with
-      (* [Tpat_var], [Tpat_fun_layout], [Tpat_alias] and [Tpat_deref] are
-         the only cases that directly bind an ident *)
+      (* [Tpat_var], [Tpat_fun_layout], [Tpat_alias], [Tpat_deref] and
+         [Tpat_alias_deref] are the only cases that directly bind an ident *)
       | Tpat_var { id; name = s; uid; sort; mode } ->
           f id s pat.pat_type uid mode (of_sort sort)
       | Tpat_fun_layout { id; name = s; uid; sort; mode; _ } ->
@@ -1393,7 +1409,11 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
                      type_expr = ty } ->
           loop f p;
           f id s ty uid mode (of_sort sort)
-      | Tpat_deref { id; name = s; uid; sort; mode; type_expr = ty; _ } ->
+      | Tpat_deref { id; name = s; uid; sort; mode; type_expr = ty } ->
+          f id s ty uid mode (of_sort sort)
+      | Tpat_alias_deref { pattern = p; id; name = s; uid; sort; mode;
+                           type_expr = ty } ->
+          loop f p;
           f id s ty uid mode (of_sort sort)
       | Tpat_or (p1, p2, _) ->
         if both_sides_of_or then (loop f p1; loop f p2)
@@ -1533,6 +1553,15 @@ let rec alpha_pat
       {p with pat_desc =
        try Tpat_deref { d with id = alpha_var env d.id } with
        | Not_found -> Tpat_any}
+  | Tpat_alias_deref d ->
+      let new_p = alpha_pat env d.pattern in
+      begin try
+        {p with pat_desc =
+           Tpat_alias_deref
+             { d with pattern = new_p; id = alpha_var env d.id }}
+      with
+      | Not_found -> new_p
+      end
   | d ->
      let pat_desc =
        shallow_map_pattern_desc { f = fun p -> alpha_pat env p } d in

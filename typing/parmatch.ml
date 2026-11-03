@@ -357,8 +357,8 @@ module Compat
 
   let rec compat p q = match p.pat_desc,q.pat_desc with
 (* Variables and dereference patterns match any value *)
-  | ((Tpat_any|Tpat_var _|Tpat_deref _),_)
-  | (_,(Tpat_any|Tpat_var _|Tpat_deref _)) -> true
+  | ((Tpat_any|Tpat_var _|Tpat_deref _|Tpat_alias_deref _),_)
+  | (_,(Tpat_any|Tpat_var _|Tpat_deref _|Tpat_alias_deref _)) -> true
 (* Structural induction *)
   | Tpat_alias { pattern = p; _ },_      -> compat p q
   | _,Tpat_alias { pattern = q; _ }      -> compat p q
@@ -699,7 +699,7 @@ let set_args q r = match q with
     q::r (* case any is used in matching.ml *)
 | {pat_desc =
      (Tpat_var _ | Tpat_fun_layout _ | Tpat_alias _ | Tpat_deref _
-     | Tpat_or _); _} ->
+     | Tpat_alias_deref _ | Tpat_or _); _} ->
     fatal_error "Parmatch.set_args"
 
 (* Given a matrix of non-empty rows
@@ -1346,7 +1346,7 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
-  | Tpat_addr (_, _, p) | Tpat_lazy p
+  | Tpat_addr (_, _, p) | Tpat_alias_deref { pattern = p; _ } | Tpat_lazy p
     -> has_instance p
 
 and has_instances = function
@@ -1976,7 +1976,7 @@ and every_both pss qs q1 q2 =
 (* le_pat p q  means, forall V,  V matches q implies V matches p *)
 let rec le_pat p q =
   match (p.pat_desc, q.pat_desc) with
-  | (Tpat_var _|Tpat_any|Tpat_deref _),_ -> true
+  | (Tpat_var _|Tpat_any|Tpat_deref _|Tpat_alias_deref _),_ -> true
   | Tpat_alias { pattern = p; _ }, _ -> le_pat p q
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
@@ -2036,8 +2036,8 @@ let get_mins le ps =
 let rec lub p q = match p.pat_desc,q.pat_desc with
 | Tpat_alias { pattern = p; _ },_      -> lub p q
 | _,Tpat_alias { pattern = q; _ }      -> lub p q
-| (Tpat_any|Tpat_var _|Tpat_deref _),_ -> q
-| _,(Tpat_any|Tpat_var _|Tpat_deref _) -> p
+| (Tpat_any|Tpat_var _|Tpat_deref _|Tpat_alias_deref _),_ -> q
+| _,(Tpat_any|Tpat_var _|Tpat_deref _|Tpat_alias_deref _) -> p
 | Tpat_or (p1,p2,_),_     -> orlub p1 p2 q
 | _,Tpat_or (q1,q2,_)     -> orlub q1 q2 p (* Thanks god, lub is commutative *)
 | Tpat_constant c1, Tpat_constant c2 when const_compare c1 c2 = 0 -> p
@@ -2274,7 +2274,8 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
-| Tpat_variant (_, Some p, _) | Tpat_alias { pattern = p; _ } ->
+| Tpat_variant (_, Some p, _) | Tpat_alias { pattern = p; _ }
+| Tpat_alias_deref { pattern = p; _ } ->
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
     collect_paths_from_pat (collect_paths_from_pat r p1) p2
@@ -2402,7 +2403,7 @@ let inactive ~partial pat =
         | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
         | Tpat_variant (_, None, _) | Tpat_fun_layout _
         (* A dereference pattern reads nothing: it only binds an address *)
-        | Tpat_deref _
+        | Tpat_deref _ | Tpat_alias_deref _
         -> true
         | Tpat_constant c -> begin
             match c with
@@ -2562,7 +2563,7 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
         (simpl head_bound_variables varsets p2 ps k)
     (* A dereference pattern binds the address at the head and leaves the
        value unconstrained *)
-    | `Deref (id, _, _, _, _, _) ->
+    | `Deref (id, _, _, _, _, _) | `Alias_deref (_, id, _, _, _, _, _) ->
       simpl (Ident.Set.add id head_bound_variables) varsets Patterns.omega ps k
     | #Patterns.Simple.view as view ->
       add_column (Patterns.Head.deconstruct { p with pat_desc = view })

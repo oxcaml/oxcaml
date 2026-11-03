@@ -393,6 +393,9 @@ let pat
                           lpoly; env_locality_mode }
     | Tpat_addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, sub.pat sub p)
     | Tpat_deref d -> Tpat_deref { d with name = map_loc sub d.name }
+    | Tpat_alias_deref d ->
+        Tpat_alias_deref
+          { d with pattern = sub.pat sub d.pattern; name = map_loc sub d.name }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc

@@ -2276,7 +2276,7 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
-  | Tpat_deref _ ->
+  | Tpat_deref _ | Tpat_alias_deref _ ->
     (* taking the address of a position does not read it *)
     no_memory_access ()
   | Tpat_tuple pats ->
@@ -2392,7 +2392,7 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
          borrows and yields both. See Note [Loading from addresses]. *)
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
-    | Tpat_deref { id; _ } -> (
+    | Tpat_deref { id; _ } | Tpat_alias_deref { id; _ } -> (
       match base_paths with
       | None ->
         Misc.fatal_error

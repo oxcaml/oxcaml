@@ -114,6 +114,8 @@ let rec var_from_pat pat_desc acc =
     var_from_pat p1.pat_desc (var_from_pat p2.pat_desc acc)
   | O (Tpat_addr (_, _, pat) | Tpat_lazy pat) -> var_from_pat pat.pat_desc acc
   | O (Tpat_deref { id; _ }) -> id :: acc
+  | O (Tpat_alias_deref { pattern; id; _ }) ->
+    var_from_pat pattern.pat_desc (id :: acc)
   | O (Tpat_fun_layout { id; _ }) -> id :: acc
   | O
       ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
@@ -199,6 +201,13 @@ let rec rem_in_pat str pat should_remove =
     if (not is_used) && should_remove ()
     then { pat with pat_desc = Tpat_any }
     else pat
+  | O (Tpat_alias_deref d) ->
+    let is_used = is_used_var str d.id in
+    if (not is_used) && should_remove ()
+    then rem_in_pat str d.pattern should_remove
+    else
+      let pattern = rem_in_pat str d.pattern should_remove in
+      { pat with pat_desc = Tpat_alias_deref { d with pattern } }
   | O (Tpat_lazy pat) ->
     { pat with pat_desc = Tpat_lazy (rem_in_pat str pat should_remove) }
   | O (Tpat_fun_layout { id; _ }) ->
