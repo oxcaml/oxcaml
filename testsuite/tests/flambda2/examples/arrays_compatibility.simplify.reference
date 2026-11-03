@@ -38,7 +38,7 @@ let code inline(always) loopify(never) size(60) newer_version_of(convert_fast_1)
             ((let prim_2 = %array_length.`imm` (index) in
               let prim_3 = %int_comp.unsigned.lt (int_sub, prim_2) in
               switch prim_3
-                | 0 -> k4
+                | 0 likelihood(cold) -> k4
                 | 1 -> k5)
                where k5 =
                  let Parrayrefs = %array_load.`imm`.mut (index, int_sub) in
@@ -90,7 +90,7 @@ let code loopify(never) size(75) newer_version_of(f_2)
                  ((let prim_2 = %array_length.`imm` (index) in
                    let prim_3 = %int_comp.unsigned.lt (int_sub, prim_2) in
                    switch prim_3
-                     | 0 -> k4
+                     | 0 likelihood(cold) -> k4
                      | 1 -> k5)
                     where k5 =
                       let Parrayrefs = %array_load.`imm`.mut (index, int_sub)
