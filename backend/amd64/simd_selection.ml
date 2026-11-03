@@ -1256,8 +1256,9 @@ module Generated = struct
       else if_enabled (instr ~i) (bind cur) args
     | Flag { flag; instr = simd } ->
       let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
-      if_enabled (fun simd args -> seq (Seq.kflag (kflag flag) simd) args) simd
-        args
+      if_enabled
+        (fun simd args -> seq (Seq.kflag (kflag flag) simd) args)
+        simd args
     | Load { arity; bind = b; args = ops } ->
       let args = operands op ~arity ops args in
       if_enabled (simd_load ~mode:Arch.identity_addressing) (bind b) args
