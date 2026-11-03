@@ -876,6 +876,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         CC.close_let_cont acc ccenv ~name:continuation ~is_exn_handler:false
           ~params ~recursive ~body ~handler)
   | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout, _yielding) ->
+    let callsite_counter = Env.fdo_call_counter env loc in
     cps_non_tail_simple acc env ccenv obj
       (fun acc env ccenv obj _obj_arity ->
         let obj = must_be_singleton_simple obj in
@@ -915,7 +916,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                         return_arity =
                           Flambda_arity.create
                             [ Flambda_arity.Component_for_creation.from_lambda
-                                layout ~machine_width:(Acc.machine_width acc) ]
+                                layout ~machine_width:(Acc.machine_width acc) ];
+                        callsite_counter
                       }
                     in
                     wrap_return_continuation acc env ccenv apply))
@@ -1244,6 +1246,7 @@ and cps_non_tail_var :
 and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
     ap_inlined ap_probe ap_return (k : Continuation.t) (k_exn : Continuation.t)
     : Expr_with_acc.t =
+  let callsite_counter = Env.fdo_call_counter env ap_loc in
   cps_non_tail_list acc env ccenv ap_args
     (fun acc env ccenv args args_arity ->
       cps_non_tail_var "func" acc env ccenv ap_func
@@ -1274,7 +1277,8 @@ and cps_tail_apply acc env ccenv ap_func ap_args ap_region_close ap_mode ap_loc
               return_arity =
                 Flambda_arity.create
                   [ Flambda_arity.Component_for_creation.from_lambda ap_return
-                      ~machine_width:(Acc.machine_width acc) ]
+                      ~machine_width:(Acc.machine_width acc) ];
+              callsite_counter
             }
           in
           wrap_return_continuation acc env ccenv apply)
@@ -1682,6 +1686,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
     ~scrutinee (k : Continuation.t) (k_exn : Continuation.t) : Expr_with_acc.t =
+  let fdo = Env.fdo_switch_counters env switch in
   let block_nums, sw_blocks = List.split switch.sw_blocks in
   List.iter
     (fun sw_tag ->
@@ -1779,10 +1784,18 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           Some (cont, dbg, None, []), wrappers
       in
       let const_switch : IR.switch =
-        { numconsts = switch.sw_numconsts; consts; failaction }
+        { numconsts = switch.sw_numconsts;
+          consts;
+          failaction;
+          counters = fdo.consts
+        }
       in
       let block_switch : IR.switch =
-        { numconsts = switch.sw_numblocks; consts = blocks; failaction }
+        { numconsts = switch.sw_numblocks;
+          consts = blocks;
+          failaction;
+          counters = fdo.blocks
+        }
       in
       let build_switch scrutinee wrappers =
         let const_switch acc ccenv =
@@ -1836,7 +1849,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
               consts =
                 [ 0, block_cont, condition_dbg, None, [];
                   1, const_cont, condition_dbg, None, [] ];
-              failaction = None
+              failaction = None;
+              counters = fdo.is_int
             }
           in
           let is_scrutinee_int = Ident.create_local "is_scrutinee_int" in
