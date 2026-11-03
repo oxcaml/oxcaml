@@ -748,6 +748,8 @@ and pattern ctxt f x =
   else match x.ppat_desc with
     | Ppat_alias (p, s) ->
         pp f "@[<2>%a@;as@;%a@]" (pattern ctxt) p ident_of_name s.txt
+    | Ppat_alias_deref (p, s) ->
+        pp f "@[<2>%a@;as deref_@;%a@]" (pattern ctxt) p ident_of_name s.txt
     | _ -> pattern_or ctxt f x
 
 and pattern_or ctxt f x =

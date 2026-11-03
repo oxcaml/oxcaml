@@ -725,6 +725,8 @@ module P = struct
     | Ppat_type s -> type_ ~loc ~attrs (map_loc_lid sub s)
     | Ppat_addr (mut, p) -> addr ~loc ~attrs mut (sub.pat sub p)
     | Ppat_deref p -> deref ~loc ~attrs (sub.pat sub p)
+    | Ppat_alias_deref (p, s) ->
+        alias_deref ~loc ~attrs (sub.pat sub p) (map_loc sub s)
     | Ppat_lazy p -> lazy_ ~loc ~attrs (sub.pat sub p)
     | Ppat_unpack s -> unpack ~loc ~attrs (map_loc sub s)
     | Ppat_open (lid,p) ->
