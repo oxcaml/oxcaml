@@ -170,7 +170,7 @@ let random_int_in_range (st : State.t) ~min ~max =
   Random.State.int_in_range st.random_state ~min ~max
 
 let with_probability (st : State.t) ~probability =
-  Random.State.int st.random_state 100 < probability
+  Random.State.int st.random_state 10_000 < probability
 
 let maybe_assert (st : State.t) ~f =
   match st.swarm.assertions with
