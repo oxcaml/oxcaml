@@ -412,9 +412,9 @@ let observe_body decls statement =
              ident column ])
         (print_bindings initialized)
     in
-    (* Use [match ... with exception] rather than [try ... with] to protect
-       only [expr], not the continuation or observations. This also avoids
-       boxing unboxed initializer results. *)
+    (* Use [match ... with exception] rather than [try ... with] to protect only
+       [expr], not the continuation or observations. This also avoids boxing
+       unboxed initializer results. *)
     Ast_helper.Exp.match_ expr
       [ Ast_helper.Exp.case pattern on_return;
         Ast_helper.Exp.case exception_pattern on_assertion ]
