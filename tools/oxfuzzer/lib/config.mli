@@ -83,8 +83,6 @@ type assertion_mode =
   | Disabled
   | Unreachable_only
   | May_raise
-      (** Assertion failures are observed with initialized state, rather than
-          treated as errors. *)
 
 module Swarm : sig
   type t =
