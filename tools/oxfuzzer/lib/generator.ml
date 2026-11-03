@@ -188,7 +188,7 @@ let bind_operand (st : State.t) expr ~f =
     let name = State.fresh st in
     Expr.Let { name; expr; body = f (Expr.Read (Place.Variable name)) }
 
-(* Evaluate strict operands right-to-left. *)
+(* Evaluate operands right-to-left. *)
 let rec bind_operands st operands ~f =
   match operands with
   | [] -> f []
