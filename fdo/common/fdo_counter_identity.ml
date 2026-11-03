@@ -71,6 +71,8 @@ module Body_hash = struct
   let to_string t = Printf.sprintf "%08lx" t
 
   let prehash t = Fdo_prehash.of_int (Int32.to_int t)
+
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 end
 
 module Tag = struct

@@ -869,7 +869,7 @@ and code_binding ppf
     (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
     stub
     (pp_option ~space:Before
-       (pp_like "fdo_entry_annotation%a" Fdo_annotation.print))
+       (pp_like "fdo_entry_annotation%a" Fdo_annotation.With_body_hash.print))
     fdo_entry_annotation Flambda_colours.pop code_id id;
   let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
       =
