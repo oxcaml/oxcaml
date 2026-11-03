@@ -356,10 +356,13 @@ end = struct
           | `Or _ as or_view -> stop orpat or_view
           | other_view -> continue orpat other_view
         )
-      | `Deref (id, _, uid, _, _, _)
-      | `Alias_deref (_, id, _, uid, _, _, _) ->
+      | `Deref (id, _, uid, _, _, _) ->
           aux
             ( ({ p with pat_desc = `Any }, patl),
+              bind_address (id, uid) deref_address action )
+      | `Alias_deref (sub_p, id, _, uid, _, _, _) ->
+          aux
+            ( (General.view sub_p, patl),
               bind_address (id, uid) deref_address action )
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
@@ -721,8 +724,9 @@ end = struct
           match p.pat_desc with
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
-          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
-          | `Var _ | `Deref _ | `Alias_deref _ ->
+          | `Alias (p, _, _, _, _, _, _) | `Alias_deref (p, _, _, _, _, _, _) ->
+              filter_rec ((left, p, right) :: rem)
+          | `Var _ | `Deref _ ->
               filter_rec ((left, Patterns.omega, right) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
@@ -865,8 +869,9 @@ end = struct
       | (p, ps) :: rem -> (
           let p = General.view p in
           match p.pat_desc with
-          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
-          | `Var _ | `Deref _ | `Alias_deref _ ->
+          | `Alias (p, _, _, _, _, _, _) | `Alias_deref (p, _, _, _, _, _, _) ->
+              filter_rec ((p, ps) :: rem)
+          | `Var _ | `Deref _ ->
               filter_rec ((Patterns.omega, ps) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
@@ -1602,7 +1607,9 @@ let rec omega_like p =
   | Tpat_any
   | Tpat_var _ ->
       true
-  | Tpat_alias { pattern = p; _ } -> omega_like p
+  | Tpat_deref _ -> true
+  | Tpat_alias { pattern = p; _ } | Tpat_alias_deref { pattern = p; _ } ->
+      omega_like p
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
 

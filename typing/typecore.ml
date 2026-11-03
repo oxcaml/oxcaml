@@ -2362,7 +2362,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
     ty, mode
   in
   match p.pat_desc with
-    Tpat_alias { pattern = p1; _ } ->
+    Tpat_alias { pattern = p1; _ } | Tpat_alias_deref { pattern = p1; _ } ->
      build_as_type_and_mode env p1 ~mode
   | Tpat_tuple pl ->
       let labeled_tyl =
@@ -2438,9 +2438,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
           ty, mode
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-  | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_addr _ | Tpat_deref _ | Tpat_alias_deref _
-  | Tpat_lazy _ ->
+  | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_deref _
+  | Tpat_array _ | Tpat_addr _ | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -5210,7 +5209,8 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref _ | Tpat_alias_deref _ ->
+  | Tpat_alias_deref { pattern = p; _ } -> check_rec ~info p expected_ty k
+  | Tpat_deref _ ->
       (* CR address-patterns: deref patterns aren't always refuted. E.g. this
          case is rejected:
          {[
