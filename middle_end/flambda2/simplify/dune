@@ -31,7 +31,9 @@
    -open
    Flambda2_types
    -open
-   Flambda2_ui))
+   Flambda2_ui
+   -open
+   Flambda2_fdo))
  (ocamlopt_flags
   (:standard
    (:include %{project_root}/ocamlopt_flags.sexp)
@@ -52,4 +54,5 @@
   flambda2_terms
   flambda2_simplify_shared
   flambda2_types
-  flambda2_ui))
+  flambda2_ui
+  flambda2_fdo))

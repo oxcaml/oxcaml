@@ -143,6 +143,14 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
   | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
   | Maybe_alloc_stack _, Maybe_alloc_stack
   | Not_alloc_stack _, Not_alloc_stack ->
+    (* The call is inlined out, but its code stays: its counters are preserved
+       in the current region (see [Fdo_region_counters]). *)
+    let dacc =
+      DA.preserve_fdo_counters dacc
+        (Fdo_term_counters.of_inlined_call
+           ~callsite_counter:(Apply.callsite_counter apply)
+           code)
+    in
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in

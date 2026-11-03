@@ -74,6 +74,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
          (Flow.Acc.init_toplevel ~dummy_toplevel_cont
             (Bound_parameters.append params implicit_params))
   in
+  let dacc = DA.with_fdo_region_counters dacc Fdo_region_counters.empty in
   let dacc =
     DA.record_continuation dacc return_continuation
       (Flambda_arity.unarize_t return_arity)
