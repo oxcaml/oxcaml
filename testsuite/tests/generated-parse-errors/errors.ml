@@ -649,6 +649,9 @@ function % and assert
 #0 "implementation: FUNCTION UNDERSCORE AS WITH"
 function _ as with
 ;;
+#0 "implementation: FUNCTION UNDERSCORE AS DEREF WITH"
+function _ as deref_ with
+;;
 #0 "implementation: FUNCTION UNDERSCORE BAR UNDERSCORE WITH"
 function _ | _ with
 ;;
@@ -1521,6 +1524,9 @@ let* UIdent with
 ;;
 #0 "implementation: LETOP UNDERSCORE AS WITH"
 let* _ as with
+;;
+#0 "implementation: LETOP UNDERSCORE AS DEREF WITH"
+let* _ as deref_ with
 ;;
 #0 "implementation: LETOP UNDERSCORE BAR UNDERSCORE WITH"
 let* _ | _ with

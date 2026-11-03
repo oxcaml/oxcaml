@@ -3716,6 +3716,7 @@ let rec has_literal_pattern p =
   | Ppat_alias (p, _)
   | Ppat_addr (_, p)
   | Ppat_deref p
+  | Ppat_alias_deref (p, _)
   | Ppat_lazy p
   | Ppat_open (_, p) ->
      has_literal_pattern p
@@ -4300,7 +4301,7 @@ and type_pat_aux
         | Ppat_or (p1, p2) ->
             check_non_escaping p1;
             check_non_escaping p2
-        | Ppat_alias (p, _) ->
+        | Ppat_alias (p, _) | Ppat_alias_deref (p, _) ->
             check_non_escaping p
         | Ppat_constraint _ ->
             Error.log_or_raise p.ppat_loc !!penv Inlined_record_escape
@@ -4837,7 +4838,8 @@ let rec pat_tuple_arity spat =
       Not_local_tuple
   | Ppat_or(sp1, sp2) ->
       combine_pat_tuple_arity (pat_tuple_arity sp1) (pat_tuple_arity sp2)
-  | Ppat_constraint(p, _, _) | Ppat_open(_, p) | Ppat_alias(p, _) -> pat_tuple_arity p
+  | Ppat_constraint(p, _, _) | Ppat_open(_, p) | Ppat_alias(p, _)
+  | Ppat_alias_deref (p, _) -> pat_tuple_arity p
 
 let rec cases_tuple_arity cases =
   match cases with
@@ -6697,7 +6699,8 @@ let shallow_iter_ppat f p =
   | Ppat_exception p | Ppat_alias (p,_)
   | Ppat_open (_,p)
   | Ppat_constraint (p,_,_)
-  | Ppat_addr (_, p) | Ppat_deref p | Ppat_lazy p -> f p
+  | Ppat_addr (_, p) | Ppat_deref p | Ppat_alias_deref (p, _) | Ppat_lazy p ->
+    f p
   | Ppat_record (args, _flag) | Ppat_record_unboxed_product (args, _flag) ->
     List.iter (fun (_,p) -> f p) args
 

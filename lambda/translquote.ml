@@ -1419,6 +1419,8 @@ module Pat : sig
 
   val deref : Debuginfo.Scoped_location.t -> t -> t'
 
+  val alias_deref : Debuginfo.Scoped_location.t -> t -> Var.Value.t -> t'
+
   val lazy_ : Debuginfo.Scoped_location.t -> t -> t'
 
   val any_module : t'
@@ -1485,6 +1487,9 @@ end = struct
   let addr loc a1 a2 = apply2 "Pat" "addr" loc (extract a1) (transl_bool a2)
 
   let deref loc a1 = apply1 "Pat" "deref" loc (extract a1)
+
+  let alias_deref loc a1 a2 =
+    apply2 "Pat" "alias_deref" loc (extract a1) (extract a2)
 
   let lazy_ loc a1 = apply1 "Pat" "lazy_" loc (extract a1)
 

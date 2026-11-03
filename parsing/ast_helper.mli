@@ -150,6 +150,7 @@ module Pat:
     val type_: ?loc:loc -> ?attrs:attrs -> lid -> pattern
     val addr: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern -> pattern
     val deref: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
+    val alias_deref: ?loc:loc -> ?attrs:attrs -> pattern -> str -> pattern
     val lazy_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern
     val unpack: ?loc:loc -> ?attrs:attrs -> str_opt -> pattern
     val open_: ?loc:loc -> ?attrs:attrs  -> lid -> pattern -> pattern
