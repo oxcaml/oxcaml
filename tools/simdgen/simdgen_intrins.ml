@@ -608,7 +608,8 @@ let gather_scatter_spec ~by_mnem i instr : Spec.t =
       match dst with
       | "XMM" -> Zero_vec128
       | "YMM" -> Zero_vec256
-      | _ -> Zero_vec512
+      | "ZMM" -> Zero_vec512
+      | _ -> raise Unsupported
     in
     Gather
       { arity;
@@ -1056,7 +1057,7 @@ let print_selection ~bindings intrinsics =
      [@@@ocaml.warning \"+a-4-40-42-70\"]\n\n\
      open! Amd64_simd_instrs\n\
      open! Amd64_simd_defs.Intrin\n\n\
-     let table : (string * id t) array =\n\
+     let table () : (string * id t) array =\n\
     \  [|\n";
   specs ~bindings intrinsics
   |> List.filter_map (fun (i, spec) ->

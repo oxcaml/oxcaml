@@ -15,6 +15,7 @@
 (executable
  (name simdgen)
  (modes native)
+ (libraries ocamlcommon)
  (modules simdgen simdgen_types simdgen_xml simdgen_intrins amd64_simd_defs))
 
 (rule

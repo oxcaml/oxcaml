@@ -7,7 +7,7 @@
 open! Amd64_simd_instrs
 open! Amd64_simd_defs.Intrin
 
-let table : (string * id t) array =
+let table () : (string * id t) array =
   [|
     "caml_cvtmask16_u32", Default { arity = 1; imm = No_imm; bind = Instr kmovw_r32_K; args = [|Value 0|] };
     "caml_cvtmask32_u32", Default { arity = 1; imm = No_imm; bind = Instr kmovd_r32_K; args = [|Value 0|] };

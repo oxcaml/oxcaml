@@ -1149,7 +1149,7 @@ let select_operation_fma ~dbg:_ op args =
 module Generated = struct
   module Intrin = Amd64_simd_defs.Intrin
 
-  let table = lazy (Hashtbl.of_seq (Array.to_seq Amd64_simd_intrins.table))
+  let table = lazy (Hashtbl.of_seq (Array.to_seq (Amd64_simd_intrins.table ())))
 
   let find op = Hashtbl.find_opt (Lazy.force table) op
 
@@ -1218,28 +1218,22 @@ module Generated = struct
 
   let kflag : Intrin.flag -> Simd.Kflag.t = function Zf -> Zf | Cf -> Cf
 
-  let instrs (spec : Amd64_simd_instrs.id Intrin.t) =
-    match spec with
-    | Default { bind = b; _ } | Load { bind = b; _ } | Store { bind = b; _ } ->
-      [bind b]
-    | With_round { bind = b; cur; _ } ->
-      rnd_bind ~rnd:Rnd_near b :: Option.to_list (Option.map bind cur)
-    | With_sae { bind = b; cur; _ } ->
-      sae_bind b :: Option.to_list (Option.map bind cur)
-    | With_sae_imm { bind = b; cur; _ } -> [sae_bind b; bind cur]
-    | Flag { instr; _ } | Gather { instr; _ } | Scatter { instr; _ } -> [instr]
+  let if_enabled select simd args =
+    if Arch.Extension.enabled_instruction simd then select simd args else None
 
-  let select_enabled op (spec : Amd64_simd_instrs.id Intrin.t) args =
+  let select op (spec : Amd64_simd_instrs.id Intrin.t) args =
     match spec with
     | Default { arity; imm = imm_spec; bind = b; args = ops } ->
       let i, args = imm op args imm_spec in
-      instr (bind b) ?i (operands op ~arity ops args)
+      if_enabled (instr ?i) (bind b) (operands op ~arity ops args)
     | With_round { arity; bind = b; cur; args = ops } -> (
       let control, args = extract_constant args op ~max:255 in
       let args = operands op ~arity ops args in
       match rounding control, cur with
-      | Some rnd, (Some _ | None) -> instr (rnd_bind ~rnd b) args
-      | None, Some cur when control = round_current -> instr (bind cur) args
+      | Some rnd, (Some _ | None) ->
+        if_enabled (instr ?i:None) (rnd_bind ~rnd b) args
+      | None, Some cur when control = round_current ->
+        if_enabled (instr ?i:None) (bind cur) args
       | None, (Some _ | None) -> bad_immediate op)
     | With_sae { arity; imm = imm_spec; bind = b; cur; args = ops } -> (
       let i, args = imm op args imm_spec in
@@ -1247,40 +1241,37 @@ module Generated = struct
       let args = operands op ~arity ops args in
       (* _MM_FROUND_NO_EXC or _MM_FROUND_NO_EXC|_MM_FROUND_CUR_DIRECTION. *)
       if sae = 8 || sae = 12
-      then instr (sae_bind b) ?i args
+      then if_enabled (instr ?i) (sae_bind b) args
       else
         match cur with
-        | Some cur when sae = round_current -> instr (bind cur) ?i args
+        | Some cur when sae = round_current ->
+          if_enabled (instr ?i) (bind cur) args
         | Some _ | None -> bad_immediate op)
     | With_sae_imm { arity; bind = b; cur; args = ops } ->
       let i, args = extract_constant args op ~max:15 in
       let args = operands op ~arity ops args in
       (* The instruction ignores bit 3 of its immediate, _MM_FROUND_NO_EXC. *)
       if i land 8 <> 0
-      then instr (sae_bind b) ~i:(i land lnot 8) args
-      else instr (bind cur) ~i args
+      then if_enabled (instr ~i:(i land lnot 8)) (sae_bind b) args
+      else if_enabled (instr ~i) (bind cur) args
     | Flag { flag; instr = simd } ->
       let args = operands op ~arity:2 [| Value 0; Value 1 |] args in
-      seq (Seq.kflag (kflag flag) simd) args
+      if_enabled (fun simd args -> seq (Seq.kflag (kflag flag) simd) args) simd
+        args
     | Load { arity; bind = b; args = ops } ->
       let args = operands op ~arity ops args in
-      simd_load ~mode:Arch.identity_addressing (bind b) args
+      if_enabled (simd_load ~mode:Arch.identity_addressing) (bind b) args
     | Store { arity; bind = b; args = ops } ->
       let args = operands op ~arity ops args in
-      simd_store ~mode:Arch.identity_addressing (bind b) args
+      if_enabled (simd_store ~mode:Arch.identity_addressing) (bind b) args
     | Gather { arity; instr = simd; args = ops } ->
       let scale, args = extract_scale args op in
       let args = operands op ~arity ops args in
-      simd_load ~mode:(Iindexed2scaled (scale, 0)) simd args
+      if_enabled (simd_load ~mode:(Iindexed2scaled (scale, 0))) simd args
     | Scatter { arity; instr = simd; args = ops } ->
       let scale, args = extract_scale args op in
       let args = operands op ~arity ops args in
-      simd_store ~mode:(Iindexed2scaled (scale, 0)) simd args
-
-  let select op spec args =
-    if List.for_all Arch.Extension.enabled_instruction (instrs spec)
-    then select_enabled op spec args
-    else None
+      if_enabled (simd_store ~mode:(Iindexed2scaled (scale, 0))) simd args
 end
 
 let select_operation_generated ~dbg:_ op args =
