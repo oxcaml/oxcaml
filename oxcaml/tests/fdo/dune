@@ -23,6 +23,12 @@
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
 
+; Extracting the FDO annotations from fexpr dumps.
+
+(executable
+ (name fdo_annotations)
+ (modules fdo_annotations))
+
 ; Function identities ([Fdo_function_naming]). function_ids_edited.ml is
 ; function_ids.ml with:
 ; - anonymous functions inserted: other functions keep their names;
@@ -33,14 +39,9 @@
 ;   discriminators;
 ; - functions without a location (as in classes) are named by their binders.
 
-(executable
- (name fdo_entries)
- (modules fdo_entries)
- (libraries ocamlcommon))
-
 (rule
  (targets function_ids.output.corrected)
- (deps function_ids.ml function_ids_edited.ml fdo_entries.exe)
+ (deps function_ids.ml function_ids_edited.ml fdo_annotations.exe)
  (enabled_if
   (= %{context_name} "main"))
  (action
@@ -67,7 +68,11 @@
     function_ids_edited.ml)
    (with-stdout-to
     function_ids.output.corrected
-    (run ./fdo_entries.exe function_ids.raw.fl function_ids.edited.raw.fl)))))
+    (run
+     ./fdo_annotations.exe
+     compare-entries
+     function_ids.raw.fl
+     function_ids.edited.raw.fl)))))
 
 (rule
  (alias runtest)
@@ -83,7 +88,7 @@
 
 (rule
  (targets body_hash.output.corrected)
- (deps body_hash.ml body_hash_edited.ml fdo_entries.exe)
+ (deps body_hash.ml body_hash_edited.ml fdo_annotations.exe)
  (enabled_if
   (= %{context_name} "main"))
  (action
@@ -110,7 +115,11 @@
     body_hash_edited.ml)
    (with-stdout-to
     body_hash.output.corrected
-    (run ./fdo_entries.exe body_hash.raw.fl body_hash.edited.raw.fl)))))
+    (run
+     ./fdo_annotations.exe
+     compare-entries
+     body_hash.raw.fl
+     body_hash.edited.raw.fl)))))
 
 (rule
  (alias runtest)
