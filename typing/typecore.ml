@@ -6173,6 +6173,7 @@ let rec type_approx env sexp ty_expected =
       type_tuple_approx env sexp.pexp_loc ty_expected l
   | Pexp_ifthenelse (_,e,_) -> type_approx env e ty_expected
   | Pexp_sequence (_,e) -> type_approx env e ty_expected
+  | Pexp_stack e -> type_approx env e ty_expected
   | Pexp_constraint (e, Some sty, _) ->
       let ty_expected =
         type_approx_constraint env (Pconstraint sty) ty_expected ~loc
@@ -12418,7 +12419,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     match sexp.pexp_desc with
     | Pexp_function _ -> true
     | Pexp_constraint (e, _, _)
-    | Pexp_newtype (_, _, e) -> sexp_is_fun e
+    | Pexp_newtype (_, _, e)
+    | Pexp_stack e -> sexp_is_fun e
     | _ -> false
   in
   let vb_is_fun { pvb_expr = sexp; _ } = sexp_is_fun sexp in
