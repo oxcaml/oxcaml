@@ -380,11 +380,20 @@ module TLS0 = struct
   let[@poll error] store idx obj =
     Array.unsafe_set (get_tls_state ()) idx obj
 
-  let[@cold] grow_and_set idx x =
+  (* [@poll error] so that interrupts cannot run between check and update. *)
+  let[@poll error] compare_and_set_tls_state old_st new_st =
+    if get_tls_state () == old_st
+    then (set_tls_state new_st; true)
+    else false
+
+  let[@cold] rec grow_and_set idx x =
     let old_st = get_tls_state () in
     let new_st = Obj_slot.grow_array old_st idx (Array.length old_st) in
-    set_tls_state new_st;
-    store idx (Obj_slot.some x)
+    (* Like in [DLS], growing the array may be interrupted and another
+       access may grow the state. We must retry in this case. *)
+    if compare_and_set_tls_state old_st new_st
+    then store idx (Obj_slot.some x)
+    else grow_and_set idx x
 
   let[@inline never] already_accessing () =
     failwith "Domain.Safe.TLS: key is already being accessed"
