@@ -20,7 +20,7 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
       ((let prim_1 = %array_length.`float` (a) in
         let prim_2 = %int_comp.unsigned.lt (int_add_2, prim_1) in
         switch prim_2
-          | 0 -> k2
+          | 0 likelihood(cold) -> k2
           | 1 -> k3 (prim_1))
          where k3 (prim_1) =
            let cse_param = prim_1 in
@@ -28,7 +28,7 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
            let Parrayrefs = %box_num.`float`.my_alloc_region (prim_2) in
            ((let prim_3 = %int_comp.unsigned.lt (i31, cse_param) in
              switch prim_3
-               | 0 -> k3
+               | 0 likelihood(cold) -> k3
                | 1 -> k4)
               where k4 =
                 let prim_3 = %array_load.`float`.mut (a, i31) in

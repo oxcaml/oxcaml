@@ -12,7 +12,7 @@ let code loopify(never) size(72) newer_version_of(foo_0)
   (let prim = %array_length.generic (arr) in
    let prim_1 = %int_comp.unsigned.lt (i, prim) in
    switch prim_1
-     | 0 -> k3
+     | 0 likelihood(cold) -> k3
      | 1 -> k4)
     where k4 =
       ((let cond_result = %is_flat_float_array (arr) in

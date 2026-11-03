@@ -34,7 +34,7 @@ in
  let `*match*` = Pmakeblock_0 in
  let prim = %is_int (`*match*`) in
  switch prim
-   | 0 -> k1
+   | 0 likelihood(cold) -> k1
    | 1 -> k
    where k1 =
      invalid)

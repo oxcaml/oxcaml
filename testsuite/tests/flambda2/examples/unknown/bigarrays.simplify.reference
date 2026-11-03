@@ -14,14 +14,14 @@ in
        let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
        let prim_2 = %int_comp.`nativeint`.unsigned.lt (1n, prim_1) in
        switch prim_2
-         | 0 -> k1
+         | 0 likelihood(cold) -> k1
          | 1 -> k2)
         where k2 =
           ((let prim = %bigarray_length.[`2`] (region_return) in
             let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
             let prim_2 = %int_comp.`nativeint`.unsigned.lt (1n, prim_1) in
             switch prim_2
-              | 0 -> k1
+              | 0 likelihood(cold) -> k1
               | 1 -> k2)
              where k2 =
                let prim = %bigarray_length.[`2`] (region_return) in

@@ -39,7 +39,7 @@ let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_
       ((let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim) in
         let prim_3 = %int_comp.`nativeint`.unsigned.lt (0n, prim_2) in
         switch prim_3
-          | 0 -> k2
+          | 0 likelihood(cold) -> k2
           | 1 -> k3)
          where k3 =
            let prim_2 = %string_load.[`8`] (s, 0n) in
