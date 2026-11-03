@@ -213,6 +213,12 @@ open Cmo_format
 exception Load_failed
 
 let check_consistency ppf filename cu =
+  if cu.cu_no_crc && not !Clflags.no_crc then begin
+    fprintf ppf "@[<hov>The file %s@ was compiled with -no-crc;@ \
+                 it can only be loaded by a toplevel@ \
+                 started with -no-crc.@]@." filename;
+    raise Load_failed
+  end;
   try Env.import_crcs ~source:filename cu.cu_imports
   with Persistent_env.Consistbl.Inconsistency {
       unit_name = name;

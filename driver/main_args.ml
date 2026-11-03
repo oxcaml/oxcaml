@@ -440,6 +440,13 @@ let mk_no_alias_deps f =
   "-no-alias-deps", Arg.Unit f,
   " Do not record dependencies for module aliases"
 
+let mk_no_crc f =
+  "-no-crc", Arg.Unit f,
+  " Do not check or record interface CRCs; inconsistent inputs then go\n\
+  \    undetected and the behaviour of the outputs is undefined. Files\n\
+  \    produced with -no-crc can only be used by tools that also pass\n\
+  \    -no-crc"
+
 let mk_app_funct f =
   "-app-funct", Arg.Unit f, " Activate applicative functors"
 
@@ -1196,6 +1203,7 @@ module type Common_options = sig
   val _labels : unit -> unit
   val _alias_deps : unit -> unit
   val _no_alias_deps : unit -> unit
+  val _no_crc : unit -> unit
   val _app_funct : unit -> unit
   val _no_app_funct : unit -> unit
   val _directory : string -> unit
@@ -1559,6 +1567,7 @@ struct
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
+    mk_no_crc F._no_crc;
     mk_app_funct F._app_funct;
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
@@ -1681,6 +1690,7 @@ struct
     mk_labels F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
+    mk_no_crc F._no_crc;
     mk_app_funct F._app_funct;
     mk_no_app_funct F._no_app_funct;
     mk_directory F._directory;
@@ -1850,6 +1860,7 @@ struct
     mk_inline_max_depth F._inline_max_depth;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
+    mk_no_crc F._no_crc;
     mk_linscan F._linscan;
     mk_app_funct F._app_funct;
     mk_no_app_funct F._no_app_funct;
@@ -2028,6 +2039,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_labels F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
+    mk_no_crc F._no_crc;
     mk_linscan F._linscan;
     mk_app_funct F._app_funct;
     mk_no_app_funct F._no_app_funct;
@@ -2156,6 +2168,7 @@ struct
     mk_modern F._labels;
     mk_alias_deps F._alias_deps;
     mk_no_alias_deps F._no_alias_deps;
+    mk_no_crc F._no_crc;
     mk_app_funct F._app_funct;
     mk_no_app_funct F._no_app_funct;
     mk_disable_all_extensions F._disable_all_extensions;
@@ -2267,6 +2280,7 @@ module Default = struct
     let _no_absname = clear Clflags.absname
     let _no_locs = clear Clflags.locs
     let _no_alias_deps = set no_alias_deps
+    let _no_crc = set no_crc
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
     let _no_principal = clear principal

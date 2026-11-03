@@ -1,0 +1,5 @@
+File "a.ml", line 1, characters 11-12:
+1 | let f (x : B.u) = match x with B.A -> "A" | B.B s -> s
+               ^
+Error: The interface b.cmi for module B was compiled with -no-crc.
+       It can only be used by tools that also pass -no-crc.
