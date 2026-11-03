@@ -896,6 +896,7 @@
    %{dep:middle_end/flambda2/terms/flambda2_terms.a}
    %{dep:middle_end/flambda2/simplify_shared/flambda2_simplify_shared.a}
    %{dep:middle_end/flambda2/cmx/flambda2_cmx.a}
+   %{dep:middle_end/flambda2/fdo/flambda2_fdo.a}
    %{dep:middle_end/flambda2/from_lambda/flambda2_from_lambda.a}
    %{dep:middle_end/flambda2/simplify/flambda2_simplify.a}
    %{dep:middle_end/flambda2/reaper/flambda2_reaper.a}
@@ -939,6 +940,7 @@
    %{dep:middle_end/flambda2/terms/flambda2_terms.cma}
    %{dep:middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cma}
    %{dep:middle_end/flambda2/cmx/flambda2_cmx.cma}
+   %{dep:middle_end/flambda2/fdo/flambda2_fdo.cma}
    %{dep:middle_end/flambda2/from_lambda/flambda2_from_lambda.cma}
    %{dep:middle_end/flambda2/simplify/flambda2_simplify.cma}
    %{dep:middle_end/flambda2/reaper/flambda2_reaper.cma}
@@ -982,6 +984,7 @@
    %{dep:middle_end/flambda2/terms/flambda2_terms.cmxa}
    %{dep:middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cmxa}
    %{dep:middle_end/flambda2/cmx/flambda2_cmx.cmxa}
+   %{dep:middle_end/flambda2/fdo/flambda2_fdo.cmxa}
    %{dep:middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa}
    %{dep:middle_end/flambda2/simplify/flambda2_simplify.cmxa}
    %{dep:middle_end/flambda2/reaper/flambda2_reaper.cmxa}
