@@ -2787,7 +2787,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
       ~dbg
-      ~fdo_entry_annotation:Fdo_annotation.empty
+      ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
         (* The wrapper isn't in the source: the function's entry counter is on
            [main_code]. *)
       ~is_tupled ~is_my_closure_used:true ~inlining_decision ~absolute_history
@@ -3808,7 +3808,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
           ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc
-          ~fdo_entry_annotation:Fdo_annotation.empty
+          ~fdo_entry_annotation:Fdo_annotation.With_body_hash.empty
             (* The wrapper isn't in the source: it has no entry counter. *)
           ~free_idents_of_body ~closure_alloc_mode ~first_complex_local_param
           ~result_mode Recursive.Non_recursive ]
