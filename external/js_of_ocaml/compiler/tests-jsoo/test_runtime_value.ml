@@ -18,4 +18,8 @@ let%expect_test "boxed_nativeint_to_i64" =
       assert (Int64.equal i (Int64.of_nativeint n));
       print_endline (Int64.to_string i))
     [ -1n; Nativeint.min_int; Nativeint.max_int ];
-  [%expect {| |}]
+  [%expect {|
+           -1
+           -2147483648
+           2147483647
+           |}]
