@@ -1,4 +1,4 @@
-open SsaGraph
+open SsaGraphSpec
 open SsaModel
 
 (** val supported_operation : Operation.t -> 'a1 list -> bool **)

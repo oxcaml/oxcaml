@@ -25,7 +25,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* Finite traversals of a certified loop in SsaSemantics.step.
+(* Finite traversals of a certified loop in SsaSemanticsSpec.step.
 
    [region_iteration] uses CFG accessibility and instruction-list induction to
    reach the next header entry or an exit. [region_steps] includes only the
@@ -37,8 +37,8 @@
 From Stdlib Require Import ZArith Lia List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlInt OxCamlList.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution SsaProgress SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
+  SsaDominanceSpec SsaSemanticsSpec SsaSemanticsProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar DeleteEmptyLoops.
 Import ListNotations.
 Local Open Scope nat_scope.
@@ -49,7 +49,7 @@ Inductive region_steps (region : blockset) : state -> state -> Prop :=
   | Region_refl : ∀ (s : state), region_steps region s s
   | Region_cons : ∀ (before middle after : state),
       set_mem (current_block before) region = true ->
-      SsaSemantics.step before middle -> region_steps region middle after ->
+      SsaSemanticsSpec.step before middle -> region_steps region middle after ->
       region_steps region before after.
 
 (* Region segments are executions in the same original graph. *)
@@ -163,7 +163,7 @@ Lemma step_exits_region : control_edges -> ∀ (region : blockset)
     (before after : state),
   set_mem (current_block before) region = true ->
   set_mem (current_block after) region = false ->
-  SsaSemantics.step before after ->
+  SsaSemanticsSpec.step before after ->
   (current_block after) ∈ (all_successors (current_block before))
     ∧ after = enter (current_block after) (current_registers after).
 Proof.
@@ -201,7 +201,7 @@ Qed.
 
 (* A terminator step follows a graph edge and starts the target's body. *)
 Lemma terminator_step_edge : control_edges -> ∀ (before after : state),
-  remaining before = [] -> SsaSemantics.step before after ->
+  remaining before = [] -> SsaSemanticsSpec.step before after ->
   (current_block after) ∈ (all_successors (current_block before))
   ∧ remaining after = block_body (current_block after).
 Proof.
@@ -217,7 +217,7 @@ Qed.
 Lemma region_finish_body : ∀ (region : blockset) (start : state),
   (∀ (reached : state), region_steps region start reached ->
     set_mem (current_block reached) region = true ->
-    ∃ (next : state), SsaSemantics.step reached next) ->
+    ∃ (next : state), SsaSemanticsSpec.step reached next) ->
   ∀ (b : block) (insns : list instr) (regs : registers),
   set_mem b region = true ->
   region_steps region start
@@ -248,9 +248,9 @@ Theorem region_iteration : control_edges -> parameter_layout ->
   set_mem (current_block start) region = true ->
   (∀ (reached : state), region_steps region start reached ->
     set_mem (current_block reached) region = true ->
-    ∃ (next : state), SsaSemantics.step reached next) ->
+    ∃ (next : state), SsaSemanticsSpec.step reached next) ->
   ∃ (before after : state),
-    region_steps region start before ∧ SsaSemantics.step before after
+    region_steps region start before ∧ SsaSemanticsSpec.step before after
     ∧ set_mem (current_block before) region = true
     ∧ remaining before = []
     ∧ (set_mem (current_block after) region = false
@@ -269,7 +269,7 @@ Proof.
     (forall (index : int), regs (Param header index)
       = current_registers start (Param header index)) ->
     exists (before after : state),
-      region_steps region start before ∧ SsaSemantics.step before after
+      region_steps region start before ∧ SsaSemanticsSpec.step before after
       ∧ set_mem (current_block before) region = true
       ∧ remaining before = []
       ∧ (set_mem (current_block after) region = false
@@ -445,7 +445,7 @@ Theorem loop_back_edge_step : ∀ (blocks : list block) (entry : block)
   ∀ (before after : state),
     remaining before = [] ->
     set_mem (current_block before) loop.(body) = true ->
-    SsaSemantics.step before after -> current_block after = loop.(header) ->
+    SsaSemanticsSpec.step before after -> current_block after = loop.(header) ->
     ∃ (args : list Terminator.arg),
       (current_block before) ∈ loop.(back_edge_sources)
       ∧ (current_block before) ∈ (predecessors loop.(header))

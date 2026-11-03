@@ -31,12 +31,13 @@
    DeadInductionVar.ml, is the implementation.
 
    See the reading guide at the top of LoopComparisons.v for the Rocq
-   vocabulary, SsaModel.v for how the models see an SSA graph, SsaGraph.v
-   (backend/ssa/rocq/) for the uses of a value in the graph, and NaturalLoop.v
-   and InductionVar.v for the loops, their exit branches and the basic
-   induction variables this file is given. As there, the file has four parts:
-   (1) the definitions, (2) the intended meaning, (3) stepping-stone lemmas,
-   (4) the theorems. Parts 1 and 2 are the part to check by eye.
+   vocabulary, SsaModel.v for how the models see an SSA graph,
+   SsaGraphProofs.v (backend/ssa/rocq/) for the uses of a value in the graph,
+   and NaturalLoop.v and InductionVar.v for the loops, their exit branches and
+   the basic induction variables this file is given. As there, the file has
+   four parts: (1) the definitions, (2) the intended meaning, (3)
+   stepping-stone lemmas, (4) the theorems. Parts 1 and 2 are the part to
+   check by eye.
 
    Why the uses of the exit comparison are checked ([exit_comparison_uses_ok]):
    deleting the loop (DeleteEmptyLoops.v) leaves the comparison computed from
@@ -57,7 +58,7 @@
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlList.
-From OxCamlSsa Require Import SsaModel SsaGraph.
+From OxCamlSsa Require Import SsaModel SsaGraph SsaGraphProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar.
 Import ListNotations.
 
@@ -150,7 +151,7 @@ Definition analyze (blocks : list block)
 
 (* The parameter [parameter_index] of [header] is used only by the exit
    comparison [exit_comparison] and the [updates], and by no terminator
-   ([uses_only], SsaGraph.v). *)
+   ([uses_only], SsaGraphProofs.v). *)
 Definition param_used_only_by_exit_comparison_and_updates
     (blocks : list block) (header : block) (parameter_index : int)
     (exit_comparison : value) (updates : list value) : Prop :=

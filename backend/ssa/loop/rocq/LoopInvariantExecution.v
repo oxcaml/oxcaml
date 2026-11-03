@@ -38,8 +38,9 @@ From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlList.
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaDominanceSpec
+  SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec
+  SsaExecutionProofs SsaContextSpec SsaContextProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar LoopExecution
   DeleteEmptyLoops.
 Import ListNotations.

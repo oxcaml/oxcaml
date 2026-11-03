@@ -41,8 +41,10 @@ From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlList.
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
 From OxCamlBackend Require Import Operation IntegerComparison.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
+  SsaDominanceSpec SsaDominance SsaDominanceProofs SsaSemanticsSpec
+  SsaSemanticsProofs SsaExecutionSpec SsaExecutionProofs SsaContextSpec
+  SsaContextProofs.
 From OxCamlLoop Require Import AffineSsa LoopValueSnapshot.
 Import ListNotations.
 Local Open Scope Z_scope.
@@ -111,7 +113,7 @@ Section Execution.
   Hypothesis dominance : dominance_semantics entry.
   Hypothesis dominance_complete : ∀ (dominator target : block),
     dominator ∈ blocks -> target ∈ blocks ->
-    (∀ (visited_blocks : list block), SsaDominance.block_path_from entry
+    (∀ (visited_blocks : list block), SsaDominanceSpec.block_path_from entry
       visited_blocks target ->
        dominator ∈ visited_blocks) -> dominator ▷ target.
 
@@ -372,7 +374,7 @@ Theorem executed_guards_taken : ∀ (blocks : list block) (entry : block),
   control_edges -> well_formed_ssa blocks entry -> dominance_semantics entry ->
   (∀ (dominator target : block),
     dominator ∈ blocks -> target ∈ blocks ->
-    (∀ (visited_blocks : list block), SsaDominance.block_path_from entry
+    (∀ (visited_blocks : list block), SsaDominanceSpec.block_path_from entry
       visited_blocks target ->
        dominator ∈ visited_blocks) -> dominator ▷ target) ->
   switch_edge_multiplicity ->
@@ -399,7 +401,7 @@ Proof.
     + eapply sole_predecessor_switch_distinct; eassumption.
     + apply program_point_dominance_of_block; [exact Hedges |].
       change (forall block_path_from : list block,
-        SsaDominance.block_path_from entry block_path_from (current_block
+        SsaDominanceSpec.block_path_from entry block_path_from (current_block
           reached) ->
         (if negate then ifnot else ifso) ∈ block_path_from).
       rewrite Hblock. exact (dominates_spec Hdominance _ _ Hdom).

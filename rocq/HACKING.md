@@ -17,21 +17,21 @@ Start review of empty-loop deletion at `LoopEligibility.v`: read
 `eligible_entry` and `find_deletions_eligible`, then their imported
 semantics and contracts. The theorem proves, for every header/exit pair
 the pass reports, that the execution from the header first arrives at
-the exit after finitely many steps (`SsaSemantics.steps_until`) and
+the exit after finitely many steps (`SsaSemanticsSpec.steps_until`) and
 agrees with the first header execution on every register read before
 its next definition. Its premises are two records, `finished_graph`
-(`SsaProgress.v`: what the SSA builder guarantees) and `reached_header`
-(`SsaContext.v`: bound inputs and an observed prefix to the header). It
-assumes no recurrence, invariant bound, guard outcome, progress or
-finite exit, and the discovered loop does not appear in the statement.
-The mechanically rewritten graph, renaming and cleanup are deliberately
-outside this proof's scope.
+(`SsaProgressSpec.v`: what the SSA builder guarantees) and
+`reached_header` (`SsaContextSpec.v`: bound inputs and an observed prefix
+to the header). It assumes no recurrence, invariant bound, guard outcome,
+progress or finite exit, and the discovered loop does not appear in the
+statement. The mechanically rewritten graph, renaming and cleanup are
+deliberately outside this proof's scope.
 
 The loop whitelist remains integer constants, additions, subtractions and
-comparisons, with Goto/Switch control flow. `SsaSemantics.v` defines exact
-execution; its evaluator additionally supports immediate shifts and or
-for computations before the loop. `SsaContext.v` overapproximates word
-observations in the unchanged prefix: opaque instructions can produce
+comparisons, with Goto/Switch control flow. `SsaSemanticsSpec.v` defines
+exact execution; its evaluator additionally supports immediate shifts and
+or for computations before the loop. `SsaContextSpec.v` overapproximates
+word observations in the unchanged prefix: opaque instructions can produce
 arbitrary bounded outputs, and opaque terminators can take CFG successors
 with arbitrary parameter values. Memory effects are unconstrained, not
 no-ops. Trap markers step without touching a register, and the exception
@@ -46,10 +46,11 @@ remains a review boundary. The simulation argument from `eligible_entry`
 to the rewritten function is written out in ROCQ-REVIEW-GUIDE.md (section
 4), which also says how to review the development as a whole.
 
-`SsaExecution.v` supplies definition-site and frame facts; `SsaContext.v`
-proves available-value equations and execution invariants once for both
-exact and opaque steps. `SsaLiveness.v` defines reads before redefinition;
-`SsaProgress.v` derives progress from bound operands. `LoopExecution.v`
+`SsaExecutionProofs.v` supplies definition-site and frame facts;
+`SsaContextProofs.v` proves available-value equations and execution
+invariants once for both exact and opaque steps. `SsaLivenessSpec.v`
+defines reads before redefinition; `SsaProgressProofs.v` derives progress
+from bound operands. `LoopExecution.v`
 uses accessibility to construct finite traversals to the next header or
 exit. `LoopInvariantExecution.v` proves bound constancy on finite segments;
 `LoopCounterExecution.v` iterates up to the arithmetic exit witness.
@@ -82,16 +83,17 @@ Each directory is a Rocq library (`rocq/Makefile` maps them):
 |--------------------------|----------------|-----------------------------------------------|
 | `rocq/`                  | `OxCamlStdlib` | Models of OxCaml's own types (`int`, `Int64`, lists, exceptions as options), generic arithmetic (`IntArith.v`), proof helpers, and the extraction directives mapping them onto OxCaml's functions (`OxCamlExtract.v`) |
 | `backend/rocq/`          | `OxCamlBackend`| Backend-wide definitions: the semantics of `Cmm.integer_comparison`, the model's copy of `Operation.t` |
-| `backend/ssa/rocq/`      | `OxCamlSsa`    | The SSA graph as the models see it: `SsaModel.v` (the abstract interface), `SsaGraph.v` (properties of blocks, terminators and uses that any pass may need), `SsaDominance.v`, `SsaSemantics.v` (execution of the restricted integer fragment), `SsaExecution.v` (well-formedness and available-value equations), `SsaLiveness.v` (reads before redefinition), `SsaProgress.v` (definedness and progress), `SsaContext.v` (opaque surrounding computations) |
+| `backend/ssa/rocq/`      | `OxCamlSsa`    | The SSA graph as the models see it, each model split into Spec, implementation and Proofs files (see "The layout of a model"): `SsaModel.v` (the abstract interface), `SsaGraph*` (terminators, edges and uses), `SsaDominance*` (dominance, paths and program points), `SsaSemantics*` (execution of the restricted integer fragment), `SsaExecution*` (well-formedness and available-value equations), `SsaLiveness*` (reads before redefinition), `SsaProgress*` (the `finished_graph` contract, definedness and progress), `SsaContext*` (opaque surrounding computations and the `reached_header` contract) |
 | `backend/ssa/loop/rocq/` | `OxCamlLoop`   | The loop analyses, the operational proofs in `LoopExecution.v`, `LoopInvariantExecution.v`, `LoopCounterExecution.v`, `LoopValueSnapshot.v`, `LoopGuardExecution.v`, `LoopRangeExecution.v`, `LoopLiveOut.v` and `LoopEligibility.v`, and `Extract.v`, which extracts the implementation |
 
 Put a definition or lemma where its OxCaml counterpart would live. A fact
 about lists goes in `OxCamlList.v`, about machine integers in
 `OxCamlInt.v`, `OxCamlInt64.v` or `IntArith.v`, about terminators or
-values of any SSA graph in `SsaGraph.v`, about dominance in
-`SsaDominance.v`; only what is specific to a pass stays in its file. The
-same question one asks of an OxCaml module ("is this really about loops?")
-applies.
+values of any SSA graph in the `SsaGraph` files, about dominance in the
+`SsaDominance` files; only what is specific to a pass stays in its files.
+The same question one asks of an OxCaml module ("is this really about
+loops?") applies, and then the question of "The layout of a model" below
+("does a statement to be reviewed need it?") picks the file.
 
 ## The workflow
 
@@ -143,45 +145,83 @@ not leave generated audit sources in the workspace.
 ### Adding a module
 
 A new `.v` file goes in the library's list in `rocq/Makefile` (`STDLIB`,
-`BACKEND`, `SSA` or `LOOP`). If it is extracted (it defines functions the
-compiler runs, as opposed to only lemmas), also add its `.ml`/`.mli` to
-`SSA_MODULES` or `LOOP_EXTRACTED` there, add the module to the list in the
-root `dune` file next to the other extracted modules, and mention it in
-the header of `Extract.v`. Extraction writes every file into
-`backend/ssa/loop/rocq/`; the Makefile moves the `OxCamlSsa` ones next to
-their sources. A module whose every definition is mapped onto OxCaml's own
-functions extracts to an empty file, which the Makefile deletes.
+`BACKEND`, `SSA` or `LOOP`); the Spec, implementation and Proofs files of
+a model are three such entries, and `make claims` finds the Spec files in
+the `SSA` and `LOOP` lists by their suffix. If a file is extracted (it
+defines functions the compiler runs, as opposed to only lemmas), also add
+its `.ml`/`.mli` to `SSA_MODULES` or `LOOP_EXTRACTED` there, add the
+module to the list in the root `dune` file next to the other extracted
+modules, and mention it in the header of `Extract.v`. Extraction writes
+every file into `backend/ssa/loop/rocq/`; the Makefile moves the
+`OxCamlSsa` ones next to their sources. A module whose every definition is
+mapped onto OxCaml's own functions extracts to an empty file, which the
+Makefile deletes.
 
-## The layout of a model file
+## The layout of a model
 
-Every model file has a header and four parts, marked by banners:
+A model is split over up to three files, so that a reviewer knows from a
+file's name whether to read it:
 
-1. **The definitions.** The analysis itself, written to mirror the shape
-   of the OxCaml it replaces: same decomposition into functions, same
-   names where possible, booleans for checks. This is what is extracted.
-2. **The intended meaning.** `Prop`s saying what the analysis's answers
-   are supposed to mean, in terms of the model's observations of the
-   graph and of mathematical integers (`Z`). Each conjunct of a
-   specification is a named predicate (`exits_only_to`,
-   `params_are_dead_bivs`, `body_in_supported_fragment`, ...), so that the
-   specification reads as a sentence and needs no comment explaining its
-   parts. Local compiler-data contracts belong here too, as `Hypothesis`
-   in a `Section` or fields of a `Record`: for example, `control_edges`
-   and `parameter_layout`. Execution belongs in an independent semantics
-   such as `SsaSemantics.step`; the facts an analysis needs from execution
-   must be proved, not packaged as a trusted run record.
-3. **Lemmas used by the proofs.** Stepping stones. Each non-trivial one
-   has a comment before it saying, in plain words, what it states.
-4. **The theorems.** The correctness claims, each with a comment before
-   it. Their statements mention only parts 1 and 2.
+- **`XSpec.v`: what is claimed.** Everything a reviewer has to read about
+  the model and nothing else: the definitions its statements are made with
+  (a semantics such as `SsaSemanticsSpec.step`, a contract such as
+  `finished_graph`, the meaning of a decision such as `eligible_entry`),
+  and the statements of its theorems, each bound as a proposition
+  (`Definition step_deterministic_statement : Prop := ...`). A Spec file
+  imports Model, Spec and implementation files only, so nothing in a Proofs
+  file can change what it says; it mentions an implementation function by
+  name (`find_deletions` in a statement), never its body. The header says
+  what is trusted and what to check the definitions against.
+- **`X.v`: the implementation.** The analysis itself, written to mirror the
+  shape of the OxCaml it replaces: same decomposition into functions, same
+  names where possible, booleans for checks. This is what is extracted
+  (`X.ml`). It needs no review: the Spec says what its answers mean and the
+  Proofs show that they do.
+- **`XProofs.v`: the proofs.** Each theorem proves a statement of the Spec
+  under the statement's name without its suffix
+  (`Theorem step_deterministic : step_deterministic_statement`), with the
+  stepping-stone lemmas and the intermediate specifications they go through
+  (the meaning of a helper check such as `uses_only`, an invariant of
+  execution such as `valid_position`). Nothing here needs review, and
+  `make -C rocq claims` (run by `make -C rocq all`) checks that every
+  statement a Spec binds is proved.
 
-The header says what the file models, where its extraction lives, which
-files to read first, what the main theorems establish, and what is
-trusted. Review the definitions, contracts and theorem statements by eye;
-Rocq checks the proofs. Analysis-certificate theorems go one way: a boolean
-check answering `true` implies its meaning. Nothing is claimed about `false` answers, so the
+A model with nothing to extract has no `X.v`; one whose meaning appears in
+no reviewed statement has no `XSpec.v`. A Spec whose definitions the
+implementation calls is extracted too (`SsaGraphSpec.ml`: the two readings
+of a terminator shared by the semantics and the checks). `*Model.v` and
+`*Extract.v` stand apart: they are the trusted base (below), reviewed by
+inspection.
+
+A definition goes in a Spec only if a statement that has to be read uses
+it, and the test is mechanical: start from the theorems ROCQ-REVIEW-GUIDE.md
+names and follow their definitions; what is reached is Spec, and what is
+not, however meaningful, is a Proofs definition (`available_value` is one:
+the loop proofs use it and no reviewed statement does). A lemma statement
+goes in a Spec only when the reader needs it to interpret a theorem
+(`step_deterministic_statement` is what makes `steps_until` speak of *the*
+execution from a state). Each conjunct of a specification is a named
+predicate (`exits_only_to`, `params_are_dead_bivs`, ...), so that it reads
+as a sentence and needs no comment explaining its parts. Local
+compiler-data contracts are `Record`s of `Prop`s or `Hypothesis` in a
+`Section` (`control_edges`, `parameter_layout`). Execution belongs in an
+independent semantics such as `SsaSemanticsSpec.step`; the facts an
+analysis needs from execution must be proved, not packaged as a trusted run
+record.
+
+A statement bound as a proposition is used by `apply`, `eapply`, `rewrite`,
+`destruct` and `exact` as if it were the theorem's type; only
+`rewrite ... at` and `setoid_rewrite` need it unfolded first.
+Analysis-certificate theorems go one way: a boolean check answering `true`
+implies its meaning. Nothing is claimed about `false` answers, so the
 analyses may be conservative wherever that is convenient (size limits,
 overflow, unrecognised shapes).
+
+The loop models in `backend/ssa/loop/rocq/` still use the earlier layout:
+one file with four banners (the definitions, the intended meaning, the
+lemmas, the theorems), of which the first two are the part to review. They
+are to be split as above, with `LoopEligibilitySpec.v` holding
+`eligible_entry` and `find_deletions_eligible_statement`.
 
 ## Modelling OxCaml
 
@@ -286,10 +326,11 @@ header.
 - The existential witnesses in a specification should be things the
   analysis actually computes (`∃ args, goto_args ... = Some args`),
   so that the proof is a reading-back of the code.
-- Define machine execution once (`SsaSemantics.v`). Derive operation
-  equations only for available, canonical definitions (`SsaExecution.v`
-  and `SsaContext.v`). An abstract arithmetic valuation such as
-  `AffineSsa.value_words` is constrained by `SsaSemantics.eval_operation`
+- Define machine execution once (`SsaSemanticsSpec.v`). Derive operation
+  equations only for available, canonical definitions
+  (`SsaExecutionProofs.v` and `SsaContextProofs.v`). An abstract
+  arithmetic valuation such as
+  `AffineSsa.value_words` is constrained by `SsaSemanticsSpec.eval_operation`
   (`AffineSsa.op_semantics`), not by a second statement of the
   arithmetic, and needs a proved connection to execution
   (`LoopValueSnapshot.v`) before it can justify optimization.
@@ -337,8 +378,9 @@ header.
 
 - `make -C rocq all` passes and the extracted diff is the intended one.
 - `make -s boot-compiler`, the pass's tests and `make -s fmt` pass.
-- New definitions sit in the most generic file that fits; new modules are
-  registered in `rocq/Makefile`, `dune` and `Extract.v`.
+- New definitions sit in the most generic file that fits, and in a Spec
+  only if a reviewed statement needs them; new modules are registered in
+  `rocq/Makefile`, `dune` and `Extract.v`.
 - Every non-trivial lemma and theorem has a comment; no comment restates
   a named predicate.
 - The headers list what is trusted, and nothing is `Admitted`.

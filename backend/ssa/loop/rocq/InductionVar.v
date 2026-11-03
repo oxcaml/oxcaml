@@ -52,7 +52,8 @@ From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlList.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance.
+From OxCamlSsa Require Import SsaModel SsaGraph SsaGraphProofs SsaDominance
+  SsaSemanticsSpec.
 From OxCamlLoop Require Import NaturalLoop.
 Import ListNotations.
 

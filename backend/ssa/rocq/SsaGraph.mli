@@ -1,7 +1,5 @@
 open SsaModel
 
-val terminator_pure_control : Ssa.finished Ssa.Terminator.t -> bool
-
 val is_param : block -> int -> Ssa.finished Ssa.Value.t -> bool
 
 val instr_defines_value :
@@ -9,9 +7,6 @@ val instr_defines_value :
 
 val args_of_instr :
   Ssa.finished Ssa.Instruction.t -> Ssa.finished Ssa.Value.t list
-
-val terminator_args :
-  Ssa.finished Ssa.Terminator.t -> Ssa.finished Ssa.Value.t list list
 
 val arg_is : Ssa.finished Ssa.Value.t -> Ssa.finished Ssa.Terminator.arg -> bool
 

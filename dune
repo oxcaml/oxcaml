@@ -725,6 +725,7 @@
   cfg_of_ssa
   ;; backend/ssa/rocq/ (extracted from Rocq by rocq/Makefile)
   SsaModel
+  SsaGraphSpec
   SsaGraph
   SsaDominance
   SsaSemantics

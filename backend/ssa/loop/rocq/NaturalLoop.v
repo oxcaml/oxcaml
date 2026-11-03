@@ -58,12 +58,13 @@
    The trusted part is SsaModel.v: that [predecessors] and [all_successors] are
    the two ends of the same edges, that the block list given is the whole graph
    (which the theorems state as hypotheses), and that [dominates] is dominance
-   in the graph (SsaDominance.v says what that means). *)
+   in the graph (SsaDominanceSpec.v says what that means). *)
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlInt OxCamlList.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance.
+From OxCamlSsa Require Import SsaModel SsaGraphProofs SsaDominanceSpec
+  SsaDominanceProofs SsaSemanticsSpec.
 Import ListNotations.
 
 (* ======================================================================== *)

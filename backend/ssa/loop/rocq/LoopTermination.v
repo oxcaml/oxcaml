@@ -50,7 +50,7 @@ From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlInt64 OxCamlList.
 From OxCamlBackend Require Import IntegerComparison Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance.
+From OxCamlSsa Require Import SsaModel SsaGraph SsaSemanticsSpec.
 From OxCamlLoop Require Import FourierMotzkin LoopComparisons AffineExpr
   NaturalLoop AffineSsa InductionVar.
 Import ListNotations.

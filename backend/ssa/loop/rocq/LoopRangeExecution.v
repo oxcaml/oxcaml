@@ -36,8 +36,9 @@
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
+  SsaDominanceSpec SsaSemanticsSpec SsaExecutionSpec SsaExecutionProofs
+  SsaContextSpec SsaContextProofs.
 From OxCamlLoop Require Import FourierMotzkin AffineExpr AffineSsa
   LoopComparisons LoopTermination LoopValueSnapshot LoopGuardExecution.
 Import ListNotations.
@@ -162,7 +163,7 @@ Theorem executed_bound_in_range : ∀ (blocks : list block) (entry : block),
   control_edges -> well_formed_ssa blocks entry -> dominance_semantics entry ->
   (∀ (dominator target : block),
     dominator ∈ blocks -> target ∈ blocks ->
-    (∀ (visited_blocks : list block), SsaDominance.block_path_from entry
+    (∀ (visited_blocks : list block), SsaDominanceSpec.block_path_from entry
       visited_blocks target ->
        dominator ∈ visited_blocks) -> dominator ▷ target) ->
   switch_edge_multiplicity -> graph_size_supported blocks ->

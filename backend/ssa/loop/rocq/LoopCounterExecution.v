@@ -34,9 +34,10 @@
 
    LoopInvariantExecution.v proves bound constancy on finite segments;
    LoopRangeExecution.v supplies affine range facts from the actual prefix.
-   SsaContext.v permits opaque surrounding computations in that prefix and
-   proves the available-value equations used here. LoopEligibility.v discharges
-   progress and combines finite exit with live-out agreement.
+   SsaContextSpec.v permits opaque surrounding computations in that prefix
+   and SsaContextProofs.v proves the available-value equations used here.
+   LoopEligibility.v discharges progress and combines finite exit with
+   live-out agreement.
 
    Review the observation definitions and [accepted_loop_finite_exit], together
    with the graph contracts in their premises. The mechanical graph rewrite is
@@ -46,8 +47,9 @@ From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
 From OxCamlBackend Require Import Operation IntegerComparison.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaSemantics SsaExecution
-  SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaGraphProofs
+  SsaDominanceSpec SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec
+  SsaExecutionProofs SsaContextSpec SsaContextProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar LoopTermination
   LoopComparisons DeleteEmptyLoops LoopExecution LoopInvariantExecution
   LoopRangeExecution.
@@ -225,7 +227,7 @@ Qed.
 (* Operands of the actual comparison are available at every point where its
    result is available. This includes an update tested by the header. *)
 Lemma comparison_operands_available : ∀ (blocks : list block)
-    (entry : block) (position : SsaDominance.program_point) (condition : value)
+    (entry : block) (position : SsaDominanceSpec.program_point) (condition : value)
     (cmp : integer_comparison) (iv_is_left : bool) (counter_ref : value)
     (comparison_bound : bound),
   well_formed_ssa blocks entry ->
@@ -337,7 +339,7 @@ Section CounterExecution.
   Hypothesis progress : ∀ (reached : state),
     region_steps loop.(body) start reached ->
     set_mem (current_block reached) loop.(body) = true ->
-    ∃ (next : state), SsaSemantics.step reached next.
+    ∃ (next : state), SsaSemanticsSpec.step reached next.
 
   (* The header test is an actual terminator operand and is therefore available
      after the header instructions have executed. *)
@@ -505,10 +507,10 @@ Section CounterExecution.
      traversal may exit earlier; otherwise its counter and fixed bound make the
      witnessed header test take the exiting edge. *)
   Theorem accepted_loop_finite_exit :
-    SsaDominance.dominance_semantics entry -> op_def_correct defs blocks ->
+    SsaDominanceSpec.dominance_semantics entry -> op_def_correct defs blocks ->
     (∀ (dominator target : block),
       dominator ∈ blocks -> target ∈ blocks ->
-      (∀ (visited_blocks : list block), SsaDominance.block_path_from entry
+      (∀ (visited_blocks : list block), SsaDominanceSpec.block_path_from entry
         visited_blocks target ->
          dominator ∈ visited_blocks) -> dominator ▷ target) ->
     switch_edge_multiplicity -> graph_size_supported blocks ->

@@ -42,15 +42,15 @@ the loop at `header` may be bypassed towards `exit`: `eligible_entry`.
 
 - `exit` takes no block parameters;
 - executing the header's instructions once from `header_regs` yields
-  some `first_header_regs` (`SsaSemantics.executes_insns`);
+  some `first_header_regs` (`SsaSemanticsSpec.executes_insns`);
 - from the header's terminator with those registers, the execution of
   the *original* graph first arrives at `exit` after finitely many steps,
-  entering it with some `exit_regs` (`SsaSemantics.steps_until`);
+  entering it with some `exit_regs` (`SsaSemanticsSpec.steps_until`);
 - `first_header_regs` and `exit_regs` agree on every register live at the
   entry of `exit`, that is, read somewhere before being redefined
-  (`SsaLiveness.agree_on_live`).
+  (`SsaLivenessSpec.agree_on_live`).
 
-Because `SsaSemantics.step` is deterministic, the third point is about
+Because `SsaSemanticsSpec.step` is deterministic, the third point is about
 *the* execution from the header: it neither diverges nor gets stuck
 before the exit, and since `step` has rules only for whitelisted integer
 operations, `Goto` and `Switch`, the skipped execution touches neither
@@ -121,18 +121,25 @@ The files involved, bottom up:
 | File | Role |
 |---|---|
 | `backend/ssa/rocq/SsaModel.v` | The graph as the models see it: abstract blocks with a few observations, and `Inductive` copies of the compiler's values, instructions and terminators (section 5.4) |
-| `SsaGraph.v`, `SsaDominance.v` | Structural facts any pass may need: terminators, uses, edges, dominance and paths |
-| `SsaSemantics.v` | The execution semantics (section 3) |
-| `SsaExecution.v` | Well-formed SSA and the equations of the values available at a program point |
-| `SsaLiveness.v` | Registers read before redefinition |
-| `SsaProgress.v` | Progress of a supported state; the `finished_graph` contract |
-| `SsaContext.v` | Word observations of the code before the loop; the `reached_header` contract |
+| `SsaGraphSpec.v`, `SsaDominanceSpec.v` | Terminators, edges and the `control_edges` contract; dominance, paths and program points |
+| `SsaSemanticsSpec.v` | The execution semantics (section 3) |
+| `SsaExecutionSpec.v` | Well-formed SSA (`well_formed_ssa`) |
+| `SsaLivenessSpec.v` | Registers read before redefinition |
+| `SsaProgressSpec.v` | The `finished_graph` contract and the defined-input condition for `Switch` |
+| `SsaContextSpec.v` | Word observations of the code before the loop; the `reached_header` contract |
+| `SsaGraph.v`, `SsaDominance.v`, `SsaSemantics.v` | The checks the loop analyses run on a graph (extracted; no review needed) |
+| `Ssa*Proofs.v` | The equations of available values, progress, the invariants of the observation semantics, and every lemma (no review needed) |
 | `backend/ssa/loop/rocq/LoopExecution.v` | Finite traversals of the loop body |
 | `LoopInvariantExecution.v` | Values defined before the loop do not change during it |
 | `LoopCounterExecution.v` | The counter's arithmetic in actual execution; finite exit |
 | `LoopValueSnapshot.v`, `LoopGuardExecution.v`, `LoopRangeExecution.v` | The affine facts the termination argument relies on, justified by actual execution |
 | `LoopLiveOut.v` | Agreement on live-out registers |
 | `LoopEligibility.v` | The statement and its proof |
+
+The SSA models are split into `*Spec.v`, implementation and `*Proofs.v`
+files (`rocq/HACKING.md`, "The layout of a model"): the Spec files, with
+`SsaModel.v` and `SsaModelExtract.v`, are all of `backend/ssa/rocq/` that
+has to be read.
 
 The arithmetic models (`FourierMotzkin.v`, `AffineExpr.v`,
 `LoopComparisons.v`) sit beside these and are used by the certificates.
@@ -147,7 +154,7 @@ theorem comes from, and no proof can check it against the compiler.
 
 ### 3.1 Registers, not expressions
 
-`SsaSemantics.v` gives a program state three components: the current
+`SsaSemanticsSpec.v` gives a program state three components: the current
 block, the instructions of it that remain to be executed, and a register
 file. A register is either result `index` of instruction `id`
 (`Result id index`) or parameter `index` of a block (`Param b index`);
@@ -163,11 +170,11 @@ A `value` term of the model carries its defining operation and operands,
 so a semantics that evaluated values syntactically would give a meaning
 to any term one can write, including terms that correspond to no
 instruction of the graph, and theorems about such terms would say nothing
-about the program. Instead, `SsaExecution.v` derives the equation of a
-value only where the value is *available*: its definition site dominates
-the current point (`available_value`), so by the frame lemmas its
-register was written by that instruction and not since. These derived
-equations (`coherent_at`) are what the affine and counter proofs use.
+about the program. Instead, `SsaExecutionProofs.v` derives the equation of
+a value only where the value is *available*: its definition site dominates
+the current point (`available_value`), so by the frame lemmas its register
+was written by that instruction and not since. These derived equations
+(`coherent_at`) are what the affine and counter proofs use.
 
 ### 3.2 One deterministic step
 
@@ -200,9 +207,9 @@ execution inside the body until it reaches `exit`.
 The code *before* the loop, from the function's entry to the header, is
 another matter: it contains loads, calls, allocations, trap pushes and
 whatever else the function does, and modelling all of that would need a
-memory and a calling convention. `SsaContext.v` avoids this with a second
-relation, `context_step`, an over-approximation of what the machine does
-to registers:
+memory and a calling convention. `SsaContextSpec.v` avoids this with a
+second relation, `context_step`, an over-approximation of what the machine
+does to registers:
 
 - an exactly modelled instruction, a `Goto` or a `Switch` takes a `step`;
 - any other instruction (`Context_opaque_instruction`) writes arbitrary
@@ -220,8 +227,8 @@ rules, except an exactly modelled operation with other than one result,
 which the extracted gate rejects for the whole graph. So every real
 prefix reaching the header is represented by some `context_steps` run,
 and `reached_header` can require one (section 5.3). The theorems of
-`SsaContext.v` establish, once for exact and opaque steps alike, that the
-observations stay bounded words, that available modelled values satisfy
+`SsaContextProofs.v` establish, once for exact and opaque steps alike, that
+the observations stay bounded words, that available modelled values satisfy
 their equations (`context_execution_values_coherent`) and that every
 register live at the reached point is bound
 (`context_execution_live_registers_defined`). Opaque results carry no
@@ -257,7 +264,7 @@ infinite trace.
   `exits_only_to`, or returns to the header with the counter advanced
   once; after `n` of them the header's own `Switch` takes the exit edge.
 
-Progress at each step (`SsaProgress.supported_state_progress`) needs the
+Progress at each step (`SsaProgressProofs.supported_state_progress`) needs the
 operands to be bound and `Switch` indices to be in range. Boundness comes
 from liveness: an operand about to be read is live, a live register at
 the reached header is bound by `reached_header`, and `control_layout`
@@ -292,7 +299,7 @@ syntax. Three files connect them to execution:
 
 ### 3.7 Live-out agreement
 
-`SsaLiveness.register_live_at p r` says that some structural path from
+`SsaLivenessSpec.register_live_at p r` says that some structural path from
 `p` reads `r` before redefining it, including reads in later blocks and
 on later entries of the loop; infeasible paths count, which only makes
 the condition stronger. `LoopLiveOut.v` shows that every register live at
@@ -351,7 +358,7 @@ nested cycle, but the simulation does not need this.)
 The OCaml rewrite is reviewed as ordinary code. In
 `backend/ssa/loop/delete_empty_loops.ml`, `find_deletions` builds the
 table of defining blocks (`compute_op_def`: every `Op` of every block, as
-`SsaGraph.op_def_correct` requires) and calls the extracted
+`SsaGraphSpec.op_def_correct` requires) and calls the extracted
 `DeleteEmptyLoops.find_deletions` on the finished graph; `run` then
 applies an `Ssa_reducer` whose only change is `visit_terminator`: for a
 reported header, replace the terminator by
@@ -368,7 +375,7 @@ done by reading.
 
 ### 5.1 The semantics against the backend
 
-In `SsaSemantics.v`: `eval_operation` (64-bit wrapping addition and
+In `SsaSemanticsSpec.v`: `eval_operation` (64-bit wrapping addition and
 subtraction, `Const_int` through `Int64.of_nativeint`, the shifts and
 `Ior` used for bounds), `comparison_value` with
 `backend/rocq/IntegerComparison.v` (signed and unsigned comparisons, in
@@ -389,14 +396,14 @@ typing conventions for the operations it models.
 
 ### 5.2 The graph contract: `finished_graph`
 
-Each field of `SsaProgress.finished_graph` is something `Ssa.finish_graph`
+Each field of `SsaProgressSpec.finished_graph` is something `Ssa.finish_graph`
 (`backend/ssa/ssa.ml`) is believed to guarantee of the graph the pass
 receives. Where to look:
 
 | Field | Meaning | Code to compare with |
 |---|---|---|
-| `graph_well_formed` (`SsaExecution.well_formed_ssa`) | every instruction has one definition site; instruction operands have strictly earlier dominating definitions and terminator operands dominating ones; parameters are distinct and canonical; blocks are reachable and closed under successors | `check_value_invariants`, `check_terminator`, `compute_reachability_and_trap_stacks` in `ssa.ml` |
-| `graph_predecessors_closed`, `graph_edges` (`SsaGraph.control_edges`) | predecessors, `all_successors` and terminators describe the same edges, the exception successor of a `Call` or `Raise` included | `finish_graph` and the predecessor and successor tables it fills |
+| `graph_well_formed` (`SsaExecutionSpec.well_formed_ssa`) | every instruction has one definition site; instruction operands have strictly earlier dominating definitions and terminator operands dominating ones; parameters are distinct and canonical; blocks are reachable and closed under successors | `check_value_invariants`, `check_terminator`, `compute_reachability_and_trap_stacks` in `ssa.ml` |
+| `graph_predecessors_closed`, `graph_edges` (`SsaGraphSpec.control_edges`) | predecessors, `all_successors` and terminators describe the same edges, the exception successor of a `Call` or `Raise` included | `finish_graph` and the predecessor and successor tables it fills |
 | `graph_switch_edges` (`switch_edge_multiplicity`) | a `Switch` with a repeated target produces repeated predecessor entries | the same |
 | `graph_dominance`, `graph_dominance_complete` | `Block.dominates` answers true exactly when every path from the entry passes through the dominator | `compute_dominators`, `Block.dominates` |
 | `graph_strict_dominators` | `Block.strict_dominators` lists distinct blocks of the graph | `Block.strict_dominators` (the walk up the immediate dominators) |
@@ -411,7 +418,7 @@ defined on them (header of `SsaModel.v`).
 
 ### 5.3 The input contract: `reached_header`
 
-Its four fields (`SsaContext.v`) are the only assumptions about how the
+Its four fields (`SsaContextSpec.v`) are the only assumptions about how the
 function was entered and ran:
 
 - `inputs_bounded`: the initial registers hold 64-bit words;
@@ -486,16 +493,17 @@ analyses more conservative.
    Check @find_deletions_eligible.
    Print Assumptions find_deletions_eligible.
    Print eligible_entry.
-   Print SsaSemantics.steps_until.
-   Print SsaProgress.finished_graph.
-   Print SsaContext.reached_header.
+   Print SsaSemanticsSpec.steps_until.
+   Print SsaProgressSpec.finished_graph.
+   Print SsaContextSpec.reached_header.
    ```
 
    The theorem is not in a `Section`, so `Check` shows every premise.
-2. `SsaSemantics.v` parts 1 and 2, `SsaLiveness.v` parts 1 and 2, then
-   `SsaContext.v` up to `reached_header`: section 3 above, against the
-   backend (section 5.1).
-3. `SsaProgress.finished_graph` and `SsaExecution.well_formed_ssa`
+2. `SsaSemanticsSpec.v`, `SsaLivenessSpec.v` and `SsaContextSpec.v`:
+   section 3 above, against the backend (section 5.1). Nothing else in
+   `backend/ssa/rocq/` but `SsaModel.v` and `SsaModelExtract.v` needs
+   reading.
+3. `SsaProgressSpec.finished_graph` and `SsaExecutionSpec.well_formed_ssa`
    against `ssa.ml` (section 5.2).
 4. `DeleteEmptyLoops.v` parts 1 and 2, and the theorem statements of the
    analysis models, for what the certificate says.

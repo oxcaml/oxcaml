@@ -34,7 +34,7 @@
    record of analysis answers. Entering [header] with registers [header_regs],
    the original graph executes the header's instructions once, then its
    execution first arrives at [exit] after finitely many steps of
-   SsaSemantics.step, at the exit's entry with no parameter to bind, holding
+   SsaSemanticsSpec.step, at the exit's entry with no parameter to bind, holding
    the value computed by that first header execution in every register the
    exit's continuation reads before redefining it. The retained header is
    executed, not skipped. [steps_until] is a property of the one execution from
@@ -44,20 +44,20 @@
 
    [find_deletions_eligible] proves this for every header/exit pair the
    extracted gate and analyses report, given [finished_graph] (what
-   Ssa.finish_graph guarantees of the graph, SsaProgress.v) and
+   Ssa.finish_graph guarantees of the graph, SsaProgressSpec.v) and
    [reached_header] (bound inputs and an observed prefix to the header,
-   SsaContext.v). It assumes no recurrence, invariant bound, guard outcome or
-   finite exit; those are conclusions. The loop and its body never appear in
-   the statement: which blocks the execution visits before the exit is
+   SsaContextSpec.v). It assumes no recurrence, invariant bound, guard outcome
+   or finite exit; those are conclusions. The loop and its body never appear
+   in the statement: which blocks the execution visits before the exit is
    irrelevant to bypassing it.
 
-   The loop executes in SsaSemantics.v. Its unchanged prefix uses
-   SsaContext.v's word-observation overapproximation, so loads, calls and other
-   opaque computations need not be given full memory semantics. Review that
-   abstraction and the graph contracts in SsaExecution.v, SsaGraph.v and
-   SsaProgress.v alongside the extraction veneer. Finite exit follows by
-   iteration; definedness uses classical case splits. Neither introduces
-   semantic axioms.
+   The loop executes in SsaSemanticsSpec.v. Its unchanged prefix uses
+   SsaContextSpec.v's word-observation overapproximation, so loads, calls and
+   other opaque computations need not be given full memory semantics. Review
+   that abstraction and the graph contracts in SsaExecutionSpec.v,
+   SsaGraphSpec.v and SsaProgressSpec.v alongside the extraction veneer.
+   Finite exit follows by iteration; definedness uses classical case splits.
+   Neither introduces semantic axioms.
 
    No post-deletion graph, renaming or pruning is modelled here, and
    eligibility is not assumed as a compiler contract. The step from
@@ -71,8 +71,10 @@
 From Stdlib Require Import List Bool.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlList.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution SsaLiveness SsaProgress SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
+  SsaDominanceSpec SsaSemanticsSpec SsaSemantics SsaSemanticsProofs
+  SsaExecutionSpec SsaLivenessSpec SsaProgressSpec SsaProgressProofs
+  SsaContextSpec SsaContextProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar DeleteEmptyLoops
   LoopExecution LoopLiveOut LoopCounterExecution LoopRangeExecution.
 Import ListNotations.
@@ -175,7 +177,7 @@ Theorem certificate_region_progress : control_edges ->
   ∀ (reached : state),
   region_steps loop.(body) (enter loop.(header) header_regs) reached ->
   set_mem (current_block reached) loop.(body) = true ->
-  ∃ (next : state), SsaSemantics.step reached next.
+  ∃ (next : state), SsaSemanticsSpec.step reached next.
 Proof.
   intros Hedges blocks entry defs loop bivs exit initial_regs header_regs
     Hwf Hlayout Hgraph Hcertificate Hinputs Hswitches Hprefix reached
@@ -210,7 +212,7 @@ Theorem certificate_entry_eligible : control_edges ->
   op_def_correct defs blocks ->
   (∀ (dominator target : block),
     dominator ∈ blocks -> target ∈ blocks ->
-    (∀ (visited_blocks : list block), SsaDominance.block_path_from entry
+    (∀ (visited_blocks : list block), SsaDominanceSpec.block_path_from entry
       visited_blocks target ->
        dominator ∈ visited_blocks) -> dominator ▷ target) ->
   switch_edge_multiplicity -> graph_size_supported blocks ->
@@ -230,7 +232,7 @@ Proof.
   assert (Hprogress : forall (reached : state),
     region_steps loop.(body) (enter loop.(header) header_regs) reached ->
     set_mem (current_block reached) loop.(body) = true ->
-    exists (next : state), SsaSemantics.step reached next).
+    exists (next : state), SsaSemanticsSpec.step reached next).
   { eapply certificate_region_progress; eassumption. }
   destruct (accepted_loop_finite_exit blocks entry defs loop bivs exit
     initial_regs header_regs Hedges Hwf Hgraph Hcertificate Hprefix

@@ -61,12 +61,12 @@
    proofs (see rocq/Makefile at the root of the repository).
 
    This file proves arithmetic facts, not optimizer correctness. The
-   independent instruction semantics is in SsaSemantics.v, and structural SSA
-   well-formedness is in SsaExecution.v. DeleteEmptyLoops.v states the analysis
-   certificate. The operational root is
+   independent instruction semantics is in SsaSemanticsSpec.v, and structural
+   SSA well-formedness is in SsaExecutionSpec.v. DeleteEmptyLoops.v states the
+   analysis certificate. The operational root is
    LoopEligibility.find_deletions_eligible, proving finite first exit and
    live-out agreement from that decision and explicit graph/input contracts.
-   SsaContext.v permits opaque computations in the unchanged prefix. The
+   SsaContextSpec.v permits opaque computations in the unchanged prefix. The
    post-deletion graph and its cleanup are deliberately not modelled. *)
 
 From Stdlib Require Import ZArith Lia Bool List.

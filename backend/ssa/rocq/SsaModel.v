@@ -51,7 +51,7 @@
    the pass receives: [finish_graph] prunes the unreachable ones, no reachable
    block refers to them, and the compiler's [dominates] is not even defined on
    them. Hypotheses that quantify over every [block] without a membership
-   guard, such as [SsaGraph.control_edges], use this universe. *)
+   guard, such as [SsaGraphSpec.control_edges], use this universe. *)
 
 From Stdlib Require Import ZArith Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.

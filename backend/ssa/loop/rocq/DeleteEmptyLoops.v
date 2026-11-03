@@ -49,7 +49,7 @@
    simple one LoopTermination.v recognises, with an exit target that takes no
    arguments; the termination analysis has returned [Terminates], and the body
    without the header has a well-founded successor relation
-   ([SsaGraph.region_acyclic_except]); each header parameter is a basic
+   ([SsaGraphProofs.region_acyclic_except]); each header parameter is a basic
    induction variable (InductionVar.v) that is dead in the sense of
    DeadInductionVar.v; every block of its body has only whitelisted integer
    instructions and a [Goto] or [Switch] terminator; and all edges leaving the
@@ -81,7 +81,8 @@ From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlList.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaSemantics.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaGraphProofs
+  SsaSemanticsSpec SsaSemantics SsaSemanticsProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar LoopTermination
   DeadInductionVar.
 Import ListNotations.
@@ -256,8 +257,8 @@ Qed.
 (* Every reported deletion passed both applicability checks. This removes graph
    size as a premise of the public eligibility theorem and enforces the
    syntactic coverage of the unchanged-prefix observation semantics: every
-   exactly modeled operation in the graph has one result, so SsaContext.v has a
-   rule for every instruction of every prefix. *)
+   exactly modeled operation in the graph has one result, so SsaContextSpec.v
+   has a rule for every instruction of every prefix. *)
 Theorem find_deletions_supported :
   ∀ (defs : op_def) (blocks : list block) (header exit : block),
   (header, exit) ∈ (find_deletions defs blocks) ->

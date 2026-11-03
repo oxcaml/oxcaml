@@ -25,57 +25,21 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* Values needed at a program point, independently of any optimization.
+(* Every read, and every live register, has an available canonical
+   definition; derived from the structural SSA contract, not assumed as an
+   execution or loop-analysis invariant.
 
-   A register is live when some structural continuation reads it before
-   redefining it. This includes reads in later blocks and on later loop
-   entries, not just the operands of the next instruction. The definition is
-   deliberately an overapproximation: infeasible CFG paths count too.
-
-   Review [operand_at], [register_defined_at] and [register_live_at]. The
-   availability theorem below is derived from the structural SSA contract, not
-   assumed as an execution or loop-analysis invariant. Nothing here is
-   extracted. *)
+   Nothing here needs review. *)
 
 From Stdlib Require Import ZArith Lia List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlList.
 From OxCamlStdlib Require Import OxCamlInt.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaDominanceSpec
+  SsaDominanceProofs SsaSemanticsSpec SsaExecutionSpec SsaExecutionProofs
+  SsaLivenessSpec.
 Import ListNotations.
-
-(* Instruction operands are read before the instruction's result site;
-   terminator operands are read at point zero. *)
-Inductive operand_at : program_point -> value -> Prop :=
-  | Instruction_operand : ∀ (b : block) (remaining : nat)
-      (id : instr_id) (op : operation) (args : list value) (count : int)
-      (arg : value),
-      result_definition id op args count (b, remaining) -> arg ∈ args ->
-      operand_at (b, S remaining) arg
-  | Terminator_operand : ∀ (b : block) (args : list value) (arg : value),
-      args ∈ (terminator_args (terminator b)) -> arg ∈ args ->
-      operand_at (b, 0%nat) arg.
-
-Definition register_defined_at (position : program_point)
-  (reg : register) : Prop :=
-  ∃ (v : value), value_definition v position ∧ register_of_value v = reg.
-
-(* Definitions kill the old register value on the incoming edge. In particular,
-   a later entry to a parameter's block does not read its old value merely
-   because that parameter is used in the block. *)
-Inductive register_live_at : program_point -> register -> Prop :=
-  | Live_read : ∀ (position : program_point) (v : value),
-      operand_at position v -> register_live_at position (register_of_value v)
-  | Live_predecessor : ∀ (before after : program_point) (reg : register),
-      program_point_edge before after -> ~ register_defined_at after reg ->
-      register_live_at after reg -> register_live_at before reg.
-
-Definition agree_on_live (position : program_point)
-  (left right : registers) : Prop :=
-  ∀ (reg : register),
-    register_live_at position reg -> left reg = right reg.
 
 (* The point immediately before an actual instruction has its instruction edge
    to the definition site. *)

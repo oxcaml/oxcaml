@@ -2,6 +2,7 @@
 #
 #   make          check every .v file, then run the extraction
 #   make assumptions  print global assumptions and declaration types
+#   make claims   check that every statement a Spec file binds is proved
 #   make clean    remove everything generated
 #
 # The sources live in four directories, each a Rocq library:
@@ -46,8 +47,11 @@ BACKEND := $(addprefix $(BACKEND_DIR)/, \
   IntegerComparison.v IntegerComparisonExtract.v Operation.v \
   OperationExtract.v)
 SSA := $(addprefix $(SSA_DIR)/, \
-  SsaModel.v SsaModelExtract.v SsaGraph.v SsaDominance.v SsaSemantics.v \
-  SsaExecution.v SsaLiveness.v SsaProgress.v SsaContext.v)
+  SsaModel.v SsaModelExtract.v SsaGraphSpec.v SsaGraph.v SsaGraphProofs.v \
+  SsaDominanceSpec.v SsaDominance.v SsaDominanceProofs.v SsaSemanticsSpec.v \
+  SsaSemantics.v SsaSemanticsProofs.v SsaExecutionSpec.v \
+  SsaExecutionProofs.v SsaLivenessSpec.v SsaLivenessProofs.v \
+  SsaProgressSpec.v SsaProgressProofs.v SsaContextSpec.v SsaContextProofs.v)
 LOOP := $(addprefix $(LOOP_DIR)/, \
   FourierMotzkin.v FourierMotzkinExtract.v LoopComparisons.v AffineExpr.v \
   AffineExprExtract.v NaturalLoop.v AffineSsa.v AffineSsaExtract.v \
@@ -61,7 +65,7 @@ EXTRACT := $(LOOP_DIR)/Extract.v
 # those of the SSA models are then moved next to their sources. Those of the
 # rocq/ models that are not mapped onto OxCaml's own functions (OxCamlList,
 # IntArith) stay in the loop directory.
-SSA_MODULES := SsaModel SsaGraph SsaDominance SsaSemantics
+SSA_MODULES := SsaModel SsaGraphSpec SsaGraph SsaDominance SsaSemantics
 SSA_EXTRACTED := $(addprefix $(SSA_DIR)/, \
   $(foreach m, $(SSA_MODULES), $(m).ml $(m).mli))
 LOOP_EXTRACTED := $(addprefix $(LOOP_DIR)/, \
@@ -81,9 +85,38 @@ MODULES := $(patsubst $(STDLIB_DIR)/%.v,OxCamlStdlib.%,$(STDLIB)) \
   $(patsubst $(LOOP_DIR)/%.v,OxCamlLoop.%,$(LOOP) $(EXTRACT))
 DEPS := $(STDLIB_DIR)/.rocqdeps.d
 
-.PHONY: all assumptions clean
+.PHONY: all assumptions claims clean
 
-all: $(SOURCES:.v=.vo)
+all: $(SOURCES:.v=.vo) claims
+
+# Every statement a Spec file binds as a proposition ([Definition X_statement
+# : Prop]) must be proved as the theorem [X] of the matching Proofs module
+# (HACKING.md, "The layout of a model"). Each is checked by defining a
+# constant of the statement's type whose body is the theorem; on success the
+# claims checked are listed.
+SPECS := $(patsubst %,OxCamlSsa:%,$(filter %Spec.v,$(SSA))) \
+  $(patsubst %,OxCamlLoop:%,$(filter %Spec.v,$(LOOP)))
+
+claims: $(SOURCES:.v=.vo)
+	@set -eu; \
+	  claims_dir=$$(mktemp -d); \
+	  trap 'rm -rf "$$claims_dir"' 0; \
+	  : > "$$claims_dir/list"; \
+	  for entry in $(SPECS); do \
+	    lib=$${entry%%:*}; spec=$${entry#*:}; \
+	    module=$$(basename $$spec .v); proofs=$${module%Spec}Proofs; \
+	    for claim in $$(sed -n \
+	        's/^Definition \([A-Za-z0-9_]*\)_statement : Prop.*/\1/p' $$spec); \
+	    do \
+	      printf 'From %s Require %s %s.\n' $$lib $$module $$proofs; \
+	      printf 'Definition %s_claim : %s.%s_statement := %s.%s.\n' \
+	        $$claim $$module $$claim $$proofs $$claim; \
+	      printf '%s.%s proves %s.%s_statement\n' \
+	        $$proofs $$claim $$module $$claim >> "$$claims_dir/list"; \
+	    done; \
+	  done > "$$claims_dir/Claims.v"; \
+	  $(ROCQ) repl -q -batch $(FLAGS) -l "$$claims_dir/Claims.v"; \
+	  cat "$$claims_dir/list"
 
 # The checker reports global assumptions, not theorem premises. Constant
 # types also expose Section arguments and contract fields,

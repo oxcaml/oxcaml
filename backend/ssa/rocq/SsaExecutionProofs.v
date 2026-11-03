@@ -25,14 +25,13 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* SSA well-formedness and the values available during execution.
+(* The values available during execution and their equations, derived from
+   [well_formed_ssa] and the frame facts of SsaSemanticsProofs.v.
 
-   The well-formedness conditions below concern definitions, instruction
-   positions and graph paths only. They contain no valuations, execution
-   invariants or loop-analysis verdicts. The purpose of this layer is to derive
-   operation equations at their actual uses, rather than assume equations for
-   every freely constructed [value] term. Only operations selected by
-   [modeled_operation] have exact equations. SsaContext.v uses the frame and
+   Nothing here needs review. [available_value] and [coherent_at] give
+   operation equations at their actual uses, rather than for every freely
+   constructed [value] term; only operations selected by [modeled_operation]
+   have exact equations. SsaContextProofs.v uses the frame and
    newly-defined-result lemmas here to prove preservation once, for both
    integer steps and surrounding opaque computations. *)
 
@@ -40,65 +39,18 @@ From Stdlib Require Import ZArith Lia List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaDominanceSpec
+  SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec.
 Import ListNotations.
 
+(* The program point of a state. *)
 Definition state_program_point (current : state) : program_point :=
   (current_block current, length (remaining current)).
 
-(* The point immediately after an instruction is its definition site. *)
-Definition result_definition (id : instr_id) (op : operation)
-    (args : list value) (result_count : int) (site : program_point) : Prop :=
-  ∃ (prefix suffix : list instr),
-    block_body (fst site) = prefix ++ Op id op args result_count :: suffix
-    ∧ snd site = length suffix.
-
-(* A reference carries the actual definition's payload, not just its ID.
-   Parameters are available at entry; operation results after execution. *)
-Definition value_definition (v : value) (site : program_point) : Prop :=
-  match v with
-  | Res id op args index =>
-    ∃ (result_count : int),
-      result_definition id op args result_count site
-      ∧ (0 <= to_Z index < to_Z result_count)%Z
-  | Block_param b index =>
-    site = block_entry_point b ∧ nth_int (params b) index = Some v
-  end.
-
-Record well_formed_ssa (blocks : list block) (entry : block) : Prop :=
-  { entry_in_graph : entry ∈ blocks;
-    (* Finished graphs contain only reachable blocks. This is structural
-       reachability through program points, not a claim that operations execute
-       successfully or that branches are dynamically feasible. *)
-    graph_blocks_reachable : ∀ (b : block), b ∈ blocks ->
-      program_point_reachable entry (b, 0%nat);
-    graph_successors_closed : ∀ (source target : block),
-      source ∈ blocks -> target ∈ (all_successors source) ->
-      target ∈ blocks;
-    graph_parameters : parameter_layout;
-    result_sites_unique : ∀ (id : instr_id) (op op' : operation)
-      (args args' : list value) (count count' : int)
-        (site site' : program_point),
-      (fst site) ∈ blocks -> (fst site') ∈ blocks ->
-      result_definition id op args count site ->
-      result_definition id op' args' count' site' -> site = site';
-    operand_definitions : ∀ (id : instr_id) (op : operation)
-      (args : list value) (count : int) (site : program_point),
-      (fst site) ∈ blocks -> result_definition id op args count site ->
-      ∀ (arg : value), arg ∈ args ->
-      ∃ (arg_site : program_point),
-        value_definition arg arg_site ∧ (fst arg_site) ∈ blocks
-        ∧ program_point_dominates entry arg_site site ∧ arg_site <> site;
-    terminator_definitions : ∀ (b : block) (args : list value),
-      b ∈ blocks -> args ∈ (terminator_args (terminator b)) ->
-      ∀ (arg : value), arg ∈ args ->
-      ∃ (arg_site : program_point),
-        value_definition arg arg_site ∧ (fst arg_site) ∈ blocks
-        ∧ program_point_dominates entry arg_site (b, 0%nat) }.
-
 (* Exact equations for modeled instruction results, and no equations for opaque
    results or parameters. Register definedness is proved separately in
-   SsaProgress.v; this predicate does not silently default missing reads. *)
+   SsaProgressProofs.v; this predicate does not silently default missing
+   reads. *)
 Definition value_coherent (regs : registers) (v : value) : Prop :=
   match v with
   | Res id op args index =>

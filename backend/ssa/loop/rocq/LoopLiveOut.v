@@ -32,16 +32,18 @@
    separate changing loop control from values needed at the exit. No live-out
    invariance is assumed of the compiler. The public theorem
    [finite_exit_live_agreement] derives agreement between the first header body
-   execution and a finite exit, using the liveness definition in SsaLiveness.v.
-   It does not establish existence of that finite exit. Nothing is extracted.
-   *)
+   execution and a finite exit, using the liveness definition in
+   SsaLivenessSpec.v. It does not establish existence of that finite exit.
+   Nothing is extracted. *)
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlInt OxCamlList.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraph SsaDominance SsaSemantics
-  SsaExecution SsaLiveness SsaContext.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaGraphProofs
+  SsaDominanceSpec SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs
+  SsaExecutionSpec SsaExecutionProofs SsaLivenessSpec SsaLivenessProofs
+  SsaContextSpec SsaContextProofs.
 From OxCamlLoop Require Import NaturalLoop InductionVar DeadInductionVar
   LoopTermination DeleteEmptyLoops LoopExecution LoopCounterExecution
   AffineSsa.

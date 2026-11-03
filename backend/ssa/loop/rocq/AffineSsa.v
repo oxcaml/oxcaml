@@ -88,7 +88,7 @@
    that far below [max_int].
 
    Trusted parts, beyond those of AffineExpr.v: what the recognised operations
-   compute, which is [SsaSemantics.eval_operation] ([op_semantics] below asks
+   compute, which is [SsaSemanticsSpec.eval_operation] ([op_semantics] below asks
    that the valuation satisfy it), that [Ssa.Value.equal] only identifies
    values with the same machine value, and that the dominators and terminators
    SsaModel.v reports are the graph's. *)
@@ -98,7 +98,7 @@ From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlInt64 OxCamlList
   IntArith.
 From OxCamlBackend Require Import IntegerComparison Operation.
-From OxCamlSsa Require Import SsaModel SsaDominance SsaSemantics.
+From OxCamlSsa Require Import SsaModel SsaDominance SsaSemanticsSpec.
 From OxCamlLoop Require Import FourierMotzkin LoopComparisons AffineExpr.
 Import ListNotations.
 
@@ -392,7 +392,7 @@ Section Semantics.
     ∀ (v w : value),
     value_eqb v w = true -> value_words v = value_words w.
 
-  (* The recognised operations compute what [SsaSemantics.eval_operation] says
+  (* The recognised operations compute what [SsaSemanticsSpec.eval_operation] says
      on the machine values of their arguments: there is one arithmetic
      semantics in the development, and this is a reading of it. It covers every
      [modeled_operation], comparisons included, though the affine theorems only

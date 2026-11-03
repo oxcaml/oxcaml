@@ -40,7 +40,8 @@ From OxCamlStdlib Require Import OxCamlLogic.
 From OxCamlStdlib Require Import OxCamlList.
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaSemantics SsaExecution.
+From OxCamlSsa Require Import SsaModel SsaDominanceSpec SsaSemanticsSpec
+  SsaSemanticsProofs SsaExecutionSpec SsaExecutionProofs.
 From OxCamlLoop Require Import AffineExpr AffineSsa.
 Import ListNotations.
 Local Open Scope Z_scope.
@@ -177,7 +178,7 @@ Qed.
    extension. The induction descends only through available canonical operands,
    whose equations follow from execution. *)
 Theorem snapshot_agrees_available : ∀ (blocks : list block)
-    (entry : block) (position : SsaDominance.program_point) (regs : registers),
+    (entry : block) (position : SsaDominanceSpec.program_point) (regs : registers),
   well_formed_ssa blocks entry -> coherent_at blocks entry regs position ->
   bounded_registers regs -> ∀ (v : value),
   available_value blocks entry position v ->
@@ -201,7 +202,7 @@ Qed.
 (* This is the bridge used by range proofs: no default or recomputation remains
    when the available value has an actual register reading. *)
 Theorem snapshot_read_available : ∀ (blocks : list block) (entry : block)
-    (position : SsaDominance.program_point) (regs : registers) (v : value)
+    (position : SsaDominanceSpec.program_point) (regs : registers) (v : value)
       (word : Z),
   well_formed_ssa blocks entry -> coherent_at blocks entry regs position ->
   bounded_registers regs -> available_value blocks entry position v ->
