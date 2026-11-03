@@ -1177,12 +1177,8 @@ module Error : sig
   type exn += private In_context of error
 
   val log_or_raise : error -> unit
-
-  val log_and_raise : error -> 'a
 end = struct
   type exn += In_context of error
-
-  let log_and_raise err = Typing_recovery.log_and_raise (In_context err)
 
   let log_or_raise err = Typing_recovery.log_or_raise (In_context err)
 
@@ -1333,7 +1329,8 @@ end = struct
       (fun first_is_of_second t0 t1 ->
         try fu t0 t1
         with Usage.Cannot_force inner ->
-          Error.log_and_raise (Cannot_force { inner; first_is_of_second }))
+          Error.log_or_raise (Cannot_force { inner; first_is_of_second });
+          t0)
       fl
       (fun t0 t1 ->
         try fo t0 t1
