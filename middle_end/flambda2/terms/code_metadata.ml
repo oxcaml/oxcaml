@@ -282,7 +282,8 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Absolute.print absolute_history
 
 let [@ocamlformat "disable"] print_fdo_entry_annotation ppf annotation =
-  if !Oxcaml_flags.fdo_counters then
+  if !Oxcaml_flags.fdo_counters && not (Fdo_annotation.is_empty annotation)
+  then
     Format.fprintf ppf "@[<hov 1>(fdo_entry_annotation@ %a)@]@ "
       Fdo_annotation.print annotation
 
@@ -589,7 +590,7 @@ let approx_equal
       cost_metrics = cost_metrics1;
       inlining_arguments = inlining_arguments1;
       dbg = dbg1;
-      fdo_entry_annotation = _;
+      fdo_entry_annotation = fdo_entry_annotation1;
       is_tupled = is_tupled1;
       is_my_closure_used = is_my_closure_used1;
       inlining_decision = inlining_decision1;
@@ -618,7 +619,7 @@ let approx_equal
       cost_metrics = cost_metrics2;
       inlining_arguments = inlining_arguments2;
       dbg = dbg2;
-      fdo_entry_annotation = _;
+      fdo_entry_annotation = fdo_entry_annotation2;
       is_tupled = is_tupled2;
       is_my_closure_used = is_my_closure_used2;
       inlining_decision = inlining_decision2;
@@ -648,6 +649,7 @@ let approx_equal
   && Cost_metrics.equal cost_metrics1 cost_metrics2
   && Inlining_arguments.equal inlining_arguments1 inlining_arguments2
   && Int.equal (Debuginfo.compare dbg1 dbg2) 0
+  && Fdo_annotation.equal fdo_entry_annotation1 fdo_entry_annotation2
   && Bool.equal is_tupled1 is_tupled2
   && Bool.equal is_my_closure_used1 is_my_closure_used2
   && Function_decl_inlining_decision_type.equal inlining_decision1

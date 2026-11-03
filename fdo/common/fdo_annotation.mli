@@ -45,6 +45,7 @@ val to_list : t -> Fdo_counter.t list
     counters. Duplicates are removed. *)
 val combine : t -> t -> t
 
+(** Ignores order. *)
 val equal : t -> t -> bool
 
 val print : Format.formatter -> t -> unit

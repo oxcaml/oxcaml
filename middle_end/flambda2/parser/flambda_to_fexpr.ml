@@ -460,8 +460,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let is_tupled = Code.is_tupled code in
       let stub = Code.stub code in
       let fdo_entry_annotation =
-        if !Oxcaml_flags.fdo_counters
-        then Some (Code.fdo_entry_annotation code)
+        let annotation = Code.fdo_entry_annotation code in
+        if
+          !Oxcaml_flags.fdo_counters && not (Fdo_annotation.is_empty annotation)
+        then Some annotation
         else None
       in
       let params_and_body =

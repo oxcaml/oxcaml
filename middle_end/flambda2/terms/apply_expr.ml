@@ -94,14 +94,11 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
       Inlining_history.Relative.print relative_history
 
 let[@ocamlformat "disable"] print_callsite_counter ppf callsite_counter =
-  if !Oxcaml_flags.fdo_counters
-  then
-    let print_fdo_counter ppf counter =
-      Format.fprintf ppf "%s" (Fdo_counter.to_string counter)
-    in
-    Format.fprintf ppf "@[<hov 1>(callsite_counter@ %a)@]@ "
-      (Misc.Stdlib.Option.print print_fdo_counter)
-      callsite_counter
+  match callsite_counter with
+  | Some counter when !Oxcaml_flags.fdo_counters ->
+    Format.fprintf ppf "@[<hov 1>(callsite_counter@ %s)@]@ "
+      (Fdo_counter.to_string counter)
+  | Some _ | None -> ()
 
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
@@ -183,7 +180,7 @@ let invariant
        call_kind;
        return_mode = _;
        dbg = _;
-       callsite_counter = _;
+       callsite_counter;
        inlined = _;
        inlining_state = _;
        probe = _;
@@ -217,6 +214,15 @@ let invariant
       Misc.fatal_errorf
         "Algebraic effect operations in [Apply_expr] must have no callee and \
          no arguments; all data are specified in the [Call_kind]:@ %a"
+        print t));
+  (match call_kind with
+  | Function _ | Method _ -> ()
+  | C_call _ | Effect _ -> (
+    match callsite_counter with
+    | None -> ()
+    | Some _ ->
+      Misc.fatal_errorf
+        "[C_call] and [Effect] applications cannot have an FDO counter:@ %a"
         print t));
   if List.compare_lengths args (Flambda_arity.unarize args_arity) <> 0
   then
@@ -454,4 +460,7 @@ let with_inlined_attribute t inlined = { t with inlined }
 
 let callsite_counter t = t.callsite_counter
 
-let with_callsite_counter t callsite_counter = { t with callsite_counter }
+let with_callsite_counter t callsite_counter =
+  let t = { t with callsite_counter } in
+  invariant t;
+  t

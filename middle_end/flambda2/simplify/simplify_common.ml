@@ -178,8 +178,8 @@ let split_direct_over_application apply ~callee's_code_id
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
       ~return_mode:outer_apply_alloc_mode
       (Apply.dbg apply)
-      (* This application of the result has no counter: instrumentation ran
-         before Simplify, and the full apply executes exactly as often. *)
+      (* The source call has a single counter, on the full application of the
+         callee below. This application of its result has none. *)
       ~callsite_counter:None ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)

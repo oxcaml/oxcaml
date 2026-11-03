@@ -37,6 +37,11 @@ let print_probability ~uniform ppf (probability : Likelihood.classification) =
   | Cold -> Format.fprintf ppf "[cold]"
   | Weight p -> if not uniform then Format.fprintf ppf "[p = %f]" p
 
+let print_fdo_annotation ppf fdo_annotation =
+  if !Oxcaml_flags.fdo_counters && not (Fdo_annotation.is_empty fdo_annotation)
+  then
+    Format.fprintf ppf "[fdo_annotation %a]" Fdo_annotation.print fdo_annotation
+
 let print_arms ppf arms =
   let total, ~uniform = scale_for_printing arms in
   let arms =
@@ -46,15 +51,19 @@ let print_arms ppf arms =
           Likelihood.rescale ~total (Switch_arm.likelihood arm)
           |> Likelihood.classify
         in
+        let annotations =
+          ( probability,
+            Branch_annotations.fdo_annotation (Switch_arm.annotations arm) )
+        in
         let action = Switch_arm.action arm in
         match Apply_cont_expr.Map.find action arms_inverse with
         | exception Not_found ->
           Apply_cont_expr.Map.add action
-            (Target_ocaml_int.Map.singleton discr probability)
+            (Target_ocaml_int.Map.singleton discr annotations)
             arms_inverse
         | discrs ->
           Apply_cont_expr.Map.add action
-            (Target_ocaml_int.Map.add discr probability discrs)
+            (Target_ocaml_int.Map.add discr annotations discrs)
             arms_inverse)
       arms Apply_cont_expr.Map.empty
   in
@@ -78,11 +87,12 @@ let print_arms ppf arms =
       fprintf ppf "@[<hov 2>@[<hov 0>| %a %t\u{21a6}%t@ @]%a@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ | ")
-           (fun ppf (discr, probability) ->
-             Format.fprintf ppf "%a%t%a%t" Target_ocaml_int.print discr
+           (fun ppf (discr, (probability, fdo_annotation)) ->
+             Format.fprintf ppf "%a%t%a%a%t" Target_ocaml_int.print discr
                Flambda_colours.continuation_annotation
                (print_probability ~uniform)
-               probability Flambda_colours.pop))
+               probability print_fdo_annotation fdo_annotation
+               Flambda_colours.pop))
         discrs Flambda_colours.elide Flambda_colours.pop Apply_cont_expr.print
         action)
     arms
