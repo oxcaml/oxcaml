@@ -3,6 +3,7 @@
 #   make          check every .v file, then run the extraction
 #   make assumptions  print global assumptions and declaration types
 #   make claims   check that every statement a Spec file binds is proved
+#   make review   typeset what a reviewer reads as rocq/review.pdf
 #   make clean    remove everything generated
 #
 # The sources live in four directories, each a Rocq library:
@@ -90,9 +91,18 @@ MODULES := $(patsubst $(STDLIB_DIR)/%.v,OxCamlStdlib.%,$(STDLIB)) \
   $(patsubst $(LOOP_DIR)/%.v,OxCamlLoop.%,$(LOOP) $(EXTRACT))
 DEPS := $(STDLIB_DIR)/.rocqdeps.d
 
-.PHONY: all assumptions claims clean
+.PHONY: all assumptions claims review clean
 
 all: $(SOURCES:.v=.vo) claims
+
+# The review document, rocq/review.pdf: ROCQ-REVIEW-GUIDE.md followed by
+# every reviewed .v file (definitions and statements; the implementation and
+# Proofs files are left out), the extraction directives and the axioms the
+# statements rest on, typeset by rocq doc and LuaLaTeX (HACKING.md, "The
+# review document").
+review: $(SOURCES:.v=.vo)
+	perl $(STDLIB_DIR)/review-pdf.pl $(STDLIB_DIR)/_review \
+	  $(STDLIB_DIR)/review.pdf $(STDLIB) $(BACKEND) $(SSA) $(LOOP) $(EXTRACT)
 
 # Every statement a Spec file binds as a proposition ([Definition X_statement
 # : Prop]) must be proved as the theorem [X] of the matching Proofs module
@@ -182,7 +192,8 @@ $(DEPS): $(SOURCES)
 -include $(DEPS)
 
 clean:
-	rm -f $(DEPS) $(EXTRACTED)
+	rm -f $(DEPS) $(EXTRACTED) $(STDLIB_DIR)/review.pdf
+	rm -rf $(STDLIB_DIR)/_review
 	for d in $(STDLIB_DIR) $(BACKEND_DIR) $(SSA_DIR) $(LOOP_DIR); do \
 	  rm -rf $$d/*.vo $$d/*.vos $$d/*.vok $$d/*.glob $$d/.*.aux \
 	    $$d/.lia.cache $$d/.nia.cache $$d/.coq-native; \

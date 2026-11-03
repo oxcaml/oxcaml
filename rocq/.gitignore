@@ -8,3 +8,6 @@
 .coq-native/
 .rocqdeps.d
 .nia.cache
+# The review document (make review).
+_review/
+review.pdf

@@ -145,6 +145,25 @@ The target derives its module list from the build lists, so newly added
 modules are included automatically. It prints to standard output and does
 not leave generated audit sources in the workspace.
 
+### The review document
+
+`make -C rocq review` typesets what a reviewer reads as one PDF,
+`rocq/review.pdf`, in parts: the shared models (every reviewed `.v` file
+of `rocq/`, `backend/rocq/` and `backend/ssa/rocq/`: the Spec, Model and
+definition files; implementation and Proofs files are left out), then one
+part per pass with its sections of `ROCQ-REVIEW-GUIDE.md` and its Spec
+files, then the extraction directives and the axioms each statement rests
+on. Which guide sections and which Spec files belong to a pass is set at
+the top of `rocq/review-pdf.pl`; a new Spec file or guide section must be
+assigned to a part there, or the script stops. The sources are typeset by
+`rocq doc` with every identifier linked to its definition, so the target
+needs the `.glob` files of a complete build, and LuaLaTeX with `fontspec`
+(Libertinus and DejaVu Sans Mono are used when installed).
+The layout of a file carries over: its header comment opens its section, a
+banner comment (`(* --- Title --- *)`, or a title between two `(* === *)`
+lines) becomes a heading, and `[ident]` in a comment is typeset as code
+and linked. The script is `rocq/review-pdf.pl`.
+
 ### Adding a module
 
 A new `.v` file goes in the library's list in `rocq/Makefile` (`STDLIB`,

@@ -552,6 +552,8 @@ analyses more conservative.
    reproduces the committed files; `make -s -C rocq assumptions` prints
    the audit report, whose first part lists the global axioms and whose
    second prints every declaration's type, Section premises included.
+   `make -C rocq review` typesets this guide and every reviewed file as
+   one PDF, `rocq/review.pdf`, each identifier linked to its definition.
 
 Rocq vocabulary, for a reader with none: `Inductive` declares a variant
 type, like OxCaml `type t = A | B`; `Definition` a function or constant,
