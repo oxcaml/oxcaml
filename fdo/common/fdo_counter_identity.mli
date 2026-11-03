@@ -63,6 +63,8 @@ module Body_hash : sig
   val equal : t -> t -> bool
 
   val to_string : t -> string
+
+  val print : Format.formatter -> t -> unit
 end
 
 (** A string that represents a name (like a demangled name, though not

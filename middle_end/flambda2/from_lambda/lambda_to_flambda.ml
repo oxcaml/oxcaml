@@ -1675,7 +1675,7 @@ and cps_function env ~fid ~fuid ~let_bound ~(recursive : Recursive.t)
     cps_tail acc new_env ccenv body body_cont body_exn_cont
   in
   let fdo_entry_annotation =
-    Option.fold ~none:Fdo_annotation.empty
+    Option.fold ~none:Fdo_annotation.With_body_hash.empty
       ~some:Fdo_from_lambda_env.entry_annotation fdo
   in
   Function_decl.create ~let_rec_ident:(Some fid) ~let_rec_uid:fuid
@@ -1901,7 +1901,7 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   in
   let fdo =
     if Flambda_features.fdo_counters ()
-    then Some (Fdo_from_lambda_env.toplevel compilation_unit)
+    then Some (Fdo_from_lambda_env.toplevel compilation_unit lam)
     else None
   in
   let env =
