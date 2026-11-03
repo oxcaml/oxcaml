@@ -1450,6 +1450,9 @@ and simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
            (Bound_parameters.append invariant_params params))
       dacc
   in
+  let dacc =
+    DA.map_denv dacc ~f:(fun denv -> DE.set_fdo_region denv (Handler cont))
+  in
   simplify_expr dacc handler ~down_to_up:(fun dacc simplified_handler ->
       let dacc = DA.map_flow_acc ~f:(Flow.Acc.exit_continuation cont) dacc in
       let cont_uses_env_in_handler = DA.continuation_uses_env dacc in

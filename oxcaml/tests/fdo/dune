@@ -167,3 +167,36 @@
  (deps instrumentation.output instrumentation.output.corrected)
  (action
   (diff instrumentation.output instrumentation.output.corrected)))
+
+; The counters after Simplify: inlined bodies get their call site as inlining
+; context, the functions of inlined functor applications are copies with their
+; own counters, and the counters of removed instructions (inlined calls, folded
+; switches, self tail calls) are kept on the edges into the code they were in.
+
+(rule
+ (targets simplify.output.corrected)
+ (deps simplify.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    simplify
+    -color
+    never
+    simplify.ml)
+   (with-stdout-to
+    simplify.output.corrected
+    (run ./fdo_annotations.exe list simplify.simplify.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps simplify.output simplify.output.corrected)
+ (action
+  (diff simplify.output simplify.output.corrected)))
