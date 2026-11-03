@@ -25,14 +25,25 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type t
+type t = Jkind_types.Sort.Var.id
 
-include Identifiable.S with type t := t
+let of_sort_var var =
+  if not (Jkind_types.Sort.Var.is_root var)
+  then Misc.fatal_error "Layout_ident.of_sort_var: not a root";
+  Jkind_types.Sort.Var.get_id var
 
-(** "Lifts" an [Ident.t], equal [Ident.t]s will produce equal values. *)
-val of_ident : Ident.t -> t
+include Identifiable.Make (struct
+  type nonrec t = t
 
-(** "Lifts" a [Jkind_types.Sort.var], equal [Jkind_types.Sort.var]s will produce
-    equal values. This function relies on the var being passed through to be
-    normalised such that its contents is none and will never be mutated. *)
-val of_sort_var : Jkind_types.Sort.var -> t
+  let equal (var1 : t) (var2 : t) = Int.equal (var1 :> int) (var2 :> int)
+
+  let hash (var : t) = Hashtbl.hash (var :> int)
+
+  let compare (var1 : t) (var2 : t) = Int.compare (var1 :> int) (var2 :> int)
+
+  let output oc (var : t) =
+    output_string oc "s_";
+    output_binary_int oc (var :> int)
+
+  let print ppf (var : t) = Format.fprintf ppf "layout_%i" (var :> int)
+end)
