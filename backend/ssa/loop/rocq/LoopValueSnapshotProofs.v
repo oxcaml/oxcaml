@@ -37,12 +37,14 @@
 
 From Stdlib Require Import ZArith Lia List Bool.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlList.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
+From OxCamlStdlib Require Import OxCamlList OxCamlListProofs.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs.
 From OxCamlBackend Require Import Operation.
 From OxCamlSsa Require Import SsaModel SsaDominanceSpec SsaSemanticsSpec
   SsaSemanticsProofs SsaExecutionSpec SsaExecutionProofs.
-From OxCamlLoop Require Import AffineExpr AffineSsa.
+From OxCamlLoop Require Import AffineExpr AffineExprProofs AffineSsa
+  AffineSsaProofs.
 Import ListNotations.
 Local Open Scope Z_scope.
 
@@ -178,7 +180,8 @@ Qed.
    extension. The induction descends only through available canonical operands,
    whose equations follow from execution. *)
 Theorem snapshot_agrees_available : ∀ (blocks : list block)
-    (entry : block) (position : SsaDominanceSpec.program_point) (regs : registers),
+    (entry : block) (position : SsaDominanceSpec.program_point)
+    (regs : registers),
   well_formed_ssa blocks entry -> coherent_at blocks entry regs position ->
   bounded_registers regs -> ∀ (v : value),
   available_value blocks entry position v ->

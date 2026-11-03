@@ -31,8 +31,9 @@
    SsaDominance.ml, is the implementation.
 
    This file needs no review: what the tests establish is proved where they
-   are used (InductionVar.v, AffineSsa.v and LoopGuardExecution.v, the last
-   from [SsaDominanceProofs.singleton_predecessor_dominance]). *)
+   are used (InductionVarProofs.v, AffineSsaProofs.v and
+   LoopGuardExecutionProofs.v, the last from
+   [SsaDominanceProofs.singleton_predecessor_dominance]). *)
 
 From Stdlib Require Import Bool List.
 From OxCamlSsa Require Import SsaModel.

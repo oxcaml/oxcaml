@@ -41,7 +41,7 @@
    evaluator covers the loop whitelist and, for bounds computed before a
    loop, immediate shifts and or ([modeled_operation]); this does not widen
    the whitelist. [steps_until] and [executes_insns] are the forms of
-   execution the eligibility theorem (LoopEligibility.v) speaks of;
+   execution the eligibility statement (LoopEligibilitySpec.v) speaks of;
    [bounded_registers] and [parameter_layout] are premises of it, through
    [reached_header] and [well_formed_ssa].
 

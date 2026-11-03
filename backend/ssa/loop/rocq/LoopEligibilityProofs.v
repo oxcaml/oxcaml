@@ -25,81 +25,37 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* Semantic eligibility for bypassing a loop, stated on the original graph.
+(* The proof of LoopEligibilitySpec.find_deletions_eligible_statement. Nothing
+   here needs review.
 
-   This file is the statement to review: [eligible_entry] and
-   [find_deletions_eligible]. Everything else in it is proof.
-
-   [eligible_entry header exit header_regs] is the target property, not a
-   record of analysis answers. Entering [header] with registers [header_regs],
-   the original graph executes the header's instructions once, then its
-   execution first arrives at [exit] after finitely many steps of
-   SsaSemanticsSpec.step, at the exit's entry with no parameter to bind, holding
-   the value computed by that first header execution in every register the
-   exit's continuation reads before redefining it. The retained header is
-   executed, not skipped. [steps_until] is a property of the one execution from
-   the header, since [step] is deterministic; so the loop neither diverges nor
-   gets stuck before the exit, and its steps are whitelisted integer
-   operations, Gotos and Switches, because [step] has no other rule.
-
-   [find_deletions_eligible] proves this for every header/exit pair the
-   extracted gate and analyses report, given [finished_graph] (what
-   Ssa.finish_graph guarantees of the graph, SsaProgressSpec.v) and
-   [reached_header] (bound inputs and an observed prefix to the header,
-   SsaContextSpec.v). It assumes no recurrence, invariant bound, guard outcome
-   or finite exit; those are conclusions. The loop and its body never appear
-   in the statement: which blocks the execution visits before the exit is
-   irrelevant to bypassing it.
-
-   The loop executes in SsaSemanticsSpec.v. Its unchanged prefix uses
-   SsaContextSpec.v's word-observation overapproximation, so loads, calls and
-   other opaque computations need not be given full memory semantics. Review
-   that abstraction and the graph contracts in SsaExecutionSpec.v,
-   SsaGraphSpec.v and SsaProgressSpec.v alongside the extraction veneer.
+   The proof goes through the loop the analyses discovered:
+   [eligible_loop_entry] is [eligible_entry] phrased on it (the execution to
+   the exit stays in the body), and the operational files establish it from
+   the analysis certificate (DeleteEmptyLoopsProofs.deletion_certificate):
+   [certificate_region_progress] says the loop's execution does not get stuck,
+   [certificate_finite_exit_eligible] turns a finite execution to the exit
+   into [eligible_loop_entry], and [certificate_entry_eligible] combines them
+   with the finite-exit construction of LoopCounterExecutionProofs.v.
+   [find_deletions_eligible] instantiates the last with the certificate
+   DeleteEmptyLoopsProofs.find_deletions_spec supplies for each reported pair.
    Finite exit follows by iteration; definedness uses classical case splits.
-   Neither introduces semantic axioms.
-
-   No post-deletion graph, renaming or pruning is modelled here, and
-   eligibility is not assumed as a compiler contract. The step from
-   [eligible_entry], per loop and per header entry, to the rewritten function
-   behaving like the original is the usual liveness simulation; it is written
-   out in ROCQ-REVIEW-GUIDE.md, section 4. Its one non-obvious point: a
-   register live at the exit's entry is live at the header's terminator,
-   because the exit is a successor of the header and has no parameters, so
-   nothing is defined on entering it. Nothing is extracted. *)
+   Neither introduces semantic axioms. *)
 
 From Stdlib Require Import List Bool.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlList.
+From OxCamlStdlib Require Import OxCamlList OxCamlListProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
   SsaDominanceSpec SsaSemanticsSpec SsaSemantics SsaSemanticsProofs
   SsaExecutionSpec SsaLivenessSpec SsaProgressSpec SsaProgressProofs
   SsaContextSpec SsaContextProofs.
-From OxCamlLoop Require Import NaturalLoop InductionVar DeleteEmptyLoops
-  LoopExecution LoopLiveOut LoopCounterExecution LoopRangeExecution.
+From OxCamlLoop Require Import NaturalLoop NaturalLoopProofs InductionVar
+  InductionVarProofs DeleteEmptyLoops DeleteEmptyLoopsProofs
+  LoopExecutionProofs LoopLiveOutProofs LoopCounterExecutionProofs
+  LoopRangeExecutionProofs LoopEligibilitySpec.
 Import ListNotations.
 
 (* ======================================================================== *)
-(* Part 1: the statement                                                    *)
-(* ======================================================================== *)
-
-(* A valid bypass retains the first header body, then replaces only its
-   terminator by a jump to the parameterless exit. All execution relations here
-   refer to the unchanged original graph. [steps_until exit] stops at the first
-   state in [exit], so no instruction of the exit is included. *)
-Definition eligible_entry (header exit : block) (header_regs : registers)
-    : Prop :=
-  params exit = []
-  ∧ ∃ (first_header_regs exit_regs : registers),
-       executes_insns header_regs (block_body header) first_header_regs
-       ∧ steps_until exit
-            {| current_block := header; remaining := [];
-               current_registers := first_header_regs |}
-            (enter exit exit_regs)
-       ∧ agree_on_live (block_entry_point exit) first_header_regs exit_regs.
-
-(* ======================================================================== *)
-(* Part 2: proof                                                            *)
+(* Proof                                                                    *)
 (* ======================================================================== *)
 
 (* The same property phrased on the discovered loop: the execution to the exit
@@ -245,18 +201,11 @@ Proof.
   subst reached. eapply certificate_finite_exit_eligible; eassumption.
 Qed.
 
-(* The public theorem starts from the actual deletion decision. Its graph
-   premise is builder metadata only; its input premise is ordinary bound
-   arguments, an observed prefix and defined Switch indices. No loop recurrence
-   or termination premise remains. *)
-Theorem find_deletions_eligible :
-  ∀ (blocks : list block) (entry : block) (defs : op_def)
-    (header exit : block),
-  finished_graph blocks entry defs ->
-  (header, exit) ∈ (find_deletions defs blocks) ->
-  ∀ (initial_regs header_regs : registers),
-    reached_header entry header initial_regs header_regs ->
-    eligible_entry header exit header_regs.
+(* The statement of the development starts from the actual deletion decision.
+   Its graph premise is builder metadata only; its input premise is ordinary
+   bound arguments, an observed prefix and defined Switch indices. No loop
+   recurrence or termination premise remains. *)
+Theorem find_deletions_eligible : find_deletions_eligible_statement.
 Proof.
   intros blocks entry defs header exit Hgraph Hin initial_regs header_regs
     Hreached.

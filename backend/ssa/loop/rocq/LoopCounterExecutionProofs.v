@@ -29,30 +29,31 @@
 
    [counter_iteration] derives the update from an actual finite traversal and
    its back-edge argument. [accepted_loop_finite_exit] then iterates up to the
-   arithmetic exit witness from LoopComparisons.v, unless an earlier traversal
-   exits. No infinite trace or sampled counter valuation is used.
+   arithmetic exit witness from LoopComparisonsProofs.v, unless an earlier
+   traversal exits. No infinite trace or sampled counter valuation is used.
 
-   LoopInvariantExecution.v proves bound constancy on finite segments;
-   LoopRangeExecution.v supplies affine range facts from the actual prefix.
-   SsaContextSpec.v permits opaque surrounding computations in that prefix
-   and SsaContextProofs.v proves the available-value equations used here.
-   LoopEligibility.v discharges progress and combines finite exit with
-   live-out agreement.
-
-   Review the observation definitions and [accepted_loop_finite_exit], together
-   with the graph contracts in their premises. The mechanical graph rewrite is
-   deliberately outside this proof. *)
+   LoopInvariantExecutionProofs.v proves bound constancy on finite segments;
+   LoopRangeExecutionProofs.v supplies affine range facts from the actual
+   prefix. SsaContextSpec.v permits opaque surrounding computations in that
+   prefix and SsaContextProofs.v proves the available-value equations used
+   here.
+   LoopEligibilityProofs.v discharges progress and combines finite exit with
+   live-out agreement. Nothing here needs review; the mechanical graph rewrite
+   is deliberately outside this proof. *)
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
-From OxCamlBackend Require Import Operation IntegerComparison.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs OxCamlList OxCamlListProofs.
+From OxCamlBackend Require Import Operation IntegerComparison
+  IntegerComparisonProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaGraphProofs
   SsaDominanceSpec SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec
   SsaExecutionProofs SsaContextSpec SsaContextProofs.
-From OxCamlLoop Require Import NaturalLoop InductionVar LoopTermination
-  LoopComparisons DeleteEmptyLoops LoopExecution LoopInvariantExecution
-  LoopRangeExecution.
+From OxCamlLoop Require Import NaturalLoop NaturalLoopProofs InductionVar
+  InductionVarProofs LoopTermination LoopTerminationProofs LoopComparisons
+  LoopComparisonsProofs DeleteEmptyLoops DeleteEmptyLoopsProofs
+  LoopExecutionProofs LoopInvariantExecutionProofs LoopRangeExecutionProofs.
 Import ListNotations.
 Local Open Scope Z_scope.
 
@@ -227,7 +228,8 @@ Qed.
 (* Operands of the actual comparison are available at every point where its
    result is available. This includes an update tested by the header. *)
 Lemma comparison_operands_available : ∀ (blocks : list block)
-    (entry : block) (position : SsaDominanceSpec.program_point) (condition : value)
+    (entry : block) (position : SsaDominanceSpec.program_point)
+    (condition : value)
     (cmp : integer_comparison) (iv_is_left : bool) (counter_ref : value)
     (comparison_bound : bound),
   well_formed_ssa blocks entry ->
@@ -564,7 +566,7 @@ Section CounterExecution.
       ∨ (continue_terminates step_size
            (oriented_continue_comparison iv_is_left
              exit_info.(continue_when_true) cmp) = Terminates_if_bound_in_range
-          ∧ LoopComparisons.bound_in_range (to_Z step_size) bound_word
+          ∧ LoopComparisonsProofs.bound_in_range (to_Z step_size) bound_word
                = true)).
     { destruct Hverdict as [Hverdict | [Hverdict Hrange]];
         [left; exact Hverdict | right; split; [exact Hverdict |]].

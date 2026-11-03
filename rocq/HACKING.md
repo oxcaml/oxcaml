@@ -10,12 +10,13 @@ changing such a model. It records how the models are laid out, what is
 trusted, and what was learned writing the first ones.
 
 The first models are the loop analyses behind `-ssa-delete-empty-loops`
-(`backend/ssa/loop/rocq/`); read them as worked examples, starting with
-the reading guide at the top of `LoopComparisons.v`.
+(`backend/ssa/loop/rocq/`); read them as worked examples.
+`DeleteEmptyLoops.v`, `DeleteEmptyLoopsProofs.v` and
+`DeleteEmptyLoopsSpec.v` show the three files of a model.
 
-Start review of empty-loop deletion at `LoopEligibility.v`: read
-`eligible_entry` and `find_deletions_eligible`, then their imported
-semantics and contracts. The theorem proves, for every header/exit pair
+Start review of empty-loop deletion at `LoopEligibilitySpec.v`: read
+`eligible_entry` and `find_deletions_eligible_statement`, then their
+imported semantics and contracts. The statement says, for every header/exit pair
 the pass reports, that the execution from the header first arrives at
 the exit after finitely many steps (`SsaSemanticsSpec.steps_until`) and
 agrees with the first header execution on every register read before
@@ -50,13 +51,14 @@ to the rewritten function is written out in ROCQ-REVIEW-GUIDE.md (section
 `SsaContextProofs.v` proves available-value equations and execution
 invariants once for both exact and opaque steps. `SsaLivenessSpec.v`
 defines reads before redefinition; `SsaProgressProofs.v` derives progress
-from bound operands. `LoopExecution.v`
-uses accessibility to construct finite traversals to the next header or
-exit. `LoopInvariantExecution.v` proves bound constancy on finite segments;
-`LoopCounterExecution.v` iterates up to the arithmetic exit witness.
-`LoopValueSnapshot.v`, `LoopGuardExecution.v` and `LoopRangeExecution.v`
-connect affine entailment to the actual prefix, including duplicate
-Switch edges. `LoopLiveOut.v` derives live-out agreement.
+from bound operands. `LoopExecutionProofs.v` uses accessibility to construct
+finite traversals to the next header or exit.
+`LoopInvariantExecutionProofs.v` proves bound constancy on finite
+segments; `LoopCounterExecutionProofs.v` iterates up to the arithmetic
+exit witness. `LoopValueSnapshotProofs.v`, `LoopGuardExecutionProofs.v`
+and `LoopRangeExecutionProofs.v` connect affine entailment to the actual
+prefix, including duplicate Switch edges. `LoopLiveOutProofs.v` derives
+live-out agreement.
 
 The public theorem's non-algorithmic premises are the fields of
 `finished_graph` (structural SSA/dominance metadata, edge multiplicities,
@@ -81,15 +83,16 @@ Each directory is a Rocq library (`rocq/Makefile` maps them):
 
 | Directory                | Library        | Contents                                      |
 |--------------------------|----------------|-----------------------------------------------|
-| `rocq/`                  | `OxCamlStdlib` | Models of OxCaml's own types (`int`, `Int64`, lists, exceptions as options), generic arithmetic (`IntArith.v`), proof helpers, and the extraction directives mapping them onto OxCaml's functions (`OxCamlExtract.v`) |
-| `backend/rocq/`          | `OxCamlBackend`| Backend-wide definitions: the semantics of `Cmm.integer_comparison`, the model's copy of `Operation.t` |
+| `rocq/`                  | `OxCamlStdlib` | Models of OxCaml's own types (`int`, `Int64`, lists, exceptions as options) and generic arithmetic (`IntArith.v`), each a file of definitions and axioms with its lemmas in a `*Proofs.v`; proof helpers (`ZTactics.v`); and the extraction directives mapping the models onto OxCaml's functions (`OxCamlExtract.v`) |
+| `backend/rocq/`          | `OxCamlBackend`| Backend-wide definitions: the semantics of `Cmm.integer_comparison` (with `IntegerComparisonProofs.v`), the model's copy of `Operation.t` |
 | `backend/ssa/rocq/`      | `OxCamlSsa`    | The SSA graph as the models see it, each model split into Spec, implementation and Proofs files (see "The layout of a model"): `SsaModel.v` (the abstract interface), `SsaGraph*` (terminators, edges and uses), `SsaDominance*` (dominance, paths and program points), `SsaSemantics*` (execution of the restricted integer fragment), `SsaExecution*` (well-formedness and available-value equations), `SsaLiveness*` (reads before redefinition), `SsaProgress*` (the `finished_graph` contract, definedness and progress), `SsaContext*` (opaque surrounding computations and the `reached_header` contract) |
-| `backend/ssa/loop/rocq/` | `OxCamlLoop`   | The loop analyses, the operational proofs in `LoopExecution.v`, `LoopInvariantExecution.v`, `LoopCounterExecution.v`, `LoopValueSnapshot.v`, `LoopGuardExecution.v`, `LoopRangeExecution.v`, `LoopLiveOut.v` and `LoopEligibility.v`, and `Extract.v`, which extracts the implementation |
+| `backend/ssa/loop/rocq/` | `OxCamlLoop`   | The loop analyses, each an implementation file and a `*Proofs.v`; the operational proofs in `LoopExecutionProofs.v`, `LoopInvariantExecutionProofs.v`, `LoopCounterExecutionProofs.v`, `LoopValueSnapshotProofs.v`, `LoopGuardExecutionProofs.v`, `LoopRangeExecutionProofs.v` and `LoopLiveOutProofs.v`; the statements to review in `LoopEligibilitySpec.v` and `DeleteEmptyLoopsSpec.v`, proved in `LoopEligibilityProofs.v` and `DeleteEmptyLoopsProofs.v`; and `Extract.v`, which extracts the implementation |
 
 Put a definition or lemma where its OxCaml counterpart would live. A fact
-about lists goes in `OxCamlList.v`, about machine integers in
-`OxCamlInt.v`, `OxCamlInt64.v` or `IntArith.v`, about terminators or
-values of any SSA graph in the `SsaGraph` files, about dominance in the
+about lists goes in `OxCamlListProofs.v`, about machine integers in
+`OxCamlIntProofs.v`, `OxCamlInt64Proofs.v` or `IntArithProofs.v` (a
+definition, in the file without the suffix), about terminators or values
+of any SSA graph in the `SsaGraph` files, about dominance in the
 `SsaDominance` files; only what is specific to a pass stays in its files.
 The same question one asks of an OxCaml module ("is this really about
 loops?") applies, and then the question of "The layout of a model" below
@@ -217,11 +220,19 @@ implies its meaning. Nothing is claimed about `false` answers, so the
 analyses may be conservative wherever that is convenient (size limits,
 overflow, unrecognised shapes).
 
-The loop models in `backend/ssa/loop/rocq/` still use the earlier layout:
-one file with four banners (the definitions, the intended meaning, the
-lemmas, the theorems), of which the first two are the part to review. They
-are to be split as above, with `LoopEligibilitySpec.v` holding
-`eligible_entry` and `find_deletions_eligible_statement`.
+The models of OxCaml's own types and the backend definitions (`rocq/`,
+`backend/rocq/`) are the trusted base rather than models with a Spec:
+`OxCamlInt.v`, `OxCamlInt64.v`, `OxCamlList.v`, `IntArith.v`,
+`IntegerComparison.v` and `Operation.v` hold definitions and axioms only,
+read by inspection against their `*Extract.v` like `SsaModel.v`, and their
+lemmas are in `*Proofs.v` files. A proof-only module, with nothing
+extracted and no reviewed statement, is a single `XProofs.v`
+(`LoopExecutionProofs.v`). In the loop library only two statements are
+reviewed: `LoopEligibilitySpec.find_deletions_eligible_statement`, the
+result, and the two facts of `DeleteEmptyLoopsSpec.v` that the arguments
+outside Rocq rely on; the certificates of the analyses
+(`InductionVarProofs.biv_spec`, `DeleteEmptyLoopsProofs.deletion_certificate`)
+are reached by no reviewed statement and are Proofs definitions.
 
 ## Modelling OxCaml
 
@@ -232,8 +243,8 @@ are to be split as above, with `LoopEligibilitySpec.v` holding
   `Extract Inlined Constant ... => "..."` line in the `*Extract.v` file,
   and the two must be kept in step (see `FourierMotzkinExtract.v`).
   Arithmetic wraps: `Sint63.add_spec` and friends give the result modulo
-  `2^63` as `cmod`; `OxCamlInt.v` has the lemmas that let `lia` work on
-  such sums.
+  `2^63` as `cmod`; `OxCamlIntProofs.v` has the lemmas that let `lia` work
+  on such sums.
 - **`Int64`** is a `Parameter` type with axioms (`OxCamlInt64.v`), each the
   documented behaviour of one OxCaml operation. Do not put `Definition`s
   inside `Module Int64` there: they would be extracted into a module
@@ -312,8 +323,9 @@ header.
 - Say what the booleans mean with `Prop`s over the observations of
   `SsaModel.v`, not over the compiler's data.
 - Use the notations `SsaModel.v` defines (`a ▷ b` for `a`
-  dominating `b`) in parts 2 to 4, where a statement is read by eye.
-  Part 1 is code and calls the primitives as the compiler does.
+  dominating `b`) in Spec and Proofs files, where a statement is read by
+  eye. Implementation files are code and call the primitives as the
+  compiler does.
 - Use `∀` and `∃` for quantifiers and `∧` and `∨` for conjunction and
   disjunction, importing `OxCamlLogic.v`. Keep the default `->` and `<->`
   arrows, and `exists` for the tactic.
@@ -331,21 +343,21 @@ header.
   (`SsaExecutionProofs.v` and `SsaContextProofs.v`). An abstract
   arithmetic valuation such as
   `AffineSsa.value_words` is constrained by `SsaSemanticsSpec.eval_operation`
-  (`AffineSsa.op_semantics`), not by a second statement of the
+  (`AffineSsaProofs.op_semantics`), not by a second statement of the
   arithmetic, and needs a proved connection to execution
-  (`LoopValueSnapshot.v`) before it can justify optimization.
+  (`LoopValueSnapshotProofs.v`) before it can justify optimization.
 - Keep analysis preconditions in named propositions, not in executable
   types. For example, the counter proof needs `biv_spec`, which
-  `InductionVar.analyze_spec` establishes for the discovered variables.
+  `InductionVarProofs.analyze_spec` establishes for the discovered variables.
   Composing the analyses must discharge these preconditions, rather than
   turn them into trusted assumptions about the program.
 - Execution must not depend on the analysis being verified. For example,
-  `LoopExecution.region_steps` is a sequence of instruction steps,
+  `LoopExecutionProofs.region_steps` is a sequence of instruction steps,
   not a record assuming counter recurrence or invariant bounds. A
   property of an analysis result is stated as what it means
   (`loop_invariant_value`), tied to the function by a read-back theorem
   (`is_loop_invariant_spec`), and then justified operationally
-  (`LoopInvariantExecution.loop_invariant_value_same`).
+  (`LoopInvariantExecutionProofs.loop_invariant_value_same`).
 
 ## Proof style
 
@@ -368,7 +380,7 @@ header.
 - `functional induction` proves properties of a `Function`; the
   decreasing measure is proved once, at the definition.
 - A `Section` with `Variable`s and `Hypothesis`es shares the setting of
-  many lemmas (the graph in `LoopCounterExecution.v`); the lemmas are
+  many lemmas (the graph in `LoopCounterExecutionProofs.v`); the lemmas are
   generalised over them at `End`.
 - Name hypotheses after what they say (`Hexit`, `Hwf`), not `H0`, `H1`.
 - Do not comment what a named predicate already says; do comment every

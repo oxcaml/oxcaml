@@ -35,14 +35,16 @@
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlList.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
+From OxCamlStdlib Require Import OxCamlList OxCamlListProofs.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs.
 From OxCamlBackend Require Import Operation.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaDominanceSpec
   SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec
   SsaExecutionProofs SsaContextSpec SsaContextProofs.
-From OxCamlLoop Require Import NaturalLoop InductionVar LoopExecution
-  DeleteEmptyLoops.
+From OxCamlLoop Require Import NaturalLoop NaturalLoopProofs InductionVar
+  InductionVarProofs LoopExecutionProofs DeleteEmptyLoops
+  DeleteEmptyLoopsProofs.
 Import ListNotations.
 
 Section Invariants.

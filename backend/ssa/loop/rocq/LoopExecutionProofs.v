@@ -36,10 +36,12 @@
 
 From Stdlib Require Import ZArith Lia List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlList.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlList
+  OxCamlListProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
   SsaDominanceSpec SsaSemanticsSpec SsaSemanticsProofs.
-From OxCamlLoop Require Import NaturalLoop InductionVar DeleteEmptyLoops.
+From OxCamlLoop Require Import NaturalLoop NaturalLoopProofs InductionVar
+  InductionVarProofs DeleteEmptyLoops DeleteEmptyLoopsProofs.
 Import ListNotations.
 Local Open Scope nat_scope.
 
@@ -430,7 +432,7 @@ Section Graph.
     exists l, bivs. split; [exact Hl |].
     split; [exact Hheader |]. split; [exact Hcert |].
     apply found_loop_graph_properties.
-    exact (proj1 (InductionVar.analyze_spec _ _ _ _ Hl)).
+    exact (proj1 (InductionVarProofs.analyze_spec _ _ _ _ Hl)).
   Qed.
 End Graph.
 

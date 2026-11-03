@@ -12,9 +12,9 @@ from them. The extracted `.ml`/`.mli` files are committed and are the
 implementation; never edit them by hand.
 
 Read `rocq/HACKING.md` in full before touching a `.v` file. It gives the
-directory and library layout, the four-part layout of a model file, how OxCaml
-types and compiler data are modelled, what is trusted, the extraction pitfalls
-and the proof style.
+directory and library layout, the split of a model into Spec, implementation
+and Proofs files, how OxCaml types and compiler data are modelled, what is
+trusted, the extraction pitfalls and the proof style.
 
 The cycle for any change:
 

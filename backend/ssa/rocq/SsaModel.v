@@ -132,9 +132,9 @@ Parameter predecessors : block -> list block.
 Parameter all_successors : block -> list block.
 Parameter dominates : block -> block -> bool.
 
-(* [dominator ▷ block]: [dominator] dominates [block]. The statements of
-   parts 2 to 4 of the models write dominance this way; the code of part 1
-   calls [dominates] as the compiler does. *)
+(* [dominator ▷ block]: [dominator] dominates [block]. The statements and
+   proofs of the models write dominance this way; the implementation files
+   call [dominates] as the compiler does. *)
 Notation "dominator ▷ block" := (dominates dominator block = true)
   (at level 70, no associativity).
 

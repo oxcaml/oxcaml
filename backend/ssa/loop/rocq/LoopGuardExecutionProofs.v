@@ -34,18 +34,21 @@
    guard truth or per-iteration value equation is assumed here.
 
    This proof-only module connects AffineSsa's guards to the mathematical
-   snapshot of LoopValueSnapshot.v. *)
+   snapshot of LoopValueSnapshotProofs.v. *)
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlList.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
-From OxCamlBackend Require Import Operation IntegerComparison.
+From OxCamlStdlib Require Import OxCamlList OxCamlListProofs.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs.
+From OxCamlBackend Require Import Operation IntegerComparison
+  IntegerComparisonProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
   SsaDominanceSpec SsaDominance SsaDominanceProofs SsaSemanticsSpec
   SsaSemanticsProofs SsaExecutionSpec SsaExecutionProofs SsaContextSpec
   SsaContextProofs.
-From OxCamlLoop Require Import AffineSsa LoopValueSnapshot.
+From OxCamlLoop Require Import AffineSsa AffineSsaProofs
+  LoopValueSnapshotProofs.
 Import ListNotations.
 Local Open Scope Z_scope.
 

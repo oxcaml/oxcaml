@@ -37,9 +37,10 @@ open! Int_replace_polymorphic_compare
    each should jump to instead. The rewriting of the graph below is not
    modelled.
 
-   [LoopEligibility.find_deletions_eligible] justifies each bypass on its own,
-   on the original graph; the simulation argument connecting it to the rewritten
-   function, including doing all the bypasses in one pass over the graph, is in
+   [LoopEligibilitySpec.find_deletions_eligible_statement], proved in
+   LoopEligibilityProofs.v, justifies each bypass on its own, on the original
+   graph; the simulation argument connecting it to the rewritten function,
+   including doing all the bypasses in one pass over the graph, is in
    ROCQ-REVIEW-GUIDE.md, section 4. *)
 
 open Ssa.Export

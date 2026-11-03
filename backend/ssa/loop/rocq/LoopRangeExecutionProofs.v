@@ -35,12 +35,15 @@
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs OxCamlList OxCamlListProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraphProofs
   SsaDominanceSpec SsaSemanticsSpec SsaExecutionSpec SsaExecutionProofs
   SsaContextSpec SsaContextProofs.
-From OxCamlLoop Require Import FourierMotzkin AffineExpr AffineSsa
-  LoopComparisons LoopTermination LoopValueSnapshot LoopGuardExecution.
+From OxCamlLoop Require Import FourierMotzkin FourierMotzkinProofs AffineExpr
+  AffineExprProofs AffineSsa AffineSsaProofs LoopComparisons
+  LoopComparisonsProofs LoopTermination LoopTerminationProofs
+  LoopValueSnapshotProofs LoopGuardExecutionProofs.
 Import ListNotations.
 Local Open Scope Z_scope.
 
@@ -124,12 +127,12 @@ Lemma snapshot_bound_in_range : ∀ (regs : registers) (target : block)
   linearize_atom_bound + guards_atom_bound target <= ocaml_max_int ->
   guards_taken (snapshot_value regs) target ->
   LoopTermination.bound_in_range step_size target comparison_bound = true ->
-  LoopComparisons.bound_in_range (to_Z step_size)
+  LoopComparisonsProofs.bound_in_range (to_Z step_size)
     (bound_value (snapshot_value regs) comparison_bound) = true.
 Proof.
   intros regs target step_size [v | constant] Hsmall Htaken Hcheck;
     [ | eapply constant_bound_in_range; exact Hcheck].
-  unfold LoopComparisons.bound_in_range. rewrite Z.gtb_ltb.
+  unfold LoopComparisonsProofs.bound_in_range. rewrite Z.gtb_ltb.
   unfold LoopTermination.bound_in_range in Hcheck. cbv zeta in Hcheck.
   rewrite zero_ltb_to_Z in Hcheck. cbn [bound_value].
   destruct (linearize new_ctx [] v) as [[form side1] c1] eqn:Hlin.
@@ -179,7 +182,7 @@ Theorem executed_bound_in_range : ∀ (blocks : list block) (entry : block),
   current_registers reached (register_of_value bound_ref) = Some bound_word ->
   LoopTermination.bound_in_range step_size target (Value_bound bound_ref)
     = true ->
-  LoopComparisons.bound_in_range (to_Z step_size) bound_word = true.
+  LoopComparisonsProofs.bound_in_range (to_Z step_size) bound_word = true.
 Proof.
   intros blocks entry Hedges Hwf Hdominance Hcomplete Hmultiplicity Hsize
     target initial_regs reached step_size v word Hnodup Hmembers Hbounded
@@ -190,7 +193,7 @@ Proof.
     - eapply context_execution_values_coherent; eassumption.
     - exact (proj2 (context_execution_invariants _ _ _ Hbounded Hsteps)). }
   rewrite <- Hsnapshot.
-  change (LoopComparisons.bound_in_range (to_Z step_size)
+  change (LoopComparisonsProofs.bound_in_range (to_Z step_size)
     (bound_value (snapshot_value (current_registers reached)) (Value_bound v))
     = true).
   eapply snapshot_bound_in_range; [ | | exact Hcheck].

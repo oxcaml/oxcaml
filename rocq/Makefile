@@ -53,12 +53,17 @@ SSA := $(addprefix $(SSA_DIR)/, \
   SsaExecutionProofs.v SsaLivenessSpec.v SsaLivenessProofs.v \
   SsaProgressSpec.v SsaProgressProofs.v SsaContextSpec.v SsaContextProofs.v)
 LOOP := $(addprefix $(LOOP_DIR)/, \
-  FourierMotzkin.v FourierMotzkinExtract.v LoopComparisons.v AffineExpr.v \
-  AffineExprExtract.v NaturalLoop.v AffineSsa.v AffineSsaExtract.v \
-  InductionVar.v InductionVarExtract.v LoopTermination.v DeadInductionVar.v \
-  DeleteEmptyLoops.v LoopExecution.v LoopInvariantExecution.v \
-  LoopCounterExecution.v LoopLiveOut.v LoopEligibility.v LoopValueSnapshot.v \
-  LoopGuardExecution.v LoopRangeExecution.v)
+  FourierMotzkin.v FourierMotzkinProofs.v FourierMotzkinExtract.v \
+  LoopComparisons.v LoopComparisonsProofs.v AffineExpr.v AffineExprProofs.v \
+  AffineExprExtract.v NaturalLoop.v NaturalLoopProofs.v AffineSsa.v \
+  AffineSsaProofs.v AffineSsaExtract.v InductionVar.v InductionVarProofs.v \
+  InductionVarExtract.v LoopTermination.v LoopTerminationProofs.v \
+  DeadInductionVar.v DeadInductionVarProofs.v DeleteEmptyLoopsSpec.v \
+  DeleteEmptyLoops.v DeleteEmptyLoopsProofs.v LoopExecutionProofs.v \
+  LoopInvariantExecutionProofs.v LoopCounterExecutionProofs.v \
+  LoopLiveOutProofs.v LoopEligibilitySpec.v LoopEligibilityProofs.v \
+  LoopValueSnapshotProofs.v LoopGuardExecutionProofs.v \
+  LoopRangeExecutionProofs.v)
 EXTRACT := $(LOOP_DIR)/Extract.v
 
 # The extraction writes one .ml and .mli per model into the loop directory;

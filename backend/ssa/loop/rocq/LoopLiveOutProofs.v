@@ -30,23 +30,25 @@
    The proof concerns only the original graph. It uses ordinary SSA
    definition/use dominance and the analysis's checked dead-use facts to
    separate changing loop control from values needed at the exit. No live-out
-   invariance is assumed of the compiler. The public theorem
+   invariance is assumed of the compiler. The theorem
    [finite_exit_live_agreement] derives agreement between the first header body
    execution and a finite exit, using the liveness definition in
    SsaLivenessSpec.v. It does not establish existence of that finite exit.
-   Nothing is extracted. *)
+   Nothing is extracted, and nothing here needs review. *)
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlList.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlList
+  OxCamlListProofs.
 From OxCamlBackend Require Import Operation.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaGraphProofs
   SsaDominanceSpec SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs
   SsaExecutionSpec SsaExecutionProofs SsaLivenessSpec SsaLivenessProofs
   SsaContextSpec SsaContextProofs.
-From OxCamlLoop Require Import NaturalLoop InductionVar DeadInductionVar
-  LoopTermination DeleteEmptyLoops LoopExecution LoopCounterExecution
-  AffineSsa.
+From OxCamlLoop Require Import NaturalLoop NaturalLoopProofs InductionVar
+  InductionVarProofs DeadInductionVar DeadInductionVarProofs LoopTermination
+  LoopTerminationProofs DeleteEmptyLoops DeleteEmptyLoopsProofs
+  LoopExecutionProofs LoopCounterExecutionProofs AffineSsa AffineSsaProofs.
 Import ListNotations.
 
 Section Geometry.

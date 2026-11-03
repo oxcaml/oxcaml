@@ -32,7 +32,7 @@
    later loop entries count, not just the operands of the next instruction,
    and so do infeasible paths; the definition is deliberately an
    overapproximation. [agree_on_live] is the condition the eligibility
-   theorem (LoopEligibility.v) puts on the registers at the exit, and
+   statement (LoopEligibilitySpec.v) puts on the registers at the exit, and
    [register_live_at] says which registers [reached_header] requires to be
    bound at entry. Nothing here is extracted.
 
