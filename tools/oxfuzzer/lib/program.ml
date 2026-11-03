@@ -389,10 +389,11 @@ let observe_body decls statement =
   let observe expr ~initialized ~pattern ~on_return =
     let line = "assertion_line" in
     let column = "assertion_column" in
-    (* Each compiler configuration uses a different source directory. *)
     let payload =
       Ast_helper.Pat.tuple
-        [ None, Ast_helper.Pat.any ();
+        [ (* Ignore the filename: each compiler configuration uses a different
+             source directory. *)
+          None, Ast_helper.Pat.any ();
           None, Ast_helper.Pat.var (loc line);
           None, Ast_helper.Pat.var (loc column) ]
         Closed
