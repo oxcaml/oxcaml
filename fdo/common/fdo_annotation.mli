@@ -50,6 +50,9 @@ val combine : t -> t -> t
 (** [combine] over a list, in order. *)
 val union : t list -> t
 
+(** Duplicates created by [f] are removed. *)
+val map : (Fdo_counter.t -> Fdo_counter.t) -> t -> t
+
 (** Ignores order. *)
 val equal : t -> t -> bool
 
