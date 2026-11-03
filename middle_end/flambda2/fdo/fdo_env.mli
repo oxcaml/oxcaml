@@ -26,42 +26,18 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The FDO identity of a function, computed from its Lambda definition (see
-    [Fdo_counter_identity]).
-
-    The [definition_id] names the function by its scope path and a
-    discriminator.
-
-    Functions with no (stable) names (like anonymous functions, wrappers, or
-    lazy bodies) instead use the enclosing path and the first few tokens
-    (parameters, identifiers, primitives, and constants). For example, like:
-    ["Foo.(fun)@x,acc,+"]. *)
-
-(** What naming a function depends on besides its own definition. Used in
-    [Lambda_to_flambda_env] while translating from Lambda. Contains the path of
-    the enclosing function and the discriminators already handed out in the
-    compilation unit. *)
-module Naming_context : sig
-  type t
-
-  (** The context of a compilation unit's toplevel code. *)
-  val toplevel : Compilation_unit.t -> t
-end
+(** The FDO state of the translation from Lambda (see [Lambda_to_flambda_env]):
+    the identity of the function being translated (see [Fdo_function_naming])
+    and what is needed to name the functions defined in it. *)
 
 type t
 
-(** The identity of a function defined in the given context, and the context of
-    the functions defined in its body. *)
-val of_function : Naming_context.t -> Lambda.lfunction -> t * Naming_context.t
+(** The state for a compilation unit's toplevel code. *)
+val toplevel : Compilation_unit.t -> t
 
-(** The FDO function id. *)
-val function_ : t -> Fdo_counter.Function.t
+(** The state for the body of the given function, defined in the code [t] is
+    for. *)
+val enter_function : t -> Lambda.lfunction -> t
 
-(** The counters of the function's entry edge. *)
+(** The counters of the entry edge of the function [t] is for. *)
 val entry_annotation : t -> Fdo_annotation.t
-
-(** The first [limit] (5 by default) distinct tokens of a function. Only
-    parameter and body identifiers, primitives, and constants are considered, in
-    translation order. *)
-val leading_tokens :
-  ?limit:int -> params:Ident.t list -> Lambda.lambda -> string list
