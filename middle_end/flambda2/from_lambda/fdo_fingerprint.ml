@@ -85,8 +85,7 @@ module Leading_tokens = struct
           | Const_immstring _ | Const_float_block _ | Const_null )
       | Lapply _ | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lifthenelse _
       | Lsequence _ | Lwhile _ | Lsend _ | Levent _ | Lregion _ | Lexclave _
-      | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
-      | Linstantiate _ ->
+      | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
         ());
       L.iter_head_constructor term lam
     in
