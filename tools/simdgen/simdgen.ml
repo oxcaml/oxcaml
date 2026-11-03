@@ -573,7 +573,9 @@ let print_one bind instr =
         match loc with
         | Pin _ -> arg
         | Temp temps ->
-          let temps = Misc.Stdlib.Array.filteri (fun _ -> temp_is_reg) temps in
+          let temps =
+            Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+          in
           if Array.length temps = 0 then failwith instr.mnemonic;
           { arg with loc = Temp temps })
       args
@@ -617,7 +619,9 @@ let print_one bind instr =
           in
           if mem < reg
           then
-            let regs = Misc.Stdlib.Array.filteri (fun _ -> temp_is_reg) temps in
+            let regs =
+              Array.of_list (List.filter temp_is_reg (Array.to_list temps))
+            in
             { arg with loc = Temp regs }
           else arg)
       args
