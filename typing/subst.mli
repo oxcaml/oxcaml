@@ -52,6 +52,7 @@ val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_jkind: Ident.t -> Path.t -> t -> t
+val add_value: Ident.t -> Path.t -> 'k subst -> 'k subst
 
 type additional_action_config =
    | Duplicate_variables
