@@ -167,11 +167,12 @@ type exttype =
   | XVec512
   | XDummy_int
   | XDummy_float
+  | XFat_pointer
 
 let is_dummy_exttype = function
   | XDummy_int | XDummy_float -> true
   | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-  | XVec256 | XVec512 ->
+  | XVec256 | XVec512 | XFat_pointer ->
     false
 
 let machtype_of_exttype = function
@@ -190,6 +191,7 @@ let machtype_of_exttype = function
   | XVec512 -> typ_vec512
   | XDummy_int -> typ_int
   | XDummy_float -> typ_float
+  | XFat_pointer -> Array.append typ_val typ_int
 
 let machtype_of_exttype_list xtl =
   Array.concat (List.map machtype_of_exttype xtl)
@@ -961,7 +963,8 @@ let equal_machtype left right =
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-     | XVec256 | XVec512 | XDummy_int | XDummy_float ) as left) right =
+     | XVec256 | XVec512 | XDummy_int | XDummy_float | XFat_pointer ) as left)
+    right =
   (* we can use polymorphic compare as long as exttype is all constant
      constructors *)
   Stdlib.( = ) left right
