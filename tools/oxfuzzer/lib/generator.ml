@@ -1009,8 +1009,8 @@ and gen_match (st : State.t) env result_ty =
               reachable_constructors
           in
           match st.swarm.assertions, reachable with
-          | Unreachable_only, false -> Expr.Assert_false
-          | (Disabled | May_raise), _ | Unreachable_only, true ->
+          | (Unreachable_only | May_raise), false -> Expr.Assert_false
+          | Disabled, _ | (Unreachable_only | May_raise), true ->
             gen_value st env result_ty))
 
 and gen_decl (st : State.t) env =
