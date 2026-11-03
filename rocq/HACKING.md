@@ -62,7 +62,7 @@ Opaque loads and calls are allowed. This avoids a full memory/call/vector
 semantics; the correspondence of word observations to compiler operations
 remains a review boundary. The simulation argument from `eligible_entry`
 to the rewritten function is written out in ROCQ-REVIEW-GUIDE.md (section
-4), which also says how to review the development as a whole.
+4.7), which also says how to review the development as a whole.
 
 `SsaExecutionProofs.v` supplies definition-site and frame facts;
 `SsaContextProofs.v` proves available-value equations and execution
@@ -171,13 +171,16 @@ not leave generated audit sources in the workspace.
 ### The review document
 
 `make -C rocq review` typesets what a reviewer reads as one PDF,
-`rocq/review.pdf`, in parts: the shared models (every reviewed `.v` file
-of `rocq/`, `backend/rocq/` and `backend/ssa/rocq/`: the Spec, Model and
+`rocq/review.pdf`, in parts: the shared models (the sections of
+`ROCQ-REVIEW-GUIDE.md` about every pass, then every reviewed `.v` file of
+`rocq/`, `backend/rocq/` and `backend/ssa/rocq/`: the Spec, Model and
 definition files; implementation and Proofs files are left out), then one
-part per pass with its sections of `ROCQ-REVIEW-GUIDE.md` and its Spec
-files, then the extraction directives and the axioms each statement rests
-on. Which guide sections and which Spec files belong to a pass is set at
-the top of `rocq/review-pdf.pl`; a new Spec file or guide section must be
+part for what the loop passes share and one per pass, each a top-level
+section of the guide promoted to a part, with the pass's Spec files at
+the end, then the extraction directives and the axioms each statement
+rests on. Which guide sections make a part, or open the first one, and
+which Spec files belong to a pass is set at the top of
+`rocq/review-pdf.pl`; a new Spec file or top-level guide section must be
 assigned to a part there, or the script stops. The sources are typeset by
 `rocq doc` with every identifier linked to its definition, so the target
 needs the `.glob` files of a complete build, and LuaLaTeX with `fontspec`

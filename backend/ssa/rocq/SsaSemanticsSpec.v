@@ -29,7 +29,7 @@
    the models give an exact meaning to, and the steps of instructions, Gotos
    and Switches.
 
-   This file is to be reviewed, against the backend (section 5.1 of
+   This file is to be reviewed, against the backend (section 2.1 of
    ROCQ-REVIEW-GUIDE.md): [eval_operation], [execute_instruction],
    [read_arguments], [bind_parameters] and the rules of [step]. Registers are
    identified by instruction/result or block/parameter, not by a freely

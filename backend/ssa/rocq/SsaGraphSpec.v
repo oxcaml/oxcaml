@@ -36,7 +36,7 @@
    checks of SsaGraph.v to use. [control_edges], [switch_edge_multiplicity]
    and [op_def_correct] are fields of [finished_graph] (SsaProgressSpec.v):
    what [Ssa.finish_graph] and the pass's table of defining blocks guarantee;
-   section 5.2 of ROCQ-REVIEW-GUIDE.md says where to check each in the
+   section 2.2 of ROCQ-REVIEW-GUIDE.md says where to check each in the
    builder.
 
    The checks the loop analyses make of a graph are in SsaGraph.v, what they

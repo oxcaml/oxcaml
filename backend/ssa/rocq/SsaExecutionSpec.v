@@ -29,7 +29,7 @@
    about definitions, uses, parameters and reachability ([well_formed_ssa],
    the first field of [finished_graph]).
 
-   This file is to be reviewed, against [Ssa.finish_graph] (section 5.2 of
+   This file is to be reviewed, against [Ssa.finish_graph] (section 2.2 of
    ROCQ-REVIEW-GUIDE.md). A definition site is a program point
    (SsaDominanceSpec.v): the point after an instruction for its results, the
    block's entry for its parameters. The conditions concern definitions,

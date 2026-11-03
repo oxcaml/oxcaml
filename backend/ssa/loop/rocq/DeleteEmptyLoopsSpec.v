@@ -39,13 +39,13 @@
      header's own [Switch]. The rewrite replaces that terminator by a [Goto]
      to the exit, so the rewritten graph has a subset of the original's
      edges, and a register live at the exit's entry is live at the header's
-     terminator (ROCQ-REVIEW-GUIDE.md, section 4).
+     terminator (ROCQ-REVIEW-GUIDE.md, section 4.7).
    - [find_deletions_context_covered_statement]: no instruction of the graph
      is an exactly modelled operation with other than one result, the one
      instruction shape SsaContextSpec.context_step has no rule for. So every
      real execution of the code before the loop is some [context_steps] run,
      and the [reached_header] premise of the eligibility statement can be met
-     by every real execution reaching the header (section 5.3).
+     by every real execution reaching the header (section 4.6).
 
    What the analyses check of a loop they delete, read back from the decision,
    is DeleteEmptyLoopsProofs.deletion_certificate: the proof's internal

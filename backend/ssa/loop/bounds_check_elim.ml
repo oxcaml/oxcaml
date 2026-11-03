@@ -36,7 +36,7 @@ open! Int_replace_polymorphic_compare
    [rocq/Makefile]); it returns the blocks whose [Switch] always takes its true
    edge, with that edge's target. The rewriting of the graph below is not
    modelled; it is the same rewrite as [Delete_empty_loops] performs on a loop
-   header, and the simulation argument of ROCQ-REVIEW-GUIDE.md, section 4,
+   header, and the simulation argument of ROCQ-REVIEW-GUIDE.md, section 5.5,
    applies to it unchanged. *)
 
 open Ssa.Export

@@ -101,7 +101,7 @@ DEPS := $(STDLIB_DIR)/.rocqdeps.d
 
 all: $(SOURCES:.v=.vo) claims
 
-# The review document, rocq/review.pdf: ROCQ-REVIEW-GUIDE.md followed by
+# The review document, rocq/review.pdf: ROCQ-REVIEW-GUIDE.md, in parts, with
 # every reviewed .v file (definitions and statements; the implementation and
 # Proofs files are left out), the extraction directives and the axioms the
 # statements rest on, typeset by rocq doc and LuaLaTeX (HACKING.md, "The

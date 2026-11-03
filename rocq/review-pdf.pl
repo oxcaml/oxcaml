@@ -2,11 +2,12 @@
 # review-pdf.pl BUILD_DIR OUT.pdf FILE.v ...
 #
 # Typesets what a reviewer of the Rocq development reads as one PDF, in the
-# shape of a paper. The first part is the ground the passes share: every
-# reviewed .v file of the stdlib, backend and SSA libraries (the definitions
-# and the axioms; the implementation and Proofs files are left out). Then
-# comes one part per pass, with its sections of ROCQ-REVIEW-GUIDE.md as the
-# narrative and its statements; then the extraction directives and the
+# shape of a paper. The first part is the ground the passes share: the
+# sections of ROCQ-REVIEW-GUIDE.md about every pass, then every reviewed .v
+# file of the stdlib, backend and SSA libraries (the definitions and the
+# axioms; the implementation and Proofs files are left out). Then come the
+# parts about the passes, each a section of the guide promoted to a part,
+# with the statements of its pass; then the extraction directives and the
 # axioms the statements rest on. `rocq doc` typesets the sources, with every
 # identifier linked to its definition; LuaLaTeX typesets the document.
 #
@@ -76,30 +77,39 @@ my %library = map { $_->{dir} => $_ } @libraries;
 
 # ---- The parts of the document ------------------------------------------
 
-# A part either shows whole libraries, in dependency order, or is about one
-# pass: it takes the sections of the review guide whose headings match
-# [guide] (the first part whose pattern matches wins) and the Spec files
-# whose names match [sources], introduced by [statements]. Every reviewed
-# file and every section of the guide must land in a part.
+# A part takes the top-level sections of the review guide whose headings
+# are listed in, or match, [guide] (the first part that takes a heading
+# wins). It either shows whole [libraries], in dependency order, after those
+# sections, or it is one [promote]d section of the guide, whose heading is
+# its [title]: the section becomes the part, its subsections the part's
+# sections, and the Spec files whose names match [sources], introduced by
+# [statements], end it. Every reviewed file and every top-level section of
+# the guide must land in a part.
 my @parts = (
   { title => 'The shared models',
+    guide => [ 'How SSA execution is reasoned about',
+      'What must be checked by inspection', 'Reading order and commands',
+      'What not to take on trust' ],
     libraries => [qw(OxCamlStdlib OxCamlBackend OxCamlSsa)],
     intro => <<'TEX' },
-The files of this part are the ground every pass stands on: what the
-development takes on trust about OxCaml, and the SSA graph with the
-execution semantics that the statements of the following parts speak of.
-None of it is about any one pass. A reader who wants the claims first may
-begin with the next part and return here for the definitions.
+This part is the ground every pass stands on. It opens with the sections of
+the review guide that are about every pass: how the execution of SSA code
+is reasoned about, and what must be checked by inspection because no proof
+covers it. Then come the sources: what the development takes on trust
+about OxCaml, and the SSA graph with the execution semantics that the
+statements of the following parts speak of. None of it is about any one
+pass. A reader who wants the claims first may begin with the next part and
+return here for the definitions.
 TEX
-  { title => 'Empty-loop deletion',
-    guide => qr/./,
+  { title => 'The loop passes', promote => 1 },
+  { title => 'Empty-loop deletion', promote => 1,
     sources => qr/^(?:DeleteEmptyLoops|LoopEligibility)Spec$/,
     statements => <<'TEX' },
 What is claimed about the extracted decision \texttt{find\_deletions}. The
 analyses themselves are extracted code, and their \texttt{*Proofs.v} files
 give their meaning and prove the statements; neither is shown.
 TEX
-  { title => 'Bounds-check elimination',
+  { title => 'Bounds-check elimination', promote => 1,
     sources => qr/^BoundsCheckExecutionSpec$/,
     statements => <<'TEX' },
 What is claimed about the extracted decision \texttt{find\_eliminations}.
@@ -108,11 +118,20 @@ its meaning and prove the statement; neither is shown.
 TEX
 );
 # The guide numbers its sections by hand, and the sources refer to them by
-# number; the references follow the sections wherever the document puts them.
-my (%guide_label, @guide_references);
+# number; the references follow the sections wherever the document puts
+# them, as "Section" or "Part" according to what the section became.
+# Until the guide is read, a reference is a placeholder, \x04 ... \x05.
+my %guide_label;
+my $number = qr/\d+(?:\.\d+)*/;
+my $numbers = qr/$number(?:(?:, | and )$number)*/;
 my %part_of_library;
 for my $part (@parts) {
   $part_of_library{$_} = $part for @{ $part->{libraries} // [] };
+  $part->{guide} //= [ $part->{title} ] if $part->{promote};
+  if (ref $part->{guide} eq 'ARRAY') {
+    my $headings = join '|', map { quotemeta } @{ $part->{guide} };
+    $part->{guide} = qr/^(?:$headings)$/;
+  }
 }
 
 # ---- Which files a reviewer reads --------------------------------------
@@ -243,11 +262,11 @@ for my $base (keys %fragment) {
   $s =~ s/\A(\\begin\{coqdoccode\}\n)(?:\\coqdocemptyline\n)+/$1/;
   $s =~ s/\\coqref\{([^}]*)\}\{($braced)\}/
     $defined{$1} ? "\\coqref{$1}{$2}" : $2/ge;
-  $s =~ s/(ROCQ-REVIEW-GUIDE\.md, )section (\d+(?:\.\d+)*)(?!\d)/
-    push @guide_references, $2; "$1Section~\\ref{guide:$2}"/ge;
-  open my $t, '>', "$build/tex/$base.tex" or die;
-  print $t $s;
-  close $t;
+  $s =~ s/(ROCQ-REVIEW-GUIDE\.md, )(sections?) ($numbers)(?!\d)/
+    "$1\x04$2 $3\x05"/ge;
+  $s =~ s/(sections?) ($numbers) (of ROCQ-REVIEW-GUIDE\.md)/
+    "\x04$1 $2\x05 $3"/ge;
+  $fragment{$base} = $s;
 }
 
 # ---- The statements and their theorems ---------------------------------
@@ -305,9 +324,31 @@ sub inline {
   $s = escape($s);
   $s =~ s/\*\*(.+?)\*\*/\\textbf{$1}/g;
   $s =~ s/(?<![\w\\])\*(?=\S)(.+?)(?<=\S)\*(?!\w)/\\emph{$1}/g;
-  $s =~ s/\bsection (\d+(?:\.\d+)*)(?!\d)/
-    push @guide_references, $1; "Section~\\ref{guide:$1}"/ge;
+  $s =~ s/\b([Ss]ections?) ($numbers)(?!\d)/"\x04$1 $2\x05"/ge;
   $s =~ s/\x02(\d+)\x03/code_span($code[$1], $in_heading)/ge;
+  return $s;
+}
+
+# A reference to guide sections, once the guide has been read: "Section" or
+# "Part" (whichever the first section named became), then the labels.
+sub reference {
+  my ($word, $list) = @_;
+  my @numbers = $list =~ /($number)/g;
+  for (@numbers) {
+    die "a reference to section $_ of the guide, which it has not got\n"
+      unless $guide_label{$_};
+  }
+  my $kind = $guide_label{ $numbers[0] } eq 'part' ? 'Part' : 'Section';
+  $kind .= 's' if $word =~ /s$/;
+  my @refs = map { "\\ref{guide:$_}" } @numbers;
+  return "$kind~$refs[0]" if @refs == 1;
+  my $last = pop @refs;
+  return "$kind~" . join(', ', @refs) . " and~$last";
+}
+
+sub resolve_references {
+  my ($s) = @_;
+  $s =~ s/\x04([Ss]ections?) ([^\x05]*)\x05/reference($1, $2)/ge;
   return $s;
 }
 
@@ -340,8 +381,9 @@ sub table {
 # ---- The review guide, from Markdown ------------------------------------
 
 # The guide's title names the document; its text before the first section
-# opens the first part that has guide sections; each section goes to the
-# part whose [guide] pattern matches its heading.
+# opens the first part that has guide sections; each top-level section goes
+# to the part whose [guide] pattern matches its heading, and becomes the
+# part itself when that part is promoted.
 my ($title, $preamble, @guide) = ('The Rocq development', '');
 {
   my $path = "$root/ROCQ-REVIEW-GUIDE.md";
@@ -365,22 +407,30 @@ my ($title, $preamble, @guide) = ('The Rocq development', '');
       $i++;
       $$sink .= "\\begin{Verbatim}[fontsize=\\small,xleftmargin=1.5em]\n"
         . join("\n", @code) . "\n\\end{Verbatim}\n\n";
-    } elsif ($line =~ /^(#{1,3}) (.*)$/) {
+    } elsif ($line =~ /^(#{1,4}) (.*)$/) {
       $flush->();
       my ($level, $text) = (length $1, $2);
-      my $number = $text =~ s/^(\d+(?:\.\d+)*)\.?\s+// ? $1 : undef;
+      my $num = $text =~ s/^($number)\.?\s+// ? $1 : undef;
       if ($level == 1) {
         $title = inline($text);
       } else {
         if ($level == 2) {
-          push @guide, { heading => $text, tex => '' };
+          my ($part) = grep { $_->{guide} && $text =~ $_->{guide} } @parts;
+          die "no part of the document takes the guide's section"
+            . " \"$text\"\n" unless $part;
+          push @guide, { heading => $text, part => $part, tex => '' };
+          push @{ $part->{guide_sections} }, $guide[-1];
           $sink = \$guide[-1]{tex};
         }
-        my $cmd = $level == 2 ? 'section' : 'subsection';
-        $$sink .= "\\$cmd\{" . inline($text, 1) . "}\n";
-        if (defined $number) {
-          $$sink .= "\\label{guide:$number}\n";
-          $guide_label{$number} = 1;
+        my $promoted = $guide[-1]{part}{promote};
+        my $depth = $level - ($promoted ? 3 : 2);
+        if ($depth >= 0) {
+          my $cmd = ('section', 'subsection', 'subsubsection')[$depth];
+          $$sink .= "\\$cmd\{" . inline($text, 1) . "}\n";
+        }
+        if (defined $num) {
+          $$sink .= "\\label{guide:$num}\n";
+          $guide_label{$num} = $depth < 0 ? 'part' : 'section';
         }
       }
       $i++;
@@ -446,18 +496,14 @@ my ($title, $preamble, @guide) = ('The Rocq development', '');
   }
   $flush->();
 }
-for my $n (sort keys %{ { map { $_ => 1 } @guide_references } }) {
-  die "the guide refers to section $n, which it has not got\n"
-    unless $guide_label{$n};
-}
-for my $section (@guide) {
-  my ($part) = grep { $_->{guide} && $section->{heading} =~ $_->{guide} }
-    @parts;
-  die "no part of the document takes the guide's section"
-    . " \"$section->{heading}\"\n" unless $part;
-  push @{ $part->{guide_sections} }, $section;
-}
 my ($narrative) = grep { $_->{guide_sections} } @parts;
+$preamble = resolve_references($preamble);
+$_->{tex} = resolve_references($_->{tex}) for @guide;
+for my $base (keys %fragment) {
+  open my $t, '>', "$build/tex/$base.tex" or die;
+  print $t resolve_references($fragment{$base});
+  close $t;
+}
 
 # ---- The axioms the statements rest on ----------------------------------
 
@@ -557,9 +603,10 @@ $pdftitle =~ s/[{}]//g;
 
 # The parts about the passes, named in the abstract.
 my @topics = map { lcfirst $_->{title} } grep { !$_->{libraries} } @parts;
-my $topics = @topics == 1 ? "The second part is about $topics[0]"
+my $topics = @topics == 1 ? "The second part is about $topics[0], with"
   : 'The parts that follow are about '
-    . join(', ', @topics[0 .. $#topics - 1]) . " and $topics[-1]; each";
+    . join(', ', @topics[0 .. $#topics - 1])
+    . " and $topics[-1], each with";
 
 my $conventions = <<'TEX';
 \section{How the sources are shown}
@@ -567,9 +614,10 @@ Each statement is bound in a \texttt{*Spec.v} file as a proposition, a
 \texttt{Definition} of type \texttt{Prop}, and proved under the same name
 without the \texttt{\_statement} suffix in the matching \texttt{*Proofs.v}
 file; \texttt{make -C rocq claims} checks that each theorem has exactly the
-statement bound there. The sections of this part give, library by library
-and in dependency order, every file the statements rest on: the definitions
-they use, and the axioms and types that model the compiler's data. The
+statement bound there. The remaining sections of this part give, library by
+library and in dependency order, every file the statements rest on: the
+definitions they use, and the axioms and types that model the compiler's
+data. The
 parts that follow give the statements of each pass. The typesetting is that
 of \texttt{rocq doc}: keywords in bold, defined constants in green,
 inductive types in purple, their constructors in brown, axioms and
@@ -639,14 +687,16 @@ $unicode\\usepackage{xcolor}
 Some passes of the OxCaml SSA backend take their decisions from OCaml
 extracted from a Rocq development, and the development proves those
 decisions sound. This document collects what a reviewer of the development
-reads. The first part is the ground the passes share, typeset from the
-sources with the implementation and the proofs left out: the models of
-OxCaml's own types, the backend definitions, and the SSA graph with its
-execution semantics. $topics gives the review guide for the pass, which
-says what is claimed, how the proof is put together, how the execution of
-SSA code is reasoned about, and what remains to be checked by inspection
-because no proof covers it, followed by the statements themselves. Every
-use of an identifier is a link to its definition. The appendices give the
+reads. The first part is the ground the passes share: the sections of the
+review guide about every pass, which say how the execution of SSA code is
+reasoned about and what remains to be checked by inspection because no
+proof covers it, then the models of OxCaml's own types, the backend
+definitions, and the SSA graph with its execution semantics, typeset from
+the sources with the implementation and the proofs left out. $topics the
+sections of the guide about it, which say what is claimed, how the proof is
+put together and how the theorem carries over to the rewrite, followed by
+the statements themselves. Every use of an identifier is a link to its
+definition. The appendices give the
 extraction directives and the axioms the statements rest on. Nothing in the
 Proofs files or in the extracted implementations appears here: Rocq checks
 those, and the statements do not mention them.
@@ -659,7 +709,7 @@ for my $part (@parts) {
   my @sections = @{ $part->{guide_sections} // [] };
   next unless @in_part || @sections;
   $main .= "\\clearpage\n\\part{$part->{title}}\n" . ($part->{intro} // '');
-  $main .= $preamble if $narrative && $part == $narrative;
+  $main .= "\n$preamble" if $narrative && $part == $narrative;
   $main .= $_->{tex} for @sections;
   if ($part->{libraries}) {
     $main .= $conventions;

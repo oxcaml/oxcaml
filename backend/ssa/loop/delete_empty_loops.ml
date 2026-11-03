@@ -41,7 +41,7 @@ open! Int_replace_polymorphic_compare
    LoopEligibilityProofs.v, justifies each bypass on its own, on the original
    graph; the simulation argument connecting it to the rewritten function,
    including doing all the bypasses in one pass over the graph, is in
-   ROCQ-REVIEW-GUIDE.md, section 4. *)
+   ROCQ-REVIEW-GUIDE.md, section 4.7. *)
 
 open Ssa.Export
 open Ssa_reducer

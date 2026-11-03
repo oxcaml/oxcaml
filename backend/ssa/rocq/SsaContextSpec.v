@@ -28,7 +28,7 @@
 (* Word observations of surrounding SSA code, and the contract on the
    function's inputs, [reached_header].
 
-   This file is to be reviewed (section 3.3 of ROCQ-REVIEW-GUIDE.md). Integer
+   This file is to be reviewed (section 1.3 of ROCQ-REVIEW-GUIDE.md). Integer
    operations and Goto/Switch use [SsaSemanticsSpec.step]. An opaque
    instruction may produce arbitrary signed-word observations in exactly its
    declared result registers. An opaque terminator may take any CFG successor

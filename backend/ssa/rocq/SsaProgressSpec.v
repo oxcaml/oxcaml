@@ -28,7 +28,7 @@
 (* The contract on the graph the pass receives, [finished_graph], and the
    conditions on its inputs that progress rests on.
 
-   This file is to be reviewed, against [Ssa.finish_graph] (section 5.2 of
+   This file is to be reviewed, against [Ssa.finish_graph] (section 2.2 of
    ROCQ-REVIEW-GUIDE.md). [control_layout] formalizes ordinary builder
    guarantees: Goto arguments match parameters, omitted arguments feed
    globally unused parameters, and Switch targets have no parameters.
@@ -84,7 +84,7 @@ Definition switches_in_range (initial : state) : Prop :=
 (* What [Ssa.finish_graph] guarantees of the graph the pass receives, as the
    eligibility theorem needs it: [blocks] is the graph's block list, [entry]
    its entry block and [defs] the table of defining blocks the pass builds from
-   [blocks]. One field per builder guarantee; section 5.2 of
+   [blocks]. One field per builder guarantee; section 2.2 of
    ROCQ-REVIEW-GUIDE.md says where to look for each in the builder. *)
 Record finished_graph (blocks : list block) (entry : block) (defs : op_def)
     : Prop :=

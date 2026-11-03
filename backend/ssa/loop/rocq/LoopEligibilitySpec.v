@@ -63,7 +63,7 @@
    eligibility is not assumed as a compiler contract. The step from
    [eligible_entry], per loop and per header entry, to the rewritten function
    behaving like the original is the usual liveness simulation; it is written
-   out in ROCQ-REVIEW-GUIDE.md, section 4. Its one non-obvious point: a
+   out in ROCQ-REVIEW-GUIDE.md, section 4.7. Its one non-obvious point: a
    register live at the exit's entry is live at the header's terminator,
    because the exit is a target of the header's own [Switch]
    (DeleteEmptyLoopsSpec.find_deletions_exit_edge_statement) and has no

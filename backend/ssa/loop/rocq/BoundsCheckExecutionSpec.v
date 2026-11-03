@@ -42,7 +42,7 @@
    [Switch] on the unsigned comparison the compiler emits for an array bounds
    check, takes its edge to [target]. Replacing the branch by a jump to
    [target] therefore changes no execution, and since nothing is skipped
-   there is no liveness condition to meet (ROCQ-REVIEW-GUIDE.md, section 4).
+   there is no liveness condition to meet (ROCQ-REVIEW-GUIDE.md, section 5.5).
    The guards, loop counters and affine facts the decision relied on do not
    appear in the statement. Nothing is extracted. *)
 
