@@ -38,14 +38,34 @@ module Modalities = struct
 end
 
 module Mode = struct
-  type t = Mode of string [@@unboxed]
+  type t =
+    | Pmode of string
+    | Pmode_var of string
+    | Pmode_bounded of bounded
+
+  and bounded =
+    { pmode_upper : bound
+    ; pmode_lower : bound
+    }
+
+  and bound = bound_elem list
+
+  and bound_elem =
+    | Pbound_var of bound_var
+    | Pbound_const of string loc list
+
+  and bound_var =
+    { pbound_morph : string loc option
+    ; pbound_var : string loc
+    ; pbound_mod : string loc list
+    }
 end
 
 module Modes = struct
   type t = Mode.t loc list
 
   let none = []
-  let local ~loc = [ { txt = Mode.Mode "local"; loc } ]
+  let local ~loc = [ { txt = Mode.Pmode "local"; loc } ]
 end
 
 module Include_kind = struct
@@ -1173,7 +1193,32 @@ module Ast_traverse = struct
       ; ret_type_constraint : type_constraint option
       }
 
-    and mode = Mode.t = Mode of string [@@unboxed]
+    and mode_const = string
+    and mode_var = string
+    and mode_morph = string
+
+    and mode = Mode.t =
+      | Pmode of mode_const
+      | Pmode_var of mode_var
+      | Pmode_bounded of mode_bounded
+
+    and mode_bounded = Mode.bounded =
+      { pmode_upper : mode_bound
+      ; pmode_lower : mode_bound
+      }
+
+    and mode_bound = mode_bound_elem list
+
+    and mode_bound_elem = Mode.bound_elem =
+      | Pbound_var of mode_bound_var
+      | Pbound_const of mode_const loc list
+
+    and mode_bound_var = Mode.bound_var =
+      { pbound_morph : mode_morph loc option
+      ; pbound_var : mode_var loc
+      ; pbound_mod : mode_const loc list
+      }
+
     and modes = mode loc list
     and modality = Modality.t = Modality of string [@@unboxed]
     and modalities = modality loc list
@@ -1243,12 +1288,47 @@ module Ast_traverse = struct
             in
             { mode_annotations; ret_mode_annotations; ret_type_constraint }
 
+        method mode_const : mode_const -> mode_const = self#string
+        method mode_var : mode_var -> mode_var = self#string
+        method mode_morph : mode_morph -> mode_morph = self#string
+
         method mode : mode -> mode =
           fun x ->
             match x with
-            | Mode a ->
-              let a = self#string a in
-              Mode a
+            | Pmode a ->
+              let a = self#mode_const a in
+              Pmode a
+            | Pmode_var a ->
+              let a = self#mode_var a in
+              Pmode_var a
+            | Pmode_bounded a ->
+              let a = self#mode_bounded a in
+              Pmode_bounded a
+
+        method mode_bounded : mode_bounded -> mode_bounded =
+          fun { pmode_upper; pmode_lower } ->
+            let pmode_upper = self#mode_bound pmode_upper in
+            let pmode_lower = self#mode_bound pmode_lower in
+            { pmode_upper; pmode_lower }
+
+        method mode_bound : mode_bound -> mode_bound = self#list self#mode_bound_elem
+
+        method mode_bound_elem : mode_bound_elem -> mode_bound_elem =
+          fun x ->
+            match x with
+            | Pbound_var a ->
+              let a = self#mode_bound_var a in
+              Pbound_var a
+            | Pbound_const a ->
+              let a = self#list (self#loc self#mode_const) a in
+              Pbound_const a
+
+        method mode_bound_var : mode_bound_var -> mode_bound_var =
+          fun { pbound_morph; pbound_var; pbound_mod } ->
+            let pbound_morph = self#option (self#loc self#mode_morph) pbound_morph in
+            let pbound_var = self#loc self#mode_var pbound_var in
+            let pbound_mod = self#list (self#loc self#mode_const) pbound_mod in
+            { pbound_morph; pbound_var; pbound_mod }
 
         method modes : modes -> modes = self#list (self#loc self#mode)
 
@@ -1316,10 +1396,35 @@ module Ast_traverse = struct
             self#modes ret_mode_annotations;
             self#option self#type_constraint ret_type_constraint
 
+        method mode_const : mode_const -> unit = self#string
+        method mode_var : mode_var -> unit = self#string
+        method mode_morph : mode_morph -> unit = self#string
+
         method mode : mode -> unit =
           fun x ->
             match x with
-            | Mode a -> self#string a
+            | Pmode a -> self#mode_const a
+            | Pmode_var a -> self#mode_var a
+            | Pmode_bounded a -> self#mode_bounded a
+
+        method mode_bounded : mode_bounded -> unit =
+          fun { pmode_upper; pmode_lower } ->
+            self#mode_bound pmode_upper;
+            self#mode_bound pmode_lower
+
+        method mode_bound : mode_bound -> unit = self#list self#mode_bound_elem
+
+        method mode_bound_elem : mode_bound_elem -> unit =
+          fun x ->
+            match x with
+            | Pbound_var a -> self#mode_bound_var a
+            | Pbound_const a -> self#list (self#loc self#mode_const) a
+
+        method mode_bound_var : mode_bound_var -> unit =
+          fun { pbound_morph; pbound_var; pbound_mod } ->
+            self#option (self#loc self#mode_morph) pbound_morph;
+            self#loc self#mode_var pbound_var;
+            self#list (self#loc self#mode_const) pbound_mod
 
         method modes : modes -> unit = self#list (self#loc self#mode)
 
@@ -1388,10 +1493,37 @@ module Ast_traverse = struct
             let acc = self#option self#type_constraint ret_type_constraint acc in
             acc
 
+        method mode_const : mode_const -> 'acc -> 'acc = self#string
+        method mode_var : mode_var -> 'acc -> 'acc = self#string
+        method mode_morph : mode_morph -> 'acc -> 'acc = self#string
+
         method mode : mode -> 'acc -> 'acc =
           fun x acc ->
             match x with
-            | Mode a -> self#string a acc
+            | Pmode a -> self#mode_const a acc
+            | Pmode_var a -> self#mode_var a acc
+            | Pmode_bounded a -> self#mode_bounded a acc
+
+        method mode_bounded : mode_bounded -> 'acc -> 'acc =
+          fun { pmode_upper; pmode_lower } acc ->
+            let acc = self#mode_bound pmode_upper acc in
+            let acc = self#mode_bound pmode_lower acc in
+            acc
+
+        method mode_bound : mode_bound -> 'acc -> 'acc = self#list self#mode_bound_elem
+
+        method mode_bound_elem : mode_bound_elem -> 'acc -> 'acc =
+          fun x acc ->
+            match x with
+            | Pbound_var a -> self#mode_bound_var a acc
+            | Pbound_const a -> self#list (self#loc self#mode_const) a acc
+
+        method mode_bound_var : mode_bound_var -> 'acc -> 'acc =
+          fun { pbound_morph; pbound_var; pbound_mod } acc ->
+            let acc = self#option (self#loc self#mode_morph) pbound_morph acc in
+            let acc = self#loc self#mode_var pbound_var acc in
+            let acc = self#list (self#loc self#mode_const) pbound_mod acc in
+            acc
 
         method modes : modes -> 'acc -> 'acc = self#list (self#loc self#mode)
 
@@ -1487,12 +1619,48 @@ module Ast_traverse = struct
             in
             { mode_annotations; ret_mode_annotations; ret_type_constraint }, acc
 
+        method mode_const : mode_const -> 'acc -> mode_const * 'acc = self#string
+        method mode_var : mode_var -> 'acc -> mode_var * 'acc = self#string
+        method mode_morph : mode_morph -> 'acc -> mode_morph * 'acc = self#string
+
         method mode : mode -> 'acc -> mode * 'acc =
           fun x acc ->
             match x with
-            | Mode a ->
-              let a, acc = self#string a acc in
-              Mode a, acc
+            | Pmode a ->
+              let a, acc = self#mode_const a acc in
+              Pmode a, acc
+            | Pmode_var a ->
+              let a, acc = self#mode_var a acc in
+              Pmode_var a, acc
+            | Pmode_bounded a ->
+              let a, acc = self#mode_bounded a acc in
+              Pmode_bounded a, acc
+
+        method mode_bounded : mode_bounded -> 'acc -> mode_bounded * 'acc =
+          fun { pmode_upper; pmode_lower } acc ->
+            let pmode_upper, acc = self#mode_bound pmode_upper acc in
+            let pmode_lower, acc = self#mode_bound pmode_lower acc in
+            { pmode_upper; pmode_lower }, acc
+
+        method mode_bound : mode_bound -> 'acc -> mode_bound * 'acc =
+          self#list self#mode_bound_elem
+
+        method mode_bound_elem : mode_bound_elem -> 'acc -> mode_bound_elem * 'acc =
+          fun x acc ->
+            match x with
+            | Pbound_var a ->
+              let a, acc = self#mode_bound_var a acc in
+              Pbound_var a, acc
+            | Pbound_const a ->
+              let a, acc = self#list (self#loc self#mode_const) a acc in
+              Pbound_const a, acc
+
+        method mode_bound_var : mode_bound_var -> 'acc -> mode_bound_var * 'acc =
+          fun { pbound_morph; pbound_var; pbound_mod } acc ->
+            let pbound_morph, acc = self#option (self#loc self#mode_morph) pbound_morph acc in
+            let pbound_var, acc = self#loc self#mode_var pbound_var acc in
+            let pbound_mod, acc = self#list (self#loc self#mode_const) pbound_mod acc in
+            { pbound_morph; pbound_var; pbound_mod }, acc
 
         method modes : modes -> 'acc -> modes * 'acc = self#list (self#loc self#mode)
 
@@ -1576,12 +1744,48 @@ module Ast_traverse = struct
             in
             { mode_annotations; ret_mode_annotations; ret_type_constraint }
 
+        method mode_const : 'ctx -> mode_const -> mode_const = self#string
+        method mode_var : 'ctx -> mode_var -> mode_var = self#string
+        method mode_morph : 'ctx -> mode_morph -> mode_morph = self#string
+
         method mode : 'ctx -> mode -> mode =
           fun ctx x ->
             match x with
-            | Mode a ->
-              let a = self#string ctx a in
-              Mode a
+            | Pmode a ->
+              let a = self#mode_const ctx a in
+              Pmode a
+            | Pmode_var a ->
+              let a = self#mode_var ctx a in
+              Pmode_var a
+            | Pmode_bounded a ->
+              let a = self#mode_bounded ctx a in
+              Pmode_bounded a
+
+        method mode_bounded : 'ctx -> mode_bounded -> mode_bounded =
+          fun ctx { pmode_upper; pmode_lower } ->
+            let pmode_upper = self#mode_bound ctx pmode_upper in
+            let pmode_lower = self#mode_bound ctx pmode_lower in
+            { pmode_upper; pmode_lower }
+
+        method mode_bound : 'ctx -> mode_bound -> mode_bound =
+          self#list self#mode_bound_elem
+
+        method mode_bound_elem : 'ctx -> mode_bound_elem -> mode_bound_elem =
+          fun ctx x ->
+            match x with
+            | Pbound_var a ->
+              let a = self#mode_bound_var ctx a in
+              Pbound_var a
+            | Pbound_const a ->
+              let a = self#list (self#loc self#mode_const) ctx a in
+              Pbound_const a
+
+        method mode_bound_var : 'ctx -> mode_bound_var -> mode_bound_var =
+          fun ctx { pbound_morph; pbound_var; pbound_mod } ->
+            let pbound_morph = self#option (self#loc self#mode_morph) ctx pbound_morph in
+            let pbound_var = self#loc self#mode_var ctx pbound_var in
+            let pbound_mod = self#list (self#loc self#mode_const) ctx pbound_mod in
+            { pbound_morph; pbound_var; pbound_mod }
 
         method modes : 'ctx -> modes -> modes = self#list (self#loc self#mode)
 
@@ -1675,12 +1879,48 @@ module Ast_traverse = struct
               ; "ret_type_constraint", ret_type_constraint
               ]
 
+        method mode_const : mode_const -> 'res = self#string
+        method mode_var : mode_var -> 'res = self#string
+        method mode_morph : mode_morph -> 'res = self#string
+
         method mode : mode -> 'res =
           fun x ->
             match x with
-            | Mode a ->
-              let a = self#string a in
-              self#constr "Mode" [ a ]
+            | Pmode a ->
+              let a = self#mode_const a in
+              self#constr "Pmode" [ a ]
+            | Pmode_var a ->
+              let a = self#mode_var a in
+              self#constr "Pmode_var" [ a ]
+            | Pmode_bounded a ->
+              let a = self#mode_bounded a in
+              self#constr "Pmode_bounded" [ a ]
+
+        method mode_bounded : mode_bounded -> 'res =
+          fun { pmode_upper; pmode_lower } ->
+            let pmode_upper = self#mode_bound pmode_upper in
+            let pmode_lower = self#mode_bound pmode_lower in
+            self#record [ "pmode_upper", pmode_upper; "pmode_lower", pmode_lower ]
+
+        method mode_bound : mode_bound -> 'res = self#list self#mode_bound_elem
+
+        method mode_bound_elem : mode_bound_elem -> 'res =
+          fun x ->
+            match x with
+            | Pbound_var a ->
+              let a = self#mode_bound_var a in
+              self#constr "Pbound_var" [ a ]
+            | Pbound_const a ->
+              let a = self#list (self#loc self#mode_const) a in
+              self#constr "Pbound_const" [ a ]
+
+        method mode_bound_var : mode_bound_var -> 'res =
+          fun { pbound_morph; pbound_var; pbound_mod } ->
+            let pbound_morph = self#option (self#loc self#mode_morph) pbound_morph in
+            let pbound_var = self#loc self#mode_var pbound_var in
+            let pbound_mod = self#list (self#loc self#mode_const) pbound_mod in
+            self#record
+              [ "pbound_morph", pbound_morph; "pbound_var", pbound_var; "pbound_mod", pbound_mod ]
 
         method modes : modes -> 'res = self#list (self#loc self#mode)
 
@@ -1801,12 +2041,59 @@ module Ast_traverse = struct
                 ; "ret_type_constraint", Stdlib.snd ret_type_constraint
                 ] )
 
+        method mode_const : 'ctx -> mode_const -> mode_const * 'res = self#string
+        method mode_var : 'ctx -> mode_var -> mode_var * 'res = self#string
+        method mode_morph : 'ctx -> mode_morph -> mode_morph * 'res = self#string
+
         method mode : 'ctx -> mode -> mode * 'res =
           fun ctx x ->
             match x with
-            | Mode a ->
-              let a = self#string ctx a in
-              Mode (Stdlib.fst a), self#constr ctx "Mode" [ Stdlib.snd a ]
+            | Pmode a ->
+              let a = self#mode_const ctx a in
+              Pmode (Stdlib.fst a), self#constr ctx "Pmode" [ Stdlib.snd a ]
+            | Pmode_var a ->
+              let a = self#mode_var ctx a in
+              Pmode_var (Stdlib.fst a), self#constr ctx "Pmode_var" [ Stdlib.snd a ]
+            | Pmode_bounded a ->
+              let a = self#mode_bounded ctx a in
+              ( Pmode_bounded (Stdlib.fst a)
+              , self#constr ctx "Pmode_bounded" [ Stdlib.snd a ] )
+
+        method mode_bounded : 'ctx -> mode_bounded -> mode_bounded * 'res =
+          fun ctx { pmode_upper; pmode_lower } ->
+            let pmode_upper = self#mode_bound ctx pmode_upper in
+            let pmode_lower = self#mode_bound ctx pmode_lower in
+            ( { pmode_upper = Stdlib.fst pmode_upper; pmode_lower = Stdlib.fst pmode_lower }
+            , self#record ctx [ "pmode_upper", Stdlib.snd pmode_upper; "pmode_lower", Stdlib.snd pmode_lower ] )
+
+        method mode_bound : 'ctx -> mode_bound -> mode_bound * 'res =
+          self#list self#mode_bound_elem
+
+        method mode_bound_elem : 'ctx -> mode_bound_elem -> mode_bound_elem * 'res =
+          fun ctx x ->
+            match x with
+            | Pbound_var a ->
+              let a = self#mode_bound_var ctx a in
+              Pbound_var (Stdlib.fst a), self#constr ctx "Pbound_var" [ Stdlib.snd a ]
+            | Pbound_const a ->
+              let a = self#list (self#loc self#mode_const) ctx a in
+              Pbound_const (Stdlib.fst a), self#constr ctx "Pbound_const" [ Stdlib.snd a ]
+
+        method mode_bound_var : 'ctx -> mode_bound_var -> mode_bound_var * 'res =
+          fun ctx { pbound_morph; pbound_var; pbound_mod } ->
+            let pbound_morph = self#option (self#loc self#mode_morph) ctx pbound_morph in
+            let pbound_var = self#loc self#mode_var ctx pbound_var in
+            let pbound_mod = self#list (self#loc self#mode_const) ctx pbound_mod in
+            ( { pbound_morph = Stdlib.fst pbound_morph
+              ; pbound_var = Stdlib.fst pbound_var
+              ; pbound_mod = Stdlib.fst pbound_mod
+              }
+            , self#record
+                ctx
+                [ "pbound_morph", Stdlib.snd pbound_morph
+                ; "pbound_var", Stdlib.snd pbound_var
+                ; "pbound_mod", Stdlib.snd pbound_mod
+                ] )
 
         method modes : 'ctx -> modes -> modes * 'res = self#list (self#loc self#mode)
 
@@ -1840,7 +2127,14 @@ module Ast_traverse = struct
       method function_body : function_body T.t
       method function_constraint : Pexp_function.Function_constraint.t T.t
       method type_constraint : type_constraint T.t
+      method mode_const : string T.t
+      method mode_var : string T.t
+      method mode_morph : string T.t
       method mode : Mode.t T.t
+      method mode_bounded : Mode.bounded T.t
+      method mode_bound : Mode.bound T.t
+      method mode_bound_elem : Mode.bound_elem T.t
+      method mode_bound_var : Mode.bound_var T.t
       method modes : Modes.t T.t
       method modality : Modality.t T.t
       method modalities : Modalities.t T.t
@@ -1859,7 +2153,14 @@ module Ast_traverse = struct
       method function_body : ('ctx, function_body) T.t
       method function_constraint : ('ctx, Pexp_function.Function_constraint.t) T.t
       method type_constraint : ('ctx, type_constraint) T.t
+      method mode_const : ('ctx, string) T.t
+      method mode_var : ('ctx, string) T.t
+      method mode_morph : ('ctx, string) T.t
       method mode : ('ctx, Mode.t) T.t
+      method mode_bounded : ('ctx, Mode.bounded) T.t
+      method mode_bound : ('ctx, Mode.bound) T.t
+      method mode_bound_elem : ('ctx, Mode.bound_elem) T.t
+      method mode_bound_var : ('ctx, Mode.bound_var) T.t
       method modes : ('ctx, Modes.t) T.t
       method modality : ('ctx, Modality.t) T.t
       method modalities : ('ctx, Modalities.t) T.t
@@ -1878,7 +2179,14 @@ module Ast_traverse = struct
       method function_body : (function_body, 'a) T.t
       method function_constraint : (Pexp_function.Function_constraint.t, 'a) T.t
       method type_constraint : (type_constraint, 'a) T.t
+      method mode_const : (string, 'a) T.t
+      method mode_var : (string, 'a) T.t
+      method mode_morph : (string, 'a) T.t
       method mode : (Mode.t, 'a) T.t
+      method mode_bounded : (Mode.bounded, 'a) T.t
+      method mode_bound : (Mode.bound, 'a) T.t
+      method mode_bound_elem : (Mode.bound_elem, 'a) T.t
+      method mode_bound_var : (Mode.bound_var, 'a) T.t
       method modes : (Modes.t, 'a) T.t
       method modality : (Modality.t, 'a) T.t
       method modalities : (Modalities.t, 'a) T.t
@@ -1897,7 +2205,14 @@ module Ast_traverse = struct
       method function_body : ('ctx, function_body, 'res) T.t
       method function_constraint : ('ctx, Pexp_function.Function_constraint.t, 'res) T.t
       method type_constraint : ('ctx, type_constraint, 'res) T.t
+      method mode_const : ('ctx, string, 'res) T.t
+      method mode_var : ('ctx, string, 'res) T.t
+      method mode_morph : ('ctx, string, 'res) T.t
       method mode : ('ctx, Mode.t, 'res) T.t
+      method mode_bounded : ('ctx, Mode.bounded, 'res) T.t
+      method mode_bound : ('ctx, Mode.bound, 'res) T.t
+      method mode_bound_elem : ('ctx, Mode.bound_elem, 'res) T.t
+      method mode_bound_var : ('ctx, Mode.bound_var, 'res) T.t
       method modes : ('ctx, Modes.t, 'res) T.t
       method modality : ('ctx, Modality.t, 'res) T.t
       method modalities : ('ctx, Modalities.t, 'res) T.t

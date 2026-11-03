@@ -33,6 +33,9 @@ type mapper = {
   attribute: mapper -> attribute -> attribute;
   attributes: mapper -> attribute list -> attribute list;
   modes : mapper -> modes -> modes;
+  mode : mapper -> mode Location.loc -> mode Location.loc;
+  mode_bound : mapper -> mode_bound -> mode_bound;
+  mode_bound_var : mapper -> mode_bound_var -> mode_bound_var;
   modalities : mapper -> modalities -> modalities;
   binding_op: mapper -> binding_op -> binding_op;
   case: mapper -> case -> case;
@@ -1040,7 +1043,32 @@ let default_mapper =
          { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc });
 
     modes = (fun this m ->
-      List.map (map_loc this) m);
+      List.map (this.mode this) m);
+
+    mode = (fun this { txt; loc } ->
+      let txt =
+        match txt with
+        | (Pmode _ | Pmode_var _) as mode -> mode
+        | Pmode_bounded { pmode_upper; pmode_lower } ->
+          Pmode_bounded
+            { pmode_upper = this.mode_bound this pmode_upper;
+              pmode_lower = this.mode_bound this pmode_lower
+            }
+      in
+      { txt; loc = this.location this loc });
+
+    mode_bound = (fun this elems ->
+      List.map
+        (function
+          | Pbound_var v -> Pbound_var (this.mode_bound_var this v)
+          | Pbound_const cs -> Pbound_const (List.map (map_loc this) cs))
+        elems);
+
+    mode_bound_var = (fun this { pbound_morph; pbound_var; pbound_mod } ->
+      { pbound_morph = Option.map (map_loc this) pbound_morph;
+        pbound_var = map_loc this pbound_var;
+        pbound_mod = List.map (map_loc this) pbound_mod
+      });
 
     modalities = (fun this m ->
       List.map (map_loc this) m);

@@ -38,14 +38,34 @@ module Modalities = struct
 end
 
 module Mode = struct
-  type t = mode = Mode of string [@@unboxed]
+  type t = mode =
+    | Pmode of string
+    | Pmode_var of string
+    | Pmode_bounded of bounded
+
+  and bounded = mode_bounded =
+    { pmode_upper : bound
+    ; pmode_lower : bound
+    }
+
+  and bound = bound_elem list
+
+  and bound_elem = mode_bound_elem =
+    | Pbound_var of bound_var
+    | Pbound_const of string loc list
+
+  and bound_var = mode_bound_var =
+    { pbound_morph : string loc option
+    ; pbound_var : string loc
+    ; pbound_mod : string loc list
+    }
 end
 
 module Modes = struct
   type t = Mode.t loc list
 
   let none = []
-  let local ~loc = [ { txt = Mode "local"; loc } ]
+  let local ~loc = [ { txt = Pmode "local"; loc } ]
 end
 
 module Include_kind = struct
