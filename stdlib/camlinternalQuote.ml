@@ -1639,9 +1639,12 @@ module Ast = struct
     | TypeAny -> pp fmt "_"
     | TypeVar v -> Var.Type_var.print env fmt v
     | TypeArrow (arg_label, ty1, ms1, ty2, ms2) ->
+      let print_return_type =
+        if ms2 = [] then print_core_type else print_core_type_with_parens
+      in
       pp fmt "%a%a%a@ ->@ %a%a" print_arrow_arg_lab arg_label
         (print_core_type_with_arrow env)
-        ty1 print_mode_constraint ms1 (print_core_type env) ty2
+        ty1 print_mode_constraint ms1 (print_return_type env) ty2
         print_mode_constraint ms2
     | TypeTuple ts ->
       pp fmt "%a"
