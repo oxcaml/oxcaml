@@ -697,6 +697,20 @@ let parens ~if_scope_is scope ppf f =
     Format.fprintf ppf "(%t)" (f Outer)
   | (Outer | Where_body | Continuation_body), _ -> f scope ppf
 
+(* As in [Switch_expr.print], likelihoods are printed relative to the other arms
+   of the switch, and only if they differ. *)
+let branch_annotations ~total ~uniform ppf annotations =
+  (match
+     Likelihood.rescale ~total (Branch_annotations.likelihood annotations)
+     |> Likelihood.classify
+   with
+  | Cold -> Format.fprintf ppf "@ likelihood(cold)"
+  | Weight p -> if not uniform then Format.fprintf ppf "@ likelihood(%f)" p);
+  let fdo_annotation = Branch_annotations.fdo_annotation annotations in
+  if not (Fdo_annotation.is_empty fdo_annotation)
+  then
+    Format.fprintf ppf "@ fdo_annotation%a" Fdo_annotation.print fdo_annotation
+
 let rec expr scope ppf = function
   | Invalid ->
     Format.fprintf ppf "%tinvalid%t" Flambda_colours.invalid_keyword
