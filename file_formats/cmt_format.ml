@@ -308,7 +308,7 @@ let iter_on_occurrences
       | Tpat_fun_layout _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _
       | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _
-      | Tpat_addr _ | Tpat_deref _ | Tpat_lazy _
+      | Tpat_addr _ | Tpat_deref _ | Tpat_alias_deref _ | Tpat_lazy _
       | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
       List.iter  (fun (pat_extra, _, _) ->
         match pat_extra with

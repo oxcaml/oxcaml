@@ -435,6 +435,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
     | Tpat_deref { name; _ } ->
         Ppat_deref (Pat.var ~loc:name.loc name)
+    | Tpat_alias_deref { pattern = p; name; _ } ->
+        Ppat_alias_deref (sub.pat sub p, name)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)

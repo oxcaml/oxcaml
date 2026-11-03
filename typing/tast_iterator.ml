@@ -318,6 +318,8 @@ let pat
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
   | Tpat_deref { name = s; _ } -> iter_loc sub s
+  | Tpat_alias_deref { pattern = p; name = s; _ } ->
+      sub.pat sub p; iter_loc sub s
   | Tpat_addr (_, _, p) | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
