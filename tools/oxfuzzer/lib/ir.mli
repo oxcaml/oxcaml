@@ -195,6 +195,8 @@ end
 module Expr : sig
   type t =
     | Const of Number.t
+    | Assert_false
+        (** Non-returning expression, valid at any result type or layout. *)
     | Read of place
     | Array_literal of t list
     | Array_make of
