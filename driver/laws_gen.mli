@@ -26,10 +26,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Generation of the laws file of a compilation unit. The file declares the
-    laws of the unit as values of [CamlinternalLaw.Make(Choice).t], in a functor
-    [Instantiate] over the choices of a testing backend, with a record type
-    ['a each] with one field per law. *)
+(** Generation of the laws file of a compilation unit. The file declares each
+    law of the unit as a function from its choice to a value of
+    [CamlinternalLaw.Make(Choice).t], in a functor [Instantiate] over the
+    choices of a testing backend, with a record type ['a each] with one field
+    per law. *)
 
 val generate :
   unit:Compilation_unit.t -> Typedtree.implementation -> Laws_file.t

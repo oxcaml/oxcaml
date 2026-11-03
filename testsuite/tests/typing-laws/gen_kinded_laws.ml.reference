@@ -89,22 +89,14 @@ type refined_input =
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
-    module type Choices  =
-      sig
-        val kinded : kinded_input Choice.t
-        val narrowed : narrowed_input Choice.t
-        val nullable : nullable_input Choice.t
-        val plain : plain_input Choice.t
-        val refined : refined_input Choice.t
-      end
-    let kinded ((module C)  : (module Choices))  : unit Law.t =
+    let kinded (choice : kinded_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.kinded),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.kinded;
+                 source = choice;
                  predicate =
                    (fun ((Kinded_input { x }) : kinded_input) ->
                       (Laws_gen_Gen_kinded.f x : bool));
@@ -117,14 +109,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 45
                    }
                }))
-    let narrowed ((module C)  : (module Choices))  : unit Law.t =
+    let narrowed (choice : narrowed_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.narrowed),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.narrowed;
+                 source = choice;
                  predicate =
                    (fun ((Narrowed_input { x; y }) : narrowed_input) ->
                       (Laws_gen_Stdlib.(&&) (Laws_gen_Gen_kinded.f x)
@@ -138,14 +130,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 44
                    }
                }))
-    let nullable ((module C)  : (module Choices))  : unit Law.t =
+    let nullable (choice : nullable_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.nullable),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.nullable;
+                 source = choice;
                  predicate =
                    (fun ((Nullable_input { x }) : nullable_input) ->
                       (fun (type a : value_or_null) (x : a) ->
@@ -159,14 +151,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 56
                    }
                }))
-    let plain ((module C)  : (module Choices))  : unit Law.t =
+    let plain (choice : plain_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.plain),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.plain;
+                 source = choice;
                  predicate =
                    (fun ((Plain_input { x }) : plain_input) ->
                       (Laws_gen_Stdlib.(=) 1 1 : bool));
@@ -179,14 +171,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 27
                    }
                }))
-    let refined ((module C)  : (module Choices))  : unit Law.t =
+    let refined (choice : refined_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.refined),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.refined;
+                 source = choice;
                  predicate =
                    (fun ((Refined_input { w; x }) : refined_input) ->
                       (fun (type a) (w : a Laws_gen_Gen_kinded.ty) (x : a) ->
@@ -206,12 +198,4 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 60
                    }
                }))
-    let laws choices =
-      {
-        kinded = (kinded choices);
-        narrowed = (narrowed choices);
-        nullable = (nullable choices);
-        plain = (plain choices);
-        refined = (refined choices)
-      }
   end

@@ -22,15 +22,14 @@ type fresh_input =
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
-    module type Choices  = sig val fresh : fresh_input Choice.t end
-    let fresh ((module C)  : (module Choices))  : unit Law.t =
+    let fresh (choice : fresh_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.fresh),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.fresh;
+                 source = choice;
                  predicate =
                    (fun ((Fresh_input) : fresh_input) ->
                       (Laws_gen_Stdlib_1.(=) Laws_gen_Laws_gen_Stdlib.x 1 : 
@@ -44,5 +43,4 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 34
                    }
                }))
-    let laws choices = { fresh = (fresh choices) }
   end

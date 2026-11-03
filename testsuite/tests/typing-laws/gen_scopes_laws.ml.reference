@@ -123,90 +123,15 @@ type partly_hidden_hidden_input =
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
-    module type Map_choices  =
-      sig
-        module Key : Laws_gen_Gen_scopes.Comparable
-        type find_elem_input =
-          | Find_elem_input: 'a .
-          {
-          k: Key.t ;
-          m: 'a Laws_gen_Gen_scopes.Map(Key).t } -> find_elem_input 
-        type empty_find_empty_input =
-          | Empty_find_empty_input: {
-          k: Key.t } -> empty_find_empty_input 
-        val find_elem : find_elem_input Choice.t
-        val empty_find_empty : empty_find_empty_input Choice.t
-      end
-    module type Lex_choices  =
-      sig
-        module A : Laws_gen_Gen_scopes.Comparable
-        module B : Laws_gen_Gen_scopes.Comparable
-        type refl_input =
-          | Refl_input: {
-          p: (A.t * B.t) } -> refl_input 
-        val refl : refl_input Choice.t
-      end
-    module type Order_max_choices  =
-      sig
-        module X : Laws_gen_Gen_scopes.Comparable
-        type max_comm_input =
-          | Max_comm_input: {
-          a: X.t ;
-          b: X.t } -> max_comm_input 
-        module type Pair_choices  =
-          sig
-            module Y : sig type t val equal : t -> t -> bool end
-            type pair_refl_input =
-              | Pair_refl_input: {
-              a: X.t ;
-              b: Y.t } -> pair_refl_input 
-            val pair_refl : pair_refl_input Choice.t
-          end
-        val max_comm : max_comm_input Choice.t
-        val pair : (module Pair_choices) Choice.t
-      end
-    module type Twice_choices  =
-      sig
-        module X :
-        sig
-          val f : int -> int
-          law? idem (x : int) : Laws_gen_Stdlib.(=) (f (f x)) (f x)
-        end
-        type g_idem_input =
-          | G_idem_input: {
-          x: int } -> g_idem_input 
-        val g_idem : g_idem_input Choice.t
-      end
-    module type Outer_choices  =
-      sig
-        module X : Laws_gen_Gen_scopes.Comparable
-        module type Inner_choices  =
-          sig
-            module X_1 : Laws_gen_Gen_scopes.Comparable
-            type mk_ok_input =
-              | Mk_ok_input: {
-              x: X_1.t } -> mk_ok_input 
-            val mk_ok : mk_ok_input Choice.t
-          end
-        val inner : (module Inner_choices) Choice.t
-      end
-    module type Choices  =
-      sig
-        val partly_hidden_hidden : partly_hidden_hidden_input Choice.t
-        val map : (module Map_choices) Choice.t
-        val lex : (module Lex_choices) Choice.t
-        val order_max : (module Order_max_choices) Choice.t
-        val twice : (module Twice_choices) Choice.t
-        val outer : (module Outer_choices) Choice.t
-      end
-    let partly_hidden_hidden ((module C)  : (module Choices))  : unit Law.t =
+    let partly_hidden_hidden (choice : partly_hidden_hidden_input Choice.t) 
+      : unit Law.t =
       Law.Bind
-        ((Law.Choose C.partly_hidden_hidden),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.partly_hidden_hidden;
+                 source = choice;
                  predicate =
                    (fun
                       ((Partly_hidden_hidden_input { x }) :
@@ -224,10 +149,21 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 33
                    }
                }))
-    let map_find_elem ((module C)  : (module Choices))  : unit Law.t =
+    module type Map_find_elem_choices  =
+      sig
+        module Key : Laws_gen_Gen_scopes.Comparable
+        type find_elem_input =
+          | Find_elem_input: 'a .
+          {
+          k: Key.t ;
+          m: 'a Laws_gen_Gen_scopes.Map(Key).t } -> find_elem_input 
+        val find_elem : find_elem_input Choice.t
+      end
+    let map_find_elem (choice : (module Map_find_elem_choices) Choice.t)  :
+      unit Law.t =
       Law.Bind
-        ((Law.Choose C.map),
-          (fun ((module M)  : (module Map_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Map_find_elem_choices)) ->
              let module I = (Laws_gen_Gen_scopes.Map)(M.Key) in
                Law.Bind
                  ((Law.Choose M.find_elem),
@@ -274,10 +210,20 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                      end_col = 49
                                    }
                                }))))))
-    let map_empty_find_empty ((module C)  : (module Choices))  : unit Law.t =
+    module type Map_empty_find_empty_choices  =
+      sig
+        module Key : Laws_gen_Gen_scopes.Comparable
+        type empty_find_empty_input =
+          | Empty_find_empty_input: {
+          k: Key.t } -> empty_find_empty_input 
+        val empty_find_empty : empty_find_empty_input Choice.t
+      end
+    let map_empty_find_empty
+      (choice : (module Map_empty_find_empty_choices) Choice.t)  : unit Law.t
+      =
       Law.Bind
-        ((Law.Choose C.map),
-          (fun ((module M)  : (module Map_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Map_empty_find_empty_choices)) ->
              let module I = (Laws_gen_Gen_scopes.Map)(M.Key) in
                Law.Bind
                  ((Law.Choose M.empty_find_empty),
@@ -302,10 +248,20 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                               end_col = 63
                             }
                         }))))
-    let lex_refl ((module C)  : (module Choices))  : unit Law.t =
+    module type Lex_refl_choices  =
+      sig
+        module A : Laws_gen_Gen_scopes.Comparable
+        module B : Laws_gen_Gen_scopes.Comparable
+        type refl_input =
+          | Refl_input: {
+          p: (A.t * B.t) } -> refl_input 
+        val refl : refl_input Choice.t
+      end
+    let lex_refl (choice : (module Lex_refl_choices) Choice.t)  : unit Law.t
+      =
       Law.Bind
-        ((Law.Choose C.lex),
-          (fun ((module M)  : (module Lex_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Lex_refl_choices)) ->
              let module I = ((Laws_gen_Gen_scopes.Lex)(M.A))(M.B) in
                Law.Bind
                  ((Law.Choose M.refl),
@@ -327,10 +283,20 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                               end_col = 45
                             }
                         }))))
-    let order_max_max_comm ((module C)  : (module Choices))  : unit Law.t =
+    module type Order_max_max_comm_choices  =
+      sig
+        module X : Laws_gen_Gen_scopes.Comparable
+        type max_comm_input =
+          | Max_comm_input: {
+          a: X.t ;
+          b: X.t } -> max_comm_input 
+        val max_comm : max_comm_input Choice.t
+      end
+    let order_max_max_comm
+      (choice : (module Order_max_max_comm_choices) Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.order_max),
-          (fun ((module M)  : (module Order_max_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Order_max_max_comm_choices)) ->
              let module I = (Laws_gen_Gen_scopes.Order.Max)(M.X) in
                Law.Bind
                  ((Law.Choose M.max_comm),
@@ -356,11 +322,26 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                               end_col = 73
                             }
                         }))))
-    let order_max_pair_pair_refl ((module C)  : (module Choices))  :
+    module type Order_max_pair_pair_refl_choices  =
+      sig
+        module X : Laws_gen_Gen_scopes.Comparable
+        module type Pair_choices  =
+          sig
+            module Y : sig type t val equal : t -> t -> bool end
+            type pair_refl_input =
+              | Pair_refl_input: {
+              a: X.t ;
+              b: Y.t } -> pair_refl_input 
+            val pair_refl : pair_refl_input Choice.t
+          end
+        val pair : (module Pair_choices) Choice.t
+      end
+    let order_max_pair_pair_refl
+      (choice : (module Order_max_pair_pair_refl_choices) Choice.t)  :
       unit Law.t =
       Law.Bind
-        ((Law.Choose C.order_max),
-          (fun ((module M)  : (module Order_max_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Order_max_pair_pair_refl_choices)) ->
              let module I = (Laws_gen_Gen_scopes.Order.Max)(M.X) in
                Law.Bind
                  ((Law.Choose M.pair),
@@ -391,10 +372,23 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                        end_col = 48
                                      }
                                  }))))))
-    let twice_g_idem ((module C)  : (module Choices))  : unit Law.t =
+    module type Twice_g_idem_choices  =
+      sig
+        module X :
+        sig
+          val f : int -> int
+          law? idem (x : int) : Laws_gen_Stdlib.(=) (f (f x)) (f x)
+        end
+        type g_idem_input =
+          | G_idem_input: {
+          x: int } -> g_idem_input 
+        val g_idem : g_idem_input Choice.t
+      end
+    let twice_g_idem (choice : (module Twice_g_idem_choices) Choice.t)  :
+      unit Law.t =
       Law.Bind
-        ((Law.Choose C.twice),
-          (fun ((module M)  : (module Twice_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Twice_g_idem_choices)) ->
              let module I = (Laws_gen_Gen_scopes.Twice)(M.X) in
                Law.Bind
                  ((Law.Choose M.g_idem),
@@ -416,10 +410,24 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                               end_col = 39
                             }
                         }))))
-    let outer_inner_mk_ok ((module C)  : (module Choices))  : unit Law.t =
+    module type Outer_inner_mk_ok_choices  =
+      sig
+        module X : Laws_gen_Gen_scopes.Comparable
+        module type Inner_choices  =
+          sig
+            module X_1 : Laws_gen_Gen_scopes.Comparable
+            type mk_ok_input =
+              | Mk_ok_input: {
+              x: X_1.t } -> mk_ok_input 
+            val mk_ok : mk_ok_input Choice.t
+          end
+        val inner : (module Inner_choices) Choice.t
+      end
+    let outer_inner_mk_ok
+      (choice : (module Outer_inner_mk_ok_choices) Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.outer),
-          (fun ((module M)  : (module Outer_choices)) ->
+        ((Law.Choose choice),
+          (fun ((module M)  : (module Outer_inner_mk_ok_choices)) ->
              let module I = (Laws_gen_Gen_scopes.Outer)(M.X) in
                Law.Bind
                  ((Law.Choose M.inner),
@@ -448,15 +456,4 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                                        end_col = 38
                                      }
                                  }))))))
-    let laws choices =
-      {
-        partly_hidden_hidden = (partly_hidden_hidden choices);
-        map_find_elem = (map_find_elem choices);
-        map_empty_find_empty = (map_empty_find_empty choices);
-        lex_refl = (lex_refl choices);
-        order_max_max_comm = (order_max_max_comm choices);
-        order_max_pair_pair_refl = (order_max_pair_pair_refl choices);
-        twice_g_idem = (twice_g_idem choices);
-        outer_inner_mk_ok = (outer_inner_mk_ok choices)
-      }
   end

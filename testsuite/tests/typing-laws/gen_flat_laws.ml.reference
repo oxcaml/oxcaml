@@ -234,31 +234,14 @@ type records_input =
 module Instantiate(Choice:CamlinternalLaw.Choice) =
   struct
     module Law = (CamlinternalLaw.Make)(Choice)
-    module type Choices  =
-      sig
-        val poly : poly_input Choice.t
-        val modes : modes_input Choice.t
-        val unboxed : unboxed_input Choice.t
-        val \#type : type_input Choice.t
-        val alias : alias_input Choice.t
-        val assumption : assumption_input Choice.t
-        val constants : constants_input Choice.t
-        val constructors : constructors_input Choice.t
-        val tuples : tuples_input Choice.t
-        val control : control_input Choice.t
-        val binding : binding_input Choice.t
-        val functions : functions_input Choice.t
-        val local : local_input Choice.t
-        val records : records_input Choice.t
-      end
-    let poly ((module C)  : (module Choices))  : unit Law.t =
+    let poly (choice : poly_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.poly),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.poly;
+                 source = choice;
                  predicate =
                    (fun ((Poly_input { xs; f }) : poly_input) ->
                       (Laws_gen_Stdlib.(=)
@@ -274,14 +257,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 46
                    }
                }))
-    let modes ((module C)  : (module Choices))  : unit Law.t =
+    let modes (choice : modes_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.modes),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.modes;
+                 source = choice;
                  predicate =
                    (fun ((Modes_input { g }) : modes_input) ->
                       (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.apply g)
@@ -295,14 +278,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 54
                    }
                }))
-    let unboxed ((module C)  : (module Choices))  : unit Law.t =
+    let unboxed (choice : unboxed_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.unboxed),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.unboxed;
+                 source = choice;
                  predicate =
                    (fun ((Unboxed_input { x }) : unboxed_input) ->
                       (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.of_unboxed x)
@@ -316,14 +299,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 55
                    }
                }))
-    let \#type ((module C)  : (module Choices))  : unit Law.t =
+    let \#type (choice : type_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.\#type),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.\#type;
+                 source = choice;
                  predicate =
                    (fun ((Type_input { \#method }) : type_input) ->
                       (Laws_gen_Stdlib.(=) \#method \#method : bool));
@@ -336,14 +319,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 50
                    }
                }))
-    let alias ((module C)  : (module Choices))  : unit Law.t =
+    let alias (choice : alias_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.alias),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.alias;
+                 source = choice;
                  predicate =
                    (fun ((Alias_input { x }) : alias_input) ->
                       (Laws_gen_Stdlib.(=) x x : bool));
@@ -356,15 +339,15 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 36
                    }
                }))
-    let assumption ((module C)  : (module Choices))  : unit Law.t =
+    let assumption (choice : assumption_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.assumption),
+        ((Law.Choose choice),
           (fun input ->
              Law.Bind
                ((Law.Assumption
                    {
                      value = input;
-                     source = C.assumption;
+                     source = choice;
                      predicate =
                        (fun ((Assumption_input { x }) : assumption_input) ->
                           (Laws_gen_Stdlib.(>) x 0 : bool));
@@ -381,7 +364,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                     Law.Assertion
                       {
                         value = input;
-                        source = C.assumption;
+                        source = choice;
                         predicate =
                           (fun ((Assumption_input { x }) : assumption_input)
                              -> (Laws_gen_Stdlib.(<>) x 0 : bool));
@@ -394,15 +377,15 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             end_col = 45
                           }
                       }))))
-    let constants ((module C)  : (module Choices))  : unit Law.t =
+    let constants (choice : constants_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.constants),
+        ((Law.Choose choice),
           (fun input ->
              Law.Bind
                ((Law.Assumption
                    {
                      value = input;
-                     source = C.constants;
+                     source = choice;
                      predicate =
                        (fun ((Constants_input { c }) : constants_input) ->
                           (Laws_gen_Stdlib.(=) c 'a' : bool));
@@ -419,7 +402,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                     Law.Assertion
                       {
                         value = input;
-                        source = C.constants;
+                        source = choice;
                         predicate =
                           (fun ((Constants_input { c }) : constants_input) ->
                              (Laws_gen_Stdlib.(&&)
@@ -434,15 +417,15 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             end_col = 68
                           }
                       }))))
-    let constructors ((module C)  : (module Choices))  : unit Law.t =
+    let constructors (choice : constructors_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.constructors),
+        ((Law.Choose choice),
           (fun input ->
              Law.Bind
                ((Law.Assumption
                    {
                      value = input;
-                     source = C.constructors;
+                     source = choice;
                      predicate =
                        (fun ((Constructors_input { s }) : constructors_input)
                           ->
@@ -462,7 +445,7 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                     Law.Assertion
                       {
                         value = input;
-                        source = C.constructors;
+                        source = choice;
                         predicate =
                           (fun
                              ((Constructors_input { s }) : constructors_input)
@@ -481,14 +464,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                             end_col = 63
                           }
                       }))))
-    let tuples ((module C)  : (module Choices))  : unit Law.t =
+    let tuples (choice : tuples_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.tuples),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.tuples;
+                 source = choice;
                  predicate =
                    (fun ((Tuples_input { x; y }) : tuples_input) ->
                       (Laws_gen_Stdlib.(&&)
@@ -503,14 +486,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 66
                    }
                }))
-    let control ((module C)  : (module Choices))  : unit Law.t =
+    let control (choice : control_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.control),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.control;
+                 source = choice;
                  predicate =
                    (fun ((Control_input { x }) : control_input) ->
                       (Laws_gen_Stdlib.(&&)
@@ -533,14 +516,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 54
                    }
                }))
-    let binding ((module C)  : (module Choices))  : unit Law.t =
+    let binding (choice : binding_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.binding),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.binding;
+                 source = choice;
                  predicate =
                    (fun ((Binding_input { s }) : binding_input) ->
                       (let a =
@@ -560,14 +543,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 49
                    }
                }))
-    let functions ((module C)  : (module Choices))  : unit Law.t =
+    let functions (choice : functions_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.functions),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.functions;
+                 source = choice;
                  predicate =
                    (fun ((Functions_input { xs }) : functions_input) ->
                       (Laws_gen_Stdlib.(||)
@@ -589,14 +572,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 53
                    }
                }))
-    let local ((module C)  : (module Choices))  : unit Law.t =
+    let local (choice : local_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.local),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.local;
+                 source = choice;
                  predicate =
                    (fun ((Local_input { x }) : local_input) ->
                       (Laws_gen_Stdlib.(=) (Laws_gen_Gen_flat.Ops.add x 1)
@@ -610,14 +593,14 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 44
                    }
                }))
-    let records ((module C)  : (module Choices))  : unit Law.t =
+    let records (choice : records_input Choice.t)  : unit Law.t =
       Law.Bind
-        ((Law.Choose C.records),
+        ((Law.Choose choice),
           (fun input ->
              Law.Assertion
                {
                  value = input;
-                 source = C.records;
+                 source = choice;
                  predicate =
                    (fun ((Records_input { p }) : records_input) ->
                       (Laws_gen_Stdlib.(&&)
@@ -637,21 +620,4 @@ module Instantiate(Choice:CamlinternalLaw.Choice) =
                      end_col = 74
                    }
                }))
-    let laws choices =
-      {
-        poly = (poly choices);
-        modes = (modes choices);
-        unboxed = (unboxed choices);
-        \#type = (\#type choices);
-        alias = (alias choices);
-        assumption = (assumption choices);
-        constants = (constants choices);
-        constructors = (constructors choices);
-        tuples = (tuples choices);
-        control = (control choices);
-        binding = (binding choices);
-        functions = (functions choices);
-        local = (local choices);
-        records = (records choices)
-      }
   end
