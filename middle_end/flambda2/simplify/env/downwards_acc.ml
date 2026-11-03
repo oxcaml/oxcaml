@@ -26,6 +26,7 @@ type t =
     used_value_slots : Name_occurrences.t;
     lifted_constants : LCS.t;
     flow_acc : Flow.Acc.t;
+    fdo_region_counters : Fdo_region_counters.t;
     demoted_exn_handlers : Continuation.Set.t;
     code_ids_to_remember : Code_id.Set.t;
     code_ids_to_never_delete : Code_id.Set.t;
@@ -49,7 +50,8 @@ let print_lifted_cont ppf (denv, original_handlers) =
 
 let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
-        lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
+        lifted_constants; flow_acc; fdo_region_counters = _; demoted_exn_handlers;
+        code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
@@ -99,6 +101,7 @@ let create denv slot_offsets continuation_uses_env =
     used_value_slots = Name_occurrences.empty;
     lifted_constants = LCS.empty;
     flow_acc = Flow.Acc.empty ();
+    fdo_region_counters = Fdo_region_counters.empty;
     demoted_exn_handlers = Continuation.Set.empty;
     code_ids_to_remember = Code_id.Set.empty;
     code_ids_to_never_delete = Code_id.Set.empty;
@@ -118,6 +121,28 @@ let flow_acc t = t.flow_acc
 let[@inline always] with_flow_acc flow_acc t = { t with flow_acc }
 
 let[@inline always] map_flow_acc t ~f = { t with flow_acc = f t.flow_acc }
+
+let fdo_region_counters t = t.fdo_region_counters
+
+let with_fdo_region_counters t fdo_region_counters =
+  { t with fdo_region_counters }
+
+let map_fdo_region_counters t ~f =
+  { t with fdo_region_counters = f t.fdo_region_counters }
+
+let map_fdo_region t ~f =
+  match DE.fdo_region t.denv with
+  | None -> t
+  | Some region ->
+    map_fdo_region_counters t ~f:(fun counters -> f counters region)
+
+let preserve_fdo_counters t counters =
+  map_fdo_region t ~f:(fun region_counters region ->
+      Fdo_region_counters.add_counters region_counters region counters)
+
+let fdo_region_continues_into t cont =
+  map_fdo_region t ~f:(fun region_counters region ->
+      Fdo_region_counters.add_continuation_into region_counters region cont)
 
 let[@inline always] map_denv t ~f = { t with denv = f t.denv }
 

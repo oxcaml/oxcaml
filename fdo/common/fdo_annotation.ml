@@ -48,6 +48,8 @@ let combine t1 t2 = Fdo_counter.add_all t1 t2
 
 let union ts = Fdo_counter.add_all [] (List.concat ts)
 
+let map f t = of_list (List.map f t)
+
 let equal t1 t2 =
   List.equal Fdo_counter.equal
     (List.sort Fdo_counter.compare t1)

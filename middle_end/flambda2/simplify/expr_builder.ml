@@ -455,13 +455,24 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
   let body, uacc = put_bindings_around_body uacc ~body in
   place_constants uacc ~around:body lifted_constants_from_defining_expr
 
-let create_switch uacc ~condition_dbg ~scrutinee ~arms =
+let preserve_fdo_counters_of_arms uacc ~fdo_region arms =
+  match fdo_region with
+  | None -> uacc
+  | Some region ->
+    UA.map_fdo_region_counters uacc ~f:(fun region_counters ->
+        Fdo_region_counters.add_counters region_counters region
+          (Fdo_term_counters.of_switch_arms arms))
+
+let create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region =
   if Target_ocaml_int.Map.cardinal arms < 1
   then
     ( RE.create_invalid Zero_switch_arms,
       UA.notify_added ~code_size:Code_size.invalid uacc )
   else
     let change_to_apply_cont action =
+      (* The arms' edges become a single jump, which runs every time: their
+         counters are preserved in the region (see [Fdo_region_counters]). *)
+      let uacc = preserve_fdo_counters_of_arms uacc ~fdo_region arms in
       let uacc =
         UA.add_free_names uacc (Apply_cont.free_names action)
         |> UA.notify_added ~code_size:(Code_size.apply_cont action)

@@ -79,8 +79,36 @@ let find_all_aliases env arg =
       | None -> find_all_aliases ())
     arg
 
+(* The counters preserved in the handler the arm leads to go onto the arm (see
+   [Fdo_region_counters]). That handler is the specialized one if the arm's
+   continuation was specialized for this use. *)
+let attach_fdo_region_counters uacc ~use_id action annotations =
+  let cont = AC.continuation action in
+  let cont =
+    match
+      Continuation_callsite_map.find cont use_id (UA.specialization_map uacc)
+    with
+    | exception Not_found -> cont
+    | specialized -> specialized
+  in
+  let preserved =
+    Fdo_region_counters.counters_into
+      (UA.fdo_region_counters uacc)
+      (Handler cont)
+  in
+  if Fdo_annotation.is_empty preserved
+  then annotations
+  else
+    Branch_annotations.with_fdo_annotation annotations
+      (Fdo_annotation.combine
+         (Branch_annotations.fdo_annotation annotations)
+         preserved)
+
 let rebuild_arm uacc arm (action, ~annotations, use_id, arity, env_at_use)
     (new_let_conts, arms, (mergeable_arms : mergeable_arms)) =
+  let annotations =
+    attach_fdo_region_counters uacc ~use_id action annotations
+  in
   let action =
     Simplify_common.clear_demoted_trap_action_and_patch_unused_exn_bucket uacc
       action
@@ -763,7 +791,8 @@ let rebuild_switch
       scrutinee_ty;
       shareable_constants;
       typing_env_before_switch;
-      cse_before_switch
+      cse_before_switch;
+      fdo_region
     } uacc ~after_rebuild =
   let machine_width = TE.machine_width typing_env_before_switch in
   let new_let_conts, arms, mergeable_arms =
@@ -799,7 +828,7 @@ let rebuild_switch
            should not count them in the number of removed operations: these
            branches wouldn't have been taken during execution anyway. *)
         let expr, uacc =
-          EB.create_switch uacc ~condition_dbg ~scrutinee ~arms
+          EB.create_switch uacc ~condition_dbg ~scrutinee ~arms ~fdo_region
         in
         if
           Flambda_features.check_invariants ()
@@ -818,6 +847,8 @@ let rebuild_switch
         let uacc =
           UA.notify_removed ~operation:Removed_operations.branch uacc
         in
+        (* The arms' edges become a single jump (see [EB.create_switch]). *)
+        let uacc = EB.preserve_fdo_counters_of_arms uacc ~fdo_region arms in
         (* CR bclement: should use a single unboxed product lookup table *)
         let rec rebuild_merged_switch mergeable_args args_rev =
           match mergeable_args with
@@ -874,6 +905,11 @@ let simplify_arm arm (switch_arm, env_at_use) (arms, dacc) =
   let dbg = AC.debuginfo action in
   let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
   let action = AC.with_debuginfo action ~dbg in
+  let annotations =
+    Branch_annotations.with_fdo_annotation annotations
+      (DE.inline_fdo_annotation (DA.denv dacc)
+         (Branch_annotations.fdo_annotation annotations))
+  in
   let dacc =
     DA.map_flow_acc dacc
       ~f:
@@ -1055,9 +1091,17 @@ let simplify_switch dacc switch ~down_to_up =
   in
   match TI.Map.get_singleton arms with
   | Some (_, (arm, env_at_use)) ->
-    (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
+    (* Rewrite to a regular apply_cont so that it is an inlinable use. The arm's
+       edge disappears with the switch, but the code it leads to runs as often:
+       its counters are preserved in the current region (see
+       [Fdo_region_counters]). *)
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let dacc = DA.with_denv dacc denv_at_use in
+    let dacc =
+      DA.preserve_fdo_counters dacc
+        (DE.inline_fdo_annotation denv_at_use
+           (Branch_annotations.fdo_annotation (Switch_arm.annotations arm)))
+    in
     Simplify_apply_cont_expr.simplify_apply_cont dacc (Switch_arm.action arm)
       ~down_to_up:(fun dacc simplified_expr ->
         down_to_up dacc
@@ -1093,4 +1137,5 @@ let simplify_switch dacc switch ~down_to_up =
     let cse_before_switch = DE.cse (DA.denv dacc_before_switch) in
     down_to_up dacc
       (SE.simplified_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~shareable_constants ~typing_env_before_switch ~cse_before_switch)
+         ~shareable_constants ~typing_env_before_switch ~cse_before_switch
+         ~fdo_region:(DE.fdo_region (DA.denv dacc_before_switch)))
