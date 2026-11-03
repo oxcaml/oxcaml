@@ -40,9 +40,9 @@ FLAGS := -Q $(STDLIB_DIR) OxCamlStdlib -Q $(BACKEND_DIR) OxCamlBackend \
   -Q $(SSA_DIR) OxCamlSsa -Q $(LOOP_DIR) OxCamlLoop
 
 STDLIB := $(addprefix $(STDLIB_DIR)/, \
-  OxCamlLogic.v OxCamlOption.v ZTactics.v OxCamlInt.v OxCamlInt64.v \
-  OxCamlList.v IntArith.v \
-  OxCamlExtract.v IntArithExtract.v)
+  OxCamlLogic.v OxCamlOption.v ZTactics.v OxCamlInt.v OxCamlIntProofs.v \
+  OxCamlInt64.v OxCamlInt64Proofs.v OxCamlList.v OxCamlListProofs.v \
+  IntArith.v IntArithProofs.v OxCamlExtract.v IntArithExtract.v)
 BACKEND := $(addprefix $(BACKEND_DIR)/, \
   IntegerComparison.v IntegerComparisonExtract.v Operation.v \
   OperationExtract.v)

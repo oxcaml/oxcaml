@@ -35,7 +35,8 @@
 
 From Stdlib Require Import ZArith Lia List Classical_Prop.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs OxCamlList OxCamlListProofs.
 From OxCamlBackend Require Import Operation.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaDominanceSpec
   SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec
@@ -336,7 +337,7 @@ Proof.
       apply (f_equal fst) in Hentry. cbn in Hentry. subst parameter_block.
       assert (Hin_param : register_of_value (Block_param target index)
                 ∈ map register_of_value (params target)).
-      { apply in_map. eapply OxCamlList.nth_int_In. exact Hparam. }
+      { apply in_map. eapply OxCamlListProofs.nth_int_In. exact Hparam. }
       destruct (proj2 H1 _ Hin_param) as [word [Hbounded Hword]].
       exists word. exact Hword.
   - destruct Hdefinition as [v [Hdefinition <-]].

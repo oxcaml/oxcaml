@@ -30,12 +30,12 @@
    Nothing here needs review: [program_point_eqb] is a proof device, and the
    lemmas and theorems are stepping stones for SsaExecutionProofs.v,
    SsaLivenessProofs.v, SsaContextProofs.v and the loop proofs. The direction
-   a dominating branch took is derived operationally in LoopGuardExecution.v
-   from [singleton_predecessor_dominance]. *)
+   a dominating branch took is derived operationally in
+   LoopGuardExecutionProofs.v from [singleton_predecessor_dominance]. *)
 
 From Stdlib Require Import Bool List Lia PeanoNat.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlList.
+From OxCamlStdlib Require Import OxCamlList OxCamlListProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaDominanceSpec.
 Import ListNotations.
 

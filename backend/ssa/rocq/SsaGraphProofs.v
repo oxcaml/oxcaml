@@ -35,7 +35,8 @@
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlList.
+From OxCamlStdlib Require Import OxCamlOption OxCamlInt OxCamlIntProofs
+  OxCamlList OxCamlListProofs.
 From OxCamlBackend Require Import Operation.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph.
 Import ListNotations.

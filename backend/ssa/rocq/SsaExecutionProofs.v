@@ -37,7 +37,8 @@
 
 From Stdlib Require Import ZArith Lia List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlInt64 OxCamlList.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlInt64
+  OxCamlInt64Proofs OxCamlList OxCamlListProofs.
 From OxCamlBackend Require Import Operation.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaDominanceSpec
   SsaDominanceProofs SsaSemanticsSpec SsaSemanticsProofs SsaExecutionSpec.

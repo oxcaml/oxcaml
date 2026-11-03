@@ -33,7 +33,8 @@
 
 From Stdlib Require Import ZArith Lia Bool List.
 From OxCamlStdlib Require Import OxCamlLogic.
-From OxCamlStdlib Require Import OxCamlInt OxCamlList.
+From OxCamlStdlib Require Import OxCamlInt OxCamlIntProofs OxCamlList
+  OxCamlListProofs.
 From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaGraph SsaGraphProofs
   SsaDominanceSpec SsaDominanceProofs SsaSemanticsSpec SsaSemantics
   SsaSemanticsProofs SsaExecutionSpec SsaExecutionProofs SsaLivenessSpec
