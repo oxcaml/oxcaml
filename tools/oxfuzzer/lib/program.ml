@@ -439,6 +439,8 @@ let observe_body decls statement =
         then Statement.let_binding binding (ident name) body
         else body
       in
+      (* CR-soon xclerc for xclerc: as noted in `ir.ml`, we should consider
+         omitting the constraint (e.g. under a swarm flag). *)
       observe
         (Ast_helper.Exp.constraint_ (Expr.to_code expr)
            (Some (Ty.to_code binding.ty))
