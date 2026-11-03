@@ -4048,6 +4048,36 @@ and type_pat_aux
       let lbl_a_list = List.map (type_label_pat rep) lbl_a_list in
       rvp @@ solve_expected (make_record_pat rep lbl_a_list ambiguity)
   in
+  (* CR address-patterns: [deref_] should be allowed while deepening an
+     [addr_] at [write] and [immutable], too. Currently, this is only
+     accepted if the ['a addr] is at least read. Similarly, [deref_] on
+     a mutable field should be allowed in records at [write], [immutable]
+     or [contended]. *)
+  let type_deref ~attrs name =
+    let { position_mutability; container_mode; container_loc; base;
+          rev_unboxed } =
+      match deref_position with
+      | Some pos -> pos
+      | None -> Error.log_and_raise loc !!penv Deref_pattern_bad_position
+    in
+    let unboxed = List.rev rev_unboxed in
+    check_block_path ~loc ~env:!!penv Deref_pattern
+      ~mutability:position_mutability base unboxed;
+    let ty_addr, addr_sort =
+      solve_Ppat_deref !!penv position_mutability expected_ty
+    in
+    let is_contained_by : Mode.Hint.is_contained_by =
+      { containing = Derived_address; container = (container_loc, Pattern) }
+    in
+    let mode = apply_left_is_contained_by is_contained_by container_mode in
+    let type_expr = instance ty_addr in
+    let mode = cross_left !!penv ty_addr mode in
+    let id, uid =
+      enter_variable ~pv_kind:Deref_var tps name.loc name mode
+        ~kind:(Val_reg addr_sort) type_expr attrs addr_sort
+    in
+    id, uid, addr_sort, mode, type_expr
+  in
   match sp.ppat_desc with
     Ppat_any ->
       rvp {
@@ -4632,50 +4662,34 @@ and type_pat_aux
   | Ppat_effect _ ->
       Error.log_and_raise loc !!penv Effect_pattern_below_toplevel
   | Ppat_deref sp1 ->
-      (* CR address-patterns: [deref_] should be allowed while deepening an
-         [addr_] at [write] and [immutable], too. Currently, this is only
-         accepted if the ['a addr] is at least read. Similarly, [deref_] on
-         a mutable field should be allowed in records at [write], [immutable]
-         or [contended]. *)
-      (* CR address-patterns: support [as deref_ x], which lifts the
-         restriction below; then, print a more informative error when
-         the argument is a pattern that [as deref_ x] would accept. *)
-      let name =
-        match sp1.ppat_desc with
-        | Ppat_var name -> name
-        | _ ->
+      (* CR address-patterns: print a more informative error when the argument
+         is a pattern that [as deref_ x] would accept. *)
+      begin match sp1.ppat_desc with
+      | Ppat_var name ->
+          let id, uid, sort, mode, type_expr =
+            type_deref ~attrs:sp1.ppat_attributes name
+          in
+          rvp { pat_desc = Tpat_deref { id; name; uid; sort; mode; type_expr };
+                pat_loc = loc; pat_extra=[];
+                pat_type = instance expected_ty;
+                pat_attributes = sp.ppat_attributes;
+                pat_env = !!penv;
+                pat_unique_barrier = Unique_barrier.not_computed () }
+      | _ ->
           Error.log_and_raise sp1.ppat_loc !!penv Deref_pattern_bad_argument
+      end
+  | Ppat_alias_deref (sp1, name) ->
+      let q = type_pat tps Value ?deref_position sp1 expected_ty sort in
+      let id, uid, sort, mode, type_expr =
+        type_deref ~attrs:sp.ppat_attributes name
       in
-      let { position_mutability; container_mode; container_loc; base;
-            rev_unboxed } =
-        match deref_position with
-        | Some pos -> pos
-        | None -> Error.log_and_raise loc !!penv Deref_pattern_bad_position
-      in
-      let unboxed = List.rev rev_unboxed in
-      check_block_path ~loc ~env:!!penv Deref_pattern
-        ~mutability:position_mutability base unboxed;
-      let ty_addr, addr_sort =
-        solve_Ppat_deref !!penv position_mutability expected_ty
-      in
-      let is_contained_by : Mode.Hint.is_contained_by =
-        { containing = Derived_address; container = (container_loc, Pattern) }
-      in
-      let mode = apply_left_is_contained_by is_contained_by container_mode in
-      let type_expr = instance ty_addr in
-      let mode = cross_left !!penv ty_addr mode in
-      let id, uid =
-        enter_variable ~pv_kind:Deref_var tps name.loc name mode
-          ~kind:(Val_reg addr_sort) type_expr sp1.ppat_attributes addr_sort
-      in
-      rvp {
-        pat_desc =
-          Tpat_deref { id; name; uid; sort = addr_sort; mode; type_expr };
-        pat_loc = loc; pat_extra=[];
-        pat_type = instance expected_ty;
-        pat_attributes = sp.ppat_attributes;
-        pat_env = !!penv;
-        pat_unique_barrier = Unique_barrier.not_computed () }
+      rvp { pat_desc = Tpat_alias_deref { pattern = q; id; name; uid;
+                                          sort; mode; type_expr };
+            pat_loc = loc; pat_extra=[];
+            pat_type = q.pat_type;
+            pat_attributes = sp.ppat_attributes;
+            pat_env = !!penv;
+            pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
