@@ -907,6 +907,10 @@ and gen_try_expr (st : State.t) (env : Env.t) ty =
       let body = gen_body body_env in
       Expr.Try { ty; body; handlers })
 
+(* In [May_raise] mode, [gen_value] may replace the whole expression with
+   [assert false]. Type-specific generators such as [gen_number] and [gen_bool]
+   do not inject assertions at the root, but their generated expressions can
+   still raise assertions in subexpressions or callees. *)
 and gen_value (st : State.t) env ty =
   maybe_assert st ~f:(fun () ->
       match ty with
