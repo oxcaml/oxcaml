@@ -308,7 +308,8 @@ type apply =
     alloc_mode : region alloc_mode_for_applications;
     arities : function_arities option;
     inlined : inlined_attribute option;
-    inlining_state : inlining_state option
+    inlining_state : inlining_state option;
+    callsite_counter : Fdo_counter.t option
   }
 
 type size = int
@@ -331,9 +332,15 @@ type expr =
   | Apply_cont of apply_cont
   | Switch of
       { scrutinee : simple;
-        cases : (int * apply_or_inlined_cont) list
+        cases : switch_case list
       }
   | Invalid
+
+and switch_case =
+  { tag : int;
+    action : apply_or_inlined_cont;
+    annotations : Branch_annotations.t
+  }
 
 and apply_or_inlined_cont =
   | Inlined_goto of expr

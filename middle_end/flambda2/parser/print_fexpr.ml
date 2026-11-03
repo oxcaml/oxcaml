@@ -686,6 +686,20 @@ let parens ~if_scope_is scope ppf f =
     Format.fprintf ppf "(%t)" (f Outer)
   | (Outer | Where_body | Continuation_body), _ -> f scope ppf
 
+(* As in [Switch_expr.print], likelihoods are printed relative to the other arms
+   of the switch, and only if they differ. *)
+let branch_annotations ~total ~uniform ppf annotations =
+  (match
+     Likelihood.rescale ~total (Branch_annotations.likelihood annotations)
+     |> Likelihood.classify
+   with
+  | Cold -> Format.fprintf ppf "@ likelihood(cold)"
+  | Weight p -> if not uniform then Format.fprintf ppf "@ likelihood(%f)" p);
+  let fdo_annotation = Branch_annotations.fdo_annotation annotations in
+  if not (Fdo_annotation.is_empty fdo_annotation)
+  then
+    Format.fprintf ppf "@ fdo_annotation%a" Fdo_annotation.print fdo_annotation
+
 let rec expr scope ppf = function
   | Invalid ->
     Format.fprintf ppf "%tinvalid%t" Flambda_colours.invalid_keyword
@@ -718,9 +732,17 @@ let rec expr scope ppf = function
     parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
         let_symbol_expr scope ppf l)
   | Switch { scrutinee; cases } ->
+    let likelihoods =
+      List.map
+        (fun ({ annotations; _ } : Fexpr.switch_case) ->
+          Branch_annotations.likelihood annotations)
+        cases
+    in
+    let total = Likelihood.sum_list likelihoods in
+    let uniform = Likelihood.is_uniform likelihoods in
     Format.fprintf ppf "@[<v 2>%tswitch%t %a%a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop simple scrutinee
-      (pp_list ~sep:"" switch_case)
+      (pp_list ~sep:"" (switch_case ~total ~uniform))
       cases
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
   | Apply
@@ -732,20 +754,29 @@ let rec expr scope ppf = function
         exn_continuation = ek;
         args;
         func;
-        arities
+        arities;
+        callsite_counter
       } ->
     let pp_inlining_state ppf () =
       pp_option ~space:Before
         (pp_like "inlining_state(%a)" inlining_state)
         ppf is
     in
+    let pp_callsite_counter ppf () =
+      pp_option ~space:Before
+        (fun ppf counter ->
+          Format.fprintf ppf "callsite_counter(%s)"
+            (Fdo_counter.to_string counter))
+        ppf callsite_counter
+    in
     Format.fprintf ppf
-      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
+      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ \
+       %a@]@]@]"
       Flambda_colours.expr_keyword Flambda_colours.pop Flambda_colours.elide
       (call_kind_and_alloc_mode ~space:Before)
       (kind, alloc_mode)
       (inlined_attribute_opt ~space:Before)
-      inlined pp_inlining_state () Flambda_colours.pop
+      inlined pp_inlining_state () pp_callsite_counter () Flambda_colours.pop
       func_name_with_optional_arities (func, arities)
       (simple_args ~space:Before ~omit_if_empty:true)
       args result_continuation ret exn_continuation ek
@@ -767,8 +798,11 @@ and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
   | Named_cont ac -> apply_cont ppf ac
   | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
 
-and switch_case ppf (v, c) =
-  Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
+and switch_case ~total ~uniform ppf
+    ({ tag; action; annotations } : Fexpr.switch_case) =
+  Format.fprintf ppf "@;@[<hov 2>| %i%a ->@ %a@]" tag
+    (branch_annotations ~total ~uniform)
+    annotations apply_or_inlined_cont action
 
 and let_expr scope ppf : let_ -> unit = function
   | { bindings = first :: rest; body; value_slots = ces } ->

@@ -189,7 +189,7 @@ apply ccall
                                (prim_3, prim_2)
                            in
                            switch prim_4
-                             | 0 -> k3
+                             | 0 likelihood(cold) -> k3
                              | 1 -> k4 (prim_3))
                             where k4 (prim_2 : nativeint) =
                               let cse_param_1 = prim_2 in

@@ -23,6 +23,12 @@
  (action
   (diff fdo_counters.output fdo_counters.output.corrected)))
 
+; Extracting the FDO annotations from fexpr dumps.
+
+(executable
+ (name fdo_annotations)
+ (modules fdo_annotations))
+
 ; Stability of function identities ([Fdo_function_naming],
 ; [Fdo_body_hash]): the entry counters and body hashes of function_ids.ml and
 ; of function_ids_edited.ml (the same module with extra anonymous functions
@@ -31,14 +37,9 @@
 ; Additionally, the discriminators should distinguish functions with the same
 ; name (or anonymous functions with the same body).
 
-(executable
- (name fdo_entries)
- (modules fdo_entries)
- (libraries ocamlcommon))
-
 (rule
  (targets function_ids.output.corrected)
- (deps function_ids.ml function_ids_edited.ml fdo_entries.exe)
+ (deps function_ids.ml function_ids_edited.ml fdo_annotations.exe)
  (enabled_if
   (= %{context_name} "main"))
  (action
@@ -65,7 +66,11 @@
     function_ids_edited.ml)
    (with-stdout-to
     function_ids.output.corrected
-    (run ./fdo_entries.exe function_ids.raw.fl function_ids.edited.raw.fl)))))
+    (run
+     ./fdo_annotations.exe
+     compare-entries
+     function_ids.raw.fl
+     function_ids.edited.raw.fl)))))
 
 (rule
  (alias runtest)

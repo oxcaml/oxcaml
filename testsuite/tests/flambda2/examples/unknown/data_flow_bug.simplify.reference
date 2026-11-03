@@ -97,7 +97,7 @@ let Popaque = %opaque ($camlData_flow_bug__immstring_3) in
                                                   (0n, prim_1)
                                               in
                                               switch prim_2
-                                                | 0 -> k1
+                                                | 0 likelihood(cold) -> k1
                                                 | 1 -> k2)
                                                where k2 =
                                                  let prim =
