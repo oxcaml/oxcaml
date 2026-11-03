@@ -1928,7 +1928,8 @@ let close_exact_or_unknown_apply acc env
        ghost_region;
        alloc_region;
        args_arity;
-       return_arity
+       return_arity;
+       callsite_counter
      } :
       IR.apply) callee_approx ~replace_region : Expr_with_acc.t =
   let callee = find_simple_from_id env func in
@@ -2026,10 +2027,7 @@ let close_exact_or_unknown_apply acc env
         ~callee:(if can_erase_callee then None else Some callee)
         ~continuation:(Return continuation) apply_exn_continuation ~args
         ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
-        ~callsite_counter:None
-          (* CR yusumez: the counter of the source call, once calls have FDO
-             ids. *)
-        ~inlined:inlined_call
+        ~callsite_counter ~inlined:inlined_call
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -2075,6 +2073,13 @@ let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
 
 let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     Expr_with_acc.t =
+  let arm_with_counters fdo_annotation action =
+    Switch_arm.create
+      ~annotations:
+        (Branch_annotations.with_fdo_annotation Branch_annotations.default
+           fdo_annotation)
+      action
+  in
   let scrutinee = find_simple_from_id env scrutinee in
   let untagged_scrutinee = Variable.create "untagged" K.naked_immediate in
   let untagged_scrutinee_duid = Flambda_debug_uid.none in
@@ -2139,8 +2144,11 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       (* CR bclement: use likelihood information from annotations. *)
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
-           ~if_true:(Switch_arm.from_apply_cont action)
-           ~if_false:(Switch_arm.from_apply_cont default_action))
+           ~if_true:
+             (arm_with_counters
+                (sw.counters.case (Target_ocaml_int.to_int case))
+                action)
+           ~if_false:(arm_with_counters sw.counters.failaction default_action))
     in
     let acc, body =
       Let_with_acc.create acc
@@ -2190,7 +2198,9 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
                      compute logits *)
                   ( acc,
                     Target_ocaml_int.Map.add case
-                      (Switch_arm.from_apply_cont arm)
+                      (arm_with_counters
+                         (sw.counters.case (Target_ocaml_int.to_int case))
+                         arm)
                       arms ))
                 arms
                 (acc, Target_ocaml_int.Map.empty)
@@ -3731,7 +3741,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     else Some (Ident.create_local "my_ghost_region")
   in
   let fbody acc env =
-    (* CR yusumez: this call should carry the counter of the source partial
+    (* The call to the callee keeps the counter of the source partial
        application [apply], as in
        [Simplify_apply_expr.simplify_direct_partial_application]. *)
     close_exact_or_unknown_apply acc env

@@ -79,3 +79,35 @@
  (deps function_ids.output function_ids.output.corrected)
  (action
   (diff function_ids.output function_ids.output.corrected)))
+
+; The counters attached by [Fdo_instrumentation] during the translation from
+; Lambda: edges of switches, interior and module-level calls, in nested
+; functions, functors and local modules.
+
+(rule
+ (targets instrumentation.output.corrected)
+ (deps instrumentation.ml fdo_annotations.exe)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (progn
+   (run
+    %{bin:ocamlopt.opt}
+    -c
+    -fdo-counters
+    -dfexpr-annot-after
+    raw
+    -color
+    never
+    instrumentation.ml)
+   (with-stdout-to
+    instrumentation.output.corrected
+    (run ./fdo_annotations.exe list instrumentation.raw.fl)))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (= %{context_name} "main"))
+ (deps instrumentation.output instrumentation.output.corrected)
+ (action
+  (diff instrumentation.output instrumentation.output.corrected)))

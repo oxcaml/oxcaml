@@ -78,7 +78,8 @@ module IR = struct
       ghost_region : Ident.t option;
       alloc_region : Ident.t;
       args_arity : [`Complex] Flambda_arity.t;
-      return_arity : [`Complex] Flambda_arity.t
+      return_arity : [`Complex] Flambda_arity.t;
+      callsite_counter : Fdo_counter.t option
     }
 
   type switch =
@@ -87,7 +88,8 @@ module IR = struct
         (int * Continuation.t * Debuginfo.t * trap_action option * simple list)
         list;
       failaction :
-        (Continuation.t * Debuginfo.t * trap_action option * simple list) option
+        (Continuation.t * Debuginfo.t * trap_action option * simple list) option;
+      counters : Fdo_instrumentation.Switch_counters.t
     }
 
   let fprintf = Format.fprintf
