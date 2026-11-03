@@ -2532,13 +2532,6 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
 let first_complex_local_param_of_function_decl decl =
   First_complex_local_param.Index (Function_decl.first_complex_local_param decl)
 
-(* The entry counter of a function's code (see [Fdo_fingerprint]), when it has
-   an FDO identity. *)
-let fdo_entry decl =
-  match Function_decl.fdo_fingerprint decl with
-  | Some fingerprint -> Fdo_fingerprint.entry_annotation fingerprint
-  | None -> Fdo_annotation.empty
-
 let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     params_arity ~unarized_param_modes:param_modes return result_arity_main_code
     code_id main_code_id decl loc external_env recursive
@@ -2829,7 +2822,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   let body = Function_decl.body decl in
   let loc = Function_decl.loc decl in
   let dbg = Debuginfo.from_location loc in
-  let fdo_entry_annotation = fdo_entry decl in
+  let fdo_entry_annotation = Function_decl.fdo_entry_annotation decl in
   let unarized_params = Function_decl.params decl in
   let params_arity = Function_decl.params_arity decl in
   let unarized_param_modes =
@@ -3371,7 +3364,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         in
         let cost_metrics = Cost_metrics.zero in
         let dbg = Debuginfo.from_location (Function_decl.loc decl) in
-        let fdo_entry_annotation = fdo_entry decl in
+        let fdo_entry_annotation = Function_decl.fdo_entry_annotation decl in
         let is_tupled =
           match Function_decl.kind decl with
           | Curried _ -> false
@@ -3816,8 +3809,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
           ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc
-          ~fdo_fingerprint:None ~free_idents_of_body ~closure_alloc_mode
-          ~first_complex_local_param ~result_mode Recursive.Non_recursive ]
+          ~fdo_entry_annotation:Fdo_annotation.empty ~free_idents_of_body
+          ~closure_alloc_mode ~first_complex_local_param ~result_mode
+          Recursive.Non_recursive ]
     in
     let body acc env =
       let arg = find_simple_from_id env wrapper_id in

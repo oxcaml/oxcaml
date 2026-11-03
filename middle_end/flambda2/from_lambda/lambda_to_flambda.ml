@@ -1393,14 +1393,8 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } as
      func :
       L.lfunction) : Function_decl.t =
-  let fdo_fingerprint, fdo_body_naming_context =
-    match Env.fdo_naming_context env with
-    | None -> None, None
-    | Some context ->
-      let fingerprint, body_context =
-        Fdo_fingerprint.of_function context func
-      in
-      Some fingerprint, Some body_context
+  let fdo =
+    Option.map (fun fdo -> Fdo_env.enter_function fdo func) (Env.fdo env)
   in
   let contains_no_escaping_local_allocs =
     match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
@@ -1593,7 +1587,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     Env.create ~current_unit:(Env.current_unit env)
       ~machine_width:(Env.machine_width env) ~return_continuation:body_cont
       ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
-      ~my_alloc_region ~fdo_naming_context:fdo_body_naming_context
+      ~my_alloc_region ~fdo
   in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
@@ -1677,7 +1671,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ~function_slot ~kind ~params ~params_arity ~removed_params ~return
     ~calling_convention ~return_continuation:body_cont ~exn_continuation
     ~my_region ~my_ghost_region ~my_alloc_region ~body ~attr ~loc
-    ~fdo_fingerprint ~free_idents_of_body recursive ~closure_alloc_mode:mode
+    ~fdo_entry_annotation:
+      (Option.fold ~none:Fdo_annotation.empty ~some:Fdo_env.entry_annotation fdo)
+    ~free_idents_of_body recursive ~closure_alloc_mode:mode
     ~first_complex_local_param ~result_mode:ret_mode
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
@@ -1898,9 +1894,9 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     Env.create ~current_unit:compilation_unit ~machine_width
       ~return_continuation ~exn_continuation ~my_region:None
       ~my_alloc_region:toplevel_my_alloc_region
-      ~fdo_naming_context:
+      ~fdo:
         (if !Oxcaml_flags.fdo_counters
-         then Some (Fdo_fingerprint.Naming_context.toplevel compilation_unit)
+         then Some (Fdo_env.toplevel compilation_unit)
          else None)
   in
   let program acc ccenv =

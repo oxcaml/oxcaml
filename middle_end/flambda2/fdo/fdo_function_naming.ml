@@ -96,7 +96,7 @@ module Leading_tokens = struct
     List.rev !tokens
 end
 
-module Naming_context = struct
+module Context = struct
   type t =
     { enclosing_path : string;
       occurrences : int Misc.Stdlib.String.Tbl.t
@@ -119,9 +119,13 @@ module Naming_context = struct
     index
 end
 
-type t = { function_ : FC.Function.t }
+let toplevel_function compilation_unit =
+  FC.Function.create_original
+    (FC.Name.create
+       ~name_str:(Compilation_unit.full_path_as_string compilation_unit)
+       ~discriminator:0)
 
-let of_function (context : Naming_context.t) (fn : L.lfunction) =
+let of_function (context : Context.t) (fn : L.lfunction) =
   let { L.loc; params; body; _ } = fn in
   let params = List.map (fun (p : L.lparam) -> p.name) params in
   let path, anonymous =
@@ -156,18 +160,10 @@ let of_function (context : Naming_context.t) (fn : L.lfunction) =
     else path
   in
   let function_ =
-    let discriminator = Naming_context.fresh_discriminator context ~path in
+    let discriminator = Context.fresh_discriminator context ~path in
     let name = FC.Name.create ~name_str:path ~discriminator in
     FC.Function.create_original name
   in
-  { function_ }, { context with enclosing_path = path }
-
-let function_ t = t.function_
+  function_, { context with enclosing_path = path }
 
 let leading_tokens = Leading_tokens.leading_tokens
-
-let entry_annotation t =
-  let counter =
-    t.function_ |> FC.Position.create_function_entry |> FC.of_position
-  in
-  Fdo_annotation.of_list [counter]

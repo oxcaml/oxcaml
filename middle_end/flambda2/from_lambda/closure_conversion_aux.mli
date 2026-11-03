@@ -380,7 +380,7 @@ module Function_decls : sig
       body:(Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t) ->
       attr:Lambda.function_attribute ->
       loc:Lambda.scoped_location ->
-      fdo_fingerprint:Fdo_fingerprint.t option ->
+      fdo_entry_annotation:Fdo_annotation.t ->
       free_idents_of_body:Ident.Set.t ->
       Recursive.t ->
       closure_alloc_mode:Lambda.locality_mode ->
@@ -440,7 +440,9 @@ module Function_decls : sig
 
     val loc : t -> Lambda.scoped_location
 
-    val fdo_fingerprint : t -> Fdo_fingerprint.t option
+    (** The counters of the entry edge of the function's code (see [Fdo_env]),
+        empty if it has no FDO identity. *)
+    val fdo_entry_annotation : t -> Fdo_annotation.t
 
     val recursive : t -> Recursive.t
 
