@@ -23,9 +23,22 @@ open Typedtree
 
 type error = Float32_match
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
 
-let raise_matched_float32 () = raise (Error Float32_match)
+  val log_and_raise : error -> 'a
+end = struct
+  type exn += In_context of error
+
+  let log_and_raise err = Typing_recovery.log_and_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
+
+let raise_matched_float32 () = Error.log_and_raise Float32_match
 
 type 'pattern parmatch_case =
   { pattern : 'pattern;
@@ -2708,5 +2721,6 @@ let report_error ppf = function
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error.In_context err ->
+      Some (Location.error_of_printer_file report_error err)
     | _ -> None)
