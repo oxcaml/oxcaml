@@ -44,8 +44,8 @@ STDLIB := $(addprefix $(STDLIB_DIR)/, \
   OxCamlInt64.v OxCamlInt64Proofs.v OxCamlList.v OxCamlListProofs.v \
   IntArith.v IntArithProofs.v OxCamlExtract.v IntArithExtract.v)
 BACKEND := $(addprefix $(BACKEND_DIR)/, \
-  IntegerComparison.v IntegerComparisonExtract.v Operation.v \
-  OperationExtract.v)
+  IntegerComparison.v IntegerComparisonProofs.v IntegerComparisonExtract.v \
+  Operation.v OperationExtract.v)
 SSA := $(addprefix $(SSA_DIR)/, \
   SsaModel.v SsaModelExtract.v SsaGraphSpec.v SsaGraph.v SsaGraphProofs.v \
   SsaDominanceSpec.v SsaDominance.v SsaDominanceProofs.v SsaSemanticsSpec.v \
