@@ -201,8 +201,9 @@ module General = struct
 
   let rec strip_vars (p : pattern) : Half_simple.pattern =
     match p.pat_desc with
-    | `Alias (p, _, _, _, _, _, _) -> strip_vars (view p)
-    | `Var _ | `Fun_layout _ | `Deref _ | `Alias_deref _ ->
+    | `Alias (p, _, _, _, _, _, _) | `Alias_deref (p, _, _, _, _, _, _) ->
+        strip_vars (view p)
+    | `Var _ | `Fun_layout _ | `Deref _ ->
         { p with pat_desc = `Any }
     | #Half_simple.view as view -> { p with pat_desc = view }
 end
