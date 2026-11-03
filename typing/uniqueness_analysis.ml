@@ -2303,6 +2303,14 @@ and pattern_match_barrier pat paths : UF.t =
    consume: the value stored there and the part of the memory storing it (see
    [deref_base_paths]). *)
 and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
+  let unwrap_base_paths () =
+    match base_paths with
+    | Some base_paths -> base_paths
+    | None ->
+      Misc.fatal_error
+        "Uniqueness_analysis.pattern_match_single: dereference pattern without \
+         base paths"
+  in
   let uf_read = pattern_match_barrier pat paths in
   let ext, uf_pats =
     match pat.pat_desc with
@@ -2392,13 +2400,13 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
          borrows and yields both. See Note [Loading from addresses]. *)
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
-    | Tpat_deref { id; _ } | Tpat_alias_deref { id; _ } -> (
-      match base_paths with
-      | None ->
-        Misc.fatal_error
-          "Uniqueness_analysis.pattern_match_single: dereference pattern \
-           without base paths"
-      | Some base_paths -> Ienv.Extension.singleton id base_paths, UF.unused)
+    | Tpat_deref { id; _ } ->
+      Ienv.Extension.singleton id (unwrap_base_paths ()), UF.unused
+    | Tpat_alias_deref { pattern = pat'; id; _ } ->
+      let base_paths = unwrap_base_paths () in
+      let ext0 = Ienv.Extension.singleton id base_paths in
+      let ext1, uf = pattern_match_single ~base_paths pat' paths in
+      Ienv.Extension.conjunct ext0 ext1, uf
     | Tpat_tuple args ->
       List.mapi
         (fun i (_, arg, _) ->
