@@ -1460,6 +1460,10 @@ let _ =
       let s = J.EBin (J.Plus, str_js_utf8 "", cx) in
       ocaml_string ~ctx ~loc s);
   register_un_prim "%direct_obj_tag" `Pure (fun cx _loc -> Mlvalue.Block.tag cx);
+  (* Emitted by the OxCaml JSIR backend when the argument is not known to be a
+     block. *)
+  register_un_prim "%direct_obj_tag_nullish" `Pure (fun cx _loc ->
+      Mlvalue.Block.tag_nullish cx);
   register_bin_prims
     [ "caml_array_unsafe_get"
     ; "caml_array_unsafe_get_float"

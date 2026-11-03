@@ -25,9 +25,10 @@ type s = A | B
 val pair : 'a expr -> 'b -> 'a eval * 'b = <fun>
 |}]
 
-(* Inference with ['a eval] is incomplete, and we do not propagate through it *)
 let p () : int * t = pair <[ 1 ]> A
 [%%expect {|
+val p : unit -> int * t = <fun>
+|}, Principal{|
 Line 1, characters 21-35:
 1 | let p () : int * t = pair <[ 1 ]> A
                          ^^^^^^^^^^^^^^
@@ -36,7 +37,6 @@ Error: This expression has type "int * s"
        Type "s" is not compatible with type "t"
 |}]
 
-(* A failed early unification must leave argument inference usable. *)
 let p () : int * t = pair <[ 1 ]> (A : t)
 [%%expect{|
 val p : unit -> int * t = <fun>
@@ -44,6 +44,12 @@ val p : unit -> int * t = <fun>
 
 let p () : string * t = pair <[ 1 ]> (A : t)
 [%%expect{|
+Line 1, characters 32-33:
+1 | let p () : string * t = pair <[ 1 ]> (A : t)
+                                    ^
+Error: The constant "1" has type "int" but an expression was expected of type
+         "string"
+|}, Principal{|
 Line 1, characters 24-44:
 1 | let p () : string * t = pair <[ 1 ]> (A : t)
                             ^^^^^^^^^^^^^^^^^^^^

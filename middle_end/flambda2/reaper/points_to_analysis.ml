@@ -395,15 +395,15 @@ module Datalog_schedule = struct
       (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
        [any_source if_any_source; alias_if_any_source ~if_any_source ~to_ ~from]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; from; to_] =
-         ["base"; "base_use"; "relation"; "from"; "to_"]
+      (let$$ [base; base_use; relation; to_; from] =
+         ["base"; "base_use"; "relation"; "to_"; "from"]
        in
        [ constructor ~base relation ~from;
          nontop_usages base base_use;
          rev_accessor ~base:base_use relation ~to_ ]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; from; to_] =
-         ["base"; "base_use"; "relation"; "from"; "to_"]
+      (let$$ [base; base_use; relation; to_; from] =
+         ["base"; "base_use"; "relation"; "to_"; "from"]
        in
        [ when1 is_local relation;
          constructor ~base relation ~from;
@@ -432,11 +432,11 @@ module Datalog_schedule = struct
          sources base base_source;
          constructor ~base:base_source relation ~from ]
        ==> alias ~to_ ~from);
-      (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
+      (let$ [relation; to_; from] = ["relation"; "to_"; "from"] in
        [escaping_field relation from; reading_field relation to_]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_source; relation; from; to_] =
-         ["base"; "base_source"; "relation"; "from"; "to_"]
+      (let$$ [base; base_source; relation; to_; from] =
+         ["base"; "base_source"; "relation"; "to_"; "from"]
        in
        [ rev_argument ~base relation ~from;
          nontop_sources base base_source;
@@ -1012,16 +1012,16 @@ let post_processing_rules =
 
 let has_source_query db x = has_source_query [x] db
 
-let perform_analysis db ~stats ~analysis_scope =
+let perform_analysis ?stats db ~analysis_scope =
   current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "analysis" (fun () ->
-        Datalog.Schedule.run ~stats datalog_schedule db)
+        Datalog.Schedule.run ?stats datalog_schedule db)
   in
   let db =
     Profile.record_call ~accumulate:true "compute_field_usages" (fun () ->
         List.fold_left
-          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          (fun db rule -> Datalog.Schedule.run ?stats rule db)
           db post_processing_rules)
   in
   db

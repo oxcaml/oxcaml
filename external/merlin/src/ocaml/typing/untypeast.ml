@@ -223,8 +223,10 @@ let structure_item sub item =
 let modalities_of_val_modal_info = function
   | Valmi_sig_value modalities -> Typemode.untransl_modalities modalities
   | Valmi_str_primitive modes ->
-      let modality_of_mode { txt = Mode mode; loc } =
-        { txt = Modality mode; loc }
+      let modality_of_mode = function
+        | { txt = Pmode mode; loc } -> { txt = Modality mode; loc }
+        | { txt = Pmode_var _ | Pmode_bounded _; _ } ->
+            Misc.fatal_error "Untypeast.modality_of_mode: non-constant mode"
       in
       List.map modality_of_mode (Typemode.untransl_mode modes)
 

@@ -3651,6 +3651,34 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
   Code.invariant p.code;
   p
 
+type jsir_unit =
+  { name : string
+  ; program : Code.program
+  ; info : Unit_info.t
+  }
+
+let from_cmj ic =
+  let { Code.program
+      ; last_var
+      ; imported_compilation_units
+      ; exported_compilation_unit
+      ; force_link
+      } =
+    (Marshal.from_channel ic : Code.cmj_body)
+  in
+  (* Each unit is compiled one at a time, so the variables might not be disjoint.
+     This means that it is enough for fresh variables to be larger than any
+     variable of any unit. *)
+  Code.Var.set_last last_var;
+  { name = exported_compilation_unit
+  ; program = Code.Marshalable_program.to_program program
+  ; info =
+      Unit_info.of_compilation_units
+        ~exported:exported_compilation_unit
+        ~imported:imported_compilation_units
+        ~force_link
+  }
+
 let from_channel ic =
   let format =
     try

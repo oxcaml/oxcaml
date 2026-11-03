@@ -19,7 +19,7 @@
 type t
 
 module Idx : sig
-  type t
+  type 'a t
 end
 
 val create : int array -> string -> in_channel -> first_section_offset:int -> t
@@ -28,7 +28,7 @@ val empty : t
 
 val length : t -> int
 
-val get : t -> Idx.t -> Obj.t
+val get : t -> 'a Idx.t -> 'a
 
 val serialize : t -> string array * int array * int
 
@@ -39,7 +39,7 @@ module Builder : sig
   type t
 
   val create : int -> t
-  val add : t -> Obj.t -> Idx.t
+  val add : t -> 'a -> 'a Idx.t
   val build : t -> file_sections
   val clear : t -> unit
 end

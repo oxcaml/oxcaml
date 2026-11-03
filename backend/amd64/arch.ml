@@ -384,6 +384,11 @@ let num_args_addressing = function
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
 
+let strength_reduce_mul mult =
+  match mult with
+  | 3 | 5 | 9 -> Some (Ilea (Iindexed2scaled (mult - 1, 0)))
+  | _ -> None
+
 let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
   match op with
   | Ilea addr ->

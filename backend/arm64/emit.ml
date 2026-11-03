@@ -972,6 +972,18 @@ let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
 let emit_stack_str env reg r = emit_stack_load_store env STR reg r
 
+(* Moves of 8- and 16-bit stack arguments. The store writes exactly the
+   argument's width; instruction selection only creates these moves with a
+   stack-slot destination, so every other shape is unexpected. *)
+let emit_sized_move env ~str (src : Reg.t) (dst : Reg.t) =
+  if not (Reg.same_loc src dst)
+  then
+    match src.loc, dst.loc with
+    | Reg _, Stack _ -> emit_stack_load_store env str (H.reg_w src) dst
+    | Reg _, Reg _ | Stack _, (Reg _ | Stack _) | _, Unknown | Unknown, _ ->
+      Misc.fatal_errorf "Emit.emit_sized_move: unexpected move (%a to %a)"
+        Printreg.reg src Printreg.reg dst
+
 let emit_stack_ldr_simd_and_fp env reg r =
   emit_stack_load_store env LDR_simd_and_fp reg r
 
@@ -1510,6 +1522,8 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop (Specific Imove8) -> emit_sized_move env ~str:STRB i.arg.(0) i.res.(0)
+  | Lop (Specific Imove16) -> emit_sized_move env ~str:STRH i.arg.(0) i.res.(0)
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -1782,6 +1796,7 @@ let emit_instr env i =
       A.ins2 RBIT (H.reg_x i.res.(0)) (H.reg_x i.arg.(0));
       A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.res.(0)))
   | Lop (Intop Iclz) -> A.ins2 CLZ (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
+  | Lop (Intop Inot) -> A.ins_mvn (H.reg_x i.res.(0)) (H.reg_x i.arg.(0))
   | Lop (Intop Iand) ->
     let rd, rn, rm = H.reg_x i.res.(0), H.reg_x i.arg.(0), H.reg_x i.arg.(1) in
     A.ins4 AND_shifted_register rd rn rm O.optional_none
@@ -1827,7 +1842,8 @@ let emit_instr env i =
   | Lop (Intop_imm (Iasr, shift_in_bits)) ->
     A.ins_asr_immediate (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) ~shift_in_bits
   | Lop
-      (Intop_imm ((Imul | Idiv _ | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
+      (Intop_imm
+         ((Imul | Idiv _ | Inot | Iclz | Ictz | Ipopcnt | Imod _ | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
       Printlinear.instr i
@@ -2137,10 +2153,13 @@ let emit_relaxed_instruction (relaxed : relaxed_instruction) =
     in
     ()
   | Far_stackcheck { max_frame_size_bytes } ->
-    let _sc_label, _sc_return =
-      assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
-    in
-    ()
+    if Config.no_stack_checks
+    then emit_stack_probes ~max_frame_size_bytes
+    else
+      let _sc_label, _sc_return =
+        assembly_code_for_stack_check0 ~far:true ~max_frame_size_bytes
+      in
+      ()
   | Condbranch { test; lbl; arg } -> emit_condbranch arg test lbl
   | Branch lbl -> emit_branch lbl
 

@@ -81,18 +81,26 @@ module Reader_phase = struct
   module Fingerprint = struct
     type t =
       { source_digest : Msource.Digest.t;
-        for_completion : Msource.position option
+        for_completion : Msource.position option;
+        config : Mconfig.t
       }
 
-    let make { source = source, _; for_completion; _ } =
-      Ok { source_digest = Msource.Digest.make source; for_completion }
+    let make { source = source, _; for_completion; config; _ } =
+      Ok { source_digest = Msource.Digest.make source; for_completion; config }
 
     let equal
-        { source_digest = source_digest_1; for_completion = for_completion_1 }
-        { source_digest = source_digest_2; for_completion = for_completion_2 } =
+        { source_digest = source_digest_1;
+          for_completion = for_completion_1;
+          config = config1
+        }
+        { source_digest = source_digest_2;
+          for_completion = for_completion_2;
+          config = config2
+        } =
       Msource.Digest.equal source_digest_1 source_digest_2
       && Stdlib.Option.equal Msource.equal_position for_completion_1
            for_completion_2
+      && Cache.key config1 = Cache.key config2
   end
 end
 

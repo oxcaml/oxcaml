@@ -18,15 +18,14 @@ type modalities =
 val transl_mode_annots :
   Parsetree.modes -> Mode.With_locality.Const.Option.t modes
 
-val apply_mode_implications :
-  Mode.With_locality.Const.Option.t -> Mode.With_locality.Const.Option.t
-
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
 val transl_mode_with_locality :
   Parsetree.modes -> Mode.With_locality.Const.t modes
+
+val legacy_modes : Mode.With_locality.lr modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
@@ -95,9 +94,9 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)
-val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes
+val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> string list
 
-val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
+val block_path_expected_modalities : Types.mutability -> Mode.Modality.Const.t
 
 (* Merlin-only: This is exposed for Merlin (for syntax_doc.ml). *)
 

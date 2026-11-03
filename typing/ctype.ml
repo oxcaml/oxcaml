@@ -207,7 +207,7 @@ let mark_persistent_in_quotations env =
 let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   begin_def ();
   let level = !current_level in
-  let result, pool =
+  let result, pool, sort_pool =
     with_new_pool ~level:!current_level begin fun () ->
       let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
@@ -263,6 +263,22 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
           | _ -> ()
         end
   end pool;
+  List.iter begin fun s ->
+    let open Jkind_types.Sort in
+    (* In contrast to types, which can be generalised implicitly, sort variables
+       need to be explicitly generalized and instantiated in [Typecore].
+       Hence, we lower all non-generic variables like type variables
+       in [structure] mode. *)
+    iter_var s ~f:(fun v ->
+      let t = of_var v in
+      if get_level t >= subject_level then () else
+      begin match update_level !current_level t with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.with_local_level_gen: rigid sort variable"
+      end;
+      add_to_sort_pool ~level:(get_level t) t)
+  end sort_pool;
   result
 
 let with_local_level_generalize ~before_generalize f =
@@ -374,31 +390,29 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_locality_mode : Mode.Locality.r option; }
+      is_lpoly : bool; }
   val make:
-    ?env_locality_mode:Mode.Locality.r
+    ?is_lpoly:bool
     -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_locality_mode : t -> Mode.Locality.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_locality_mode : Mode.Locality.r option; }
-  let make ?env_locality_mode env ~equations_scope ~in_counterexample =
+      is_lpoly : bool; }
+  let make ?(is_lpoly=false) env ~equations_scope ~in_counterexample =
     { env;
       equations_scope;
       in_counterexample;
-      env_locality_mode; }
+      is_lpoly; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
-  let set_env_locality_mode penv m = penv.env_locality_mode <- m
 end
 
 (**** unification mode ****)
@@ -992,7 +1006,16 @@ let duplicate_class_type ty =
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
-    iter_type_expr lower_all (Fun.const ()) ty
+    begin match get_desc ty with
+    | Tvar { jkind } ->
+      begin match Jkind.update_level !current_level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.lower_all: rigid sort variable in generalize"
+      end
+    | _ -> ()
+    end;
+    iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
   end
 
 (*
@@ -1051,10 +1074,17 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   let current_level = !current_level in
-  if level <> generic_level then begin
-    if is_Tvar ty && level > current_level then
-      set_level ty current_level
-    else if level > current_level then begin
+  if level <> generic_level && level > current_level then
+    match get_desc ty with
+    | Tvar { jkind } ->
+      set_level ty current_level;
+      begin match Jkind.update_level current_level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.generalize_structure: \
+          rigid sort variable in generalize_structure"
+      end
+    | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -1063,8 +1093,6 @@ let rec generalize_structure ty =
       set_level ty generic_level;
       let mgen m = Mode.With_locality.generalize_structure ~current_level m in
       iter_type_expr generalize_structure mgen ty
-    end
-  end
 
 let generalize_structure ty =
   simple_abbrevs := Mnil;
@@ -1244,7 +1272,7 @@ let rec update_level env level expand ty =
             variance tl
         in
         begin try
-          if not needs_expand then raise Cannot_expand;
+          if not needs_expand then raise_notrace Cannot_expand;
           let ty' = !forward_try_expand_safe env ty in
           link_type ty ty';
           update_level env level expand ty'
@@ -1274,6 +1302,13 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
+    | Tvar { jkind } ->
+      set_level ();
+      begin match Jkind.update_level level jkind with
+      | Ok () -> ()
+      | Error Rigid ->
+        Misc.fatal_error "Ctype.update_level: rigid sort variable"
+      end
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1312,7 +1347,15 @@ let rec lower_contravariant env var_level visited contra ty =
     Hashtbl.add visited (get_id ty) contra;
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
-      Tvar _ -> if contra then set_level ty var_level
+      Tvar { jkind } ->
+        if contra then begin
+          set_level ty var_level;
+          match Jkind.update_level var_level jkind with
+          | Ok () -> ()
+          | Error Rigid ->
+            Misc.fatal_error
+              "Ctype.lower_contravariant: rigid sort variable"
+        end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
        let variance, maybe_expand =
@@ -2461,7 +2504,7 @@ let expand_abbrev_gen kind find_type_expansion env ty =
       | exception Not_found ->
           (* another way to expand is to normalize the path itself *)
           let path' = Env.normalize_type_path None env path in
-          if Path.same path path' then raise Cannot_expand
+          if Path.same path path' then raise_notrace Cannot_expand
           else newty2 ~level (Tconstr (path', args, abbrev))
       | (params, body, lv) ->
           (* prerr_endline
@@ -2513,7 +2556,7 @@ let rec try_expand_once_gen expand_abbrev env ty =
       try_expand_once_gen expand_abbrev (incr_stage env) t |> new_quote_eval_ty
   | Tbox t ->
       try_expand_once_gen expand_abbrev env t |> new_box_ty
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 let unbox_ty env ty =
   match get_desc ty with
@@ -2544,7 +2587,7 @@ let try_expand_safe env ty =
   let snap = Btype.snapshot () in
   try try_expand_once env ty
   with Escape _ ->
-    Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
+    Btype.backtrack snap; cleanup_abbrev (); raise_notrace Cannot_expand
 
 (* Note [Beta normal form]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2593,7 +2636,7 @@ let rec try_reduce_once env t =
     (* reduce in subterm *)
     | Tsplice _ -> try_reduce_once (decr_stage env) t |> new_splice_ty
     | Tquote_eval _ -> try_reduce_once (decr_stage env) t |> new_splice_ty
-    | _ -> raise Cannot_expand
+    | _ -> raise_notrace Cannot_expand
     end
   | Tquote t -> begin
     match get_desc t with
@@ -2603,18 +2646,21 @@ let rec try_reduce_once env t =
     (* reduce in subterm *)
     | Tquote _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
     | Tquote_eval _ -> try_reduce_once (incr_stage env) t |> new_quote_ty
-    | _ -> raise Cannot_expand
+    | _ -> raise_notrace Cannot_expand
     end
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
+(** Apply a reduction step on [<[t]> eval].
+    [copy_persistent] relies on this function to always return copies,
+    and to behave well on ill-staged types. *)
 and try_reduce_quote_eval env t =
   let path_must_be_persistent env path =
     if not (Env.path_is_persistent_in_quotations env path) then
-      raise Cannot_expand
+      raise_notrace Cannot_expand
   in
   let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
-  | Tvar _ | Tunivar _ -> raise Cannot_expand
+  | Tvar _ | Tunivar _ -> raise_notrace Cannot_expand
   (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
   | Tarrow (a, t1, t2, c) ->
     (* Reduce the parameter type's [Tpoly] immediately *)
@@ -2640,7 +2686,7 @@ and try_reduce_quote_eval env t =
   | Tobject (t, ct) ->
     (* Attempt to reduce the field list immediately:
        - If the object type is open, then its tail ([Tvar] or [Tunivar])
-         will [raise Cannot_expand]. [Cannot_expand] propagates to here
+         will [raise_notrace Cannot_expand]. [Cannot_expand] propagates to here
          so the [Tobject] does not reduce at all.
          Alternatively, the object type has a private row type given by
          a [Tconstr], in which case we will reduce if it is persistent.
@@ -2709,7 +2755,7 @@ and try_reduce_quote_eval env t =
                pack_cstrs =
                  List.map (fun (n, t) -> n, new_quote_eval_ty t) pack_cstrs }
   (* It is safe not to expand [Tof_kind], and we do not need to currently *)
-  | Tof_kind _ -> raise Cannot_expand
+  | Tof_kind _ -> raise_notrace Cannot_expand
   | Tlink _ | Tsubst _ -> assert false
 
 and try_reduce_box t =
@@ -2718,17 +2764,33 @@ and try_reduce_box t =
   | Tconstr (p, args, _) ->
     begin match Path.boxed_version p with
     | Some boxed_p -> Tconstr (boxed_p, args, ref Mnil)
-    | None -> raise Cannot_expand
+    | None -> raise_notrace Cannot_expand
     end
   (* [#(t1 * t2) box] ==> [t1 * t2] *)
   | Tunboxed_tuple tys -> Ttuple tys
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
 let rec try_reduce env ty =
   let ty' = try_reduce_once env ty in
   try try_reduce env ty'
   with Cannot_expand -> ty'
+
+(** Deeply reduce all [Tquote_eval]s appearing in a type.
+    The resulting type does not contain any [Tquote_eval]s and has no sharing.
+    Raises [Cannot_expand] on failure. *)
+let rec try_full_reduce_quote_eval_desc env = function
+  | Tquote_eval t ->
+    try_reduce_quote_eval env t |> try_full_reduce_quote_eval_desc env
+  | Tvariant row ->
+    (* unimplemented by [copy_type_desc], follows [try_reduce_quote_eval] *)
+    Tvariant (
+      copy_row (try_full_reduce_quote_eval env) true row false (row_more row))
+  | t ->
+    copy_type_desc (try_full_reduce_quote_eval env) Fun.id t
+and try_full_reduce_quote_eval env t =
+  try_full_reduce_quote_eval_desc env (get_desc t)
+  |> newty3 ~level:(get_level t) ~scope:(get_scope t)
 
 (* [Predef]'s [eval] and [box] are special -- we want to always expand it in
    [reduce_head], so we special-case its abbreviation expansion there. *)
@@ -2737,7 +2799,7 @@ let expand_reducible_abbrevs env ty =
   | Tconstr (path, [_], _) when Path.same path Predef.path_eval
                              || Path.same path Predef.path_box ->
     try_expand_once env ty
-  | _ -> raise Cannot_expand
+  | _ -> raise_notrace Cannot_expand
 
 
 let try_expand_reducible_abbrevs_once =
@@ -2760,7 +2822,7 @@ let reduce_head ~expand_reducible_abbrevs env ty =
   let try_once =
     if expand_reducible_abbrevs
     then try_expand_reducible_abbrevs_once
-    else (fun _env _ty -> raise Cannot_expand)
+    else (fun _env _ty -> raise_notrace Cannot_expand)
   in
   try try_expand_head try_once env ty
   with Cannot_expand -> ty
@@ -2854,7 +2916,7 @@ let try_expand_safe_opt env ty =
   let snap = Btype.snapshot () in
   try try_expand_once_opt env ty
   with Escape _ ->
-    Btype.backtrack snap; raise Cannot_expand
+    Btype.backtrack snap; raise_notrace Cannot_expand
 
 let expand_head_opt env ty =
   try try_expand_head try_expand_safe_opt env ty with Cannot_expand -> ty
@@ -2915,11 +2977,17 @@ type unbox_result =
 
 (* We pass in [ty] as an [unwrapped_type_expr], which represents the state of a
    process of unwrapping before we do this extra step. This allows us to
-   backtrack in case an [or_null] we unwrap here cannot be re-applied: see
-   Note [unwrapped_type_expr backtracking for or_null].
+   backtrack in case an [or_null] we unwrap here cannot be re-applied, such as
+   for:
 
-   (In most callers of this, there is no ongoing state of unwrapping, so we just
-   use [mk_unwrapped_type_expr]). *)
+     let rec bad () : float# or_null = Null
+
+   Although this is ill-typed, we don't realize this when we typecheck it with
+   [type_approx], which we use for recursive functions. This gets us into
+   trouble when [type_approx] calls [type_jkind], which could then unwrap and
+   re-wrap an invalid application of [or_null] like the above. So, to avoid
+   needing to consider invalid applications of [or_null], we use the previous
+   [unwrapped_type_expr] as a fallback. *)
 let unbox_once env ty =
   match get_desc ty.ty with
   | Tconstr (p, args, _) ->
@@ -3090,6 +3158,12 @@ let get_unboxed_type_approximation env ty =
   match get_unboxed_type_representation env ty with
   | Ok ty | Error ty -> ty
 
+let unwrap_until_or_null env ty =
+  let unwrapped_ty = get_unboxed_type_approximation env ty in
+  match unwrapped_ty.or_null with
+  | Some { prev; _ } -> prev.ty
+  | None -> unwrapped_ty.ty
+
 
 (* forward declarations *)
 let type_equal' = ref (fun _ _ _ -> Misc.fatal_error "type_equal")
@@ -3169,8 +3243,12 @@ let apply_jkind_wrapping_l ~env ~level
   end
   |> Result.map (Jkind.apply_modality_l modality)
 
-let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
-      jkind =
+(* Given some unwrapped type [t] and kind [k], try to produce some [t'] and
+   [k'] such that the constraint [t : k] can be reduced to [t' : k'] (where the
+   latter implies the former).
+
+   Fails if no [t] could have kind [k]. *)
+let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty; modality; or_null } jkind =
   begin
     if Option.is_some or_null then
       (* The testsuite passes if we replace the body of this [then] with
@@ -3181,7 +3259,7 @@ let apply_jkind_wrapping_r ~env ~unwrapped_ty:{ ty = _; modality; or_null }
     else
       Ok jkind
   end
-  |> Result.map (Jkind.apply_modality_r modality)
+  |> Result.map (fun jkind -> ty, Jkind.apply_modality_r modality jkind)
 
 let maybe_expand_component env ty ~expand_components =
   match expand_components with
@@ -3447,12 +3525,20 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
           Because of these reasons, we pull out the mutable tyvar case and treat
           it first.
         *)
-       let jkind_inter =
-         Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection env
-           ty's_jkind jkind
-       in
-       Result.map (set_var_jkind ty) jkind_inter
+        let open Misc.Stdlib.Monad.Result.Syntax in
+        let* ty's_new_jkind =
+          Jkind.intersection_or_error ~type_equal ~context
+            ~reason:Tyvar_refinement_intersection env
+            ty's_jkind jkind
+        in
+        let+ () =
+          Jkind.update_level (get_level ty) ty's_new_jkind
+          |> Result.map_error (fun error ->
+            Jkind.Violation.of_ ~context env (
+              Not_a_subjkind (ty's_jkind, jkind,
+              [Layout_disagreement (Level error)])))
+        in
+        set_var_jkind ty ty's_new_jkind
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
@@ -3536,7 +3622,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           "Axis_disagreement("
                           ^ Jkind_axis.Axis.name axis
                           ^ ")"
-                        | Layout_disagreement -> "Layout_disagreement"
+                        | Layout_disagreement _ -> "Layout_disagreement"
                         | With_bounds_on_left -> "With_bounds_on_left"
                         | Constrain_ran_out_of_fuel ->
                           "Constrain_ran_out_of_fuel")
@@ -3569,7 +3655,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                           (Jkind.Violation.of_ ~context env
                              (Not_a_subjkind
                                 (ty's_jkind, jkind, sub_failure_reasons)))
-                      | Ok jkind ->
+                      | Ok (ty, jkind) ->
                       match Jkind.extract_layout env ty's_jkind with
                       | Ok (Any _) ->
                         (* We re-estimate in this case rather than reuse the
@@ -3581,16 +3667,15 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env
-                          unwrapped_ty.ty jkind
+                        estimate_jkind_and_loop ~fuel ~expanded:false env ty
+                          jkind
                       | _ ->
                         (* In this case, there's nothing to gain by
                            re-estimating: either it's already a product and we
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
-                          ty's_jkind jkind)
+                        loop ~fuel ~expanded:false env ty ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -3793,11 +3878,6 @@ let check_type_separability env ty sep =
 let is_always_gc_ignorable env ty =
   check_type_externality env ty
     (Jkind_axis.Externality.upper_bound_if_is_always_gc_ignorable ())
-
-let check_type_jkind_exn env texn ty jkind =
-  match check_type_jkind env ty jkind with
-  | Ok _ -> ()
-  | Error err -> raise_for texn (Bad_jkind (ty,err))
 
 let constrain_type_jkind_exn env texn ty jkind =
   match constrain_type_jkind env ty jkind with
@@ -4068,7 +4148,7 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal env jkind1 jkind2) then
+  if Result.is_error (Jkind.equal env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
@@ -4479,6 +4559,14 @@ let rec is_aliasable_ty env ty =
   | Tquote ty' -> is_aliasable_ty (incr_stage env) ty'
   | Tsplice ty' -> is_aliasable_ty (decr_stage env) ty'
   | _ -> false
+
+let copy_persistent env ty =
+  try_full_reduce_quote_eval env (new_quote_eval_ty ty)
+
+let is_persistent_ty env ty =
+  match copy_persistent env ty with
+  | _ -> true
+  | exception Cannot_expand -> false
 
 let compatible_paths p1 p2 =
   let open Predef in
@@ -4910,7 +4998,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind
-                when not (Jkind.equal env jkind decl_jkind) ->
+                when Result.is_error (Jkind.equal env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
@@ -5237,7 +5325,7 @@ and unify2_rec uenv t10 t1 t20 t2 =
         then unify2_rec uenv t10 t1 t20 (try_expand_safe env t2)
         else unify2_rec uenv t10 (try_expand_safe env t1) t20 t2
   | _ ->
-      raise Cannot_expand
+      raise_notrace Cannot_expand
   with Cannot_expand ->
     unify2_expand uenv t10 t1 t20 t2
 
@@ -5301,6 +5389,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv (new_quote_ty t1') s2)
   | (_, Tquote s2) when is_flexible_ty s2 ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv (new_splice_ty t1') s2)
+  | (Tquote_eval t1, _) when is_persistent_ty (get_env uenv) t2' ->
+      let t2' = copy_persistent (get_env uenv) t2' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2')
+  | (_, Tquote_eval t2) when is_persistent_ty (get_env uenv) t1' ->
+      let t1' = copy_persistent (get_env uenv) t1' in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1' t2)
   | (Tbox t1, Tbox t2) ->
       unify uenv t1 t2
   | (_, Tbox t2) when is_unboxable_ty (get_env uenv) t1' ->
@@ -6393,6 +6487,21 @@ let moregen_occur env level ty =
   occur_univar_for Moregen env ty;
   update_level_for Moregen env level ty
 
+let moregen_check_type_jkind_exn env subj pat jkind =
+  let failed_because_of_rigid_instatiation = function
+    | Jkind.Sub_failure_reason.Layout_disagreement (Level Rigid) -> true
+    | _ -> false
+  in
+  match check_type_jkind env subj jkind with
+  | Ok () -> ()
+  (* We improve the error message for rigid variables, which occur in [subj].
+     The check may fail if they are equated against something non-generic,
+     like a weak variable or a concrete layout. *)
+  | Error { violation = Not_a_subjkind (_, _, reasons) }
+    when List.exists failed_because_of_rigid_instatiation reasons ->
+    raise_for Moregen (Weaken_sort { pat; subj } )
+  | Error err -> raise_for Moregen (Bad_jkind (subj, err))
+
 type moregen_pairs =
   { invariant_pairs : TypePairs.t;
     covariant_pairs : TypePairs.t;
@@ -6605,7 +6714,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
-        check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+        moregen_check_type_jkind_exn env t2 t1
+          (Jkind.disallow_left jkind);
         link_type t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
@@ -6624,7 +6734,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
-              check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+              moregen_check_type_jkind_exn env t2 t1
+                (Jkind.disallow_left jkind);
               link_type t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
@@ -6697,6 +6808,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when is_persistent_ty env t2' ->
+              let t2' = copy_persistent env t2' in
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
@@ -6924,13 +7039,13 @@ let moregeneral ~self_check env inst_nongen
         changed.
        *)
       let (subj_inst_sorts, subj_inst) =
-        Jkind_types.Sort.instance_with ~level:!current_level subj_sch_sorts
+        Jkind.Sort.instance_with ~level:!current_level subj_sch_sorts
           (fun () -> instance_aux ~instantiate_modes subj_sch)
       in
       let subj_inst' = duplicate_type subj_inst in
       (* Duplicate generic variables *)
       let (pat_inst_sorts, pat_inst) =
-        Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
+        Jkind.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       try
@@ -6942,8 +7057,7 @@ let moregeneral ~self_check env inst_nongen
       with Moregen_trace trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
-        ignore
-          (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
+        ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
     | _, Ok (subj_inst_sorts, pat_inst_sorts) ->
       (* After [moregen], [pat_inst_sorts] have been set to [subj_inst_sorts],
@@ -7061,10 +7175,10 @@ let all_distinct_vars_with_original_jkinds env vars =
        if TypeSet.mem ty !tys then Unification_failure { name; ty } else begin
          tys := TypeSet.add ty !tys;
          match get_desc ty with
-         | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate env inferred_jkind original_jkind
-           then All_good
-           else Jkind_mismatch { original_jkind; inferred_jkind; ty }
+         | Tvar { jkind = inferred_jkind } -> (
+           match Jkind.equate env inferred_jkind original_jkind with
+           | Ok () -> All_good
+           | Error _ -> Jkind_mismatch { original_jkind; inferred_jkind; ty })
          | _ -> Unification_failure { name; ty }
        end
   in
@@ -7118,7 +7232,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal env k1 k2)
+    if do_jkind_check && Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -7148,7 +7262,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal env k1 k2)
+      if Result.is_error (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in

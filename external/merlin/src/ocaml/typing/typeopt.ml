@@ -65,11 +65,9 @@ let scrape_ty env ty =
       begin match get_desc ty with
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
-          | Some _ -> begin
-            match (Ctype.get_unboxed_type_approximation env ty) with
-            | { ty; or_null = None; modality = _ } ->
-              Some ty
-            | _ -> Some ty end
+          | Some _ ->
+            (* Keep any [or_null], to preserve the nullability of [ty] *)
+            Some (Ctype.unwrap_until_or_null env ty)
           | None -> Some ty
           | exception Not_found -> None
           end
@@ -778,9 +776,11 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
 
-and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : unit Lambda.mixed_block_element) ty
-  : int * unit Lambda.mixed_block_element =
+and value_kind_mixed_block_field
+  : 'a. Env.t -> loc:Location.t -> visited:Numbers.Int.Set.t -> depth:int
+    -> num_nodes_visited:int -> 'a Lambda.mixed_block_element
+    -> type_expr option -> int * 'a Lambda.mixed_block_element =
+  fun env ~loc ~visited ~depth ~num_nodes_visited field ty ->
   match field with
   | Value original_kind ->
     begin match ty with
@@ -854,7 +854,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | ( Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | ( Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
     | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
     | Splice_variable _ ) as field ->
     num_nodes_visited, field
@@ -1255,7 +1255,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                    Language_extension.(is_at_least SIMD Beta) ->
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
-    Lambda.layout_unboxed_unit
+    Lambda.layout_void
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
@@ -1272,7 +1272,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
+  | Genvar var -> Psplicevar (Layout_ident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1299,39 +1299,6 @@ let layout env loc sort ty =
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
-
-let layout_of_ident env ident =
-  let path = Path.Pident ident in
-  match Env.find_value path env with
-  | value_desc ->
-    let { val_type; val_kind; val_loc; _ } =
-      Subst.Lazy.force_value_description value_desc
-    in
-    begin match val_kind with
-    | Val_reg sort | Val_mut (_, sort) ->
-      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-      let layout = layout env val_loc const_sort val_type in
-      Some layout
-    | Val_prim _ -> None
-    | Val_ivar _ | Val_self _ | Val_anc _ ->
-      Some layout_any_value
-    end
-  | exception Not_found ->
-    match Env.find_module path env with
-    | _ -> Some layout_module
-    | exception Not_found ->
-      match Env.find_ident_constructor ident env with
-      | { cstr_tag = Extension _ } -> Some layout_extensible_variant_constructor
-      | _ | exception Not_found ->
-        match Env.find_class path env with
-        | _ -> Some Lambda.layout_class
-        | exception Not_found ->
-            (match Translobj.layout_of_ident ident with
-            | Some _ as layout -> layout
-            | None ->
-              Misc.fatal_errorf "Failed to find value_desc for %a"
-                Ident.print ident)
-
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

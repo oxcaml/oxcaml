@@ -191,6 +191,11 @@ let find_size_of_alloc_prim prim args =
     | _ -> None
   else None
 
+let bytecode_block_size shape =
+  match singleton_product_shape_for_bytecode shape with
+  | Some elements -> Array.length elements
+  | None -> Array.length shape
+
 let compute_mixed_block_size shape =
   if Clflags.target_is_native () then
     let bytes = Mixed_product_bytes.count (Product shape) in
@@ -198,7 +203,7 @@ let compute_mixed_block_size shape =
     let size = Mixed_product_bytes.size_in_words bytes in
     { size; value_prefix_len }
   else
-    let size = Array.length shape in
+    let size = bytecode_block_size shape in
     { size; value_prefix_len = size }
 
 let compute_static_size lam =
@@ -272,12 +277,10 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
-    | Lsplice _ ->
-      fatal_error_invalid_constructor lam
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
     | Ltemplate tmpl ->
-      raise_error ~loc:tmpl.tmpl_func.loc Recursive_template
+      raise_error ~loc:tmpl.loc Recursive_template
     | Lkindinstantiate _ | Linstantiate  _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
@@ -298,7 +301,7 @@ let compute_static_size lam =
     if Clflags.target_is_native () then
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
-    else Array.length shape
+    else bytecode_block_size shape
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
   and size_of_primitive env loc p args =
@@ -893,8 +896,6 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
-  | Lsplice _ ->
-    fatal_error_invalid_constructor lam
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

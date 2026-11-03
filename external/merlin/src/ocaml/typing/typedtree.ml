@@ -236,7 +236,6 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.With_regionality.l;
       lpoly: Lpoly.t;
-      env_locality_mode: locality_mode_r;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -908,8 +907,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.Const.t modes *
-                  core_type * Mode.With_locality.Const.t modes
+  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.lr modes *
+                  core_type * Mode.With_locality.lr modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list

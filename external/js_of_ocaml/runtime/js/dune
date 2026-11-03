@@ -22,6 +22,7 @@
   md5.js
   mlBytes.js
   nat.js
+  ocamlj.js
   parsing.js
   promise.js
   stdlib.js

@@ -47,18 +47,16 @@ let prim_args ~env ~res simples =
       arg :: args, res)
     simples ([], res)
 
-let with_int_prefix_exn ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms
-    op =
+let with_int_prefix ~(kind : Flambda_kind.Standard_int.t) ~percent_for_imms op =
   let prefix =
     match kind, percent_for_imms with
-    | (Tagged_immediate | Naked_immediate), true -> "%int"
-    | (Tagged_immediate | Naked_immediate), false -> "caml_int"
+    | (Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16), true ->
+      "%int"
+    | (Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16), false ->
+      "caml_int"
     | Naked_int32, _ -> "caml_int32"
     | Naked_int64, _ -> "caml_int64"
     | Naked_nativeint, _ -> "caml_nativeint"
-    | (Naked_int8 | Naked_int16), _ ->
-      (* CR selee: smallints *)
-      raise Primitive_not_supported
   in
   prefix ^ "_" ^ op
 
@@ -76,7 +74,7 @@ let identity ~env ~res x =
 
 let unit ~env ~res =
   let var = Jsir.Var.fresh () in
-  Some var, env, To_jsir_result.add_instr_exn res (Let (var, Constant Null))
+  Some var, env, To_jsir_result.add_instr_exn res (Let (var, Constant Null_))
 
 let use_prim0 ~env ~res prim args =
   let expr : Jsir.expr = Prim (prim, args) in
@@ -87,14 +85,42 @@ let use_prim ~env ~res prim args =
   let var, env, res = use_prim0 ~env ~res prim args in
   Some var, env, res
 
+let use_prim0' ~env ~res prim simples =
+  let args, res = prim_args ~env ~res simples in
+  use_prim0 ~env ~res prim args
+
 let use_prim' ~env ~res prim simples =
   let args, res = prim_args ~env ~res simples in
   use_prim ~env ~res prim args
 
+(* Smallints ([Naked_int8] and [Naked_int16]) are 32-bit integers that are
+   always kept sign-extended, as in bytecode and Cmm. Operations whose result
+   might not fit must therefore be followed by [sign_extend]. *)
+let smallint_bits (kind : Flambda_kind.Standard_int.t) =
+  match kind with
+  | Naked_int8 -> Some 8
+  | Naked_int16 -> Some 16
+  | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+  | Naked_nativeint ->
+    None
+
+let int_const n : Jsir.prim_arg = Pc (Int (Targetint.of_int_exn n))
+
+let sign_extend ~env ~res ~bits (x : Jsir.prim_arg) =
+  let shift = int_const (Targetint.num_bits () - bits) in
+  let shifted, env, res =
+    use_prim0 ~env ~res (Extern ("%int_lsl", None)) [x; shift]
+  in
+  use_prim ~env ~res (Extern ("%int_asr", None)) [Pv shifted; shift]
+
+let zero_extend ~env ~res ~bits (x : Jsir.prim_arg) =
+  let mask = int_const ((1 lsl bits) - 1) in
+  use_prim0 ~env ~res (Extern ("%int_and", None)) [x; mask]
+
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   let use_prim' prim = use_prim ~env ~res prim [] in
   match f with
-  | Invalid _ -> use_prim' (Extern "caml_invalid_primitive")
+  | Invalid _ -> use_prim' (Extern ("caml_invalid_primitive", None))
   | Optimised_out _ ->
     (* For phantom lets, which are kept around for debugging information for
        pieces of code that were optimised away. *)
@@ -103,23 +129,27 @@ let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   | Enter_inlined_apply _ ->
     (* CR selee: we should eventually use this debuginfo *)
     no_op ~env ~res
-  | Dls_get -> use_prim' (Extern "caml_domain_dls_get")
-  | Tls_get -> use_prim' (Extern "caml_domain_tls_get")
-  | Domain_index -> use_prim' (Extern "caml_ml_domain_index")
+  | Dls_get -> use_prim' (Extern ("caml_domain_dls_get", None))
+  | Tls_get -> use_prim' (Extern ("caml_domain_tls_get", None))
+  | Domain_index -> use_prim' (Extern ("caml_ml_domain_index", None))
   | Poll ->
     (* See [parse_bytecode.ml] in jsoo - treated as a noop *)
     no_op ~env ~res
-  | Cpu_relax -> use_prim' (Extern "caml_ml_domain_cpu_relax")
+  | Cpu_relax -> use_prim' (Extern ("caml_ml_domain_cpu_relax", None))
 
+(* [x] must be a block. *)
 let get_tag ~env ~res x =
   let x, res = prim_arg ~env ~res x in
-  use_prim0 ~env ~res (Extern "%direct_obj_tag") [x]
+  use_prim0 ~env ~res (Extern ("%direct_obj_tag", None)) [x]
 
+(* [x] may be any value, including a JS value that is not an OCaml block, so the
+   tag is read with optional chaining. *)
 let check_tag ~env ~res x ~tag =
-  let tag_var, env, res = get_tag ~env ~res x in
-  let expr : Jsir.expr =
-    Prim (Eq, [Pv tag_var; Pc (Int (Targetint.of_int tag))])
+  let x, res = prim_arg ~env ~res x in
+  let tag_var, env, res =
+    use_prim0 ~env ~res (Extern ("%direct_obj_tag_nullish", None)) [x]
   in
+  let expr : Jsir.expr = Prim (Eq, [Pv tag_var; int_const tag]) in
   let var = Jsir.Var.fresh () in
   Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
 
@@ -133,15 +163,14 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
   | Mixed
       { field_kind =
           Flat_suffix
-            (Naked_immediate | Naked_int32 | Naked_int64 | Naked_nativeint);
+            ( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32
+            | Naked_int64 | Naked_nativeint );
         _
       } ->
     Non_float
   | Mixed
       { field_kind =
-          Flat_suffix
-            ( Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
-            | Naked_vec512 | Naked_mask );
+          Flat_suffix (Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask);
         _
       } ->
     raise Primitive_not_supported
@@ -187,57 +216,105 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Duplicate_block _ | Duplicate_array _ | Obj_dup _ ->
-    use_prim' (Extern "caml_obj_dup")
+    use_prim' (Extern ("caml_obj_dup", None))
   | Is_int _ -> use_prim' IsInt
   | Is_null ->
     let x, res = prim_arg ~env ~res x in
-    use_prim ~env ~res Eq [x; Pc Null]
+    use_prim ~env ~res Eq [x; Pc Null_]
   | Get_tag ->
     let var, env, res = get_tag ~env ~res x in
     Some var, env, res
-  | Array_length _ -> use_prim' Vectlength
+  | Array_length _ -> use_prim' (Vectlength Generic)
   | Bigarray_length { dimension } ->
     let x, res = prim_arg ~env ~res x in
-    use_prim ~env ~res (Extern "caml_ba_dim")
-      [x; Pc (Int (Targetint.of_int (dimension - 1)))]
-  | String_length _ -> use_prim' (Extern "caml_ml_string_length")
-  | Int_as_pointer _ -> use_prim' (Extern "caml_int_as_pointer")
+    use_prim ~env ~res
+      (Extern ("caml_ba_dim", None))
+      [x; int_const (dimension - 1)]
+  | String_length _ -> use_prim' (Extern ("caml_ml_string_length", None))
+  | Int_as_pointer _ -> use_prim' (Extern ("caml_int_as_pointer", None))
   | Opaque_identity { middle_end_only = true; kind = _ } -> identity ~env ~res x
   | Opaque_identity { middle_end_only = false; kind : Flambda_kind.t = _ } ->
     (* CR selee: treating these as the identity for now *)
     identity ~env ~res x
+  | Int_arith (kind, Not) ->
+    let extern_name = with_int_prefix ~kind "xor" ~percent_for_imms:true in
+    let x, res = prim_arg ~env ~res x in
+    let minus_one =
+      Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit
+        (Flambda_kind.Standard_int.to_kind kind)
+        (-1)
+      |> To_jsir_shared.reg_width_const
+    in
+    use_prim ~env ~res (Extern (extern_name, None)) [x; Pc minus_one]
   | Int_arith (kind, Swap_byte_endianness) -> (
     match kind with
     | Naked_int8 -> identity ~env ~res x
-    | ( Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
-      | Naked_immediate | Tagged_immediate ) as kind ->
-      let extern_name =
-        match kind with
-        | Naked_int32 -> "caml_int32_bswap"
-        | Naked_int64 -> "caml_int64_bswap"
-        | Naked_nativeint -> "caml_nativeint_bswap"
-        | Naked_int16 | Naked_immediate | Tagged_immediate -> "caml_bswap16"
-        | Naked_int8 -> assert false
+    | Naked_int16 ->
+      (* The swap might change the sign, so we need to sign-extend to maintain
+         our representation invariant (see [sign_extend]). *)
+      let var, env, res =
+        use_prim0' ~env ~res (Extern ("caml_bswap16", None)) [x]
       in
-      use_prim' (Extern extern_name))
+      sign_extend ~env ~res ~bits:16 (Pv var)
+    | Naked_immediate | Tagged_immediate ->
+      use_prim' (Extern ("caml_bswap16", None))
+    | Naked_int32 -> use_prim' (Extern ("caml_int32_bswap", None))
+    | Naked_int64 -> use_prim' (Extern ("caml_int64_bswap", None))
+    | Naked_nativeint -> use_prim' (Extern ("caml_nativeint_bswap", None)))
   | Float_arith (bitwidth, op) ->
     let op_name = match op with Abs -> "abs" | Neg -> "neg" in
     let extern_name = with_float_suffix ~bitwidth op_name in
-    use_prim' (Extern extern_name)
+    use_prim' (Extern (extern_name, None))
   | Num_conv { src; dst } -> (
     let caml_of src dst =
-      use_prim' (Extern (Format.sprintf "caml_%s_of_%s" src dst))
+      use_prim' (Extern (Format.sprintf "caml_%s_of_%s" src dst, None))
     in
     let caml_of_bytecode src dst =
-      use_prim' (Extern (Format.sprintf "caml_%s_of_%s_bytecode" src dst))
+      use_prim' (Extern (Format.sprintf "caml_%s_of_%s_bytecode" src dst, None))
     in
     let caml_to src dst =
-      use_prim' (Extern (Format.sprintf "caml_%s_to_%s" src dst))
+      use_prim' (Extern (Format.sprintf "caml_%s_to_%s" src dst, None))
     in
     let caml_to_bytecode src dst =
-      use_prim' (Extern (Format.sprintf "caml_%s_to_%s_bytecode" src dst))
+      use_prim' (Extern (Format.sprintf "caml_%s_to_%s_bytecode" src dst, None))
+    in
+    (* Narrowing conversions to smallints: convert to a 32-bit integer first (if
+       needed) and then sign-extend. *)
+    let narrow ~bits =
+      let x, res = prim_arg ~env ~res x in
+      sign_extend ~env ~res ~bits x
+    in
+    let narrow_via extern_name ~bits =
+      let var, env, res =
+        use_prim0' ~env ~res (Extern (extern_name, None)) [x]
+      in
+      sign_extend ~env ~res ~bits (Pv var)
     in
     match src, dst with
+    | ( Naked_int8,
+        ( Naked_int8 | Naked_int16 | Tagged_immediate | Naked_immediate
+        | Naked_int32 | Naked_nativeint ) )
+    | ( Naked_int16,
+        ( Naked_int16 | Tagged_immediate | Naked_immediate | Naked_int32
+        | Naked_nativeint ) ) ->
+      (* Smallints are kept sign-extended, so widening is the identity *)
+      identity ~env ~res x
+    | (Naked_int8 | Naked_int16), Naked_int64 -> caml_of "int64" "int32"
+    | (Naked_int8 | Naked_int16), Naked_float -> caml_of "float" "int"
+    | (Naked_int8 | Naked_int16), Naked_float32 -> caml_of "float32" "int"
+    | ( ( Tagged_immediate | Naked_immediate | Naked_int32 | Naked_nativeint
+        | Naked_int16 ),
+        Naked_int8 ) ->
+      narrow ~bits:8
+    | ( (Tagged_immediate | Naked_immediate | Naked_int32 | Naked_nativeint),
+        Naked_int16 ) ->
+      narrow ~bits:16
+    | Naked_int64, Naked_int8 -> narrow_via "caml_int64_to_int32" ~bits:8
+    | Naked_int64, Naked_int16 -> narrow_via "caml_int64_to_int32" ~bits:16
+    | Naked_float, Naked_int8 -> narrow_via "caml_int_of_float" ~bits:8
+    | Naked_float, Naked_int16 -> narrow_via "caml_int_of_float" ~bits:16
+    | Naked_float32, Naked_int8 -> narrow_via "caml_int_of_float32" ~bits:8
+    | Naked_float32, Naked_int16 -> narrow_via "caml_int_of_float32" ~bits:16
     | (Tagged_immediate | Naked_immediate), (Tagged_immediate | Naked_immediate)
     | Naked_float32, Naked_float32
     | Naked_float, Naked_float
@@ -278,10 +355,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     | Naked_nativeint, Naked_float32 -> caml_of "float32" "nativeint"
     | Naked_nativeint, Naked_float -> caml_to "nativeint" "float"
     | Naked_nativeint, Naked_int32 -> caml_to "nativeint" "int32"
-    | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint"
-    | (Naked_int8 | Naked_int16), _ | _, (Naked_int8 | Naked_int16) ->
-      (* CR selee: smallints *)
-      raise Primitive_not_supported)
+    | Naked_nativeint, Naked_int64 -> caml_of "int64" "nativeint")
   | Boolean_not -> use_prim' Not
   | Reinterpret_64_bit_word reinterpret ->
     let extern_name =
@@ -293,7 +367,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
         raise Primitive_not_supported
       | Tagged_int63_as_unboxed_int64 -> raise Primitive_not_supported
     in
-    use_prim' (Extern extern_name)
+    use_prim' (Extern (extern_name, None))
   | Reinterpret_boxed_vector -> identity ~env ~res x
   | Unbox_number _ | Box_number _ | Untag_immediate | Tag_immediate ->
     (* everything is untagged and "unboxed" in JS: see README *)
@@ -304,7 +378,16 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
   | Project_value_slot { project_from = _; value_slot } ->
     check_my_closure ~env x;
     Some (To_jsir_env.get_value_slot_exn env value_slot), env, res
-  | Is_boxed_float -> use_prim' (Extern "caml_is_boxed_float")
+  | Is_boxed_float ->
+    (* This only arises from [Pmakearray Pgenarray], to decide whether an array
+       literal of unknown element type is a flat float array or an ordinary one.
+       A boxed float is a plain number in JavaScript, so they can't be
+       distinguished, but the JSOO runtime already puts floats in ordinary
+       arrays ([caml_array_make], so we return [false] according to this
+       convention. *)
+    let var = Jsir.Var.fresh () in
+    let expr : Jsir.expr = Constant (Int Targetint.zero) in
+    Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
   | Is_flat_float_array -> check_tag ~env ~res x ~tag:Obj.double_array_tag
   | End_region _ | End_try_region _ -> no_op ~env ~res
   | Get_header ->
@@ -376,15 +459,15 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Mask ->
           "caml_ba_uint8_" ^ op_name)
     in
-    use_prim' (Extern extern_name)
+    use_prim' (Extern (extern_name, None))
   | Bigarray_load (_dims, _kind, _layout) ->
     (* The index calculation is already done in Flambda, so we are free to
        ignore the parameters. *)
-    use_prim' (Extern "caml_ba_get_raw_unsafe")
+    use_prim' (Extern ("caml_ba_get_raw_unsafe", None))
   | Phys_equal comparison ->
     let prim : Jsir.prim = match comparison with Eq -> Eq | Neq -> Neq in
     use_prim' prim
-  | Int_arith (kind, op) ->
+  | Int_arith (kind, op) -> (
     let op_name =
       match op with
       | Add -> "add"
@@ -398,45 +481,73 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Or -> "or"
       | Xor -> "xor"
     in
-    let extern_name =
-      with_int_prefix_exn ~kind op_name ~percent_for_imms:true
+    let prim : Jsir.prim =
+      Extern (with_int_prefix ~kind op_name ~percent_for_imms:true, None)
     in
-    use_prim' (Extern extern_name)
-  | Int_shift (kind, op) ->
+    match smallint_bits kind, op with
+    | None, _ | Some _, (And | Or | Xor | Mod Signed) ->
+      (* Bitwise operations on sign-extended operands yield sign-extended
+         results, and a signed remainder is always smaller in magnitude than the
+         divisor, so it is in range too. *)
+      use_prim' prim
+    | Some bits, (Add | Sub | Mul | Div Signed) ->
+      (* The result may be out of range, e.g. [-128 / -1] for [int8] *)
+      let var, env, res = use_prim0' ~env ~res prim [x; y] in
+      sign_extend ~env ~res ~bits (Pv var)
+    | Some bits, (Div Unsigned | Mod Unsigned) ->
+      (* Zero-extend the operands to get their unsigned values *)
+      let x, res = prim_arg ~env ~res x in
+      let y, res = prim_arg ~env ~res y in
+      let x, env, res = zero_extend ~env ~res ~bits x in
+      let y, env, res = zero_extend ~env ~res ~bits y in
+      let var, env, res = use_prim0 ~env ~res prim [Pv x; Pv y] in
+      sign_extend ~env ~res ~bits (Pv var))
+  | Int_shift (kind, op) -> (
     let op_name =
       match kind, op with
-      | (Tagged_immediate | Naked_immediate), Lsl -> "lsl"
+      | (Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16), Lsl ->
+        "lsl"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsl -> "shift_left"
-      | (Tagged_immediate | Naked_immediate), Lsr -> "lsr"
+      | (Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16), Lsr ->
+        "lsr"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Lsr ->
         "shift_right_unsigned"
-      | (Tagged_immediate | Naked_immediate), Asr -> "asr"
+      | (Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16), Asr ->
+        "asr"
       | (Naked_int32 | Naked_int64 | Naked_nativeint), Asr -> "shift_right"
-      | (Naked_int8 | Naked_int16), _ ->
-        (* CR selee: smallints *)
-        raise Primitive_not_supported
     in
-    let extern_name =
-      with_int_prefix_exn ~kind op_name ~percent_for_imms:true
+    let prim : Jsir.prim =
+      Extern (with_int_prefix ~kind op_name ~percent_for_imms:true, None)
     in
-    use_prim' (Extern extern_name)
+    match smallint_bits kind, op with
+    | None, _ | Some _, Asr -> use_prim' prim
+    | Some bits, Lsl ->
+      let var, env, res = use_prim0' ~env ~res prim [x; y] in
+      sign_extend ~env ~res ~bits (Pv var)
+    | Some bits, Lsr ->
+      (* Shift the unsigned value, then sign-extend (e.g. for a shift by 0) *)
+      let x, res = prim_arg ~env ~res x in
+      let y, res = prim_arg ~env ~res y in
+      let x, env, res = zero_extend ~env ~res ~bits x in
+      let var, env, res = use_prim0 ~env ~res prim [Pv x; y] in
+      sign_extend ~env ~res ~bits (Pv var))
   | Int_comp (kind, behaviour) -> (
     match behaviour with
     | Yielding_bool comparison -> (
       let eq, neq, lt, ult, le =
         let open Jsir in
         match kind with
-        | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_nativeint ->
+        | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
+        | Naked_int32 | Naked_nativeint ->
+          (* Sign extension preserves both signed and unsigned ordering, so
+             smallints can be compared directly *)
           Eq, Neq, Lt, Ult, Le
         | Naked_int64 ->
-          ( Extern "caml_equal",
-            Extern "caml_notequal",
-            Extern "caml_lessthan",
-            Extern "caml_int64_ult",
-            Extern "caml_lessequal" )
-        | Naked_int8 | Naked_int16 ->
-          (* CR selee: smallints *)
-          raise Primitive_not_supported
+          ( Extern ("caml_equal", None),
+            Extern ("caml_notequal", None),
+            Extern ("caml_lessthan", None),
+            Extern ("caml_int64_ult", None),
+            Extern ("caml_lessequal", None) )
       in
       let unsigned_le x y =
         let var_ule = Jsir.Var.fresh () in
@@ -451,7 +562,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
           To_jsir_result.add_instr_exn res (Jsir.Let (var_eq, expr_eq))
         in
         let expr_or : Jsir.expr =
-          Prim (Extern "%int_or", [Pv var_ule; Pv var_eq])
+          Prim (Extern ("%int_or", None), [Pv var_ule; Pv var_eq])
         in
         ( Some var_or,
           env,
@@ -471,23 +582,40 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Ge Signed -> use_prim ~env ~res le [y; x]
       | Ge Unsigned -> unsigned_le y x)
     | Yielding_int_like_compare_functions signed_or_unsigned -> (
+      let compare : Jsir.prim =
+        Extern (with_int_prefix ~kind "compare" ~percent_for_imms:false, None)
+      in
       match signed_or_unsigned with
-      | Signed ->
-        let extern_name =
-          with_int_prefix_exn ~kind "compare" ~percent_for_imms:false
-        in
-        use_prim' (Extern extern_name)
+      | Signed -> use_prim' compare
       | Unsigned ->
-        (* Also unimplemented in Cmm. See [To_cmm_primitive]. *)
-        (* CR selee: can do this by subtracting [min_int] before doing the
-           compare *)
-        raise Primitive_not_supported))
+        (* Map the operands to values whose signed ordering is the unsigned
+           ordering of the originals. Smallints should be zero-extended, and the
+           sign bit of the other kinds should be flipped. *)
+        let flip_sign_bit (min_int : Jsir.constant) ~env ~res arg =
+          use_prim0 ~env ~res
+            (Extern (with_int_prefix ~kind "xor" ~percent_for_imms:true, None))
+            [arg; Pc min_int]
+        in
+        let to_signed_order =
+          match kind with
+          | Naked_int8 -> zero_extend ~bits:8
+          | Naked_int16 -> zero_extend ~bits:16
+          | Tagged_immediate | Naked_immediate ->
+            flip_sign_bit (Int (Targetint.min_int ()))
+          | Naked_int32 | Naked_nativeint -> flip_sign_bit (Int32 Int32.min_int)
+          | Naked_int64 -> flip_sign_bit (Int64 Int64.min_int)
+        in
+        let x, res = prim_arg ~env ~res x in
+        let y, res = prim_arg ~env ~res y in
+        let x, env, res = to_signed_order ~env ~res x in
+        let y, env, res = to_signed_order ~env ~res y in
+        use_prim ~env ~res compare [Pv x; Pv y]))
   | Float_arith (bitwidth, op) ->
     let op_name =
       match op with Add -> "add" | Sub -> "sub" | Mul -> "mul" | Div -> "div"
     in
     let extern_name = with_float_suffix ~bitwidth op_name in
-    use_prim' (Extern extern_name)
+    use_prim' (Extern (extern_name, None))
   | Float_comp (bitwidth, behaviour) ->
     let extern_name =
       match behaviour with
@@ -507,8 +635,9 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Float64 -> "caml_float_compare"
         | Float32 -> "caml_float32_compare")
     in
-    use_prim' (Extern extern_name)
-  | Atomic_load (Field_index, _) -> use_prim' (Extern "caml_atomic_load_field")
+    use_prim' (Extern (extern_name, None))
+  | Atomic_load (Field_index, _) ->
+    use_prim' (Extern ("caml_atomic_load_field", None))
   | Bigarray_get_alignment _ ->
     (* Only used for SIMD *)
     raise Primitive_not_supported
@@ -564,11 +693,11 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Bigstring, Single -> "caml_ba_uint8_setf32"
       | Bigstring, Sixty_four -> "caml_ba_uint8_set64"
     in
-    use_prim' (Extern extern_name)
+    use_prim' (Extern (extern_name, None))
   | Bigarray_set (_dims, _kind, _layout) ->
     (* The index calculation is already done in Flambda, so we are free to
        ignore the parameters. *)
-    use_prim' (Extern "caml_ba_set_raw_unsafe")
+    use_prim' (Extern ("caml_ba_set_raw_unsafe", None))
   | Atomic_int_arith (Field_index, op) ->
     let extern_name =
       match op with
@@ -579,12 +708,14 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Or -> "caml_atomic_lor_field"
       | Xor -> "caml_atomic_lxor_field"
     in
-    use_prim' (Extern extern_name)
+    use_prim' (Extern (extern_name, None))
   | Atomic_set (Field_index, _, _) ->
-    let _var, env, res = use_prim' (Extern "caml_atomic_exchange_field") in
+    let _var, env, res =
+      use_prim' (Extern ("caml_atomic_exchange_field", None))
+    in
     unit ~env ~res
   | Atomic_exchange (Field_index, _, _) ->
-    use_prim' (Extern "caml_atomic_exchange_field")
+    use_prim' (Extern ("caml_atomic_exchange_field", None))
   | Atomic_int_arith (Byte_offset, _)
   | Atomic_set (Byte_offset, _, _)
   | Atomic_exchange (Byte_offset, _, _)
@@ -598,9 +729,9 @@ let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
   let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
   match f with
   | Atomic_compare_and_set (Field_index, _, _) ->
-    use_prim' (Extern "caml_atomic_cas_field")
+    use_prim' (Extern ("caml_atomic_cas_field", None))
   | Atomic_compare_exchange { offset_units = Field_index; _ } ->
-    use_prim' (Extern "caml_atomic_compare_exchange_field")
+    use_prim' (Extern ("caml_atomic_compare_exchange_field", None))
   | Atomic_compare_and_set (Byte_offset, _, _)
   | Atomic_compare_exchange { offset_units = Byte_offset; _ } ->
     raise Primitive_not_supported
@@ -678,4 +809,6 @@ let extern ~env ~res symbol args =
   let args, res = prim_args ~env ~res args in
   let name = Symbol.linkage_name_as_string symbol in
   let var = Jsir.Var.fresh () in
-  var, To_jsir_result.add_instr_exn res (Let (var, Prim (Extern name, args)))
+  ( var,
+    To_jsir_result.add_instr_exn res
+      (Let (var, Prim (Extern (name, None), args))) )

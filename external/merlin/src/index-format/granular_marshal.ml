@@ -43,6 +43,16 @@ end = struct
   let read fd = really_input_string fd digest_size
 end
 
+module Outdated_store = struct
+  type t =
+    { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+    let compare = compare
+  end)
+end
+
 type store = { filename : string; id : File_digest.t; cache : cache }
 
 and cache = any_link Cache.t
@@ -154,9 +164,7 @@ let string_of_link : type a. a link -> string =
   | In_memory_reused _ -> "In_memory_reused"
   | Duplicate _ -> "Duplicate"
 
-exception
-  Outdated_store of
-    { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
+exception Outdated_store of Outdated_store.t
 
 let lru_dbllist : cached Dbllist.t option ref = ref None
 let lru_size = ref 1_000_000
@@ -205,6 +213,9 @@ let int_of_binstring s =
 let last_open_store = ref None
 
 let force_open_store store =
+  (* Before opening a new store, make sure the old one is closed. *)
+  Option.iter (fun (_, fd) -> close_in fd) !last_open_store;
+  last_open_store := None;
   try
     let fd = open_in_bin store.filename in
     seek_in fd (String.length Config.index_magic_number);
@@ -212,10 +223,11 @@ let force_open_store store =
     if File_digest.equal required_id store.id then (
       last_open_store := Some (store, fd);
       fd)
-    else
+    else (
+      close_in fd;
       raise
         (Outdated_store
-           { filename = store.filename; reason = `Index_ids_do_not_match })
+           { filename = store.filename; reason = `Index_ids_do_not_match }))
   with Sys_error _ ->
     raise (Outdated_store { filename = store.filename; reason = `Missing_file })
 
@@ -224,10 +236,7 @@ let open_store store =
   | Some (store', fd)
     when File_digest.equal store.id store'.id
          && String.equal store.filename store'.filename -> fd
-  | Some (_, fd) ->
-    close_in fd;
-    force_open_store store
-  | None -> force_open_store store
+  | Some _ | None -> force_open_store store
 
 let resolve_filename store ~filename =
   if Filename.is_relative filename then
@@ -474,6 +483,87 @@ let cache (type a) (module Key : Hashtbl.HashedType with type t = a) =
         lnk := Duplicate original_lnk
       | exception Not_found -> H.add cache key lnk
 
+type materialized_entry = { first_link : Obj.t; mutable reused : bool }
+
+(** [materialize root_schema root_value] replaces every link into another file
+    reachable from [root_value] with an in-memory copy of the pointed-at value. *)
+let materialize root_schema root_value =
+  let seen : (string * int * int, materialized_entry) Hashtbl.t =
+    Hashtbl.create 1024
+  in
+  let assignments = ref [] in
+  let key_of_disk_link : type a. a link -> string * int * int =
+   fun lnk ->
+    match !lnk with
+    | On_disk { store; loc; _ } | In_cache { store; loc; _ } ->
+      (store.filename, loc, -1)
+    | On_disk_small { parent; small_pos; _ } ->
+      let store, loc = store_and_loc_of_parent parent in
+      (store.filename, loc, small_pos)
+    | _ ->
+      invalid_arg
+        ("Granular_marshal.materialize: not an on-disk link "
+       ^ string_of_link lnk)
+  in
+  let fetch_clean : type a. a link -> a schema -> a =
+   fun lnk schema ->
+    (match !lnk with
+    | On_disk { store; loc; schema = None } ->
+      lnk := On_disk { store; loc; schema = Some schema }
+    | In_cache { store; schema = None; _ } ->
+      upgrade_reused_link_schema lnk store schema
+    | _ -> ());
+    fetch lnk
+  in
+  let rec iter =
+    { yield =
+        (fun (type a) (lnk : a link) _type_id (schema : a schema) ->
+          visit_link lnk schema)
+    }
+  and visit_link : type a. a link -> a schema -> unit =
+   fun lnk schema ->
+    match !lnk with
+    | In_memory v | In_memory_reused v -> schema iter v
+    | Duplicate original -> (
+      match !original with
+      | On_disk _ | In_cache _ | On_disk_small _ ->
+        let entry = visit_disk_link original schema in
+        entry.reused <- true
+      | _ -> visit_link original schema)
+    | On_disk _ | In_cache _ | On_disk_small _ ->
+      ignore (visit_disk_link lnk schema : materialized_entry)
+    | Serialized _
+    | Serialized_small _
+    | Small _
+    | On_disk_ptr _
+    | On_disk_small_ptr _ ->
+      invalid_arg
+        ("Granular_marshal.materialize: unexpected link " ^ string_of_link lnk)
+  and visit_disk_link : type a. a link -> a schema -> materialized_entry =
+   fun lnk schema ->
+    let key = key_of_disk_link lnk in
+    match Hashtbl.find_opt seen key with
+    | Some entry ->
+      if not (entry.first_link == Obj.repr lnk) then (
+        entry.reused <- true;
+        (* Same file and location, hence same type. *)
+        let first : a link = Obj.obj entry.first_link in
+        assignments := (fun () -> lnk := Duplicate first) :: !assignments);
+      entry
+    | None ->
+      let entry = { first_link = Obj.repr lnk; reused = false } in
+      Hashtbl.add seen key entry;
+      let v = fetch_clean lnk schema in
+      schema iter v;
+      assignments :=
+        (fun () ->
+          lnk := if entry.reused then In_memory_reused v else In_memory v)
+        :: !assignments;
+      entry
+  in
+  root_schema iter root_value;
+  List.iter (fun assign -> assign ()) !assignments
+
 let relativize ~wrt:path =
   let path_segments = Misc.split_path path in
   let rec aux path target =
@@ -487,7 +577,15 @@ let relativize ~wrt:path =
     let target_segments = Misc.split_path target in
     List.fold_left Filename.concat "" (aux path_segments target_segments)
 
-let write ?(flags = []) fd ~filename root_schema root_value =
+module File_kind = struct
+  type t = No_standalone | Standalone
+end
+
+let write ?(flags = []) fd ~filename ~(file_kind : File_kind.t) root_schema
+    root_value =
+  (match file_kind with
+  | Standalone -> materialize root_schema root_value
+  | No_standalone -> ());
   let relativize =
     relativize ~wrt:Filename.(dirname (concat (Unix.getcwd ()) filename))
   in

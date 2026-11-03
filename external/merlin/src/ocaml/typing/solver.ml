@@ -442,6 +442,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let rigid_level = generic_level - 1
 
+  let rec effective_level v =
+    match v.gencopy with
+    | Some copy when copy.level <= v.level -> effective_level copy
+    | Some _ | None -> v.level
+
   let fatal_if_rigid mutation v =
     if v.level = rigid_level
     then
@@ -619,15 +624,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Amodejoin (_, _, mvs) ->
       VarMap.for_all (fun _ mv -> check_level_morphvar mv 0) mvs
 
+  let check_generic_morphvar : type a l r. (a, l * r) morphvar -> bool =
+   fun (Amorphvar (v, _, _)) -> effective_level v = generic_level
+
   let check_generic : type a l r. (a, l * r) mode -> bool =
    fun m ->
     match m with
     | Amode _ -> false
-    | Amodevar mv -> check_level_morphvar mv generic_level
+    | Amodevar mv -> check_generic_morphvar mv
     | Amodemeet (_, _, mvs) ->
-      VarMap.exists (fun _ mv -> check_level_morphvar mv generic_level) mvs
+      VarMap.exists (fun _ mv -> check_generic_morphvar mv) mvs
     | Amodejoin (_, _, mvs) ->
-      VarMap.exists (fun _ mv -> check_level_morphvar mv generic_level) mvs
+      VarMap.exists (fun _ mv -> check_generic_morphvar mv) mvs
 
   type var_iterator =
     { iter : 'a. 'a C.obj -> ('a, allowed * allowed) mode -> unit }
@@ -673,7 +681,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_right f_hint, g_hint)
           in
           let mu = Amorphvar (u, fg, fg_hint) in
-          iter ~id:u.id ~level:u.level ~morph:(Packed_morph fg) (Amodevar mu);
+          iter ~id:u.id ~level:(effective_level u) ~morph:(Packed_morph fg)
+            (Amodevar mu);
           iter_covariant_morphvar ~visited dst iter mu)
         v.vlower
     end
@@ -720,7 +729,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (Comp_hint.Morph_hint.disallow_left f_hint, g_hint)
           in
           let mu = Amorphvar (u, fg, fg_hint) in
-          iter ~id:u.id ~level:u.level ~morph:(Packed_morph fg) (Amodevar mu);
+          iter ~id:u.id ~level:(effective_level u) ~morph:(Packed_morph fg)
+            (Amodevar mu);
           iter_contravariant_morphvar ~visited dst iter mu)
         v.vupper
     end
@@ -1029,6 +1039,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (a, l * allowed) morphvar ->
       (unit, a * (a, right_only) Comp_hint.t) Result.t =
    fun ~allow_rigid ~log pp obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
+    (* Fast failure path *)
     let mlower = mlower obj mv in
     let mupper = mupper obj mv in
     let mupper_hint = mupper_hint mv in
@@ -1037,9 +1048,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else if not (C.le obj a mupper)
     then Error (mupper, mupper_hint)
     else
-      (* At this point we know [a <= f v], therefore [a] is in the downward
-         closure of [f]'s image. Therefore, asking [a <= f v] is equivalent to
-         asking [f' a <= v]. *)
+      (* Asking [a <= f v] is equivalent to asking [f' a <= v]. *)
       let f' = C.left_adjoint obj f in
       let src_pp, src, f'_hint =
         Comp_hint.Morph_hint.left_adjoint pp obj f_hint
@@ -1101,8 +1110,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ('a, right_only) Comp_hint.t ->
       (unit, 'a * ('a, left_only) Comp_hint.t) Result.t =
    fun ~allow_rigid ~log pp obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
-    (* See [submode_cmv] for why we need the following seemingly redundant
-       lines. *)
+    (* Fast failure path *)
     let mupper = mupper obj mv in
     let mlower = mlower obj mv in
     let mlower_hint = mlower_hint mv in
@@ -2606,7 +2614,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           let vlower = VarMap.map f v.vlower in
           var_map_to_list vlower
         in
-        let desc_level = v.level in
+        let desc_level = effective_level v in
         { desc_id; desc_lower; desc_upper; desc_vlower; desc_level }
     end
 

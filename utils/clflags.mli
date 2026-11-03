@@ -85,6 +85,16 @@ val include_dirs : visible_include list ref
 val hidden_include_dirs : string list ref
 val include_manifests : string list ref
 val hidden_include_manifests : string list ref
+
+type hidden_include_file =
+  { visible_path : string;
+    actual_path : string;
+    cmx_guaranteed : bool;
+  }
+
+val hidden_include_files : hidden_include_file list ref
+val parse_hidden_include_file :
+  cmx_guaranteed:bool -> string -> (hidden_include_file, string) result
 val no_std_include : bool ref
 val no_cwd : bool ref
 val print_types : bool ref
@@ -181,7 +191,6 @@ val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
 val dump_tlambda : bool ref
-val dump_slambda : bool ref
 val dump_matchcomp : bool ref
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
@@ -212,6 +221,25 @@ end
 val set_target : Target.t -> unit
 val target_is_native : unit -> bool
 val target_is_jsir : unit -> bool
+
+(** The js_of_ocaml invocations of [ocamlopt -target js_of_ocaml] that options
+    can be passed through to, with [-jsoo-opt-<phase>] (and [-jsoo-opt] for all
+    of them):
+    - [Compile]: [js_of_ocaml compile], producing a unit's [.cmjo];
+    - [Archive]: [js_of_ocaml link -a], producing a [.cmja] ([-a]);
+    - [Runtime]: [js_of_ocaml build-runtime], when linking an executable;
+    - [Link]: [js_of_ocaml link], when linking an executable. *)
+module Jsoo_phase : sig
+  type t = All | Compile | Archive | Runtime | Link
+
+  val all : t list
+
+  (** The command-line flag, e.g. [-jsoo-opt-compile]. *)
+  val flag : t -> string
+end
+
+(** The options given for a phase, most recent first. *)
+val jsoo_opts : Jsoo_phase.t -> string list ref
 val default_inline_threshold : float
 val inline_threshold : Float_arg_helper.parsed ref
 val inlining_report : bool ref

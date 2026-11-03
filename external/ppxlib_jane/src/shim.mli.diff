@@ -15,87 +15,99 @@
 >   val to_parsetree : t -> Longident.t
 >   val of_parsetree : Longident.t -> t
 25c25
-<   type t = mode = Mode of string [@@unboxed]
+<   type t = mode =
 ---
->   type t = Mode of string [@@unboxed]
+>   type t =
+30c30
+<   and bounded = mode_bounded =
+---
+>   and bounded =
 37c37
+<   and bound_elem = mode_bound_elem =
+---
+>   and bound_elem =
+41c41
+<   and bound_var = mode_bound_var =
+---
+>   and bound_var =
+57c57
 <   type t = modality = Modality of string [@@unboxed]
 ---
 >   type t = Modality of string [@@unboxed]
-48c48
+68c68
 <   type t = include_kind =
 ---
 >   type t =
-77c77
+97c97
 <   type t = constructor_argument
 ---
 >   type t = core_type
-116c116
+136c136
 <   type t = module_declaration =
 ---
 >   type t =
-139c139
+159c159
 < type nonrec jkind_annotation_desc = jkind_annotation_desc =
 ---
 > type jkind_annotation_desc =
-148c148
+168c168
 < type nonrec jkind_annotation = jkind_annotation =
 ---
 > and jkind_annotation =
-153c153
+173c173
 < type nonrec jkind_declaration = jkind_declaration =
 ---
 > and jkind_declaration =
-161c161
+181c181
 <   type t = type_declaration =
 ---
 >   type t =
-179c179
+199c199
 <   type t = constant =
 ---
 >   type t =
-194c194
+214c214
 <   type nonrec function_param_desc = function_param_desc =
 ---
 >   type function_param_desc =
-198c198
+218c218
 <   type nonrec function_param = function_param =
 ---
 >   type function_param =
-208c208
+228c228
 <     type t = function_constraint =
 ---
 >     type t =
-234c234
+254c254
 < type nonrec access_flag = access_flag =
 ---
 > type nonrec access_flag =
-239c239
+259c259
 < type nonrec block_access = block_access =
 ---
 > type block_access =
-243c243
+263c263
 < type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Astlib.Longident.t loc
 ---
 > type unboxed_access = Uaccess_unboxed_field of Astlib.Longident.t loc
-246c246
+266c266
 <   type t = core_type_desc =
 ---
 >   type t =
-271c271
+291c291
 <   type t = core_type =
 ---
 >   type t =
-283c283
+303c303
 <   type t = pattern_desc =
 ---
 >   type t =
-294c294,295
+314c314,315
 <         Astlib.Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
 ---
 >         Astlib.Longident.t loc
 >         * ((string loc * jkind_annotation option) list * pattern) option
-313c314,319
+333c334,339
 <   type t = expression_desc =
 ---
 >   (* TODO: Fully support comprehensions upstream. *)
@@ -104,42 +116,42 @@
 >     | Pcomp_array_comprehension of unit
 > 
 >   type t =
-373c379
+393c399
 <   type t = type_kind =
 ---
 >   type t =
-399c405
+419c425
 <   type 'a t = 'a include_infos =
 ---
 >   type 'a t =
-411c417
+431c437
 <   type t = signature_item_desc =
 ---
 >   type t =
-435c441
+455c461
 <   type t = signature =
 ---
 >   type t =
-446c452
+466c472
 <   type t = structure_item_desc =
 ---
 >   type t =
-469c475
+489c495
 <   type t = functor_parameter =
 ---
 >   type t =
-478c484
+498c504
 <   type t = module_type_desc =
 ---
 >   type t =
-493c499,502
+513c519,522
 <   type t = module_expr_desc =
 ---
 >   (* TODO: Fully support module instances upstream. *)
 >   type module_instance = private Module_instance
 > 
 >   type t =
-509,514c518,643
+529,534c538,691
 <   class virtual map : Ppxlib_ast.Ast.map
 <   class virtual iter : Ppxlib_ast.Ast.iter
 <   class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
@@ -157,7 +169,14 @@
 >       method function_body : function_body T.t
 >       method function_constraint : Pexp_function.Function_constraint.t T.t
 >       method type_constraint : type_constraint T.t
+>       method mode_const : string T.t
+>       method mode_var : string T.t
+>       method mode_morph : string T.t
 >       method mode : Mode.t T.t
+>       method mode_bounded : Mode.bounded T.t
+>       method mode_bound : Mode.bound T.t
+>       method mode_bound_elem : Mode.bound_elem T.t
+>       method mode_bound_var : Mode.bound_var T.t
 >       method modes : Modes.t T.t
 >       method modality : Modality.t T.t
 >       method modalities : Modalities.t T.t
@@ -175,7 +194,14 @@
 >       method function_body : ('ctx, function_body) T.t
 >       method function_constraint : ('ctx, Pexp_function.Function_constraint.t) T.t
 >       method type_constraint : ('ctx, type_constraint) T.t
+>       method mode_const : ('ctx, string) T.t
+>       method mode_var : ('ctx, string) T.t
+>       method mode_morph : ('ctx, string) T.t
 >       method mode : ('ctx, Mode.t) T.t
+>       method mode_bounded : ('ctx, Mode.bounded) T.t
+>       method mode_bound : ('ctx, Mode.bound) T.t
+>       method mode_bound_elem : ('ctx, Mode.bound_elem) T.t
+>       method mode_bound_var : ('ctx, Mode.bound_var) T.t
 >       method modes : ('ctx, Modes.t) T.t
 >       method modality : ('ctx, Modality.t) T.t
 >       method modalities : ('ctx, Modalities.t) T.t
@@ -193,7 +219,14 @@
 >       method function_body : (function_body, 'a) T.t
 >       method function_constraint : (Pexp_function.Function_constraint.t, 'a) T.t
 >       method type_constraint : (type_constraint, 'a) T.t
+>       method mode_const : (string, 'a) T.t
+>       method mode_var : (string, 'a) T.t
+>       method mode_morph : (string, 'a) T.t
 >       method mode : (Mode.t, 'a) T.t
+>       method mode_bounded : (Mode.bounded, 'a) T.t
+>       method mode_bound : (Mode.bound, 'a) T.t
+>       method mode_bound_elem : (Mode.bound_elem, 'a) T.t
+>       method mode_bound_var : (Mode.bound_var, 'a) T.t
 >       method modes : (Modes.t, 'a) T.t
 >       method modality : (Modality.t, 'a) T.t
 >       method modalities : (Modalities.t, 'a) T.t
@@ -211,7 +244,14 @@
 >       method function_body : ('ctx, function_body, 'res) T.t
 >       method function_constraint : ('ctx, Pexp_function.Function_constraint.t, 'res) T.t
 >       method type_constraint : ('ctx, type_constraint, 'res) T.t
+>       method mode_const : ('ctx, string, 'res) T.t
+>       method mode_var : ('ctx, string, 'res) T.t
+>       method mode_morph : ('ctx, string, 'res) T.t
 >       method mode : ('ctx, Mode.t, 'res) T.t
+>       method mode_bounded : ('ctx, Mode.bounded, 'res) T.t
+>       method mode_bound : ('ctx, Mode.bound, 'res) T.t
+>       method mode_bound_elem : ('ctx, Mode.bound_elem, 'res) T.t
+>       method mode_bound_var : ('ctx, Mode.bound_var, 'res) T.t
 >       method modes : ('ctx, Modes.t, 'res) T.t
 >       method modality : ('ctx, Modality.t, 'res) T.t
 >       method modalities : ('ctx, Modalities.t, 'res) T.t
@@ -273,7 +313,7 @@
 >     inherit ['ctx] Ppxlib_ast.Ast.map_with_context
 >     inherit ['ctx] Jane_street_extensions0_ctx(Ts.Map_with_context).t
 >   end
-516,517c645,653
+536,537c693,701
 <   class virtual ['ctx, 'res] lift_map_with_context :
 <     ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
 ---

@@ -297,8 +297,8 @@ let calling_convention_changes_rules =
          changing the calling convention, but this would require wrappers for
          over- and partial applications, as well as untupling. As these wrappers
          are complex to write correctly, this is not done yet. *)
-      (let$ [call_witness; codeid; set_of_closures] =
-         ["call_witness"; "codeid"; "set_of_closures"]
+      (let$ [call_witness; set_of_closures; codeid] =
+         ["call_witness"; "set_of_closures"; "codeid"]
        in
        [ rev_constructor ~from:call_witness
            !!Field.unknown_arity_call_witness
@@ -343,8 +343,8 @@ let unboxing_rules =
       (* Likewise, if a block with a local field escapes, and that field is read
          again from a value with several sources, prevent changing the
          representation. *)
-      (let$ [usage; field; source1; source2; v] =
-         ["usage"; "field"; "source1"; "source2"; "v"]
+      (let$ [usage; field; v; source1; source2] =
+         ["usage"; "field"; "v"; "source1"; "source2"]
        in
        [ rev_accessor ~base:usage field ~to_:v;
          has_usage v;
@@ -532,8 +532,8 @@ let unboxing_rules =
          the representation of the other allocation can be changed, of it the
          field it is stored in is never read, as in that case a poison value
          will be stored instead. *)
-      (let$ [alias; allocation_id; relation; to_] =
-         ["alias"; "allocation_id"; "relation"; "to_"]
+      (let$ [alias; relation; to_; allocation_id] =
+         ["alias"; "relation"; "to_"; "allocation_id"]
        in
        [ sources alias allocation_id;
          rev_constructor ~from:alias relation ~base:to_;
@@ -669,7 +669,7 @@ let cannot_change_calling_convention ~analysis_scope uses v =
            (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
-let perform_analysis0 db ~stats ~analysis_scope =
+let perform_analysis0 ?stats db ~analysis_scope =
   current_analysis_scope := analysis_scope;
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
@@ -698,7 +698,7 @@ let perform_analysis0 db ~stats ~analysis_scope =
             db
         in
         List.fold_left
-          (fun db rule -> Datalog.Schedule.run ~stats rule db)
+          (fun db rule -> Datalog.Schedule.run ?stats rule db)
           db unboxing_rules)
   in
   let name_of_node =
@@ -866,21 +866,21 @@ let perform_analysis0 db ~stats ~analysis_scope =
   in
   { db; unboxed_fields = unboxed; changed_representation }
 
-let perform_analysis db ~stats ~analysis_scope =
+let perform_analysis ?stats db ~analysis_scope =
   let db =
     if Flambda_features.reaper_change_calling_conventions ()
     then
       Profile.record_call ~accumulate:true "compute_calling_convention_changes"
         (fun () ->
           List.fold_left
-            (fun db rule -> Datalog.Schedule.run ~stats rule db)
+            (fun db rule -> Datalog.Schedule.run ?stats rule db)
             db calling_convention_changes_rules)
     else db
   in
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats ~analysis_scope
+  then perform_analysis0 db ?stats ~analysis_scope
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
@@ -961,7 +961,7 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
   in
   let forget_all_types = Flambda_features.debug_reaper "forget-types" in
   Code_id.Map.mapi
-    (fun code_id (code_dep : Traverse_acc.code_dep) ->
+    (fun code_id (code_dep : Traverse_acc.Code_dep.t) ->
       let code_metadata = code_dep.code_metadata in
       let is_my_closure_used = is_var_used code_dep.my_closure in
       let code_metadata =
@@ -999,15 +999,11 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
           in
           let original_arity = Code_metadata.params_arity code_metadata in
           let params_arity =
-            Flambda_arity.create
-              (List.map
-                 (fun kinds ->
-                   Flambda_arity.Component_for_creation.(
-                     Unboxed_product
-                       (List.map (fun kind -> Singleton kind) kinds)))
-                 (Flambda_arity.group_by_parameter original_arity
-                    (rewrite_kinds code_dep.params
-                       (Flambda_arity.unarize original_arity))))
+            (* As for the result arity below, the structure of the original
+               arity is preserved. *)
+            Flambda_arity.with_unarized_kinds original_arity
+              (rewrite_kinds code_dep.params
+                 (Flambda_arity.unarize original_arity))
           in
           let result_arity =
             let original_result_arity =

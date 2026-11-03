@@ -406,12 +406,8 @@ module Lattices = struct
   [@@inline]
 
   module type Diamond = sig
-    (** A lattice is a partial order, if for any [a] [b], either:
-        - [a <= b] or [b <= a]
-        - [a] and [b] are incomparable.
-
-        This interface and the [Diamond] functor below are specialized to
-        partial lattices of the form
+    (** This interface and the [Diamond] functor below are specialized to
+        lattices of the following form
         {v
             Max
             / \
@@ -4804,6 +4800,9 @@ module Report = struct
 
   let print_region_desc : region_desc -> _ = function
     | Borrow -> print_article_noun Consonant "borrow region"
+    | Try_body -> print_article_noun Consonant "try-with region"
+    | Match_with_exception ->
+      print_article_noun Consonant "match-with-exception region"
 
   let print_region : capitalize:_ -> region -> _ =
    fun ~capitalize (loc, desc) ->
@@ -4835,10 +4834,6 @@ module Report = struct
         "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
-    | Lpoly_captured_environment ->
-      Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
     | Captured_by_partial_application ->
       Fmt.dprintf "has a partial application capturing a value"
 
@@ -4855,9 +4850,6 @@ module Report = struct
          allocation)"
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
-    | Lpoly_captured_environment ->
-      (* currently not testable *)
-      Fmt.dprintf "is a layout-polymorphic expression"
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 
@@ -4868,9 +4860,10 @@ module Report = struct
           print the remaining chain. *)
     then (fun _ppf Modality -> ()), pp
     else
-      (* if the modality change the bound, we signal that. Moreover, since each
-         axis is total ordering, the modality is solely responsible for the
-         bound, and we omit the remaining chain. *)
+      (* if the modality does change the bound, we signal that. Moreover, since
+         each axis is total or diamond-shaped (with incomparable elements
+         joining to max and meeting to min), the modality is solely responsible
+         for the bound, and we omit the remaining chain. *)
       (* CR-someday zqian: print the modality on the offending axis. *)
       ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
         (Location.none, Unknown : pinpoint) )
@@ -7731,6 +7724,64 @@ module Const = struct
       staticity
     }
 
+  let implied_forkable : Locality.Const.t -> Forkable.Const.t = function
+    | Global -> Forkable
+    | Local -> Unforkable
+
+  let implied_yielding : Locality.Const.t -> Yielding.Const.t = function
+    | Global -> Unyielding
+    | Local -> Yielding
+
+  let implied_contention : Visibility.Const.t -> Contention.Const.t = function
+    | Immutable -> Contended
+    | Read -> Shared
+    | Write -> Corrupted
+    | Read_write -> Uncontended
+
+  let implied_portability : Statefulness.Const.t -> Portability.Const.t =
+    function
+    | Stateless -> Portable
+    | Reading -> Shareable
+    | Writing -> Corruptible
+    | Stateful -> Nonportable
+
+  let apply_implications (m : With_locality.Const.Option.t) :
+      With_locality.Const.Option.t =
+    let imply implied source target =
+      match target, source with
+      | Some _, _ | None, None -> target
+      | None, Some source -> Some (implied source)
+    in
+    { m with
+      forkable = imply implied_forkable m.areality m.forkable;
+      yielding = imply implied_yielding m.areality m.yielding;
+      contention = imply implied_contention m.visibility m.contention;
+      portability = imply implied_portability m.statefulness m.portability
+    }
+
+  let erase_implications (m : With_locality.Const.t) :
+      With_locality.Const.Option.t =
+    let erase equal implied source target =
+      if equal (implied source) target then None else Some target
+    in
+    { areality = Some m.areality;
+      linearity = Some m.linearity;
+      uniqueness = Some m.uniqueness;
+      portability =
+        erase Portability.Const.equal implied_portability m.statefulness
+          m.portability;
+      contention =
+        erase Contention.Const.equal implied_contention m.visibility
+          m.contention;
+      forkable =
+        erase Forkable.Const.equal implied_forkable m.areality m.forkable;
+      yielding =
+        erase Yielding.Const.equal implied_yielding m.areality m.yielding;
+      statefulness = Some m.statefulness;
+      visibility = Some m.visibility;
+      staticity = Some m.staticity
+    }
+
   module Axis = struct
     let is_areality (type a) :
         a With_locality.Axis.t ->
@@ -8519,7 +8570,7 @@ module Crossing = struct
         (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
     let apply_right_unhint (Modality (Join_const c)) m =
-      (* The right adjoint of join is a restriction of identity *)
+      (* On the image of join, identity is its right adjoint *)
       Mode.join_const_unhint c m
 
     let apply_right_with_locality t m =
@@ -8625,7 +8676,7 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left_unhint (Modality (Meet_const c)) m =
-      (* The left adjoint of meet is a restriction of identity *)
+      (* On the image of meet, identity is its left adjoint *)
       Mode.meet_const_unhint c m
 
     let apply_left_with_locality t m =

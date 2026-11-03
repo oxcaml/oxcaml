@@ -70,7 +70,10 @@ type legacy =
   | Quoted
 
 (* CR-soon zqian: add loop and function body to [region_desc] *)
-type region_desc = Borrow
+type region_desc =
+  | Borrow
+  | Try_body
+  | Match_with_exception
 
 type region = Location.t * region_desc
 
@@ -178,7 +181,6 @@ type allocation_desc =
   | Optional_argument
   | Function_coercion
   | Float_projection
-  | Lpoly_captured_environment
   | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
