@@ -284,9 +284,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
      processing time because there may be an [@@@flambda_oclassic] or
      [@@@flambda_o3] attribute. *)
   if Flambda_features.classic_mode () then Clflags.use_linscan := true;
-  (* Checked here for the same reason. Counters are numbered on the
-     closure-converted term, which classic mode's inlining would make depend on
-     other units. *)
+  (* Checked here for the same reason. Classic mode inlines during closure
+     conversion, which doesn't put the inlined counters in the context of the
+     call site. *)
   if Flambda_features.classic_mode () && !Oxcaml_flags.fdo_counters
   then
     Location.raise_errorf

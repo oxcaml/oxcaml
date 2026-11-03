@@ -968,7 +968,8 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
         Apply.create ~callee:(Some callee)
           ~continuation:(Return return_continuation) exn_continuation ~args
           ~args_arity:param_arity ~return_arity ~call_kind
-          ~return_mode:alloc_mode_app dbg ~callsite_counter:None
+          ~return_mode:alloc_mode_app dbg
+          ~callsite_counter:None (* C calls don't have counters. *)
           ~inlined:Default_inlined
           ~inlining_state:(Inlining_state.default ~round:0)
           ~probe:None ~position:Normal
@@ -1209,7 +1210,8 @@ let close_effect_primitive acc env ~dbg exn_continuation
         ~return_mode:
           (Alloc_mode.For_applications.not_alloc_stack
              ~alloc_region:current_alloc_region)
-        dbg ~callsite_counter:None ~inlined:Never_inlined
+        dbg ~callsite_counter:None (* Effects don't have counters. *)
+        ~inlined:Never_inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
@@ -1991,7 +1993,10 @@ let close_exact_or_unknown_apply acc env
         ~callee:(if can_erase_callee then None else Some callee)
         ~continuation:(Return continuation) apply_exn_continuation ~args
         ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
-        ~callsite_counter:None ~inlined:inlined_call
+        ~callsite_counter:None
+          (* CR yusumez: the counter of the source call, once calls have FDO
+             ids. *)
+        ~inlined:inlined_call
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc env)
@@ -2597,7 +2602,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
-        Debuginfo.none ~callsite_counter:None
+        Debuginfo.none
+        ~callsite_counter:None (* Only calls to the wrapper have counters. *)
         ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
@@ -2747,8 +2753,11 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
       ~cold:false ~is_opaque:false ~recursive ~newer_version_of:None
       ~cost_metrics
       ~inlining_arguments:(Inlining_arguments.create ~round:0)
-      ~dbg ~fdo_entry_annotation:Fdo_annotation.empty ~is_tupled
-      ~is_my_closure_used:true ~inlining_decision ~absolute_history
+      ~dbg
+      ~fdo_entry_annotation:Fdo_annotation.empty
+        (* The wrapper isn't in the source: the function's entry counter is on
+           [main_code]. *)
+      ~is_tupled ~is_my_closure_used:true ~inlining_decision ~absolute_history
       ~relative_history ~loopify:Never_loopify
   in
   let main_approx =
@@ -3693,6 +3702,9 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     else Some (Ident.create_local "my_ghost_region")
   in
   let fbody acc env =
+    (* CR yusumez: this call should carry the counter of the source partial
+       application [apply], as in
+       [Simplify_apply_expr.simplify_direct_partial_application]. *)
     close_exact_or_unknown_apply acc env
       { apply with
         kind = Function;
@@ -3844,7 +3856,11 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         ~continuation apply_exn_continuation ~args:remaining
         ~args_arity:remaining_arity ~return_arity:apply.return_arity
         ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
-        apply_dbg ~callsite_counter:None ~inlined
+        apply_dbg
+        ~callsite_counter:None
+          (* The source call has a single counter, on [full_call] (see
+             [Simplify_common.split_direct_over_application]). *)
+        ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
         ~relative_history:(Env.relative_history_from_scoped ~loc:apply.loc env)

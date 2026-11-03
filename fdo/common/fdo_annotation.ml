@@ -38,7 +38,10 @@ let to_list t = t
 
 let combine t1 t2 = Fdo_counter.add_all t1 t2
 
-let equal t1 t2 = List.equal Fdo_counter.equal t1 t2
+let equal t1 t2 =
+  List.equal Fdo_counter.equal
+    (List.sort Fdo_counter.compare t1)
+    (List.sort Fdo_counter.compare t2)
 
 let print ppf t =
   Format.fprintf ppf "@[<hov 1>(%a)@]"
