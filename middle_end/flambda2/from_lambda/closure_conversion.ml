@@ -467,7 +467,9 @@ module Inlining = struct
         ~bind_params ~bind_depth ~apply_renaming
     in
     let inlined_debuginfo =
+      (* Classic mode does not support FDO counters. *)
       Inlined_debuginfo.create ~called_code_id ~apply_dbg
+        ~apply_callsite_counter:None
     in
     let inlined_dbg_var = Variable.create "inlined_dbg" K.value in
     let inlined_dbg_var_duid = Flambda_debug_uid.none in

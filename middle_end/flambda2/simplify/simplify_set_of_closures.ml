@@ -39,6 +39,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
+  let denv = DE.set_fdo_region denv (Function_entry code_id) in
   let denv =
     if Code_metadata.stub code_metadata
     then DE.enter_stub_function denv
@@ -509,6 +510,12 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
        allocation. *)
     let dbg = DE.add_inlined_debuginfo (DA.denv outer_dacc) (Code.dbg code) in
     let cold = Code.cold code || body_is_cold in
+    let fdo_entry_annotation =
+      Fdo_region_counters.entry_annotation
+        (UA.fdo_region_counters uacc_after_upwards_traversal)
+        old_code_id
+        (Code.fdo_entry_annotation code)
+    in
     Rebuilt_static_const.create_code
       (DA.are_rebuilding_terms dacc_after_body)
       code_id ~params_and_body ~free_names_of_params_and_body:free_names_of_code
@@ -522,8 +529,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~regalloc_attribute:(Code.regalloc_attribute code)
       ~regalloc_param_attribute:(Code.regalloc_param_attribute code)
       ~cold ~is_a_functor ~is_opaque ~recursive ~cost_metrics
-      ~inlining_arguments ~dbg
-      ~fdo_entry_annotation:(Code.fdo_entry_annotation code)
+      ~inlining_arguments ~dbg ~fdo_entry_annotation
       ~is_tupled:(Code.is_tupled code) ~is_my_closure_used ~inlining_decision
       ~absolute_history ~relative_history ~loopify
   in
@@ -589,6 +595,9 @@ let simplify_function context ~outer_dacc function_slot code_id
     | Code_present code
       when (not (Code.stub code))
            || C.stub_can_be_simplified (DA.denv outer_dacc) ->
+      let code =
+        Option.value (C.code_to_simplify context code_id) ~default:code
+      in
       let rec run ~outer_dacc ~code count =
         let { code_id; code = new_code; outer_dacc; should_resimplify } =
           simplify_function0 context ~outer_dacc (Some function_slot) code_id

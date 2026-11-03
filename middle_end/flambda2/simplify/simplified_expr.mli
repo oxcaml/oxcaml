@@ -118,7 +118,9 @@ and simplified_switch = private
     scrutinee_ty : flambda_type;
     shareable_constants : Symbol.t Static_const.Map.t;
     typing_env_before_switch : Typing_env.t;
-    cse_before_switch : Common_subexpression_elimination.t
+    cse_before_switch : Common_subexpression_elimination.t;
+    fdo_region : Fdo_region_counters.Region.t option
+        (** The region the switch is in (see [Fdo_region_counters]). *)
   }
 
 val notify_removed : operation:Removed_operations.t -> t -> t
@@ -162,6 +164,7 @@ val simplified_switch :
   shareable_constants:Symbol.t Static_const.Map.t ->
   typing_env_before_switch:Typing_env.t ->
   cse_before_switch:Common_subexpression_elimination.t ->
+  fdo_region:Fdo_region_counters.Region.t option ->
   t
 
 val simplified_invalid : Flambda.Invalid.t -> t

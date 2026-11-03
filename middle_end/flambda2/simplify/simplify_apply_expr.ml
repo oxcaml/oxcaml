@@ -44,7 +44,13 @@ let record_free_names_of_apply_as_used0 apply ~use_id ~exn_cont_use_id data_flow
     ~exn_cont:(exn_cont_use_id, exn_cont)
     ~result_cont ~result_arity:(Apply.return_arity apply) data_flow
 
+(* For applications that are not inlined out. *)
 let record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply =
+  let dacc =
+    match Apply.continuation apply with
+    | Return k -> DA.fdo_region_continues_into dacc k
+    | Never_returns -> dacc
+  in
   DA.map_flow_acc dacc
     ~f:(record_free_names_of_apply_as_used0 ~use_id ~exn_cont_use_id apply)
 
@@ -95,7 +101,19 @@ let loopify_decision_for_call dacc apply =
         then DE.loopify_state denv
         else Loopify_state.do_not_loopify)
 
+(* For an expression built from the simplified [apply] (see
+   [DE.clear_inlined_debuginfo]). *)
+let simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up =
+  simplify_expr
+    (DA.map_denv dacc ~f:DE.clear_inlined_debuginfo)
+    expr ~down_to_up
+
 let simplify_self_tail_call dacc apply self_cont ~down_to_up =
+  (* The call becomes a jump, which runs as often: its counter is preserved. *)
+  let dacc =
+    DA.preserve_fdo_counters dacc
+      (Fdo_annotation.of_list (Option.to_list (Apply.callsite_counter apply)))
+  in
   Simplify_apply_cont_expr.simplify_apply_cont dacc
     (Apply_cont_expr.create self_cont ~args:(Apply.args apply)
        ~dbg:(Apply.dbg apply))
@@ -179,7 +197,7 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
         |> Expr.create_let)
       vars_and_fields apply_expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let update_direct_call_benefit expr ~(original_call : Call_kind.Function_call.t)
     ~callee's_code_metadata =
@@ -856,7 +874,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
     let expr = SE.notify_removed ~operation:Removed_operations.call expr in
     down_to_up dacc expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     ~(original_call : Call_kind.Function_call.t) ~callee's_code_id
@@ -876,7 +894,7 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     in
     down_to_up dacc expr
   in
-  simplify_expr dacc expr ~down_to_up
+  simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
   down_to_up dacc (SE.simplified_invalid reason)
@@ -1334,7 +1352,10 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~call_kind:(Apply.call_kind apply)
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
-        ~callsite_counter:(Apply.callsite_counter apply)
+        ~callsite_counter:
+          (Option.map
+             (DE.inline_fdo_counter (DA.denv dacc))
+             (Apply.callsite_counter apply))
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
         ~position:(Apply.position apply)
         ~relative_history:
@@ -1404,7 +1425,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     let down_to_up dacc expr =
       down_to_up dacc (SE.notify_removed ~operation expr)
     in
-    simplify_expr dacc expr ~down_to_up
+    simplify_expr_built_from_apply ~simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
     let dacc, use_id =
       match Apply.continuation apply with
