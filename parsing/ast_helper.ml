@@ -228,6 +228,7 @@ module Pat = struct
   let type_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_type a)
   let addr ?loc ?attrs a b = mk ?loc ?attrs (Ppat_addr (a, b))
   let deref ?loc ?attrs a = mk ?loc ?attrs (Ppat_deref a)
+  let alias_deref ?loc ?attrs a b = mk ?loc ?attrs (Ppat_alias_deref (a, b))
   let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_lazy a)
   let unpack ?loc ?attrs a = mk ?loc ?attrs (Ppat_unpack a)
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_open (a, b))

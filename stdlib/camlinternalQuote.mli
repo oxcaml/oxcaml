@@ -364,6 +364,8 @@ module Pat : sig
 
   val deref : t -> t
 
+  val alias_deref : t -> Var.Value.t -> t
+
   val lazy_ : t -> t
 
   val any_module : t

@@ -347,6 +347,9 @@ and pattern i ppf x =
   | Ppat_deref p ->
       line i ppf "Ppat_deref\n";
       pattern i ppf p;
+  | Ppat_alias_deref (p, s) ->
+      line i ppf "Ppat_alias_deref %a\n" fmt_string_loc s;
+      pattern i ppf p;
   | Ppat_lazy p ->
       line i ppf "Ppat_lazy\n";
       pattern i ppf p;

@@ -630,6 +630,7 @@ module P = struct
     | Ppat_type s -> iter_loc_lid sub s
     | Ppat_addr (_mut, p) -> sub.pat sub p
     | Ppat_deref p -> sub.pat sub p
+    | Ppat_alias_deref (p, s) -> sub.pat sub p; iter_loc sub s
     | Ppat_lazy p -> sub.pat sub p
     | Ppat_unpack s -> iter_loc sub s
     | Ppat_effect (p1,p2) -> sub.pat sub p1; sub.pat sub p2
