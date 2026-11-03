@@ -12,7 +12,7 @@ module List : sig end
 
 let f (x : int Stdlib.List.t) = x
 [%%expect {|
-val f : int List.t -> int List.t = <fun>
+val f : int Stdlib.List.t -> int Stdlib.List.t = <fun>
 |}]
 
 module Unshadowed = struct
