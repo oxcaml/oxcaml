@@ -2439,7 +2439,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_addr _ | Tpat_deref _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_addr _ | Tpat_deref _ | Tpat_alias_deref _
+  | Tpat_lazy _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -5209,7 +5210,7 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_deref _ ->
+  | Tpat_deref _ | Tpat_alias_deref _ ->
       (* CR address-patterns: deref patterns aren't always refuted. E.g. this
          case is rejected:
          {[
