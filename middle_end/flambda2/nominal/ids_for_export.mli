@@ -72,6 +72,38 @@ val union : t -> t -> t
 
 val union_list : t list -> t
 
+val no_ids : 'a -> t
+
+val ids_for_export_set :
+  fold:(('key -> t -> t) -> 'set -> t -> t) ->
+  add_ids_key:(t -> 'key -> t) ->
+  'set ->
+  t
+
+val ids_for_export_map :
+  fold:(('key -> 'value -> t -> t) -> 'map -> t -> t) ->
+  add_ids_key:(t -> 'key -> t) ->
+  ids_for_export_value:('value -> t) ->
+  'map ->
+  t
+
+val ids_for_export_name_set : Name.Set.t -> t
+
+val ids_for_export_code_id_set : Code_id.Set.t -> t
+
+val ids_for_export_continuation_set : Continuation.Set.t -> t
+
+val ids_for_export_variable_map : ('a -> t) -> 'a Variable.Map.t -> t
+
+val ids_for_export_name_map : ('a -> t) -> 'a Name.Map.t -> t
+
+val ids_for_export_code_id_map : ('a -> t) -> 'a Code_id.Map.t -> t
+
+val ids_for_export_continuation_map : ('a -> t) -> 'a Continuation.Map.t -> t
+
+val ids_for_export_code_id_or_name_map :
+  ('a -> t) -> 'a Code_id_or_name.Map.t -> t
+
 (** Tables of int_ids. *)
 module Table_data : sig
   type ids := t

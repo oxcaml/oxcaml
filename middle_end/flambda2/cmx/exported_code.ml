@@ -104,25 +104,10 @@ let prepare_for_export t ~reachable_names ~used_value_slots ~canonicalise =
     t
 
 let ids_for_export t =
-  Code_id.Map.fold
-    (fun code_id code_or_metadata all_ids ->
-      Ids_for_export.union
-        (Ids_for_export.add_code_id all_ids code_id)
-        (Code_or_metadata.ids_for_export code_or_metadata))
-    t Ids_for_export.empty
+  Ids_for_export.ids_for_export_code_id_map Code_or_metadata.ids_for_export t
 
 let apply_renaming renaming t =
-  if Renaming.is_identity renaming
-  then t
-  else
-    Code_id.Map.fold
-      (fun code_id code_or_metadata all_code ->
-        let code_id = Renaming.apply_code_id renaming code_id in
-        let code_or_metadata =
-          Code_or_metadata.apply_renaming code_or_metadata renaming
-        in
-        Code_id.Map.add code_id code_or_metadata all_code)
-      t Code_id.Map.empty
+  Renaming.apply_code_id_map Code_or_metadata.apply_renaming renaming t
 
 let iter_code t ~f =
   Code_id.Map.iter
