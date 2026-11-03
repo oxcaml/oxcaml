@@ -51,7 +51,7 @@ let
       "--cache-file=/dev/null"
       "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
       (
-        if pkgs.stdenv.isDarwin then
+        if pkgs.stdenv.hostPlatform.isDarwin then
           "--disable-assembler-suitable-for-dissector"
         else
           "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
@@ -824,7 +824,7 @@ stdenv.mkDerivation {
     ocamlformat # required for make fmt
     pkgs.removeReferencesTo
   ]
-  ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
+  ++ (if pkgs.stdenv.hostPlatform.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
   ++ lib.optional oxcamlLldb pkgs.python312
   ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs
   ++ lib.optionals withJsoo jsooTools;
