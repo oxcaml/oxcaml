@@ -728,6 +728,7 @@
   SsaGraphSpec
   SsaGraph
   SsaDominance
+  SsaSemanticsSpec
   SsaSemantics
   ;; backend/ssa/loop/rocq/ (extracted from Rocq by rocq/Makefile)
   OxCamlList
@@ -741,8 +742,11 @@
   LoopTermination
   DeadInductionVar
   DeleteEmptyLoops
+  InductionRange
+  BoundsCheckElim
   ;; backend/ssa/loop/
   delete_empty_loops
+  bounds_check_elim
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

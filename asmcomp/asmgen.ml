@@ -602,6 +602,19 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
   let ssa, summary =
+    if !Oxcaml_flags.ssa_bounds_check_elim
+    then begin
+      let ssa, eliminated = Bounds_check_elim.run ~ppf_dump ssa in
+      if !Oxcaml_flags.dump_ssa && eliminated > 0
+      then
+        Format.fprintf ppf_dump
+          "*** SSA after Bounds_check_elim (%d eliminated)@.@.%a" eliminated
+          Ssa_print.print ssa;
+      ssa, [Printf.sprintf "Bounds_check_elim: %d eliminated" eliminated]
+    end
+    else ssa, []
+  in
+  let ssa, summary =
     if !Oxcaml_flags.ssa_delete_empty_loops
     then begin
       let ssa, deleted = Delete_empty_loops.run ~ppf_dump ssa in
@@ -610,9 +623,9 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
         Format.fprintf ppf_dump
           "*** SSA after Delete_empty_loops (%d deleted)@.@.%a" deleted
           Ssa_print.print ssa;
-      ssa, [Printf.sprintf "Delete_empty_loops: %d deleted" deleted]
+      ssa, summary @ [Printf.sprintf "Delete_empty_loops: %d deleted" deleted]
     end
-    else ssa, []
+    else ssa, summary
   in
   Ssa_expect.record ~summary ssa;
   try

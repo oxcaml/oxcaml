@@ -22,8 +22,8 @@
 #                           that any pass may need
 #   backend/ssa/loop/rocq/  OxCamlLoop: the loop analyses and their
 #                           extraction (Extract.v, one .ml per model); the
-#                           pass using them is backend/ssa/loop/
-#                           delete_empty_loops.ml
+#                           passes using them are backend/ssa/loop/
+#                           delete_empty_loops.ml and bounds_check_elim.ml
 #
 # The extracted files are run through ocamlformat so that they satisfy the
 # repository's `make fmt` check like any other source under backend/ssa/.
@@ -60,18 +60,22 @@ LOOP := $(addprefix $(LOOP_DIR)/, \
   AffineSsaProofs.v AffineSsaExtract.v InductionVar.v InductionVarProofs.v \
   InductionVarExtract.v LoopTermination.v LoopTerminationProofs.v \
   DeadInductionVar.v DeadInductionVarProofs.v DeleteEmptyLoopsSpec.v \
-  DeleteEmptyLoops.v DeleteEmptyLoopsProofs.v LoopExecutionProofs.v \
-  LoopInvariantExecutionProofs.v LoopCounterExecutionProofs.v \
-  LoopLiveOutProofs.v LoopEligibilitySpec.v LoopEligibilityProofs.v \
-  LoopValueSnapshotProofs.v LoopGuardExecutionProofs.v \
-  LoopRangeExecutionProofs.v)
+  DeleteEmptyLoops.v DeleteEmptyLoopsProofs.v InductionRange.v \
+  InductionRangeProofs.v BoundsCheckElim.v BoundsCheckElimProofs.v \
+  LoopExecutionProofs.v LoopInvariantExecutionProofs.v \
+  LoopCounterExecutionProofs.v LoopLiveOutProofs.v LoopEligibilitySpec.v \
+  LoopEligibilityProofs.v LoopValueSnapshotProofs.v \
+  LoopGuardExecutionProofs.v LoopRangeExecutionProofs.v \
+  InductionRangeExecutionProofs.v BoundsCheckExecutionSpec.v \
+  BoundsCheckExecutionProofs.v)
 EXTRACT := $(LOOP_DIR)/Extract.v
 
 # The extraction writes one .ml and .mli per model into the loop directory;
 # those of the SSA models are then moved next to their sources. Those of the
 # rocq/ models that are not mapped onto OxCaml's own functions (OxCamlList,
 # IntArith) stay in the loop directory.
-SSA_MODULES := SsaModel SsaGraphSpec SsaGraph SsaDominance SsaSemantics
+SSA_MODULES := SsaModel SsaGraphSpec SsaGraph SsaDominance SsaSemanticsSpec \
+  SsaSemantics
 SSA_EXTRACTED := $(addprefix $(SSA_DIR)/, \
   $(foreach m, $(SSA_MODULES), $(m).ml $(m).mli))
 LOOP_EXTRACTED := $(addprefix $(LOOP_DIR)/, \
@@ -81,7 +85,9 @@ LOOP_EXTRACTED := $(addprefix $(LOOP_DIR)/, \
   NaturalLoop.ml NaturalLoop.mli AffineSsa.ml AffineSsa.mli \
   InductionVar.ml InductionVar.mli LoopTermination.ml LoopTermination.mli \
   DeadInductionVar.ml DeadInductionVar.mli \
-  DeleteEmptyLoops.ml DeleteEmptyLoops.mli)
+  DeleteEmptyLoops.ml DeleteEmptyLoops.mli \
+  InductionRange.ml InductionRange.mli \
+  BoundsCheckElim.ml BoundsCheckElim.mli)
 EXTRACTED := $(SSA_EXTRACTED) $(LOOP_EXTRACTED)
 
 SOURCES := $(STDLIB) $(BACKEND) $(SSA) $(LOOP) $(EXTRACT)

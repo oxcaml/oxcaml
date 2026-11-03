@@ -29,7 +29,11 @@
    [integer_operation] and [operation] are [Operation.integer_operation] and
    [Operation.t], whose constructors must be listed in the same order as in
    backend/operation.mli; the abstract payload types are the compiler's,
-   inlined so that this module extracts to nothing. *)
+   inlined so that this module extracts to nothing. [specific_linear] is
+   [Arch.linear_specific_operation] of the target being compiled for, which
+   must answer the coefficients and constant only for an operation that
+   computes that linear combination of its arguments, wrapped to 64 bits:
+   this is what the target asserts and the proofs rely on. *)
 
 From Stdlib Require Import Extraction.
 From OxCamlBackend Require Import Operation.
@@ -53,6 +57,8 @@ Extract Inlined Constant int128_operation => "Operation.int128_operation".
 Extract Inlined Constant float_width => "Operation.float_width".
 Extract Inlined Constant float_operation => "Operation.float_operation".
 Extract Inlined Constant test => "Operation.test".
+Extract Inlined Constant specific_linear =>
+  "Arch.linear_specific_operation".
 
 Extract Inductive integer_operation => "Operation.integer_operation"
   [ "Operation.Iadd" "Operation.Isub" "Operation.Imul" "Operation.Imulh"

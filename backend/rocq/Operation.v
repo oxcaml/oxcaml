@@ -34,7 +34,10 @@
    types, each named after the compiler type standing for it.
 
    Nothing is proved here. What an operation computes is stated where it is
-   relied on (backend/ssa/loop/rocq/AffineSsa.v, LoopTermination.v). *)
+   relied on (backend/ssa/loop/rocq/AffineSsa.v, LoopTermination.v), except
+   for the target-specific operations: the one thing the models know about a
+   [Specific] operation is the target's own reading of it as a linear
+   combination of its arguments, [specific_linear], which is trusted. *)
 
 From OxCamlStdlib Require Import OxCamlInt OxCamlInt64.
 From OxCamlBackend Require Import IntegerComparison.
@@ -46,6 +49,15 @@ Parameter memory_chunk addressing_mode reinterpret_cast static_cast
 Parameter signedness load intop_atomic probe_is_enabled name_for_debugger
   alloc : Type.
 Parameter int128_operation float_width float_operation test : Type.
+
+(* [Arch.linear_specific_operation]: the target's reading of a specific
+   operation that computes a linear combination of its integer arguments,
+   as the coefficients, one per argument in order, and the constant: the
+   operation computes [c1 * arg1 + ... + cn * argn + k], wrapped to 64 bits.
+   [None] for every other specific operation. This is trusted: the models
+   state nothing about what any other operation of the target computes, and
+   no proof can check it (see OperationExtract.v). *)
+Parameter specific_linear : specific_operation -> option (list int * int).
 
 (* [Operation.integer_operation], the constructors in the same order. *)
 Inductive integer_operation : Type :=

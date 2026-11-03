@@ -6,10 +6,10 @@ allowed-tools: Bash(make -C rocq all), Bash(make -C rocq clean), Bash(make -s bo
 
 # Rocq models of compiler passes
 
-Some analyses (currently the loop analyses behind `-ssa-delete-empty-loops`)
-are defined and proved in Rocq, and the OCaml the compiler builds is extracted
-from them. The extracted `.ml`/`.mli` files are committed and are the
-implementation; never edit them by hand.
+Some analyses (currently the loop analyses behind `-ssa-delete-empty-loops`
+and `-ssa-bounds-check-elim`) are defined and proved in Rocq, and the OCaml
+the compiler builds is extracted from them. The extracted `.ml`/`.mli` files
+are committed and are the implementation; never edit them by hand.
 
 Read `rocq/HACKING.md` in full before touching a `.v` file. It gives the
 directory and library layout, the split of a model into Spec, implementation

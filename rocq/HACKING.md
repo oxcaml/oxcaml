@@ -10,8 +10,8 @@ changing such a model. It records how the models are laid out, what is
 trusted, and what was learned writing the first ones.
 
 The first models are the loop analyses behind `-ssa-delete-empty-loops`
-(`backend/ssa/loop/rocq/`); read them as worked examples.
-`DeleteEmptyLoops.v`, `DeleteEmptyLoopsProofs.v` and
+and `-ssa-bounds-check-elim` (`backend/ssa/loop/rocq/`); read them as
+worked examples. `DeleteEmptyLoops.v`, `DeleteEmptyLoopsProofs.v` and
 `DeleteEmptyLoopsSpec.v` show the three files of a model.
 
 Start review of empty-loop deletion at `LoopEligibilitySpec.v`: read
@@ -28,11 +28,28 @@ progress or finite exit, and the discovered loop does not appear in the
 statement. The mechanically rewritten graph, renaming and cleanup are
 deliberately outside this proof's scope.
 
+Start review of bounds-check elimination at `BoundsCheckExecutionSpec.v`:
+`find_eliminations_sound_statement` says, and `BoundsCheckExecutionProofs.v`
+proves, for every block/target pair the pass reports, that every run of
+the observation semantics (`SsaContextSpec.context_steps`) from the entry
+to the end of the block steps to the target, so the block's two-way branch
+on an unsigned comparison may become a jump. The decision is
+`BoundsCheckElim.v`, over the guard facts of `AffineSsa.v` (with the index
+linearized modulo 2^64, `linearize_goal`) and the bounds of loop counters
+certified in `InductionRange.v`, whose meaning is `InductionRangeProofs.v`
+and whose operational meaning is
+`InductionRangeExecutionProofs.counter_bounded`. Its premises are
+`finished_graph`, bound inputs and the observed run; nothing is skipped,
+so no liveness or finite-exit argument is involved.
+
 The loop whitelist remains integer constants, additions, subtractions and
 comparisons, with Goto/Switch control flow. `SsaSemanticsSpec.v` defines
 exact execution; its evaluator additionally supports immediate shifts and
-or for computations before the loop. `SsaContextSpec.v` overapproximates
-word observations in the unchanged prefix: opaque instructions can produce
+or for computations before the loop, and the target-specific operations
+the target itself reads as linear combinations of their arguments
+(`Operation.specific_linear`, trusted), which re-tag the counters of
+`for` loops. `SsaContextSpec.v` overapproximates word observations in the
+unchanged prefix: opaque instructions can produce
 arbitrary bounded outputs, and opaque terminators can take CFG successors
 with arbitrary parameter values. Memory effects are unconstrained, not
 no-ops. Trap markers step without touching a register, and the exception
@@ -58,7 +75,10 @@ segments; `LoopCounterExecutionProofs.v` iterates up to the arithmetic
 exit witness. `LoopValueSnapshotProofs.v`, `LoopGuardExecutionProofs.v`
 and `LoopRangeExecutionProofs.v` connect affine entailment to the actual
 prefix, including duplicate Switch edges. `LoopLiveOutProofs.v` derives
-live-out agreement.
+live-out agreement. `InductionRangeExecutionProofs.v` carries a counter's
+certified bounds along every observed step of its loop;
+`BoundsCheckExecutionProofs.v` evaluates a removed check under the snapshot
+valuation.
 
 The public theorem's non-algorithmic premises are the fields of
 `finished_graph` (structural SSA/dominance metadata, edge multiplicities,
@@ -72,7 +92,8 @@ prefix instruction coverage, so graph size is not a public theorem premise.
 Finite exit is constructed directly; definedness uses classical case
 splits, not new semantic axioms.
 
-`find_deletions_spec` is the analysis-certificate theorem.
+`find_deletions_spec` and `find_eliminations_spec` are the
+analysis-certificate theorems.
 `well_formed_ssa` formally assumes that finished graph blocks are
 structurally reachable, as the OCaml builder's reachability pass ensures;
 it does not assume dynamic feasibility.
@@ -86,7 +107,7 @@ Each directory is a Rocq library (`rocq/Makefile` maps them):
 | `rocq/`                  | `OxCamlStdlib` | Models of OxCaml's own types (`int`, `Int64`, lists, exceptions as options) and generic arithmetic (`IntArith.v`), each a file of definitions and axioms with its lemmas in a `*Proofs.v`; proof helpers (`ZTactics.v`); and the extraction directives mapping the models onto OxCaml's functions (`OxCamlExtract.v`) |
 | `backend/rocq/`          | `OxCamlBackend`| Backend-wide definitions: the semantics of `Cmm.integer_comparison` (with `IntegerComparisonProofs.v`), the model's copy of `Operation.t` |
 | `backend/ssa/rocq/`      | `OxCamlSsa`    | The SSA graph as the models see it, each model split into Spec, implementation and Proofs files (see "The layout of a model"): `SsaModel.v` (the abstract interface), `SsaGraph*` (terminators, edges and uses), `SsaDominance*` (dominance, paths and program points), `SsaSemantics*` (execution of the restricted integer fragment), `SsaExecution*` (well-formedness and available-value equations), `SsaLiveness*` (reads before redefinition), `SsaProgress*` (the `finished_graph` contract, definedness and progress), `SsaContext*` (opaque surrounding computations and the `reached_header` contract) |
-| `backend/ssa/loop/rocq/` | `OxCamlLoop`   | The loop analyses, each an implementation file and a `*Proofs.v`; the operational proofs in `LoopExecutionProofs.v`, `LoopInvariantExecutionProofs.v`, `LoopCounterExecutionProofs.v`, `LoopValueSnapshotProofs.v`, `LoopGuardExecutionProofs.v`, `LoopRangeExecutionProofs.v` and `LoopLiveOutProofs.v`; the statements to review in `LoopEligibilitySpec.v` and `DeleteEmptyLoopsSpec.v`, proved in `LoopEligibilityProofs.v` and `DeleteEmptyLoopsProofs.v`; and `Extract.v`, which extracts the implementation |
+| `backend/ssa/loop/rocq/` | `OxCamlLoop`   | The loop analyses, each an implementation file and a `*Proofs.v`; the operational proofs in `LoopExecutionProofs.v`, `LoopInvariantExecutionProofs.v`, `LoopCounterExecutionProofs.v`, `LoopValueSnapshotProofs.v`, `LoopGuardExecutionProofs.v`, `LoopRangeExecutionProofs.v`, `LoopLiveOutProofs.v` and `InductionRangeExecutionProofs.v`; the statements to review in `LoopEligibilitySpec.v`, `DeleteEmptyLoopsSpec.v` and `BoundsCheckExecutionSpec.v`, proved in `LoopEligibilityProofs.v`, `DeleteEmptyLoopsProofs.v` and `BoundsCheckExecutionProofs.v`; and `Extract.v`, which extracts the implementation |
 
 Put a definition or lemma where its OxCaml counterpart would live. A fact
 about lists goes in `OxCamlListProofs.v`, about machine integers in
@@ -113,7 +134,8 @@ With Rocq and the repository's `ocamlformat` on `PATH`:
 4. `make -s boot-compiler`, then the tests of the pass (for the loop
    passes, the `expect.opt` tests in `testsuite/tests/backend/ssa/loop/`,
    whose `[%%expect_ssa]` blocks show the SSA each function ends up with
-   and how many loops were deleted from it, and the unit test alias
+   and how many loops were deleted or checks removed from it, and the
+   unit test alias
    `dune build @oxcaml/tests/backend/ssa/runtest`), then `make -s fmt`.
 5. Commit the `.v` files and the regenerated `.ml`/`.mli` together.
 
@@ -135,9 +157,10 @@ module listed in this Makefile. The report has two parts:
    hide names through a search blacklist. This part includes proved
    theorems too; it is not another list of axioms.
 
-For a particular theorem, `Check @find_deletions_eligible.` shows its full
-premises and `Print Assumptions find_deletions_eligible.` gives its global
-axiom dependencies. Named predicates still need inspection in the source:
+For a particular theorem, `Check @find_deletions_eligible.` (or
+`Check @find_eliminations_sound.`) shows its full premises and
+`Print Assumptions find_deletions_eligible.` gives its global axiom
+dependencies. Named predicates still need inspection in the source:
 declaration types do not print definition bodies, and an assumption audit
 cannot check that the semantics or extraction match the compiler.
 
@@ -310,6 +333,10 @@ The trusted base is small and must stay listed in the headers:
   OxCaml's (`OxCamlInt64.v`, `OxCamlList.v`);
 - the `Parameter`s with axioms standing for a few lines of OxCaml that
   are easier to review than to model (`IntArith.v`'s overflow tests);
+- the target's reading of its specific operations as linear combinations
+  of their arguments (`Operation.specific_linear`, realised by
+  `Arch.linear_specific_operation`), the one thing the models take on
+  trust about a target's semantics;
 - the extraction directives, which say which OxCaml value realises each
   model definition (`*Extract.v`), including the match functions written
   in them;

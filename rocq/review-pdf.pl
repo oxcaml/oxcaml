@@ -99,6 +99,13 @@ What is claimed about the extracted decision \texttt{find\_deletions}. The
 analyses themselves are extracted code, and their \texttt{*Proofs.v} files
 give their meaning and prove the statements; neither is shown.
 TEX
+  { title => 'Bounds-check elimination',
+    sources => qr/^BoundsCheckExecutionSpec$/,
+    statements => <<'TEX' },
+What is claimed about the extracted decision \texttt{find\_eliminations}.
+The analysis itself is extracted code, and its \texttt{*Proofs.v} files give
+its meaning and prove the statement; neither is shown.
+TEX
 );
 # The guide numbers its sections by hand, and the sources refer to them by
 # number; the references follow the sections wherever the document puts them.

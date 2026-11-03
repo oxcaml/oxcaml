@@ -390,6 +390,17 @@ Proof.
   eapply context_step_valid_position; eassumption.
 Qed.
 
+(* A finite context prefix stays in a successor-closed graph. *)
+Lemma context_steps_in_graph : control_edges -> ∀ (blocks : list block)
+    (entry : block) (before after : state),
+  well_formed_ssa blocks entry -> context_steps before after ->
+  (current_block before) ∈ blocks -> (current_block after) ∈ blocks.
+Proof.
+  intros Hedges blocks entry before after Hwf Hrun. induction Hrun;
+    intros Hin; [exact Hin |]. apply IHHrun.
+  eapply context_step_in_graph; eassumption.
+Qed.
+
 (* The observations of a finite context prefix fit signed words. *)
 Theorem context_execution_invariants : ∀ (entry : block)
     (initial_regs : registers) (reached : state),

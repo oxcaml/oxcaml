@@ -179,6 +179,46 @@ Proof.
     try discriminate; reflexivity.
 Qed.
 
+(* The specific operations with a linear reading are exactly those the
+   evaluator accepts, on any operand values. *)
+Lemma specific_modeled_total : ∀ (A : Type) (s : specific_operation)
+    (args : list A) (value_of : A -> Z),
+  specific_modeled s args = true ->
+  ∃ (result : Z),
+    eval_operation (Specific s) (map value_of args) = Some result.
+Proof.
+  intros A s args value_of Hmodeled.
+  unfold specific_modeled in Hmodeled. cbn [eval_operation].
+  unfold eval_specific.
+  destruct (specific_linear s) as [[[ | c [ | c' [ | c'' cs]]] k] | ];
+    destruct args as [ | lhs [ | rhs [ | extra rest]]]; try discriminate;
+    cbn [map]; eexists; reflexivity.
+Qed.
+
+Lemma specific_unmodeled_undefined : ∀ (A : Type) (s : specific_operation)
+    (args : list A) (value_of : A -> Z),
+  specific_modeled s args = false ->
+  eval_operation (Specific s) (map value_of args) = None.
+Proof.
+  intros A s args value_of Hmodeled.
+  unfold specific_modeled in Hmodeled. cbn [eval_operation].
+  unfold eval_specific.
+  destruct (specific_linear s) as [[[ | c [ | c' [ | c'' cs]]] k] | ];
+    destruct args as [ | lhs [ | rhs [ | extra rest]]]; try discriminate;
+    reflexivity.
+Qed.
+
+(* A linear reading fits a machine register, being wrapped. *)
+Lemma eval_specific_bounded : ∀ (s : specific_operation)
+    (arg_values : list Z) (result : Z),
+  eval_operation (Specific s) arg_values = Some result -> in_int64 result.
+Proof.
+  intros s zs z H. cbn [eval_operation] in H. unfold eval_specific in H.
+  destruct (specific_linear s) as [[[ | c [ | c' [ | c'' cs]]] k] | ];
+    destruct zs as [ | x [ | y [ | a zs]]]; try discriminate;
+    injection H as <-; apply wrap64_in_range.
+Qed.
+
 (* The modeled operations are exactly those the evaluator accepts, on any
    operand values: [eval_operation] is total on them and undefined on the
    others. The affine analysis interprets syntax through these two facts. *)
@@ -190,8 +230,9 @@ Proof.
   intros A op args value_of Hmodeled.
   destruct op; try discriminate; try (destruct op; try discriminate);
     destruct args as [ | lhs [ | rhs [ | extra rest]]]; try discriminate;
-    cbn [modeled_operation] in Hmodeled; cbn [map eval_operation];
-    try rewrite Hmodeled; eexists; reflexivity.
+    cbn [modeled_operation] in Hmodeled;
+    try (apply specific_modeled_total; exact Hmodeled);
+    cbn [map eval_operation]; try rewrite Hmodeled; eexists; reflexivity.
 Qed.
 
 Lemma unmodeled_operation_undefined : ∀ (A : Type) (op : operation)
@@ -203,6 +244,7 @@ Proof.
   destruct op; try reflexivity; try (destruct op; try reflexivity);
     destruct args as [ | lhs [ | rhs [ | extra rest]]];
     cbn [modeled_operation] in Hmodeled; try discriminate;
+    try (apply specific_unmodeled_undefined; exact Hmodeled);
     cbn [map eval_operation]; try rewrite Hmodeled; reflexivity.
 Qed.
 
@@ -213,6 +255,7 @@ Lemma eval_operation_bounded :
 Proof.
   intros op zs z H. destruct op; try discriminate;
     try (destruct op; try discriminate);
+    try (eapply eval_specific_bounded; exact H);
     destruct zs as [ | x [ | y [ | a zs ] ]]; try discriminate;
     cbn [eval_operation] in H;
     try (destruct (Z.leb 0 (to_Z k) && Z.leb (to_Z k) 63);

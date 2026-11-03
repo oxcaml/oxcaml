@@ -38,6 +38,9 @@
      sense of AffineExprProofs.v;
    - [linearize_sound]: the affine form of a value has the value's machine
      value, and the side facts it pushes are true;
+   - [linearize_goal_sound]: the affine form [linearize_goal] builds for a
+     proof goal has the value's machine value modulo 2^64; a goal that pins
+     the form into register range is then a fact about the machine value;
    - [comparison_facts_sound]: when the comparison a branch tests came out as
      the branch taken requires, the facts derived from it are true; and they
      are well-formed, as [FourierMotzkin.entails] needs;
@@ -147,8 +150,9 @@ Section Semantics.
      shift wrap at 64 bits; the arithmetic right shift divides rounding towards
      minus infinity; the logical right shift divides the unsigned reading of
      its argument, read back as a signed register; or is the bitwise or of
-     two's-complement values. Shifts by amounts outside the register width are
-     not constrained. *)
+     two's-complement values; a target-specific operation with a linear
+     reading computes that linear combination, wrapped at 64 bits. Shifts by
+     amounts outside the register width are not constrained. *)
   Definition op_equations (v : value) : Prop :=
     match v with
     | Res _ (Const_int n) _ _ => value_words v = Int64.to_Z (Int64.of_nativeint
@@ -170,6 +174,13 @@ Section Semantics.
       value_words v = wrap64 (unsigned64 (value_words a) / 2 ^ to_Z k)
     | Res _ (Intop_imm Ior m) [a] _ => value_words v = Z.lor (value_words a)
       (to_Z m)
+    | Res _ (Specific s) [a] _ =>
+      ∀ (ma k : int), specific_linear s = Some ([ma], k) ->
+      value_words v = wrap64 (to_Z ma * value_words a + to_Z k)
+    | Res _ (Specific s) [a; b] _ =>
+      ∀ (ma mb k : int), specific_linear s = Some ([ma; mb], k) ->
+      value_words v
+        = wrap64 (to_Z ma * value_words a + to_Z mb * value_words b + to_Z k)
     | _ => True
     end.
 
@@ -201,6 +212,14 @@ Section Semantics.
       injection Hs as Hs. rewrite <- Hs. apply wrap64_id.
       eapply in_range_implies_int64.
       eapply signed_shift_range_sound; [exact Hk | apply value_words_bounded].
+    - (* Specific, one argument *)
+      intros ma k Hl. unfold specific_modeled, eval_specific in Hs.
+      rewrite Hl in Hs. specialize (Hs eq_refl). injection Hs as Hs.
+      symmetry. exact Hs.
+    - (* Specific, two arguments *)
+      intros ma mb k Hl. unfold specific_modeled, eval_specific in Hs.
+      rewrite Hl in Hs. specialize (Hs eq_refl). injection Hs as Hs.
+      symmetry. exact Hs.
   Qed.
 
   (* A valuation agrees with a context when it reads each atom as the machine
@@ -422,6 +441,30 @@ Section Semantics.
       value_words_bounded.
   Qed.
 
+  (* [goal_atom] returns a plain atom standing for [value_ref]: the context
+     stays well-formed, keeps its budget and gains at most one atom, and under
+     any agreeing valuation the atom reads as [value_ref]'s machine value,
+     which wrapping leaves unchanged. *)
+  Lemma goal_atom_spec :
+    ∀ (initial_ctx : ctx) (value_ref : value) (expr : AffineExpr.t)
+      (final_ctx : ctx),
+    ctx_wf initial_ctx -> to_Z initial_ctx.(next) < ocaml_max_int ->
+    goal_atom initial_ctx value_ref = (expr, final_ctx) ->
+    ctx_wf final_ctx ∧ extends initial_ctx final_ctx ∧ to_Z final_ctx.(next)
+      <= to_Z initial_ctx.(next) + 1
+    ∧ to_Z final_ctx.(budget) = to_Z initial_ctx.(budget)
+    ∧ ∀ (rho : valuation), agrees rho final_ctx ->
+         wrap64 (AffineExprProofs.eval rho expr) = value_words value_ref.
+  Proof.
+    intros c v e c' Hwf Hnext H. unfold goal_atom in H.
+    destruct (intern c v) as [id c1] eqn:Hi. injection H as <- <-.
+    destruct (intern_spec c v id c1 Hwf Hnext Hi)
+      as [Hwf1 [He1 [Hn1 [Hb1 Hid]]]].
+    refine (conj Hwf1 (conj He1 (conj Hn1 (conj Hb1 _)))).
+    intros rho Ha. cbn [AffineExprProofs.eval]. rewrite (Hid rho Ha).
+    apply wrap64_id, value_words_bounded.
+  Qed.
+
   (* --- [push_sides] --- *)
 
   (* Every fact of the result comes from one of the two lists ... *)
@@ -545,7 +588,7 @@ Section Semantics.
       [ | cbn [expr_of_value] in H; finish_atomized Hwf (extends_refl c) H ].
     pose proof (value_word_equations (Res id op args i)) as Hs.
     destruct op as [ | | | n | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? ? ? | iop
-                   | ? | iop k | ? | ? ? | ? | ? | ? | ? | | | | ? | ? | | | |
+                   | ? | iop k | ? | ? ? | ? | ? | ? | ? | | | | s | ? | | | |
                    | | ? ];
       try solve [ cbn [expr_of_value] in H;
                   finish_atomized Hwf (extends_refl c) H ].
@@ -820,6 +863,100 @@ Section Semantics.
             apply signed_shift_range_sound; [ lia | apply value_words_bounded
               ]. }
         * finish_atomized Hwfa (extends_trans _ _ _ He1 Hea) H.
+    - (* Specific *)
+      destruct args as [ | a [ | b [ | ? ? ] ] ];
+        try solve [ cbn [expr_of_value] in H;
+                    finish_atomized Hwf (extends_refl c) H ];
+        cbn [expr_of_value] in H; cbn [op_equations] in Hs;
+        pose proof (Forall_inv IHargs) as IHa.
+      + (* one argument *)
+        destruct (specific_linear s) as [ [ [ | ma [ | ? ? ] ] k ] | ] eqn:Hl;
+          try rewrite Hl in H;
+          try solve [ finish_atomized Hwf (extends_refl c) H ].
+        specialize (Hs ma k eq_refl).
+        destruct (one <=? c.(budget))%sint63 eqn:Hle;
+          [ | finish_atomized Hwf (extends_refl c) H ].
+        pay one Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value (spend_budget c one) a) as [[ea ra] ca] eqn:Ha.
+        destruct (IHa _ ea ra ca Hwf1 ltac:(lia) Ha)
+          as [Hwfa [Hea [Hna Hrho_a]]].
+        unfold keep_if_range_known in H.
+        destruct (add_optional_ranges (scale_optional_range ma ra)
+          (Some (Range.const k))) as [ rg | ] eqn:Hr.
+        * injection H as <- <- <-.
+          unfold add_optional_ranges, scale_optional_range in Hr.
+          destruct ra as [ rga | ]; [ | discriminate ].
+          destruct (Range.scale ma rga) as [ rsa | ] eqn:Hrsa;
+            try rewrite Hrsa in Hr; [ | discriminate ].
+          refine (conj Hwfa (conj (extends_trans _ _ _ He1 Hea) (conj _ _)));
+            [ lia | ].
+          intros rho Hrho.
+          destruct (Hrho_a rho Hrho) as [Ea [Ca Ra]].
+          specialize (Ra rga eq_refl).
+          pose proof (range_scale_sound _ _ _ _ Hrsa Ra) as Hprod.
+          pose proof (range_add_sound _ _ _ _ _ Hr Hprod
+            (constant_range_sound k)) as Hsum.
+          pose proof (in_range_implies_int64 _ _ Hsum) as Hfits.
+          rewrite Hs, (wrap64_id _ Hfits).
+          cbn [AffineExprProofs.eval atom_operations_consistent].
+          split; [ rewrite Ea; reflexivity | ].
+          split; [ exact (conj Ca I) | ].
+          intros rg' Hrg. injection Hrg as <-. exact Hsum.
+        * finish_atomized Hwfa (extends_trans _ _ _ He1 Hea) H.
+      + (* two arguments *)
+        destruct (specific_linear s)
+          as [ [ [ | ma [ | mb [ | ? ? ] ] ] k ] | ] eqn:Hl;
+          try rewrite Hl in H;
+          try solve [ finish_atomized Hwf (extends_refl c) H ].
+        specialize (Hs ma mb k eq_refl).
+        pose proof (Forall_inv (Forall_inv_tail IHargs)) as IHb.
+        destruct (two <=? c.(budget))%sint63 eqn:Hle;
+          [ | finish_atomized Hwf (extends_refl c) H ].
+        pay two Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value (spend_budget c two) a) as [[ea ra] ca] eqn:Ha.
+        destruct (expr_of_value ca b) as [[eb rb] cb] eqn:Hb.
+        destruct (IHa _ ea ra ca Hwf1 ltac:(lia) Ha)
+          as [Hwfa [Hea [Hna Hrho_a]]].
+        destruct (IHb ca eb rb cb Hwfa ltac:(lia) Hb)
+          as [Hwfb [Heb [Hnb Hrho_b]]].
+        unfold keep_if_range_known in H.
+        destruct (add_optional_ranges
+          (add_optional_ranges (scale_optional_range ma ra)
+            (scale_optional_range mb rb))
+          (Some (Range.const k))) as [ rg | ] eqn:Hr.
+        * injection H as <- <- <-.
+          unfold add_optional_ranges, scale_optional_range in Hr.
+          destruct ra as [ rga | ]; [ | discriminate ].
+          destruct (Range.scale ma rga) as [ rsa | ] eqn:Hrsa;
+            try rewrite Hrsa in Hr; [ | discriminate ].
+          destruct rb as [ rgb | ]; [ | discriminate ].
+          destruct (Range.scale mb rgb) as [ rsb | ] eqn:Hrsb;
+            try rewrite Hrsb in Hr; [ | discriminate ].
+          destruct (Range.add rsa rsb) as [ rab | ] eqn:Hrab;
+            try rewrite Hrab in Hr; [ | discriminate ].
+          refine (conj Hwfb
+                    (conj (extends_trans _ _ _ He1
+                             (extends_trans _ _ _ Hea Heb))
+                       (conj _ _)));
+            [ lia | ].
+          intros rho Hrho.
+          destruct (Hrho_b rho Hrho) as [Eb [Cb Rb]].
+          destruct (Hrho_a rho (agrees_extends _ _ _ Heb Hrho))
+            as [Ea [Ca Ra]].
+          specialize (Ra rga eq_refl). specialize (Rb rgb eq_refl).
+          pose proof (range_scale_sound _ _ _ _ Hrsa Ra) as Hpa.
+          pose proof (range_scale_sound _ _ _ _ Hrsb Rb) as Hpb.
+          pose proof (range_add_sound _ _ _ _ _ Hrab Hpa Hpb) as Hab.
+          pose proof (range_add_sound _ _ _ _ _ Hr Hab
+            (constant_range_sound k)) as Hsum.
+          pose proof (in_range_implies_int64 _ _ Hsum) as Hfits.
+          rewrite Hs, (wrap64_id _ Hfits).
+          cbn [AffineExprProofs.eval atom_operations_consistent].
+          split; [ rewrite Ea, Eb; reflexivity | ].
+          split; [ exact (conj (conj Ca Cb) I) | ].
+          intros rg' Hrg. injection Hrg as <-. exact Hsum.
+        * finish_atomized Hwfb
+            (extends_trans _ _ _ He1 (extends_trans _ _ _ Hea Heb)) H.
   Qed.
 
   (* The affine form of a value has the value's machine value, and the side
@@ -871,6 +1008,221 @@ Section Semantics.
         [ lia | intros Hside; exact Hside | ].
       intros rho Hrho. split; [ rewrite var_denote; apply Hid; exact Hrho | ].
       intros Hside. exact Hside.
+  Qed.
+
+  (* The fall-through of a case of [expr_of_value_goal] to [goal_atom]: close
+     the goal from [goal_atom_spec], given the context's well-formedness and
+     its extension from the initial context. *)
+  Ltac finish_goal_atom Hwf Hext H :=
+    let A := fresh "A" in let B := fresh "B" in let C := fresh "C" in
+    let D := fresh "D" in let E := fresh "E" in let F := fresh "F" in
+    pose proof (ctx_wf_budget _ Hwf) as F;
+    destruct (goal_atom_spec _ _ _ _ Hwf ltac:(lia) H) as [A [B [C [D E]]]];
+    refine (conj A (conj (extends_trans _ _ _ Hext B) (conj _ E))); lia.
+
+  (* The expression built for a value as a goal has the value's machine value
+     modulo 2^64, under any valuation agreeing with the context it leaves. The
+     context stays well-formed and only grows, and the atoms it gains are paid
+     for by the budget, but for one. *)
+  Theorem expr_of_value_goal_sound :
+    ∀ (value_ref : value) (initial_ctx : ctx) (expr : AffineExpr.t)
+      (final_ctx : ctx),
+    ctx_wf initial_ctx ->
+    to_Z initial_ctx.(next) + to_Z initial_ctx.(budget) + 1 <= ocaml_max_int ->
+    expr_of_value_goal initial_ctx value_ref = (expr, final_ctx) ->
+    ctx_wf final_ctx ∧ extends initial_ctx final_ctx
+    ∧ to_Z final_ctx.(next) + to_Z final_ctx.(budget)
+       <= to_Z initial_ctx.(next) + to_Z initial_ctx.(budget) + 1
+    ∧ ∀ (rho : valuation), agrees rho final_ctx ->
+         wrap64 (AffineExprProofs.eval rho expr) = value_words value_ref.
+  Proof.
+    intros v. induction v as [id op args i IHargs | b i] using value_ind';
+      intros c e c' Hwf Hn H;
+      [ | cbn [expr_of_value_goal] in H;
+          finish_goal_atom Hwf (extends_refl c) H ].
+    pose proof (value_word_equations (Res id op args i)) as Hs.
+    destruct op as [ | | | n | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? ? ? | iop
+                   | ? | iop k | ? | ? ? | ? | ? | ? | ? | | | | s | ? | | | |
+                   | | ? ];
+      try solve [ cbn [expr_of_value_goal] in H;
+                  finish_goal_atom Hwf (extends_refl c) H ].
+    - (* Const_int *)
+      cbn [expr_of_value_goal] in H. cbn [op_equations] in Hs.
+      destruct (int64_is_int (Int64.of_nativeint n)) eqn:Hf;
+        [ | finish_goal_atom Hwf (extends_refl c) H ].
+      injection H as <- <-.
+      refine (conj Hwf (conj (extends_refl c) (conj _ _))); [ lia | ].
+      intros rho _. cbn [AffineExprProofs.eval].
+      rewrite (int64_is_int_spec _ Hf), <- Hs.
+      apply wrap64_id, value_words_bounded.
+    - (* Intop *)
+      destruct iop;
+        try solve [ cbn [expr_of_value_goal] in H;
+                    finish_goal_atom Hwf (extends_refl c) H ];
+        destruct args as [ | a [ | b [ | ? ? ] ] ];
+        try solve [ cbn [expr_of_value_goal] in H;
+                    finish_goal_atom Hwf (extends_refl c) H ];
+        cbn [expr_of_value_goal] in H; cbn [op_equations] in Hs;
+        pose proof (Forall_inv IHargs) as IHa;
+        pose proof (Forall_inv (Forall_inv_tail IHargs)) as IHb;
+        destruct (two <=? c.(budget))%sint63 eqn:Hle;
+        [ | finish_goal_atom Hwf (extends_refl c) H
+          | | finish_goal_atom Hwf (extends_refl c) H ];
+        pay two Hwf Hle Hwf1 He1 Hn1 Hb1;
+        destruct (expr_of_value_goal (spend_budget c two) a) as [ea ca]
+          eqn:Ha;
+        destruct (expr_of_value_goal ca b) as [eb cb] eqn:Hb;
+        destruct (IHa _ ea ca Hwf1 ltac:(lia) Ha) as [Hwfa [Hea [Hna Hrho_a]]];
+        destruct (IHb ca eb cb Hwfa ltac:(lia) Hb) as [Hwfb [Heb [Hnb Hrho_b]]];
+        injection H as <- <-;
+        refine (conj Hwfb
+                  (conj (extends_trans _ _ _ He1 (extends_trans _ _ _ Hea Heb))
+                     (conj _ _)));
+          [ lia | | lia | ];
+        intros rho Hrho;
+        rewrite <- (Hrho_b rho Hrho) in Hs;
+        rewrite <- (Hrho_a rho (agrees_extends _ _ _ Heb Hrho)) in Hs;
+        cbn [AffineExprProofs.eval]; rewrite Hs.
+      + (* Iadd *) symmetry. apply wrap64_add_wrapped.
+      + (* Isub *) symmetry. apply wrap64_sub_wrapped.
+    - (* Intop_imm *)
+      destruct iop;
+        try solve [ cbn [expr_of_value_goal] in H;
+                    finish_goal_atom Hwf (extends_refl c) H ];
+        destruct args as [ | a [ | ? ? ] ];
+        try solve [ cbn [expr_of_value_goal] in H;
+                    finish_goal_atom Hwf (extends_refl c) H ];
+        cbn [expr_of_value_goal] in H; cbn [op_equations] in Hs;
+        pose proof (Forall_inv IHargs) as IHa.
+      + (* Iadd *)
+        destruct (one <=? c.(budget))%sint63 eqn:Hle;
+          [ | finish_goal_atom Hwf (extends_refl c) H ].
+        pay one Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value_goal (spend_budget c one) a) as [ea ca] eqn:Ha.
+        destruct (IHa _ ea ca Hwf1 ltac:(lia) Ha) as [Hwfa [Hea [Hna Hrho_a]]].
+        injection H as <- <-.
+        refine (conj Hwfa (conj (extends_trans _ _ _ He1 Hea) (conj _ _)));
+          [ lia | ].
+        intros rho Hrho. rewrite <- (Hrho_a rho Hrho) in Hs.
+        cbn [AffineExprProofs.eval]. rewrite Hs. symmetry.
+        apply wrap64_add_wrapped_l.
+      + (* Isub *)
+        destruct (one <=? c.(budget))%sint63 eqn:Hle;
+          [ | finish_goal_atom Hwf (extends_refl c) H ].
+        pay one Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value_goal (spend_budget c one) a) as [ea ca] eqn:Ha.
+        destruct (IHa _ ea ca Hwf1 ltac:(lia) Ha) as [Hwfa [Hea [Hna Hrho_a]]].
+        injection H as <- <-.
+        refine (conj Hwfa (conj (extends_trans _ _ _ He1 Hea) (conj _ _)));
+          [ lia | ].
+        intros rho Hrho. rewrite <- (Hrho_a rho Hrho) in Hs.
+        cbn [AffineExprProofs.eval]. rewrite Hs. symmetry.
+        apply wrap64_sub_wrapped_l.
+      + (* Ilsl *)
+        destruct ((zero <=? k) && (k <? max_shift_bits)
+                  && (one <=? c.(budget)))%sint63 eqn:Hg;
+          [ | finish_goal_atom Hwf (extends_refl c) H ].
+        apply andb_prop in Hg. destruct Hg as [Hk Hle]. shift_guard Hk.
+        pay one Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value_goal (spend_budget c one) a) as [ea ca] eqn:Ha.
+        destruct (IHa _ ea ca Hwf1 ltac:(lia) Ha) as [Hwfa [Hea [Hna Hrho_a]]].
+        injection H as <- <-.
+        refine (conj Hwfa (conj (extends_trans _ _ _ He1 Hea) (conj _ _)));
+          [ lia | ].
+        intros rho Hrho. specialize (Hs ltac:(lia)).
+        rewrite <- (Hrho_a rho Hrho) in Hs.
+        cbn [AffineExprProofs.eval]. rewrite Hs, to_Z_lsl_one by lia.
+        rewrite (Z.mul_comm (wrap64 (AffineExprProofs.eval rho ea))),
+          wrap64_mul_wrapped. reflexivity.
+    - (* Specific *)
+      destruct args as [ | a [ | b [ | ? ? ] ] ];
+        try solve [ cbn [expr_of_value_goal] in H;
+                    finish_goal_atom Hwf (extends_refl c) H ];
+        cbn [expr_of_value_goal] in H; cbn [op_equations] in Hs;
+        pose proof (Forall_inv IHargs) as IHa.
+      + (* one argument *)
+        destruct (specific_linear s) as [ [ [ | ma [ | ? ? ] ] k ] | ] eqn:Hl;
+          try rewrite Hl in H;
+          try solve [ finish_goal_atom Hwf (extends_refl c) H ].
+        specialize (Hs ma k eq_refl).
+        destruct (one <=? c.(budget))%sint63 eqn:Hle;
+          [ | finish_goal_atom Hwf (extends_refl c) H ].
+        pay one Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value_goal (spend_budget c one) a) as [ea ca] eqn:Ha.
+        destruct (IHa _ ea ca Hwf1 ltac:(lia) Ha) as [Hwfa [Hea [Hna Hrho_a]]].
+        injection H as <- <-.
+        refine (conj Hwfa (conj (extends_trans _ _ _ He1 Hea) (conj _ _)));
+          [ lia | ].
+        intros rho Hrho. rewrite <- (Hrho_a rho Hrho) in Hs.
+        cbn [AffineExprProofs.eval]. rewrite Hs. symmetry.
+        apply wrap64_linear_wrapped.
+      + (* two arguments *)
+        destruct (specific_linear s)
+          as [ [ [ | ma [ | mb [ | ? ? ] ] ] k ] | ] eqn:Hl;
+          try rewrite Hl in H;
+          try solve [ finish_goal_atom Hwf (extends_refl c) H ].
+        specialize (Hs ma mb k eq_refl).
+        pose proof (Forall_inv (Forall_inv_tail IHargs)) as IHb.
+        destruct (two <=? c.(budget))%sint63 eqn:Hle;
+          [ | finish_goal_atom Hwf (extends_refl c) H ].
+        pay two Hwf Hle Hwf1 He1 Hn1 Hb1.
+        destruct (expr_of_value_goal (spend_budget c two) a) as [ea ca]
+          eqn:Ha.
+        destruct (expr_of_value_goal ca b) as [eb cb] eqn:Hb.
+        destruct (IHa _ ea ca Hwf1 ltac:(lia) Ha) as [Hwfa [Hea [Hna Hrho_a]]].
+        destruct (IHb ca eb cb Hwfa ltac:(lia) Hb) as [Hwfb [Heb [Hnb Hrho_b]]].
+        injection H as <- <-.
+        refine (conj Hwfb
+                  (conj (extends_trans _ _ _ He1 (extends_trans _ _ _ Hea Heb))
+                     (conj _ _)));
+          [ lia | ].
+        intros rho Hrho.
+        rewrite <- (Hrho_b rho Hrho) in Hs.
+        rewrite <- (Hrho_a rho (agrees_extends _ _ _ Heb Hrho)) in Hs.
+        cbn [AffineExprProofs.eval]. rewrite Hs. symmetry.
+        apply wrap64_linear2_wrapped.
+  Qed.
+
+  (* The affine form [linearize_goal] builds has the value's machine value
+     modulo 2^64, and is well-formed. *)
+  Theorem linearize_goal_sound :
+    ∀ (value_ref : value) (initial_ctx : ctx) (form : Affine.t)
+      (final_ctx : ctx),
+    ctx_wf initial_ctx ->
+    to_Z initial_ctx.(next) + linearize_atom_bound <= ocaml_max_int ->
+    linearize_goal initial_ctx value_ref = (form, final_ctx) ->
+    ctx_wf final_ctx ∧ extends initial_ctx final_ctx
+    ∧ to_Z final_ctx.(next) <= to_Z initial_ctx.(next) + linearize_atom_bound
+    ∧ wf form
+    ∧ ∀ (rho : valuation), agrees rho final_ctx ->
+         wrap64 (denote rho form) = value_words value_ref.
+  Proof.
+    intros v c f c' Hwf Hn H. unfold linearize_goal in H.
+    rewrite linearize_atom_bound_eq in *.
+    destruct (refill_budget_spec c Hwf) as [Hwfr [Her [Hnr Hbr]]].
+    rewrite to_Z_max_nodes in Hbr.
+    destruct (expr_of_value_goal (refill_budget c) v) as [e ce] eqn:He.
+    destruct (expr_of_value_goal_sound v (refill_budget c) e ce Hwfr
+      ltac:(lia) He) as [Hwfe [Hee [Hne Hrho_e]]].
+    pose proof (ctx_wf_budget _ Hwfe) as Hbe.
+    destruct (to_affine e) as [ [form sides] | ] eqn:Hta.
+    - injection H as <- <-.
+      destruct (to_affine_wf e form sides Hta) as [Hwff _].
+      refine (conj Hwfe (conj (extends_trans _ _ _ Her Hee)
+                (conj _ (conj Hwff _))));
+        [ lia | ].
+      intros rho Hrho.
+      destruct (to_affine_sound rho e form sides Hta) as [Ed _].
+      rewrite Ed. apply Hrho_e. exact Hrho.
+    - destruct (intern ce v) as [atom c1] eqn:Hi. injection H as <- <-.
+      destruct (intern_spec ce v atom c1 Hwfe ltac:(lia) Hi)
+        as [Hwf1 [He1 [Hn1 [_ Hid]]]].
+      refine (conj Hwf1
+                (conj (extends_trans _ _ _ Her (extends_trans _ _ _ Hee He1))
+                   (conj _ (conj (var_wf atom) _))));
+        [ lia | ].
+      intros rho Hrho. rewrite var_denote, (Hid rho Hrho).
+      apply wrap64_id, value_words_bounded.
   Qed.
 
   (* A value that is not a comparison yields no facts: close the goal of

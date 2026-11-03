@@ -39,14 +39,18 @@
    SsaSemanticsProofs.v); it has no rule for returns, calls or other opaque
    code, which SsaContextSpec.v observes without interpreting. The exact
    evaluator covers the loop whitelist and, for bounds computed before a
-   loop, immediate shifts and or ([modeled_operation]); this does not widen
-   the whitelist. [steps_until] and [executes_insns] are the forms of
+   loop, immediate shifts and or, and the target-specific operations the
+   target reads as linear combinations of their arguments
+   ([modeled_operation], [eval_specific]; that reading,
+   Operation.specific_linear, is trusted); this does not widen the
+   whitelist. [steps_until] and [executes_insns] are the forms of
    execution the eligibility statement (LoopEligibilitySpec.v) speaks of;
    [bounded_registers] and [parameter_layout] are premises of it, through
    [reached_header] and [well_formed_ssa].
 
-   The whitelist the loop analyses accept is SsaSemantics.v, extracted; the
-   lemmas and the proofs are in SsaSemanticsProofs.v. Neither needs
+   The whitelist the loop analyses accept is SsaSemantics.v, extracted; it
+   uses [specific_modeled], which is extracted with it (SsaSemanticsSpec.ml).
+   The lemmas and the proofs are in SsaSemanticsProofs.v. Neither file needs
    review. *)
 
 From Stdlib Require Import ZArith Bool List.
@@ -102,9 +106,20 @@ Fixpoint read_values (regs : registers) (args : list value)
 Definition comparison_value (cmp : integer_comparison) (x y : Z) : Z :=
   if IntegerComparison.eval cmp x y then 1 else 0.
 
+(* Whether the target reads a specific operation as a linear combination of
+   this many arguments (Operation.specific_linear): one coefficient per
+   argument, for one or two arguments. *)
+Definition specific_modeled {A : Type} (s : specific_operation)
+    (args : list A) : bool :=
+  match specific_linear s, args with
+  | Some ([_], _), [_] | Some ([_; _], _), [_; _] => true
+  | _, _ => false
+  end.
+
 (* Operations for which the observation semantics has an exact integer
    equation. This is broader than the loop whitelist: shifts and bitwise or may
-   compute bounds before entering an otherwise empty loop. *)
+   compute bounds before entering an otherwise empty loop, and the
+   target-specific scaled additions re-tag loop counters. *)
 Definition modeled_operation {A : Type} (op : operation) (args : list A)
     : bool :=
   match op, args with
@@ -113,6 +128,7 @@ Definition modeled_operation {A : Type} (op : operation) (args : list A)
   | Intop_imm (Iadd | Isub | Icomp _ | Ior) _, [_] => true
   | Intop_imm (Ilsl | Iasr | Ilsr) bits, [_] =>
     Z.leb 0 (to_Z bits) && Z.leb (to_Z bits) 63
+  | Specific s, _ => specific_modeled s args
   | _, _ => false
   end.
 
@@ -122,6 +138,17 @@ Definition is_trap_marker (insn : instr) : bool :=
   match insn with
   | Push_trap | Pop_trap => true
   | Op _ _ _ _ => false
+  end.
+
+(* The linear reading of a specific operation on its operand words, wrapped
+   to 64 bits, when the target gives one for that many operands. *)
+Definition eval_specific (s : specific_operation) (args : list Z)
+    : option Z :=
+  match specific_linear s, args with
+  | Some ([c], k), [x] => Some (wrap64 (to_Z c * x + to_Z k))
+  | Some ([c1; c2], k), [x; y] =>
+    Some (wrap64 (to_Z c1 * x + to_Z c2 * y + to_Z k))
+  | _, _ => None
   end.
 
 (* Operations compute on values read from the current environment. These
@@ -147,6 +174,7 @@ Definition eval_operation (op : operation) (args : list Z) : option Z :=
     if Z.leb 0 (to_Z bits) && Z.leb (to_Z bits) 63
     then Some (wrap64 (unsigned64 x / 2 ^ to_Z bits)) else None
   | Intop_imm Ior mask, [x] => Some (wrap64 (Z.lor x (to_Z mask)))
+  | Specific s, _ => eval_specific s args
   | _, _ => None
   end.
 

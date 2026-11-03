@@ -53,6 +53,12 @@
    SsaModel.v provides as [strict_dominators], reading each dominator's
    terminator.
 
+   [linearize_goal] is the linearization of a proof goal for the bounds-check
+   entailment (BoundsCheckElim.v): sums, differences, immediate additions,
+   left shifts and the target's scaled additions are decomposed whether or
+   not their results are known to fit a register, so its form has the value's
+   machine value only modulo 2^64.
+
    Trusted parts, beyond those of AffineExpr.v: what the recognised operations
    compute, which is [SsaSemanticsSpec.eval_operation], that [Ssa.Value.equal]
    only identifies values with the same machine value, and that the dominators
@@ -136,9 +142,12 @@ Definition scale_optional_range (k : int)
    operation defining it and, recursively, its arguments; the budget pays for
    each argument before it is walked. A value defined by an operation not
    understood here, one whose range is lost, or one beyond the budget becomes
-   an atom ([atomize]). The argument of a logical shift is not walked. Sound
-   for a well-formed context ([ctx_wf] in AffineSsaProofs.v) whose atom counter
-   has room for the budget: [expr_of_value_sound], there. *)
+   an atom ([atomize]). The argument of a logical shift is not walked. A
+   target-specific operation is understood through the target's linear
+   reading of it (Operation.specific_linear): a scaled addition, like the
+   re-tagging of a loop counter. Sound for a well-formed context ([ctx_wf] in
+   AffineSsaProofs.v) whose atom counter has room for the budget:
+   [expr_of_value_sound], there. *)
 Fixpoint expr_of_value (c : ctx) (v : value)
     : (AffineExpr.t * option Range.t) * ctx :=
   match v with
@@ -219,6 +228,39 @@ Fixpoint expr_of_value (c : ctx) (v : value)
       | ((_, None), c) => atomize c v
       end
     else atomize c v
+  | Res _ (Specific s) [a] _ =>
+    match specific_linear s with
+    | Some ([ma], k) =>
+      if one <=? c.(budget)
+      then
+        let c := spend_budget c one in
+        let '((ea, ra), c) := expr_of_value c a in
+        keep_if_range_known c v
+          (AffineExpr.Add (AffineExpr.Scale ma ea) (AffineExpr.Const k))
+          (add_optional_ranges (scale_optional_range ma ra)
+            (Some (Range.const k)))
+      else atomize c v
+    | _ => atomize c v
+    end
+  | Res _ (Specific s) [a; b] _ =>
+    match specific_linear s with
+    | Some ([ma; mb], k) =>
+      if two <=? c.(budget)
+      then
+        let c := spend_budget c two in
+        let '((ea, ra), c) := expr_of_value c a in
+        let '((eb, rb), c) := expr_of_value c b in
+        keep_if_range_known c v
+          (AffineExpr.Add
+            (AffineExpr.Add (AffineExpr.Scale ma ea) (AffineExpr.Scale mb eb))
+            (AffineExpr.Const k))
+          (add_optional_ranges
+            (add_optional_ranges (scale_optional_range ma ra)
+              (scale_optional_range mb rb))
+            (Some (Range.const k)))
+      else atomize c v
+    | _ => atomize c v
+    end
   | _ => atomize c v
   end.
 
@@ -243,6 +285,103 @@ Definition linearize (c : ctx) (side : list Affine.t) (v : value)
   match to_affine e with
   | Some (form, sides) => ((form, push_sides side sides), c)
   | None => let '(id, c) := intern c v in ((Affine.var id, side), c)
+  end.
+
+(* --- Linearization for proof goals --- *)
+
+(* [goal_atom] makes a value a plain atom. *)
+Definition goal_atom (c : ctx) (v : value) : AffineExpr.t * ctx :=
+  let '(id, c) := intern c v in (AffineExpr.Atom id, c).
+
+(* The expression of a value as a proof goal sees it: sums, differences,
+   immediate additions, left shifts and the target's scaled additions are
+   decomposed whether or not their results are known to fit a register,
+   constants are literals and everything else is an atom. The expression has
+   the machine value only modulo 2^64 ([expr_of_value_goal_sound] in
+   AffineSsaProofs.v): sound for a goal that itself pins the value into
+   register range (the bounds-check goals of BoundsCheckElim.v), not for a
+   fact. The budget pays for each argument as in [expr_of_value]. *)
+Fixpoint expr_of_value_goal (c : ctx) (v : value) : AffineExpr.t * ctx :=
+  match v with
+  | Res _ (Const_int n) _ _ =>
+    let n := Int64.of_nativeint n in
+    if int64_is_int n
+    then (AffineExpr.Const (Int64.to_int n), c)
+    else goal_atom c v
+  | Res _ (Intop Iadd) [a; b] _ =>
+    if two <=? c.(budget)
+    then
+      let c := spend_budget c two in
+      let '(ea, c) := expr_of_value_goal c a in
+      let '(eb, c) := expr_of_value_goal c b in
+      (AffineExpr.Add ea eb, c)
+    else goal_atom c v
+  | Res _ (Intop Isub) [a; b] _ =>
+    if two <=? c.(budget)
+    then
+      let c := spend_budget c two in
+      let '(ea, c) := expr_of_value_goal c a in
+      let '(eb, c) := expr_of_value_goal c b in
+      (AffineExpr.Sub ea eb, c)
+    else goal_atom c v
+  | Res _ (Intop_imm Iadd k) [a] _ =>
+    if one <=? c.(budget)
+    then
+      let c := spend_budget c one in
+      let '(ea, c) := expr_of_value_goal c a in
+      (AffineExpr.Add ea (AffineExpr.Const k), c)
+    else goal_atom c v
+  | Res _ (Intop_imm Isub k) [a] _ =>
+    if one <=? c.(budget)
+    then
+      let c := spend_budget c one in
+      let '(ea, c) := expr_of_value_goal c a in
+      (AffineExpr.Sub ea (AffineExpr.Const k), c)
+    else goal_atom c v
+  | Res _ (Intop_imm Ilsl k) [a] _ =>
+    if (zero <=? k) && (k <? max_shift_bits) && (one <=? c.(budget))
+    then
+      let c := spend_budget c one in
+      let '(ea, c) := expr_of_value_goal c a in
+      (AffineExpr.Scale (one << k) ea, c)
+    else goal_atom c v
+  | Res _ (Specific s) [a] _ =>
+    match specific_linear s with
+    | Some ([ma], k) =>
+      if one <=? c.(budget)
+      then
+        let c := spend_budget c one in
+        let '(ea, c) := expr_of_value_goal c a in
+        (AffineExpr.Add (AffineExpr.Scale ma ea) (AffineExpr.Const k), c)
+      else goal_atom c v
+    | _ => goal_atom c v
+    end
+  | Res _ (Specific s) [a; b] _ =>
+    match specific_linear s with
+    | Some ([ma; mb], k) =>
+      if two <=? c.(budget)
+      then
+        let c := spend_budget c two in
+        let '(ea, c) := expr_of_value_goal c a in
+        let '(eb, c) := expr_of_value_goal c b in
+        (AffineExpr.Add
+          (AffineExpr.Add (AffineExpr.Scale ma ea) (AffineExpr.Scale mb eb))
+          (AffineExpr.Const k), c)
+      else goal_atom c v
+    | _ => goal_atom c v
+    end
+  | _ => goal_atom c v
+  end.
+
+(* The affine form of a value as a proof goal, walked with a fresh budget; an
+   atom for the value itself when [to_affine] overflows. There are no side
+   facts: the shifts and ors that have them are atoms here. Sound modulo 2^64:
+   [linearize_goal_sound] in AffineSsaProofs.v. *)
+Definition linearize_goal (c : ctx) (v : value) : Affine.t * ctx :=
+  let '(e, c) := expr_of_value_goal (refill_budget c) v in
+  match to_affine e with
+  | Some (form, _) => (form, c)
+  | None => let '(id, c) := intern c v in (Affine.var id, c)
   end.
 
 (* --- Guard facts from dominating branches --- *)

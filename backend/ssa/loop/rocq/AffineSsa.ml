@@ -237,6 +237,65 @@ let rec expr_of_value c v =
               else atomize c v
             | _ :: _ -> atomize c v))
         | _ -> atomize c v)
+      | Operation.Specific s -> (
+        match args with
+        | [] -> atomize c v
+        | a :: l -> (
+          match l with
+          | [] -> (
+            match Arch.linear_specific_operation s with
+            | Some p -> (
+              let l0, k = p in
+              match l0 with
+              | [] -> atomize c v
+              | ma :: l1 -> (
+                match l1 with
+                | [] ->
+                  if 1 <= c.budget
+                  then
+                    let c0 = spend_budget c 1 in
+                    let p0, c1 = expr_of_value c0 a in
+                    let ea, ra = p0 in
+                    keep_if_range_known c1 v
+                      (Add (Scale (ma, ea), Const k))
+                      (add_optional_ranges
+                         (scale_optional_range ma ra)
+                         (Some (Range.const k)))
+                  else atomize c v
+                | _ :: _ -> atomize c v))
+            | None -> atomize c v)
+          | b :: l0 -> (
+            match l0 with
+            | [] -> (
+              match Arch.linear_specific_operation s with
+              | Some p -> (
+                let l1, k = p in
+                match l1 with
+                | [] -> atomize c v
+                | ma :: l2 -> (
+                  match l2 with
+                  | [] -> atomize c v
+                  | mb :: l3 -> (
+                    match l3 with
+                    | [] ->
+                      if 2 <= c.budget
+                      then
+                        let c0 = spend_budget c 2 in
+                        let p0, c1 = expr_of_value c0 a in
+                        let ea, ra = p0 in
+                        let p1, c2 = expr_of_value c1 b in
+                        let eb, rb = p1 in
+                        keep_if_range_known c2 v
+                          (Add (Add (Scale (ma, ea), Scale (mb, eb)), Const k))
+                          (add_optional_ranges
+                             (add_optional_ranges
+                                (scale_optional_range ma ra)
+                                (scale_optional_range mb rb))
+                             (Some (Range.const k)))
+                      else atomize c v
+                    | _ :: _ -> atomize c v)))
+              | None -> atomize c v)
+            | _ :: _ -> atomize c v)))
       | _ -> atomize c v)
     (fun _ _ -> atomize c v)
     v
@@ -264,6 +323,166 @@ let linearize c side v =
   | None ->
     let id, c1 = intern c0 v in
     (Affine.var id, side), c1
+
+(** val goal_atom : ctx -> Ssa.finished Ssa.Value.t -> t * ctx **)
+
+let goal_atom c v =
+  let id, c0 = intern c v in
+  Atom id, c0
+
+(** val expr_of_value_goal : ctx -> Ssa.finished Ssa.Value.t -> t * ctx **)
+
+let rec expr_of_value_goal c v =
+  (fun f_res f_param (v : Ssa.finished Ssa.Value.t) ->
+    match v with
+    | Ssa.Instruction.Res ({ Ssa.Instruction.id; op; args; _ }, i) ->
+      f_res id op (Array.to_list args) i
+    | Ssa.Instruction.Block_param (b, i) -> f_param b i)
+    (fun _ op args _ ->
+      match op with
+      | Operation.Const_int n ->
+        let n0 = Int64.of_nativeint n in
+        if int64_is_int n0 then Const (Int64.to_int n0), c else goal_atom c v
+      | Operation.Intop op0 -> (
+        match op0 with
+        | Operation.Iadd -> (
+          match args with
+          | [] -> goal_atom c v
+          | a :: l -> (
+            match l with
+            | [] -> goal_atom c v
+            | b :: l0 -> (
+              match l0 with
+              | [] ->
+                if 2 <= c.budget
+                then
+                  let c0 = spend_budget c 2 in
+                  let ea, c1 = expr_of_value_goal c0 a in
+                  let eb, c2 = expr_of_value_goal c1 b in
+                  Add (ea, eb), c2
+                else goal_atom c v
+              | _ :: _ -> goal_atom c v)))
+        | Operation.Isub -> (
+          match args with
+          | [] -> goal_atom c v
+          | a :: l -> (
+            match l with
+            | [] -> goal_atom c v
+            | b :: l0 -> (
+              match l0 with
+              | [] ->
+                if 2 <= c.budget
+                then
+                  let c0 = spend_budget c 2 in
+                  let ea, c1 = expr_of_value_goal c0 a in
+                  let eb, c2 = expr_of_value_goal c1 b in
+                  Sub (ea, eb), c2
+                else goal_atom c v
+              | _ :: _ -> goal_atom c v)))
+        | _ -> goal_atom c v)
+      | Operation.Intop_imm (op0, k) -> (
+        match op0 with
+        | Operation.Iadd -> (
+          match args with
+          | [] -> goal_atom c v
+          | a :: l -> (
+            match l with
+            | [] ->
+              if 1 <= c.budget
+              then
+                let c0 = spend_budget c 1 in
+                let ea, c1 = expr_of_value_goal c0 a in
+                Add (ea, Const k), c1
+              else goal_atom c v
+            | _ :: _ -> goal_atom c v))
+        | Operation.Isub -> (
+          match args with
+          | [] -> goal_atom c v
+          | a :: l -> (
+            match l with
+            | [] ->
+              if 1 <= c.budget
+              then
+                let c0 = spend_budget c 1 in
+                let ea, c1 = expr_of_value_goal c0 a in
+                Sub (ea, Const k), c1
+              else goal_atom c v
+            | _ :: _ -> goal_atom c v))
+        | Operation.Ilsl -> (
+          match args with
+          | [] -> goal_atom c v
+          | a :: l -> (
+            match l with
+            | [] ->
+              if (0 <= k && k < 16) && 1 <= c.budget
+              then
+                let c0 = spend_budget c 1 in
+                let ea, c1 = expr_of_value_goal c0 a in
+                Scale (1 lsl k, ea), c1
+              else goal_atom c v
+            | _ :: _ -> goal_atom c v))
+        | _ -> goal_atom c v)
+      | Operation.Specific s -> (
+        match args with
+        | [] -> goal_atom c v
+        | a :: l -> (
+          match l with
+          | [] -> (
+            match Arch.linear_specific_operation s with
+            | Some p -> (
+              let l0, k = p in
+              match l0 with
+              | [] -> goal_atom c v
+              | ma :: l1 -> (
+                match l1 with
+                | [] ->
+                  if 1 <= c.budget
+                  then
+                    let c0 = spend_budget c 1 in
+                    let ea, c1 = expr_of_value_goal c0 a in
+                    Add (Scale (ma, ea), Const k), c1
+                  else goal_atom c v
+                | _ :: _ -> goal_atom c v))
+            | None -> goal_atom c v)
+          | b :: l0 -> (
+            match l0 with
+            | [] -> (
+              match Arch.linear_specific_operation s with
+              | Some p -> (
+                let l1, k = p in
+                match l1 with
+                | [] -> goal_atom c v
+                | ma :: l2 -> (
+                  match l2 with
+                  | [] -> goal_atom c v
+                  | mb :: l3 -> (
+                    match l3 with
+                    | [] ->
+                      if 2 <= c.budget
+                      then
+                        let c0 = spend_budget c 2 in
+                        let ea, c1 = expr_of_value_goal c0 a in
+                        let eb, c2 = expr_of_value_goal c1 b in
+                        Add (Add (Scale (ma, ea), Scale (mb, eb)), Const k), c2
+                      else goal_atom c v
+                    | _ :: _ -> goal_atom c v)))
+              | None -> goal_atom c v)
+            | _ :: _ -> goal_atom c v)))
+      | _ -> goal_atom c v)
+    (fun _ _ -> goal_atom c v)
+    v
+
+(** val linearize_goal : ctx -> Ssa.finished Ssa.Value.t -> Affine.t * ctx **)
+
+let linearize_goal c v =
+  let e, c0 = expr_of_value_goal (refill_budget c) v in
+  match to_affine e with
+  | Some p ->
+    let form, _ = p in
+    form, c0
+  | None ->
+    let id, c1 = intern c0 v in
+    Affine.var id, c1
 
 (** val comparison_facts : ctx -> Affine.t list -> bool -> Ssa.finished
     Ssa.Value.t -> (Affine.t list * Affine.t list) * ctx **)

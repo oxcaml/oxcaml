@@ -27,20 +27,23 @@
 
 (* The extraction of the loop models to OxCaml, one file per model, written
    next to this file (rocq/Makefile then moves SsaModel.ml, SsaGraphSpec.ml,
-   SsaGraph.ml, SsaDominance.ml and SsaSemantics.ml, the models of the SSA
-   graph, next to their sources in backend/ssa/rocq/): those five,
-   FourierMotzkin.ml, LoopComparisons.ml, AffineExpr.ml, NaturalLoop.ml,
-   AffineSsa.ml, InductionVar.ml, LoopTermination.ml, DeadInductionVar.ml,
-   DeleteEmptyLoops.ml, and, for the models of rocq/ with no OxCaml
-   counterpart, OxCamlList.ml and IntArith.ml. The pass itself,
-   delete_empty_loops.ml in the parent directory, calls
-   [DeleteEmptyLoops.find_deletions] and rewrites the graph at the loops it
-   returns; that rewriting, and the table of defining blocks the analyses are
-   given, are not modelled.
+   SsaGraph.ml, SsaDominance.ml, SsaSemanticsSpec.ml and SsaSemantics.ml,
+   the models of the SSA graph, next to their sources in backend/ssa/rocq/):
+   those six, FourierMotzkin.ml, LoopComparisons.ml, AffineExpr.ml,
+   NaturalLoop.ml, AffineSsa.ml, InductionVar.ml, LoopTermination.ml,
+   DeadInductionVar.ml, DeleteEmptyLoops.ml, InductionRange.ml,
+   BoundsCheckElim.ml, and, for the models of rocq/ with no OxCaml
+   counterpart, OxCamlList.ml and IntArith.ml. The passes themselves,
+   delete_empty_loops.ml and bounds_check_elim.ml in the parent directory,
+   call [DeleteEmptyLoops.find_deletions] and
+   [BoundsCheckElim.find_eliminations] and rewrite the graph at the loops and
+   branches they return; that rewriting, and the table of defining blocks the
+   analyses are given, are not modelled.
 
-   The entry points extracted are [find_deletions] and, for the unit test
-   oxcaml/tests/backend/ssa/loop_comparisons_facts.ml, the affine forms with
-   [feasible], [entails] and [facts]; everything they use comes with them.
+   The entry points extracted are [find_deletions], [find_eliminations] and,
+   for the unit test oxcaml/tests/backend/ssa/loop_comparisons_facts.ml, the
+   affine forms with [feasible], [entails] and [facts]; everything they use
+   comes with them.
 
    Everything about the functions is proved in the model files. The mapping of
    the models' types and primitives onto OxCaml's is what has to be trusted by
@@ -52,15 +55,16 @@ From Stdlib Require Import Extraction.
 From OxCamlStdlib Require Import OxCamlExtract IntArithExtract.
 From OxCamlBackend Require Import IntegerComparisonExtract OperationExtract.
 From OxCamlSsa Require Import SsaModelExtract SsaGraphSpec SsaGraph
-  SsaDominance SsaSemantics.
+  SsaDominance SsaSemanticsSpec SsaSemantics.
 From OxCamlLoop Require Import FourierMotzkin FourierMotzkinExtract
   LoopComparisons AffineExpr AffineExprExtract NaturalLoop AffineSsa
   AffineSsaExtract InductionVar InductionVarExtract LoopTermination
-  DeadInductionVar DeleteEmptyLoops.
+  DeadInductionVar DeleteEmptyLoops InductionRange BoundsCheckElim.
 
 Extract Inlined Constant DeleteEmptyLoops.graph_block_limit =>
   "4_294_967_296".
 
 Separate Extraction
   Affine feasible entails facts
-  DeleteEmptyLoops.find_deletions.
+  DeleteEmptyLoops.find_deletions
+  BoundsCheckElim.find_eliminations.

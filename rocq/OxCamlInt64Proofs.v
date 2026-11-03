@@ -84,6 +84,88 @@ Proof.
   assert (k = 0) by lia. subst k. lia.
 Qed.
 
+(* Adding a multiple of 2^64 does not change the wrapped value ... *)
+Lemma wrap64_add_multiple : ∀ (z multiple : Z),
+  wrap64 (z + multiple * two64) = wrap64 z.
+Proof.
+  intros z m. unfold wrap64.
+  replace (z + m * two64 + two63) with (z + two63 + m * two64) by lia.
+  rewrite Z.mod_add by (unfold two64; lia). reflexivity.
+Qed.
+
+(* ... so wrapping commutes with the ring operations: wrapping the operands
+   of a sum, a difference or a product by a constant first gives the same
+   wrapped result. *)
+Lemma wrap64_add_wrapped : ∀ (x y : Z),
+  wrap64 (wrap64 x + wrap64 y) = wrap64 (x + y).
+Proof.
+  intros x y.
+  destruct (wrap64_sub_multiple x) as [kx Hx].
+  destruct (wrap64_sub_multiple y) as [ky Hy].
+  rewrite Hx, Hy.
+  replace (x - kx * two64 + (y - ky * two64))
+    with (x + y + (- kx - ky) * two64) by lia.
+  apply wrap64_add_multiple.
+Qed.
+
+Lemma wrap64_sub_wrapped : ∀ (x y : Z),
+  wrap64 (wrap64 x - wrap64 y) = wrap64 (x - y).
+Proof.
+  intros x y.
+  destruct (wrap64_sub_multiple x) as [kx Hx].
+  destruct (wrap64_sub_multiple y) as [ky Hy].
+  rewrite Hx, Hy.
+  replace (x - kx * two64 - (y - ky * two64))
+    with (x - y + (ky - kx) * two64) by lia.
+  apply wrap64_add_multiple.
+Qed.
+
+Lemma wrap64_mul_wrapped : ∀ (k x : Z),
+  wrap64 (k * wrap64 x) = wrap64 (k * x).
+Proof.
+  intros k x. destruct (wrap64_sub_multiple x) as [kx Hx]. rewrite Hx.
+  replace (k * (x - kx * two64)) with (k * x + (- k * kx) * two64) by lia.
+  apply wrap64_add_multiple.
+Qed.
+
+(* The same with only the left operand wrapped. *)
+Lemma wrap64_add_wrapped_l : ∀ (x y : Z),
+  wrap64 (wrap64 x + y) = wrap64 (x + y).
+Proof.
+  intros x y. destruct (wrap64_sub_multiple x) as [kx Hx]. rewrite Hx.
+  replace (x - kx * two64 + y) with (x + y + (- kx) * two64) by lia.
+  apply wrap64_add_multiple.
+Qed.
+
+Lemma wrap64_sub_wrapped_l : ∀ (x y : Z),
+  wrap64 (wrap64 x - y) = wrap64 (x - y).
+Proof.
+  intros x y. destruct (wrap64_sub_multiple x) as [kx Hx]. rewrite Hx.
+  replace (x - kx * two64 - y) with (x - y + (- kx) * two64) by lia.
+  apply wrap64_add_multiple.
+Qed.
+
+(* The same for a linear combination of one or two wrapped values. *)
+Lemma wrap64_linear_wrapped : ∀ (a x k : Z),
+  wrap64 (a * wrap64 x + k) = wrap64 (a * x + k).
+Proof.
+  intros a x k. destruct (wrap64_sub_multiple x) as [kx Hx]. rewrite Hx.
+  replace (a * (x - kx * two64) + k) with (a * x + k + (- (a * kx)) * two64)
+    by ring.
+  apply wrap64_add_multiple.
+Qed.
+
+Lemma wrap64_linear2_wrapped : ∀ (a x b y k : Z),
+  wrap64 (a * wrap64 x + b * wrap64 y + k) = wrap64 (a * x + b * y + k).
+Proof.
+  intros a x b y k.
+  destruct (wrap64_sub_multiple x) as [kx Hx]. rewrite Hx.
+  destruct (wrap64_sub_multiple y) as [ky Hy]. rewrite Hy.
+  replace (a * (x - kx * two64) + b * (y - ky * two64) + k)
+    with (a * x + b * y + k + (- (a * kx + b * ky)) * two64) by ring.
+  apply wrap64_add_multiple.
+Qed.
+
 (* The truncated quotient of a 64-bit value by a positive divisor is again a
    64-bit value (its magnitude does not grow). *)
 Lemma quot_abs_le : ∀ (dividend divisor : Z), 0 < divisor -> Z.abs (Z.quot

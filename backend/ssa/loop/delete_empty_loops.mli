@@ -71,6 +71,11 @@
 
 open Ssa.Export
 
+(** The table from the id of each [Op] to the block defining it, which the
+    analyses read through [SsaModel.op_def_find]. Shared with
+    [Bounds_check_elim]. *)
+val compute_op_def : finished Ssa.graph -> SsaModel.op_def
+
 (** Delete empty loops in the graph, returning the rewritten graph together with
     the number of loops deleted. Returns the input unchanged when there is
     nothing to delete. *)

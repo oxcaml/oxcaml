@@ -42,7 +42,7 @@
 From Stdlib Require Import Bool List.
 From OxCamlStdlib Require Import OxCamlInt.
 From OxCamlBackend Require Import Operation.
-From OxCamlSsa Require Import SsaModel SsaGraphSpec.
+From OxCamlSsa Require Import SsaModel SsaGraphSpec SsaSemanticsSpec.
 Import ListNotations.
 
 (* Constants, counter increments/decrements and integer comparisons only. Match
@@ -79,5 +79,7 @@ Definition context_instruction_supported (insn : instr) : bool :=
   | Op _ (Const_int _ | Intop (Iadd | Isub | Icomp _)
           | Intop_imm (Iadd | Isub | Icomp _ | Ior | Ilsl | Iasr | Ilsr) _)
       _ count => (count =? one)%sint63
+  | Op _ (Specific s) args count =>
+    negb (specific_modeled s args) || (count =? one)%sint63
   | Op _ _ _ _ | Push_trap | Pop_trap => true
   end.

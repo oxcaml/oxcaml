@@ -180,6 +180,34 @@ Qed.
 (* Theorems                                                                 *)
 (* ======================================================================== *)
 
+(* What [graph_supported] checks, read back: the graph-size contract, and that
+   every exactly modeled operation has one result. *)
+Lemma graph_supported_spec : ∀ (blocks : list block),
+  graph_supported blocks = true ->
+  graph_size_supported blocks ∧
+  ∀ (b : block) (id : instr_id) (op : operation) (args : list value)
+    (count : int),
+    b ∈ blocks -> (Op id op args count) ∈ (block_body b) ->
+    modeled_operation op args = true -> count = one.
+Proof.
+  intros blocks Hcheck.
+  unfold graph_supported in Hcheck. apply andb_true_iff in Hcheck.
+  destruct Hcheck as [Hsize Hprefix]. split.
+  - apply length_at_most_spec in Hsize. exact Hsize.
+  - intros b id op args count Hb Hinsn. rewrite forallb_forall in Hprefix.
+    specialize (Hprefix b Hb). rewrite forallb_forall in Hprefix.
+    specialize (Hprefix _ Hinsn).
+    intros Hmodeled. destruct op;
+      cbn [context_instruction_supported modeled_operation] in *;
+      try discriminate; try (apply eqb_int; exact Hprefix).
+    3: { rewrite Hmodeled in Hprefix. apply orb_true_iff in Hprefix.
+         destruct Hprefix as [Habsurd | Hprefix]; [discriminate |].
+         apply eqb_int. exact Hprefix. }
+    all: destruct op; cbn [context_instruction_supported] in Hprefix;
+      try (apply eqb_int; exact Hprefix);
+      destruct args as [|x [|y [|extra rest]]]; discriminate.
+Qed.
+
 (* Every reported deletion passed both applicability checks. This removes graph
    size as a premise of the public eligibility theorem and enforces the
    syntactic coverage of the unchanged-prefix observation semantics: every
@@ -196,18 +224,7 @@ Theorem find_deletions_supported :
 Proof.
   intros defs blocks header exit Hin. unfold find_deletions in Hin.
   destruct (graph_supported blocks) eqn:Hcheck; [ | contradiction].
-  unfold graph_supported in Hcheck. apply andb_true_iff in Hcheck.
-  destruct Hcheck as [Hsize Hprefix]. split.
-  - apply length_at_most_spec in Hsize. exact Hsize.
-  - intros b id op args count Hb Hinsn. rewrite forallb_forall in Hprefix.
-    specialize (Hprefix b Hb). rewrite forallb_forall in Hprefix.
-    specialize (Hprefix _ Hinsn).
-    intros Hmodeled. destruct op;
-      cbn [context_instruction_supported modeled_operation] in *;
-      try discriminate; try (apply eqb_int; exact Hprefix).
-    all: destruct op; cbn [context_instruction_supported] in Hprefix;
-      try (apply eqb_int; exact Hprefix);
-      destruct args as [|x [|y [|extra rest]]]; discriminate.
+  apply graph_supported_spec. exact Hcheck.
 Qed.
 
 (* Every pair [(header, exit)] that [find_deletions] returns names the header

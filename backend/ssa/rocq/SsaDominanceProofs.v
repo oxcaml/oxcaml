@@ -459,3 +459,73 @@ Proof.
   - apply Block_path_cons; [exact Hedge | constructor].
   - apply Block_path_cons; [assumption | apply IHblock_path_from; exact Hedge].
 Qed.
+
+(* The rest of a path from one of its points, within the path. *)
+Lemma program_point_path_suffix : ∀ (first last : program_point)
+    (points : list program_point),
+  program_point_path_from first points last -> ∀ (member : program_point),
+  member ∈ points ->
+  ∃ (suffix : list program_point),
+    program_point_path_from member suffix last ∧ incl suffix points.
+Proof.
+  intros first last points Hpath. induction Hpath; intros member Hin.
+  - destruct Hin as [<- | []]. exists [position].
+    split; [constructor | apply incl_refl].
+  - destruct Hin as [<- | Hin].
+    + exists (first :: next :: rest).
+      split; [econstructor; eassumption | apply incl_refl].
+    + destruct (IHHpath member Hin) as [suffix [Hsuffix Hincl]].
+      exists suffix. split; [exact Hsuffix | apply incl_tl; exact Hincl].
+Qed.
+
+(* A path from a point of a block to a point of another block runs on through
+   the block: it visits every later point of the block. *)
+Lemma block_descent_visited : ∀ (b : block) (remaining : nat)
+    (points : list program_point) (last : program_point),
+  program_point_path_from (b, remaining) points last -> fst last <> b ->
+  ∀ (later : nat), later <= remaining -> (b, later) ∈ points.
+Proof.
+  intros b remaining points last Hpath.
+  remember (b, remaining) as first eqn:Hfirst. revert remaining Hfirst.
+  induction Hpath as [position | first next last rest Hedge Hpath IH];
+    intros remaining Hfirst Hother later Hlater; subst.
+  - cbn in Hother. contradiction.
+  - inversion Hedge; subst.
+    + destruct (Nat.eq_dec later (S insns_left)) as [-> | Hneq];
+        [left; reflexivity |].
+      right. apply (IH insns_left eq_refl Hother). lia.
+    + assert (later = 0) by lia. subst later. left. reflexivity.
+Qed.
+
+(* Every instruction point of a block dominates whatever the block's entry
+   point dominates in other blocks: a path through the entry runs on to the
+   terminator before leaving the block. *)
+Lemma dominating_block_point_dominates : ∀ (entry dominator : block)
+    (remaining : nat) (target : program_point),
+  fst target <> dominator -> remaining <= length (block_body dominator) ->
+  program_point_dominates entry (block_entry_point dominator) target ->
+  program_point_dominates entry (dominator, remaining) target.
+Proof.
+  intros entry dominator remaining target Hother Hlen Hdom points Hpath.
+  destruct (program_point_path_suffix _ _ _ Hpath _ (Hdom _ Hpath))
+    as [suffix [Hsuffix Hincl]].
+  apply Hincl.
+  exact (block_descent_visited _ _ _ _ Hsuffix Hother remaining Hlen).
+Qed.
+
+(* A block other than the entry that is reachable at its terminator is
+   reachable at its entry point, through which it was entered. *)
+Lemma block_entry_reachable : control_edges -> ∀ (entry b : block),
+  b <> entry -> program_point_reachable entry (b, 0) ->
+  program_point_reachable entry (block_entry_point b).
+Proof.
+  intros Hedges entry b Hother [points Hpath].
+  destruct (program_point_path_to_blocks Hedges _ _ _ Hpath)
+    as [blocks [Hblocks Hmembers]].
+  cbn in Hblocks, Hmembers.
+  destruct (Hmembers b (block_path_last _ _ _ Hblocks)) as [Heq | Hin];
+    [contradiction |].
+  destruct (program_point_path_member _ _ _ Hpath _ Hin)
+    as [prefix [Hprefix _]].
+  exists prefix. exact Hprefix.
+Qed.

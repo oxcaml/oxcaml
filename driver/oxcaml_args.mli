@@ -115,6 +115,7 @@ module type Oxcaml_options = sig
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
   val ssa_delete_empty_loops : unit -> unit
+  val ssa_bounds_check_elim : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit

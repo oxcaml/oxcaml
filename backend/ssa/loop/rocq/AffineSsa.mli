@@ -43,6 +43,12 @@ val linearize :
   Ssa.finished Ssa.Value.t ->
   (Affine.t * Affine.t list) * ctx
 
+val goal_atom : ctx -> Ssa.finished Ssa.Value.t -> t * ctx
+
+val expr_of_value_goal : ctx -> Ssa.finished Ssa.Value.t -> t * ctx
+
+val linearize_goal : ctx -> Ssa.finished Ssa.Value.t -> Affine.t * ctx
+
 val comparison_facts :
   ctx ->
   Affine.t list ->

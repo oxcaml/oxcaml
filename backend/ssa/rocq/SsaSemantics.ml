@@ -1,5 +1,6 @@
 open SsaGraphSpec
 open SsaModel
+open SsaSemanticsSpec
 
 (** val supported_operation : Operation.t -> 'a1 list -> bool **)
 
@@ -77,7 +78,7 @@ let context_instruction_supported insn =
       f_op id op (Array.to_list args) (Array.length typ)
     | Ssa.Instruction.Push_trap _ -> f_push_trap ()
     | Ssa.Instruction.Pop_trap _ -> f_pop_trap ())
-    (fun _ op _ count ->
+    (fun _ op args count ->
       match op with
       | Operation.Const_int _ -> Int.equal count 1
       | Operation.Intop op0 -> (
@@ -96,6 +97,8 @@ let context_instruction_supported insn =
         | Operation.Iasr -> Int.equal count 1
         | Operation.Icomp _ -> Int.equal count 1
         | _ -> true)
+      | Operation.Specific s ->
+        (not (specific_modeled s args)) || Int.equal count 1
       | _ -> true)
     (fun _ -> true)
     (fun _ -> true)

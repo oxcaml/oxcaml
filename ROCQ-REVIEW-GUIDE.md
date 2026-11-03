@@ -1,23 +1,27 @@
-# Reviewing the Rocq-verified empty-loop deletion
+# Reviewing the Rocq-verified SSA loop passes
 
-This page says how to review the empty-loop deletion pass of the SSA
-backend (`-ssa-delete-empty-loops`) and the Rocq development behind it:
-what is claimed, how the proof is put together, how the execution of SSA
-code is reasoned about, and what remains to be checked by eye because no
+This page says how to review the empty-loop deletion and bounds-check
+elimination passes of the SSA backend (`-ssa-delete-empty-loops`,
+`-ssa-bounds-check-elim`) and the Rocq development behind them: what is
+claimed, how the proofs are put together, how the execution of SSA code
+is reasoned about, and what remains to be checked by eye because no
 proof covers it. `rocq/HACKING.md` is the companion page for changing the
 models; this one is for reading them.
 
-The pass is `backend/ssa/loop/delete_empty_loops.ml`. Its decision, which
-loops to bypass, is the OCaml extracted from `DeleteEmptyLoops.v` and the
-models it uses (`backend/ssa/loop/rocq/`, with the generic SSA models in
+The passes are `backend/ssa/loop/delete_empty_loops.ml` and
+`backend/ssa/loop/bounds_check_elim.ml`. Their decisions, which loops to
+bypass and which checks to remove, are the OCaml extracted from
+`DeleteEmptyLoops.v` and `BoundsCheckElim.v` and the models they use
+(`backend/ssa/loop/rocq/`, with the generic SSA models in
 `backend/ssa/rocq/`, backend-wide definitions in `backend/rocq/` and the
 models of OxCaml's own types in `rocq/`). The extracted `.ml`/`.mli` files
 are committed next to the models and are the implementation. The rewrite
-of the graph once the decision is made is hand-written OCaml.
+of the graph once a decision is made is hand-written OCaml.
 
 ## 1. What is claimed
 
-The result to review is `find_deletions_eligible_statement`, at the end of
+For the empty-loop deletion, the result to review is
+`find_deletions_eligible_statement`, at the end of
 `backend/ssa/loop/rocq/LoopEligibilitySpec.v`; `LoopEligibilityProofs.v`
 proves it as `find_deletions_eligible`, and `make -C rocq claims` checks
 that the theorem has exactly this statement:
@@ -59,17 +63,50 @@ operations, `Goto` and `Switch`, the skipped execution touches neither
 memory nor the trap stack. The loop the analysis discovered, its body and
 its induction variables do not appear in the statement.
 
+For the bounds-check elimination, the result to review is
+`find_eliminations_sound_statement`, at the end of
+`backend/ssa/loop/rocq/BoundsCheckExecutionSpec.v`;
+`BoundsCheckExecutionProofs.v` proves it as `find_eliminations_sound`:
+
+```coq
+Definition find_eliminations_sound_statement : Prop :=
+  ∀ (blocks : list block) (entry : block) (defs : op_def)
+    (b target : block),
+  finished_graph blocks entry defs ->
+  (b, target) ∈ (find_eliminations defs entry blocks) ->
+  ∀ (initial_regs : registers) (reached : state),
+  bounded_registers initial_regs ->
+  context_steps (enter entry initial_regs) reached ->
+  current_block reached = b -> remaining reached = [] ->
+  SsaSemanticsSpec.step reached (enter target (current_registers reached)).
+```
+
+In words: take any pair `(b, target)` that the extracted decision
+`find_eliminations` reports for a finished graph. Whenever the function
+is entered with machine words in its registers and the observation
+semantics of section 3.3 (`context_steps`, which represents every real
+execution) reaches the end of the instructions of `b`, the next step of
+the *original* graph enters `target` with the registers unchanged: the
+branch ending `b`, a two-way `Switch` on the unsigned comparison the
+compiler emits for an array bounds check, takes its edge to `target`.
+Replacing the branch by `Goto target` therefore changes no execution, and
+since no segment is skipped there is no liveness condition to meet. The
+guards, loop counters and affine facts the decision relied on do not
+appear in the statement.
+
 What is *not* claimed:
 
 - Nothing about `false` answers: a loop the pass keeps may well be
-  deletable. Every theorem is a soundness result for positive answers.
-- Nothing about the rewritten graph. The theorem is stated on the
+  deletable, a check it keeps may well be redundant. Every theorem is a
+  soundness result for positive answers.
+- Nothing about the rewritten graph. The theorems are stated on the
   original graph; the step to "the rewritten function behaves like the
-  original" is the liveness simulation of section 4, written out but not
-  mechanised, and the OCaml rewrite is reviewed as ordinary code.
+  original" is the simulation of section 4, written out but not
+  mechanised, and the OCaml rewrites are reviewed as ordinary code.
 - Nothing is `Admitted`.
-  `Print Assumptions LoopEligibilityProofs.find_deletions_eligible` lists
-  the axioms the theorem rests on; section 5.5 says what they are.
+  `Print Assumptions LoopEligibilityProofs.find_deletions_eligible` and
+  `Print Assumptions BoundsCheckExecutionProofs.find_eliminations_sound`
+  list the axioms the theorems rest on; section 5.5 says what they are.
 
 ### 1.1 Two statements the unmechanised parts rely on
 
@@ -90,7 +127,9 @@ and the semantics only:
   every real execution reaching the header (section 5.3).
 
 `DeleteEmptyLoopsProofs.v` proves both, and `make -C rocq claims` checks
-them as well.
+them as well. The bounds-check elimination needs no such statement: its
+rewrite skips nothing, and its input contract is the premise list of its
+own statement.
 
 ## 2. The shape of the proof
 
@@ -101,10 +140,11 @@ can be followed. The development has two kinds of theorems.
 
 **Analysis certificates** read a boolean decision back into its meaning.
 Each analysis `X.v` (`NaturalLoop.v`, `InductionVar.v`, `AffineSsa.v`,
-`LoopTermination.v`, `DeadInductionVar.v`, `DeleteEmptyLoops.v`, ...) is
-the code that is extracted, and `XProofs.v` holds the named predicates
-giving its intended meaning, the lemmas and the theorems
-(`rocq/HACKING.md`, "The layout of a model"). The top certificate is
+`LoopTermination.v`, `DeadInductionVar.v`, `DeleteEmptyLoops.v`,
+`InductionRange.v`, `BoundsCheckElim.v`, ...) is the code that is
+extracted, and `XProofs.v` holds the named predicates giving its intended
+meaning, the lemmas and the theorems (`rocq/HACKING.md`, "The layout of a
+model"). The top certificate of the empty-loop deletion is
 `DeleteEmptyLoopsProofs.find_deletions_spec`: every pair that `find_deletions`
 returns comes with a natural loop and its basic induction variables
 satisfying `deletion_certificate`, whose conjuncts are
@@ -131,6 +171,36 @@ operation family while having other than one result (the one instruction
 shape the execution semantics has no rule for); the second half is
 `find_deletions_context_covered_statement` of section 1.1.
 
+The top certificate of the bounds-check elimination is
+`BoundsCheckElimProofs.find_eliminations_spec`: every pair that
+`find_eliminations` returns comes with the block's terminator, a two-way
+`Switch` on a comparison `unsigned_check` recognises (an index against a
+limit, a value or a literal, under `<u` or `<=u`, or the two values
+exchanged under `>u` or `>=u`), with a list of counter certificates and
+the conjuncts
+
+- `certificate_spec` (`InductionRangeProofs.v`) of each counter
+  certificate:
+  its counter is a basic induction variable (`InductionVar.v`) of a loop
+  `NaturalLoop.v` finds, with a positive literal step; the loop's header
+  is not the entry block; every entry of the header passes a literal at
+  least the certified lower bound; when the certificate names an upper
+  bound, that value is defined in a strict dominator of the header, is
+  an operand of some two-way branch on a comparison, and every
+  predecessor of the header passes a value `argument_at_most` showed,
+  from the guards there, to be at most it; and at every back edge
+  `no_wrap_at` showed, from the guards there and the certified bounds,
+  that the update cannot wrap;
+- a bound on the number of certificates, for the affine atom capacity;
+- `check_passes`: the facts of the branches dominating the block
+  (`AffineSsa.guards_at`), the side facts of the linearizations and the
+  bounds of the certified counters whose loops contain the block
+  (`range_facts`) entail `0 <= index` and `index <= limit - 1` (or
+  `index <= limit` for `<=u`), with the index linearized modulo 2^64
+  (`linearize_goal`) and the limit exactly.
+
+`find_eliminations_supported` reads back the same gate.
+
 **Operational theorems** take the certificate as a hypothesis and prove
 what it implies for executions. In `LoopEligibilityProofs.v`,
 `certificate_region_progress` says the loop's execution does not get
@@ -142,6 +212,22 @@ supplies for each reported pair. The hypotheses of these theorems about
 the graph are the fields of `finished_graph` and `reached_header` and
 nothing else: no counter recurrence, invariant bound, guard outcome or
 finite exit is assumed. Those are conclusions.
+
+For the bounds-check elimination,
+`InductionRangeExecutionProofs.counter_bounded` says that in every state the
+observation semantics reaches inside a certified loop's body the
+counter's register holds a word within the certified bounds: at least
+the lower bound and at most the word in the upper bound's register (an
+induction over `context_steps`: the entry literals, the back-edge
+updates, the values every predecessor passes, and the frame of every
+other step, which leaves the upper bound's register alone because its
+definition lies outside the body), and
+`BoundsCheckExecutionProofs.find_eliminations_sound` combines it with the guard
+facts of section 3.6, both evaluated under the valuation of
+`LoopValueSnapshotProofs.v` built from the registers at the branch, to show
+that the comparison's register holds 1 and the `Switch` steps to the
+reported target. Again the only hypotheses about the graph and the run
+are `finished_graph`, bound inputs and `context_steps`.
 
 The files involved, bottom up:
 
@@ -158,14 +244,16 @@ The files involved, bottom up:
 | `SsaContextSpec.v` | Word observations of the code before the loop; the `reached_header` contract |
 | `SsaGraph.v`, `SsaDominance.v`, `SsaSemantics.v` | The checks the loop analyses run on a graph (extracted; no review needed) |
 | `Ssa*Proofs.v` | The equations of available values, progress, the invariants of the observation semantics, and every lemma (no review needed) |
-| `backend/ssa/loop/rocq/FourierMotzkin.v`, `AffineExpr.v`, `LoopComparisons.v`, `NaturalLoop.v`, `AffineSsa.v`, `InductionVar.v`, `LoopTermination.v`, `DeadInductionVar.v`, `DeleteEmptyLoops.v` | The analyses (extracted; no review needed), each with a `*Proofs.v` giving its meaning and certificate (no review needed) |
+| `backend/ssa/loop/rocq/FourierMotzkin.v`, `AffineExpr.v`, `LoopComparisons.v`, `NaturalLoop.v`, `AffineSsa.v`, `InductionVar.v`, `LoopTermination.v`, `DeadInductionVar.v`, `DeleteEmptyLoops.v`, `InductionRange.v`, `BoundsCheckElim.v` | The analyses (extracted; no review needed), each with a `*Proofs.v` giving its meaning and certificate (no review needed) |
 | `DeleteEmptyLoopsSpec.v` | The two statements of section 1.1 |
 | `LoopExecutionProofs.v` | Finite traversals of the loop body (no review needed, like every `*Proofs.v` below) |
 | `LoopInvariantExecutionProofs.v` | Values defined before the loop do not change during it |
 | `LoopCounterExecutionProofs.v` | The counter's arithmetic in actual execution; finite exit |
 | `LoopValueSnapshotProofs.v`, `LoopGuardExecutionProofs.v`, `LoopRangeExecutionProofs.v` | The affine facts the termination argument relies on, justified by actual execution |
 | `LoopLiveOutProofs.v` | Agreement on live-out registers |
-| `LoopEligibilitySpec.v`, `LoopEligibilityProofs.v` | The statement (section 1) and its proof |
+| `LoopEligibilitySpec.v`, `LoopEligibilityProofs.v` | The statement for empty-loop deletion (section 1) and its proof |
+| `InductionRangeExecutionProofs.v` | The certified bounds of loop counters hold in every reached state of their loops |
+| `BoundsCheckExecutionSpec.v`, `BoundsCheckExecutionProofs.v` | The statement for bounds-check elimination (section 1) and its proof |
 
 Every model is split into `*Spec.v`, implementation and `*Proofs.v` files
 (`rocq/HACKING.md`, "The layout of a model"). What has to be read is the
@@ -265,6 +353,11 @@ register live at the reached point is bound
 (`context_execution_live_registers_defined`). Opaque results carry no
 equation; the affine analysis sees them as atoms.
 
+The bounds-check elimination has no exactly executed segment: its theorem
+is about the observed run up to the branch, so `context_steps` is its
+whole input contract (section 5.3), and the counter bounds it uses are
+carried along that run (`InductionRangeExecutionProofs.v`).
+
 ### 3.4 Values that do not change during the loop
 
 `LoopInvariantExecutionProofs.v` gives
@@ -346,7 +439,7 @@ execution as at the exit. The header itself is retained by the rewrite
 and executes once, as it did on the first iteration before it (the
 header of `DeleteEmptyLoopsProofs.v` spells this out).
 
-## 4. From the theorem to the rewrite
+## 4. From the theorems to the rewrites
 
 `find_deletions_eligible` is per loop and per entry of its header, on the
 original graph. The step from it to "the rewritten function behaves like
@@ -401,6 +494,22 @@ header's instructions. Check that the reducer maps blocks and values
 consistently, that pruning the now unreachable body removes nothing
 live, and that the rewrite is applied to the graph that was analysed.
 
+For the bounds-check elimination the simulation is immediate. With `P'`
+the graph in which each reported block's terminator has been replaced by
+`Goto target` with no arguments, `find_eliminations_sound` says that at
+such a terminator `P` steps to `enter target` with the registers
+unchanged, which is the step `P'` takes; so the relation above is
+preserved with no segment skipped, and nothing about liveness is needed.
+The rewrite in `backend/ssa/loop/bounds_check_elim.ml` is the same as
+the one above: `find_eliminations` builds the table of defining blocks
+with `Delete_empty_loops.compute_op_def` and calls the extracted
+`BoundsCheckElim.find_eliminations` on the finished graph, and `run`
+applies an `Ssa_reducer` whose only change is `visit_terminator`,
+replacing a reported block's terminator by
+`Continue { continuation = Goto target; args = [||] }`. The same checks
+apply; the block that raised the exception becomes unreachable when the
+check was its only predecessor, and is pruned.
+
 ## 5. What must be checked by inspection
 
 Rocq checks the proofs. It cannot check that the definitions mean what
@@ -413,8 +522,13 @@ In `SsaSemanticsSpec.v`: `eval_operation` (64-bit wrapping addition and
 subtraction, `Const_int` through `Int64.of_nativeint`, the shifts and
 `Ior` used for bounds), `comparison_value` with
 `backend/rocq/IntegerComparison.v` (signed and unsigned comparisons, in
-the constructor order of `typing/scalar.ml`), and the untagged 0/1
-result of a comparison. `Step_goto` and `Step_switch` against
+the constructor order of `typing/scalar.ml`), the untagged 0/1
+result of a comparison, and `eval_specific`: a target-specific operation
+computes the linear combination of its arguments that the target's
+`Operation.specific_linear` gives for it, wrapped to 64 bits, and is
+opaque when the target gives none. That reading is trusted (section
+5.4); it is how the re-tagging of a `for` loop's counter is
+understood. `Step_goto` and `Step_switch` against
 `backend/ssa/ssa.mli`: all arguments read before any parameter is bound,
 omitted arguments leave the parameter unbound, `Switch` selects by a
 non-negative in-range index and enters a parameterless block. `wrap64`,
@@ -442,7 +556,7 @@ receives. Where to look:
 | `graph_dominance`, `graph_dominance_complete` | `Block.dominates` answers true exactly when every path from the entry passes through the dominator | `compute_dominators`, `Block.dominates` |
 | `graph_strict_dominators` | `Block.strict_dominators` lists distinct blocks of the graph | `Block.strict_dominators` (the walk up the immediate dominators) |
 | `graph_layout` (`control_layout`) | `Goto` arguments match the target's parameters in number and order; an omitted argument feeds a parameter no operand anywhere reads; `Switch` targets have no parameters | `check_terminator` |
-| `graph_definitions` (`op_def_correct`) | the table maps every instruction to its block | `compute_op_def` in `delete_empty_loops.ml` |
+| `graph_definitions` (`op_def_correct`) | the table maps every instruction to its block | `compute_op_def` in `delete_empty_loops.ml`, shared by `bounds_check_elim.ml` |
 
 Statements such as `control_edges` quantify over the type `block`
 without a membership guard. Read `block` as the reachable blocks of one
@@ -466,6 +580,12 @@ function was entered and ran:
 - `switches_defined`: from the header on, every `Switch` the exact
   execution reaches has an in-range index.
 
+The bounds-check elimination's input contract is the premise list of
+`find_eliminations_sound` itself: `bounded_registers` of the initial
+registers (the first field above) and a `context_steps` run from the
+entry to the branch (the third). It needs neither live inputs nor
+defined `Switch` indices, since it skips nothing.
+
 ### 5.4 The extraction directives
 
 The `*Extract.v` files say which OxCaml type or value realises each model
@@ -486,22 +606,29 @@ type and primitive, and they are trusted as written:
   mapped back onto the compiler's types. Keep them in step with
   `backend/operation.mli`: a constructor added there must be added to
   both, in the same position, or the extracted matches silently
-  misalign.
+  misalign. `specific_linear` extracts to the target's
+  `Arch.linear_specific_operation`, the one statement about a target's
+  semantics the proofs rest on: check against the target's emitter that
+  every operation it answers for computes exactly the combination
+  `c1 * arg1 + ... + cn * argn + k` of its arguments, wrapped to 64 bits
+  (on amd64 the register forms of `Ilea`, on arm64 `Ishiftarith` with a
+  non-negative shift), and that it answers `None` for every other.
 - `backend/rocq/IntegerComparisonExtract.v`: the constructor order of
   `typing/scalar.ml`.
 - `rocq/OxCamlExtract.v`: `int` and `Int64` operations, list and option
   functions, fold argument order, short-circuit booleans.
 - `rocq/IntArithExtract.v`: the four overflow tests `add_fits`,
   `mul_fits`, `add_fits64` and `mul_fits64`, a few lines of OCaml each.
-- `backend/ssa/loop/rocq/Extract.v`: the entry points (`find_deletions`
-  and the affine functions the unit test calls) and the literal for
-  `graph_block_limit`.
+- `backend/ssa/loop/rocq/Extract.v`: the entry points (`find_deletions`,
+  `find_eliminations` and the affine functions the unit test calls) and
+  the literal for `graph_block_limit`.
 
 `make -C rocq all` must reproduce the committed `.ml`/`.mli` exactly.
 
 ### 5.5 Axioms and primitives
 
-`Print Assumptions LoopEligibilityProofs.find_deletions_eligible` and
+`Print Assumptions LoopEligibilityProofs.find_deletions_eligible`,
+`Print Assumptions BoundsCheckExecutionProofs.find_eliminations_sound` and
 `make -s -C rocq assumptions` list them: the axioms of
 `rocq/OxCamlInt64.v` (each the documented behaviour of one `Int64`
 operation), the equality and set axioms of `SsaModel.v` (identity of
@@ -509,12 +636,15 @@ blocks and values, sets ordered by block id), the axioms about the list
 functions mapped onto OxCaml's in `rocq/OxCamlList.v`, the four overflow
 tests of `rocq/IntArith.v`, and Rocq's own axioms for its primitive
 63-bit integers, plus classical logic, used for case splits on
-definedness. None of them states anything about SSA executions.
+definedness; and the parameter `Operation.specific_linear`, the target's
+reading of its specific operations (section 5.4). None of them states
+anything about SSA executions.
 
 ### 5.6 The gate and the limits
 
-`DeleteEmptyLoops.graph_supported` must run before the analyses and
-reject the whole graph on failure (see `find_deletions`); its
+`DeleteEmptyLoops.graph_supported` must run before the analyses of
+either pass and reject the whole graph on failure (see `find_deletions`
+and `find_eliminations`); its
 `graph_block_limit` extracts to `4_294_967_296`. The Fourier-Motzkin and
 linearization budgets (`FourierMotzkin.v`, `AffineSsa.v`) only make the
 analyses more conservative.
@@ -537,17 +667,22 @@ analyses more conservative.
 
    The statement is a closed proposition, not in a `Section`, so `Print`
    shows every premise; the `Check` is what `make -C rocq claims` runs.
-2. `SsaSemanticsSpec.v`, `SsaLivenessSpec.v` and `SsaContextSpec.v`:
+2. `BoundsCheckExecutionSpec.v`: `find_eliminations_sound_statement`,
+   likewise, with `Print find_eliminations_sound_statement.` and
+   `Print Assumptions BoundsCheckExecutionProofs.find_eliminations_sound.`;
+   its premises are `finished_graph`, `bounded_registers` and
+   `context_steps`.
+3. `SsaSemanticsSpec.v`, `SsaLivenessSpec.v` and `SsaContextSpec.v`:
    section 3 above, against the backend (section 5.1). Nothing else in
    `backend/ssa/rocq/` but `SsaModel.v` and `SsaModelExtract.v` needs
    reading.
-3. `SsaProgressSpec.finished_graph` and `SsaExecutionSpec.well_formed_ssa`
+4. `SsaProgressSpec.finished_graph` and `SsaExecutionSpec.well_formed_ssa`
    against `ssa.ml` (section 5.2).
-4. `DeleteEmptyLoopsSpec.v`: the two statements the simulation (section 4)
+5. `DeleteEmptyLoopsSpec.v`: the two statements the simulation (section 4)
    and the input contract (section 5.3) rely on.
-5. The `*Extract.v` files (section 5.4) and the OCaml wrapper
+6. The `*Extract.v` files (section 5.4) and the OCaml wrappers
    (section 4).
-6. `make -C rocq all` (Rocq 9 and the repository's `ocamlformat` on
+7. `make -C rocq all` (Rocq 9 and the repository's `ocamlformat` on
    `PATH`) checks every proof and confirms that the extraction
    reproduces the committed files; `make -s -C rocq assumptions` prints
    the audit report, whose first part lists the global axioms and whose
@@ -569,7 +704,8 @@ dominates block `b`, and `x ∈ l` is list membership.
 Proof scripts (`Proof. ... Qed.`) can be skipped: Rocq checks them. The
 tests are in `testsuite/tests/backend/ssa/loop/`, where the
 `[%%expect_ssa X86_64{|...|}]` blocks show the SSA each function ends up
-with and the number of loops deleted (they are checked on x86-64 only,
+with and the number of loops deleted or checks removed (they are checked
+on x86-64 only,
 since the SSA is printed after instruction selection), and in
 `oxcaml/tests/backend/ssa/`.
 
@@ -578,10 +714,11 @@ since the SSA is printed after instruction selection), and in
 - A hypothesis stated through an analysis function silently trusts that
   function. The development avoids this at the top: `finished_graph` and
   `reached_header` are stated through the primitives of `SsaModel.v` and
-  the semantics, never through implementation code. Lower down, hypotheses such
-  as `biv_spec` or `deletion_certificate` are stated through code, but
-  the development discharges them itself (`InductionVarProofs.analyze_spec`,
-  `find_deletions_spec`, ...), so nothing at the top depends on their
+  the semantics, never through implementation code. Lower down, hypotheses
+  such as `biv_spec`, `deletion_certificate` or `certificate_spec` are
+  stated through code, but the development discharges them itself
+  (`InductionVarProofs.analyze_spec`, `find_deletions_spec`,
+  `find_eliminations_spec`, ...), so nothing at the top depends on their
   truth of the program. When reading a lemma, ask which of its premises
   the main theorem discharges and which it passes on.
 - A conclusion stated through code cannot make a theorem vacuous; it only
@@ -595,4 +732,5 @@ since the SSA is printed after instruction selection), and in
   Two values of one graph are equal to it exactly when they are the same
   term, and the models never construct values.
 - The analyses may be wrong in the conservative direction. A kept loop
-  needs no justification; a deleted one needs all of section 1.
+  or check needs no justification; a deleted loop or removed check needs
+  all of section 1.
