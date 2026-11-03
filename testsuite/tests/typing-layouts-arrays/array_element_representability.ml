@@ -35,7 +35,13 @@ val product_edge_case : ('a : value_maybe_null). #('a * 'a) array -> int =
 |}]
 
 (* This is not sound whenever 'a is not a value, but this is the kind of
-   unsoundness that is generally permitted with [external] declarations *)
+   unsoundness that is generally permitted with [external] declarations.
+
+   The [value_maybe_null] printing below is an artifact of the toplevel; in a
+   compilation unit, it gets type checked against [any] before any of it is
+   translated. This defaulting is harmless, however, since [%floatarray_length]
+   does not get specialized based on ['a]. See [Note regarding jkind checks on
+   external declarations] in [typedecl.ml] for primitives where ['a] matters. *)
 external weird_flarr_len : ('a : any mod separable). 'a array -> int
   = "%floatarray_length"
 let weird_flarr_len' x = weird_flarr_len x
@@ -46,22 +52,18 @@ val weird_flarr_len' : ('a : value_maybe_null). 'a array -> int = <fun>
 |}]
 
 
-(* CR layouts: [blit] below is unsound. In a compilation unit, it is type
-   checked (and exported) at [('a : any separable)]; the type printed below is
-   an artifact of the toplevel, which translates each phrase before printing
-   it. But translating [blit_ext] in the body of [blit] defaults ['a] to
-   [value], so [blit] is compiled for arrays of values. Applying it to (say)
-   two [int8# array]s then copies [n] words rather than [n] bytes, writing out
-   of bounds. *)
+(* Primitives that inspect the element's layout must be [@layout_poly] when
+   the element has layout [any]. Otherwise, a function like [blit] below
+   would be generalized over [any] but compiled for [value]. *)
 external blit_ext : ('a : any mod separable).
   'a array -> int -> 'a array -> int -> int -> unit = "%arrayblit"
 let blit a b n = blit_ext a 0 b 0 n
 [%%expect{|
-external blit_ext :
-  ('a : any separable). 'a array -> int -> 'a array -> int -> int -> unit
-  = "%arrayblit"
-val blit : ('a : value_maybe_null). 'a array -> 'a array -> int -> unit =
-  <fun>
+Lines 1-2, characters 20-51:
+1 | ....................('a : any mod separable).
+2 |   'a array -> int -> 'a array -> int -> int -> unit...............
+Error: The primitive "%arrayblit" doesn't work well with type variables of
+       layout any. Consider using "[@layout_poly]".
 |}]
 
 (*******************************************************************)

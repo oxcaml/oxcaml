@@ -4752,15 +4752,14 @@ let unexpected_layout_any_check env prim cty ty =
 
       [let f x = len x]
 
-      [x] here will have type ['a array] where the jkind of ['a] is [any]. The
-      array kind function in [typeopt] will look at ['a] expecting it to be
-      representable and fail. This produces a bad error message that doesn't
-      point to the source of the mistake which is, in fact, the external
-      declaration.
+      [x] here will have type ['a array] where the jkind of ['a] is [any].
+      Specialization of the length primitive requires this be representable, and
+      will generate code based on the default, [value]. This disagrees with the
+      type of [f], which will still contain [any].
 
-      For this reason, we have [unexpected_layout_any_check].  It's here to
-      point out this type of mistake early and suggest the use of
-      [@layout_poly].
+      [unexpected_layout_any_check] rules this out by rejecting the external
+      declaration and suggesting [@layout_poly], which instead picks a sort
+      for ['a] at each use during type checking.
 
       An exception is raised if any of these checks fails. *)
 (* CR layouts v7.1: additionally, we do not allow externals to have unboxed
