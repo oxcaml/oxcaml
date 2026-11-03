@@ -1778,35 +1778,9 @@ end = struct
        !foo
        (* the loaded value owns both *)
      ]}
-     Instead, we could put both below the position, with a [<contents>]
-     projection for the value:
-     {[
-       let { deref_ foo; _ } = x in
-       (* [foo] owns [x.foo] *)
-       !foo
-       (* the read borrows [x.foo.<memory>] and yields [x.foo.<contents>] *)
-     ]}
-     In the example from before, consuming [s] would then only use
-     [x.foo.<contents>], not the memory the second match reads, so the example
-     would be accepted.
-
-     Below an address, unboxed projections and loads would have to commute. In
-     hypothetical syntax, with [!] for loading and [&] for taking an address:
-     {[
-       val a : #(string * string) addr_imm
-       let _ = (!a).#0          (* yields [a.<contents>.0] *)
-       let _ = !(&((!a).#0))    (* yields [a.0.<contents>] *)
-     ]}
-     These are the same access, so paths would have to be normalised, e.g. by
-     moving [<contents>] past unboxed projections.
-
-     Even then, more subtle examples like this would be rejected:
-     {[
-       let swap (a : 'a addr @ unique) x =
-         let old = !a in
-         a := x;
-         #(old, a)
-     ]} *)
+     Improving the accuracy of the uniqueness analysis in this case would
+     require distinguishing these two paths, for instance by tracking multiple
+     paths per object or by cleverly manipulating paths. *)
   let address_load mut t =
     let modality = Typemode.address_modalities mut in
     if tracked_under modality then t else untracked
@@ -2386,10 +2360,10 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
       ext, UF.par uf_force uf_arg
     | Tpat_addr (mut, _, arg) ->
       let base_paths = Paths.with_memory_address paths in
-      (* CR address-patterns: this is slightly imprecise. In principle, we
-         should borrow just the memory we read from and yield its contents here,
-         but the current uniqueness analysis cannot express that: it always
-         borrows and yields both. See Note [Loading from addresses]. *)
+      (* CR address-patterns: this is slightly imprecise. In principle, we should borrow
+         just the memory we read from and yield its contents here, but the current
+         uniqueness analysis cannot express that: the loaded value always owns both. See
+         Note [Loading from addresses]. *)
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
     | Tpat_deref { id; _ } -> (
