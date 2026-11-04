@@ -7710,7 +7710,7 @@ module Mode_with (Areality : Areality) = struct
       let comonadic = Comonadic.Guts.get_ceil comonadic in
       merge { monadic; comonadic }
 
-    let le_loose m1 m2 =
+    let sub_loose m1 m2 =
       Comonadic.Const.le
         (Comonadic.Guts.get_loose_ceil m1.comonadic)
         (Comonadic.Guts.get_loose_floor m2.comonadic)

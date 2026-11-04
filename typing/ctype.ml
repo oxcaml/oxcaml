@@ -6703,11 +6703,6 @@ let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
 
 exception Complicated_moregen
 
-let rec path_scope : Path.t -> int = function
-  | Papply (f, _) -> path_scope f
-  | Pdot (p, _) | Pextra_ty (p, _) -> path_scope p
-  | Pident id -> if Ident.is_predef id then -1 else Ident.scope id
-
 let rec expand_path_fast env p =
   match Env.find_type_expansion p env with
   | exception Not_found -> Env.normalize_type_path None env p, None
@@ -6719,7 +6714,7 @@ let rec expand_path_fast env p =
     | _ -> Env.normalize_type_path None env p, Some (params, body)
 
 let expand_paths_fast env p1 p2 =
-  if path_scope p1 >= path_scope p2 then begin
+  if Path.scope p1 >= Path.scope p2 then begin
     let p1, exp1 = expand_path_fast env p1 in
     if Path.same p1 p2 then p1, exp1, p2, None
     else
@@ -6736,9 +6731,9 @@ let expand_paths_fast env p1 p2 =
 let moregen_mode_fast v m1 m2 =
   let ok =
     match v with
-    | Invariant -> With_locality.Guts.(le_loose m1 m2 && le_loose m2 m1)
-    | Covariant -> With_locality.Guts.le_loose m1 m2
-    | Contravariant -> With_locality.Guts.le_loose m2 m1
+    | Invariant -> With_locality.Guts.(sub_loose m1 m2 && sub_loose m2 m1)
+    | Covariant -> With_locality.Guts.sub_loose m1 m2
+    | Contravariant -> With_locality.Guts.sub_loose m2 m1
     | Bivariant -> true
   in
   if not ok then raise_notrace Complicated_moregen
