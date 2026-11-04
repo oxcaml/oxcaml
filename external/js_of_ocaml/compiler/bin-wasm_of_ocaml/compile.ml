@@ -379,6 +379,19 @@ let add_source_map sourcemap_don't_inline_content z opt_source_map =
                 ~name:(Link.source_name i j file)
                 ~contents:(Yojson.Basic.to_string (`String sm))))
 
+(* Read a file produced by the OxCaml JSIR backend ([ocamlopt -target
+   wasm_of_ocaml]): a magic number followed by a marshaled [Code.jsir_file]. *)
+let read_jsir_unit ~file ic =
+  let unit = Parse_bytecode.from_jsir_channel ~target:Code.Wasm ~filename:file ic in
+  if not (Config.Flag.portable_int ())
+  then
+    failwith
+      (Printf.sprintf
+         "%s was compiled for 63-bit integers; compiling it requires \
+          --enable=portable-int"
+         file);
+  unit
+
 let merge_shape a b = StringMap.union (fun _name _s1 _s2 -> assert false) a b
 
 let sexp_of_shapes s =
@@ -510,8 +523,14 @@ let run
             , Prim (Extern ("caml_set_static_env", None), [ Pc (String k); Pc (String v) ])
             )))
   in
-  let output (one : Parse_bytecode.one) ~unit_name ~wat_file ~file ~opt_source_map_file =
-    check_debug one;
+  let output
+      ?(check_sourcemap = true)
+      (one : Parse_bytecode.one)
+      ~unit_name
+      ~wat_file
+      ~file
+      ~opt_source_map_file =
+    if check_sourcemap then check_debug one;
     let standalone = Option.is_none unit_name in
     (* Seed the runtime environment with the --setenv bindings, so that
        lookups that are not statically evaluated still see them. As in
@@ -587,12 +606,63 @@ let run
          | Some f -> f
        in
        let ch = open_in_bin input_file in
-       let res = Parse_bytecode.from_channel ch in
+       let res =
+         if
+           List.exists [ ".cmw"; ".cmj" ] ~f:(fun ext ->
+               Filename.check_suffix input_file ext)
+         then `Jsir (read_jsir_unit ~file:input_file ch)
+         else
+           (Parse_bytecode.from_channel ch
+             :> [ `Cmo of Ocaml_compiler.Cmo_format.t
+                | `Cma of Cmo_format.library
+                | `Jsir of Parse_bytecode.jsir_unit
+                | `Exe
+                ])
+       in
        Gc.compact ();
        let include_dirs = Filename.dirname input_file :: include_dirs in
        res, ch, (fun () -> close_in ch), include_dirs
      in
      let include_cmis = toplevel && not no_cmis in
+     let compile_unit ?check_sourcemap ~unit_name ~unit_info ~cmi_files code cont =
+       Fs.with_intermediate_file (Filename.temp_file unit_name ".wasm")
+       @@ fun tmp_wasm_file ->
+       opt_with
+         Fs.with_intermediate_file
+         (if enable_source_maps
+          then Some (Filename.temp_file unit_name ".wasm.map")
+          else None)
+       @@ fun opt_tmp_map_file ->
+       let unit_data, shapes =
+         Fs.with_intermediate_file (Filename.temp_file unit_name ".wasm")
+         @@ fun input_file ->
+         opt_with
+           Fs.with_intermediate_file
+           (if enable_source_maps
+            then Some (Filename.temp_file unit_name ".wasm.map")
+            else None)
+         @@ fun opt_input_sourcemap ->
+         let fragments, shapes =
+           output
+             ?check_sourcemap
+             code
+             ~wat_file:
+               (Filename.concat (Filename.dirname output_file) (unit_name ^ ".wat"))
+             ~unit_name:(Some unit_name)
+             ~file:input_file
+             ~opt_source_map_file:opt_input_sourcemap
+         in
+         Binaryen.optimize
+           ~profile
+           ~opt_input_sourcemap
+           ~opt_output_sourcemap:opt_tmp_map_file
+           ~input_file
+           ~output_file:tmp_wasm_file
+           ();
+         { Link.unit_name; unit_info; fragments }, shapes
+       in
+       cont unit_data unit_name tmp_wasm_file opt_tmp_map_file shapes cmi_files
+     in
      let compile_cmo cmo cont =
        let t1 = Timer.make () in
        let code =
@@ -617,42 +687,25 @@ let run
        let unit_info = Unit_info.of_cmo cmo in
        let (Global_name.Compunit unit_name) = Ocaml_compiler.Cmo_format.name cmo in
        if times () then Format.eprintf "  parsing: %a (%s)@." Timer.print t1 unit_name;
-       Fs.with_intermediate_file (Filename.temp_file unit_name ".wasm")
-       @@ fun tmp_wasm_file ->
-       opt_with
-         Fs.with_intermediate_file
-         (if enable_source_maps
-          then Some (Filename.temp_file unit_name ".wasm.map")
-          else None)
-       @@ fun opt_tmp_map_file ->
-       let unit_data, shapes =
-         Fs.with_intermediate_file (Filename.temp_file unit_name ".wasm")
-         @@ fun input_file ->
-         opt_with
-           Fs.with_intermediate_file
-           (if enable_source_maps
-            then Some (Filename.temp_file unit_name ".wasm.map")
-            else None)
-         @@ fun opt_input_sourcemap ->
-         let fragments, shapes =
-           output
-             code
-             ~wat_file:
-               (Filename.concat (Filename.dirname output_file) (unit_name ^ ".wat"))
-             ~unit_name:(Some unit_name)
-             ~file:input_file
-             ~opt_source_map_file:opt_input_sourcemap
-         in
-         Binaryen.optimize
-           ~profile
-           ~opt_input_sourcemap
-           ~opt_output_sourcemap:opt_tmp_map_file
-           ~input_file
-           ~output_file:tmp_wasm_file
-           ();
-         { Link.unit_name; unit_info; fragments }, shapes
+       compile_unit ~unit_name ~unit_info ~cmi_files code cont
+     in
+     let compile_jsir (unit : Parse_bytecode.jsir_unit) cont =
+       (* CR-soon selee: the OxCaml JSIR backend does not produce any
+          debug-related information yet. This should be updated once the
+          JSIR file format changes. *)
+       let code : Parse_bytecode.one =
+         { code = unit.program
+         ; cmis = StringSet.empty
+         ; debug = Parse_bytecode.Debug.default_summary
+         }
        in
-       cont unit_data unit_name tmp_wasm_file opt_tmp_map_file shapes cmi_files
+       compile_unit
+         ~check_sourcemap:false
+         ~unit_name:unit.name
+         ~unit_info:unit.info
+         ~cmi_files:[]
+         code
+         cont
      in
      (match kind with
      | `Exe ->
@@ -770,13 +823,17 @@ let run
          Fs.gen_file output_file
          @@ fun tmp_output_file ->
          Fs.write_file ~name:tmp_output_file ~contents:js_runtime
-     | `Cmo cmo ->
+     | (`Cmo _ | `Jsir _) as kind ->
          Fs.gen_file output_file
          @@ fun tmp_output_file ->
          let z = Zip.open_out tmp_output_file in
-         let compile_cmo' z cmo =
-           compile_cmo
-             cmo
+         let compile, build_info =
+           match kind with
+           | `Cmo cmo -> compile_cmo cmo, Build_info.create `Cmo
+           | `Jsir unit -> compile_jsir unit, Build_info.create `Jsir
+         in
+         let compile' z =
+           compile
              (fun unit_data unit_name tmp_wasm_file opt_tmp_map_file shapes cmi_files ->
                Zip.add_file z ~name:"code.wasm" ~file:tmp_wasm_file;
                Zip.add_entry z ~name:"link_order" ~contents:unit_name;
@@ -790,8 +847,8 @@ let run
                    ~contents:(Marshal.to_string cmi_files []);
                unit_data)
          in
-         let unit_data = [ compile_cmo' z cmo ] in
-         Link.add_info z ~build_info:(Build_info.create `Cmo) ~unit_data ();
+         let unit_data = [ compile' z ] in
+         Link.add_info z ~build_info ~unit_data ();
          Zip.close_out z
      | `Cma cma ->
          Fs.gen_file output_file
