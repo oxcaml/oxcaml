@@ -536,6 +536,9 @@ static intnat ephe_mark (intnat budget, uintnat round,
               /* Do not short-circuit the pointer */
             } else {
               Field(ephe, i) = key = f;
+              if (Is_block (f) && Is_young (f))
+                add_to_ephe_ref_table(&domain_state->minor_tables->ephe_ref,
+                                      ephe, i);
               goto ephemeron_again;
             }
           }
@@ -543,7 +546,10 @@ static intnat ephe_mark (intnat budget, uintnat round,
         else if (Tag_val (key) == Infix_tag) {
           key -= Infix_offset_val (key);
         }
-        if (is_unmarked (key))
+        /* Young keys are not dead: they are reclaimed, and the
+           ephemeron cleaned, only by the minor GC. A young key can
+           appear here when a mutator sets it during marking. */
+        if (!Is_young (key) && is_unmarked (key))
           preserve_data = false;
       }
     }
