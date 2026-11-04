@@ -219,44 +219,6 @@ The abbreviations defined in the language are as follows:
 
 * `value_maybe_null = value_or_null separable`
 
-## Box kinds
-
-Writing `box` after a kind gives the kind of a boxed version of a type of that
-kind: `k box` classifies values that hold the same data as a type of kind `k`,
-but have a value layout. For example:
-
-```ocaml
-type t : bits8 box
-type u : (bits64 & float64) box
-type v : bits8 box box
-```
-
-No extension flag is needed. `box` binds more tightly than `&`, so
-`bits8 box & bits16` is a product whose first component is a box.
-
-Every box kind is a value layout, so every box kind is representable. The
-scannable axes of `k box` are implied by the layout of `k`:
-
-* `void box`, `bits8 box`, `bits16 box` and `untagged_immediate box` are
-  `value non_pointer`.
-* `bits32 box` and `float32 box` are `value non_pointer64`.
-* `float64 box` is `value`.
-* Boxes of other representable layouts, such as `bits64 box`, `value box`,
-  `(bits64 & float64) box` and `bits8 box box`, are `value non_float`.
-* `any box` is only `value_or_null`.
-
-Not every value has a box kind: `string` does not have kind `any box`.
-
-A box kind crosses modes like `mutable_data with (type : k)`. For example,
-`immediate box` crosses portability but not contention. Bounds written inside
-the box apply to the box:
-`(value mod portable) box` is the same kind as `value box mod portable`.
-
-Externality follows from the implied scannable axes (see
-[externality](../non-modal#externality)): `bits8 box` is `mod external_` and
-`bits32 box` is `mod external64`, but `bits64 box` and `immediate box` are
-not external.
-
 ## Implications
 
 Declaring that a kind crosses some axes implies that it also crosses others;
@@ -530,11 +492,8 @@ First we define the syntax for kinds:
 kind ::= modified-kind [ `mod` mod-bounds ] [ with-bounds ]
      |   kind `&` kind
 
-modified-kind ::= base-kind { kind-modifier }
-              |   `(` kind `)` { kind-modifier }
-
-kind-modifier ::= scannable-axis
-              |   `box`
+modified-kind ::= base-kind { scannable-axis }
+              |   `(` kind `)` { scannable-axis }
 
 base-kind ::= layout
           |   predef-kind-abbrev
