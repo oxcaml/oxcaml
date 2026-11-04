@@ -1,8 +1,8 @@
 ; Dune root for the libraries that depend on the compiler's AST, built against
 ; the installed compiler (see the top-level Makefile). The symlinks next to
-; this file point at sources vendored in external/; those under deps/ (test
-; dependencies) and under the projects' oxcaml-private/ directories (private
-; dependencies) are created by make from nix-provided sources.
+; this file point at sources vendored in external/; those under deps/ (shared
+; and test dependencies) and under the projects' oxcaml-private/ directories
+; (private dependencies) are created by make from nix-provided sources.
 
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
 (vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
@@ -19,6 +19,7 @@
  (name ppxlib-libs)
  (deps
   ocaml-compiler-libs/ocaml-compiler-libs.install
+  deps/ppx_derivers/ppx_derivers.install
   deps/sexp_type/sexp_type.install
   ppxlib/ppxlib_ast.install
   ppxlib/ppxlib.install

@@ -24,19 +24,18 @@ This may be useful for upstream maintainers to see the changes done in this repo
 2. `export PPXLIB_UPSTREAM_REV="$(git rev-parse ocaml-ppx-ppxlib/main)"`
 3. `git cherry -v "$PPXLIB_UPSTREAM_REV" "$(git subtree split --ignore-joins --prefix=external/ppxlib)"`
 
-## Private dependencies
+## Shared dependencies
 
-ppx_derivers is private to this project when it is built with
-`make ppxlib-build` or `make jsoo-build`: the top-level Makefile links its
-nix-provided sources into `oxcaml-private/`, and default.nix makes it the
-wrapped library `oxcaml_private_ppx_derivers`, installed as
-`ppxlib.private.ppx_derivers`. `src` sees the usual module name through
-`-open Oxcaml_private_ppx_derivers`. See `external/js_of_ocaml/HACKING.jst.md`.
-ppx_derivers is a registry shared between ppx frameworks, so this also means
-that derivers registered through another copy of it (a ppx_deriving plugin
-built against a user's own ppx_derivers) are not visible to this ppxlib's
-`Deriving`.
+Unlike js_of_ocaml's dependencies (see `external/js_of_ocaml/HACKING.jst.md`),
+ppx_derivers and sexp_type are not private to this project: both are shipped
+as their own public packages, built from the nix-provided sources that the
+top-level Makefile links into `external/ast-dependent-libs/deps/`.
 
-sexp_type is shared on purpose, as its own public `sexp_type` package: its
-type appears in ppxlib's interface (`Stdppx.Sexp.t`), and has to be the same
-as the one users' sexplib0 builds on.
+ppx_derivers is the registry through which ppxlib's `Deriving` and
+ppx_deriving see each other's derivers when they are linked into the same
+driver: `Ppx_derivers.deriver` is an extensible type, and each framework
+ignores the derivers it doesn't own. That only works with a single copy of it,
+so it has to be the one users' ppx_deriving builds on.
+
+sexp_type's type appears in ppxlib's interface (`Stdppx.Sexp.t`), and has to
+be the same as the one users' sexplib0 builds on.

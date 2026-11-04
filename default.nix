@@ -322,33 +322,25 @@ let
     rm -f dune-project *.opam
   '';
 
+  # ppx_derivers is not private: it is shipped as its own public package. It is
+  # the registry through which ppxlib's Deriving and ppx_deriving see each
+  # other's derivers when they are linked into the same driver, so there must
+  # be a single copy of it, the one users' ppx_deriving builds on.
   ppxDeriversSrc =
     let
       version = "1.2.1";
-      srcDune = pkgs.writeText "ppx_derivers-src-dune" ''
-        (library
-         (name oxcaml_private_ppx_derivers)
-         (public_name ppxlib.private.ppx_derivers))
-      '';
     in
-    pkgs.applyPatches {
+    pkgs.fetchFromGitHub {
       name = "ppx_derivers-${version}-source";
-      src = pkgs.fetchFromGitHub {
-        owner = "ocaml-ppx";
-        repo = "ppx_derivers";
-        tag = version;
-        hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
-      };
-      postPatch = ''
-        ${joinConsumingProject}
-        cp ${srcDune} src/dune
-      '';
+      owner = "ocaml-ppx";
+      repo = "ppx_derivers";
+      tag = version;
+      hash = "sha256-9k4rbB1G4894F95XPMQsiVgwZKJ2XcaDUaEviArHG3s=";
     };
 
-  # sexp_type has no releases; pin a commit. Unlike the other dependencies, it
-  # is shipped as its own public package: its type is part of ppxlib's
-  # interface (Stdppx.Sexp.t), and must be the same as the one users' sexplib0
-  # builds on.
+  # sexp_type has no releases; pin a commit. Like ppx_derivers, it is shipped
+  # as its own public package: its type is part of ppxlib's interface
+  # (Stdppx.Sexp.t), and must be the same as the one users' sexplib0 builds on.
   sexpTypeSrc = pkgs.applyPatches {
     name = "sexp_type-6d16004-source";
     src = pkgs.fetchFromGitHub {

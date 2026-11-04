@@ -18,8 +18,6 @@ GenShims_
 Gen_intf
 # menhirLib
 MenhirLib
-# ppx_derivers
-Ppx_derivers
 # sedlex, sedlex.utils, sedlex.ppx
 Cset
 Iso
