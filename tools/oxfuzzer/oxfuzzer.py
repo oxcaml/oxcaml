@@ -723,6 +723,7 @@ async def fuzz(
     toolchain: Toolchain,
     run_dir: Path,
     iterations: int,
+    max_failures: int | None,
     jobs: int,
     output_dir: Path,
     base_seed: int,
@@ -736,6 +737,10 @@ async def fuzz(
     async def iteration_worker() -> None:
         # Shared iterator: each seed is taken by exactly one worker.
         for seed in pending:
+            # Let in-flight cases finish and save their results, even if this
+            # takes the failure count past the limit.
+            if max_failures is not None and stats.failed >= max_failures:
+                return
             await run_case(toolchain, run_dir, seed, stats, output_dir, run_info, slots)
 
     async with asyncio.TaskGroup() as group:
@@ -771,6 +776,14 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         help="number of cases to run (default: %(default)s)",
     )
     parser.add_argument(
+        "--max-failures",
+        type=int,
+        default=None,
+        metavar="N",
+        help="stop starting cases after N failures (default: unlimited); "
+        "in-flight cases finish and may exceed the limit",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=Path,
@@ -791,11 +804,11 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         default=None,
         help="seed for the sequence of case seeds (default: random, printed)",
     )
-    # CR-soon xclerc: Add flag to limit amount of failures before the
-    # campaign is aborted, so that there are no space leaks.
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
+    if args.max_failures is not None and args.max_failures < 1:
+        parser.error("--max-failures must be at least 1")
     toolchain = Toolchain(REPOSITORY_ROOT / "_build")
     toolchain.check_dependencies()
     base_seed = (
@@ -827,6 +840,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
                 toolchain=toolchain,
                 run_dir=Path(run_dir),
                 iterations=args.iterations,
+                max_failures=args.max_failures,
                 jobs=args.jobs,
                 # CR-soon xclerc: We should instead create a temporary
                 # directory inside of args.output, so that there are no

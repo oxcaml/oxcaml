@@ -9,6 +9,14 @@ make compiler
 python3 oxfuzzer.py -o output_directory
 ```
 
+Use `--max-failures N` (a positive integer) to stop starting new cases after N
+failing cases have been saved. Each generated case counts once, regardless of
+how many compiler configurations fail. In-flight cases are allowed to finish
+and save their results rather than being cancelled, so the final failure count
+may exceed N. Omitting this option leaves the number of failures unlimited;
+`--iterations` still limits the total number of cases. The exit status remains 1
+if any case failed.
+
 Failures will be saved in `output_directory/seed-<seed>/` with the following structure:
 ```
 program.ml   the generated program
