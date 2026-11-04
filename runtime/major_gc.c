@@ -321,32 +321,6 @@ static struct {
  * the lock. */
 static caml_plat_mutex ephe_lock = CAML_PLAT_MUTEX_INITIALIZER;
 
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-/* Global (not per-domain) preparation work for ephemeron marking. */
-static void global_prepare_for_ephe_marking (int num_domains_in_stw) {
-  caml_atomic_counter_init(&ephe_round_info.num_domains_todo,
-                           num_domains_in_stw);
-  caml_atomic_counter_init(&ephe_round_info.round, 1);
-  caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
-  caml_atomic_counter_init(&num_domains_to_ephe_sweep, 0);
-  /* Will be set to the correct number when switching to
-     [Phase_sweep_ephe] */
-}
-
-/* Prepare to mark ephemerons by making all 'live' ephes become 'todo' */
-static void prepare_for_ephe_marking(caml_domain_state *domain)
-{
-  CAMLassert(domain->ephe_info->todo == (value) NULL);
-  domain->ephe_info->todo = domain->ephe_info->live;
-  domain->ephe_info->live = (value) NULL;
-  domain->ephe_info->must_sweep_ephe = 0;
-  domain->ephe_info->round = 0;
-  domain->ephe_info->cursor.todop = NULL;
-  domain->ephe_info->cursor.round = 0;
-}
-
-=======
 /* Global (not per-domain) preparation work for ephemeron marking. */
 static void global_prepare_for_ephe_marking (int num_domains_in_stw) {
   caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
@@ -378,7 +352,6 @@ static bool has_completed_last_ephe_round (caml_domain_state *domain_state)
   return (domain_state->ephe_info->round == ephe_round_info.round);
 }
 
->>>>>>> ocaml/ocaml#14733
 /* Move to the next global ephemeron round. Called whenever any domain
  * finishes marking. */
 static void ephe_next_round (void)
@@ -387,14 +360,8 @@ static void ephe_next_round (void)
 
   CAMLassert(caml_atomic_counter_value(&ephe_round_info.num_domains_done) <=
              caml_atomic_counter_value(&ephe_round_info.num_domains_todo));
-<<<<<<< OxCaml
-  (void)caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
-||||||| Upstream OCaml
-  caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
-=======
   caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
   (void)caml_atomic_counter_incr(&ephe_round_info.round);
->>>>>>> ocaml/ocaml#14733
 
   caml_plat_unlock(&ephe_lock);
 }
@@ -408,48 +375,15 @@ static void ephe_todo_list_emptied (caml_domain_state *domain_state)
      not ephemeron sweeping. */
   CAMLassert (caml_ephe_marking_ongoing());
 
-<<<<<<< OxCaml
-  /* Force next ephemeron marking round in order to avoid reasoning about
-   * whether the domain has already incremented
-   * [ephe_round_info.num_domains_done] counter. */
-  caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
-  (void)caml_atomic_counter_incr(&ephe_round_info.round);
-
-  /* Since the todo list is empty, this domain does not need to participate in
-   * further ephemeron cycles. */
-||||||| Upstream OCaml
-  /* Force next ephemeron marking round in order to avoid reasoning about
-   * whether the domain has already incremented
-   * [ephe_round_info.num_domains_done] counter. */
-  caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
-  (void)caml_atomic_counter_incr(&ephe_round_info.round);
-
-  /* Since the todo list is empty, this domain does not need to participate in
-   * further ephemeron rounds. */
-=======
   caml_plat_lock_blocking(&ephe_lock);
   if (has_completed_last_ephe_round(domain_state)) {
     /* Undo the increment to [num_domains_done] */
     (void)caml_atomic_counter_decr(&ephe_round_info.num_domains_done);
   }
->>>>>>> ocaml/ocaml#14733
   (void)caml_atomic_counter_decr(&ephe_round_info.num_domains_todo);
   CAMLassert(caml_atomic_counter_value(&ephe_round_info.num_domains_done) <=
              caml_atomic_counter_value(&ephe_round_info.num_domains_todo));
   caml_plat_unlock(&ephe_lock);
-}
-
-/* Begin ephemeron marking by making all 'live' ephes become 'todo' */
-static void begin_ephe_marking(void)
-{
-  caml_domain_state* domain = Caml_state;
-  CAMLassert(domain->ephe_info->todo == (value) NULL);
-  domain->ephe_info->todo = domain->ephe_info->live;
-  domain->ephe_info->live = (value) NULL;
-  domain->ephe_info->must_sweep_ephe = 0;
-  domain->ephe_info->round = 0;
-  domain->ephe_info->cursor.todop = NULL;
-  domain->ephe_info->cursor.round = 0;
 }
 
 /* Record that a domain finished ephemeron marking for the given
@@ -470,19 +404,6 @@ static void record_ephe_marking_done (
   /* Domain has finished marking ephemerons for the current round */
   caml_plat_lock_blocking(&ephe_lock);
   if (round == caml_atomic_counter_value(&ephe_round_info.round)) {
-<<<<<<< OxCaml
-    /* Round hasn't just advanced */
-    Caml_state->ephe_info->round = round;
-    (void)caml_atomic_counter_incr(&ephe_round_info.num_domains_done);
-    CAMLassert(caml_atomic_counter_value(&ephe_round_info.num_domains_done) <=
-               caml_atomic_counter_value(&ephe_round_info.num_domains_todo));
-||||||| Upstream OCaml
-    /* Round hasn't just advanced. */
-    Caml_state->ephe_info->round = round;
-    (void)caml_atomic_counter_incr(&ephe_round_info.num_domains_done);
-    CAMLassert(caml_atomic_counter_value(&ephe_round_info.num_domains_done) <=
-               caml_atomic_counter_value(&ephe_round_info.num_domains_todo));
-=======
     /* Round hasn't just advanced. */
     domain_state->ephe_info->round = round;
     if (domain_state->ephe_info->todo) {
@@ -490,45 +411,10 @@ static void record_ephe_marking_done (
       CAMLassert(caml_atomic_counter_value(&ephe_round_info.num_domains_done) <=
                  caml_atomic_counter_value(&ephe_round_info.num_domains_todo));
     }
->>>>>>> ocaml/ocaml#14733
   }
   caml_plat_unlock(&ephe_lock);
 }
 
-<<<<<<< OxCaml
-||||||| Upstream OCaml
-/* Global (not per-domain) preparation work for ephemeron sweeping. */
-static void global_prepare_for_ephe_sweeping (
-  int participant_count,
-  caml_domain_state** participating)
-{
-  caml_atomic_counter_init(&num_domains_to_ephe_sweep, participant_count);
-  for (int i = 0; i < participant_count; i++)
-    participating[i]->ephe_info->must_sweep_ephe = 1;
-}
-
-/* Prepare to sweep ephemerons by moving the ephemerons on the live
-   list to the todo list. This is needed since the live list may
-   contain ephemerons with unmarked keys, which need to be
-   cleaned. This code is executed exactly once per major cycle per
-   domain, using the [ephe_info->must_sweep_ephe] state as
-   a reminder. */
-static void prepare_for_ephe_sweeping(caml_domain_state *domain_state)
-{
-  domain_state->ephe_info->todo =
-    caml_ephe_list_append(
-      domain_state->ephe_info->todo,
-      domain_state->ephe_info->live);
-  domain_state->ephe_info->live = 0;
-
-  /* If the todo list is empty, then the ephemeron has no sweeping work
-   * to do. */
-  if (domain_state->ephe_info->todo == 0) {
-    (void)caml_atomic_counter_decr(&num_domains_to_ephe_sweep);
-  }
-}
-
-=======
 /* Global (not per-domain) preparation work for ephemeron sweeping. */
 static void global_prepare_for_ephe_sweeping (int participant_count)
 {
@@ -554,7 +440,6 @@ static void prepare_for_ephe_sweeping (caml_domain_state *domain_state)
   }
 }
 
->>>>>>> ocaml/ocaml#14733
 #define EPHE_MARK_DEFAULT false
 #define EPHE_MARK_FORCE_ALIVE true
 
@@ -1887,24 +1772,19 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
        orphaned in [Phase_sweep_main], so they must come from last
        cycle, so will have status [UNMARKED] now). */
     adopt_orphaned_work (caml_global_heap_state.UNMARKED);
-<<<<<<< OxCaml
-
     /* Any work incurred before the start of the marking phase prior
        to this one is definitely done by now. */
     uintnat definitely_done = total_work_incurred_at_mark_start;
     if (total_work_completed < definitely_done)
       total_work_completed = definitely_done;
     total_work_incurred_at_mark_start = total_work_incurred;
-||||||| Upstream OCaml
-=======
 
     global_prepare_for_ephe_marking(participant_count);
->>>>>>> ocaml/ocaml#14733
   }
 
   caml_domain_state* domain = Caml_state;
 
-  begin_ephe_marking();
+  prepare_for_ephe_marking(domain);
 
   CAML_EV_BEGIN(EV_MAJOR_MARK_ROOTS);
   {
@@ -1930,38 +1810,10 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
                   "Marking started, %ld entries on mark stack\n",
                   (long)domain->mark_stack->count);
 
-<<<<<<< OxCaml
-  if (domain->ephe_info->todo == (value) NULL)
-    ephe_todo_list_emptied();
-
   /* Wait until global roots are marked. It's fine if other domains are still
      marking their local roots, as long as the globals are done */
   if (atomic_load_acquire(&global_roots_scanned) != WORK_COMPLETE) {
     struct caml_opportunistic_events evs = { false, 0 };
-||||||| Upstream OCaml
-  if (domain->ephe_info->todo == (value) NULL)
-    ephe_todo_list_emptied();
-
-  /* Wait until global roots are marked before leaving the slice,
-     using the time to do some opportunistic work. Mutators can alter
-     the set of global roots, so they should not run while global
-     roots are being marked. But a domain's local roots can only be
-     changed by that domain, so it's OK for other domains to leave the
-     STW. */
-
-  if (atomic_load_acquire(&global_roots_status) != MARKED) {
-    CAML_EV_BEGIN(EV_MAJOR_MARK_OPPORTUNISTIC);
-=======
-  /* Wait until global roots are marked before leaving the slice,
-     using the time to do some opportunistic work. Mutators can alter
-     the set of global roots, so they should not run while global
-     roots are being marked. But a domain's local roots can only be
-     changed by that domain, so it's OK for other domains to leave the
-     STW. */
-
-  if (atomic_load_acquire(&global_roots_status) != MARKED) {
-    CAML_EV_BEGIN(EV_MAJOR_MARK_OPPORTUNISTIC);
->>>>>>> ocaml/ocaml#14733
     SPIN_WAIT {
       caml_opportunistic_events_add
         (&evs, caml_opportunistic_major_collection_slice(1000));
@@ -2158,19 +2010,6 @@ static void cycle_major_heap_from_stw_single(
                    "work completed: "F_U" at start of sweep\n",
                    work_completed_at_sweep_start);
   atomic_store(&caml_gc_mark_phase_requested, 0);
-<<<<<<< OxCaml
-  caml_atomic_counter_init(&ephe_round_info.num_domains_todo,
-                           num_domains_in_stw);
-  caml_atomic_counter_init(&ephe_round_info.round, 1);
-  caml_atomic_counter_init(&ephe_round_info.num_domains_done, 0);
-
-  caml_atomic_counter_init(&num_domains_to_ephe_sweep, 0);
-  /* Will be set to the correct number when switching to
-     [Phase_sweep_ephe] */
-||||||| Upstream OCaml
-  global_prepare_for_ephe_marking(num_domains_in_stw);
-=======
->>>>>>> ocaml/ocaml#14733
 
   caml_atomic_counter_init(&num_domains_to_final_update_first,
                            num_domains_in_stw);
@@ -2354,15 +2193,7 @@ static void stw_try_complete_gc_phase(
       caml_gc_phase = Phase_mark_final;
     } else if (is_complete_phase_mark_final()) {
       caml_gc_phase = Phase_sweep_ephe;
-<<<<<<< OxCaml
-      caml_atomic_counter_init(&num_domains_to_ephe_sweep, participant_count);
-      for (int i = 0; i < participant_count; i++)
-        participating[i]->ephe_info->must_sweep_ephe = 1;
-||||||| Upstream OCaml
-      global_prepare_for_ephe_sweeping(participant_count, participating);
-=======
       global_prepare_for_ephe_sweeping(participant_count);
->>>>>>> ocaml/ocaml#14733
     }
   }
 
@@ -2580,17 +2411,9 @@ mark_again:
     }
 
     /* Ephemerons */
-<<<<<<< OxCaml
-    if (caml_gc_phase != Phase_sweep_ephe) {
+    if (caml_ephe_marking_ongoing()) {
       /* Ephemeron Marking
          This work is accounted as marking work */
-||||||| Upstream OCaml
-    if (caml_gc_phase != Phase_sweep_ephe) {
-      /* Ephemeron Marking */
-=======
-    if (caml_ephe_marking_ongoing()) {
-      /* Ephemeron Marking */
->>>>>>> ocaml/ocaml#14733
       saved_ephe_round = caml_atomic_counter_value(&ephe_round_info.round);
       if (domain_state->ephe_info->todo != (value) NULL &&
           saved_ephe_round > domain_state->ephe_info->round &&
@@ -2635,55 +2458,15 @@ mark_again:
       /* Ephemeron Sweeping
          This work is accounted as sweeping work */
 
-<<<<<<< OxCaml
-      if (domain_state->ephe_info->must_sweep_ephe) {
-        /* Move the ephemerons on the live list to the todo list. This is
-           needed since the live list may contain ephemerons with unmarked
-           keys, which need to be cleaned. This code is executed exactly once
-           per major cycle per domain. */
-        domain_state->ephe_info->must_sweep_ephe = 0;
-        domain_state->ephe_info->todo =
-          caml_ephe_list_append(
-            domain_state->ephe_info->todo,
-            domain_state->ephe_info->live);
-        domain_state->ephe_info->live = 0;
-
-        /* If the todo list is empty, then the ephemeron has no sweeping work
-         * to do. */
-        if (domain_state->ephe_info->todo == 0) {
-          (void)caml_atomic_counter_decr(&num_domains_to_ephe_sweep);
-        }
-      }
-
       if (domain_state->ephe_info->todo != 0 &&
           get_major_slice_sweepwork(mode) > 0) {
-        CAMLassert (domain_state->ephe_info->must_sweep_ephe == 0);
-||||||| Upstream OCaml
-      if (domain_state->ephe_info->must_sweep_ephe) {
-        domain_state->ephe_info->must_sweep_ephe = 0;
-        prepare_for_ephe_sweeping(domain_state);
-      }
-
-      if (domain_state->ephe_info->todo != 0) {
-        CAMLassert (domain_state->ephe_info->must_sweep_ephe == 0);
-=======
-      if (domain_state->ephe_info->todo != 0) {
->>>>>>> ocaml/ocaml#14733
         /* Sweep the ephemeron todo list */
         slice_events_begin(mode, &events_begun, &counters);
         CAML_EV_BEGIN(EV_MAJOR_EPHE_SWEEP);
 
         while (domain_state->ephe_info->todo != 0 &&
-<<<<<<< OxCaml
                (budget = get_major_slice_sweepwork(mode)) > 0) {
           intnat left = ephe_sweep (domain_state, budget);
-||||||| Upstream OCaml
-               (budget = get_major_slice_work(mode)) > 0) {
-          intnat left = ephe_sweep (domain_state, budget);
-=======
-               (budget = get_major_slice_work(mode)) > 0) {
-          intnat left = ephe_sweep(domain_state, budget);
->>>>>>> ocaml/ocaml#14733
           intnat work_done = budget - left;
           ephe_sweep_work += work_done;
           commit_major_slice_sweepwork(work_done);
