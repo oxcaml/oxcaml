@@ -1,0 +1,52 @@
+(function{phantom_safe_subst.ml:31,44-64}
+ camlPhantom_safe_subst__effectful_0_2_code
+     (param/0[((module_path param/0) (location ()) (original_ident param/0)
+               (is_parameter local))]: int) : int
+ (let?
+   s/0[((module_path s/0) (location ()) (original_ident s/0)
+        (is_parameter local))]
+     camlPhantom_safe_subst__immstring_0
+   (extcall "caml_ml_output"{phantom_safe_subst.ml:31,49-64;stdlib.ml:505,21-43;stdlib.ml:387,2-47}
+     (load val (+a G:"camlStdlib__print_string_43_94" 16))
+     L:"camlPhantom_safe_subst__immstring_0" 1 1 int,int,int,int->val)) )
+
+(function{phantom_safe_subst.ml:33,36-131} camlPhantom_safe_subst__f_1_3_code
+     (q/0[((module_path q/0) (location ()) (original_ident q/0)
+           (is_parameter local))]: val
+      x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : int
+ (let region/0 (beginregion)
+   (catch
+     (let?
+       (c_pproxy/0 ()
+        unused_pair/0[((module_path unused_pair/0) (location ())
+                       (original_ident unused_pair/0) (is_parameter local))]
+          [0: c_pproxy/0; x/0])
+       (if (>s x/0 1)
+         (let
+           c/0[((module_path c/0) (location ()) (original_ident c/0)
+                (is_parameter local))]
+             (load val q/0)
+           (phantom_add_equality c_pproxy/0 c/0)
+           (let
+             param/1
+               (app{phantom_safe_subst.ml:36,17-29}
+                 G:"camlPhantom_safe_subst__effectful_0_2_code" 1 int)
+             (exit 6 c/0)))
+         (exit 6 1)))
+   with(6 region_return/0: int)
+     (let unit/0 (seq (endregion region/0) 1) region_return/0))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_safe_subst__entry
+     () : val
+ (catch
+   (let?
+     (effectful/0[((module_path effectful/0) (location ())
+                   (original_ident effectful/0) (is_parameter local))]
+        camlPhantom_safe_subst__effectful_1
+      f/0[((module_path f/0) (location ()) (original_ident f/0)
+           (is_parameter local))]
+        camlPhantom_safe_subst__f_2)
+     (exit 5 G:"camlPhantom_safe_subst"))
+ with(5 *ret*/0: val) 1) )
+

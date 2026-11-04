@@ -254,7 +254,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
        recording the variable it brings into scope. We should track the in-scope
        phantom set in the SSA graph (see [Cfg_of_ssa.make_instr]). *)
     | Cphantom_let (_var, _defining_expr, body) -> emit env c body ~tail
-    | Cname_for_debugger (var, body) ->
+    | Cnormal_var_optimised_out (var, body) ->
       (* In tail position [body] never returns here, so no naming op is emitted,
          matching [Cfg_selectgen.emit_tail]. *)
       let* r = emit env c body ~tail in

@@ -47,6 +47,11 @@ let mk_no_ocamlcfg f =
 let mk_dcfg f = ("-dcfg", Arg.Unit f, " (undocumented)")
 let mk_dssa f = ("-dssa", Arg.Unit f, " (undocumented)")
 
+let mk_dcmm_functions f =
+  ( "-dcmm-functions",
+    Arg.Unit f,
+    " Like -dcmm, but print only function definitions (no data items)" )
+
 let mk_dcfg_invariants f =
   ("-dcfg-invariants", Arg.Unit f, " Extra sanity checks on Cfg")
 
@@ -1405,6 +1410,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
   val dssa : unit -> unit
+  val dcmm_functions : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -1616,6 +1622,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
       mk_dssa F.dssa;
+      mk_dcmm_functions F.dcmm_functions;
       mk_dcfg_invariants F.dcfg_invariants;
       mk_regalloc F.regalloc;
       mk_regalloc_linscan_threshold F.regalloc_linscan_threshold;
@@ -1975,6 +1982,7 @@ module Oxcaml_options_impl = struct
   let no_ocamlcfg () = ()
   let dcfg = set' Oxcaml_flags.dump_cfg
   let dssa = set' Oxcaml_flags.dump_ssa
+  let dcmm_functions = set' Oxcaml_flags.dump_cmm_functions
   let dcfg_invariants = set' Oxcaml_flags.cfg_invariants
   let regalloc x = Oxcaml_flags.regalloc := x
 
