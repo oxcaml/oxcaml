@@ -247,6 +247,7 @@ module Flambda2 : sig
       val inline_effects_in_cmm : bool
       val cmm_safe_subst : bool
       val phantom_lets : bool
+      val cmm_normal_var_optimised_out : bool
       val max_block_size_for_projections : int option
       val max_unboxing_depth : int
       val can_inline_recursive_functions : bool
@@ -261,6 +262,7 @@ module Flambda2 : sig
       inline_effects_in_cmm : bool;
       cmm_safe_subst : bool;
       phantom_lets : bool;
+      cmm_normal_var_optimised_out : bool;
       max_block_size_for_projections : int option;
       max_unboxing_depth : int;
       can_inline_recursive_functions : bool;
@@ -276,6 +278,7 @@ module Flambda2 : sig
     val inline_effects_in_cmm : bool or_default ref
     val cmm_safe_subst : bool or_default ref
     val phantom_lets : bool or_default ref
+    val cmm_normal_var_optimised_out : bool or_default ref
     val max_block_size_for_projections : int option or_default ref
     val max_unboxing_depth : int or_default ref
     val can_inline_recursive_functions : bool or_default ref

@@ -952,13 +952,18 @@ let bind_phantom_variable env res var defining_expr =
    phantom defining expression; see [flush_phantom_binding]. *)
 (* CR mshinwell: when the wrapped expression flows into the Cmm arithmetic
    helpers (e.g. as an argument of a tagged-integer operation), the helpers
-   can rebuild the expression and drop the wrappers; see the [arith] case of
+   can rebuild the expression and drop the wrappers, or leave a
+   [Cnormal_var_optimised_out] around an expression whose value is no longer
+   that of the variable; see the [arith] case of
    tests/phantom-lets/phantom_add_equality.ml.  The helpers (and the
    [Untag] extra-info shortcut in [To_cmm_primitive]) need to preserve
-   them. *)
+   them.  Until then the annotations can be disabled with
+   -no-flambda2-expert-cmm-normal-var-optimised-out. *)
 let wrap_phantom ~phantomize ~phantom_proxies cmm_var cmm_expr free_vars =
   let cmm_expr =
-    if not phantomize
+    if
+      (not phantomize)
+      || not (Flambda_features.Expert.cmm_normal_var_optimised_out ())
     then cmm_expr
     else
       match Backend_var.With_provenance.provenance cmm_var with

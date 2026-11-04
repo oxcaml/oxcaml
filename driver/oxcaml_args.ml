@@ -889,6 +889,24 @@ let mk_flambda2_expert_phantom_lets f =
       " Generate phantom lets when -g\n     is specified%s (Flambda 2 only)"
       (format_default Flambda2.Expert.Default.phantom_lets) )
 
+let mk_flambda2_expert_cmm_normal_var_optimised_out f =
+  ( "-flambda2-expert-cmm-normal-var-optimised-out",
+    Arg.Unit f,
+    Printf.sprintf
+      " Annotate the Cmm expressions of inlined-out normal\n\
+      \     variables with Cnormal_var_optimised_out when generating\n\
+      \     phantom lets%s (Flambda 2 only)"
+      (format_default Flambda2.Expert.Default.cmm_normal_var_optimised_out) )
+
+let mk_no_flambda2_expert_cmm_normal_var_optimised_out f =
+  ( "-no-flambda2-expert-cmm-normal-var-optimised-out",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not annotate the Cmm expressions of inlined-out normal\n\
+      \     variables with Cnormal_var_optimised_out%s (Flambda 2 only)"
+      (format_not_default Flambda2.Expert.Default.cmm_normal_var_optimised_out)
+  )
+
 let mk_no_flambda2_expert_phantom_lets f =
   ( "-no-flambda2-expert-phantom-lets",
     Arg.Unit f,
@@ -1554,6 +1572,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
+  val flambda2_expert_cmm_normal_var_optimised_out : unit -> unit
+  val no_flambda2_expert_cmm_normal_var_optimised_out : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
   val flambda2_expert_max_unboxing_depth : int -> unit
   val flambda2_expert_can_inline_recursive_functions : unit -> unit
@@ -1786,6 +1806,10 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_flambda2_expert_cmm_safe_subst F.no_flambda2_expert_cmm_safe_subst;
       mk_flambda2_expert_phantom_lets F.flambda2_expert_phantom_lets;
       mk_no_flambda2_expert_phantom_lets F.no_flambda2_expert_phantom_lets;
+      mk_flambda2_expert_cmm_normal_var_optimised_out
+        F.flambda2_expert_cmm_normal_var_optimised_out;
+      mk_no_flambda2_expert_cmm_normal_var_optimised_out
+        F.no_flambda2_expert_cmm_normal_var_optimised_out;
       mk_flambda2_expert_max_block_size_for_projections
         F.flambda2_expert_max_block_size_for_projections;
       mk_flambda2_expert_max_unboxing_depth F.flambda2_expert_max_unboxing_depth;
@@ -2296,6 +2320,12 @@ module Oxcaml_options_impl = struct
   let no_flambda2_expert_cmm_safe_subst = clear Flambda2.Expert.cmm_safe_subst
   let flambda2_expert_phantom_lets = set Flambda2.Expert.phantom_lets
   let no_flambda2_expert_phantom_lets = clear Flambda2.Expert.phantom_lets
+
+  let flambda2_expert_cmm_normal_var_optimised_out =
+    set Flambda2.Expert.cmm_normal_var_optimised_out
+
+  let no_flambda2_expert_cmm_normal_var_optimised_out =
+    clear Flambda2.Expert.cmm_normal_var_optimised_out
 
   let flambda2_expert_max_block_size_for_projections size =
     Flambda2.Expert.max_block_size_for_projections :=
@@ -2820,6 +2850,8 @@ module Extra_params = struct
         set Flambda2.Expert.inline_effects_in_cmm
     | "flambda2-expert-cmm-safe-subst" -> set Flambda2.Expert.cmm_safe_subst
     | "flambda2-expert-phantom-lets" -> set Flambda2.Expert.phantom_lets
+    | "flambda2-expert-cmm-normal-var-optimised-out" ->
+        set Flambda2.Expert.cmm_normal_var_optimised_out
     | "flambda2-expert-max-unboxing-depth" ->
         set_int Flambda2.Expert.max_unboxing_depth
     | "flambda2-expert-can-inline-recursive-functions" ->

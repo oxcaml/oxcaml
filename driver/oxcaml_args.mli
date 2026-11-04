@@ -176,6 +176,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
+  val flambda2_expert_cmm_normal_var_optimised_out : unit -> unit
+  val no_flambda2_expert_cmm_normal_var_optimised_out : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
   val flambda2_expert_max_unboxing_depth : int -> unit
   val flambda2_expert_can_inline_recursive_functions : unit -> unit

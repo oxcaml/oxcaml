@@ -186,6 +186,11 @@ module Expert : sig
 
   val phantom_lets : unit -> bool
 
+  (** Whether, when phantom lets are generated, the Cmm expressions of
+      inlined-out normal variables are wrapped in [Cnormal_var_optimised_out]
+      annotations. *)
+  val cmm_normal_var_optimised_out : unit -> bool
+
   val max_unboxing_depth : unit -> int
 
   val can_inline_recursive_functions : unit -> bool

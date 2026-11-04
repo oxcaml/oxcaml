@@ -594,10 +594,16 @@ and expression =
           newly-defined previously. Such variables can then be given equalities
           to values that exist at runtime using [Cphantom_add_equality]. *)
   | Cnormal_var_optimised_out of Backend_var.Provenance.t * expression
-      (** Annotation recording that the wrapped expression's value was bound to
-          the variable described by the provenance, from which instruction
-          selection produces a naming operation. No [Backend_var.t] is involved:
-          the variable itself may no longer be bound anywhere. *)
+      (** Annotation recording that the normal variable described by the
+          provenance was bound to the wrapped expression, before its binding was
+          inlined out; instruction selection produces a naming operation from
+          it. No [Backend_var.t] is involved: the variable itself may no longer
+          be bound anywhere. Caveat: the Cmm helpers may subsequently rewrite
+          the wrapped expression (for example when it flows into tagged-integer
+          arithmetic), in which case its value is no longer that of the
+          variable; see the CR in [To_cmm_env.wrap_phantom]. These annotations
+          can be disabled with -no-flambda2-expert-cmm-normal-var-optimised-out.
+      *)
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
