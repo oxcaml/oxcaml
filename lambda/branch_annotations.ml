@@ -50,10 +50,14 @@ let with_fdo_annotation t fdo_annotation = { t with fdo_annotation }
 
 let sum_likelihoods annots = Likelihood.sum_list (List.map likelihood annots)
 
-let sum_list annots =
+(* The merged branch is taken whenever one of the given branches would be, so
+   its likelihood is the sum of theirs, and it carries all their FDO
+   counters. *)
+let sum_list_for_merge annots =
   create ~likelihood:(sum_likelihoods annots)
     ~fdo_annotation:(Fdo_annotation.union (List.map fdo_annotation annots))
 
-let add t1 t2 = sum_list [t1; t2]
-
+(* The likelihood is the sum, as for a merge, but the edge carries no FDO
+   counters: they are counted on the edges below it, and counting them here too
+   would count them twice (see [Fdo_annotation]). *)
 let sum_list_for_dispatch annots = from_likelihood (sum_likelihoods annots)
