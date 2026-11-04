@@ -33,6 +33,7 @@ type t =
   { function_ : FC.Function.t;
     body_hash : FC.Body_hash.t;
     mutable next_index : int;
+        (** For a position in the lambda body of the current function *)
     module_call_indices : int String.Tbl.t
         (** The next index of the calls that bind a module-level result, by the
             path of the binding. *)
