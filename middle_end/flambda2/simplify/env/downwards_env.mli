@@ -168,6 +168,9 @@ val inline_fdo_annotation : t -> Fdo_annotation.t -> Fdo_annotation.t
 (** See [Fdo_downwards_env.specialize_counters_of_copied_code]. *)
 val specialize_fdo_counters_of_copied_code : t -> Code.t -> Code.t
 
+(** See [Fdo_downwards_env.stub_callsite_counter]. *)
+val fdo_stub_callsite_counter : t -> Fdo_counter.t option
+
 (** See [Fdo_downwards_env.region]. *)
 val fdo_region : t -> Fdo_region_counters.Region.t option
 

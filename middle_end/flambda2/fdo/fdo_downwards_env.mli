@@ -42,12 +42,20 @@ val enter_set_of_closures : t -> inlined_debuginfo:Inlined_debuginfo.t -> t
 
 (** For the body of an inlined function. The call site's counter already carries
     the copy context of the function the call is in. *)
-val enter_inlined_apply : t -> t
+val enter_inlined_apply :
+  t -> stub:bool -> callsite_counter:Fdo_counter.t option -> t
 
-(** [t] with the copy context of [from]. *)
+(** [t] with the copy context and {!stub_callsite_counter} of [from]. *)
 val with_copy_context_of : t -> from:t -> t
 
+(** Also clears {!stub_callsite_counter}. *)
 val clear_copy_context : t -> t
+
+(** In the body of an inlined stub, the counter of the call it was inlined at
+    (already in context). The calls in a stub that have no counter of their own
+    (e.g. the call of an unboxed function wrapper to the main function) stand
+    for that call. *)
+val stub_callsite_counter : t -> Fdo_counter.t option
 
 (** The FDO counters of the code of a function of a set of closures met where
     [t] is, renamed (see [Fdo_counter.specialize]) if the set is a copy so that

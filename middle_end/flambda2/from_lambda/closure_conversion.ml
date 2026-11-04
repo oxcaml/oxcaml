@@ -2627,7 +2627,10 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
         Debuginfo.none
-        ~callsite_counter:None (* Only calls to the wrapper have counters. *)
+        ~callsite_counter:None
+          (* This call stands for the call to the wrapper: when the wrapper (a
+             stub) is inlined, it takes the counter of that call (see
+             [Fdo_downwards_env.stub_callsite_counter]). *)
         ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal

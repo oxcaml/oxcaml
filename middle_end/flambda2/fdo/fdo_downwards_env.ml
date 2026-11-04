@@ -32,24 +32,43 @@ type t =
             function is being simplified, making it a copy of the original
             definition. They do not add inlined frames to its debuginfo, which
             keeps describing the original. *)
-    region : Fdo_region_counters.Region.t option
+    region : Fdo_region_counters.Region.t option;
+    stub_callsite_counter : Fdo_counter.t option
+        (** In the body of an inlined stub, the counter of the call it was
+            inlined at. *)
   }
 
-let none = { copy_context = Inlined_debuginfo.none; region = None }
+let none =
+  { copy_context = Inlined_debuginfo.none;
+    region = None;
+    stub_callsite_counter = None
+  }
 
 let enter_set_of_closures t ~inlined_debuginfo =
   (* At most one of the two is set: see [enter_inlined_apply]. *)
   { copy_context =
       Inlined_debuginfo.merge t.copy_context ~from_apply_expr:inlined_debuginfo;
     (* Set when entering each function's body. *)
-    region = None
+    region = None;
+    stub_callsite_counter = None
   }
 
-let enter_inlined_apply t = { t with copy_context = Inlined_debuginfo.none }
+let enter_inlined_apply t ~stub ~callsite_counter =
+  { t with
+    copy_context = Inlined_debuginfo.none;
+    stub_callsite_counter = (if stub then callsite_counter else None)
+  }
 
-let with_copy_context_of t ~from = { t with copy_context = from.copy_context }
+let with_copy_context_of t ~from =
+  { t with
+    copy_context = from.copy_context;
+    stub_callsite_counter = from.stub_callsite_counter
+  }
 
-let clear_copy_context t = { t with copy_context = Inlined_debuginfo.none }
+let clear_copy_context t =
+  { t with copy_context = Inlined_debuginfo.none; stub_callsite_counter = None }
+
+let stub_callsite_counter t = t.stub_callsite_counter
 
 let specialize_counters_of_copied_code t ~inlined_debuginfo code =
   let copy_context =
