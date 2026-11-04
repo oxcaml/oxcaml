@@ -54,6 +54,8 @@ val count_variable : t -> Variable.t -> Num_occurrences.t
 
 val count_variable_normal_mode : t -> Variable.t -> Num_occurrences.t
 
+val count_variable_phantom_mode : t -> Variable.t -> Num_occurrences.t
+
 val singleton_variable : Variable.t -> Name_mode.t -> t
 
 val add_variable : t -> Variable.t -> Name_mode.t -> t

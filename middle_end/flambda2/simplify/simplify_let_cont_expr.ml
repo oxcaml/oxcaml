@@ -264,7 +264,11 @@ let decide_param_usage_recursive ~required_names ~invariant_set ~removed_aliased
     Name.Set.mem (BP.name param) required_names
     && not (Variable.Set.mem (BP.var param) removed_aliased)
   then
-    if Bound_parameter.Set.mem param invariant_set
+    (* [invariant_set] contains underlying variables rather than bound
+       parameters so that membership is insensitive to binder metadata such as
+       [Bound_parameter.needed_by_phantom_let] (which participates in
+       [Bound_parameter.compare]). *)
+    if Variable.Set.mem (BP.var param) invariant_set
     then Used_as_invariant
     else Used
   else Unused
@@ -349,9 +353,9 @@ let make_rewrite_for_recursive_continuation uacc ~cont ~is_cold
   let required_names = UA.required_names uacc in
   let removed_aliased = get_removed_aliased_params uacc cont in
   let invariant_set =
-    BP.Set.union
-      (Bound_parameters.to_set original_invariant_params)
-      (Bound_parameters.to_set
+    Variable.Set.union
+      (Bound_parameters.var_set original_invariant_params)
+      (Bound_parameters.var_set
          (EPA.extra_params invariant_extra_params_and_args))
   in
   let decide_param_usage =
@@ -487,17 +491,27 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           (fun handler -> handler.handler)
           continuation_handlers
       in
-      let expr =
-        RE.create_recursive_let_cont
-          (UA.are_rebuilding_terms uacc)
-          ~invariant_params rec_handlers ~body
-      in
       let name_occurrences =
         Continuation.Lmap.fold
           (fun _ handler name_occurrences ->
             NO.union name_occurrences
               (NO.increase_counts handler.name_occurrences_of_handler))
           continuation_handlers name_occurrences_body
+      in
+      (* The invariant parameters of the group are marked here, since they are
+         shared between the handlers. Their occurrences have already been
+         removed from the handlers' recorded name occurrences, but the
+         transitive requirement set consulted by
+         [Expr_builder.promote_params_needed_by_phantom_lets] does not depend on
+         the occurrences. *)
+      let invariant_params =
+        Expr_builder.promote_params_needed_by_phantom_lets uacc invariant_params
+          ~free_names:name_occurrences
+      in
+      let expr =
+        RE.create_recursive_let_cont
+          (UA.are_rebuilding_terms uacc)
+          ~invariant_params rec_handlers ~body
       in
       let name_occurrences =
         Continuation.Lmap.fold
@@ -693,6 +707,10 @@ let rebuild_single_non_recursive_handler ~rebuild_expr ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names_of_handler = remove_params new_phantom_params free_names in
+      let params =
+        Expr_builder.promote_params_needed_by_phantom_lets uacc params
+          ~free_names:free_names_of_handler
+      in
       (* Update the cold marker on the rebuilt handler according to the marker
          on the [let cont], so that it gets properly propagated if the
          continuation gets inlined. *)
@@ -814,6 +832,13 @@ let rebuild_single_recursive_handler ~rebuild_expr cont
       let free_names = remove_params new_phantom_params free_names in
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
+      in
+      (* Invariant parameters are not marked here: they are shared between the
+         handlers of a recursive group, so the marking happens once, at the
+         point where the whole group is rebuilt. *)
+      let variant_params =
+        Expr_builder.promote_params_needed_by_phantom_lets uacc variant_params
+          ~free_names
       in
       let cont_handler =
         RE.Continuation_handler.create
