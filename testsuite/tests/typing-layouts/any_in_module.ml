@@ -825,7 +825,6 @@ Line 4, characters 2-11:
     because of the definition of t at line 3, characters 2-12.
   But the kind of t must be representable
     because it's the type of an item in a module being projected from.
-  No .cmi file found containing k.
 |}]
 
 module F(M : S with kind_ k = value) = struct

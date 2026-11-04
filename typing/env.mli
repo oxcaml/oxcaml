@@ -318,6 +318,7 @@ type lookup_error =
         unrep_loc : Location.t;
         unrep_id : Ident.t;
         unrep_ty : type_expr;
+        unrep_env : t;
         violation : Jkind.Violation.t
       }
 

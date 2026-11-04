@@ -917,6 +917,7 @@ type lookup_error =
         unrep_loc : Location.t;
         unrep_id : Ident.t;
         unrep_ty : type_expr;
+        unrep_env : t;
         violation : Jkind.Violation.t
       }
 
@@ -1782,7 +1783,7 @@ let sorts_of_signature_items ~why env items
   loop [] items
 
 exception Unrepresentable_type of
-    Location.t * Ident.t * type_expr * Jkind.Violation.t
+    Location.t * Ident.t * type_expr * t * Jkind.Violation.t
 
 let rec find_module_address path env =
   match path with
@@ -1802,7 +1803,8 @@ and force_module_repr { inner_full_env; items } =
   | Ok repr -> repr
   | Error { item; item_desc; item_type; violation } ->
     raise
-      (Unrepresentable_type (item_desc.val_loc, item, item_type, violation))
+      (Unrepresentable_type
+         (item_desc.val_loc, item, item_type, !inner_full_env, violation))
 
 and get_module_repr mr =
   Lazy_backtrack.force force_module_repr mr
@@ -3641,13 +3643,14 @@ let may_lookup_error report_errors loc env err =
 
 let check_representable ~errors ~loc ~env address =
   match address () with
-  | exception Unrepresentable_type (unrep_loc, id, ty, violation) ->
+  | exception Unrepresentable_type (unrep_loc, id, ty, unrep_env, violation) ->
     may_lookup_error errors loc env
       (Module_projection_unrepresentable
          {
            unrep_loc;
            unrep_id = id;
            unrep_ty = ty;
+           unrep_env;
            violation
        })
   | (_ : address) -> ()
@@ -4937,7 +4940,7 @@ let check_module_path_representable ~loc path env =
 let fatal_if_unrepresentable find path env =
   match find path env with
   | address -> address
-  | exception Unrepresentable_type (_, _, _, _) ->
+  | exception Unrepresentable_type (_, _, _, _, _) ->
     (* the type checker should have already checked that the address's
        enclosing modules are representable *)
     Misc.fatal_error "expected representable type"
@@ -5727,13 +5730,13 @@ let report_lookup_error_doc loc env = function
         quoted_longident lid
         print_stage avail_stage
   | Module_projection_unrepresentable
-      { unrep_loc; unrep_id; unrep_ty; violation } ->
+      { unrep_loc; unrep_id; unrep_ty; unrep_env; violation } ->
     let sub = [
       Location.msg ~loc:unrep_loc "%a is not representable.@ %a"
         Style.inline_code (Ident.name unrep_id)
         (fun ppf v -> !report_jkind_violation_with_offender
             ~offender:(fun ppf -> !print_type_expr ppf unrep_ty)
-            env ppf v) violation
+            unrep_env ppf v) violation
     ] in
     Location.errorf ~loc ~sub
       "This path projects from a module that contains unrepresentable \
