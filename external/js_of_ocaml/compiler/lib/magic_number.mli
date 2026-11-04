@@ -32,7 +32,7 @@ val of_string : string -> t
 
 val to_string : t -> string
 
-val kind : t -> [ `Cmo | `Cma | `Cmj | `Exe | `Other of string ]
+val kind : t -> [ `Cmo | `Cma | `Jsir | `Exe | `Other of string ]
 
 val current_exe : t
 
@@ -40,7 +40,7 @@ val current_cmo : t
 
 val current_cma : t
 
-val current_cmj : t
+val current_jsir : t
 
 
-val current : [ `Cmo | `Cma | `Cmj | `Exe ] -> t
+val current : [ `Cmo | `Cma | `Jsir | `Exe ] -> t
