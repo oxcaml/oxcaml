@@ -127,15 +127,10 @@ let current_unit t = t.current_unit
 let fdo t = t.fdo
 
 let fdo_call_counter t loc =
-  Option.map
-    (fun fdo -> Fdo_instrumentation.call (Fdo_from_lambda_env.counters fdo) loc)
-    t.fdo
+  Option.map (fun fdo -> Fdo_from_lambda_env.call_counter fdo loc) t.fdo
 
 let fdo_switch_counters t switch =
-  match t.fdo with
-  | None -> Fdo_instrumentation.no_switch
-  | Some fdo ->
-    Fdo_instrumentation.switch (Fdo_from_lambda_env.counters fdo) switch
+  Option.map (fun fdo -> Fdo_from_lambda_env.switch_counters fdo switch) t.fdo
 
 let machine_width t = t.machine_width
 

@@ -52,7 +52,11 @@ val fdo_call_counter : t -> Lambda.scoped_location -> Fdo_counter.t option
     [Fdo_instrumentation.switch]). To be called once per switch, on reaching it.
 *)
 val fdo_switch_counters :
-  t -> Lambda.lambda_switch -> Fdo_instrumentation.switch
+  t ->
+  Lambda.lambda_switch ->
+  (consts:Fdo_instrumentation.Switch_counters.t
+  * blocks:Fdo_instrumentation.Switch_counters.t)
+  option
 
 val machine_width : t -> Target_system.Machine_width.t
 

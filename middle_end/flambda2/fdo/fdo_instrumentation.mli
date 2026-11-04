@@ -34,7 +34,7 @@
     on the body (whose body hash guards it), not on how the translation compiles
     it. Calls and switches that the translation introduces (e.g. bounds checks,
     or the dispatch on whether a variant is an immediate) are not in the source
-    and get no counter of their own. *)
+    and get no counters. *)
 
 type t
 
@@ -49,29 +49,22 @@ val entry_annotation : t -> Fdo_annotation.With_body_hash.t
     given location. *)
 val call : t -> Lambda.scoped_location -> Fdo_counter.t
 
-(** The counters of the arms of a switch the translation emits: by discriminant,
-    and of its default arm. *)
+(** The counters of the arms of a switch the translation emits. *)
 module Switch_counters : sig
-  type t =
-    { case : int -> Fdo_annotation.t;
-          (** A discriminant without an arm of its own goes to the default arm,
-              and gets its counters. *)
-      failaction : Fdo_annotation.t
-    }
+  type t
 
-  val none : t
+  (** The counters of the arm of the given discriminant. A discriminant without
+      an arm of its own goes to the default arm, and gets its counters. *)
+  val case : t -> int -> Fdo_annotation.t
+
+  (** The counters of the default arm. *)
+  val failaction : t -> Fdo_annotation.t
 end
 
-(** The counters of the switches a [Lambda] switch translates to: one on the
-    constant constructors, one on the tags of the blocks, and one on whether the
-    scrutinee is an immediate (whose edges carry the counters of the arms they
-    lead to). All of them share one index. *)
-type switch =
-  { consts : Switch_counters.t;
-    blocks : Switch_counters.t;
-    is_int : Switch_counters.t
-  }
-
-val no_switch : switch
-
-val switch : t -> Lambda.lambda_switch -> switch
+(** The counters of the switches a [Lambda] switch translates to: the one on the
+    constant constructors and the one on the tags of the blocks, which share one
+    index. *)
+val switch :
+  t ->
+  Lambda.lambda_switch ->
+  (consts:Switch_counters.t * blocks:Switch_counters.t)
