@@ -51,7 +51,8 @@ Line 2, characters 2-34:
 Error: The following items of "Id" require testing
        but are not bound by this structure:
          val "Id.is_valid"
-       Hint: Bind each one here alongside its tests,
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Id".
 |}]
 
@@ -114,7 +115,8 @@ Error: The following items of "Items" require testing
          val "Items.a"
          val "Items.c"
          val "Items.f"
-       Hint: Bind each one here alongside its tests,
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Items".
 |}]
 
@@ -167,10 +169,11 @@ Line 31, characters 2-38:
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The following items of "Nested" require testing
        but are not bound by this structure:
-         val "Nested.Tested.x"
-         val "Nested.Carved_out.y"
+         module "Nested.Tested" (containing "x")
+         module "Nested.Carved_out" (containing "y")
          val "Nested.Floating.x"
-       Hint: Bind each one here alongside its tests,
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Nested".
 |}]
 
@@ -195,7 +198,8 @@ Line 2, characters 2-45:
 Error: The following items of "Nested.Tested" require testing
        but are not bound by this structure:
          val "Nested.Tested.x"
-       Hint: Bind each one here alongside its tests,
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Nested.Tested".
 |}]
 
@@ -268,15 +272,15 @@ Line 31, characters 2-40:
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The following items of "Includes" require testing
        but are not bound by this structure:
-         val "Includes.Not_tested_by_default.explicitly_tested"
-         val "Includes.Not_tested_by_default.tested_by_default"
-         val "Includes.Tested_by_default.plain"
-         val "Includes.Tested_by_default.explicitly_tested"
-         val "Includes.Tested_by_default.tested_by_default"
+         module "Includes.Not_tested_by_default" (containing "explicitly_tested",
+           "tested_by_default")
+         module "Includes.Tested_by_default" (containing "plain",
+           "explicitly_tested", "tested_by_default")
          val "Includes.explicitly_tested"
          val "Includes.tested_by_default"
-         val "Includes.Uses_t.in_t"
-       Hint: Bind each one here alongside its tests,
+         module "Includes.Uses_t" (containing "in_t")
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Includes".
 |}]
 
@@ -302,7 +306,8 @@ Line 6, characters 2-40:
 Error: The following items of "Reexport" require testing
        but are not bound by this structure:
          val "Reexport.is_valid"
-       Hint: Bind each one here alongside its tests,
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Reexport".
 |}]
 
@@ -335,7 +340,8 @@ Line 14, characters 2-40:
 Error: The following items of "Functors" require testing
        but are not bound by this structure:
          module "Functors.Make"
-       Hint: Bind each one here alongside its tests,
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
        or mark it "[@@testing_not_required]" in the interface of "Functors".
 |}]
 
@@ -384,15 +390,72 @@ end = struct
   let y = 2
 end
 [%%expect{|
-Line 2, characters 14-40:
-2 |   val x : int [@@testing_required "yes"]
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute "testing_required".
-  No attribute payload was expected
-
 Line 3, characters 38-58:
 3 |   val y : int [@@testing_required] [@@testing_not_required]
                                           ^^^^^^^^^^^^^^^^^^^^
 Warning 54 [duplicated-attribute]: the "testing_not_required" attribute is used more than once
   on this expression
+|}]
+
+(* A local alias of the tested module is checked like the module. *)
+module Nested_alias = Nested.Tested
+
+module _ = struct
+  [@@@covers_required_tests_of Nested_alias]
+end
+[%%expect{|
+module Nested_alias = Nested.Tested
+Line 4, characters 2-44:
+4 |   [@@@covers_required_tests_of Nested_alias]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The following items of "Nested_alias" require testing
+       but are not bound by this structure:
+         val "Nested_alias.x"
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
+       or mark it "[@@testing_not_required]" in the interface of "Nested_alias".
+|}]
+
+(* A submodule checked by a nested structure needn't be bound by the outer
+   one, so test modules don't have to shadow the modules they test. *)
+module _ = struct
+  [@@@covers_required_tests_of Nested]
+  module _ = struct
+    [@@@covers_required_tests_of Nested.Tested]
+    let x = Nested.Tested.x
+  end
+  module Carved_out = Nested.Carved_out
+  module _ = struct
+    [@@@covers_required_tests_of Nested.Floating]
+  end
+end
+[%%expect{|
+Line 9, characters 4-49:
+9 |     [@@@covers_required_tests_of Nested.Floating]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The following items of "Nested.Floating" require testing
+       but are not bound by this structure:
+         val "Nested.Floating.x"
+       Hint: Bind each one here alongside its tests
+       (a module alias binds a whole module),
+       or mark it "[@@testing_not_required]" in the interface of "Nested.Floating".
+|}]
+
+(* The reason can be given as a payload. *)
+module Reasons : sig
+  [@@@testing_required]
+  val x : int [@@testing_not_required "Too slow to test."]
+  val y : int [@@testing_not_required 1]
+end = struct
+  let x = 1
+  let y = 2
+end
+[%%expect{|
+Line 4, characters 14-40:
+4 |   val y : int [@@testing_not_required 1]
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 47 [attribute-payload]: illegal payload for attribute "testing_not_required".
+  A string literal (the reason) or no payload was expected
+
+module Reasons : sig val x : int val y : int end
 |}]

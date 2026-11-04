@@ -1265,7 +1265,14 @@ let parse_testing_requirement_attribute attr =
   | None -> None
   | Some t ->
     mark_used attr.attr_name;
-    ignore (parse_empty_payload attr : unit option);
+    (* An optional string payload gives the reason. *)
+    begin match attr.attr_payload with
+    | PStr [] -> ()
+    | payload ->
+        if Option.is_none (string_of_payload payload) then
+          warn_payload attr.attr_loc attr.attr_name.txt
+            "A string literal (the reason) or no payload was expected"
+    end;
     Some t
 
 let parse_testing_requirement attrs =

@@ -103,8 +103,9 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Nothing_requires_testing of Path.t
-  | Missing_tests of Path.t * (Sig_component_kind.t * string) list
+  | Nothing_requires_testing of Longident.t
+  | Missing_tests of
+      Longident.t * (Sig_component_kind.t * string * string list) list
 
 
 exception Error_forward of Location.error
@@ -231,8 +232,24 @@ module Tests_check = struct
     in
     effective ~default (Env.find_module path env).md_attributes
 
+  (* Modules checked by [[@@@covers_required_tests_of]] so far. A structure
+     checking [M] needn't bind a submodule of [M] that has been checked by a
+     nested structure, e.g. [module _ = struct [@@@covers_required_tests_of
+     M.Sub] ... end]. *)
+  let checked = ref []
+
+  let rec names ~prefix items =
+    List.concat_map (function
+        | Value name | Opaque_module name -> [prefix ^ name]
+        | Module (name, items) -> names ~prefix:(prefix ^ name ^ ".") items)
+      items
+
+  let is_checked env path =
+    let path = Env.normalize_module_path None env path in
+    List.exists (Path.same path) !checked
+
   (* Bindings that are found count as uses, since they mark what is tested. *)
-  let rec missing env ~prefix items sg =
+  let rec missing env ~path ~prefix items sg =
     let env = Env.add_signature sg env in
     let has_value name =
       List.exists (function
@@ -254,24 +271,35 @@ module Tests_check = struct
     List.concat_map (function
         | Value name ->
             if has_value name then []
-            else [Sig_component_kind.Value, prefix ^ name]
+            else [Sig_component_kind.Value, prefix ^ name, []]
         | Opaque_module name ->
-            if Option.is_some (find_module name) then []
-            else [Sig_component_kind.Module, prefix ^ name]
+            if Option.is_some (find_module name)
+            || is_checked env (Pdot (path, name))
+            then []
+            else [Sig_component_kind.Module, prefix ^ name, []]
         | Module (name, items) ->
-            let sg =
+            if is_checked env (Pdot (path, name)) then []
+            else
               match find_module name with
-              | None -> []
+              | None ->
+                  [Sig_component_kind.Module, prefix ^ name,
+                   names ~prefix:"" items]
               | Some md ->
-                  match Mtype.scrape_alias env md.md_type with
-                  | Mty_signature sg -> sg
-                  | Mty_ident _ | Mty_alias _ | Mty_strengthen _
-                  | Mty_functor _ -> []
-            in
-            missing env ~prefix:(prefix ^ name ^ ".") items sg)
+                  let sg =
+                    match Mtype.scrape_alias env md.md_type with
+                    | Mty_signature sg -> sg
+                    | Mty_ident _ | Mty_alias _ | Mty_strengthen _
+                    | Mty_functor _ -> []
+                  in
+                  missing env ~path:(Pdot (path, name))
+                    ~prefix:(prefix ^ name ^ ".") items sg)
       items
 
-  let check ~loc env path sg =
+  let check ~loc env (lid : Longident.t) path sg =
+    (* Look through aliases, so that a local alias of [M] is checked like
+       [M]. *)
+    let path = Env.normalize_module_path (Some loc) env path in
+    checked := path :: !checked;
     let md = Env.find_module path env in
     let default = testing_requirement_of_path env path in
     let items =
@@ -280,12 +308,13 @@ module Tests_check = struct
       | `Opaque _ -> []
     in
     match items with
-    | [] -> Error.log_or_raise loc env (Nothing_requires_testing path)
+    | [] -> Error.log_or_raise loc env (Nothing_requires_testing lid)
     | _ :: _ ->
-        match missing env ~prefix:(Path.name path ^ ".") items sg with
+        let prefix = String.concat "." (Longident.flatten lid) ^ "." in
+        match missing env ~path ~prefix items sg with
         | [] -> ()
         | missing ->
-            Error.log_or_raise loc env (Missing_tests (path, missing))
+            Error.log_or_raise loc env (Missing_tests (lid, missing))
 end
 
 let apply_is_contained_by ~loc_md item ?modalities mode =
@@ -4511,7 +4540,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         | None | Some None -> ()
         | Some (Some lid) ->
             let path, _, _ = Env.lookup_module ~loc:lid.loc lid.txt env in
-            covered := (x.attr_loc, path) :: !covered
+            covered := (x.attr_loc, lid.txt, path) :: !covered
         end;
         let new_env =
           add_implicit_jkinds env
@@ -4555,7 +4584,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
     let (items, sg, shape_map, final_env) =
       type_struct env Shape.Map.empty sstr [] [] toplevel_sig
     in
-    List.iter (fun (loc, path) -> Tests_check.check ~loc final_env path sg)
+    List.iter (fun (loc, lid, path) ->
+        Tests_check.check ~loc final_env lid path sg)
       (List.rev !covered);
     let str = { str_items = items; str_type = sg; str_final_env = final_env } in
     str, sg, md_mode, names, Shape.str shape_map, final_env
@@ -5836,26 +5866,37 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "@[No values of %a require testing.@ \
          Mark them with %a or %a in its interface.@]"
-        (Style.as_inline_code path) p
+        (Style.as_inline_code longident) p
         Style.inline_code "[@@testing_required]"
         Style.inline_code "[@@@testing_required]"
   | Missing_tests (p, items) ->
-      let pp_item ppf (kind, name) =
-        Format_doc.fprintf ppf "%s %a"
+      let pp_inner ppf = function
+        | [] -> ()
+        | _ :: _ as inner ->
+            Format_doc.fprintf ppf "@ (containing %a)"
+              (Format_doc.pp_print_list
+                 ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf ",@ ")
+                 Style.inline_code)
+              inner
+      in
+      let pp_item ppf (kind, name, inner) =
+        Format_doc.fprintf ppf "@[<hov 2>%s %a%a@]"
           (match (kind : Sig_component_kind.t) with
            | Value -> "val"
            | _ -> Sig_component_kind.to_string kind)
           Style.inline_code name
+          pp_inner inner
       in
       Location.errorf ~loc
         "@[<v>@[The following items of %a require testing@ \
          but are not bound by this structure:@]@;<1 2>@[<v>%a@]@ \
-         @[Hint: Bind each one here alongside its tests,@ \
+         @[Hint: Bind each one here alongside its tests@ \
+         (a module alias binds a whole module),@ \
          or mark it %a in the interface of %a.@]@]"
-        (Style.as_inline_code path) p
+        (Style.as_inline_code longident) p
         (Format_doc.pp_print_list pp_item) items
         Style.inline_code "[@@testing_not_required]"
-        (Style.as_inline_code path) p
+        (Style.as_inline_code longident) p
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env
@@ -5878,6 +5919,7 @@ let () =
     )
 
 let reset ~preserve_persistent_env =
+  Tests_check.checked := [];
   Env.reset_cache ~preserve_persistent_env;
   Envaux.reset_cache ~preserve_persistent_env;
   Typetexp.TyVarEnv.reset ()
