@@ -80,7 +80,7 @@
         [0: Pfield_pproxy/1; x/3])
      (let
        (Popaque/0
-          (opaque (phantom_add_equality Pfield_pproxy/1 (load val q/1)))
+          (opaque val (phantom_add_equality Pfield_pproxy/1 (load val q/1)))
         unit/3 (seq (endregion region/3) 1))
        x/3))) )
 

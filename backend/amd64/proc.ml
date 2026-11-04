@@ -849,6 +849,7 @@ let operation_supported = function
   | Ccmpf _
   | Craise _
   | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion | Cendregion
+  | Cphantom_add_equality _
   | Ctuple_field _
   | Cdls_get
   | Ctls_get

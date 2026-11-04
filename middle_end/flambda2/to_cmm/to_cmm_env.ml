@@ -244,8 +244,7 @@ let print_inline (type a) ppf (inline : a inline) =
 let print_cmm_expr_with_free_vars ppf (cmm_expr, free_vars) =
   let open! Misc.Sexp in
   print ppf
-    [ a "expr" cmm_expr Printcmm.expression;
-      a "free_vars" free_vars FV.print ]
+    [a "expr" cmm_expr Printcmm.expression; a "free_vars" free_vars FV.print]
 
 let print_phantom_cmm ppf = function
   | None -> Format.fprintf ppf "()"
@@ -254,7 +253,7 @@ let print_phantom_cmm ppf = function
 let print_phantom_with_free_vars ppf (phantom, free_vars) =
   let open! Misc.Sexp in
   print ppf
-    [ a "expr" phantom print_phantom_cmm; a "free_vars" free_vars FV.print ]
+    [a "expr" phantom print_phantom_cmm; a "free_vars" free_vars FV.print]
 
 let print_bound_expr (type a) ppf (b : a bound_expr) =
   match b with

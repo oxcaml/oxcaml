@@ -22,10 +22,10 @@
  (+
    (+
      (invalid
-       "[]\nUnreachable code because of\ndead function slots: (g/1 \226\136\183 \240\157\149\141)\ndead value slots: (y/1 \226\136\183 \240\157\149\141(immediate))\n"
+       "[]\nUnreachable code because of\ndead function slots: (g/1 [size 2])\ndead value slots: (y/1 \226\136\183 \240\157\149\141(immediate))\n"
        L:"camlPhantom_closure__invalid_3")
      (invalid
-       "[]\nUnreachable code because of\ndead function slots: (g/1 \226\136\183 \240\157\149\141)\ndead value slots: (x/0 \226\136\183 \240\157\149\141(immediate))\n"
+       "[]\nUnreachable code because of\ndead function slots: (g/1 [size 2])\ndead value slots: (x/0 \226\136\183 \240\157\149\141(immediate))\n"
        L:"camlPhantom_closure__invalid_4"))
    -1) )
 

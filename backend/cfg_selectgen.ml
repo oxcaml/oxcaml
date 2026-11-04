@@ -247,9 +247,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cconst_int (Nativeint.to_int n, dbg)
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cnormal_var_optimised_out _
-    | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-    | Cexit _ | Cinvalid _ ->
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _
+    | Cnormal_var_optimised_out _ | Ctuple _ | Cop _ | Csequence _
+    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
       expr
 
   (* Instruction selection for conditionals *)
@@ -1023,7 +1023,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _
           | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
           | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
-          | Cpoll | Cpause ),
+          | Cpoll | Cpause | Cphantom_add_equality _ ),
           _,
           _ )
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _

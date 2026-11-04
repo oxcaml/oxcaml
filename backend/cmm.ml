@@ -935,18 +935,15 @@ let contains_debug_only_constructs expr =
     | Cop (Cphantom_add_equality _, _, _) ->
       raise Found
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
-          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
-          | Capply _ | Cextcall _ | Cload _
-          | Cstore (_, _)
-          | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
-          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
-          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
-          | Ccmpf (_, _)
-          | Craise _ | Cprobe _ | Cprobe_is_enabled _
-          | Ctuple_field (_, _) ),
+        ( ( Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi
+          | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
+          | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Cbswap _
+          | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
+          | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+          | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+          | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
+          | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+          | Cpoll | Cpause ),
           _,
           _ )
     | Clet _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _

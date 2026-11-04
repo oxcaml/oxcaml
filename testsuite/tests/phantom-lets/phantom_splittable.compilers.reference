@@ -10,7 +10,7 @@
         [0: s_pproxy/0; x/0])
      (let
        (Popaque/0
-          (opaque
+          (opaque val
             (phantom_add_equality s_pproxy/0
               (normal_var_optimised_out
                 ((module_path s/0) (location ()) (original_ident s/0)

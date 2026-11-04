@@ -97,19 +97,23 @@ let branch_is_cold (branch : Branch_annotations.t) =
   Likelihood.is_cold (Branch_annotations.likelihood branch)
   && !Oxcaml_flags.cfg_block_layout
 
+let emit_name_for_debugger_with_provenance env c ~ident provenance args =
+  emit_op_nores env c
+    (Operation.Name_for_debugger
+       { ident;
+         which_parameter =
+           Cfg_selectgen.which_parameter_of_provenance (Some provenance);
+         provenance = Some provenance;
+         regs = [||]
+       })
+    Debuginfo.none args
+
 let emit_name_for_debugger env c v args =
   match VP.provenance v with
   | None -> ()
-  | Some _ as provenance ->
-    emit_op_nores env c
-      (Operation.Name_for_debugger
-         { ident = VP.var v;
-           which_parameter =
-             Cfg_selectgen.which_parameter_of_provenance provenance;
-           provenance;
-           regs = [||]
-         })
-      Debuginfo.none args
+  | Some provenance ->
+    emit_name_for_debugger_with_provenance env c ~ident:(VP.var v) provenance
+      args
 
 let bind_let env c v args =
   let env = env_add v args env in
@@ -254,11 +258,14 @@ and emit env c (exp : Cmm.expression) ~tail : result =
        recording the variable it brings into scope. We should track the in-scope
        phantom set in the SSA graph (see [Cfg_of_ssa.make_instr]). *)
     | Cphantom_let (_var, _defining_expr, body) -> emit env c body ~tail
-    | Cnormal_var_optimised_out (var, body) ->
+    | Cnormal_var_optimised_out (provenance, body) ->
       (* In tail position [body] never returns here, so no naming op is emitted,
-         matching [Cfg_selectgen.emit_tail]. *)
+         matching [Cfg_selectgen.emit_tail]. See [Cfg_selectgen.emit_expr]
+         regarding the choice of [ident]. *)
       let* r = emit env c body ~tail in
-      emit_name_for_debugger env c var r;
+      emit_name_for_debugger_with_provenance env c
+        ~ident:(Backend_var.Provenance.original_ident provenance)
+        provenance r;
       Ok r
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
@@ -317,6 +324,12 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       let* r = emit_tuple env c args in
       finish_block env c ~dbg (continue (Raise k) r);
       Never_returns
+    | Cop (Cphantom_add_equality _, [arg], _dbg) ->
+      (* The operation is transparent: only the argument is compiled, as in
+         [Cfg_selectgen.emit_expr]. *)
+      emit env c arg ~tail
+    | Cop (Cphantom_add_equality _, ([] | _ :: _ :: _), _) ->
+      Misc.fatal_error "Cphantom_add_equality takes exactly one argument"
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) ->
       let* loc_exp = emit env c arg ~tail:false in
       let flat_size a =
