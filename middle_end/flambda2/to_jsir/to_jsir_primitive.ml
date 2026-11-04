@@ -381,7 +381,8 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let extern_name = with_int_prefix ~kind "xor" ~percent_for_imms:true in
     let x, res = prim_arg ~env ~res x in
     let minus_one =
-      Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit
+      Reg_width_const.of_int_of_kind
+        (To_jsir_target.machine_width ())
         (Flambda_kind.Standard_int.to_kind kind)
         (-1)
       |> To_jsir_shared.reg_width_const

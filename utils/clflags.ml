@@ -261,6 +261,17 @@ module Target = struct
     | Bytecode
     | Native
     | Js_of_ocaml
+    | Wasm_of_ocaml
+end
+
+module Jsir_target = struct
+  type t =
+    | Js
+    | Wasm
+
+  let program_name = function
+    | Js -> "js_of_ocaml"
+    | Wasm -> "wasm_of_ocaml"
 end
 
 let target = ref Target.Bytecode
@@ -270,12 +281,25 @@ let set_target t = target := t
 let[@inline] target_is_native () =
   match !target with
   | Native -> true
-  | Bytecode | Js_of_ocaml -> false
+  | Bytecode | Js_of_ocaml | Wasm_of_ocaml -> false
 
 let[@inline] target_is_jsir () =
   match !target with
-  | Js_of_ocaml -> true
+  | Js_of_ocaml | Wasm_of_ocaml -> true
   | Bytecode | Native -> false
+
+let jsir_target () : Jsir_target.t option =
+  match !target with
+  | Js_of_ocaml -> Some Js
+  | Wasm_of_ocaml -> Some Wasm
+  | Bytecode | Native -> None
+
+let jsir_target_exn () : Jsir_target.t =
+  match jsir_target () with
+  | Some target -> target
+  | None ->
+    Misc.fatal_error
+      "Clflags.jsir_target_exn: the target is not js_of_ocaml or wasm_of_ocaml"
 
 module Jsoo_phase = struct
   type t = All | Compile | Archive | Runtime | Link
@@ -303,19 +327,41 @@ let jsoo_opts =                         (* -jsoo-opt, -jsoo-opt-<phase> *)
     | Link -> link
 
 module Jsoo_effects = struct
-  type t = Disabled | Cps | Double_translation
+  type t = Disabled | Cps | Double_translation | Jspi | Native
 
-  let all = [Disabled; Cps; Double_translation]
+  let all = [Disabled; Cps; Double_translation; Jspi; Native]
 
   let to_string = function
     | Disabled -> "disabled"
     | Cps -> "cps"
     | Double_translation -> "double-translation"
+    | Jspi -> "jspi"
+    | Native -> "native"
 
   let of_string s = List.find_opt (fun t -> String.equal (to_string t) s) all
+
+  let supported_by (target : Jsir_target.t) =
+    match target with
+    | Js -> [Disabled; Cps; Double_translation]
+    | Wasm -> [Disabled; Cps; Jspi; Native]
+
+  let default (target : Jsir_target.t) =
+    match target with
+    | Js -> Double_translation
+    | Wasm -> Jspi
 end
 
-let jsoo_effects = ref Jsoo_effects.Double_translation (* -jsoo-effects *)
+let jsoo_effects_flag = ref (None : Jsoo_effects.t option) (* -jsoo-effects *)
+
+let set_jsoo_effects effects = jsoo_effects_flag := Some effects
+
+let jsoo_effects () =
+  match jsir_target () with
+  | None -> None
+  | Some target ->
+    match !jsoo_effects_flag with
+    | Some effects -> Some effects
+    | None -> Some (Jsoo_effects.default target)
 
 let force_slash = ref false             (* for ocamldep *)
 let clambda_checks = ref false          (* -clambda-checks *)
