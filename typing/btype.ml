@@ -1790,6 +1790,31 @@ module Jkind0 = struct
              immutable"
         }
 
+      let slice_layout =
+        Layout.Const.product [addr_layout; base Word Scannable_axes.max]
+
+      let kind_of_slice =
+        { jkind =
+            { base = Layout slice_layout;
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "(value_or_null & bits64) & word mod forkable unyielding many \
+             stateless"
+        }
+
+      let kind_of_slice_imm =
+        { jkind =
+            { base = Layout slice_layout;
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "(value_or_null & bits64) & word mod forkable unyielding many \
+             stateless immutable"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
