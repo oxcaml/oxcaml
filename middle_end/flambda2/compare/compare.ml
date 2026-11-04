@@ -447,11 +447,10 @@ and subst_apply env apply =
   let position = Apply_expr.position apply in
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
+  let callsite_counter = Apply_expr.callsite_counter apply in
   Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
-    ~return_mode dbg
-    ~callsite_counter:(Apply_expr.callsite_counter apply)
-    ~inlined ~inlining_state ~probe:None ~position ~relative_history ~args_arity
-    ~return_arity
+    ~return_mode dbg ~callsite_counter ~inlined ~inlining_state ~probe:None
+    ~position ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
 and subst_apply_cont env apply_cont =
