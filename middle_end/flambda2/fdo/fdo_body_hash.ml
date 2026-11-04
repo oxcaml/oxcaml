@@ -53,9 +53,9 @@ module H = Fdo_prehash
    - layouts and modes of terms.
 
    Every node is hashed from a tag of its own, its fields and its children, so
-   that distinct trees get distinct hashes.
+   that distinct trees get distinct hashes. *)
 
-   CR yusumez: The translation to Lambda and the names of the primitives change
+(* CR yusumez: The translation to Lambda and the names of the primitives change
    between compiler versions, so a body hash from one compiler version does not
    in general match the one from another. *)
 
@@ -119,8 +119,8 @@ let peek_or_poke (access : L.peek_or_poke) =
 (* A primitive is hashed from its constructor and the payloads that select what
    it computes: field indices and paths, block tags, globals, C functions,
    scalar operations, bounds checks and sizes of raw accesses. Modes, layouts,
-   kinds, shapes, mutability and the representation of indices and results are
-   left out. *)
+   kinds (but see below), shapes, mutability and the representation of indices
+   and results are left out. *)
 let primitive (prim : L.primitive) =
   let int = H.of_int in
   let path p = H.of_list (List.map H.of_int p) in
@@ -214,12 +214,20 @@ let primitive (prim : L.primitive) =
     | Pbytesrefs -> []
     | Pbytessets -> []
     | Pmakearray (_kind, _mutability, _mode) -> []
-    | Pmakearray_dynamic (_kind, _mode, initializer_) ->
-      [ int
+    (* The array kinds of [Pmakearray_dynamic] and [Parrayblit] are hashed
+       because their expansion (see [Lambda_to_lambda_transforms]) depends on
+       them and introduces control flow, whose counters are numbered (see
+       [Fdo_instrumentation]). *)
+    | Pmakearray_dynamic (kind, _mode, initializer_) ->
+      [ H.of_string (Printlambda.array_kind kind);
+        int
           (match initializer_ with With_initializer -> 1 | Uninitialized -> 0)
       ]
     | Pduparray (_kind, _mutability) -> []
-    | Parrayblit { src_mutability = _; dst_array_set_kind = _ } -> []
+    | Parrayblit { src_mutability = _; dst_array_set_kind } ->
+      [ H.of_string
+          (Printlambda.array_kind
+             (L.array_kind_of_array_set_kind dst_array_set_kind)) ]
     | Parraylength _kind -> []
     | Parrayrefu (_ref_kind, _index_kind, _mutability) -> []
     | Parraysetu (_set_kind, _index_kind) -> []
