@@ -47,25 +47,10 @@ open Ssa.Export
 open Ssa_reducer
 module E = DeleteEmptyLoops
 
-(* The table from the id of each [Op] to the block defining it, which the
-   analyses read through [SsaModel.op_def_find]. *)
-let compute_op_def (ssa : finished Ssa.graph) : SsaModel.op_def =
-  let tbl : SsaModel.op_def = Instruction.Id.Tbl.create 64 in
-  List.iter
-    (fun (bl : finished Block.t) ->
-      Array.iter
-        (fun (i : finished Instruction.t) ->
-          match i with
-          | Op { id; _ } -> Instruction.Id.Tbl.replace tbl id bl
-          | Push_trap _ | Pop_trap _ -> ())
-        (Block.body bl))
-    (Ssa.blocks ssa);
-  tbl
-
 (* Loop headers to bypass, mapped to the exit target their terminator should
    jump to instead. *)
 let find_deletions (ssa : finished Ssa.graph) : finished Block.t Block.Tbl.t =
-  let op_def = compute_op_def ssa in
+  let op_def = Ssa.defining_blocks ssa in
   let deletions = Block.Tbl.create 4 in
   List.iter
     (fun (header, exit_target) ->

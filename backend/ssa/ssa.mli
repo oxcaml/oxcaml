@@ -440,6 +440,12 @@ val finish_graph : under_construction graph -> finished graph
     [Cursor.finish_block], but where every block's dominators precede it. *)
 val blocks : finished graph -> finished Block.t list
 
+(** The table from the id of each [Op] of the graph to the block that defines
+    it, filled when the graph is finished. The SSA loop analyses proved in Rocq
+    read it as [SsaModel.op_def] (backend/ssa/rocq/SsaModel.v). *)
+val defining_blocks :
+  finished graph -> (finished, finished Block.t) Instruction.Id.Tbl.t
+
 module Export : sig
   module Instruction = Instruction
   module Value = Value

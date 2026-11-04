@@ -154,7 +154,7 @@ receives. Where to look:
 | `graph_dominance`, `graph_dominance_complete` | `Block.dominates` answers true exactly when every path from the entry passes through the dominator | `compute_dominators`, `Block.dominates` |
 | `graph_strict_dominators` | `Block.strict_dominators` lists distinct blocks of the graph | `Block.strict_dominators` (the walk up the immediate dominators) |
 | `graph_layout` (`control_layout`) | `Goto` arguments match the target's parameters in number and order; an omitted argument feeds a parameter no operand anywhere reads; `Switch` targets have no parameters | `check_terminator` |
-| `graph_definitions` (`op_def_correct`) | the table maps every instruction to its block | `compute_op_def` in `delete_empty_loops.ml`, shared by `bounds_check_elim.ml` |
+| `graph_definitions` (`op_def_correct`) | the table maps every instruction to its block | `check_value_invariants` in `ssa.ml`, which fills the table that `Ssa.defining_blocks` returns |
 
 Statements such as `control_edges` quantify over the type `block`
 without a membership guard. Read `block` as the reachable blocks of one
@@ -598,10 +598,11 @@ loops are in fact pairwise disjoint, since `acyclic_except` rejects a
 nested cycle, but the simulation does not need this.)
 
 The OCaml rewrite is reviewed as ordinary code. In
-`backend/ssa/loop/delete_empty_loops.ml`, `find_deletions` builds the
-table of defining blocks (`compute_op_def`: every `Op` of every block, as
+`backend/ssa/loop/delete_empty_loops.ml`, `find_deletions` takes the
+table of defining blocks from the finished graph (`Ssa.defining_blocks`,
+filled by the builder with every `Op` of every block, as
 `SsaGraphSpec.op_def_correct` requires) and calls the extracted
-`DeleteEmptyLoops.find_deletions` on the finished graph; `run` then
+`DeleteEmptyLoops.find_deletions`; `run` then
 applies an `Ssa_reducer` whose only change is `visit_terminator`: for a
 reported header, replace the terminator by
 `Continue { continuation = Goto exit_target; args = [||] }`, keeping the
@@ -737,9 +738,9 @@ is preserved with no segment skipped, and nothing about liveness is
 needed.
 
 The rewrite in `backend/ssa/loop/bounds_check_elim.ml` is the same as the
-one of section 4.7: `find_eliminations` builds the table of defining
-blocks with `Delete_empty_loops.compute_op_def` and calls the extracted
-`BoundsCheckElim.find_eliminations` on the finished graph, and `run`
+one of section 4.7: `find_eliminations` takes the table of defining
+blocks from the finished graph and calls the extracted
+`BoundsCheckElim.find_eliminations`, and `run`
 applies an `Ssa_reducer` whose only change is `visit_terminator`,
 replacing a reported block's terminator by
 `Continue { continuation = Goto target; args = [||] }`. The same checks

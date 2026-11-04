@@ -180,8 +180,8 @@ Parameter terminator : block -> Terminator.t.
 (* The table of defining blocks                                             *)
 (* ======================================================================== *)
 
-(* The table from the id of each [Op] to the block defining it, built by the
-   pass (delete_empty_loops.ml); [op_def_find] is
-   [Instruction.Id.Tbl.find_opt]. *)
+(* The table from the id of each [Op] to the block defining it, which
+   [Ssa.finish_graph] fills and [Ssa.defining_blocks] returns; [op_def_find]
+   is [Instruction.Id.Tbl.find_opt]. *)
 Parameter op_def : Type.
 Parameter op_def_find : op_def -> instr_id -> option block.

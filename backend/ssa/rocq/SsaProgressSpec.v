@@ -83,8 +83,8 @@ Definition switches_in_range (initial : state) : Prop :=
 
 (* What [Ssa.finish_graph] guarantees of the graph the pass receives, as the
    eligibility theorem needs it: [blocks] is the graph's block list, [entry]
-   its entry block and [defs] the table of defining blocks the pass builds from
-   [blocks]. One field per builder guarantee; section 2.2 of
+   its entry block and [defs] the table of defining blocks the builder fills
+   ([Ssa.defining_blocks]). One field per builder guarantee; section 2.2 of
    ROCQ-REVIEW-GUIDE.md says where to look for each in the builder. *)
 Record finished_graph (blocks : list block) (entry : block) (defs : op_def)
     : Prop :=

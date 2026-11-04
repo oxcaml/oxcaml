@@ -46,7 +46,7 @@ module E = BoundsCheckElim
 (* Blocks whose check always passes, mapped to the target of its true edge. *)
 let find_eliminations (ssa : finished Ssa.graph) : finished Block.t Block.Tbl.t
     =
-  let op_def = Delete_empty_loops.compute_op_def ssa in
+  let op_def = Ssa.defining_blocks ssa in
   let eliminations = Block.Tbl.create 4 in
   List.iter
     (fun (block, target) -> Block.Tbl.replace eliminations block target)
