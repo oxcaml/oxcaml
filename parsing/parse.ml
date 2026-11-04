@@ -212,6 +212,9 @@ let prepare_error err =
         "Syntax error: A parenthesis here can only follow %a, %a, or %a."
         Style.inline_code ".idx_imm" Style.inline_code ".idx_mut"
         Style.inline_code ".idx_atomic"
+  | Multiple_slice_rests loc ->
+      Location.errorf ~loc
+        "Syntax error: A slice pattern can have at most one rest."
 
 let () =
   Location.register_error_of_exn

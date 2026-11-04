@@ -914,6 +914,8 @@ rule token = parse
   | "["  { LBRACKET }
   | "[|" { LBRACKETBAR }
   | "[:" { LBRACKETCOLON }
+  | "[&|" { LBRACKETAMPERBAR }
+  | "[&:" { LBRACKETAMPERCOLON }
   | "[<" { LBRACKETLESS }
   | "[>" { LBRACKETGREATER }
   | "]"  { RBRACKET }

@@ -624,6 +624,11 @@ module P = struct
     | Ppat_record_unboxed_product (lpl, _cf) ->
         List.iter (iter_tuple (iter_loc_lid sub) (sub.pat sub)) lpl
     | Ppat_array (_mut, pl) -> List.iter (sub.pat sub) pl
+    | Ppat_slice (_mut, Pslice_closed pl) -> List.iter (sub.pat sub) pl
+    | Ppat_slice (_mut, Pslice_open { prefix; rest; suffix }) ->
+        List.iter (sub.pat sub) prefix;
+        Option.iter (iter_loc sub) rest;
+        List.iter (sub.pat sub) suffix
     | Ppat_or (p1, p2) -> sub.pat sub p1; sub.pat sub p2
     | Ppat_constraint (p, t, m) ->
         sub.pat sub p; Option.iter (sub.typ sub) t; sub.modes sub m;
