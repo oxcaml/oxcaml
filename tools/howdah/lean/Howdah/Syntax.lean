@@ -1,5 +1,5 @@
 inductive Constant where
-  | String (string : String)
+  | string (string : String)
   deriving Repr
 
 structure Ident where
@@ -7,25 +7,25 @@ structure Ident where
   deriving Repr
 
 inductive Path where
-  | Ident (id : Ident)
-  | Dot (nested : Path) (field : String)
+  | ident (id : Ident)
+  | dot (nested : Path) (field : String)
   deriving Repr
 
 inductive TypeExpr where
-  | Constr (path : Path)
-  | String
+  | constr (path : Path)
+  | string
   deriving Repr
 
 inductive StructuredConstant where
-  | Base (const : Constant)
-  | Block (tag : Nat) (fields : List StructuredConstant)
+  | base (const : Constant)
+  | block (tag : Nat) (fields : List StructuredConstant)
   deriving Repr
 
 inductive Lambda where
-  | Var (id : Ident)
-  | Const (const : StructuredConstant)
-  | Let (id : Ident) (value : Lambda) (body : Lambda)
-  | MakeBlock (tag : Nat) (fields : List Lambda)
+  | var (id : Ident)
+  | const (const : StructuredConstant)
+  | let (id : Ident) (value : Lambda) (body : Lambda)
+  | makeBlock (tag : Nat) (fields : List Lambda)
   deriving Repr
 
 structure RecordLabelDecl where
@@ -38,7 +38,7 @@ structure RecordTypeDecl where
   deriving Repr
 
 inductive TypeDeclDesc where
-  | Record (record : RecordTypeDecl)
+  | record (record : RecordTypeDecl)
   deriving Repr
 
 structure TypeDecl where
@@ -47,8 +47,8 @@ structure TypeDecl where
   deriving Repr
 
 inductive SignatureItem where
-  | TypeDecl (decl : TypeDecl)
-  | Value (id : Ident) (type : TypeExpr)
+  | typeDecl (decl : TypeDecl)
+  | value (id : Ident) (type : TypeExpr)
   deriving Repr
 
 structure Signature where

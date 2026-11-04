@@ -24,7 +24,7 @@ Cmt2annot.gen_annot target_filename
 
 (* Serialize a constant expression. *)
 let serialize_constant : Typedtree.constant -> Json.t = function
-  | Const_string (s, _, _) -> Json.String s |> tag "string" |> tag "String"
+  | Const_string (s, _, _) -> Json.String s |> tag "string" |> tag "string"
   | other_constant ->
     Format.asprintf "Constant not yet supported:@ %s"
       (Printpat.pretty_const other_constant)
@@ -36,13 +36,13 @@ let serialize_ident (id : Ident.t) : Json.t =
 
 (* Serialize a source-code path like [F(X).a.b.c]. *)
 let rec serialize_path ~(loc : Warnings.loc) : Path.t -> Json.t = function
-  | Pident id -> serialize_ident id |> tag "id" |> tag "Ident"
+  | Pident id -> serialize_ident id |> tag "id" |> tag "ident"
   | Pdot (nested, field) ->
     Json.Object
       [ ("nested", serialize_path ~loc nested);
         ("field", Json.String field);
       ]
-    |> tag "Dot"
+    |> tag "dot"
   | other_path ->
     Format.asprintf "Path not yet supported:@ %a:@ %a"
       Location.print_loc loc
@@ -55,13 +55,13 @@ let rec serialize_structured_constant
   | Const_base constant ->
     serialize_constant constant
     |> tag "const"
-    |> tag "Base"
+    |> tag "base"
   | Const_block (block_tag, fields) ->
     Json.Object
       [ ("tag", Json.int block_tag);
         ("fields", Json.Array (List.map serialize_structured_constant fields));
       ]
-    |> tag "Block"
+    |> tag "block"
   | other_constant ->
     Format.asprintf "Structured constant not yet supported:@ %a"
       Printlambda.structured_constant other_constant
@@ -72,24 +72,24 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
   | Lvar id ->
     serialize_ident id
     |> tag "id"
-    |> tag "Var"
+    |> tag "var"
   | Lconst constant ->
     serialize_structured_constant constant
     |> tag "const"
-    |> tag "Const"
+    |> tag "const"
   | Llet (Strict, _, id, _, value, body) ->
     Json.Object
       [ ("id", serialize_ident id);
         ("value", serialize_lambda value);
         ("body", serialize_lambda body);
       ]
-    |> tag "Let"
+    |> tag "let"
   | Lprim (Pmakeblock (block_tag, Immutable, _, Alloc_heap), fields, _) ->
     Json.Object
       [ ("tag", Json.int block_tag);
         ("fields", Json.Array (List.map serialize_lambda fields));
       ]
-    |> tag "MakeBlock"
+    |> tag "makeBlock"
   | other_lambda ->
     Format.asprintf "Lambda term not yet supported:@ %a"
       Printlambda.lambda other_lambda
@@ -100,9 +100,9 @@ let rec serialize_type_expr ~(loc : Warnings.loc) (ty : Types.type_expr) : Json.
   begin match Types.get_desc ty with
   | Tpoly (ty, []) -> serialize_type_expr ~loc ty
   | Tconstr (path, [], _) when Path.same path Predef.path_string ->
-    Json.String "String"
+    Json.String "string"
   | Tconstr (path, [], _) ->
-    serialize_path ~loc path |> tag "path" |> tag "Constr"
+    serialize_path ~loc path |> tag "path" |> tag "constr"
   | _ ->
     Format.asprintf "Type declaration not yet supported:@ %a:@ %a"
       Location.print_loc loc
@@ -126,7 +126,7 @@ let serialize_type_declaration (id : Ident.t) (decl : Types.type_declaration)
       List.map serialize_record_label_decl labels
       |> fun labels -> tag "labels" (Json.Array labels)
       |> tag "record"
-      |> tag "Record"
+      |> tag "record"
     | _ ->
       Format.asprintf "Type declaration not yet supported:@ %a:@ %a"
         Location.print_loc decl.type_loc
@@ -144,13 +144,13 @@ let serialize_signature_item : Types.signature_item -> Json.t = function
   | Sig_type (id, decl, _, Exported) ->
     serialize_type_declaration id decl
     |> tag "decl"
-    |> tag "TypeDecl"
+    |> tag "typeDecl"
   | Sig_value (id, desc, Exported) ->
     Json.Object
       [ ("id", serialize_ident id);
         ("type", serialize_type_expr ~loc:desc.val_loc desc.val_type);
       ]
-    |> tag "Value"
+    |> tag "value"
   | other_item ->
     Format.asprintf "Signature item not yet supported:@ %a"
       Printtyp.signature [other_item]
