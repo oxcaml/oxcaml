@@ -723,6 +723,8 @@ let specialize_fdo_counters_of_copied_code t code =
   Fdo_downwards_env.specialize_counters_of_copied_code t.fdo
     ~inlined_debuginfo:t.inlined_debuginfo code
 
+let fdo_stub_callsite_counter t = Fdo_downwards_env.stub_callsite_counter t.fdo
+
 let fdo_region t = Fdo_downwards_env.region t.fdo
 
 let set_fdo_region t region =
@@ -770,7 +772,9 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   in
   { t with
     inlined_debuginfo;
-    fdo = Fdo_downwards_env.enter_inlined_apply t.fdo;
+    fdo =
+      Fdo_downwards_env.enter_inlined_apply t.fdo ~stub:(Code.stub called_code)
+        ~callsite_counter:(Apply.callsite_counter apply);
     inlined_attribute_to_forward;
     inlining_state;
     inlining_history_tracker =
