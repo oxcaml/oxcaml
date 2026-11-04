@@ -5,7 +5,7 @@
 ; (private dependencies) are created by make from nix-provided sources.
 
 ; js_of_ocaml stays unvendored: recursive aliases skip vendored directories.
-(vendored_dirs deps ocaml-compiler-libs ppxlib ppxlib_jane)
+(vendored_dirs deps ppxlib ppxlib_jane)
 
 ; smoke is a separate project, built against the installed compiler package
 ; (see mkJsooSmokeTest in default.nix).
@@ -19,7 +19,6 @@
 (alias
  (name ppxlib-libs)
  (deps
-  ocaml-compiler-libs/ocaml-compiler-libs.install
   deps/ppx_derivers/ppx_derivers.install
   deps/sexp_type/sexp_type.install
   ppxlib/ppxlib_ast.install

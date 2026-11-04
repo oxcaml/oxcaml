@@ -22,7 +22,6 @@ bug-reports: "https://github.com/ocaml-ppx/ppxlib/issues"
 depends: [
   "dune" {>= "3.8"}
   "ocaml"
-  "ocaml-compiler-libs" {>= "v0.11.0"}
   "ppx_derivers" {>= "1.0"}
   "sexp_type"
   "odoc" {with-doc}

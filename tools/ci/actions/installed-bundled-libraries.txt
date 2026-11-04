@@ -26,12 +26,6 @@ js_of_ocaml-toplevel.common
 js_of_ocaml-toplevel.protocol
 js_of_ocaml-toplevel.worker
 js_of_ocaml.deriving
-ocaml-compiler-libs.bytecomp
-ocaml-compiler-libs.common
-ocaml-compiler-libs.frontend
-ocaml-compiler-libs.optcomp
-ocaml-compiler-libs.shadow
-ocaml-compiler-libs.toplevel
 ocaml-jit
 ppx_derivers
 ppxlib
@@ -47,6 +41,7 @@ ppxlib.traverse
 ppxlib.traverse_builtins
 ppxlib_ast.ast
 ppxlib_ast.astlib
+ppxlib_ast.private.compiler_libs
 ppxlib_ast.stdppx
 ppxlib_ast.traverse_builtins
 ppxlib_jane

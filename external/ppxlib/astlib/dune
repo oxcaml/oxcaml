@@ -3,8 +3,8 @@
  (public_name ppxlib_ast.astlib)
  (modules ast_414 ast_500 ast_999 ast_metadata astlib clean config keyword location longident
   longident_504 migrate_414_500 migrate_500_414 migrate_500_999 migrate_999_500 parse pprintast stdlib0)
- (libraries ocaml-compiler-libs.common compiler-libs.common)
- (flags -w -9)
+ (libraries oxcaml_private_compiler_libs compiler-libs.common)
+ (flags -w -9 -open Oxcaml_private_compiler_libs)
  (preprocess
   (action
    (run %{exe:pp/pp.exe} %{read:ast-version} %{input-file}))))

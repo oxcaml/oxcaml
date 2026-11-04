@@ -299,16 +299,8 @@ ast-dependent-libs-compiler:
 	  exit 1; }
 	@mkdir -p _build
 
-# Against the system compiler, in isolated dune roots so that ppxlib_jane's
+# Against the system compiler, in an isolated dune root so that ppxlib_jane's
 # (select ...) picks the upstream shim.
-.PHONY: ocaml-compiler-libs-build-boot
-ocaml-compiler-libs-build-boot:
-	mkdir -p _build
-	$(dune) build \
-	  --root=external/ocaml-compiler-libs \
-	  --build-dir="$(CURDIR)/_build/ocaml-compiler-libs-boot" \
-	  @install
-
 .PHONY: ppxlib-jane-build-boot
 ppxlib-jane-build-boot:
 	mkdir -p _build
@@ -318,7 +310,7 @@ ppxlib-jane-build-boot:
 	  @default
 
 .PHONY: ast-dependent-libs-build-boot
-ast-dependent-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-boot
+ast-dependent-libs-build-boot: ppxlib-jane-build-boot
 
 $(ast_dependent_libs_deps)/ppx_derivers: src_var = PPXLIB_PPX_DERIVERS_SRC
 $(ast_dependent_libs_deps)/sexp_type: src_var = PPXLIB_SEXP_TYPE_SRC
@@ -366,8 +358,7 @@ jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
 
 # The packages built by the ppxlib-libs and jsoo-libs aliases. js_of_ocaml's
 # private dependencies are installed with its packages, as sub-libraries.
-PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexp_type ppxlib_ast \
-  ppxlib ppxlib_jane
+PPXLIB_PACKAGES = ppx_derivers sexp_type ppxlib_ast ppxlib ppxlib_jane
 JSOO_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-compiler \
   wasm_of_ocaml-compiler js_of_ocaml-ppx js_of_ocaml-runtime js_of_ocaml \
   js_of_ocaml-toplevel

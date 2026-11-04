@@ -429,9 +429,9 @@ end
 [@@if oxcaml]
 
 module Hint = struct
-  type t = Ocaml_bytecomp.Instruct.optimization_hint
+  type t = Instruct.optimization_hint
 
-  let import_ccall (h : Ocaml_bytecomp.Instruct.ccall_hint) :
+  let import_ccall (h : Instruct.ccall_hint) :
       Optimization_hint.ccall option =
     match h with
     | Hint_unsafe -> Some Hint_unsafe
@@ -512,7 +512,7 @@ module Hint = struct
     | Never_specialise -> Never_specialise
     | Default_specialise -> Default_specialise
 
-  let import_closure_hint (h : Ocaml_bytecomp.Instruct.closure_hint) :
+  let import_closure_hint (h : Instruct.closure_hint) :
       Optimization_hint.closure_hint =
     { params = List.map ~f:import_value_kind h.params
     ; return = import_value_kind h.return

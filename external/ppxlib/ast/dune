@@ -5,9 +5,9 @@
 (library
  (name ppxlib_ast)
  (public_name ppxlib_ast.ast)
- (libraries astlib compiler-libs.common ocaml-compiler-libs.common ocaml-compiler-libs.shadow)
+ (libraries astlib compiler-libs.common oxcaml_private_compiler_libs)
  (flags
-  (:standard -safe-string -open Ocaml_shadow)
+  (:standard -safe-string -open Oxcaml_private_compiler_libs -open Ocaml_shadow)
   -w
   -9-27-32)
  (preprocess

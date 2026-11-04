@@ -3,8 +3,9 @@
  (public_name js_of_ocaml-compiler)
  (synopsis "Js_of_ocaml compiler library")
  (libraries
-  ocaml-compiler-libs.common
-  ocaml-compiler-libs.bytecomp
+  compiler-libs.common
+  compiler-libs.bytecomp
+  ppxlib_ast.private.compiler_libs
   oxcaml_private_menhirlib
   oxcaml_private_sedlex
   oxcaml_private_yojson)
@@ -18,7 +19,9 @@
    -open
    Oxcaml_private_sedlex
    -open
-   Oxcaml_private_yojson))
+   Oxcaml_private_yojson
+   -open
+   Oxcaml_private_compiler_libs))
  (foreign_stubs
   (language c)
   (names float32_stubs))
