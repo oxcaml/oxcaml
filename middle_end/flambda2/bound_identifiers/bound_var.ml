@@ -28,8 +28,8 @@ let print_debug_uid ppf duid =
 let [@ocamlformat "disable"] print ppf
     { var; debug_uid; name_mode = _; needed_by_phantom_let; } =
   if needed_by_phantom_let then
-    Format.fprintf ppf "%a%a" Int_ids.Variable.print_as_needed_by_phantom_let
-      var print_debug_uid debug_uid
+    Format.fprintf ppf "%a%a" Variable.print_as_needed_by_phantom_let var
+      print_debug_uid debug_uid
   else
     Format.fprintf ppf "%a%a" Variable.print var print_debug_uid debug_uid
 

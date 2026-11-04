@@ -67,7 +67,7 @@ include Container_types.Make (struct
       { param; kind; uid; needed_by_phantom_let } =
     let print_var =
       if needed_by_phantom_let
-      then Int_ids.Variable.print_as_needed_by_phantom_let
+      then Variable.print_as_needed_by_phantom_let
       else Variable.print
     in
     Format.fprintf ppf "@[(%t%a%a%t @<1>\u{2237} %a)@]"

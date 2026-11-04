@@ -1,11 +1,10 @@
 (* TEST
  flambda2;
- flags += "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets";
  (* Warning 210 is disabled because [unboxing_kind] is currently consulted
     for the return type even when no return unboxing is requested, which
     emits a spurious [Unboxing_impossible] warning here; this is to be fixed
     separately. *)
- flags += "-w -210";
+ flags += "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -w -210";
  { native with dump-simplify; check-fexpr-dump; }
 *)
 
