@@ -1356,9 +1356,12 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~return_mode:(Apply.return_mode apply)
         (DE.add_inlined_debuginfo (DA.denv dacc) (Apply.dbg apply))
         ~callsite_counter:
-          (Option.map
-             (DE.inline_fdo_counter (DA.denv dacc))
-             (Apply.callsite_counter apply))
+          (match Apply.callsite_counter apply, Apply.call_kind apply with
+          | Some counter, _ ->
+            Some (DE.inline_fdo_counter (DA.denv dacc) counter)
+          | None, (Function _ | Method _) ->
+            DE.fdo_stub_callsite_counter (DA.denv dacc)
+          | None, (C_call _ | Effect _) -> None)
         ~inlined ~inlining_state ~probe:(Apply.probe apply)
         ~position:(Apply.position apply)
         ~relative_history:
