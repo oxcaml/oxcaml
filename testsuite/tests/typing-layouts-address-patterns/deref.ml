@@ -324,7 +324,7 @@ Error: Dereference patterns do not support polymorphic record fields
        (here "poly").
 |}]
 
-(* Private types can only be pointed through by immutable references *)
+(* Private types need to respect mutability *)
 module Private : sig
   type t = private { p : string; mutable pm : string }
   type unboxed = private #{ pu : string; other : string }
@@ -362,6 +362,8 @@ Line 1, characters 18-28:
 Error: Dereference patterns do not support private types in mutable positions.
 |}]
 
+(* CR address-patterns: these should be rejected, as they allow mutating the
+   contents of private types. *)
 let private_unboxed { mu = #{ Private.pu = deref_ a; _ }; _ } = a
 [%%expect{|
 val private_unboxed : has_private -> string addr = <fun>
