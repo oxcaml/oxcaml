@@ -105,6 +105,17 @@ end
 
 type name_info = { param_projection : Param_projection.t } [@@unboxed]
 
+let update_name_info ~new_name_info prev_name_info =
+  match prev_name_info with
+  | None -> Some new_name_info
+  | Some { param_projection = _ } ->
+    (* param projection can't represent unions of projections, and neither the
+       new one or the old one is expected to be more precise.
+
+       This function is here mostly to force extensions of name_info to take
+       this into account. *)
+    Some new_name_info
+
 type t =
   { machine_width : Target_system.Machine_width.t;
     resolver : Compilation_unit.t -> serializable option;
@@ -121,7 +132,7 @@ type t =
     is_bottom : bool;
     name_info : name_info Name.Map.t
         (* [name_info] should contain entries only for true canonical elements
-           (in any name mode) *)
+           (ignoring name mode) *)
   }
 
 and serializable =
@@ -931,7 +942,9 @@ let add_alias t ~canonical_element1 ~canonical_element2 :
         let name_info = Name.Map.remove demoted_name t.name_info in
         Simple.pattern_match canonical_element
           ~name:(fun canonical ~coercion:_ ->
-            Name.Map.add canonical prev_info name_info)
+            Name.Map.update canonical
+              (update_name_info ~new_name_info:prev_info)
+              name_info)
           ~const:(fun _ -> name_info)
     in
     let t = with_aliases t ~aliases in
