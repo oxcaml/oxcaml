@@ -115,3 +115,10 @@ let[@inline] make k =
 let[@inline never] known () = make 1
 
 let[@inline never] unknown k = make k
+
+(* A function with an unboxed parameter is called through a wrapper, a stub
+   inlined at direct calls: its call to the main function is then the source
+   call, and takes its counter. *)
+let[@inline never] scale = fun (x [@unboxable]) -> x *. 2.
+
+let[@inline never] scaled x = scale (x +. 1.)

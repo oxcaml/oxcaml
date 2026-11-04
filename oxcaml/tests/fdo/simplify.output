@@ -100,3 +100,6 @@ simplify.simplify.fl:
   call: "Simplify.make.f":0@("Simplify.known":0:4633a79a:0:call):2432a021:1:call
   entry: "Simplify.known":0 "Simplify.make":0 <- "Simplify.known":0:4633a79a:0:call body_hash:4633a79a
   entry: "Simplify.unknown":0 "Simplify.make":0 <- "Simplify.unknown":0:2bf20549:0:call body_hash:2bf20549
+  entry: "Simplify.scale":0 body_hash:208a9988
+  entry: "Simplify.scaled":0 body_hash:e6999516
+  call: "Simplify.scaled":0:e6999516:0:call
