@@ -5468,7 +5468,7 @@ end = struct
 
   let set t =
     f := t;
-    Submode_error_simple_context.register t
+    Submode_error_simple_context.register ()
 end
 
 and Submode_error_simple_context : sig
@@ -5476,19 +5476,19 @@ and Submode_error_simple_context : sig
 
   val log_and_raise : Hint.pinpoint -> Error.packed -> 'a
 
-  val register : Typing_recovery_functions.t -> unit
+  val register : unit -> unit
 end = struct
   type exn += In_context of Hint.pinpoint * Error.packed
 
   let log_and_raise hint err =
     (Typing_recovery_functions.get ()).log_and_raise (In_context (hint, err))
 
-  let register (typing_recovery_functions : Typing_recovery_functions.t) =
+  let register () =
     (* We can't call this immediately upon startup because we need to wait for
        the ref in [Typing_recovery_functions] to get filled. Instead, we make
        [Typing_recovery_functions.set] call this, so that we register once it is
        filled. *)
-    typing_recovery_functions.register_recoverable (function
+    (Typing_recovery_functions.get ()).register_recoverable (function
       | In_context _ -> true
       | _ -> false)
 end
