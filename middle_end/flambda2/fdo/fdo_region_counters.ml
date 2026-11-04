@@ -87,27 +87,31 @@ let add_continuation_into t region cont =
         t.continues_into
   }
 
-type visit =
-  { visited : Region.Set.t;
-    counters : Fdo_annotation.t
-  }
+module Visit = struct
+  type t =
+    { visited : Region.Set.t;
+      counters : Fdo_annotation.t
+    }
+
+  let empty = { visited = Region.Set.empty; counters = Fdo_annotation.empty }
+end
 
 (* Regions can continue into each other in a cycle (a loop that never branches),
    hence [visited]. *)
 let counters_into t region =
-  let rec visit region ({ visited; counters } as acc) =
+  let rec visit region ({ visited; counters } as acc : Visit.t) : Visit.t =
     if Region.Set.mem region visited
     then acc
     else
       Continuation.Set.fold
         (fun cont acc -> visit (Region.Handler cont) acc)
         (continuations_of t region)
-        { visited = Region.Set.add region visited;
-          counters = Fdo_annotation.combine counters (counters_of t region)
-        }
+        ({ visited = Region.Set.add region visited;
+           counters = Fdo_annotation.combine counters (counters_of t region)
+         }
+          : Visit.t)
   in
-  (visit region { visited = Region.Set.empty; counters = Fdo_annotation.empty })
-    .counters
+  (visit region Visit.empty).counters
 
 let entry_annotation t code_id entry_annotation =
   Fdo_annotation.With_body_hash.with_annotation entry_annotation

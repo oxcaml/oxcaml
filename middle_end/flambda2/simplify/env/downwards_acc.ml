@@ -50,9 +50,9 @@ let print_lifted_cont ppf (denv, original_handlers) =
 
 let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
-        lifted_constants; flow_acc; fdo_region_counters = _; demoted_exn_handlers;
-        code_ids_to_remember;
-        code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
+        lifted_constants; flow_acc; fdo_region_counters = _;
+        demoted_exn_handlers; code_ids_to_remember; code_ids_to_never_delete;
+        code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
   Format.fprintf ppf "@[<hov 1>(\

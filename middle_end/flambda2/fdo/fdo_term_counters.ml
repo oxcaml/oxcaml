@@ -82,27 +82,22 @@ and map_handler ~apply ~switch ~code handler =
         ~is_exn_handler:(Continuation_handler.is_exn_handler handler)
         ~is_cold:(Continuation_handler.is_cold handler))
 
-let map_code_body ~f code =
-  let params_and_body =
-    Function_params_and_body.pattern_match (Code.params_and_body code)
-      ~f:(fun
-          ~return_continuation
-          ~exn_continuation
-          params
-          ~body
-          ~my_closure
-          ~is_my_closure_used:_
-          ~my_alloc_mode
-          ~my_depth
-          ~free_names_of_body:_
-        ->
-        Function_params_and_body.create ~return_continuation ~exn_continuation
-          params ~body:(f body) ~free_names_of_body:Unknown ~my_closure
-          ~my_alloc_mode ~my_depth)
-  in
-  Code.with_params_and_body ~params_and_body
-    ~free_names_of_params_and_body:(Code.free_names_of_params_and_body code)
-    ~cost_metrics:(Code.cost_metrics code) code
+let map_body ~f params_and_body =
+  Function_params_and_body.pattern_match params_and_body
+    ~f:(fun
+        ~return_continuation
+        ~exn_continuation
+        params
+        ~body
+        ~my_closure
+        ~is_my_closure_used:_
+        ~my_alloc_mode
+        ~my_depth
+        ~free_names_of_body:_
+      ->
+      Function_params_and_body.create ~return_continuation ~exn_continuation
+        params ~body:(f body) ~free_names_of_body:Unknown ~my_closure
+        ~my_alloc_mode ~my_depth)
 
 let map_counters_of_apply ~f apply =
   Apply_expr.with_callsite_counter apply
@@ -131,15 +126,15 @@ let rec map_counters_of_code ~f code =
             (Fdo_annotation.With_body_hash.annotation entry_annotation)))
       (Code.code_metadata code)
   in
-  let code =
-    map_code_body code
-      ~f:
-        (map_expr ~apply:(map_counters_of_apply ~f)
-           ~switch:(map_counters_of_switch ~f)
-           ~code:(map_counters_of_code ~f))
+  let params_and_body =
+    Code.params_and_body code
+    |> map_body
+         ~f:
+           (map_expr ~apply:(map_counters_of_apply ~f)
+              ~switch:(map_counters_of_switch ~f)
+              ~code:(map_counters_of_code ~f))
   in
-  Code.create_with_metadata
-    ~params_and_body:(Code.params_and_body code)
+  Code.create_with_metadata ~params_and_body
     ~free_names_of_params_and_body:(Code.free_names_of_params_and_body code)
     ~code_metadata
 
