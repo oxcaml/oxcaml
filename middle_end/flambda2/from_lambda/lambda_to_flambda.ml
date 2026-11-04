@@ -1787,14 +1787,14 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
         { numconsts = switch.sw_numconsts;
           consts;
           failaction;
-          counters = fdo.consts
+          counters = Option.map (fun (~consts, ~blocks:_) -> consts) fdo
         }
       in
       let block_switch : IR.switch =
         { numconsts = switch.sw_numblocks;
           consts = blocks;
           failaction;
-          counters = fdo.blocks
+          counters = Option.map (fun (~consts:_, ~blocks) -> blocks) fdo
         }
       in
       let build_switch scrutinee wrappers =
@@ -1850,7 +1850,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
                 [ 0, block_cont, condition_dbg, None, [];
                   1, const_cont, condition_dbg, None, [] ];
               failaction = None;
-              counters = fdo.is_int
+              counters =
+                None (* This switch is not in the source: it has no counters. *)
             }
           in
           let is_scrutinee_int = Ident.create_local "is_scrutinee_int" in

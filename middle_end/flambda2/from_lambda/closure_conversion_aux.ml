@@ -89,7 +89,7 @@ module IR = struct
         list;
       failaction :
         (Continuation.t * Debuginfo.t * trap_action option * simple list) option;
-      counters : Fdo_instrumentation.Switch_counters.t
+      counters : Fdo_instrumentation.Switch_counters.t option
     }
 
   let fprintf = Format.fprintf
