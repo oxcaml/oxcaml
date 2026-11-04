@@ -5187,12 +5187,12 @@ module Type_head = struct
     | Ttuple ltys -> Shape (Stuple (List.map fst ltys))
     | Tunboxed_tuple ltys -> Shape (Sunboxed_tuple (List.map fst ltys))
     | Tconstr (p, _, _) ->
-        (* Locally abstract types ([type a], GADT existentials) have no shape:
-           once out of scope they are replaced by type variables (e.g. by
-           [type_newtype]). Other abstract types, such as [M.t], keep their
-           identity, so do have one. *)
-        let is_locally_abstract = Env.is_locally_abstract p env in
-        if is_locally_abstract then Locally_abstract else Shape (Sconstr p)
+      (* Locally abstract types ([type a], GADT existentials) have no shape:
+         once out of scope they are replaced by type variables (e.g. by
+         [type_newtype]). Other abstract types, such as [M.t], keep their
+         identity, so do have one. *)
+      let is_locally_abstract = Env.is_locally_abstract p env in
+      if is_locally_abstract then Locally_abstract else Shape (Sconstr p)
     | Tobject _ -> Shape Sobject
     | Tvariant _ -> Shape Svariant
     | Tpackage pack -> Shape (Spackage pack.pack_path)
@@ -5202,14 +5202,20 @@ module Type_head = struct
     (* Not the types of values. *)
     | Tfield _ | Tnil | Tof_kind _ -> Undefined
     | Tmod _ -> Undefined
-    | Tlink _ | Tsubst _ -> assert false
+    | Tlink _ | Tsubst _ ->
+      Misc.fatal_error
+        "Ctype.Type_head.of_expanded_type: unexpected Tlink or Tsubst"
 end
 
+(* [transfer_ivar ivar t2] turns the [Tvar] [t2] into a [Tivar]
+   carrying [ivar].
+
+   Safety: [t2] must be a [Tvar]. *)
 let transfer_ivar ivar t2 =
   let name, jkind =
     match get_desc t2 with
     | Tvar { name; jkind } -> name, jkind
-    | _ -> assert false
+    | _ -> Misc.fatal_error "Ctype.transfer_ivar: expected Tvar"
   in
   set_type_desc t2 (Tivar { name; jkind; ivar })
 
