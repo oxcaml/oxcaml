@@ -4706,14 +4706,33 @@ let check_unboxable env loc ty =
     all_unboxable_types
     ()
 
-let has_ty_var_with_layout_any env ty =
-  Ctype.exists_free_variable (fun _ jkind -> Jkind.has_layout_any env jkind) ty
+(* Unlike other similar functions, we care about [any] specifically, not just
+   unrepresentable layouts. Abstract kinds should pass this check; if they did
+   not, we would report an error with an inaccurate suggestion. *)
+let has_ty_var_containing_layout_any env ty =
+  (* Look through products but not [box], since we know how to represent
+     [any box]. Basically checks representability, just not abstract kinds. *)
+  let rec needs_to_represent_any : _ Jkind.Layout.t -> bool = function
+    | Any _ -> true
+    | Addressable l -> needs_to_represent_any l
+    | Product ls -> List.exists needs_to_represent_any ls
+    | Sort _ | Box _ -> false
+  in
+  Ctype.exists_free_variable
+    (fun _ jkind ->
+       match Jkind.extract_layout env jkind with
+       | Ok l -> needs_to_represent_any l
+       | Error _ -> false)
+    ty
 
 let unexpected_layout_any_check env prim cty ty =
   if Primitive.prim_can_contain_layout_any prim ||
      prim.prim_is_layout_poly then ()
   else
-  if has_ty_var_with_layout_any env ty then
+  (* Slightly conservative: doesn't check where these types containing [any]
+     occur, meaning we might reject an ['a : any] that only appears in
+     acceptable positions. But that seems fine. *)
+  if has_ty_var_containing_layout_any env ty then
     Error.log_and_raise cty.ctyp_loc
       (Unexpected_layout_any_in_primitive(prim.prim_name))
 
@@ -4746,7 +4765,7 @@ let unexpected_layout_any_check env prim cty ty =
       See comment in [prim_has_valid_reprs] about what it could miss.
 
    3. Built-in primitives that inspect the jkind of type parameters cannot have
-      type variables with jkind [any] anywhere within their types.
+      type variables containing jkind [any] anywhere within their types.
 
       This check is here to prevent someone from writing:
 
@@ -4757,15 +4776,14 @@ let unexpected_layout_any_check env prim cty ty =
 
       [let f x = len x]
 
-      [x] here will have type ['a array] where the jkind of ['a] is [any]. The
-      array kind function in [typeopt] will look at ['a] expecting it to be
-      representable and fail. This produces a bad error message that doesn't
-      point to the source of the mistake which is, in fact, the external
-      declaration.
+      [x] here will have type ['a array] where the jkind of ['a] is [any].
+      Specialization of the length primitive requires this be representable, and
+      will generate code based on the default, [value]. This disagrees with the
+      type of [f], which will still contain [any].
 
-      For this reason, we have [unexpected_layout_any_check].  It's here to
-      point out this type of mistake early and suggest the use of
-      [@layout_poly].
+      [unexpected_layout_any_check] rules this out by rejecting the external
+      declaration and suggesting [@layout_poly], which instead picks a sort
+      for ['a] at each use during type checking (not just during transl).
 
       An exception is raised if any of these checks fails. *)
 (* CR layouts v7.1: additionally, we do not allow externals to have unboxed
@@ -4937,7 +4955,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         Builtin_attributes.has_layout_poly valdecl.pval_attributes
       in
       if is_layout_poly &&
-         not (has_ty_var_with_layout_any env ty) then
+         not (has_ty_var_containing_layout_any env ty) then
         Error.log_and_raise valdecl.pval_type.ptyp_loc Useless_layout_poly;
       let native_repr_args, native_repr_res =
         parse_native_repr_attributes
