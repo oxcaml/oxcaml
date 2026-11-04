@@ -87,25 +87,24 @@ val new_block_with_addr_exn :
     argument. This function raises if there are no blocks being worked on. *)
 val end_block_with_last_exn : t -> Jsir.last -> t
 
-(** Returns the address for a special block for invalid switches, creating one
-    if it doesn't exist already. *)
-val invalid_switch_block : t -> t * Jsir.Addr.t
+(** Create a block for the invalid arms of a switch, which raises. As it defines
+    a variable, it must only be used within one function. *)
+val new_invalid_switch_block : t -> t * Jsir.Addr.t
 
-(** Get a public method and return the function. Increments the method cache ID.
-*)
+(** Get a public method and return the function. *)
 val get_public_method :
   t -> obj:Jsir.Var.t -> field:Jsir.Var.t -> t * Jsir.Var.t
 
 (** Register the fact that we import the given compilation unit (either its
-    toplevel module from the JSOO global data table or one of its symbols from
-    the symbol table). This is used to inform Js_of_ocaml that the compilation
-    unit must be linked before this one. *)
+    toplevel module, with [caml_get_global], or one of its symbols from the
+    symbol table). This is used to inform Js_of_ocaml that the compilation unit
+    must be linked before this one. *)
 val import_compilation_unit : t -> Compilation_unit.t -> t
 
 (** Register [var] as the value of [symbol] in the global symbol table, so that
     other compilation units can fetch it. Does nothing for symbols that no other
     unit can refer to (those not in [reachable_names]), nor for module symbols,
-    which are fetched from the JSOO global data instead. *)
+    which are fetched with [caml_get_global] instead. *)
 val register_symbol : t -> Symbol.t -> Jsir.Var.t -> t
 
 (** The variable holding the value of [symbol], which must be from another

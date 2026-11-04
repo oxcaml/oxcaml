@@ -24,7 +24,7 @@ Entry point: 0
   v39 = "caml_register_symbol"("Events"j, "camlEvents__raise_e_8"j, v35) 
   v41 = CONST{1}
   event events.ml:36:17
-  v42 = v9(v41)
+  v42 = v9!(v41)
   event events.ml:36:26
   branch 10 (v42)
 
@@ -75,7 +75,7 @@ Entry point: 0
   v45 = fun(v44){12 ()} [hint:(int)->int]
   v48 = CONST{2}
   event events.ml:37:17
-  v49 = v17(v45, v48)
+  v49 = v17!(v45, v48)
   event events.ml:37:46
   branch 11 (v49)
 
@@ -83,7 +83,7 @@ Entry point: 0
   v52 = fun(v51){14 ()} [hint:(int)->int]
   v55 = CONST{3}
   event events.ml:38:17
-  v56 = v25(v52, v55)
+  v56 = v25!(v52, v55)
   event events.ml:38:42
   branch 13 (v56)
 
@@ -95,7 +95,7 @@ Entry point: 0
 ==== 13 (v50) ====
   v58 = CONST{0}
   event events.ml:39:17
-  v59 = v30(v58)
+  v59 = v30!(v58)
   event events.ml:39:28
   branch 15 (v59)
 
@@ -107,7 +107,7 @@ Entry point: 0
 ==== 15 (v57) ====
   v61 = CONST{4}
   event events.ml:40:17
-  v62 = v35(v61)
+  v62 = v35!(v61)
   event events.ml:40:28
   branch 16 (v62)
 
