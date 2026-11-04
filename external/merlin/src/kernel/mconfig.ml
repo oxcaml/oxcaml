@@ -14,6 +14,7 @@ type ocaml =
     real_paths : bool;
     threads : [ `None | `Threads | `Vmthreads ];
     recursive_types : bool;
+    no_crc : bool;
     strict_sequence : bool;
     applicative_functors : bool;
     nopervasives : bool;
@@ -52,6 +53,7 @@ let dump_ocaml x =
       ("principal", `Bool x.principal);
       ("real_paths", `Bool x.real_paths);
       ("recursive_types", `Bool x.recursive_types);
+      ("no_crc", `Bool x.no_crc);
       ("strict_sequence", `Bool x.strict_sequence);
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
@@ -1006,6 +1008,9 @@ let ocaml_flags =
     ( "-rectypes",
       Marg.unit (fun ocaml -> { ocaml with recursive_types = true }),
       " Allow arbitrary recursive types" );
+    ( "-no-crc",
+      Marg.unit (fun ocaml -> { ocaml with no_crc = true }),
+      " Accept interfaces compiled with -no-crc and skip CRC checks" );
     ( "-strict-sequence",
       Marg.unit (fun ocaml -> { ocaml with strict_sequence = true }),
       " Left-hand part of a sequence must have type unit" );
@@ -1141,6 +1146,7 @@ let initial =
         real_paths = true;
         threads = `None;
         recursive_types = false;
+        no_crc = false;
         strict_sequence = false;
         applicative_functors = true;
         nopervasives = false;

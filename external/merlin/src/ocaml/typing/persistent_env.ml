@@ -398,53 +398,6 @@ let acknowledge_import penv ~check modname pers_sig =
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
-<<<<<<< Merlin:no-consistency-check-v2
-||||||| Compiler:last-imported
-  if not (CU.Name.equal modname found_name) then
-    error (Illegal_renaming(modname, found_name, filename));
-  List.iter
-    (function
-        | Rectypes ->
-            if not !Clflags.recursive_types then
-              error (Need_recursive_types(modname))
-        | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
-  begin match kind, Current_unit.get_cu () with
-  | Normal { cmi_impl = imported_unit }, Some current_unit ->
-      let access_allowed =
-        CU.can_access_by_name imported_unit ~accessed_by:current_unit
-      in
-      if not access_allowed then
-        let prefix = CU.for_pack_prefix current_unit in
-        error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
-  | _, _ -> ()
-  end;
-=======
-  if not (CU.Name.equal modname found_name) then
-    error (Illegal_renaming(modname, found_name, filename));
-  List.iter
-    (function
-        | Rectypes ->
-            if not !Clflags.recursive_types then
-              error (Need_recursive_types(modname))
-        | Alerts _ -> ()
-        | No_crc ->
-            if not !Clflags.no_crc then
-              error (Need_no_crc (modname, filename))
-        | Opaque -> register_import_as_opaque penv modname)
-    flags;
-  begin match kind, Current_unit.get_cu () with
-  | Normal { cmi_impl = imported_unit }, Some current_unit ->
-      let access_allowed =
-        CU.can_access_by_name imported_unit ~accessed_by:current_unit
-      in
-      if not access_allowed then
-        let prefix = CU.for_pack_prefix current_unit in
-        error (Direct_reference_from_wrong_package (imported_unit, filename, prefix));
-  | _, _ -> ()
-  end;
->>>>>>> Compiler:HEAD
   let is_param =
     match kind with
     | Normal _ -> false
@@ -491,6 +444,9 @@ let acknowledge_import penv ~check modname pers_sig =
             if not !Clflags.recursive_types then
               error (Need_recursive_types(modname))
         | Alerts _ -> ()
+        | No_crc ->
+            if not !Clflags.no_crc then
+              error (Need_no_crc (modname, filename))
         | Opaque -> register_import_as_opaque penv modname)
     flags;
   begin match kind, Current_unit.get_cu () with
