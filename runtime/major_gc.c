@@ -683,8 +683,19 @@ void caml_orphan_ephemerons (caml_domain_state* domain_state)
       ephe_info->live == 0)
     return;
 
-<<<<<<< OxCaml
   if (caml_ephe_marking_ongoing()) {
+    /* Mark all ephemerons on live list.
+       (ephe_mark() may move unmarked ephemerons to the live list if
+        their data is none or immediate.)
+       The orphan list may only contain marked ephemerons: see the
+       invariant comment in [adopt_orphaned_work]. */
+    for (value v = ephe_info->live; v != 0; v = Ephe_link(v)) {
+      if (is_unmarked(v)) {
+        /* This can only happen when the data is trivial. */
+        CAMLassert(Ephe_data(v) == caml_ephe_none || Is_long(Ephe_data(v)));
+        caml_darken(domain_state, v, 0);
+      }
+    }
     if (ephe_info->todo) {
       /* Force all ephemerons and their data on todo list to be alive */
       while (ephe_info->todo) {
@@ -703,29 +714,6 @@ void caml_orphan_ephemerons (caml_domain_state* domain_state)
         commit_major_slice_sweepwork(budget - leftover);
       }
       (void)caml_atomic_counter_decr(&num_domains_to_ephe_sweep);
-||||||| Upstream OCaml
-  /* Force all ephemerons and their data on todo list to be alive */
-  if (ephe_info->todo) {
-    while (ephe_info->todo) {
-      ephe_mark (100000, 0, EPHE_MARK_FORCE_ALIVE);
-=======
-  /* Mark all ephemerons on live list.
-     (ephe_mark() may move unmarked ephemerons to the live list if
-      their data is none or immediate.)
-     See Note [invariants on orphaned ephemerons]. */
-  for (value v = ephe_info->live; v != 0; v = Ephe_link(v)) {
-    if (is_unmarked(v)) {
-      /* This can only happen when the data is trivial. */
-      CAMLassert(Ephe_data(v) == caml_ephe_none || Is_long(Ephe_data(v)));
-      caml_darken(domain_state, v, 0);
-    }
-  }
-
-  /* Force all ephemerons and their data on todo list to be alive */
-  if (ephe_info->todo) {
-    while (ephe_info->todo) {
-      ephe_mark (100000, 0, EPHE_MARK_FORCE_ALIVE);
->>>>>>> ocaml/ocaml#14722
     }
   } else {
     /* other phases do not use a ephemeron todo-list */
@@ -1874,25 +1862,12 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
       diffmod (atomic_load (&total_work_completed), work_completed_at_sweep_start);
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
 
-<<<<<<< OxCaml
     /* Any work incurred before the start of the marking phase prior
        to this one is definitely done by now. */
     uintnat definitely_done = total_work_incurred_at_mark_start;
     if (total_work_completed < definitely_done)
       total_work_completed = definitely_done;
     total_work_incurred_at_mark_start = total_work_incurred;
-||||||| Upstream OCaml
-    /* Adopt orphaned work from domains that were spawned and terminated in the
-       previous cycle. There must be no orphaned work remaining when this phase
-       change takes place because orphaned work contains roots.
-=======
-    /* Note [invariants on orphaned ephemerons].
-
-       Here we adopt orphaned work from domains that were spawned and
-       terminated in the previous cycle. There must be no orphaned
-       work remaining when this phase change takes place because
-       orphaned work contains roots.
->>>>>>> ocaml/ocaml#14722
 
     global_prepare_for_ephe_marking(participant_count);
   }
