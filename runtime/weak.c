@@ -1,5 +1,3 @@
-/* CR mshinwell: Reverted to 5.x version, need to check conflicts */
-
 /**************************************************************************/
 /*                                                                        */
 /*                                 OCaml                                  */
