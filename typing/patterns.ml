@@ -103,6 +103,13 @@ module General = struct
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
+    | `Deref of
+        Ident.t
+        * string loc
+        * Uid.t
+        * Jkind.Sort.t
+        * Mode.With_regionality.l
+        * Types.type_expr
   ]
   type pattern = view pattern_data
 
@@ -138,6 +145,8 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
+    | Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty } ->
+       `Deref (id, str, uid, sort, mode, ty)
     | Tpat_lazy p -> `Lazy p
 
   let view p : pattern =
@@ -169,6 +178,8 @@ module General = struct
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
+    | `Deref (id, str, uid, sort, mode, ty) ->
+       Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty }
     | `Lazy p -> Tpat_lazy p
 
   let erase p : Typedtree.pattern =
@@ -177,7 +188,7 @@ module General = struct
   let rec strip_vars (p : pattern) : Half_simple.pattern =
     match p.pat_desc with
     | `Alias (p, _, _, _, _, _, _) -> strip_vars (view p)
-    | `Var _ | `Fun_layout _ -> { p with pat_desc = `Any }
+    | `Var _ | `Fun_layout _ | `Deref _ -> { p with pat_desc = `Any }
     | #Half_simple.view as view -> { p with pat_desc = view }
 end
 

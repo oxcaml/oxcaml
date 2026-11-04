@@ -88,6 +88,13 @@ module General : sig
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
+    | `Deref of
+        Ident.t
+        * string loc
+        * Uid.t
+        * Jkind.Sort.t
+        * Mode.With_regionality.l
+        * Types.type_expr
   ]
   type pattern = view pattern_data
 

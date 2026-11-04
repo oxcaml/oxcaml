@@ -1354,6 +1354,15 @@ let* addr_imm_ % and while
 #0 "implementation: LETOP ADDR_IMM WITH"
 let* addr_imm_ with
 ;;
+#0 "implementation: LETOP DEREF LBRACKETAT AND RBRACKET ASSERT"
+let* deref_ [@ and ] assert
+;;
+#0 "implementation: LETOP DEREF PERCENT AND WHILE"
+let* deref_ % and while
+;;
+#0 "implementation: LETOP DEREF WITH"
+let* deref_ with
+;;
 #0 "implementation: LETOP LAZY LBRACKETAT AND RBRACKET ASSERT"
 let* lazy [@ and ] assert
 ;;

@@ -209,8 +209,8 @@ let iter_on_occurrences
       add_label ~namespace:Label exp_env lid label_desc
     | Baccess_block _ -> ()
   in
-  let iter_unboxed_access exp_env = function
-    | Uaccess_unboxed_field (lid, label_desc, _) ->
+  let iter_unboxed_access exp_env : index unboxed_access -> _ = function
+    | Uaccess_record_unboxed_product_field (lid, label_desc, _) ->
       add_label ~namespace:Unboxed_label exp_env lid label_desc
   in
   let with_constraint ~env (_path, _lid, with_constraint) =
@@ -308,7 +308,7 @@ let iter_on_occurrences
       | Tpat_fun_layout _
       | Tpat_unboxed_unit | Tpat_unboxed_bool _
       | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _
-      | Tpat_addr _ | Tpat_lazy _
+      | Tpat_addr _ | Tpat_deref _ | Tpat_lazy _
       | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
       List.iter  (fun (pat_extra, _, _) ->
         match pat_extra with

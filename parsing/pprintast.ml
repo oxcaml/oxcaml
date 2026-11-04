@@ -851,6 +851,8 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_addr (mut, p) ->
         let kw = match mut with Mutable -> "addr_" | Immutable -> "addr_imm_" in
         pp f "@[<2>(%s@;%a)@]" kw (simple_pattern ctxt) p
+    | Ppat_deref p ->
+        pp f "@[<2>(deref_@;%a)@]" (simple_pattern ctxt) p
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
     | Ppat_exception p ->

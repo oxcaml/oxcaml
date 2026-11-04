@@ -230,6 +230,7 @@ let rec add_pattern bv pat =
   | Ppat_variant(_, op) -> add_opt add_pattern bv op
   | Ppat_type li -> add bv li
   | Ppat_addr (_, p) -> add_pattern bv p
+  | Ppat_deref p -> add_pattern bv p
   | Ppat_lazy p -> add_pattern bv p
   | Ppat_unpack id ->
       Option.iter

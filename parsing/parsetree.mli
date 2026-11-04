@@ -373,6 +373,7 @@ and pattern_desc =
           - [addr_ P]     when [flag] is [Mutable]
           - [addr_imm_ P] when [flag] is [Immutable]
        *)
+  | Ppat_deref of pattern  (** Pattern [deref_ P] *)
   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
   | Ppat_unpack of string option loc
       (** [Ppat_unpack(s)] represents:

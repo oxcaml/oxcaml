@@ -433,6 +433,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
     | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
+    | Tpat_deref { name; _ } ->
+        Ppat_deref (Pat.var ~loc:name.loc name)
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
@@ -492,14 +494,16 @@ let value_binding sub vb =
   in
   Vb.mk ~loc ~attrs ?value_constraint ~modes pat (sub.expr sub vb.vb_expr)
 
-let block_access sub : block_access -> Parsetree.block_access = function
+let block_access sub : index block_access -> Parsetree.block_access =
+  function
   | Baccess_field (lid, _, _) ->
     Baccess_field (map_loc sub lid)
   | Baccess_block (mut, idx) ->
     Baccess_block (mut, sub.expr sub idx)
 
-let unboxed_access sub : unboxed_access -> Parsetree.unboxed_access = function
-  | Uaccess_unboxed_field (lid, _, _) ->
+let unboxed_access sub : index unboxed_access -> Parsetree.unboxed_access =
+  function
+  | Uaccess_record_unboxed_product_field (lid, _, _) ->
     Uaccess_unboxed_field (map_loc sub lid)
 
 let comprehension sub comp =

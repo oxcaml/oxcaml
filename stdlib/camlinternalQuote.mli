@@ -362,6 +362,8 @@ module Pat : sig
 
   val addr : t -> bool -> t
 
+  val deref : t -> t
+
   val lazy_ : t -> t
 
   val any_module : t
