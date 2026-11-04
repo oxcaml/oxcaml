@@ -573,6 +573,20 @@ let win64 =
   | _                   -> false
 
 
+(* Specific operations that compute a linear combination of their integer
+   arguments, read by the SSA loop analyses (backend/rocq/Operation.v) *)
+
+let linear_specific_operation = function
+  | Ilea (Iindexed displ) -> Some ([1], displ)
+  | Ilea (Iindexed2 displ) -> Some ([1; 1], displ)
+  | Ilea (Iscaled (scale, displ)) -> Some ([scale], displ)
+  | Ilea (Iindexed2scaled (scale, displ)) -> Some ([1; scale], displ)
+  | Ilea (Ibased _) | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _
+  | Ibswap _ | Isextend32 | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence
+  | Isfence | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _
+  | Iprefetch _ | Illvm_intrinsic _ ->
+    None
+
 (* Specific operations that are pure *)
 (* Keep in sync with [Vectorize_specific] *)
 let operation_is_pure = function

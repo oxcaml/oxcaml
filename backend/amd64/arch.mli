@@ -184,6 +184,14 @@ val print_specific_operation :
 
 val win64 : bool
 
+(* Specific operations that compute a linear combination of their integer
+   arguments: the coefficients, one per argument in order, and the constant,
+   such that the operation computes [c1 * arg1 + ... + cn * argn + k] with
+   64-bit wraparound. [None] for every other operation. The SSA loop analyses
+   proved in Rocq trust this reading (see backend/rocq/Operation.v). *)
+
+val linear_specific_operation : specific_operation -> (int list * int) option
+
 val operation_is_pure : specific_operation -> bool
 
 val operation_allocates : specific_operation -> bool

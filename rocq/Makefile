@@ -1,0 +1,206 @@
+# Check the Rocq models and proofs, and regenerate the extracted OxCaml.
+#
+#   make          check every .v file, then run the extraction
+#   make assumptions  print global assumptions and declaration types
+#   make claims   check that every statement a Spec file binds is proved
+#   make review   typeset what a reviewer reads as rocq/review.pdf
+#   make clean    remove everything generated
+#
+# The sources live in four directories, each a Rocq library:
+#
+#   rocq/                   OxCamlStdlib: models of OxCaml's own types (int,
+#                           Int64, lists, exceptions as options), generic
+#                           integer arithmetic, and their extraction
+#                           directives; see HACKING.md there
+#   backend/rocq/           OxCamlBackend: backend-wide definitions, such as
+#                           the semantics of integer comparisons and the
+#                           operations of the backend's instructions
+#   backend/ssa/rocq/       OxCamlSsa: the SSA graph as the models see it
+#                           (abstract blocks and values, with the few
+#                           observations the passes make of them), and the
+#                           properties of terminators, uses and dominance
+#                           that any pass may need
+#   backend/ssa/loop/rocq/  OxCamlLoop: the loop analyses and their
+#                           extraction (Extract.v, one .ml per model); the
+#                           passes using them are backend/ssa/loop/
+#                           delete_empty_loops.ml and bounds_check_elim.ml
+#
+# The extracted files are run through ocamlformat so that they satisfy the
+# repository's `make fmt` check like any other source under backend/ssa/.
+
+ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+ROCQ ?= rocq
+OCAMLFORMAT ?= ocamlformat
+
+STDLIB_DIR := $(ROOT)/rocq
+BACKEND_DIR := $(ROOT)/backend/rocq
+SSA_DIR := $(ROOT)/backend/ssa/rocq
+LOOP_DIR := $(ROOT)/backend/ssa/loop/rocq
+
+FLAGS := -Q $(STDLIB_DIR) OxCamlStdlib -Q $(BACKEND_DIR) OxCamlBackend \
+  -Q $(SSA_DIR) OxCamlSsa -Q $(LOOP_DIR) OxCamlLoop
+
+STDLIB := $(addprefix $(STDLIB_DIR)/, \
+  OxCamlLogic.v OxCamlOption.v ZTactics.v OxCamlInt.v OxCamlIntProofs.v \
+  OxCamlInt64.v OxCamlInt64Proofs.v OxCamlList.v OxCamlListProofs.v \
+  IntArith.v IntArithProofs.v OxCamlExtract.v IntArithExtract.v)
+BACKEND := $(addprefix $(BACKEND_DIR)/, \
+  IntegerComparison.v IntegerComparisonProofs.v IntegerComparisonExtract.v \
+  Operation.v OperationExtract.v)
+SSA := $(addprefix $(SSA_DIR)/, \
+  SsaModel.v SsaModelExtract.v SsaGraphSpec.v SsaGraph.v SsaGraphProofs.v \
+  SsaDominanceSpec.v SsaDominance.v SsaDominanceProofs.v SsaSemanticsSpec.v \
+  SsaSemantics.v SsaSemanticsProofs.v SsaExecutionSpec.v \
+  SsaExecutionProofs.v SsaLivenessSpec.v SsaLivenessProofs.v \
+  SsaProgressSpec.v SsaProgressProofs.v SsaContextSpec.v SsaContextProofs.v)
+LOOP := $(addprefix $(LOOP_DIR)/, \
+  FourierMotzkin.v FourierMotzkinProofs.v FourierMotzkinExtract.v \
+  LoopComparisons.v LoopComparisonsProofs.v AffineExpr.v AffineExprProofs.v \
+  AffineExprExtract.v NaturalLoop.v NaturalLoopProofs.v AffineSsa.v \
+  AffineSsaProofs.v AffineSsaExtract.v InductionVar.v InductionVarProofs.v \
+  InductionVarExtract.v LoopTermination.v LoopTerminationProofs.v \
+  DeadInductionVar.v DeadInductionVarProofs.v DeleteEmptyLoopsSpec.v \
+  DeleteEmptyLoops.v DeleteEmptyLoopsProofs.v InductionRange.v \
+  InductionRangeProofs.v BoundsCheckElim.v BoundsCheckElimProofs.v \
+  LoopExecutionProofs.v LoopInvariantExecutionProofs.v \
+  LoopCounterExecutionProofs.v LoopLiveOutProofs.v LoopEligibilitySpec.v \
+  LoopEligibilityProofs.v LoopValueSnapshotProofs.v \
+  LoopGuardExecutionProofs.v LoopRangeExecutionProofs.v \
+  InductionRangeExecutionProofs.v BoundsCheckExecutionSpec.v \
+  BoundsCheckExecutionProofs.v)
+EXTRACT := $(LOOP_DIR)/Extract.v
+
+# The extraction writes one .ml and .mli per model into the loop directory;
+# those of the SSA models are then moved next to their sources. Those of the
+# rocq/ models that are not mapped onto OxCaml's own functions (OxCamlList,
+# IntArith) stay in the loop directory.
+SSA_MODULES := SsaModel SsaGraphSpec SsaGraph SsaDominance SsaSemanticsSpec \
+  SsaSemantics
+SSA_EXTRACTED := $(addprefix $(SSA_DIR)/, \
+  $(foreach m, $(SSA_MODULES), $(m).ml $(m).mli))
+LOOP_EXTRACTED := $(addprefix $(LOOP_DIR)/, \
+  OxCamlList.ml OxCamlList.mli IntArith.ml IntArith.mli \
+  FourierMotzkin.ml FourierMotzkin.mli \
+  LoopComparisons.ml LoopComparisons.mli AffineExpr.ml AffineExpr.mli \
+  NaturalLoop.ml NaturalLoop.mli AffineSsa.ml AffineSsa.mli \
+  InductionVar.ml InductionVar.mli LoopTermination.ml LoopTermination.mli \
+  DeadInductionVar.ml DeadInductionVar.mli \
+  DeleteEmptyLoops.ml DeleteEmptyLoops.mli \
+  InductionRange.ml InductionRange.mli \
+  BoundsCheckElim.ml BoundsCheckElim.mli)
+EXTRACTED := $(SSA_EXTRACTED) $(LOOP_EXTRACTED)
+
+SOURCES := $(STDLIB) $(BACKEND) $(SSA) $(LOOP) $(EXTRACT)
+MODULES := $(patsubst $(STDLIB_DIR)/%.v,OxCamlStdlib.%,$(STDLIB)) \
+  $(patsubst $(BACKEND_DIR)/%.v,OxCamlBackend.%,$(BACKEND)) \
+  $(patsubst $(SSA_DIR)/%.v,OxCamlSsa.%,$(SSA)) \
+  $(patsubst $(LOOP_DIR)/%.v,OxCamlLoop.%,$(LOOP) $(EXTRACT))
+DEPS := $(STDLIB_DIR)/.rocqdeps.d
+
+.PHONY: all assumptions claims review clean
+
+all: $(SOURCES:.v=.vo) claims
+
+# The review document, rocq/review.pdf: ROCQ-REVIEW-GUIDE.md, in parts, with
+# every reviewed .v file (definitions and statements; the implementation and
+# Proofs files are left out), the extraction directives and the axioms the
+# statements rest on, typeset by rocq doc and LuaLaTeX (HACKING.md, "The
+# review document").
+review: $(SOURCES:.v=.vo)
+	perl $(STDLIB_DIR)/review-pdf.pl $(STDLIB_DIR)/_review \
+	  $(STDLIB_DIR)/review.pdf $(STDLIB) $(BACKEND) $(SSA) $(LOOP) $(EXTRACT)
+
+# Every statement a Spec file binds as a proposition ([Definition X_statement
+# : Prop]) must be proved as the theorem [X] of the matching Proofs module
+# (HACKING.md, "The layout of a model"). Each is checked by defining a
+# constant of the statement's type whose body is the theorem; on success the
+# claims checked are listed.
+SPECS := $(patsubst %,OxCamlSsa:%,$(filter %Spec.v,$(SSA))) \
+  $(patsubst %,OxCamlLoop:%,$(filter %Spec.v,$(LOOP)))
+
+claims: $(SOURCES:.v=.vo)
+	@set -eu; \
+	  claims_dir=$$(mktemp -d); \
+	  trap 'rm -rf "$$claims_dir"' 0; \
+	  : > "$$claims_dir/list"; \
+	  for entry in $(SPECS); do \
+	    lib=$${entry%%:*}; spec=$${entry#*:}; \
+	    module=$$(basename $$spec .v); proofs=$${module%Spec}Proofs; \
+	    for claim in $$(sed -n \
+	        's/^Definition \([A-Za-z0-9_]*\)_statement : Prop.*/\1/p' $$spec); \
+	    do \
+	      printf 'From %s Require %s %s.\n' $$lib $$module $$proofs; \
+	      printf 'Definition %s_claim : %s.%s_statement := %s.%s.\n' \
+	        $$claim $$module $$claim $$proofs $$claim; \
+	      printf '%s.%s proves %s.%s_statement\n' \
+	        $$proofs $$claim $$module $$claim >> "$$claims_dir/list"; \
+	    done; \
+	  done > "$$claims_dir/Claims.v"; \
+	  $(ROCQ) repl -q -batch $(FLAGS) -l "$$claims_dir/Claims.v"; \
+	  cat "$$claims_dir/list"
+
+# The checker reports global assumptions, not theorem premises. Constant
+# types also expose Section arguments and contract fields,
+# including declarations inside nested modules.
+assumptions: all
+	@printf '%s\n' '=== Global assumptions (including dependencies) ==='
+	@$(ROCQ) check -silent -o $(FLAGS) $(MODULES) 2>&1
+	@printf '\n%s\n' '=== Declaration types and contract fields ===' \
+	  'Section hypotheses appear as arguments in these types.' \
+	  'This section includes proved theorems, not just assumptions.'
+	@set -eu; \
+	  audit_dir=$$(mktemp -d); \
+	  trap 'rm -rf "$$audit_dir"' 0; \
+	  { printf '%s\n' 'Set Printing Width 78.' \
+	      'Set Printing Depth 1000000.'; \
+	    for module in $(MODULES); do \
+	      printf 'Require %s.\nPrint Namespace %s.\n' "$$module" "$$module"; \
+	    done; \
+	  } > "$$audit_dir/Assumptions.v"; \
+	  $(ROCQ) repl -q -batch $(FLAGS) -l "$$audit_dir/Assumptions.v"
+
+# Extract.v writes the .ml and .mli files into the loop directory. Separate
+# extraction also writes an empty pair for every Rocq module whose contents
+# are all mapped onto OxCaml's own (OxCamlInt, Uint63, ...); those are removed.
+# It also puts the same `open M` lines at the top of a .ml and of its .mli;
+# in the .mli only types can be referred to, so the open of a module that
+# defines no types or submodules (OxCamlList) is unused there, which warning
+# 33 rejects. Such opens are removed from the .mli files.
+$(EXTRACT:.v=.vo): $(EXTRACT)
+	$(ROCQ) compile $(FLAGS) -output-directory $(LOOP_DIR) $<
+	for f in $(LOOP_DIR)/*.ml $(LOOP_DIR)/*.mli; do \
+	  grep -q '[^[:space:]]' $$f || rm -f $$f; done
+	mv $(foreach m, $(SSA_MODULES), $(LOOP_DIR)/$(m).ml $(LOOP_DIR)/$(m).mli) \
+	  $(SSA_DIR)/
+	@for f in $(LOOP_DIR)/*.ml $(LOOP_DIR)/*.mli; do \
+	  case " $(LOOP_EXTRACTED) " in *" $$f "*) ;; *) \
+	    echo "error: unexpected extracted file $$f: a model computes with" \
+	      "something that has no OxCaml realization (see OxCamlExtract.v)"; \
+	    exit 1;; \
+	  esac; \
+	done
+	for f in $(LOOP_DIR)/*.mli $(SSA_DIR)/*.mli; do \
+	  for m in `sed -n 's/^open \(.*\)$$/\1/p' $$f`; do \
+	    cat $(LOOP_DIR)/$$m.mli $(SSA_DIR)/$$m.mli 2>/dev/null \
+	      | grep -q -E '^ *(type|module) ' || \
+	      { grep -v "^open $$m$$" $$f > $$f.tmp && mv $$f.tmp $$f; }; \
+	  done; \
+	done
+	$(OCAMLFORMAT) -i $(EXTRACTED)
+
+%.vo: %.v
+	$(ROCQ) compile $(FLAGS) $<
+
+# The dependencies between the .v files, computed by rocq dep.
+$(DEPS): $(SOURCES)
+	$(ROCQ) dep $(FLAGS) $(SOURCES) > $@
+
+-include $(DEPS)
+
+clean:
+	rm -f $(DEPS) $(EXTRACTED) $(STDLIB_DIR)/review.pdf
+	rm -rf $(STDLIB_DIR)/_review
+	for d in $(STDLIB_DIR) $(BACKEND_DIR) $(SSA_DIR) $(LOOP_DIR); do \
+	  rm -rf $$d/*.vo $$d/*.vos $$d/*.vok $$d/*.glob $$d/.*.aux \
+	    $$d/.lia.cache $$d/.nia.cache $$d/.coq-native; \
+	done

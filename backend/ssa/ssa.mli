@@ -357,6 +357,10 @@ module Block : sig
   (** The immediate dominator of a block (the entry dominates itself). *)
   val immediate_dominator : finished t -> finished t
 
+  (** The blocks strictly dominating a block, nearest first, ending with the
+      entry (empty for the entry itself). *)
+  val strict_dominators : finished t -> finished t list
+
   (** The depth of a block in the dominator tree (the entry has depth 0). *)
   val dominator_depth : finished t -> int
 
