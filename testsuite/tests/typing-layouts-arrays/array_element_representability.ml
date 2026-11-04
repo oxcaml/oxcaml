@@ -65,6 +65,17 @@ Error: The primitive "%arrayblit" doesn't work well with type variables of
        layout any. Consider using "[@layout_poly]".
 |}]
 
+(* The same applies when [any] is nested inside an unboxed product. *)
+external len_prod : ('a : any & value). 'a array -> int = "%array_length"
+let len_prod a = len_prod a
+[%%expect{|
+Line 1, characters 20-55:
+1 | external len_prod : ('a : any & value). 'a array -> int = "%array_length"
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive "%array_length" doesn't work well with type variables of
+       layout any. Consider using "[@layout_poly]".
+|}]
+
 (*******************************************************************)
 (* Test: arrays of non-representable elements can be passed around *)
 
