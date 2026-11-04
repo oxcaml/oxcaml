@@ -444,7 +444,7 @@ let f3 : float# -> int32_u = magic;; (* error *)
 This feature is conceptually similar to `[@local_opt]` for modes and is useful for
 array access primitives.
 
-Here's the list of primitives that currently support `[@layout_poly]`:
+Primitives supporting `[@layout_poly]` include:
 
 * `%identity`
 * `%opaque`
@@ -459,7 +459,6 @@ Here's the list of primitives that currently support `[@layout_poly]`:
 * `%array_length`
 * `%makearray_dynamic`
 * `%get_idx` and `%set_idx` (see [block indices](../block-indices))
-* `%peek` and `%poke`
 
 # Arrays of unboxed elements
 
