@@ -452,6 +452,8 @@ File "implementation: FUNCTION PERCENT AND ASSERT", line 1, characters 15-21:
 Error: Syntax error
 File "implementation: FUNCTION UNDERSCORE AS WITH", line 1, characters 14-18:
 Error: Syntax error: identifier expected.
+File "implementation: FUNCTION UNDERSCORE AS DEREF WITH", line 1, characters 21-25:
+Error: Syntax error: identifier expected.
 File "implementation: FUNCTION UNDERSCORE BAR UNDERSCORE WITH", line 1, characters 15-19:
 Error: Syntax error
 File "implementation: FUNCTION UNDERSCORE BAR WITH", line 1, characters 13-17:
@@ -1111,6 +1113,8 @@ Error: Syntax error
 File "implementation: LETOP UIDENT WITH", line 1, characters 12-16:
 Error: Syntax error
 File "implementation: LETOP UNDERSCORE AS WITH", line 1, characters 10-14:
+Error: Syntax error: identifier expected.
+File "implementation: LETOP UNDERSCORE AS DEREF WITH", line 1, characters 17-21:
 Error: Syntax error: identifier expected.
 File "implementation: LETOP UNDERSCORE BAR UNDERSCORE WITH", line 1, characters 11-15:
 Error: Syntax error

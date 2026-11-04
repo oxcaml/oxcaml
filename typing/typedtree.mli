@@ -394,6 +394,16 @@ and 'k pattern_desc =
       type_expr: Types.type_expr;
     } -> value pattern_desc
         (** deref_ x *)
+  | Tpat_alias_deref : {
+      pattern: value general_pattern;
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    } -> value pattern_desc
+        (** P as deref_ x *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)

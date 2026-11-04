@@ -162,3 +162,37 @@ ab ab
 ba ba
 ba ba
 
+alias deref record fields
+4
+-1
+0
+1
+efghefgh
+1.5
+7
+7 6
+11
+2.5
+
+alias deref unboxed
+12
+13.5
+30
+9 six
+
+alias deref tuples
+zero a
+4 bb
+6
+8
+d
+
+alias deref below addr
+8
+3
+2 3
+
+alias deref choosing and sharing positions
+2 10 1 11
+x
+

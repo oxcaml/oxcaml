@@ -385,6 +385,12 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 - : <[$('a) * $('b) -> $('a) addr_imm]> expr = <[fun (deref_ (a), _) -> a]>
 |}];;
 
+<[ fun ((x as deref_ a), _) -> (x, a) ]>;;
+[%%expect {|
+- : <[$('a) * $('b) -> $('a) * $('a) addr_imm]> expr =
+<[fun (x as deref_ a, _) -> (x, a)]>
+|}];;
+
 <[ fun f x d -> match f x with | res -> res | exception e -> d ]>;;
 [%%expect {|
 - : <[($('a) -> $('b)) -> $('a) -> $('b) -> $('b)]> expr =

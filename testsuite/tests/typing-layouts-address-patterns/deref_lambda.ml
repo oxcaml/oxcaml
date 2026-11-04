@@ -148,3 +148,41 @@ val mixed : m -> float# addr = <fun>
   (apply (field_imm 1 (global Toploop!)) "deepen" deepen))
 val deepen : p addr -> float# addr = <fun>
 |}]
+
+(* Alias dereference patterns bind the address and match [P] against the
+   value at the position *)
+type o = { mutable oo : int option }
+let alias = function
+  | { oo = Some v as deref_ a } -> #(v, a)
+  | { oo = None as deref_ a } -> #(0, a)
+[%%expect{|
+0
+type o = { mutable oo : int option; }
+(let
+  (alias =
+     (function {nlocal = 0} param : #(?, #(?, int64))
+       (let (*match* =o? (field_mut 0 param))
+         (if *match*
+           (make_unboxed_product #(value<int>, #(?, int64))
+             (field_imm 0 *match*)
+             (make_unboxed_product #(?, int64) param (idx_field 0)))
+           (make_unboxed_product #(value<int>, #(?, int64)) 0
+             (make_unboxed_product #(?, int64) param (idx_field 0)))))))
+  (apply (field_imm 1 (global Toploop!)) "alias" alias))
+val alias : o -> #(int * int option addr) = <fun>
+|}]
+
+(* On elements of syntactic tuples, they need the tuple in memory *)
+let alias_single x y = match x, y with ((v as deref_ a), _) -> #(v, a)
+[%%expect{|
+(let
+  (alias_single =
+     (function {nlocal = 0} x? y? : #(?, #(?, int64))
+       (let (*match* = (makeblock 0 x y))
+         (make_unboxed_product #(?, #(?, int64))
+           (mixedfield 0  (?,?) *match*)
+           (make_unboxed_product #(?, int64) *match*
+             (idx_mixed_field  (?,?) 0 ))))))
+  (apply (field_imm 1 (global Toploop!)) "alias_single" alias_single))
+val alias_single : 'a -> 'b -> #('a * 'a addr_imm) = <fun>
+|}]

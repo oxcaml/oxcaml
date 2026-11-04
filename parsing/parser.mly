@@ -3740,6 +3740,10 @@ pattern_no_exn:
   | mkpat(
       self AS mkrhs(val_ident)
         { Ppat_alias($1, $3) }
+    | self AS DEREF mkrhs(val_ident)
+        { Ppat_alias_deref($1, $4) }
+    | self AS DEREF error
+        { expecting $loc($4) "identifier" }
     | self AS error
         { expecting $loc($3) "identifier" }
     | labeled_tuple_pattern(self)
