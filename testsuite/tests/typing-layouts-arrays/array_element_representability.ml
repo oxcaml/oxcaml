@@ -17,14 +17,14 @@
 
 (* CR layouts-scannable: This signature seems needlessly restrictive
    (but this probably doesn't matter too much). *)
-external weird_id : ('a : any mod separable). 'a array -> int = "%identity"
+external weird_id : ('a : any separable). 'a array -> int = "%identity"
 let weird_id' arr = weird_id arr
 [%%expect{|
 external weird_id : ('a : any separable). 'a array -> int = "%identity"
 val weird_id' : ('a : any separable). 'a array -> int = <fun>
 |}]
 
-external product_edge_case : ('a : any mod separable). #('a * 'a) array -> int
+external product_edge_case : ('a : any separable). #('a * 'a) array -> int
   = "%identity"
 let product_edge_case x = product_edge_case x
 [%%expect{|
@@ -41,7 +41,7 @@ val product_edge_case : ('a : any separable). #('a * 'a) array -> int = <fun>
    translated. This defaulting is harmless, however, since [%floatarray_length]
    does not get specialized based on ['a]. See [Note regarding jkind checks on
    external declarations] in [typedecl.ml] for primitives where ['a] matters. *)
-external weird_flarr_len : ('a : any mod separable). 'a array -> int
+external weird_flarr_len : ('a : any separable). 'a array -> int
   = "%floatarray_length"
 let weird_flarr_len' x = weird_flarr_len x
 [%%expect{|
@@ -54,12 +54,12 @@ val weird_flarr_len' : ('a : value_maybe_null). 'a array -> int = <fun>
 (* Primitives that inspect the element's layout must be [@layout_poly] when
    the element has layout [any]. Otherwise, a function like [blit] below
    would be generalized over [any] but compiled for [value]. *)
-external blit_ext : ('a : any mod separable).
+external blit_ext : ('a : any separable).
   'a array -> int -> 'a array -> int -> int -> unit = "%arrayblit"
 let blit a b n = blit_ext a 0 b 0 n
 [%%expect{|
 Lines 1-2, characters 20-51:
-1 | ....................('a : any mod separable).
+1 | ....................('a : any separable).
 2 |   'a array -> int -> 'a array -> int -> int -> unit...............
 Error: The primitive "%arrayblit" doesn't work well with type variables of
        layout any. Consider using "[@layout_poly]".
@@ -209,7 +209,7 @@ Error: The value "a" has type "t array" but an expression was expected of type
          representable at call sites).
 |}]
 
-(* Externals can only mention a non-representable type under [array]... *)
+(* [external] arguments and return values still need to be representable *)
 external get : t array -> int -> t = "%array_safe_get"
 [%%expect{|
 Line 1, characters 33-34:
@@ -234,7 +234,7 @@ Error: Types in an external must have a representable layout.
          because it's the type of an argument in an external declaration.
 |}]
 
-(* ...and the error appears when the primitive is specialized. *)
+(* Array element representability error is triggered by specialization *)
 external len : t array -> int = "%array_length"
 let g a = len a
 [%%expect{|

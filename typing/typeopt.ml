@@ -353,7 +353,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Genvar _ ->
     Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
-let array_kind_of_representable_elt env loc elt_ty representing_layout =
+let array_kind_of_representable_elt env loc elt_ty elt_layout =
   let elt_ty_for_error = elt_ty in (* report the un-scraped ty in errors *)
   let ty = match scrape_ty env elt_ty with Some ty -> ty | None -> elt_ty in
   let classify_product ty sorts =
@@ -365,7 +365,7 @@ let array_kind_of_representable_elt env loc elt_ty representing_layout =
   in
   (* CR dkalinichenko: many checks in [classify] are redundant
      with separability. *)
-  match classify ~classify_product env ty representing_layout with
+  match classify ~classify_product env ty elt_layout with
   | Any ->
     if Config.flat_float_array
       && not (Ctype.check_type_separability env ty Non_float)
