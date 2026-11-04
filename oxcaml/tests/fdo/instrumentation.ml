@@ -29,8 +29,8 @@ let[@inline never] nested n =
 let[@inline never] add x y = x + y
 
 (* The counter of a partial application goes on the call in the wrapper that
-   closure conversion builds for it, and an over-application has a single
-   counter, on the call to the callee. *)
+   closure conversion builds for it, and that of an over-application on both
+   calls it makes: to the callee, and to its result. *)
 let[@inline never] partial x = add x
 
 let[@inline never] over x = apply add x 1
