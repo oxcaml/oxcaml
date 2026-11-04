@@ -1427,6 +1427,12 @@ Error: Annotating types with kinds
 - : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
 |}];;
 
+<[ (assert false : bytes -> (bytes -> bytes @ local) @ local) ]>
+[%%expect {|
+- : <[bytes -> (bytes -> bytes @ local) @ local]> expr =
+<[(assert false : bytes -> (bytes -> (bytes) @ local) @ local)]>
+|}];;
+
 (* Function definitions -- without type annotation *)
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|

@@ -344,7 +344,7 @@
   tmc
   simplif
   slambda
-  slambdaident
+  layout_ident
   switch
   value_rec_compiler
   translmode

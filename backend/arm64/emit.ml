@@ -972,6 +972,18 @@ let emit_stack_ldr env reg r = emit_stack_load_store env LDR reg r
 
 let emit_stack_str env reg r = emit_stack_load_store env STR reg r
 
+(* Moves of 8- and 16-bit stack arguments. The store writes exactly the
+   argument's width; instruction selection only creates these moves with a
+   stack-slot destination, so every other shape is unexpected. *)
+let emit_sized_move env ~str (src : Reg.t) (dst : Reg.t) =
+  if not (Reg.same_loc src dst)
+  then
+    match src.loc, dst.loc with
+    | Reg _, Stack _ -> emit_stack_load_store env str (H.reg_w src) dst
+    | Reg _, Reg _ | Stack _, (Reg _ | Stack _) | _, Unknown | Unknown, _ ->
+      Misc.fatal_errorf "Emit.emit_sized_move: unexpected move (%a to %a)"
+        Printreg.reg src Printreg.reg dst
+
 let emit_stack_ldr_simd_and_fp env reg r =
   emit_stack_load_store env LDR_simd_and_fp reg r
 
@@ -1510,6 +1522,8 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop (Specific Imove8) -> emit_sized_move env ~str:STRB i.arg.(0) i.res.(0)
+  | Lop (Specific Imove16) -> emit_sized_move env ~str:STRH i.arg.(0) i.res.(0)
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
