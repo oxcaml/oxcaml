@@ -53,3 +53,112 @@ local
 4
 efgh
 
+deref record fields
+1
+vy
+2
+vy
+1
+efgh
+1.5
+7 6
+7
+10
+efgh
+10.5
+7 6
+70
+
+deref unboxed
+1
+2
+10
+20
+3
+4
+5
+6 six
+7 seven
+eight 9 10.5
+eleven 12 13.5
+30
+4
+50
+60 SIX
+7 seven
+EIGHT 90 100.5
+eleven 12 13.5
+
+deref tuples
+1
+one
+2
+two
+3
+4
+5
+
+deref below addr
+1
+5
+3 2
+7 6
+7
+10
+5
+30 20
+7 6
+70
+3
+5
+6 six
+eight 9 10.5
+eleven 12 13.5
+30
+50
+60 SIX
+EIGHT 90 100.5
+eleven 12 13.5
+
+deref binding sites
+match: 1 -> 2
+let: 1 -> 2
+parameter: 1 -> 2
+function: 1 -> 2
+optional argument default: 1 -> 2
+let-operator: 1 -> 2
+match with an exception case: 1 -> 2
+guard: 1 -> 2
+or-pattern: 1 -> 2
+constructor argument: 1 -> 2
+syntactic tuple element: 1 -> 2
+local: 1 -> 2
+
+deref syntactic tuples
+match: xy
+match with an exception case: xy
+match with several rows: xy
+match with an alias: xyxy
+match on a nested tuple: xy
+let: xy
+let of a nested tuple: xy
+let of a constant: xy
+tupled function: xy
+
+deref choice
+3
+2
+1
+3
+x
+y
+1
+1
+2
+3
+
+deref evaluation order
+ab ab
+ba ba
+ba ba
+
