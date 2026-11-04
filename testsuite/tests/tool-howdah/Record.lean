@@ -1,4 +1,4 @@
-import Howdah
+import Howdah.Import
 
 def imported := howdah% "record.json"
 

@@ -1,0 +1,29 @@
+(rule
+ (targets Syntax.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Syntax.lean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Syntax.lean})))
+
+(rule
+ (targets Import.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Import.lean
+  Syntax.olean)
+ (action
+  (run
+   %{dep:../lean-with-flags}
+   -R
+   ..
+   -o
+   %{targets}
+   %{dep:Import.lean})))
+
