@@ -34,6 +34,7 @@ let serialize_constant : Typedtree.constant -> Json.t = function
 let serialize_ident (id : Ident.t) : Json.t =
   Json.String (Ident.unique_toplevel_name id) |> tag "unique_toplevel_name"
 
+(* Serialize a source-code path like [F(X).a.b.c]. *)
 let rec serialize_path ~(loc : Warnings.loc) : Path.t -> Json.t = function
   | Pident id -> serialize_ident id |> tag "id" |> tag "Ident"
   | Pdot (nested, field) ->
@@ -48,6 +49,7 @@ let rec serialize_path ~(loc : Warnings.loc) : Path.t -> Json.t = function
       Printtyp.path other_path
     |> fun message -> raise (Error_message message)
 
+(* Serialize a constant in [Lambda]. *)
 let rec serialize_structured_constant
   : Lambda.structured_constant -> Json.t = function
   | Const_base constant ->
@@ -65,6 +67,7 @@ let rec serialize_structured_constant
       Printlambda.structured_constant other_constant
     |> fun message -> raise (Error_message message)
 
+(* Serialize an untyped [Lambda] expression. *)
 let rec serialize_lambda : Lambda.lambda -> Json.t = function
   | Lvar id ->
     serialize_ident id
@@ -168,6 +171,7 @@ let serialize_implementation
   in
   serialize_lambda program.code
 
+(* Restore load-path information from the [.cmt] artifact. *)
 let rehydrate_envs (info : Cmt_format.cmt_infos) :
     Typedtree.structure -> Typedtree.structure =
   Load_path.init ~auto_include:Load_path.no_auto_include
@@ -178,6 +182,7 @@ let rehydrate_envs (info : Cmt_format.cmt_infos) :
   in
   mapper.structure mapper
 
+(* Check that the [.cmi] and [.cmt] file discuss the same source code. *)
 let check_same_compilation
     (cmi : Cmi_format.cmi_infos) (cmt : Cmt_format.cmt_infos) : unit =
   let cmi_crc =
@@ -207,8 +212,8 @@ let run ~(cmi_filename : string) ~(cmt_filename : string) : unit =
     raise (Error_message "first input file extension must be `.cmi`");
   if Filename.extension cmt_filename <> ".cmt" then
     raise (Error_message "second input file extension must be `.cmt`");
-  let cmi : Cmi_format.cmi_infos = Cmi_format.read_cmi cmi_filename in
-  let cmt : Cmt_format.cmt_infos = Cmt_format.read_cmt cmt_filename in
+  let cmi = Cmi_format.read_cmi cmi_filename in
+  let cmt = Cmt_format.read_cmt cmt_filename in
   check_same_compilation cmi cmt;
   let interface, _ = cmi.cmi_sign in
   let structure =
