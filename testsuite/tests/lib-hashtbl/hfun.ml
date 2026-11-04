@@ -5,8 +5,9 @@
    (* Under js_of_ocaml, floats are JavaScript numbers, so 0.0 hashes like 0,
       and nativeints are plain numbers, so they hash like ints. *)
    reference = "${test_source_directory}/hfun.jsir-output.reference";
-   jsir;
+   jsir-js;
  }
+ { jsir-wasm; }
 *)
 
 (* Testing the hash function Hashtbl.hash *)

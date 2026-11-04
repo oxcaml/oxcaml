@@ -1,9 +1,10 @@
 ; The standard library and the other libraries of the compiler distribution
 ; for JSIR. This lives here rather than with the compiler's libraries because
-; the compiler in JSIR mode runs js_of_ocaml, so they can only be built once
-; js_of_ocaml is: against an installed compiler, or in the main context of the
-; compiler's build, with the boot compiler and its standard library (see the
-; top-level Makefile).
+; the compiler in JSIR mode runs js_of_ocaml or wasm_of_ocaml, so they can only
+; be built once those are: against an installed compiler, or in the main
+; context of the compiler's build, with the boot compiler and its standard
+; library (see the top-level Makefile). wasm_of_ocaml runs the Binaryen tools
+; (wasm-opt, wasm-merge), which must be in the PATH.
 ;
 ; Every stanza is disabled unless OXCAML_BUILD_STDLIB_JSIR=true, which the
 ; top-level Makefile sets for the builds that want this library: other builds
@@ -429,3 +430,12 @@
   (glob_files_rec
    (build/*.{cmjx,cmjxa,cmja} with_prefix ocaml))
   (build/std_exit.cmjo as ocaml/std_exit.cmjo)))
+
+(install
+ (package stdlib-wasm)
+ (enabled_if %{env:OXCAML_BUILD_STDLIB_JSIR=false})
+ (section lib_root)
+ (files
+  (glob_files_rec
+   (build/*.{cmwx,cmwxa,cmwa} with_prefix ocaml))
+  (build/std_exit.cmwo as ocaml/std_exit.cmwo)))
