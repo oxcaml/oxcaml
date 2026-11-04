@@ -1036,38 +1036,17 @@ let curry_mode_of_occurrence :
             areality = (With_locality.Guts.get_ceil m).areality }
       else Const (With_locality.zap_to_legacy_force ~arg m)
 
-(** Whether the return mode [m] of an arrow is the curry mode implied by
-    [acc_mode]. Mutating when [m] must be zapped: [m] is equated with the
-    constant (a [Variable] contains generic variables and cannot be equated
-    with directly); otherwise the bounds of [m] must be those of a hidden
-    curry mode: the implied floor, and no other constraint.
-
-    [equate_with_const] additionally checks [m]'s edges. *)
-let equate_with_curry_bounds : With_locality.lr -> Curry_mode.t -> bool =
+(** Whether the return mode [m] of an arrow is the constant curry mode
+    implied by [acc_mode]. Mutating: [m] is equated with the constant. *)
+let equate_with_const_curry : With_locality.lr -> Curry_mode.t -> bool =
   fun m acc_mode ->
-    if not (mode_polymorphism_printing_enabled ()) then
-      match acc_mode with
-      | Const c -> Result.is_ok (With_locality.equate
-           m
-           (With_locality.of_const c))
-      | Variable _ -> fatal_error "Out_type.equate_with_curry_bounds"
-    else
-      match acc_mode, With_locality.check_generic m with
-      | Const c, false ->
-        Result.is_ok (With_locality.equate m (With_locality.of_const c))
-      | Variable _, true ->
-        let floor = With_locality.Guts.get_floor m in
-        let ceil = With_locality.Guts.get_ceil m in
-        let expected_floor =
-          With_locality.Const.merge
-            { comonadic =
-                With_locality.Comonadic.Guts.get_floor
-                  (Curry_mode.comonadic acc_mode);
-              monadic = With_locality.Monadic.Const.min }
-        in
-        With_locality.Const.equal floor expected_floor
-        && With_locality.Const.equal ceil With_locality.Const.max
-      | Const _, true | Variable _, false -> false
+    match acc_mode with
+    | Const c ->
+      Result.is_ok (With_locality.equate m (With_locality.of_const c))
+    | Variable _ -> false
+
+let is_generic_curry_mode m =
+  mode_polymorphism_printing_enabled () && With_locality.check_generic m
 
 module Variable_names : sig
   val reset_names : unit -> unit
@@ -1082,9 +1061,9 @@ module Variable_names : sig
 
   (** Whether the return mode [m] of an arrow can be elided: the arrow is
       then printed without parens and [m] is not printed. Mutates [m] when
-      it must be zapped (see [equate_with_curry_bounds]). Must be called
+      it must be zapped (see [equate_with_const_curry]). Must be called
       after [reserve], which decides the elisions. *)
-  val equate_with_const : With_locality.lr -> Curry_mode.t -> bool
+  val is_implied_curry_mode : With_locality.lr -> Curry_mode.t -> bool
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
@@ -1116,10 +1095,6 @@ end = struct
   let named_vars = ref ([] : string list)
   let visited_for_named_vars = ref ([] : transient_expr list)
 
-  (* The curry modes of the type with their currying accumulator, in
-     traversal order; [register_suppressed_curries] decides which are
-     elided. *)
-  let curry_candidates = ref ([] : (With_locality.lr * Curry_mode.t) list)
   let visited_for_named_modevars = ref ([] : transient_expr list)
 
   module Desc = With_locality.Desc
@@ -1385,41 +1360,6 @@ end = struct
         if not (List.exists (eq_pair pair) !visible_pairs) then
           visible_pairs := pair :: !visible_pairs
       end
-
-  let rec register_curry_candidates ~visited acc_mode ty =
-    let px = proxy ty in
-    if not (List.memq px visited) then begin
-      let visited = px :: visited in
-      match get_desc ty with
-      | Tarrow ((l, marg, mret), ty1, ty2, _) ->
-        let arg_acc = curry_mode_of_occurrence ~arg:true marg in
-        if is_optional l then begin
-          match
-            get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
-          with
-          | Tconstr (path, [ty], _) when Path.same path Predef.path_option ->
-            register_curry_candidates ~visited arg_acc ty
-          | _ -> ()
-        end
-        else register_curry_candidates ~visited arg_acc ty1;
-        let acc_mode = curry_acc acc_mode marg in
-        let acc_mode =
-          match get_desc ty2 with
-          | Tarrow _ ->
-            curry_candidates := (mret, acc_mode) :: !curry_candidates;
-            if equate_with_curry_bounds mret acc_mode then acc_mode
-            else curry_mode_of_occurrence ~arg:false mret
-          | _ -> curry_mode_of_occurrence ~arg:false mret
-        in
-        register_curry_candidates ~visited acc_mode ty2
-      | Tpoly (ty, []) | Trepr (ty, []) ->
-        register_curry_candidates ~visited acc_mode ty
-      | _ ->
-        printer_iter_type_expr
-          (register_curry_candidates ~visited
-             (Curry_mode.Const With_locality.Const.legacy))
-          (Fun.const ()) ty
-    end
 
   (** [register_visible_modes] iterates over the type and registers every
       visible mode variable. *)
@@ -2048,6 +1988,8 @@ end = struct
   (* Comonadic heads of elided curry modes; edges to and from them are
      not printed. *)
   let suppressed_curry_heads = ref ([] : boxedhead list)
+  let suppressed_curries = ref ([] : With_locality.lr list)
+  let rejected_curries = ref ([] : With_locality.lr list)
 
   let heads_of_mode (m : With_locality.lr) =
     match With_locality.get_comonadic_desc m.comonadic with
@@ -2064,7 +2006,8 @@ end = struct
     name_counter := 0;
     named_vars := [];
     visited_for_named_vars := [];
-    curry_candidates := [];
+    suppressed_curries := [];
+    rejected_curries := [];
     visited_for_named_modevars := [];
     visible_pairs := [];
     modenames := [];
@@ -2089,81 +2032,60 @@ end = struct
     | Some (_, edges) -> edges
     | None -> { lower = []; upper = [] }
 
-  (* The variable heads of the curry accumulator. *)
-  let acc_heads (acc : Curry_mode.t) : boxedhead list =
-    let head (Desc.Amorphvar (v, _)) = H v in
-    match With_locality.get_comonadic_desc (Curry_mode.comonadic acc) with
-    | Amode _ -> []
-    | Amodevar mv -> [head mv]
-    | Amodejoin (_, mvs) -> List.map head mvs
-
-  (* Whether every edge on the curry mode [m] is implied by the currying
-     interpretation: edges into [m] are [past]/[close] edges from [acc] or
-     edges from another implied curry mode. *)
-  let curry_edges_implied ~curry_heads ~(acc : Curry_mode.t)
-      (m : With_locality.lr) =
-    let pair = pair_of_mode m in
-    let { lower; upper } = find_edges pair in
-    let acc_heads = acc_heads acc in
-    let src_in heads = function
-      | Simple_name { src; _ } -> mem_head heads src
-      | Comonadic_name { src; _ } -> mem_head heads src
-    in
-    let is_id f = eq_morph With_locality.obj_comonadic f C.id in
-    List.for_all
-      (function
-        | Upper_comonadic { c_via; c_name = Comonadic_name { target; _ } } ->
-          is_id c_via && mem_head curry_heads target
-        | Upper_comonadic { c_name = Simple_name _; _ } | Upper_simple _ ->
-          false)
-      upper
-    && List.for_all
-         (function
-           | Lower_simple _ -> false
-           | Lower_comonadic { c_via; c_name } ->
-             is_id c_via
-             && src_in (acc_heads @ !suppressed_curry_heads) c_name
-           | Lower_closing_over_to ({ cls_edge = { name; _ }; _ } as e) ->
-             eq_morph With_locality.obj_comonadic
-               (closing_over_composition e)
-               With_locality.monadic_to_comonadic_min_morph
-             && src_in acc_heads name)
-         lower
-
-  let is_suppressed_curry (m : With_locality.lr) =
-    List.for_all
-      (fun (H h) -> mem_head !suppressed_curry_heads h)
-      (heads_of_mode m)
-
-  (* Decides whether a mode is equal to the accumulated implied curry mode.
-    must be called after [register_suppressed_curries] has been called *)
-  let equate_with_const : With_locality.lr -> Curry_mode.t -> bool =
+  let is_implied_curry_mode : With_locality.lr -> Curry_mode.t -> bool =
     fun m acc_mode ->
-      equate_with_curry_bounds m acc_mode
-      && (not (With_locality.check_generic m)
-          || not (mode_polymorphism_printing_enabled ())
-          || is_suppressed_curry m)
+      if is_generic_curry_mode m then List.memq m !suppressed_curries
+      else equate_with_const_curry m acc_mode
 
-  (* Registers curry modes with equal to the curry mode implied by
-    preceding arguments *)
-  let register_suppressed_curries () =
-    let candidates = List.rev !curry_candidates in
-    let curry_heads =
-      List.concat_map (fun (m, _) -> heads_of_mode m) candidates
-    in
-    let implied (m, acc) =
-      With_locality.check_generic m
-      && equate_with_curry_bounds m acc
-      && curry_edges_implied ~curry_heads ~acc m
-    in
-    List.iter
-      (fun (m, _) ->
-        if List.for_all implied
-             (List.filter (fun (m', _) -> m' == m) candidates)
-        then
-          suppressed_curry_heads := heads_of_mode m @ !suppressed_curry_heads)
-      candidates;
-    curry_candidates := []
+  let register_curry_mode m acc_mode =
+    if not (is_generic_curry_mode m) then equate_with_const_curry m acc_mode
+    else begin
+      let curry = Curry_mode.mode acc_mode in
+      let implied =
+        With_locality.moregen m curry && With_locality.moregen curry m
+        && not (List.memq m !rejected_curries)
+      in
+      if implied then suppressed_curries := m :: !suppressed_curries
+      else begin
+        rejected_curries := m :: !rejected_curries;
+        suppressed_curries :=
+          List.filter (fun m' -> m' != m) !suppressed_curries
+      end;
+      suppressed_curry_heads :=
+        List.concat_map heads_of_mode !suppressed_curries;
+      implied
+    end
+
+  let rec register_suppressed_curries ~visited acc_mode ty =
+    let px = proxy ty in
+    if not (List.memq px visited) then begin
+      let visited = px :: visited in
+      let register = register_suppressed_curries ~visited in
+      match get_desc ty with
+      | Tarrow ((l, marg, mret), ty1, ty2, _) ->
+        let arg_acc = curry_mode_of_occurrence ~arg:true marg in
+        if is_optional l then begin
+          match
+            get_desc (Ctype.expand_head !printing_env (tpoly_get_mono ty1))
+          with
+          | Tconstr (path, [ty], _) when Path.same path Predef.path_option ->
+            register arg_acc ty
+          | _ -> ()
+        end
+        else register arg_acc ty1;
+        let acc_mode = curry_acc acc_mode marg in
+        let acc_mode =
+          match get_desc ty2 with
+          | Tarrow _ when register_curry_mode mret acc_mode -> acc_mode
+          | _ -> curry_mode_of_occurrence ~arg:false mret
+        in
+        register acc_mode ty2
+      | Tpoly (ty, []) | Trepr (ty, []) -> register acc_mode ty
+      | _ ->
+        printer_iter_type_expr
+          (register (Curry_mode.Const With_locality.Const.legacy))
+          (Fun.const ()) ty
+    end
 
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
@@ -2342,10 +2264,7 @@ end = struct
       register_visible_modes ty;
       add_visible_paths ();
       add_visible_edges ();
-      let snap = Btype.snapshot () in
-      register_curry_candidates ~visited:[] (Curry_mode.Const base) ty;
-      Btype.backtrack snap;
-      register_suppressed_curries ()
+      register_suppressed_curries ~visited:[] (Curry_mode.Const base) ty
     end
 
   let reserve ty = reserve_with_base ~base:With_locality.Const.legacy ty
@@ -2909,7 +2828,7 @@ and tree_of_ret_typ_mutating (acc_mode : Curry_mode.t) m ty=
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
         can omit parens and modes. *)
-      if Variable_names.equate_with_const m acc_mode then begin
+      if Variable_names.is_implied_curry_mode m acc_mode then begin
         (Orm_no_parens, acc_mode)
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined

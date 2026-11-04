@@ -325,8 +325,8 @@ module Curry_mode : sig
       upper bound of the areality of the argument. *)
   val add_arg : t -> With_locality.lr -> upper_areality:Locality.Const.t -> t
 
-  (** The comonadic mode of the accumulated curry. *)
-  val comonadic : t -> With_locality.Comonadic.l
+  (** The accumulated curry mode. *)
+  val mode : t -> With_locality.lr
 end
 
 val apply:

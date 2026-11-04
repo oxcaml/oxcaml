@@ -804,12 +804,12 @@ let curry_edge_to_printed_curry f a b c =
   ignore (f == fun _ (_ : int ref) _ -> ()); f a b c
 [%%expect{|
 val curry_edge_to_printed_curry :
-  ('a @ [< past('o) & global > 'mm0] ->
-   int ref @ [< past('m) & past('n) & global > 'q mod many portable forkable unyielding stateless] ->
-   ('b @ [> 'p] -> unit @ [< global]) @ [> past('m) | past('n) mod many portable forkable unyielding stateless | past('o)]) @ [< past('mm3) & past('mm2) & past('mm1) & global many uncontended read_write] ->
-  ('a @ [< 'mm0 & global] ->
-   (int ref @ [< 'q & global] ->
-    ('b @ [< 'p] -> unit @ [> dynamic]) @ [> close('q) mod many portable stateless | close('mm0) | past('mm3) | stateful]) @ [> close('mm0) | past('mm2) | stateful]) @ [> past('mm1) | stateful] =
+  ('a @ [< global > 'o] ->
+   int ref @ [< global > 'n mod many portable forkable unyielding stateless] ->
+   'b @ [> 'm] -> unit @ [< global]) @ [< past('mm0) & past('q) & past('p) & global many uncontended read_write] ->
+  ('a @ [< 'o & global] ->
+   (int ref @ [< 'n & global] ->
+    ('b @ [< 'm] -> unit @ [> dynamic]) @ [> close('n) mod many portable stateless | close('o) | past('mm0) | stateful]) @ [> close('o) | past('q) | stateful]) @ [> past('p) | stateful] =
   <fun>
 |}, Principal{|
 val curry_edge_to_printed_curry :
@@ -825,9 +825,16 @@ let curry_acc_mismatch_crash f k a =
   k (fun () -> let _ = h in ());
   ()
 [%%expect{|
->> Fatal error: Out_type.name_of_modes: printing an elided curry mode
-Uncaught exception: Misc.Fatal_error
-
+val curry_acc_mismatch_crash :
+  ('a @ [< global > 'n] -> 'b @ [< global] -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< past('mm3) & past('o) & global many uncontended read_write] ->
+  (((unit @ 'q -> unit @ 'p) @ 'mm1 -> 'd @ 'mm0) @ [< past('mm2) & global] ->
+   ('a @ [< 'n & global] -> unit @ 'mm4) @ [> past('mm2) | past('mm3) | stateful]) @ [> past('o) | stateful] =
+  <fun>
+|}, Principal{|
+val curry_acc_mismatch_crash :
+  ('a @ [< global > 'n] -> 'b @ [< global] -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< global many uncontended read_write] ->
+  ((unit @ 'p -> unit @ 'o) @ 'mm0 -> 'd @ 'q) @ [< global] ->
+  'a @ [< 'n & global] -> unit @ 'mm1 = <fun>
 |}]
 
 let curry_acc_mismatch_imprecise f k a =
@@ -836,17 +843,15 @@ let curry_acc_mismatch_imprecise f k a =
   k (fun () -> let _ = h in ()); ()
 [%%expect{|
 val curry_acc_mismatch_imprecise :
-  ('a @ [< past('n) & global > 'p] ->
-   ('b @ [> local] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< past('mm4) & past('q) & global many uncontended read_write] ->
-  (((unit @ 'mm1 -> unit @ 'mm0) @ [> past('m)] -> 'd @ 'mm2) @ [< past('mm3) & global] ->
-   ('a @ [< 'p & global] -> unit @ 'mm5) @ [> past('mm3) | past('mm4) | stateful]) @ [> past('q) | stateful] =
+  ('a @ [< global > 'n] -> 'b @ [> local] -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< past('mm3) & past('o) & global many uncontended read_write] ->
+  (((unit @ 'q -> unit @ 'p) @ 'mm1 -> 'd @ 'mm0) @ [< past('mm2) & global] ->
+   ('a @ [< 'n & global] -> unit @ 'mm4) @ [> past('mm2) | past('mm3) | stateful]) @ [> past('o) | stateful] =
   <fun>
 |}, Principal{|
 val curry_acc_mismatch_imprecise :
-  ('a @ [< past('n) & global > 'p] ->
-   ('b @ [> local] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< global many uncontended read_write] ->
-  ((unit @ 'mm0 -> unit @ 'q) @ [> past('m)] -> 'd @ 'mm1) @ [< global] ->
-  'a @ [< 'p & global] -> unit @ 'mm2 = <fun>
+  ('a @ [< global > 'n] -> 'b @ [> local] -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< global many uncontended read_write] ->
+  ((unit @ 'p -> unit @ 'o) @ 'mm0 -> 'd @ 'q) @ [< global] ->
+  'a @ [< 'n & global] -> unit @ 'mm1 = <fun>
 |}]
 
 let empty_heads (x @ local once unforkable yielding)
@@ -855,17 +860,16 @@ let empty_heads (x @ local once unforkable yielding)
 [%%expect{|
 val empty_heads :
   'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
-  ((a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
-   ((b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n mod aliased contended immutable] ->
-    (a:int ->
-     (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic]) @ [> close('m) | local once nonportable unforkable yielding stateful]) @ [> close('m) | local once nonportable unforkable yielding stateful] =
+  (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
+  (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n mod aliased contended immutable] ->
+  (a:int -> b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}, Principal{|
 val empty_heads :
   'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
-  ((a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
-   ((b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n] ->
-    (a:int -> b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic]) @ [> close('m) | local once nonportable unforkable yielding stateful]) @ [> close('m) | local once nonportable unforkable yielding stateful] =
+  (a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
+  (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n] ->
+  (a:int -> b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic] =
   <fun>
 |}]
 
@@ -873,7 +877,33 @@ module Curry_inclusion : sig val g : ('a -> int) -> unit end = struct
   let g f = ignore (f == (fun (x @ local) y z -> z))
 end
 [%%expect{|
->> Fatal error: Out_type.name_of_modes: printing an elided curry mode
-Uncaught exception: Typemod.Error.In_context(_, _, _)
-
+Lines 1-3, characters 63-3:
+1 | ...............................................................struct
+2 |   let g f = ignore (f == (fun (x @ local) y z -> z))
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val g :
+             ('a @ [> local] -> 'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< many uncontended read_write] ->
+             unit @ [> dynamic]
+         end
+       is not included in
+         sig val g : ('a -> int) -> unit end
+       Values do not match:
+         val g :
+           ('a @ [> local] -> 'b @ 'n -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< many uncontended read_write] ->
+           unit @ [> dynamic]
+       is not included in
+         val g : ('a -> int) -> unit
+       The type
+         "('a @ [< past('n) > local] ->
+          'b @ [< past('m)] ->
+          ('c @ [< 'o] -> 'c @ [> 'o]) @ [> past('m) | past('n) | local]) @ [< many uncontended read_write] ->
+         unit @ [> dynamic]"
+       is not compatible with the type "('a -> int) -> unit"
+       Type
+         "'b @ [< past('m)] ->
+         ('c @ [< 'o] -> 'c @ [> 'o]) @ [> past('m) | past('n) | local]"
+       is not compatible with type "int"
 |}]

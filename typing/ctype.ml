@@ -2196,6 +2196,13 @@ module Curry_mode = struct
     | Const c -> c.areality
     | Variable { areality; _ } -> areality
 
+  let mode : t -> With_locality.lr = function
+    | Const c -> With_locality.of_const c
+    | Variable { comonadic; _ } ->
+      let level = With_locality.generic_level in
+      let comonadic, _ = With_locality.Comonadic.newvar_above level comonadic in
+      { comonadic; monadic = With_locality.Monadic.newvar level }
+
   let add_arg t marg ~upper_areality =
     let areality = Locality.Const.join (areality t) upper_areality in
     let pinned =
