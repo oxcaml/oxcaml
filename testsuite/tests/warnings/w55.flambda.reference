@@ -14,6 +14,5 @@ File "w55.ml", line 31, characters 10-27:
 31 | let i x = (!r [@inlined]) x
                ^^^^^^^^^^^^^^^^^
 Warning 55 [inlining-impossible]: Cannot inline:
-  
   the optimizer did not know what function was being applied
   (the full inlining stack was: w55.ml:31,10--27)

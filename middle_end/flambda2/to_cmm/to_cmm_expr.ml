@@ -63,10 +63,10 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
   | None -> ()
   | Some use_info ->
     let reason =
-      Format.asprintf "\n  %s  (the full inlining stack was: %a)"
+      Format.asprintf "%s(the full inlining stack was: %a)"
         (match Inlined_attribute.Use_info.explanation use_info with
         | None -> ""
-        | Some explanation -> explanation ^ "\n")
+        | Some explanation -> explanation ^ "\n  ")
         Debuginfo.print_compact dbg_with_inlined
     in
     Location.prerr_warning
