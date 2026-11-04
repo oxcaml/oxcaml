@@ -536,11 +536,7 @@ let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     let incr =
       match bound_expr with
       | Inlined | Phantom _ | Simple _ | Split _ -> 1
-      | Splittable_prim { args; _ } ->
-        (* one binding for each arg + one for the actual binding + 1 for the
-           phantom binding left behind upon splitting (see
-           [new_bindings_for_splitting]) *)
-        List.length args + 1 + 1
+      | Splittable_prim { args; _ } -> List.length args + 1
     in
     next_order := !next_order + incr;
     !next_order
@@ -600,27 +596,7 @@ type split_result =
         split_binding : complex binding
       }
 
-let new_bindings_for_splitting ~phantomize ~cmm_var order args =
-  (* When phantom lets are being generated, splitting a binding leaves behind a
-     phantom binding for the variable being split, so that it remains visible to
-     the debugger if the split-off primitive application ends up being sunk
-     elsewhere. *)
-  let initial_bindings, initial_order =
-    if not phantomize
-    then [], order - 1
-    else
-      let phantom_binding =
-        Binding
-          { order = order - 1;
-            phantomize = true;
-            effs = Ece.pure_can_be_duplicated;
-            inline = Inlined;
-            bound_expr = Inlined;
-            cmm_var
-          }
-      in
-      [phantom_binding], order - 2
-  in
+let new_bindings_for_splitting order args =
   let (new_bindings, _, free_vars_of_new_cmm_args), new_cmm_args =
     List.fold_left_map
       (fun (new_bindings, order, free_vars)
@@ -658,7 +634,7 @@ let new_bindings_for_splitting ~phantomize ~cmm_var order args =
               order - 1,
               FV.add ~mode:Normal backend_var free_vars ),
             C.var backend_var ))
-      (initial_bindings, initial_order, FV.empty)
+      ([], order - 1, FV.empty)
       args
   in
   new_bindings, new_cmm_args, free_vars_of_new_cmm_args
@@ -711,8 +687,7 @@ let split_complex_binding ~env ~res (binding : complex binding) =
        arguments, but that should be extremely rare, and should not affect code
        generation much. *)
     let new_bindings, new_cmm_args, free_vars_of_new_cmm_args =
-      new_bindings_for_splitting ~phantomize:binding.phantomize
-        ~cmm_var:binding.cmm_var binding.order args
+      new_bindings_for_splitting binding.order args
     in
     let new_cmm_expr, res = rebuild_prim ~dbg ~env ~res prim new_cmm_args in
     let prim_effects =
