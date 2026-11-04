@@ -39,6 +39,8 @@
 
 (copy_files# utils/*.ml{,i})
 
+(copy_files# fdo/common/*.ml{,i})
+
 (copy_files# parsing/*.ml{,i})
 
 (copy_files parsing/parser.mly)
@@ -62,8 +64,6 @@
 (copy_files# tools/simdgen/*.ml{,i})
 
 (copy_files# backend/cfg/*.ml{,i})
-
-(copy_files# backend/fdo/*.ml{,i})
 
 (copy_files# backend/ssa/*.ml{,i})
 
@@ -181,6 +181,7 @@
   zero_alloc_utils
   zero_alloc_annotations
   doubly_linked_list
+  ;; fdo/common/
   fdo_prehash
   fdo_counter_identity
   fdo_counter

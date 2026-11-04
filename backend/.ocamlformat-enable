@@ -63,8 +63,6 @@ debug/**/*.ml
 debug/**/*.mli
 emitaux.ml
 emitaux.mli
-fdo/*.ml
-fdo/*.mli
 generic_fns.ml
 generic_fns.mli
 operation.ml
