@@ -828,22 +828,11 @@ Line 4, characters 2-11:
   No .cmi file found containing k.
 |}]
 
-(* Bug: this should typecheck and compile. *)
 module F(M : S with kind_ k = value) = struct
   let f () = M.x
 end
 [%%expect{|
-Line 2, characters 13-16:
-2 |   let f () = M.x
-                 ^^^
-Error: This path projects from a module that contains unrepresentable items.
-Line 4, characters 2-11:
-4 |   val x : t
-      ^^^^^^^^^
-  "x" is not representable.
-  The kind of t/2 is k
-    because of the definition of t at line 3, characters 2-12.
-  But the kind of t/2 must be representable
-    because it's the type of an item in a module being projected from.
-  No .cmi file found containing k.
+module F :
+  functor (M : sig kind_ k = value type t val x : t end) ->
+    sig val f : unit -> M.t end
 |}]

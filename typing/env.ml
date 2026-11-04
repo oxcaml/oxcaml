@@ -2642,7 +2642,8 @@ let rec components_of_module_maker
             let decl' = Subst.jkind_declaration sub decl in
             let shape = Shape.proj cm_shape (Shape.Item.jkind id) in
             let jkda = { jkda_declaration = decl'; jkda_shape = shape } in
-            c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
+            c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds;
+            env := store_jkind ~check:false id decl shape !env
       )
         items_and_paths;
       inner_full_env := !env;
@@ -2977,7 +2978,7 @@ and store_cltype id desc shape env =
     cltypes = IdTbl.add id cltda env.cltypes;
     summary = Env_cltype(env.summary, id, desc) }
 
-let store_jkind ~check id decl shape env =
+and store_jkind ~check id decl shape env =
   let loc = decl.jkind_loc in
   if check then
     check_usage loc id decl.jkind_uid
