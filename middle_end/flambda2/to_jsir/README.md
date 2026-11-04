@@ -5,28 +5,36 @@ the compiler by [jsoo_imports/dune](jsoo_imports/dune)). This translation enable
 
 ## Usage
 
-The pass is the code generator of `ocamlopt -target js_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which works like regular `ocamlopt`:
+The pass is the code generator of `ocamlopt -target js_of_ocaml` and `ocamlopt -target wasm_of_ocaml` (see [`Jscomp`](../../../optcomp/jscomp.mli)), which work like regular `ocamlopt`:
 
 ```
 ocamlopt -target js_of_ocaml -c foo.ml                           # foo.cmi foo.cmjx foo.cmjo
 ocamlopt -target js_of_ocaml -a -o lib.cmjxa foo.cmjx stubs.js   # lib.cmjxa lib.cmja
 ocamlopt -target js_of_ocaml -o prog.js lib.cmjxa main.cmjx      # or a.out.js without -o
+
+ocamlopt -target wasm_of_ocaml -c foo.ml                          # foo.cmi foo.cmwx foo.cmwo
+ocamlopt -target wasm_of_ocaml -a -o lib.cmwxa foo.cmwx stubs.wat  # lib.cmwxa lib.cmwa
+ocamlopt -target wasm_of_ocaml -o prog.js lib.cmwxa main.cmwx     # prog.js prog.assets/
 ```
 
-| Native | js_of_ocaml | Contents |
-|--------|-------------|----------|
-| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | Flambda 2 export information |
-| `.o` / `.a` | `.cmjo` / `.cmja` | JavaScript, produced by `js_of_ocaml compile` / `js_of_ocaml link -a` |
-| `.s` | `.cmj` | The JSIR of a unit, marshaled; deleted unless `-S` is given |
-| startup file | `<exe>.runtime.js` | The output of `js_of_ocaml build-runtime`; deleted unless `-dstartup` is given |
-| C stubs | `.js` stubs | Recorded in `.cmjxa` files and passed to `js_of_ocaml build-runtime` when linking |
+| Native | js_of_ocaml | wasm_of_ocaml | Contents |
+|--------|-------------|---------------|----------|
+| `.cmx` / `.cmxa` | `.cmjx` / `.cmjxa` | `.cmwx` / `.cmwxa` | Flambda 2 export information |
+| `.o` / `.a` | `.cmjo` / `.cmja` | `.cmwo` / `.cmwa` | JavaScript or WebAssembly, produced by `compile` / `link -a` |
+| `.s` | `.cmj` | `.cmw` | The JSIR of a unit, marshaled (the same format, recording the target); deleted unless `-S` is given |
+| startup file | `<exe>.runtime.js` | `<exe>.runtime.wasma` | The output of `build-runtime`; deleted unless `-dstartup` is given |
+| C stubs | `.js` stubs | `.js`, `.wat`, `.wast` and `.wasm` stubs | Recorded in library files and passed to `build-runtime` when linking |
+| executable | `prog.js` | `prog.js` and `prog.assets/` | The output of `link`; the directory holds the WebAssembly code that `prog.js` loads |
 
-The compiler runs the `js_of_ocaml` executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` environment variable is populated.
+The compiler runs the `js_of_ocaml` (`wasm_of_ocaml`) executable found in its `bin` directory, or in the `PATH`, unless the `OXCAML_JS_OF_OCAML` (`OXCAML_WASM_OF_OCAML`) environment variable is populated.
+Every `wasm_of_ocaml` command is given `--enable=portable-int`, as we use 63-bit integers.
 We can print JSIR with `-djsir`, `-g` makes `js_of_ocaml` keep debug information, and `-verbose` shows the `js_of_ocaml` commands.
 C sources and objects and `-ccopt`/`-cclib` are ignored (with a warning under `-verbose`).
 
-Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the `.js` stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc.
+`-jsoo-effects` selects the implementation of effect handlers, passed as `--effects` to `compile` and `build-runtime`: `disabled`, `cps` or `double-translation` (the default) for `js_of_ocaml`, and `disabled`, `cps`, `jspi` (the default) or `native` for `wasm_of_ocaml`.
+Only `jspi` (and `disabled`, which uses the same runtime) has a precompiled `wasm_of_ocaml` runtime for 63-bit integers; with `cps` or `native`, `build-runtime` compiles the runtime from its sources every time an executable is linked, which is slow.
 
+Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. They apply to the same `wasm_of_ocaml` commands. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc., and also `target=` and `jsoo-effects=`.
 
 ## Number representations
 | Flambda kind       | JSIR representation                                                                                                                                                                                                |
