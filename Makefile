@@ -126,7 +126,8 @@ $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
 
 # Whether make test also runs the testsuite under JSIR (ocamlopt -target
-# js_of_ocaml), which needs js_of_ocaml (see jsoo-build) and node. A nix shell
+# js_of_ocaml and -target wasm_of_ocaml), which needs js_of_ocaml and
+# wasm_of_ocaml (see jsoo-build), the Binaryen tools and node. A nix shell
 # built with withJsoo=true sets OXCAML_WITH_JSIR=true.
 with_jsir ?= $(if $(filter true,$(OXCAML_WITH_JSIR)),true,false)
 
@@ -241,8 +242,10 @@ merlin-promote:
 	$(MAKE) -C external/merlin test-promote
 
 # AST-dependent libraries: ppxlib, js_of_ocaml and their dependencies, and
-# the standard library compiled for ocamlopt -target js_of_ocaml (which runs
-# js_of_ocaml, so it can only be built once that is).
+# the standard library compiled for ocamlopt -target js_of_ocaml and -target
+# wasm_of_ocaml (which run js_of_ocaml and wasm_of_ocaml, so it can only be
+# built once they are; wasm_of_ocaml also needs wasm-opt and wasm-merge from
+# Binaryen in the PATH).
 #
 # Built with external/ast-dependent-libs as the dune root, against the
 # installed compiler in $(OXCAML_INSTALL) (found through PATH and OCAMLLIB).
@@ -262,6 +265,9 @@ merlin-promote:
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
 jsoo_private_deps = external/js_of_ocaml/oxcaml-private
+# Where the compiler's main build builds the libraries of the stdlib-jsir and
+# stdlib-wasm packages (see jsoo-install-shipped).
+stdlib_jsir_build = _build/main/$(ast_dependent_libs_root)/stdlib-jsir/build
 
 # The build directory is the default, $(ast_dependent_libs_root)/_build: with an
 # absolute --build-dir, dune install records absolute build-directory paths for
@@ -376,7 +382,7 @@ JSOO_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-compiler \
 build_stdlib_jsir = OXCAML_BUILD_STDLIB_JSIR=true
 
 stdlib_jsir_install = \
-  $(call ast_dependent_libs_install,--sections=lib_root stdlib-jsir)
+  $(call ast_dependent_libs_install,--sections=lib_root stdlib-jsir stdlib-wasm)
 
 AST_DEPENDENT_LIBS_PREFIX ?= $(OXCAML_INSTALL)
 
@@ -418,7 +424,7 @@ jsoo-install-shipped: boot-compiler $(PPXLIB_DEPS) $(JSOO_DEPS)
 	  --sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES)
 	$(build_stdlib_jsir) $(dune) install $(ws_main) \
 	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
-	  --sections=lib_root stdlib-jsir
+	  --sections=lib_root stdlib-jsir stdlib-wasm
 
 # The tests run in the compiler build too, against the js_of_ocaml it ships
 # (the main context sets up what js_of_ocaml's dune-workspace does). The nix

@@ -188,8 +188,11 @@ let ocamlc_opt_exit_status = make ("ocamlc_opt_exit_status",
 let ocamlopt_opt_exit_status = make ("ocamlopt_opt_exit_status",
   "Expected exit status of ocamlopt.opt")
 
-let ocamlopt_jsir_exit_status = make ("ocamlopt_jsir_exit_status",
+let ocamlopt_jsir_js_exit_status = make ("ocamlopt_jsir_js_exit_status",
   "Expected exit status of ocamlopt.opt -target js_of_ocaml")
+
+let ocamlopt_jsir_wasm_exit_status = make ("ocamlopt_jsir_wasm_exit_status",
+  "Expected exit status of ocamlopt.opt -target wasm_of_ocaml")
 
 let export_ocamlrunparam value =
   ("OCAMLRUNPARAM", value)
@@ -301,7 +304,8 @@ let init () =
     ocamlnat_exit_status;
     ocamlc_opt_exit_status;
     ocamlopt_opt_exit_status;
-    ocamlopt_jsir_exit_status;
+    ocamlopt_jsir_js_exit_status;
+    ocamlopt_jsir_wasm_exit_status;
     ocamlrunparam;
     ocamllex_flags;
     ocamlyacc_flags;
