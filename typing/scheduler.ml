@@ -62,16 +62,22 @@ module Change = struct
       and [take] operations:
       - For [add], we use a [skip] bit on jobs. The scheduler will clear up any
         skipped garbage jobs on [run]
-      - For [take], we log the [job] taken from the scheduler. *)
+      - For [take], we log the [job] taken from the scheduler.
+      - For [clear], we log the jobs that were removed. *)
   type nonrec t =
     | Add of Job.With_skip.t
     | Take of t * Job.With_skip.t
+    | Clear of t * Job.With_skip.t Queue.t
 
   let undo = function
     | Add job -> job.skip <- true
     | Take (t, job) ->
       (* [job]'s effects should be undone, thus requeuing is ok. *)
       Queue.add job t.jobs
+    | Clear (t, jobs) ->
+      (* Jobs added since are skipped; put the cleared ones before them. *)
+      Queue.transfer t.jobs jobs;
+      Queue.transfer jobs t.jobs
 end
 
 include With_backtracking.Make (Change)
@@ -99,3 +105,10 @@ let run t =
     let next_job = take t in
     Job.With_skip.run next_job
   done
+
+let clear t =
+  if not (Queue.is_empty t.jobs)
+  then (
+    let jobs = Queue.create () in
+    Queue.transfer t.jobs jobs;
+    log (Clear (t, jobs)))

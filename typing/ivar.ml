@@ -1,6 +1,6 @@
 module Union_find = Union_find.Make ()
 
-module Callback = struct
+module Handler = struct
   type 'a t =
     { run : 'a -> unit;
       cancel : unit -> unit;
@@ -19,7 +19,9 @@ end
 
 module Cell = struct
   type 'a t =
-    | Empty of 'a Callback.t list
+    (* Newest first. Handlers run oldest first, so the first error reported
+       is at the earliest use. *)
+    | Empty of 'a Handler.t list
     | Full of 'a
 
   let empty = Empty []
@@ -27,41 +29,30 @@ module Cell = struct
   module After_merge = struct
     type 'a t =
       | Noop
-      | Schedule of 'a * 'a Callback.t list
+      | Schedule of 'a * 'a Handler.t list
 
     let run t ~scheduler =
       match t with
       | Noop -> ()
-      | Schedule (value, callbacks) ->
-        List.iter (Callback.schedule_run ~value ~scheduler) callbacks
+      | Schedule (value, handlers) ->
+        List.iter (Handler.schedule_run ~value ~scheduler) (List.rev handlers)
   end
 
   let merge (t1 : 'a t) (t2 : 'a t) ~(f : 'a -> 'a -> 'a) :
       'a t * 'a After_merge.t =
     match t1, t2 with
-    | Empty callbacks1, Empty callbacks2 ->
-      Empty (callbacks2 @ callbacks1), Noop
-    | Empty callbacks, (Full value as t) | (Full value as t), Empty callbacks ->
-      t, Schedule (value, callbacks)
+    | Empty handlers1, Empty handlers2 -> Empty (handlers1 @ handlers2), Noop
+    | Empty handlers, (Full value as t) | (Full value as t), Empty handlers ->
+      t, Schedule (value, handlers)
     | Full value1, Full value2 -> Full (f value1 value2), Noop
 end
 
 type 'a t = 'a Cell.t Union_find.t
 
-type packed = Packed : 'a t -> packed
-
-let global_pool : packed list ref = Local_store.s_ref []
-
 module Change = struct
-  type t =
-    | Union_find of Union_find.Change.t
-    | Global_pool_add
-    | Global_pool_take of packed list
+  type t = Union_find of Union_find.Change.t
 
-  let undo = function
-    | Union_find change -> Union_find.Change.undo change
-    | Global_pool_add -> global_pool := List.tl !global_pool
-    | Global_pool_take pool -> global_pool := pool
+  let undo = function Union_find change -> Union_find.Change.undo change
 end
 
 module Log = With_backtracking.Make (Change)
@@ -75,6 +66,9 @@ let cell (t : 'a t) : 'a Cell.t = Union_find.get t
 let set_cell (t : 'a t) (cell : 'a Cell.t) = Union_find.set t cell
 
 let is_empty t = match cell t with Empty _ -> true | Full _ -> false
+
+let has_handlers t =
+  match cell t with Empty (_ :: _) -> true | Empty [] | Full _ -> false
 
 let peek t = match cell t with Empty _ -> None | Full value -> Some value
 
@@ -92,23 +86,30 @@ end
 let fill t value ~scheduler : _ Fill_result.t =
   match cell t with
   | Full value' -> Already_full value'
-  | Empty callbacks ->
+  | Empty handlers ->
     set_cell t (Full value);
-    List.iter (Callback.schedule_run ~value ~scheduler) callbacks;
+    List.iter (Handler.schedule_run ~value ~scheduler) (List.rev handlers);
     Ok
 
 let upon t ~run ~cancel ~scheduler =
   match cell t with
   | Full value -> Scheduler.add scheduler (fun () -> run value)
-  | Empty callbacks ->
-    set_cell t (Empty (Callback.create ~run ~cancel :: callbacks))
+  | Empty handlers ->
+    set_cell t (Empty (Handler.create ~run ~cancel :: handlers))
 
-let cancel_all t ~scheduler =
+let take_handlers t =
   match cell t with
-  | Full _value -> ()
-  | Empty callbacks ->
+  | Full _ | Empty [] -> []
+  | Empty handlers ->
     set_cell t Cell.empty;
-    List.iter (Callback.schedule_cancel ~scheduler) callbacks
+    List.rev handlers
+
+let cancel_all ts ~scheduler =
+  (* Detach all handlers first: under the eager policy, [cancel] runs now. *)
+  List.concat_map take_handlers ts
+  |> List.iter (Handler.schedule_cancel ~scheduler)
+
+let drop_all ts = List.iter (fun t -> ignore (take_handlers t)) ts
 
 let merge t1 t2 ~f ~scheduler =
   if not (Union_find.same t1 t2)
@@ -118,19 +119,4 @@ let merge t1 t2 ~f ~scheduler =
     set_cell t1 cell;
     Cell.After_merge.run after ~scheduler)
 
-module Global_pool = struct
-  let add t =
-    Log.log Global_pool_add;
-    global_pool := Packed t :: !global_pool
-
-  let take () =
-    let pool = !global_pool in
-    Log.log (Global_pool_take pool);
-    global_pool := [];
-    pool
-end
-
-let create ~in_global_pool () =
-  let t = Union_find.create Cell.empty in
-  if in_global_pool then Global_pool.add t;
-  t
+let create () = Union_find.create Cell.empty

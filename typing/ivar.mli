@@ -2,27 +2,18 @@
     filled.
 
     Ivars can be merged, after which they behave as a single ivar. Handlers may
-    run in any order.
-
-    {2 The global pool}
-
-    An ivar created with [~in_global_pool:true] is registered in the
-    {!Global_pool}, recording that it must eventually be filled or cancelled.
-    The pool does not decide when that is: the client does, by draining it with
-    {!Global_pool.take}.
-
-    There is a single, global pool. It does not distinguish ivars by when or
-    where they were created: {!Global_pool.take} returns every ivar registered
-    since the previous [take]. *)
+    run in any order. *)
 
 type 'a t
 
-(** [create ~in_global_pool ()] returns an empty ivar, added to the
-    {!Global_pool} iff [in_global_pool]. *)
-val create : in_global_pool:bool -> unit -> 'a t
+(** [create ()] returns an empty ivar. *)
+val create : unit -> 'a t
 
 (** [is_empty t] returns [true] if [t] is empty. *)
 val is_empty : 'a t -> bool
+
+(** [has_handlers t] is [true] iff [t] is empty and has handlers attached. *)
+val has_handlers : 'a t -> bool
 
 (** [peek t] is [Some v] if [t] has been filled with [v], [None] otherwise. *)
 val peek : 'a t -> 'a option
@@ -42,10 +33,11 @@ end
 val fill : 'a t -> 'a -> scheduler:Scheduler.t -> 'a Fill_result.t
 
 (** [upon t ~run ~cancel ~scheduler] registers a handler on [t]. Each handler is
-    either run or cancelled, exactly once:
+    run, cancelled or dropped, at most once:
     - [run v] once [t] is filled with [v]. If [t] is already full, it is
       enqueued immediately.
-    - [cancel ()] if the handler is detached by {!cancel_all}.
+    - [cancel ()] if [t] is cancelled by {!cancel_all}.
+    - neither, if [t] is dropped by {!drop_all}.
 
     Both run in the monitor current when [upon] is called (see
     {!Scheduler.Monitor}), not the one current when [t] is filled or cancelled.
@@ -57,26 +49,18 @@ val upon :
   scheduler:Scheduler.t ->
   unit
 
-(** [cancel_all t ~scheduler] detaches all handlers waiting on [t] and enqueues
-    each [cancel]. Does nothing if [t] is full. *)
-val cancel_all : 'a t -> scheduler:Scheduler.t -> unit
+(** [cancel_all ts ~scheduler] detaches the handlers of every ivar in [ts], then
+    enqueues each [cancel]. The ivars stay empty. *)
+val cancel_all : 'a t list -> scheduler:Scheduler.t -> unit
+
+(** [drop_all ts] detaches the handlers of every ivar in [ts]. *)
+val drop_all : 'a t list -> unit
 
 (** [merge t1 t2 ~f ~scheduler] makes [t1] and [t2] the same ivar. If both are
     empty, their handlers are combined. If exactly one is full, the other's
     handlers are enqueued as if by {!fill}. If both are full, [f] combines their
     values. *)
 val merge : 'a t -> 'a t -> f:('a -> 'a -> 'a) -> scheduler:Scheduler.t -> unit
-
-(** An ivar of any content type. *)
-type packed = Packed : 'a t -> packed
-
-(** The global pool of ivars that must be filled or cancelled, described at the
-    top of this module. *)
-module Global_pool : sig
-  (** [take ()] empties the pool, returning the ivars that were in it. Like all
-      mutations, this is logged, so backtracking restores the pool. *)
-  val take : unit -> packed list
-end
 
 (** All mutations are reported to the log installed by [set_log], so they can be
     undone with [Change.undo]. Jobs enqueued on the scheduler are logged

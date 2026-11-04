@@ -13506,6 +13506,8 @@ let type_binding env mutable_flag rec_flag ?force_toplevel spat_sexp_list =
       At_toplevel
       env mutable_flag rec_flag spat_sexp_list Modules_rejected
   in
+  (* Before checking uniqueness, which reads the modes they constrain. *)
+  Ctype.default_all_ivars_if_toplevel ();
   maybe_check_uniqueness_value_bindings pat_exp_list;
   (pat_exp_list, new_env)
 
@@ -13529,6 +13531,7 @@ let type_expression env jkind sexp =
     ~before_generalize:(fun exp -> may_lower_contravariant env exp)
     ~generalize:(fun exp -> generalize exp.exp_type)
   in
+  Ctype.default_all_ivars_if_toplevel ();
   let exp =
     match sexp.pexp_desc with
       Pexp_ident lid ->
