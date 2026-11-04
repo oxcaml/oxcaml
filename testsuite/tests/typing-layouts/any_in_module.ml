@@ -835,3 +835,37 @@ module F :
   functor (M : sig kind_ k = value type t val x : t end) ->
     sig val f : unit -> M.t end
 |}]
+
+(* Interaction with GADTs *)
+
+module type S = sig
+  type t : any
+  val x : t
+end
+
+type ('a : any) repr = Int : int repr
+[%%expect{|
+module type S = sig type t : any val x : t end
+type ('a : any) repr = Int : int repr
+|}]
+
+(* This test demonstrates a limitation of the current approach. [M]'s
+   representation is computed lazily in the environment where [M] was bound, so
+   it can't use GADT equations (here [a = int]) introduced later. *)
+
+let read (type a : any) (repr : a repr) (module M : S with type t = a) : int =
+  match repr with Int -> M.x
+[%%expect{|
+Line 2, characters 25-28:
+2 |   match repr with Int -> M.x
+                             ^^^
+Error: This path projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the annotation on the abstract type declaration for a.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
+|}]
