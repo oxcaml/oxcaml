@@ -819,6 +819,28 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         pp f  "%s" x
     | Ppat_any -> pp f "_";
     | Ppat_var ({txt = txt;_}) -> ident_of_name f txt
+    | Ppat_slice (mut, elements) ->
+        let punct =
+          match mut with
+          | Mutable -> '|'
+          | Immutable -> ':'
+        in
+        let item f = function
+          | `Pattern p -> pattern1 ctxt f p
+          | `Rest None -> pp f ".."
+          | `Rest (Some s) -> pp f ".. as %a" ident_of_name s.txt
+        in
+        let patterns = List.map (fun p -> `Pattern p) in
+        let items =
+          match elements with
+          | Pslice_closed l -> patterns l
+          | Pslice_open { prefix; rest; suffix } ->
+              patterns prefix @ [`Rest rest] @ patterns suffix
+        in
+        pp f "@[<2>[&%c%a%c]@]"
+          punct
+          (list item ~sep:";") items
+          punct
     | Ppat_array (mut, l) ->
         let punct =
           match mut with
@@ -865,7 +887,8 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_open (lid, p) ->
         let with_paren =
         match p.ppat_desc with
-        | Ppat_array _ | Ppat_record _ | Ppat_record_unboxed_product _
+        | Ppat_array _ | Ppat_slice _ | Ppat_record _
+        | Ppat_record_unboxed_product _
         | Ppat_construct (({txt=Lident ("()"|"[]"|"true"|"false");_}), None) ->
             false
         | _ -> true in

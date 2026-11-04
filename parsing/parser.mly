@@ -1074,6 +1074,8 @@ let maybe_pmod_constraint mode expr =
 %token LBRACKET               "["
 %token LBRACKETBAR            "[|"
 %token LBRACKETCOLON          "[:"
+%token LBRACKETAMPERBAR       "[&|"
+%token LBRACKETAMPERCOLON     "[&:"
 %token LBRACKETLESS           "[<"
 %token LBRACKETGREATER        "[>"
 %token LBRACKETPERCENT        "[%"
@@ -3875,6 +3877,10 @@ simple_delimited_pattern:
             Immutable
             $1
         }
+    | LBRACKETAMPERBAR slice_items BARRBRACKET
+        { Ppat_slice (Mutable, $2) }
+    | LBRACKETAMPERCOLON slice_items COLONRBRACKET
+        { Ppat_slice (Immutable, $2) }
     | HASHLPAREN reversed_labeled_tuple_pattern(pattern) RPAREN
         { let (closed, fields) = $2 in
           Ppat_unboxed_tuple (List.rev fields, closed) }
@@ -3947,6 +3953,50 @@ labeled_tuple_pattern(self):
   ps = separated_or_terminated_nonempty_list(SEMI, pattern)
     { ps }
 ;
+(* The elements of a slice pattern. *)
+slice_items:
+  | /* empty */
+      { Pslice_closed [] }
+  | pattern
+      { Pslice_closed [$1] }
+  | pattern SEMI slice_items
+      { match $3 with
+        | Pslice_closed ps -> Pslice_closed ($1 :: ps)
+        | Pslice_open o -> Pslice_open { o with prefix = $1 :: o.prefix } }
+  | slice_rest
+      { Pslice_open { prefix = []; rest = $1; suffix = [] } }
+  | slice_rest SEMI slice_suffix
+      { Pslice_open { prefix = []; rest = $1; suffix = $3 } }
+;
+slice_rest:
+  | DOTDOT
+      { None }
+  | DOTDOT AS mkrhs(val_ident)
+      { Some $3 }
+  | DOTDOT AS error
+      { expecting $loc($3) "identifier" }
+;
+slice_suffix:
+  | /* empty */
+      { [] }
+  | pattern
+      { [$1] }
+  | pattern SEMI slice_suffix
+      { $1 :: $3 }
+/* BEGIN AVOID */
+  | second_slice_rest
+      { $1 }
+  | second_slice_rest SEMI slice_suffix
+      { $1 }
+/* END AVOID */
+;
+/* BEGIN AVOID */
+(* separate production to improve error printing *)
+second_slice_rest:
+  | slice_rest
+      { raise Syntaxerr.(Error (Multiple_slice_rests (make_loc $sloc))) }
+;
+/* END AVOID */
 (* A label-pattern list is a nonempty list of label-pattern pairs, optionally
    followed with an UNDERSCORE, separated-or-terminated with semicolons. *)
 %inline record_pat_content:

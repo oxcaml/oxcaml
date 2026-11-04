@@ -361,6 +361,11 @@ and pattern_desc =
          *)
   | Ppat_array of mutable_flag * pattern list
       (** Pattern [[| P1; ...; Pn |]] or [[: P1; ...; Pn :]] *)
+  | Ppat_slice of mutable_flag * slice_elements
+      (** [Ppat_slice(flag, elements)] represents:
+          - [[&| ... |]] when [flag] is [Mutable]
+          - [[&: ... :]] when [flag] is [Immutable]
+         *)
   | Ppat_or of pattern * pattern  (** Pattern [P1 | P2] *)
   | Ppat_constraint of pattern * core_type option * modes
       (** [Ppat_constraint(tyopt, modes)] represents:
@@ -389,6 +394,20 @@ and pattern_desc =
   | Ppat_effect of pattern * pattern (* Pattern [effect P P] *)
   | Ppat_extension of extension  (** Pattern [[%id]] *)
   | Ppat_open of Longident.t loc * pattern  (** Pattern [M.(P)] *)
+
+(** The elements of a slice pattern *)
+and slice_elements =
+  | Pslice_closed of pattern list  (** [P1; ...; Pn] *)
+  | Pslice_open of
+      { prefix : pattern list;
+        rest : string loc option;
+        suffix : pattern list;
+      }
+      (** [Pslice_open { prefix = [P1; ...; Pn]; rest; suffix = [Q1; ...; Qm] }]
+          represents:
+          - [P1; ...; Pn; ..; Q1; ...; Qm] when [rest] is [None]
+          - [P1; ...; Pn; .. as x; Q1; ...; Qm] when [rest] is [Some x]
+       *)
 
 (** {2 Value expressions} *)
 

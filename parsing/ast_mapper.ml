@@ -719,6 +719,14 @@ module P = struct
         record_unboxed_product ~loc ~attrs
                (List.map (map_tuple (map_loc sub) (sub.pat sub)) lpl) cf
     | Ppat_array (mut, pl) -> array ~loc ~attrs mut (List.map (sub.pat sub) pl)
+    | Ppat_slice (mut, Pslice_closed pl) ->
+        slice ~loc ~attrs mut (Pslice_closed (List.map (sub.pat sub) pl))
+    | Ppat_slice (mut, Pslice_open { prefix; rest; suffix }) ->
+        slice ~loc ~attrs mut
+          (Pslice_open
+             { prefix = List.map (sub.pat sub) prefix;
+               rest = Option.map (map_loc sub) rest;
+               suffix = List.map (sub.pat sub) suffix })
     | Ppat_or (p1, p2) -> or_ ~loc ~attrs (sub.pat sub p1) (sub.pat sub p2)
     | Ppat_constraint (p, t, m) ->
         constraint_ ~loc ~attrs (sub.pat sub p) (Option.map (sub.typ sub) t) (sub.modes sub m)
