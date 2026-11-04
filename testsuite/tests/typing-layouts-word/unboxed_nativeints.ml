@@ -6,7 +6,9 @@
  }{
    (* Under js_of_ocaml, nativeints are 32 bits wide. *)
    reference = "${test_source_directory}/unboxed_nativeints.jsir-output.reference";
-   jsir;
+   jsir-js;
+ }{
+   jsir-wasm;
  }{
    bytecode;
  }{
