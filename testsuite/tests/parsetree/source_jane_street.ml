@@ -1985,10 +1985,8 @@ let f = function
   | _ -> 0
 let g = function [&: :] -> 0 | [&: x :] -> x | _ -> 0
 [%%expect{|
-Line 2, characters 4-10:
-2 |   | [&| |] -> 0
-        ^^^^^^
-Error: Slice patterns are not supported yet.
+val f : int slice -> int = <fun>
+val g : int slice_imm -> int = <fun>
 |}]
 
 (* Rests are parsed, but not supported yet *)
@@ -1997,5 +1995,5 @@ let h (s : int slice) = match s with [&| x; .. as _r; y |] -> x + y | _ -> 0
 Line 1, characters 37-58:
 1 | let h (s : int slice) = match s with [&| x; .. as _r; y |] -> x + y | _ -> 0
                                          ^^^^^^^^^^^^^^^^^^^^^
-Error: Slice patterns are not supported yet.
+Error: Rests in slice patterns are not supported yet.
 |}]
