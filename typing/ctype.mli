@@ -123,13 +123,21 @@ val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
 val newvar: ?name:string -> jkind_lr -> type_expr
 
-(** [newivar ?name jkind] returns a fresh [Tivar] whose empty ivar is in the
-    global ivar pool. *)
-val newivar : ?name:string -> jkind_lr -> type_expr
-
 (** The scheduler on which filling a [Tivar] during unification
     enqueues the ivar's handlers. Unification never runs it. *)
 val scheduler: unit -> Scheduler.t
+
+(** Runs the scheduler and defaults the ivars in the initial pool, as no
+    scope will. Does nothing inside a generalization scope, whose exit
+    handles them. On failure, their handlers and the queued jobs are
+    dropped. *)
+val default_all_ivars_if_toplevel : unit -> unit
+
+(** Once typing is done, outside every generalization scope and after
+    [default_all_ivars_if_toplevel], rewrites the [Tivar]s of the initial
+    pool into [Tvar]s, so that none outlives typing. Fails if one still has
+    handlers. *)
+val rewrite_defaulted_toplevel_tivars : unit -> unit
 
 val new_rep_var
   : ?name:string
@@ -477,6 +485,8 @@ val moregeneral: self_check:bool -> Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
   type_expr -> type_expr -> Jkind_types.Sort.Const.t option list
         (* Check if the first type scheme is more general than the second.
+           Generated suspended constraints (e.g. mode crossing) are defaulted
+           before returning, so every failure is reported in the result.
            The two [Sort.var list] arguments are the layout-polymorphic sort
            variables of the pattern and subject respectively.
            Returns, for each pattern sort variable (in order), the sort it was
@@ -549,7 +559,8 @@ type class_match_failure =
 
 val match_class_types:
     ?trace:bool -> Env.t -> class_type -> class_type -> class_match_failure list
-        (* Check if the first class type is more general than the second. *)
+        (* Check if the first class type is more general than the second.
+           Suspended constraints are defaulted as for [moregeneral]. *)
 val equal: ?do_jkind_check:bool ->
   Env.t -> bool -> type_expr list -> type_expr list -> unit
         (* [equal env [x1...xn] tau [y1...yn] sigma]
