@@ -35,14 +35,14 @@ val create :
   exn_continuation:Continuation.t ->
   my_region:Region_stack_element.t option ->
   my_alloc_region:Ident.t ->
-  fdo:Fdo_env.t option ->
+  fdo:Fdo_from_lambda_env.t option ->
   t
 
 val current_unit : t -> Compilation_unit.t
 
-(** The FDO state of the function being translated (see [Fdo_env]), when
-    [-fdo-counters] is in effect. *)
-val fdo : t -> Fdo_env.t option
+(** The FDO state of the function being translated (see [Fdo_from_lambda_env]),
+    [None] if [-fdo-counters] is off. *)
+val fdo : t -> Fdo_from_lambda_env.t option
 
 val machine_width : t -> Target_system.Machine_width.t
 
