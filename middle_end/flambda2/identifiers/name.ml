@@ -55,6 +55,11 @@ let compilation_unit t =
     ~var:(fun var -> Variable.compilation_unit var)
     ~symbol:(fun sym -> Symbol.compilation_unit sym)
 
+let found_compilation_unit t =
+  pattern_match t
+    ~var:(fun var -> Variable.found_compilation_unit var)
+    ~symbol:(fun sym -> Symbol.found_compilation_unit sym)
+
 let is_imported t =
   let current = Current_unit.get_cu_exn () in
   not (Compilation_unit.equal current (compilation_unit t))

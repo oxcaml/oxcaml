@@ -36,14 +36,14 @@ val get_older_version_of : t -> Code_id.t -> Code_id.t option
     code are related, e.g. due to a missing cmx file. *)
 val meet :
   t ->
-  resolver:(Compilation_unit.t -> t option) ->
+  resolver:(Compilation_unit.Found.t -> t option) ->
   Code_id.t ->
   Code_id.t ->
   Code_id.t Or_unknown_or_bottom.t
 
 val meet_set :
   t ->
-  resolver:(Compilation_unit.t -> t option) ->
+  resolver:(Compilation_unit.Found.t -> t option) ->
   Code_id.Set.t ->
   Code_id.Set.t ->
   Code_id.Set.t Or_bottom.t

@@ -117,7 +117,9 @@ let make
 
     let compile_implementation ~keep_symbol_tables ~sourcefile:_ ~prefixname
         ~ppf_dump (program : Lambda.program) =
-      Compilation_unit.Set.iter Compilenv.require_global
+      Compilation_unit.Set.iter
+        (fun cu ->
+          Compilenv.require_global (Compilation_unit.Found.without_cmx_path cu))
         program.required_globals;
       let jsir =
         lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables program

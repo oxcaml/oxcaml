@@ -105,7 +105,7 @@ end
 
 type t =
   { machine_width : Target_system.Machine_width.t;
-    resolver : Compilation_unit.t -> serializable option;
+    resolver : Compilation_unit.Found.t -> serializable option;
     binding_time_resolver : Name.t -> Binding_time.With_name_mode.t;
     defined_symbols : Symbol.Set.t;
     code_age_relation : Code_age_relation.t;
@@ -320,12 +320,19 @@ let names_to_types t =
 
 exception Binding_time_resolver_failure
 
+(* Errors meant for the user, such as a .cmx file that cannot be read, are
+   reported as such rather than as a bug in the resolver. *)
+let reraise_user_error exn =
+  match Location.error_of_exn exn with Some _ -> raise exn | None -> ()
+
 let binding_time_resolver resolver name =
-  match resolver (Name.compilation_unit name) with
-  | exception _ ->
+  match resolver (Name.found_compilation_unit name) with
+  | exception exn ->
+    let backtrace = Printexc.get_raw_backtrace () in
+    reraise_user_error exn;
     Misc.fatal_errorf
       "Exception in resolver (via [binding_time_resolver])@ Backtrace is: %s"
-      (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
+      (Printexc.raw_backtrace_to_string backtrace)
   | None -> raise Binding_time_resolver_failure
   | Some t -> (
     match Name.Map.find_or_null name t.names_to_types with
@@ -388,8 +395,10 @@ let variable_is_from_missing_cmx_file t name =
     if Compilation_unit.equal comp_unit (Current_unit.get_cu_exn ())
     then false
     else
-      match (resolver t) comp_unit with
-      | exception _ -> true
+      match (resolver t) (Name.found_compilation_unit name) with
+      | exception exn ->
+        reraise_user_error exn;
+        true
       | None -> true
       | Some _ -> false
 
@@ -428,11 +437,13 @@ let find_with_binding_time_and_mode' t name kind =
       in
       Name.pattern_match name ~var ~symbol
     else
-      match (resolver t) comp_unit with
+      match (resolver t) (Name.found_compilation_unit name) with
       | exception exn ->
+        let backtrace = Printexc.get_raw_backtrace () in
+        reraise_user_error exn;
         Misc.fatal_errorf "Exception in resolver: %s@ Backtrace is: %s"
           (Printexc.to_string exn)
-          (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
+          (Printexc.raw_backtrace_to_string backtrace)
       | None ->
         Name.pattern_match name
           ~symbol:(fun _ ->

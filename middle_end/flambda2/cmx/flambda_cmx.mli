@@ -19,14 +19,17 @@
 
 type loader
 
+(** [get_module_info] reads the .cmx file of a unit, from the location recorded
+    on it if any (see [Compilation_unit.Found]). *)
 val create_loader :
-  get_module_info:(Compilation_unit.t -> Flambda_cmx_format.t option) -> loader
+  get_module_info:(Compilation_unit.Found.t -> Flambda_cmx_format.t option) ->
+  loader
 
 val get_imported_code : loader -> unit -> Exported_code.t
 
 val load_cmx_file_contents :
   loader ->
-  Compilation_unit.t ->
+  Compilation_unit.Found.t ->
   Flambda2_types.Typing_env.Serializable.t option
 
 val load_symbol_approx :

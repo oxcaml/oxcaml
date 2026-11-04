@@ -39,6 +39,12 @@ val for_compilation_unit : Compilation_unit.t -> t
 
 val compilation_unit : t -> Compilation_unit.t
 
+(** The compilation unit together with the recorded location of its .cmx
+    file, if any (see [Compilation_unit.Found]). *)
+val found_compilation_unit : t -> Compilation_unit.Found.t
+
+val with_found_compilation_unit : t -> Compilation_unit.Found.t -> t
+
 val linkage_name : t -> Linkage_name.t
 
 (** Linkage names displayed in ocamlobjinfo are formatted differently. *)

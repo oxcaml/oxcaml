@@ -632,3 +632,45 @@ let name_mangling_scheme_for_current_unit () =
   match !name_mangling_scheme_override with
   | Some scheme -> scheme
   | None -> Config.name_mangling_scheme
+
+module Found = struct
+  type cu = t
+
+  (* The path is ignored by [compare], [equal] and [hash]. The empty string
+     means no location is recorded. *)
+  type t =
+    { unit : cu;
+      cmx_path : Misc.filepath
+    }
+
+  let without_cmx_path unit = { unit; cmx_path = "" }
+
+  let unit t = t.unit
+
+  let with_cmx_path t cmx_path =
+    if String.equal cmx_path "" then Misc.fatal_error "Empty cmx path";
+    { t with cmx_path }
+
+  let cmx_path t = match t.cmx_path with "" -> None | path -> Some path
+
+  let which_cmx_file t ~accessed_by =
+    { t with unit = which_cmx_file t.unit ~accessed_by }
+
+  let doc_print ppf t = doc_print ppf t.unit
+
+  include Identifiable.Make (struct
+    type nonrec t = t
+
+    let compare t1 t2 = compare t1.unit t2.unit
+
+    let equal t1 t2 = equal t1.unit t2.unit
+
+    let hash t = hash t.unit
+
+    let print ppf t = Fmt.compat doc_print ppf t
+
+    let output = Misc.output_of_doc_print doc_print
+  end)
+
+  let print = doc_print
+end
