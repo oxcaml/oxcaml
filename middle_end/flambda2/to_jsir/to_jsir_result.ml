@@ -272,11 +272,11 @@ let resolve_var_aliases var_aliases =
 let add_entry_prelude_instr t instr =
   { t with entry_prelude = instr :: t.entry_prelude }
 
-let symbol_to_native_strings symbol =
+let symbol_to_name_constants symbol : Jsir.constant * Jsir.constant =
   ( Symbol.compilation_unit symbol
     |> Compilation_unit.name |> Compilation_unit.Name.to_string
-    |> Jsir.Native_string.of_string,
-    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
+    |> To_jsir_target.name_constant,
+    Symbol.linkage_name_as_string symbol |> To_jsir_target.name_constant )
 
 let symbol_is_for_compilation_unit symbol =
   let compilation_unit = Symbol.compilation_unit symbol in
@@ -295,16 +295,14 @@ let register_symbol t ?loc symbol var =
        exported *)
     t
   else
-    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
+    let compilation_unit_name, symbol_name = symbol_to_name_constants symbol in
     let t = match loc with None -> t | Some loc -> add_event_at_exn t loc in
     add_instr_exn t
       (Let
          ( Jsir.Var.fresh (),
            Prim
              ( Extern ("caml_register_symbol", None),
-               [ Pc (NativeString compilation_unit_name);
-                 Pc (NativeString symbol_name);
-                 Pv var ] ) ))
+               [Pc compilation_unit_name; Pc symbol_name; Pv var] ) ))
 
 let predef_exception_lookup symbol : Jsir.expr =
   let symbol_name = Symbol.linkage_name_as_string symbol in
@@ -322,7 +320,7 @@ let predef_exception_lookup symbol : Jsir.expr =
   (* js_of_ocaml registers these with [caml_register_global_predef] *)
   Prim
     ( Extern ("caml_get_global_predef", None),
-      [Pc (NativeString (Jsir.Native_string.of_string symbol_name))] )
+      [Pc (To_jsir_target.name_constant symbol_name)] )
 
 let external_symbol_lookup t symbol : t * Jsir.expr =
   match Symbol.is_predefined_exception symbol with
@@ -338,21 +336,18 @@ let external_symbol_lookup t symbol : t * Jsir.expr =
       ( t,
         Prim
           ( Extern ("caml_get_global", None),
-            [ Pc
-                (NativeString
-                   (Jsir.Native_string.of_string compilation_unit_name)) ] ) )
+            [Pc (To_jsir_target.name_constant compilation_unit_name)] ) )
     | false ->
       (* The unit defining the symbol must be linked (and initialised) before
          this one, so record it as an import too. *)
       let t = import_compilation_unit t (Symbol.compilation_unit symbol) in
       let compilation_unit_name, symbol_name =
-        symbol_to_native_strings symbol
+        symbol_to_name_constants symbol
       in
       ( t,
         Prim
           ( Extern ("caml_get_symbol", None),
-            [ Pc (NativeString compilation_unit_name);
-              Pc (NativeString symbol_name) ] ) ))
+            [Pc compilation_unit_name; Pc symbol_name] ) ))
 
 (* Symbols from other compilation units are fetched once at the start of the
    entry block. *)

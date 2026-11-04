@@ -450,7 +450,8 @@ let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
   let run () =
     let { flambda; all_code; offsets; reachable_names } =
       lambda_to_flambda ~ppf_dump ~prefixname
-        ~machine_width:Thirty_two_no_gc_tag_bit program
+        ~machine_width:(Flambda2_to_jsir.To_jsir_target.machine_width ())
+        program
     in
     let { Flambda2_to_jsir.To_jsir_result.program; imported_compilation_units }
         =

@@ -45,7 +45,7 @@ type expr_binding =
 
 let target_ocaml_int_to_jsir_const targetint : Jsir.constant =
   let repr =
-    Target_ocaml_int.to_targetint Thirty_two_no_gc_tag_bit targetint
+    Target_ocaml_int.to_targetint (To_jsir_target.machine_width ()) targetint
     |> Targetint_32_64.repr
   in
   let targetint =
@@ -77,7 +77,9 @@ let int32_to_jsir_const int32 : Jsir.constant = Int32 int32
 let int64_to_jsir_const int64 : Jsir.constant = Int64 int64
 
 let nativeint_to_jsir_const nativeint : Jsir.constant =
-  Int32 (Targetint_32_64.to_int32 nativeint)
+  match Targetint_32_64.repr nativeint with
+  | Int32 int32 -> NativeInt (Targetnativeint.of_int32_exn int32)
+  | Int64 int64 -> NativeInt (Targetnativeint.of_int64_exn int64)
 
 let rec reg_width_const const : Jsir.constant =
   match Reg_width_const.descr const with
@@ -93,8 +95,9 @@ let rec reg_width_const const : Jsir.constant =
   | Null -> Jsir.Null_
   | Poison (kind, name) ->
     reg_width_const
-      (Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit kind
-         (String.hash name))
+      (Reg_width_const.of_int_of_kind
+         (To_jsir_target.machine_width ())
+         kind (String.hash name))
   | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ ->
     (* CR-someday selee: SIMD support *)
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const

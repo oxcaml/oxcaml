@@ -1362,31 +1362,40 @@ let mk_target f =
        we are hoping to use this flag for cross-compilation triplets, and
        we don't want anyone to rely on this behaviour before that is in
        place. *)
-    Arg.Symbol ([ "js_of_ocaml" ], fun _ -> f Clflags.Target.Js_of_ocaml),
-    " Compile to JavaScript instead of native code" )
+    (let targets =
+       [
+         ("js_of_ocaml", Clflags.Target.Js_of_ocaml);
+         ("wasm_of_ocaml", Clflags.Target.Wasm_of_ocaml);
+       ]
+     in
+     Arg.Symbol (List.map fst targets, fun s -> f (List.assoc s targets))),
+    " Compile to JavaScript (js_of_ocaml) or WebAssembly (wasm_of_ocaml) \
+     instead of native code" )
 
 let mk_jsoo_opt f =
   let doc (phase : Clflags.Jsoo_phase.t) =
     match phase with
-    | All -> "<opt>  Pass option <opt> to every js_of_ocaml invocation"
+    | All ->
+        "<opt>  Pass option <opt> to every js_of_ocaml or wasm_of_ocaml \
+         invocation"
     | Compile ->
-        "<opt>  Pass option <opt> to js_of_ocaml when compiling a unit \
-         (js_of_ocaml compile)"
+        "<opt>  Pass option <opt> when compiling a unit (js_of_ocaml or \
+         wasm_of_ocaml compile)"
     | Archive ->
-        "<opt>  Pass option <opt> to js_of_ocaml when creating an archive with \
-         -a (js_of_ocaml link -a)"
+        "<opt>  Pass option <opt> when creating an archive with -a \
+         (js_of_ocaml or wasm_of_ocaml link -a)"
     | Runtime ->
-        "<opt>  Pass option <opt> to js_of_ocaml when building the runtime of \
-         an executable (js_of_ocaml build-runtime)"
+        "<opt>  Pass option <opt> when building the runtime of an executable \
+         (js_of_ocaml or wasm_of_ocaml build-runtime)"
     | Link ->
-        "<opt>  Pass option <opt> to js_of_ocaml when linking an executable \
-         (js_of_ocaml link)"
+        "<opt>  Pass option <opt> when linking an executable (js_of_ocaml or \
+         wasm_of_ocaml link)"
   in
   List.map
     (fun phase ->
       ( Clflags.Jsoo_phase.flag phase,
         Arg.String (f phase),
-        doc phase ^ " (with -target js_of_ocaml)" ))
+        doc phase ^ " (with -target js_of_ocaml or wasm_of_ocaml)" ))
     Clflags.Jsoo_phase.all
 
 let mk_jsoo_effects f =
@@ -1395,15 +1404,28 @@ let mk_jsoo_effects f =
       (fun effects -> (Clflags.Jsoo_effects.to_string effects, effects))
       Clflags.Jsoo_effects.all
   in
+  let doc_for_target (target : Clflags.Jsir_target.t) =
+    let default = Clflags.Jsoo_effects.default target in
+    let values =
+      List.map
+        (fun effects ->
+          let name = Clflags.Jsoo_effects.to_string effects in
+          if effects = default then name ^ " (default)" else name)
+        (Clflags.Jsoo_effects.supported_by target)
+    in
+    Printf.sprintf "%s with -target %s"
+      (String.concat ", " values)
+      (Clflags.Jsir_target.program_name target)
+  in
   ( "-jsoo-effects",
     Arg.Symbol (List.map fst assoc_list, fun s -> f (List.assoc s assoc_list)),
-    Printf.sprintf
-      " Effect handlers backend for js_of_ocaml. (default: %s) (with -target \
-       js_of_ocaml)"
-      (Clflags.Jsoo_effects.to_string !Clflags.jsoo_effects) )
+    Printf.sprintf " Effect handlers backend: %s; %s" (doc_for_target Js)
+      (doc_for_target Wasm) )
 
 let mk_djsir f =
-  ("-djsir", Arg.Unit f, " Print the Js_of_ocaml IR (with -target js_of_ocaml)")
+  ( "-djsir",
+    Arg.Unit f,
+    " Print the Js_of_ocaml IR (with -target js_of_ocaml or wasm_of_ocaml)" )
 
 let mk_x f = ("-X", Arg.String f, "(undocumented)")
 
@@ -2485,7 +2507,7 @@ module Oxcaml_options_impl = struct
 
   let target = Clflags.set_target
   let jsoo_opt = Compenv.add_first_jsoo_opt
-  let jsoo_effects effects = Clflags.jsoo_effects := effects
+  let jsoo_effects = Clflags.set_jsoo_effects
   let djsir () = Clflags.dump_jsir := true
   let x = Extra_options.parse_one_arg
 
@@ -2961,22 +2983,27 @@ module Extra_params = struct
         Oxcaml_flags.cached_generic_functions_path := v;
         true
     | "target" -> (
+        let set target =
+          (match position with
+          | Compenv.Before_args -> Clflags.set_target target
+          | Compenv.Before_compile _ | Compenv.Before_link ->
+              (* The backend has been chosen by then. *)
+              Compenv.fatal
+                "OCAMLPARAM: target must be given before the _ separator");
+          true
+        in
         match v with
-        | "js_of_ocaml" ->
-            (match position with
-            | Compenv.Before_args -> Clflags.set_target Js_of_ocaml
-            | Compenv.Before_compile _ | Compenv.Before_link ->
-                (* The backend has been chosen by then. *)
-                Compenv.fatal
-                  "OCAMLPARAM: target must be given before the _ separator");
-            true
+        | "js_of_ocaml" -> set Js_of_ocaml
+        | "wasm_of_ocaml" -> set Wasm_of_ocaml
         | _ ->
             Printf.ksprintf Compenv.fatal
-              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml)" v)
+              "OCAMLPARAM: unknown target %S (possible values: js_of_ocaml, \
+               wasm_of_ocaml)"
+              v)
     | "jsoo-effects" -> (
         match Clflags.Jsoo_effects.of_string v with
         | Some effects ->
-            Clflags.jsoo_effects := effects;
+            Clflags.set_jsoo_effects effects;
             true
         | None ->
             Printf.ksprintf Compenv.fatal

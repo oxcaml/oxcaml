@@ -83,15 +83,32 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      if Clflags.target_is_jsir () then begin
-        if !output_c_object then
+      match Clflags.jsir_target () with
+      | Some target ->
+        let unsupported what =
           Compenv.fatal
-            "-output-obj is not supported when targeting js_of_ocaml";
-        if !make_package then
-          Compenv.fatal "-pack is not supported when targeting js_of_ocaml";
-        Jscomp.make ~lambda_to_jsir:Flambda2.lambda_to_jsir
-      end
-      else Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
+            (Printf.sprintf "%s is not supported when targeting %s" what
+               (Clflags.Jsir_target.program_name target))
+        in
+        if !output_c_object then unsupported "-output-obj";
+        if !make_package then unsupported "-pack";
+        let supported_effects = Clflags.Jsoo_effects.supported_by target in
+        (match Clflags.jsoo_effects () with
+         | Some effects when not (List.mem effects supported_effects) ->
+           let supported_effects =
+             List.map Clflags.Jsoo_effects.to_string supported_effects
+             |> String.concat ", "
+           in
+           Compenv.fatal
+             (Printf.sprintf
+                "-jsoo-effects %s is not supported when targeting %s \
+                 (supported values: %s)"
+                (Clflags.Jsoo_effects.to_string effects)
+                (Clflags.Jsir_target.program_name target)
+                supported_effects)
+         | Some _ | None -> ());
+        Jscomp.make target ~lambda_to_jsir:Flambda2.lambda_to_jsir
+      | None -> Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
