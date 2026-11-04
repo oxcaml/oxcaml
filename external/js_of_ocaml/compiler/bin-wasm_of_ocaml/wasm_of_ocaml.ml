@@ -85,33 +85,44 @@ let () =
       prerr_string backtrace;
       exit Cmdliner.Cmd.Exit.internal_error
   | Magic_number.Bad_magic_number s ->
-      Format.eprintf "%s: Error: Not an ocaml bytecode file@." Sys.argv.(0);
+      Format.eprintf
+        "%s: Error: Not an ocaml bytecode file or Js_of_ocaml IR file (.cmw)@."
+        Sys.argv.(0);
       Format.eprintf "%s: Error: Invalid magic number %S@." Sys.argv.(0) s;
       exit 1
   | Magic_number.Bad_magic_version h ->
-      Format.eprintf "%s: Error: Bytecode version mismatch.@." Sys.argv.(0);
       let k =
         match Magic_number.kind h with
         | (`Cmo | `Cma | `Jsir | `Exe) as x -> x
         | `Other _ -> assert false
       in
+      let what =
+        match k with
+        | `Jsir -> "Js_of_ocaml IR file (.cmw)"
+        | `Cmo | `Cma | `Exe -> "ocaml bytecode"
+      in
+      (match k with
+      | `Jsir -> Format.eprintf "%s: Error: IR version mismatch.@." Sys.argv.(0)
+      | `Cmo | `Cma | `Exe ->
+          Format.eprintf "%s: Error: Bytecode version mismatch.@." Sys.argv.(0));
       let comp =
         if Magic_number.compare h (Magic_number.current k) < 0
         then "an older"
         else "a newer"
       in
       Format.eprintf
-        "%s: Error: Your ocaml bytecode and the wasm_of_ocaml compiler have to be \
-         compiled with the same version of ocaml.@."
-        Sys.argv.(0);
+        "%s: Error: Your %s and the wasm_of_ocaml compiler have to be compiled with the \
+         same version of ocaml.@."
+        Sys.argv.(0)
+        what;
       Format.eprintf
         "%s: Error: The Wasm_of_ocaml compiler has been compiled with ocaml version %s.@."
         Sys.argv.(0)
         Sys.ocaml_version;
       Format.eprintf
-        "%s: Error: Its seems that your ocaml bytecode has been compiled with %s version \
-         of ocaml.@."
+        "%s: Error: Its seems that your %s has been compiled with %s version of ocaml.@."
         Sys.argv.(0)
+        what
         comp;
       exit 1
   | Failure s ->
