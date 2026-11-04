@@ -891,6 +891,11 @@ and ident_kind =
    dereference patterns. A path starts with a boxed value, an index (when
    constructing a block index expression), or an address (when constructing a
    dereference pattern). *)
+(* CR address-patterns: I don't think data is structured quite right: deref
+   patterns don't need much of this information (like the index on a tuple or
+   the sort of an address). Perhaps we should go back the legacy representation
+   here, and have a variant [block_path_step] in [typecore.ml] that's used just
+   by [check_block_path]? *)
 and 'k block_access =
   | Baccess_field :
       Longident.t loc * Data_types.label_description
