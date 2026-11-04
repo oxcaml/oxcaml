@@ -223,6 +223,20 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+type callee =
+  | Symbol of symbol
+  | Argument of
+      { argument_index : int
+            (** The index of this argument in the list of arguments to the
+                immediately surrounding closure.
+
+                For example, in [... -> fun g -> fun x f -> f x], the
+                [argument_index] on [f x] would be 1, to refer to the argument
+                [f] (index 1 in the list [["x"; "f"]]). *)
+      }
+
+val equal_callee : callee -> callee -> bool
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -432,7 +446,7 @@ type operation =
   | Capply of
       { result_type : machtype;
         region : Lambda.region_close;
-        callees : symbol list option
+        callees : callee list option
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
       }

@@ -38,8 +38,8 @@ module Witness = struct
         { bytes : int;
           dbginfo : Cmm.alloc_dbginfo
         }
-    | Indirect_call of { callee : string option }
-    | Indirect_tailcall of { callee : string option }
+    | Indirect_call of { callee : Cmm.callee option }
+    | Indirect_tailcall of { callee : Cmm.callee option }
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }
@@ -96,9 +96,11 @@ module Witness = struct
     | Indirect_call { callee = None } -> fprintf ppf "indirect call"
     | Indirect_tailcall { callee = None } -> fprintf ppf "indirect tailcall"
     | Indirect_call { callee = Some callee } ->
-      fprintf ppf "indirect call (possibly calling %s)" callee
+      fprintf ppf "indirect call (possibly calling %a)" Printcmm.callee_doc
+        callee
     | Indirect_tailcall { callee = Some callee } ->
-      fprintf ppf "indirect tailcall (possibly calling %s)" callee
+      fprintf ppf "indirect tailcall (possibly calling %a)" Printcmm.callee_doc
+        callee
     | Direct_call { callee } -> fprintf ppf "direct call %s" callee
     | Direct_tailcall { callee : string } ->
       fprintf ppf "direct tailcall %s" callee
@@ -2608,10 +2610,16 @@ end = struct
         report t exn ~msg:"transform_call_indirect exn" ~desc dbg;
         let effect_ =
           List.fold_left
-            (fun all_effects { Cmm.sym_name = callee; _ } ->
+            (fun all_effects (callee : Cmm.callee) ->
               let k = wkind callee in
-              let v = find_callee t callee ~desc dbg k in
               let w = create_witnesses t k dbg in
+              let v =
+                match callee with
+                | Symbol { sym_name; _ } -> find_callee t sym_name ~desc dbg k
+                | Argument { argument_index = _ } ->
+                  (* CR-soon wsturgeon for wsturgeon: this is a separate PR *)
+                  Value.top w
+              in
               let effect_ =
                 match Metadata.assume_value dbg ~can_raise:true w with
                 | Some v' ->
