@@ -37,24 +37,28 @@ Only `jspi` (and `disabled`, which uses the same runtime) has a precompiled `was
 Options passed in through `-jsoo-opt` are passed through to all `js_of_ocaml` commands. The flags `-jsoo-opt-compile`, `-jsoo-opt-archive`, `-jsoo-opt-runtime` and `-jsoo-opt-link` pass in arguments to one of them only: `js_of_ocaml compile` (for `-c`), `js_of_ocaml link -a` (for `-a`), `js_of_ocaml build-runtime` (the runtime and the stubs of an executable) and the `js_of_ocaml link` of an executable, respectively. They apply to the same `wasm_of_ocaml` commands. `OCAMLPARAM` accepts them as `jsoo-opt=`, `jsoo-opt-compile=`, etc., and also `target=` and `jsoo-effects=`.
 
 ## Number representations
-| Flambda kind       | JSIR representation                                                                                                                                                                                                |
-|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Tagged_immediate` | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_immediate`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits                                                                                                                        |
-| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits                                                                                                                       |
-| `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                                             |
-| `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                                  |
-| `Naked_float32`    | Untagged 64-bit float (via `Number`), where operations are performed in 64-bit precesion then [rounded down](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/float32.js) to the nearest 32-bit result |
-| `Naked_float`      | Untagged 64-bit float (via `Number`)                                                                                                                                                                               |
+The JSIR produced for `-target js_of_ocaml` and `-target wasm_of_ocaml` differs in a few places, chosen by [`To_jsir_target`](to_jsir_target.mli).
+For WebAssembly, we use wasm_of_ocaml's portable integer representation, where integers have the same widths as in native code: Flambda compiles for a 64-bit machine, and `Targetint` and `Targetnativeint` are 63 and 64 bits wide.
 
-Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers are untagged. Similarly, `Box_number` and `Unbox_number` are also identities, since everything is represented as the `Number` type (with the exception of `Naked_int64`, which are just three `Number`s under the hood).
+| Flambda kind       | JavaScript                                                                                                                                                                                       | WebAssembly                                            |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
+| `Tagged_immediate` | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Untagged 63-bit integer                                |
+| `Naked_immediate`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Untagged 63-bit integer                                |
+| `Naked_int8`       | Untagged 32-bit integer (via `Number`), always kept sign-extended to 8 bits                                                                                                                      | Untagged 63-bit integer, always kept sign-extended to 8 bits  |
+| `Naked_int16`      | Untagged 32-bit integer (via `Number`), always kept sign-extended to 16 bits                                                                                                                     | Untagged 63-bit integer, always kept sign-extended to 16 bits |
+| `Naked_nativeint`  | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Boxed 64-bit integer                                   |
+| `Naked_int32`      | Untagged 32-bit integer (via `Number`)                                                                                                                                                           | Boxed 32-bit integer                                   |
+| `Naked_int64`      | Untagged 64-bit integer (via [`MlInt64`](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/int64.js) )                                                                                | Boxed 64-bit integer                                   |
+| `Naked_float32`    | Untagged 64-bit float (via `Number`), where operations are performed in 64-bit precesion then [rounded down](https://github.com/oxcaml/js_of_ocaml/blob/master/runtime/js/float32.js) to the nearest 32-bit result | Boxed 32-bit float                                     |
+| `Naked_float`      | Untagged 64-bit float (via `Number`)                                                                                                                                                             | Boxed 64-bit float                                     |
+
+Hence `Tag_immediate` and `Untag_immediate` are identities in JSIR: all integers are untagged. Similarly, `Box_number` and `Unbox_number` are also identities: in JavaScript, everything is represented as the `Number` type (with the exception of `Naked_int64`, which are just three `Number`s under the hood), and in WebAssembly, boxed numbers are structs at the level of JSIR, which wasm_of_ocaml unboxes where it can.
 
 Beware - immediates are 32 bits in JavaScript, instead of 63 or 31!
 
 Smallints (`Naked_int8` and `Naked_int16`) follow the same convention as bytecode and Cmm, where they are stored sign-extended.
 This means that JavaScript stubs receive exactly the same values for `int8#`/`int16#` arguments as they do in bytecode, and must likewise return sign-extended values.
+Conversions between smallints and other integers go through ints (e.g. `caml_int32_of_int`), which are identities in JavaScript.
 
 ## Block indices
 JSIR blocks have the same flattened and reordered layout as native blocks. However, these blocks
@@ -83,10 +87,6 @@ The following are not yet supported in JSIR translation, and will raise an excep
 
 1. SIMD/vector types: `vec128`, `vec256` and `vec512`
 
-### WASM
-The produced JSIR is not suitable for WASM compilation via `wasm_of_ocaml`, despite the two sharing the same IR.
-In particular, there are places within the `to_jsir` code that assumes JavaScript - these are marked with comments.
-
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.
 However, when **unboxed products** are involved (as arguments or return type), we instead use the **native** name. In this case, we use a slightly different convention to that of both existing JS/bytecode stubs and native C stubs:
@@ -104,5 +104,5 @@ The JSIR pass attaches the same hints, computed from Flambda instead (see [`Opti
 | Closure hints | Every `Closure`, from the metadata of its code: the representation of its parameters and result (from the arities), its `inline` attribute (`Available_inline` is `Hint_inline`) and whether it is a functor. |
 | `Hint_unsafe` | String, bytes and bigstring accesses of 16 bits or more (`String_or_bigstring_load`, `Bytes_or_bigstring_set`). Flambda inserts the bounds checks itself, so these accesses are always unsafe and call the unchecked runtime primitives (`caml_string_get16u`, ...), as `js_of_ocaml` does for bytecode accesses with this hint. Signed accesses load the unsigned value and sign-extend it. The runtime only provides the unchecked 16- and 64-bit bigstring accessors for OCaml >= 5.6, so those still call the checked ones. |
 | `Hint_bigarray` | `Bigarray_load`, `Bigarray_set` and byte accesses to bigstrings (`caml_ba_get_raw_unsafe`, `caml_ba_set_raw_unsafe`), giving the kind and layout of the bigarray. |
-| `Hint_int` | Comparisons of unboxed `int64`s. |
+| `Hint_int` | Comparisons of unboxed `int64`s, `int32`s and `nativeint`s. |
 | `Hint_primitive` | Not emitted yet. Bytecode attaches it to the calls of externals whose native name differs from the bytecode one, with that name and the representations of its arguments and result. Flambda does not keep the native name right now, and JSOO does not use this hint yet, so we defer this until later. |
