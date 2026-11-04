@@ -29,9 +29,9 @@ first occurrence wins: ok
 compare agrees with equal: ok
 counters are keys: ok
 entry hash: 762c1c9f
-branch hash: 1bcc2762
-module-level call hash: 33a562ac
-specialized entry hash: 7d1f5df1
+branch hash: 3e9919f0
+module-level call hash: d372d78e
+specialized entry hash: 549f8f0f
 the entry hash is the function's: ok
 only entries carry the entry bit: ok
 the entry bit survives specialization: ok
