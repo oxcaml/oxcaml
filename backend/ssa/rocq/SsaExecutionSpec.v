@@ -36,8 +36,8 @@
    instruction positions and graph paths only; they contain no valuations,
    execution invariants or analysis verdicts.
 
-   The equations of the values available at a program point, and the proofs,
-   are in SsaExecutionProofs.v, which needs no review. *)
+   SsaExecutionProofs.v, which needs no review, has the equations of the
+   values available at a program point, and the proofs. *)
 
 From Stdlib Require Import ZArith List.
 From OxCamlStdlib Require Import OxCamlLogic.

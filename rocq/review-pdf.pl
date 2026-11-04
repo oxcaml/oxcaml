@@ -246,7 +246,7 @@ copy("$build/sty/coqdoc.sty", "$build/coqdoc.sty")
 # Every definition in the document, so that links to definitions outside it
 # (in implementation files, or Rocq's library) can be dropped; then the
 # fragments are tidied.
-my (%fragment, %defined);
+my (%fragment, %defined, %module_of_base);
 for my $entry (@sources, @extracts) {
   my $file = "$build/tex/$entry->{lib}{name}.$entry->{base}.tex";
   open my $t, '<', $file or die "$file: rocq doc wrote no such file\n";
@@ -255,17 +255,143 @@ for my $entry (@sources, @extracts) {
   close $t;
   $defined{$1} = 1 while $s =~ /\\coqdef\{([^}]*)\}/g;
   $fragment{$entry->{base}} = $s;
+  $module_of_base{$entry->{base}} = "$entry->{lib}{name}.$entry->{base}";
 }
+
+# rocq doc sets an identifier it cannot resolve as a variable, in italics:
+# the inline code of the comments, the arguments of the extraction
+# directives, the primitive type int. One that names a definition of the
+# document gets the style of its definition and a link to it, unless the
+# file also binds a variable of that name, when a comment is ambiguous. One
+# that the code uses with a known style (list, Some, int), or that a module
+# left out of the document defines (its .glob file says how), gets that
+# style, though only a type or constructor keeps it under a qualifier, as
+# List.sort_uniq is no axiom because sort_uniq is. A qualified name that is
+# neither is a definition of Rocq's library in code, and OCaml in a comment,
+# set upright; so is an unqualified one in a comment that is spelt like
+# OCaml (a capital, an underscore), while a short lower-case one stays a
+# variable of the prose. File names in comments are set upright too, and a
+# qualified name written outside brackets is treated as if bracketed.
+my (%kind_of_label, %labels_of_name, %kind_of_name, %binders_of_base);
+for my $base (keys %fragment) {
+  my $s = $fragment{$base};
+  while ($s =~ /\\coqdef\{([^}]*)\}\{([^}]*)\}\{\\coqdoc([a-z]+)\{/g) {
+    my ($label, $name, $kind) = ($1, $2, $3);
+    if ($kind eq 'binder' || $kind eq 'variable') {
+      $binders_of_base{$base}{$name} = 1;
+    } else {
+      $kind_of_label{$label} = $kind;
+      push @{ $labels_of_name{$name} }, $label;
+    }
+  }
+  $kind_of_name{$2} //= $1 while $s =~ /\\coqdoc(definition|inductive
+    |constructor|axiom|lemma|projection|record)\{([^}]*)\}/gx;
+}
+my %style_of_glob_kind = (def => 'definition', scheme => 'definition',
+  abbrev => 'abbreviation', prf => 'lemma', constr => 'constructor',
+  ax => 'axiom', proj => 'projection', ind => 'inductive', rec => 'record',
+  mod => 'module');
+for my $glob (map { glob "$root/$_->{dir}/*.glob" } @libraries) {
+  open my $g, '<', $glob or die "$glob: $!\n";
+  while (<$g>) {
+    my ($kind, $name) = /^(\w+) \d+:\d+ (?:\S+ )?<> (\S+)$/ or next;
+    my $style = $style_of_glob_kind{$kind} or next;
+    $name =~ s/.*\.//;
+    $name =~ s/_/\\_/g;
+    $kind_of_name{$name} //= $style;
+  }
+}
+$kind_of_name{$_} //= 'inductive' for qw(int nat);
+
+# The styled form of the unresolved identifier [name] of file [base], or
+# undef when it is best left as a variable.
+sub styled_reference {
+  my ($name, $base, $in_code) = @_;
+  my ($qualifier, $short) = $name =~ /^(?:(.*)\.)?([^.]+)$/ or return undef;
+  # A long qualified name may break after a dot, as in the guide.
+  my $shown = $name;
+  $shown =~ s/\./.\\allowbreak{}/g if defined $qualifier && !$in_code;
+  return undef
+    if !$in_code && !defined $qualifier && $binders_of_base{$base}{$short};
+  my @labels = @{ $labels_of_name{$short} // [] };
+  if (defined $qualifier) {
+    # A label spells an identifier with spaces for its underscores.
+    (my $path = "$qualifier.$short") =~ s/\\_/ /g;
+    @labels = grep { /(?:^|\.)\Q$path\E$/ } @labels;
+  }
+  my ($own) = grep { /^\Q$module_of_base{$base}\E\./ } @labels;
+  my $label = $own // $labels[0];
+  return "\\coqref{$label}{\\coqdoc$kind_of_label{$label}\{$shown}}" if $label;
+  my $kind = $kind_of_name{$short};
+  $kind = 'definition'
+    if defined $qualifier && $kind && $kind !~ /^(?:inductive|record)$/;
+  return "\\coqdoc$kind\{$shown}" if $kind;
+  return $in_code ? "\\coqdocdefinition{$shown}" : "\\texttt{$shown}"
+    if defined $qualifier;
+  return "\\texttt{$shown}" if !$in_code && $name =~ /^[A-Z]|\\_/;
+  return undef;
+}
+
+# A file name in a comment, in the monospace font, breakable after a
+# directory separator or a hyphen.
+sub typeset_filename {
+  (my $name = shift) =~ s{([/-])}{$1\\allowbreak{}}g;
+  return "\\texttt{$name}";
+}
+
+sub restyle_unresolved {
+  my ($s, $base) = @_;
+  my ($in_code, @lines) = (0);
+  for my $line (split /\n/, $s, -1) {
+    $in_code = 1 if $line =~ /\\begin\{coqdoccode\}/;
+    $in_code = 0 if $line =~ /\\end\{coqdoccode\}/;
+    $line =~ s/(\\coqdockw\{From\} )\\coqdocvar\{([^}]*)\}/
+      "$1\\coqdoclibrary{$2}"/ge;
+    $line =~ s/(\\coqdockw\{Ltac\} )\\coqdocvar\{([^}]*)\}/
+      "$1\\coqdoctac{$2}"/ge;
+    $line =~ s/(\\coqdockw\{Extraction\}\ )\\coqdocvar\{Language\}
+      \ \\coqdocvar\{OCaml\}/$1\\coqdockw{Language} \\coqdockw{OCaml}/gx;
+    $line =~ s/\\coqdocvar\{(Inlined|Constant)\}/\\coqdockw{$1}/g
+      if $line =~ /\\coqdockw\{Extract\}/;
+    $line =~ s/\\coqdocvar\{make\}\ -\\coqdocvar\{C\}\ \\coqdocvar\{rocq\}
+      \ \\coqdocvar\{claims\}/\\texttt{make -C rocq claims}/gx;
+    $line =~ s/\\coqdocvar\{([^}]*)\}/
+      styled_reference($1, $base, $in_code) \/\/ "\\coqdocvar{$1}"/ge;
+    # What an extraction directive names is a constant or an inductive type
+    # of some module, whether or not the document knows it.
+    if ($line =~ /\\coqdockw\{Extract\}/) {
+      $line =~ s/(\\coqdockw\{Constant\} )\\coqdocvar\{([^}]*)\}/
+        "$1\\coqdocdefinition{$2}"/ge;
+      $line =~ s/(\\coqdockw\{Inductive\} )\\coqdocvar\{([^}]*)\}/
+        "$1\\coqdocinductive{$2}"/ge;
+    }
+    $line =~ s{(?<![\w\\{\/.-])((?:[\w-]+\/)*(?:[A-Za-z0-9-]|\\_)+
+      \.(?:v|ml|mli|md|pl))(?![\w}\/-])(?!\.\w)}{typeset_filename($1)}gex
+      unless $in_code;
+    # A qualified name a comment writes outside brackets, Module.ident,
+    # is styled as if it had been in brackets.
+    $line =~ s{(?<![\w\\\{\}.\/-])([A-Z][A-Za-z0-9]*(?:\.(?:[A-Za-z0-9]|\\_)+)+)
+      (?![\w\}\/-])(?!\.\w)}{styled_reference($1, $base, 0) // $1}gex
+      unless $in_code;
+    push @lines, $line;
+  }
+  return join "\n", @lines;
+}
+
 my $braced = qr/(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*/;
 for my $base (keys %fragment) {
   my $s = $fragment{$base};
   $s =~ s/\A(\\begin\{coqdoccode\}\n)(?:\\coqdocemptyline\n)+/$1/;
+  # The star of the [let*] notation is not a product.
+  $s =~ s/(\\coqref\{[^}]*'let\*'[^}]*\}\{\\coqdocnotation\{)
+    \\ensuremath\{\\times\}\}/$1*}/gx;
   $s =~ s/\\coqref\{([^}]*)\}\{($braced)\}/
     $defined{$1} ? "\\coqref{$1}{$2}" : $2/ge;
   $s =~ s/(ROCQ-REVIEW-GUIDE\.md, )(sections?) ($numbers)(?!\d)/
     "$1\x04$2 $3\x05"/ge;
   $s =~ s/(sections?) ($numbers) (of ROCQ-REVIEW-GUIDE\.md)/
     "\x04$1 $2\x05 $3"/ge;
+  $s = restyle_unresolved($s, $base);
   $fragment{$base} = $s;
 }
 

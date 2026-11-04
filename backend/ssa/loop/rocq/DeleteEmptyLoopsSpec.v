@@ -47,8 +47,8 @@
      and the [reached_header] premise of the eligibility statement can be met
      by every real execution reaching the header (section 4.6).
 
-   What the analyses check of a loop they delete, read back from the decision,
-   is DeleteEmptyLoopsProofs.deletion_certificate: the proof's internal
+   DeleteEmptyLoopsProofs.deletion_certificate is what the analyses check of
+   a loop they delete, read back from the decision: the proof's internal
    interface, stated through the analyses themselves, which needs no review. *)
 
 From Stdlib Require Import List.

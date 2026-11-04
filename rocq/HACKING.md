@@ -188,7 +188,8 @@ needs the `.glob` files of a complete build, and LuaLaTeX with `fontspec`
 The layout of a file carries over: its header comment opens its section, a
 banner comment (`(* --- Title --- *)`, or a title between two `(* === *)`
 lines) becomes a heading, and `[ident]` in a comment is typeset as code
-and linked. The script is `rocq/review-pdf.pl`.
+and linked, as are a file name and a `Module.ident` written without
+brackets. The script is `rocq/review-pdf.pl`.
 
 ### Adding a module
 
