@@ -1,14 +1,8 @@
-(function{phantom_safe_subst.ml:31,44-64}
+(function{phantom_safe_subst.ml:31,44-51}
  camlPhantom_safe_subst__effectful_0_2_code
      (param/0[((module_path param/0) (location ()) (original_ident param/0)
                (is_parameter local))]: int) : int
- (let?
-   s/0[((module_path s/0) (location ()) (original_ident s/0)
-        (is_parameter local))]
-     camlPhantom_safe_subst__immstring_0
-   (extcall "caml_ml_output"{phantom_safe_subst.ml:31,49-64;stdlib.ml:511,21-43;stdlib.ml:393,2-47}
-     (load val (+a G:"camlStdlib__print_string_43_94" 16))
-     L:"camlPhantom_safe_subst__immstring_0" 1 1 int,int,int,int->val)) )
+ 1 )
 
 (function{phantom_safe_subst.ml:33,36-131} camlPhantom_safe_subst__f_1_3_code
      (q/0[((module_path q/0) (location ()) (original_ident q/0)

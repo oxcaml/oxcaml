@@ -28,7 +28,7 @@
 
 [@@@ocaml.warning "-26-27-32"]
 
-let[@inline never] [@local never] effectful () = print_string ""
+let[@inline never] [@local never] effectful () = ()
 
 let[@inline never] [@local never] f q x =
   let c = fst q in
