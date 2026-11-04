@@ -798,3 +798,82 @@ val optional_curry :
   ?g:('a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]) @ [< global many uncontended read_write] ->
   unit @ 'o -> unit @ [> dynamic] = <fun>
 |}]
+
+
+let curry_edge_to_printed_curry f a b c =
+  ignore (f == fun _ (_ : int ref) _ -> ()); f a b c
+[%%expect{|
+val curry_edge_to_printed_curry :
+  ('a @ [< past('o) & global > 'mm0] ->
+   int ref @ [< past('m) & past('n) & global > 'q mod many portable forkable unyielding stateless] ->
+   ('b @ [> 'p] -> unit @ [< global]) @ [> past('m) | past('n) mod many portable forkable unyielding stateless | past('o)]) @ [< past('mm3) & past('mm2) & past('mm1) & global many uncontended read_write] ->
+  ('a @ [< 'mm0 & global] ->
+   (int ref @ [< 'q & global] ->
+    ('b @ [< 'p] -> unit @ [> dynamic]) @ [> close('q) mod many portable stateless | close('mm0) | past('mm3) | stateful]) @ [> close('mm0) | past('mm2) | stateful]) @ [> past('mm1) | stateful] =
+  <fun>
+|}, Principal{|
+val curry_edge_to_printed_curry :
+  ('a @ [< global > 'p] ->
+   int ref @ [< global > 'o] -> 'b @ [> 'n] -> unit @ [< 'm & global]) @ [< global many uncontended read_write] ->
+  'a @ [< 'p & global] ->
+  int ref @ [< 'o & global] -> 'b @ [< 'n] -> unit @ [> 'm | dynamic] = <fun>
+|}]
+
+let curry_acc_mismatch_crash f k a =
+  ignore (f == (fun x y z -> z));
+  let h = f a in
+  k (fun () -> let _ = h in ());
+  ()
+[%%expect{|
+>> Fatal error: Out_type.name_of_modes: printing an elided curry mode
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+let curry_acc_mismatch_imprecise f k a =
+  ignore (f == (fun x (y @ local) z -> z));
+  let h = f a in
+  k (fun () -> let _ = h in ()); ()
+[%%expect{|
+val curry_acc_mismatch_imprecise :
+  ('a @ [< past('n) & global > 'p] ->
+   ('b @ [> local] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< past('mm4) & past('q) & global many uncontended read_write] ->
+  (((unit @ 'mm1 -> unit @ 'mm0) @ [> past('m)] -> 'd @ 'mm2) @ [< past('mm3) & global] ->
+   ('a @ [< 'p & global] -> unit @ 'mm5) @ [> past('mm3) | past('mm4) | stateful]) @ [> past('q) | stateful] =
+  <fun>
+|}, Principal{|
+val curry_acc_mismatch_imprecise :
+  ('a @ [< past('n) & global > 'p] ->
+   ('b @ [> local] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< global many uncontended read_write] ->
+  ((unit @ 'mm0 -> unit @ 'q) @ [> past('m)] -> 'd @ 'mm1) @ [< global] ->
+  'a @ [< 'p & global] -> unit @ 'mm2 = <fun>
+|}]
+
+let empty_heads (x @ local once unforkable yielding)
+    (f : a:int -> b:int -> _ @ local once -> _) g =
+  exclave_ (if true then f x else fun ~a:_ -> g)
+[%%expect{|
+val empty_heads :
+  'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
+  ((a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
+   ((b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n mod aliased contended immutable] ->
+    (a:int ->
+     (b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'n | local once nonportable unforkable yielding stateful]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic]) @ [> close('m) | local once nonportable unforkable yielding stateful]) @ [> close('m) | local once nonportable unforkable yielding stateful] =
+  <fun>
+|}, Principal{|
+val empty_heads :
+  'a @ [< 'm & uncontended read_write > local once unforkable yielding] ->
+  ((a:int -> (b:int -> 'a @ local once -> 'b)) @ [< global many forkable unyielding] ->
+   ((b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [< 'n] ->
+    (a:int -> b:int -> 'b @ [> aliased nonportable stateful dynamic]) @ [> 'm | local once nonportable unforkable yielding stateful dynamic]) @ [> close('m) | local once nonportable unforkable yielding stateful]) @ [> close('m) | local once nonportable unforkable yielding stateful] =
+  <fun>
+|}]
+
+module Curry_inclusion : sig val g : ('a -> int) -> unit end = struct
+  let g f = ignore (f == (fun (x @ local) y z -> z))
+end
+[%%expect{|
+>> Fatal error: Out_type.name_of_modes: printing an elided curry mode
+Uncaught exception: Typemod.Error.In_context(_, _, _)
+
+|}]
