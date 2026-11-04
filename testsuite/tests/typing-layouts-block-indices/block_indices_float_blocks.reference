@@ -1,0 +1,10 @@
+All-float# record
+1.0 2.0
+3.0 4.0
+float# array
+1.0
+2.0
+3.0
+Mixed record
+foo 1.0
+foo 2.0
