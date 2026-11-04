@@ -1,30 +1,6 @@
 module Fmt = Format_doc
-
-module Parameter_name = struct
-  type t = string
-
-  let of_string t = t
-
-  let to_string t = t
-
-  let doc_print = Fmt.pp_print_string
-
-  include Identifiable.Make (struct
-    type nonrec t = t
-
-    let compare = String.compare
-
-    let equal a b = compare a b = 0
-
-    let print ppf x = Fmt.compat doc_print ppf x
-
-    let output = Misc.output_of_doc_print doc_print
-
-    let hash = Hashtbl.hash
-  end)
-
-  let print = doc_print
-end
+module CUI = Compilation_unit_intf
+module Parameter_name = CUI
 
 let pp_concat pp ppf list =
   Fmt.pp_print_list ~pp_sep:Fmt.pp_print_cut pp ppf list
@@ -85,21 +61,21 @@ let check_uniqueness_of_merged (type v) l1 l2 =
 
 module Name : sig
   type t = private
-    { head : string;
+    { head : CUI.t;
       args : argument list
     }
 
   and argument = t Argument.t
 
-  val create : string -> argument list -> (t, t duplicate) Result.t
+  val create : CUI.t -> argument list -> (t, t duplicate) Result.t
 
-  val create_exn : string -> argument list -> t
+  val create_exn : CUI.t -> argument list -> t
 
-  val create_no_args : string -> t
+  val create_no_args : CUI.t -> t
 
   val of_parameter_name : Parameter_name.t -> t
 
-  val unsafe_create_unchecked : string -> argument list -> t
+  val unsafe_create_unchecked : CUI.t -> argument list -> t
 
   val find_in_parameter_map : t -> 'a Parameter_name.Map.t -> 'a option
 
@@ -112,7 +88,7 @@ module Name : sig
   val print : Fmt.formatter -> t -> unit
 end = struct
   type t =
-    { head : string;
+    { head : CUI.t;
       args : argument list
     }
 
@@ -122,9 +98,10 @@ end = struct
     match args with
     | [] ->
       (* Preserve simple non-wrapping behaviour in atomic case *)
-      Fmt.fprintf ppf "%s" head
+      Fmt.fprintf ppf "%a" CUI.print head
     | _ ->
-      Fmt.fprintf ppf "@[<hov 1>%s%a@]" head (pp_concat print_arg_pair) args
+      Fmt.fprintf ppf "@[<hov 1>%a%a@]" CUI.print head
+        (pp_concat print_arg_pair) args
 
   and print_arg_pair ppf ({ param = name; value = arg } : argument) =
     Fmt.fprintf ppf "[%a:%a]" Parameter_name.print name doc_print arg
@@ -137,7 +114,7 @@ end = struct
       if t1 == t2
       then 0
       else
-        match String.compare head1 head2 with
+        match CUI.compare head1 head2 with
         | 0 -> List.compare compare_arg args1 args2
         | c -> c
 
@@ -192,7 +169,7 @@ end
 
 module T0 : sig
   type t = private
-    { head : string;
+    { head : CUI.t;
       visible_args : argument list;
       (* CR-someday lmaurer: Could just be the parameter names *)
       hidden_args : argument list
@@ -205,21 +182,21 @@ module T0 : sig
   val print : Fmt.formatter -> t -> unit
 
   val create :
-    string ->
+    CUI.t ->
     argument list ->
     hidden_args:Parameter_name.t list ->
     (t, t duplicate) Result.t
 
   val create_exn :
-    string -> argument list -> hidden_args:Parameter_name.t list -> t
+    CUI.t -> argument list -> hidden_args:Parameter_name.t list -> t
 
   val to_name : t -> Name.t
 
   val unsafe_create_unchecked :
-    string -> argument list -> hidden_args:argument list -> t
+    CUI.t -> argument list -> hidden_args:argument list -> t
 end = struct
   type t =
-    { head : string;
+    { head : CUI.t;
       visible_args : argument list;
       hidden_args : argument list
     }
@@ -234,7 +211,7 @@ end = struct
     print_syntax ppf ~head ~visible_args ~hidden_args
 
   and print_syntax ppf ~head ~visible_args ~hidden_args =
-    Fmt.fprintf ppf "@[<hov 1>%s%a%a@]" head
+    Fmt.fprintf ppf "@[<hov 1>%a%a%a@]" CUI.print head
       (pp_concat print_visible_pair)
       visible_args
       (pp_concat print_hidden_pair)
@@ -261,7 +238,7 @@ end = struct
       if t1 == t2
       then 0
       else
-        match String.compare head1 head2 with
+        match CUI.compare head1 head2 with
         | 0 ->
           begin match
             List.compare compare_pairs visible_args1 visible_args2
@@ -453,7 +430,7 @@ module With_precision = struct
           ~right_only:(fun acc_rev _ -> acc_rev)
           ~both:(fun acc_rev arg1 arg2 -> meet_args arg1 arg2 :: acc_rev)
       in
-      meet_atom String.equal glob1.head glob2.head;
+      meet_atom CUI.equal glob1.head glob2.head;
       let visible_args = List.rev visible_args_rev in
       let hidden_args = List.rev hidden_args_rev in
       unsafe_create_unchecked glob1.head visible_args ~hidden_args
