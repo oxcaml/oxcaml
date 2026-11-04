@@ -16,7 +16,7 @@
 
 (** {2 Initialization} *)
 
-type opt_backend = Native | Js_of_ocaml
+type opt_backend = Native | Js_of_ocaml | Wasm_of_ocaml
 
 type backend = Byte | Opt of opt_backend
 

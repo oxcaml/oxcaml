@@ -205,10 +205,9 @@ let block_like ~env ~res symbol (const : Static_const.t) =
       Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
     in
     numeric_block_or_array ~env ~res ~symbol values ~tag ~array_or_not:Array
-      ~to_bits:Targetint_32_64.to_int32
-      ~bits_to_constant:To_jsir_shared.int32_to_jsir_const
+      ~to_bits:Fun.id ~bits_to_constant:To_jsir_shared.nativeint_to_jsir_const
       ~bits_to_array:(fun bits ->
-        Tuple (tag, Array.map To_jsir_shared.int32_to_jsir_const bits, Array))
+        Tuple (tag, Array.map To_jsir_shared.nativeint_to_jsir_const bits, Array))
   | Immutable_vec128_array _ | Immutable_vec256_array _
   | Immutable_vec512_array _ | Immutable_mask_array _ ->
     (* Need SIMD *)
