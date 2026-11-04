@@ -238,9 +238,13 @@ let atomic_field ~env ~res
   use_prim ~env ~res (Extern (extern_name, None)) (base :: offset :: rest)
 
 let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
-  let use_prim' prim = use_prim ~env ~res prim [] in
+  (* CR-someday selee: we should be able to stop passing in [unit] to nullary
+     primitives once we drop bytecode support, by modifying the JSOO runtime. *)
+  let use_prim' name =
+    use_prim ~env ~res (Extern (name, None)) [Pc (Int Targetint.zero)]
+  in
   match f with
-  | Invalid _ -> use_prim' (Extern ("caml_invalid_primitive", None))
+  | Invalid _ -> use_prim ~env ~res (Extern ("caml_invalid_primitive", None)) []
   | Optimised_out _ ->
     (* For phantom lets, which are kept around for debugging information for
        pieces of code that were optimised away. *)
@@ -249,14 +253,14 @@ let nullary_exn ~env ~res (f : Flambda_primitive.nullary_primitive) =
   | Enter_inlined_apply _ ->
     (* CR selee: we should eventually use this debuginfo *)
     no_op ~env ~res
-  | Dls_get -> use_prim' (Extern ("caml_domain_dls_get", None))
-  | Tls_get -> use_prim' (Extern ("caml_domain_tls_get", None))
-  | Domain_index -> use_prim' (Extern ("caml_ml_domain_index", None))
-  | Thread_self_id -> use_prim' (Extern ("caml_ml_thread_self_id", None))
+  | Dls_get -> use_prim' "caml_domain_dls_get"
+  | Tls_get -> use_prim' "caml_domain_tls_get"
+  | Domain_index -> use_prim' "caml_ml_domain_index"
+  | Thread_self_id -> use_prim' "caml_ml_thread_self_id"
   | Poll ->
     (* See [parse_bytecode.ml] in jsoo - treated as a noop *)
     no_op ~env ~res
-  | Cpu_relax -> use_prim' (Extern ("caml_ml_domain_cpu_relax", None))
+  | Cpu_relax -> use_prim' "caml_ml_domain_cpu_relax"
 
 (* [x] must be a block. *)
 let get_tag ~env ~res x =
@@ -618,8 +622,14 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Or -> "or"
       | Xor -> "xor"
     in
+    let percent_for_imms =
+      (* The unsigned operations are runtime functions, as in bytecode *)
+      match op with
+      | Div Unsigned | Mod Unsigned -> false
+      | Add | Sub | Mul | Div Signed | Mod Signed | And | Or | Xor -> true
+    in
     let prim : Jsir.prim =
-      Extern (with_int_prefix ~kind op_name ~percent_for_imms:true, None)
+      Extern (with_int_prefix ~kind op_name ~percent_for_imms, None)
     in
     match smallint_bits kind, op with
     | None, _ | Some _, (And | Or | Xor | Mod Signed) ->
