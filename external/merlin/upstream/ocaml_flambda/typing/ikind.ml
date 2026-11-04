@@ -142,10 +142,6 @@ end
     where [base] is the intrinsic kind of a constructor and each [coeff_i]
     describes the contribution coming from the i-th type argument. *)
 module Solver = struct
-  type mode =
-    | Normal
-    | Round_up
-
   let rec uid_is_reliable_identity = function
     | Types.Uid.Internal -> false
     | Types.Uid.Unboxed_version uid -> uid_is_reliable_identity uid
@@ -157,6 +153,16 @@ module Solver = struct
      union-find aliases map to a single entry. This table is used to cache
      repeated kind computations, as well as to make circular types work. *)
   module TyTbl = Btype.TypeHash
+
+  type mode =
+    | Normal
+    | Normal_except_vars of (Types.type_expr -> unit)
+        (** Like [Normal], but calls the callback on each [Tvar] or [Tivar]
+            whose kind is computed. Entering this mode uses a fresh
+            [ty_to_kind] table, so that a kind cached in another mode cannot
+            skip the callback. Constructor coefficients are still computed in
+            [Normal] mode. *)
+    | Round_up
 
   let constr_to_string (path : Path.t) : string =
     Format_doc.asprintf "%a" Path.print path
@@ -192,7 +198,6 @@ module Solver = struct
       lookup_of_env : Env.t -> Path.t -> constr_decl;
       mode : mode;
       provenance : provenance_ctx option;
-      on_type_var : Types.type_expr -> unit;
       ty_to_kind : Ldd.node TyTbl.t;
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
@@ -210,12 +215,14 @@ module Solver = struct
       lookup_of_env;
       mode;
       provenance = None;
-      on_type_var = ignore;
       ty_to_kind = global_ty_to_kind;
       constr_to_coeffs = global_constr_to_coeffs
     }
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
+
+  let with_on_var (ctx : ctx) ~(on_var : Types.type_expr -> unit) : ctx =
+    { ctx with mode = Normal_except_vars on_var; ty_to_kind = TyTbl.create 1 }
 
   let with_provenance ~(decl_uid_under_check : Types.Uid.t option) (ctx : ctx) :
       ctx =
@@ -242,7 +249,8 @@ module Solver = struct
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
     match ctx.mode, name with
-    | Normal, _ | Round_up, Provenance _ -> Ldd.node_of_var (Ldd.rigid name)
+    | (Normal | Normal_except_vars _), _ | Round_up, Provenance _ ->
+      Ldd.node_of_var (Ldd.rigid name)
     | Round_up, _ -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
@@ -488,8 +496,14 @@ module Solver = struct
       match ctx.provenance with None -> ctx | Some _ -> without_provenance ctx
     in
     (* Variables encountered while computing the constructor's coefficients
-       are not relevant for propagating requirements through with-bounds. *)
-    let constr_ctx = { constr_ctx with on_type_var = ignore } in
+       are not relevant to [Normal_except_vars]. The [ty_to_kind] table is
+       shared, so if [args] share type nodes with the constructor's
+       declaration, the callback may miss some of their variables. *)
+    let constr_ctx =
+      match constr_ctx.mode with
+      | Normal_except_vars _ -> { constr_ctx with mode = Normal }
+      | Normal | Round_up -> constr_ctx
+    in
     let base, coeffs =
       constr_kind constr_ctx ~min_arity:(List.length args) path
     in
@@ -569,8 +583,7 @@ module Solver = struct
       (ty : Types.type_expr) : Ldd.node =
     if check_principality && not (is_principal_type ty)
     then Ldd.const Axis_lattice.top
-    else (
-      if Btype.is_Tvar ty then ctx.on_type_var ty;
+    else
       match TyTbl.find_opt ctx.ty_to_kind ty with
       | Some kind_poly -> kind_poly
       | None -> (
@@ -600,7 +613,7 @@ module Solver = struct
             if Option.is_none ctx.provenance
             then TyTbl.add ctx.ty_to_kind ty kind_rhs;
             cache_provenance_kind ctx ty kind_rhs;
-            kind_rhs))
+            kind_rhs)
 
   (* Worker for [kind]; does not memoize.
      Only call from [kind] so caching and LFP handling apply. *)
@@ -621,7 +634,12 @@ module Solver = struct
     in
     match desc with
     | Types.Tvar { name = _name; jkind }
-    | Types.Tivar { name = _name; jkind; ivar = _ }
+    | Types.Tivar { name = _name; jkind; ivar = _ } ->
+      (match ctx.mode with
+      | Normal_except_vars on_var -> on_var ty
+      | Normal | Round_up -> ());
+      (* Keep a rigid param, but cap it by its annotated jkind. *)
+      self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
     | Types.Tunivar { name = _name; jkind } ->
       (* Keep a rigid param, but cap it by its annotated jkind. *)
       self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
@@ -705,8 +723,8 @@ module Solver = struct
 
   let kind_with_type_vars (ctx : ctx) ty =
     let type_vars = ref Btype.TypeSet.empty in
-    let on_type_var ty = type_vars := Btype.TypeSet.add ty !type_vars in
-    let ctx = { ctx with on_type_var } in
+    let on_var ty = type_vars := Btype.TypeSet.add ty !type_vars in
+    let ctx = with_on_var ctx ~on_var in
     let poly = normalize (kind ~use_tables:true ctx ty) in
     poly, Btype.TypeSet.elements !type_vars
 
