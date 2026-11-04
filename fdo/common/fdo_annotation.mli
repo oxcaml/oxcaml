@@ -29,14 +29,7 @@
 (** The counters attached to one point of the program, see [Fdo_counter]. The
     counters can represent either a control-flow edge, such as a switch arm, or
     a function entry. Callsites can have at most one counter and hence don't use
-    this type.
-
-    Every counter in the set is counted each time the point is reached, so the
-    count of a point is not the sum of the counts of its counters. A point
-    carries several counters when points are merged into one, e.g. identical
-    switch arms that are shared. A point that is only passed through on the way
-    to others, such as a node of a decision tree that dispatches to switch arms,
-    carries none of their counters: they are counted below it. *)
+    this type. *)
 
 type t
 
@@ -52,7 +45,7 @@ val to_list : t -> Fdo_counter.t list
     Duplicates are removed. *)
 val combine : t -> t -> t
 
-(** [union ts] is [combine] applied to all of [ts], in order. *)
+(** [combine] over a list, in order. *)
 val union : t list -> t
 
 (** Ignores order. *)

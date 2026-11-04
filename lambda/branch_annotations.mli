@@ -52,18 +52,11 @@ val fdo_annotation : t -> Fdo_annotation.t
 
 val with_fdo_annotation : t -> Fdo_annotation.t -> t
 
-(** Combine the annotations of branches that have been found to be identical and
-    shared into annotations for the shared branch. Its likelihood is the sum of
-    theirs, and it carries the FDO counters of all of them. *)
-val sum_list : t list -> t
+(** Annotations for a single branch that replaces the given branches, when they
+    have been found to be identical and shared. *)
+val sum_list_for_merge : t list -> t
 
-(** [add t1 t2] is [sum_list [t1; t2]]. *)
-val add : t -> t -> t
-
-(** Combine multiple branch annotations into annotations for an intermediate
-    jump target that captures all the provided branches, followed by a branching
-    point that dispatches to them (e.g. a node of the decision tree compiled
-    from a switch). Its likelihood is the sum of theirs, as for [sum_list], but
-    it carries no FDO counters: they are counted on the edges below it (see
-    [Fdo_annotation]). *)
+(** Annotations for the edge into an intermediate branching point that
+    dispatches to the given branches, e.g. a node of the decision tree compiled
+    from a switch. *)
 val sum_list_for_dispatch : t list -> t

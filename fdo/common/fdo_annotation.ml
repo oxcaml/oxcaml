@@ -26,6 +26,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(* Every counter in the set is counted each time the point is reached, so the
+   count of a point is not the sum of the counts of its counters. A point
+   carries several counters when points are merged into one, e.g. identical
+   switch arms that are shared. A point that is only passed through on the way
+   to others, such as a node of a decision tree that dispatches to switch arms,
+   carries none of their counters: they are counted below it. *)
 type t = Fdo_counter.t list
 
 let empty = []
