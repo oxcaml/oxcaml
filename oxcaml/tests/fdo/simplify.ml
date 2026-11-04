@@ -32,8 +32,8 @@ let[@inline never] guarded b v =
    it. *)
 let[@inline never] rec count_down n = if n <= 0 then n else count_down (n - 1)
 
-(* An over-application that only Simplify can split, inside an inlined body: the
-   context is added once. *)
+(* An over-application that only Simplify can split, inside an inlined body:
+   both calls it makes get its counter, with the context added once. *)
 let[@inline never] curried x = fun y -> x + y
 
 let[@inline always] apply2 k x = k x 1
