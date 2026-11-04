@@ -2115,13 +2115,13 @@ module Const = struct
 
   (* The mod bounds of [k box], given [k]'s mod bounds. *)
   let box_mod_bounds mod_bounds =
-    (* [k box] crosses like [mutable_data with (type : k)].
+    (* [k box] crosses like [immutable_data with (type : k)].
 
-       This is necessary for soundness. If [k box] crossed like
-       [immutable_data with (type : k)], then the record [{ mutable i : int }],
-       which will have kind [immediate box], would incorrectly be
-       [immutable_data]. *)
-    Mod_bounds.join Builtin.mutable_data.jkind.mod_bounds mod_bounds
+       This relies on unboxed versions accounting for the mutability of their
+       contents. For instance, the unboxed version of [{ mutable i : int }] does
+       not cross contention or visibility, so [box]ing it gives the kind of the
+       boxed version (in this case, [mutable_data]). *)
+    Mod_bounds.join Builtin.immutable_data.jkind.mod_bounds mod_bounds
 
   let apply_box ~loc (t : _ jkind_const_desc) =
     match t.base with
