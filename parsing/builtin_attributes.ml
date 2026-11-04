@@ -157,6 +157,9 @@ let builtin_attrs =
   ; "flatten_floats"
   ; "represent_as_float_array"
   ; "immediate_all_void_constructor"
+  ; "testing_required"
+  ; "testing_not_required"
+  ; "covers_required_tests_of"
   ]
 
 let builtin_attrs =
@@ -1245,3 +1248,56 @@ let get_tracing_probe_payload (payload : Parsetree.payload) =
     | _ -> Error ()
   in
   Ok { name; name_loc; enabled_at_init; arg }
+
+type testing_requirement = Testing_required | Testing_not_required
+
+let testing_requirement_of_attribute attr =
+  if attr_equals_builtin attr "testing_required" then Some Testing_required
+  else if attr_equals_builtin attr "testing_not_required" then
+    Some Testing_not_required
+  else None
+
+let testing_requirement attrs =
+  List.find_map testing_requirement_of_attribute attrs
+
+let parse_testing_requirement_attribute attr =
+  match testing_requirement_of_attribute attr with
+  | None -> None
+  | Some t ->
+    mark_used attr.attr_name;
+    ignore (parse_empty_payload attr : unit option);
+    Some t
+
+let parse_testing_requirement attrs =
+  match List.filter_map (fun a ->
+      Option.map (fun t -> a, t) (parse_testing_requirement_attribute a)) attrs
+  with
+  | [] -> None
+  | (_, t) :: rest ->
+    List.iter (fun ({ attr_name = { txt; loc }; _ }, _) ->
+        Location.prerr_warning loc (Warnings.Duplicated_attribute txt))
+      rest;
+    Some t
+
+let testing_requirement_attr t =
+  let name =
+    match t with
+    | Testing_required -> "testing_required"
+    | Testing_not_required -> "testing_not_required"
+  in
+  Attr.mk (Location.mknoloc name) (PStr [])
+
+let covers_required_tests_of_attribute attr =
+  if not (attr_equals_builtin attr "covers_required_tests_of") then None
+  else begin
+    mark_used attr.attr_name;
+    match attr.attr_payload with
+    | PStr [{ pstr_desc =
+                Pstr_eval ({ pexp_desc = Pexp_construct (lid, None); _ }, []);
+              _ }] ->
+      Some (Some lid)
+    | _ ->
+      warn_payload attr.attr_loc attr.attr_name.txt
+        "A module path was expected";
+      Some None
+  end

@@ -103,6 +103,8 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Nothing_requires_testing of Path.t
+  | Missing_tests of Path.t * (Sig_component_kind.t * string) list
 
 
 exception Error_forward of Location.error
@@ -174,6 +176,117 @@ let location_of_structure sstr =
   |> function
   | [] -> Location.none
   | (_ :: _) as xs -> Location.merge xs
+
+(* Checking [[@@@covers_required_tests_of M]]: the structure containing the
+   attribute must bind every item of [M] that requires testing. See
+   [Builtin_attributes.testing_requirement]. *)
+module Tests_check = struct
+  open Builtin_attributes
+
+  type item =
+    | Value of string
+    | Module of string * item list
+    | Opaque_module of string
+      (* A functor or abstract module containing items requiring testing. *)
+
+  let effective ~default attrs =
+    Option.value (testing_requirement attrs) ~default
+
+  let rec items_of_sig env ~default sg =
+    let env = Env.add_signature sg env in
+    List.concat_map (function
+        | Sig_value (id, vd, _) ->
+            begin match effective ~default vd.val_attributes with
+            | Testing_required -> [Value (Ident.name id)]
+            | Testing_not_required -> []
+            end
+        | Sig_module (id, _, md, _, _) ->
+            let default = effective ~default md.md_attributes in
+            let name = Ident.name id in
+            begin match items_of_modtype env ~default md.md_type with
+            | `Signature [] | `Opaque false -> []
+            | `Signature items -> [Module (name, items)]
+            | `Opaque true -> [Opaque_module name]
+            end
+        | Sig_type _ | Sig_typext _ | Sig_modtype _ | Sig_class _
+        | Sig_class_type _ | Sig_jkind _ -> [])
+      sg
+
+  and items_of_modtype env ~default mty =
+    match Mtype.scrape_alias env mty with
+    | Mty_signature sg -> `Signature (items_of_sig env ~default sg)
+    | Mty_functor (_, res, _) ->
+        begin match items_of_modtype env ~default res with
+        | `Signature items -> `Opaque (items <> [])
+        | `Opaque _ as res -> res
+        end
+    | Mty_ident _ | Mty_alias _ | Mty_strengthen _ ->
+        `Opaque (default = Testing_required)
+
+  let rec testing_requirement_of_path env path =
+    let default =
+      match path with
+      | Pdot (prefix, _) -> testing_requirement_of_path env prefix
+      | Pident _ | Papply _ | Pextra_ty _ -> Testing_not_required
+    in
+    effective ~default (Env.find_module path env).md_attributes
+
+  (* Bindings that are found count as uses, since they mark what is tested. *)
+  let rec missing env ~prefix items sg =
+    let env = Env.add_signature sg env in
+    let has_value name =
+      List.exists (function
+          | Sig_value (id, vd, _) when String.equal (Ident.name id) name ->
+              Env.mark_value_used vd.val_uid;
+              true
+          | _ -> false)
+        sg
+    in
+    let find_module name =
+      List.find_map (function
+          | Sig_module (id, _, md, _, _)
+            when String.equal (Ident.name id) name ->
+              Env.mark_module_used md.md_uid;
+              Some md
+          | _ -> None)
+        sg
+    in
+    List.concat_map (function
+        | Value name ->
+            if has_value name then []
+            else [Sig_component_kind.Value, prefix ^ name]
+        | Opaque_module name ->
+            if Option.is_some (find_module name) then []
+            else [Sig_component_kind.Module, prefix ^ name]
+        | Module (name, items) ->
+            let sg =
+              match find_module name with
+              | None -> []
+              | Some md ->
+                  match Mtype.scrape_alias env md.md_type with
+                  | Mty_signature sg -> sg
+                  | Mty_ident _ | Mty_alias _ | Mty_strengthen _
+                  | Mty_functor _ -> []
+            in
+            missing env ~prefix:(prefix ^ name ^ ".") items sg)
+      items
+
+  let check ~loc env path sg =
+    let md = Env.find_module path env in
+    let default = testing_requirement_of_path env path in
+    let items =
+      match items_of_modtype env ~default md.md_type with
+      | `Signature items -> items
+      | `Opaque _ -> []
+    in
+    match items with
+    | [] -> Error.log_or_raise loc env (Nothing_requires_testing path)
+    | _ :: _ ->
+        match missing env ~prefix:(Path.name path ^ ".") items sg with
+        | [] -> ()
+        | missing ->
+            Error.log_or_raise loc env (Missing_tests (path, missing))
+end
 
 let apply_is_contained_by ~loc_md item ?modalities mode =
   let is_contained_by : Hint.is_contained_by =
@@ -2278,6 +2391,49 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
       psg_modalities
   in
 
+  (* Set by [[@@@testing_required]] and [[@@@testing_not_required]]. *)
+  let default_testing_requirement = ref None in
+  (* Record the testing requirement of the values and modules bound by [item]
+     in their attributes, so that it survives in the signature. Items without
+     an explicit requirement take the default from an attribute on the item
+     (for [include]) or from the enclosing signature, if any. *)
+  let add_testing_requirement item sg =
+    let parse = Builtin_attributes.parse_testing_requirement in
+    let own =
+      match item.psig_desc with
+      | Psig_value vd -> parse vd.pval_attributes
+      | Psig_module pmd -> parse pmd.pmd_attributes
+      | Psig_recmodule pmds ->
+          List.iter (fun pmd ->
+              ignore (parse pmd.pmd_attributes
+                      : Builtin_attributes.testing_requirement option))
+            pmds;
+          None
+      | Psig_include (incl, _) -> parse incl.pincl_attributes
+      | _ -> None
+    in
+    match own, !default_testing_requirement with
+    | None, None -> sg
+    | Some t, _ | None, Some t ->
+        let attr = Builtin_attributes.testing_requirement_attr t in
+        let add attrs =
+          match Builtin_attributes.testing_requirement attrs with
+          | Some _ -> attrs
+          | None -> attrs @ [attr]
+        in
+        List.map (function
+            | Sig_value (id, vd, vis) ->
+                Sig_value (id, {vd with val_attributes = add vd.val_attributes},
+                           vis)
+            | Sig_module (id, pres, md, rs, vis) ->
+                Sig_module
+                  (id, pres, {md with md_attributes = add md.md_attributes},
+                   rs, vis)
+            | Sig_type _ | Sig_typext _ | Sig_modtype _ | Sig_class _
+            | Sig_class_type _ | Sig_jkind _ as item -> item)
+          sg
+  in
+
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
     let modalities =
@@ -2635,6 +2791,8 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
         typedtree, tsg, newenv
     | Psig_attribute attr ->
         Builtin_attributes.parse_standard_interface_attributes attr;
+        Option.iter (fun t -> default_testing_requirement := Some t)
+          (Builtin_attributes.parse_testing_requirement_attribute attr);
         let newenv =
           add_implicit_jkinds env
             (Builtin_attributes.get_implicit_jkind_attr attr)
@@ -2656,6 +2814,7 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
             !Clflags.typing_recovery && Typing_recovery.is_recoverable exn ->
             transl_sig env sig_items sig_type srem
         | new_item, new_types, env ->
+            let new_types = add_testing_requirement item new_types in
             transl_sig env
               (new_item :: sig_items)
               (List.rev_append new_types sig_type)
@@ -3908,6 +4067,9 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
 
 and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   let names = Signature_names.create () in
+  (* The modules named by [[@@@covers_required_tests_of]] attributes, most
+     recent first. *)
+  let covered = ref [] in
   let loc_md = location_of_structure sstr in
   let _, md_mode = register_allocation loc_md in
 
@@ -4345,6 +4507,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Pstr_attribute x ->
         Builtin_attributes.parse_standard_implementation_attributes x;
+        begin match Builtin_attributes.covers_required_tests_of_attribute x with
+        | None | Some None -> ()
+        | Some (Some lid) ->
+            let path, _, _ = Env.lookup_module ~loc:lid.loc lid.txt env in
+            covered := (x.attr_loc, path) :: !covered
+        end;
         let new_env =
           add_implicit_jkinds env
             (Builtin_attributes.get_implicit_jkind_attr x)
@@ -4387,6 +4555,8 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
     let (items, sg, shape_map, final_env) =
       type_struct env Shape.Map.empty sstr [] [] toplevel_sig
     in
+    List.iter (fun (loc, path) -> Tests_check.check ~loc final_env path sg)
+      (List.rev !covered);
     let str = { str_items = items; str_type = sg; str_final_env = final_env } in
     str, sg, md_mode, names, Shape.str shape_map, final_env
   in
@@ -5662,6 +5832,30 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
+  | Nothing_requires_testing p ->
+      Location.errorf ~loc
+        "@[No values of %a require testing.@ \
+         Mark them with %a or %a in its interface.@]"
+        (Style.as_inline_code path) p
+        Style.inline_code "[@@testing_required]"
+        Style.inline_code "[@@@testing_required]"
+  | Missing_tests (p, items) ->
+      let pp_item ppf (kind, name) =
+        Format_doc.fprintf ppf "%s %a"
+          (match (kind : Sig_component_kind.t) with
+           | Value -> "val"
+           | _ -> Sig_component_kind.to_string kind)
+          Style.inline_code name
+      in
+      Location.errorf ~loc
+        "@[<v>@[The following items of %a require testing@ \
+         but are not bound by this structure:@]@;<1 2>@[<v>%a@]@ \
+         @[Hint: Bind each one here alongside its tests,@ \
+         or mark it %a in the interface of %a.@]@]"
+        (Style.as_inline_code path) p
+        (Format_doc.pp_print_list pp_item) items
+        Style.inline_code "[@@testing_not_required]"
+        (Style.as_inline_code path) p
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

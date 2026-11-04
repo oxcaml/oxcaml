@@ -206,6 +206,8 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+  | Nothing_requires_testing of Path.t
+  | Missing_tests of Path.t * (Sig_component_kind.t * string) list
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t
