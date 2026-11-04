@@ -334,7 +334,8 @@ module Position = struct
     match t.edge with
     | Call call -> { caller = t.function_.name; call } :: t.function_.copied_at
     | Entry | Branch _ ->
-      Misc.fatal_errorf "Fdo_counter.specialize: %s is not a call site"
+      Misc.fatal_errorf
+        "Fdo_counter_identity.Position.specialize: %s is not a call site"
         (to_string t)
 
   let specialize t ~at =

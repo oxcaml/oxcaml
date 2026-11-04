@@ -27,7 +27,11 @@
  ******************************************************************************)
 
 (** Stable structural hashing for FDO identities and Lambda fingerprints.
-    Changing this algorithm requires new FDO metadata / profile versions. *)
+    Changing this algorithm requires new FDO metadata / profile versions.
+
+    The composite forms ({!node}, {!of_list} and {!of_option}) are kept apart:
+    values built with different forms never have the same structure, whatever
+    their tags or lengths. *)
 
 type t
 

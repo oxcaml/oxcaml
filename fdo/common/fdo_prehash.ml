@@ -52,11 +52,26 @@ let combine a b =
   let p = 0x9e3779b97f4a7c15L in
   mix (Int64.add (Int64.mul a p) b)
 
-let node ~tag components = List.fold_left combine (of_int tag) components
+(* Each composite form starts with its own number, so that a node, a list and an
+   option never have the same structure, whatever their tags. *)
+type form =
+  | Node_form
+  | List_form
+  | Option_form
 
-let of_list xs = node ~tag:(List.length xs) xs
+let composite form ~label components =
+  let form =
+    match form with Node_form -> 0 | List_form -> 1 | Option_form -> 2
+  in
+  List.fold_left combine (combine (of_int form) (of_int label)) components
 
-let of_option = function None -> of_int 0 | Some x -> combine (of_int 1) x
+let node ~tag components = composite Node_form ~label:tag components
+
+let of_list xs = composite List_form ~label:(List.length xs) xs
+
+let of_option = function
+  | None -> composite Option_form ~label:0 []
+  | Some x -> composite Option_form ~label:1 [x]
 
 (* The low 32 bits after mixing. *)
 let to_int32 x = Int64.to_int32 (mix x)

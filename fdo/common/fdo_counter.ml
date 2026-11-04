@@ -93,7 +93,20 @@ module Tbl = Hashtbl.Make (struct
 end)
 
 let add_all existing counters =
-  List.fold_left
-    (fun acc counter ->
-      if List.exists (equal counter) acc then acc else acc @ [counter])
-    existing counters
+  match existing, counters with
+  | _, [] -> existing
+  | [], [_] -> counters
+  | _, _ :: _ ->
+    let seen = Tbl.create 16 in
+    List.iter (fun counter -> Tbl.replace seen counter ()) existing;
+    let added =
+      List.fold_left
+        (fun added counter ->
+          if Tbl.mem seen counter
+          then added
+          else (
+            Tbl.add seen counter ();
+            counter :: added))
+        [] counters
+    in
+    existing @ List.rev added
