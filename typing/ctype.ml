@@ -190,21 +190,68 @@ let scheduler = s_ref_of_create Scheduler.create ()
 
 let scheduler () = !scheduler
 
-(* Runs the scheduler, then defaults any still-empty ivars, until none
-   remain. *)
-let run_scheduler_and_default_ivars () =
+let get_local_ivars ~level =
+  let ivars = ref [] in
+  iter_pool ~level (fun ty ->
+      let ty = Transient_expr.type_expr ty in
+      if get_level ty >= level
+      then
+        match get_desc ty with
+        | Tivar { ivar; _ } when Ivar.has_handlers ivar ->
+          ivars := ivar :: !ivars
+        | _ -> ());
+  !ivars
+
+let get_all_ivars () =
+  List.filter Ivar.has_handlers (take_ivar_pool ~level:!current_level)
+
+(* Runs the scheduler, then defaults any still-empty ivars returned
+   by [get_ivars], until none remain. *)
+let default_ivars get_ivars =
+  let scheduler = scheduler () in
   let rec loop () =
-    Scheduler.run (scheduler ());
-    let defaulted = ref false in
-    List.iter (fun (Ivar.Packed ivar) ->
-        if Ivar.is_empty ivar then begin
-          defaulted := true;
-          Ivar.cancel_all ivar ~scheduler:(scheduler ())
-        end)
-      (Ivar.Global_pool.take ());
-    if !defaulted then loop ()
+    Scheduler.run scheduler;
+    match get_ivars () with
+    | [] -> ()
+    | ivars ->
+      Ivar.cancel_all ivars ~scheduler;
+      loop ()
   in
   loop ()
+
+let drop_all_ivars () =
+  Ivar.drop_all (get_all_ivars ());
+  Scheduler.clear (scheduler ())
+
+let try_or_drop_all_ivars f =
+  try f ()
+  with exn ->
+    Misc.reraise_preserving_backtrace exn drop_all_ivars
+
+let default_all_ivars () =
+  try_or_drop_all_ivars (fun () -> default_ivars get_all_ivars)
+
+let try_then_default_all_ivars f =
+  try_or_drop_all_ivars f;
+  default_all_ivars ()
+
+let default_all_ivars_if_toplevel () =
+  if not (in_generalization_scope ()) then default_all_ivars ()
+
+(* No pool walk generalizes the nodes of the initial pool *)
+let rewrite_defaulted_toplevel_tivars () =
+  if in_generalization_scope ()
+  then fatal_error "Ctype.rewrite_defaulted_toplevel_tivars: not at toplevel";
+  if Language_extension.is_enabled Omnidirectionality then
+    iter_pool ~level:!current_level (fun ty ->
+        match ty.desc with
+        | Tivar { ivar; name; jkind } ->
+          if Ivar.has_handlers ivar
+          then
+            fatal_error
+              "Ctype.rewrite_defaulted_toplevel_tivars: undefaulted Tivar";
+          set_type_desc (Transient_expr.type_expr ty) (Tvar { name; jkind })
+        | _ -> ())
 
 let get_current_level () = !current_level
 let init_def level = current_level := level; nongen_level := level
@@ -240,15 +287,16 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
     =
   begin_def ();
   let level = !current_level in
-  let result, pool, sort_pool =
+  let result, pool, sort_pool, ivars =
     with_new_pool ~level:!current_level begin fun () ->
       let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
-      if not structure then run_scheduler_and_default_ivars ();
+      if not structure then default_ivars (fun () -> get_local_ivars ~level);
       generalize result;
       result
     end
   in
+  List.iter (add_to_ivar_pool ~level:!current_level) ivars;
   simple_abbrevs := Mnil;
   (* Nodes in [pool] were either created by the above calls to [f]
      and [before_generalize], or they were created before, generalized,
@@ -271,9 +319,6 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
            without introducing polymorphism *)
         if ty.level >= level then Transient_expr.set_level ty !current_level;
         add_to_pool ~level:ty.level ty
-    | Tivar _ ->
-      (* [Tivar]s cannot exist after defaulting *)
-      fatal_error "Ctype.with_local_level_gen: unsupported Tivar"
     | Tlink _ -> ()
         (* If a node is no longer used as representative, no need
            to track it anymore *)
@@ -287,6 +332,11 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize ~generalize f
           (* Generalize all remaining nodes *)
           Transient_expr.set_level ty generic_level;
           match ty.desc with
+          | Tivar { ivar; name; jkind } ->
+              (* Only empty generalizable [Tivar]s exist after defaulting *)
+              if Ivar.has_handlers ivar
+              then fatal_error "Ctype.with_local_level_gen: unsupported Tivar";
+              Transient_expr.set_desc ty (Tvar { name; jkind })
           | Tconstr (_, _, abbrev) when structure ->
               (* In structure mode, we drop abbreviations, as the goal of
                  this mode is to reduce sharing *)
@@ -392,10 +442,6 @@ let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 
 let newvar ?name jkind =
   newty2 ~level:!current_level (Tvar { name; jkind })
-
-let newivar ?name jkind =
-  let ivar = Ivar.create ~in_global_pool:true () in
-  newty2 ~level:!current_level (Tivar { name; jkind; ivar })
 
 let new_rep_var ?name ~why () =
   let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
@@ -1086,11 +1132,13 @@ let rec generalize stage_offset ty =
     | Tsplice ty' ->
         generalize (stage_offset - 1) ty'
     (* Normalize the variable to be at [stage_offset = 0] *)
-    | Tvar name ->
-        update_variable_stage stage_offset ty name.name name.jkind;
-        Jkind.generalize ~current_level name.jkind
-    | Tivar _ ->
-        fatal_error "Ctype.generalize: unsupported Tivar"
+    | Tvar { name; jkind } ->
+        generalize_var_stage_and_jkind stage_offset ty name jkind
+    | Tivar { ivar; name; jkind } ->
+        if Ivar.has_handlers ivar
+        then fatal_error "Ctype.generalize: unsupported Tivar";
+        set_type_desc ty (Tvar { name; jkind });
+        generalize_var_stage_and_jkind stage_offset ty name jkind
     (* Do not generalize cross-stage row-polymorphic types, as we cannot
        quote or splice row variables.
        Weak type variables that arise here are considered cross-stage,
@@ -1113,6 +1161,10 @@ let rec generalize stage_offset ty =
       iter_type_expr (generalize stage_offset) mgen ty
     end;
   end
+
+and generalize_var_stage_and_jkind stage_offset ty name jkind =
+  update_variable_stage stage_offset ty name jkind;
+  Jkind.generalize ~current_level:!current_level jkind
 
 let generalize ty =
   simple_abbrevs := Mnil;
@@ -5335,7 +5387,11 @@ let link_var tr_exn env t1 t2 =
     link_type t1 t2;
     match head with
     | Var -> transfer_ivar ivar1 t2'
-    | Locally_abstract | Undefined -> ()
+    | Locally_abstract | Undefined ->
+      (* [t2'] has no shape, so [ivar1] will never be filled.
+         No [Tivar] holds it any more, so no drain would find
+         it: default now, as [upon_shape] does. *)
+      Ivar.cancel_all [ivar1] ~scheduler:(scheduler ())
     | Ivar ivar2 -> merge_ivars tr_exn ivar1 ivar2
     | Shape s -> fill_ivar tr_exn ivar1 s)
   | _ -> Misc.fatal_error "Ctype.link_var: expected Tvar or Tivar"
@@ -5429,24 +5485,14 @@ let upon_shape env ty ~run ~default =
   let ty = expand_head_ignoring_local_constraints env ty in
   let head = Type_head.of_expanded_type env ty in
   let wait ivar =
-    let cancel () =
-      (* [cancel]ling because we did not determine [ty]'s shape: turn [ty]
-         back into a [Tvar] and run its default constraint. If [ty] is now a
-         [Tivar] for a different ivar (registered by an earlier default),
-         leave it. *)
-      (match get_desc ty with
-      | Tivar { name; jkind; ivar = ivar' } when ivar == ivar' ->
-        set_type_desc ty (Tvar { name; jkind })
-      | _ -> ());
-      default ()
-    in
-    Ivar.upon ivar ~run ~cancel ~scheduler
+    Ivar.upon ivar ~run ~cancel:default ~scheduler;
+    add_to_ivar_pool ~level:!current_level ivar
   in
   match head with
   | Var when not (Language_extension.is_enabled Omnidirectionality) ->
     Scheduler.add scheduler default
   | Var ->
-    let ivar = Ivar.create ~in_global_pool:true () in
+    let ivar = Ivar.create () in
     transfer_ivar ivar ty;
     wait ivar
   | Ivar ivar -> wait ivar
@@ -7039,8 +7085,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         instantiating [t2], which we do not wish to do *)
         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
         (* A [Tivar] [t1] may be waited on by a crossing delayed by
-           [moregen]. An orphaned ivar is defaulted on exit from [moregeneral]
-           or [match_class_types]. *)
+           [moregen], which [moregeneral] defaults before returning. *)
         link_var Moregen env t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
@@ -7370,18 +7415,21 @@ let moregeneral ~self_check env inst_nongen
         Jkind.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
-      Scheduler.Monitor.try_ begin fun () ->
-        try
-          with_univar_pairs [] begin fun () ->
-            let type_pairs = fresh_moregen_pairs () in
-            moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
-          end;
-          subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
-        with Moregen_trace trace -> subj_inst, Error trace
-      end
-      ~with_:(function
-        | Moregen_trace trace -> Moregen (expand_to_moregen_error env trace)
-        | e -> e)
+      match
+        Scheduler.Monitor.try_
+          (fun () ->
+            try_then_default_all_ivars (fun () ->
+              with_univar_pairs [] (fun () ->
+                  let type_pairs = fresh_moregen_pairs () in
+                  moregen inst_nongen Covariant type_pairs env pat_inst
+                    subj_inst')))
+          ~with_:(function
+            | Moregen_trace trace ->
+              Moregen (expand_to_moregen_error env trace)
+            | e -> e)
+      with
+      | () -> subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
+      | exception Moregen err -> subj_inst, Error err
     end
       ~generalize:(fun (subj_inst, _) ->
         ignore (Jkind.Sort.generalize_with (fun () -> generalize subj_inst)))
@@ -7408,7 +7456,7 @@ let moregeneral ~self_check env inst_nongen
             |> Jkind_types.Sort.Const.subst subst_map
             |> Option.some)
         pat_inst_sorts
-    | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
+    | _, Error err -> raise (Moregen err)
   end
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
@@ -8020,14 +8068,6 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
          the original types, but that would be rather ad hoc.
        *)
       with_level ~level:(subject_level - 1) begin fun () ->
-      (* CR-someday omni: This is somewhat disgusting & will break later.
-
-         A crossing delayed by [moregen_clty] can raise [Failure] after the
-         inner [try] has returned, when [with_local_level_generalize] runs
-         delayed checks on exit; catch it here too. That exit defaults every
-         pending ivar, so no check is left to fail after
-         [match_class_types] returns. *)
-        match
         with_local_level_generalize ~generalize:ignore begin fun () ->
           assert (!current_level = subject_level);
           (*
@@ -8053,12 +8093,12 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
           (* Always succeeds *)
           moregen true Covariant type_pairs env row1 row2;
           (* May fail *)
-          try moregen_clty trace type_pairs env patt subj; []
+          try
+            try_then_default_all_ivars (fun () ->
+                moregen_clty trace type_pairs env patt subj);
+            []
           with Failure res -> res
         end
-        with
-        | res -> res
-        | exception Failure res -> res
       end
   | errors ->
       CM_Class_type_mismatch (env, pat_sch, subj_sch) :: errors
