@@ -28,12 +28,12 @@
 
 type t =
   { naming_context : Fdo_function_naming.Context.t;
-    counters : Fdo_instrumentation.t
+    numbering : Fdo_instrumentation.t
   }
 
 let toplevel compilation_unit module_initializer =
   { naming_context = Fdo_function_naming.Context.toplevel compilation_unit;
-    counters =
+    numbering =
       Fdo_instrumentation.create
         ~function_:(Fdo_function_naming.toplevel_function compilation_unit)
         ~body_hash:(Fdo_body_hash.of_toplevel module_initializer)
@@ -44,11 +44,13 @@ let enter_function t ~binder fn =
     Fdo_function_naming.of_function t.naming_context ~binder fn
   in
   { naming_context;
-    counters =
+    numbering =
       Fdo_instrumentation.create ~function_
         ~body_hash:(Fdo_body_hash.of_function fn)
   }
 
-let entry_annotation t = Fdo_instrumentation.entry_annotation t.counters
+let entry_annotation t = Fdo_instrumentation.entry_annotation t.numbering
 
-let counters t = t.counters
+let call_counter t loc = Fdo_instrumentation.call t.numbering loc
+
+let switch_counters t switch = Fdo_instrumentation.switch t.numbering switch

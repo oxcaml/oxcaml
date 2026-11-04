@@ -110,26 +110,18 @@ module Switch_counters = struct
       failaction : Fdo_annotation.t
     }
 
-  let none =
-    { case = (fun _ -> Fdo_annotation.empty);
-      failaction = Fdo_annotation.empty
-    }
+  let case t n = t.case n
+
+  let failaction t = t.failaction
 end
-
-type switch =
-  { consts : Switch_counters.t;
-    blocks : Switch_counters.t;
-    is_int : Switch_counters.t
-  }
-
-let no_switch =
-  { consts = Switch_counters.none;
-    blocks = Switch_counters.none;
-    is_int = Switch_counters.none
-  }
 
 (* The arms of a [Lambda] switch are numbered by constant, then by tag, then the
    default arm. *)
+(* CR yusumez: The switches introduced by the expansion of primitives (e.g. the
+   loops that initialise and blit arrays, see [Lambda_to_lambda_transforms]) are
+   numbered like those of the source. They should get no counters, which needs
+   the switches of the expansion to be told apart from those of its source
+   subterms (the arguments). *)
 let switch t
     ({ sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction } :
       Lambda.lambda_switch) =
@@ -153,21 +145,4 @@ let switch t
   in
   let consts = switch_counters sw_consts ~first_arm:0 in
   let blocks = switch_counters sw_blocks ~first_arm:sw_numconsts in
-  (* The edges into the switch on the constants, and into the one on the tags,
-     carry the counters of the arms of those. *)
-  let all cases ~num (counters : Switch_counters.t) =
-    List.fold_left
-      (fun acc (n, _) -> Fdo_annotation.combine acc (counters.case n))
-      (if List.compare_length_with cases num < 0
-       then counters.failaction
-       else Fdo_annotation.empty)
-      cases
-  in
-  let to_blocks = all sw_blocks ~num:sw_numblocks blocks in
-  let to_consts = all sw_consts ~num:sw_numconsts consts in
-  let is_int : Switch_counters.t =
-    { case = (fun is_int -> if is_int = 0 then to_blocks else to_consts);
-      failaction = Fdo_annotation.empty
-    }
-  in
-  { consts; blocks; is_int }
+  ~consts, ~blocks
