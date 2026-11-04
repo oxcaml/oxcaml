@@ -27,11 +27,11 @@
  ******************************************************************************)
 
 (** FDO counters (see [Fdo_counter]) whose instruction Simplify removes while
-    the code they count stays: the call-site counter of an inlined call, with
-    the entry counters of the callee; the counter of a self tail call turned
-    into a jump; the counters of the arms of a switch that collapses into a
-    single jump. Such a counter is preserved by attaching it to the edges into
-    the straight-line code it was in, which execute exactly as often.
+    the code they count stays: the entry counters of the callee of an inlined
+    call (see [Fdo_term_counters.of_inlined_call]); the counter of a self tail
+    call turned into a jump; the counters of the arms of a switch that collapses
+    into a single jump. Such a counter is preserved by attaching it to the edges
+    into the straight-line code it was in, which execute exactly as often.
 
     A region is a stretch of straight-line control flow: a function body or a
     continuation handler, up to its terminator. The counters preserved in a
