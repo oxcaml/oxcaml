@@ -982,7 +982,7 @@ stdenv.mkDerivation {
           "  (make ppxlib-build needs this shell built with withAstDependentLibs=true)\n";
       jsooCommands =
         if withJsoo then
-          "  make jsoo-build          - Build js_of_ocaml, wasm_of_ocaml and the JSIR stdlib\n"
+          "  make jsoo-build          - Build js_of_ocaml, wasm_of_ocaml and their JSIR stdlibs\n"
           + "  make jsoo-install        - Install them (AST_DEPENDENT_LIBS_PREFIX=...)\n"
           + "  make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions\n"
           + "  make test-without-jsir   - Run all tests but the JSIR ones\n"

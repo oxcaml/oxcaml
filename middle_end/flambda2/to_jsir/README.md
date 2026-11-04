@@ -87,6 +87,12 @@ The following are not yet supported in JSIR translation, and will raise an excep
 
 1. SIMD/vector types: `vec128`, `vec256` and `vec512`
 
+### Partial applications of functions of void parameters
+Void parameters are erased in JSIR, so a function all of whose parameters are void is a closure of arity 0.
+When the callee is unknown, the generic application of `js_of_ocaml` and `wasm_of_ocaml` (`caml_call_gen`, `caml_apply0`) cannot tell a partial application supplying only some of its void arguments from a full one, and evaluates the function immediately (native and bytecode defer it).
+For example, given `let[@inline never] g (v : void) (w : void) = print_string "g"; 1` and `let[@inline never] partial2 (k : void -> void -> int) = let p = k (void ()) in print_string "a"; p (void ())`, `print_int (partial2 g)` prints `ga1` instead of `ag1` (and fails at runtime with the JavaScript target).
+Functions with at least one non-void parameter are unaffected.
+
 ## External stub behaviour
 For `external` declarations containing both bytecode and native names, the JSIR pass uses the **bytecode** name for most cases, and such JavaScript stubs are compatible with the existing `js_of_ocaml` stubs.
 However, when **unboxed products** are involved (as arguments or return type), we instead use the **native** name. In this case, we use a slightly different convention to that of both existing JS/bytecode stubs and native C stubs:

@@ -7,7 +7,9 @@
  }{
    (* Under js_of_ocaml, ints are 32 bits wide. *)
    reference = "${test_source_directory}/test_json.jsir-output.reference";
-   jsir;
+   jsir-js;
+ }{
+   jsir-wasm;
  }
 *)
 

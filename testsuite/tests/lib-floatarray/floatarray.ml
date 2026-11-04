@@ -1,4 +1,9 @@
-(* TEST *)
+(* TEST
+ { bytecode; }
+ { native; }
+ { jsir-js; }
+ (* Disabled on jsir-wasm due to an upstream WASMOO bug *)
+*)
 
 open Printf
 

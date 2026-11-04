@@ -39,7 +39,8 @@
   js_of_ocaml/js_of_ocaml-runtime.install
   js_of_ocaml/js_of_ocaml.install
   js_of_ocaml/js_of_ocaml-toplevel.install
-  stdlib-jsir/stdlib-jsir.install))
+  stdlib-jsir/stdlib-jsir.install
+  stdlib-jsir/stdlib-wasm.install))
 
 ; For js_of_ocaml's dune-workspace, which defines runtest-js and runtest-wasm.
 
