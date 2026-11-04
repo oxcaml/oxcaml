@@ -103,7 +103,12 @@ module Error_set = Set.Make (struct
       else
         1
   end)
-<<<<<<< Merlin:liam-recovery-mode
+
+let () =
+  Mode.Typing_recovery_functions.set {
+    log_and_raise;
+    register_recoverable;
+  }
 
 (* Merlin specific *)
 
@@ -138,12 +143,3 @@ let () =
 let () = Location.prerr_warning_ref := prerr_warning
 
 let () = Location.prerr_alert_ref := prerr_alert
-||||||| Compiler:last-imported
-=======
-
-let () =
-  Mode.Typing_recovery_functions.set {
-    log_and_raise;
-    register_recoverable;
-  }
->>>>>>> Compiler:HEAD
