@@ -7920,7 +7920,12 @@ type class_match_failure =
   | CM_Private_method of string
   | CM_Virtual_method of string
 
-exception Failure of class_match_failure list
+exception Class_match_failure of class_match_failure
+
+type moregen_clty_trace = class_match_failure list
+
+exception Moregen_clty_trace of moregen_clty_trace
+exception Moregen_clty of moregen_clty_trace
 
 let match_class_sig_shape ~strict sign1 sign2 =
   let errors =
@@ -7977,12 +7982,12 @@ let match_class_sig_shape ~strict sign1 sign2 =
 
 (* [arrow_index] is the number of [Cty_arrow] constructors we've seen so far.
    The handlers below are monitor frames, so that checks delayed by [moregen]
-   (e.g. mode crossing) fail with the same [Failure]. *)
+   (e.g. mode crossing) fail with the same [Moregen_clty_trace]. *)
 let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
   Scheduler.Monitor.try_
     ~with_:(function
-      | Failure error when trace || error = [] ->
-        Failure (CM_Class_type_mismatch (env, cty1, cty2) :: error)
+      | Moregen_clty_trace error when trace || error = [] ->
+        Moregen_clty_trace (CM_Class_type_mismatch (env, cty1, cty2) :: error)
       | e -> e)
   begin fun () ->
     match cty1, cty2 with
@@ -7996,7 +8001,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
           (fun () -> moregen true Covariant type_pairs env ty1 ty2)
           ~with_:(function
             | Moregen_trace trace ->
-              Failure [
+              Moregen_clty_trace [
                 CM_Parameter_mismatch
                   (arrow_index, env, expand_to_moregen_error env trace)]
             | e -> e);
@@ -8014,7 +8019,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                    (fun () -> moregen true Covariant type_pairs env ty' ty)
                    ~with_:(function
                      | Moregen_trace trace ->
-                       Failure [
+                       Moregen_clty_trace [
                          CM_Meth_type_mismatch
                            (lab,
                             env,
@@ -8034,7 +8039,7 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                    (fun () -> moregen true Covariant type_pairs env ty' ty)
                    ~with_:(function
                      | Moregen_trace trace ->
-                       Failure [
+                       Moregen_clty_trace [
                          CM_Val_type_mismatch
                            (lab,
                             env,
@@ -8043,11 +8048,13 @@ let rec moregen_clty ~arrow_index trace type_pairs env cty1 cty2 =
                      | e -> e))
           sign2.csig_vars
     | _ ->
-        raise (Failure [])
+        raise (Moregen_clty_trace [])
   end
 
 let moregen_clty trace type_pairs env cty1 cty2 =
-  moregen_clty ~arrow_index:0 trace type_pairs env cty1 cty2
+  Scheduler.Monitor.try_
+    (fun () -> moregen_clty ~arrow_index:0 trace type_pairs env cty1 cty2)
+    ~with_:(function Moregen_clty_trace trace -> Moregen_clty trace | e -> e)
 
 let match_class_types ?(trace=true) env pat_sch subj_sch =
   let sign1 = signature_of_class_type pat_sch in
@@ -8097,54 +8104,49 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
             try_then_default_all_ivars (fun () ->
                 moregen_clty trace type_pairs env patt subj);
             []
-          with Failure res -> res
+          with Moregen_clty res -> res
         end
       end
   | errors ->
       CM_Class_type_mismatch (env, pat_sch, subj_sch) :: errors
 
-let equal_clsig trace type_pairs subst env sign1 sign2 =
-  try
-    Meths.iter
-      (fun lab (_, _, ty) ->
-         match Meths.find lab sign1.csig_meths with
-         | exception Not_found ->
-             (* This function is only called after checking that
-                all methods in sign2 are present in sign1. *)
-             assert false
-         | (_, _, ty') ->
-             match eqtype true type_pairs subst env ty' ty with
-             | () -> ()
-             | exception Equality_trace trace ->
-                 raise (Failure [
-                   CM_Meth_type_mismatch
-                     (lab,
-                      env,
-                      Equality_error
-                        (expand_to_equality_error env trace !subst))]))
-      sign2.csig_meths;
-    Vars.iter
-      (fun lab (_, _, ty) ->
-         match Vars.find lab sign1.csig_vars with
-         | exception Not_found ->
-             (* This function is only called after checking that
-                all instance variables in sign2 are present in sign1. *)
-             assert false
-         | (_, _, ty') ->
-             match eqtype true type_pairs subst env ty' ty with
-             | () -> ()
-             | exception Equality_trace trace ->
-                 raise (Failure [
-                   CM_Val_type_mismatch
-                     (lab,
-                      env,
-                      Equality_error
-                        (expand_to_equality_error env trace !subst))]))
-      sign2.csig_vars
-  with
-    Failure error when trace ->
-      raise (Failure (CM_Class_type_mismatch
-                        (env, Cty_signature sign1, Cty_signature sign2)::error))
+let equal_clsig type_pairs subst env sign1 sign2 =
+  Meths.iter
+    (fun lab (_, _, ty) ->
+        match Meths.find lab sign1.csig_meths with
+        | exception Not_found ->
+            (* This function is only called after checking that
+              all methods in sign2 are present in sign1. *)
+            assert false
+        | (_, _, ty') ->
+            match eqtype true type_pairs subst env ty' ty with
+            | () -> ()
+            | exception Equality_trace trace ->
+                raise (Class_match_failure (
+                  CM_Meth_type_mismatch
+                    (lab,
+                    env,
+                    Equality_error
+                      (expand_to_equality_error env trace !subst)))))
+    sign2.csig_meths;
+  Vars.iter
+    (fun lab (_, _, ty) ->
+        match Vars.find lab sign1.csig_vars with
+        | exception Not_found ->
+            (* This function is only called after checking that
+              all instance variables in sign2 are present in sign1. *)
+            assert false
+        | (_, _, ty') ->
+            match eqtype true type_pairs subst env ty' ty with
+            | () -> ()
+            | exception Equality_trace trace ->
+                raise (Class_match_failure (
+                  CM_Val_type_mismatch
+                    (lab,
+                    env,
+                    Equality_error
+                      (expand_to_equality_error env trace !subst)))))
+    sign2.csig_vars
 
 let match_class_declarations env patt_params patt_type subj_params subj_type =
   let sign1 = signature_of_class_type patt_type in
@@ -8165,15 +8167,15 @@ let match_class_declarations env patt_params patt_type subj_params subj_type =
         let lp = List.length patt_params in
         let ls = List.length subj_params in
         if lp  <> ls then
-          raise (Failure [CM_Parameter_arity_mismatch (lp, ls)]);
+          raise (Class_match_failure (CM_Parameter_arity_mismatch (lp, ls)));
         Stdlib.List.iteri2 (fun n p s ->
           try eqtype true type_pairs subst env p s with Equality_trace trace ->
-            raise (Failure
-                     [CM_Type_parameter_mismatch
-                        (n+1, env, expand_to_equality_error env trace !subst)]))
+            raise (Class_match_failure
+                     (CM_Type_parameter_mismatch
+                        (n+1, env, expand_to_equality_error env trace !subst))))
           patt_params subj_params;
      (* old code: equal_clty false type_pairs subst env patt_type subj_type; *)
-        equal_clsig false type_pairs subst env sign1 sign2;
+        equal_clsig type_pairs subst env sign1 sign2;
         (* Use moregeneral for class parameters, need to recheck everything to
            keeps relationships (PR#4824) *)
         let clty_params =
@@ -8181,7 +8183,9 @@ let match_class_declarations env patt_params patt_type subj_params subj_type =
         match_class_types ~trace:false env
           (clty_params patt_params patt_type)
           (clty_params subj_params subj_type)
-      with Failure r -> r
+      with
+      | Class_match_failure r -> [ r ]
+      | Moregen_clty trace -> trace
     end
   | error ->
       error

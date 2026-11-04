@@ -461,11 +461,6 @@ Error: The class type object method m : 'a -> 'a ref end
        The class type object method m : 'a -> 'a ref end
        is not matched by the class type
          object method m : 'a @ local -> 'a ref end
-       The class type object method m : 'a -> 'a ref end
-       is not matched by the class type ['_a] ct
-       The class type object method m : 'a -> 'a ref end
-       is not matched by the class type
-         object method m : 'a @ local -> 'a ref end
        The method m has type "'a -> 'a ref" but is expected to have type
          "'a @ local -> 'a ref"
        Type "'a -> 'a ref" is not compatible with type "'a @ local -> 'a ref"
