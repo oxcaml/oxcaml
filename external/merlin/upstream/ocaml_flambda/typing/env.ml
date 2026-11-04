@@ -27,6 +27,8 @@ open Data_types
 
 open Local_store
 
+module CUI = Compilation_unit_intf
+
 module Jkind = Btype.Jkind0
 module String = Misc.Stdlib.String
 
@@ -1913,7 +1915,7 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = global.Global_module.Name.head in
+    let name = CUI.Found.intf global.Global_module.Name.head in
     if Current_unit.Name.is (Compilation_unit.Name.to_string name)
     then begin
       (* The current compilation unit appears in quotes.
@@ -2011,13 +2013,20 @@ and expand_modtype_path env path =
   | Some (Mty_ident path) -> normalize_modtype_path env path
   | _ | exception Not_found -> path
 
+(* The ident of a global unit whose cmi has been loaded. Under
+   [-persistent-deps], it records where the cmi was found (see [CUI.Found]),
+   so that signatures mentioning it are saved with the location. *)
+let global_ident_of_loaded name =
+  Ident.create_global
+    (Persistent_env.with_recorded_cmi_path !persistent_env name)
+
 let normalize_instance_names_in_ident ident =
   if Ident.is_instance ident then
     let modname = Ident.to_global_exn ident in
     let modname2 =
       Persistent_env.normalize_global_name !persistent_env modname
     in
-    if modname == modname2 then ident else Ident.create_global modname2
+    if modname == modname2 then ident else global_ident_of_loaded modname2
   else
     ident
 
@@ -2222,7 +2231,8 @@ let same_types env1 env2 =
 let used_persistent () =
   Persistent_env.fold !persistent_env
     (fun s _m r ->
-       Compilation_unit.Name.Set.add s.Global_module.Name.head r)
+       Compilation_unit.Name.Set.add
+         (CUI.Found.intf s.Global_module.Name.head) r)
     Compilation_unit.Name.Set.empty
 
 let find_all_comps wrap proj s (p, mda) =
@@ -3397,7 +3407,8 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
   let pers_sig =
     Persistent_env.Persistent_signature.{
       filename; cmi;
-      visibility = Visible { cmx_guaranteed = false }
+      visibility = Visible { cmx_guaranteed = false };
+      manifest_location = None
     }
   in
   Persistent_env.save_cmi !persistent_env pers_sig;
@@ -3723,14 +3734,14 @@ type _ load =
 
 let lookup_global_name_module_no_locks
       (type a) (load : a load) ~errors ~use ~loc name env =
-  let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
       check_pers_mod ~allow_hidden:false ~loc name;
-      path, (() : a)
+      Pident (Ident.create_global name), (() : a)
   | Load -> begin
       match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
       | mda ->
+          let path = Pident (global_ident_of_loaded name) in
           use_module ~use ~loc path mda;
           path, (mda : a)
       | exception Not_found ->
@@ -4459,7 +4470,7 @@ let open_pers_signature_cmi filename env =
   let mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
   in
-  let path = Pident (Ident.create_global global_name) in
+  let path = Pident (global_ident_of_loaded global_name) in
   use_module ~use:true ~loc:Location.none path mda;
   let comps = find_structure_components path env in
   let locks =
@@ -4521,10 +4532,16 @@ let open_signature
 
 (* General forms of the lookup functions *)
 
+(* Whether module aliases load the cmis of their targets. Under
+   [-persistent-deps] they do even with [-no-alias-deps], which however still
+   decides whether the targets become runtime dependencies. *)
+let aliases_load_cmis () =
+  !Clflags.persistent_deps || not !Clflags.no_alias_deps
+
 let lookup_module_path ~errors ~use ~loc ~load lid env =
   match lid with
   | Lident s ->
-      if !Clflags.no_alias_deps && not load then
+      if not (aliases_load_cmis () || load) then
         let path, mode_with_locks, () =
           lookup_ident_module Don't_load ~errors ~use ~loc s env
         in
@@ -4546,7 +4563,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   (* The locks are whatever locks we would find if we went through
      [lookup_module_path] on a module not found in the environment *)
   let path, loc_def, mode =
-    if !Clflags.no_alias_deps && not load then
+    if not (aliases_load_cmis () || load) then
       let path, () =
         lookup_global_name_module_no_locks Don't_load ~errors ~use ~loc name env
       in

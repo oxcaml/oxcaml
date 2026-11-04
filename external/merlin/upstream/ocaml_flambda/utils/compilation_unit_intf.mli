@@ -47,3 +47,33 @@ val print : Format_doc.formatter -> t -> unit
 (** Print the name for use in error messages. Uses [Format_doc.formatter] and
     applies inline code styling. *)
 val print_as_inline_code : Format_doc.formatter -> t -> unit
+
+(** An interface together with the location of its .cmi file, when recorded.
+    Most users should traffic in plain [t]; a [Found.t] additionally remembers
+    where the .cmi file is, as a path relative to the manifest files root (see
+    [Load_path.found]), so that later lookups load it from there instead of
+    searching the load path. Locations are recorded only under
+    [-persistent-deps], and only for .cmi files found through manifests.
+    The path does not affect identity: it is ignored by [compare], [equal] and
+    [hash]. *)
+module Found : sig
+  type cui := t
+
+  type t
+
+  (** Create without a recorded .cmi location. *)
+  val without_cmi_path : cui -> t
+
+  val intf : t -> cui
+
+  (** Record the location of the interface's .cmi file. *)
+  val with_cmi_path : t -> Misc.filepath -> t
+
+  (** The recorded location of the .cmi file, if any. *)
+  val cmi_path : t -> Misc.filepath option
+
+  (** Printing, comparison, sets, maps, etc.; all ignore the path. *)
+  include Identifiable.S with type t := t
+
+  val print : Format_doc.formatter -> t -> unit
+end

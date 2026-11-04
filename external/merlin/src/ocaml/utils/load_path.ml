@@ -77,8 +77,12 @@ module Dune_manifests_reader : sig
       type t
 
       val of_string : string -> t
+      val to_string : t -> string
       val to_cwd_relative : t -> Cwd_relative.t
     end
+
+    (* The manifest files root ([$MANIFEST_FILES_ROOT]), if set. *)
+    val root : unit -> string option
   end
 
   type t
@@ -87,8 +91,8 @@ module Dune_manifests_reader : sig
 
   val read_manifest
     :  t
-    -> f:(filename:string -> location:Path.Cwd_relative.t ->
-          cmx_guaranteed:bool -> unit)
+    -> f:(filename:string -> location:Path.Load_root_relative.t ->
+          path:Path.Cwd_relative.t -> cmx_guaranteed:bool -> unit)
     -> on_manifest:(Path.Load_root_relative.t -> unit)
     -> manifest_path:Path.Load_root_relative.t
     -> unit
@@ -108,6 +112,7 @@ end = struct
       type t
 
       val of_string : string -> t
+      val to_string : t -> string
       val to_cwd_relative : t -> Cwd_relative.t
 
       module Hash_set : sig
@@ -119,22 +124,24 @@ end = struct
         val add : t -> elem -> unit
       end
     end
+
+    val root : unit -> string option
   end = struct
     module For_testing = struct
       let root_override = ref None
     end
 
     let root =
-      let from_env_var = lazy (
-        let var_name = "MANIFEST_FILES_ROOT" in
-        match Sys.getenv_opt var_name with
-        | None -> failwith (var_name ^ " not set")
-        | Some path -> path)
-      in
+      let from_env_var = lazy (Sys.getenv_opt "MANIFEST_FILES_ROOT") in
       fun () ->
         match !For_testing.root_override with
         | None -> Lazy.force from_env_var
-        | Some root -> root
+        | Some _ as root -> root
+
+    let root_exn () =
+      match root () with
+      | Some root -> root
+      | None -> failwith "MANIFEST_FILES_ROOT not set"
 
     module Cwd_relative = struct
       type t = string
@@ -147,8 +154,10 @@ end = struct
 
       let of_string path = path
 
+      let to_string path = path
+
       let to_cwd_relative path =
-        Filename.concat (root ()) path
+        Filename.concat (root_exn ()) path
       ;;
 
       module Hash_set = struct
@@ -224,8 +233,8 @@ end = struct
         match parse_line ~buffer line with
         | None -> ()
         | Some (Entry.File { filename; location; cmx_guaranteed }) ->
-          visit t location ~f:(fun location ->
-            f ~filename ~location ~cmx_guaranteed)
+          visit t location ~f:(fun path ->
+            f ~filename ~location ~path ~cmx_guaranteed)
         | Some (Manifest manifest_path) -> on_manifest manifest_path))
   ;;
 end
@@ -248,6 +257,16 @@ let visibility_eq a b =
     Bool.equal cmx_guaranteed_a cmx_guaranteed_b
   | Hidden, Hidden -> true
   | Visible _, Hidden | Hidden, Visible _ -> false
+
+type found =
+  { path : string;
+    visibility : visibility;
+    manifest_location : string option }
+
+let resolve_manifest_location location =
+  Option.map
+    (fun root -> Filename.concat root location)
+    (Dune_manifests_reader.Path.root ())
 
 module Dir : sig
   type entry = {
@@ -445,6 +464,10 @@ let pending_hidden_manifests
 
 let manifests_reader = s_table Dune_manifests_reader.create ()
 
+(* The location of each file contributed by a manifest entry, by path. *)
+let manifest_locations : string Misc.Stdlib.String.Tbl.t ref =
+  s_table Misc.Stdlib.String.Tbl.create 42
+
 let reset () =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.reset ();
@@ -453,8 +476,15 @@ let reset () =
   visible_basenames := [];
   auto_include_callback := no_auto_include;
   Queue.clear !pending_hidden_manifests;
-  manifests_reader := Dune_manifests_reader.create ()
+  manifests_reader := Dune_manifests_reader.create ();
+  Misc.Stdlib.String.Tbl.clear !manifest_locations
 ;;
+
+let path_of_manifest_entry ~location ~path =
+  let path = Dune_manifests_reader.Path.Cwd_relative.to_string path in
+  Misc.Stdlib.String.Tbl.replace !manifest_locations path
+    (Dune_manifests_reader.Path.Load_root_relative.to_string location);
+  path
 
 type dirs_and_files =
   { dirs : Dir.t list
@@ -501,14 +531,14 @@ let init_manifests () =
       !manifests_reader
       ~manifest_path
       ~on_manifest:load_visible_manifest
-      ~f:(fun ~filename ~location ~cmx_guaranteed ->
+      ~f:(fun ~filename ~location ~path ~cmx_guaranteed ->
           let basename = Filename.basename filename in
           visible_basenames := basename :: !visible_basenames;
           Path_cache.prepend_add_single
             ~hidden:false
             ~cmx_guaranteed
             basename
-            (Dune_manifests_reader.Path.Cwd_relative.to_string location))
+            (path_of_manifest_entry ~location ~path))
   in
   let enqueue_hidden_manifest manifest_path =
     Queue.add manifest_path !pending_hidden_manifests
@@ -543,10 +573,9 @@ let load_one_pending_manifest ~uncap fn =
       ~manifest_path
       ~on_manifest:(fun manifest_path ->
         Queue.add manifest_path !pending_hidden_manifests)
-      ~f:(fun ~filename ~location ~cmx_guaranteed:_ ->
+      ~f:(fun ~filename ~location ~path ~cmx_guaranteed:_ ->
         let basename = Filename.basename filename in
-        let location =
-          Dune_manifests_reader.Path.Cwd_relative.to_string location in
+        let location = path_of_manifest_entry ~location ~path in
         if Option.is_none !found && basename_matches ~uncap fn basename
         then found := Some (location, Hidden);
         Path_cache.add_hidden_single basename location);
@@ -719,6 +748,12 @@ let find_normalized_with_visibility fn =
   with Not_found ->
     (!auto_include_callback Dir.find_normalized fn_uncap,
      Visible { cmx_guaranteed = false })
+
+let find_normalized_with_origin fn =
+  let path, visibility = find_normalized_with_visibility fn in
+  { path; visibility;
+    manifest_location =
+      Misc.Stdlib.String.Tbl.find_opt !manifest_locations path }
 
 let find_normalized fn = fst (find_normalized_with_visibility fn)
 

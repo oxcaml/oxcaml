@@ -1,0 +1,4 @@
+File "libc/c1.ml", line 1:
+Error: The compiled interface for A was recorded at liba/a.cmi
+       relative to the manifest files root, but no manifest files root is set
+       (MANIFEST_FILES_ROOT).
