@@ -483,7 +483,6 @@ static intnat ephe_mark (intnat budget, uintnat round,
 
     if (force_alive) preserve_data = true;
 
-<<<<<<< OxCaml
     bool keep;
     value data = Ephe_data(ephe);
     if (data == caml_ephe_none || Is_long(data)) {
@@ -507,29 +506,8 @@ static intnat ephe_mark (intnat budget, uintnat round,
       prev_linkp = &Ephe_link(ephe);
     } else {
        /* move to 'live' list */
-      Ephe_link(ephe) = domain_state->ephe_info->live;
-      domain_state->ephe_info->live = ephe;
-      /* remove from 'todo' list */
-||||||| Upstream OCaml
-    if (preserve_data) {
-      value data = Ephe_data(ephe);
-      if (data != caml_ephe_none && Is_block(data)) {
-        caml_darken (domain_state, data, 0);
-      }
-      /* Move to 'live' list */
-      Ephe_link(ephe) = domain_state->ephe_info->live;
-      domain_state->ephe_info->live = ephe;
-      /* Remove from 'todo' list */
-=======
-    if (preserve_data) {
-      value data = Ephe_data(ephe);
-      if (data != caml_ephe_none && Is_block(data)) {
-        caml_darken (domain_state, data, 0);
-      }
-      /* Move to 'live' list */
       caml_ephe_list_cons_inplace(ephe, &domain_state->ephe_info->live);
-      /* Remove from 'todo' list */
->>>>>>> ocaml/ocaml#14735
+      /* remove from 'todo' list */
       *prev_linkp = next;
     }
     scanned ++;
@@ -554,19 +532,9 @@ static intnat ephe_sweep (caml_domain_state* domain_state, intnat budget)
   CAMLassert (caml_gc_phase == Phase_sweep_ephe);
 
   while (domain_state->ephe_info->todo != 0 && budget > 0) {
-<<<<<<< OxCaml
-    value ephe = domain_state->ephe_info->todo;
-    domain_state->ephe_info->todo = Ephe_link(ephe);
-||||||| Upstream OCaml
-    /* pop the first ephemeron from the todo list */
-    ephe = domain_state->ephe_info->todo;
-    domain_state->ephe_info->todo = Ephe_link(ephe);
-
-=======
     /* pop the first ephemeron from the todo list */
     value ephe = caml_ephe_list_pop(&domain_state->ephe_info->todo);
 
->>>>>>> ocaml/ocaml#14735
     CAMLassert (Tag_val(ephe) == Abstract_tag);
 
     if (is_unmarked(ephe)) {

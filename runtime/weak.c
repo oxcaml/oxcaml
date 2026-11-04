@@ -79,19 +79,9 @@ CAMLprim value caml_ephe_create (value len)
     caml_invalid_argument ("Weak.create");
   res = caml_alloc_shr (size, Abstract_tag);
 
-<<<<<<< OxCaml
-  Ephe_link(res) = domain_state->ephe_info->live;
-  domain_state->ephe_info->live = res;
-||||||| Upstream OCaml
-  /* Add the new ephemeron to the live list */
-  Ephe_link(res) = domain_state->ephe_info->live;
-  domain_state->ephe_info->live = res;
-
-=======
   /* Add the new ephemeron to the live list */
   caml_ephe_list_cons_inplace(res, &domain_state->ephe_info->live);
 
->>>>>>> ocaml/ocaml#14735
   for (mlsize_t i = CAML_EPHE_DATA_OFFSET; i < size; i++)
     Field(res, i) = caml_ephe_none;
   /* run memprof callbacks */
