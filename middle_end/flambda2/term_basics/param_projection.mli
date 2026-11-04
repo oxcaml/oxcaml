@@ -54,15 +54,7 @@ type t =
     projection : projection
   }
 
-module Key : sig
-  type t = projection_key
-
-  val compare : t -> t -> int
-
-  val print : Format.formatter -> t -> unit
-end
-
-module Map : Map.S with type key = Key.t and type 'a t = 'a Map.Make(Key).t
+module Key : Container_types.S with type t = projection_key
 
 val compare_projection : projection -> projection -> int
 

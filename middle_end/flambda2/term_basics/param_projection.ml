@@ -69,36 +69,48 @@ let compare_source s1 s2 =
   | My_closure, Param _ -> 1
 
 module Key = struct
-  type t = projection_key
+  module M0 = struct
+    type t = projection_key
 
-  let compare p1 p2 =
-    match p1, p2 with
-    | Get_tag, Get_tag -> 0
-    | Untag, Untag -> 0
-    | Is_int, Is_int -> 0
-    | Block_load { field = f1; kind = k1 }, Block_load { field = f2; kind = k2 }
-      -> (
-      match Target_ocaml_int.compare f1 f2 with
-      | 0 -> Flambda_kind.compare k1 k2
-      | c -> c)
-    | Get_tag, _ -> -1
-    | _, Get_tag -> 1
-    | Untag, _ -> -1
-    | _, Untag -> 1
-    | Is_int, _ -> -1
-    | _, Is_int -> 1
+    let compare p1 p2 =
+      match p1, p2 with
+      | Get_tag, Get_tag -> 0
+      | Untag, Untag -> 0
+      | Is_int, Is_int -> 0
+      | ( Block_load { field = f1; kind = k1 },
+          Block_load { field = f2; kind = k2 } ) -> (
+        match Target_ocaml_int.compare f1 f2 with
+        | 0 -> Flambda_kind.compare k1 k2
+        | c -> c)
+      | Get_tag, _ -> -1
+      | _, Get_tag -> 1
+      | Untag, _ -> -1
+      | _, Untag -> 1
+      | Is_int, _ -> -1
+      | _, Is_int -> 1
 
-  let[@ocamlformat "disable"] print ppf = function
-    | Get_tag -> Format.fprintf ppf "Get_tag"
-    | Untag -> Format.fprintf ppf "Untag"
-    | Is_int -> Format.fprintf ppf "Is_int"
-    | Block_load { field; kind } ->
-        Format.fprintf ppf "(Block_load %a %a)"
-          Target_ocaml_int.print field
-          Flambda_kind.print kind
+    let equal p1 p2 = compare p1 p2 = 0
+
+    let hash = function
+      | Get_tag -> Hashtbl.hash 0
+      | Untag -> Hashtbl.hash 1
+      | Is_int -> Hashtbl.hash 2
+      | Block_load { field; kind } ->
+        Hashtbl.hash (0, (Target_ocaml_int.hash field, Flambda_kind.hash kind))
+
+    let[@ocamlformat "disable"] print ppf = function
+      | Get_tag -> Format.fprintf ppf "Get_tag"
+      | Untag -> Format.fprintf ppf "Untag"
+      | Is_int -> Format.fprintf ppf "Is_int"
+      | Block_load { field; kind } ->
+          Format.fprintf ppf "(Block_load %a %a)"
+            Target_ocaml_int.print field
+            Flambda_kind.print kind
+  end
+
+  include M0
+  include Container_types.Make (M0)
 end
-
-module Map = Map.Make (Key)
 
 let rec compare_projection p1 p2 =
   match p1, p2 with
