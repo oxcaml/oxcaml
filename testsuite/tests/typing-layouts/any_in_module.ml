@@ -797,3 +797,53 @@ Line 3, characters 2-11:
   But the layout of t must be representable
     because it's the type of an item in a module being projected from.
 |}]
+
+(* Like [any], abstract kinds are unrepresentable. *)
+
+module type S = sig
+  kind_ k
+  type t : k
+  val x : t
+end
+[%%expect{|
+module type S = sig kind_ k type t : k val x : t end
+|}]
+
+module F(M : S) = struct
+  let f () = M.x
+end
+[%%expect{|
+Line 2, characters 13-16:
+2 |   let f () = M.x
+                 ^^^
+Error: This path projects from a module that contains unrepresentable items.
+Line 4, characters 2-11:
+4 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The kind of t is k
+    because of the definition of t at line 3, characters 2-12.
+  But the kind of t must be representable
+    because it's the type of an item in a module being projected from.
+  No .cmi file found containing k.
+|}]
+
+(* Bug: this should typecheck and compile. *)
+module F(M : S with kind_ k = value) = struct
+  let f () = M.x
+end
+[%%expect{|
+Line 2, characters 13-16:
+2 |   let f () = M.x
+                 ^^^
+Error: This path projects from a module that contains unrepresentable items.
+Line 4, characters 2-11:
+4 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The kind of t/2 is k
+    because of the definition of t at line 3, characters 2-12.
+  But the kind of t/2 must be representable
+    because it's the type of an item in a module being projected from.
+  No .cmi file found containing k.
+|}]
