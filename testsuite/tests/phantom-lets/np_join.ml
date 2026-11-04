@@ -1,5 +1,8 @@
 (* TEST
  flambda2;
+ (* Insulate the test from OCAMLPARAM settings used by CI configurations
+    (e.g. classic mode, under which no Simplify dump would be produced). *)
+ set OCAMLPARAM = "_,";
  flags += "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets";
  { native with dump-simplify; check-fexpr-dump; }
 *)

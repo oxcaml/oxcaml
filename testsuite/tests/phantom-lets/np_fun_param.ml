@@ -1,5 +1,8 @@
 (* TEST
  flambda2;
+ (* Insulate the test from OCAMLPARAM settings used by CI configurations
+    (e.g. classic mode, under which no Simplify dump would be produced). *)
+ set OCAMLPARAM = "_,";
  (* Warning 210 is disabled because [unboxing_kind] is currently consulted
     for the return type even when no return unboxing is requested, which
     emits a spurious [Unboxing_impossible] warning here; this is to be fixed
