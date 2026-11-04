@@ -1767,64 +1767,17 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
 
   Caml_global_barrier_if_final(participant_count) {
     caml_gc_phase = Phase_sweep_and_mark_main;
-<<<<<<< OxCaml
     latest_sweep_work =
       diffmod (atomic_load (&total_work_completed), work_completed_at_sweep_start);
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
 
-    /* Adopt orphaned work from domains that were spawned and
-       terminated in the previous cycle. There must be no orphaned
-       work remaining when this phase change takes place because
-       orphaned work contains roots.
-
-       This also checks that the ephemerons being adopted all have
-       status UNMARKED in this cycle (because ephemerons are not
-       orphaned in [Phase_sweep_main], so they must come from last
-       cycle, so will have status [UNMARKED] now). */
-    adopt_orphaned_work (caml_global_heap_state.UNMARKED);
     /* Any work incurred before the start of the marking phase prior
        to this one is definitely done by now. */
     uintnat definitely_done = total_work_incurred_at_mark_start;
     if (total_work_completed < definitely_done)
       total_work_completed = definitely_done;
     total_work_incurred_at_mark_start = total_work_incurred;
-||||||| Upstream OCaml
-    caml_gc_log ("work_counter: %" CAML_PRIuNAT " at root marking",
-                 work_counter);
-    atomic_store_relaxed(&global_roots_status, WAITING);
 
-    latest_sweep_allocs = diffmod (work_counter, work_counter_at_sweep_start);
-
-    /* Adopt orphaned work from domains that were spawned and terminated in the
-       previous cycle. There must be no orphaned work remaining when this phase
-       change takes place because orphaned work contains roots.
-
-       [adopt_orphaned_work] also verifies that the ephemerons to be adopted
-       all have status [UNMARKED] in this cycle.
-
-       Note that ephemerons are not orphaned in [Phase_sweep_main]. When
-       orphaned, ephemerons and their data are [MARKED]. Any unadopted
-       ephemerons must come from last cycle. Due to the GC cycling, the
-       [MARKED] ephemerons must have status [UNMARKED] now. */
-    adopt_orphaned_work (caml_global_heap_state.UNMARKED);
-=======
-    caml_gc_log ("work_counter: %" CAML_PRIuNAT " at root marking",
-                 work_counter);
-    atomic_store_relaxed(&global_roots_status, WAITING);
-
-    latest_sweep_allocs = diffmod (work_counter, work_counter_at_sweep_start);
-
-<<<<<<< OxCaml
-    /* Orphaned work may contain roots so we adopt them first. */
-    adopt_orphaned_work();
->>>>>>> ocaml/ocaml#14813
-
-||||||| Upstream OCaml
-    /* Orphaned work may contain roots so we adopt them first. */
-    adopt_orphaned_work();
-
-=======
->>>>>>> ocaml/ocaml#14877
     global_prepare_for_ephe_marking(participant_count);
   }
 
@@ -2366,20 +2319,12 @@ static uintnat major_collection_slice(intnat howmuch,
 
   call_timing_hook(&caml_major_slice_begin_hook);
 
-<<<<<<< OxCaml
+  adopt_orphaned_work();
+
   if (!domain_state->sweeping_done &&
       get_major_slice_sweepwork(mode) > 0) {
     slice_events_begin(mode, &events_begun, &counters);
     if (events_begun) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
-||||||| Upstream OCaml
-  if (!domain_state->sweeping_done) {
-    if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
-=======
-  adopt_orphaned_work();
-
-  if (!domain_state->sweeping_done) {
-    if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
->>>>>>> ocaml/ocaml#14877
 
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_sweepwork(mode)) > 0) {
