@@ -15,7 +15,7 @@ let code loopify(never) size(19) newer_version_of(f_0)
   (let prim = %array_length (arr) in
    let prim_1 = %int_comp.unsigned.lt (0, prim) in
    switch prim_1
-     | 0 -> k2
+     | 0 likelihood(cold) -> k2
      | 1 -> k3)
     where k3 =
       let Parrayrefs = %array_load.mut (arr, 0) in

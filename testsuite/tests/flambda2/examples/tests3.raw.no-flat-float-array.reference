@@ -11,7 +11,7 @@
    (let prim = %array_length (arr) in
     let prim_1 = %int_comp.unsigned.lt (i, prim) in
     switch prim_1
-      | 0 -> k5
+      | 0 likelihood(cold) -> k5
       | 1 -> k6)
      where k6 =
        cont k4
@@ -24,7 +24,7 @@
        ((let prim = %array_length (arr) in
          let prim_1 = %int_comp.unsigned.lt (i, prim) in
          switch prim_1
-           | 0 -> k4
+           | 0 likelihood(cold) -> k4
            | 1 -> k5)
           where k5 =
             cont k3
