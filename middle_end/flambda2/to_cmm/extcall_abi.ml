@@ -174,7 +174,8 @@ module Reg_class = struct
 
   let of_exttype (exttype : Cmm.exttype) : t =
     match exttype with
-    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XDummy_int -> Int_regs
+    | XInt | XInt8 | XInt16 | XInt32 | XInt64 | XDummy_int | XFat_pointer ->
+      Int_regs
     | XFloat | XFloat32 | XVec128 | XVec256 | XVec512 | XDummy_float ->
       Float_regs
 end
@@ -293,6 +294,10 @@ module Component = struct
     | XVec512 -> Float_regs, 64
     | XDummy_int | XDummy_float ->
       Misc.fatal_error "Extcall_abi.Component.reg_class_and_size: dummy"
+    | XFat_pointer ->
+      (* Fat-pointer externals bypass the struct-passing ABI; see
+         [To_cmm_extcall.translate_fat_pointer_external_call]. *)
+      Misc.fatal_error "Extcall_abi.Component.reg_class_and_size: fat pointer"
 
   let exttype t = To_cmm_shared.exttype_of_kind (K.With_subkind.kind t.kind)
 
@@ -743,6 +748,8 @@ module Slot = struct
     | XVec512 -> 64
     | XDummy_int | XDummy_float ->
       Misc.fatal_error "Extcall_abi.Slot.amd64_stack_size: dummy"
+    | XFat_pointer ->
+      Misc.fatal_error "Extcall_abi.Slot.amd64_stack_size: fat pointer"
 end
 
 (* The slots of the stack-bound arguments, in order.

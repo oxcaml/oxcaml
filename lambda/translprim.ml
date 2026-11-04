@@ -227,6 +227,7 @@ let extern_repr_of_native_repr:
   | Unboxed_mask, _ -> Unboxed_mask
   | Unextended_bits8, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits8
   | Unextended_bits16, _ -> Same_as_ocaml_repr Jkind.Sort.Const.bits16
+  | Raw_pointer, _ -> Raw_pointer
   | Unpacked_product sort, _ ->
     Unpacked_product sort
 
@@ -236,6 +237,7 @@ let sort_of_native_repr ~poly_sort repr =
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
+  | Raw_pointer -> Jkind.Sort.Const.(product [scannable; bits64])
 
 let sort_of_native_repr_or_elided ~poly_sort = function
   | Elided_void -> Jkind.Sort.Const.void

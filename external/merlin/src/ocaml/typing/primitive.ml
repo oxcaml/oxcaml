@@ -45,6 +45,7 @@ type native_repr =
   | Unpacked_product of Jkind_types.Sort.Const.t
   | Unextended_bits8
   | Unextended_bits16
+  | Raw_pointer
 
 type native_repr_or_elided = Native_repr of native_repr | Elided_void
 
@@ -84,6 +85,7 @@ type wrong_repr_error =
   | Unpacked_product_return
   | Unextended_return
   | Small_int_arg
+  | Raw_pointer_return
   | Repr_mismatch
 [@@immediate]
 
@@ -98,6 +100,7 @@ type error =
   | No_native_primitive_with_non_value
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
+  | Raw_pointer_requires_noalloc
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }
@@ -116,7 +119,8 @@ let check_ocaml_value = function
                 | Unboxed_or_untagged_integer _
                 | Unpacked_product _
                 | Unextended_bits8
-                | Unextended_bits16) -> Bad_attribute
+                | Unextended_bits16
+                | Raw_pointer) -> Bad_attribute
   | Elided_void -> Elided
 
 let is_builtin_prim_name name = String.length name > 0 && name.[0] = '%'
@@ -242,6 +246,13 @@ let parse_declaration valdecl ~native_repr_args ~native_repr_res ~is_layout_poly
                            No_native_primitive_with_non_value)))
       (Native_repr (snd native_repr_res) :: native_repr_args_reprs);
   let noalloc = old_style_noalloc || noalloc_attribute in
+  if (not noalloc)
+     && List.exists
+          (fun (_, repr) ->
+             match repr with Native_repr Raw_pointer -> true | _ -> false)
+          native_repr_args
+  then
+    raise (Error (valdecl.pval_loc, Raw_pointer_requires_noalloc));
   if noalloc && only_generative_effects_attribute then
     raise (Error (valdecl.pval_loc,
                   Inconsistent_noalloc_attributes_for_effects));
@@ -295,6 +306,7 @@ let oattr_unboxed = { oattr_name = "unboxed" }
 let oattr_untagged = { oattr_name = "untagged" }
 let oattr_unpacked = { oattr_name = "unpacked" }
 let oattr_unsafe_unextended = { oattr_name = "unsafe_unextended" }
+let oattr_fat_ptr = { oattr_name = "fat_ptr" }
 let oattr_noalloc = { oattr_name = "noalloc" }
 let oattr_builtin = { oattr_name = "builtin" }
 let oattr_no_effects = { oattr_name = "no_effects" }
@@ -328,6 +340,7 @@ let print p osig_val_decl =
     | Same_as_ocaml_repr (Base Scannable)
     | Repr_poly
     | Unpacked_product _
+    | Raw_pointer
     | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
                                  | Untagged_int16) -> false
     | Unboxed_float _
@@ -361,6 +374,7 @@ let print p osig_val_decl =
     | Unpacked_product _
     | Unextended_bits8
     | Unextended_bits16
+    | Raw_pointer
     | Repr_poly -> false
   in
   let all_unboxed = for_all needs_unboxed_attribute in
@@ -410,6 +424,7 @@ let print p osig_val_decl =
      | Native_repr (Unpacked_product _) -> [oattr_unpacked]
      | Native_repr (Unextended_bits8 | Unextended_bits16) ->
        [oattr_unsafe_unextended]
+     | Native_repr Raw_pointer -> [oattr_fat_ptr]
      | Native_repr ((Same_as_ocaml_repr _) as repr) ->
        if all_unboxed || not (needs_unboxed_attribute repr)
        then []
@@ -490,57 +505,68 @@ let equal_native_repr nr1 nr2 =
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
                | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
-               | Unpacked_product _)
+               | Unpacked_product _ | Raw_pointer)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
     | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
-    | Unpacked_product _), Repr_poly
+    | Unpacked_product _ | Raw_pointer), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _ |
+     Raw_pointer) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _ |
+     Raw_pointer) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_or_untagged_integer _ | Unboxed_mask | Unpacked_product _) ->
+     Unboxed_or_untagged_integer _ | Unboxed_mask | Unpacked_product _ |
+     Raw_pointer) ->
     false
   | Unboxed_mask, Unboxed_mask -> true
   | Unboxed_mask,
     (Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _ |
-     Unboxed_or_untagged_integer _ | Unpacked_product _) -> false
+     Unboxed_or_untagged_integer _ | Unpacked_product _ |
+     Raw_pointer) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _ |
+     Raw_pointer) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
+     Raw_pointer) -> false
+  | Raw_pointer, Raw_pointer -> true
+  | Raw_pointer,
+    (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
+     Unpacked_product _) -> false
   | Unextended_bits8, Unextended_bits8 -> true
   | Unextended_bits8,
     (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
-     Unpacked_product _)
+     Unpacked_product _ | Raw_pointer)
   | (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
-     Unpacked_product _),
+     Unpacked_product _ | Raw_pointer),
     Unextended_bits8 -> false
   | Unextended_bits16 , Unextended_bits16 -> true
   | Unextended_bits16,
     (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
-     Unextended_bits8 | Unpacked_product _)
+     Unextended_bits8 | Unpacked_product _ | Raw_pointer)
   | (Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _ |
      Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _ |
-     Unextended_bits8 | Unpacked_product _),
+     Unextended_bits8 | Unpacked_product _ | Raw_pointer),
     Unextended_bits16 -> false
 
 let equal_native_repr_or_elided nr1 nr2 =
@@ -587,8 +613,8 @@ module Repr_check = struct
     | Same_as_ocaml_repr (Base Scannable)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask -> true
-    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ | Unextended_bits8 |
-      Unextended_bits16 -> false
+    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _
+    | Unextended_bits8 | Unextended_bits16 | Raw_pointer -> false
 
   let rec sort_contains_bits8_or_bits16 : Jkind_types.Sort.Const.t -> bool =
     function
@@ -624,7 +650,7 @@ module Repr_check = struct
       else []
     | Unextended_bits8 | Unextended_bits16
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unboxed_mask | Repr_poly -> []
+    | Unboxed_mask | Raw_pointer | Repr_poly -> []
 
   let rec c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _ | Product _)
@@ -638,6 +664,7 @@ module Repr_check = struct
       Misc.fatal_error "c_stub_return_errors: genvar"
     | Unpacked_product _ -> [Unpacked_product_return]
     | Unextended_bits8 | Unextended_bits16 -> [Unextended_return]
+    | Raw_pointer -> [Raw_pointer_return]
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
@@ -1429,6 +1456,11 @@ let report_error ppf err =
     Format_doc.fprintf ppf "Cannot use %a in conjunction with %a."
       Style.inline_code "[@@no_generative_effects]"
       Style.inline_code "[@@noalloc]"
+  | Raw_pointer_requires_noalloc ->
+    Format_doc.fprintf ppf
+      "The %a attribute may only be used on %a primitives."
+      Style.inline_code "[@fat_ptr]"
+      Style.inline_code "[@@noalloc]"
   | Invalid_representation_polymorphic_attribute ->
     Format_doc.fprintf ppf "Attribute %a can only be used \
                         on built-in primitives."
@@ -1466,6 +1498,11 @@ let report_error ppf err =
            the garbage upper bits.@]"
           Style.inline_code "[@@builtin]"
           Style.inline_code "[@unsafe_unextended]"
+      | Raw_pointer_return ->
+        Format_doc.fprintf ppf
+          "@.@{<hint>Hint@}: @[<v>\
+           The %a attribute is not allowed on C stub returns.@]"
+          Style.inline_code "[@fat_ptr]"
       | Repr_mismatch -> ()
         (* The error message already says "wrong layout", so a hint here would
            be redundant. *))
