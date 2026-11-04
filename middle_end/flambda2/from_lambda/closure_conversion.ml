@@ -1899,6 +1899,14 @@ let close_exact_or_unknown_apply acc env
        callsite_counter
      } :
       IR.apply) callee_approx ~replace_region : Expr_with_acc.t =
+  (if !Oxcaml_flags.fdo_counters && Flambda_features.check_invariants ()
+   then
+     match kind, callsite_counter with
+     | (Function | Method _), None ->
+       Misc.fatal_errorf "Application of %a without an FDO counter:@ %a"
+         Ident.print func Debuginfo.print_compact
+         (Debuginfo.from_location loc)
+     | (Function | Method _), Some _ -> ());
   let callee = find_simple_from_id env func in
   let mode =
     let current_region, current_ghost_region =
@@ -2040,12 +2048,19 @@ let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
 
 let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     Expr_with_acc.t =
-  let arm_with_counters fdo_annotation action =
-    Switch_arm.create
-      ~annotations:
-        (Branch_annotations.with_fdo_annotation Branch_annotations.default
-           fdo_annotation)
-      action
+  let arm_with_counters action ~counters =
+    match sw.counters with
+    | None -> Switch_arm.from_apply_cont action
+    | Some sw_counters ->
+      Switch_arm.create
+        ~annotations:
+          (Branch_annotations.with_fdo_annotation Branch_annotations.default
+             (counters sw_counters))
+        action
+  in
+  let case_counters case sw_counters =
+    Fdo_instrumentation.Switch_counters.case sw_counters
+      (Target_ocaml_int.to_int case)
   in
   let scrutinee = find_simple_from_id env scrutinee in
   let untagged_scrutinee = Variable.create "untagged" K.naked_immediate in
@@ -2111,11 +2126,10 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
       (* CR bclement: use likelihood information from annotations. *)
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
-           ~if_true:
-             (arm_with_counters
-                (sw.counters.case (Target_ocaml_int.to_int case))
-                action)
-           ~if_false:(arm_with_counters sw.counters.failaction default_action))
+           ~if_true:(arm_with_counters action ~counters:(case_counters case))
+           ~if_false:
+             (arm_with_counters default_action
+                ~counters:Fdo_instrumentation.Switch_counters.failaction))
     in
     let acc, body =
       Let_with_acc.create acc
@@ -2165,9 +2179,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
                      compute logits *)
                   ( acc,
                     Target_ocaml_int.Map.add case
-                      (arm_with_counters
-                         (sw.counters.case (Target_ocaml_int.to_int case))
-                         arm)
+                      (arm_with_counters arm ~counters:(case_counters case))
                       arms ))
                 arms
                 (acc, Target_ocaml_int.Map.empty)
