@@ -337,6 +337,19 @@ and pattern i ppf x =
   | Ppat_array (mut, l) ->
       line i ppf "Ppat_array %a\n" fmt_mutable_flag mut;
       list i pattern ppf l;
+  | Ppat_slice (mut, Pslice_closed l) ->
+      line i ppf "Ppat_slice %a\n" fmt_mutable_flag mut;
+      line i ppf "Pslice_closed\n";
+      list i pattern ppf l;
+  | Ppat_slice (mut, Pslice_open { prefix; rest; suffix }) ->
+      line i ppf "Ppat_slice %a\n" fmt_mutable_flag mut;
+      line i ppf "Pslice_open\n";
+      list i pattern ppf prefix;
+      begin match rest with
+      | None -> line i ppf "rest\n"
+      | Some s -> line i ppf "rest %a\n" fmt_string_loc s
+      end;
+      list i pattern ppf suffix;
   | Ppat_or (p1, p2) ->
       line i ppf "Ppat_or\n";
       pattern i ppf p1;

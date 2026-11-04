@@ -223,6 +223,10 @@ let rec add_pattern bv pat =
   | Ppat_record(pl, _) | Ppat_record_unboxed_product(pl, _) ->
       List.iter (fun (lbl, p) -> add bv lbl; add_pattern bv p) pl
   | Ppat_array (_, pl) -> List.iter (add_pattern bv) pl
+  | Ppat_slice (_, Pslice_closed pl) -> List.iter (add_pattern bv) pl
+  | Ppat_slice (_, Pslice_open { prefix; suffix; _ }) ->
+      List.iter (add_pattern bv) prefix;
+      List.iter (add_pattern bv) suffix
   | Ppat_or(p1, p2) -> add_pattern bv p1; add_pattern bv p2
   | Ppat_constraint(p, ty, _) ->
       add_pattern bv p;

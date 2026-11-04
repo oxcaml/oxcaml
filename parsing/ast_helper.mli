@@ -144,6 +144,8 @@ module Pat:
                 -> closed_flag -> pattern
     val array: ?loc:loc -> ?attrs:attrs -> mutable_flag -> pattern list ->
       pattern
+    val slice: ?loc:loc -> ?attrs:attrs -> mutable_flag -> slice_elements ->
+      pattern
     val or_: ?loc:loc -> ?attrs:attrs -> pattern -> pattern -> pattern
     val constraint_: ?loc:loc -> ?attrs:attrs -> pattern -> core_type option
                      -> mode with_loc list -> pattern

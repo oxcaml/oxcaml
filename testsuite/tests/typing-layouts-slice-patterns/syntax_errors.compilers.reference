@@ -1,0 +1,13 @@
+Line 8, characters 30-32:
+8 | let bad = function [&| ..; x; ..; y; .. |] -> x;;
+                                  ^^
+Error: Syntax error: A slice pattern can have at most one rest (..).
+Line 3, characters 27-29:
+3 | let bad = function [&| ..; ..; y |] -> y;;
+                               ^^
+Error: Syntax error: A slice pattern can have at most one rest (..).
+Line 3, characters 27-34:
+3 | let bad = function [&| ..; .. as r |] -> r;;
+                               ^^^^^^^
+Error: Syntax error: A slice pattern can have at most one rest (..).
+

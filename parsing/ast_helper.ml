@@ -223,6 +223,7 @@ module Pat = struct
   let record_unboxed_product ?loc ?attrs a b =
     mk ?loc ?attrs (Ppat_record_unboxed_product (a, b))
   let array ?loc ?attrs a b = mk ?loc ?attrs (Ppat_array (a, b))
+  let slice ?loc ?attrs a b = mk ?loc ?attrs (Ppat_slice (a, b))
   let or_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_or (a, b))
   let constraint_ ?loc ?attrs a b c = mk ?loc ?attrs (Ppat_constraint (a, b, c))
   let type_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_type a)
