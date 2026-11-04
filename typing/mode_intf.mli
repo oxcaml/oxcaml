@@ -915,9 +915,6 @@ module type S = sig
 
     val meet_const_morph : 'a -> ('a, 'a, allowed * disallowed) C.morph
 
-    val monadic_to_comonadic_min_morph :
-      (Monadic.Const.t, Comonadic.Const.t, allowed * disallowed) C.morph
-
     val pretty_print_monadic_morph :
       (Fmt.formatter -> 'a -> unit) ->
       'a ->
@@ -949,6 +946,8 @@ module type S = sig
     val to_const_exn : lr -> Const.t
 
     val to_of_const_exn : lr -> lr
+
+    val moregen : lr -> lr -> bool
 
     module List : sig
       (* No new types exposed to avoid too many type names *)
@@ -1072,10 +1071,6 @@ module type S = sig
       (** Returns the precise ceiling of a mode. see notes on [get_ceil] in
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t
-
-      (** Returns the precise floor of a mode. see notes on [get_floor] in
-          [solver_intf.mli] for cautions. *)
-      val get_floor : (allowed * 'r) t -> Const.t
 
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
