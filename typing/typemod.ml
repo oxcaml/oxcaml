@@ -4372,21 +4372,23 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         (List.rev str_acc, List.rev sig_acc, shape_map, env)
     | item :: srem -> begin
         let previous_saved_types = Cmt_format.get_saved_types () in
-        match type_str_item env shape_map item sig_acc_include_functor with
-        | desc, sg, shape_map, new_env ->
-            let str =
-              { str_desc = desc; str_loc = item.pstr_loc; str_env = env }
-            in
-            Cmt_format.set_saved_types
-              (Cmt_format.Partial_structure_item str :: previous_saved_types);
-            type_struct new_env shape_map srem (str :: str_acc)
-              (List.rev_append sg sig_acc)
-              (List.rev_append sg sig_acc_include_functor)
-        | exception exn when
+        try
+          let desc, sg, shape_map, new_env =
+            type_str_item env shape_map item sig_acc_include_functor
+          in
+          Ctype.default_all_ivars_if_toplevel ();
+          let str = { str_desc = desc; str_loc = item.pstr_loc; str_env = env } in
+          Cmt_format.set_saved_types (Cmt_format.Partial_structure_item str
+                                      :: previous_saved_types);
+          type_struct new_env shape_map srem (str :: str_acc)
+            (List.rev_append sg sig_acc)
+            (List.rev_append sg sig_acc_include_functor)
+        with
+        | exn when
             !Clflags.typing_recovery && Typing_recovery.is_recoverable exn ->
             type_struct env shape_map srem str_acc sig_acc
               sig_acc_include_functor
-      end
+        end
   in
   let delayed () =
     let (items, sg, shape_map, final_env) =
@@ -4422,6 +4424,7 @@ let type_toplevel_phrase env sig_acc s =
   Typecore.reset_allocations ();
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
+  Ctype.rewrite_defaulted_toplevel_tivars ();
   With_regionality.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
@@ -4462,31 +4465,41 @@ and normalize_signature_item = function
 
 let type_module_type_of env smod =
   let remove_aliases = has_remove_aliases_attribute smod.pmod_attributes in
-  let tmty, skip_nongen_check =
+  let scrape tmty =
+    Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type
+  in
+  (* PR#5036: must not contain non-generalized type variables *)
+  let check_nongen mty =
+    Mode.With_locality.with_zap_scope (fun ~zap_scope ->
+       check_nongen_modtype ~zap_scope env smod.pmod_loc mty)
+  in
+  let tmty, mty =
     match smod.pmod_desc with
     | Pmod_ident lid -> (* turn off strengthening in this case *)
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
         in
-        let skip_nongen_check =
-          List.for_all Ident.is_global (Path.heads path)
-        in
+        let tmty =
           { mod_desc = Tmod_ident (path, lid);
             mod_type = md.md_type;
             mod_mode = mode, Some (locks, lid.txt, lid.loc);
             mod_env = env;
             mod_attributes = smod.pmod_attributes;
-            mod_loc = smod.pmod_loc },
-          skip_nongen_check
+            mod_loc = smod.pmod_loc }
+        in
+        let mty = scrape tmty in
+        if not (List.for_all Ident.is_global (Path.heads path))
+        then check_nongen mty;
+        tmty, mty
     | _ ->
-        let me, _shape = type_module env smod in
-        me, false
+        Ctype.with_local_level_generalize
+          (fun () ->
+             let me, _shape = type_module env smod in
+             me, scrape me)
+          (* After defaulting, and before generalizing would hide weak
+             variables. *)
+          ~generalize:(fun (_, mty) -> check_nongen mty)
   in
-  let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
-  (* PR#5036: must not contain non-generalized type variables *)
-  if not skip_nongen_check then
-    Mode.With_locality.with_zap_scope (fun ~zap_scope ->
-       check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
@@ -4799,6 +4812,7 @@ let type_implementation target modulename initial_env ast =
           remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
             simple_sg
         in
+        Ctype.rewrite_defaulted_toplevel_tivars ();
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
         Typecore.optimise_allocations ();
@@ -4887,6 +4901,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env source_intf
               ~actual_staticity:staticity dclsig arg_type
           in
+          Ctype.rewrite_defaulted_toplevel_tivars ();
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -4936,6 +4951,7 @@ let type_implementation target modulename initial_env ast =
             check_argument_type_if_given initial_env sourcefile
               ~actual_staticity:Staticity.Dynamic simple_sg arg_type
           in
+          Ctype.rewrite_defaulted_toplevel_tivars ();
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
           Typecore.optimise_allocations ();
@@ -5017,22 +5033,25 @@ let type_interface target modulename env ast =
     let uid = Shape.Uid.of_compilation_unit_id modulename in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
+  let transl_signature_and_default () =
+    let sg =
+      transl_signature ~md_mode:With_regionality.Const.legacy
+        ~interface_toplevel:true env ast
+    in
+    Ctype.default_all_ivars_if_toplevel ();
+    sg
+  in
   let sg =
-    if !Clflags.typing_recovery then
+    if !Clflags.typing_recovery
+    then
       let caught = ref [] in
       let result =
-        Typing_recovery.catch_errors caught
-          (fun () ->
-            transl_signature
-              ~md_mode:With_regionality.Const.legacy
-              ~interface_toplevel:true env ast)
-      in match !caught with
+        Typing_recovery.catch_errors caught transl_signature_and_default
+      in
+      match !caught with
       | [] -> result
       | exn_list -> collect_recovery_errors target exn_list
-    else
-      transl_signature
-        ~md_mode:With_regionality.Const.legacy
-        ~interface_toplevel:true env ast
+    else transl_signature_and_default ()
   in
   let arg_type =
     !Clflags.as_argument_for
@@ -5042,6 +5061,7 @@ let type_interface target modulename env ast =
   ignore (check_argument_type_if_given env sourcefile ~actual_staticity
             sg.sig_type arg_type
           : Typedtree.argument_interface option);
+  Ctype.rewrite_defaulted_toplevel_tivars ();
   sg
 
 let type_interface target modulename env ast =
