@@ -7,16 +7,26 @@ let debug = false
 
 let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   match instr.desc with
-  | Op (Specific Imove32) -> (
+  | Op (Specific (Imove8 | Imove16 | Imove32)) -> (
     if debug then check_lengths instr ~of_arg:1 ~of_res:1;
     match is_spilled map instr.arg.(0), is_spilled map instr.res.(0) with
     | false, false -> All_spilled_registers_rewritten
-    | false, true ->
-      use_stack_operand map instr.res 0;
-      All_spilled_registers_rewritten
-    | true, false ->
-      use_stack_operand map instr.arg 0;
-      All_spilled_registers_rewritten
+    | false, true -> (
+      (* Only rewrite if the other operand is not already on the stack: these
+         moves cannot take two stack operands. In particular the destination of
+         an external-call argument move is a hard stack slot, which is never in
+         [map]: a spilled source must be reloaded instead. *)
+      match instr.arg.(0).loc with
+      | Stack _ -> May_still_have_spilled_registers
+      | Reg _ | Unknown ->
+        use_stack_operand map instr.res 0;
+        All_spilled_registers_rewritten)
+    | true, false -> (
+      match instr.res.(0).loc with
+      | Stack _ -> May_still_have_spilled_registers
+      | Reg _ | Unknown ->
+        use_stack_operand map instr.arg 0;
+        All_spilled_registers_rewritten)
     | true, true ->
       if Reg.same instr.arg.(0) instr.res.(0)
       then All_spilled_registers_rewritten
