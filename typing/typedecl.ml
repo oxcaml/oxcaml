@@ -4701,6 +4701,9 @@ let check_unboxable env loc ty =
     all_unboxable_types
     ()
 
+(* Unlike other similar functions, we care about [any] specifically, not just
+   unrepresentable layouts. Abstract kinds should pass this check; if they did
+   not, we would report an error with an inaccurate suggestion. *)
 let has_ty_var_containing_layout_any env ty =
   (* Look through products but not [box], since we know how to represent
      [any box]. Basically checks representability, just not abstract kinds. *)
@@ -4721,6 +4724,9 @@ let unexpected_layout_any_check env prim cty ty =
   if Primitive.prim_can_contain_layout_any prim ||
      prim.prim_is_layout_poly then ()
   else
+  (* Slightly conservative: doesn't check where these types containing [any]
+     occur, meaning we might reject an ['a : any] that only appears in
+     acceptable positions. But that seems fine. *)
   if has_ty_var_containing_layout_any env ty then
     Error.log_and_raise cty.ctyp_loc
       (Unexpected_layout_any_in_primitive(prim.prim_name))
