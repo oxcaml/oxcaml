@@ -29,6 +29,17 @@
    ))
    (import "fail" "caml_invalid_argument"
       (func $caml_invalid_argument (param (ref eq))))
+   (import "int32" "caml_copy_int32"
+      (func $caml_copy_int32 (param i32) (result (ref eq))))
+   (import "int64" "caml_copy_int64"
+      (func $caml_copy_int64 (param i64) (result (ref eq))))
+   (@if $portable-int
+   (@then
+      (import "nativeint" "caml_copy_nativeint"
+         (func $caml_copy_nativeint (param i64) (result (ref eq)))))
+   (@else
+      (import "nativeint" "caml_copy_nativeint"
+         (func $caml_copy_nativeint (param i32) (result (ref eq))))))
 
    (type $block (array (mut (ref eq))))
    (type $bytes (array (mut i8)))
@@ -126,6 +137,7 @@
    (func $caml_floatarray_create
       (export "caml_make_float_vect") (export "caml_floatarray_create")
       (export "caml_array_create_float") (export "caml_floatarray_create_local")
+      (export "caml_make_unboxed_float64_vect_bytecode")
       (param $n (ref eq)) (result (ref eq))
       (local $sz i32)
       (@if $portable-int
@@ -137,6 +149,103 @@
          (then (call $caml_invalid_argument (global.get $Array_make))))
       (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
       (array.new $float_array (f64.const 0) (local.get $sz)))
+
+   (func (export "caml_make_untagged_int_vect_bytecode")
+      (export "caml_make_untagged_int8_vect_bytecode")
+      (export "caml_make_untagged_int16_vect_bytecode")
+      (param $n (ref eq)) (result (ref eq))
+      (return_call $caml_make_vect (local.get $n) (ref.i31 (i32.const 0))))
+
+   (func (export "caml_make_unboxed_int32_vect_bytecode")
+      (param $n (ref eq)) (result (ref eq))
+      (return_call $caml_make_vect (local.get $n)
+         (call $caml_copy_int32 (i32.const 0))))
+
+   (func (export "caml_make_unboxed_int64_vect_bytecode")
+      (param $n (ref eq)) (result (ref eq))
+      (return_call $caml_make_vect (local.get $n)
+         (call $caml_copy_int64 (i64.const 0))))
+
+   (func (export "caml_make_unboxed_nativeint_vect_bytecode")
+      (param $n (ref eq)) (result (ref eq))
+      (return_call $caml_make_vect (local.get $n)
+         (@if $portable-int
+         (@then (call $caml_copy_nativeint (i64.const 0)))
+         (@else (call $caml_copy_nativeint (i32.const 0))))))
+
+   (@string $makearray_dynamic_nothing
+      "%makearray_dynamic: the only array that can be initialized with nothing is a zero-length array")
+   (@string $makearray_dynamic_too_large
+      "%makearray_dynamic: array size too large")
+
+   ;; The number of fields of an array of [len] unboxed products of [n]
+   ;; components each.
+   (func $makearray_dynamic_size
+      (param $vn (ref eq)) (param $vlen (ref eq)) (result i32)
+      (local $n i64) (local $len i64)
+      (@if $portable-int
+      (@then
+         (local.set $n (call $portable_int_val (local.get $vn)))
+         (local.set $len (call $portable_int_val (local.get $vlen))))
+      (@else
+         (local.set $n
+            (i64.extend_i32_s
+               (i31.get_s (ref.cast (ref i31) (local.get $vn)))))
+         (local.set $len
+            (i64.extend_i32_s
+               (i31.get_s (ref.cast (ref i31) (local.get $vlen)))))))
+      (if (i32.or (i64.eqz (local.get $n)) (i64.eqz (local.get $len)))
+         (then (return (i32.const 0))))
+      (if (i64.lt_s (local.get $n) (i64.const 1))
+         (then
+            (call $caml_invalid_argument
+               (global.get $makearray_dynamic_nothing))))
+      (if (i32.or (i64.ge_u (local.get $len) (i64.const 0xfffffff))
+             (i32.or (i64.ge_u (local.get $n) (i64.const 0xfffffff))
+                (i64.ge_u (i64.mul (local.get $n) (local.get $len))
+                   (i64.const 0xfffffff))))
+         (then
+            (call $caml_invalid_argument
+               (global.get $makearray_dynamic_too_large))))
+      (i32.wrap_i64 (i64.mul (local.get $n) (local.get $len))))
+
+   (func (export "caml_makearray_dynamic_non_scannable_unboxed_product")
+      (param $n (ref eq)) (param $is_local (ref eq)) (param $len (ref eq))
+      (result (ref eq))
+      (local $sz i32) (local $b (ref $block))
+      (local.set $sz
+         (call $makearray_dynamic_size (local.get $n) (local.get $len)))
+      (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
+      (local.set $b
+         (array.new $block (ref.i31 (i32.const 0))
+            (i32.add (local.get $sz) (i32.const 1))))
+      (local.get $b))
+
+   ;; [init] is a block holding the unarized components of one element.
+   (func (export "caml_makearray_dynamic_scannable_unboxed_product")
+      (param $vinit (ref eq)) (param $is_local (ref eq)) (param $len (ref eq))
+      (result (ref eq))
+      (local $init (ref $block)) (local $b (ref $block))
+      (local $n i32) (local $sz i32) (local $i i32)
+      (local.set $init (ref.cast (ref $block) (local.get $vinit)))
+      (local.set $n
+         (i32.sub (array.len (local.get $init)) (i32.const 1)))
+      (local.set $sz
+         (call $makearray_dynamic_size
+            (ref.i31 (local.get $n)) (local.get $len)))
+      (if (i32.eqz (local.get $sz)) (then (return (global.get $empty_array))))
+      (local.set $b
+         (array.new $block (ref.i31 (i32.const 0))
+            (i32.add (local.get $sz) (i32.const 1))))
+      (loop $loop
+         (array.set $block (local.get $b)
+            (i32.add (local.get $i) (i32.const 1))
+            (array.get $block (local.get $init)
+               (i32.add (i32.rem_u (local.get $i) (local.get $n))
+                  (i32.const 1))))
+         (local.set $i (i32.add (local.get $i) (i32.const 1)))
+         (br_if $loop (i32.lt_u (local.get $i) (local.get $sz))))
+      (local.get $b))
 
    (func (export "caml_array_of_uniform_array") (export "caml_make_array")
       (param $vinit (ref eq)) (result (ref eq))
