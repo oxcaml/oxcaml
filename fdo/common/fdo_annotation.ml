@@ -38,6 +38,8 @@ let to_list t = t
 
 let combine t1 t2 = Fdo_counter.add_all t1 t2
 
+let union ts = Fdo_counter.add_all [] (List.concat ts)
+
 let equal t1 t2 =
   List.equal Fdo_counter.equal
     (List.sort Fdo_counter.compare t1)
