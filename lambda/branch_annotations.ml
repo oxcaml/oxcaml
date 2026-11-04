@@ -61,3 +61,13 @@ let sum_list_for_merge annots =
    counters: they are counted on the edges below it, and counting them here too
    would count them twice (see [Fdo_annotation]). *)
 let sum_list_for_dispatch annots = from_likelihood (sum_likelihoods annots)
+
+let likelihood_printing_scale annots =
+  Likelihood.printing_scale (List.map likelihood annots)
+
+let print scale ppf { likelihood; fdo_annotation } =
+  if Likelihood.worth_printing scale likelihood
+  then Format.fprintf ppf "@ likelihood(%a)" (Likelihood.print scale) likelihood;
+  if not (Fdo_annotation.is_empty fdo_annotation)
+  then
+    Format.fprintf ppf "@ fdo_annotation%a" Fdo_annotation.print fdo_annotation

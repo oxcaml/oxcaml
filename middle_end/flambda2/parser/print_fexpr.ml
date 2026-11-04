@@ -697,20 +697,6 @@ let parens ~if_scope_is scope ppf f =
     Format.fprintf ppf "(%t)" (f Outer)
   | (Outer | Where_body | Continuation_body), _ -> f scope ppf
 
-(* As in [Switch_expr.print], likelihoods are printed relative to the other arms
-   of the switch, and only if they differ. *)
-let branch_annotations ~total ~uniform ppf annotations =
-  (match
-     Likelihood.rescale ~total (Branch_annotations.likelihood annotations)
-     |> Likelihood.classify
-   with
-  | Cold -> Format.fprintf ppf "@ likelihood(cold)"
-  | Weight p -> if not uniform then Format.fprintf ppf "@ likelihood(%f)" p);
-  let fdo_annotation = Branch_annotations.fdo_annotation annotations in
-  if not (Fdo_annotation.is_empty fdo_annotation)
-  then
-    Format.fprintf ppf "@ fdo_annotation%a" Fdo_annotation.print fdo_annotation
-
 let rec expr scope ppf = function
   | Invalid ->
     Format.fprintf ppf "%tinvalid%t" Flambda_colours.invalid_keyword
@@ -743,17 +729,15 @@ let rec expr scope ppf = function
     parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
         let_symbol_expr scope ppf l)
   | Switch { scrutinee; cases } ->
-    let likelihoods =
-      List.map
-        (fun ({ annotations; _ } : Fexpr.switch_case) ->
-          Branch_annotations.likelihood annotations)
-        cases
+    let scale =
+      Branch_annotations.likelihood_printing_scale
+        (List.map
+           (fun ({ annotations; _ } : Fexpr.switch_case) -> annotations)
+           cases)
     in
-    let total = Likelihood.sum_list likelihoods in
-    let uniform = Likelihood.is_uniform likelihoods in
     Format.fprintf ppf "@[<v 2>%tswitch%t %a%a@]" Flambda_colours.expr_keyword
       Flambda_colours.pop simple scrutinee
-      (pp_list ~sep:"" (switch_case ~total ~uniform))
+      (pp_list ~sep:"" (switch_case ~scale))
       cases
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
   | Apply
@@ -809,10 +793,9 @@ and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
   | Named_cont ac -> apply_cont ppf ac
   | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
 
-and switch_case ~total ~uniform ppf
-    ({ tag; action; annotations } : Fexpr.switch_case) =
+and switch_case ~scale ppf ({ tag; action; annotations } : Fexpr.switch_case) =
   Format.fprintf ppf "@;@[<hov 2>| %i%a ->@ %a@]" tag
-    (branch_annotations ~total ~uniform)
+    (Branch_annotations.print scale)
     annotations apply_or_inlined_cont action
 
 and let_expr scope ppf : let_ -> unit = function
