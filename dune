@@ -608,6 +608,7 @@
   simd_selection
   amd64_simd_defs
   amd64_simd_instrs
+  amd64_simd_intrins
   stack_check
   sub_cfg
   reg
