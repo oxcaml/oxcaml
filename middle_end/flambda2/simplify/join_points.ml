@@ -129,24 +129,6 @@ let add_extra_params_from_join_analysis denv analysis use_envs_with_ids' =
   in
   denv, extra_params_and_args
 
-(* The projection (if any) described by [simple] in the use environment
-   [tenv_at_use], looking through aliases. *)
-let projection_of_simple_at_use tenv_at_use simple =
-  Simple.pattern_match simple
-    ~const:(fun _ -> None)
-    ~name:(fun name ~coercion:_ ->
-      let canonical =
-        match
-          TE.get_canonical_simple_exn ~min_name_mode:Name_mode.normal
-            tenv_at_use (Simple.name name)
-        with
-        | exception Not_found -> Simple.name name
-        | canonical -> canonical
-      in
-      Simple.pattern_match canonical
-        ~const:(fun _ -> None)
-        ~name:(fun name ~coercion:_ -> TE.is_param_projection tenv_at_use name))
-
 (* For each variable created during the join, propagate the parameter projection
    information if all of its definitions across the uses agree on the same
    projection. This is conservative but sound: the resulting projection is valid
@@ -164,7 +146,13 @@ let add_name_info_from_join_analysis handler_env analysis ~use_tenvs_by_id =
               with
               | None -> raise Not_uniform
               | Some tenv_at_use -> (
-                match projection_of_simple_at_use tenv_at_use simple with
+                let projection =
+                  Simple.pattern_match simple
+                    ~const:(fun _ -> None)
+                    ~name:(fun name ~coercion:_ ->
+                      TE.is_param_projection tenv_at_use name)
+                in
+                match projection with
                 | None -> raise Not_uniform
                 | Some proj -> (
                   match acc with
