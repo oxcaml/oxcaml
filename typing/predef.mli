@@ -56,6 +56,8 @@ type abstract_non_value_type_constr = [
   | `Idx_atomic
   | `Addr
   | `Addr_imm
+  | `Slice
+  | `Slice_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -144,6 +146,8 @@ val type_idx_mut : type_expr -> type_expr -> type_expr
 val type_idx_atomic : type_expr -> type_expr -> type_expr
 val type_addr : type_expr -> type_expr
 val type_addr_imm : type_expr -> type_expr
+val type_slice : type_expr -> type_expr
+val type_slice_imm : type_expr -> type_expr
 
 val type_int8x16: type_expr
 val type_int16x8: type_expr
@@ -242,6 +246,8 @@ val path_idx_mut: Path.t
 val path_idx_atomic: Path.t
 val path_addr: Path.t
 val path_addr_imm: Path.t
+val path_slice: Path.t
+val path_slice_imm: Path.t
 
 val path_int8x16: Path.t
 val path_int16x8: Path.t
@@ -308,6 +314,8 @@ val ident_idx_imm : Ident.t
 val ident_idx_mut : Ident.t
 val ident_addr : Ident.t
 val ident_addr_imm : Ident.t
+val ident_slice : Ident.t
+val ident_slice_imm : Ident.t
 
 (* The jkind used for optional function argument types *)
 val optional_argument_jkind : jkind_lr

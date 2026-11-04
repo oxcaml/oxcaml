@@ -72,6 +72,8 @@ type abstract_non_value_type_constr = [
   | `Idx_atomic
   | `Addr
   | `Addr_imm
+  | `Slice
+  | `Slice_imm
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -142,6 +144,8 @@ let base_type_constrs : type_constr list = [
   `Idx_atomic;
   `Addr;
   `Addr_imm;
+  `Slice;
+  `Slice_imm;
 ]
 
 let or_null_extension_type_constrs : type_constr list = [
@@ -246,6 +250,8 @@ and ident_idx_mut = ident_create "idx_mut"
 and ident_idx_atomic = ident_create "idx_atomic"
 and ident_addr = ident_create "addr"
 and ident_addr_imm = ident_create "addr_imm"
+and ident_slice = ident_create "slice"
+and ident_slice_imm = ident_create "slice_imm"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -313,6 +319,8 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Idx_atomic -> ident_idx_atomic
   | `Addr -> ident_addr
   | `Addr_imm -> ident_addr_imm
+  | `Slice -> ident_slice
+  | `Slice_imm -> ident_slice_imm
   | `Int8x16 -> ident_int8x16
   | `Int16x8 -> ident_int16x8
   | `Int32x4 -> ident_int32x4
@@ -376,6 +384,8 @@ and path_idx_mut = Pident ident_idx_mut
 and path_idx_atomic = Pident ident_idx_atomic
 and path_addr = Pident ident_addr
 and path_addr_imm = Pident ident_addr_imm
+and path_slice = Pident ident_slice
+and path_slice_imm = Pident ident_slice_imm
 and path_expr = Pident ident_expr
 and path_eval = Pident ident_eval
 and path_box = Pident ident_box
@@ -489,6 +499,8 @@ and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
 and type_idx_atomic t1 t2 = tconstr path_idx_atomic [t1; t2]
 and type_addr t = tconstr path_addr [t]
 and type_addr_imm t = tconstr path_addr_imm [t]
+and type_slice t = tconstr path_slice [t]
+and type_slice_imm t = tconstr path_slice_imm [t]
 
 and type_int8x16 = tconstr path_int8x16 []
 and type_int16x8 = tconstr path_int16x8 []
@@ -1032,6 +1044,36 @@ let decl_of_type_constr type_constr =
          }))
        ~jkind:(fun param ->
          builtin Jkind.Const.Builtin.kind_of_addr_imm |>
+         Jkind.add_with_bounds
+           ~modality:(Typemode.address_modalities Immutable)
+           ~type_expr:param)
+       ()
+  | `Slice ->
+    decl1 ~variance:Variance.full
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_slice;
+           position = 1;
+           arity = 1;
+         }))
+       ~jkind:(fun param ->
+         builtin Jkind.Const.Builtin.kind_of_slice |>
+         Jkind.add_with_bounds
+           ~modality:(Typemode.address_modalities (Mutable {
+             mode = Mode.With_regionality.Comonadic.legacy;
+             atomic = Nonatomic }))
+           ~type_expr:param)
+       ()
+  | `Slice_imm ->
+    decl1 ~variance:Variance.covariant
+       ~param_jkind:(
+         Jkind.Builtin.any ~why:(Type_argument {
+           parent_path = Path.Pident ident_slice_imm;
+           position = 1;
+           arity = 1;
+         }))
+       ~jkind:(fun param ->
+         builtin Jkind.Const.Builtin.kind_of_slice_imm |>
          Jkind.add_with_bounds
            ~modality:(Typemode.address_modalities Immutable)
            ~type_expr:param)

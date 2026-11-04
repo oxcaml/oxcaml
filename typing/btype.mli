@@ -613,6 +613,12 @@ module Jkind0 : sig
       (** The jkind of immutable addresses ([addr_imm]) with mode crossing. *)
       val kind_of_addr_imm : t
 
+      (** The jkind of mutable slices ([slice]) with mode crossing. *)
+      val kind_of_slice : t
+
+      (** The jkind of immutable slices ([slice_imm]) with mode crossing. *)
+      val kind_of_slice_imm : t
+
       (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
       val vec128 : t
 
