@@ -496,8 +496,12 @@ let build_output_repr ~env input_repr pos_cc_list =
             | Error _ ->
               Misc.fatal_error
                 "build_output_repr: expected representable primitive")
-         (* [Tcoerce_invalid] is never actually translated; see the
-            comment at its definition in [typedtree.mli]. *)
+         (* We only ever encounter [Tcoerce_invalid] as part of the recursive
+            module consistency check. This coercion never gets translated, and
+            it doesn't exist at runtime, so we just assign it sort [void].
+
+           Eventually, we will build coercions and check inclusion separately,
+            at which point this case should be genuinely unreachable. *)
          | Tcoerce_invalid -> Jkind.Sort.(of_const Const.void)
          | Tcoerce_none | Tcoerce_structure _ | Tcoerce_functor _
          | Tcoerce_kindtemplate _ ->

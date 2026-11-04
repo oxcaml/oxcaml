@@ -869,3 +869,12 @@ Line 3, characters 2-11:
   But the layout of t must be representable
     because it's the type of an item in a module being projected from.
 |}]
+
+(* Typing of recursive modules is unique in that it
+   constructs [Tcoerce_invalid] *)
+module rec M : sig val f : int -> int end = struct
+  external f : int -> int = "%identity"
+end
+[%%expect{|
+module rec M : sig val f : int -> int end
+|}]
