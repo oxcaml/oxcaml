@@ -3809,9 +3809,10 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
           ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc
-          ~fdo_entry_annotation:Fdo_annotation.empty ~free_idents_of_body
-          ~closure_alloc_mode ~first_complex_local_param ~result_mode
-          Recursive.Non_recursive ]
+          ~fdo_entry_annotation:Fdo_annotation.empty
+            (* The wrapper isn't in the source: it has no entry counter. *)
+          ~free_idents_of_body ~closure_alloc_mode ~first_complex_local_param
+          ~result_mode Recursive.Non_recursive ]
     in
     let body acc env =
       let arg = find_simple_from_id env wrapper_id in

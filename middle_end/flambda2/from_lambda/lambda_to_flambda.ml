@@ -1394,7 +1394,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
      func :
       L.lfunction) : Function_decl.t =
   let fdo =
-    Option.map (fun fdo -> Fdo_env.enter_function fdo func) (Env.fdo env)
+    Option.map
+      (fun fdo -> Fdo_from_lambda_env.enter_function fdo func)
+      (Env.fdo env)
   in
   let contains_no_escaping_local_allocs =
     match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
@@ -1667,14 +1669,16 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     let ccenv = CCenv.set_not_at_toplevel ccenv in
     cps_tail acc new_env ccenv body body_cont body_exn_cont
   in
+  let fdo_entry_annotation =
+    Option.fold ~none:Fdo_annotation.empty
+      ~some:Fdo_from_lambda_env.entry_annotation fdo
+  in
   Function_decl.create ~let_rec_ident:(Some fid) ~let_rec_uid:fuid
     ~function_slot ~kind ~params ~params_arity ~removed_params ~return
     ~calling_convention ~return_continuation:body_cont ~exn_continuation
     ~my_region ~my_ghost_region ~my_alloc_region ~body ~attr ~loc
-    ~fdo_entry_annotation:
-      (Option.fold ~none:Fdo_annotation.empty ~some:Fdo_env.entry_annotation fdo)
-    ~free_idents_of_body recursive ~closure_alloc_mode:mode
-    ~first_complex_local_param ~result_mode:ret_mode
+    ~fdo_entry_annotation ~free_idents_of_body recursive
+    ~closure_alloc_mode:mode ~first_complex_local_param ~result_mode:ret_mode
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
     ~scrutinee (k : Continuation.t) (k_exn : Continuation.t) : Expr_with_acc.t =
@@ -1890,14 +1894,15 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   let toplevel_my_alloc_region =
     Ident.create_local "toplevel_my_alloc_region"
   in
+  let fdo =
+    if !Oxcaml_flags.fdo_counters
+    then Some (Fdo_from_lambda_env.toplevel compilation_unit)
+    else None
+  in
   let env =
     Env.create ~current_unit:compilation_unit ~machine_width
       ~return_continuation ~exn_continuation ~my_region:None
-      ~my_alloc_region:toplevel_my_alloc_region
-      ~fdo:
-        (if !Oxcaml_flags.fdo_counters
-         then Some (Fdo_env.toplevel compilation_unit)
-         else None)
+      ~my_alloc_region:toplevel_my_alloc_region ~fdo
   in
   let program acc ccenv =
     cps_tail acc env ccenv lam return_continuation exn_continuation

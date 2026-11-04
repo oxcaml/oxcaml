@@ -92,7 +92,7 @@ type t =
       region_closure_continuation Region_stack_element.Map.t;
     my_alloc_region : Ident.t;
     ident_stamp_upon_starting : int;
-    fdo : Fdo_env.t option
+    fdo : Fdo_from_lambda_env.t option
   }
 
 let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
