@@ -3,7 +3,7 @@ exception Error_message of string
 
 (* CLI info for the [Arg] module. *)
 let flags : (string * Arg.spec * string) list = []
-let description : string = "Extract a `.cmt{i}` file to Lean";;
+let description : string = "Extract a matching `.cmi` and `.cmt` to Lean";;
 
 (* Serialize a Lean constructor to JSON by tagging its constructor name. *)
 let tag (lean_ctor_name : string) (contents : Json.t) : Json.t =
@@ -48,51 +48,52 @@ let rec serialize_path ~(loc : Warnings.loc) : Path.t -> Json.t = function
       Printtyp.path other_path
     |> fun message -> raise (Error_message message)
 
-(* Serialize an expression. *)
-let rec serialize_expr (expr : Typedtree.expression) : Json.t =
-  let desc =
-    begin match expr.exp_desc with
-    | Texp_record { fields; _ } ->
-      Array.to_list fields
-      |> List.map serialize_record_label
-      |> fun fields -> Json.Array fields
-      |> tag "labels"
-      |> tag "Record"
-    | Texp_constant constant ->
-      serialize_constant constant
-      |> tag "const"
-      |> tag "Constant"
-    | _ ->
-      Format.asprintf "Expression not yet supported:@ %a:@ %a"
-        Location.print_loc expr.exp_loc
-        Pprintast.expression Untypeast.(default_mapper.expr default_mapper expr)
-      |> fun message -> raise (Error_message message)
-    end
-  in
-  Json.Object
-    [ ("desc", desc);
-      ("type", serialize_type_expr ~loc:expr.exp_loc expr.exp_type);
-    ]
-
-(* Serialize a label within a record. *)
-and serialize_record_label
-    ( ({ lbl_name; lbl_loc; _ } : Data_types.label_description),
-      (_ : Jkind_types.Sort.t),
-      (defn : Typedtree.record_label_definition)) =
-  begin match (defn : Typedtree.record_label_definition) with
-  | Overridden (_loc, expr) ->
+let rec serialize_structured_constant
+  : Lambda.structured_constant -> Json.t = function
+  | Const_base constant ->
+    serialize_constant constant
+    |> tag "const"
+    |> tag "Base"
+  | Const_block (block_tag, fields) ->
     Json.Object
-      [ ("name", Json.String lbl_name);
-        ("value", serialize_expr expr);
+      [ ("tag", Json.int block_tag);
+        ("fields", Json.Array (List.map serialize_structured_constant fields));
       ]
-  | Kept _ ->
-    Format.asprintf "Incomplete record expression not yet supported:@ %a"
-      Location.print_loc lbl_loc
+    |> tag "Block"
+  | other_constant ->
+    Format.asprintf "Structured constant not yet supported:@ %a"
+      Printlambda.structured_constant other_constant
     |> fun message -> raise (Error_message message)
-  end
+
+let rec serialize_lambda : Lambda.lambda -> Json.t = function
+  | Lvar id ->
+    serialize_ident id
+    |> tag "id"
+    |> tag "Var"
+  | Lconst constant ->
+    serialize_structured_constant constant
+    |> tag "const"
+    |> tag "Const"
+  | Llet (Strict, _, id, _, value, body) ->
+    Json.Object
+      [ ("id", serialize_ident id);
+        ("value", serialize_lambda value);
+        ("body", serialize_lambda body);
+      ]
+    |> tag "Let"
+  | Lprim (Pmakeblock (block_tag, Immutable, _, Alloc_heap), fields, _) ->
+    Json.Object
+      [ ("tag", Json.int block_tag);
+        ("fields", Json.Array (List.map serialize_lambda fields));
+      ]
+    |> tag "MakeBlock"
+  | other_lambda ->
+    Format.asprintf "Lambda term not yet supported:@ %a"
+      Printlambda.lambda other_lambda
+    |> fun message -> raise (Error_message message)
 
 (* Serialize a type expression. *)
-and serialize_type_expr ~(loc : Warnings.loc) (ty : Types.type_expr) : Json.t =
+let rec serialize_type_expr ~(loc : Warnings.loc) (ty : Types.type_expr) : Json.t =
   begin match Types.get_desc ty with
   | Tpoly (ty, []) -> serialize_type_expr ~loc ty
   | Tconstr (path, [], _) when Path.same path Predef.path_string ->
@@ -106,117 +107,149 @@ and serialize_type_expr ~(loc : Warnings.loc) (ty : Types.type_expr) : Json.t =
     |> fun message -> raise (Error_message message)
   end
 
-(* Serialize a value defined and bound to a name. *)
-let serialize_value_binding (vb : Typedtree.value_binding) : Json.t =
-  begin match vb.vb_pat.pat_desc with
-  | Tpat_var { id; _ } ->
-    Json.Object [("id", serialize_ident id); ("value", serialize_expr vb.vb_expr)]
-  | _ ->
-    Format.asprintf "Value binding not yet supported:@ %a:@ let %a =@ %a"
-      Location.print_loc vb.vb_loc
-      Printpat.Compat.pretty_pat vb.vb_pat
-      Pprintast.expression Untypeast.(default_mapper.expr default_mapper vb.vb_expr)
-    |> fun message -> raise (Error_message message)
-  end
-
 (* Serialize a label within a record. *)
-let serialize_record_label_decl (label : Typedtree.label_declaration) : Json.t =
+let serialize_record_label_decl (label : Types.label_declaration) : Json.t =
   Json.Object
-    [ ("name", Json.String label.ld_name.txt);
-      ("type", serialize_type_expr ~loc:label.ld_loc label.ld_type.ctyp_type);
+    [ ("id", serialize_ident label.ld_id);
+      ("type", serialize_type_expr ~loc:label.ld_loc label.ld_type);
     ]
 
 (* Serialize a top-level type declaration. *)
-let serialize_type_declaration (typedecl : Typedtree.type_declaration) : Json.t =
+let serialize_type_declaration (id : Ident.t) (decl : Types.type_declaration)
+  : Json.t =
   let desc =
-    begin match typedecl.typ_kind with
-    | Ttype_record labels ->
+    begin match decl.type_kind with
+    | Type_record (labels, _, _) ->
       List.map serialize_record_label_decl labels
       |> fun labels -> tag "labels" (Json.Array labels)
       |> tag "record"
       |> tag "Record"
     | _ ->
       Format.asprintf "Type declaration not yet supported:@ %a:@ %a"
-        Location.print_loc typedecl.typ_loc
-        (Printtyp.type_declaration typedecl.typ_id) typedecl.typ_type
+        Location.print_loc decl.type_loc
+        (Printtyp.type_declaration id) decl
       |> fun message -> raise (Error_message message)
     end
   in
   Json.Object
-    [ ("id", serialize_ident typedecl.typ_id);
+    [ ("id", serialize_ident id);
       ("desc", desc)
     ]
 
 (* Serialize a top-level item from an [.mli] file. *)
-let serialize_signature_item (item : Typedtree.signature_item) : Json.t =
-  begin match item.sig_desc with
-  | _ ->
-    item
-    |> Untypeast.(default_mapper.signature_item default_mapper)
-    |> Format.asprintf "Signature item not yet supported:@ %a:@ %a"
-         Location.print_loc item.sig_loc
-         Pprintast.signature_item
+let serialize_signature_item : Types.signature_item -> Json.t = function
+  | Sig_type (id, decl, _, Exported) ->
+    serialize_type_declaration id decl
+    |> tag "decl"
+    |> tag "TypeDecl"
+  | Sig_value (id, desc, Exported) ->
+    Json.Object
+      [ ("id", serialize_ident id);
+        ("type", serialize_type_expr ~loc:desc.val_loc desc.val_type);
+      ]
+    |> tag "Value"
+  | other_item ->
+    Format.asprintf "Signature item not yet supported:@ %a"
+      Printtyp.signature [other_item]
     |> fun message -> raise (Error_message message)
-  end
 
-(* Serialize a top-level item from an [.ml] file. *)
-let serialize_structure_item (item : Typedtree.structure_item) : Json.t =
-  begin match item.str_desc with
-  | Tstr_type (_, types) ->
-    List.map serialize_type_declaration types
-    |> fun types -> Json.Array types
-    |> tag "type_declarations"
-    |> tag "TypeDeclarations"
-  | Tstr_value (_, values) ->
-    List.map serialize_value_binding values
-    |> fun types -> Json.Array types
-    |> tag "value_bindings"
-    |> tag "ValueBindings"
-  | _ ->
-    item
-    |> Untypeast.(default_mapper.structure_item default_mapper)
-    |> Format.asprintf "Structure item not yet supported:@ %a:@ %a"
-         Location.print_loc item.str_loc
-         Pprintast.structure_item
-    |> fun message -> raise (Error_message message)
-  end
-
-(* Handle a [.cmti] from an [.mli] file. *)
-let run_signature ({ sig_items; _ } : Typedtree.signature) : Json.t =
-  List.map serialize_signature_item sig_items
+(* Serialize an interface from an [.mli]/[.cmi] pair. *)
+let serialize_interface (signature : Types.signature) : Json.t =
+  List.map serialize_signature_item signature
   |> fun items -> tag "items" (Json.Array items)
 
-(* Handle a [.cmt] from an [.ml] file. *)
-let run_structure ({ str_items; _ } : Typedtree.structure) : Json.t =
-  List.map serialize_structure_item str_items
-  |> fun items -> tag "items" (Json.Array items)
+(* Serialize an implementation from an [.ml]/[.cmt] pair. *)
+let serialize_implementation
+    (info : Cmt_format.cmt_infos) (structure : Typedtree.structure)
+    (coercion : Typedtree.module_coercion) : Json.t =
+  let program =
+    Translmod.transl_implementation info.cmt_modname
+      (structure, coercion, None) ~loc:Location.none
+  in
+  serialize_lambda program.code
 
-(* Handle the user's supplied (alleged) filename, whatever that may be. *)
-let run (filename : string) : unit =
-  begin match Filename.extension filename with
-  | ".cmt" | ".cmti" -> ()
-  | _ -> raise (Error_message "input file extension must be `.cmt` or `.cmti`")
-  end;
-  let info : Cmt_format.cmt_infos = Cmt_format.read_cmt filename in
-  let json_output : Json.t =
-    begin match info.cmt_annots with
-    | Interface signature ->
-      run_signature signature
-      |> tag "sig"
-      |> tag "Signature"
-    | Implementation structure ->
-      run_structure structure
-      |> tag "str"
-      |> tag "Structure"
-    | Functorize | Packed _ | Partial_implementation _ | Partial_interface _ ->
-      raise (Error_message "input `.cmt{i}` must come from a full `.ml{i}` file")
+let rehydrate_envs (info : Cmt_format.cmt_infos) :
+    Typedtree.structure -> Typedtree.structure =
+  Load_path.init ~auto_include:Load_path.no_auto_include
+    ~visible:info.cmt_loadpath.visible ~hidden:info.cmt_loadpath.hidden;
+  let mapper =
+    { Tast_mapper.default with
+      env = fun _ env -> Envaux.env_of_only_summary env }
+  in
+  mapper.structure mapper
+
+let check_same_compilation
+    (cmi : Cmi_format.cmi_infos) (cmt : Cmt_format.cmt_infos) : unit =
+  let cmi_crc =
+    Array.find_map
+      ( fun import ->
+          if Compilation_unit.Name.equal (Import_info.name import) cmi.cmi_name
+          then Import_info.crc import
+          else None )
+      cmi.cmi_crcs
+  in
+  let digest =
+    begin match cmt.cmt_interface_digest with
+    | Some digest -> digest
+    | None ->
+      raise
+        (Error_message "`.cmt` without an inferred interface not yet supported")
     end
+  in
+  if Some digest <> cmi_crc
+  then begin
+    raise (Error_message "`.cmi` and `.cmt` come from different compilations")
+  end
+
+(* Handle the user's supplied (alleged) filenames, whatever those may be. *)
+let run ~(cmi_filename : string) ~(cmt_filename : string) : unit =
+  if Filename.extension cmi_filename <> ".cmi" then
+    raise (Error_message "first input file extension must be `.cmi`");
+  if Filename.extension cmt_filename <> ".cmt" then
+    raise (Error_message "second input file extension must be `.cmt`");
+  let cmi : Cmi_format.cmi_infos = Cmi_format.read_cmi cmi_filename in
+  let cmt : Cmt_format.cmt_infos = Cmt_format.read_cmt cmt_filename in
+  check_same_compilation cmi cmt;
+  let interface, _ = cmi.cmi_sign in
+  let structure =
+    begin match cmt.cmt_annots with
+    | Implementation structure -> rehydrate_envs cmt structure
+    | Interface _ | Functorize | Packed _
+    | Partial_implementation _ | Partial_interface _ ->
+      raise (Error_message "input `.cmt` must come from a full `.ml` file")
+    end
+  in
+  (* Reorder fields in the [.ml] as necessary to match the [.mli]. *)
+  let coercion, _ =
+    let mode = Persistent_env.mode_pers_mod Mode.Staticity.Dynamic in
+    Includemod.compunit
+      (Envaux.env_of_only_summary cmt.cmt_initial_env)
+      ~mark:false
+      (Option.value cmt.cmt_sourcefile ~default:"")
+      ~modes:(Includecore.Specific ((mode, None), mode))
+      structure.str_type "(inferred signature)" interface Shape.dummy_mod
+  in
+  let json_output : Json.t =
+    Json.Object
+      [ ("interface", serialize_interface interface);
+        ("implementation", serialize_implementation cmt structure coercion);
+      ]
   in
   Format.printf "%a@." (Json.print ~mode:Pretty) json_output
 
 (* Parse command-line arguments and invoke the main program behavior. *)
 let main () : unit =
-  try Arg.parse_expand flags run description with
+  try
+    let filenames = ref [] in
+    let add_filename filename = filenames := filename :: !filenames in
+    Arg.parse_expand flags add_filename description;
+    begin match !filenames with
+    | [cmt_filename; cmi_filename] ->
+      (* reversed! (because of [::] above) *)
+      run ~cmi_filename ~cmt_filename
+    | _ -> raise (Error_message "expected exactly two files: `.cmi` then `.cmt`")
+    end
+  with
   | Error_message message ->
     Printf.fprintf stderr "ERROR: %s\n%!" message;
     exit 2

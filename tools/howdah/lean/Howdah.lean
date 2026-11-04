@@ -15,35 +15,25 @@ inductive Path where
   | Dot (nested : Path) (field : String)
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
-mutual
-  structure Expr where
-    desc : ExprDesc
-    type : TypeExpr
-    deriving Lean.FromJson, Lean.ToExpr, Repr
+inductive TypeExpr where
+  | Constr (path : Path)
+  | String
+  deriving Lean.FromJson, Lean.ToExpr, Repr
 
-  inductive ExprDesc where
-    | Constant (const : Constant)
-    | Record (labels : List RecordLabel)
-    deriving Lean.FromJson, Lean.ToExpr, Repr
+inductive StructuredConstant where
+  | Base (const : Constant)
+  | Block (tag : Nat) (fields : List StructuredConstant)
+  deriving Lean.FromJson, Lean.ToExpr, Repr
 
-  structure RecordLabel where
-    name : String
-    value : Expr
-    deriving Lean.FromJson, Lean.ToExpr, Repr
-
-  inductive TypeExpr where
-    | Constr (path : Path)
-    | String
-    deriving Lean.FromJson, Lean.ToExpr, Repr
-end
-
-structure ValueBinding where
-  id : Ident -- TODO: pattern, but then handle `let () = go_modify_some_mutable_state ()`
-  value : Expr
+inductive Lambda where
+  | Var (id : Ident)
+  | Const (const : StructuredConstant)
+  | Let (id : Ident) (value : Lambda) (body : Lambda)
+  | MakeBlock (tag : Nat) (fields : List Lambda)
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
 structure RecordLabelDecl where
-  name : String
+  id : Ident
   type : TypeExpr
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
@@ -61,24 +51,17 @@ structure TypeDecl where
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
 inductive SignatureItem where
-  deriving Lean.FromJson, Lean.ToExpr, Repr
-
-inductive StructureItem where
-  | TypeDeclarations (type_declarations : List TypeDecl)
-  | ValueBindings (value_bindings : List ValueBinding)
+  | TypeDecl (decl : TypeDecl)
+  | Value (id : Ident) (type : TypeExpr)
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
 structure Signature where
   items : List SignatureItem
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
-structure Structure where
-  items : List StructureItem
-  deriving Lean.FromJson, Lean.ToExpr, Repr
-
-inductive JsonImport : Type where
-  | Signature (sig : Signature)
-  | Structure (str : Structure)
+structure JsonImport : Type where
+  interface : Signature
+  implementation : Lambda
   deriving Lean.FromJson, Lean.ToExpr, Repr
 
 open Lean Elab Command

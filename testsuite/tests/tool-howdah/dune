@@ -15,7 +15,10 @@
 (rule
  (with-stdout-to
   record.json
-  (run %{exe:../../../tools/howdah/howdah.exe} %{dep:record.cmt})))
+  (run
+   %{exe:../../../tools/howdah/howdah.exe}
+   %{dep:record.cmi}
+   %{dep:record.cmt})))
 
 (rule
  (alias record)
