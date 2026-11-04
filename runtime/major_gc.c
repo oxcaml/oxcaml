@@ -2886,21 +2886,12 @@ int caml_init_major_gc(caml_domain_state* d) {
   d->mark_stack->compressed_stack_iter =
                   caml_addrmap_iterator(&d->mark_stack->compressed_stack);
 
-  /* Fresh domains do not need to perform marking or sweeping. */
-  if (caml_gc_phase == Phase_sweep_main) {
-    d->sweeping_done = 1;
-    d->marking_done = 0;
-    (void)caml_atomic_counter_incr(&num_domains_to_mark);
-  } else {
-    d->sweeping_done = 1;
-    d->marking_done = 1;
-  }
-
   /* Finalisers. Fresh domains participate in updating finalisers. */
   d->final_info = caml_alloc_final_info ();
   if(d->final_info == NULL) {
     caml_stat_free(d->mark_stack->stack);
     caml_stat_free(d->mark_stack);
+    d->mark_stack = NULL;
     return -1;
   }
   d->ephe_info = caml_alloc_ephe_info();
@@ -2912,6 +2903,18 @@ int caml_init_major_gc(caml_domain_state* d) {
     d->mark_stack = NULL;
     return -1;
   }
+  /* Sign up for marking only now that nothing can fail: on failure the
+     domain never joins the STW set, so the increment could not be undone
+     and the cycle could never complete. */
+  if (caml_gc_phase == Phase_sweep_main) {
+    d->sweeping_done = 1;
+    d->marking_done = 0;
+    (void)caml_atomic_counter_incr(&num_domains_to_mark);
+  } else {
+    d->sweeping_done = 1;
+    d->marking_done = 1;
+  }
+
   (void)caml_atomic_counter_incr(&num_domains_to_final_update_first);
   (void)caml_atomic_counter_incr(&num_domains_to_final_update_last);
 
