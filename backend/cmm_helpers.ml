@@ -3598,11 +3598,11 @@ module SArgBlocks = struct
           ifnot_a,
           ifnot,
           Debuginfo.none ),
-      Branch_annotations.add ifso_a ifnot_a )
+      Branch_annotations.sum_list_for_dispatch [ifso_a; ifnot_a] )
 
   let make_switch dbg () arg cases actions =
     let annots =
-      Branch_annotations.sum_list
+      Branch_annotations.sum_list_for_dispatch
         (Array.map (fun (_, annots) -> annots) actions |> Array.to_list)
     in
     let actions = Array.map (fun (expr, annots) -> expr, dbg, annots) actions in

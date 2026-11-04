@@ -48,13 +48,12 @@ let fdo_annotation { fdo_annotation; _ } = fdo_annotation
 
 let with_fdo_annotation t fdo_annotation = { t with fdo_annotation }
 
+let sum_likelihoods annots = Likelihood.sum_list (List.map likelihood annots)
+
 let sum_list annots =
-  let likelihood = Likelihood.sum_list (List.map likelihood annots) in
-  let fdo_annotation =
-    List.fold_left
-      (fun acc annot -> Fdo_annotation.combine acc annot.fdo_annotation)
-      Fdo_annotation.empty annots
-  in
-  create ~likelihood ~fdo_annotation
+  create ~likelihood:(sum_likelihoods annots)
+    ~fdo_annotation:(Fdo_annotation.union (List.map fdo_annotation annots))
 
 let add t1 t2 = sum_list [t1; t2]
+
+let sum_list_for_dispatch annots = from_likelihood (sum_likelihoods annots)
