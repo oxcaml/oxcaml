@@ -85,8 +85,9 @@ let write_cmj ~filename ~compilation_unit ~required_globals
     ~exceptionally:(fun () -> Misc.remove_file filename)
     (fun () ->
       output_string oc Config.cmj_magic_number;
-      let body : Jsoo_imports.Code.cmj_body =
-        { program = Jsoo_imports.Code.Marshalable_program.of_program program;
+      let body : Jsoo_imports.Code.jsir_file =
+        { target = Js;
+          program = Jsoo_imports.Code.Marshalable_program.of_program program;
           (* [Var] numbers variables with mutable state. js_of_ocaml needs to
              know the highest number used so that the variables it creates do
              not clash with these. *)

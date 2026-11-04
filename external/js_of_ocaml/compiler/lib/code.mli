@@ -262,8 +262,14 @@ module Marshalable_program : sig
   val to_program : t -> program
 end
 
-type cmj_body =
-  { program : Marshalable_program.t
+(** The target a JSIR file (.cmj or .cmw) was produced for. *)
+type jsir_target =
+  | Js
+  | Wasm
+
+type jsir_file =
+  { target : jsir_target
+  ; program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
@@ -280,8 +286,8 @@ type cmj_body =
         (** Whether the unit was compiled with [-linkall], so must be linked
             even if nothing requires it. Needed to fill in [Unit_info.t]. *)
   }
-(** Contents of a [.cmj] file produced by the OxCaml JSIR backend (after the
-    magic number), marshaled. *)
+(** Contents of a JSIR file (.cmj or .cmw) produced by the OxCaml JSIR backend
+    (after the magic number), marshaled. *)
 
 module Print : sig
   type xinstr =

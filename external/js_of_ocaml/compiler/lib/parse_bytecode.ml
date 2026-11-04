@@ -3653,31 +3653,63 @@ let from_cma ?(includes = []) ?(include_cmis = false) ?(debug = false) lib ic =
 
 type jsir_unit =
   { name : string
+  ; target : Code.jsir_target
   ; program : Code.program
   ; info : Unit_info.t
   }
 
-let from_cmj ic =
-  let { Code.program
+let from_jsir_channel ~target:(expected_target : Code.jsir_target) ~filename ic =
+  let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
+  (match Magic_number.kind magic with
+  | `Jsir -> ()
+  | `Cmo | `Cma | `Exe | `Other _ ->
+      raise Magic_number.(Bad_magic_number (to_string magic)));
+  if
+    Config.Flag.check_magic () && not (Magic_number.equal magic Magic_number.current_jsir)
+  then raise Magic_number.(Bad_magic_version magic);
+  let { Code.target
+      ; program
       ; last_var
       ; imported_compilation_units
       ; exported_compilation_unit
       ; force_link
       } =
-    (Marshal.from_channel ic : Code.cmj_body)
+    (Marshal.from_channel ic : Code.jsir_file)
   in
   (* Each unit is compiled one at a time, so the variables might not be disjoint.
      This means that it is enough for fresh variables to be larger than any
      variable of any unit. *)
   Code.Var.set_last last_var;
-  { name = exported_compilation_unit
-  ; program = Code.Marshalable_program.to_program program
-  ; info =
-      Unit_info.of_compilation_units
-        ~exported:exported_compilation_unit
-        ~imported:imported_compilation_units
-        ~force_link
-  }
+  let unit =
+    { name = exported_compilation_unit
+    ; target
+    ; program = Code.Marshalable_program.to_program program
+    ; info =
+        Unit_info.of_compilation_units
+          ~exported:exported_compilation_unit
+          ~imported:imported_compilation_units
+          ~force_link
+    }
+  in
+  let program_name : Code.jsir_target -> string = function
+    | Js -> "js_of_ocaml"
+    | Wasm -> "wasm_of_ocaml"
+  in
+  let output_language : Code.jsir_target -> string = function
+    | Js -> "JavaScript"
+    | Wasm -> "WebAssembly"
+  in
+  (match target, expected_target with
+  | Js, Js | Wasm, Wasm -> ()
+  | Js, Wasm | Wasm, Js ->
+      failwith
+        (Printf.sprintf
+           "%s was compiled for %s (ocamlopt -target %s) and cannot be compiled to %s"
+           filename
+           (program_name target)
+           (program_name target)
+           (output_language expected_target)));
+  unit
 
 let from_channel ic =
   let format =

@@ -552,8 +552,13 @@ module Marshalable_program = struct
     { start; blocks; free_pc }
 end
 
-type cmj_body =
-  { program : Marshalable_program.t
+type jsir_target =
+  | Js
+  | Wasm
+
+type jsir_file =
+  { target : jsir_target
+  ; program : Marshalable_program.t
   ; last_var : int
         (** Highest variable index used in [program]. [Var] keeps this in mutable
             state, so the OxCaml JSIR backend must communicate it to
