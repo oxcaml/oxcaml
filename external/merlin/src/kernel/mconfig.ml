@@ -465,6 +465,7 @@ let ocaml_ignored_flags =
     "-dcanonical-ids";
     "-dclambda";
     "-dcmm";
+    "-dcmm-functions";
     "-dcse";
     "-dflambda";
     "-dflambda-no-invariants";
@@ -554,6 +555,7 @@ let ocaml_ignored_flags =
     "-flambda2-expert-code-id-and-symbol-scoping-checks";
     "-flambda2-expert-fallback-inlining-heuristic";
     "-flambda2-expert-inline-effects-in-cmm";
+    "-flambda2-expert-cmm-normal-var-optimised-out";
     "-flambda2-expert-phantom-lets";
     "-flambda2-inlining-report-bin";
     "-flambda2-join-points";
@@ -574,6 +576,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-expert-code-id-and-symbol-scoping-checks";
     "-no-flambda2-expert-fallback-inlining-heuristic";
     "-no-flambda2-expert-inline-effects-in-cmm";
+    "-no-flambda2-expert-cmm-normal-var-optimised-out";
     "-no-flambda2-expert-phantom-lets";
     "-no-flambda2-join-points";
     "-no-flambda2-speculative-inlining-only-if-arguments-useful";
