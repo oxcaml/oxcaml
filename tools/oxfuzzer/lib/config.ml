@@ -53,7 +53,7 @@ let unboxed_tuple_probability = 2_500
 
 let match_in_match_probability = 5_000
 
-let assert_false_probability = 100
+let assert_false_probability = 1
 
 let nested_record_probability = 1_500
 
