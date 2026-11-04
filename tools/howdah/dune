@@ -1,0 +1,4 @@
+(executable
+ (name howdah)
+ (modes byte native)
+ (libraries ocamlfrontend))

@@ -1,0 +1,7 @@
+(rule
+ (targets Howdah.olean)
+ (deps
+  (sandbox preserve_file_kind)
+  Howdah.lean)
+ (action
+  (run lean -DautoImplicit=false -o %{targets} %{deps})))

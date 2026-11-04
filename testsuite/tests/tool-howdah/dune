@@ -1,0 +1,29 @@
+(rule
+ (targets record.cmi record.cmt)
+ (deps record.ml)
+ (action
+  (run
+   %{exe:../../../main_native.exe}
+   -nostdlib
+   -nopervasives
+   -bin-annot
+   -stop-after
+   typing
+   -c
+   %{deps})))
+
+(rule
+ (with-stdout-to
+  record.json
+  (run %{exe:../../../tools/howdah/howdah.exe} %{dep:record.cmt})))
+
+(rule
+ (alias record)
+ (deps
+  record.json
+  ../../../tools/howdah/lean/Howdah.olean)
+ (action
+  (setenv
+   LEAN_PATH
+   %{workspace_root}/tools/howdah/lean
+   (run lean %{dep:Record.lean}))))
