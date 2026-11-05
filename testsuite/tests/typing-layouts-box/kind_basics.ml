@@ -203,18 +203,18 @@ Error: This type "t" should be an instance of type "('a : value non_pointer)"
        the layout value non_float.
 |}]
 
-type t : (bits8 & bits8) addressable box
+type t : (bits8 & bits8) box
 type ok = t nf_req
 type bad = t np_req
 [%%expect{|
-type t : (bits8 & bits8) addressable box
+type t : (bits8 & bits8) box
 type ok = t nf_req
 Line 3, characters 11-12:
 3 | type bad = t np_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_pointer)"
        The layout of t is value non_float
-         because of the definition of t at line 1, characters 0-40.
+         because of the definition of t at line 1, characters 0-28.
        But the layout of t must be a sublayout of value non_pointer
          because of the definition of np_req at line 1, characters 0-36.
        Note: The layout of immediate is value non_pointer.
@@ -230,10 +230,10 @@ type t : float64 addressable box
 type ok = t nf_req
 |}]
 
-type t : (float64 & float64) addressable box
+type t : (float64 & float64) box
 type ok = t nf_req
 [%%expect{|
-type t : (float64 & float64) addressable box
+type t : (float64 & float64) box
 type ok = t nf_req
 |}]
 

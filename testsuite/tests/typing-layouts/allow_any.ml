@@ -66,8 +66,14 @@ type t : any = #{ f : float# }
 and s : value = t require_f64
 [%%expect{|
 type ('a : float64) require_f64
-type t : float64 = #{ f : float#; } [@@unsafe_allow_any_mode_crossing]
-and s = t require_f64
+Lines 3-4, characters 0-34:
+3 | type t : any = #{ f : float# }
+4 | [@@unsafe_allow_any_mode_crossing]
+Error:
+       The layout of t is any addressable
+         because of the annotation on the declaration of the type t.
+       But the layout of t must be a sublayout of float64
+         because of the definition of require_f64 at line 1, characters 0-31.
 |}]
 
 (* Annotations with with-bounds are allowed *)
