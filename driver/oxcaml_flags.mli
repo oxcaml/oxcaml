@@ -153,6 +153,8 @@ val keep_llvmir : bool ref
 val llvm_path : string option ref
 val llvm_flags : string ref
 
+val fdo_counters : bool ref
+
 module Flambda2 : sig
   val debug : bool ref
   val reaper_debug_flags : string list ref
