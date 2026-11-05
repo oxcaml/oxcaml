@@ -7,18 +7,32 @@ instance : ToString PureEvalError where
   toString
     | .unboundVariable id => s!"unbound variable `{id}`"
 
-inductive PureEval (T : Type) : Type where
+inductive PureEvalResult (T : Type) : Type where
   | halted (result : T)
   | maybeNonterminating
   | error (error : PureEvalError)
 
-instance : Monad PureEval where
+instance : Monad PureEvalResult where
   pure := .halted
   bind m f :=
     match m with
     | .maybeNonterminating => .maybeNonterminating
     | .error e => .error e
     | .halted result => f result
+
+instance : LawfulMonad PureEvalResult :=
+  LawfulMonad.mk'
+    (id_map := @fun _ x ↦ by cases x <;> rfl)
+    (pure_bind := @fun _ _ _ _ => by rfl)
+    (bind_assoc := @fun _ _ _ x _ _ => by cases x <;> rfl)
+
+@[simp]
+theorem PureEvalResult.bind_halted {α β} {f : α → PureEvalResult β} {x} :
+  (PureEvalResult.halted x >>= f) = f x := rfl
+
+@[simp]
+theorem PureEvalResult.map_halted {α β} {f : α → β} {x} :
+  (f <$> PureEvalResult.halted x) = .halted (f x) := rfl
 
 attribute [simp] dbgTrace
 
@@ -53,7 +67,7 @@ theorem Lambda.size_substitute (lambda : Lambda) idToReplace value :
   | makeBlock tag fields ih => induction ih with simp_all
 
 @[simp]
-def Lambda.pureEval : Lambda → PureEval Value
+def Lambda.pureEval : Lambda → PureEvalResult Value
   | .var id => .unboundVariable id |> .error
   | .const c => .const c |> .halted
   | .makeBlock tag fields =>
@@ -72,3 +86,9 @@ def Lambda.pureEval! (lambda : Lambda) : Value :=
   | .halted result => result
   | .maybeNonterminating => panic! "maybe nonterminating"
   | .error e => panic! toString e
+
+@[simp]
+def PureEval (lambda : Lambda) (value : Value) : Prop :=
+  lambda.pureEval = .halted value
+
+notation:50 e " ⇓ " v => PureEval e v
