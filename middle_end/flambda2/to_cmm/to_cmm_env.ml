@@ -385,8 +385,8 @@ let gen_variable ~debug_uid ~needed_by_phantom_let v =
      [Num_occurrences.By_name_mode.needed_by_phantom_let]) are treated like
      user-visible ones here: the provenance causes [Name_for_debugger]
      operations to be emitted during instruction selection (including via
-     [Cnormal_var_optimised_out]), without which the phantom lets' references
-     to such variables could not be resolved by the debugger. *)
+     [Cnormal_var_optimised_out]), without which the phantom lets' references to
+     such variables could not be resolved by the debugger. *)
   let user_visible = Variable.user_visible v || needed_by_phantom_let in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
@@ -565,7 +565,8 @@ let create_binding (type a) effs var ~(inline : a inline) ~needed_by_phantom_let
     Misc.fatal_errorf
       "[Inlined] bindings should never be created directly; they are only \
        generated when an existing binding is inlined."
-  | Phantom _ -> create_binding_aux effs var ~inline bound_expr
+  | Phantom _ ->
+    create_binding_aux effs var ~inline ~needed_by_phantom_let bound_expr
   | (Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars })
     when is_cmm_simple cmm_expr ->
     (* trivial/simple cmm expression (as decided by [is_cmm_simple]) do not have
@@ -906,13 +907,17 @@ let bind_variable ~mode ?extra env res var ~defining_expr
       ~inline:Must_inline_and_duplicate ~needed_by_phantom_let
 
 let bind_variable_to_primitive (type a) ?extra env res var ~inline
-    ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr =
+    ~needed_by_phantom_let ~(defining_expr : a bound_expr)
+    ~effects_and_coeffects_of_defining_expr =
   bind_variable_with_decision ~mode:FV.Mode.Normal ?extra env res var ~inline
-    ~defining_expr ~effects_and_coeffects_of_defining_expr
+    ~needed_by_phantom_let ~defining_expr
+    ~effects_and_coeffects_of_defining_expr
 
 let bind_phantom_variable env res var defining_expr =
+  (* Phantom bindings have no runtime value to locate: whether the variable is
+     referenced by other phantom lets does not affect its provenance. *)
   bind_variable_with_decision ~mode:FV.Mode.Phantom env res var ~inline:Phantom
-    ~defining_expr
+    ~needed_by_phantom_let:false ~defining_expr
     ~effects_and_coeffects_of_defining_expr:Ece.pure_can_be_duplicated
 
 (* Variable lookup (for potential inlining) *)
@@ -1325,8 +1330,8 @@ let split_binding_and_rebind ~num_occurrences_of_var ~needed_by_phantom_let env
     | More_than_one -> Must_inline_and_duplicate
   in
   bind_variable_with_decision ~mode:FV.Mode.Normal env res var ~inline
-    ~needed_by_phantom_let
-    ~defining_expr ~effects_and_coeffects_of_defining_expr:effs
+    ~needed_by_phantom_let ~defining_expr
+    ~effects_and_coeffects_of_defining_expr:effs
 
 let add_alias env res ~var ~alias_of ~num_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
