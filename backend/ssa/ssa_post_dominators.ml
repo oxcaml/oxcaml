@@ -9,7 +9,9 @@ open Ssa.Export
    algorithm used in `Cfg_dominators`. *)
 
 (* CR-soon xclerc for xclerc: see what can be shared with the computations of
-   dominators (CFG and SSA). *)
+   dominators (CFG and SSA). More precisely, the goal is to share along two
+   dimensions: IR (CFG vs SSA) and kind ("regular" vs "post-"). The refactoring
+   will happen after we merge the AFL fuzzer stress testing the CFG version. *)
 
 module Node = struct
   type t =
