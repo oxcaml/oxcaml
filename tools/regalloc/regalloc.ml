@@ -290,24 +290,30 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
   in
   let start_time = cpu_time () in
   let allocator = select_allocator config cfg_with_layout in
-  let (_, rounds_ref) : Cfg_with_infos.t * int ref =
+  let (_, rematerializations, rounds_ref) :
+      Cfg_with_infos.t * Regalloc_rematerializations.t * int ref =
     match allocator with
-    | GI -> Regalloc_gi.run cfg_with_infos, Regalloc_gi.For_testing.rounds
+    | GI ->
+      let res, rematerializations = Regalloc_gi.run cfg_with_infos in
+      res, rematerializations, Regalloc_gi.For_testing.rounds
     | IRC ->
       begin match Regalloc_irc.run cfg_with_infos with
-      | Some res -> res, Regalloc_irc.For_testing.rounds
-      | None ->
-        fatal "IRC allocator returned None (function %S is likely too complex)"
+      | Ok (res, rematerializations) ->
+        res, rematerializations, Regalloc_irc.For_testing.rounds
+      | Error _ ->
+        fatal "IRC allocator gave up (function %S is likely too complex)"
           (Cfg_with_layout.cfg cfg_with_layout).fun_name
       end
-    | LS -> Regalloc_ls.run cfg_with_infos, Regalloc_ls.For_testing.rounds
+    | LS ->
+      let res, rematerializations = Regalloc_ls.run cfg_with_infos in
+      res, rematerializations, Regalloc_ls.For_testing.rounds
   in
   let end_time = cpu_time () in
   (match cfg_description with
   | None -> ()
   | Some cfg_description ->
     let (_ : Cfg_with_infos.t) =
-      Regalloc_validate.run cfg_description cfg_with_infos
+      Regalloc_validate.run cfg_description ~rematerializations cfg_with_infos
     in
     ());
   let duration = end_time -. start_time in

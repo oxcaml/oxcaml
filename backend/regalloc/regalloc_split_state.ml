@@ -7,9 +7,22 @@ module DLL = Doubly_linked_list
 
 type destructions_at_end = (destruction_kind * Reg.Set.t) Label.Map.t
 
-type definitions_at_beginning = Reg.Set.t Label.Map.t
+type unqualified_definitions_at_beginning = Reg.Set.t Label.Map.t
+
+type definitions_at_beginning = definition_kind Reg.Map.t Label.Map.t
 
 type phi_at_beginning = Reg.Set.t Label.Map.t
+
+type additional_uses = Reg.Set.t Label.Map.t
+
+let additional_uses_in_block additional_uses label =
+  match Label.Map.find_opt label additional_uses with
+  | None -> Reg.Set.empty
+  | Some regs -> regs
+
+let occurs_with_additional_uses ~additional_uses block reg =
+  occurs_block block reg
+  || Reg.Set.mem reg (additional_uses_in_block additional_uses block.Cfg.start)
 
 type t =
   { destructions_at_end : destructions_at_end;
@@ -36,9 +49,9 @@ let log_renaming_info : t -> unit =
   log "definitions:";
   indent ();
   Label.Map.iter
-    (fun label regset ->
-      log " - beginning of block %a (%a)" Label.format label Printreg.regset
-        regset)
+    (fun label regs ->
+      log " - beginning of block %a (reloads: %a)" Label.format label
+        Printreg.regmap regs)
     state.definitions_at_beginning;
   dedent ();
   log "phi:";
@@ -61,9 +74,10 @@ let log_renaming_info : t -> unit =
 module ExtractSpillsAndReloadsFromLoops : sig
   val optimize :
     Cfg_with_infos.t ->
+    additional_uses:additional_uses ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
-    destructions_at_end * definitions_at_beginning
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    destructions_at_end * unqualified_definitions_at_beginning
 end = struct
   type loop_sets =
     { destroyed : Reg.Set.t;
@@ -71,7 +85,7 @@ end = struct
       written : Reg.Set.t
     }
 
-  let compute_loop_sets cfg loop destructions_at_end =
+  let compute_loop_sets cfg loop destructions_at_end ~additional_uses =
     Label.Set.fold
       (fun label { destroyed; read; written } ->
         let destroyed_here =
@@ -81,6 +95,9 @@ end = struct
         in
         let destroyed = Reg.Set.union destroyed destroyed_here in
         let block = Cfg.get_block_exn cfg label in
+        let read =
+          Reg.Set.union read (additional_uses_in_block additional_uses label)
+        in
         let[@inline] update : type a.
             Reg.Set.t * Reg.Set.t -> a Cfg.instruction -> Reg.Set.t * Reg.Set.t
             =
@@ -101,14 +118,14 @@ end = struct
         written = Reg.Set.empty
       }
 
-  let optimize_loop cfg ~header (loop : Label.Set.t)
+  let optimize_loop cfg ~header ~additional_uses (loop : Label.Set.t)
       (destructions_at_end, definitions_at_beginning) =
     if debug
     then (
       log "ExtractSpillsAndReloadsFromLoops.optimize_loop";
       indent ());
     let { destroyed; read; written } =
-      compute_loop_sets cfg loop destructions_at_end
+      compute_loop_sets cfg loop destructions_at_end ~additional_uses
     in
     (* [to_move_destructions]: destroyed and not written — stack slot is
        loop-invariant, so the spill can be moved before the loop.
@@ -135,7 +152,7 @@ end = struct
       (* Remove destructions for not-written and definitions for not-occurring
          registers from inside the loop. *)
       let (destructions_at_end, definitions_at_beginning) :
-          destructions_at_end * definitions_at_beginning =
+          destructions_at_end * unqualified_definitions_at_beginning =
         Label.Set.fold
           (fun label (destructions_at_end, definitions_at_beginning) ->
             let destructions_at_end =
@@ -187,7 +204,7 @@ end = struct
              loop Label.Set.empty)
           loop
       in
-      let definitions_at_beginning : definitions_at_beginning =
+      let definitions_at_beginning : unqualified_definitions_at_beginning =
         Label.Set.fold
           (fun label acc ->
             if debug then log "definitions now happen at %a" Label.print label;
@@ -201,7 +218,8 @@ end = struct
       if debug then dedent ();
       destructions_at_end, definitions_at_beginning
 
-  let optimize cfg_with_infos ~destructions_at_end ~definitions_at_beginning =
+  let optimize cfg_with_infos ~additional_uses ~destructions_at_end
+      ~definitions_at_beginning =
     if debug
     then (
       log "ExtractSpillsAndReloadsFromLoops.optimize";
@@ -217,7 +235,7 @@ end = struct
           in
           (* we use `fold_right` to start with the bigger loops *)
           List.fold_right loops ~init:acc ~f:(fun loop acc ->
-              optimize_loop cfg ~header:loop_header loop acc))
+              optimize_loop cfg ~header:loop_header ~additional_uses loop acc))
         loop_infos.header_map
         (destructions_at_end, definitions_at_beginning)
     in
@@ -232,9 +250,10 @@ end
 module MoveSpillsAndReloads : sig
   val optimize :
     Cfg_with_infos.t ->
+    additional_uses:additional_uses ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
-    destructions_at_end * definitions_at_beginning
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    destructions_at_end * unqualified_definitions_at_beginning
 end = struct
   (** A definition at the begin of a block can be moved down if:
 
@@ -245,9 +264,10 @@ end = struct
       - the defined register has no occurrences in the block. *)
   let move_definitions_at_beginning_down :
       Cfg_with_infos.t ->
-      definitions_at_beginning:definitions_at_beginning ->
-      definitions_at_beginning * Label.t Stack.t =
-   fun cfg_with_infos ~definitions_at_beginning ->
+      additional_uses:additional_uses ->
+      definitions_at_beginning:unqualified_definitions_at_beginning ->
+      unqualified_definitions_at_beginning * Label.t Stack.t =
+   fun cfg_with_infos ~additional_uses ~definitions_at_beginning ->
     if debug
     then (
       log "MoveSpillsAndReloads.move_definitions_at_beginning_down";
@@ -286,7 +306,9 @@ end = struct
                      up the check. *)
                   Reg.Set.filter
                     (fun (reg : Reg.t) ->
-                      let occurs = occurs_block block reg in
+                      let occurs =
+                        occurs_with_additional_uses ~additional_uses block reg
+                      in
                       not occurs)
                     definitions
                 in
@@ -324,10 +346,12 @@ end = struct
   let move_destructions_at_end_up :
       Cfg_with_infos.t ->
       Label.t Stack.t ->
-      definitions_at_beginning:definitions_at_beginning ->
+      additional_uses:additional_uses ->
+      definitions_at_beginning:unqualified_definitions_at_beginning ->
       destructions_at_end:destructions_at_end ->
       destructions_at_end =
-   fun cfg_with_infos stack ~definitions_at_beginning ~destructions_at_end ->
+   fun cfg_with_infos stack ~additional_uses ~definitions_at_beginning
+       ~destructions_at_end ->
     if debug
     then (
       log "MoveSpillsAndReloads.move_destructions_at_end_up";
@@ -362,7 +386,9 @@ end = struct
                 (fun (reg : Reg.t) ->
                   (* CR-soon xclerc for xclerc: consider ignoring `arg` to speed
                      up the check. *)
-                  let occurs_block = occurs_block block reg in
+                  let occurs_block =
+                    occurs_with_additional_uses ~additional_uses block reg
+                  in
                   let occurs_defs =
                     match Label.Map.find_opt label definitions_at_beginning with
                     | None -> false
@@ -395,18 +421,19 @@ end = struct
     if debug then dedent ();
     !destructions_at_end
 
-  let optimize cfg_with_infos ~destructions_at_end ~definitions_at_beginning =
+  let optimize cfg_with_infos ~additional_uses ~destructions_at_end
+      ~definitions_at_beginning =
     if debug
     then (
       log "MoveSpillsAndReloads.optimize";
       indent ());
     let definitions_at_beginning, stack =
-      move_definitions_at_beginning_down cfg_with_infos
+      move_definitions_at_beginning_down cfg_with_infos ~additional_uses
         ~definitions_at_beginning
     in
     let destructions_at_end =
-      move_destructions_at_end_up cfg_with_infos stack ~definitions_at_beginning
-        ~destructions_at_end
+      move_destructions_at_end_up cfg_with_infos stack ~additional_uses
+        ~definitions_at_beginning ~destructions_at_end
     in
     if debug then dedent ();
     destructions_at_end, definitions_at_beginning
@@ -418,11 +445,13 @@ end
 module RemoveReloadSpillInSameBlock : sig
   val optimize :
     Cfg_with_infos.t ->
+    additional_uses:additional_uses ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
-    destructions_at_end * definitions_at_beginning
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    destructions_at_end * unqualified_definitions_at_beginning
 end = struct
-  let optimize cfg_with_infos ~destructions_at_end ~definitions_at_beginning =
+  let optimize cfg_with_infos ~additional_uses ~destructions_at_end
+      ~definitions_at_beginning =
     if debug
     then (
       log "RemoveReloadSpillInSameBlock.optimize";
@@ -456,7 +485,9 @@ end = struct
                     let block =
                       Cfg_with_infos.get_block_exn cfg_with_infos label
                     in
-                    let occurs = occurs_block block reg in
+                    let occurs =
+                      occurs_with_additional_uses ~additional_uses block reg
+                    in
                     if debug then log "occurs? %B" occurs;
                     not occurs)
                 definitions
@@ -492,24 +523,17 @@ module RemoveDominatedSpillsForConstants : sig
   val optimize :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
+    uses:Uses.t ->
     destructions_at_end
 end = struct
-  type set =
-    | At_most_once
-    | Maybe_more_than_once
-
-  let string_of_set = function
-    | At_most_once -> "at most once"
-    | Maybe_more_than_once -> "maybe more than once"
-
   let rec remove_dominated_spills :
       Cfg_dominators.t ->
       Cfg_dominators.dominator_tree ->
-      num_sets:set Reg.Tbl.t ->
+      uses:Uses.t ->
       already_spilled:Label.t Reg.Map.t ->
       destructions_at_end:destructions_at_end ->
       destructions_at_end =
-   fun doms tree ~num_sets ~already_spilled ~destructions_at_end ->
+   fun doms tree ~uses ~already_spilled ~destructions_at_end ->
     if debug
     then (
       log "remove_dominated_spills %a" Label.format tree.label;
@@ -524,9 +548,9 @@ end = struct
                 (fun (reg : Reg.t) ->
                   if debug then log "register %a" Printreg.reg reg;
                   let keep =
-                    match Reg.Tbl.find_opt num_sets reg with
+                    match Reg.Tbl.find_opt uses reg with
                     | None | Some Maybe_more_than_once -> true
-                    | Some At_most_once -> (
+                    | Some (At_most_once _) -> (
                       match Reg.Map.find_opt reg !already_spilled with
                       | None ->
                         if debug
@@ -592,57 +616,111 @@ end = struct
       List.fold_left tree.children ~init:destructions_at_end
         ~f:(fun destructions_at_end (child : Cfg_dominators.dominator_tree) ->
           if debug then log "child %a" Label.format child.label;
-          remove_dominated_spills doms child ~num_sets
+          remove_dominated_spills doms child ~uses
             ~already_spilled:!already_spilled ~destructions_at_end)
     in
     if debug then dedent ();
     res
 
-  let optimize cfg_with_infos ~destructions_at_end =
+  let optimize cfg_with_infos ~destructions_at_end ~uses =
     if debug
     then (
       log "RemoveDominatedSpillsForConstants.optimize";
       indent ());
-    let loops = Cfg_with_infos.loop_infos cfg_with_infos in
-    let incr_set (tbl : set Reg.Tbl.t) (arr : Reg.t array) ~(in_loop : bool) :
-        unit =
-      Array.iter arr ~f:(fun (reg : Reg.t) ->
-          match Reg.Tbl.find_opt tbl reg with
-          | None ->
-            Reg.Tbl.replace tbl reg
-              (if in_loop then Maybe_more_than_once else At_most_once)
-          | Some At_most_once -> Reg.Tbl.replace tbl reg Maybe_more_than_once
-          | Some Maybe_more_than_once -> ())
-    in
-    let num_sets =
-      Cfg_with_infos.fold_blocks cfg_with_infos ~init:(Reg.Tbl.create 123)
-        ~f:(fun label block acc ->
-          let in_loop : bool = Cfg_loop_infos.is_in_loop loops label in
-          if debug then log "block %a in_loop? %B" Label.format label in_loop;
-          incr_set acc block.terminator.res ~in_loop;
-          DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
-              incr_set acc instr.res ~in_loop);
-          acc)
-    in
     if debug
     then (
-      log "num_sets:";
+      log "uses:";
       indent ();
-      Reg.Tbl.iter
-        (fun reg num_set ->
-          log "%a ~> %s" Printreg.reg reg (string_of_set num_set))
-        num_sets;
+      log "%a" Uses.format uses;
       dedent ());
     let doms = Cfg_with_infos.dominators cfg_with_infos in
     let forest = Cfg_dominators.dominator_forest doms in
     let res =
       List.fold_left forest ~init:destructions_at_end
         ~f:(fun destructions_at_end dominator_tree ->
-          remove_dominated_spills doms dominator_tree ~num_sets
+          remove_dominated_spills doms dominator_tree ~uses
             ~already_spilled:Reg.Map.empty ~destructions_at_end)
     in
     dedent ();
     res
+end
+
+(* Converts the unqualified `definitions_at_beginning` (a set of registers) to a
+   qualified one (a map from register to `definition_kind`), turning entries
+   into `Rematerialize` when possible and `Reload` otherwise. A register can be
+   rematerialized as a copy of an immutable load, a constant, or a safe
+   [Intop_imm] (cf. [try_rematerialize]), provided the source and each of its
+   arguments are definitely defined at the beginning of the block (cf.
+   [Definitely_defined]): the copy is then a re-execution of an instruction that
+   ran on every path reaching the block, never a speculative one. Dependencies
+   between rematerializations are allowed; insertion orders their copies before
+   their consumers. *)
+module RewriteAsRematerialize : sig
+  val optimize :
+    Cfg_with_infos.t ->
+    uses:Uses.t ->
+    definitely_defined:Definitely_defined.t Lazy.t ->
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
+    definition_kind Reg.Map.t Label.Map.t
+end = struct
+  let optimize cfg_with_infos ~uses ~definitely_defined
+      ~definitions_at_beginning =
+    if debug
+    then (
+      log "RewriteAsRematerialize.optimize";
+      indent ());
+    let enabled = Param.get split_rematerialize in
+    let result =
+      Label.Map.mapi
+        (fun (label : Label.t) (regs : Reg.Set.t) ->
+          let candidates =
+            if not enabled
+            then Reg.Map.empty
+            else
+              let live_at_beginning =
+                live_at_block_beginning cfg_with_infos label
+              in
+              let definitely_defined = Lazy.force definitely_defined in
+              let is_available reg =
+                Definitely_defined.mem definitely_defined label reg
+              in
+              (* An argument must be live at the beginning of the block (so that
+                 split keeps its value available there), set at most once (so
+                 that this value is the one the source read), and definitely
+                 defined (so that it is not garbage on some path). *)
+              let is_arg_ok reg =
+                at_most_once_in uses live_at_beginning reg && is_available reg
+              in
+              Reg.Set.fold
+                (fun reg acc ->
+                  match try_rematerialize uses ~is_arg_ok ~is_available reg with
+                  | None -> acc
+                  | Some source -> Reg.Map.add reg source acc)
+                regs Reg.Map.empty
+          in
+          if debug
+          then (
+            log "block %a" Label.format label;
+            indent ();
+            Reg.Map.iter
+              (fun reg (load : Instruction.t) ->
+                log "remat %a from instruction %a" Printreg.reg reg
+                  InstructionId.format load.id)
+              candidates;
+            dedent ());
+          Reg.Set.fold
+            (fun (reg : Reg.t) acc ->
+              let kind : definition_kind =
+                match Reg.Map.find_opt reg candidates with
+                | Some load -> Rematerialize load
+                | None -> Reload
+              in
+              Reg.Map.add reg kind acc)
+            regs Reg.Map.empty)
+        definitions_at_beginning
+    in
+    if debug then dedent ();
+    result
 end
 
 let add_destruction_point_at_end :
@@ -690,7 +768,7 @@ let compute_destructions : Cfg_with_infos.t -> destructions_at_end =
 let compute_definitions :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning =
+    unqualified_definitions_at_beginning =
  fun cfg_with_infos ~destructions_at_end ->
   let definitions_at_beginning = Label.Map.empty in
   let definitions_at_beginning =
@@ -820,7 +898,7 @@ let rec fix_point_phi : Cfg_with_infos.t -> phi_at_beginning -> phi_at_beginning
 let compute_phis :
     Cfg_with_infos.t ->
     destructions_at_end:destructions_at_end ->
-    definitions_at_beginning:definitions_at_beginning ->
+    definitions_at_beginning:unqualified_definitions_at_beginning ->
     phi_at_beginning =
  fun cfg_with_infos ~destructions_at_end ~definitions_at_beginning ->
   let phi_at_beginning = Label.Map.empty in
@@ -849,42 +927,80 @@ let[@inline] remove_empty_sets (map : 'a Label.Map.t) ~(f : 'a -> Reg.Set.t) :
   Label.Map.filter (fun _ data -> not (Reg.Set.is_empty (f data))) map
 
 let make cfg_with_infos =
-  let destructions_at_end = compute_destructions cfg_with_infos in
-  let definitions_at_beginning =
-    compute_definitions cfg_with_infos ~destructions_at_end
+  let initial_destructions = compute_destructions cfg_with_infos in
+  let initial_definitions =
+    compute_definitions cfg_with_infos ~destructions_at_end:initial_destructions
   in
-  let destructions_at_end, definitions_at_beginning =
-    if Param.get split_around_loops
-    then
-      ExtractSpillsAndReloadsFromLoops.optimize cfg_with_infos
+  let uses = Uses.compute cfg_with_infos in
+  let definitely_defined = lazy (Definitely_defined.compute cfg_with_infos) in
+  (* A rematerialization introduces argument uses at block entry. Replan with
+     these uses so that their reloads are not moved past the copies or removed.
+     Those reloads can themselves become rematerializations. The accumulated
+     uses only grow, and each is already live at that block in the original CFG,
+     so this reaches a fixpoint without changing liveness or register names. *)
+  let rec plan additional_uses =
+    let destructions_at_end, definitions_at_beginning =
+      if Param.get split_around_loops
+      then
+        ExtractSpillsAndReloadsFromLoops.optimize cfg_with_infos
+          ~additional_uses ~destructions_at_end:initial_destructions
+          ~definitions_at_beginning:initial_definitions
+      else initial_destructions, initial_definitions
+    in
+    let destructions_at_end, definitions_at_beginning =
+      MoveSpillsAndReloads.optimize cfg_with_infos ~additional_uses
         ~destructions_at_end ~definitions_at_beginning
-    else destructions_at_end, definitions_at_beginning
+    in
+    let destructions_at_end, definitions_at_beginning =
+      RemoveReloadSpillInSameBlock.optimize cfg_with_infos ~additional_uses
+        ~destructions_at_end ~definitions_at_beginning
+    in
+    let destructions_at_end =
+      RemoveDominatedSpillsForConstants.optimize cfg_with_infos
+        ~destructions_at_end ~uses
+      |> fun map -> remove_empty_sets map ~f:snd
+    in
+    let definitions_at_beginning =
+      remove_empty_sets definitions_at_beginning ~f:Fun.id
+    in
+    let definitions =
+      RewriteAsRematerialize.optimize cfg_with_infos ~uses ~definitely_defined
+        ~definitions_at_beginning
+    in
+    let changed = ref false in
+    let additional_uses =
+      Label.Map.fold
+        (fun label regs additional_uses ->
+          let previous = additional_uses_in_block additional_uses label in
+          let needed =
+            Reg.Map.fold
+              (fun _ kind needed ->
+                match kind with
+                | Reload -> needed
+                | Rematerialize source -> Reg.add_set_array needed source.arg)
+              regs previous
+          in
+          if Reg.Set.equal previous needed
+          then additional_uses
+          else (
+            changed := true;
+            Label.Map.add label needed additional_uses))
+        definitions additional_uses
+    in
+    if !changed
+    then plan additional_uses
+    else
+      let phi_at_beginning =
+        compute_phis cfg_with_infos ~destructions_at_end
+          ~definitions_at_beginning
+      in
+      { destructions_at_end;
+        definitions_at_beginning = definitions;
+        phi_at_beginning;
+        stack_slots = Regalloc_stack_slots.make ()
+      }
   in
-  let destructions_at_end, definitions_at_beginning =
-    MoveSpillsAndReloads.optimize cfg_with_infos ~destructions_at_end
-      ~definitions_at_beginning
-  in
-  let destructions_at_end, definitions_at_beginning =
-    RemoveReloadSpillInSameBlock.optimize cfg_with_infos ~destructions_at_end
-      ~definitions_at_beginning
-  in
-  let destructions_at_end =
-    RemoveDominatedSpillsForConstants.optimize cfg_with_infos
-      ~destructions_at_end
-  in
-  let definitions_at_beginning =
-    remove_empty_sets definitions_at_beginning ~f:Fun.id
-  in
-  let destructions_at_end = remove_empty_sets destructions_at_end ~f:snd in
-  let phi_at_beginning =
-    compute_phis cfg_with_infos ~destructions_at_end ~definitions_at_beginning
-  in
-  let stack_slots = Regalloc_stack_slots.make () in
-  { destructions_at_end;
-    definitions_at_beginning;
-    phi_at_beginning;
-    stack_slots
-  }
+  plan Label.Map.empty
 
 let destructions_at_end state = state.destructions_at_end
 

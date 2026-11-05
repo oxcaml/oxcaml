@@ -522,11 +522,20 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       State.invariant state;
       main ~round:(succ round) state cfg_with_infos)
 
-let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
+let run :
+    Cfg_with_infos.t ->
+    ( Cfg_with_infos.t * Regalloc_rematerializations.t,
+      Regalloc_rewrite.prelude_result )
+    result =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots, affinity =
+  let ({ Regalloc_rewrite.cfg_infos;
+         stack_slots;
+         affinity;
+         rematerializations;
+         cfg_with_infos = _
+       } as prepared) =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () -> save_cfg "irc" cfg_with_layout)
@@ -542,7 +551,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
       ~stack_slots ~affinity ()
   in
   match main ~round:1 state cfg_with_infos with
-  | exception Function_is_too_complex -> None
+  | exception Function_is_too_complex -> Error prepared
   | () ->
     if debug then log_cfg_with_infos cfg_with_infos;
     Regalloc_rewrite.postlude
@@ -555,4 +564,4 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t option =
           (fun reg -> State.set_degree state reg 0)
           (all_precolored_regs ()))
       cfg_with_infos;
-    Some cfg_with_infos
+    Ok (cfg_with_infos, rematerializations)
