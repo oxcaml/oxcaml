@@ -3910,9 +3910,10 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         ~args_arity:remaining_arity ~return_arity:apply.return_arity
         ~call_kind:Call_kind.indirect_function_call_unknown_arity ~return_mode
         apply_dbg
-        ~callsite_counter:apply.callsite_counter
-          (* Like [full_call], this call is made by the source call (see
-             [Simplify_common.split_direct_over_application]). *)
+        ~callsite_counter:None
+          (* The source call has a single counter, on [full_call] (see
+             [Simplify_common.split_direct_over_application]): giving this call
+             the same one would count the source call twice. *)
         ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position
