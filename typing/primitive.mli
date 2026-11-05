@@ -166,7 +166,9 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
 
 (** Check if a primitive can have layout [any] anywhere within its type
     declaration. Returns [false] for built-in primitives that inspect
-    the layout of type parameters ([%array_length] for example). *)
+    the layout of type parameters ([%array_length] for example). Missing such
+    a primitive here is unsound; see [Note regarding jkind checks on external
+    declarations] in [typedecl.ml]. *)
 val prim_can_contain_layout_any : description -> bool
 
 type wrong_repr_error =
