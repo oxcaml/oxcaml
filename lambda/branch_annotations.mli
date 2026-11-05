@@ -54,9 +54,9 @@ val with_fdo_annotation : t -> Fdo_annotation.t -> t
 
 (** Annotations for a single branch that replaces the given branches, when they
     have been found to be identical and shared. *)
-val sum_list_for_merge : t list -> t
+val join_point : t list -> t
 
 (** Annotations for the edge into an intermediate branching point that
     dispatches to the given branches, e.g. a node of the decision tree compiled
     from a switch. *)
-val sum_list_for_dispatch : t list -> t
+val fork_point : t list -> t

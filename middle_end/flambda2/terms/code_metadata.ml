@@ -281,12 +281,6 @@ let [@ocamlformat "disable"] print_inlining_paths ppf
       Inlining_history.Relative.print relative_history
       Inlining_history.Absolute.print absolute_history
 
-let [@ocamlformat "disable"] print_fdo_entry_annotation ppf annotation =
-  if !Oxcaml_flags.fdo_counters && not (Fdo_annotation.is_empty annotation)
-  then
-    Format.fprintf ppf "@[<hov 1>(fdo_entry_annotation@ %a)@]@ "
-      Fdo_annotation.print annotation
-
 let [@ocamlformat "disable"] print ppf
        { code_id = _; newer_version_of; stub; inline; zero_alloc_attribute; poll_attribute;
          regalloc_attribute; regalloc_param_attribute; cold; is_a_functor; is_opaque; params_arity; param_modes;
@@ -318,7 +312,7 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(cost_metrics@ %a)@]@ \
       @[<hov 1>(inlining_arguments@ %a)@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
-      %a\
+      @[<hov 1>(fdo_entry_annotation@ %a)@]@ \
       @[<hov 1>%t(is_tupled@ %b)%t@]@ \
       @[<hov 1>(is_my_closure_used@ %b)@]@ \
       %a\
@@ -410,7 +404,7 @@ let [@ocamlformat "disable"] print ppf
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
-    print_fdo_entry_annotation fdo_entry_annotation
+    Fdo_annotation.print fdo_entry_annotation
     (if is_tupled
     then Flambda_colours.none
     else Flambda_colours.elide)

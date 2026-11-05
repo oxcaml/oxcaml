@@ -287,10 +287,14 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   (* Checked here for the same reason. Classic mode inlines during closure
      conversion, which doesn't put the inlined counters in the context of the
      call site. *)
-  if Flambda_features.classic_mode () && !Oxcaml_flags.fdo_counters
+  if
+    Flambda_features.classic_mode ()
+    && !Oxcaml_flags.fdo_counters
+    && not !Oxcaml_flags.fdo_counters_ignore_classic
   then
     Location.raise_errorf
-      "-fdo-counters is not supported in classic mode (-Oclassic)";
+      "-fdo-counters is not supported in classic mode (-Oclassic); pass \
+       -fdo-counters-ignore-classic to ignore this";
   Misc.Style.setup (Flambda_features.colour ());
   (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
      the length of arrays will need fixing, I don't think it only applies to the

@@ -93,13 +93,6 @@ let [@ocamlformat "disable"] print_inlining_paths ppf relative_history =
     Format.fprintf ppf "@[<hov 1>(relative_history@ %a)@]@ "
       Inlining_history.Relative.print relative_history
 
-let[@ocamlformat "disable"] print_callsite_counter ppf callsite_counter =
-  match callsite_counter with
-  | Some counter when !Oxcaml_flags.fdo_counters ->
-    Format.fprintf ppf "@[<hov 1>(callsite_counter@ %s)@]@ "
-      (Fdo_counter.to_string counter)
-  | Some _ | None -> ()
-
 let [@ocamlformat "disable"] print_normal ppf
     { callee; continuation; exn_continuation; args; args_arity;
       return_arity; call_kind; return_mode; dbg; callsite_counter; inlined; inlining_state; probe;
@@ -112,7 +105,7 @@ let [@ocamlformat "disable"] print_normal ppf
       @[<hov 1>(call_kind@ %a)@]@ \
       @[<hov 1>(return_mode@ %a)@]@ \
       @[<hov 1>%t(dbg@ %a)%t@]@ \
-      %a\
+      @[<hov 1>(callsite_counter %a) \
       @[<hov 1>(inline@ %a)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
       %a\
@@ -130,7 +123,7 @@ let [@ocamlformat "disable"] print_normal ppf
     Flambda_colours.debuginfo
     Debuginfo.print_compact dbg
     Flambda_colours.pop
-    print_callsite_counter callsite_counter
+    (Misc.Stdlib.Option.print Fdo_counter.print) callsite_counter
     Inlined_attribute.print inlined
     Inlining_state.print inlining_state
     print_inlining_paths relative_history
