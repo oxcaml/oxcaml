@@ -302,18 +302,11 @@ let include_functor_input_repr env sig_acc input_coercion =
       (fun items item -> Ident.Map.add (signature_item_id item) item items)
       Ident.Map.empty sig_acc
   in
-  let sort_of_type ty =
-    match Ctype.type_sort ~why:Structure_item ~allow_mutation:false env ty with
-    | Ok sort -> sort
-    | Error _ ->
-      (* this should be unreachable: structure items must be representable *)
-      Misc.fatal_error "include_functor_input_repr: unrepresentable item"
-  in
   List.map
     (fun (id, cc) ->
        match cc with
        | Tcoerce_alias _ -> Jkind.Sort.(of_const Const.for_module)
-       | Tcoerce_primitive pc -> sort_of_type pc.pc_type
+       | Tcoerce_primitive _ -> Jkind.Sort.(of_const Const.for_primitive)
        | Tcoerce_none | Tcoerce_structure _ | Tcoerce_functor _
        | Tcoerce_kindtemplate _ | Tcoerce_invalid ->
          match

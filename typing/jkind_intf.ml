@@ -215,6 +215,8 @@ module type Sort = sig
 
     val for_continuation : t
 
+    val for_primitive : t
+
     (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
         base sort. Use this when constructing [_sort : Const.t option] fields
         (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
