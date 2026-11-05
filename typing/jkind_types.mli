@@ -41,6 +41,10 @@
 
    All definitions here are commented in jkind.ml or jkind.mli. *)
 
+(** Unfilled variables are not written [inherit] *)
+val ampersand_component_written_inherit :
+  is_var:bool -> is_surely_addressable:bool -> bool
+
 module Sort : sig
   (* We need to expose these details for use in [Jkind] *)
 
@@ -102,6 +106,8 @@ module Sort : sig
   (** Post-condition (which holds deeply within the sort): If the result is a
       [Var v], then [!v] is [None]. *)
   val get : t -> t
+
+  val is_unfilled_var : t -> bool
 
   (** Determines if the sort is [Scannable] or an unfilled sort variable,
       possibly under [Addressable] wrappers *)
@@ -202,6 +208,8 @@ module Layout : sig
 
     val product : t list -> t
 
+    val strip_head_addressable : t -> t
+
     val univar : Sort.univar -> Scannable_axes.t -> t
 
     val genvar : Sort.var -> Scannable_axes.t -> t
@@ -252,5 +260,11 @@ module Layout : sig
 
   val product : 'a t list -> 'a t
 
-  val apply_operator : 'a t -> Kind_operator.t -> 'a t
+  val is_surely_addressable : Sort.t t -> bool
+
+  (** [addressable t] is [t] made addressable, without a redundant [Addressable]
+      when [t] is already known to be addressable. *)
+  val addressable : Sort.t t -> Sort.t t
+
+  val apply_operator : Sort.t t -> Kind_operator.t -> Sort.t t
 end
