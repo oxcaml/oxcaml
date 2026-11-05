@@ -18,6 +18,9 @@ module Toplevel = struct
   let override_sys_argv = Toploop.override_sys_argv
   let initialize_toplevel_env = Toploop.initialize_toplevel_env
   let load_file fmt fname = Topeval.load_file false fmt fname
+  let max_printer_depth = Toploop.max_printer_depth
+  let max_printer_steps = Toploop.max_printer_steps
+  let isolate_run f = f ()
   let execute_phrase = Toploop.execute_phrase
 end
 

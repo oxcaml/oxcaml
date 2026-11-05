@@ -1081,6 +1081,7 @@ let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
 
 module Variable_names : sig
   val reset_names : unit -> unit
+  val reset_weak_names : unit -> unit
 
   val add_subst : (type_expr * type_expr) list -> unit
 
@@ -1330,6 +1331,11 @@ end = struct
   let weak_counter = ref 1
   let weak_var_map = ref TypeMap.empty
   let named_weak_vars = ref String.Set.empty
+
+  let reset_weak_names () =
+    named_weak_vars := String.Set.empty;
+    weak_var_map := TypeMap.empty;
+    weak_counter := 1
 
   let add_named_var tty =
     match tty.desc with
@@ -2375,6 +2381,8 @@ let reset_except_conflicts () =
 let reset () =
   Ident_conflicts.reset ();
   reset_except_conflicts ()
+
+let reset_weak_names () = Variable_names.reset_weak_names ()
 
 let prepare_for_printing tyl =
   reset_except_conflicts ();
