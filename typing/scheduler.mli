@@ -48,4 +48,8 @@ val add : ?monitor:Monitor.t -> t -> Job.t -> unit
     {!Monitor}) and propagates, and the remaining jobs stay in [t]. *)
 val run : t -> unit
 
+(** [clear t] removes every job from [t] without running it. This is logged, so
+    backtracking restores them. *)
+val clear : t -> unit
+
 include With_backtracking.S

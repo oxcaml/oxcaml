@@ -21,16 +21,10 @@ val f : int @ local -> int * unit = <fun>
 
 let f (local_ x) = (x, ignore (x ^ ""))
 [%%expect{|
-Line 1, characters 20-21:
+Line 1, characters 31-32:
 1 | let f (local_ x) = (x, ignore (x ^ ""))
-                        ^
-Error: This value is "local" to the parent region
-       but is expected to be "global"
-         because it is an element of the tuple at line 1, characters 19-39
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+                                   ^
+Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
 let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
@@ -58,7 +52,6 @@ Line 2, characters 4-5:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-
 let f (x @ nonportable) =
   ((x : _ @ portable), unify x (Some None), unify x (Some (Some (fun () -> ()))))
 [%%expect{|
@@ -68,14 +61,10 @@ Line 2, characters 4-5:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
-(* CR-soon omni: this test should change once defaulting is lazier *)
 let f (x @ nonportable) =
   ((x : _ @ portable), unify x (Some None), unify x (Some (Some 1)))
 [%%expect{|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), unify x (Some None), unify x (Some (Some 1)))
-        ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option option -> int option option * unit * unit = <fun>
 |}]
 
 (* Reported examples *)
@@ -96,7 +85,12 @@ let variant = Variant ()
 
 let works1 = foo variant
 let works2 = foo (Variant () : _)
-(* CR-soon omni: this fails due to eager defaulting *)
+(* XCR-soon omni: this fails due to eager defaulting
+
+   aobrien: This fails due to order dependence in typing (not mode crossing).
+   Essentially, the type ['a t] is unified with [foo]'s argument type,
+   which results in the subkinding ['a t <= value mod portable contended],
+   *before* we start typing the arguments. *)
 let doesn't_work = foo (Variant ())
 [%%expect {|
 type 'a t = Variant of 'a
@@ -138,16 +132,7 @@ let f (local_ r) =
   let rec loop i = if i >= r then i else loop (i + 1) in
   loop 0
 [%%expect {|
-Line 3, characters 2-6:
-3 |   loop 0
-      ^^^^
-Error: This value is "local"
-         because it is allocated at line 2, characters 15-53 containing data
-         which is "local" to the parent region
-         because it closes over the value "r" at line 2, characters 27-28
-         which is "local" to the parent region.
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it is the function in a tail call.
+val f : int @ local -> int = <fun>
 |}]
 
 type t = { mutable x : int }
@@ -241,24 +226,276 @@ type 'a field = { fld : 'a; }
 val gadt_field : 'a gadt -> 'a -> 'a = <fun>
 |}]
 
-(* CR-soon omni: rejected due to eager defaulting *)
+(* Defaulting waits for the end of the scope that generalizes the variable *)
+
 let f (x @ nonportable) =
   ((x : _ @ portable), (match x with Some 1 -> () | _ -> ()))
 [%%expect {|
-Line 2, characters 4-5:
-2 |   ((x : _ @ portable), (match x with Some 1 -> () | _ -> ()))
-        ^
-Error: This value is "nonportable" but is expected to be "portable".
+val f : int option -> int option * unit = <fun>
 |}]
 
-(* CR-soon omni: rejected due to eager defaulting *)
 let f (x @ nonportable) =
   let p = ((x : _ @ portable), ()) in
   ignore (x = Some 1);
   p
 [%%expect {|
-Line 2, characters 12-13:
-2 |   let p = ((x : _ @ portable), ()) in
-                ^
+val f : int option -> int option * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let module M = struct let y = () end in M.y), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let module M = struct end in ()), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let open struct let y = () end in y), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (let open struct end in ()), ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+let f (x @ nonportable) =
+  ((x : _ @ portable),
+   (let module M : module type of struct end = struct end in ()),
+   ignore (x = Some 1))
+[%%expect{|
+val f : int option -> int option * unit * unit = <fun>
+|}]
+
+(* Top-level items default at their end *)
+
+module F (X : sig end) = struct
+  let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
+end
+[%%expect{|
+module F :
+  functor (X : sig end) -> sig val f : int option -> int option * unit end
+|}]
+
+module F (X : sig end) = struct
+  let r = ref None
+  let g (x @ nonportable) = r := Some (x : _ @ portable)
+end
+[%%expect{|
+Line 3, characters 39-40:
+3 |   let g (x @ nonportable) = r := Some (x : _ @ portable)
+                                           ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+include struct
+  let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
+end
+[%%expect{|
+val f : int option -> int option * unit = <fun>
+|}]
+
+class c = object
+  method m (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
+end
+[%%expect{|
+class c : object method m : int option -> int option * unit end
+|}]
+
+(* Weak variables *)
+
+(* Defaulted weak variables can be printed *)
+let r = (fun x -> ref x) (Obj.magic 0)
+[%%expect{|
+val r : '_weak1 ref = {contents = <poly>}
+|}]
+
+(* A weak variable waited on by a later phrase *)
+let r = ref None
+[%%expect{|
+val r : '_weak2 option ref = {contents = None}
+|}]
+
+let g (x @ portable) = r := Some x
+[%%expect{|
+val g : '_weak2 @ portable -> unit = <fun>
+|}]
+
+let _ = r
+[%%expect{|
+- : '_weak2 option ref = {contents = None}
+|}]
+
+(* A failed phrase leaves nothing pending *)
+let r = ref None
+let f (x @ nonportable) = r := Some (x : _ @ portable); 1 + ""
+[%%expect{|
+val r : '_weak3 option ref = {contents = None}
+Line 2, characters 60-62:
+2 | let f (x @ nonportable) = r := Some (x : _ @ portable); 1 + ""
+                                                                ^^
+Error: This constant has type "string" but an expression was expected of type
+         "int"
+|}]
+
+let g (x @ portable) = r := Some x
+let _ = r
+[%%expect{|
+val g : '_weak3 @ portable -> unit = <fun>
+- : '_weak3 option ref = {contents = None}
+|}]
+
+(* [module type of] defaults its own scope before checking generalizability *)
+
+module type S = module type of struct
+  let f (x @ nonportable) = ((x : _ @ portable), ignore (x = Some 1))
+end
+[%%expect{|
+module type S = sig val f : int option -> int option * unit @@ portable end
+|}]
+
+module type S = module type of struct let r = ref [] end
+[%%expect{|
+Line 1, characters 31-56:
+1 | module type S = module type of struct let r = ref [] end
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type of this module, sig val r : '_weak4 list ref end,
+       contains non-generalizable type variable(s).
+       (see manual section 6.1.2)
+Line 1, characters 42-43:
+1 | module type S = module type of struct let r = ref [] end
+                                              ^
+  The type of this value, "'_weak4 list ref",
+  contains the non-generalizable type variable(s) "'_weak4".
+|}]
+
+module type S = module type of struct
+  let r = ref None
+  let g (x @ portable) = r := Some x
+end
+[%%expect{|
+Lines 1-4, characters 31-3:
+1 | ...............................struct
+2 |   let r = ref None
+3 |   let g (x @ portable) = r := Some x
+4 | end
+Error: The type of this module,
+       sig val r : '_weak5 option ref val g : '_weak5 @ portable -> unit end,
+       contains non-generalizable type variable(s).
+       (see manual section 6.1.2)
+Line 2, characters 6-7:
+2 |   let r = ref None
+          ^
+  The type of this value, "'_weak5 option ref",
+  contains the non-generalizable type variable(s) "'_weak5".
+|}]
+
+(* Checks delayed by an inclusion check are done before it returns *)
+
+module M : sig
+  val f : 'a @ local -> 'a ref
+end = struct
+  let f (x : 'a) = ref x
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f (x : 'a) = ref x
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'a ref end
+       is not included in
+         sig val f : 'a @ local -> 'a ref end
+       Values do not match:
+         val f : 'a -> 'a ref
+       is not included in
+         val f : 'a @ local -> 'a ref
+       The type "'a -> 'a ref" is not compatible with the type
+         "'a @ local -> 'a ref"
+       The argument mode was expected to be "global"
+       because it crosses with something but is "local"
+|}]
+
+(* The synchronous error is preferred *)
+module M : sig
+  val f : ('a @ local -> 'a ref) * string
+end = struct
+  let f = ((fun (x : 'a) -> ref x), 1)
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f = ((fun (x : 'a) -> ref x), 1)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : ('a -> 'a ref) * int end
+       is not included in
+         sig val f : ('a @ local -> 'a ref) * string end
+       Values do not match:
+         val f : ('a -> 'a ref) * int
+       is not included in
+         val f : ('a @ local -> 'a ref) * string
+       The type "('a -> 'a ref) * int" is not compatible with the type
+         "('a @ local -> 'a ref) * string"
+       Type "int" is not compatible with type "string"
+|}]
+
+class type ['a] ct = object method m : 'a @ local -> 'a ref end
+class ['a] c : ['a] ct = object method m (x : 'a) = ref x end
+[%%expect{|
+class type ['a] ct = object method m : 'a @ local -> 'a ref end
+Line 2, characters 25-61:
+2 | class ['a] c : ['a] ct = object method m (x : 'a) = ref x end
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The class type object method m : 'a -> 'a ref end
+       is not matched by the class type ['_a] ct
+       The class type object method m : 'a -> 'a ref end
+       is not matched by the class type
+         object method m : 'a @ local -> 'a ref end
+       The method m has type "'a -> 'a ref" but is expected to have type
+         "'a @ local -> 'a ref"
+       Type "'a -> 'a ref" is not compatible with type "'a @ local -> 'a ref"
+       The argument mode was expected to be "global"
+       because it crosses with something but is "local"
+|}]
+
+(* The synchronous error is preferred *)
+class type ['a] ct = object
+  method m : 'a @ local -> 'a ref
+  method n : string
+end
+class ['a] c : ['a] ct = object method m (x : 'a) = ref x method n = 1 end
+[%%expect{|
+class type ['a] ct =
+  object method m : 'a @ local -> 'a ref method n : string end
+Line 5, characters 25-74:
+5 | class ['a] c : ['a] ct = object method m (x : 'a) = ref x method n = 1 end
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The class type object method m : 'a -> 'a ref method n : int end
+       is not matched by the class type ['_a] ct
+       The class type object method m : 'a -> 'a ref method n : int end
+       is not matched by the class type
+         object method m : 'a @ local -> 'a ref method n : string end
+       The method n has type "int" but is expected to have type "string"
+       Type "int" is not compatible with type "string"
+|}]
+
+(* The earliest failing use is reported *)
+
+let f (x @ nonportable) =
+  ((x : _ @ portable), (x : _ @ portable), x ())
+[%%expect{|
+Line 2, characters 4-5:
+2 |   ((x : _ @ portable), (x : _ @ portable), x ())
+        ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]

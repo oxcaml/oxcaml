@@ -1,0 +1,3 @@
+val r : '_weak1 option ref
+val g : '_weak1 @ portable -> unit
+val f : int option -> int option * unit

@@ -67,16 +67,31 @@ val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
 
 val with_new_pool:
-  level:int -> (unit -> 'a)
-  -> 'a * transient_expr list * Jkind_types.Sort.t list
+  level:int -> (unit -> 'a) ->
+  'a * transient_expr list * Jkind_types.Sort.t list * type_shape Ivar.t list
         (* [with_new_pool ~level f] executes [f] and returns the type and sort
-           nodes that were created at level [level] and above *)
+           nodes that were created at level [level] and above, and the ivars
+           left in the pool *)
 val add_to_pool: level:int -> transient_expr -> unit
         (* Add a type node to the pool associated to the level (which should
            be the level of the type node).
            Do nothing if [level = generic_level] or [level = lowest_level]. *)
 val add_to_sort_pool: level:int -> Jkind_types.Sort.t -> unit
         (* Like [add_to_pool], but adds a sort to the pool. *)
+
+(** Iterate over the type nodes of the pool for [level] *)
+val iter_pool : level:int -> (transient_expr -> unit) -> unit
+
+(** Add an ivar waited on at [level] to the pool for [level], if it has
+    handlers. *)
+val add_to_ivar_pool : level:int -> type_shape Ivar.t -> unit
+
+(** Whether [with_new_pool] is running, i.e. some pool other than the initial
+    one is open. *)
+val in_generalization_scope : unit -> bool
+
+(** Empty the ivars of the pool for [level], returning them. *)
+val take_ivar_pool : level:int -> type_shape Ivar.t list
 
 val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
