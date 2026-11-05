@@ -207,7 +207,7 @@ val normalize_instance_names_in_module_path: Path.t -> Path.t
 val reset_required_globals: unit -> unit
 val get_required_globals: unit -> Compilation_unit.t list
 val add_required_global: Path.t -> t -> unit
-val add_required_global_for_quote: Path.t -> t -> unit
+val add_required_global_for_quote: Location.t -> Path.t -> t -> unit
 
 (* Return the set of interfaces referenced by quotes *)
 val quoted_intfs: unit -> Compilation_unit.Name.Set.t

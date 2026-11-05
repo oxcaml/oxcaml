@@ -1980,35 +1980,6 @@ let add_required_ident id env =
 let add_required_global path env =
   add_required_ident (Path.head path) env
 
-let add_required_global_for_quote path env =
-  begin match Ident.to_global (Path.head path) with
-  | None -> ()
-  | Some global ->
-    let name = Compilation_unit.Name.of_head_of_global_name global in
-    if Current_unit.Name.is (Compilation_unit.Name.to_string name)
-    then begin
-      (* The current compilation unit appears in quotes.
-         [find_module_address] would [raise Not_found] in this case. *)
-      match Current_unit.get_cu () with
-      | Some cu ->
-        Persistent_env.require_impl_for_quote !persistent_env cu
-      | None ->
-        Misc.fatal_error
-          "the current compilation unit was required for a quote \
-          but is unavailable"
-      end
-    else begin
-      (* Any other compilation unit *)
-      let address = find_module_address path env in
-      match address_head address with
-      | AHlocal _ -> ()
-      | AHunit cu ->
-        add_required_unit cu;
-        Persistent_env.require_impl_for_quote !persistent_env cu
-      end;
-    Persistent_env.require_intf_for_quote !persistent_env name
-  end
-
 let quoted_intfs () = Persistent_env.quoted_intfs !persistent_env
 
 let loaded_transitive_dependencies intfs =
@@ -2061,6 +2032,34 @@ let find_module_address_head loc path env =
   let root = Path.Pident (Path.head path) in
   let address = find_module_address root env in
   address_head address
+
+let add_required_global_for_quote loc path env =
+  begin match Ident.to_global (Path.head path) with
+  | None -> ()
+  | Some global ->
+    let name = Compilation_unit.Name.of_head_of_global_name global in
+    if Current_unit.Name.is (Compilation_unit.Name.to_string name)
+    then begin
+      (* The current compilation unit appears in quotes.
+         [find_module_address] would [raise Not_found] in this case. *)
+      match Current_unit.get_cu () with
+      | Some cu ->
+        Persistent_env.require_impl_for_quote !persistent_env cu
+      | None ->
+        Misc.fatal_error
+          "the current compilation unit was required for a quote \
+          but is unavailable"
+      end
+    else begin
+      (* Any other compilation unit *)
+      match find_module_address_head loc path env with
+      | AHlocal _ -> ()
+      | AHunit cu ->
+        add_required_unit cu;
+        Persistent_env.require_impl_for_quote !persistent_env cu
+      end;
+    Persistent_env.require_intf_for_quote !persistent_env name
+  end
 
 let rec normalize_path_prefix oloc env path =
   match path with

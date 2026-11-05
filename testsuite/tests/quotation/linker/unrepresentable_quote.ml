@@ -25,10 +25,9 @@
      -uses-metaprogramming \
    ";
    all_modules = "eval.cmxa lib.cmxa unrepresentable_quote.ml";
-   compiler_output = "unrepresentable_quote.output";
-   ocamlopt_opt_exit_status = "2";
    ocamlopt.opt;
-   check-ocamlopt.opt-output;
+   run;
+   check-program-output;
  }
 *)
 
