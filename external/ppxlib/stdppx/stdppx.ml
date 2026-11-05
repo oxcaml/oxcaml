@@ -1,9 +1,86 @@
 module Caml = Stdlib [@@deprecated "[since 2023-06] use Stdlib instead"]
 open Stdlib
 open StdLabels
-module Sexp = Sexplib0.Sexp
-module Sexpable = Sexplib0.Sexpable
-include Sexplib0.Sexp_conv
+
+module Sexp = struct
+  include Sexp_type.Sexp
+
+  let must_escape_char = function
+    | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '+' | '-' | '.' | '_' -> false
+    | _ -> true
+
+  let must_escape string =
+    String.length string = 0 || String.exists string ~f:must_escape_char
+
+  let rec pp_gen ~hum fmt t =
+    match t with
+    | Atom string ->
+      if must_escape string
+      then Format.fprintf fmt "%S" string
+      else Format.pp_print_string fmt string
+    | List [] -> Format.pp_print_string fmt "()"
+    | List (head :: tail) ->
+      if hum then Format.pp_open_box fmt 1;
+      Format.pp_print_string fmt "(";
+      pp_gen ~hum fmt head;
+      List.iter tail ~f:(fun t ->
+        if hum then Format.pp_print_space fmt () else Format.pp_print_string fmt " ";
+        pp_gen ~hum fmt t);
+      Format.pp_print_string fmt ")";
+      if hum then Format.pp_close_box fmt ()
+
+  let pp_hum fmt t = pp_gen fmt t ~hum:true
+  let pp fmt t = pp_gen fmt t ~hum:false
+
+  let to_string_hum t =
+    pp_hum Format.str_formatter t;
+    Format.flush_str_formatter ()
+
+  let to_string t =
+    pp Format.str_formatter t;
+    Format.flush_str_formatter ()
+
+  let message_of_alist alist =
+    List.map alist ~f:(function
+      | "", sexp -> sexp
+      | string, sexp -> List [Atom string; sexp])
+
+  let message string alist : t =
+    match string, alist with
+    | "", [] -> List []
+    | "", alist -> List (message_of_alist alist)
+    | string, [] -> Atom string
+    | string, alist -> List (Atom string :: message_of_alist alist)
+end
+
+module Sexpable = struct
+  module type S = sig
+    type t
+
+    val sexp_of_t : t -> Sexp.t
+  end
+end
+
+include struct
+  let sexp_of_string string = Sexp.Atom string
+  let sexp_of_int int = Sexp.Atom (Int.to_string int)
+  let sexp_of_int32 int32 = Sexp.Atom (Int32.to_string int32)
+  let sexp_of_int64 int64 = Sexp.Atom (Int64.to_string int64)
+  let sexp_of_nativeint nativeint = Sexp.Atom (Nativeint.to_string nativeint)
+  let sexp_of_float float = Sexp.Atom (Printf.sprintf "%.17G" float)
+  let sexp_of_bool bool = Sexp.Atom (Bool.to_string bool)
+  let sexp_of_char char = Sexp.Atom (String.make 1 char)
+  let sexp_of_unit () = Sexp.List []
+  let sexp_of_list f list = Sexp.List (List.map list ~f)
+
+  let sexp_of_array f array =
+    Sexp.List
+      (List.init ~len:(Array.length array) ~f:(fun pos -> f (Array.get array pos)))
+
+  let sexp_of_option f = function
+    | None -> Sexp.List []
+    | Some x -> Sexp.List [f x]
+end
 
 module type Comparisons = sig
   type t
@@ -21,7 +98,8 @@ module type Comparisons = sig
 end
 
 module Poly = struct
-  let compare = compare
+  let compare__local (a @ local) (b @ local) = compare a b
+  let compare a b = compare__local a b
   let equal = ( = )
   let ( = ) = ( = )
   let ( < ) = ( < )

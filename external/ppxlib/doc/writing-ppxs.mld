@@ -102,7 +102,7 @@ See below for examples on when the above name and context will trigger rewriting
   let _ = match () with [%add_suffix "payload"] -> () (* wrong context *)
 ]}
 
-{3 The Payload Extraction}
+{3:extender-payload The Payload Extraction}
 
 An extension node contains a {{!Ppxlib.Parsetree.payload}[payload]}, which will be passed to the transformation function. However, while this payload contains all information, it is not always structured the best way for the transformation function. For instance, in [[%add_suffix "payload"]], the string ["payload"] is encoded as a structure item consisting of an expression’s evaluation, a constant that is a string.
 

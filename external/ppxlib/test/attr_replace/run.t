@@ -124,6 +124,23 @@ Test that the "attr_multiple_replace" infrastructure works.
   $ ./driver.exe test.ml
   let _ = ((prefix_foo_suffix)[@alert "-1"][@alert "-2"][@alert "-3"])
 
+A malformed payload is reported as an embedded error, and does not prevent the
+rest of the file from being expanded.
+  $ cat > test.ml << EOF
+  > let _ = foo [@test.exp "suffix"]
+  > let _ = bar [@test.exp 42]
+  > let _ = match () with (a [@test.pat "suffix"]) -> ignore a__suffix
+  > module S = struct
+  >   [%%foo] [@@test.str.ext "suffix"]
+  > end
+  > EOF
+  $ ./driver.exe test.ml
+  [%%ocaml.error "string expected"]
+  let _ = foo__suffix
+  let _ = ((bar)[@test.exp 42])
+  let _ = match () with | a__suffix -> ignore a__suffix
+  module S = struct [%%foo__suffix ] end
+
 Demonstrate error when multiple instances of one attribute are passed.
   $ cat > test.ml << EOF
   > let _ =
@@ -133,11 +150,10 @@ Demonstrate error when multiple instances of one attribute are passed.
   >   [@suffix "_again"]
   > EOF
   $ ./driver.exe test.ml
-  File "test.ml", line 5, characters 4-10:
-  5 |   [@suffix "_again"]
-          ^^^^^^
-  Error: Duplicated attribute
-  [1]
+  [%%ocaml.error "Duplicated attribute"]
+  [%%ocaml.error "Duplicated attribute"]
+  let _ = ((prefix_foo)
+    [@prefix "prefix_"][@suffix "_suffix"][@suffix "_again"])
 
 Demonstrate error when multiple instances of one attribute are passed and
 no other attributes are available.
@@ -148,8 +164,5 @@ no other attributes are available.
   >   [@suffix "_again"]
   > EOF
   $ ./driver.exe test.ml
-  File "test.ml", line 4, characters 4-10:
-  4 |   [@suffix "_again"]
-          ^^^^^^
-  Error: Duplicated attribute
-  [1]
+  [%%ocaml.error "Duplicated attribute"]
+  let _ = ((foo)[@suffix "_suffix"][@suffix "_again"])
