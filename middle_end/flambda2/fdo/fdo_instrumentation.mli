@@ -38,7 +38,7 @@
 
 type t
 
-(** The numbering of the counters in the body of the given function. *)
+(** The instrumentation of the body of the given function. *)
 val create :
   function_:Fdo_counter.Function.t -> body_hash:Fdo_counter.Body_hash.t -> t
 

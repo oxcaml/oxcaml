@@ -88,12 +88,11 @@ let module_level_call_binding (loc : Lambda.scoped_location) =
       None)
 
 let call t loc =
-  let index = fresh_index t in
   let position =
     match module_level_call_binding loc with
     | None ->
       FC.Position.create_call ~function_:t.function_ ~body_hash:t.body_hash
-        ~index
+        ~index:(fresh_index t)
     | Some path ->
       (* Multiple calls can have the same binder, e.g. [module M = F (G (X))] *)
       let index =
