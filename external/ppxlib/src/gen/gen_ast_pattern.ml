@@ -20,8 +20,8 @@ let assert_no_attributes ~path ~prefix =
   M.expr "Common.assert_no_attributes x.%a" A.id
     (fqn_longident' path (prefix ^ "attributes"))
 
-let gen_combinator_for_constructor ?wrapper path ~prefix cd =
-  let exp, pat, _args, funcs =
+let gen_combinator_for_constructor ?wrapper path ~prefix ~exhaustive cd =
+  let exp, pat, _args, funcs, needs_loc =
     match cd.pcd_args with
     | Pcstr_record r ->
         let args = List.map ~f:(fun p -> sprintf "%s" p.pld_name.txt) r in
@@ -41,8 +41,8 @@ let gen_combinator_for_constructor ?wrapper path ~prefix cd =
                             pvar v.pld_name.txt )))
                      Closed))
         in
-        let exp, _ = apply_parsers funcs (List.map args ~f:evar) typs in
-        (exp, pat, args, funcs)
+        let exp, needs_loc = apply_parsers funcs (List.map args ~f:evar) typs in
+        (exp, pat, args, funcs, needs_loc)
     | Pcstr_tuple cd_args ->
         let args = List.mapi cd_args ~f:(fun i _ -> sprintf "x%d" i) in
         let funcs = List.mapi cd_args ~f:(fun i _ -> sprintf "f%d" i) in
@@ -54,19 +54,25 @@ let gen_combinator_for_constructor ?wrapper path ~prefix cd =
             | [ x ] -> Some (pvar x)
             | _ -> Some (Pat.tuple (List.map args ~f:pvar)))
         in
-        let exp, _ =
+        let exp, needs_loc =
           apply_parsers funcs (List.map args ~f:evar)
             (List.map cd_args ~f:(fun ca -> ca.pca_type))
         in
-        (exp, pat, args, funcs)
+        (exp, pat, args, funcs, needs_loc)
   in
   let expected = without_prefix ~prefix cd.pcd_name.txt in
   let body =
-    M.expr
-      {|match x with
+    if exhaustive then
+      M.expr
+        {|match x with
+          | %a -> ctx.matched <- ctx.matched + 1; %a|}
+        A.patt pat A.expr exp
+    else
+      M.expr
+        {|match x with
           | %a -> ctx.matched <- ctx.matched + 1; %a
           | _ -> fail loc %S|}
-      A.patt pat A.expr exp expected
+        A.patt pat A.expr exp expected
   in
   let body =
     match wrapper with
@@ -88,7 +94,9 @@ let gen_combinator_for_constructor ?wrapper path ~prefix cd =
   in
   let body =
     let loc =
-      match wrapper with None -> M.patt "loc" | Some _ -> M.patt "_loc"
+      match wrapper with
+      | Some _ -> M.patt "_loc"
+      | None -> M.patt (if needs_loc || not exhaustive then "loc" else "_loc")
     in
     M.expr "T (fun ctx %a x k -> %a)" A.patt loc A.expr body
   in
@@ -167,9 +175,11 @@ let gen_td ?wrapper path td =
         let prefix =
           common_prefix (List.map cds ~f:(fun cd -> cd.pcd_name.txt))
         in
+        let exhaustive = List.length cds = 1 in
         let items =
           List.map cds ~f:(fun cd ->
-              gen_combinator_for_constructor ?wrapper path ~prefix cd)
+              gen_combinator_for_constructor ?wrapper path ~prefix ~exhaustive
+                cd)
         in
         match wrapper with
         | Some (_, prefix, has_attrs) ->

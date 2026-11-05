@@ -1,5 +1,4 @@
 (library
- (package ppxlib)
  (kind ppx_deriver)
  (name ppx_foo_deriver)
  (libraries ppxlib))
