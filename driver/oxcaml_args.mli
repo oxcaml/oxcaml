@@ -32,6 +32,7 @@ module type Oxcaml_options = sig
   val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
   val dssa : unit -> unit
+  val dcmm_functions : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
   val regalloc_linscan_threshold : int -> unit
@@ -175,6 +176,8 @@ module type Oxcaml_options = sig
   val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
+  val flambda2_expert_cmm_normal_var_optimised_out : unit -> unit
+  val no_flambda2_expert_cmm_normal_var_optimised_out : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
   val flambda2_expert_max_unboxing_depth : int -> unit
   val flambda2_expert_can_inline_recursive_functions : unit -> unit

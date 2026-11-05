@@ -1,0 +1,41 @@
+(function{phantom_duplicated.ml:27,36-151} camlPhantom_duplicated__f_0_1_code
+     (q/0[((module_path q/0) (location ()) (original_ident q/0)
+           (is_parameter local))]: val
+      x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : val
+ (let region/0 (beginregion)
+   (catch
+     (let?
+       (b_pproxy/0 ()
+        unused_pair/0[((module_path unused_pair/0) (location ())
+                       (original_ident unused_pair/0) (is_parameter local))]
+          [0: b_pproxy/0; x/0])
+       (if (>s x/0 1)
+         (exit 6
+           (alloc{phantom_duplicated.ml:30,16-22} 2048
+             (phantom_add_equality b_pproxy/0
+               (normal_var_optimised_out
+                 ((module_path b/0) (location ()) (original_ident b/0)
+                  (is_parameter local))
+                 q/0))
+             3))
+         (exit 6
+           (alloc{phantom_duplicated.ml:30,28-34} 2048 5
+             (phantom_add_equality b_pproxy/0
+               (normal_var_optimised_out
+                 ((module_path b/0) (location ()) (original_ident b/0)
+                  (is_parameter local))
+                 q/0))))))
+   with(6 region_return/0: val)
+     (let unit/0 (seq (endregion region/0) 1) region_return/0))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_duplicated__entry
+     () : val
+ (catch
+   (let?
+     f/0[((module_path f/0) (location ()) (original_ident f/0)
+          (is_parameter local))]
+       camlPhantom_duplicated__f_1
+     (exit 5 G:"camlPhantom_duplicated"))
+ with(5 *ret*/0: val) 1) )
+

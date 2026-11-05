@@ -72,7 +72,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
     | Cphantom_let (_var, _defining_expr, body) -> is_simple_expr body
-    | Cname_for_debugger (_, body) -> is_simple_expr body
+    | Cnormal_var_optimised_out (_, body) -> is_simple_expr body
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
@@ -126,7 +126,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             coeffects = Has_coeffects
           }
       | Capply _ | Calloc _ | Cstore _ | Craise _ | Catomic _ | Cprobe _
-      | Cprobe_is_enabled _ | Copaque _ | Cpoll | Cpause ->
+      | Cprobe_is_enabled _ | Copaque _ | Cpoll | Cpause
+      | Cphantom_add_equality _ ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -168,7 +169,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
-    | Cname_for_debugger (_, body) -> effects_of body
+    | Cnormal_var_optimised_out (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
     | Cifthenelse
         (cond, _ifso_dbg, _ifso_p, ifso, _ifnot_dbg, _ifnot_p, ifnot, _dbg) ->
@@ -188,6 +189,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
         | Capply _ | Cprobe _ | Copaque _ | Cpoll | Cpause -> EC.arbitrary
+        | Cphantom_add_equality _ -> EC.none
         | Calloc (Heap, _) -> EC.none
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
@@ -245,9 +247,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cconst_int (Nativeint.to_int n, dbg)
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
-    | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-    | Cexit _ | Cinvalid _ ->
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _
+    | Cnormal_var_optimised_out _ | Ctuple _ | Cop _ | Csequence _
+    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
       expr
 
   (* Instruction selection for conditionals *)
@@ -522,6 +524,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cendregion -> SU.basic_op End_region, args
     | Cpackf32 | Cbswap _ | Cprefetch _ | Craise _ | Ctuple_field (_, _) ->
       Misc.fatal_error "Selection.select_oper"
+    | Cphantom_add_equality _ ->
+      Misc.fatal_error
+        "Cphantom_add_equality should be handled directly in [emit_expr]"
 
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
       (dbg : Debuginfo.t) ~label_after :
@@ -899,29 +904,35 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (var, defining_expr, body) ->
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_expr env sub_cfg body ~bound_name
-    | Cname_for_debugger (var, body) -> (
+    | Cnormal_var_optimised_out (provenance, body) -> (
       match emit_expr env sub_cfg body ~bound_name with
       | Never_returns -> Never_returns
       | Ok regs ->
-        let provenance = VP.provenance var in
-        (if Option.is_some provenance
-         then
-           let ident = VP.var var in
-           let naming_op =
-             Operation.Name_for_debugger
-               { ident;
-                 provenance;
-                 which_parameter = which_parameter_of_provenance provenance;
-                 regs
-               }
-           in
-           insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        (* The provenance's original ident is used as the operation's [ident]:
+           copies of phantom lets arising from the same source binding share
+           their provenance, so their naming operations are keyed to the same
+           variable by the availability analyses. *)
+        let naming_op =
+          Operation.Name_for_debugger
+            { ident = V.Provenance.original_ident provenance;
+              provenance = Some provenance;
+              which_parameter = which_parameter_of_provenance (Some provenance);
+              regs
+            }
+        in
+        insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||];
         Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
       match emit_parts_list env sub_cfg exp_list with
       | Never_returns -> Never_returns
       | Ok (simple_list, ext_env) -> emit_tuple ext_env sub_cfg simple_list)
+    | Cop (Cphantom_add_equality _, [arg], _) ->
+      (* The operation is transparent: only the argument is compiled. The
+         marking itself is currently ignored during instruction selection. *)
+      emit_expr env sub_cfg arg ~bound_name
+    | Cop (Cphantom_add_equality _, ([] | _ :: _ :: _), _) ->
+      Misc.fatal_error "Cphantom_add_equality takes exactly one argument"
     | Cop (Craise k, args, dbg) -> emit_expr_raise env sub_cfg k args dbg
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
@@ -976,7 +987,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (var, defining_expr, body) ->
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_tail env sub_cfg body
-    | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
+    | Cnormal_var_optimised_out (_, body) -> emit_tail env sub_cfg body
     | Cop
         ( (Capply { result_type = ty; region = Rc_normal; callees = _ } as op),
           args,
@@ -1012,7 +1023,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _
           | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
           | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
-          | Cpoll | Cpause ),
+          | Cpoll | Cpause | Cphantom_add_equality _ ),
           _,
           _ )
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _

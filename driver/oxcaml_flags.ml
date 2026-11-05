@@ -15,6 +15,7 @@
 (**************************************************************************)
 let dump_cfg = ref false                (* -dcfg *)
 let dump_ssa = ref false                (* -dssa *)
+let dump_cmm_functions = ref false      (* -dcmm-functions *)
 let cfg_invariants = ref false          (* -dcfg-invariants *)
 let regalloc = ref Clflags.Register_allocator.Cfg (* -regalloc *)
 let default_regalloc_linscan_threshold = 100_000
@@ -332,6 +333,7 @@ module Flambda2 = struct
       let inline_effects_in_cmm = false
       let cmm_safe_subst = false
       let phantom_lets = false
+      let cmm_normal_var_optimised_out = true
       let max_block_size_for_projections = None
       let max_unboxing_depth = 3
       let can_inline_recursive_functions = false
@@ -346,6 +348,7 @@ module Flambda2 = struct
       inline_effects_in_cmm : bool;
       cmm_safe_subst : bool;
       phantom_lets : bool;
+      cmm_normal_var_optimised_out : bool;
       max_block_size_for_projections : int option;
       max_unboxing_depth : int;
       can_inline_recursive_functions : bool;
@@ -360,6 +363,7 @@ module Flambda2 = struct
       inline_effects_in_cmm = Default.inline_effects_in_cmm;
       cmm_safe_subst = Default.cmm_safe_subst;
       phantom_lets = Default.phantom_lets;
+      cmm_normal_var_optimised_out = Default.cmm_normal_var_optimised_out;
       max_block_size_for_projections = Default.max_block_size_for_projections;
       max_unboxing_depth = Default.max_unboxing_depth;
       can_inline_recursive_functions = Default.can_inline_recursive_functions;
@@ -402,6 +406,7 @@ module Flambda2 = struct
     let inline_effects_in_cmm = ref Default
     let cmm_safe_subst = ref Default
     let phantom_lets = ref Default
+    let cmm_normal_var_optimised_out = ref Default
     let max_block_size_for_projections = ref Default
     let max_unboxing_depth = ref Default
     let can_inline_recursive_functions = ref Default

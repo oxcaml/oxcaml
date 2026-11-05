@@ -215,7 +215,7 @@ let bind_args_in_evaluation_order args =
     | Cconst_float _ | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _
     | Cconst_vec512 _ | Cconst_mask _ ->
       true
-    | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Cop _
+    | Clet _ | Cphantom_let _ | Cnormal_var_optimised_out _ | Ctuple _ | Cop _
     | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _
       ->
       false

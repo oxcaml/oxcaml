@@ -334,6 +334,10 @@ module Expert = struct
     !Oxcaml_flags.Flambda2.Expert.phantom_lets
     |> with_default ~f:(fun d -> d.phantom_lets)
 
+  let cmm_normal_var_optimised_out () =
+    !Oxcaml_flags.Flambda2.Expert.cmm_normal_var_optimised_out
+    |> with_default ~f:(fun d -> d.cmm_normal_var_optimised_out)
+
   let max_unboxing_depth () =
     !Oxcaml_flags.Flambda2.Expert.max_unboxing_depth
     |> with_default ~f:(fun d -> d.max_unboxing_depth)

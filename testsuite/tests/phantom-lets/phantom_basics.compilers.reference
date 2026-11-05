@@ -1,0 +1,22 @@
+(function{phantom_basics.ml:22,36-132} camlPhantom_basics__f_0_1_code
+     (x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int
+      y/0[((module_path y/0) (location ()) (original_ident y/0)
+           (is_parameter local))]: int) : int
+ (let region/0 (beginregion)
+   (let?
+     unused_pair/0[((module_path unused_pair/0) (location ())
+                    (original_ident unused_pair/0) (is_parameter local))]
+       [0: x/0; y/0]
+     (let (int_add/0 (+ (+ x/0 y/0) -1) unit/0 (seq (endregion region/0) 1))
+       int_add/0))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_basics__entry () : val
+ (catch
+   (let?
+     f/0[((module_path f/0) (location ()) (original_ident f/0)
+          (is_parameter local))]
+       camlPhantom_basics__f_1
+     (exit 3 G:"camlPhantom_basics"))
+ with(3 *ret*/0: val) 1) )
+

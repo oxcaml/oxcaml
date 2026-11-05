@@ -253,7 +253,7 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Cabsf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
   | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
   | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
-  | Cpause ->
+  | Cpause | Cphantom_add_equality _ ->
     Use_default
 
 let select_operation

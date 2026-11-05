@@ -1,0 +1,48 @@
+(function{phantom_inlined_params.ml:30,26-58}
+ camlPhantom_inlined_params__inner_0_2_code
+     (a/0[((module_path a/0) (location ()) (original_ident a/0)
+           (is_parameter local))]: int
+      b/0[((module_path b/0) (location ()) (original_ident b/0)
+           (is_parameter local))]: int) : int
+ (+
+   (*
+     (normal_var_optimised_out
+       ((module_path s/0) (location ()) (original_ident s/0)
+        (is_parameter local))
+       (+ (+ a/0 b/0) -2))
+     (>>s b/0 1))
+   1) )
+
+(function{phantom_inlined_params.ml:34,41-55}
+ camlPhantom_inlined_params__caller_1_3_code
+     (x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : int
+ (let?
+   (a/1[((module_path a/1) (location ()) (original_ident a/1)
+         (is_parameter local))]
+      x/0
+    b/1[((module_path b/1) (location ()) (original_ident b/1)
+         (is_parameter local))]
+      42)
+   (+
+     (*
+       (normal_var_optimised_out
+         ((module_path s/1) (location ()) (original_ident s/1)
+          (is_parameter local))
+         (+ x/0 83))
+       42)
+     1)) )
+
+(function no_cse reduce_code_size linscan camlPhantom_inlined_params__entry
+     () : val
+ (catch
+   (let?
+     (inner/0[((module_path inner/0) (location ()) (original_ident inner/0)
+               (is_parameter local))]
+        camlPhantom_inlined_params__inner_1
+      caller/0[((module_path caller/0) (location ())
+                (original_ident caller/0) (is_parameter local))]
+        camlPhantom_inlined_params__caller_2)
+     (exit 4 G:"camlPhantom_inlined_params"))
+ with(4 *ret*/0: val) 1) )
+

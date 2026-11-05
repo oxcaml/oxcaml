@@ -640,6 +640,7 @@ type operation =
         enabled_at_init : bool option
       }
   | Copaque of machtype
+  | Cphantom_add_equality of { var : Backend_var.t }
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
@@ -701,7 +702,17 @@ and expression =
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
-  | Cname_for_debugger of Backend_var.With_provenance.t * expression
+  | Cnormal_var_optimised_out of Backend_var.Provenance.t * expression
+      (** Annotation recording that the normal variable described by the
+          provenance was bound to the wrapped expression, before its binding was
+          inlined out; instruction selection produces a naming operation from
+          it. No [Backend_var.t] is involved: the variable itself may no longer
+          be bound anywhere. Caveat: the Cmm helpers may subsequently rewrite
+          the wrapped expression (for example when it flows into tagged-integer
+          arithmetic), in which case its value is no longer that of the
+          variable; see the CR in [To_cmm_env.wrap_phantom]. These annotations
+          can be disabled with -no-flambda2-expert-cmm-normal-var-optimised-out.
+      *)
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
@@ -793,8 +804,9 @@ let ctrywith (body, lbl, id, extra_args, handler, dbg) =
 let reset () = Label.reset ()
 
 let iter_shallow_tail f = function
-  | Clet (_, _, body) | Cphantom_let (_, _, body) | Cname_for_debugger (_, body)
-    ->
+  | Clet (_, _, body)
+  | Cphantom_let (_, _, body)
+  | Cnormal_var_optimised_out (_, body) ->
     f body;
     true
   | Cifthenelse
@@ -828,7 +840,8 @@ let iter_shallow_tail f = function
         | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
-        | Ctuple_field (_, _) ),
+        | Ctuple_field (_, _)
+        | Cphantom_add_equality _ ),
         _,
         _ ) ->
     false
@@ -836,7 +849,8 @@ let iter_shallow_tail f = function
 let map_shallow_tail f = function
   | Clet (id, exp, body) -> Clet (id, exp, f body)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, f body)
-  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, f body)
+  | Cnormal_var_optimised_out (var, body) ->
+    Cnormal_var_optimised_out (var, f body)
   | Cifthenelse (cond, ifso_dbg, ifso_p, ifso, ifnot_dbg, ifnot_p, ifnot, dbg)
     ->
     Cifthenelse
@@ -866,7 +880,8 @@ let map_shallow_tail f = function
           | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
-          | Ctuple_field (_, _) ),
+          | Ctuple_field (_, _)
+          | Cphantom_add_equality _ ),
           _,
           _ ) ) as cmm ->
     cmm
@@ -880,7 +895,7 @@ let map_tail f =
     | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
       | Cphantom_let (_, _, _)
-      | Cname_for_debugger _
+      | Cnormal_var_optimised_out _
       | Csequence (_, _)
       | Cifthenelse (_, _, _, _, _, _, _, _)
       | Cswitch (_, _, _, _)
@@ -894,7 +909,7 @@ let iter_shallow f = function
     f e1;
     f e2
   | Cphantom_let (_id, _de, e) -> f e
-  | Cname_for_debugger (_var, e) -> f e
+  | Cnormal_var_optimised_out (_var, e) -> f e
   | Ctuple el -> List.iter f el
   | Cop (_op, el, _dbg) -> List.iter f el
   | Csequence (e1, e2) ->
@@ -922,9 +937,23 @@ let contains_debug_only_constructs expr =
   let exception Found in
   let rec check expr =
     match expr with
-    | Cphantom_let _ | Cname_for_debugger _ -> raise Found
-    | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
-    | Ccatch _ | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
+    | Cphantom_let _ | Cnormal_var_optimised_out _
+    | Cop (Cphantom_add_equality _, _, _) ->
+      raise Found
+    | Cop
+        ( ( Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi
+          | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
+          | Cmuli64 _ | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr | Cbswap _
+          | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
+          | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+          | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+          | Craise _ | Cprobe _ | Cprobe_is_enabled _ | Copaque _ | Cbeginregion
+          | Cendregion | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index
+          | Cpoll | Cpause ),
+          _,
+          _ )
+    | Clet _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+    | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
     | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
       iter_shallow check expr
