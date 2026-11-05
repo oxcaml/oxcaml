@@ -264,26 +264,18 @@ let mode_consts_of_modes annots =
 let transl_mode_annots annots =
   let step modes_so_far { txt; loc } =
     Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-    let annot =
-      try Some { txt = Mode_axis_pair.of_string ~loc txt; loc }
-      with Not_found ->
-        Error.log_or_raise loc (Unrecognized_modifier (Mode, txt));
-        None
-    in
-    let new_modes_so_far =
-      Option.bind annot
-        (fun { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } ->
-          if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
-          then (
-            Error.log_or_raise loc (Duplicated_axis (Mode, ax));
-            None)
-          else Some (With_locality.Const.Option.set ax (Some mode) modes_so_far))
-    in
-    let annot = match new_modes_so_far with None -> None | Some _ -> annot in
-    let new_modes_so_far =
-      Option.value new_modes_so_far ~default:modes_so_far
-    in
-    new_modes_so_far, annot
+    match Mode_axis_pair.of_string ~loc txt with
+    | exception Not_found ->
+      Error.log_or_raise loc (Unrecognized_modifier (Mode, txt));
+      modes_so_far, None
+    | Atom (ax, mode) as atom ->
+      if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
+      then (
+        Error.log_or_raise loc (Duplicated_axis (Mode, ax));
+        modes_so_far, None)
+      else
+        ( With_locality.Const.Option.set ax (Some mode) modes_so_far,
+          Some { txt = atom; loc } )
   in
   let modes, annots =
     List.fold_left_map step With_locality.Const.Option.none
