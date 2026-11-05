@@ -6,6 +6,7 @@ deriving instance Lean.FromJson, Lean.ToExpr for Ident
 deriving instance Lean.FromJson, Lean.ToExpr for Path
 deriving instance Lean.FromJson, Lean.ToExpr for TypeExpr
 deriving instance Lean.FromJson, Lean.ToExpr for StructuredConstant
+deriving instance Lean.FromJson, Lean.ToExpr for Value
 deriving instance Lean.FromJson, Lean.ToExpr for Lambda
 deriving instance Lean.FromJson, Lean.ToExpr for RecordLabelDecl
 deriving instance Lean.FromJson, Lean.ToExpr for RecordTypeDecl

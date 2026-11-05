@@ -32,7 +32,7 @@ let serialize_constant : Typedtree.constant -> Json.t = function
 
 (* Serialize an identifier. *)
 let serialize_ident (id : Ident.t) : Json.t =
-  Json.String (Ident.unique_toplevel_name id) |> tag "unique_toplevel_name"
+  Json.String (Ident.unique_toplevel_name id) |> tag "uniqueToplevelName"
 
 (* Serialize a source-code path like [F(X).a.b.c]. *)
 let rec serialize_path ~(loc : Warnings.loc) : Path.t -> Json.t = function
@@ -80,10 +80,10 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
   | Llet (Strict, _, id, _, value, body) ->
     Json.Object
       [ ("id", serialize_ident id);
-        ("value", serialize_lambda value);
+        ("subst", serialize_lambda value);
         ("body", serialize_lambda body);
       ]
-    |> tag "let"
+    |> tag "bind"
   | Lprim (Pmakeblock (block_tag, Immutable, _, Alloc_heap), fields, _) ->
     Json.Object
       [ ("tag", Json.int block_tag);
@@ -150,7 +150,7 @@ let serialize_signature_item : Types.signature_item -> Json.t = function
       [ ("id", serialize_ident id);
         ("type", serialize_type_expr ~loc:desc.val_loc desc.val_type);
       ]
-    |> tag "value"
+    |> tag "exprDecl"
   | other_item ->
     Format.asprintf "Signature item not yet supported:@ %a"
       Printtyp.signature [other_item]
