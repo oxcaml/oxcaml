@@ -245,6 +245,10 @@ merlin-promote:
 # its private sub-libraries; ppx_derivers and sexp_type, which are shipped as
 # their own packages, and test-only dependencies are symlinked into
 # external/ast-dependent-libs/deps/. Both are gitignored.
+#
+# They can also be built by the compiler build itself, against the compiler
+# being built: `make compiler WITH_JSOO=1` builds them along with it, in its
+# main context, and jsoo-install-shipped installs from that build.
 
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
@@ -282,7 +286,8 @@ ast_dependent_libs_env = \
     OCAMLLIB="$(OXCAML_INSTALL)/lib/ocaml" \
     OCAMLFIND_CONF=/dev/null \
     OCAMLPARAM="_,syntax-quotations=0" \
-    DUNE_CACHE=disabled
+    DUNE_CACHE=disabled \
+    $(build_stdlib_jsir)
 
 # The .install files are not promoted, as some of the sources are read-only.
 ast_dependent_libs_dune = \
@@ -363,6 +368,10 @@ JSOO_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-compiler \
   wasm_of_ocaml-compiler js_of_ocaml-ppx js_of_ocaml-runtime js_of_ocaml \
   js_of_ocaml-toplevel
 
+# Enables the rules of $(ast_dependent_libs_root)/stdlib-jsir, which other
+# builds of the compiler's workspace leave disabled (see its dune file).
+build_stdlib_jsir = OXCAML_BUILD_STDLIB_JSIR=true
+
 stdlib_jsir_install = \
   $(call ast_dependent_libs_install,--sections=lib_root stdlib-jsir)
 
@@ -386,11 +395,27 @@ SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler \
 SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
+ifeq ($(WITH_JSOO),1)
+compiler_jsoo_targets = @$(ast_dependent_libs_root)/jsoo-libs
+compiler_jsoo_env = $(build_stdlib_jsir)
+compiler: $(PPXLIB_DEPS) $(JSOO_DEPS)
+endif
+
+# From the compiler build (see above): the build is a no-op after
+# `make compiler WITH_JSOO=1`.
 .PHONY: jsoo-install-shipped
-jsoo-install-shipped: jsoo-build
-	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
-	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
-	$(stdlib_jsir_install)
+jsoo-install-shipped: boot-compiler $(PPXLIB_DEPS) $(JSOO_DEPS)
+	$(build_stdlib_jsir) $(dune) build $(ws_main) \
+	  --promote-install-files=false @$(ast_dependent_libs_root)/jsoo-libs
+	$(build_stdlib_jsir) $(dune) install $(ws_main) \
+	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=bin $(SHIPPED_BIN_PACKAGES)
+	$(build_stdlib_jsir) $(dune) install $(ws_main) \
+	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES)
+	$(build_stdlib_jsir) $(dune) install $(ws_main) \
+	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=lib_root stdlib-jsir
 
 .PHONY: jsoo-test
 jsoo-test: ast-dependent-libs-compiler \
