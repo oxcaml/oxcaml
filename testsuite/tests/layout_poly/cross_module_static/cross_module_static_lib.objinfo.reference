@@ -25,8 +25,8 @@ Static data:
   ]
   (Cross_module_static_lib/counted_id/2
     (closure [calls/323: *]
-      (ktemplate layout_17
-        (function {nlocal = 0} x/326[$layout_17] : $layout_17
+      (ktemplate layout_19
+        (function {nlocal = 0} x/326[$layout_19] : $layout_19
           (seq (+:=1 calls/323) x/326)))))
   (Cross_module_static_lib/id/0
     (closure []
@@ -40,11 +40,11 @@ Static data:
            *match*/349 =[value<int>] (+:=1 calls/323)
            initial/330 =[value<int>] (field_int 0 (field_imm 1 X/329))
            with_stamp/331 =
-             (ktemplate layout_29
-               (function {nlocal = 0} x/333[$layout_29] never_inline
-                 : #(?, $layout_29)
+             (ktemplate layout_31
+               (function {nlocal = 0} x/333[$layout_31] never_inline
+                 : #(?, $layout_31)
                  (seq (+:=1 calls/323) (+:=1 (field_imm 1 X/329))
-                   (make_unboxed_product #(value<int>, $layout_29)
+                   (make_unboxed_product #(value<int>, $layout_31)
                      (%int_add (field_imm 0 X/329)
                        (field_int 0 (field_imm 1 X/329)))
                      x/333)))))
