@@ -117,11 +117,6 @@ end
 
 (* The arms of a [Lambda] switch are numbered by constant, then by tag, then the
    default arm. *)
-(* CR yusumez: The switches introduced by the expansion of primitives (e.g. the
-   loops that initialise and blit arrays, see [Lambda_to_lambda_transforms]) are
-   numbered like those of the source. They should get no counters, which needs
-   the switches of the expansion to be told apart from those of its source
-   subterms (the arguments). *)
 let switch t
     ({ sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction } :
       Lambda.lambda_switch) =
