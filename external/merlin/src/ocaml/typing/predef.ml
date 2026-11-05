@@ -159,9 +159,6 @@ let simd_stable_extension_type_constrs : type_constr list = [
   `Float16x16;
   `Float32x8;
   `Float64x4;
-]
-
-let simd_beta_extension_type_constrs : type_constr list = [
   `Int8x64;
   `Int16x32;
   `Int32x16;
@@ -194,7 +191,6 @@ let all_type_constrs = (
   @ or_null_extension_type_constrs
   @ small_number_extension_type_constrs
   @ simd_stable_extension_type_constrs
-  @ simd_beta_extension_type_constrs
   @ metaprogramming_extension_type_constrs
 )
 
@@ -1253,10 +1249,7 @@ let add_simd_stable_extension_types add_type env =
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
   ) env simd_stable_extension_type_constrs
 
-let add_simd_beta_extension_types add_type env =
-  List.fold_left (fun env tconstr ->
-    add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
-  ) env simd_beta_extension_type_constrs
+let add_simd_beta_extension_types _add_type env = env
 
 let add_simd_alpha_extension_types _add_type env = env
 
