@@ -26,29 +26,32 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-module FC = Fdo_counter
-
 type t =
   { naming_context : Fdo_function_naming.Context.t;
-    function_ : FC.Function.t;
-    body_hash : FC.Body_hash.t
+    instrumentation : Fdo_instrumentation.t
   }
 
 let toplevel compilation_unit module_initializer =
   { naming_context = Fdo_function_naming.Context.toplevel compilation_unit;
-    function_ = Fdo_function_naming.toplevel_function compilation_unit;
-    body_hash = Fdo_body_hash.of_toplevel module_initializer
+    instrumentation =
+      Fdo_instrumentation.create
+        ~function_:(Fdo_function_naming.toplevel_function compilation_unit)
+        ~body_hash:(Fdo_body_hash.of_toplevel module_initializer)
   }
 
 let enter_function t fn =
   let function_, naming_context =
     Fdo_function_naming.of_function t.naming_context fn
   in
-  { naming_context; function_; body_hash = Fdo_body_hash.of_function fn }
+  { naming_context;
+    instrumentation =
+      Fdo_instrumentation.create ~function_
+        ~body_hash:(Fdo_body_hash.of_function fn)
+  }
 
-let entry_annotation t =
-  let annotation =
-    Fdo_annotation.of_list
-      [t.function_ |> FC.Position.create_function_entry |> FC.of_position]
-  in
-  Fdo_annotation.With_body_hash.create ~annotation ~body_hash:(Some t.body_hash)
+let entry_annotation t = Fdo_instrumentation.entry_annotation t.instrumentation
+
+let call_counter t loc = Fdo_instrumentation.call t.instrumentation loc
+
+let switch_counters t switch =
+  Fdo_instrumentation.switch t.instrumentation switch

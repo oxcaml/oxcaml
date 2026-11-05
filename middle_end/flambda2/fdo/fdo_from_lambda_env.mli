@@ -27,8 +27,9 @@
  ******************************************************************************)
 
 (** The FDO state of the translation from Lambda (see [Lambda_to_flambda_env]):
-    the identity and body hash of the function being translated (see
-    [Fdo_function_naming] and [Fdo_body_hash]) and what is needed to name the
+    the instrumentation of the function being translated (see
+    [Fdo_instrumentation]), from its identity and body hash (see
+    [Fdo_function_naming] and [Fdo_body_hash]), and what is needed to name the
     functions defined in it. *)
 
 type t
@@ -44,3 +45,15 @@ val enter_function : t -> Lambda.lfunction -> t
 (** The counters of the entry edge of the function [t] is for, with its body
     hash. *)
 val entry_annotation : t -> Fdo_annotation.With_body_hash.t
+
+(** The counter of a call at the given location in the function [t] is for (see
+    [Fdo_instrumentation.call]). *)
+val call_counter : t -> Lambda.scoped_location -> Fdo_counter.t
+
+(** The counters of the switches a [Lambda] switch in the function [t] is for
+    translates to (see [Fdo_instrumentation.switch]). *)
+val switch_counters :
+  t ->
+  Lambda.lambda_switch ->
+  (consts:Fdo_instrumentation.Switch_counters.t
+  * blocks:Fdo_instrumentation.Switch_counters.t)
