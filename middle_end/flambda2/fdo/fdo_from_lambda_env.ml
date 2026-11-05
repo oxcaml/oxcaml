@@ -49,8 +49,7 @@ let enter_function t ~binder fn =
         ~body_hash:(Fdo_body_hash.of_function fn)
   }
 
-let entry_annotation t =
-  Fdo_instrumentation.entry_annotation t.instrumentation
+let entry_annotation t = Fdo_instrumentation.entry_annotation t.instrumentation
 
 let call_counter t loc = Fdo_instrumentation.call t.instrumentation loc
 
