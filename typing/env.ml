@@ -3808,8 +3808,9 @@ let use_constructor_desc ~use ~loc usage env cstr =
     Builtin_attributes.check_alerts loc cstr.cstr_attributes cstr.cstr_name
   end
 
-let use_constructor ~use ~loc usage env cda =
-  use_constructor_desc ~use ~loc usage env cda.cda_description
+let use_constructor ~errors ~use ~loc usage env cda =
+  use_constructor_desc ~use ~loc usage env cda.cda_description;
+  check_constructor_address_representable ~errors ~loc ~env cda
 
 type _ load =
   | Load : module_data load
@@ -4173,9 +4174,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
       List.map
         (fun (_path, cda, (locks, use_fn)) ->
            let use_fn () =
-             use_constructor ~use ~loc usage env cda;
-             check_constructor_address_representable
-               ~errors ~loc ~env cda;
+             use_constructor ~errors ~use ~loc usage env cda;
              use_fn ()
            in
            ((cda.cda_description, locks), use_fn))
@@ -4419,9 +4418,7 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
           List.map
             (fun cda ->
                let use_fun () =
-                 use_constructor ~use ~loc usage env cda;
-                 check_constructor_address_representable
-                   ~errors ~loc ~env cda
+                 use_constructor ~errors ~use ~loc usage env cda;
                in
                ((cda.cda_description, locks), use_fun))
             cstrs
@@ -4677,9 +4674,6 @@ let lookup_value_lazy ~errors ~use ~loc lid env =
     | Lapply _ -> assert false
   in
   let vd, mode = Normalize_mode.vda Normalize vda in
-  (* CR jkerrigan: It's not clear to me that this is the right place to enforce
-     that addresses are representable. The goal here is to force any runtime
-     value to commit to a runtime representation. *)
   (match vd.val_kind with
    | Val_reg _ -> check_address_representable ~errors ~loc ~env vda.vda_address
    | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ | Val_anc _ -> ()
