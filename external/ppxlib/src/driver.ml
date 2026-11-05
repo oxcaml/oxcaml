@@ -26,6 +26,7 @@ let output_metadata_filename = ref None
 let corrected_suffix = ref ".ppx-corrected"
 let keywords = ref None
 let raise_embedded_errors_flag = ref false
+let as_merlin = ref false
 
 let ghost =
   object
@@ -59,7 +60,7 @@ let get_default_path_str : structure -> string = function
   | [] -> ""
   | { pstr_loc = loc; _ } :: _ -> get_default_path loc
 
-let get_default_path_sig : signature -> string = function
+let get_default_path_sig : signature_item list -> string = function
   | [] -> ""
   | { psig_loc = loc; _ } :: _ -> get_default_path loc
 
@@ -164,7 +165,7 @@ module Transform = struct
     enclose_intf :
       (Expansion_context.Base.t ->
       Location.t option ->
-      Parsetree.signature * Parsetree.signature)
+      Parsetree.signature_item list * Parsetree.signature_item list)
       option;
     instrument : Instrument.t option;
     rules : Context_free.Rule.t list;
@@ -293,13 +294,13 @@ module Transform = struct
       map#structure base_ctxt (List.concat [ attrs; header; st; footer ])
       >>= fun st -> match impl with None -> return st | Some f -> f ctxt st
     in
-    let map_intf ctxt sg_with_attrs =
-      let attrs, sg =
-        List.split_while sg_with_attrs ~f:(function
+    let map_intf ctxt ({ psg_items; _ } as sg) =
+      let attrs, psg_items =
+        List.split_while psg_items ~f:(function
           | { psig_desc = Psig_attribute _; _ } -> true
           | _ -> false)
       in
-      let file_path = get_default_path_sig sg in
+      let file_path = get_default_path_sig psg_items in
       let base_ctxt =
         Expansion_context.Base.top_level ~tool_name ~file_path ~input_name
       in
@@ -308,12 +309,15 @@ module Transform = struct
         | None -> ([], [])
         | Some f ->
             let whole_loc =
-              loc_of_list sg ~get_loc:(fun sg -> sg.Parsetree.psig_loc)
+              loc_of_list psg_items ~get_loc:(fun sg -> sg.Parsetree.psig_loc)
             in
             gen_header_and_footer Signature_item whole_loc (f base_ctxt)
       in
-      map#signature base_ctxt (List.concat [ attrs; header; sg; footer ])
-      >>= fun sg -> match intf with None -> return sg | Some f -> f ctxt sg
+      map#signature_items base_ctxt
+        (List.concat [ attrs; header; psg_items; footer ])
+      >>= fun psg_items ->
+      let sg = { sg with psg_items } in
+      match intf with None -> return sg | Some f -> f ctxt sg
     in
     { t with impl = Some map_impl; intf = Some map_intf }
 
@@ -611,7 +615,13 @@ let error_to_sig_extension error =
 
 let error_to_extension error ~(kind : Kind.t) =
   match kind with
-  | Intf -> Intf_or_impl.Intf [ error_to_sig_extension error ]
+  | Intf ->
+      Intf_or_impl.Intf
+        {
+          psg_items = [ error_to_sig_extension error ];
+          psg_modalities = [];
+          psg_loc = Location.none;
+        }
   | Impl -> Intf_or_impl.Impl [ error_to_str_extension error ]
 
 let exn_to_extension exn ~(kind : Kind.t) =
@@ -722,27 +732,21 @@ let map_structure st =
   with
   | ast -> ast
 
-(*$ str_to_sig _last_text_block *)
-
 let map_signature_gen sg ~tool_name ~hook ~expect_mismatch_handler ~input_name
     ~embed_errors =
   Cookies.acknowledge_cookies T;
   if !perform_checks then (
     Attribute.reset_checks ();
     Attribute.collect#signature sg);
-  let lint lint_errors sg =
-    let sg =
-      match lint_errors with
-      | [] -> sg
-      | _ ->
-          List.map lint_errors
-            ~f:(fun ({ attr_name = { loc; _ }; _ } as attr) ->
-              Ast_builder.Default.psig_attribute ~loc attr)
-          @ sg
-    in
-    sg
+  let lint lint_errors items =
+    match lint_errors with
+    | [] -> items
+    | _ ->
+        List.map lint_errors ~f:(fun ({ attr_name = { loc; _ }; _ } as attr) ->
+            Ast_builder.Default.psig_attribute ~loc attr)
+        @ items
   in
-  let with_errors errors sg =
+  let with_errors errors items =
     let sorted = sort_errors_by_loc errors in
     List.map sorted ~f:(fun error ->
         Ast_builder.Default.psig_extension
@@ -750,20 +754,21 @@ let map_signature_gen sg ~tool_name ~hook ~expect_mismatch_handler ~input_name
           (Location.Error.to_extension error)
           []
         |> ghost#signature_item)
-    @ sg
+    @ items
   in
-  let cookies_and_check sg =
+  let cookies_and_check items =
     Cookies.call_post_handlers T;
     let errors =
       if !perform_checks then
         (* TODO: these two passes could be merged, we now have more passes for
            checks than for actual rewriting. *)
         let unused_attributes_errors =
-          Attribute.collect_unused_attributes_errors#signature sg []
+          Attribute.collect_unused_attributes_errors#signature_items items []
         in
         let unused_extension_errors =
           if !perform_checks_on_extensions then
-            Extension.collect_unhandled_extension_errors#signature sg []
+            Extension.collect_unhandled_extension_errors#signature_items items
+              []
           else []
         in
         let not_seen_errors = Attribute.collect_unseen_errors () in
@@ -773,12 +778,12 @@ let map_signature_gen sg ~tool_name ~hook ~expect_mismatch_handler ~input_name
     (if !perform_locations_check then
        let open Location_check in
        ignore
-         ((enforce_invariants !loc_fname)#signature sg
+         ((enforce_invariants !loc_fname)#signature_items items
             Non_intersecting_ranges.empty
            : Non_intersecting_ranges.t));
-    with_errors errors sg
+    with_errors errors items
   in
-  let file_path = get_default_path_sig sg in
+  let file_path = get_default_path_sig sg.psg_items in
   let sg, lint_errors, errors =
     apply_transforms sg ~tool_name ~file_path
       ~field:(fun (ct : Transform.t) -> ct.intf)
@@ -786,9 +791,12 @@ let map_signature_gen sg ~tool_name ~hook ~expect_mismatch_handler ~input_name
       ~dropped_so_far:Attribute.dropped_so_far_signature ~hook
       ~expect_mismatch_handler ~input_name ~embed_errors
   in
-  sg |> lint lint_errors |> cookies_and_check
-  |> with_errors (List.rev errors)
-  |> raise_embedded_errors#signature
+  let psg_items =
+    sg.psg_items |> lint lint_errors |> cookies_and_check
+    |> with_errors (List.rev errors)
+    |> raise_embedded_errors#signature_items
+  in
+  { sg with psg_items }
 
 let map_signature sg =
   match
@@ -965,46 +973,48 @@ let add_cookies_str st =
   in
   prefix @ st
 
-(*$ str_to_sig _last_text_block *)
-let extract_cookies_sig sg =
-  let sg =
-    match sg with
+let extract_cookies_sig items =
+  let items =
+    match items with
     | ({
          psig_desc =
            Psig_attribute { attr_name = { txt = "ocaml.ppx.context"; _ }; _ };
          _;
        } as prefix)
       :: sg ->
-        let prefix = Ppxlib_ast.Selected_ast.to_ocaml Signature [ prefix ] in
+        let prefix =
+          Ppxlib_ast.Selected_ast.to_ocaml (List Signature_item) [ prefix ]
+        in
         assert (
           List.is_empty
-            (Astlib.Ast_metadata.drop_ppx_context_sig ~restore:true prefix));
+            (Astlib.Ast_metadata.drop_ppx_context_sig_items ~restore:true
+               prefix));
         sg
-    | _ -> sg
+    | _ -> items
   in
   (* The cli cookies have to be set after restoring the ppx context,
      since restoring the ppx context resets the cookies *)
   List.iter !Cookies.given_through_cli ~f:(fun (name, expr) ->
       Cookies.set T name expr);
-  sg
+  items
 
-let add_cookies_sig sg =
+let add_cookies_sig items =
   let prefix =
-    Astlib.Ast_metadata.add_ppx_context_sig ~tool_name:"ppxlib_driver" []
-    |> Ppxlib_ast.Selected_ast.of_ocaml Signature
+    Astlib.Ast_metadata.add_ppx_context_sig_items ~tool_name:"ppxlib_driver" []
+    |> Ppxlib_ast.Selected_ast.of_ocaml (List Signature_item)
   in
-  prefix @ sg
-
-(*$*)
+  prefix @ items
 
 let extract_cookies (ast : Intf_or_impl.t) : Intf_or_impl.t =
   match ast with
-  | Intf x -> Intf (extract_cookies_sig x)
+  | Intf ({ psg_items; _ } as sg) ->
+      Intf { sg with psg_items = extract_cookies_sig psg_items }
   | Impl x -> Impl (extract_cookies_str x)
 
 let add_cookies (ast : Intf_or_impl.t) : Intf_or_impl.t =
   match ast with
-  | Intf x -> Intf (add_cookies_sig x)
+  | Intf ({ psg_items; _ } as sg) ->
+      Intf { sg with psg_items = add_cookies_sig psg_items }
   | Impl x -> Impl (add_cookies_str x)
 
 let corrections = ref []
@@ -1044,7 +1054,11 @@ module Create_file_property
     (Name : sig
       val name : string
     end)
-    (T : Sexpable.S) =
+    (T : sig
+      type t
+
+      include Sexpable.S with type t := t
+    end) =
 struct
   let t : _ File_property.t =
     { name = Name.name; data = None; sexp_of_t = T.sexp_of_t }
@@ -1164,7 +1178,9 @@ let process_file (kind : Kind.t) fn ~input_name ~relocate ~use_compiler_pprint
                  Pprintast.structure ppf
                    (Clean.remove_migration_attributes#structure ast));
           let null_ast =
-            match ast with Intf [] | Impl [] -> true | _ -> false
+            match ast with
+            | Intf { psg_items = []; _ } | Impl [] -> true
+            | _ -> false
           in
           if not null_ast then Stdlib.Format.pp_print_newline ppf ())
   | Dump_ast ->
@@ -1344,8 +1360,8 @@ let shared_args =
       Arg.Set raise_embedded_errors_flag,
       " Raise the first embedded error found in the processed AST" );
     ( "-allow-deriving-end",
-      Arg.Bool (( := ) Code_matcher.allow_deriving_end),
-      " Whether to allow [@@@deriving.end], which will soon be deprecated." );
+      Arg.Set Code_matcher.allow_deriving_end,
+      " Allow the use of [@@@deriving.end] (which is deprecated)." );
   ]
 
 let () =
@@ -1451,6 +1467,12 @@ let standalone_args =
       Arg.Set use_compiler_pprint,
       "Force migrating the AST back to the compiler's version before printing \
        it as source code using the compiler's Pprintast utilities." );
+    ( "-as-merlin",
+      Arg.Set as_merlin,
+      " Merlin should pass this flag to indicate that the PPX is being run by \
+       Merlin. This allows PPXes to modify their behavior when run by Merlin \
+       rather than the compiler. Merlin override attributes will only be \
+       generated when this flag is included." );
   ]
 
 let get_args ?(standalone_args = standalone_args) () =
@@ -1509,7 +1531,7 @@ let rewrite_binary_ast_file input_fn output_fn =
 
 let parse_input passed_in_args ~valid_args ~incorrect_input_msg =
   try
-    Arg.parse_argv passed_in_args (Arg.align valid_args)
+    Arg.parse_argv ~current:(ref 0) passed_in_args (Arg.align valid_args)
       (fun _ -> raise (Arg.Bad "anonymous arguments not accepted"))
       incorrect_input_msg
   with
@@ -1519,6 +1541,11 @@ let parse_input passed_in_args ~valid_args ~incorrect_input_msg =
   | Arg.Help msg ->
       Printf.eprintf "%s" msg;
       Stdlib.exit 0
+
+let parse_additional_flags ~prog ~flags =
+  parse_input
+    (Array.of_list (prog :: flags))
+    ~valid_args:!args ~incorrect_input_msg:"unrecognized PPX flags"
 
 let run_as_ppx_rewriter_main ~standalone_args ~usage input =
   let valid_args = get_args ~standalone_args () in
@@ -1578,6 +1605,7 @@ let run_as_ppx_rewriter () =
     Stdlib.exit 1
 
 let pretty () = !pretty
+let as_merlin () = !as_merlin
 
 let enable_checks () =
   (* We do not enable the locations check here, we currently require that one
@@ -1601,6 +1629,7 @@ let () =
         Context_free.Rule.attr_sig_floating_expect_and_expand
           (Attribute.Floating.declare "expand_inline" Signature_item
              Ast_pattern.(psig __)
-             Fn.id)
-          (fun ~ctxt:_ items -> Utils.prettify_odoc_attributes#signature items);
+             (fun sg -> sg.psg_items))
+          (fun ~ctxt:_ items ->
+            Utils.prettify_odoc_attributes#signature_items items);
       ]

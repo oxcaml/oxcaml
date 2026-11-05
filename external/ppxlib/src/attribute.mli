@@ -45,6 +45,7 @@ module Context : sig
     | Psig_extension : signature_item t
     | Rtag : row_field t
     | Object_type_field : object_field t
+    | Pfunction_cases : function_body t
 
   val label_declaration : label_declaration t
   val constructor_declaration : constructor_declaration t
@@ -75,6 +76,8 @@ module Context : sig
   val psig_extension : signature_item t
   val rtag : row_field t
   val object_type_field : object_field t
+  val pfunction_cases : function_body t
+
   val equal : 'a t -> 'b t -> bool
 end
 
