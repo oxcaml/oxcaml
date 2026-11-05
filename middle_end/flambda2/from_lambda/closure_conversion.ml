@@ -3913,8 +3913,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         apply_dbg
         ~callsite_counter:None
           (* The source call has a single counter, on [full_call] (see
-             [Simplify_common.split_direct_over_application]): giving this call
-             the same one would count the source call twice. *)
+             [Simplify_common.split_direct_over_application]). *)
         ~inlined
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe ~position

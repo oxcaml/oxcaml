@@ -179,8 +179,7 @@ let split_direct_over_application apply ~callee's_code_id
       ~return_mode:outer_apply_alloc_mode
       (Apply.dbg apply)
       (* The source call has a single counter, on the full application of the
-         callee below. This application of its result has none: giving it the
-         same counter would count the source call twice. *)
+         callee below. This application of its result has none. *)
       ~callsite_counter:None ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
