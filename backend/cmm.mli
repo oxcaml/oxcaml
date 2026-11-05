@@ -201,8 +201,10 @@ type is_global =
 
 val equal_is_global : is_global -> is_global -> bool
 
-(** Whether the target and backend can deduplicate [Weak] functions (ELF COMDAT
-    groups, native emitters only). *)
+(** Whether the target and backend can deduplicate [Weak] functions: they need
+    ELF COMDAT groups and frametable pieces that can join them (as for
+    [-frametable-sections]), so neither the LLVM backend nor the internal
+    assembler. *)
 val weak_functions_supported : unit -> bool
 
 (* Symbols are marked with whether they are local, global, or weak, at both

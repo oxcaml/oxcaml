@@ -1,7 +1,9 @@
 (* TEST
  arch_amd64;
- not-macos;
+ frametable_sections;
+ unset OCAMLPARAM;
  readonly_files = "lpoly_lib.mli lpoly_lib.ml user1.ml user2.ml user3.ml";
+ arguments = "1";
  setup-ocamlopt.byte-build-env;
  {
   flags = "-extension layout_poly_alpha -nocwd -Ix .";
@@ -63,8 +65,31 @@
   all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
   run;
+ }{
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -internal-assembler";
+  module = "lpoly_lib.mli";
+  ocamlopt.byte;
+  module = "lpoly_lib.ml";
+  ocamlopt.byte;
+  module = "user1.ml";
+  ocamlopt.byte;
+  module = "user2.ml";
+  ocamlopt.byte;
+  module = "user3.ml";
+  ocamlopt.byte;
+  module = "comdat_dedup.ml";
+  ocamlopt.byte;
+  unset module;
+  program = "${test_build_directory}/comdat_dedup.exe";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
+  ocamlopt.byte;
+  arguments = "0";
+  run;
  }
 *)
+
+(* OCAMLPARAM is unset because the aarch64 CI jobs set it to include
+   verify-binary-emitter=1, which disables weak functions. *)
 
 (* [user1.ml] and [user2.ml] both instantiate [Lpoly_lib.lpoly_pair] at
    (float64, float64), so each object file carries a weak copy of the
@@ -74,7 +99,7 @@
    symbol.
 
    [lpoly_call_between] has a frame descriptor, which must be discarded along
-   with each losing copy of the code. The last block compiles [user1.ml] and
+   with each losing copy of the code. The third block compiles [user1.ml] and
    [user2.ml] at different optimization levels, so that the copies differ.
    Calling both instances runs the GC through the surviving copy's frame.
    [lpoly_select] has a jump table, which likewise refers into the code.
@@ -82,7 +107,11 @@
    The test runs the linked program and then shells out to [nm] to inspect
    the symbol table, and to [readelf] to check that nothing outside a COMDAT
    group refers into it by section (which would dangle when a losing copy is
-   discarded, whether or not the linker notices). *)
+   discarded, whether or not the linker notices).
+
+   The internal assembler does not support weak functions, so the last block
+   falls back to private copies of each instance: the program's argument, the
+   expected number of copies of each cohort's shared symbol, is 0. *)
 
 external box : float# -> float = "%box_float"
 
@@ -103,21 +132,24 @@ let expected_symbol_res =
     "camlLpoly_lib__Lpoly_lib_lpoly_call_between_.*float64_float64__cohort_code$";
     "camlLpoly_lib__Lpoly_lib_lpoly_select_.*float64_float64__cohort_code$" ]
 
+let expected_copies = int_of_string Sys.argv.(1)
+
 let () =
   let exe = Filename.quote Sys.executable_name in
   let ok = ref true in
   List.iter
     (fun re ->
       let check =
-        Printf.sprintf "test $(nm %s | grep -c '%s') -eq 1" exe re
+        Printf.sprintf "test $(nm %s | grep -c '%s') -eq %d" exe re
+          expected_copies
       in
       if Sys.command check <> 0
       then begin
         ok := false;
         Printf.eprintf
-          "expected exactly one copy of weak symbol matching /%s/; \
+          "expected %d copies of weak symbol matching /%s/; \
            relevant nm output:\n%!"
-          re;
+          expected_copies re;
         let dump = Printf.sprintf "nm %s | grep Lpoly_lib >&2 || true" exe in
         ignore (Sys.command dump)
       end)

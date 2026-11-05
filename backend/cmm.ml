@@ -312,13 +312,12 @@ let equal_is_global g g' =
   | (Local | Global | Weak), _ -> false
 
 let weak_functions_supported () =
-  (not !Clflags.llvm_backend)
-  &&
-  match Target_system.system () with
-  | Linux | FreeBSD | NetBSD | OpenBSD | Generic_BSD | Solaris | Dragonfly | GNU
-    ->
-    true
-  | Windows _ | MacOS_like | BeOS | Unknown -> false
+  (* A weak function's frame descriptors go in a frametable piece in its group,
+     which needs what [-frametable-sections] needs (see [Optmaindriver]). *)
+  Config.frametable_sections
+  && (not !Clflags.llvm_backend)
+  && (not !Oxcaml_flags.internal_assembler)
+  && not !Oxcaml_flags.verify_binary_emitter
 
 type symbol =
   { sym_name : string;
