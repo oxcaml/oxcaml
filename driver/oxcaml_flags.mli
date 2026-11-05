@@ -119,6 +119,8 @@ val use_ssa : bool ref
 
 val ssa_simplify : bool ref
 
+val ssa_sink : bool ref
+
 val ssa_validate : bool ref
 
 type function_result_types = Never | Functors_only | All_functions
