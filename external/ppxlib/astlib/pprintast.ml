@@ -1,4 +1,4 @@
-(* OxCaml uses the compiler's implementation of pprintast, not ppxlib's. *)
+(* Jane Street: We use the compiler's implementation of pprintast, not ppxlib's. *)
 
 module Janestreet = Ocaml_common.Pprintast
 
@@ -56,6 +56,15 @@ module To_janestreet = struct
 
   let copy_structure_item (x : From.structure_item) : To.structure_item =
     Migrate_500_999.copy_structure_item x
+
+  let copy_value_binding (x : From.value_binding) : To.value_binding =
+    Migrate_500_999.copy_value_binding x
+
+  let copy_payload (x : From.payload) : To.payload =
+    Migrate_500_999.copy_payload x
+
+  let copy_longident (x : Longident.t) : Ast_999.Longident.t =
+    Migrate_500_999.copy_Longident_t ~loc:Location.none x
 end
 
 type space_formatter = (unit, Format.formatter, unit) format
@@ -86,6 +95,15 @@ let structure fmt st =
 
 let string_of_structure st =
   Janestreet.string_of_structure (To_janestreet.copy_structure st)
+
+let binding fmt vb =
+  Janestreet.binding fmt (To_janestreet.copy_value_binding vb)
+
+let longident fmt lid =
+  Janestreet.longident fmt (To_janestreet.copy_longident lid)
+
+let payload fmt payload =
+  Janestreet.payload fmt (To_janestreet.copy_payload payload)
 
 let class_expr fmt clexpr =
   Janestreet.class_expr fmt (To_janestreet.copy_class_expr clexpr)

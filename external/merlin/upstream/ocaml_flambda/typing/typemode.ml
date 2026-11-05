@@ -51,6 +51,12 @@ type error =
 
 exception Error of Location.t * error
 
+let mode_variable_error ~loc =
+  Language_extension.assert_enabled ~loc Mode_polymorphism
+    Language_extension.Alpha;
+  Misc.fatal_errorf "%a: mode variables and mode bounds are not yet supported"
+    Location.print_loc loc
+
 module Mode_axis_pair = struct
   type t = Mode.With_locality.atom
 
@@ -205,54 +211,23 @@ let enforce_forbidden_modalities ~loc annot_type m =
     raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
-let apply_mode_implications (annots : With_locality.Const.Option.t) =
-  (* [forkable] has a different default depending on whether [areality]
-     is [global] or [local]. *)
-  let forkable =
-    match annots.forkable, annots.areality with
-    | (Some _ as y), _ | y, None -> y
-    | None, Some Locality.Const.Global -> Some Forkable.Const.Forkable
-    | None, Some Locality.Const.Local -> Some Forkable.Const.Unforkable
-  in
-  (* Likewise for [yielding]. *)
-  let yielding =
-    match annots.yielding, annots.areality with
-    | (Some _ as y), _ | y, None -> y
-    | None, Some Locality.Const.Global -> Some Yielding.Const.Unyielding
-    | None, Some Locality.Const.Local -> Some Yielding.Const.Yielding
-  in
-  (* Likewise for [contention]. *)
-  let contention =
-    match annots.contention, annots.visibility with
-    | (Some _ as c), _ | c, None -> c
-    | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
-    | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
-    | None, Some Visibility.Const.Write -> Some Contention.Const.Corrupted
-    | None, Some Visibility.Const.Read_write ->
-      Some Contention.Const.Uncontended
-  in
-  (* Likewise for [portability]. *)
-  let portability =
-    match annots.portability, annots.statefulness with
-    | (Some _ as p), _ | p, None -> p
-    | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
-    | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
-    | None, Some Statefulness.Const.Writing ->
-      Some Portability.Const.Corruptible
-    | None, Some Statefulness.Const.Stateful ->
-      Some Portability.Const.Nonportable
-  in
-  { annots with forkable; yielding; contention; portability }
+let mode_consts_of_modes annots =
+  List.map
+    (fun { txt; loc } ->
+      match (txt : Parsetree.mode) with
+      | Pmode txt -> { txt; loc }
+      | Pmode_var _ | Pmode_bounded _ -> mode_variable_error ~loc)
+    annots
 
 let transl_mode_annots annots =
   let annots =
     List.map
-      (fun { txt = Parsetree.Mode txt; loc } ->
+      (fun { txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
         try { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
-      annots
+      (mode_consts_of_modes annots)
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
@@ -266,7 +241,7 @@ let untransl_mode modes =
   let untransl_annot =
     Location.map
       (fun (Atom (ax, mode) : Mode.With_locality.atom) : Parsetree.mode ->
-        Mode
+        Pmode
           (Format_doc.asprintf "%a"
              (Mode.With_locality.Const.print_axis ax)
              mode))
@@ -323,32 +298,33 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   then if for_mutable_variable then monadic else monadic @ comonadic
   else []
 
+let modality_of_atoms l =
+  List.fold_left
+    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
+    Modality.Const.id l
+
 let mutable_implied_modalities ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
     (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
     Modality.Const.id l
 
-let idx_expected_modalities ~(mut : bool) =
-  (* There are two design constraints on what modalities we allow in an index
-     creation to contain. Because these are coupled, this function checks that
-     they are equal.
+let block_path_expected_modalities mutability =
+  (* There are two design constraints on what modalities we allow a block
+     path (such as a block index) to point to. Because these are coupled,
+     this function checks that they are equal.
       1. The default modalities (id for non-mutable fields, global many aliased
          forkable unyielding for mutable fields) should work.
       2. It should also be safe wrt to type signatures given to block index
-         primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_beta]). *)
-  let modality_of_list l =
-    List.fold_left
-      (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
-      Modality.Const.id l
-  in
+         primitives (see [idx_imm.mli] and [idx_mut.mli] in [Stdlib_stable]). *)
+  let mut = Types.is_mutable mutability in
   let expected1 = mutable_implied_modalities mut ~for_mutable_variable:false in
   let expected2 =
     if mut
     then
       (* If this list is updated, the external bindings in the [Idx_imm] and
-         [Idx_mut] modules in [Stdlib_beta] may also have to be updated. *)
-      modality_of_list
+         [Idx_mut] modules in [Stdlib_stable] may also have to be updated. *)
+      modality_of_atoms
         [ Atom (Comonadic Areality, Meet_const Regionality.Const.legacy);
           Atom (Comonadic Linearity, Meet_const Linearity.Const.legacy);
           Atom (Comonadic Forkable, Meet_const Forkable.Const.legacy);
@@ -364,7 +340,7 @@ let idx_expected_modalities ~(mut : bool) =
   | Ok () -> expected1
   | Error _ ->
     Misc.fatal_error
-      "Typemode.idx_expected_modalities: mismatch with mutable implied \
+      "Typemode.block_path_expected_modalities: mismatch with mutable implied \
        modalities"
 
 let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
@@ -552,7 +528,7 @@ let transl_mode_with_locality annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
     transl_mode_annots annots
   in
-  let opt_modes = apply_mode_implications opt_modes in
+  let opt_modes = Mode.Const.apply_implications opt_modes in
   let modes =
     With_locality.Const.Option.value opt_modes
       ~default:With_locality.Const.legacy
@@ -647,7 +623,7 @@ let transl_mod_bounds ?(warn = true) annots =
   in
   let nonmodal, base_modality, modal_atoms =
     List.fold_left
-      (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
+      (fun (nonmodal, base, atoms, seen_ev) { txt; loc } ->
         match Modality_axis_pair.of_string ~loc txt with
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
@@ -670,7 +646,7 @@ let transl_mod_bounds ?(warn = true) annots =
           in
           nonmodal, base, atoms, seen_ev)
       (Nonmodal_bounds.empty, Modality.Const.id, [], false)
-      annots
+      (mode_consts_of_modes annots)
     |> fun (nm, base, atoms, _) ->
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)

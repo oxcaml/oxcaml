@@ -1,6 +1,9 @@
 (executables
  (names notebook)
- (libraries js_of_ocaml-compiler js_of_ocaml-toplevel)
+ (libraries
+  js_of_ocaml-compiler
+  js_of_ocaml-toplevel
+  js_of_ocaml-compiler.dynlink)
  (link_flags
   (:standard -linkall))
  (modes byte)

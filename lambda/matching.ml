@@ -259,7 +259,7 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
-      | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | `Alias (sub_p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view sub_p, patl),
@@ -379,7 +379,7 @@ end = struct
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
-      | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -636,7 +636,7 @@ end = struct
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
-          | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -779,7 +779,7 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
-          | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -2681,12 +2681,9 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
         Lprim (Punboxed_product_field (pos, lbl_layouts), [ arg ], loc)
       in
       let binding_kind, mut =
-        if Types.is_mutable lbl.lbl_mut then
-          fatal_error
-            ("Matching.get_expr_args_record_unboxed_product: "
-             ^ "unboxed record labels are never mutable")
-        else
-          Alias, compose_mut mut Immutable
+        (* CR mutable-kinds: This is only sound currently because we cannot
+           mutate mutable fields of unboxed records. *)
+        Alias, compose_mut mut Immutable
       in
       let lbl_sort =
         Jkind.Sort.default_for_transl_and_get
@@ -4746,8 +4743,6 @@ let rec map_return f = function
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
-  | Lsplice _ as lam ->
-      fatal_error_invalid_constructor lam
 
 (* The 'opt' reference indicates if the optimization is worthy.
 
@@ -4814,33 +4809,18 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_fun_layout { id; uid = duid; lpoly; env_locality_mode; _ }
+  | Tpat_fun_layout { id; uid = duid; lpoly; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
     let kind_params =
-      List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
+      List.map Layout_ident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_locality_mode =
-      Translmode.transl_typed_locality_mode_r env_locality_mode
-    in
-    let param =
+    let ktmpl_body =
       match param with
       | Lfunction lfun -> lfun
       | _ -> Misc.fatal_error "let poly_ definitions must be functions"
     in
-    let ktmpl_body, ktmpl_env =
-      Lambda.extract_free_var_env param
-        ~layout_of_ident:(Typeopt.layout_of_ident pat.pat_env)
-    in
-    let f =
-      Lkindtemplate
-        { ktmpl_params = kind_params;
-          ktmpl_body;
-          ktmpl_env;
-          ktmpl_env_mode = env_locality_mode;
-          ktmpl_loc = Scoped_location.of_location ~scopes loc;
-        }
-    in
+    let f = Lkindtemplate { ktmpl_params = kind_params; ktmpl_body } in
     Llet (Strict, layout_block, id, duid, f, body)
   | Tpat_var { id; uid = duid; _ }
   | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }

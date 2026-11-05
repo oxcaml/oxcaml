@@ -23,9 +23,22 @@ open Typedtree
 
 type error = Float32_match
 
-exception Error of error
+module Error : sig
+  type exn += private In_context of error
 
-let raise_matched_float32 () = raise (Error Float32_match)
+  val log_and_raise : error -> 'a
+end = struct
+  type exn += In_context of error
+
+  let log_and_raise err = Typing_recovery.log_and_raise (In_context err)
+
+  let () =
+    Typing_recovery.register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
+
+let raise_matched_float32 () = Error.log_and_raise Float32_match
 
 type 'pattern parmatch_case =
   { pattern : 'pattern;
@@ -2407,14 +2420,12 @@ let inactive ~partial pat =
               (fun (_, lbl, p) -> lbl.lbl_mut = Immutable && loop p)
               ldps
         | Tpat_record_unboxed_product (ldps,_,_) ->
+          (* CR mutable-kinds: this does not check for mutability, to agree with
+             the [matching.ml] code, but does also rely on the inability to
+             mutate mutable unboxed records.
+             (Also, this function is seemingly dead). *)
             List.for_all
-              (fun (_, lbl, p) ->
-                 match lbl.lbl_mut with
-                 | Immutable -> loop p
-                 | Mutable _ ->
-                   fatal_error
-                     ("Parmatch.inactive: "
-                        ^ "unboxed record labels are never mutable"))
+              (fun (_, _lbl, p) -> loop p)
               ldps
         | Tpat_or (p,q,_) ->
             loop p && loop q
@@ -2531,7 +2542,7 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
     match (Patterns.General.view p).pat_desc with
     | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
-    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _, _) ->
+    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _) ->
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps
@@ -2708,5 +2719,6 @@ let report_error ppf = function
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error.In_context err ->
+      Some (Location.error_of_printer_file report_error err)
     | _ -> None)

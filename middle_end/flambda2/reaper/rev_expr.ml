@@ -63,7 +63,8 @@ and rev_params_and_body =
 
 and rev_set_of_closures =
   { value_slots : Simple.t Value_slot.Map.t;
-    function_decls : Function_declarations.t
+    function_decls : Function_declarations.t;
+    dbg : Debuginfo.t
   }
 
 and cont_handler =
@@ -80,7 +81,7 @@ and rev_expr =
 
 type t = rev_expr
 
-let ids_for_export_set_of_closures { value_slots; function_decls } =
+let ids_for_export_set_of_closures { value_slots; function_decls; dbg = _ } =
   Value_slot.Map.fold
     (fun _value_slot simple ids -> Ids_for_export.add_simple ids simple)
     value_slots
@@ -151,11 +152,13 @@ and ids_for_export_cont_handler
     (Bound_parameters.ids_for_export bound_parameters)
     (ids_for_export expr)
 
-let apply_renaming_set_of_closures { value_slots; function_decls } renaming =
+let apply_renaming_set_of_closures { value_slots; function_decls; dbg } renaming
+    =
   { value_slots =
       Value_slot.Map.map (Renaming.apply_simple renaming) value_slots;
     function_decls =
-      Function_declarations.apply_renaming function_decls renaming
+      Function_declarations.apply_renaming function_decls renaming;
+    dbg
   }
 
 let apply_renaming_static_const_or_code (const : rev_static_const_or_code)

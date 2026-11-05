@@ -123,7 +123,7 @@ let is_mutating_label_usage = function
 let label_usages () =
   {lu_projection = false; lu_mutation = false; lu_construct = false}
 
-let label_usage_complaint priv mut lu
+let label_usage_complaint (type rep) (record_form : rep record_form) priv mut lu
   : Warnings.field_usage_warning option =
   match priv, mut with
   | Asttypes.Private, _ ->
@@ -140,7 +140,13 @@ let label_usage_complaint priv mut lu
       | true, true, _ -> None
       | false, false, false -> Some Unused
       | false, _, _ -> Some Not_read
-      | true, false, _ -> Some Not_mutated
+      | true, false, _ ->
+        (* Unboxed record fields can't (currently) be mutated in place,
+           so don't complain that a [mutable] one never is. *)
+        begin match record_form with
+        | Legacy -> Some Not_mutated
+        | Unboxed_product -> None
+        end
     end
 
 let stamped_used_labels = s_table local_stamped 32
@@ -1597,9 +1603,10 @@ let step_find_unboxed_version decl =
 
 let rec find_type_data path env seen =
   match
-    StagedPath.Map.find (path_at_current_stage env path) env.local_constraints
+    StagedPath.Map.find_opt (path_at_current_stage env path)
+      env.local_constraints
   with
-  | decl ->
+  | Some decl ->
     {
       tda_declaration = decl;
       tda_descriptions = Type_abstract (Btype.type_origin decl);
@@ -1607,7 +1614,7 @@ let rec find_type_data path env seen =
       tda_unboxed_version_descriptions = None;
       tda_hidden = false;
     }
-  | exception Not_found -> begin
+  | None -> begin
       match path with
       | Pident id ->
           IdTbl.find_same_without_locks id env.types
@@ -2119,7 +2126,7 @@ let find_type_expansion path env =
      private row are still considered unknown to the type system.
      Hence, this case is caught by the following clause that also handles
      purely abstract data types without manifest type definition. *)
-  | _ -> raise Not_found
+  | _ -> raise_notrace Not_found
 
 (* Find the manifest type information associated to a type, i.e.
    the necessary information for the compiler's type-based optimisations.
@@ -2132,7 +2139,7 @@ let find_type_expansion_opt path env =
      an approximation using their manifest type. *)
   | Some body ->
       (decl.type_params, body, decl.type_expansion_scope)
-  | _ -> raise Not_found
+  | _ -> raise_notrace Not_found
 
 let find_jkind_expansion path env =
   let decl = find_jkind path env in
@@ -2836,7 +2843,7 @@ and store_label
                    Location.prerr_warning
                      loc
                      (Warnings.Unused_field { form; field = name; complaint }))
-              (label_usage_complaint priv mut used))
+              (label_usage_complaint record_form priv mut used))
   end);
   Builtin_attributes.mark_alerts_used lbl.lbl_attributes;
   begin match lbl.lbl_mut with

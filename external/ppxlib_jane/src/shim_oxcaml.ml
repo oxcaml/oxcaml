@@ -38,14 +38,34 @@ module Modalities = struct
 end
 
 module Mode = struct
-  type t = mode = Mode of string [@@unboxed]
+  type t = mode =
+    | Pmode of string
+    | Pmode_var of string
+    | Pmode_bounded of bounded
+
+  and bounded = mode_bounded =
+    { pmode_upper : bound
+    ; pmode_lower : bound
+    }
+
+  and bound = bound_elem list
+
+  and bound_elem = mode_bound_elem =
+    | Pbound_var of bound_var
+    | Pbound_const of string loc list
+
+  and bound_var = mode_bound_var =
+    { pbound_morph : string loc option
+    ; pbound_var : string loc
+    ; pbound_mod : string loc list
+    }
 end
 
 module Modes = struct
   type t = Mode.t loc list
 
   let none = []
-  let local ~loc = [ { txt = Mode "local"; loc } ]
+  let local ~loc = [ { txt = Pmode "local"; loc } ]
 end
 
 module Include_kind = struct
@@ -132,10 +152,11 @@ end
 module Value_binding = struct
   let extract_modes vb = vb.pvb_modes, { vb with pvb_modes = [] }
 
-  let create ~loc ~pat ~expr ~modes =
+  let create ~loc ~pat ~expr ~constraint_ ~modes =
     { pvb_is_poly = false
     ; pvb_pat = pat
     ; pvb_expr = expr
+    ; pvb_constraint = constraint_
     ; pvb_modes = modes
     ; pvb_attributes = []
     ; pvb_loc = loc
@@ -517,6 +538,7 @@ module Module_expr_desc = struct
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension

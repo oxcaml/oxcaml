@@ -5,6 +5,7 @@
  (libraries ppxlib))
 
 (tests
+ (package ppxlib)
  (names test test2)
  (modules test test2)
  (preprocess

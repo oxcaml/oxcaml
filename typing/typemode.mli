@@ -18,9 +18,6 @@ type modalities =
 val transl_mode_annots :
   Parsetree.modes -> Mode.With_locality.Const.Option.t modes
 
-val apply_mode_implications :
-  Mode.With_locality.Const.Option.t -> Mode.With_locality.Const.Option.t
-
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
@@ -99,4 +96,4 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
     [verbose] is true, redundant annotations are included. *)
 val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> string list
 
-val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
+val block_path_expected_modalities : Types.mutability -> Mode.Modality.Const.t

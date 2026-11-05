@@ -798,7 +798,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             applied_values
           |> Value_slot.Map.of_list
         in
-        ( Set_of_closures.create ~value_slots function_decls,
+        ( Set_of_closures.create ~value_slots ~dbg function_decls,
           new_closure_alloc_mode,
           dacc,
           code_id,
@@ -1525,8 +1525,12 @@ let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
       in
       simplify_method_call dacc apply ~callee_ty ~kind ~obj ~down_to_up
     | C_call
-        { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ }
-      ->
+        { needs_caml_c_call = _;
+          is_c_builtin = _;
+          effects = _;
+          coeffects = _;
+          fat_ptr_arg_starts = _
+        } ->
       let callee_ty =
         match callee_ty with
         | Some callee_ty -> callee_ty

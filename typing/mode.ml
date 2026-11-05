@@ -406,12 +406,8 @@ module Lattices = struct
   [@@inline]
 
   module type Diamond = sig
-    (** A lattice is a partial order, if for any [a] [b], either:
-        - [a <= b] or [b <= a]
-        - [a] and [b] are incomparable.
-
-        This interface and the [Diamond] functor below are specialized to
-        partial lattices of the form
+    (** This interface and the [Diamond] functor below are specialized to
+        lattices of the following form
         {v
             Max
             / \
@@ -4838,10 +4834,6 @@ module Report = struct
         "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
-    | Lpoly_captured_environment ->
-      Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
     | Captured_by_partial_application ->
       Fmt.dprintf "has a partial application capturing a value"
 
@@ -4858,9 +4850,6 @@ module Report = struct
          allocation)"
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
-    | Lpoly_captured_environment ->
-      (* currently not testable *)
-      Fmt.dprintf "is a layout-polymorphic expression"
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 
@@ -4871,9 +4860,10 @@ module Report = struct
           print the remaining chain. *)
     then (fun _ppf Modality -> ()), pp
     else
-      (* if the modality change the bound, we signal that. Moreover, since each
-         axis is total ordering, the modality is solely responsible for the
-         bound, and we omit the remaining chain. *)
+      (* if the modality does change the bound, we signal that. Moreover, since
+         each axis is total or diamond-shaped (with incomparable elements
+         joining to max and meeting to min), the modality is solely responsible
+         for the bound, and we omit the remaining chain. *)
       (* CR-someday zqian: print the modality on the offending axis. *)
       ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
         (Location.none, Unknown : pinpoint) )
@@ -5445,11 +5435,67 @@ module Error = struct
     Location.error_of_printer ~loc print ()
 end
 
-exception Submode_error_simple_context of Hint.pinpoint * Error.packed
+module rec Typing_recovery_functions : sig
+  type t =
+    { log_and_raise : 'a. exn -> 'a;
+      register_recoverable : (exn -> bool) -> unit
+    }
+
+  val get : unit -> t
+
+  val set : t -> unit
+end = struct
+  type t =
+    { log_and_raise : 'a. exn -> 'a;
+      register_recoverable : (exn -> bool) -> unit
+    }
+
+  let f =
+    ref
+      { log_and_raise =
+          (fun _ ->
+            failwith
+              "This value should be filled in with \
+               Typing_recovery.log_and_raise");
+        register_recoverable =
+          (fun _ ->
+            failwith
+              "This value should be filled in with \
+               Typing_recovery.register_recoverable")
+      }
+
+  let get () = !f
+
+  let set t =
+    f := t;
+    Submode_error_simple_context.register ()
+end
+
+and Submode_error_simple_context : sig
+  type exn += private In_context of Hint.pinpoint * Error.packed
+
+  val log_and_raise : Hint.pinpoint -> Error.packed -> 'a
+
+  val register : unit -> unit
+end = struct
+  type exn += In_context of Hint.pinpoint * Error.packed
+
+  let log_and_raise hint err =
+    (Typing_recovery_functions.get ()).log_and_raise (In_context (hint, err))
+
+  let register () =
+    (* We can't call this immediately upon startup because we need to wait for
+       the ref in [Typing_recovery_functions] to get filled. Instead, we make
+       [Typing_recovery_functions.set] call this, so that we register once it is
+       filled. *)
+    (Typing_recovery_functions.get ()).register_recoverable (function
+      | In_context _ -> true
+      | _ -> false)
+end
 
 let () =
   Location.register_error_of_exn (function
-    | Submode_error_simple_context (pp, err) ->
+    | Submode_error_simple_context.In_context (pp, err) ->
       Some (Error.print_packed_simple_context pp err)
     | _ -> None)
 
@@ -5587,7 +5633,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error e -> Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let print_error pp err = Error.print_all pp obj err
 
@@ -5637,7 +5683,8 @@ module Comonadic_gen (Obj : Obj) = struct
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
-    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error (_, e) ->
+      Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -5792,7 +5839,7 @@ module Monadic_gen (Obj : Obj) = struct
   let submode_err pp a b =
     match submode ~pp a b with
     | Ok () -> ()
-    | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error e -> Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let generic_level = S.generic_level
 
@@ -5846,7 +5893,8 @@ module Monadic_gen (Obj : Obj) = struct
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
-    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
+    | Error (_, e) ->
+      Submode_error_simple_context.log_and_raise pp (All (obj, e))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
@@ -6373,14 +6421,14 @@ module Comonadic_with (Areality : Areality) = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
     | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
@@ -6531,14 +6579,14 @@ module Monadic = struct
     | Ok () -> ()
     | Error e ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let equate_err pp a b =
     match equate ~pp a b with
     | Ok () -> ()
     | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
-      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+      Submode_error_simple_context.log_and_raise pp (Proj (Obj.obj, ax, e))
 
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
@@ -7734,6 +7782,64 @@ module Const = struct
       staticity
     }
 
+  let implied_forkable : Locality.Const.t -> Forkable.Const.t = function
+    | Global -> Forkable
+    | Local -> Unforkable
+
+  let implied_yielding : Locality.Const.t -> Yielding.Const.t = function
+    | Global -> Unyielding
+    | Local -> Yielding
+
+  let implied_contention : Visibility.Const.t -> Contention.Const.t = function
+    | Immutable -> Contended
+    | Read -> Shared
+    | Write -> Corrupted
+    | Read_write -> Uncontended
+
+  let implied_portability : Statefulness.Const.t -> Portability.Const.t =
+    function
+    | Stateless -> Portable
+    | Reading -> Shareable
+    | Writing -> Corruptible
+    | Stateful -> Nonportable
+
+  let apply_implications (m : With_locality.Const.Option.t) :
+      With_locality.Const.Option.t =
+    let imply implied source target =
+      match target, source with
+      | Some _, _ | None, None -> target
+      | None, Some source -> Some (implied source)
+    in
+    { m with
+      forkable = imply implied_forkable m.areality m.forkable;
+      yielding = imply implied_yielding m.areality m.yielding;
+      contention = imply implied_contention m.visibility m.contention;
+      portability = imply implied_portability m.statefulness m.portability
+    }
+
+  let erase_implications (m : With_locality.Const.t) :
+      With_locality.Const.Option.t =
+    let erase equal implied source target =
+      if equal (implied source) target then None else Some target
+    in
+    { areality = Some m.areality;
+      linearity = Some m.linearity;
+      uniqueness = Some m.uniqueness;
+      portability =
+        erase Portability.Const.equal implied_portability m.statefulness
+          m.portability;
+      contention =
+        erase Contention.Const.equal implied_contention m.visibility
+          m.contention;
+      forkable =
+        erase Forkable.Const.equal implied_forkable m.areality m.forkable;
+      yielding =
+        erase Yielding.Const.equal implied_yielding m.areality m.yielding;
+      statefulness = Some m.statefulness;
+      visibility = Some m.visibility;
+      staticity = Some m.staticity
+    }
+
   module Axis = struct
     let is_areality (type a) :
         a With_locality.Axis.t ->
@@ -8522,7 +8628,7 @@ module Crossing = struct
         (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
     let apply_right_unhint (Modality (Join_const c)) m =
-      (* The right adjoint of join is a restriction of identity *)
+      (* On the image of join, identity is its right adjoint *)
       Mode.join_const_unhint c m
 
     let apply_right_with_locality t m =
@@ -8628,7 +8734,7 @@ module Crossing = struct
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left_unhint (Modality (Meet_const c)) m =
-      (* The left adjoint of meet is a restriction of identity *)
+      (* On the image of meet, identity is its left adjoint *)
       Mode.meet_const_unhint c m
 
     let apply_left_with_locality t m =

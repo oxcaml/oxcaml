@@ -346,7 +346,8 @@ let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
 let rewrite_set_of_closures env res ~(bound : Name.t list)
-    ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
+    ({ Rev_expr.function_decls; value_slots; dbg } :
+      Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
     List.exists
       (fun bound_name ->
@@ -513,7 +514,9 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
   let function_decls =
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let set_of_closures =
+    Set_of_closures.create ~value_slots ~dbg function_decls
+  in
   set_of_closures, { res with code_ids_to_remember }
 
 let rewrite_static_const env ~(bound_to : Symbol.t) (sc : SC.t) =

@@ -885,18 +885,18 @@ type t
 
 (* A wrapper made redundant by unification (here, the second component's
    variable is filled with [value]) is not printed back. *)
-let bad (x : ('a : (float64 & value) addressable)) (y : #('b * 'c)) =
+let bad (x : ('a : (value & float64) addressable)) (y : #('b * 'c)) =
   if true then x else y
 [%%expect{|
 Line 2, characters 22-23:
 2 |   if true then x else y
                           ^
 Error: The value "y" has type "#('b * 'c)" but an expression was expected of type
-         "('a : (float64 & value) addressable)"
+         "('a : (value & float64) addressable)"
        The layout of #('b * 'c) is
-           '_representable_layout_2 addressable & value_or_null
+           value_or_null & '_representable_layout_2 addressable
          because it is an unboxed tuple.
        But the layout of #('b * 'c) must be a sublayout of
-           (float64 & value) addressable
+           (value & float64) addressable
          because of the annotation on the type variable 'a.
 |}]

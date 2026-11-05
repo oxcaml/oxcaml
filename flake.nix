@@ -36,7 +36,6 @@
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           ppxlib = oxcaml.mkPpxlibLibs oxcaml;
           jsoo = oxcaml.mkJsooLibs oxcaml;
-          jsoo-test = oxcaml.mkJsooTest oxcaml;
           jsoo-smoke-test = oxcaml.mkJsooSmokeTest oxcaml;
           installed-libraries = oxcaml.mkInstalledLibrariesCheck oxcaml;
           default = oxcaml;
@@ -49,7 +48,6 @@
             oxcaml-asan
             ppxlib
             jsoo
-            jsoo-test
             jsoo-smoke-test
             installed-libraries
             merlin
