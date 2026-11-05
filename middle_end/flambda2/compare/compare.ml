@@ -1284,7 +1284,7 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
          && Inline_attribute.equal (Code.inline code1) (Code.inline code2)
          && Bool.equal (Code.is_a_functor code1) (Code.is_a_functor code2)
          && Recursive.equal (Code.recursive code1) (Code.recursive code2)
-         && Fdo_annotation.equal
+         && Fdo_annotation.With_body_hash.equal
               (Code.fdo_entry_annotation code1)
               (Code.fdo_entry_annotation code2))
 
