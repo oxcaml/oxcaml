@@ -202,6 +202,8 @@ module Layout : sig
 
     val product : t list -> t
 
+    val strip_head_addressable : t -> t
+
     val univar : Sort.univar -> Scannable_axes.t -> t
 
     val genvar : Sort.var -> Scannable_axes.t -> t
@@ -267,5 +269,11 @@ module Layout : sig
   val constrain_above_addressable :
     allow_mutation:bool -> Sort.t t -> (unit, Sort.error) result
 
-  val apply_operator : 'a t -> Kind_operator.t -> 'a t
+  val is_surely_addressable : Sort.t t -> bool
+
+  (** [addressable t] is [t] made addressable, without a redundant [Addressable]
+      when [t] is already known to be addressable. *)
+  val addressable : Sort.t t -> Sort.t t
+
+  val apply_operator : Sort.t t -> Kind_operator.t -> Sort.t t
 end

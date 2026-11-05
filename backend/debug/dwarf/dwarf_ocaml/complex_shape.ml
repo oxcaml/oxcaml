@@ -789,7 +789,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                field_layout ))
          fields)
   | Record { fields; kind = Record_unboxed_product }, Some ly
-    when Layout.equal ly (unboxed_record_layout fields) ->
+    when equal_layouts_erasing_addressable ly (unboxed_record_layout fields) ->
     record_unboxed
       (List.map
          (fun (field_name, _, field_value, field_layout) ->
