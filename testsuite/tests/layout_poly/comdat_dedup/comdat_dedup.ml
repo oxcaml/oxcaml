@@ -77,9 +77,12 @@
    with each losing copy of the code. The last block compiles [user1.ml] and
    [user2.ml] at different optimization levels, so that the copies differ.
    Calling both instances runs the GC through the surviving copy's frame.
+   [lpoly_select] has a jump table, which likewise refers into the code.
 
    The test runs the linked program and then shells out to [nm] to inspect
-   the symbol table. *)
+   the symbol table, and to [readelf] to check that nothing outside a COMDAT
+   group refers into it by section (which would dangle when a losing copy is
+   discarded, whether or not the linker notices). *)
 
 external box : float# -> float = "%box_float"
 
@@ -89,12 +92,16 @@ let () =
   let _ = Sys.opaque_identity User3.call_user1 () in
   let #(a, b) = User1.call_between () in
   let #(c, d) = User2.call_between () in
-  assert (box a = 2.0 && box b = 1.0 && box c = 4.0 && box d = 3.0)
+  assert (box a = 2.0 && box b = 1.0 && box c = 4.0 && box d = 3.0);
+  let #(k1, e, f) = User1.select 3 5 in
+  let #(k2, g, h) = User2.select 5 6 in
+  assert (k1 = 5 lxor 99 && box e = 2.0 && box f = 1.0);
+  assert (k2 = 36 && box g = 4.0 && box h = 3.0)
 
 let expected_symbol_res =
   [ "camlLpoly_lib__Lpoly_lib_lpoly_pair_.*float64_float64__cohort_code$";
-    "camlLpoly_lib__Lpoly_lib_lpoly_call_between_.*float64_float64__cohort_code$"
-  ]
+    "camlLpoly_lib__Lpoly_lib_lpoly_call_between_.*float64_float64__cohort_code$";
+    "camlLpoly_lib__Lpoly_lib_lpoly_select_.*float64_float64__cohort_code$" ]
 
 let () =
   let exe = Filename.quote Sys.executable_name in
@@ -116,3 +123,77 @@ let () =
       end)
     expected_symbol_res;
   if not !ok then exit 1
+
+let output_lines cmd ~out =
+  if Sys.command (Printf.sprintf "%s > %s" cmd (Filename.quote out)) <> 0
+  then failwith ("command failed: " ^ cmd);
+  In_channel.with_open_text out In_channel.input_lines
+
+let words s = String.split_on_char ' ' s |> List.filter (fun w -> w <> "")
+
+(* The offsets of the object's sections that are members of a COMDAT group,
+   from the "G" flag in [readelf -SW] output. *)
+let group_member_offsets obj =
+  output_lines ("readelf -SW " ^ Filename.quote obj) ~out:(obj ^ ".sections")
+  |> List.filter_map (fun line ->
+         match String.index_opt line ']' with
+         | None -> None
+         | Some i -> (
+           let fields =
+             words (String.sub line (i + 1) (String.length line - i - 1))
+           in
+           match fields with
+           | [_name; _type; _addr; off; _size; _es; flags; _lk; _inf; _al]
+             when String.contains flags 'G' ->
+             int_of_string_opt ("0x" ^ off)
+           | _ -> None))
+
+(* The sections of a weak function's group: its code and its jump tables. *)
+let is_cohort_section_symbol w =
+  String.starts_with ~prefix:".text." w
+  && (String.ends_with ~suffix:"__cohort_code" w
+     || String.ends_with ~suffix:"__cohort_code.jump_tables" w)
+
+(* Relocations from outside any group against a section symbol of a cohort
+   group. Linkers special-case unwind and debug information, which may. *)
+let bad_relocations obj =
+  let in_group = group_member_offsets obj in
+  let lines =
+    output_lines ("readelf -rW " ^ Filename.quote obj) ~out:(obj ^ ".relocs")
+  in
+  let _, bad =
+    List.fold_left
+      (fun (checking, bad) line ->
+        match
+          Scanf.sscanf_opt line "Relocation section '%s@' at offset %i"
+            (fun name off -> name, off)
+        with
+        | Some (name, off) ->
+          let allowed =
+            String.equal name ".rela.eh_frame"
+            || String.starts_with ~prefix:".rela.debug_" name
+            || List.mem off in_group
+          in
+          (if allowed then None else Some name), bad
+        | None -> (
+          match checking with
+          | Some name when List.exists is_cohort_section_symbol (words line) ->
+            checking, (name ^ ":" ^ line) :: bad
+          | Some _ | None -> checking, bad))
+      (None, []) lines
+  in
+  List.rev bad
+
+let () =
+  let dir = Filename.dirname Sys.executable_name in
+  let bad =
+    List.concat_map
+      (fun obj -> bad_relocations (Filename.concat dir obj))
+      ["user1.o"; "user2.o"; "user3.o"]
+  in
+  if bad <> []
+  then begin
+    prerr_endline "relocations into a COMDAT group from outside it:";
+    List.iter prerr_endline bad;
+    exit 1
+  end
