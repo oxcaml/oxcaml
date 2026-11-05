@@ -287,24 +287,30 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   { annots with forkable; yielding; contention; portability }
 
 let transl_mode_annots annots =
-  let annots =
-    List.filter_map
-      (fun { txt = Parsetree.Mode txt; loc } ->
-        Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-        try Some { txt = Mode_axis_pair.of_string ~loc txt; loc }
-        with Not_found ->
-          Error.log_or_raise loc (Unrecognized_modifier (Mode, txt));
-          None)
-      annots
+  let step modes_so_far { txt = Parsetree.Mode txt; loc } =
+    Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
+    let annot =
+      try Some { txt = Mode_axis_pair.of_string ~loc txt; loc }
+      with Not_found ->
+        Error.log_or_raise loc (Unrecognized_modifier (Mode, txt));
+        None
+    in
+    let new_modes_so_far =
+      match annot with
+      | Some { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } ->
+        if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
+        then (
+          Error.log_or_raise loc (Duplicated_axis (Mode, ax));
+          modes_so_far)
+        else With_locality.Const.Option.set ax (Some mode) modes_so_far
+      | None -> modes_so_far
+    in
+    new_modes_so_far, annot
   in
-  let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
-    if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
-    then (
-      Error.log_or_raise loc (Duplicated_axis (Mode, ax));
-      modes_so_far)
-    else With_locality.Const.Option.set ax (Some mode) modes_so_far
+  let modes, annots =
+    List.fold_left_map step With_locality.Const.Option.none annots
   in
-  let modes = List.fold_left step With_locality.Const.Option.none annots in
+  let annots = List.filter_map Fun.id annots in
   { mode_modes = modes; mode_desc = annots }
 
 let untransl_mode modes =
