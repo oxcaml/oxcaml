@@ -251,8 +251,9 @@ module F :
   functor (M : S3) -> sig type u = M.N.u module type T = Inner_with_type end
 |}]
 
-(* Like unrepresentable modules, functor applications have no runtime address.
-   Accessing types inside of functors must not force one. *)
+(* Like projections from unrepresentable modules, addresses inside functor
+   applications can't be computed. Accessing types through them mustn't
+   force one. *)
 module G (X : sig end) = struct
   module N = struct type u = int end
 end
