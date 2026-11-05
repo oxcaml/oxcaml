@@ -161,10 +161,18 @@ val sorts_of_signature_items:
   Subst.Lazy.signature_item list ->
   (module_representation, unrepresentable_item) result
 
+type address_head =
+  | AHunit of Compilation_unit.t
+  | AHlocal of Ident.t
+
+val address_head : address -> address_head
+
 val find_value_address: Path.t -> t -> address
 val find_module_address: Path.t -> t -> address
 val find_class_address: Path.t -> t -> address
 val find_constructor_address: Path.t -> t -> address
+
+val find_module_address_head : Location.t -> Path.t -> t -> address_head
 
 val shape_of_path:
   namespace:Shape.Sig_component_kind.t -> t -> Path.t -> Shape.t
@@ -884,12 +892,6 @@ val fold_cltypes:
 val check_value_name: string -> Location.t -> unit
 
 val print_address : Format.formatter -> address -> unit
-
-type address_head =
-  | AHunit of Compilation_unit.t
-  | AHlocal of Ident.t
-
-val address_head : address -> address_head
 
 val print_stage : Format_doc.formatter -> stage -> unit
 

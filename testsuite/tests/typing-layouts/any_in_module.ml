@@ -288,9 +288,7 @@ module F (M : S4) = struct
   let home = M.N.getenv "HOME"
 end
 [%%expect{|
->> Fatal error: expected representable type
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : S4) -> sig val home : string end
 |}]
 
 (* Can include in signatures without knowing the module representation. *)

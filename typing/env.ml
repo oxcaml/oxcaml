@@ -2056,6 +2056,12 @@ let normalize_module_path oloc env path =
       Error.log_and_raise
         (Missing_module(loc, path, normalize_module_path true env path))
 
+let find_module_address_head loc path env =
+  let path = normalize_module_path (Some loc) env path in
+  let root = Path.Pident (Path.head path) in
+  let address = find_module_address root env in
+  address_head address
+
 let rec normalize_path_prefix oloc env path =
   match path with
   | Pdot(p, s) ->
