@@ -38,7 +38,9 @@ let print_probability ~uniform ppf (probability : Likelihood.classification) =
   | Weight p -> if not uniform then Format.fprintf ppf "[p = %f]" p
 
 let print_fdo_annotation ppf fdo_annotation =
-  if !Oxcaml_flags.fdo_counters && not (Fdo_annotation.is_empty fdo_annotation)
+  if
+    Flambda_features.fdo_counters ()
+    && not (Fdo_annotation.is_empty fdo_annotation)
   then
     Format.fprintf ppf "[fdo_annotation %a]" Fdo_annotation.print fdo_annotation
 

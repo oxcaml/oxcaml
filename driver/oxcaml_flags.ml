@@ -195,8 +195,6 @@ let llvm_flags = ref "" (* -llvm-flags *)
 
 let fdo_counters = ref false (* -fdo-counters *)
 
-let fdo_counters_ignore_classic = ref false (* -fdo-counters-ignore-classic *)
-
 module Flambda2 = struct
   let debug = ref false (* -flambda2-debug *)
   let reaper_debug_flags = ref [] (* -reaper-debug-flags *)

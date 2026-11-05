@@ -594,12 +594,8 @@ let mk_llvm_flags f =
 let mk_fdo_counters f =
   ( "-fdo-counters",
     Arg.Unit f,
-    " Attach FDO counters to function entries, branches, and call sites" )
-
-let mk_fdo_counters_ignore_classic f =
-  ( "-fdo-counters-ignore-classic",
-    Arg.Unit f,
-    " Silently omit FDO counters in classic mode instead of failing" )
+    " Attach FDO counters to function entries, branches, and call sites (no \
+     counters are attached in classic mode)" )
 
 module Flambda2 = Oxcaml_flags.Flambda2
 
@@ -1518,7 +1514,6 @@ module type Oxcaml_options = sig
   val llvm_path : string -> unit
   val llvm_flags : string -> unit
   val fdo_counters : unit -> unit
-  val fdo_counters_ignore_classic : unit -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
   val reaper_debug_flags : string -> unit
@@ -1741,7 +1736,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_llvm_path F.llvm_path;
       mk_llvm_flags F.llvm_flags;
       mk_fdo_counters F.fdo_counters;
-      mk_fdo_counters_ignore_classic F.fdo_counters_ignore_classic;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
       mk_reaper_debug_flags F.reaper_debug_flags;
@@ -2199,9 +2193,6 @@ module Oxcaml_options_impl = struct
   let llvm_path s = Oxcaml_flags.llvm_path := Some s
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let fdo_counters = set' Oxcaml_flags.fdo_counters
-
-  let fdo_counters_ignore_classic =
-    set' Oxcaml_flags.fdo_counters_ignore_classic
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
 
@@ -2787,8 +2778,6 @@ module Extra_params = struct
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "fdo-counters" -> set' Oxcaml_flags.fdo_counters
-    | "fdo-counters-ignore-classic" ->
-        set' Oxcaml_flags.fdo_counters_ignore_classic
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
     | "reaper-debug-flags" ->
         Oxcaml_flags.Flambda2.reaper_debug_flags :=

@@ -37,6 +37,10 @@ let classic_mode () =
 
 let mode () = if classic_mode () then Mode Classic else Mode Normal
 
+(* Ignore classic mode since inlined functions don't get their counters
+   updated. *)
+let fdo_counters () = !Oxcaml_flags.fdo_counters && not (classic_mode ())
+
 let join_points () =
   !Oxcaml_flags.Flambda2.join_points |> with_default ~f:(fun d -> d.join_points)
 

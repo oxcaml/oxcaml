@@ -462,7 +462,8 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let fdo_entry_annotation =
         let annotation = Code.fdo_entry_annotation code in
         if
-          !Oxcaml_flags.fdo_counters && not (Fdo_annotation.is_empty annotation)
+          Flambda_features.fdo_counters ()
+          && not (Fdo_annotation.is_empty annotation)
         then Some annotation
         else None
       in
