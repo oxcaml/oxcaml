@@ -178,11 +178,10 @@ let split_direct_over_application apply ~callee's_code_id
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
       ~return_mode:outer_apply_alloc_mode
       (Apply.dbg apply)
-      (* Both this application of the result and the full application of the
-         callee below are calls made by the source call, so both carry its
-         counter: the profile then records the targets of each. *)
-      ~callsite_counter:(Apply.callsite_counter apply)
-      ~inlined:(Apply.inlined apply)
+      (* The source call has a single counter, on the full application of the
+         callee below. This application of its result has none: giving it the
+         same counter would count the source call twice. *)
+      ~callsite_counter:None ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)

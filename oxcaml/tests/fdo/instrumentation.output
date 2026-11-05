@@ -44,7 +44,6 @@ instrumentation.raw.fl:
   entry: "Instrumentation.partial":0 body_hash:4b84b832
   entry: "Instrumentation.over":0 body_hash:76af839b
   call: "Instrumentation.over":0:76af839b:0:call
-  call: "Instrumentation.over":0:76af839b:0:call
   entry: "Instrumentation.F":0 body_hash:4007f721
   call: "Instrumentation.F":0:4007f721:0:call
   call: "Instrumentation.F":0:module("Instrumentation.F":0):0:call
