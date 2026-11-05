@@ -265,6 +265,34 @@ module Empty : sig end
 type u = G(Empty).N.u
 |}]
 
+(* Addresses of non-primitive externals need to record a compilation unit,
+   but that shouldn't force the address. *)
+module type S4 = sig
+  type t : any
+  val x : t
+
+  module N : sig
+    external getenv : string -> string = "caml_sys_getenv"
+  end
+end
+[%%expect{|
+module type S4 =
+  sig
+    type t : any
+    val x : t
+    module N : sig external getenv : string -> string = "caml_sys_getenv" end
+  end
+|}]
+
+module F (M : S4) = struct
+  let home = M.N.getenv "HOME"
+end
+[%%expect{|
+>> Fatal error: expected representable type
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 (* Can include in signatures without knowing the module representation. *)
 module type Including_S = sig
   include S
