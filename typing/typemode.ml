@@ -296,14 +296,17 @@ let transl_mode_annots annots =
         None
     in
     let new_modes_so_far =
-      match annot with
-      | Some { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } ->
-        if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
-        then (
-          Error.log_or_raise loc (Duplicated_axis (Mode, ax));
-          modes_so_far)
-        else With_locality.Const.Option.set ax (Some mode) modes_so_far
-      | None -> modes_so_far
+      Option.bind annot
+        (fun { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } ->
+          if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
+          then (
+            Error.log_or_raise loc (Duplicated_axis (Mode, ax));
+            None)
+          else Some (With_locality.Const.Option.set ax (Some mode) modes_so_far))
+    in
+    let annot = match new_modes_so_far with None -> None | Some _ -> annot in
+    let new_modes_so_far =
+      Option.value new_modes_so_far ~default:modes_so_far
     in
     new_modes_so_far, annot
   in
