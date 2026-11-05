@@ -1,6 +1,7 @@
 (* Compares the function entry annotations of two compilations of the same
-   module. Extracts the annoations via the raw fexpr dumps obtained via
-   `-drawfexpr`. Prints each dump's entries, then those in only one of them. *)
+   module. Extracts the annotations from the raw fexpr dumps obtained via
+   `-dfexpr-annot-after raw`. Prints each dump's entries, then those in only
+   one of them. *)
 
 let prefix = "fdo_entry_annotation("
 
