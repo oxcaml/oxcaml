@@ -105,9 +105,14 @@ module Context = struct
     }
 
   let toplevel compilation_unit =
-    { enclosing_path = Compilation_unit.full_path_as_string compilation_unit;
-      occurrences = Misc.Stdlib.String.Tbl.create 64
-    }
+    let enclosing_path =
+      Compilation_unit.full_path_as_string compilation_unit
+    in
+    let occurrences = Misc.Stdlib.String.Tbl.create 64 in
+    (* Reserve discriminator 0 of the unit's own path for
+       [toplevel_function]. *)
+    Misc.Stdlib.String.Tbl.replace occurrences enclosing_path 1;
+    { enclosing_path; occurrences }
 
   let fresh_discriminator t ~path =
     let index =
