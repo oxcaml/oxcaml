@@ -526,6 +526,18 @@ module Unboxed_field_transformation : sig
       to turn it into an expectation on its unboxed contents, checking if the
       transformation result is satisfiable and failing if it is not. *)
   val apply_r : t -> ('l * allowed) Types.jkind -> (Types.jkind_r, unit) result
+
+  (** Translates a violation from checking some unboxed contents against
+      [apply_r t jk] into a violation of their unboxed container against [jk].
+      Returns [None] if the violation is not a [Not_a_subjkind]. *)
+  val unapply_violation :
+    context:jkind_context ->
+    Env.t ->
+    t ->
+    history:Types.jkind_history ->
+    ('l * allowed) Types.jkind ->
+    Violation.t ->
+    Violation.t option
 end
 
 (** Build a jkind of unboxed products, from a list of types, their layouts, and

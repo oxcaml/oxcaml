@@ -4468,6 +4468,19 @@ module Unboxed_field_transformation = struct
         (Mod_bounds.to_axis_lattice jk.jkind.mod_bounds)
     in
     if satisfiable then Ok (apply_modality_r t.modality jk) else Error ()
+
+  (* The failure reasons carry over: [apply_r] only relaxes the requirement on
+     axes that [apply_l] strengthens, and [apply_r] succeeding means that the
+     weakening by [mutability_transformation] can't introduce new failures. *)
+  let unapply_violation ~context env t ~history jk
+      ({ violation; missing_cmi } : Violation.t) =
+    match violation with
+    | Not_a_subjkind (sub, _, reasons) ->
+      let sub = { (apply_l t sub) with history } in
+      Some
+        (Violation.of_ ~context ?missing_cmi env
+           (Not_a_subjkind (sub, jk, reasons)))
+    | No_intersection _ -> None
 end
 
 let product_of_fields ~why fields layouts =
