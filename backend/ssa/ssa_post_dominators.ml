@@ -43,7 +43,9 @@ type t =
 
 (* Depth-first search from [root] of the graph with the given [successors].
    Returns the postorder number of each reachable node, and the reachable nodes
-   in reverse postorder. *)
+   in reverse postorder. Postorder numbers increase as DFS finishes each node,
+   after its children in the DFS tree. Reverse postorder lists nodes in
+   decreasing postorder number. *)
 let compute_postorder ~num_nodes ~(successors : Node.t -> Node.t list) ~root :
     int Node.Tbl.t * Node.t list =
   let postorder = Node.Tbl.create num_nodes in
