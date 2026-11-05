@@ -498,33 +498,17 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
 
   if (offset_d < offset_s) {
     for (long i = 0; i < length; i++) {
-<<<<<<< OxCaml
-      caml_ephe_await_key(ed, offset_d + i);
-      ephe_modify(ed, offset_d + i, ephe_key(es, offset_s + i));
-||||||| Upstream OCaml
-      caml_ephe_await_key(ed, offset_d + i);
-      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
-=======
       do_check_key_clean(es, offset_s + i);
       if (ed_has_data) { do_check_key_clean(ed, offset_d + i); }
       else { caml_ephe_await_key(ed, offset_d + i); }
-      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
->>>>>>> ocaml/ocaml#15033
+      ephe_modify(ed, offset_d + i, ephe_key(es, offset_s + i));
     }
   } else {
     for (long i = length - 1; i >= 0; i--) {
-<<<<<<< OxCaml
-      caml_ephe_await_key(ed, offset_d + i);
-      ephe_modify(ed, offset_d + i, ephe_key(es, offset_s + i));
-||||||| Upstream OCaml
-      caml_ephe_await_key(ed, offset_d + i);
-      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
-=======
       do_check_key_clean(es, offset_s + i);
       if (ed_has_data) { do_check_key_clean(ed, offset_d + i); }
       else { caml_ephe_await_key(ed, offset_d + i); }
-      ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
->>>>>>> ocaml/ocaml#15033
+      ephe_modify(ed, offset_d + i, ephe_key(es, offset_s + i));
     }
   }
   CAMLreturn(Val_unit);
