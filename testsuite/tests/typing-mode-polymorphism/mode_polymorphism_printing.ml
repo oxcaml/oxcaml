@@ -677,8 +677,7 @@ val opaque_return :
   'b @ 'm -> 'a @ [> aliased nonportable stateful dynamic] = <fun>
 val global_opaque_return :
   'a @ [< global many uncontended forkable unyielding read_write] ->
-  ('b @ 'm -> 'a @ [> aliased nonportable stateful dynamic]) @ [< global > nonportable stateful] =
-  <fun>
+  'b @ 'm -> 'a @ [> aliased nonportable stateful dynamic] = <fun>
 |}]
 
 let _ : (string -> (unit -> string) @ local) ref = ref opaque_return
