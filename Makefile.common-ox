@@ -21,6 +21,14 @@ ifneq ($(BUILD_OCAMLPARAM),)
 main_ocamlparam = syntax-quotations=0,$(BUILD_OCAMLPARAM)
 endif
 
+# Also for the libraries of external/ast-dependent-libs, as js_of_ocaml and
+# wasm_of_ocaml ship with the compiler.
+ifeq ($(main_build_profile),dev)
+main_ocamlopt_optimization_flags :=
+else
+main_ocamlopt_optimization_flags := -O3
+endif
+
 define dune_main_context
 (lang dune 3.23)
 (using oxcaml 0.1)
@@ -38,12 +46,12 @@ define dune_main_context
     ; Not the toplevel of this build, which only runs once installed.
     (binaries (duneconf/ocaml as ocaml))
     (bin_annot_cms true)
-    ; The root project's profiles add -warn-error +A, and the main profile
-    ; adds -O3 (see the root dune file): this environment also applies to the
-    ; libraries of external/ast-dependent-libs.
+    ; The root project's profiles add -warn-error +A (see the root dune file):
+    ; this environment also applies to the libraries of
+    ; external/ast-dependent-libs.
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
-    (ocamlopt_flags (:standard -fno-asan))
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
     (env-vars ("OCAMLPARAM" "$(main_ocamlparam)"))))))
 endef
 
