@@ -65,7 +65,7 @@ let match_simple_printer_type env ty ~is_old_style =
   in
   match
     Ctype.with_local_level_generalize
-      ~before_generalize:Ctype.generalize begin fun () ->
+      ~generalize:Ctype.generalize begin fun () ->
       let ty_arg =
         Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument)
       in
@@ -137,7 +137,7 @@ let match_generic_printer_type env ty =
   | Some (ty_path, params) ->
       match
         Ctype.with_local_level_generalize
-          ~before_generalize:(List.iter Ctype.generalize)
+          ~generalize:(List.iter Ctype.generalize)
           begin fun () ->
           let args = List.map (fun _ ->
             Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument))

@@ -188,9 +188,9 @@ Line 1, characters 8-30:
             ^^^^^^^^^^^^^^^^^^^^^^
 Warning 10 [non-unit-statement]: this expression should have type unit.
 
-Line 1, characters 9-21:
+Line 1, characters 8-30:
 1 | let _ = (assert false : t_any); ()
-             ^^^^^^^^^^^^
+            ^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
          "('a : '_representable_layout_6)"
        because it is in the left-hand side of a sequence
