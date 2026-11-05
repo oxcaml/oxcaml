@@ -1126,9 +1126,10 @@ Line 2, characters 55-56:
 Error: The value "x" has type "shared_outer"
        but an expression was expected of type "('a : value mod contended)"
        The kind of shared_outer is
-           mutable_data non_pointer mod global dynamic unforkable yielding
-         because of the definition of mut_inner at line 1, characters 0-37.
-       But the kind of shared_outer must be a subkind of value mod corrupted
+           mutable_data non_pointer
+             mod global shared dynamic unforkable yielding
+         because of the definition of shared_outer at line 1, characters 0-48.
+       But the kind of shared_outer must be a subkind of value mod contended
          because of the annotation on the wildcard _ at line 2, characters 27-52.
 |}]
 
@@ -1175,8 +1176,8 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 (* Single-label unboxed records are looked through when checking a kind, which
    can refine the declared layout. But no contents could make [mut1] cross
-   contention, so a requirement to cross contention stops looking through and
-   reports the declared layout. *)
+   contention, so a requirement to cross contention fails without checking the
+   contents. *)
 type 'a mut1 = #{ mutable v : 'a }
 let f (x : int mut1) : (_ : value non_pointer) = x
 [%%expect {|
@@ -1191,9 +1192,9 @@ Line 1, characters 41-42:
                                              ^
 Error: The value "x" has type "int mut1" but an expression was expected of type
          "('a : immediate)"
-       The layout of int mut1 is value
+       The kind of int mut1 is
+           mutable_data non_pointer mod global dynamic unforkable yielding
          because of the definition of mut1 at line 1, characters 0-34.
-       But the layout of int mut1 must be a sublayout of value non_pointer
+       But the kind of int mut1 must be a subkind of immediate
          because of the annotation on the wildcard _ at line 1, characters 23-38.
-       Note: The layout of immediate is value non_pointer.
 |}]

@@ -3819,10 +3819,34 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
                  begin match
                    Jkind.Unboxed_field_transformation.apply_r wrapping jkind
                  with
-                 | Ok jkind ->
-                   estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env
-                     ty jkind
-                 | Error () -> Error error
+                 | Ok inner_jkind ->
+                   begin match
+                     estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false
+                       env ty inner_jkind
+                   with
+                   | Ok () -> Ok ()
+                   | Error inner_error ->
+                     (* The [loop]-ed error is about [ty] and a requirement
+                        transformed by [wrapping], so we translate it back. *)
+                     Jkind.Unboxed_field_transformation.unapply_violation
+                       ~context env wrapping ~history:ty's_jkind.history
+                       jkind inner_error
+                     |> Option.value ~default:error
+                     |> Result.error
+                   end
+                 | Error () ->
+                   (* [error] compares the first approximation [ty's_jkind]
+                      against [jkind], so it may report a mismatch that looking
+                      through would resolve. We recompute to report the most
+                      accurate error in this case (e.g. some bad crossing) *)
+                   let ty's_best_jkind =
+                     type_jkind_purely env ty
+                     |> Jkind.Unboxed_field_transformation.apply_l wrapping
+                   in
+                   Error (Jkind.Violation.of_ ~context env
+                     (Not_a_subjkind
+                        ({ ty's_best_jkind with history = ty's_jkind.history },
+                         jkind, sub_failure_reasons)))
                  end
                | Stepped { ty; wrapping; or_null = Some _ } ->
                  or_null ~fuel:(fuel - 1) ty wrapping
