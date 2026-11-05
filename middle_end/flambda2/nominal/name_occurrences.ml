@@ -430,8 +430,15 @@ let count_variable t var = For_names.count t.names (Name.var var)
 let count_variable_normal_mode t var =
   For_names.count_normal t.names (Name.var var)
 
-let count_variable_phantom_mode t var =
-  For_names.count_phantom t.names (Name.var var)
+let count_variable_by_name_mode t var : Num_occurrences.By_name_mode.t =
+  let name = Name.var var in
+  { normal = For_names.count_normal t.names name;
+    phantom = For_names.count_phantom t.names name
+  }
+
+let variable_needed_by_phantom_let t var =
+  Num_occurrences.By_name_mode.needed_by_phantom_let var
+    (count_variable_by_name_mode t var)
 
 let singleton_variable var name_mode =
   { empty with names = For_names.singleton (Name.var var) name_mode }

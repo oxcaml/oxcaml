@@ -160,8 +160,9 @@ val create_bound_parameter :
   t * Backend_var.With_provenance.t
 
 (** Same as {!create_variable} but for a list of variables. The boolean
-    component indicates whether the parameter's binder is marked as needed by
-    phantom lets (see [Bound_parameter.needed_by_phantom_let]). *)
+    component indicates whether the parameter's binder must carry provenance
+    because the parameter is needed by phantom lets (see
+    [Num_occurrences.By_name_mode.needed_by_phantom_let]). *)
 val create_bound_parameters :
   t ->
   (Variable.t * Flambda_debug_uid.t * bool) list ->
@@ -263,6 +264,7 @@ val bind_variable_to_primitive :
   To_cmm_result.t ->
   Bound_var.t ->
   inline:'a inline ->
+  needed_by_phantom_let:bool ->
   defining_expr:'a bound_expr ->
   effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
   t * To_cmm_result.t
@@ -276,7 +278,7 @@ val bind_variable :
   Bound_var.t ->
   defining_expr:Cmm.expression ->
   free_vars_of_defining_expr:free_vars ->
-  num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
+  num_occurrences_of_bound_vars:Num_occurrences.By_name_mode.t Variable.Map.t ->
   effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
   t * To_cmm_result.t
 
@@ -285,7 +287,7 @@ val add_alias :
   To_cmm_result.t ->
   var:Bound_var.t ->
   alias_of:Variable.t ->
-  num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
+  num_occurrences_of_bound_vars:Num_occurrences.By_name_mode.t Variable.Map.t ->
   t * To_cmm_result.t
 
 val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
@@ -358,7 +360,8 @@ type cont = private
       }
   | Inline of
       { handler_params : Bound_parameters.t;
-        handler_params_occurrences : Num_occurrences.t Variable.Map.t;
+        handler_params_occurrences :
+          Num_occurrences.By_name_mode.t Variable.Map.t;
         handler_body : Flambda.Expr.t;
         handler_body_inlined_debuginfo : Inlined_debuginfo.t
       }
@@ -376,7 +379,7 @@ val add_inline_cont :
   t ->
   Continuation.t ->
   handler_params:Bound_parameters.t ->
-  handler_params_occurrences:Num_occurrences.t Variable.Map.t ->
+  handler_params_occurrences:Num_occurrences.By_name_mode.t Variable.Map.t ->
   handler_body:Flambda.Expr.t ->
   t
 

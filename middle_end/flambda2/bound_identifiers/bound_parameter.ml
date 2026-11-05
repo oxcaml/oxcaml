@@ -19,60 +19,37 @@ module Simple = Int_ids.Simple
 type t =
   { param : Variable.t;
     uid : Flambda_debug_uid.t;
-    kind : Flambda_kind.With_subkind.t;
-    needed_by_phantom_let : bool
+    kind : Flambda_kind.With_subkind.t
   }
 
 include Container_types.Make (struct
   type nonrec t = t
 
-  let compare
-      { param = param1;
-        kind = kind1;
-        uid = uid1;
-        needed_by_phantom_let = needed_by_phantom_let1
-      }
-      { param = param2;
-        kind = kind2;
-        uid = uid2;
-        needed_by_phantom_let = needed_by_phantom_let2
-      } =
+  let compare { param = param1; kind = kind1; uid = uid1 }
+      { param = param2; kind = kind2; uid = uid2 } =
     let c = Variable.compare param1 param2 in
     if c <> 0
     then c
     else
       let c = Flambda_kind.With_subkind.compare kind1 kind2 in
-      if c <> 0
-      then c
-      else
-        let c = Flambda_debug_uid.compare uid1 uid2 in
-        if c <> 0
-        then c
-        else Bool.compare needed_by_phantom_let1 needed_by_phantom_let2
+      if c <> 0 then c else Flambda_debug_uid.compare uid1 uid2
 
   let equal t1 t2 = compare t1 t2 = 0
 
-  let hash { param; kind; uid; needed_by_phantom_let } =
+  let hash { param; kind; uid } =
     Hashtbl.hash
       ( Variable.hash param,
         Flambda_kind.With_subkind.hash kind,
-        Flambda_debug_uid.hash uid,
-        needed_by_phantom_let )
+        Flambda_debug_uid.hash uid )
 
   let print_debug_uid ppf duid =
     if !Clflags.dump_debug_uids
     then Format.fprintf ppf "%@{%a}" Flambda_debug_uid.print duid
 
-  let [@ocamlformat "disable"] print ppf
-      { param; kind; uid; needed_by_phantom_let } =
-    let print_var =
-      if needed_by_phantom_let
-      then Variable.print_as_needed_by_phantom_let
-      else Variable.print
-    in
+  let [@ocamlformat "disable"] print ppf { param; kind; uid } =
     Format.fprintf ppf "@[(%t%a%a%t @<1>\u{2237} %a)@]"
       Flambda_colours.parameter
-      print_var param
+      Variable.print param
       print_debug_uid uid
       Flambda_colours.pop
       Flambda_kind.With_subkind.print kind
@@ -89,7 +66,7 @@ let create param kind uid =
       "Cannot create parameter %a with kind %a: it must have a subkind of %a"
       Variable.print param Flambda_kind.With_subkind.print kind
       Flambda_kind.print (Variable.kind param);
-  { param; kind; uid; needed_by_phantom_let = false }
+  { param; kind; uid }
 
 let var t = t.param
 
@@ -109,20 +86,16 @@ let is_renamed_version_of t t' =
   Flambda_kind.With_subkind.equal t.kind t'.kind
   && Variable.is_renamed_version_of t.param t'.param
 
-let needed_by_phantom_let t = t.needed_by_phantom_let
-
-let with_needed_by_phantom_let t = { t with needed_by_phantom_let = true }
-
-let free_names { param; kind = _; uid = _; needed_by_phantom_let = _ } =
+let free_names { param; kind = _; uid = _ } =
   Name_occurrences.singleton_variable param Name_mode.normal
 
-let apply_renaming ({ param; _ } as t) renaming =
+let apply_renaming ({ param; kind; uid } as t) renaming =
   let param' = Renaming.apply_variable renaming param in
-  if param == param' then t else { t with param = param' }
+  if param == param' then t else create param' kind uid
 
-let import_and_rename ({ param; _ } as t) renaming =
+let import_and_rename { param; kind; uid } renaming =
   let renaming, param = Renaming.bind_variable renaming param in
-  renaming, { t with param }
+  renaming, create param kind uid
 
-let ids_for_export { param; kind = _; uid = _; needed_by_phantom_let = _ } =
+let ids_for_export { param; kind = _; uid = _ } =
   Ids_for_export.add_variable Ids_for_export.empty param

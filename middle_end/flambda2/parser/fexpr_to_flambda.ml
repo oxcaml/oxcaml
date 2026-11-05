@@ -355,8 +355,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       if is_phantom then Name_mode.phantom else Name_mode.normal
     in
     let binding_to_var_and_closure_binding : Fexpr.let_binding -> _ = function
-      | { var; defining_expr = Closure binding; needed_by_phantom_let } ->
-        (var, needed_by_phantom_let), binding
+      | { var; defining_expr = Closure binding; needed_by_phantom_let = _ } ->
+        var, binding
       | { var = { txt = _; loc };
           defining_expr = Simple _ | Prim _ | Rec_info _;
           _
@@ -368,15 +368,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       List.map binding_to_var_and_closure_binding bindings
     in
     let bound_vars, env =
-      let convert_binding env ((var, needed_by_phantom_let), _) :
-          Bound_var.t * env =
+      let convert_binding env (var, _) : Bound_var.t * env =
         let var, var_duid, env = fresh_var env var Flambda_kind.value in
         let var = Bound_var.create var var_duid name_mode in
-        let var =
-          if needed_by_phantom_let
-          then Bound_var.with_needed_by_phantom_let var
-          else var
-        in
         var, env
       in
       map_accum_left convert_binding env vars_and_closure_bindings
@@ -405,7 +399,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
   | Let { value_slots = Some _; _ } ->
     Misc.fatal_errorf "'with' clause only allowed when defining closures"
   | Let
-      { bindings = [{ var; defining_expr = d; needed_by_phantom_let }];
+      { bindings = [{ var; defining_expr = d; needed_by_phantom_let = _ }];
         body;
         value_slots = None;
         is_phantom
@@ -417,11 +411,6 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       if is_phantom then Name_mode.phantom else Name_mode.normal
     in
     let var = Bound_var.create id id_duid name_mode in
-    let var =
-      if needed_by_phantom_let
-      then Bound_var.with_needed_by_phantom_let var
-      else var
-    in
     let bound = Bound_pattern.singleton var in
     let let_expr =
       Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
@@ -452,18 +441,13 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let create_params env params =
       let env, parameters =
         List.fold_right
-          (fun ({ param; kind; needed_by_phantom_let } : Fexpr.kinded_parameter)
-               (env, args) ->
+          (fun ({ param; kind; needed_by_phantom_let = _ } :
+                 Fexpr.kinded_parameter) (env, args) ->
             let kind = value_kind_with_subkind_opt kind in
             let var, var_duid, env =
               fresh_var env param (Flambda_kind.With_subkind.kind kind)
             in
             let param = Bound_parameter.create var kind var_duid in
-            let param =
-              if needed_by_phantom_let
-              then Bound_parameter.with_needed_by_phantom_let param
-              else param
-            in
             env, param :: args)
           params (env, [])
       in
@@ -488,6 +472,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       | Recursive _ ->
         let handlers = Continuation.Lmap.singleton name handler in
         Flambda.Let_cont.create_recursive ~invariant_params handlers ~body
+          ~free_names_of_handlers:Unknown
     in
     acc, let_cont
   | Let_cont _ -> failwith "TODO andwhere"
@@ -751,18 +736,13 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let params, env =
             map_accum_left
               (fun env
-                   ({ param; kind; needed_by_phantom_let } :
+                   ({ param; kind; needed_by_phantom_let = _ } :
                      Fexpr.kinded_parameter) ->
                 let kind = value_kind_with_subkind_opt kind in
                 let var, var_duid, env =
                   fresh_var env param (Flambda_kind.With_subkind.kind kind)
                 in
                 let param = Bound_parameter.create var kind var_duid in
-                let param =
-                  if needed_by_phantom_let
-                  then Bound_parameter.with_needed_by_phantom_let param
-                  else param
-                in
                 param, env)
               env params
           in

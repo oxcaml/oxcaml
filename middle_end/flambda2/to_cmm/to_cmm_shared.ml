@@ -356,12 +356,12 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   in
   List.rev args, free_vars, env, res, effs
 
-let bound_parameters_aux ~f env l =
+let bound_parameters_aux ~f ~needed_by_phantom_let env l =
   let flambda_vars =
     List.map
       (fun bp ->
         let var, uid = Bound_parameter.var_and_uid bp in
-        var, uid, Bound_parameter.needed_by_phantom_let bp)
+        var, uid, needed_by_phantom_let var)
       (Bound_parameters.to_list l)
   in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in
@@ -370,11 +370,22 @@ let bound_parameters_aux ~f env l =
   in
   env, vars
 
-let continuation_bound_parameters env l =
-  bound_parameters_aux ~f:param_machtype_of_kinded_parameter env l
+let continuation_bound_parameters env l ~num_occurrences_of_params =
+  bound_parameters_aux ~f:param_machtype_of_kinded_parameter
+    ~needed_by_phantom_let:(fun var ->
+      Num_occurrences.By_name_mode.needed_by_phantom_let_in_map var
+        num_occurrences_of_params)
+    env l
 
-let function_bound_parameters env l =
-  bound_parameters_aux ~f:machtype_of_kinded_parameter env l
+let function_bound_parameters env l ~free_names_of_body =
+  let needed_by_phantom_let var =
+    match (free_names_of_body : _ Or_unknown.t) with
+    | Unknown -> false
+    | Known free_names ->
+      Name_occurrences.variable_needed_by_phantom_let free_names var
+  in
+  bound_parameters_aux ~f:machtype_of_kinded_parameter ~needed_by_phantom_let
+    env l
 
 let invalid res ~message =
   let message_sym, res =

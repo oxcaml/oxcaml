@@ -10,10 +10,10 @@ let code loopify(never) size(24) newer_version_of(test_0)
      | 0 -> k3
      | 1 -> k4)
     where k4 =
-      let np int_add = %int_barith.add (x, 1) in
+      let int_add = %int_barith.add (x, 1) in
       cont k2 (int_add)
     where k3 =
-      let np int_mul = %int_barith.mul (x, 2) in
+      let int_mul = %int_barith.mul (x, 2) in
       cont k2 (int_mul)
     where k2 (np a : imm tagged) =
       let phantom pair = %block.[`0`].my_alloc_region.local[`region`] (a, x)

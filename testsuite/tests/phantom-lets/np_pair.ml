@@ -11,9 +11,10 @@
    variables (continuation parameters). Once [pair]'s projections have been
    simplified away, [pair]'s binding becomes a phantom let referencing those
    variables, which must therefore be marked "np" (not user visible, but
-   needed by phantom let) so that they remain locatable by the debugger. The region variable of [pair]'s local allocation, in
-   contrast, must not be so marked: it cannot be referenced by phantom
-   defining expressions once translated to Cmm. *)
+   needed by phantom let) so that they remain locatable by the debugger. The
+   region variable of [pair]'s local allocation, in contrast, is not marked:
+   the phantom defining expression mentions it, but such expressions never
+   evaluate regions, so the debugger has no need of it. *)
 
 let[@inline never] [@local never] produce x = x + 1
 

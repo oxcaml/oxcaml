@@ -41,7 +41,7 @@ val let_dynamic_set_of_closures :
   To_cmm_result.t ->
   body:Expr.t ->
   bound_vars:Bound_var.t list ->
-  num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
+  num_occurrences_of_bound_vars:Num_occurrences.By_name_mode.t Variable.Map.t ->
   Set_of_closures.t ->
   Alloc_mode.For_allocations.t ->
   translate_expr:translate_expr ->

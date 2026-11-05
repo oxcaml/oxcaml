@@ -9,14 +9,11 @@
 
 (* The unboxed fields of [state] become non-user-visible parameters of the
    loopified recursive continuation. The phantom let for [pair] references
-   only the first field's parameter, which must be marked "np". However the
-   marking must extend through the loop-carried argument cycle: the first
-   field's next value is the second field's parameter, so the debugger may
-   need to locate the second field's parameter (and, similarly, the
-   temporaries passed as loop arguments, such as the decremented fuel) in
-   order to recover values that phantom lets refer to. These transitive
-   requirements go through the argument edges of the recursive continuation
-   and therefore need the fixed point computed by the flow analysis. *)
+   only the first field's parameter, which is therefore marked "np". The
+   second field's parameter and the temporaries passed as loop arguments
+   (such as the decremented fuel) are not marked, even though their values
+   flow into the first field's parameter around the loop: the marking records
+   only direct references from the defining expressions of phantom lets. *)
 
 let[@inline never] [@local never] [@loop] rec iter fuel (state : int * int) =
   if fuel = 0

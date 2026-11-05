@@ -9,7 +9,9 @@
 
 (* As for np_pair.ml, but here the variable referenced by the phantom let for
    [pair] is a parameter of a recursive continuation: the unboxed contents of
-   [acc], carried around the loop. It must likewise be marked "np". *)
+   [acc], carried around the loop. It must likewise be marked "np". The
+   temporaries computed in the loop body (the sum and the next loop counter)
+   are not referenced by any phantom let and so are not marked. *)
 
 let test n =
   let acc = ref 1 in

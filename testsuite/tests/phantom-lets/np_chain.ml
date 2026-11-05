@@ -10,12 +10,11 @@
 (* Once [pair]'s projections have been simplified away, its binding becomes a
    phantom let referencing the non-user-visible temporary holding
    [(produce x * 2) + 1]. That temporary remains a normal let (its value is
-   also used by the addition of the two components), so it is marked "np";
-   and the marking must propagate through the defining expressions of marked
-   bindings: the multiplication temporary, and in turn the non-user-visible
-   continuation parameter receiving [produce x]'s result, must also be marked
-   "np", since the debugger may need them to recover the values of variables
-   further down the chain. *)
+   also used by the addition of the two components), so it is marked "np"
+   (not user visible, but needed by a phantom let). Only variables directly
+   referenced by the defining expressions of phantom lets are marked: the
+   multiplication temporary and the continuation parameter receiving
+   [produce x]'s result are not, since no phantom let refers to them. *)
 
 let[@inline never] [@local never] produce x = x + 1
 

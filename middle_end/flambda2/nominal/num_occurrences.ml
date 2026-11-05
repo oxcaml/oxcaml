@@ -24,3 +24,31 @@ let [@ocamlformat "disable"] print ppf t =
   | Zero -> Format.fprintf ppf "Zero"
   | One -> Format.fprintf ppf "One"
   | More_than_one -> Format.fprintf ppf "More_than_one"
+
+module By_name_mode = struct
+  type num_occurrences = t
+
+  type t =
+    { normal : num_occurrences;
+      phantom : num_occurrences
+    }
+
+  let print ppf { normal; phantom } =
+    match phantom with
+    | Zero -> Format.fprintf ppf "#%a" print normal
+    | One | More_than_one ->
+      Format.fprintf ppf "#%a(phantom #%a)" print normal print phantom
+
+  let needed_by_phantom_let var { normal = _; phantom } =
+    match phantom with
+    | Zero -> false
+    | One | More_than_one -> (
+      match Variable.kind var with
+      | Region | Rec_info -> false
+      | Value | Naked_number _ -> true)
+
+  let needed_by_phantom_let_in_map var num_occurrences =
+    match Variable.Map.find var num_occurrences with
+    | exception Not_found -> false
+    | num_occurrences -> needed_by_phantom_let var num_occurrences
+end
