@@ -102,7 +102,7 @@ end
 
 module Inlining : sig
   type inlinable_result =
-    | Not_inlinable
+    | Not_inlinable of { disabled_for_jsir : bool }
     | Inlinable of Code.t
 
   val threshold : unit -> int

@@ -57,7 +57,9 @@ module Use_info = struct
         then " (is it marked [@inline never]?)"
         else "")
     | Jsir_inlining_disabled ->
-      Some "function inlining is disabled for Js_of_ocaml translation"
+      Some
+        "the function's body refers to closure slots, which cannot be moved \
+         into another function when compiling to Js_of_ocaml"
 end
 
 type t =
