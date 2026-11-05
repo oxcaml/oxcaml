@@ -7289,10 +7289,7 @@ module Mode_with (Areality : Areality) = struct
         in
         let general = copy_generic ~copy_scope general in
         let log = ref S.empty_changes in
-        let result =
-          equate_from_submode (submode_log ?pp:None) general specific
-            ~log:(Some log)
-        in
+        let result = submode_log general specific ~log:(Some log) in
         S.undo_changes !log;
         Result.is_ok result)
 
