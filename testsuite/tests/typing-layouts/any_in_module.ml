@@ -392,6 +392,26 @@ module F : functor (M : S) -> sig end
 |}]
 
 module F (M : S) = struct
+  open M
+  (* ...but this isn't, because it gets compiled as the projection [M.y]. *)
+  let y = y
+end
+[%%expect {|
+Line 4, characters 10-11:
+4 |   let y = y
+              ^
+Error: This path projects from a module that contains unrepresentable items.
+Line 3, characters 2-11:
+3 |   val x : t
+      ^^^^^^^^^
+  "x" is not representable.
+  The layout of t is any
+    because of the definition of t at line 2, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in a module being projected from.
+|}]
+
+module F (M : S) = struct
   open (M : S)
 end
 [%%expect {|
