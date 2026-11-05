@@ -219,16 +219,34 @@ end
 let use_external (type (a : float64 mod external_)) (_ : a) = ()
 let ok_value = use_external (M.mk ())
 [%%expect{|
-module M : sig type 'a f : float64 with 'a val mk : unit -> string f end
-val use_external : ('a : float64). 'a -> unit = <fun>
-val ok_value : unit = ()
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   type 'a f = #{ x : float# }
+6 |   let mk () = #{ x = #1. }
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a f = #{ x : float#; } val mk : unit -> 'a f end
+       is not included in
+         sig type 'a f : float64 with 'a val mk : unit -> string f end
+       Type declarations do not match:
+         type 'a f = #{ x : float#; }
+       is not included in
+         type 'a f : float64 with 'a
+       The layout of the first is float64 addressable
+         because it is the expansion of a type abbreviation.
+       But the layout of the first must be a sublayout of float64
+         because of the definition of f at line 2, characters 2-29.
 |}]
 
 let ok_value_infer y =
   use_external y;
   (y : string M.f)
 [%%expect{|
-val ok_value_infer : string M.f -> string M.f = <fun>
+Line 2, characters 2-14:
+2 |   use_external y;
+      ^^^^^^^^^^^^
+Error: Unbound value "use_external"
 |}]
 
 (* Scannable layouts with separability [non_pointer] inherently cross
