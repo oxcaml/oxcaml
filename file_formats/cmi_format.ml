@@ -247,7 +247,7 @@ let output_cmi filename oc cmi =
   flush oc;
   let crc = Digest.file filename in
   let no_crc =
-    List.exists (function No_crc -> true | _ -> false) cmi.cmi_flags
+    List.mem No_crc cmi.cmi_flags
   in
   let my_info =
     if no_crc then Import_info.Intf.create cmi.cmi_name None
