@@ -137,3 +137,104 @@ class virtual ['ctx, 'res] lift_map_with_context :
     method t : 'ctx -> t -> t * 'res
   end
 |}]
+
+(* Test [Ast_traverse.sexp_of] and compare it visually to [Pprintast]. *)
+let via_pprintast, via_sexp_of =
+  let open Stdppx in
+  (* Pretty-print a string by turning it into a multi-line list, all padded to the same
+     length. This forces the value printer to split every string onto its own line.
+     Otherwise it may put multiple indented strings onto one line, which is unreadable. *)
+  let pretty string =
+    let lines = String.split_on_char string ~sep:'\n' in
+    let len =
+      List.fold_left lines ~init:0 ~f:(fun acc string ->
+        Int.max acc (String.length string))
+    in
+    List.map lines ~f:(fun string ->
+      string ^ String.make (len - String.length string) ' ')
+  in
+  (* Tests dotted identifier, infix operator, attributes, and [Location.none]. *)
+  let expr =
+    let loc = Ppxlib.Location.none in
+    [%expr
+      function
+      | 0 -> true
+      | 1 -> false
+      | n -> (f [@tailcall]) (Stdlib.Int.( - ) n 2)]
+  in
+  (* Tests locations and [loc_ghost]. *)
+  let structure =
+    let loc : Ppxlib.Location.t =
+      {
+        loc_ghost = true;
+        loc_start = { pos_fname = "file.ml"; pos_lnum = 2; pos_bol = 1; pos_cnum = 2 };
+        loc_end = { pos_fname = "file.ml"; pos_lnum = 4; pos_bol = 6; pos_cnum = 9 };
+      }
+    in
+    [%str
+      module M = struct
+        let rec f = [%e expr]
+      end]
+  in
+  (* Render two different ways. *)
+  let via_pprintast = Ppxlib.Pprintast.string_of_structure structure |> pretty in
+  let via_sexp_of =
+    structure
+    |> Ppxlib.Ast_traverse.sexp_of#structure
+    |> Sexp.to_string_hum
+    |> pretty
+  in
+  via_pprintast, via_sexp_of
+[%%expect{|
+val via_pprintast : string list =
+  ["module M =                                         ";
+   "  struct                                           ";
+   "    let rec f =                                    ";
+   "      function                                     ";
+   "      | 0 -> true                                  ";
+   "      | 1 -> false                                 ";
+   "      | n -> ((f)[@tailcall ]) (Stdlib.Int.(-) n 2)";
+   "  end                                              "]
+val via_sexp_of : string list =
+  ["(((pstr_desc                                                                   ";
+   "   (Pstr_module                                                                ";
+   "    ((pmb_name                                                                 ";
+   "      ((txt (M)) (loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\")))    ";
+   "     (pmb_expr                                                                 ";
+   "      ((pmod_desc                                                              ";
+   "        (Pmod_structure                                                        ";
+   "         (((pstr_desc                                                          ";
+   "            (Pstr_value Recursive                                              ";
+   "             (((pvb_pat                                                        ";
+   "                ((ppat_desc                                                    ";
+   "                  (Ppat_var                                                    ";
+   "                   ((txt f)                                                    ";
+   "                    (loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\"))))";
+   "                 (ppat_loc                                                     ";
+   "                  \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\")))        ";
+   "               (pvb_expr                                                       ";
+   "                (Pexp_function () ()                                           ";
+   "                 (Pfunction_cases                                              ";
+   "                  (((pc_lhs (Ppat_constant (Pconst_integer 0 ())))             ";
+   "                    (pc_rhs (Pexp_construct true ())))                         ";
+   "                   ((pc_lhs (Ppat_constant (Pconst_integer 1 ())))             ";
+   "                    (pc_rhs (Pexp_construct false ())))                        ";
+   "                   ((pc_lhs (Ppat_var n))                                      ";
+   "                    (pc_rhs                                                    ";
+   "                     (Pexp_apply                                               ";
+   "                      ((pexp_desc (Pexp_ident f)) (pexp_loc_stack (()))        ";
+   "                       (pexp_attributes                                        ";
+   "                        (((attr_name tailcall) (attr_payload (PStr ()))))))    ";
+   "                      ((Nolabel                                                ";
+   "                        ((pexp_desc                                            ";
+   "                          (Pexp_apply (Pexp_ident \"Stdlib.Int.( - )\")          ";
+   "                           ((Nolabel (Pexp_ident n))                           ";
+   "                            (Nolabel (Pexp_constant (Pconst_integer 2 ())))))) ";
+   "                         (pexp_loc_stack (())))))))))                          ";
+   "                  () ())))                                                     ";
+   "               (pvb_loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\")))))";
+   "           (pstr_loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\")))))   ";
+   "       (pmod_loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\")))         ";
+   "     (pmb_loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\"))))           ";
+   "  (pstr_loc \"File \\\"file.ml\\\", line 2, characters 1-8:<ghost>\")))              "]
+|}]
