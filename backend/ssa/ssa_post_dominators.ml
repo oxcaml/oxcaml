@@ -39,8 +39,8 @@ type t =
   { immediate_post_dominator : Node.t Node.Tbl.t;
         (* No entry for blocks from which no exit can be reached. *)
     depth : int Node.Tbl.t
-        (* Depth in the post-dominator tree, the virtual exit being at [0].
-           No entry for blocks from which no exit can be reached. *)
+        (* Depth in the post-dominator tree, the virtual exit being at [0]. No
+           entry for blocks from which no exit can be reached. *)
   }
 
 (* Depth-first search from [root] of the graph with the given [successors].
