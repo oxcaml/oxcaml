@@ -1,5 +1,4 @@
 (* TEST
- arch_amd64;
  frametable_sections;
  unset OCAMLPARAM;
  readonly_files = "lpoly_lib.mli lpoly_lib.ml user1.ml user2.ml user3.ml";
@@ -66,6 +65,7 @@
   ocamlopt.byte;
   run;
  }{
+  arch_amd64;
   flags = "-extension layout_poly_alpha -nocwd -Ix . -internal-assembler";
   module = "lpoly_lib.mli";
   ocamlopt.byte;
@@ -110,7 +110,7 @@
    discarded, whether or not the linker notices).
 
    The internal assembler does not support weak functions, so the last block
-   falls back to private copies of each instance: the program's argument, the
+   (amd64 only) falls back to private copies of each instance: the program's argument, the
    expected number of copies of each cohort's shared symbol, is 0. *)
 
 external box : float# -> float = "%box_float"
