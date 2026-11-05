@@ -32,3 +32,11 @@
 (package
   (name unix)
 )
+
+(package
+  (name str)
+)
+
+(package
+  (name runtime_events)
+)

@@ -30,8 +30,8 @@
   withMerlin ? true,
   withAstDependentLibs ? true,
   withJsoo ? true,
-  # Test-only sources for make jsoo-test; not needed to build the compiler.
-  withJsooTestSources ? pkgs.lib.inNixShell,
+  # Test-only sources for make jsoo-test, which the check phase runs.
+  withJsooTestSources ? withJsoo,
 }:
 let
   inherit (pkgs) lib;
@@ -685,13 +685,6 @@ let
     postInstall = wrapWasmOfOcaml;
   };
 
-  mkJsooTest = mkAstDependentLibsBuild {
-    pname = "oxcaml-jsoo-test";
-    buildTarget = "jsoo-test";
-    sources = ppxlibSources // jsooSources // jsooTestSources;
-    extraNativeBuildInputs = jsooTools;
-  };
-
   # Builds and runs small js_of_ocaml programs using only what a compiler
   # package built withJsoo ships.
   mkJsooSmokeTest =
@@ -912,6 +905,10 @@ stdenv.mkDerivation {
       rm -rf testsuite/tests/unicode
       make SHELL="$SHELL" ci
     ''
+    + lib.optionalString withJsoo ''
+      # The tests of the js_of_ocaml that the package ships, as built with it.
+      make SHELL="$SHELL" jsoo-test
+    ''
     + ''
       runHook postCheck
     '';
@@ -996,7 +993,6 @@ stdenv.mkDerivation {
       lldb
       mkPpxlibLibs
       mkJsooLibs
-      mkJsooTest
       mkJsooSmokeTest
       mkInstalledLibrariesCheck
       mkMerlinPackages
