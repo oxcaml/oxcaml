@@ -5,10 +5,8 @@ open! Import
 type t = longident = Lident of string | Ldot of t * string | Lapply of t * t
 
 val compare : t -> t -> int
-val compare__local : t @ local -> t @ local -> int
 val sexp_of_t : t -> Sexp.t
 val flatten_exn : t -> string list
-val unflatten : string list -> t option
 val last_exn : t -> string
 
 val parse : string -> t

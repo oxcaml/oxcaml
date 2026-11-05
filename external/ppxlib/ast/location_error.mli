@@ -11,4 +11,3 @@ val to_extension : t -> Import.Parsetree.extension
 val raise : t -> 'a
 val update_loc : t -> Location.t -> t
 val get_location : t -> Location.t
-val of_extension : Import.Parsetree.extension -> t option

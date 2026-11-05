@@ -47,11 +47,9 @@
             oxcaml
             oxcaml-fp
             oxcaml-asan
-            ppxlib
-            jsoo
-            jsoo-test
-            jsoo-smoke-test
-            installed-libraries
+            # ppxlib, jsoo, jsoo-test, jsoo-smoke-test and installed-libraries
+            # are temporarily off: the vendored ppxlib is reverted while it is
+            # upgraded.
             merlin
             ;
         };

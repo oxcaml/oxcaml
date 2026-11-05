@@ -245,6 +245,15 @@ merlin-promote:
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
 
+# Temporarily off: the vendored ppxlib is reverted to its unpatched state while
+# it is upgraded, and does not build against this compiler. Builds must leave
+# withAstDependentLibs and withJsoo off (see default.nix).
+.PHONY: ast-dependent-libs-disabled
+ast-dependent-libs-disabled:
+	@echo "error: ppxlib and js_of_ocaml are temporarily not built while" \
+	  "the vendored ppxlib is upgraded" >&2
+	@exit 1
+
 # The build directory is the default, $(ast_dependent_libs_root)/_build: with an
 # absolute --build-dir, dune install records absolute build-directory paths for
 # library archives in the installed dune-package files.
@@ -354,12 +363,13 @@ $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS):
 	ln -sfn "$($(src_var))" $@
 
 .PHONY: ppxlib-build
-ppxlib-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws $(PPXLIB_DEPS)
+ppxlib-build: ast-dependent-libs-disabled ast-dependent-libs-compiler \
+  duneconf/ast-dependent-libs.ws $(PPXLIB_DEPS)
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @ppxlib-libs
 
 .PHONY: jsoo-build
-jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
-  $(PPXLIB_DEPS) $(JSOO_DEPS)
+jsoo-build: ast-dependent-libs-disabled ast-dependent-libs-compiler \
+  duneconf/ast-dependent-libs.ws $(PPXLIB_DEPS) $(JSOO_DEPS)
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs
 
 # The packages built by the ppxlib-libs and jsoo-libs aliases.
@@ -402,7 +412,7 @@ jsoo-install-shipped: jsoo-build
 	$(stdlib_jsir_install)
 
 .PHONY: jsoo-test
-jsoo-test: ast-dependent-libs-compiler \
+jsoo-test: ast-dependent-libs-disabled ast-dependent-libs-compiler \
   $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
 	PROJECT_ROOT="$(CURDIR)/_build/jsoo-test/default/js_of_ocaml" \
 	WASM_OF_OCAML=true \

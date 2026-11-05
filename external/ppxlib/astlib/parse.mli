@@ -3,7 +3,7 @@
 val implementation : Lexing.lexbuf -> Parsetree.structure_item list
 (** Parse a structure *)
 
-val interface : Lexing.lexbuf -> Parsetree.signature
+val interface : Lexing.lexbuf -> Parsetree.signature_item list
 (** Parse a signature *)
 
 val toplevel_phrase : Lexing.lexbuf -> Parsetree.toplevel_phrase
