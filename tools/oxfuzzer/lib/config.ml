@@ -44,7 +44,8 @@ let max_unboxed_tuple_depth = 2
 
 let max_probability = 10_000
 
-(* Probabilities out of [max_probability], conditional on reaching each choice. *)
+(* Probabilities out of [max_probability], conditional on reaching each
+   choice. *)
 let record_probability = 2_500
 
 let variant_probability = 2_500
