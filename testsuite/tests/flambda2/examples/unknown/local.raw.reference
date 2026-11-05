@@ -223,7 +223,7 @@
    let next_depth = rec_info (succ my_depth) in
    (let prim = %int_comp.ne (2, 0) in
     switch prim
-      | 0 -> k4
+      | 0 likelihood(cold) -> k4
       | 1 -> k5)
      where k5 =
        cont k3
