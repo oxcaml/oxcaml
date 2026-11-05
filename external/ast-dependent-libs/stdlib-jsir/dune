@@ -1,0 +1,73 @@
+; The standard library for JSIR. This lives here rather than in the compiler's
+; build because compiler in JSIR mode runs js_of_ocaml, which is not available
+; when building the compiler.
+
+(copy_files# ../stdlib/dune_rules/gen.ml)
+
+(executable
+ (name gen)
+ (modules gen)
+ (modes native))
+
+(rule
+ (target build_settings.txt)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    make
+    -s
+    -f
+    %{dep:../stdlib/StdlibModules}
+    --eval
+    "stdlib-modules: ; @echo stdlib_modules: $(STDLIB_MODULE_BASENAMES)"
+    stdlib-modules))))
+
+(rule
+ (target sources.dune)
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{dep:gen.exe} %{dep:build_settings.txt} stdlib-jsir-sources))))
+
+(subdir
+ src
+ (dynamic_include ../sources.dune))
+
+(rule
+ (target stdlib_module_deps.txt)
+ (deps
+  (:stdlib
+   (glob_files src/*.ml)
+   (glob_files src/*.mli)))
+ (action
+  (with-stdout-to
+   %{target}
+   (chdir
+    src
+    (run %{ocaml_bin}/ocamldep -one-line -as-map %{stdlib})))))
+
+(rule
+ (target stdlib_jsir.dune)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{dep:gen.exe}
+    %{dep:build_settings.txt}
+    stdlib-jsir
+    %{dep:stdlib_module_deps.txt}))))
+
+(subdir
+ build
+ (dynamic_include ../stdlib_jsir.dune))
+
+(install
+ (package stdlib-jsir)
+ (section lib_root)
+ (files
+  (glob_files
+   (build/*.cmjx with_prefix ocaml))
+  (build/stdlib.cmjxa as ocaml/stdlib.cmjxa)
+  (build/stdlib.cmja as ocaml/stdlib.cmja)
+  (build/std_exit.cmjo as ocaml/std_exit.cmjo)))
