@@ -33,10 +33,10 @@ end
 (* Bind a Cmm variable to the result of translating a [Simple] into Cmm. *)
 
 let bind_var_to_simple ~dbg_with_inlined:dbg env res v
-    ~num_normal_occurrences_of_bound_vars s =
+    ~num_occurrences_of_bound_vars s =
   match Simple.must_be_var s with
   | Some (alias_of, _coercion) ->
-    Env.add_alias env res ~var:v ~num_normal_occurrences_of_bound_vars ~alias_of
+    Env.add_alias env res ~var:v ~num_occurrences_of_bound_vars ~alias_of
   | None ->
     let To_cmm_env.
           { env;
@@ -52,7 +52,7 @@ let bind_var_to_simple ~dbg_with_inlined:dbg env res v
     let env, res =
       Env.bind_variable env res v ~effects_and_coeffects_of_defining_expr
         ~defining_expr ~free_vars_of_defining_expr
-        ~num_normal_occurrences_of_bound_vars
+        ~num_occurrences_of_bound_vars
     in
     env, res
 
@@ -568,15 +568,19 @@ let rec expr env res e :
   | Switch e' -> switch env res e'
   | Invalid { message } -> invalid env res ~message
 
-and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
+and let_prim env res ~num_occurrences_of_bound_vars v p dbg body =
   let dbg = Env.add_inlined_debuginfo env dbg in
   let effects_and_coeffects_of_prim =
     Flambda_primitive.effects_and_coeffects p
   in
   let inline =
     To_cmm_effects.classify_let_binding (Bound_var.var v)
-      ~num_normal_occurrences_of_bound_vars
+      ~num_occurrences_of_bound_vars
       ~effects_and_coeffects_of_defining_expr:effects_and_coeffects_of_prim
+  in
+  let needed_by_phantom_let =
+    Num_occurrences.By_name_mode.needed_by_phantom_let_in_map (Bound_var.var v)
+      num_occurrences_of_bound_vars
   in
   let simple_case (inline : Env.simple Env.inline) =
     let defining_expr, extra, env, res, args_effs =
@@ -587,7 +591,8 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
     in
     let env, res =
       Env.bind_variable_to_primitive ?extra env res v ~inline
-        ~effects_and_coeffects_of_defining_expr ~defining_expr
+        ~needed_by_phantom_let ~effects_and_coeffects_of_defining_expr
+        ~defining_expr
     in
     expr env res body
   in
@@ -599,7 +604,7 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
       Ece.join args_effs effects_and_coeffects_of_prim
     in
     let env, res =
-      Env.bind_variable_to_primitive env res v ~inline
+      Env.bind_variable_to_primitive env res v ~inline ~needed_by_phantom_let
         ~effects_and_coeffects_of_defining_expr ~defining_expr
     in
     expr env res body
@@ -613,7 +618,7 @@ and let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body =
   | Must_inline_and_duplicate -> complex_case Must_inline_and_duplicate
 
 and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
-    ~num_normal_occurrences_of_bound_vars ~body =
+    ~num_occurrences_of_bound_vars ~body =
   match[@warning "-4"] bound_pattern, Let.defining_expr let_expr with
   | Singleton v, Simple s ->
     (* CR mshinwell: Try to get a proper [dbg] here (although the majority of
@@ -623,7 +628,7 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     let dbg_with_inlined = Debuginfo.none in
     let env, res =
       bind_var_to_simple ~dbg_with_inlined env res v
-        ~num_normal_occurrences_of_bound_vars s
+        ~num_occurrences_of_bound_vars s
     in
     expr env res body
   | Singleton _, Prim (p, _)
@@ -648,15 +653,15 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
       Env.flush_delayed_lets ~mode:Flush_everything env res
     in
     let cmm, free_vars, symbol_inits, res =
-      let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
+      let_prim env res ~num_occurrences_of_bound_vars v p dbg body
     in
     let cmm, free_vars, symbol_inits = wrap cmm free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
   | Singleton v, Prim (p, dbg) ->
-    let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
+    let_prim env res ~num_occurrences_of_bound_vars v p dbg body
   | Set_of_closures bound_vars, Set_of_closures (soc, alloc_mode) ->
     To_cmm_set_of_closures.let_dynamic_set_of_closures env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr
+      ~num_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr
   | Static bound_static, Static_consts consts -> (
     let env, res, update_opt =
       To_cmm_static.static_consts env res
@@ -685,11 +690,11 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
 
 and let_expr env res let_expr =
   Let.pattern_match' let_expr
-    ~f:(fun bound_pattern ~num_normal_occurrences_of_bound_vars ~body ->
+    ~f:(fun bound_pattern ~num_occurrences_of_bound_vars ~body ->
       match Bound_pattern.name_mode bound_pattern with
       | Normal ->
-        let_expr0 env res let_expr bound_pattern
-          ~num_normal_occurrences_of_bound_vars ~body
+        let_expr0 env res let_expr bound_pattern ~num_occurrences_of_bound_vars
+          ~body
       | Phantom -> expr env res body
       | In_types ->
         Misc.fatal_errorf "Cannot bind In_types variables in terms:@ %a"
@@ -712,23 +717,25 @@ and let_cont env res (let_cont : Flambda.Let_cont.t) =
         | May_inline -> let_cont_inlined env res k handler body
         | Regular -> let_cont_not_inlined env res k handler body)
   | Recursive handlers ->
-    Recursive_let_cont_handlers.pattern_match handlers
-      ~f:(fun ~invariant_params ~body conts ->
+    Recursive_let_cont_handlers.pattern_match' handlers
+      ~f:(fun
+          ~invariant_params ~num_occurrences_of_invariant_params ~body conts ->
         if Continuation_handlers.contains_exn_handler conts
         then
           Misc.fatal_errorf
             "Recursive continuation bindings cannot involve exception \
              handlers:@ %a"
             Let_cont.print let_cont;
-        let_cont_rec env res invariant_params conts body)
+        let_cont_rec env res invariant_params
+          ~num_occurrences_of_invariant_params conts body)
 
 (* The bound continuation [k] will be inlined. *)
 and let_cont_inlined env res k handler body =
   Continuation_handler.pattern_match' handler
-    ~f:(fun handler_params ~num_normal_occurrences_of_params ~handler ->
+    ~f:(fun handler_params ~num_occurrences_of_params ~handler ->
       let env =
         Env.add_inline_cont env k ~handler_params
-          ~handler_params_occurrences:num_normal_occurrences_of_params
+          ~handler_params_occurrences:num_occurrences_of_params
           ~handler_body:handler
       in
       expr env res body)
@@ -823,7 +830,8 @@ and let_cont_exn_handler env res k body vars handler free_vars_of_handler
     symbol_inits,
     res )
 
-and let_cont_rec env res invariant_params conts body =
+and let_cont_rec env res invariant_params ~num_occurrences_of_invariant_params
+    conts body =
   (* Flush the env now to avoid inlining something inside of a recursive
      continuation (aka a loop), as it would increase the number of times the
      computation is performed (even if there is only one syntactic
@@ -838,7 +846,7 @@ and let_cont_rec env res invariant_params conts body =
       (fun k handler acc ->
         let continuation_arg_tys =
           Continuation_handler.pattern_match' handler
-            ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler:_ ->
+            ~f:(fun params ~num_occurrences_of_params:_ ~handler:_ ->
               List.map C.param_machtype_of_kinded_parameter
                 (Bound_parameters.to_list
                    (Bound_parameters.append invariant_params params)))
@@ -849,6 +857,7 @@ and let_cont_rec env res invariant_params conts body =
   (* Generate variables for the invariant params *)
   let env, invariant_vars =
     C.continuation_bound_parameters env invariant_params
+      ~num_occurrences_of_params:num_occurrences_of_invariant_params
   in
   (* Translate each continuation handler *)
   let conts_to_handlers, res =
@@ -895,9 +904,11 @@ and let_cont_rec env res invariant_params conts body =
 
 and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
-    ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
+    ~f:(fun params ~num_occurrences_of_params ~handler ->
       let arity = Bound_parameters.arity params in
-      let env, vars = C.continuation_bound_parameters env params in
+      let env, vars =
+        C.continuation_bound_parameters env params ~num_occurrences_of_params
+      in
       let expr, free_vars_of_handler, symbol_inits, res =
         expr env res handler
       in
@@ -983,7 +994,7 @@ and apply_expr env res apply =
           Env.bind_variable env res var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
             ~free_vars_of_defining_expr:free_vars
-            ~num_normal_occurrences_of_bound_vars:handler_params_occurrences
+            ~num_occurrences_of_bound_vars:handler_params_occurrences
         in
         let env =
           Env.set_inlined_debuginfo env handler_body_inlined_debuginfo
@@ -998,7 +1009,14 @@ and apply_expr env res apply =
         in
         let env, cmm_params =
           Env.create_bound_parameters env
-            (List.map Bound_parameter.var_and_uid params)
+            (List.map
+               (fun bp ->
+                 let var, uid = Bound_parameter.var_and_uid bp in
+                 ( var,
+                   uid,
+                   Num_occurrences.By_name_mode.needed_by_phantom_let_in_map var
+                     handler_params_occurrences ))
+               params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =
@@ -1080,8 +1098,7 @@ and apply_cont env res apply_cont =
                   Bound_var.create param_var param_uid Name_mode.normal
                 in
                 bind_var_to_simple ~dbg_with_inlined env res var
-                  ~num_normal_occurrences_of_bound_vars:
-                    handler_params_occurrences arg)
+                  ~num_occurrences_of_bound_vars:handler_params_occurrences arg)
             (env, res) handler_params args
         in
         let env =

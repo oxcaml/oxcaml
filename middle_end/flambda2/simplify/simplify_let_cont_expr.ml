@@ -487,17 +487,26 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           (fun handler -> handler.handler)
           continuation_handlers
       in
+      (* The occurrences of the invariant parameters are still present in the
+         handlers' free names at this point (see
+         [rebuild_single_recursive_handler]), as [RE.create_recursive_let_cont]
+         requires. *)
+      let free_names_of_handlers =
+        Continuation.Lmap.fold
+          (fun _ handler free_names ->
+            NO.union free_names handler.name_occurrences_of_handler)
+          continuation_handlers NO.empty
+      in
       let expr =
         RE.create_recursive_let_cont
           (UA.are_rebuilding_terms uacc)
-          ~invariant_params rec_handlers ~body
+          ~invariant_params ~free_names_of_handlers rec_handlers ~body
       in
       let name_occurrences =
-        Continuation.Lmap.fold
-          (fun _ handler name_occurrences ->
-            NO.union name_occurrences
-              (NO.increase_counts handler.name_occurrences_of_handler))
-          continuation_handlers name_occurrences_body
+        NO.union name_occurrences_body
+          (NO.increase_counts
+             (NO.diff free_names_of_handlers
+                ~without:(Bound_parameters.free_names invariant_params)))
       in
       let name_occurrences =
         Continuation.Lmap.fold
@@ -821,9 +830,9 @@ let rebuild_single_recursive_handler ~rebuild_expr cont
           variant_params ~handler ~free_names_of_handler:free_names
           ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
       in
-      let free_names =
-        remove_params invariant_params (remove_params variant_params free_names)
-      in
+      (* The invariant parameters are removed when the whole group is rebuilt
+         (see [rebuild_let_cont]), where their occurrences are needed. *)
+      let free_names = remove_params variant_params free_names in
       let rebuilt_handler : rebuilt_handler =
         { handler = cont_handler;
           handler_expr = handler;
