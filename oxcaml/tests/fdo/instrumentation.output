@@ -12,6 +12,22 @@ instrumentation.raw.fl:
   branch: "Instrumentation.matches":0:df907b51:1:branch(1)
   call: "Instrumentation.matches":0:df907b51:2:call
   call: "Instrumentation.matches":0:df907b51:3:call
+  entry: "Instrumentation.variants":0 body_hash:f01261fa
+  branch: "Instrumentation.variants":0:f01261fa:0:branch(0)
+  branch: "Instrumentation.variants":0:f01261fa:0:branch(1)
+  branch: "Instrumentation.variants":0:f01261fa:0:branch(2)
+  branch: "Instrumentation.variants":0:f01261fa:0:branch(3)
+  branch: "Instrumentation.variants":0:f01261fa:0:branch(4)
+  branch: "Instrumentation.variants":0:f01261fa:0:branch(5)
+  call: "Instrumentation.variants":0:f01261fa:1:call
+  call: "Instrumentation.variants":0:f01261fa:2:call
+  entry: "Instrumentation.defaults":0 body_hash:7ae1c06e
+  branch: "Instrumentation.defaults":0:7ae1c06e:0:branch(6)
+  branch: "Instrumentation.defaults":0:7ae1c06e:0:branch(0)
+  branch: "Instrumentation.defaults":0:7ae1c06e:0:branch(6)
+  branch: "Instrumentation.defaults":0:7ae1c06e:0:branch(3)
+  call: "Instrumentation.defaults":0:7ae1c06e:1:call
+  call: "Instrumentation.defaults":0:7ae1c06e:2:call
   entry: "Instrumentation.apply":0 body_hash:b97e43e7
   call: "Instrumentation.apply":0:b97e43e7:0:call
   entry: "Instrumentation.nested.g":0 body_hash:b712ccb3
@@ -35,7 +51,7 @@ instrumentation.raw.fl:
   entry: "Instrumentation.local":0 body_hash:6ad8d3c3
   call: "Instrumentation.local":0:module("Instrumentation.local.L":0):0:call
   call: "Instrumentation.local":0:module("Instrumentation.local.(module)":0):0:call
-  call: "Instrumentation":0:30b55370:0:call
+  call: "Instrumentation":0:63405334:0:call
   call: "Instrumentation":0:module("Instrumentation.(module)":0):0:call
   call: "Instrumentation":0:module("Instrumentation.(module)":0):1:call
   call: "Instrumentation":0:module("Instrumentation.(module)":0):2:call

@@ -19,6 +19,29 @@ let[@inline never] matches = function
   | Some 0 -> 1
   | Some n -> f n
 
+type t =
+  | C0
+  | C1
+  | C2
+  | B0 of int
+  | B1 of int
+  | B2 of int
+
+(* A match on both constant constructors and blocks is one [Lambda] switch,
+   whose arms are numbered by constant, then by tag. It translates to a switch
+   on the constants and one on the tags, behind a dispatch on whether the
+   scrutinee is an immediate, which gets no counters. Constructors that share an
+   arm keep a counter each. *)
+let[@inline never] variants = function
+  | C0 -> f 0
+  | C1 | C2 -> 1
+  | B0 n -> f n
+  | B1 n | B2 n -> n
+
+(* Constructors without an arm of their own go to the default arm, numbered
+   after the constants and tags, and get its counter. *)
+let[@inline never] defaults = function C0 -> f 0 | B0 n -> f n | _ -> 2
+
 let[@inline never] apply k x = k x
 
 (* Local and anonymous functions number their own bodies. *)
