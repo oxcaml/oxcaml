@@ -29,6 +29,7 @@ module Context : sig
     | Class_infos : _ class_infos t
     | Class_expr : class_expr t
     | Class_field : class_field t
+    | Class_type_decl : class_type_declaration t
     | Module_type : module_type t
     | Module_declaration : module_declaration t
     | Module_type_declaration : module_type_declaration t
@@ -60,6 +61,7 @@ module Context : sig
   val class_infos : _ class_infos t
   val class_expr : class_expr t
   val class_field : class_field t
+  val class_type_decl : class_type_declaration t
   val module_type : module_type t
   val module_declaration : module_declaration t
   val module_type_declaration : module_type_declaration t
@@ -73,6 +75,7 @@ module Context : sig
   val psig_extension : signature_item t
   val rtag : row_field t
   val object_type_field : object_field t
+  val equal : 'a t -> 'b t -> bool
 end
 
 val declare :
@@ -97,8 +100,8 @@ val declare :
     names: "default", "bar.default" and "foo.bar.default".
 
     Additionally it is possible to prevent a suffix to be shortened by prefixing
-    it with '\@'. So for instance an attribute declared with name
-    "foo.\@bar.default" will match exactly these attribute names: "bar.default"
+    it with '@'. So for instance an attribute declared with name
+    "foo.@bar.default" will match exactly these attribute names: "bar.default"
     and "foo.bar.default".
 
     When matching against a list of attributes on an item, if several matches
@@ -133,7 +136,8 @@ val declare_with_attr_loc :
   (payload, 'b, 'c) Ast_pattern.t ->
   (attr_loc:Location.t -> 'b) ->
   ('a, 'c) t
-(** Same as [declare] but the callback receives the location of the attribute. *)
+(** Same as [declare] but the callback receives the location of the attribute.
+*)
 
 type 'a flag = ('a, unit) t
 (** Types for attributes without payload. *)
@@ -166,7 +170,8 @@ val has_flag_res :
     for the meaning of [mark_as_seen]. *)
 
 val has_flag : 'a flag -> ?mark_as_seen:bool (** default [true] *) -> 'a -> bool
-(** See {!has_flag_res}. Raises a located error if the attribute is duplicated. *)
+(** See {!has_flag_res}. Raises a located error if the attribute is duplicated.
+*)
 
 val consume_res :
   ('a, 'b) t -> 'a -> (('a * 'b) option, Location.Error.t NonEmptyList.t) result
@@ -210,12 +215,35 @@ module Floating : sig
     'b ->
     ('a, 'c) t
 
+  val declare_with_name_loc :
+    string ->
+    'a Context.t ->
+    (payload, 'b, 'c) Ast_pattern.t ->
+    (name_loc:Location.t -> 'b) ->
+    ('a, 'c) t
+  (** Same as [declare] but the callback receives the location of the name of
+      the attribute. *)
+
+  val declare_with_attr_loc :
+    string ->
+    'a Context.t ->
+    (payload, 'b, 'c) Ast_pattern.t ->
+    (attr_loc:Location.t -> 'b) ->
+    ('a, 'c) t
+  (** Same as [declare] but the callback receives the location of the attribute.
+  *)
+
   val name : _ t -> string
 
   val convert_res :
     ('a, 'b) t list -> 'a -> ('b option, Location.Error.t NonEmptyList.t) result
 
   val convert : ('a, 'b) t list -> 'a -> 'b option
+
+  val convert_attr_res :
+    ('a, 'b) t ->
+    attribute ->
+    ('b option, Location.Error.t NonEmptyList.t) result
 end
 
 val explicitly_drop : Ast_traverse0.iter

@@ -142,12 +142,6 @@ end
     printf "module OCaml_%d : OCaml_version with module Ast = Astlib.Ast_%d\n"
       n n
   )*)
-module OCaml_402 : OCaml_version with module Ast = Astlib.Ast_402
-module OCaml_403 : OCaml_version with module Ast = Astlib.Ast_403
-module OCaml_404 : OCaml_version with module Ast = Astlib.Ast_404
-module OCaml_405 : OCaml_version with module Ast = Astlib.Ast_405
-module OCaml_406 : OCaml_version with module Ast = Astlib.Ast_406
-module OCaml_407 : OCaml_version with module Ast = Astlib.Ast_407
 module OCaml_408 : OCaml_version with module Ast = Astlib.Ast_408
 module OCaml_409 : OCaml_version with module Ast = Astlib.Ast_409
 module OCaml_410 : OCaml_version with module Ast = Astlib.Ast_410
@@ -157,6 +151,11 @@ module OCaml_413 : OCaml_version with module Ast = Astlib.Ast_413
 module OCaml_414 : OCaml_version with module Ast = Astlib.Ast_414
 module OCaml_500 : OCaml_version with module Ast = Astlib.Ast_500
 module OCaml_501 : OCaml_version with module Ast = Astlib.Ast_501
+module OCaml_502 : OCaml_version with module Ast = Astlib.Ast_502
+module OCaml_503 : OCaml_version with module Ast = Astlib.Ast_503
+module OCaml_504 : OCaml_version with module Ast = Astlib.Ast_504
+module OCaml_505 : OCaml_version with module Ast = Astlib.Ast_505
+module OCaml_506 : OCaml_version with module Ast = Astlib.Ast_506
 (*$*)
 
 (* An alias to the current compiler version *)

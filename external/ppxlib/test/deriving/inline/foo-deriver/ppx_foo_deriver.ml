@@ -65,6 +65,7 @@ let add_deriver () =
                           ];
                       pvb_attributes = [];
                       pvb_loc = loc;
+                      pvb_constraint = None;
                     };
                   ] );
           };

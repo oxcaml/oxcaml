@@ -36,6 +36,7 @@ module Expansion_helpers = Expansion_helpers
 module Merlin_helpers = Merlin_helpers
 module Spellcheck = Spellcheck
 module Keyword = Keyword
+module Pp_ast = Pp_ast
 
 (** {2 Driver-related modules} *)
 
@@ -47,6 +48,7 @@ module Ast_io = Utils.Ast_io.Read_bin
 
 module Attribute = Attribute
 module Reserved_namespaces = Name.Reserved_namespaces
+module Clean = Clean
 
 (** {2 Common helper functions} *)
 
@@ -103,8 +105,10 @@ end
 
 (**/**)
 
-(* For tests and Ppx_core compatibility layer *)
+(* For tests, Ppx_core compatibility layer and use by ppxlib-pp-ast
+   and other internal tools. *)
 module Ppxlib_private = struct
   module Common = Common
   module Name = Name
+  module Utils = Utils
 end

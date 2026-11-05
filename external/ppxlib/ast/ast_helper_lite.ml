@@ -17,7 +17,7 @@
 open Stdlib0
 module Location = Astlib.Location
 module Longident = Astlib.Longident
-open Astlib.Ast_500
+open Astlib.Ast_502
 
 [@@@warning "-9"]
 
@@ -121,7 +121,7 @@ module Typ = struct
         | Ptyp_class (longident, lst) ->
             Ptyp_class (longident, List.map loop lst)
         | Ptyp_alias (core_type, string) ->
-            check_variable var_names t.ptyp_loc string;
+            check_variable var_names t.ptyp_loc string.txt;
             Ptyp_alias (loop core_type, string)
         | Ptyp_variant (row_field_list, flag, lbl_lst_option) ->
             Ptyp_variant
@@ -135,6 +135,7 @@ module Typ = struct
             Ptyp_package
               (longident, List.map (fun (n, typ) -> (n, loop typ)) lst)
         | Ptyp_extension (s, arg) -> Ptyp_extension (s, arg)
+        | Ptyp_open (l, ct) -> Ptyp_open (l, loop ct)
       in
       { t with ptyp_desc = desc }
     and loop_row_field field =
@@ -201,8 +202,20 @@ module Exp = struct
   let ident ?loc ?attrs a = mk ?loc ?attrs (Pexp_ident a)
   let constant ?loc ?attrs a = mk ?loc ?attrs (Pexp_constant a)
   let let_ ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_let (a, b, c))
-  let fun_ ?loc ?attrs a b c d = mk ?loc ?attrs (Pexp_fun (a, b, c, d))
-  let function_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_function a)
+
+  let function_ ?loc ?attrs ?loc_location cases =
+    let loc_locations =
+      match loc_location with Some l -> l | None -> !default_loc
+    in
+    mk ?loc ?attrs
+      (Pexp_function ([], None, Pfunction_cases (cases, loc_locations, [])))
+
+  let fun_ ?loc ?attrs a b c d =
+    let pparam_desc = Pparam_val (a, b, c) in
+    let body = Pfunction_body d in
+    let pparam_loc = match loc with Some loc -> loc | None -> Location.none in
+    mk ?loc ?attrs (Pexp_function ([ { pparam_loc; pparam_desc } ], None, body))
+
   let apply ?loc ?attrs a b = mk ?loc ?attrs (Pexp_apply (a, b))
   let match_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_match (a, b))
   let try_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_try (a, b))
@@ -423,8 +436,14 @@ module Incl = struct
 end
 
 module Vb = struct
-  let mk ?(loc = !default_loc) ?(attrs = []) pat expr =
-    { pvb_pat = pat; pvb_expr = expr; pvb_attributes = attrs; pvb_loc = loc }
+  let mk ?(loc = !default_loc) ?(attrs = []) ?value_constraint pat expr =
+    {
+      pvb_pat = pat;
+      pvb_expr = expr;
+      pvb_attributes = attrs;
+      pvb_loc = loc;
+      pvb_constraint = value_constraint;
+    }
 end
 
 module Ci = struct
@@ -439,6 +458,17 @@ module Ci = struct
       pci_loc = loc;
     }
 end
+
+let constructor ?(loc = !default_loc) ?(attrs = []) ?(vars = [])
+    ?(args = Pcstr_tuple []) ?res name =
+  {
+    pcd_name = name;
+    pcd_vars = vars;
+    pcd_args = args;
+    pcd_res = res;
+    pcd_loc = loc;
+    pcd_attributes = attrs;
+  }
 
 module Type = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(params = []) ?(cstrs = [])
