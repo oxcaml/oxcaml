@@ -421,6 +421,14 @@ end
 (*****************************************)
 (* enabling / disabling *)
 
+let default_omnidirectionality : extn_pair = Pair (Omnidirectionality, Eager)
+
+let with_default_omnidirectionality (u : Universe.t) extns =
+  match u with
+  | No_extensions -> extns
+  | Upstream_compatible | Stable | Beta | Alpha ->
+    extns @ [default_omnidirectionality]
+
 (* Mutable state. Invariants:
 
    (1) [!extensions] contains at most one copy of each extension.
@@ -430,7 +438,8 @@ end
 
 (* After the migration to extension universes, this will be an empty list. *)
 let legacy_default_extensions : extn_pair list =
-  Universe.allowed_extensions_in Stable
+  with_default_omnidirectionality Universe.Stable
+    (Universe.allowed_extensions_in Stable)
 
 let extensions : extn_pair list ref = ref legacy_default_extensions
 
@@ -502,7 +511,10 @@ let erasable_extensions_only () =
 
 let set_universe_and_enable_all u =
   Universe.set u;
-  extensions := Universe.allowed_extensions_in (Universe.get ())
+  (* CR aobrien: pretty sure we can remove [Universe.set] and [Universe.get] *)
+  let u = Universe.get () in
+  extensions
+    := with_default_omnidirectionality u (Universe.allowed_extensions_in u)
 
 let set_universe_and_enable_all_of_string_exn univ_name =
   match Universe.of_string univ_name with
@@ -513,7 +525,7 @@ let set_universe_and_enable_all_of_string_exn univ_name =
 (********************************************)
 (* checking an extension *)
 
-let is_at_least (type a) (extn : a t) (value : a) =
+let is_at_least_ignoring_mode_polymorphism (type a) (extn : a t) (value : a) =
   let rec check : extn_pair list -> bool = function
     | [] -> false
     | Pair (e, v) :: es -> (
@@ -524,13 +536,23 @@ let is_at_least (type a) (extn : a t) (value : a) =
   in
   check !extensions
 
+let suppressed_by_mode_polymorphism (type a) (extn : a t) =
+  match extn with
+  | Omnidirectionality ->
+    is_at_least_ignoring_mode_polymorphism Mode_polymorphism Alpha
+  | _ -> false
+
+let is_at_least extn value =
+  (not (suppressed_by_mode_polymorphism extn))
+  && is_at_least_ignoring_mode_polymorphism extn value
+
 let is_enabled extn =
   let rec check : extn_pair list -> bool = function
     | [] -> false
     | Pair (e, _) :: _ when equal e extn -> true
     | _ :: es -> check es
   in
-  check !extensions
+  (not (suppressed_by_mode_polymorphism extn)) && check !extensions
 
 let get_command_line_string_if_enabled extn =
   let rec find = function
