@@ -1,12 +1,11 @@
 (env
  (_ (flags (:standard -no-principal -w -69-70))))
 
-(vendored_dirs gc-timings memtrace ocaml-compiler-libs ocaml-jit owee)
+(vendored_dirs gc-timings memtrace ocaml-compiler-libs ocaml-jit owee ppxlib
+  ppxlib_jane)
 
 ; js_of_ocaml is only built from ast-dependent-libs/.
-; ppxlib (and ppxlib_jane, which needs it) are temporarily not built: the
-; vendored ppxlib is reverted to its unpatched state while it is upgraded.
-(data_only_dirs js_of_ocaml ppxlib ppxlib_jane)
+(data_only_dirs js_of_ocaml)
 
 ; ast-dependent-libs/ is a dune root of its own (see ast-dependent-libs/dune).
 (dirs :standard \ ast-dependent-libs)
