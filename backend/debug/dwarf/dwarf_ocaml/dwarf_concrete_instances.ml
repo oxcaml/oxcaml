@@ -93,11 +93,15 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let concrete_instance_proto_die =
     Proto_die.create ~parent:(Some parent) ~tag:Subprogram ~attribute_values ()
   in
+  let own_section =
+    match fundecl.fun_sym_global with Weak -> true | Global | Local -> false
+  in
   let _inlined_frame_proto_dies =
     Profile.record "dwarf_inlined_frames"
       (fun () ->
         Dwarf_inlined_frames.dwarf state fundecl ~function_symbol:start_sym
-          ~function_proto_die:concrete_instance_proto_die inlined_frame_ranges)
+          ~own_section ~function_proto_die:concrete_instance_proto_die
+          inlined_frame_ranges)
       ~accumulate:true ()
   in
   (match value_type_proto_die with
@@ -107,7 +111,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
-          ~function_symbol:start_sym
+          ~function_symbol:start_sym ~own_section
           ~function_proto_die:concrete_instance_proto_die available_ranges_vars)
       ~accumulate:true ());
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we

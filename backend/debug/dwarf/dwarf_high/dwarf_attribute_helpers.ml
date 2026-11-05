@@ -64,13 +64,11 @@ let create_low_pc_from_symbol symbol =
   let spec = AS.create Low_pc Addr in
   AV.create spec (V.code_address_from_symbol ~comment:"low PC value" symbol)
 
-let create_high_pc_from_symbol ~low_pc high_pc =
-  (* Code sizes always fit in 32 bits, as above; the assembler checks for
-     overflow. *)
-  let spec = AS.create High_pc Data4 in
-  AV.create spec
-    (V.distance_between_symbols_32_bit ~comment:"high PC value" ~upper:high_pc
-       ~lower:low_pc ())
+let create_high_pc_from_symbol high_pc =
+  (* An address rather than an offset from the low PC, since the two symbols may
+     be in different sections. *)
+  let spec = AS.create High_pc Addr in
+  AV.create spec (V.code_address_from_symbol ~comment:"high PC value" high_pc)
 
 let create_producer producer_name =
   let spec = AS.create Producer Strp in

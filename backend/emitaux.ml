@@ -53,9 +53,13 @@ type frame_descr =
            labels, which is only an assembly-time constant when both labels are
            in the same section; descriptors whose section differs from the
            previous one escape. *)
-    fd_link_symbol : string option
+    fd_link_symbol : string option;
         (* Under [-frametable-sections], the symbol whose section the
            descriptor's frametable piece is linked to. *)
+    fd_group : string option
+        (* The COMDAT group of the descriptor's code, if any. Its piece must
+           join the group (whether or not [-frametable-sections] is on), so that
+           it is discarded along with a losing copy of the code. *)
   }
 
 let frame_descriptors = ref ([] : frame_descr list)
@@ -70,8 +74,11 @@ let current_code_section = ref ""
 
 let current_link_symbol = ref None
 
-let enter_code_section ?link_symbol name =
+let current_group = ref None
+
+let enter_code_section ?link_symbol ?group name =
   current_link_symbol := link_symbol;
+  current_group := group;
   if not (String.equal name !current_code_section)
   then (
     current_code_section := name;
@@ -121,7 +128,8 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
          fd_debuginfo = debuginfo;
          fd_long;
          fd_section = !frame_section_epoch;
-         fd_link_symbol = !current_link_symbol
+         fd_link_symbol = !current_link_symbol;
+         fd_group = !current_group
        }
        :: !frame_descriptors
 
@@ -581,7 +589,11 @@ let emit_frames ~debug_strings_section ~code_begin ~code_end a =
            (no same-section previous return address for a delta): escape. *)
         escape ()
   in
-  (if not !Oxcaml_flags.frametable_sections
+  let use_pieces =
+    !Oxcaml_flags.frametable_sections
+    || List.exists (fun fd -> Option.is_some fd.fd_group) descrs
+  in
+  (if not use_pieces
    then (
      a.efa_word (List.length descrs);
      ignore (List.fold_left emit_descr None descrs))
@@ -589,44 +601,53 @@ let emit_frames ~debug_strings_section ~code_begin ~code_end a =
      (* The unit's table is a header: a -1 tag (a count-prefixed table starts
         with a nonnegative count), the descriptor count, and self-relative
         offsets to the start and end of the unit's pieces. Each run of
-        descriptors with the same link symbol goes in a piece linked to that
-        symbol's section, so that the linker drops the piece along with the
-        code, and starts with an escape. The zero-size marker pieces bracketing
-        the runs are linked to [code_begin] and [code_end], so the linker places
-        them around all of the unit's pieces. *)
+        descriptors with the same link symbol and group goes in a piece linked
+        to that symbol's section, so that the linker drops the piece along with
+        the code, and starts with an escape. The zero-size marker pieces
+        bracketing the runs are linked to [code_begin] and [code_end], so the
+        linker places them around all of the unit's pieces. Without
+        [-frametable-sections], only descriptors of code in a COMDAT group get
+        pieces of their own; the rest share the [code_begin] piece. *)
      let begin_lbl = Cmm.new_label () in
      let end_lbl = Cmm.new_label () in
      a.efa_word (-1);
      a.efa_word (List.length descrs);
      a.efa_label_rel begin_lbl 0l;
      a.efa_label_rel end_lbl 0l;
-     let switch_to_piece link_symbol =
-       D.switch_to_section (Asm_section.Frametable_piece { link_symbol })
+     let switch_to_piece (link_symbol, group) =
+       D.switch_to_section (Asm_section.Frametable_piece { link_symbol; group })
      in
-     let link_symbol fd =
-       match fd.fd_link_symbol with
-       | Some link_symbol -> link_symbol
-       | None ->
+     let piece fd =
+       match fd.fd_link_symbol, fd.fd_group with
+       | Some link_symbol, (Some _ as group) -> link_symbol, group
+       | None, Some _ ->
+         Misc.fatal_error "Frame descriptor in a COMDAT group without a piece"
+       | Some link_symbol, None when !Oxcaml_flags.frametable_sections ->
+         link_symbol, None
+       | None, None when !Oxcaml_flags.frametable_sections ->
          Misc.fatal_error
            "Frame descriptor outside a -frametable-sections piece"
+       | (Some _ | None), None -> code_begin, None
      in
-     switch_to_piece code_begin;
+     let same_piece (link_symbol1, group1) (link_symbol2, group2) =
+       String.equal link_symbol1 link_symbol2
+       && Option.equal String.equal group1 group2
+     in
+     switch_to_piece (code_begin, None);
      a.efa_def_label begin_lbl;
      ignore
        (List.fold_left
           (fun prev fd ->
             let prev =
               match prev with
-              | Some prev_fd
-                when String.equal (link_symbol prev_fd) (link_symbol fd) ->
-                prev
+              | Some prev_fd when same_piece (piece prev_fd) (piece fd) -> prev
               | Some _ | None ->
-                switch_to_piece (link_symbol fd);
+                switch_to_piece (piece fd);
                 None
             in
             emit_descr prev fd)
           None descrs);
-     switch_to_piece code_end;
+     switch_to_piece (code_end, None);
      a.efa_def_label end_lbl;
      D.switch_to_section Asm_section.Read_only_data);
   Label_table.iter emit_debuginfo debuginfos;
@@ -677,6 +698,7 @@ let with_snapshot ~f =
   let saved_frame_section_epoch = !frame_section_epoch in
   let saved_current_code_section = !current_code_section in
   let saved_current_link_symbol = !current_link_symbol in
+  let saved_current_group = !current_group in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
@@ -684,6 +706,7 @@ let with_snapshot ~f =
   frame_section_epoch := saved_frame_section_epoch;
   current_code_section := saved_current_code_section;
   current_link_symbol := saved_current_link_symbol;
+  current_group := saved_current_group;
   result
 
 let get_file_num ~file_emitter file_name =

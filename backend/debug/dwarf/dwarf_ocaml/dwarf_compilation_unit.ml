@@ -52,7 +52,7 @@ let code_ranges_attributes ~code_layout
   match code_layout with
   | Dwarf_state.Continuous_code_section { code_begin; code_end } ->
     [ DAH.create_low_pc_from_symbol code_begin;
-      DAH.create_high_pc_from_symbol ~low_pc:code_begin code_end ]
+      DAH.create_high_pc_from_symbol code_end ]
   | Dwarf_state.Function_sections -> (
     match !Dwarf_flags.gdwarf_version with
     | Four ->

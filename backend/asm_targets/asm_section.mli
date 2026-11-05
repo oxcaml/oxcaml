@@ -58,10 +58,14 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings  (** Mergeable string section for debuginfo strings *)
-  | Frametable_piece of { link_symbol : string }
+  | Frametable_piece of
+      { link_symbol : string;
+        group : string option
+      }
       (** Frame descriptors linked (SHF_LINK_ORDER) to the section defining the
-          already-encoded [link_symbol], for [-frametable-sections] (ELF only)
-      *)
+          already-encoded [link_symbol], for [-frametable-sections] (ELF only).
+          With a [group], the piece is also a member of that COMDAT group, so it
+          is discarded along with a losing copy of the group's code. *)
   | Custom of
       { names : string list;
         flags : string option;

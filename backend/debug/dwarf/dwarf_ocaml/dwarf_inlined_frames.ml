@@ -328,13 +328,13 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
       scope_proto_dies, all_summaries)
 
 let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
-    ~function_proto_die =
+    ~own_section ~function_proto_die =
   DS.Debug.log "\n\nDwarf_inlined_frames.dwarf: function proto DIE is %a\n%!"
     Asm_label.print
     (Proto_die.reference function_proto_die);
   let start_of_code_symbol, dwarf_4_base_address_entry =
     Dwarf_base_address_selection.start_of_code_symbol_and_base_entries state
-      ~function_symbol
+      ~function_symbol ~own_section
       ~create_base_address_selection_entry:
         Dwarf_4_range_list_entry.create_base_address_selection_entry
   in

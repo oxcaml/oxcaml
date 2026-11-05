@@ -273,8 +273,8 @@ let iterate_over_variable_like_things state ~available_ranges_vars ~f =
       let ident_for_type = Some (Current_unit.get_cu_exn (), var) in
       f var ~ident_for_type ~range)
 
-let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
-    available_ranges_vars =
+let dwarf state ~value_type_proto_die ~function_symbol ~own_section
+    ~function_proto_die available_ranges_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
   iterate_over_variable_like_things state ~available_ranges_vars
     ~f:(fun var ~ident_for_type:_ ~range:_ ->
@@ -284,7 +284,7 @@ let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
   let start_of_code_symbol, dwarf_4_base_address_entry =
     Dwarf_base_address_selection.start_of_code_symbol_and_base_entries state
-      ~function_symbol
+      ~function_symbol ~own_section
       ~create_base_address_selection_entry:
         Dwarf_4_location_list_entry.create_base_address_selection_entry
   in

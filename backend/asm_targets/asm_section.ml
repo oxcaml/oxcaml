@@ -57,7 +57,10 @@ type t =
   | Note_ocaml_eh
   | Note_gnu_stack
   | Debuginfo_strings
-  | Frametable_piece of { link_symbol : string }
+  | Frametable_piece of
+      { link_symbol : string;
+        group : string option
+      }
   | Custom of
       { names : string list;
         flags : string option;
@@ -122,8 +125,10 @@ let print ppf t =
     | Note_ocaml_eh -> "Note_ocaml_eh"
     | Note_gnu_stack -> "Note_gnu_stack"
     | Debuginfo_strings -> "Debuginfo_strings"
-    | Frametable_piece { link_symbol } ->
+    | Frametable_piece { link_symbol; group = None } ->
       Printf.sprintf "(Frametable_piece %s)" link_symbol
+    | Frametable_piece { link_symbol; group = Some group } ->
+      Printf.sprintf "(Frametable_piece %s %s)" link_symbol group
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -285,11 +290,16 @@ let details t first_occurrence =
         _,
         (MacOS_like | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin) ) ->
       Misc.fatal_error "Frametable sections are only supported on ELF targets"
-    | Frametable_piece { link_symbol }, arch, _ ->
+    | Frametable_piece { link_symbol; group = None }, arch, _ ->
       (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the piece together
          with the section defining [link_symbol]. The name must not clash with
          the startup file's [caml_frametable] symbol. *)
       [".caml_frametable"], Some "ao", [progbits arch; link_symbol]
+    | Frametable_piece { link_symbol; group = Some group }, arch, _ ->
+      (* "G" adds SHF_GROUP; GAS wants the linked-to symbol before the group. *)
+      ( [".caml_frametable"],
+        Some "aoG",
+        [progbits arch; link_symbol; group; "comdat"] )
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

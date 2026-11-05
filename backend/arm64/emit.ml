@@ -1294,28 +1294,32 @@ let assembly_code_for_stack_check env ~far ~max_frame_size_bytes =
     Env.set_stack_realloc env
       { sc_label; sc_return; sc_max_frame_size_in_bytes = max_frame_size_bytes }
 
+let emit_own_text_section func_name =
+  (* CR sspies: Clean this up and add proper support for function sections in
+     the new asm directives. *)
+  let link_symbol = S.encode (S.create_global func_name) in
+  let name = ".text.caml." ^ link_symbol in
+  D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
+    ~is_delayed:false;
+  Emitaux.enter_code_section ~link_symbol name;
+  (* Warning: We set the internal section ref to Text here, because it currently
+     does not supported named text sections. In the rest of this file, we
+     pretend the section is called Text rather than the function specific text
+     section. *)
+  D.unsafe_set_internal_section_ref Text
+
 (* Output .text section directive, or named .text.caml.<name> if enabled. *)
 
 let emit_named_text_section func_name =
   if !Clflags.function_sections
-  then (
-    (* CR sspies: Clean this up and add proper support for function sections in
-       the new asm directives. *)
-    let link_symbol = S.encode (S.create_global func_name) in
-    let name = ".text.caml." ^ link_symbol in
-    D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["%progbits"]
-      ~is_delayed:false;
-    Emitaux.enter_code_section ~link_symbol name;
-    (* Warning: We set the internal section ref to Text here, because it
-       currently does not supported named text sections. In the rest of this
-       file, we pretend the section is called Text rather than the function
-       specific text section. *)
-    D.unsafe_set_internal_section_ref Text)
+  then emit_own_text_section func_name
   else (
     D.text ();
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
        function boundaries need not break delta chains. *)
     Emitaux.enter_code_section ".text")
+
+let has_weak_functions = ref false
 
 (* Switch to a COMDAT text section for a weak function. Mirrors the amd64
    emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
@@ -1334,9 +1338,10 @@ let emit_weak_text_section_for_symbol sym_name =
     D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
       ~args:[Printf.sprintf "%%progbits,%s,comdat" encoded]
       ~is_delayed:false;
-    (* Frame descriptors are encoded as deltas between consecutive return
-       addresses, which must not span sections. *)
-    Emitaux.enter_code_section section_name;
+    has_weak_functions := true;
+    (* The function's frametable piece joins its group, so that the linker
+       discards it along with a losing copy. *)
+    Emitaux.enter_code_section ~link_symbol:encoded ~group:encoded section_name;
     D.unsafe_set_internal_section_ref Text
 
 (* Emit code to load an emitted literal *)
@@ -2323,6 +2328,7 @@ let file_emitter ~file_num ~file_name =
 let begin_assembly _unix =
   reset_debug_info ();
   Probe_emission.reset ();
+  has_weak_functions := false;
   A.set_emit_string ~emit_string:Emitaux.emit_string;
   Asm_targets.Asm_label.initialize ~new_label:(fun () ->
       Cmm.new_label () |> Label.to_int);
@@ -2370,7 +2376,11 @@ let expect_asm_whole_function = ref false
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
-  emit_named_text_section code_end;
+  (* The linker places sections in input order, so a [code_end] of its own
+     follows the weak functions' sections, and so their frametable pieces. *)
+  if !has_weak_functions
+  then emit_own_text_section code_end
+  else emit_named_text_section code_end;
   global_maybe_protected code_end_sym;
   D.define_symbol_label ~section:Text code_end_sym;
   let data_end = Cmm_helpers.make_symbol "data_end" in

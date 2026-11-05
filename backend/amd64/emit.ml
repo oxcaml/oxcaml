@@ -377,6 +377,23 @@ let load_symbol_addr (s : Cmm.symbol) arg =
     then I.lea (mem64_rip NONE (emit_symbol s.sym_name)) arg
     else I.mov (sym (emit_symbol s.sym_name)) arg
 
+let emit_own_text_section ?link_symbol func_name =
+  let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
+  D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["@progbits"]
+    ~is_delayed:false;
+  let link_symbol =
+    match link_symbol with
+    | Some link_symbol -> link_symbol
+    | None -> emit_symbol func_name
+  in
+  Emitaux.enter_code_section ~link_symbol name;
+  (* Warning: We set the internal section ref to Text here, because it currently
+     does not supported named text sections. In the rest of this file, we
+     pretend the section is called Text rather than the function specific text
+     section. *)
+  (* CR sspies: Add proper support for named text sections. *)
+  D.unsafe_set_internal_section_ref Text
+
 (* Output .text section directive, or named .text.caml.<name> if enabled and
    supported on the target system. *)
 
@@ -415,7 +432,7 @@ let emit_named_text_section ?link_symbol func_name =
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
   else if !Clflags.function_sections
-  then (
+  then
     match[@ocaml.warning "-4"] system with
     | S_macosx
     (* Names of section segments in macosx are restricted to 16 characters, but
@@ -425,22 +442,7 @@ let emit_named_text_section ?link_symbol func_name =
       (* Win systems provide named text sections, but configure on these systems
          does not support function sections. *) ->
       assert false
-    | _ ->
-      let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
-      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
-        ~args:["@progbits"] ~is_delayed:false;
-      let link_symbol =
-        match link_symbol with
-        | Some link_symbol -> link_symbol
-        | None -> emit_symbol func_name
-      in
-      Emitaux.enter_code_section ~link_symbol name;
-      (* Warning: We set the internal section ref to Text here, because it
-         currently does not supported named text sections. In the rest of this
-         file, we pretend the section is called Text rather than the function
-         specific text section. *)
-      (* CR sspies: Add proper support for named text sections. *)
-      D.unsafe_set_internal_section_ref Text)
+    | _ -> emit_own_text_section ?link_symbol func_name
   else (
     D.text ();
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
@@ -1145,6 +1147,8 @@ let global_maybe_protected (sym : S.t) =
          inlining. *)
       D.protected sym
 
+let has_weak_functions = ref false
+
 (* Switch to a COMDAT text section for a weak function. The section name embeds
    the symbol so each weak function gets its own group. Both the section and the
    symbol use the [comdat] key, so the linker keeps exactly one copy across all
@@ -1163,9 +1167,11 @@ let emit_weak_text_section_for_symbol sym_name =
     D.switch_to_section_raw ~names:[section_name] ~flags:(Some "axG")
       ~args:[Printf.sprintf "@progbits,%s,comdat" (emit_symbol sym_name)]
       ~is_delayed:false;
-    (* Frame descriptors are encoded as deltas between consecutive return
-       addresses, which must not span sections. *)
-    Emitaux.enter_code_section section_name;
+    has_weak_functions := true;
+    (* The function's frametable piece joins its group, so that the linker
+       discards it along with a losing copy. *)
+    Emitaux.enter_code_section ~link_symbol:(emit_symbol sym_name)
+      ~group:(emit_symbol sym_name) section_name;
     D.unsafe_set_internal_section_ref Text
 
 (* CR sspies: The naming of these functions is confusing. *)
@@ -3012,7 +3018,8 @@ let reset_all () =
   Probe_emission.reset ();
   reset_traps ();
   float_constants := [];
-  all_functions := []
+  all_functions := [];
+  has_weak_functions := false
 
 let begin_assembly unix =
   reset_all ();
@@ -3364,7 +3371,11 @@ let end_assembly () =
   jump_tables := [];
   function_jump_tables := [];
   let code_end = Cmm_helpers.make_symbol "code_end" in
-  emit_named_text_section code_end;
+  (* The linker places sections in input order, so a [code_end] of its own
+     follows the weak functions' sections, and so their frametable pieces. *)
+  if !has_weak_functions
+  then emit_own_text_section code_end
+  else emit_named_text_section code_end;
   if is_macosx system then I.nop ();
   (* suppress "ld warning: atom sorting error" *)
   emit_global_label_for_symbol ~section:Text code_end;
