@@ -2169,7 +2169,8 @@ let curry_mode (type r)
     (arg : With_locality.lr) : With_locality.Comonadic.l =
   With_locality.Comonadic.join
     [(With_locality.close_over arg).comonadic;
-     (With_locality.Comonadic.disallow_right alloc)]
+     With_locality.Comonadic.disallow_right alloc]
+
 let curry_mode_const alloc arg : With_locality.Const.t =
   let acc =
     With_locality.Comonadic.Const.join
@@ -2177,8 +2178,7 @@ let curry_mode_const alloc arg : With_locality.Const.t =
       (With_locality.Const.partial_apply alloc)
   in
   With_locality.Const.merge
-    {comonadic = acc;
-     monadic = With_locality.Monadic.Const.legacy}
+    { comonadic = acc; monadic = With_locality.Monadic.Const.legacy }
 
 module Curry_mode = struct
   type t =

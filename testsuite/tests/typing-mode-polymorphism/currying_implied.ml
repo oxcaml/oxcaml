@@ -3,6 +3,10 @@
  expect;
 *)
 
+(* CR-soon mode-polymorphism-printing: these tests go through [module type of struct ... end] to print
+   the generalized type of each definition. Rewrite them as plain definitions
+   when the parser is done. *)
+
 module type Const2 = module type of struct
   let const2 x y = 0
 end
@@ -265,4 +269,16 @@ module type Stack_args =
       (int * int @ [> local] -> int * int @ [> local] -> 'a @ 'm) @ 'o ->
       unit @ 'n @@ stateless
   end
+|}]
+
+(* CR-soon mode-polymorphism-printing: printing crashes because a curry mode is
+   hidden in front of an arrow that is printed as an alias. Fix once aliased
+   types are handled properly. *)
+module type Aliased_return = module type of struct
+  let aliased_return (o : < m : 't > as 'o) : 't = fun a b -> ignore (a, b); o
+end
+[%%expect{|
+>> Fatal error: Out_type.name_of_modes: printing an elided curry mode
+Uncaught exception: Misc.Fatal_error
+
 |}]
