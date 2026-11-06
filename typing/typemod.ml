@@ -109,6 +109,8 @@ type error =
   | Law_wildcard_in_parameter
   | Law_instantiated_type_variable of string * type_expr
   | Law_in_generative_functor
+  | Law_misplaced_clause of string
+  | Law_malformed_wp
 
 
 exception Error_forward of Location.error
@@ -2246,6 +2248,164 @@ let law_type_variables tys =
        | _ -> None)
     (List.rev (Ctype.free_non_row_variables_of_list tys))
 
+(* The clauses of laws. A clause is an expression of type [bool], or one of
+   the law-level forms [e1 =:= e2], [Q1 && Q2] and [let%wp p = e in Q],
+   which are written as expressions. *)
+type typed_clause =
+  | Clause_bool of Typedtree.expression
+  | Clause_equal of Typedtree.expression * Typedtree.expression
+  | Clause_and of typed_clause_loc * typed_clause_loc
+  | Clause_wp of Typedtree.value_binding * Parsetree.modes * typed_clause_loc
+
+and typed_clause_loc = typed_clause * Location.t
+
+type clause_syntax =
+  | Syntax_equal of Parsetree.expression * Parsetree.expression
+  | Syntax_and of Parsetree.expression * Parsetree.expression
+  | Syntax_wp of Parsetree.value_binding * Parsetree.expression
+  | Syntax_malformed_wp
+  | Syntax_expression
+
+let rec clause_syntax (sexp : Parsetree.expression) =
+  match sexp.pexp_desc with
+  | Pexp_apply
+      ({ pexp_desc = Pexp_ident { txt = Lident "=:="; _ }; _ },
+       [ (Nolabel, e1); (Nolabel, e2) ]) ->
+      Syntax_equal (e1, e2)
+  | Pexp_apply
+      ({ pexp_desc = Pexp_ident { txt = Lident "&&"; _ }; _ },
+       [ (Nolabel, e1); (Nolabel, e2) ])
+    when is_law_clause e1 || is_law_clause e2 ->
+      Syntax_and (e1, e2)
+  | Pexp_extension ({ txt = "wp"; _ }, payload) ->
+      begin match payload with
+      | PStr
+          [ { pstr_desc =
+                Pstr_eval
+                  ({ pexp_desc =
+                       Pexp_let (Immutable, Nonrecursive, [ vb ], body);
+                     pexp_attributes = [];
+                     _ },
+                   []);
+              _ } ] ->
+          Syntax_wp (vb, body)
+      | _ -> Syntax_malformed_wp
+      end
+  | _ -> Syntax_expression
+
+(* Whether [sexp] is a law-level form rather than a boolean expression *)
+and is_law_clause sexp =
+  match clause_syntax sexp with
+  | Syntax_equal _ | Syntax_and _ | Syntax_wp _ | Syntax_malformed_wp -> true
+  | Syntax_expression -> false
+
+(* The law-level forms may not occur inside expressions. *)
+let check_no_misplaced_clause env (sexp : Parsetree.expression) =
+  let expr (it : Ast_iterator.iterator) (e : Parsetree.expression) =
+    match e.pexp_desc with
+    | Pexp_ident { txt = Lident "=:="; loc } ->
+        Error.log_and_raise loc env (Law_misplaced_clause "=:=")
+    | Pexp_extension ({ txt = "wp"; _ }, _) ->
+        Error.log_and_raise e.pexp_loc env (Law_misplaced_clause "let%wp")
+    | _ -> Ast_iterator.default_iterator.expr it e
+  in
+  let it = { Ast_iterator.default_iterator with expr } in
+  it.expr it sexp
+
+let rec law_clause env (sexp : Parsetree.expression) : typed_clause_loc =
+  let loc = sexp.pexp_loc in
+  match clause_syntax sexp with
+  | Syntax_equal (e1, e2) ->
+      check_no_misplaced_clause env e1;
+      check_no_misplaced_clause env e2;
+      (* A clause compares values at any mode. *)
+      let mode = With_regionality.disallow_left With_regionality.max in
+      let e1 = Typecore.type_exp env ~mode e1 in
+      let e2 =
+        Typecore.type_expect env ~mode e2 (Typecore.mk_expected e1.exp_type)
+      in
+      Clause_equal (e1, e2), loc
+  | Syntax_and (c1, c2) ->
+      let c1 = law_clause env c1 in
+      let c2 = law_clause env c2 in
+      Clause_and (c1, c2), loc
+  | Syntax_wp (svb, body) ->
+      check_no_misplaced_clause env svb.pvb_expr;
+      let vbs, env' =
+        Typecore.type_let At_toplevel env Immutable Nonrecursive [ svb ]
+      in
+      let vb =
+        match vbs with
+        | [ vb ] -> vb
+        | _ -> Misc.fatal_error "Typemod.law_clause: let%wp"
+      in
+      (* The modes of the binding are written on the clause. *)
+      let pat_extra =
+        List.filter_map
+          (fun ((extra : Typedtree.pat_extra), eloc, attrs) ->
+             match extra with
+             | Tpat_constraint (None, _) -> None
+             | Tpat_constraint (Some cty, modes) ->
+                 Some (Typedtree.Tpat_constraint
+                         (Some cty, { modes with mode_desc = [] }),
+                       eloc, attrs)
+             | _ -> Some (extra, eloc, attrs))
+          vb.vb_pat.pat_extra
+      in
+      let exp_extra =
+        List.filter
+          (fun ((extra : Typedtree.exp_extra), _, _) ->
+             match extra with Texp_mode _ -> false | _ -> true)
+          vb.vb_expr.exp_extra
+      in
+      let vb =
+        { vb with
+          vb_pat = { vb.vb_pat with pat_extra };
+          vb_expr = { vb.vb_expr with exp_extra } }
+      in
+      Clause_wp (vb, svb.pvb_modes, law_clause env' body), loc
+  | Syntax_malformed_wp -> Error.log_and_raise loc env Law_malformed_wp
+  | Syntax_expression ->
+      check_no_misplaced_clause env sexp;
+      Clause_bool
+        (Typecore.type_expect env
+           ~mode:(With_regionality.disallow_left With_regionality.max) sexp
+           (Typecore.mk_expected Predef.type_bool)),
+      loc
+
+let rec spectree_clause bound ((clause, lc_loc) : typed_clause_loc)
+    : Typedtree.law_clause =
+  let lc_desc : Typedtree.law_clause_desc =
+    match clause with
+    | Clause_bool e -> Tlc_bool (Translspec.spectree ~bound e)
+    | Clause_equal (e1, e2) ->
+        Tlc_equal
+          (Translspec.spectree ~bound e1, Translspec.spectree ~bound e2)
+    | Clause_and (c1, c2) ->
+        Tlc_and (spectree_clause bound c1, spectree_clause bound c2)
+    | Clause_wp (vb, modes, body) ->
+        let binding = Translspec.spectree_value_binding ~bound vb in
+        let bound =
+          List.fold_left (fun bound id -> Ident.Set.add id bound) bound
+            (Typedtree.pat_bound_idents vb.vb_pat)
+        in
+        Tlc_wp { binding; modes; body = spectree_clause bound body }
+  in
+  { lc_desc; lc_loc }
+
+let rec spec_clause (clause : Typedtree.law_clause) : Spec.clause =
+  match clause.lc_desc with
+  | Tlc_bool e -> Sclause_bool (Translspec.spec e)
+  | Tlc_equal (e1, e2) -> Sclause_equal (Translspec.spec e1, Translspec.spec e2)
+  | Tlc_and (c1, c2) -> Sclause_and (spec_clause c1, spec_clause c2)
+  | Tlc_wp { binding; modes; body } ->
+      Sclause_wp
+        { wp_pat = Translspec.spec_pattern binding.svb_pat;
+          wp_modes = List.map (fun { txt = Mode m; _ } -> m) modes;
+          wp_expr = Translspec.spec binding.svb_expr;
+          wp_sort = Translspec.spec_sort binding.svb_sort;
+          wp_body = spec_clause body }
+
 let transl_law env (ld : Parsetree.law_declaration)
     : Typedtree.law_declaration =
   Language_extension.assert_enabled ~loc:ld.plaw_loc Laws ();
@@ -2262,7 +2422,7 @@ let transl_law env (ld : Parsetree.law_declaration)
     |> ignore
   in
   check_duplicates ld.plaw_newtypes;
-  check_duplicates ld.plaw_params;
+  check_duplicates (List.map (fun (name, ty, _) -> (name, ty)) ld.plaw_params);
   (* We require law parameters to be fully annotated, because the generation
      of laws must be able to print their types. We print their types based on
      the typedtree expression rather than the inferred type to ensure they can
@@ -2306,7 +2466,7 @@ let transl_law env (ld : Parsetree.law_declaration)
         in
         let params =
           List.map
-            (fun (lp_name, sty) ->
+            (fun (lp_name, sty, lp_modes) ->
                let sty =
                  match sty with
                  | Some sty -> no_wildcard.typ no_wildcard sty; sty
@@ -2336,7 +2496,7 @@ let transl_law env (ld : Parsetree.law_declaration)
                        (Law_parameter_not_representable (ty, violation))
                in
                let lp_id = Ident.create_local lp_name.txt in
-               { lp_id; lp_name; lp_type }, sort)
+               { lp_id; lp_name; lp_type; lp_modes }, sort)
             ld.plaw_params
         in
         (* The variables of the parameter annotations, with the annotation of
@@ -2351,7 +2511,7 @@ let transl_law env (ld : Parsetree.law_declaration)
         in
         let env =
           List.fold_left
-            (fun env ({ lp_id; lp_name; lp_type }, sort) ->
+            (fun env ({ lp_id; lp_name; lp_type; lp_modes }, sort) ->
                let desc =
                  { val_type = lp_type.ctyp_type;
                    val_kind = Val_reg sort;
@@ -2366,15 +2526,20 @@ let transl_law env (ld : Parsetree.law_declaration)
                let check s =
                  Warnings.Unused_var_strict { name = s; mutated = false }
                in
-               Env.add_value ~check ~mode:With_regionality.legacy
-                 lp_id desc env)
+               (* The modes of the parameter, defaulting to legacy *)
+               let mode =
+                 (Typemode.transl_mode_annots lp_modes).mode_modes
+                 |> Typemode.apply_mode_implications
+                 |> With_locality.Const.Option.value
+                      ~default:With_locality.Const.legacy
+                 |> Mode.Const.with_locality_as_regionality
+                 |> With_regionality.of_const
+               in
+               Env.add_value ~check ~mode lp_id desc env)
             env params
         in
-        let clause sexp =
-          Typecore.type_expect env sexp (Typecore.mk_expected Predef.type_bool)
-        in
-        let law_assumptions = List.map clause ld.plaw_assumptions in
-        let law_conclusion = clause ld.plaw_conclusion in
+        let law_assumptions = List.map (law_clause env) ld.plaw_assumptions in
+        let law_conclusion = law_clause env ld.plaw_conclusion in
         (* Outside of the law, the types stand for type variables. *)
         let law_types =
           List.map
@@ -2423,14 +2588,16 @@ let transl_law env (ld : Parsetree.law_declaration)
       (fun bound p -> Ident.Set.add p.lp_id bound)
       Ident.Set.empty law_params
   in
-  let spectree = Translspec.spectree ~bound in
-  let law_assumptions = List.map spectree law_assumptions in
-  let law_conclusion = spectree law_conclusion in
+  let law_assumptions = List.map (spectree_clause bound) law_assumptions in
+  let law_conclusion = spectree_clause bound law_conclusion in
+  let mode_names modes = List.map (fun { txt = Mode m; _ } -> m) modes in
   let law_law : Types.law_declaration =
     { law_newtypes = List.map (fun t -> t.ln_type) law_newtypes;
-      law_params = List.map2 (fun p ty -> (p.lp_id, ty)) law_params law_types;
-      law_assumptions = List.map Translspec.spec law_assumptions;
-      law_conclusion = Translspec.spec law_conclusion;
+      law_params =
+        List.map2 (fun p ty -> (p.lp_id, ty, mode_names p.lp_modes))
+          law_params law_types;
+      law_assumptions = List.map spec_clause law_assumptions;
+      law_conclusion = spec_clause law_conclusion;
       law_attributes = ld.plaw_attributes;
       law_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
       law_loc = ld.plaw_loc }
@@ -2439,7 +2606,7 @@ let transl_law env (ld : Parsetree.law_declaration)
      signature (see [remove_mode_and_jkind_variables]). *)
   With_locality.with_zap_scope (fun ~zap_scope ->
     List.iter
-      (fun (_, ty) -> Ctype.remove_mode_and_jkind_variables ~zap_scope ty)
+      (fun (_, ty, _) -> Ctype.remove_mode_and_jkind_variables ~zap_scope ty)
       law_law.law_params);
   { law_id = Ident.create_local ld.plaw_name.txt;
     law_name = ld.plaw_name;
@@ -6093,6 +6260,17 @@ let report_error ~loc env = function
   | Law_in_generative_functor ->
       Location.errorf ~loc
         "Laws in the body of a generative functor are not supported."
+  | Law_misplaced_clause what ->
+      Location.errorf ~loc
+        "@[%a is a clause of a law, not an expression:@ it may only occur@ \
+         at the root of a clause,@ under %a or as the body of %a.@]"
+        Style.inline_code what Style.inline_code "&&"
+        Style.inline_code "let%wp"
+  | Law_malformed_wp ->
+      Location.errorf ~loc
+        "@[The extension %a in a law must be@ %a@ with a single, \
+         non-recursive binding.@]"
+        Style.inline_code "wp" Style.inline_code "let%wp p = e in Q"
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

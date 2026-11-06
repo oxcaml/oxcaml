@@ -1586,8 +1586,8 @@ and law_declaration =
     law_law: Types.law_declaration;
     law_newtypes: law_newtype list;
     law_params: law_param list;
-    law_assumptions: spec_expression list;
-    law_conclusion: spec_expression;
+    law_assumptions: law_clause list;
+    law_conclusion: law_clause;
     law_attributes: attribute list;
     law_loc: Location.t
    }
@@ -1603,8 +1603,28 @@ and law_newtype =
 and law_param =
   { lp_id: Ident.t;
     lp_name: string loc;
-    lp_type: core_type
+    lp_type: core_type;
+    lp_modes: Parsetree.modes
    }
+
+and law_clause =
+  { lc_desc: law_clause_desc;
+    lc_loc: Location.t
+   }
+
+and law_clause_desc =
+  | Tlc_bool of spec_expression
+      (** [e], a boolean expression *)
+  | Tlc_equal of spec_expression * spec_expression
+      (** [e1 =:= e2] *)
+  | Tlc_and of law_clause * law_clause
+      (** [Q1 && Q2], where [Q1] or [Q2] is not a boolean expression *)
+  | Tlc_wp of
+      { binding: spec_value_binding;
+        modes: Parsetree.modes;
+        body: law_clause;
+      }
+      (** [let%wp p @ m = e in Q] *)
 
 (* Spectree expressions are a strict subset of the typedtree expressions,
    constructed via [Translspec.spectree]. Since not all typedtree expressions

@@ -549,13 +549,31 @@ let[@warning "+9"] law_declaration sub
   in
   let law_params =
     List.map
-      (fun {lp_id; lp_name; lp_type} ->
+      (fun {lp_id; lp_name; lp_type; lp_modes} ->
          {lp_id; lp_name = map_loc sub lp_name;
-          lp_type = sub.typ sub lp_type})
+          lp_type = sub.typ sub lp_type; lp_modes})
       law_params
   in
-  let law_assumptions = List.map (sub.spec_expression sub) law_assumptions in
-  let law_conclusion = sub.spec_expression sub law_conclusion in
+  let rec clause {lc_desc; lc_loc} =
+    let lc_desc =
+      match lc_desc with
+      | Tlc_bool e -> Tlc_bool (sub.spec_expression sub e)
+      | Tlc_equal (e1, e2) ->
+          Tlc_equal (sub.spec_expression sub e1, sub.spec_expression sub e2)
+      | Tlc_and (c1, c2) -> Tlc_and (clause c1, clause c2)
+      | Tlc_wp {binding; modes; body} ->
+          let binding =
+            { binding with
+              svb_pat = sub.spec_pattern sub binding.svb_pat;
+              svb_expr = sub.spec_expression sub binding.svb_expr;
+              svb_loc = sub.location sub binding.svb_loc }
+          in
+          Tlc_wp {binding; modes; body = clause body}
+    in
+    {lc_desc; lc_loc = sub.location sub lc_loc}
+  in
+  let law_assumptions = List.map clause law_assumptions in
+  let law_conclusion = clause law_conclusion in
   let law_attributes = sub.attributes sub law_attributes in
   let law_loc = sub.location sub law_loc in
   {law_id; law_name; law_law; law_newtypes; law_params; law_assumptions;

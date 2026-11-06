@@ -910,15 +910,18 @@ and law_declaration =
   {
     plaw_name : string loc;
     plaw_newtypes : (string loc * jkind_annotation option) list;
-    plaw_params : (string loc * core_type option) list;
+    plaw_params : (string loc * core_type option * modes) list;
     plaw_assumptions : expression list;
     plaw_conclusion : expression;
     plaw_attributes : attributes;
     plaw_loc : Location.t
   }
   (** [law? name (type a1 ... am) p1 ... pn : A1 ===> ... ===> Ak ===> C],
-      where each parameter [pi] is [x] or [(x : T)] and the types [ai] are
-      [a] or [(a : k)] *)
+      where each parameter [pi] is [x], [(x : T)] or [(x : T @ m1 ... mk)]
+      and the types [ai] are [a] or [(a : k)]. A clause is an expression,
+      where [e1 =:= e2] (logical equality), [let%wp p = e in Q] and
+      [let%wp p @ m = e in Q] (weakest preconditions), and [&&] of these, are
+      law-level forms when they are not under another expression. *)
 
 
 (** {1 Class language} *)

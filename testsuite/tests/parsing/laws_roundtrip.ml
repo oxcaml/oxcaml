@@ -92,3 +92,22 @@ module type S  =
   end
 module F(X:S) = struct law? in_functor (x : int) : (X.f x) = x end
 |}]
+
+(* Modes on parameters, logical equality and [let%wp] *)
+
+let () = roundtrip {|
+  law? wp (a : int array @ local unique) (xs : int list) :
+    Array.to_list a =:= xs ===>
+    let%wp () = rev_in_place a in
+    let%wp n @ local = Array.length a in
+    Array.to_list a =:= List.rev xs && n = List.length xs
+|}
+[%%expect {|
+law? wp (a : int array @ local unique) (xs : int list) :
+  (Array.to_list a) =:= xs ===>
+  [%wp
+    (let () = rev_in_place a in
+     [%wp
+       let (n @ local) = Array.length a in
+       ((Array.to_list a) =:= (List.rev xs)) && (n = (List.length xs))])]
+|}]

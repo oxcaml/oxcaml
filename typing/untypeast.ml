@@ -354,6 +354,34 @@ let jkind_declaration _sub decl =
     pjkind_attributes = decl.jkind_attributes;
     pjkind_loc = decl.jkind_jkind.jkind_loc }
 
+(* The law-level forms of clauses are written as expressions. *)
+let rec law_clause sub (clause : T.law_clause) =
+  let loc = sub.location sub clause.lc_loc in
+  let operator name args =
+    Exp.apply ~loc
+      (Exp.ident ~loc (mkloc (Longident.Lident name) loc))
+      (List.map (fun e -> (Asttypes.Nolabel, e)) args)
+  in
+  match clause.lc_desc with
+  | Tlc_bool e -> sub.expr sub (Translspec.typedtree e)
+  | Tlc_equal (e1, e2) ->
+      operator "=:="
+        [ sub.expr sub (Translspec.typedtree e1);
+          sub.expr sub (Translspec.typedtree e2) ]
+  | Tlc_and (c1, c2) -> operator "&&" [ law_clause sub c1; law_clause sub c2 ]
+  | Tlc_wp { binding; modes; body } ->
+      let vb =
+        Vb.mk ~loc:(sub.location sub binding.svb_loc) ~modes
+          (sub.pat sub (Translspec.typedtree_value_pattern binding.svb_pat))
+          (sub.expr sub (Translspec.typedtree binding.svb_expr))
+      in
+      Exp.extension ~loc
+        ( mkloc "wp" loc,
+          PStr
+            [ Str.eval ~loc
+                (Exp.let_ ~loc Immutable Nonrecursive [ vb ]
+                   (law_clause sub body)) ] )
+
 let law_declaration sub (decl : T.law_declaration) =
   { plaw_name = map_loc sub decl.law_name;
     plaw_newtypes =
@@ -363,13 +391,10 @@ let law_declaration sub (decl : T.law_declaration) =
     plaw_params =
       List.map
         (fun (p : T.law_param) ->
-           (map_loc sub p.lp_name, Some (sub.typ sub p.lp_type)))
+           (map_loc sub p.lp_name, Some (sub.typ sub p.lp_type), p.lp_modes))
         decl.law_params;
-    plaw_assumptions =
-      List.map
-        (fun e -> sub.expr sub (Translspec.typedtree e))
-        decl.law_assumptions;
-    plaw_conclusion = sub.expr sub (Translspec.typedtree decl.law_conclusion);
+    plaw_assumptions = List.map (law_clause sub) decl.law_assumptions;
+    plaw_conclusion = law_clause sub decl.law_conclusion;
     plaw_attributes = sub.attributes sub decl.law_attributes;
     plaw_loc = sub.location sub decl.law_loc }
 

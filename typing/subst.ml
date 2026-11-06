@@ -921,12 +921,12 @@ let jkind_declaration s decl =
 
 let law_declaration' copy_scope s decl =
   let ty = typexp copy_scope s decl.law_loc in
-  let spec e =
-    Spec.map_paths ~value_path:(value_path s) ~type_path:(type_path s) e
+  let spec c =
+    Spec.map_clause_paths ~value_path:(value_path s) ~type_path:(type_path s) c
   in
   { law_newtypes = List.map ty decl.law_newtypes;
     law_params =
-      List.map (fun (x, ty_) -> (x, ty ty_)) decl.law_params;
+      List.map (fun (x, ty_, m) -> (x, ty ty_, m)) decl.law_params;
     law_assumptions = List.map spec decl.law_assumptions;
     law_conclusion = spec decl.law_conclusion;
     law_attributes = attrs s decl.law_attributes;

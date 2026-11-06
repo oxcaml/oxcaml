@@ -939,7 +939,7 @@ and extension_constructor_kind = Parsetree.extension_constructor_kind =
     {
       plaw_name : string loc;
       plaw_newtypes : (string loc * jkind_annotation option) list;
-      plaw_params : (string loc * core_type option) list;
+      plaw_params : (string loc * core_type option * modes) list;
       plaw_assumptions : expression list;
       plaw_conclusion : expression;
       plaw_attributes : attributes;
@@ -2170,9 +2170,10 @@ class virtual map =
             plaw_newtypes in
         let plaw_params =
           self#list
-            (fun (a, b) ->
+            (fun (a, b, c) ->
                let a = self#loc self#string a in
-               let b = self#option self#core_type b in (a, b))
+               let b = self#option self#core_type b in
+               let c = self#modes c in (a, b, c))
             plaw_params in
         let plaw_assumptions = self#list self#expression plaw_assumptions in
         let plaw_conclusion = self#expression plaw_conclusion in
@@ -3178,7 +3179,10 @@ class virtual iter =
              self#loc self#string a; self#option self#jkind_annotation b)
           plaw_newtypes;
         self#list
-          (fun (a, b) -> self#loc self#string a; self#option self#core_type b)
+          (fun (a, b, c) ->
+             self#loc self#string a;
+             self#option self#core_type b;
+             self#modes c)
           plaw_params;
         self#list self#expression plaw_assumptions;
         self#expression plaw_conclusion;
@@ -4207,9 +4211,10 @@ class virtual ['acc] fold =
             plaw_newtypes acc in
         let acc =
           self#list
-            (fun (a, b) acc ->
+            (fun (a, b, c) acc ->
                let acc = self#loc self#string a acc in
-               let acc = self#option self#core_type b acc in acc)
+               let acc = self#option self#core_type b acc in
+               let acc = self#modes c acc in acc)
             plaw_params acc in
         let acc = self#list self#expression plaw_assumptions acc in
         let acc = self#expression plaw_conclusion acc in
@@ -5570,10 +5575,11 @@ class virtual ['acc] fold_map =
                ((a, b), acc)) plaw_newtypes acc in
         let (plaw_params, acc) =
           self#list
-            (fun (a, b) acc ->
+            (fun (a, b, c) acc ->
                let (a, acc) = self#loc self#string a acc in
                let (b, acc) = self#option self#core_type b acc in
-               ((a, b), acc)) plaw_params acc in
+               let (c, acc) = self#modes c acc in
+               ((a, b, c), acc)) plaw_params acc in
         let (plaw_assumptions, acc) =
           self#list self#expression plaw_assumptions acc in
         let (plaw_conclusion, acc) = self#expression plaw_conclusion acc in
@@ -7017,9 +7023,10 @@ class virtual ['ctx] map_with_context =
             plaw_newtypes in
         let plaw_params =
           self#list
-            (fun ctx (a, b) ->
+            (fun ctx (a, b, c) ->
                let a = self#loc self#string ctx a in
-               let b = self#option self#core_type ctx b in (a, b)) ctx
+               let b = self#option self#core_type ctx b in
+               let c = self#modes ctx c in (a, b, c)) ctx
             plaw_params in
         let plaw_assumptions =
           self#list self#expression ctx plaw_assumptions in
@@ -8492,9 +8499,10 @@ class virtual ['res] lift =
             plaw_newtypes in
         let plaw_params =
           self#list
-            (fun (a, b) ->
+            (fun (a, b, c) ->
                let a = self#loc self#string a in
-               let b = self#option self#core_type b in self#tuple [a; b])
+               let b = self#option self#core_type b in
+               let c = self#modes c in self#tuple [a; b; c])
             plaw_params in
         let plaw_assumptions = self#list self#expression plaw_assumptions in
         let plaw_conclusion = self#expression plaw_conclusion in
@@ -10529,12 +10537,13 @@ class virtual ['ctx,'res] lift_map_with_context =
             plaw_newtypes in
         let plaw_params =
           self#list
-            (fun ctx (a, b) ->
+            (fun ctx (a, b, c) ->
                let a = self#loc self#string ctx a in
                let b = self#option self#core_type ctx b in
-               (((Stdlib.fst a), (Stdlib.fst b)),
-                 (self#tuple ctx [Stdlib.snd a; Stdlib.snd b]))) ctx
-            plaw_params in
+               let c = self#modes ctx c in
+               (((Stdlib.fst a), (Stdlib.fst b), (Stdlib.fst c)),
+                 (self#tuple ctx [Stdlib.snd a; Stdlib.snd b; Stdlib.snd c])))
+            ctx plaw_params in
         let plaw_assumptions =
           self#list self#expression ctx plaw_assumptions in
         let plaw_conclusion = self#expression ctx plaw_conclusion in

@@ -1010,9 +1010,33 @@ and law_declaration i ppf x =
   line i ppf "law_params =\n";
   list (i+1) law_param ppf x.law_params;
   line i ppf "law_assumptions =\n";
-  list (i+1) spec_expression ppf x.law_assumptions;
+  list (i+1) law_clause ppf x.law_assumptions;
   line i ppf "law_conclusion =\n";
-  spec_expression (i+1) ppf x.law_conclusion
+  law_clause (i+1) ppf x.law_conclusion
+
+and law_clause i ppf x =
+  match x.lc_desc with
+  | Tlc_bool e ->
+      line i ppf "Tlc_bool %a\n" fmt_location x.lc_loc;
+      spec_expression (i+1) ppf e
+  | Tlc_equal (e1, e2) ->
+      line i ppf "Tlc_equal %a\n" fmt_location x.lc_loc;
+      spec_expression (i+1) ppf e1;
+      spec_expression (i+1) ppf e2
+  | Tlc_and (c1, c2) ->
+      line i ppf "Tlc_and %a\n" fmt_location x.lc_loc;
+      law_clause (i+1) ppf c1;
+      law_clause (i+1) ppf c2
+  | Tlc_wp { binding; modes; body } ->
+      line i ppf "Tlc_wp %a\n" fmt_location x.lc_loc;
+      List.iter
+        (fun m ->
+           let (Parsetree.Mode m) = m.txt in
+           line (i+1) ppf "mode %s\n" m)
+        modes;
+      spec_pattern (i+1) ppf binding.svb_pat;
+      spec_expression (i+1) ppf binding.svb_expr;
+      law_clause (i+1) ppf body
 
 and law_newtype i ppf x =
   line i ppf "%a\n" fmt_ident x.ln_id;
@@ -1020,7 +1044,12 @@ and law_newtype i ppf x =
 
 and law_param i ppf x =
   line i ppf "%a\n" fmt_ident x.lp_id;
-  core_type (i+1) ppf x.lp_type
+  core_type (i+1) ppf x.lp_type;
+  List.iter
+    (fun m ->
+       let (Parsetree.Mode m) = m.txt in
+       line (i+1) ppf "mode %s\n" m)
+    x.lp_modes
 
 and spec_expression i ppf x =
   line i ppf "spec_expression %a\n" fmt_location x.stexp_loc;

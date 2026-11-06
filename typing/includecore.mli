@@ -138,6 +138,7 @@ type type_mismatch =
 type law_mismatch =
   | Law_arity of int * int
   | Law_parameter_types of string option * Errortrace.moregen_error
+  | Law_parameter_modes of string * string list * string list
   | Law_clauses
   | Law_applied_path of Path.t
 

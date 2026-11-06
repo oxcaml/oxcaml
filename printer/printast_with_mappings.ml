@@ -711,7 +711,7 @@ and law_declaration i ppf
   line i ppf "plaw_newtypes =\n";
   list (i+1) string_loc_x_jkind_annotation_option ppf plaw_newtypes;
   line i ppf "plaw_params =\n";
-  list (i+1) string_loc_x_core_type_option ppf plaw_params;
+  list (i+1) law_param ppf plaw_params;
   line i ppf "plaw_assumptions =\n";
   list (i+1) expression ppf plaw_assumptions;
   line i ppf "plaw_conclusion =\n";
@@ -721,9 +721,10 @@ and string_loc_x_jkind_annotation_option i ppf (s, jkind) =
   string_loc i ppf s;
   jkind_annotation_opt (i+1) ppf jkind
 
-and string_loc_x_core_type_option i ppf (s, ty) =
+and law_param i ppf (s, ty, mm) =
   string_loc i ppf s;
-  option (i+1) core_type ppf ty
+  option (i+1) core_type ppf ty;
+  modes (i+1) ppf mm
 
 and attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.attr_name.txt;

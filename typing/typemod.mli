@@ -218,6 +218,8 @@ type error =
   | Law_wildcard_in_parameter
   | Law_instantiated_type_variable of string * type_expr
   | Law_in_generative_functor
+  | Law_misplaced_clause of string
+  | Law_malformed_wp
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

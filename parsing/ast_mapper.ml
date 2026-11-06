@@ -1055,8 +1055,9 @@ let default_mapper =
          in
          let plaw_params =
            List.map
-             (fun (name, ty) ->
-                (map_loc this name, Option.map (this.typ this) ty))
+             (fun (name, ty, modes) ->
+                (map_loc this name, Option.map (this.typ this) ty,
+                 this.modes this modes))
              plaw_params
          in
          let plaw_assumptions = List.map (this.expr this) plaw_assumptions in

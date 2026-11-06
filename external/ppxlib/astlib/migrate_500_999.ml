@@ -407,7 +407,10 @@ and copy_law_declaration :
         plaw_newtypes;
     plaw_params =
       List.map
-        (fun (x, ty) -> copy_loc (fun x -> x) x, Option.map copy_core_type ty)
+        (fun (x, ty, modes) ->
+          ( copy_loc (fun x -> x) x,
+            Option.map copy_core_type ty,
+            copy_modes modes ))
         plaw_params;
     plaw_assumptions = List.map copy_expression plaw_assumptions;
     plaw_conclusion = copy_expression plaw_conclusion;

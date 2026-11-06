@@ -466,6 +466,8 @@ and argument bound loc (lbl, (arg : apply_arg)) =
   | Omitted _ -> unsupported loc Omitted_arguments
   | Arg (e, sort) -> arg_label loc lbl, spectree bound e, sort
 
+let spectree_value_binding ~bound vb = value_binding bound vb
+
 let spectree ~bound e = spectree bound e
 
 (* Specification expressions. Sort variables are defaulted as in the other
@@ -531,6 +533,8 @@ let rec pattern : type k. k spec_general_pattern -> Spec.pattern =
   | Stpat_value p -> pattern p
   | Stpat_exception p -> Spat_exception (pattern p)
   | Stpat_or (p1, p2) -> Spat_or (pattern p1, pattern p2)
+
+let spec_pattern p = pattern p
 
 let rec spec (e : spec_expression) : Spec.expression =
   let labelled (lbl, e, s) = lbl, spec e, sort s in
@@ -962,3 +966,8 @@ let () =
   Location.register_error_of_exn (function
     | Error (loc, err) -> Some (Location.error_of_printer ~loc report_error err)
     | _ -> None)
+
+let spec_sort = sort
+
+let typedtree_value_pattern (p : spec_pattern) : Typedtree.pattern =
+  typedtree_pattern p

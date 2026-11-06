@@ -36,11 +36,24 @@
 val spectree :
   bound:Ident.Set.t -> Typedtree.expression -> Typedtree.spec_expression
 
+(** [spectree_value_binding ~bound vb] checks the binding [vb] as [spectree]
+    checks an expression. *)
+val spectree_value_binding :
+  bound:Ident.Set.t -> Typedtree.value_binding -> Typedtree.spec_value_binding
+
 (** [spec e] strips [e] of its types. Sort variables are defaulted. *)
 val spec : Typedtree.spec_expression -> Spec.expression
 
 (** [typedtree e] is the typed expression that [spectree] made [e] from. *)
 val typedtree : Typedtree.spec_expression -> Typedtree.expression
+
+(** [spec] and [typedtree] on patterns, and the defaulting of sorts *)
+
+val spec_pattern : Typedtree.spec_pattern -> Spec.pattern
+
+val typedtree_value_pattern : Typedtree.spec_pattern -> Typedtree.pattern
+
+val spec_sort : Jkind.sort -> Spec.sort
 
 type error
 

@@ -429,11 +429,24 @@ let[@warning "+9"] law_declaration sub
        iter_loc sub ln_name)
     law_newtypes;
   List.iter
-    (fun {lp_id = _; lp_name; lp_type} ->
+    (fun {lp_id = _; lp_name; lp_type; lp_modes = _} ->
        iter_loc sub lp_name; sub.typ sub lp_type)
     law_params;
-  List.iter (sub.spec_expression sub) law_assumptions;
-  sub.spec_expression sub law_conclusion
+  let rec clause {lc_desc; lc_loc} =
+    sub.location sub lc_loc;
+    match lc_desc with
+    | Tlc_bool e -> sub.spec_expression sub e
+    | Tlc_equal (e1, e2) ->
+        sub.spec_expression sub e1; sub.spec_expression sub e2
+    | Tlc_and (c1, c2) -> clause c1; clause c2
+    | Tlc_wp {binding; modes = _; body} ->
+        sub.location sub binding.svb_loc;
+        sub.spec_pattern sub binding.svb_pat;
+        sub.spec_expression sub binding.svb_expr;
+        clause body
+  in
+  List.iter clause law_assumptions;
+  clause law_conclusion
 
 let pat_extra sub (e, loc, attrs) =
   sub.location sub loc;

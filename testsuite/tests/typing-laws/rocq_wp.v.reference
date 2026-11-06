@@ -1,0 +1,90 @@
+(** Generated from rocq_wp.ml by the OxCaml compiler (-laws-rocq);
+    do not edit. The laws are stated as [<law>_statement] and proved
+    in a separate file. *)
+From oxiris Require Import law_prelude_state.
+
+(** [let rec first p n = if p n then n else first p (n + 1)] *)
+Definition first : val :=
+  (rec: "first" "p" "n" := if: "p" "n" then "n" else "first" "p" ("n" + #1))%V.
+
+(** [let rec all_in_range n i f =
+      if n < i then f n && all_in_range (n + 1) i f else true] *)
+Definition all_in_range : val :=
+  (rec: "all_in_range" "n" "i" "f" :=
+     if: "n" < "i"
+     then
+       AndAlso ("f" "n") ("all_in_range" ("n" + #1) "i" "f")
+     else
+       #true)%V.
+
+(** [let rec length = function [] -> 0 | _ :: l -> 1 + length l] *)
+Definition length : val :=
+  (rec: "length" "param" := MatchList "param" #0 BAnon "l" (#1 + "length" "l"))%V.
+
+(** [law? first_now (p : int -> bool) (n : int) : p n ===> first p n =:= n] *)
+Definition first_now_statement : Prop :=
+  ∀ (p : val) (n : val),
+    ty_fun ty_int ty_bool p →
+    ty_int n →
+    spec_true (p n)%E →
+    (first p n)%E =:= (n)%E.
+
+(** [law? first_correct (p : int -> bool) (n : int) :
+      let%wp i = first p n in
+      n <= i && p i && all_in_range n i (fun j -> not (p j))] *)
+Definition first_correct_statement : Prop :=
+  ∀ (p : val) (n : val),
+    ty_fun ty_int ty_bool p →
+    ty_int n →
+    ⊢ let%wp i := (first p n)%E in
+      law_true
+        (AndAlso (n ≤ i)
+           (AndAlso (p i) (all_in_range n i (λ: "j", Stdlib_not (p "j")))))%E.
+
+(** [law? first_premise (p : int -> bool) (n : int) (m : int) :
+      n =:= m ===> p n ===> let%wp i = first p m in i =:= n && p i] *)
+Definition first_premise_statement : Prop :=
+  ∀ (p : val) (n : val) (m : val),
+    ty_fun ty_int ty_bool p →
+    ty_int n →
+    ty_int m →
+    ⊢ law_eq (n)%E (m)%E ===>
+      law_true (p n)%E ===>
+      let%wp i := (first p m)%E in
+      (law_eq (i)%E (n)%E) ∧ (law_true (p i)%E).
+
+(** [law? first_twice (p : int -> bool) (n : int) :
+      let%wp i = first p n in let%wp j = first p i in i =:= j] *)
+Definition first_twice_statement : Prop :=
+  ∀ (p : val) (n : val),
+    ty_fun ty_int ty_bool p →
+    ty_int n →
+    ⊢ let%wp i := (first p n)%E in
+      let%wp j := (first p i)%E in
+      law_eq (i)%E (j)%E.
+
+(** [law? local_list (xs : int list @ local) (f : int -> int) :
+      f 0 = f 0 ===>
+      length xs >= 0 ===> let%wp () = () in length xs =:= length xs] *)
+Definition local_list_statement : Prop :=
+  ∀ (Σ : gFunctors) (HΣ : heapGS Σ),
+    slaw_valid (∀ₗ xs : (TPure (ty_list ty_int)) @ (Mode Local Uncontended Nonportable),
+      ∀ₗ f : (TArrow TInt (Mode Global Uncontended Nonportable) TInt (Mode Global Uncontended Nonportable)) @ (Mode Global Uncontended Nonportable),
+      spec_true3 (f #0 = f #0)%E ===>
+      spec_true3 (#0 ≤ length xs)%E ===>
+      let%wp _ : TUnit @ (Mode Global Uncontended Nonportable) := (#())%E in
+      (length xs)%E =:= (length xs)%E).
+
+(** [law? shared_result (p : (int -> bool) [@total]) (n : int @ shared) :
+      let%wp i @ local portable = first p n in p i] *)
+Definition shared_result_statement : Prop :=
+  ∀ (Σ : gFunctors) (HΣ : heapGS Σ),
+    slaw_valid (∀ₗ p : (TPure (ty_fun ty_int ty_bool)) @ (Mode Global Uncontended Nonportable),
+      ∀ₗ n : TInt @ (Mode Global Shared Nonportable),
+      let%wp i : TInt @ (Mode Local Uncontended Portable) := (first p n)%E in
+      ⟦ (p i)%E ⟧).
+
+(** The names by which other units refer to this one. *)
+Notation Rocq_wp_first := first (only parsing).
+Notation Rocq_wp_all_in_range := all_in_range (only parsing).
+Notation Rocq_wp_length := length (only parsing).

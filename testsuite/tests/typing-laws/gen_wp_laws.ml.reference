@@ -1,0 +1,123 @@
+[@@@ocaml.warning "-27-40"]
+module Laws_gen_Stdlib = Stdlib
+module Laws_gen_Gen_wp = Gen_wp
+[@@@ocaml.text " The law first_correct is not tested: it contains let%wp. "]
+[@@@ocaml.text
+  " The law functions is not tested: it compares values that may contain functions with =:=. "]
+type 'a each = {
+  rev_rev: 'a ;
+  both: 'a ;
+  local_param: 'a }
+let names =
+  { rev_rev = "rev_rev"; both = "both"; local_param = "local_param" }
+let locations =
+  {
+    rev_rev =
+      {
+        CamlinternalLaw.file = "gen_wp.ml";
+        start_line = 23;
+        start_col = 0;
+        end_line = 23;
+        end_col = 50
+      };
+    both =
+      {
+        CamlinternalLaw.file = "gen_wp.ml";
+        start_line = 24;
+        start_col = 0;
+        end_line = 24;
+        end_col = 64
+      };
+    local_param =
+      {
+        CamlinternalLaw.file = "gen_wp.ml";
+        start_line = 25;
+        start_col = 0;
+        end_line = 25;
+        end_col = 52
+      }
+  }
+let map { rev_rev; both; local_param } ~f =
+  { rev_rev = (f rev_rev); both = (f both); local_param = (f local_param) }
+let to_list { rev_rev; both; local_param } = [rev_rev; both; local_param]
+type rev_rev_input =
+  | Rev_rev_input: {
+  xs: int list } -> rev_rev_input 
+type both_input =
+  | Both_input: {
+  xs: int list } -> both_input 
+type local_param_input =
+  | Local_param_input: {
+  xs: int list } -> local_param_input 
+module Instantiate(Choice:CamlinternalLaw.Choice) =
+  struct
+    module Law = (CamlinternalLaw.Make)(Choice)
+    let rev_rev (choice : rev_rev_input Choice.t)  : unit Law.t =
+      Law.Bind
+        ((Law.Choose choice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = choice;
+                 predicate =
+                   (fun ((Rev_rev_input { xs }) : rev_rev_input) ->
+                      (Laws_gen_Stdlib.(=)
+                         (Laws_gen_Gen_wp.rev (Laws_gen_Gen_wp.rev xs)) xs : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_wp.ml";
+                     start_line = 23;
+                     start_col = 31;
+                     end_line = 23;
+                     end_col = 50
+                   }
+               }))
+    let both (choice : both_input Choice.t)  : unit Law.t =
+      Law.Bind
+        ((Law.Choose choice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = choice;
+                 predicate =
+                   (fun ((Both_input { xs }) : both_input) ->
+                      (Laws_gen_Stdlib.(&&)
+                         (Laws_gen_Stdlib.(=)
+                            (Laws_gen_Gen_wp.rev ([] : _ list)) ([] : 
+                            _ list))
+                         (Laws_gen_Stdlib.(=)
+                            (Laws_gen_Gen_wp.rev (Laws_gen_Gen_wp.rev xs)) xs) : 
+                      bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_wp.ml";
+                     start_line = 24;
+                     start_col = 28;
+                     end_line = 24;
+                     end_col = 64
+                   }
+               }))
+    let local_param (choice : local_param_input Choice.t)  : unit Law.t =
+      Law.Bind
+        ((Law.Choose choice),
+          (fun input ->
+             Law.Assertion
+               {
+                 value = input;
+                 source = choice;
+                 predicate =
+                   (fun ((Local_param_input { xs }) : local_param_input) ->
+                      (Laws_gen_Stdlib.(=) xs xs : bool));
+                 location =
+                   {
+                     CamlinternalLaw.file = "gen_wp.ml";
+                     start_line = 25;
+                     start_col = 43;
+                     end_line = 25;
+                     end_col = 52
+                   }
+               }))
+  end

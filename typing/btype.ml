@@ -522,11 +522,11 @@ let type_iterators_without_type_expr =
     it.it_path ctd.clty_path
   and it_law_declaration it ld =
     List.iter (it.it_type_expr it) ld.law_newtypes;
-    List.iter (fun (_, ty) -> it.it_type_expr it ty) ld.law_params;
-    let clause e =
+    List.iter (fun (_, ty, _) -> it.it_type_expr it ty) ld.law_params;
+    let clause c =
       List.iter
         (fun ((Value | Type | Extension : Spec.namespace), p) -> it.it_path p)
-        (Spec.paths e)
+        (Spec.clause_paths c)
     in
     List.iter clause ld.law_assumptions;
     clause ld.law_conclusion

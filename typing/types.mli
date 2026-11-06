@@ -478,9 +478,10 @@ and law_declaration =
   {
     law_newtypes : type_expr list;
     (* The type variables that the types [(type a)] of the law stand for *)
-    law_params : (Ident.t * type_expr) list;
-    law_assumptions : Spec.expression list;
-    law_conclusion : Spec.expression;
+    law_params : (Ident.t * type_expr * string list) list;
+    (* The parameters, with their types and their modes as written *)
+    law_assumptions : Spec.clause list;
+    law_conclusion : Spec.clause;
     law_attributes : Parsetree.attributes;
     law_uid : Shape.Uid.t;
     law_loc : Location.t

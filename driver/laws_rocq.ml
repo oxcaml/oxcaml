@@ -73,7 +73,22 @@ let rec is_value = function
 type sty = Sty_var of string | Sty_app of string * sty list
 
 (* A clause of a law: [spec_true e] or [e1 =:= e2] *)
-type clause = Spec_true of expr | Spec_eq of expr * expr
+(* The clauses of a law *)
+type clause =
+  | Spec_true of expr
+  | Spec_eq of expr * expr
+  | Spec_and of clause * clause
+  | Spec_wp of {
+      var : string option;  (** [None] for [()] and [_] *)
+      ty : string;  (** The Phase 3 type of the result, printed *)
+      mode : string;  (** The Phase 3 mode of the result, printed *)
+      e : expr;
+      body : clause;
+    }
+
+(* The logic of a law: total correctness (Phase 1), weakest preconditions
+   (Phase 2) or separation logic (Phase 3), see TARGET.md *)
+type phase = Phase1 | Phase2 | Phase3
 
 module Print = struct
   open Format
@@ -228,19 +243,55 @@ module Print = struct
   (* [ty v], the proposition that [v] has the semantic type [ty] *)
   let typing ppf (ty, v) = fprintf ppf "@[<hov 2>%a@ %s@]" sty ty v
 
-  let clause ppf = function
-    | Spec_true e -> fprintf ppf "@[<hov 2>spec_true@ (%a)%%E@]" expr e
-    | Spec_eq (a, b) ->
-        fprintf ppf "@[<hov 2>(%a)%%E =:=@ (%a)%%E@]" expr a expr b
+  let rec conjuncts = function
+    | Spec_and (c1, c2) -> conjuncts c1 @ conjuncts c2
+    | c -> [ c ]
 
-  let clauses ppf = function
-    | [ c ] -> clause ppf c
+  let conjunction pp ppf c =
+    match conjuncts c with
+    | [ c ] -> pp ppf c
     | cs ->
         fprintf ppf "@[<hov>%a@]"
           (pp_print_list
              ~pp_sep:(fun ppf () -> fprintf ppf " ∧@ ")
-             (fun ppf c -> fprintf ppf "(%a)" clause c))
+             (fun ppf c -> fprintf ppf "(%a)" pp c))
           cs
+
+  let e ppf x = fprintf ppf "(%a)%%E" expr x
+
+  (* Phase 1: Coq propositions *)
+  let rec clause1 ppf = function
+    | Spec_true x -> fprintf ppf "@[<hov 2>spec_true@ %a@]" e x
+    | Spec_eq (a, b) -> fprintf ppf "@[<hov 2>%a =:=@ %a@]" e a e b
+    | Spec_and _ as c -> conjunction clause1 ppf c
+    | Spec_wp _ -> Misc.fatal_error "Laws_rocq.Print.clause1"
+
+  (* Phase 2: siProp propositions *)
+  let rec clause2 ppf = function
+    | Spec_true x -> fprintf ppf "@[<hov 2>law_true@ %a@]" e x
+    | Spec_eq (a, b) -> fprintf ppf "@[<hov 2>law_eq@ %a@ %a@]" e a e b
+    | Spec_and _ as c -> conjunction clause2 ppf c
+    | Spec_wp { var; e = x; body; _ } ->
+        fprintf ppf "@[<v>@[<hov 2>let%%wp %s :=@ %a in@]@,%a@]"
+          (Option.value var ~default:"_")
+          e x clause2 body
+
+  (* Phase 3: the body of [slaw_valid]. A premise and a conclusion are
+     written differently. *)
+  let rec premise3 ppf = function
+    | Spec_true x -> fprintf ppf "@[<hov 2>spec_true3@ %a@]" e x
+    | Spec_eq (a, b) -> fprintf ppf "@[<hov 2>(%a =:=@ %a)@]" e a e b
+    | Spec_and _ as c -> conjunction premise3 ppf c
+    | Spec_wp _ as c -> fprintf ppf "(%a)" clause3 c
+
+  and clause3 ppf = function
+    | Spec_true x -> fprintf ppf "@[<hov 2>⟦ %a ⟧@]" e x
+    | Spec_eq (a, b) -> fprintf ppf "@[<hov 2>%a =:=@ %a@]" e a e b
+    | Spec_and _ as c -> conjunction clause3 ppf c
+    | Spec_wp { var; ty; mode; e = x; body } ->
+        fprintf ppf "@[<v>@[<hov 2>let%%wp %s : %s @@ %s :=@ %a in@]@,%a@]"
+          (Option.value var ~default:"_")
+          ty mode e x clause3 body
 end
 
 (* The translation *)
@@ -274,6 +325,11 @@ type state = {
   (* The other units whose files the file imports *)
   mutable requires : String.Set.t;
   mutable uses_stuck : bool;
+  (* Whether the code of the unit may touch the heap, which makes the Phase 2
+     laws Phase 3 laws *)
+  mutable uses_state : bool;
+  (* The largest phase of the laws, which selects the prelude *)
+  mutable max_phase : phase;
   mutable counter : int;
   (* The unit-qualified names of the definitions, and their names *)
   mutable aliases : (string * string) list;
@@ -748,8 +804,8 @@ let primitive_op st ~loc ~tenv ~arg_ty name : expr list -> expr =
     in
     if not (is_type tenv arg_ty types) then
       unsupported ~loc
-        "the comparison %s at a type other than %s (only a clause e1 = e2, or \
-         a conjunct e1 = e2 of a clause, means e1 =:= e2)"
+        "the comparison %s at a type other than %s (write e1 =:= e2 for the \
+         logical equality of two values)"
         name
         (if List.length types > 2 then "int, char, bool and unit"
          else "int and char")
@@ -1215,26 +1271,166 @@ and tests st env scrut cases =
       in
       chain cases)
 
-(* Clauses: [e1 = e2] is the logical equality [e1 =:= e2], and
-   [e1 && e2] the conjunction of its clauses. *)
-let rec clause st env (e : expression) =
-  let prim name = function
-    | {
-        exp_desc =
-          Texp_ident { desc = { val_kind = Val_prim { prim_name; _ }; _ }; _ };
-        _;
-      } ->
-        String.equal prim_name name
+(* Phase 3 types and modes (see TARGET.md) *)
+
+(* [(Mode L C P)] from the modes as written; the other axes are ignored. *)
+let mode3 modes =
+  let axis values default =
+    List.fold_left
+      (fun acc m ->
+        match List.assoc_opt m values with Some v -> v | None -> acc)
+      default modes
+  in
+  Printf.sprintf "(Mode %s %s %s)"
+    (axis [ ("local", "Local"); ("global", "Global") ] "Global")
+    (axis
+       [
+         ("uncontended", "Uncontended");
+         ("shared", "Shared");
+         ("contended", "Contended");
+       ]
+       "Uncontended")
+    (axis
+       [ ("portable", "Portable"); ("nonportable", "Nonportable") ]
+       "Nonportable")
+
+let default_mode3 = mode3 []
+
+let is_stdlib_ref (p : Path.t) =
+  match Path.name p with "Stdlib.ref" | "Stdlib__.ref" -> true | _ -> false
+
+(* Whether values of [ty] are immutable data without functions: Phase 3
+   wraps their Phase 1 semantic type in [TPure]. *)
+let pure_type ~tenv ty =
+  (* The declarations of types are inspected once. *)
+  let seen = ref [] in
+  let rec pure ty =
+    match get_desc (Ctype.expand_head tenv ty) with
+    | Tvar _ | Tunivar _ -> true
+    | Tarrow _ -> false
+    | Ttuple comps -> List.for_all (fun (_, ty) -> pure ty) comps
+    | Tpoly (ty, []) -> pure ty
+    | Tconstr (p, args, _) ->
+        (not (Path.same p Predef.path_array))
+        && List.for_all pure args
+        && (List.exists (Path.same p) !seen
+           ||
+           (seen := p :: !seen;
+            match Env.find_type p tenv with
+            | { type_kind = Type_record (lds, _, _); _ } ->
+                List.for_all
+                  (fun (ld : Types.label_declaration) ->
+                    (not (Types.is_mutable ld.ld_mutable)) && pure ld.ld_type)
+                  lds
+            | { type_kind = Type_variant (cds, _, _); _ } ->
+                List.for_all
+                  (fun (cd : Types.constructor_declaration) ->
+                    List.for_all pure (Types.tys_of_constr_args cd.cd_args))
+                  cds
+            | _ -> true
+            | exception Not_found -> true))
     | _ -> false
   in
-  match e.exp_desc with
-  | Texp_apply (f, [ (Nolabel, Arg (a, _)); (Nolabel, Arg (b, _)) ], _, _, _, _)
-    when prim "%equal" f ->
-      [ Spec_eq (expr st env a, expr st env b) ]
-  | Texp_apply (f, [ (Nolabel, Arg (a, _)); (Nolabel, Arg (b, _)) ], _, _, _, _)
-    when prim "%sequand" f ->
-      clause st env a @ clause st env b
-  | _ -> [ Spec_true (expr st env e) ]
+  pure ty
+
+(* Whether [ty] is mutable: an array or a ref, maybe inside other types *)
+let rec mutable_type ~tenv ty =
+  match get_desc (Ctype.expand_head tenv ty) with
+  | Tconstr (p, args, _) ->
+      Path.same p Predef.path_array
+      || is_stdlib_ref p
+      || List.exists (mutable_type ~tenv) args
+  | Ttuple comps -> List.exists (fun (_, ty) -> mutable_type ~tenv ty) comps
+  | _ -> false
+
+let parens_if_app s = if String.contains s ' ' then "(" ^ s ^ ")" else s
+
+(* The Phase 3 type [ty] of [ty], printed. [total] makes a function type a
+   total stateless function. *)
+let rec type3 st ~loc ~tenv ~vars ?(total = false) ty =
+  let sem1 ty =
+    Format.asprintf "%a" Print.sty (sem_type st ~loc ~tenv ~vars ty)
+  in
+  let pure_arg what ty =
+    if pure_type ~tenv ty then parens_if_app (sem1 ty)
+    else
+      unsupported ~loc "%s of data that is mutable or contains functions" what
+  in
+  let expanded = Ctype.expand_head tenv ty in
+  match get_desc expanded with
+  | Tpoly (ty, []) -> type3 st ~loc ~tenv ~vars ~total ty
+  | Tconstr (p, [], _) when Path.same p Predef.path_int -> "TInt"
+  | Tconstr (p, [], _) when Path.same p Predef.path_bool -> "TBool"
+  | Tconstr (p, [], _) when Path.same p Predef.path_unit -> "TUnit"
+  | Tconstr (p, [ a ], _) when Path.same p Predef.path_array ->
+      "(TArray " ^ pure_arg "arrays" a ^ ")"
+  | Tconstr (p, [ a ], _) when is_stdlib_ref p ->
+      "(TRef " ^ pure_arg "references" a ^ ")"
+  | Tconstr (p, [ a ], _)
+    when Path.same p Predef.path_list && not (pure_type ~tenv a) ->
+      "(TList " ^ type3 st ~loc ~tenv ~vars a ^ ")"
+  | Tarrow (((Nolabel | Labelled _), _, _), _, _, _) when total ->
+      "(TPure " ^ parens_if_app (sem1 ty) ^ ")"
+  | Tarrow (((Nolabel | Labelled _), _, _), a, b, _) ->
+      Printf.sprintf "(TArrow %s %s %s %s)"
+        (type3 st ~loc ~tenv ~vars a)
+        default_mode3
+        (type3 st ~loc ~tenv ~vars b)
+        default_mode3
+  | _ when pure_type ~tenv ty -> "(TPure " ^ parens_if_app (sem1 ty) ^ ")"
+  | _ ->
+      unsupported ~loc "this type in Phase 3 (mutable data inside other data)"
+
+(* Clauses *)
+
+let rec clause st env ~avoid ~phase ~vars (c : law_clause) =
+  let loc = c.lc_loc in
+  let clause = clause st ~phase ~vars in
+  match c.lc_desc with
+  | Tlc_bool e -> Spec_true (expr st env (Translspec.typedtree e))
+  | Tlc_equal (e1, e2) ->
+      Spec_eq
+        ( expr st env (Translspec.typedtree e1),
+          expr st env (Translspec.typedtree e2) )
+  | Tlc_and (c1, c2) -> Spec_and (clause env ~avoid c1, clause env ~avoid c2)
+  | Tlc_wp { binding; modes; body } ->
+      let e = Translspec.typedtree binding.svb_expr in
+      let pat = Translspec.typedtree_value_pattern binding.svb_pat in
+      let ty, mode =
+        match phase with
+        | Phase3 ->
+            ( type3 st ~loc ~tenv:e.exp_env ~vars e.exp_type,
+              mode3
+                (List.map
+                   (fun { Location.txt = Parsetree.Mode m; _ } -> m)
+                   modes) )
+        | Phase1 | Phase2 -> ("", "")
+      in
+      let e' = expr st env e in
+      let var, env, avoid =
+        match pat.pat_desc with
+        | Tpat_var { id; name; _ } ->
+            let x = fresh_name ~avoid name.txt in
+            ( Some x,
+              {
+                env with
+                locals = Ident.Map.add id (Const (x, true)) env.locals;
+              },
+              String.Set.add x avoid )
+        | Tpat_any -> (None, env, avoid)
+        | Tpat_construct (_, cd, _, [], _)
+          when Path.same (Data_types.cstr_res_type_path cd) Predef.path_unit ->
+            (None, env, avoid)
+        | _ ->
+            unsupported ~loc:pat.pat_loc
+              "let%%wp patterns other than a variable, () and _"
+      in
+      Spec_wp { var; ty; mode; e = e'; body = clause env ~avoid body }
+
+let rec has_wp = function
+  | Spec_true _ | Spec_eq _ -> false
+  | Spec_and (c1, c2) -> has_wp c1 || has_wp c2
+  | Spec_wp _ -> true
 
 (* Items *)
 
@@ -1296,9 +1492,40 @@ let register_type st minfo id name info =
   st.types <- Ident.Map.add id info st.types;
   Option.iter (fun m -> Hashtbl.replace m.m_types name info) minfo
 
+(* Whether [e] calls a stateful primitive of [theories/lang]
+   ([Ref_make], [Array_get], ...) *)
+let rec calls_state_primitive = function
+  | Const (c, _) ->
+      String.starts_with ~prefix:"Ref_" c
+      || String.starts_with ~prefix:"Array_" c
+  | Var _ | Int _ | Bool _ | Unit | Stuck | Nil | None_ -> false
+  | Pair (a, b)
+  | Cons (a, b)
+  | Let (_, a, b)
+  | And_also (a, b)
+  | Or_else (a, b)
+  | Binop (_, a, b) ->
+      calls_state_primitive a || calls_state_primitive b
+  | Tag (_, a)
+  | Some_ a
+  | Fst a
+  | Snd a
+  | Lam (_, a)
+  | Rec (_, _, a)
+  | Unop (_, a) ->
+      calls_state_primitive a
+  | App (f, args) -> List.exists calls_state_primitive (f :: args)
+  | If (a, b, c) | Match_list (a, b, _, _, c) ->
+      calls_state_primitive a || calls_state_primitive b
+      || calls_state_primitive c
+  | Match_tag (e, _, arms, d) ->
+      calls_state_primitive e || calls_state_primitive d
+      || List.exists (fun (_, a) -> calls_state_primitive a) arms
+
 let definition st ~prefix ~display minfo ~loc id name body =
   match body () with
   | body ->
+      if calls_state_primitive body then st.uses_state <- true;
       let rocq = define st (prefix ^ name) in
       let is_value = is_value body in
       register_value st minfo id name (Translated { rocq; is_value });
@@ -1545,10 +1772,40 @@ let types st ~prefix ~display minfo ~loc ~tenv (decls : type_declaration list) =
           not_translated st ~loc:d.typ_loc ("The type " ^ display tname) reason)
         names
 
+let rec typed_has_wp (c : law_clause) =
+  match c.lc_desc with
+  | Tlc_bool _ | Tlc_equal _ -> false
+  | Tlc_and (c1, c2) -> typed_has_wp c1 || typed_has_wp c2
+  | Tlc_wp _ -> true
+
+let rec typed_has_modes (c : law_clause) =
+  match c.lc_desc with
+  | Tlc_bool _ | Tlc_equal _ -> false
+  | Tlc_and (c1, c2) -> typed_has_modes c1 || typed_has_modes c2
+  | Tlc_wp { modes; body; _ } -> modes <> [] || typed_has_modes body
+
+(* The phase of a law, from its syntax and the types of its parameters
+   (TARGET.md, section 1) *)
+let phase_of_law st (ld : law_declaration) =
+  let clauses = ld.law_conclusion :: ld.law_assumptions in
+  let stateful_params =
+    List.exists
+      (fun (lp : law_param) ->
+        lp.lp_modes <> []
+        || mutable_type ~tenv:lp.lp_type.ctyp_env lp.lp_type.ctyp_type)
+      ld.law_params
+  in
+  if stateful_params || List.exists typed_has_modes clauses then Phase3
+  else if List.exists typed_has_wp clauses then
+    (* Phase 2 runs only code that does not touch the heap. *)
+    if st.uses_state then Phase3 else Phase2
+  else Phase1
+
 let law st ~prefix (ld : law_declaration) =
   let name = Ident.name ld.law_id in
   let lw = ld.law_law in
   match
+    let phase = phase_of_law st ld in
     let avoid = st.used in
     let newtypes =
       List.map
@@ -1556,7 +1813,7 @@ let law st ~prefix (ld : law_declaration) =
         ld.law_newtypes
     in
     let vars =
-      type_var_names ~avoid (List.map snd lw.law_params)
+      type_var_names ~avoid (List.map (fun (_, ty, _) -> ty) lw.law_params)
       |> List.map (fun (id, a) ->
           match List.assoc_opt id newtypes with
           | Some n -> (id, fresh_name ~avoid (String.capitalize_ascii n))
@@ -1565,26 +1822,49 @@ let law st ~prefix (ld : law_declaration) =
     let avoid =
       List.fold_left (fun avoid (_, a) -> String.Set.add a avoid) avoid vars
     in
-    let _, params =
+    let avoid =
+      match phase with
+      | Phase3 -> String.Set.add "Σ" (String.Set.add "HΣ" avoid)
+      | Phase1 | Phase2 -> avoid
+    in
+    let avoid, params =
       List.fold_left_map
-        (fun avoid (id, ty) ->
+        (fun avoid (id, ty, modes) ->
           let x = fresh_name ~avoid (Ident.name id) in
-          (String.Set.add x avoid, (id, x, ty)))
+          (String.Set.add x avoid, (id, x, ty, modes)))
         avoid lw.law_params
     in
+    let param_of id =
+      List.find_opt
+        (fun (lp : law_param) -> Ident.same lp.lp_id id)
+        ld.law_params
+    in
     let tenv_of id =
-      match
-        List.find_opt
-          (fun (lp : law_param) -> Ident.same lp.lp_id id)
-          ld.law_params
-      with
+      match param_of id with
       | Some lp -> lp.lp_type.ctyp_env
       | None -> Env.empty
     in
+    let total id =
+      match param_of id with
+      | Some lp ->
+          List.exists
+            (fun (a : Parsetree.attribute) ->
+              String.equal a.attr_name.txt "total")
+            lp.lp_type.ctyp_attributes
+      | None -> false
+    in
     let hyps =
       List.map
-        (fun (id, x, ty) ->
-          (sem_type st ~loc:ld.law_loc ~tenv:(tenv_of id) ~vars ty, x))
+        (fun (id, x, ty, modes) ->
+          match phase with
+          | Phase1 | Phase2 ->
+              `Hyp (sem_type st ~loc:ld.law_loc ~tenv:(tenv_of id) ~vars ty, x)
+          | Phase3 ->
+              `Forall
+                ( x,
+                  type3 st ~loc:ld.law_loc ~tenv:(tenv_of id) ~vars
+                    ~total:(total id) ty,
+                  mode3 modes ))
         params
     in
     let env =
@@ -1592,34 +1872,83 @@ let law st ~prefix (ld : law_declaration) =
         empty_env with
         locals =
           List.fold_left
-            (fun locals (id, x, _) -> Ident.Map.add id (Const (x, true)) locals)
+            (fun locals (id, x, _, _) ->
+              Ident.Map.add id (Const (x, true)) locals)
             Ident.Map.empty params;
       }
     in
-    let clause c = clause st env (Translspec.typedtree c) in
+    let clause c = clause st env ~avoid ~phase ~vars c in
     let assumptions = List.map clause ld.law_assumptions in
     let conclusion = clause ld.law_conclusion in
-    (vars, params, hyps, assumptions, conclusion)
+    (phase, vars, params, hyps, assumptions, conclusion)
   with
-  | vars, params, hyps, assumptions, conclusion ->
+  | phase, vars, params, hyps, assumptions, conclusion ->
+      st.max_phase <-
+        (match (st.max_phase, phase) with
+        | Phase3, _ | _, Phase3 -> Phase3
+        | Phase2, _ | _, Phase2 -> Phase2
+        | Phase1, Phase1 -> Phase1);
       let rocq = define st (prefix ^ name ^ "_statement") in
       emit st (fun ppf ->
           source_comment ppf ld.law_loc;
           Format.fprintf ppf "@[<v 2>Definition %s : Prop :=" rocq;
-          let binders =
+          let type_binders =
             List.map (fun (_, a) -> Printf.sprintf "(%s : sem_ty)" a) vars
-            @ List.map (fun (_, x, _) -> Printf.sprintf "(%s : val)" x) params
+          in
+          let binders =
+            match phase with
+            | Phase1 | Phase2 ->
+                type_binders
+                @ List.map
+                    (fun (_, x, _, _) -> Printf.sprintf "(%s : val)" x)
+                    params
+            | Phase3 -> "(Σ : gFunctors)" :: "(HΣ : heapGS Σ)" :: type_binders
           in
           let indent = if binders = [] then "" else "  " in
           if binders <> [] then
             Format.fprintf ppf "@,∀ %s," (String.concat " " binders);
-          List.iter
-            (fun h -> Format.fprintf ppf "@,%s%a →" indent Print.typing h)
-            hyps;
-          List.iter
-            (fun c -> Format.fprintf ppf "@,%s%a →" indent Print.clauses c)
-            assumptions;
-          Format.fprintf ppf "@,%s%a.@]@." indent Print.clauses conclusion)
+          match phase with
+          | Phase1 ->
+              List.iter
+                (function
+                  | `Hyp h ->
+                      Format.fprintf ppf "@,%s%a →" indent Print.typing h
+                  | `Forall _ -> ())
+                hyps;
+              List.iter
+                (fun c -> Format.fprintf ppf "@,%s%a →" indent Print.clause1 c)
+                assumptions;
+              Format.fprintf ppf "@,%s%a.@]@." indent Print.clause1 conclusion
+          | Phase2 ->
+              List.iter
+                (function
+                  | `Hyp h ->
+                      Format.fprintf ppf "@,%s%a →" indent Print.typing h
+                  | `Forall _ -> ())
+                hyps;
+              Format.fprintf ppf "@,%s@[<v 2>⊢ " indent;
+              List.iteri
+                (fun i c ->
+                  if i > 0 then Format.fprintf ppf "@,";
+                  Format.fprintf ppf "%a ===>"
+                    (Print.parens_if (has_wp c) Print.clause2)
+                    c)
+                assumptions;
+              if assumptions <> [] then Format.fprintf ppf "@,";
+              Format.fprintf ppf "%a.@]@]@." Print.clause2 conclusion
+          | Phase3 ->
+              Format.fprintf ppf "@,%s@[<v 2>slaw_valid (" indent;
+              List.iteri
+                (fun i -> function
+                  | `Forall (x, ty, mode) ->
+                      if i > 0 then Format.fprintf ppf "@,";
+                      Format.fprintf ppf "∀ₗ %s : %s @@ %s," x ty mode
+                  | `Hyp _ -> ())
+                hyps;
+              List.iter
+                (fun c -> Format.fprintf ppf "@,%a ===>" Print.premise3 c)
+                assumptions;
+              Format.fprintf ppf "@,%a).@]@]@." Print.clause3 conclusion)
   | exception Unsupported (loc, msg) ->
       Location.raise_errorf ~loc
         "@[The law %s cannot be translated to Rocq:@ %s.@]" name msg
@@ -1671,6 +2000,8 @@ let write ~source_file ~unit (impl : implementation) ~output =
       used = String.Set.empty;
       requires = String.Set.empty;
       uses_stuck = false;
+      uses_state = false;
+      max_phase = Phase1;
       counter = 0;
       aliases = [];
       items = [];
@@ -1686,7 +2017,11 @@ let write ~source_file ~unit (impl : implementation) ~output =
          not edit. The laws are stated as [<law>_statement] and proved@ in a \
          separate file. *)@]@."
         (Filename.basename source_file);
-      Format.fprintf ppf "From oxiris Require Import law_prelude.@.";
+      Format.fprintf ppf "From oxiris Require Import %s.@."
+        (match (st.max_phase, st.uses_state) with
+        | Phase3, _ | _, true -> "law_prelude_state"
+        | Phase2, false -> "law_prelude_wp"
+        | Phase1, false -> "law_prelude");
       String.Set.iter
         (fun unit ->
           Format.fprintf ppf "From oxiris.generated Require Import %s.@."

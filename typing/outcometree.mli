@@ -265,9 +265,14 @@ and out_jkind_decl =
 and out_law_decl =
   { olaw_name: string;
     olaw_newtypes: (string * out_jkind option) list;
-    olaw_params: (string * out_type) list;
-    olaw_assumptions: out_spec list;
-    olaw_conclusion: out_spec }
+    olaw_params: (string * out_type * string list) list;
+    olaw_assumptions: out_law_clause list;
+    olaw_conclusion: out_law_clause }
+and out_law_clause =
+  | Olc_bool of out_spec
+  | Olc_equal of out_spec * out_spec
+  | Olc_and of out_law_clause * out_law_clause
+  | Olc_wp of out_spec_pattern * string list * out_spec * out_law_clause
 and out_spec =
   | Ospec_var of string
   | Ospec_global of out_ident

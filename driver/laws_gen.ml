@@ -178,6 +178,9 @@ module P : sig
 
     val warning : string -> structure_item
     (** [warning spec] is [[@@@ocaml.warning spec]]. *)
+
+    val text : string -> structure_item
+    (** [text s] is the floating comment [(** s *)]. *)
   end
 end = struct
   open Parsetree
@@ -326,6 +329,10 @@ end = struct
       H.Str.attribute
         (H.Attr.mk (mknoloc "ocaml.warning")
            (PStr [ H.Str.eval (Exp.string spec) ]))
+
+    let text s =
+      H.Str.attribute
+        (H.Attr.mk (mknoloc "ocaml.text") (PStr [ H.Str.eval (Exp.string s) ]))
   end
 end
 
@@ -341,6 +348,15 @@ let rec reroot (paths : paths) (p : Path.t) : Path.t =
   | Papply (f, arg) -> Papply (reroot paths f, reroot paths arg)
   | Pextra_ty (q, extra) -> Pextra_ty (reroot paths q, extra)
 
+(* A clause that a backend tests, at its location *)
+type test_clause = test_clause_desc * Location.t
+
+and test_clause_desc =
+  | Test_bool of Typedtree.expression
+  | Test_equal of Typedtree.expression * Typedtree.expression
+      (** [e1 =:= e2], tested with [Stdlib.( = )] *)
+  | Test_and of test_clause * test_clause
+
 type law = {
   (* The field of [each], qualified by the modules of the law. *)
   l_field : string;
@@ -353,8 +369,8 @@ type law = {
   l_frames : frame list;
   l_newtypes : Typedtree.law_newtype list;
   l_params : Typedtree.law_param list;
-  l_assumptions : Typedtree.expression list;
-  l_conclusion : Typedtree.expression;
+  l_assumptions : test_clause list;
+  l_conclusion : test_clause;
   (* The paths of the idents of the law, in types *)
   l_paths : paths;
 }
@@ -471,7 +487,8 @@ let check_exported ctx ~loc display (ld : law_declaration) =
       | Value -> check "value" Env.find_value p
       | Type -> check "type" Env.find_type p
       | Extension -> check "extension constructor" Env.find_extension_alias p)
-    (List.concat_map Spec.paths (ld.law_conclusion :: ld.law_assumptions));
+    (List.concat_map Spec.clause_paths
+       (ld.law_conclusion :: ld.law_assumptions));
   with_type_mark (fun mark ->
       let it =
         {
@@ -479,24 +496,83 @@ let check_exported ctx ~loc display (ld : law_declaration) =
           it_path = check "type" Env.find_type;
         }
       in
-      List.iter (fun (_, ty) -> it.it_type_expr it ty) ld.law_params)
+      List.iter (fun (_, ty, _) -> it.it_type_expr it ty) ld.law_params)
+
+(* The laws that a backend cannot test: the reason, and the path of the law,
+   in source order *)
+let untested : (string * string) list ref = ref []
+
+exception Untested of string
+
+(* Whether values of type [ty] may contain functions, which [Stdlib.( = )]
+   cannot compare. The declarations of types are inspected once. *)
+let may_contain_functions env ty =
+  let seen_paths = ref [] and seen = Hashtbl.create 16 in
+  let rec go ty =
+    let ty = Ctype.expand_head env ty in
+    if Hashtbl.mem seen (get_id ty) then false
+    else (
+      Hashtbl.add seen (get_id ty) ();
+      match get_desc ty with
+      | Tarrow _ | Tobject _ | Tpackage _ -> true
+      | Tconstr (p, args, _) ->
+          List.exists go args
+          || (not (List.exists (Path.same p) !seen_paths))
+             &&
+             (seen_paths := p :: !seen_paths;
+              match Env.find_type p env with
+              | decl ->
+                  let found = ref false in
+                  Btype.iter_type_expr_kind
+                    (fun ty -> if go ty then found := true)
+                    decl.type_kind;
+                  !found
+              | exception Not_found -> false)
+      | _ ->
+          let found = ref false in
+          Btype.iter_type_expr (fun ty -> if go ty then found := true) ignore ty;
+          !found)
+  in
+  go ty
+
+let rec test_clause (c : Typedtree.law_clause) : test_clause =
+  match c.lc_desc with
+  | Tlc_bool e -> (Test_bool (Translspec.typedtree e), c.lc_loc)
+  | Tlc_equal (e1, e2) ->
+      let e1 = Translspec.typedtree e1 and e2 = Translspec.typedtree e2 in
+      if may_contain_functions e1.exp_env e1.exp_type then
+        raise
+          (Untested "it compares values that may contain functions with =:=");
+      (Test_equal (e1, e2), c.lc_loc)
+  | Tlc_and (c1, c2) -> (Test_and (test_clause c1, test_clause c2), c.lc_loc)
+  | Tlc_wp _ -> raise (Untested "it contains let%wp")
 
 let law ctx (ld : Typedtree.law_declaration) =
   let name = Ident.name ld.law_id in
   let display = String.concat "." (ctx.display @ [ name ]) in
   check_exported ctx ~loc:ld.law_loc display ld.law_law;
-  {
-    l_field = qualify ctx.qualifier name;
-    l_local = qualify ctx.relative name;
-    l_display = display;
-    l_loc = ld.law_loc;
-    l_frames = List.rev ctx.frames;
-    l_newtypes = ld.law_newtypes;
-    l_params = ld.law_params;
-    l_assumptions = List.map Translspec.typedtree ld.law_assumptions;
-    l_conclusion = Translspec.typedtree ld.law_conclusion;
-    l_paths = ctx.paths;
-  }
+  match
+    (List.map test_clause ld.law_assumptions, test_clause ld.law_conclusion)
+  with
+  | exception Untested reason ->
+      untested := (display, reason) :: !untested;
+      []
+  | l_assumptions, l_conclusion ->
+      [
+        Law
+          {
+            l_field = qualify ctx.qualifier name;
+            l_local = qualify ctx.relative name;
+            l_display = display;
+            l_loc = ld.law_loc;
+            l_frames = List.rev ctx.frames;
+            l_newtypes = ld.law_newtypes;
+            l_params = ld.law_params;
+            l_assumptions;
+            l_conclusion;
+            l_paths = ctx.paths;
+          };
+      ]
 
 let rec walk_structure ctx ~path (str : Typedtree.structure) =
   let ctx = { ctx with paths = add_items ctx.paths path str.str_type } in
@@ -504,7 +580,7 @@ let rec walk_structure ctx ~path (str : Typedtree.structure) =
 
 and walk_structure_item ctx ~path (item : Typedtree.structure_item) =
   match item.str_desc with
-  | Tstr_law ld -> [ Law (law ctx ld) ]
+  | Tstr_law ld -> law ctx ld
   | Tstr_module mb -> walk_module_binding ctx ~path mb
   | Tstr_recmodule mbs -> List.concat_map (walk_module_binding ctx ~path) mbs
   | Tstr_include { incl_kind = Tincl_structure; incl_mod; _ } ->
@@ -1045,6 +1121,9 @@ let qualified n name =
 
 let law_constructor name arg = P.Exp.construct (ldot "Law" name) (Some arg)
 
+(* The boolean expression that tests a clause. [=:=] is tested with
+   [Stdlib.( = )], and [&&] of clauses with [Stdlib.( && )]. *)
+
 (** A clause of a law [l] in a scope with choices [M], an [Assumption] or an
     [Assertion] (at the top, the [source] is the [choice] of the law):
     {[
@@ -1060,7 +1139,23 @@ let law_constructor name arg = P.Exp.construct (ldot "Law" name) (Some arg)
     {[
       (fun (type (a : k)) (x1 : t1) ... (xn : tn) -> (clause : bool)) x1 ... xn
     ]} *)
-let clause_check ~check print law n (clause : Typedtree.expression) =
+let stdlib_path name =
+  Path.Pdot (Pident (Ident.create_persistent "Stdlib"), name)
+
+let rec clause_expression print ((clause, _) : test_clause) =
+  let operator name a b =
+    P.Exp.apply
+      (P.Exp.ident (print (stdlib_path name)))
+      [ (Nolabel, a); (Nolabel, b) ]
+  in
+  match clause with
+  | Test_bool e -> expression print e
+  | Test_equal (e1, e2) ->
+      operator "=" (expression print e1) (expression print e2)
+  | Test_and (c1, c2) ->
+      operator "&&" (clause_expression print c1) (clause_expression print c2)
+
+let clause_check ~check print law n ((_, clause_loc) as clause : test_clause) =
   let fields =
     match law.l_params with
     | [] -> None
@@ -1078,7 +1173,7 @@ let clause_check ~check print law n (clause : Typedtree.expression) =
   in
   let body =
     P.Exp.constraint_
-      (expression (clause_print print law) clause)
+      (clause_expression (clause_print print law) clause)
       (tconstr "bool" [])
   in
   let newtypes =
@@ -1111,7 +1206,7 @@ let clause_check ~check print law n (clause : Typedtree.expression) =
          (lid "value", P.Exp.var n.input);
          (lid "source", P.Exp.ident n.source);
          (lid "predicate", predicate);
-         (lid "location", location clause.exp_loc);
+         (lid "location", location clause_loc);
        ])
 
 (** The assumptions of a law, then its conclusion:
@@ -1231,7 +1326,8 @@ let global_roots ~unit items =
     (fun law ->
       ignore (input_declaration print law);
       List.iter
-        (fun clause -> ignore (expression (clause_print print law) clause))
+        (fun clause ->
+          ignore (clause_expression (clause_print print law) clause))
         (law.l_conclusion :: law.l_assumptions);
       List.iter
         (fun frame -> ignore (print (in_scope law.l_frames frame.f_functor)))
@@ -1302,6 +1398,10 @@ let implementation names items =
   (* Unused parameters of laws in clauses, and constructors and labels that
      their type annotation selects (see [annotation]) *)
   (P.Str.warning "-27-40" :: alias_bindings names)
+  @ List.map
+      (fun (law, reason) ->
+        P.Str.text (Printf.sprintf " The law %s is not tested: %s. " law reason))
+      (List.rev !untested)
   @ (P.Str.type_ (each laws) :: each_values laws)
   @ List.map
       (fun law -> P.Str.type_ (input_declaration names.print law))
@@ -1331,6 +1431,7 @@ let generate ~unit (impl : Typedtree.implementation) =
       frames = [];
     }
   in
+  untested := [];
   let items = walk_structure ctx ~path:(Path.Pident unit) str in
   check_names (laws_of_items items);
   let names = choose_names ~unit items in

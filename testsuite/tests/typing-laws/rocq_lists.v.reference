@@ -34,7 +34,7 @@ Definition digits : val := (CONSV #1 (CONSV #2 (CONSV #3 NILV)))%V.
 (** [let length_of_digits = length digits] *)
 Definition length_of_digits : expr := (length digits)%E.
 
-(** [law? rev_rev (xs : 'a list) : rev (rev xs) = xs] *)
+(** [law? rev_rev (xs : 'a list) : rev (rev xs) =:= xs] *)
 Definition rev_rev_statement : Prop :=
   ∀ (A : sem_ty) (xs : val),
     ty_list A xs →
@@ -48,7 +48,7 @@ Definition rev_nonempty_statement : Prop :=
     spec_true (Stdlib_not (is_empty xs))%E →
     spec_true (Stdlib_not (is_empty (rev xs)))%E.
 
-(** [law? rev_stdlib (xs : 'a list) : rev xs = List.rev xs] *)
+(** [law? rev_stdlib (xs : 'a list) : rev xs =:= List.rev xs] *)
 Definition rev_stdlib_statement : Prop :=
   ∀ (A : sem_ty) (xs : val),
     ty_list A xs →
@@ -60,15 +60,15 @@ Definition length_map_statement : Prop :=
   ∀ (A : sem_ty) (B : sem_ty) (f : val) (xs : val),
     ty_fun A B f →
     ty_list A xs →
-    (length (map f xs))%E =:= (length xs)%E.
+    spec_true (length (map f xs) = length xs)%E.
 
 (** [law? length_nonneg (xs : int list) : length xs >= 0 && List.length xs >= 0] *)
 Definition length_nonneg_statement : Prop :=
   ∀ (xs : val),
     ty_list ty_int xs →
-    (spec_true (#0 ≤ length xs)%E) ∧ (spec_true (#0 ≤ List_length xs)%E).
+    spec_true (AndAlso (#0 ≤ length xs) (#0 ≤ List_length xs))%E.
 
-(** [law? map_not (bs : bool list) : map not (map not bs) = bs] *)
+(** [law? map_not (bs : bool list) : map not (map not bs) =:= bs] *)
 Definition map_not_statement : Prop :=
   ∀ (bs : val),
     ty_list ty_bool bs →

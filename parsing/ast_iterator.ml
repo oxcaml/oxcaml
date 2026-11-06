@@ -924,8 +924,9 @@ let default_iterator =
               Option.iter (this.jkind_annotation this) jkind)
            plaw_newtypes;
          List.iter
-           (fun (name, ty) ->
-              iter_loc this name; Option.iter (this.typ this) ty)
+           (fun (name, ty, modes) ->
+              iter_loc this name; Option.iter (this.typ this) ty;
+              this.modes this modes)
            plaw_params;
          List.iter (this.expr this) plaw_assumptions;
          this.expr this plaw_conclusion;

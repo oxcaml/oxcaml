@@ -4219,7 +4219,8 @@ jkind_decl:
 ;
 
 (* Laws: [law? name (type a1 ... am) p1 ... pn : A1 ===> ... ===> Ak ===> C],
-   where each parameter is [x] or [(x : T)]. The types come first. *)
+   where each parameter is [x], [(x : T)] or [(x : T @ modes)]. The types
+   come first. *)
 
 law_declaration:
   LAWQUESTION
@@ -4250,9 +4251,10 @@ law_params:
 
 law_param:
   | name = mkrhs(LIDENT)
-      { (name, None) }
-  | LPAREN name = mkrhs(LIDENT) COLON ty = core_type RPAREN
-      { (name, Some ty) }
+      { (name, None, []) }
+  | LPAREN name = mkrhs(LIDENT) COLON ty_modes = core_type_with_optional_modes
+    RPAREN
+      { let ty, modes = ty_modes in (name, Some ty, modes) }
 ;
 
 (* [===>] is not an operator: it only separates the clauses of a law. *)

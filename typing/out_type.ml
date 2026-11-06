@@ -4131,8 +4131,18 @@ let tree_of_type_jkind ty =
   out_jkind_option_of_jkind ~ignore_null:false !printing_env
     (Ctype.estimate_type_jkind !printing_env ty)
 
+let rec tree_of_law_clause : Spec.clause -> out_law_clause = function
+  | Sclause_bool e -> Olc_bool (tree_of_spec e)
+  | Sclause_equal (e1, e2) -> Olc_equal (tree_of_spec e1, tree_of_spec e2)
+  | Sclause_and (c1, c2) ->
+      Olc_and (tree_of_law_clause c1, tree_of_law_clause c2)
+  | Sclause_wp wp ->
+      Olc_wp
+        (tree_of_spec_pattern wp.wp_pat, wp.wp_modes, tree_of_spec wp.wp_expr,
+         tree_of_law_clause wp.wp_body)
+
 let tree_of_law_params newtypes params =
-  let tys = List.map snd params in
+  let tys = List.map (fun (_, ty, _) -> ty) params in
   let base = With_locality.Const.legacy in
   prepare_for_printing ~base (newtypes @ tys);
   let newtypes =
@@ -4145,7 +4155,8 @@ let tree_of_law_params newtypes params =
   in
   let params =
     List.map
-      (fun (x, ty) -> (Ident.name x, tree_of_typexp ~base Type_scheme ty))
+      (fun (x, ty, modes) ->
+         (Ident.name x, tree_of_typexp ~base Type_scheme ty, modes))
       params
   in
   let kinds =
@@ -4158,12 +4169,12 @@ let tree_of_law_params newtypes params =
   let params =
     snd
       (List.fold_left_map
-         (fun kinds (x, ty) ->
+         (fun kinds (x, ty, modes) ->
             let kinds, ty =
               annotate_first_occurrence ~newtypes:(List.map fst newtypes)
                 kinds ty
             in
-            kinds, (x, ty))
+            kinds, (x, ty, modes))
          kinds params)
   in
   newtypes, params
@@ -4176,8 +4187,8 @@ let tree_of_law_declaration id decl =
     { olaw_name = Ident.name id;
       olaw_newtypes;
       olaw_params;
-      olaw_assumptions = List.map tree_of_spec decl.law_assumptions;
-      olaw_conclusion = tree_of_spec decl.law_conclusion }
+      olaw_assumptions = List.map tree_of_law_clause decl.law_assumptions;
+      olaw_conclusion = tree_of_law_clause decl.law_conclusion }
 
 let tree_of_jkind_declaration id decl =
   let ojkind =

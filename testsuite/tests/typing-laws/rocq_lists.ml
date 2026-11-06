@@ -26,16 +26,16 @@ let singleton x = [ x ]
 let digits = [ 1; 2; 3 ]
 let length_of_digits = length digits
 
-law? rev_rev (xs : 'a list) : rev (rev xs) = xs
+law? rev_rev (xs : 'a list) : rev (rev xs) =:= xs
 
 law? rev_nonempty (xs : 'a list) :
   not (is_empty xs) ===> not (is_empty (rev xs))
 
-law? rev_stdlib (xs : 'a list) : rev xs = List.rev xs
+law? rev_stdlib (xs : 'a list) : rev xs =:= List.rev xs
 
 law? length_map (f : 'a -> 'b) (xs : 'a list) :
   length (map f xs) = length xs
 
 law? length_nonneg (xs : int list) : length xs >= 0 && List.length xs >= 0
 
-law? map_not (bs : bool list) : map not (map not bs) = bs
+law? map_not (bs : bool list) : map not (map not bs) =:= bs

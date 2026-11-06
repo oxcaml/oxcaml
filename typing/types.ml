@@ -308,9 +308,9 @@ and jkind_declaration =
 and law_declaration =
   {
     law_newtypes : type_expr list;
-    law_params : (Ident.t * type_expr) list;
-    law_assumptions : Spec.expression list;
-    law_conclusion : Spec.expression;
+    law_params : (Ident.t * type_expr * string list) list;
+    law_assumptions : Spec.clause list;
+    law_conclusion : Spec.clause;
     law_attributes : Parsetree.attributes;
     law_uid : Shape.Uid.t;
     law_loc : Location.t

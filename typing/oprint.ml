@@ -1171,17 +1171,44 @@ and print_out_law_decl ppf ld =
     | (a, Some jkind) ->
         fprintf ppf "@ (type (%a : %a))" print_lident a print_out_jkind jkind
   in
-  let print_param ppf (x, ty) =
-    fprintf ppf "@ (%a : %a)" print_lident x !out_type ty
+  let print_modes ppf = function
+    | [] -> ()
+    | modes -> fprintf ppf " @@ %s" (String.concat " " modes)
   in
-  let print_assumption ppf spec =
-    fprintf ppf "%a ===>@ " print_out_spec spec
+  let print_param ppf (x, ty, modes) =
+    fprintf ppf "@ (%a : %a%a)" print_lident x !out_type ty print_modes modes
+  in
+  let print_assumption ppf clause =
+    fprintf ppf "%a ===>@ " print_out_law_clause clause
   in
   fprintf ppf "@[<2>law? %a%a%a :@ %a%a@]" print_lident ld.olaw_name
     (fun ppf -> List.iter (print_newtype ppf)) ld.olaw_newtypes
     (fun ppf -> List.iter (print_param ppf)) ld.olaw_params
     (fun ppf -> List.iter (print_assumption ppf)) ld.olaw_assumptions
-    print_out_spec ld.olaw_conclusion
+    print_out_law_clause ld.olaw_conclusion
+
+and print_out_law_clause ppf = function
+  | Olc_bool spec -> print_out_spec ppf spec
+  | Olc_equal (a, b) ->
+      fprintf ppf "@[<2>%a =:=@ %a@]" print_simple_out_spec a
+        print_simple_out_spec b
+  | Olc_and (a, b) ->
+      fprintf ppf "@[<2>%a &&@ %a@]" print_out_law_clause_operand a
+        print_out_law_clause_operand b
+  | Olc_wp (p, modes, e, body) ->
+      let print_modes ppf = function
+        | [] -> ()
+        | modes -> fprintf ppf " @@ %s" (String.concat " " modes)
+      in
+      fprintf ppf "@[<hv>@[<2>let%%wp %a%a =@ %a@ in@]@ %a@]"
+        print_out_spec_pattern p print_modes modes print_out_spec e
+        print_out_law_clause body
+
+and print_out_law_clause_operand ppf = function
+  | Olc_wp _ as c -> fprintf ppf "(%a)" print_out_law_clause c
+  | Olc_and _ as c -> print_out_law_clause ppf c
+  | Olc_bool spec -> print_simple_out_spec ppf spec
+  | Olc_equal _ as c -> print_out_law_clause ppf c
 
 and print_out_spec ppf = function
   | Ospec_apply (Ospec_global (Oide_ident op), [(Nolabel, a); (Nolabel, b)])

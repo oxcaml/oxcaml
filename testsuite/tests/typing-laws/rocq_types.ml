@@ -68,15 +68,15 @@ let greeting = "hello"
 let twice_greeting () = greeting ^ greeting
 let counter = ref 0
 
-law? mirror_mirror (t : 'a tree) : mirror (mirror t) = t
+law? mirror_mirror (t : 'a tree) : mirror (mirror t) =:= t
 
 law? size_mirror (t : 'a tree) : size (mirror t) = size t
 
 law? area_nonneg (s : shape) : is_round s ===> area s >= 0
 
-law? add_origin (p : point) : Point.add p origin = p
+law? add_origin (p : point) : Point.add p origin =:= p
 
-law? swap_swap (p : point) : swap (swap p) = p
+law? swap_swap (p : point) : swap (swap p) =:= p
 
 law? move_zero (p : point) (q : int pair) :
-  move p 0 = p && fst q = fst q
+  move p 0 =:= p && fst q = fst q

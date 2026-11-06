@@ -1561,10 +1561,12 @@ and jkind_def ctxt f jd =
 and law_clause ctxt f e = expression (under_semi ctxt) f e
 
 and law_def ctxt f ld =
-  let law_param f (name, ty) =
+  let law_param f (name, ty, mm) =
     match ty with
     | None -> pp f "@;%a" ident_of_name name.txt
-    | Some ty -> pp f "@;(%a :@ %a)" ident_of_name name.txt (core_type ctxt) ty
+    | Some ty ->
+        pp f "@;(%a :@ %a%a)" ident_of_name name.txt (core_type ctxt) ty
+          optional_at_modes mm
   in
   let law_newtype f (name, jkind) =
     pp f "@;(type %a)" name_jkind (name.txt, jkind)

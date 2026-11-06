@@ -428,7 +428,7 @@ and add_binding_op bv bv' pbop =
 
 and add_law_declaration bv ld =
   List.iter (fun (_, jkind) -> add_opt add_jkind bv jkind) ld.plaw_newtypes;
-  List.iter (fun (_, ty) -> Option.iter (add_type bv) ty) ld.plaw_params;
+  List.iter (fun (_, ty, _) -> Option.iter (add_type bv) ty) ld.plaw_params;
   List.iter (add_expr bv) ld.plaw_assumptions;
   add_expr bv ld.plaw_conclusion
 

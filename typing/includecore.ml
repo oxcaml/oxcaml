@@ -507,6 +507,7 @@ type jkind_mismatch =
 type law_mismatch =
   | Law_arity of int * int
   | Law_parameter_types of string option * Errortrace.moregen_error
+  | Law_parameter_modes of string * string list * string list
   | Law_clauses
   | Law_applied_path of Path.t
 
@@ -947,6 +948,16 @@ let report_law_mismatch env ppf err =
       Errortrace_report.moregen ppf Type_scheme env err
         (Fmt.doc_printf "The parameter %a has type" Style.inline_code x)
         (msg "but it is expected to have type")
+  | Law_parameter_modes (x, m1, m2) ->
+      let modes ppf = function
+        | [] -> Fmt.fprintf ppf "no modes"
+        | m ->
+            Fmt.fprintf ppf "the modes %a" Style.inline_code
+              (String.concat " " m)
+      in
+      pr "@[<hov>The parameter %a has@ %a@ in the first law,@ but@ %a@ \
+          in the second.@]"
+        Style.inline_code x modes m1 modes m2
   | Law_clauses ->
       pr "The clauses of the two laws differ."
   | Law_applied_path p ->
@@ -1992,7 +2003,8 @@ let normalize_type_path env p =
   | exception Not_found -> p
 
 let law_paths (decl : Types.law_declaration) =
-  List.concat_map Spec.paths (decl.law_conclusion :: decl.law_assumptions)
+  List.concat_map Spec.clause_paths
+    (decl.law_conclusion :: decl.law_assumptions)
 
 (* [law_applied_path] rejects a law that refers to a value or an extension
    constructor through a functor application, for example [F(A).x]. Each
@@ -2031,13 +2043,15 @@ let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
     ignore
       (Ctype.moregeneral_list ~self_check env true [] [] tys_impl tys_intf)
   in
-  let types (decl : Types.law_declaration) = List.map snd decl.law_params in
+  let types (decl : Types.law_declaration) =
+    List.map (fun (_, ty, _) -> ty) decl.law_params
+  in
   match moregeneral (types decl_impl) (types decl_intf) with
   | () -> None
   | exception Ctype.Moregen err_all ->
     let culprit =
       List.find_map
-        (fun ((x, ty_impl), (_, ty_intf)) ->
+        (fun ((x, ty_impl, _), (_, ty_intf, _)) ->
            match moregeneral [ty_impl] [ty_intf] with
            | () -> None
            | exception Ctype.Moregen err -> Some (Some (Ident.name x), err))
@@ -2045,6 +2059,15 @@ let law_parameter_types ~self_check env (decl_impl : Types.law_declaration)
     in
     let x, err = Option.value culprit ~default:(None, err_all) in
     Some (Law_parameter_types (x, err))
+
+(* The parameters of the two laws must have the same modes, as written. *)
+let law_parameter_modes (decl_impl : Types.law_declaration)
+      (decl_intf : Types.law_declaration) =
+  List.find_map
+    (fun ((x, _, m_impl), (_, _, m_intf)) ->
+       if List.equal String.equal m_impl m_intf then None
+       else Some (Law_parameter_modes (Ident.name x, m_impl, m_intf)))
+    (List.combine decl_impl.law_params decl_intf.law_params)
 
 (* The clauses of the two laws must be the same expressions up to two
    things. First, the names of the parameters: [vars] pairs them by
@@ -2065,10 +2088,10 @@ let law_clauses env (decl_impl : Types.law_declaration)
     Path.same p1 p2 || Path.same (normalize p1) (normalize p2)
   in
   let vars =
-    List.map2 (fun (x_impl, _) (x_intf, _) -> (x_impl, x_intf))
+    List.map2 (fun (x_impl, _, _) (x_intf, _, _) -> (x_impl, x_intf))
       decl_impl.law_params decl_intf.law_params
   in
-  let equal = Spec.alpha_equal ~same_path ~vars in
+  let equal = Spec.alpha_equal_clause ~same_path ~vars in
   let assumptions_impl = decl_impl.law_assumptions
   and assumptions_intf = decl_intf.law_assumptions in
   if List.compare_lengths assumptions_impl assumptions_intf = 0
@@ -2091,6 +2114,7 @@ let law_declarations ~self_check ~loc env name
   |> if_none (fun () -> law_arity decl_impl decl_intf)
   |> if_none (fun () ->
        law_parameter_types ~self_check env decl_impl decl_intf)
+  |> if_none (fun () -> law_parameter_modes decl_impl decl_intf)
   |> if_none (fun () -> law_clauses env decl_impl decl_intf)
 
 (* Inclusion between jkind declarations *)

@@ -149,6 +149,22 @@ and field =
     label : label
   }
 
+(** The clauses of laws *)
+type clause =
+  | Sclause_bool of expression  (** [e], which evaluates to [true] *)
+  | Sclause_equal of expression * expression
+      (** [e1 =:= e2], the logical equality of the values of [e1] and [e2] *)
+  | Sclause_and of clause * clause  (** [Q1 && Q2] *)
+  | Sclause_wp of wp  (** [let%wp p @ m1 ... mk = e in Q] *)
+
+and wp =
+  { wp_pat : pattern;
+    wp_modes : string list;  (** The modes of [p], as written *)
+    wp_expr : expression;
+    wp_sort : sort;
+    wp_body : clause
+  }
+
 (** {1 Traversals} *)
 
 (** [map_paths ~value_path ~type_path e] applies [value_path] to the paths of
@@ -171,6 +187,23 @@ type namespace =
 (** The global paths of an expression with their namespaces, in traversal order.
 *)
 val paths : expression -> (namespace * Path.t) list
+
+(** [map_paths], [paths] and [alpha_equal] on clauses *)
+
+val map_clause_paths :
+  value_path:(Path.t -> Path.t) ->
+  type_path:(Path.t -> Path.t) ->
+  clause ->
+  clause
+
+val clause_paths : clause -> (namespace * Path.t) list
+
+val alpha_equal_clause :
+  same_path:(namespace -> Path.t -> Path.t -> bool) ->
+  vars:(Ident.t * Ident.t) list ->
+  clause ->
+  clause ->
+  bool
 
 (** Equality up to the renaming of local variables. [same_path] compares global
     paths. [vars] relates the free variables of the first expression to those of

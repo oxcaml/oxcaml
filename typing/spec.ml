@@ -137,6 +137,20 @@ and field =
 
 (* Traversals *)
 
+type clause =
+  | Sclause_bool of expression
+  | Sclause_equal of expression * expression
+  | Sclause_and of clause * clause
+  | Sclause_wp of wp
+
+and wp =
+  { wp_pat : pattern;
+    wp_modes : string list;
+    wp_expr : expression;
+    wp_sort : sort;
+    wp_body : clause
+  }
+
 let map_constructor ~type_path = function
   | Constructor { type_path = p; name } ->
     Constructor { type_path = type_path p; name }
@@ -607,3 +621,49 @@ and same_cases ~same_path ~vars cases1 cases2 =
         Option.equal (alpha_equal ~same_path ~vars) c1.c_guard c2.c_guard
         && alpha_equal ~same_path ~vars c1.c_rhs c2.c_rhs)
     cases1 cases2
+
+let rec map_clause_paths ~value_path ~type_path = function
+  | Sclause_bool e -> Sclause_bool (map_paths ~value_path ~type_path e)
+  | Sclause_equal (e1, e2) ->
+    Sclause_equal
+      (map_paths ~value_path ~type_path e1, map_paths ~value_path ~type_path e2)
+  | Sclause_and (c1, c2) ->
+    Sclause_and
+      ( map_clause_paths ~value_path ~type_path c1,
+        map_clause_paths ~value_path ~type_path c2 )
+  | Sclause_wp wp ->
+    Sclause_wp
+      { wp with
+        wp_pat = map_pattern ~type_path wp.wp_pat;
+        wp_expr = map_paths ~value_path ~type_path wp.wp_expr;
+        wp_body = map_clause_paths ~value_path ~type_path wp.wp_body
+      }
+
+let rec clause_paths_rev acc = function
+  | Sclause_bool e -> paths_rev acc e
+  | Sclause_equal (e1, e2) -> paths_rev (paths_rev acc e1) e2
+  | Sclause_and (c1, c2) -> clause_paths_rev (clause_paths_rev acc c1) c2
+  | Sclause_wp wp ->
+    let acc = pattern_paths_rev acc wp.wp_pat in
+    clause_paths_rev (paths_rev acc wp.wp_expr) wp.wp_body
+
+let clause_paths c = List.rev (clause_paths_rev [] c)
+
+let rec alpha_equal_clause ~same_path ~vars c1 c2 =
+  match c1, c2 with
+  | Sclause_bool e1, Sclause_bool e2 -> alpha_equal ~same_path ~vars e1 e2
+  | Sclause_equal (a1, b1), Sclause_equal (a2, b2) ->
+    alpha_equal ~same_path ~vars a1 a2 && alpha_equal ~same_path ~vars b1 b2
+  | Sclause_and (a1, b1), Sclause_and (a2, b2) ->
+    alpha_equal_clause ~same_path ~vars a1 a2
+    && alpha_equal_clause ~same_path ~vars b1 b2
+  | Sclause_wp wp1, Sclause_wp wp2 -> (
+    List.equal String.equal wp1.wp_modes wp2.wp_modes
+    && same_sort wp1.wp_sort wp2.wp_sort
+    && alpha_equal ~same_path ~vars wp1.wp_expr wp2.wp_expr
+    &&
+    match alpha_pattern ~same_path vars wp1.wp_pat wp2.wp_pat with
+    | None -> false
+    | Some vars -> alpha_equal_clause ~same_path ~vars wp1.wp_body wp2.wp_body)
+  | (Sclause_bool _ | Sclause_equal _ | Sclause_and _ | Sclause_wp _), _ ->
+    false

@@ -143,7 +143,7 @@ Definition Point_add : val :=
 
 (* counter (line 69) is not translated: the primitive %makemutable. *)
 
-(** [law? mirror_mirror (t : 'a tree) : mirror (mirror t) = t] *)
+(** [law? mirror_mirror (t : 'a tree) : mirror (mirror t) =:= t] *)
 Definition mirror_mirror_statement : Prop :=
   ∀ (A : sem_ty) (t : val),
     ty_tree A t →
@@ -153,7 +153,7 @@ Definition mirror_mirror_statement : Prop :=
 Definition size_mirror_statement : Prop :=
   ∀ (A : sem_ty) (t : val),
     ty_tree A t →
-    (size (mirror t))%E =:= (size t)%E.
+    spec_true (size (mirror t) = size t)%E.
 
 (** [law? area_nonneg (s : shape) : is_round s ===> area s >= 0] *)
 Definition area_nonneg_statement : Prop :=
@@ -162,25 +162,25 @@ Definition area_nonneg_statement : Prop :=
     spec_true (is_round s)%E →
     spec_true (#0 ≤ area s)%E.
 
-(** [law? add_origin (p : point) : Point.add p origin = p] *)
+(** [law? add_origin (p : point) : Point.add p origin =:= p] *)
 Definition add_origin_statement : Prop :=
   ∀ (p : val),
     ty_point p →
     (Point_add p origin)%E =:= (p)%E.
 
-(** [law? swap_swap (p : point) : swap (swap p) = p] *)
+(** [law? swap_swap (p : point) : swap (swap p) =:= p] *)
 Definition swap_swap_statement : Prop :=
   ∀ (p : val),
     ty_point p →
     (swap (swap p))%E =:= (p)%E.
 
 (** [law? move_zero (p : point) (q : int pair) :
-      move p 0 = p && fst q = fst q] *)
+      move p 0 =:= p && fst q = fst q] *)
 Definition move_zero_statement : Prop :=
   ∀ (p : val) (q : val),
     ty_point p →
     ty_pair ty_int q →
-    ((move p #0)%E =:= (p)%E) ∧ ((Fst q)%E =:= (Fst q)%E).
+    ((move p #0)%E =:= (p)%E) ∧ (spec_true (Fst q = Fst q)%E).
 
 (** The names by which other units refer to this one. *)
 Notation ty_Rocq_types_tree := ty_tree (only parsing).
