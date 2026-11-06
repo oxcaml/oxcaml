@@ -419,6 +419,32 @@ end
 Exception: Match_failure ("", 2, 23).
 |}]
 
+module (M @ static) : sig
+    class point : object
+        val mutable x : int
+    end
+end = struct
+    class point = object
+        val mutable x = 0
+    end
+end
+[%%expect{|
+Lines 1-9, characters 20-3:
+1 | ....................: sig
+2 |     class point : object
+3 |         val mutable x : int
+4 |     end
+5 | end = struct
+6 |     class point = object
+7 |         val mutable x = 0
+8 |     end
+9 | end
+Error: The module is "dynamic"
+         because it contains the class "point" defined as the class at lines 6-8, characters 4-7
+         which is "dynamic" because classes are always at the legacy modes.
+       However, the module highlighted is expected to be "static".
+|}]
+
 (* Staticity interacts with functors in two ways:
    - a functor's own staticity, equal to its parameter's (generative functors
      are always dynamic).
