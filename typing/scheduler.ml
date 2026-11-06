@@ -1,32 +1,66 @@
 module Monitor = struct
-  (* Decorators, innermost first. *)
-  type t = (exn -> exn) list
+  type t =
+    { goto : exn -> unit;
+      frames : (exn -> exn) list  (** Exception decorators, innermost first *)
+    }
 
-  let stack : t ref = Local_store.s_ref []
+  (** The exception currently jumping to a root, if any. *)
+  let escaping : exn option ref = Local_store.s_ref None
 
-  let current () = !stack
+  let current_ref : t option ref = Local_store.s_ref None
 
-  let run_in t body ~decorate =
-    let saved = !stack in
-    stack := t;
-    match body () with
-    | v ->
-      stack := saved;
-      v
-    | exception e ->
-      stack := saved;
-      raise (decorate e)
+  let current () =
+    match !current_ref with
+    | None ->
+      Misc.fatal_error
+        "Scheduler.Monitor.current: current only defined under a root"
+    | Some t -> t
+
+  let set_current new_current = current_ref := Some new_current
+
+  let with_current t body =
+    let saved = current () in
+    set_current t;
+    Fun.protect body ~finally:(fun () -> set_current saved)
 
   let try_ body ~with_ =
-    if not (Language_extension.is_enabled Omnidirectionality)
-    then try body () with e -> raise (with_ e)
-    else run_in (with_ :: current ()) body ~decorate:with_
+    try
+      if not (Language_extension.is_enabled Omnidirectionality)
+      then body ()
+      else
+        let t = current () in
+        with_current { t with frames = with_ :: t.frames } body
+    with e ->
+      (* [with_] cannot match on the [Goto] exception *)
+      raise (with_ e)
 
-  (* Decorators of [t] still on the stack see the result again, and pass it
-     through by the contract on [try_]. *)
+  let root body =
+    if not (Language_extension.is_enabled Omnidirectionality)
+    then body ()
+    else
+      let exception Goto of exn in
+      let goto exn =
+        let exn = Goto exn in
+        escaping := Some exn;
+        raise exn
+      in
+      try with_current { frames = []; goto } body
+      with Goto exn ->
+        escaping := None;
+        raise exn
+
   let run_job t job =
-    run_in t job ~decorate:(fun e ->
-        List.fold_left (fun e decorate -> decorate e) e t)
+    if not (Language_extension.is_enabled Omnidirectionality)
+    then job ()
+    else
+      try with_current t job
+      with exn -> (
+        match !escaping with
+        | Some exn' when exn == exn' ->
+          raise exn (* an inner job's escape; ignore it *)
+        | _ ->
+          t.goto
+            (List.fold_left (fun exn decorate -> decorate exn) exn t.frames))
 end
 
 module Job = struct
