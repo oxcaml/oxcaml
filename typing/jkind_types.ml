@@ -357,10 +357,6 @@ module Sort = struct
 
     let for_continuation = scannable
 
-    (* Primitives with arity >= 1 get eta-expanded into closures when they are
-       used as regular values. Primitives with arity = 0 could reasonably be
-       nonvalues, but currently [error_if_containing_unexpected_jkind] rejects
-       these. *)
     let for_primitive = scannable
 
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
