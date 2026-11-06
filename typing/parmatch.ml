@@ -787,58 +787,34 @@ type 'matrix specialized_matrices = {
    the [extend_row] parameter.
 *)
 let build_specialized_submatrices ~extend_row rows =
-  let extend_group discr p args r rs =
-    let r = extend_row (simple_match_args discr p args) r in
-    (discr, r :: rs)
+  let is_omega ((head, _), _) =
+    match head.pat_desc with Patterns.Head.Any -> true | _ -> false
   in
-
-  (* insert a row of head [p] and rest [r] into the right group
-
-     Note: with this implementation, the order of the groups
-     is the order of their first row in the source order.
-     This is a nice property to get exhaustivity counter-examples
-     in source order.
-  *)
-  let rec insert_constr head args r = function
-    | [] ->
-      (* if no group matched this row, it has a head constructor that
-         was never seen before; add a new sub-matrix for this head *)
-      [extend_group (discr_pat head rows) head args r []]
-    | (q0,rs) as bd::env ->
-      if simple_match q0 head
-      then extend_group q0 head args r rs :: env
-      else bd :: insert_constr head args r env
+  let omega_rows, constr_rows = List.partition is_omega rows in
+  (* The discriminating heads of the column, in the order of their first row,
+     which gives exhaustivity counter-examples in source order *)
+  let discrs =
+    List.fold_left
+      (fun discrs ((head, _), _) ->
+         if List.exists (fun d -> simple_match d head) discrs then discrs
+         else discr_pat head rows :: discrs)
+      [] constr_rows
+    |> List.rev
   in
-
-  (* insert a row of head omega into all groups *)
-  let insert_omega r env =
-    List.map (fun (q0,rs) -> extend_group q0 Patterns.Head.omega [] r rs) env
+  let specialize d rows =
+    List.filter_map
+      (fun ((head, args), r) ->
+         if simple_match d head
+         then Some (extend_row (simple_match_args d head args) r)
+         else None)
+      rows
   in
-
-  let rec form_groups constr_groups omega_tails = function
-    | [] -> (constr_groups, omega_tails)
-    | ((head, args), tail) :: rest ->
-        match head.pat_desc with
-        | Patterns.Head.Any ->
-            (* note that calling insert_omega here would be wrong
-               as some groups may not have been formed yet, if the
-               first row with this head pattern comes after in the list *)
-            form_groups constr_groups (tail :: omega_tails) rest
-        | _ ->
-            form_groups
-              (insert_constr head args tail constr_groups) omega_tails rest
-  in
-
-  let constr_groups, omega_tails = form_groups [] [] rows in
-
-  (* groups are accumulated in reverse order;
-     we restore the order of rows in the source code *)
-  let default = List.rev omega_tails in
   let constrs =
-    List.fold_right insert_omega omega_tails constr_groups
-    |> List.map (fun (discr, rs) -> (discr, List.rev rs))
+    List.map
+      (fun d -> d, specialize d constr_rows @ specialize d omega_rows)
+      discrs
   in
-  { default; constrs; }
+  { default = List.map snd omega_rows; constrs }
 
 (* Variant related functions *)
 
