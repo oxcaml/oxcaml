@@ -732,16 +732,15 @@ let curry_edge_to_printed_curry f a b c =
   ignore (f == fun _ (_ : int ref) _ -> ()); f a b c
 [%%expect{|
 val curry_edge_to_printed_curry :
-  ('a @ [< past('o) & global > 'mm0] ->
-   int ref @ [< past('m) & past('n) & global > 'q mod many portable forkable unyielding stateless] ->
-   ('b @ [> 'p] -> unit @ [< global]) @ [> past('m) | past('n) mod many portable forkable unyielding stateless | past('o)]) @ [< global many uncontended read_write] ->
-  'a @ [< 'mm0 & global] ->
-  int ref @ [< 'q & global] -> 'b @ [< 'p] -> unit @ [> dynamic] = <fun>
+  ('a @ [< past('m) & global > 'q] ->
+   (int ref @ [< global > 'p mod many portable forkable unyielding stateless] ->
+    'b @ [> 'o] -> unit @ [< global]) @ [> past('m) | past('n)]) @ [< past('n) & global many uncontended read_write] ->
+  'a @ [< 'q & global] ->
+  int ref @ [< 'p & global] -> 'b @ [< 'o] -> unit @ [> dynamic] = <fun>
 |}, Principal{|
 val curry_edge_to_printed_curry :
-  ('a @ [< past('n) & global > 'mm0] ->
-   int ref @ [< past('m) & global > 'q] ->
-   ('b @ [> 'p] -> unit @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< global many uncontended read_write] ->
+  ('a @ [< past('m) & global > 'mm0] ->
+   (int ref @ [< global > 'q] -> 'b @ [> 'p] -> unit @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global many uncontended read_write] ->
   'a @ [< 'mm0 & global] ->
   int ref @ [< 'q & global] -> 'b @ [< 'p] -> unit @ [> 'o | dynamic] = <fun>
 |}]
@@ -753,9 +752,10 @@ let curry_acc_mismatch_crash f k a =
   ()
 [%%expect{|
 val curry_acc_mismatch_crash :
-  ('a @ [< global > 'n] -> 'b @ [< global] -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< global many uncontended read_write] ->
-  ((unit @ 'p -> unit @ 'o) @ 'mm0 -> 'd @ 'q) @ [< global] ->
-  'a @ [< 'n & global] -> unit @ 'mm1 = <fun>
+  ('a @ [< past('n) & global > 'p] ->
+   ('b @ [< global] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< global many uncontended read_write] ->
+  ((unit @ 'mm0 -> unit @ 'q) @ [> past('m)] -> 'd @ 'mm1) @ [< global] ->
+  'a @ [< 'p & global] -> unit @ 'mm2 = <fun>
 |}]
 
 let curry_acc_mismatch_imprecise f k a =
@@ -764,9 +764,10 @@ let curry_acc_mismatch_imprecise f k a =
   k (fun () -> let _ = h in ()); ()
 [%%expect{|
 val curry_acc_mismatch_imprecise :
-  ('a @ [< global > 'n] -> 'b @ [> local] -> 'c @ [< 'm] -> 'c @ [> 'm]) @ [< global many uncontended read_write] ->
-  ((unit @ 'p -> unit @ 'o) @ 'mm0 -> 'd @ 'q) @ [< global] ->
-  'a @ [< 'n & global] -> unit @ 'mm1 = <fun>
+  ('a @ [< past('n) & global > 'p] ->
+   ('b @ [> local] -> 'c @ [< 'o] -> 'c @ [> 'o]) @ [< past('m) > past('n)]) @ [< global many uncontended read_write] ->
+  ((unit @ 'mm0 -> unit @ 'q) @ [> past('m)] -> 'd @ 'mm1) @ [< global] ->
+  'a @ [< 'p & global] -> unit @ 'mm2 = <fun>
 |}]
 
 let empty_heads (x @ local once unforkable yielding)

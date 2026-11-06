@@ -2070,11 +2070,15 @@ end = struct
          instances)
 
   let register_curry_mode ~m_generic m ~acc_mode_rigid =
+    let has_upper_edges =
+      not (List.is_empty (find_edges (pair_of_mode m)).upper)
+    in
     let curry_rigid =
       Curry_mode.mode ~level:With_locality.rigid_level acc_mode_rigid
     in
     let implied =
-      Result.is_ok (With_locality.equate m_generic curry_rigid)
+      (not has_upper_edges)
+      && Result.is_ok (With_locality.equate m_generic curry_rigid)
       && not (List.memq m !rejected_curries)
     in
     if implied then suppressed_curries := m :: !suppressed_curries
