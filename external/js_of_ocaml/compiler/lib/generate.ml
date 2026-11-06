@@ -324,6 +324,7 @@ module Share = struct
         ; "caml_trampoline_return"
         ; "caml_wrap_exception"
         ; "caml_list_of_js_array"
+        ; "caml_list_of_js_array_with_tail"
         ; "caml_maybe_attach_backtrace"
         ; "jsoo_effect_not_supported"
         ; "caml_int64_create_lo_mi_hi"
@@ -427,6 +428,30 @@ module Share = struct
           J.EVar v
 end
 
+(* A chain of list cells [hd :: tl] built by nested [Block]s.
+
+   A list whose cells are not compile-time constants is a sequence of
+   [Block (0, [|hd; tl|])], each cell used once. The expression queue inlines each cell
+   into the next, which gives one nested array literal [[0,a,[0,b,...]]], and a long
+   enough literal overflows the stack of JavaScript parsers. So we record the chain
+   being built and, past [list_literal_max_length] cells, emit its heads as a flat array
+   converted to a list at runtime ([caml_list_of_js_array] or
+   [caml_list_of_js_array_with_tail]).
+
+   A chain is recorded under the variable of its outermost cell. A cell extends the
+   chain of its tail only if the tail's expression is physically [expr], that is, if the
+   tail cell was inlined and so has no other use: only the outermost cell of a chain can
+   be referenced. Hence the rewrite does not depend on the mutability of the blocks: the
+   runtime builds the same fresh [[0, hd, tl]] arrays as the literal would. The heads,
+   then the tail, are evaluated from left to right, as in the nested literal, and the
+   queue sees the same accesses as before. *)
+type list_chain =
+  { expr : J.expression  (** The expression generated for the outermost cell *)
+  ; elts : J.element list  (** The heads, outermost first *)
+  ; tail : J.expression  (** The tail of the innermost cell *)
+  ; length : int
+  }
+
 module Ctx = struct
   type t =
     { blocks : block Addr.Map.t
@@ -442,6 +467,8 @@ module Ctx = struct
     ; freevars : Code.Var.Set.t Code.Addr.Map.t
     ; in_cps : Effects.in_cps
     ; bool_context : Bool_context.t
+    ; list_chains : list_chain Var.Hashtbl.t
+          (** The chains being built, by the variable of their outermost cell *)
     }
 
   let initial
@@ -469,6 +496,7 @@ module Ctx = struct
     ; freevars
     ; in_cps
     ; bool_context
+    ; list_chains = Var.Hashtbl.create 17
     }
 end
 
@@ -1648,6 +1676,36 @@ let remove_unused_tail_args ctx exact trampolined args =
 
 let keep_name x = not (Code.Var.generated_name x)
 
+(* [nested] is the expression for [x = Block (tag, a, array_or_not, _)], see
+   [list_chain]. *)
+let list_cell ctx x ~tag ~array_or_not a contents ~nested =
+  match array_or_not, a, contents with
+  | (NotArray | Unknown), [| _; tl_var |], [ J.Element hd; J.Element tl ] when tag = 0 ->
+      let chain =
+        match Var.Hashtbl.find_opt ctx.Ctx.list_chains tl_var with
+        | Some chain when phys_equal chain.expr tl ->
+            Var.Hashtbl.remove ctx.Ctx.list_chains tl_var;
+            { chain with elts = J.Element hd :: chain.elts; length = chain.length + 1 }
+        | _ -> { expr = nested; elts = [ J.Element hd ]; tail = tl; length = 1 }
+      in
+      let expr =
+        if chain.length <= Config.Param.list_literal_max_length ()
+        then nested
+        else
+          let prim name = Share.get_prim (runtime_fun ctx) name ctx.Ctx.share in
+          match chain.tail with
+          | J.ENum n when J.Num.is_zero n ->
+              J.call (prim "caml_list_of_js_array") [ J.EArr chain.elts ] J.N
+          | tail ->
+              J.call
+                (prim "caml_list_of_js_array_with_tail")
+                [ J.EArr chain.elts; tail ]
+                J.N
+      in
+      Var.Hashtbl.replace ctx.Ctx.list_chains x { chain with expr };
+      expr
+  | _ -> nested
+
 let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t =
   let open Expr_builder in
   match e with
@@ -1675,11 +1733,13 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             return cx)
           (Array.to_list a)
       in
+      let cell = x in
       let x =
         match array_or_not with
         | Array -> Mlvalue.Array.make ~tag ~args:contents
         | NotArray | Unknown -> Mlvalue.Block.make ~tag ~args:contents
       in
+      let x = list_cell ctx cell ~tag ~array_or_not a contents ~nested:x in
       return (x, [])
   | Field (x, n, _) ->
       let* cx = access ~ctx x in
