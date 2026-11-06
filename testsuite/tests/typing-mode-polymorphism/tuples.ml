@@ -20,16 +20,15 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 let prod x y = (x, y)
 [%%expect{|
 val prod :
-  'a @ [< 'm & global] ->
-  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
+  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
+  <fun>
 |}]
 
 (* With exclave_ the tuple is local *)
 let prod_local (x @ local) (y @ local) = exclave_ (x, y)
 [%%expect{|
 val prod_local :
-  'a @ [< 'm > local] ->
-  ('b @ [< 'n > local] -> 'a * 'b @ [> 'n | 'm | local]) @ [> close('m) | local] =
+  'a @ [< 'n > local] -> 'b @ [< 'm > local] -> 'a * 'b @ [> 'm | 'n | local] =
   <fun>
 |}]
 

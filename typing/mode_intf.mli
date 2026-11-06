@@ -947,8 +947,6 @@ module type S = sig
 
     val to_of_const_exn : lr -> lr
 
-    val moregen : lr -> lr -> bool
-
     module List : sig
       (* No new types exposed to avoid too many type names *)
       include Allow_disallow with type (_, _, 'd) sided = 'd t list

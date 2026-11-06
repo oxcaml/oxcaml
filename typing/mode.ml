@@ -7282,17 +7282,6 @@ module Mode_with (Areality : Areality) = struct
     let comonadic1 = Comonadic.copy_for_saving ~copy_scope comonadic0 in
     { monadic = monadic1; comonadic = comonadic1 }
 
-  let moregen general specific =
-    with_copy_scope (fun copy_scope ->
-        let specific =
-          instantiate ~copy_scope ~current_level:rigid_level specific
-        in
-        let general = copy_generic ~copy_scope general in
-        let log = ref S.empty_changes in
-        let result = submode_log general specific ~log:(Some log) in
-        S.undo_changes !log;
-        Result.is_ok result)
-
   let copy_for_restoring ~copy_scope
       { monadic = monadic0; comonadic = comonadic0 } =
     let monadic1 = Monadic.copy_for_restoring ~copy_scope monadic0 in

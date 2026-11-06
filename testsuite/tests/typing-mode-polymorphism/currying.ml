@@ -33,8 +33,7 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 
 let fst x y = x
 [%%expect{|
-val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
-  <fun>
+val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -125,12 +124,9 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ [< past('mm2) & past('q) & past('o) & past('m) & global] ->
-  ('b @ [< 'n & global] ->
-   ('c @ [< past('mm1) & past('p) & global] ->
-    ('d @ [< past('mm0) & global] ->
-     ('e @ 'mm3 -> 'b @ [> 'n]) @ [> close('n) | past('mm0) | past('mm1) | past('mm2)]) @ [> close('n) | past('p) | past('q)]) @ [> close('n) | past('o)]) @ [> past('m)] =
-  <fun>
+  'a @ [< global] ->
+  'b @ [< 'm & global] ->
+  'c @ [< global] -> 'd @ [< global] -> 'e @ 'n -> 'b @ [> 'm] = <fun>
 |}]
 
 let foo (x @ portable) (y @ uncontended) =
@@ -186,8 +182,7 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
-  <fun>
+val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
 (* x is < global as before *)
@@ -297,9 +292,7 @@ Error: The value "bar1" is "nonportable"
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'm & global] ->
-  (unit @ 'p ->
-   (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)]) @ [> close('m)] =
+  'a @ [< 'm & global] -> unit @ 'p -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] =
   <fun>
 |}]
 
