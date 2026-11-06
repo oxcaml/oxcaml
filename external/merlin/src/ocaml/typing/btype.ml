@@ -536,7 +536,7 @@ let type_iterators_without_type_expr =
     | Mty_alias p -> it.it_path p
     | Mty_for_hole -> ()
     | Mty_signature sg -> it.it_signature it sg
-    | Mty_functor (p, mt, mm) ->
+    | Mty_functor (p, mt, mm, _) ->
         it.it_functor_param it p;
         it.it_module_type it mt;
         it.it_mode_expr mm
