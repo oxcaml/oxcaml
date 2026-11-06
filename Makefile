@@ -130,6 +130,10 @@ $(ocamldir)/duneconf/ox-extra.inc:
 # built with withJsoo=true sets OXCAML_WITH_JSIR=true.
 with_jsir ?= $(if $(filter true,$(OXCAML_WITH_JSIR)),true,false)
 
+ifeq ($(with_jsir),true)
+WITH_JSOO = 1
+endif
+
 include Makefile.common-ox
 
 .PHONY: ci
