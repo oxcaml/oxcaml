@@ -823,7 +823,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         default=None,
         metavar="N",
         help="number of cases to run (default: unlimited); at least one of "
-        "--iterations and --timeout-minutes is required",
+        "--iterations and --time-limit-minutes is required",
     )
     parser.add_argument(
         "--max-failures",
@@ -834,7 +834,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         "in-flight cases finish and may exceed the limit",
     )
     parser.add_argument(
-        "--timeout-minutes",
+        "--time-limit-minutes",
         type=float,
         default=None,
         metavar="M",
@@ -865,20 +865,22 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
-    if args.iterations is None and args.timeout_minutes is None:
-        parser.error("at least one of --iterations and --timeout-minutes is required")
+    if args.iterations is None and args.time_limit_minutes is None:
+        parser.error(
+            "at least one of --iterations and --time-limit-minutes is required"
+        )
     if args.iterations is not None and args.iterations < 1:
         parser.error("--iterations must be at least 1")
     if args.max_failures is not None and args.max_failures < 1:
         parser.error("--max-failures must be at least 1")
-    if args.timeout_minutes is not None and not (
-        math.isfinite(args.timeout_minutes) and args.timeout_minutes > 0
+    if args.time_limit_minutes is not None and not (
+        math.isfinite(args.time_limit_minutes) and args.time_limit_minutes > 0
     ):
-        parser.error("--timeout-minutes must be a positive number")
+        parser.error("--time-limit-minutes must be a positive number")
     limits = Limits(
         iterations=args.iterations,
         max_failures=args.max_failures,
-        time_limit_minutes=args.timeout_minutes,
+        time_limit_minutes=args.time_limit_minutes,
     )
     toolchain = Toolchain(REPOSITORY_ROOT / "_build")
     toolchain.check_dependencies()
