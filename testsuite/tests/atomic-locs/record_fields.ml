@@ -3,6 +3,13 @@
    expect;
 *)
 
+(* This test uses plain atomic field accesses on purpose, so it disables
+   the warnings for them (obscured-atomic-read/write). *)
+[@@@warning "-222-223"]
+[%%expect{|
+0
+|}]
+
 module Atomic = struct
   module Loc = struct
     type ('a : value_or_null) t = 'a atomic_loc

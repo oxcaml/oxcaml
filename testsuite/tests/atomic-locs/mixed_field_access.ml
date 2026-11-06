@@ -8,6 +8,10 @@
  }
 *)
 
+(* This test uses plain atomic field accesses on purpose, so it disables
+   the warnings for them (obscured-atomic-read/write). *)
+[@@@warning "-222-223"]
+
 module Int64_u = struct
   include Stdlib_upstream_compatible.Int64_u
 end

@@ -171,6 +171,8 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Obscured_atomic_read                    (* 222 *)
+  | Obscured_atomic_write                   (* 223 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -274,6 +276,8 @@ let number = function
   | Useless_valpoly -> 219
   | Redundant_modality -> 220
   | Unused_alert_disable _ -> 221
+  | Obscured_atomic_read -> 222
+  | Obscured_atomic_write -> 223
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -715,6 +719,14 @@ let descriptions = [
     names = ["unused-alert-disable"];
     description = "An attribute disabling an alert did not suppress any\n\
     \    occurrence of that alert.";
+    since = since 5 4 };
+  { number = 222;
+    names = ["obscured-atomic-read"];
+    description = "A field access performs an atomic read.";
+    since = since 5 4 };
+  { number = 223;
+    names = ["obscured-atomic-write"];
+    description = "A field assignment performs an atomic write.";
     since = since 5 4 };
 ]
 
@@ -1619,6 +1631,20 @@ let message = function
       msg "This attribute disables alert %a,@ \
            but it did not suppress any occurrence of the alert."
         Style.inline_code name
+  (* CR-soon jkerrigan: Suggest [Idx.Atomic.get] instead of
+     [Atomic.Loc.get]. *)
+  | Obscured_atomic_read ->
+      msg "This access obscures an atomic read.@ \
+           Hint: Consider using %a with %a instead."
+        Style.inline_code "Atomic.Loc.get"
+        Style.inline_code "[%atomic.loc]"
+  (* CR-soon jkerrigan: Suggest [Idx.Atomic.set] instead of
+     [Atomic.Loc.set]. *)
+  | Obscured_atomic_write ->
+      msg "This assignment obscures an atomic write.@ \
+           Hint: Consider using %a with %a instead."
+        Style.inline_code "Atomic.Loc.set"
+        Style.inline_code "[%atomic.loc]"
 ;;
 
 let nerrors = ref 0

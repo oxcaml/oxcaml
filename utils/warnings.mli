@@ -174,6 +174,8 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Obscured_atomic_read                    (* 222 *)
+  | Obscured_atomic_write                   (* 223 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
