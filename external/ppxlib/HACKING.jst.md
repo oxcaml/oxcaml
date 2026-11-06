@@ -62,9 +62,10 @@ not installed.
   build, the `parser.cmly` it generates).
 - `frontend.ml` (based on upstream's `ocaml/frontend.ml`) runs the compiler's
   own `Lexer` and `Parser` in incremental mode, and returns the message of the
-  first matching rule. Failures other than parse errors, such as lexer errors
-  and errors raised by the parser's semantic actions, return exactly
-  "Syntax error": ppxlib then reports the compiler's own error.
+  first matching rule. Parse errors that no rule explains, and failures other
+  than parse errors, such as lexer errors and errors raised by the parser's
+  semantic actions, return exactly "Syntax error": ppxlib then reports the
+  compiler's own error.
 
 A change to `parsing/parser.mly` can make a rule of `parse_errors.mlyl`
 invalid, which fails the build of ppxlib. Fix the rule in the same change. See

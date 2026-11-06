@@ -52,7 +52,7 @@
   | Parser.SIG -> Some "sig"
   | Parser.REC -> Some "rec"
   | Parser.PRIVATE -> Some "private"
-  | Parser.OVERWRITE -> Some "overwrite"
+  | Parser.OVERWRITE -> Some "overwrite_"
   | Parser.OR -> Some "or"
   | Parser.OPEN -> Some "open"
   | Parser.OF -> Some "of"
@@ -64,7 +64,7 @@
   | Parser.MOD -> Some "mod"
   | Parser.METHOD -> Some "method"
   | Parser.MATCH -> Some "match"
-  | Parser.LOCAL -> Some "local"
+  | Parser.LOCAL -> Some "local_"
   | Parser.LET -> Some "let"
   | Parser.LAZY -> Some "lazy"
   | Parser.INITIALIZER -> Some "initializer"
@@ -72,14 +72,14 @@
   | Parser.INCLUDE -> Some "include"
   | Parser.IN -> Some "in"
   | Parser.IF -> Some "if"
-  | Parser.GLOBAL -> Some "global"
+  | Parser.GLOBAL -> Some "global_"
   | Parser.FUNCTOR -> Some "functor"
   | Parser.FUNCTION -> Some "function"
   | Parser.FUN -> Some "fun"
   | Parser.FOR -> Some "for"
   | Parser.FALSE -> Some "false"
   | Parser.EXTERNAL -> Some "external"
-  | Parser.EXCLAVE -> Some "exclave"
+  | Parser.EXCLAVE -> Some "exclave_"
   | Parser.EXCEPTION -> Some "exception"
   | Parser.END -> Some "end"
   | Parser.ELSE -> Some "else"
@@ -92,6 +92,16 @@
   | Parser.ASSERT -> Some "assert"
   | Parser.AS -> Some "as"
   | Parser.AND -> Some "and"
+  | Parser.STACK -> Some "stack_"
+  | Parser.REPR -> Some "repr_"
+  | Parser.POLY -> Some "poly_"
+  | Parser.LAYOUT -> Some "layout_"
+  | Parser.KIND_OF -> Some "kind_of_"
+  | Parser.KIND -> Some "kind_"
+  | Parser.EFFECT -> Some "effect"
+  | Parser.BORROW -> Some "borrow_"
+  | Parser.ADDR_IMM -> Some "addr_imm_"
+  | Parser.ADDR -> Some "addr_"
   | _ -> None
 }
 
@@ -257,7 +267,9 @@ rule error_message = parse error
 | [_* / ... _ . LIDENT ...]
   partial {
    Option.map (fun kw ->
-   "`" ^ kw ^ "' is a keyword and cannot appear in this context (try " ^ kw ^ "_)"
+   "`" ^ kw ^ "' is a keyword and cannot appear in this context"
+   (* OxCaml's keywords already end in an underscore. *)
+   ^ (if String.ends_with ~suffix:"_" kw then "" else " (try " ^ kw ^ "_)")
    ) (token_name token)
   }
 
