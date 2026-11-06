@@ -2062,7 +2062,6 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.module_entry_functions_section ()
 
   let jump_table_sections () = set' Oxcaml_flags.jump_table_sections ()
-
   let frametable_sections () = set' Oxcaml_flags.frametable_sections ()
   let dasm_comments = set' Oxcaml_flags.dasm_comments
   let dno_asm_comments = clear' Oxcaml_flags.dasm_comments

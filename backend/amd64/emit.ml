@@ -420,10 +420,7 @@ let emit_named_text_section ?link_symbol func_name =
     | _ ->
       D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
-      (* Linkers place [.text.startup.*] before the rest of [.text], so a piece
-         linked to this section would sort before the unit's begin marker. *)
-      Emitaux.enter_code_section
-        ~link_symbol:(emit_symbol (Cmm_helpers.make_symbol "code_begin"))
+      Emitaux.enter_code_section ~link_symbol:(emit_symbol func_name)
         ".text.startup.caml";
       (* Warning: We set the internal section ref to Text here, because it
          currently does not supported named text sections. In the rest of this
@@ -3382,7 +3379,8 @@ let end_assembly () =
   function_jump_tables := [];
   let code_end = Cmm_helpers.make_symbol "code_end" in
   (* The linker places sections in input order, so a [code_end] of its own
-     follows the weak functions' sections, and so their frametable pieces. *)
+     follows the weak functions' sections, and the unit's code range (for DWARF
+     and code fragments) covers them. *)
   if !has_weak_functions
   then emit_own_text_section code_end
   else emit_named_text_section code_end;
@@ -3412,7 +3410,6 @@ let end_assembly () =
   (* CR sspies: Share the [emit_frames] code with the Arm backend. *)
   emit_frames ~debug_strings_section
     ~code_begin:(emit_symbol (Cmm_helpers.make_symbol "code_begin"))
-    ~code_end:(emit_symbol code_end)
     { efa_code_label =
         (fun l ->
           let l = label_to_asm_label ~section:Text l in

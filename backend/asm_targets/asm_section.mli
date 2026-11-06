@@ -66,6 +66,9 @@ type t =
           already-encoded [link_symbol], for [-frametable-sections] (ELF only).
           With a [group], the piece is also a member of that COMDAT group, so it
           is discarded along with a losing copy of the group's code. *)
+  | Frametable_count of { link_symbol : string }
+      (** A unit's count of its frame descriptors, linked like a
+          [Frametable_piece] *)
   | Custom of
       { names : string list;
         flags : string option;
@@ -74,6 +77,12 @@ type t =
       }
       (** A custom section with explicit details, for target-specific sections
           not covered by the other variants. *)
+
+(** The name of [Frametable_piece] sections *)
+val frametable_pieces_section_name : string
+
+(** The name of [Frametable_count] sections *)
+val frametable_counts_section_name : string
 
 val to_string : t -> string
 

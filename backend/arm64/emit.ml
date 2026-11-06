@@ -2377,7 +2377,8 @@ let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in
   (* The linker places sections in input order, so a [code_end] of its own
-     follows the weak functions' sections, and so their frametable pieces. *)
+     follows the weak functions' sections, and the unit's code range (for DWARF
+     and code fragments) covers them. *)
   if !has_weak_functions
   then emit_own_text_section code_end
   else emit_named_text_section code_end;
@@ -2410,7 +2411,6 @@ let end_assembly () =
   emit_frames ~debug_strings_section
     ~code_begin:
       (S.encode (S.create_global (Cmm_helpers.make_symbol "code_begin")))
-    ~code_end:(S.encode code_end_sym)
     { efa_code_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:Text lbl in

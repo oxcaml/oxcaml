@@ -65,17 +65,23 @@
  * followed by the descriptors. A unit compiled with
  * -frametable-sections instead has a header:
  *
- *   intnat  tag        = FRAMETABLE_SECTIONS_TAG
- *   intnat  count      (before any linker garbage collection)
- *   int32   begin_rel  offset from this field to the first piece
- *   int32   end_rel    offset from this field to the end of the pieces
+ *   intnat  tag               = FRAMETABLE_SECTIONS_TAG
+ *   int32   pieces_start_rel  offset from this field to the pieces section
+ *   int32   pieces_stop_rel   offset from this field to its end
+ *   int32   counts_start_rel  offset from this field to the counts section
+ *   int32   counts_stop_rel   offset from this field to its end
  *
  * Each function's descriptors form a "piece" in a section linked to
  * the function's code (SHF_LINK_ORDER), so the linker keeps the piece
- * exactly when it keeps the code; zero-size marker pieces linked to
- * the unit's code_begin and code_end delimit the unit's pieces. The
- * pieces are byte-contiguous, with no count or padding, and each
- * starts with an escaped descriptor.
+ * exactly when it keeps the code. The linker merges the pieces of all
+ * the units in an executable or shared object into one section, in no
+ * particular order, and every unit's header points to all of it (via
+ * the linker-defined __start_ and __stop_ symbols), so the runtime
+ * enters the section into the hashtable only once. The pieces are
+ * byte-contiguous, with no count or padding, and each starts with an
+ * escaped descriptor. The counts section, merged likewise, is an array
+ * of intnat, one per unit, each the number of descriptors in the
+ * unit's pieces; their sum bounds the number in the pieces section.
  *
  * There are three descriptor layouts: "short", "medium", and "long".
  *
@@ -319,6 +325,9 @@ void caml_unregister_frametable(void *table);
 /* a linked list of frametables */
 typedef struct caml_frametable_list {
   intnat* frametable;
+  /* For a -frametable-sections header: whether this is the one table
+     whose (shared) pieces section is entered into the hashtable */
+  bool owns_pieces;
   struct caml_frametable_list *next;
 } caml_frametable_list;
 

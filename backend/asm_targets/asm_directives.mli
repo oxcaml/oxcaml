@@ -327,6 +327,11 @@ val between_labels_32_bit_with_offsets :
 val between_this_and_label_offset_32bit_expr :
   upper:Asm_label.t -> offset_upper:Targetint.t -> unit
 
+(** Emit a 32-bit-wide expression giving the displacement obtained by
+    subtracting the current assembly location from the address of the given
+    symbol, which may be defined anywhere (it is resolved by the linker). *)
+val between_this_and_symbol_32bit_expr : Asm_symbol.t -> unit
+
 (** Emit a machine-width reference giving the displacement between the [lower]
     symbol and the sum of the address of the [upper] label plus [offset_upper].
     The [lower] symbol must be in the current compilation unit. The [upper]

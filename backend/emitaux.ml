@@ -151,7 +151,7 @@ type emit_frame_actions =
     efa_def_label : Label.t -> unit
   }
 
-let emit_frames ~debug_strings_section ~code_begin ~code_end a =
+let emit_frames ~debug_strings_section ~code_begin a =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
   let module Asm_section = Asm_targets.Asm_section in
@@ -599,21 +599,34 @@ let emit_frames ~debug_strings_section ~code_begin ~code_end a =
      ignore (List.fold_left emit_descr None descrs))
    else
      (* The unit's table is a header: a -1 tag (a count-prefixed table starts
-        with a nonnegative count), the descriptor count, and self-relative
-        offsets to the start and end of the unit's pieces. Each run of
-        descriptors with the same link symbol and group goes in a piece linked
-        to that symbol's section, so that the linker drops the piece along with
-        the code, and starts with an escape. The zero-size marker pieces
-        bracketing the runs are linked to [code_begin] and [code_end], so the
-        linker places them around all of the unit's pieces. Without
+        with a nonnegative count) and self-relative offsets to the start and end
+        of the pieces section and of the counts section, which the linker merges
+        across all units linked into the executable or shared object. Each run
+        of descriptors with the same link symbol and group goes in a piece
+        linked to that symbol's section, so that the linker drops the piece
+        along with the code, and starts with an escape, so that the pieces can
+        be read in any order. The unit's count of its descriptors and a
+        zero-size piece are linked to [code_begin]; the latter ensures the
+        pieces section, and hence its start and stop symbols, exists. Without
         [-frametable-sections], only descriptors of code in a COMDAT group get
         pieces of their own; the rest share the [code_begin] piece. *)
-     let begin_lbl = Cmm.new_label () in
-     let end_lbl = Cmm.new_label () in
+     let start_and_stop section_name =
+       List.map
+         (fun prefix ->
+           Asm_targets.Asm_symbol.create_global (prefix ^ section_name))
+         ["__start_"; "__stop_"]
+     in
+     let syms =
+       start_and_stop Asm_section.frametable_pieces_section_name
+       @ start_and_stop Asm_section.frametable_counts_section_name
+     in
      a.efa_word (-1);
+     List.iter D.between_this_and_symbol_32bit_expr syms;
+     List.iter D.hidden syms;
+     D.switch_to_section
+       (Asm_section.Frametable_count { link_symbol = code_begin });
+     a.efa_align Arch.size_addr;
      a.efa_word (List.length descrs);
-     a.efa_label_rel begin_lbl 0l;
-     a.efa_label_rel end_lbl 0l;
      let switch_to_piece (link_symbol, group) =
        D.switch_to_section (Asm_section.Frametable_piece { link_symbol; group })
      in
@@ -634,7 +647,6 @@ let emit_frames ~debug_strings_section ~code_begin ~code_end a =
        && Option.equal String.equal group1 group2
      in
      switch_to_piece (code_begin, None);
-     a.efa_def_label begin_lbl;
      ignore
        (List.fold_left
           (fun prev fd ->
@@ -647,8 +659,6 @@ let emit_frames ~debug_strings_section ~code_begin ~code_end a =
             in
             emit_descr prev fd)
           None descrs);
-     switch_to_piece (code_end, None);
-     a.efa_def_label end_lbl;
      D.switch_to_section Asm_section.Read_only_data);
   Label_table.iter emit_debuginfo debuginfos;
   (* The name structs are kept near the debuginfo words that reference them (a
