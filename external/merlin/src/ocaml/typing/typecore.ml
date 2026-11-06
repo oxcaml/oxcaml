@@ -625,7 +625,7 @@ let check_probe_name name loc env =
 let mk_expected ?explanation ty = { ty; explanation; }
 
 let case lhs rhs =
-  {c_lhs = lhs; c_cont = None; c_guard = None; c_rhs = rhs}
+  {c_lhs = lhs; c_cont = None; c_guard = None; c_rhs = rhs; c_generalized = []}
 
 let is_borrow e =
   match e.pexp_desc with
@@ -2117,6 +2117,23 @@ let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
     match pv_value_kind with
     | Val_mut _ -> f_mut pv_type
     | _ -> f_immut pv_lpoly pv_type) pvs
+
+(* The type variables in the types of the immutable variables [pvs] that the
+   enclosing [with_local_level_generalize] is about to generalize. Must be
+   called from its [before_generalize] callback, after any lowering. *)
+let vars_to_generalize pvs =
+  let level = get_current_level () in
+  List.filter_map
+    (fun {pv_type; pv_value_kind; _} ->
+       match pv_value_kind with
+       | Val_mut _ -> None
+       | _ -> Some pv_type)
+    pvs
+  |> free_variables_list
+  |> List.filter (fun ty ->
+       let ty_level = get_level ty in
+       ty_level > level && ty_level <> generic_level)
+  |> List.rev
 
 let add_pattern_variables ?check ?check_as env pv =
   List.fold_right
@@ -3632,7 +3649,8 @@ type ('case_pattern, 'case_data) half_typed_case =
     branch_env: Env.t;
     pat_vars: pattern_variable list;
     module_vars: module_variables;
-    contains_gadt: bool; }
+    contains_gadt: bool;
+    generalized: type_expr list; }
 
 (* Used to split patterns into value cases and exception cases. *)
 let split_half_typed_cases env zipped_cases =
@@ -6058,13 +6076,14 @@ let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
     (fun ({vb_pat; vb_expr; vb_rec_kind = _; vb_sort;
-           vb_attributes; vb_loc} as vb) ->
+           vb_attributes; vb_loc; vb_generalized} as vb) ->
       match (Value_rec_check.is_valid_recursive_expression ids vb_expr) with
       | None ->
            Error.log_or_raise vb_expr.exp_loc env Illegal_letrec_expr;
            vb
       | Some vb_rec_kind ->
-          { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc})
+          { vb_pat; vb_expr; vb_rec_kind; vb_sort; vb_attributes; vb_loc;
+            vb_generalized })
     valbinds
 
 let check_recursive_class_bindings env ids exprs =
@@ -10322,7 +10341,7 @@ and type_function
           [ { pattern = pat; has_guard = false; needs_refute = false }, () ]
           ~type_body:begin
             fun () pat ~when_env:_ ~ext_env ~cont:_ ~ty_expected ~ty_infer:_
-              ~contains_gadt:param_contains_gadt ->
+              ~contains_gadt:param_contains_gadt ~generalized:_ ->
               let { function_ = _, params_suffix, body;
                     newtypes; params_contain_gadt = suffix_contains_gadt;
                     fun_alloc_mode; ret_info; calling_convention_sorts;
@@ -11349,7 +11368,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env
                Texp_let (Nonrecursive,
                          [{vb_pat=let_pat; vb_expr=texp; vb_sort=let_pat_sort;
                            vb_attributes=[]; vb_loc=Location.none;
-                           vb_rec_kind = Dynamic;
+                           vb_rec_kind = Dynamic; vb_generalized = [];
                           }],
                          func let_var) }
       end
@@ -12021,6 +12040,8 @@ and map_half_typed_cases
         -> ty_expected:_ (* type to check body in scope of *)
         -> ty_infer:_ (* type to infer for body *)
         -> contains_gadt:_ (* whether the pattern contains a GADT *)
+        -> generalized:_ (* type variables generalized in the pattern's
+                            variables *)
         -> ret)
     -> check_if_total:bool (* if false, assume Partial right away *)
     -> ret list * partial
@@ -12074,6 +12095,7 @@ and map_half_typed_cases
     | None -> List.map (fun c -> f c None) caselist
     | Some conts -> List.map2 f caselist conts
   in
+  let generalized = ref [] in
   let half_typed_cases, ty_res, do_copy_types, ty_arg' =
    (* propagation of the argument *)
     with_local_level_generalize begin fun () ->
@@ -12107,6 +12129,7 @@ and map_half_typed_cases
                 pat_vars = pvs;
                 module_vars = mvs;
                 contains_gadt = contains_gadt (as_comp_pattern category pat);
+                generalized = [];
               }
             end
           in
@@ -12151,11 +12174,18 @@ and map_half_typed_cases
       (half_typed_cases, ty_res, do_copy_types, ty_arg')
     end
     ~before_generalize: begin fun (half_typed_cases, _, _, ty_arg') ->
+      generalized :=
+        List.map (fun { pat_vars; _ } -> vars_to_generalize pat_vars)
+          half_typed_cases;
       generalize ty_arg';
       List.iter (fun { pat_vars; _ } ->
         iter_pattern_variables_type generalize pat_vars
       ) half_typed_cases
     end
+  in
+  let half_typed_cases =
+    List.map2 (fun htc generalized -> { htc with generalized })
+      half_typed_cases !generalized
   in
   (* type bodies *)
   let ty_res' = instance ty_res in
@@ -12164,7 +12194,7 @@ and map_half_typed_cases
     map_conts
     (fun { typed_pat = pat; branch_env = ext_env;
            pat_vars = pvs; module_vars = mvs;
-           case_data; contains_gadt; _ } cont
+           case_data; contains_gadt; generalized; _ } cont
         ->
         let ext_env =
           if contains_gadt then
@@ -12194,7 +12224,7 @@ and map_half_typed_cases
             duplicate_type ty_res
           else ty_res in
         type_body case_data pat ~when_env ~ext_env ~cont ~ty_expected
-          ~ty_infer:ty_res' ~contains_gadt)
+          ~ty_infer:ty_res' ~contains_gadt ~generalized)
     conts half_typed_cases
   end in
   let do_init = may_contain_gadts || needs_exhaust_check in
@@ -12310,7 +12340,15 @@ and type_cases
     caselist ~check_if_total
     ~type_body:begin
       fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
+<<<<<<< Merlin:record-generalized-vars
         ~ty_infer ~contains_gadt:_ ->
+||||||| Compiler:last-imported
+        ~ty_infer ~contains_gadt:_ ->
+        let cont = Option.map (fun (id,_) -> id) cont in
+=======
+        ~ty_infer ~contains_gadt:_ ~generalized ->
+        let cont = Option.map (fun (id,_) -> id) cont in
+>>>>>>> Compiler:HEAD
         let guard =
           match pc_guard with
           | None -> None
@@ -12332,7 +12370,8 @@ and type_cases
           c_lhs = pat;
           c_cont = cont;
           c_guard = guard;
-          c_rhs = {exp with exp_type = ty_infer}
+          c_rhs = {exp with exp_type = ty_infer};
+          c_generalized = generalized;
         }
     end
     ~additional_checks_for_split_cases:(fun cases ->
@@ -12544,6 +12583,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let attrs_list = List.map (fun (attrs, _, _, _) -> attrs) spatl in
   let is_recursive = (rec_flag = Recursive) in
 
+  let generalized = ref [] in
   let (pat_list, exp_list, new_env, mvs, sorts, pvs) =
     with_local_level_generalize begin fun () ->
       if existential_context = At_toplevel then Typetexp.TyVarEnv.reset ();
@@ -12700,6 +12740,14 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (fun (_, pat, _) (exp, _) ->
           if maybe_expansive exp then lower_contravariant env pat.pat_type)
         mode_pat_typ_list exp_list;
+      generalized :=
+        List.map
+          (fun (_, pat, _) ->
+             let ids = pat_bound_idents pat in
+             vars_to_generalize
+               (List.filter (fun pv -> List.exists (Ident.same pv.pv_id) ids)
+                  pvs))
+          mode_pat_typ_list;
       iter_pattern_variables_type_mut
         ~f_immut:(fun pv_lpoly ty ->
           Lpoly.generalize
@@ -12757,15 +12805,16 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   List.iter2 update_exp_jkind pat_list exp_list;
   let l = List.combine pat_list exp_list in
   let l = List.combine sorts l in
+  let l = List.combine !generalized l in
   let l =
     List.map2
-      (fun (s, ((_,p,_), (e, _))) pvb ->
+      (fun (g, (s, ((_,p,_), (e, _)))) pvb ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
         let e = add_zero_alloc_attribute e pvb.pvb_attributes in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
-         vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
+         vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic; vb_generalized = g;
         })
       l spat_sexp_list
   in
