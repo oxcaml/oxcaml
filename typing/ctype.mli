@@ -327,7 +327,10 @@ module Curry_mode : sig
       upper bound of the areality of the argument. *)
   val add_arg : t -> With_locality.lr -> upper_areality:Locality.Const.t -> t
 
-  (** The accumulated curry mode. *)
+  (** Returns a full mode constrained by a [Curry_mode.t]. If the [Curry_mode.t]
+      is a constant, the same constant is returned. If the [Curry_mode.t] is a
+      comonadic mode variable, [mode] returns a freshly allocated mode at
+      [level] above a given [Curry_mode.t], where the monadic half is unconstrained *)
   val mode : level:int -> t -> With_locality.lr
 end
 

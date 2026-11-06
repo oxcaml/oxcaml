@@ -2091,6 +2091,18 @@ end = struct
       List.concat_map heads_of_mode !suppressed_curries;
     implied
 
+  (** Decides which curry modes of [ty] are hidden. This must happen before
+      printing and after the edges are computed.
+
+      We only want to print the curry mode when it happens to be more specific than the
+      curry mode implied by preceding arguments; we check this using the same ideas
+      behind subsumption.
+
+      [register_suppressed_curries] walks [ty] as the printer does, threading the curry
+      accumulator along with its rigid instance. A generic curry mode is
+      hidden when the type with the curry mode replaced by the one implied by
+      the accumulator is as general, i.e. when its generic instance can be
+      equated with [Curry_mode.mode] of the rigid accumulator. *)
   let rec register_suppressed_curries ~instances_generic ~instances_rigid
       ~visited (acc_mode, acc_mode_rigid) ty =
     let px = proxy ty in
@@ -2135,7 +2147,7 @@ end = struct
           else acc_of_occurrence ~arg:false mret
         in
         register acc_modes ty2
-      | Tpoly (ty, []) | Trepr (ty, []) ->
+      | Tpoly (ty, _) | Trepr (ty, _) ->
         register (acc_mode, acc_mode_rigid) ty
       | _ ->
         let acc = Curry_mode.Const With_locality.Const.legacy in
