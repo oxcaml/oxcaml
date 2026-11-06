@@ -1004,7 +1004,8 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
             else `Specialized (continuation, lifting_cost)))
 
 let decide_continuation_specialization ~dacc ~switch ~scrutinee =
-  Profile.record_with_counters ~accumulate:true "continuation_specialization"
+  Profile.record_with_counters ~accumulate:true ~level:2
+    "continuation_specialization"
     (fun () -> decide_continuation_specialization0 ~dacc ~switch ~scrutinee)
     ()
     ~counter_f:(fun result ->
