@@ -43,36 +43,38 @@ module Structured = struct
     let file = Option.value ~default:"" file_opt in
     Printf.sprintf "%s(%s:%d:%d)" prefix file line col
 
-  let render_path_item (item : string Structured_mangling.path_item) =
+  (* Stamps are rendered separately from the other items: see [pp_path]. *)
+  let render_path_item (item : string Structured_mangling.path_item) :
+      (string, int) Either.t =
     match item with
-    | Compilation_unit s | Module s | Class s | Function s -> s
-    | Anonymous_function (l, c, f) -> format_anonymous_location "fn" l c f
-    | Anonymous_module (l, c, f) -> format_anonymous_location "mod" l c f
-    | Partial_function (l, c, f) -> format_anonymous_location "partial" l c f
+    | Compilation_unit s | Module s | Class s | Function s -> Left s
+    | Anonymous_function (l, c, f) ->
+      Left (format_anonymous_location "fn" l c f)
+    | Anonymous_module (l, c, f) -> Left (format_anonymous_location "mod" l c f)
+    | Partial_function (l, c, f) ->
+      Left (format_anonymous_location "partial" l c f)
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)
-    | Inline_marker -> "<specialization_of>"
+    | Inline_marker -> Left "<specialization_of>"
+    | Stamp n -> Right n
 
-  let pp_path (path, suffix) =
-    String.concat "." (List.map render_path_item path) ^ suffix
+  (* Compiler-generated stamps only serve to make symbols unique and change
+     whenever unrelated code is modified, so by default they are omitted so that
+     the demangled name is stable. With [show_stamps], they are appended in
+     braces, e.g. [Foo.bar{0,3}]. *)
+  let pp_path ~show_stamps path =
+    let items, stamps = List.partition_map render_path_item path in
+    let stamps =
+      match show_stamps, stamps with
+      | false, _ | true, [] -> ""
+      | true, _ :: _ ->
+        "{" ^ String.concat "," (List.map string_of_int stamps) ^ "}"
+    in
+    String.concat "." items ^ stamps
 
-  (* The symbols of closures get a [_<number>_code] suffix appended; the length
-     prefix of the preceding identifier marks where it begins, so the whole
-     suffix is dropped when demangling: [foo_N_M_code] becomes [foo_N]. *)
-  let is_code_suffix s =
-    let n = String.length s in
-    n > 6
-    && s.[0] = '_'
-    && String.ends_with ~suffix:"_code" s
-    && String.for_all Char.Ascii.is_digit (String.sub s 1 (n - 6))
-
-  let unmangle sym =
-    Option.map
-      (fun (path, suffix) ->
-        let suffix = if is_code_suffix suffix then "" else suffix in
-        pp_path (path, suffix))
-      (Structured_mangling.Parse.parse sym)
+  let unmangle ~show_stamps sym =
+    Option.map (pp_path ~show_stamps) (Structured_mangling.Parse.parse sym)
 end
 
 module FlatCommon = struct
@@ -237,10 +239,10 @@ module Flat0 = struct
 end
 
 (* Auto-detect and demangle *)
-let auto_demangle str =
+let auto_demangle ~show_stamps str =
   (* Try the structured scheme first (most specific pattern) *)
   if Structured.starts_with_prefix str
-  then Structured.unmangle str
+  then Structured.unmangle ~show_stamps str
   else if FlatCommon.starts_with_prefix str
   then
     (* Try the flat scheme from 5.3-5.4 first, then the previously-used one *)
@@ -256,12 +258,17 @@ type demangle_format =
   | Flat1
   | Structured
 
-let demangle_with_format format str =
+type options =
+  { format : demangle_format;
+    show_stamps : bool  (** Only affects the structured scheme. *)
+  }
+
+let demangle { format; show_stamps } str =
   match format with
-  | Auto -> auto_demangle str
+  | Auto -> auto_demangle ~show_stamps str
   | Flat0 -> Flat0.unmangle str
   | Flat1 -> Flat1.unmangle str
-  | Structured -> Structured.unmangle str
+  | Structured -> Structured.unmangle ~show_stamps str
 
 type codecops =
   | Encode
@@ -283,11 +290,11 @@ let decode str =
 (* Mirroring c++filt / rustfilt: print the demangled form when we recognise the
    symbol, otherwise pass the input through unchanged. The exit code is always 0
    so the tool is safe to drop into a shell pipeline. *)
-let process_line format codecops line =
+let process_line options codecops line =
   print_endline
     (match codecops with
     | [] -> (
-      match demangle_with_format format line with
+      match demangle options line with
       | Some demangled -> demangled
       | None -> line)
     | _ ->
@@ -296,23 +303,23 @@ let process_line format codecops line =
           match codec with Encode -> encode s | Decode -> decode s)
         line codecops)
 
-let process_stdin format codecops () =
+let process_stdin options codecops () =
   let rec aux () =
     match In_channel.input_line In_channel.stdin with
     | Some line ->
-      process_line format codecops line;
+      process_line options codecops line;
       aux ()
     | None -> ()
   in
   aux ()
 
-let process_symbols format codecops symbols =
-  List.iter (process_line format codecops) symbols
+let process_symbols options codecops symbols =
+  List.iter (process_line options codecops) symbols
 
-let main format codecops symbols =
+let main options codecops symbols =
   match symbols with
-  | [] -> process_stdin format codecops ()
-  | symbols -> process_symbols format codecops symbols
+  | [] -> process_stdin options codecops ()
+  | symbols -> process_symbols options codecops symbols
 
 (* Command line interface *)
 let usage_msg =
@@ -321,6 +328,8 @@ let usage_msg =
    If no symbols are provided, reads from standard input.\n"
 
 let format_ref = ref Auto
+
+let show_stamps_ref = ref false
 
 let symbols_ref = ref []
 
@@ -340,6 +349,10 @@ let specs =
                  raise (Arg.Bad (Printf.sprintf "unknown format: '%s'" s))),
       "<format>  Set mangling format: auto, flat0 (<= 5.2.1), flat1 (>= 5.3), \
        structured  (default: auto)" );
+    ( "--stamps",
+      Arg.Set show_stamps_ref,
+      " Show the compiler-generated stamps that make symbols unique, in braces \
+       after the demangled name (structured scheme only)" );
     ( "--encode",
       Arg.Unit (fun () -> codecops_ref := Encode :: !codecops_ref),
       " Encode input as an identifier, instead of demangling; can be pipelined \
@@ -351,4 +364,6 @@ let specs =
 
 let () =
   Arg.parse specs (fun s -> symbols_ref := !symbols_ref @ [s]) usage_msg;
-  main !format_ref (List.rev !codecops_ref) !symbols_ref
+  main
+    { format = !format_ref; show_stamps = !show_stamps_ref }
+    (List.rev !codecops_ref) !symbols_ref

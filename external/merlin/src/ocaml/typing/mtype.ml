@@ -939,7 +939,11 @@ let lower_nongen nglev mty =
         Tvar { jkind } ->
           let level = get_level ty in
           if level < generic_level && level > nglev then (
-            set_level ty nglev; Jkind.update_level nglev jkind)
+            set_level ty nglev;
+            match Jkind.update_level nglev jkind with
+            | Ok () -> ()
+            | Error Rigid ->
+              Misc.fatal_error "Ctype.lower_nongen: unexpected rigid variable")
       | _ ->
           super.it_do_type_expr it ty
     in

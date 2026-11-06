@@ -137,7 +137,7 @@ end = struct
         let m = one lsl to_int bit in
         let y = k' lor (m - one) land lnot m in
         if x = y then if k' land m = zero then LB else RB else NA
-        [@@inline]
+      [@@inline]
 
       let equal { key = k1 } { key = k2 } = equal k1 k2 [@@inline]
 
@@ -196,7 +196,7 @@ end = struct
           | NA -> join (Tip (k, nil ())) k t (Key.payload k')
           | LB -> Bin (k', update_with l k ~has ~nil, r)
           | RB -> Bin (k', l, update_with r k ~has ~nil))
-      [@@specialise]
+    [@@specialise]
 
     let rec update t k ~f =
       match t with
@@ -208,7 +208,7 @@ end = struct
           | NA -> join (Tip (k, f None)) k t (Key.payload k')
           | LB -> Bin (k', update l k f, r)
           | RB -> Bin (k', l, update r k f))
-      [@@specialise]
+    [@@specialise]
 
     let rec set t k v =
       match t with
@@ -248,7 +248,7 @@ end = struct
             | LB ->
                 if is_zero ~bit:b2 k1 then Bin (p2, merge t1 l2 ~f, r2)
                 else Bin (p2, l2, merge t1 r2 ~f))
-      [@@specialise]
+    [@@specialise]
 
     let rec iter t ~f =
       match t with
@@ -257,14 +257,14 @@ end = struct
       | Bin (_, l, r) ->
           iter l ~f;
           iter r ~f
-      [@@specialise]
+    [@@specialise]
 
     let rec fold t ~init ~f =
       match t with
       | Nil -> init
       | Tip (k, v) -> f k v init
       | Bin (_, l, r) -> fold r ~f ~init:(fold l ~init ~f)
-      [@@specialise]
+    [@@specialise]
 
     let rec max_elt = function
       | Nil -> None
@@ -754,11 +754,11 @@ module Domain = struct
       try
         Result.return
         @@ Map.merge x y ~f:(fun ~key:_ -> function
-             | `Left v | `Right v -> Some v
-             | `Both (x, y) -> (
-                 match join x y with
-                 | Error conflict -> raise @@ Join.Conflict conflict
-                 | Ok z -> Some z))
+          | `Left v | `Right v -> Some v
+          | `Both (x, y) -> (
+              match join x y with
+              | Error conflict -> raise @@ Join.Conflict conflict
+              | Ok z -> Some z))
       with Join.Conflict err -> Error err
     in
     let inspect xs =
@@ -767,9 +767,9 @@ module Domain = struct
     let order x y =
       Map.symmetric_diff x y ~data_equal:equal
       |> Sequence.fold ~init:(0, 0, 0) ~f:(fun (l, m, r) -> function
-           | _, `Left _ -> (l + 1, m, r)
-           | _, `Right _ -> (l, m, r + 1)
-           | _, `Unequal _ -> (l, m + 1, r))
+        | _, `Left _ -> (l + 1, m, r)
+        | _, `Right _ -> (l, m, r + 1)
+        | _, `Unequal _ -> (l, m + 1, r))
       |> function
       | 0, 0, 0 -> Order.EQ
       | 0, 0, _ -> LT
@@ -1077,9 +1077,8 @@ module Documentation = struct
   let classes () =
     Hashtbl.to_alist Registry.public
     |> List.map ~f:(fun (cls, slots) ->
-           ( (cls, Registry.(find classes) cls),
-             List.map slots ~f:(fun slot -> (slot, Registry.(find slots) slot))
-           ))
+        ( (cls, Registry.(find classes) cls),
+          List.map slots ~f:(fun slot -> (slot, Registry.(find slots) slot)) ))
 
   let rules () = Hash_set.to_list Registry.rules
 end
@@ -1109,8 +1108,8 @@ module Class = struct
   let refine { name } sort = { name; sort }
   let same x y = Name.equal x.name y.name
 
-  let equal :
-      type a b. (a, _) t -> (b, _) t -> (a obj, b obj) Type_equal.t option =
+  let equal : type a b.
+      (a, _) t -> (b, _) t -> (a obj, b obj) Type_equal.t option =
    fun x y -> Option.some_if (same x y) Type_equal.T
 
   let assert_equal x y =
@@ -1164,7 +1163,7 @@ module Dict = struct
     let compare k1 k2 =
       let k1 = uid k1 and k2 = uid k2 in
       (Uid.compare [@inlined]) k1 k2
-      [@@inline]
+    [@@inline]
 
     let name x = x.name
     let to_sexp x = x.show
@@ -1240,7 +1239,7 @@ module Dict = struct
         | () when contains a b c d -> Contains
         | () when equals a b c d -> Equals
         | () -> assert false
-        [@@inline]
+      [@@inline]
     end
 
     (** Extension of the Allen's Algebra over points.
@@ -1268,7 +1267,7 @@ module Dict = struct
         | () when finishes p a b -> Finishes
         | () when after p a b -> After
         | () -> assert false
-        [@@inline]
+      [@@inline]
     end
   end
 
@@ -1354,7 +1353,7 @@ module Dict = struct
   let ( <$ ) k1 k2 =
     let k1 = Key.uid k1 and k2 = Key.uid k2 in
     (Key.Uid.( < ) [@inlined]) k1 k2
-    [@@inline]
+  [@@inline]
 
   let make0 = T0 [@@inlined]
   let make1 k a = T1 (k, a) [@@inline]
@@ -1364,27 +1363,27 @@ module Dict = struct
 
   let make5 ka a kb b kc c kd d ke e =
     EQ (make2 ka a kb b, kc, c, make2 kd d ke e)
-    [@@inline]
+  [@@inline]
 
   let make6 ka a kb b kc c kd d ke e kf f =
     EQ (T2 (ka, a, kb, b), kc, c, T3 (kd, d, ke, e, kf, f))
-    [@@inline]
+  [@@inline]
 
   let make7 ka a kb b kc c kd d ke e kf f kg g =
     EQ (T3 (ka, a, kb, b, kc, c), kd, d, T3 (ke, e, kf, f, kg, g))
-    [@@inline]
+  [@@inline]
 
   let make8 ka a kb b kc c kd d ke e kf f kg g kh h =
     EQ (T3 (ka, a, kb, b, kc, c), kd, d, T4 (ke, e, kf, f, kg, g, kh, h))
-    [@@inline]
+  [@@inline]
 
   let make9 ka a kb b kc c kd d ke e kf f kg g kh h ki i =
     EQ (T4 (ka, a, kb, b, kc, c, kd, d), ke, e, T4 (kf, f, kg, g, kh, h, ki, i))
-    [@@inline]
+  [@@inline]
 
   let make10 ka a kb b kc c kd d ke e kf f kg g kh h ki i kj j =
     LL (make4 ka a kb b kc c kd d, ke, e, make5 kf f kg g kh h ki i kj j)
-    [@@inline]
+  [@@inline]
 
   type 'r visitor = { visit : 'a. 'a key -> 'a -> 'r -> 'r }
 
@@ -1475,7 +1474,7 @@ module Dict = struct
          *)
         EQ (EQ (w, ka, a, x), kb, b, LL (y, kc, c, z))
     | r -> raise (Rol_wrong_rank r)
-    [@@inline]
+  [@@inline]
 
   let ror = function
     | LR (LR (x, ka, a, y), kb, b, z) ->
@@ -1540,7 +1539,7 @@ module Dict = struct
          *)
         EQ (LR (w, ka, a, x), kb, b, EQ (y, kc, c, z))
     | r -> raise (Ror_wrong_rank r)
-    [@@inline]
+  [@@inline]
 
   let rank_increases was now =
     match (was, now) with
@@ -1551,7 +1550,7 @@ module Dict = struct
     | EQ _, LL _ | EQ _, LR _ -> true
     | LR _, LL _ | LL _, LR _ -> false
     | _ -> false
-    [@@inline]
+  [@@inline]
 
   (* [p += c] updates the right subtree of [p] with [c].
      pre: rank p > 1 /\ rank c > 1 *)
@@ -1564,7 +1563,7 @@ module Dict = struct
     | EQ (b, k, x, c) ->
         if rank_increases c c' then LL (b, k, x, c') else EQ (b, k, x, c')
     | _ -> failwith "+=: rank < 2"
-    [@@inline]
+  [@@inline]
 
   (* [b =+ p] updates the left subtree of [p] with [b].
      pre: rank p > 1 /\ rank b > 1 *)
@@ -1577,7 +1576,7 @@ module Dict = struct
     | EQ (b, k, x, c) ->
         if rank_increases b b' then LR (b', k, x, c) else EQ (b', k, x, c)
     | _ -> failwith "=+: rank < 2"
-    [@@inline]
+  [@@inline]
 
   (* pre:
      - a is not in t;
@@ -1695,7 +1694,7 @@ module Dict = struct
             upsert ka a x
               ~update:(fun k -> ret @@ fun f -> LR (k f, kb, b, y))
               ~insert:(fun x -> add (x =+ t)))
-    [@@specialise]
+  [@@specialise]
 
   let monomorphic_merge : type t. t key -> (t -> t -> t) -> merge =
    fun k f ->
@@ -1705,12 +1704,12 @@ module Dict = struct
           let T = Key.same k kb in
           f b a);
     }
-   [@@specialise]
+  [@@specialise]
 
   let update f ka a x =
     let f = monomorphic_merge ka f in
     upsert ka a x ~update:(fun k -> k f) ~insert:(fun x -> x)
-    [@@specialise]
+  [@@specialise]
 
   let set ka a x =
     let f = monomorphic_merge ka (fun _ x -> x) in
@@ -1721,7 +1720,7 @@ module Dict = struct
   let return (type a b) (k : a key) (ka : b key) (a : b) : a =
     let T = Key.same k ka in
     a
-    [@@inline]
+  [@@inline]
 
   let rec get k = function
     | T0 -> raise Field_not_found
@@ -1767,7 +1766,7 @@ module Dict = struct
     | 0 -> make1 ka (app m ka kb b a)
     | 1 -> make2 kb b ka a
     | _ -> make2 ka a kb b
-    [@@inline]
+  [@@inline]
 
   let merge_12 m ka a kb b kc c =
     match Key.Point.relate ka kb kc with
@@ -1776,7 +1775,7 @@ module Dict = struct
     | During -> make3 kb b ka a kc c
     | Finishes -> make2 kb b ka (app m ka kc c a)
     | After -> make3 kb b kc c ka a
-    [@@inline]
+  [@@inline]
 
   let merge_13 m ka a kb b kc c kd d =
     match Key.Point.relate ka kb kd with
@@ -1789,7 +1788,7 @@ module Dict = struct
         | 0 -> make3 kb b kc (app m kc ka a c) kd d
         | 1 -> make4 kb b kc c ka a kd d
         | _ -> make4 kb b ka a kc c kd d)
-    [@@inline]
+  [@@inline]
 
   let merge_22 m ka a kb b kc c kd d =
     match Key.Interval.relate ka kb kc kd with
@@ -1806,7 +1805,7 @@ module Dict = struct
     | During -> make4 kc c ka a kb b kd d
     | Contains -> make4 ka a kc c kd d kb b
     | Equals -> make2 ka (app m ka kc c a) kb (app m kb kd d b)
-    [@@inline]
+  [@@inline]
 
   let merge m x y =
     if phys_equal x y then x
@@ -1820,7 +1819,7 @@ module Dict = struct
       | T3 (kb, b, kc, c, kd, d), T1 (ka, a) -> merge_13 m ka a kb b kc c kd d
       | T2 (ka, a, kb, b), T2 (kc, c, kd, d) -> merge_22 m ka a kb b kc c kd d
       | _ -> fold_merge m x y
-    [@@inline]
+  [@@inline]
 
   let sexp_of_t dict =
     Sexp.List
@@ -2127,7 +2126,7 @@ module Knowledge = struct
     type _ error = conflict
 
     let fail p : 'a t = { run = (fun ~reject ~accept:_ _ -> reject p) }
-      [@@inline]
+    [@@inline]
 
     let catch x err =
       {
@@ -2135,13 +2134,13 @@ module Knowledge = struct
           (fun ~reject ~accept s ->
             x.run s ~accept ~reject:(fun p -> (err p).run ~reject ~accept s));
       }
-      [@@inline]
+    [@@inline]
 
     include Monad.Make (struct
       type 'a t = 'a knowledge
 
       let return x : 'a t = { run = (fun ~reject:_ ~accept s -> accept x s) }
-        [@@inline]
+      [@@inline]
 
       let bind : 'a t -> ('a -> 'b t) -> 'b t =
        fun x f ->
@@ -2150,7 +2149,7 @@ module Knowledge = struct
             (fun ~reject ~accept s ->
               x.run s ~reject ~accept:(fun x s -> (f x).run ~reject ~accept s));
         }
-       [@@inline]
+      [@@inline]
 
       let map : 'a t -> f:('a -> 'b) -> 'b t =
        fun x ~f ->
@@ -2159,7 +2158,7 @@ module Knowledge = struct
             (fun ~reject ~accept s ->
               x.run s ~reject ~accept:(fun x s -> accept (f x) s));
         }
-       [@@inline]
+      [@@inline]
 
       let map = `Custom map
     end)
@@ -2294,8 +2293,7 @@ module Knowledge = struct
 
     type 'a ord = comparator_witness
 
-    let derive :
-        type a b.
+    let derive : type a b.
         (a, b) cls ->
         (module S
            with type t = (a, b) cls t
@@ -2352,22 +2350,22 @@ module Knowledge = struct
 
   let get () : state knowledge =
     { run = (fun ~reject:_ ~accept s -> accept s s) }
-    [@@inline]
+  [@@inline]
 
   let put s = { run = (fun ~reject:_ ~accept _ -> accept () s) } [@@inline]
 
   let gets f = { run = (fun ~reject:_ ~accept s -> accept (f s) s) }
-    [@@inline] [@@specialise]
+  [@@inline] [@@specialise]
 
   let update f = { run = (fun ~reject:_ ~accept s -> accept () (f s)) }
-    [@@inline] [@@specialise]
+  [@@inline] [@@specialise]
 
   let objects { Class.name } =
     get () >>| fun { classes } ->
     match Map.find classes name with
     | None -> Env.empty_class
     | Some objs -> objs
-    [@@inline]
+  [@@inline]
 
   let update_objects { Class.name } f =
     update @@ fun state ->
@@ -2379,7 +2377,7 @@ module Knowledge = struct
       | Some objs -> objs
     in
     { state with classes = Map.set state.classes name objs }
-    [@@specialise]
+  [@@specialise]
 
   let map_update_objects { Class.name } f =
     get () >>= fun state ->
@@ -2391,7 +2389,7 @@ module Knowledge = struct
     f objs @@ fun objs res ->
     put { state with classes = Map.set state.classes name objs } >>| fun () ->
     res
-    [@@specialise]
+  [@@specialise]
 
   module Object = struct
     type +'a t = 'a obj
@@ -2405,9 +2403,9 @@ module Knowledge = struct
      fun cls ->
       objects cls >>= fun objs ->
       with_new_object objs @@ fun obj objs ->
-      (update @@ function
-       | { classes } as s ->
-           { s with classes = Map.set classes ~key:cls.name ~data:objs })
+      ( update @@ function
+        | { classes } as s ->
+            { s with classes = Map.set classes ~key:cls.name ~data:objs } )
       >>| fun () -> obj
 
     let null _ = Oid.zero
@@ -2539,8 +2537,7 @@ module Knowledge = struct
       include Binable.S with type t := t
     end
 
-    let derive :
-        type a.
+    let derive : type a.
         (a, _) cls ->
         (module S with type t = a obj and type comparator_witness = a ord) =
      fun _ ->
@@ -2692,7 +2689,7 @@ module Knowledge = struct
   type slot_status = Sleep | Awoke | Ready of Dict.record
 
   let is_empty { Slot.dom; key } v = Domain.is_empty dom (Record.get key dom v)
-    [@@inline]
+  [@@inline]
 
   let status : ('a, _) slot -> 'a obj -> slot_status knowledge =
    fun slot obj ->
@@ -2884,22 +2881,22 @@ module Knowledge = struct
      fun cls ->
       Oid.Tree.to_sequence cls.vals
       |> Knowledge.Seq.fold ~init:cls ~f:(fun cls (obj, (info : Env.info)) ->
-             match info.name with
-             | None -> Knowledge.return cls
-             | Some sym ->
-                 if not (needs_import cls sym obj) then Knowledge.return cls
-                 else
-                   let obj' =
-                     match Map.find cls.objs { package; name = sym.name } with
-                     | None -> Oid.zero
-                     | Some obj' -> obj'
-                   in
-                   if (not strict) || Oid.(obj' = zero || obj' = obj) then
-                     intern_symbol sym obj cls
-                   else
-                     let info = Oid.Tree.find_exn cls.vals obj' in
-                     let sym' = Option.value_exn info.name in
-                     Knowledge.fail (Import (sym, sym')))
+          match info.name with
+          | None -> Knowledge.return cls
+          | Some sym ->
+              if not (needs_import cls sym obj) then Knowledge.return cls
+              else
+                let obj' =
+                  match Map.find cls.objs { package; name = sym.name } with
+                  | None -> Oid.zero
+                  | Some obj' -> obj'
+                in
+                if (not strict) || Oid.(obj' = zero || obj' = obj) then
+                  intern_symbol sym obj cls
+                else
+                  let info = Oid.Tree.find_exn cls.vals obj' in
+                  let sym' = Option.value_exn info.name in
+                  Knowledge.fail (Import (sym, sym')))
 
     let package_exists package =
       Map.exists ~f:(fun { Env.objs } ->
@@ -2974,7 +2971,7 @@ module Knowledge = struct
                 | None -> accept None s
                 | Some x -> (f x).run ~accept ~reject s));
       }
-      [@@inline] [@@specialise]
+    [@@inline] [@@specialise]
 
     let ( >>|? ) x f =
       {
@@ -2983,7 +2980,7 @@ module Knowledge = struct
             x.run s ~reject ~accept:(fun x s ->
                 match x with None -> accept None s | Some x -> accept (f x) s));
       }
-      [@@inline] [@@specialise]
+    [@@inline] [@@specialise]
 
     let ( let*? ) = ( >>=? )
     let ( let+? ) = ( >>|? )
@@ -2995,7 +2992,7 @@ module Knowledge = struct
             x.run s ~reject ~accept:(fun x s ->
                 y.run s ~reject ~accept:(fun y s -> accept (x, y) s)));
       }
-      [@@inline] [@@specialise]
+    [@@inline] [@@specialise]
 
     let ( and* ) = ( and+ )
     let ( .$[] ) v s = Value.get s v
@@ -3023,7 +3020,7 @@ module Knowledge = struct
    fun cls obj ->
     Slot.enum cls
     |> Base.List.filter ~f:(function Slot.Pack { promises } ->
-           not (Hashtbl.is_empty promises))
+        not (Hashtbl.is_empty promises))
     |> List.iter ~f:(fun (Slot.Pack s) -> ignore_m @@ collect s obj)
 
   let get_value cls obj =
@@ -3156,15 +3153,15 @@ module Knowledge = struct
       let payload =
         Map.to_alist classes
         |> List.map ~f:(fun (cid, { Env.vals; last }) ->
-               let data =
-                 Oid.Tree.to_list vals
-                 |> List.filter_map ~f:(fun (oid, { Env.data; name; comp }) ->
-                        let data = serialize_record data in
-                        let comp = Map.keys comp in
-                        if Array.is_empty data && Option.is_none name then None
-                        else Some { key = oid; sym = name; data; comp })
-               in
-               (cid, (last, data)))
+            let data =
+              Oid.Tree.to_list vals
+              |> List.filter_map ~f:(fun (oid, { Env.data; name; comp }) ->
+                  let data = serialize_record data in
+                  let comp = Map.keys comp in
+                  if Array.is_empty data && Option.is_none name then None
+                  else Some { key = oid; sym = name; data; comp })
+            in
+            (cid, (last, data)))
       in
       { version = V2; payload }
 

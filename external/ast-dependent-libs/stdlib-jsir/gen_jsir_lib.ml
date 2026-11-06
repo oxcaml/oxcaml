@@ -1,15 +1,15 @@
 (* Generates dune rules that build a library of the compiler distribution for
-   JSIR (ocamlopt -target js_of_ocaml), mirroring the native library installed
-   by the compiler:
+   JSIR (ocamlopt -target js_of_ocaml), mirroring its native build in the main
+   context of the compiler's build. It runs from the root of that context, and
+   the paths it is given are relative to it.
 
-   - the units are those of the installed .cmxa (read with ocamlobjinfo), in
-     the same order, and -linkall follows the archive;
-   - the interfaces are the installed .cmi files (-cmi-file), so that programs
+   - the units are those of the native .cmxa (read with ocamlobjinfo), in the
+     same order, and -linkall follows the archive;
+   - the interfaces are the native .cmi files (-cmi-file), so that programs
      compiled against the installed library link against the same interfaces;
-   - the sources are the installed ones too, next to the .cmxa (some are
-     generated when the compiler is built: unix.ml, parser.ml, ...), including
-     the alias module of a wrapped library, which dune generates and installs
-     with the other sources;
+   - the sources are the ones the native build compiles (some are generated:
+     unix.ml, parser.pp.ml, ...), including the alias module of a wrapped
+     library, which dune generates;
    - unit names follow dune's wrapping convention: unit Lib__Foo comes from
      foo.ml compiled with -open Lib__;
    - dependencies between units come from ocamldep.
@@ -26,9 +26,11 @@ let name = ref ""
 
 let cmxa = ref ""
 
+let cmi_dir = ref ""
+
 let flags = ref []
 
-(* [DIR=CMXA] *)
+(* [DIR=CMXA=CMI_DIR] *)
 let library_dep_specs = ref []
 
 let speclist =
@@ -41,18 +43,21 @@ let speclist =
     "--name", Arg.Set_string name, "NAME  Name of the library";
     ( "--cmxa",
       Arg.Set_string cmxa,
-      "FILE  The installed native archive, next to the .cmi and sources" );
+      "FILE  The native archive, next to the sources" );
+    "--cmi-dir", Arg.Set_string cmi_dir, "DIR  Where the native .cmi files are";
     ( "--flags",
       Arg.String (fun s -> flags := s :: !flags),
       "FLAGS  Extra flags for compiling the units (e.g. -extension-universe \
        beta); may be repeated" );
     ( "--dep",
       Arg.String (fun s -> library_dep_specs := s :: !library_dep_specs),
-      "DIR=CMXA  Another library built with these rules, in DIR, that this \
-       one depends on, and its installed native archive" ) ]
+      "DIR=CMXA=CMI_DIR  Another library built with these rules, in DIR, that \
+       this one depends on, its native archive and where its .cmi files are"
+    ) ]
 
 let usage =
-  "gen_jsir_lib --ocaml-bin DIR --ocaml-where DIR --name NAME --cmxa FILE ..."
+  "gen_jsir_lib --ocaml-bin DIR --ocaml-where DIR --name NAME --cmxa FILE \
+   --cmi-dir DIR ..."
 
 let fail fmt = Printf.ksprintf (fun s -> prerr_endline s; exit 2) fmt
 
@@ -82,10 +87,15 @@ let split_key_value line =
     in
     Some (key, value)
 
-(* Units of an installed archive, in link order, and whether it was built
-   with -linkall. *)
+(* The boot compiler's bin directory only has ocamlobjinfo.opt. *)
+let ocaml_tool name =
+  let path = Filename.concat !ocaml_bin name in
+  if Sys.file_exists path then path else path ^ ".opt"
+
+(* Units of a native archive, in link order, and whether it was built with
+   -linkall. *)
 let read_cmxa cmxa =
-  let lines = run_lines (Filename.concat !ocaml_bin "ocamlobjinfo") [cmxa] in
+  let lines = run_lines (ocaml_tool "ocamlobjinfo") [cmxa] in
   let units = ref [] and force_link = ref false in
   List.iter
     (fun line ->
@@ -97,6 +107,8 @@ let read_cmxa cmxa =
   if !units = [] then fail "No units found in %s" cmxa;
   List.rev !units, !force_link
 
+(* Paths in the generated rules: those of the standard library relative to
+   %{ocaml_where}, the others relative to the root of the context. *)
 let dune_path path =
   let prefix = !ocaml_where ^ "/" in
   if path = !ocaml_where
@@ -106,6 +118,8 @@ let dune_path path =
     "%{ocaml_where}/"
     ^ String.sub path (String.length prefix)
         (String.length path - String.length prefix)
+  else if Filename.is_relative path
+  then "%{workspace_root}/" ^ path
   else path
 
 let src_dir () = Filename.dirname !cmxa
@@ -115,8 +129,17 @@ let lib_prefix () = String.capitalize_ascii !name ^ "__"
 (* The files of unit [Lib__Foo] are lib__Foo.cmi, lib__Foo.cmjx, ... *)
 let file_of_unit unit_name ext = String.uncapitalize_ascii unit_name ^ ext
 
-let installed unit_name ext =
-  dune_path (Filename.concat (src_dir ()) (file_of_unit unit_name ext))
+let cmi_of_unit ~cmi_dir unit_name =
+  dune_path (Filename.concat cmi_dir (file_of_unit unit_name ".cmi"))
+
+(* Dependencies on all the .cmi of a native library, as dune runs the rules
+   in a sandbox: they include those of the alias module of a wrapped library
+   and of the modules without implementation, which are not units of the
+   archive. The standard library is outside the build. *)
+let cmi_deps_of_dir cmi_dir =
+  if Filename.is_relative cmi_dir
+  then [Printf.sprintf "(glob_files %s)" (dune_path (cmi_dir ^ "/*.cmi"))]
+  else []
 
 (* Strips the wrapping prefix (e.g. [Int] for unit [Stdlib_stable__Int]).
    Unwrapped units are unchanged. *)
@@ -145,29 +168,41 @@ let alias_module units =
 
 type unit_info =
   { unit_name : string;
-    source : string (* file name, in the installed directory *) }
+    source : string (* file name, in the source directory *) }
 
-(* Finds the installed source of each unit, failing if it is missing. *)
+(* Finds the source of each unit, failing if it is missing: the alias module
+   of a wrapped library is generated by dune as lib__.ml-gen, and a
+   preprocessed source foo.ml is compiled as foo.pp.ml. *)
 let find_unit_sources ~alias units =
   List.map
     (fun unit_name ->
-      let source =
+      let candidates =
         if Some unit_name = alias
-        then file_of_unit unit_name ".ml"
-        else String.uncapitalize_ascii (module_name unit_name) ^ ".ml"
+        then [file_of_unit unit_name ".ml-gen"]
+        else
+          let base = String.uncapitalize_ascii (module_name unit_name) in
+          [base ^ ".pp.ml"; base ^ ".ml"]
       in
-      if not (Sys.file_exists (Filename.concat (src_dir ()) source))
-      then fail "No source %s for unit %s in %s" source unit_name (src_dir ());
-      { unit_name; source })
+      match
+        List.find_opt
+          (fun source -> Sys.file_exists (Filename.concat (src_dir ()) source))
+          candidates
+      with
+      | Some source -> { unit_name; source }
+      | None ->
+        fail "No source (%s) for unit %s in %s"
+          (String.concat ", " candidates)
+          unit_name (src_dir ()))
     units
 
 type library_dep =
   { dir : string; (* where its .cmjx are, relative to the rules *)
-    installed_dir : string; (* where its .cmi are *)
+    cmi_dir : string; (* where its .cmi are *)
+    cmi_deps : string list; (* dune dependencies on its .cmi *)
     cmjx_deps : string list (* dune dependencies on its .cmjx *) }
 
 (* The compiler may read any .cmjx of a library this one depends on. *)
-let library_dep ~dir ~cmxa =
+let library_dep ~dir ~cmxa ~cmi_dir =
   let cmjx_deps =
     if dir = "."
     then
@@ -176,19 +211,19 @@ let library_dep ~dir ~cmxa =
       List.map (fun u -> file_of_unit u ".cmjx") (fst (read_cmxa cmxa))
     else [Printf.sprintf "(glob_files %s/*.cmjx)" dir]
   in
-  { dir; installed_dir = dune_path (Filename.dirname cmxa); cmjx_deps }
+  { dir; cmi_dir = dune_path cmi_dir; cmi_deps = cmi_deps_of_dir cmi_dir;
+    cmjx_deps }
 
 let parse_library_dep spec =
-  match String.index_opt spec '=' with
-  | None -> fail "--dep expects DIR=CMXA, got %s" spec
-  | Some i ->
-    let dir = String.sub spec 0 i in
-    let cmxa = String.sub spec (i + 1) (String.length spec - i - 1) in
-    library_dep ~dir ~cmxa
+  match String.split_on_char '=' spec with
+  | [dir; cmxa; cmi_dir] -> library_dep ~dir ~cmxa ~cmi_dir
+  | _ -> fail "--dep expects DIR=CMXA=CMI_DIR, got %s" spec
 
 let read_library_deps () =
   let stdlib =
-    library_dep ~dir:".." ~cmxa:(Filename.concat !ocaml_where "stdlib.cmxa")
+    library_dep ~dir:".."
+      ~cmxa:(Filename.concat !ocaml_where "stdlib.cmxa")
+      ~cmi_dir:!ocaml_where
   in
   stdlib :: List.map parse_library_dep (List.rev !library_dep_specs)
 
@@ -215,9 +250,7 @@ let read_unit_deps ~alias units =
       units
   in
   let lines =
-    run_lines
-      (Filename.concat !ocaml_bin "ocamldep")
-      ("-modules" :: List.map fst sources)
+    run_lines (ocaml_tool "ocamldep") ("-modules" :: List.map fst sources)
   in
   let unit_of_file file =
     match List.assoc_opt file sources with
@@ -283,11 +316,11 @@ let common_flags =
 let dedup l =
   List.fold_left (fun acc x -> if List.mem x acc then acc else acc @ [x]) [] l
 
-(* The .cmjx and the .cmi are in the current and installed directories,
+(* The .cmjx and the .cmi are in the current and native directories,
    respectively. *)
 let include_dirs library_deps =
-  List.concat_map (fun d -> [d.dir; d.installed_dir]) library_deps
-  @ [dune_path (src_dir ()); "%{ocaml_where}"]
+  List.concat_map (fun d -> [d.dir; d.cmi_dir]) library_deps
+  @ [dune_path !cmi_dir; "%{ocaml_where}"]
   |> List.filter (fun d -> d <> ".")
   |> dedup
   |> List.concat_map (fun d -> ["-I"; d])
@@ -301,7 +334,7 @@ let () =
   List.iter
     (fun (v, flag) -> if !v = "" then fail "%s is required" flag)
     [ ocaml_bin, "--ocaml-bin"; ocaml_where, "--ocaml-where"; name, "--name";
-      cmxa, "--cmxa" ];
+      cmxa, "--cmxa"; cmi_dir, "--cmi-dir" ];
   let unit_names, force_link = read_cmxa !cmxa in
   let alias = alias_module unit_names in
   let units = find_unit_sources ~alias unit_names in
@@ -313,28 +346,31 @@ let () =
     |> List.filter (fun s -> s <> "")
   in
   let ppf = stdout in
-  let compile_rule ~unit_name ~src_path ~cmi_deps ~cmjx_deps ~flags =
-    let cmi = installed unit_name ".cmi" in
+  let cmi_deps =
+    cmi_deps_of_dir !cmi_dir
+    @ List.concat_map (fun d -> d.cmi_deps) library_deps
+  in
+  let compile_rule ~unit_name ~src_path ~cmjx_deps ~flags =
+    let cmi = cmi_of_unit ~cmi_dir:!cmi_dir unit_name in
     let cmjx = file_of_unit unit_name ".cmjx" in
     rule ~ppf
       ~targets:[cmjx; file_of_unit unit_name ".cmjo"]
       ~deps:
-        ((Printf.sprintf "(:src %s)" src_path :: cmi
-          :: List.map (fun d -> installed d ".cmi") cmi_deps)
+        ((Printf.sprintf "(:src %s)" src_path :: cmi :: cmi_deps)
         @ List.map (fun d -> file_of_unit d ".cmjx") cmjx_deps
         @ List.concat_map (fun d -> d.cmjx_deps) library_deps)
       ~action:
         (ocamlopt_action
            (common_flags @ flags @ include_dirs library_deps
-           @ ["-cmi-file"; cmi; "-o"; cmjx; "-c"; "%{src}"]))
+           @ ["-cmi-file"; cmi; "-o"; cmjx; "-c"; "-impl"; "%{src}"]))
   in
   List.iter
     (fun u ->
       let src_path = dune_path (Filename.concat (src_dir ()) u.source) in
       if Some u.unit_name = alias
       then
-        compile_rule ~unit_name:u.unit_name ~src_path ~cmi_deps:[]
-          ~cmjx_deps:[] ~flags:["-w"; "-49"]
+        compile_rule ~unit_name:u.unit_name ~src_path ~cmjx_deps:[]
+          ~flags:["-w"; "-49"]
       else
         let unit_deps = StrSet.elements (unit_deps_of u.unit_name) in
         let alias_deps, alias_flags =
@@ -342,7 +378,7 @@ let () =
           | None -> [], []
           | Some alias -> [alias], ["-open"; alias]
         in
-        compile_rule ~unit_name:u.unit_name ~src_path ~cmi_deps:unit_deps
+        compile_rule ~unit_name:u.unit_name ~src_path
           ~cmjx_deps:(alias_deps @ unit_deps)
           ~flags:(extra_flags @ alias_flags))
     units;

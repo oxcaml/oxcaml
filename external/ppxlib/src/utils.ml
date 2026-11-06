@@ -12,17 +12,24 @@ open Import
 let get_odoc_contents_if_comment = function
   | {
       attr_loc;
-      attr_name = { txt = ("doc" | "ocaml.doc" | "text" | "ocaml.text"); _};
+      attr_name = { txt = "doc" | "ocaml.doc" | "text" | "ocaml.text"; _ };
       attr_payload =
-        PStr [
-          {
-            pstr_desc =
-              Pstr_eval
-                ({ pexp_desc = Pexp_constant (Pconst_string (text, loc, _)); _ }, _);
-            _
-          }
-        ];
-    } when Location.compare attr_loc loc = 0 -> Some text
+        PStr
+          [
+            {
+              pstr_desc =
+                Pstr_eval
+                  ( {
+                      pexp_desc = Pexp_constant (Pconst_string (text, loc, _));
+                      _;
+                    },
+                    _ );
+              _;
+            };
+          ];
+    }
+    when Location.compare attr_loc loc = 0 ->
+      Some text
   | _ -> None
 
 let prettify_odoc_attributes =
@@ -33,11 +40,11 @@ let prettify_odoc_attributes =
       let attr = super#attribute attr in
       match get_odoc_contents_if_comment attr with
       | Some txt ->
-        let open Ast_builder.Default in
-        let loc = Location.none in
-        let delim = Some (Common.valid_string_constant_delimiter txt) in
-        let expr = pexp_constant ~loc (Pconst_string (txt, loc, delim)) in
-        { attr with attr_payload = PStr [ pstr_eval ~loc expr [] ] }
+          let open Ast_builder.Default in
+          let loc = Location.none in
+          let delim = Some (Common.valid_string_constant_delimiter txt) in
+          let expr = pexp_constant ~loc (Pconst_string (txt, loc, delim)) in
+          { attr with attr_payload = PStr [ pstr_eval ~loc expr [] ] }
       | None -> attr
   end
 
@@ -92,7 +99,18 @@ let update_locs_to_include_doc_comments =
 
 let with_output fn ~binary ~f =
   match fn with
-  | None | Some "-" -> f stdout
+  | None | Some "-" ->
+      (* Flipping back and forth from binary to text is not
+         a good idea, so we'll make two simplifying assumptions:
+         1. Assume that nothing is buffered on stdout before
+            entering [with_output]. That means we don't need to
+            flush the stdout on entry.
+         2. Assume that nothing else is sent to stdout after
+            [with_output]. That means it is safe to leave stdout
+            channel in binary mode (or text mode if [binary=true])
+            after the function is done. *)
+      set_binary_mode_out stdout binary;
+      f stdout
   | Some fn -> Out_channel.with_file fn ~binary ~f
 
 module Kind = struct
@@ -160,23 +178,21 @@ module Ast_io = struct
     let input_version = (module Compiler_version : OCaml_version) in
     try
       (* To test if a file is an AST file, we have to read the first few bytes of the
-          file. If it is not, we have to parse these bytes and the rest of the file as
-          source code.
-
-          The compiler just does [seek_on 0] in this case, however this doesn't work when
-          the input is a pipe.
-
-          What we do instead is create a lexing buffer from the input channel and pre-fill
-          it with what we read to do the test. *)
-      let lexbuf = Lexing.from_channel ic in
-      let len = String.length prefix_read_from_source in
-      Bytes.blit_string ~src:prefix_read_from_source ~src_pos:0
-        ~dst:lexbuf.lex_buffer ~dst_pos:0 ~len;
-      lexbuf.lex_buffer_len <- len;
-      lexbuf.lex_curr_p <-
-        { pos_fname = input_name; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 };
+         file. If it is not, we have to parse these bytes and the rest of the file as
+         source code.
+         The compiler just does [seek_on 0] in this case, however this doesn't work
+         when the input is a pipe.
+         What we do is we build a string of the whole source, append the prefix
+         and built a lexing buffer from that.
+         We have to put all the source into the lexing buffer at once this way
+         for source quotation to work in error messages.
+         See ocaml#12238 and ocaml/driver/pparse.ml. *)
+      let all_source = prefix_read_from_source ^ In_channel.input_all ic in
+      let lexbuf = Lexing.from_string all_source in
+      lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = input_name };
+      Astlib.Location.set_input_lexbuf (Some lexbuf);
       Skip_hash_bang.skip_hash_bang lexbuf;
-      (* Force-enable all OxCaml language extensions, which enables standalone
+      (* Force-enable all Jane Street language extensions, which enables standalone
          ppx drivers to parse all constructs. *)
       Ocaml_common.Language_extension.(set_universe_and_enable_all Universe.maximal);
       let ast : Intf_or_impl.t =
@@ -198,6 +214,18 @@ module Ast_io = struct
     let s = Bytes.sub_string buf ~pos:0 ~len in
     if len = magic_length then Ok s else Error s
 
+  let set_input_lexbuf input_name =
+    let set_input_lexbuf ic =
+      (* set input lexbuf for error messages. *)
+      let source = In_channel.input_all ic in
+      let lexbuf = Lexing.from_string source in
+      Astlib.Location.set_input_lexbuf (Some lexbuf);
+      lexbuf
+    in
+    match In_channel.with_file ~binary:true input_name ~f:set_input_lexbuf with
+    | (_ : Lexing.lexbuf) -> ()
+    | exception Sys_error _ -> ()
+
   let from_channel ch ~input_kind =
     let handle_non_binary prefix_read_from_source =
       match input_kind with
@@ -205,6 +233,10 @@ module Ast_io = struct
           parse_source_code ~kind ~input_name ~prefix_read_from_source ch
       | Necessarily_binary -> Error Not_a_binary_ast
     in
+    (* Marshalled AST must be read in binary mode. Even though we don't know
+       before reading the magic number when the file has a marshalled AST,
+       it is safe to read source files in binary mode. *)
+    set_binary_mode_in ch true;
     match read_magic ch with
     | Error s -> handle_non_binary s
     | Ok s -> (
@@ -213,6 +245,7 @@ module Ast_io = struct
             let input_name : string = input_value ch in
             let ast = input_value ch in
             let module Input_to_ppxlib = Convert (Input_version) (Js) in
+            set_input_lexbuf input_name;
             let ast = Intf_or_impl.Intf (Input_to_ppxlib.copy_signature ast) in
             Ok
               {
@@ -224,6 +257,7 @@ module Ast_io = struct
             let input_name : string = input_value ch in
             let ast = input_value ch in
             let module Input_to_ppxlib = Convert (Input_version) (Js) in
+            set_input_lexbuf input_name;
             let ast = Intf_or_impl.Impl (Input_to_ppxlib.copy_structure ast) in
             Ok
               {
@@ -245,7 +279,9 @@ module Ast_io = struct
   let read input_source ~input_kind =
     try
       match input_source with
-      | Stdin -> from_channel stdin ~input_kind
+      | Stdin ->
+          set_binary_mode_in stdin true;
+          from_channel stdin ~input_kind
       | File fn -> In_channel.with_file fn ~f:(from_channel ~input_kind)
     with exn -> (
       match Location.Error.of_exn exn with
@@ -312,3 +348,15 @@ module System = struct
     if Stdlib.Sys.command command = 0 then Ok ()
     else Error (command, Ast_io.fall_back_input_version)
 end
+
+let print_as_compiler_source ppf ast =
+  let module Ppxlib_to_compiler = Convert (Js) (Compiler_version) in
+  match (ast : Intf_or_impl.t) with
+  | Intf sg ->
+      let sg = Ppxlib_to_compiler.copy_signature sg in
+      Astlib.Compiler_pprintast.signature ppf
+        (Astlib.Clean.remove_migration_attributes_from_sig sg)
+  | Impl st ->
+      let st = Ppxlib_to_compiler.copy_structure st in
+      Astlib.Compiler_pprintast.structure ppf
+        (Astlib.Clean.remove_migration_attributes_from_str st)
