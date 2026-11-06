@@ -508,6 +508,7 @@ layout ::= `any`
        |   `float64`
        |   `float32`
        |   `word`
+       |   `untagged_immediate`
        |   `bits8`
        |   `bits16`
        |   `bits32`

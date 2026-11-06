@@ -1843,6 +1843,11 @@ module Bigarray = struct
     let* little_endian = little_endian () in
     let* f =
       register_import
+        (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
+        (* We don't allow tail calls here to avoid an iOS 27.2 bug that fails on
+           tail calls across wasm modules and js/wasm modules.
+           These bindings in particular would cross wasm to js. *)
+        ~allow_tail_call:false
         ~import_module:(if Config.Flag.wasi () then "env" else "bindings")
         ~name
         (Fun
@@ -1926,6 +1931,8 @@ module Bigarray = struct
     let* little_endian = little_endian () in
     let* f =
       register_import
+        (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
+        ~allow_tail_call:false
         ~import_module:(if Config.Flag.wasi () then "env" else "bindings")
         ~name
         (Fun
@@ -2026,6 +2033,8 @@ module JavaScript = struct
     let* f =
       let* unit = unit_name in
       register_import
+        (* TODO: remove [~allow_tail_call:false] once a long term fix is released in Safari 27 *)
+        ~allow_tail_call:false
         ~import_module:
           (match unit with
           | None -> "fragments"

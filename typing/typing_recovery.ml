@@ -103,3 +103,9 @@ module Error_set = Set.Make (struct
       else
         1
   end)
+
+let () =
+  Mode.Typing_recovery_functions.set {
+    log_and_raise;
+    register_recoverable;
+  }
