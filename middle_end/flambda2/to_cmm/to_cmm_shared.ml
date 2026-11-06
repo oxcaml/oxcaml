@@ -360,8 +360,8 @@ let bound_parameters_aux ~f ~needed_by_phantom_let env l =
   let flambda_vars =
     List.map
       (fun bp ->
-        let var, uid = Bound_parameter.var_and_uid bp in
-        var, uid, needed_by_phantom_let var)
+        let var, debug_uid = Bound_parameter.var_and_uid bp in
+        ~var, ~debug_uid, ~needed_by_phantom_let:(needed_by_phantom_let var))
       (Bound_parameters.to_list l)
   in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in

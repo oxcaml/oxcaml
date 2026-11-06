@@ -156,16 +156,17 @@ val exported_offsets : t -> Exported_offsets.t
     the given variable is already bound. *)
 val create_bound_parameter :
   t ->
-  Variable.t * Flambda_debug_uid.t * bool ->
+  (var:Variable.t * debug_uid:Flambda_debug_uid.t * needed_by_phantom_let:bool) ->
   t * Backend_var.With_provenance.t
 
-(** Same as {!create_variable} but for a list of variables. The boolean
-    component indicates whether the parameter's binder must carry provenance
-    because the parameter is needed by phantom lets (see
+(** Same as {!create_variable} but for a list of variables.
+    [needed_by_phantom_let] indicates whether the parameter's binder must carry
+    provenance because the parameter is needed by phantom lets (see
     [Num_occurrences.By_name_mode.needed_by_phantom_let]). *)
 val create_bound_parameters :
   t ->
-  (Variable.t * Flambda_debug_uid.t * bool) list ->
+  (var:Variable.t * debug_uid:Flambda_debug_uid.t * needed_by_phantom_let:bool)
+  list ->
   t * Backend_var.With_provenance.t list
 
 (** {2 Delayed let-bindings}

@@ -380,6 +380,10 @@ let make_rewrite_for_recursive_continuation uacc ~cont ~is_cold
   in
   uacc
 
+let remove_params params free_names =
+  ListLabels.fold_left (Bound_parameters.to_list params) ~init:free_names
+    ~f:(fun free_names param -> NO.remove_var free_names ~var:(BP.var param))
+
 let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
   (* Here both the body and the handlers have been rebuilt. We only need to
      restore the cost metrics and name occurrences accumulators, rebuild all the
@@ -505,8 +509,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       let name_occurrences =
         NO.union name_occurrences_body
           (NO.increase_counts
-             (NO.diff free_names_of_handlers
-                ~without:(Bound_parameters.free_names invariant_params)))
+             (remove_params invariant_params free_names_of_handlers))
       in
       let name_occurrences =
         Continuation.Lmap.fold
@@ -634,10 +637,6 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
   in
   EB.make_new_let_bindings uacc ~body:handler
     ~bindings_outermost_first:new_phantom_param_bindings_outermost_first
-
-let remove_params params free_names =
-  ListLabels.fold_left (Bound_parameters.to_list params) ~init:free_names
-    ~f:(fun free_names param -> NO.remove_var free_names ~var:(BP.var param))
 
 let rebuild_single_non_recursive_handler ~rebuild_expr ~at_unit_toplevel
     ~is_single_inlinable_use ~original_invariant_params cont

@@ -349,6 +349,12 @@ let gen_variable ~debug_uid ~needed_by_phantom_let v =
      operations to be emitted during instruction selection (including via
      [Cname_for_debugger]), without which the phantom lets' references to such
      variables could not be resolved by the debugger. *)
+  (* CR mshinwell: Such binders remain subject to the usual inlining decisions
+     ([To_cmm_effects.classify_let_binding] and [add_alias]), which consult only
+     the normal-mode occurrence count. A binder with a single normal occurrence
+     may thus be inlined into its use and get no [Clet], hence no
+     [Name_for_debugger], exactly as for user-visible variables today. Consider
+     keeping such binders when compiling with -g. *)
   let user_visible = Variable.user_visible v || needed_by_phantom_let in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
@@ -373,7 +379,7 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env (v, debug_uid, needed_by_phantom_let) =
+let create_bound_parameter env (~var:v, ~debug_uid, ~needed_by_phantom_let) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"

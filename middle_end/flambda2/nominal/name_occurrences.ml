@@ -49,7 +49,7 @@ module For_one_variety_of_names_not_renamable (N : Container_types.S) : sig
 
   val count_normal : t -> N.t -> Num_occurrences.t
 
-  val count_phantom : t -> N.t -> Num_occurrences.t
+  val count_by_name_mode : t -> N.t -> Num_occurrences.By_name_mode.t
 
   val greatest_name_mode : t -> N.t -> Name_mode.Or_absent.t
 
@@ -270,17 +270,19 @@ end = struct
       then One
       else More_than_one
 
-  let count_phantom t name : Num_occurrences.t =
+  let count_by_name_mode t name : Num_occurrences.By_name_mode.t =
     match N.Map.find name t with
-    | exception Not_found -> Zero
+    | exception Not_found -> { normal = Zero; phantom = Zero }
     | for_one_name ->
-      let num_occurrences = For_one_name.num_occurrences_phantom for_one_name in
-      assert (num_occurrences >= 0);
-      if num_occurrences = 0
-      then Zero
-      else if num_occurrences = 1
-      then One
-      else More_than_one
+      let num_occurrences n : Num_occurrences.t =
+        assert (n >= 0);
+        if n = 0 then Zero else if n = 1 then One else More_than_one
+      in
+      { normal =
+          num_occurrences (For_one_name.num_occurrences_normal for_one_name);
+        phantom =
+          num_occurrences (For_one_name.num_occurrences_phantom for_one_name)
+      }
 
   let greatest_name_mode t name : Name_mode.Or_absent.t =
     match N.Map.find name t with
@@ -430,11 +432,8 @@ let count_variable t var = For_names.count t.names (Name.var var)
 let count_variable_normal_mode t var =
   For_names.count_normal t.names (Name.var var)
 
-let count_variable_by_name_mode t var : Num_occurrences.By_name_mode.t =
-  let name = Name.var var in
-  { normal = For_names.count_normal t.names name;
-    phantom = For_names.count_phantom t.names name
-  }
+let count_variable_by_name_mode t var =
+  For_names.count_by_name_mode t.names (Name.var var)
 
 let variable_needed_by_phantom_let t var =
   Num_occurrences.By_name_mode.needed_by_phantom_let var

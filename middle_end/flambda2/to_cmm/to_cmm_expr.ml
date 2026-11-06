@@ -1011,11 +1011,12 @@ and apply_expr env res apply =
           Env.create_bound_parameters env
             (List.map
                (fun bp ->
-                 let var, uid = Bound_parameter.var_and_uid bp in
-                 ( var,
-                   uid,
+                 let var, debug_uid = Bound_parameter.var_and_uid bp in
+                 let needed_by_phantom_let =
                    Num_occurrences.By_name_mode.needed_by_phantom_let_in_map var
-                     handler_params_occurrences ))
+                     handler_params_occurrences
+                 in
+                 ~var, ~debug_uid, ~needed_by_phantom_let)
                params)
         in
         let label = Lambda.next_raise_count () in
