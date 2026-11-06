@@ -18,7 +18,9 @@ import shutil
 import signal
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import enum
+import math
 from collections.abc import Sequence
 import tempfile
 
@@ -718,34 +720,76 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
             )
 
 
+class FinishReason(enum.Enum):
+    ITERATIONS = "all iterations done"
+    TIME_LIMIT = "time limit reached"
+    MAX_FAILURES = "failure limit reached"
+
+
+@dataclass(frozen=True)
+class Limits:
+    """When to stop fuzzing. Once a limit is reached no new cases are started,
+    but cases in flight finish and save their results, so a run can exceed its
+    time or failure limit."""
+    iterations: int
+    max_failures: int | None
+    time_limit_minutes: float | None
+    start: float = field(default_factory=time.monotonic)    # A time.monotonic() value.
+
+    @property
+    def deadline(self) -> float | None:
+        if self.time_limit_minutes is None:
+            return None
+        return self.start + self.time_limit_minutes * 60
+
+    def print_summary(self) -> None:
+        print(f"iterations: {self.iterations}", file=sys.stderr)
+        if self.max_failures is not None:
+            print(f"max failures: {self.max_failures}", file=sys.stderr)
+        if self.time_limit_minutes is not None:
+            print(f"time limit: {self.time_limit_minutes} minutes", file=sys.stderr)
+
+    # The iteration limit is enforced outside this function by the number of
+    # seeds generated.
+    def reached(self, stats: Stats) -> FinishReason | None:
+        if self.max_failures is not None and stats.failed >= self.max_failures:
+            return FinishReason.MAX_FAILURES
+        if self.deadline is not None and time.monotonic() >= self.deadline:
+            return FinishReason.TIME_LIMIT
+        return None
+
+
 async def fuzz(
     *,
     toolchain: Toolchain,
     run_dir: Path,
-    iterations: int,
-    max_failures: int | None,
+    limits: Limits,
     jobs: int,
     output_dir: Path,
     base_seed: int,
     run_info: str,
     stats: Stats,
-) -> None:
+) -> FinishReason:
     rng = random.Random(base_seed)
-    pending = (rng.getrandbits(62) for _ in range(iterations))
+    pending = (rng.getrandbits(62) for _ in range(limits.iterations))
     slots = asyncio.Semaphore(jobs)
 
+    finished_because = FinishReason.ITERATIONS
+
     async def iteration_worker() -> None:
+        nonlocal finished_because
         # Shared iterator: each seed is taken by exactly one worker.
         for seed in pending:
-            # Let in-flight cases finish and save their results, even if this
-            # takes the failure count past the limit.
-            if max_failures is not None and stats.failed >= max_failures:
+            reason = limits.reached(stats)
+            if reason is not None:
+                finished_because = reason
                 return
             await run_case(toolchain, run_dir, seed, stats, output_dir, run_info, slots)
 
     async with asyncio.TaskGroup() as group:
         for _ in range(jobs):
             group.create_task(iteration_worker())
+    return finished_because
 
 
 async def main() -> None:
@@ -784,6 +828,14 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         "in-flight cases finish and may exceed the limit",
     )
     parser.add_argument(
+        "--timeout-minutes",
+        type=float,
+        default=None,
+        metavar="M",
+        help="stop starting cases after M minutes (default: unlimited); "
+        "in-flight cases finish and may exceed the limit",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=Path,
@@ -809,13 +861,22 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         parser.error("--jobs must be at least 1")
     if args.max_failures is not None and args.max_failures < 1:
         parser.error("--max-failures must be at least 1")
+    if args.timeout_minutes is not None and not (
+        math.isfinite(args.timeout_minutes) and args.timeout_minutes > 0
+    ):
+        parser.error("--timeout-minutes must be a positive number")
+    limits = Limits(
+        iterations=args.iterations,
+        max_failures=args.max_failures,
+        time_limit_minutes=args.timeout_minutes,
+    )
     toolchain = Toolchain(REPOSITORY_ROOT / "_build")
     toolchain.check_dependencies()
     base_seed = (
         args.seed if args.seed is not None else random.SystemRandom().getrandbits(62)
     )
     print(f"seed: {base_seed}", file=sys.stderr)
-    print(f"iterations: {args.iterations}", file=sys.stderr)
+    limits.print_summary()
     print(f"revision: {source_revision()}", file=sys.stderr)
     args.output.mkdir(parents=True, exist_ok=True)
     toolchain_dir = Path(tempfile.mkdtemp(
@@ -836,11 +897,10 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     with tempfile.TemporaryDirectory(prefix="oxfuzzer-") as run_dir:
         try:
             await self_check(Path(run_dir), toolchain)
-            await fuzz(
+            finished_because = await fuzz(
                 toolchain=toolchain,
                 run_dir=Path(run_dir),
-                iterations=args.iterations,
-                max_failures=args.max_failures,
+                limits=limits,
                 jobs=args.jobs,
                 # CR-soon xclerc: We should instead create a temporary
                 # directory inside of args.output, so that there are no
@@ -856,6 +916,7 @@ Exit status is 1 if any case failed, 0 otherwise.""",
             print("oxfuzzer: interrupted", file=sys.stderr)
             raise SystemExit(130)
     stats.final_report()
+    print(f"oxfuzzer: finished: {finished_because.value}", file=sys.stderr)
     if stats.failed:
         raise SystemExit(1)
 
