@@ -11898,7 +11898,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
       let subexp = final_subexpression exp in
       let ty = expand_head env exp.exp_type in
       (match get_desc ty with
-      | Tvar _
+      | Tvar _ | Tivar _
         when (not (has_recovery_errors ()))
              && get_level ty > get_current_level ()
              && not (allow_polymorphic subexp) ->
