@@ -305,7 +305,7 @@ module Is_modal = struct
   and sigitem_symptom = function
     | Core s -> core_sigitem_symptom s
     | Module_type d -> module_type_symptom d.symptom
-    | Module_type_declaration _ -> None
+    | Module_type_declaration _ | Unrepresentable_item _ -> None
 
   and core_sigitem_symptom = function
     | Value_descriptions d -> value_mismatch d.symptom
@@ -1169,6 +1169,17 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
         ~ctx:(Context.Module name :: ctx) diff
   | Module_type_declaration diff ->
       module_type_decl ~expansion_token ~env ~before ~ctx name diff
+  | Unrepresentable_item (ty, violation) ->
+      let printer =
+        Fmt.dprintf
+          "@[<v>@[Signatures containing unrepresentable items cannot be@ \
+           coerced to other module types.@]@ %a is not representable.@ %a@]"
+          Style.inline_code (Ident.name name)
+          (Jkind.Violation.report_with_offender
+             ~offender:(fun ppf -> Printtyp.type_expr ppf ty) env.i_env)
+          violation
+      in
+      dwith_context ctx printer :: before
 and module_type_decl ~expansion_token ~env ~before ~ctx id diff =
   let next =
     dwith_context_and_elision ctx (module_type_declarations id diff) in

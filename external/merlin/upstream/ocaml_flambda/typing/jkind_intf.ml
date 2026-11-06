@@ -215,6 +215,8 @@ module type Sort = sig
 
     val for_continuation : t
 
+    val for_primitive : t
+
     (** Wrap [t] in [Some], reusing a pre-allocated [Some] block when [t] is a
         base sort. Use this when constructing [_sort : Const.t option] fields
         (e.g. [ld_sort], [ca_sort], [lbl_sort]) so each record/constructor load
@@ -391,6 +393,11 @@ module History = struct
     | Signature_item
     | Layout_poly
     | Typing_recovery
+    | Module_projection
+    | Module_coercion
+    | Module_inclusion
+    | Module_open
+    | Module_argument
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)

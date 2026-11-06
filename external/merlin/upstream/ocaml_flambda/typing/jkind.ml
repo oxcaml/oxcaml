@@ -3566,6 +3566,17 @@ module Format_history = struct
     | Layout_poly -> fprintf ppf "it's the layout polymorphic type"
     | Typing_recovery ->
       fprintf ppf "it's a fake kind created during error recovery"
+    | Module_projection ->
+      fprintf ppf "it's the type of an item in a module being projected from"
+    | Module_coercion ->
+      fprintf ppf "it's the type of an item in a module being coerced"
+    | Module_inclusion ->
+      fprintf ppf "it's the type of an item in a module being included"
+    | Module_open ->
+      fprintf ppf "it's the type of an item in a module being opened"
+    | Module_argument ->
+      fprintf ppf
+        "it's the type of an item in an argument for a parameterized library"
 
   let format_concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
@@ -4785,6 +4796,11 @@ module Debug_printers = struct
     | Signature_item -> fprintf ppf "Signature_item"
     | Layout_poly -> fprintf ppf "Layout_poly"
     | Typing_recovery -> fprintf ppf "Typing_recovery"
+    | Module_projection -> fprintf ppf "Module_projection"
+    | Module_coercion -> fprintf ppf "Module_coercion"
+    | Module_inclusion -> fprintf ppf "Module_inclusion"
+    | Module_open -> fprintf ppf "Module_open"
+    | Module_argument -> fprintf ppf "Module_argument"
 
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
