@@ -391,6 +391,7 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> id_fold
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
+  | Tpat_addr (_, _, p)
   | Tpat_lazy p
   | Tpat_exception p -> of_pattern p
   | Tpat_value p -> of_pattern (p :> value general_pattern)

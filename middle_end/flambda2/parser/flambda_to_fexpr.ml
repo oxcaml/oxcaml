@@ -662,7 +662,8 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     | Function
         { function_call = Indirect_unknown_arity | Indirect_known_arity _ } ->
       Function Indirect
-    | C_call { needs_caml_c_call; _ } -> C_call { alloc = needs_caml_c_call }
+    | C_call { needs_caml_c_call; fat_ptr_arg_starts; _ } ->
+      C_call { alloc = needs_caml_c_call; fat_ptr_arg_starts }
     | Method { kind; obj } -> Method { kind; obj = simple env obj }
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
   in

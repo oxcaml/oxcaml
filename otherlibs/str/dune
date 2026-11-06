@@ -14,6 +14,10 @@
 
 (library
  (name str)
+ ; Public in the main context only, like unix (see otherlibs/unix/dune).
+ (public_name str)
+ (enabled_if
+  (= %{context_name} main))
  (wrapped false)
  (modes byte native)
  (flags (
@@ -39,7 +43,6 @@
     (str.cmxs as str/str.cmxs)
     (str.cma as str/str.cma)
     (str.mli as str/str.mli)
-    (str.ml as str/str.ml)
     (.str.objs/byte/str.cmi as str/str.cmi)
     (.str.objs/byte/str.cmt as str/str.cmt)
     (.str.objs/byte/str.cmti as str/str.cmti)

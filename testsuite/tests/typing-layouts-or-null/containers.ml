@@ -196,47 +196,32 @@ Error: The constant "3.4" has type "float" but an expression was expected of typ
        the layout value non_float.
 |}]
 
-(* List type arguments are [value_or_null]: *)
+(* List type arguments are [any]: *)
 type t_any : any
 
-type should_fail = t_any list
+type should_work = t_any list
 
 [%%expect{|
 type t_any : any
-Line 3, characters 19-24:
-3 | type should_fail = t_any list
-                       ^^^^^
-Error: This type "t_any" should be an instance of type "('a : value_or_null)"
-       The layout of t_any is any
-         because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be a value layout
-         because the type argument of list has layout value_or_null.
+type should_work = t_any list
 |}]
 
 type t_value_or_null : value_or_null
 
-type should_fail = t_value_or_null list
+type should_work = t_value_or_null list
 
 [%%expect{|
 type t_value_or_null : value_or_null
-type should_fail = t_value_or_null list
+type should_work = t_value_or_null list
 |}]
 
 type t_any_mod_separable : any mod separable
 
-type should_fail = t_any_mod_separable list
+type should_work = t_any_mod_separable list
 
 [%%expect{|
 type t_any_mod_separable : any separable
-Line 3, characters 19-38:
-3 | type should_fail = t_any_mod_separable list
-                       ^^^^^^^^^^^^^^^^^^^
-Error: This type "t_any_mod_separable" should be an instance of type
-         "('a : value_or_null)"
-       The layout of t_any_mod_separable is any separable
-         because of the definition of t_any_mod_separable at line 1, characters 0-44.
-       But the layout of t_any_mod_separable must be a value layout
-         because the type argument of list has layout value_or_null.
+type should_work = t_any_mod_separable list
 |}]
 
 type t_value : value

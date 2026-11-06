@@ -317,11 +317,6 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       let* r = emit_tuple env c args in
       finish_block env c ~dbg (continue (Raise k) r);
       Never_returns
-    | Cop (Copaque, args, dbg) ->
-      let* simple_args, env = emit_parts_list env c args in
-      let* rs = emit_tuple env c simple_args in
-      let typ = Array.map Value.typ rs in
-      Ok (emit_op env c Opaque dbg typ rs)
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) ->
       let* loc_exp = emit env c arg ~tail:false in
       let flat_size a =
@@ -333,8 +328,8 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       Ok (Array.sub loc_exp size_before (Array.length fields_layout.(field)))
     | Cop
         ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _
-           | Caddi128 | Csubi128 | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cclz
-           | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
+           | Caddi128 | Csubi128 | Cand | Cor | Cxor | Cnot | Clsl | Clsr | Casr
+           | Cclz | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
            | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
            | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
@@ -343,7 +338,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
            | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
            | Creinterpret_cast _ | Cstatic_cast _
            | Ccmpf (_, _)
-           | Cprobe _ | Cprobe_is_enabled _ ) as op),
+           | Cprobe _ | Cprobe_is_enabled _ | Copaque _ ) as op),
           args,
           dbg ) ->
       emit_expr_op env c op args dbg

@@ -310,7 +310,7 @@ logxor:
 let lognot x = Int64_u.lognot x
 [%%expect_asm X86_64{|
 lognot:
-  xorq  $-1, %rax
+  notq  %rax
   ret
 |}]
 

@@ -3,11 +3,6 @@
  expect;
 *)
 
-(*
- * This file tests printing of poymorphic mode variables
-*)
-
-
 let id x = x
 [%%expect{|
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
@@ -288,6 +283,18 @@ val foo :
   'a @ [< 'o > local] ->
   'b @ [< 'n & unique] ->
   'c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local] = <fun>
+|}]
+
+(* middle mode annotations *)
+
+let foo (x @ read) = ()
+[%%expect{|
+val foo : 'a @ [< read > read] -> unit @ 'm = <fun>
+|}]
+
+let foo x : _ @ read = x
+[%%expect{|
+val foo : 'a @ [< 'm & read] -> 'a @ [< read > 'm | read] = <fun>
 |}]
 
 (* if a type is annotated, mode crossing has an effect on the bounds of mode variable *)

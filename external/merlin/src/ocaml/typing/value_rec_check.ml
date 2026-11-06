@@ -113,7 +113,7 @@ type sd = Value_rec_types.recursive_binding_kind
 let is_ref : Types.value_description -> bool = function
   | { Types.val_kind =
         Types.Val_prim { Primitive.prim_name = "%makemutable";
-                          prim_arity = 1 } } ->
+                          prim_type_arity = 1 } } ->
         true
   | _ -> false
 
@@ -1555,6 +1555,7 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_record _ -> true
     | Tpat_record_unboxed_product _ -> true
     | Tpat_array _ -> true
+    | Tpat_addr _ -> true
     | Tpat_lazy _ -> true
     | Tpat_value pat -> is_destructuring_pattern (pat :> pattern)
     | Tpat_exception _ -> false

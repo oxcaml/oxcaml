@@ -122,6 +122,9 @@ module Stdlib = struct
       | [] -> true
       | _ :: _ -> false
 
+    let count p l =
+      List.fold_left (fun n x -> if p x then n + 1 else n) 0 l
+
     let rec compare cmp l1 l2 =
       match l1, l2 with
       | [], [] -> 0
@@ -222,6 +225,22 @@ module Stdlib = struct
           | Ok x -> aux xs (i + 1) (x :: acc)
       in
       aux l 0 []
+
+    let rec fold_left_result f acc = function
+      | [] -> Ok acc
+      | x :: xs ->
+        match f acc x with
+        | Ok acc -> fold_left_result f acc xs
+        | Error e -> Error e
+
+    let rec fold_left2_result ~unequal_lengths f acc xs ys =
+      match xs, ys with
+      | [], [] -> Ok acc
+      | [], _ :: _ | _ :: _, [] -> Error unequal_lengths
+      | x :: xs, y :: ys ->
+        match f acc x y with
+        | Ok acc -> fold_left2_result ~unequal_lengths f acc xs ys
+        | Error e -> Error e
 
     let split_at n l =
       let rec aux n acc l =
@@ -846,13 +865,17 @@ module Utf8_lexeme = struct
       | Some(Lower u') -> u'
       | _ -> u
 
+  let is_ascii s = String.for_all (fun c -> Char.code c < 128) s
+
   let capitalize s =
+    if is_ascii s then Ok (String.capitalize_ascii s) else
     let first = ref true in
     normalize_generic ~keep_ascii:false
       (fun u -> if !first then (first := false; uchar_uppercase u) else u)
       s
 
   let uncapitalize s =
+    if is_ascii s then Ok (String.uncapitalize_ascii s) else
     let first = ref true in
     normalize_generic ~keep_ascii:false
       (fun u -> if !first then (first := false; uchar_lowercase u) else u)

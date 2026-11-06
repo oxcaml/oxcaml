@@ -1762,6 +1762,35 @@ module Jkind0 = struct
           name = "bits64 mod everything"
         }
 
+      let addr_layout =
+        Layout.Const.product
+          [ base Scannable
+              { nullability = Maybe_null; separability = Maybe_separable };
+            base Bits64 Scannable_axes.max ]
+
+      (* Addresses have the same modal base kind as a record with a field of the
+         same mutability. *)
+      let kind_of_addr =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless"
+        }
+
+      let kind_of_addr_imm =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless \
+             immutable"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
@@ -1960,7 +1989,7 @@ module Jkind0 = struct
     module Sub_failure_reason = struct
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
