@@ -400,11 +400,9 @@ module Compat
       compats ps qs
   | Tpat_slice s1, Tpat_slice s2 ->
       s1.mutability = s2.mutability &&
-      begin match s1.shape, s2.shape with
-      | Tslice_empty, Tslice_empty -> true
-      | Tslice_front (p, ps), Tslice_front (q, qs) -> compat p q && compat ps qs
-      | Tslice_empty, Tslice_front _ | Tslice_front _, Tslice_empty -> false
-      end
+      List.exists (fun (_, ps, qs) -> compats ps qs)
+        Patterns.Slice.(common_args (of_typed s1.elements)
+                          (of_typed s2.elements))
   | Tpat_fun_layout _, _
   | Tpat_constant _, _
   | Tpat_unboxed_unit, _
@@ -483,8 +481,6 @@ let simple_match d h =
       t1 = t2
   | Constant c1, Constant c2 -> const_compare c1 c2 = 0
   | Addr (mut1, _), Addr (mut2, _) -> mut1 = mut2
-  | Slice { mutability = m1; nonempty = b1; _ },
-    Slice { mutability = m2; nonempty = b2; _ } -> m1 = m2 && Bool.equal b1 b2
   | Lazy, Lazy -> true
   | Record _, Record _ -> true
   | Record_unboxed_product _, Record_unboxed_product _ -> true
@@ -495,6 +491,9 @@ let simple_match d h =
     List.equal (fun (l1, _) (l2, _) -> Option.equal String.equal l1 l2)
       lbls1 lbls2
   | Array (am1, _, len1), Array (am2, _, len2) -> am1 = am2 && len1 = len2
+  | Slice { mutability = m1; kind = d; _ },
+    Slice { mutability = m2; kind = h; _ } ->
+      m1 = m2 && Patterns.Slice.covers d h
   | _, Any -> true
   | ( Construct _ | Variant _ | Constant _ | Addr _ | Slice _ | Lazy
     | Record _ | Record_unboxed_product _ | Unboxed_unit | Unboxed_bool _
@@ -540,8 +539,13 @@ let simple_match_args discr head args =
   | Unboxed_tuple _
   | Array _
   | Addr _
-  | Slice _
   | Lazy -> args
+  | Slice { kind = h; _ } ->
+    begin match discr.pat_desc with
+    (* TODO move Slice.args back into this file *)
+    | Slice { kind = d; _ } -> Patterns.Slice.args d h args
+    | _ -> fatal_error "Parmatch.simple_match_args (slice)"
+    end
   | Record (lbls, _) ->
     extract_fields (record_arg discr) (List.combine lbls args)
   | Record_unboxed_product (lbls, _) ->
@@ -549,13 +553,13 @@ let simple_match_args discr head args =
   | Any ->
       begin match discr.pat_desc with
       | Construct (cstr, _, _) -> Patterns.omegas cstr.cstr_arity
+      | Slice { kind; _ } -> Patterns.omegas (Patterns.Slice.arity kind)
       | Variant { has_arg = true }
       | Addr _
       | Lazy -> [Patterns.omega]
       | Record (lbls, _) -> omega_list lbls
       | Record_unboxed_product (lbls, _) -> omega_list lbls
       | Array (_, _, len) -> Patterns.omegas len
-      | Slice _ -> Patterns.omegas (Patterns.Head.arity discr)
       | Tuple lbls -> omega_list lbls
       | Unboxed_tuple lbls -> omega_list lbls
       | Variant { has_arg = false }
@@ -607,6 +611,27 @@ let discr_pat head pss =
     { head with pat_desc = Record_unboxed_product (fields, repr) }
   | Any | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
   | Unboxed_tuple _ | Variant _ | Array _ | Addr _ | Slice _ | Lazy -> head
+
+(* The discriminating heads that the head [d] stands for in the first column
+   of [pss]: [d] itself, except that a slice head stands for each class of
+   lengths of the column that it matches (see [Patterns.Slice.split]) *)
+let split_discr d pss =
+  let open Patterns.Head in
+  match d.pat_desc with
+  | Slice { mutability; sort; kind } ->
+      let kinds =
+        List.filter_map
+          (fun h ->
+             match h.pat_desc with Slice { kind; _ } -> Some kind | _ -> None)
+          (first_column pss)
+      in
+      Patterns.Slice.split (kind :: kinds)
+      |> List.filter (fun k -> Patterns.Slice.covers k kind)
+      |> List.map (fun kind ->
+             { d with pat_desc = Slice { mutability; sort; kind } })
+  | Any | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
+  | Unboxed_tuple _ | Record _ | Record_unboxed_product _ | Variant _ | Array _
+  | Addr _ | Lazy -> [d]
 
 (*
    In case a matching value is found, set actual arguments
@@ -683,14 +708,18 @@ let set_args q r = match q with
     let args,rest = read_args omegas r in
     make_pat
       (Tpat_array (am, arg_sort, args)) q.pat_type q.pat_env :: rest
-| {pat_desc = Tpat_slice { shape = Tslice_empty; _ }} -> q::r
-| {pat_desc = Tpat_slice ({ shape = Tslice_front _; _ } as s)} ->
-    begin match r with
-      arg::slice_rest::rest ->
-        make_pat (Tpat_slice { s with shape = Tslice_front (arg, slice_rest) })
-          q.pat_type q.pat_env::rest
-    | _ -> fatal_error "Parmatch.do_set_args (slice)"
-    end
+| {pat_desc = Tpat_slice s} ->
+    let elements, rest =
+      match s.elements with
+      | Tslice_closed omegas ->
+          let args, rest = read_args omegas r in
+          Tslice_closed args, rest
+      | Tslice_open { prefix; rest = slice_rest; suffix } ->
+          let prefix, r = read_args prefix r in
+          let suffix, rest = read_args suffix r in
+          Tslice_open { prefix; rest = slice_rest; suffix }, rest
+    in
+    make_pat (Tpat_slice { s with elements }) q.pat_type q.pat_env :: rest
 | {pat_desc=Tpat_constant _|Tpat_any|Tpat_unboxed_unit|Tpat_unboxed_bool _} ->
     q::r (* case any is used in matching.ml *)
 | {pat_desc =
@@ -794,10 +823,14 @@ let build_specialized_submatrices ~extend_row rows =
   (* The discriminating heads of the column, in the order of their first row,
      which gives exhaustivity counter-examples in source order *)
   let discrs =
+    let add_discr discrs d =
+      if List.exists (fun d' -> simple_match d' d) discrs then discrs
+      else d :: discrs
+    in
     List.fold_left
       (fun discrs ((head, _), _) ->
-         if List.exists (fun d -> simple_match d head) discrs then discrs
-         else discr_pat head rows :: discrs)
+         List.fold_left add_discr discrs
+           (split_discr (discr_pat head rows) rows))
       [] constr_rows
     |> List.rev
   in
@@ -866,6 +899,14 @@ let close_variant env row =
                ~closed:true ~name ~fixed)))
   end
 
+let slice_kinds_of_env env =
+  List.filter_map
+    (fun (d, _) ->
+       match d.pat_desc with
+       | Patterns.Head.Slice { kind; _ } -> Some kind
+       | _ -> None)
+    env
+
 (*
   Check whether the first column of env makes up a complete signature or
   not. We work on the discriminating pattern heads of each sub-matrix: they
@@ -881,7 +922,6 @@ let full_match closing env =  match env with
   | Construct (c, _, _) -> List.length env = c.cstr_consts + c.cstr_nonconsts
   | Unboxed_unit -> List.length env = 1
   | Unboxed_bool _ -> List.length env = 2
-  | Slice _ -> List.length env = 2
   | Variant { type_row; _ } ->
       let fields =
         List.map
@@ -915,6 +955,7 @@ let full_match closing env =  match env with
       List.length env = 0x1_00_00
   | Constant _
   | Array _ -> false
+  | Slice _ -> Option.is_none (Patterns.Slice.missing (slice_kinds_of_env env))
   | Tuple _
   | Unboxed_tuple _
   | Record _
@@ -937,7 +978,7 @@ let should_extend ext env = match ext with
       | Construct ({cstr_tag=Extension _}, _, _) -> false
       | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
       | Variant _ | Record _ | Record_unboxed_product _
-      | Array _ | Addr _ | Slice _ | Lazy -> false
+      | Array _ | Slice _ | Addr _ | Lazy -> false
       | Any -> assert false
       end
 end
@@ -1128,9 +1169,6 @@ let build_other ext env =
           end
       | Unboxed_bool b ->
         make_pat (Tpat_unboxed_bool (not b)) d.pat_type Env.empty
-      | Slice s ->
-        Patterns.Head.to_omega_pattern
-          { d with pat_desc = Slice { s with nonempty = not s.nonempty } }
       | Variant { cstr_row; type_row } ->
           let tags =
             List.map
@@ -1276,6 +1314,13 @@ let build_other ext env =
             0.0 (fun f -> f +. 1.0) d env
       | Constant Const_float32 _
       | Constant Const_unboxed_float32 _ -> raise_matched_float32 ()
+      | Slice s ->
+          begin match Patterns.Slice.missing (slice_kinds_of_env env) with
+          | Some kind ->
+              Patterns.Head.to_omega_pattern
+                { d with pat_desc = Slice { s with kind } }
+          | None -> Patterns.omega
+          end
       | Array (am, arg_sort, _) ->
           let all_lengths =
             List.map
@@ -1302,14 +1347,14 @@ let rec has_instance p = match p.pat_desc with
       has_instances (List.map snd ps)
   | Tpat_array (_, _, ps) ->
       has_instances ps
-  | Tpat_slice { shape = Tslice_empty; _ } -> true
-  | Tpat_slice { shape = Tslice_front (p, rest); _ } -> has_instances [p; rest]
   | Tpat_tuple labeled_ps
   | Tpat_unboxed_tuple labeled_ps ->
       has_instances (List.map (fun (_, p, _) -> p) labeled_ps)
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
   | Tpat_record_unboxed_product (lps,_,_) ->
       has_instances (List.map (fun (_,_,x) -> x) lps)
+  | Tpat_slice { elements; _ } ->
+      has_instances (slice_element_patterns elements)
   | Tpat_addr (_, _, p) | Tpat_alias_deref { pattern = p; _ } | Tpat_lazy p
     -> has_instance p
 
@@ -1373,11 +1418,13 @@ let rec satisfiable pss qs = match pss with
           let hq, qargs = Patterns.Head.deconstruct q in
           if not (all_coherent (hq :: first_column pss)) then
             false
-          else begin
-              let q0 = discr_pat hq pss in
-              satisfiable (build_specialized_submatrix ~extend_row:(@) q0 pss)
-                (simple_match_args q0 hq qargs @ qs)
-            end
+          else
+            List.exists
+              (fun q0 ->
+                 satisfiable
+                   (build_specialized_submatrix ~extend_row:(@) q0 pss)
+                   (simple_match_args q0 hq qargs @ qs))
+              (split_discr (discr_pat hq pss) pss)
 
 (* While [satisfiable] only checks whether the last row of [pss + qs] is
    satisfiable, this function returns the (possibly empty) list of vectors [es]
@@ -1447,13 +1494,14 @@ let rec list_satisfying_vectors pss qs =
           let pss = simplify_first_col pss in
           if not (all_coherent (hq :: first_column pss)) then
             []
-          else begin
-            let q0 = discr_pat hq pss in
-            List.map (set_args (Patterns.Head.to_omega_pattern q0))
-              (list_satisfying_vectors
-                 (build_specialized_submatrix ~extend_row:(@) q0 pss)
-                 (simple_match_args q0 hq qargs @ qs))
-          end
+          else
+            List.concat_map
+              (fun q0 ->
+                 List.map (set_args (Patterns.Head.to_omega_pattern q0))
+                   (list_satisfying_vectors
+                      (build_specialized_submatrix ~extend_row:(@) q0 pss)
+                      (simple_match_args q0 hq qargs @ qs)))
+              (split_discr (discr_pat hq pss) pss)
 
 (******************************************)
 (* Look for a row that matches some value *)
@@ -1486,9 +1534,12 @@ let rec do_match pss qs = match qs with
       let pss = simplify_first_col pss in
       (* [pss] will (or won't) match [q0 :: qs] regardless of the coherence of
          its first column. *)
-      do_match
-        (build_specialized_submatrix ~extend_row:(@) q0 pss)
-        (qargs @ qs)
+      List.exists
+        (fun d ->
+           do_match
+             (build_specialized_submatrix ~extend_row:(@) d pss)
+             (simple_match_args d q0 qargs @ qs))
+        (split_discr q0 pss)
 
 (*
 let print_pat pat =
@@ -1804,6 +1855,15 @@ let union_res r1 r2 = match r1, r2 with
 | _, Used   -> r1
 | Upartial u1, Upartial u2 -> Upartial (u1@u2)
 
+(* Intersection of the unused parts of two answers *)
+let inter_res r1 r2 = match r1, r2 with
+| Unused, r | r, Unused -> r
+| Used, _ | _, Used -> Used
+| Upartial u1, Upartial u2 ->
+    match List.filter (fun p -> List.memq p u2) u1 with
+    | [] -> Used
+    | u -> Upartial u
+
 (* propose or pats for expansion *)
 let extract_elements qs =
   let rec do_rec seen = function
@@ -1888,13 +1948,18 @@ let rec every_satisfiables pss qs = match qs.active with
            [satisfiable] *)
         if not (all_coherent (hq :: first_column pss)) then
           Unused
-        else begin
-          let q0 = discr_pat hq pss in
-          every_satisfiables
-            (build_specialized_submatrix q0 pss
-              ~extend_row:(fun ps r -> { r with active = ps @ r.active }))
-            {qs with active=simple_match_args q0 hq args @ rem}
-        end
+        else
+          (* A sub-pattern is unused if it is unused for every discriminating
+             head. *)
+          let extend_row ps r = { r with active = ps @ r.active } in
+          List.fold_left
+            (fun r q0 ->
+               inter_res r
+                 (every_satisfiables
+                    (build_specialized_submatrix q0 pss ~extend_row)
+                    {qs with active=simple_match_args q0 hq args @ rem}))
+            Unused
+            (split_discr (discr_pat hq pss) pss)
     end
 
 (*
@@ -2040,14 +2105,32 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
         let rs = lubs ps qs in
         make_pat (Tpat_array (am1, arg_sort, rs))
           p.pat_type p.pat_env
-| Tpat_slice ({ shape = Tslice_empty; _ } as s1),
-  Tpat_slice { mutability; shape = Tslice_empty; _ }
-      when s1.mutability = mutability -> p
-| Tpat_slice ({ shape = Tslice_front (p1, r1); _ } as s1),
-  Tpat_slice { mutability; shape = Tslice_front (p2, r2); _ }
-      when s1.mutability = mutability ->
-    let shape = Tslice_front (lub p1 p2, lub r1 r2) in
-    make_pat (Tpat_slice { s1 with shape }) p.pat_type p.pat_env
+| Tpat_slice s1, Tpat_slice s2
+      when s1.mutability = s2.mutability ->
+    (* The values matched by both patterns, for each constructor of the split
+       of their lengths. This is usually not a single slice pattern, but an
+       or-pattern. *)
+    let lub_at (d, ps, qs) =
+      match lubs ps qs with
+      | exception Empty -> None
+      | rs ->
+          let elements =
+            Patterns.Slice.(to_typed (of_patterns d rs))
+          in
+          Some
+            (make_pat (Tpat_slice { s1 with elements }) p.pat_type p.pat_env)
+    in
+    let common_args =
+      Patterns.Slice.(common_args (of_typed s1.elements)
+                        (of_typed s2.elements))
+    in
+    begin match List.filter_map lub_at common_args with
+    | [] -> raise Empty
+    | r :: rs ->
+        List.fold_left
+          (fun acc r -> { p with pat_desc = Tpat_or (acc, r, None) })
+          r rs
+    end
 | _,_  ->
     raise Empty
 
@@ -2236,9 +2319,8 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     List.fold_left (fun r (_, p, _) -> collect_paths_from_pat r p) r ps
 | Tpat_array (_, _, ps) ->
     List.fold_left collect_paths_from_pat r ps
-| Tpat_slice { shape = Tslice_empty; _ } -> r
-| Tpat_slice { shape = Tslice_front (p, rest); _ } ->
-    collect_paths_from_pat (collect_paths_from_pat r p) rest
+| Tpat_slice { elements; _ } ->
+    List.fold_left collect_paths_from_pat r (slice_element_patterns elements)
 | Tpat_construct (_, {cstr_tag=Extension _}, _, ps, _)->
     List.fold_left collect_paths_from_pat r (List.map snd ps)
 | Tpat_record (lps,_,_) ->
@@ -2373,15 +2455,17 @@ let inactive ~partial pat =
       let rec loop pat =
         match pat.pat_desc with
         | Tpat_lazy _ | Tpat_addr (Mutable _, _, _)
-        | Tpat_array (Mutable _, _, _)
-        | Tpat_slice { mutability = Mutable _; shape = Tslice_front _; _ } ->
+        | Tpat_array (Mutable _, _, _) ->
           false
+        | Tpat_slice { mutability = Mutable _; elements; _ } ->
+          (* Matching on the length doesn't read mutable memory *)
+          slice_element_patterns elements = []
+        | Tpat_slice { mutability = Immutable; elements; _ } ->
+          List.for_all loop (slice_element_patterns elements)
         | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
         | Tpat_variant (_, None, _) | Tpat_fun_layout _
         (* Binding an address reads nothing *)
         | Tpat_deref _
-        (* Matching on the length doesn't read memory *)
-        | Tpat_slice { shape = Tslice_empty; _ }
         -> true
         | Tpat_constant c -> begin
             match c with
@@ -2402,9 +2486,6 @@ let inactive ~partial pat =
             List.for_all (fun (_, p) -> loop p) ps
         | Tpat_array (Immutable, _, ps) ->
             List.for_all (fun p -> loop p) ps
-        | Tpat_slice { mutability = Immutable; shape = Tslice_front (p, rest);
-                       _ } ->
-            loop p && loop rest
         | Tpat_alias { pattern = p; _ } | Tpat_variant (_, Some p, _)
         | Tpat_addr (Immutable, _, p) | Tpat_alias_deref { pattern = p; _ } ->
             loop p
@@ -2534,7 +2615,8 @@ type amb_row = { row : pattern list ; varsets : Ident.Set.t list; }
 
 let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
   let rec simpl head_bound_variables varsets p ps k =
-    match (Patterns.General.view p).pat_desc with
+    let general = Patterns.General.view p in
+    match general.pat_desc with
     | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
     | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _, _) ->
@@ -2546,6 +2628,12 @@ let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
     | `Deref (id, _, _, _, _, _) ->
       simpl (Ident.Set.add id head_bound_variables) varsets Patterns.omega ps k
     | `Alias_deref (p, id, _, _, _, _, _) ->
+      simpl (Ident.Set.add id head_bound_variables) varsets p ps k
+    (* CR slice-patterns: the rest [.. as x] of a slice pattern binds a
+       different slice depending on the lengths of the prefix and suffix
+       around it, so it should not be treated as bound to the whole slice. *)
+    | `Slice_rest (_, _, _, Tslice_rest_var { id; _ }, _) ->
+      let p = Patterns.General.(erase (strip_vars general)) in
       simpl (Ident.Set.add id head_bound_variables) varsets p ps k
     | #Patterns.Simple.view as view ->
       add_column (Patterns.Head.deconstruct { p with pat_desc = view })

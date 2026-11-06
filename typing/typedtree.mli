@@ -389,18 +389,10 @@ and 'k pattern_desc =
       mutability: Types.mutability;
       sort: Jkind.sort;
       (** The sort of the elements *)
-      shape: slice_shape;
+      elements: slice_elements;
     } -> value pattern_desc
         (** [&| ... |]    (mutability = Mutable)
-            [&: ... :]    (mutability = Immutable)
-
-            A slice pattern is a chain of [Tslice_front] cells, one per
-            element, ending in the pattern for the rest of the slice:
-            - [&| P1; ...; Pn |] is front (P1, ... front (Pn, empty))
-            - [&| P1; ...; Pn; .. |] is front (P1, ... front (Pn, _))
-            - [&| P1; ...; Pn; .. as x |] is front (P1, ... front (Pn, x))
-            Without elements, [&| .. |] is just [_] and [&| .. as x |] is
-            just [x]. *)
+            [&: ... :]    (mutability = Immutable) *)
   | Tpat_deref : {
       id: Ident.t;
       name: string loc;
@@ -449,11 +441,26 @@ and 'k pattern_desc =
                          [None] otherwise.
          *)
 
-and slice_shape =
-  | Tslice_empty
-      (** The empty slice *)
-  | Tslice_front of value general_pattern * value general_pattern
-      (** A non-empty slice: its first element and the rest of the slice *)
+and slice_elements =
+  | Tslice_closed of value general_pattern list
+      (** P1; ...; Pn *)
+  | Tslice_open of {
+      prefix: value general_pattern list;
+      rest: slice_rest_var option;
+      suffix: value general_pattern list;
+    }
+      (** P1; ...; Pn; ..; Q1; ...; Qm         (rest = None)
+          P1; ...; Pn; .. as x; Q1; ...; Qm    (rest = Some x) *)
+
+and slice_rest_var =
+  | Tslice_rest_var of {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    }
 
 and tpat_value_argument = private value general_pattern
 
@@ -1749,6 +1756,9 @@ val let_bound_idents_with_modes_sorts_and_checks:
   value_binding list
   -> (Ident.t * (Location.t * Mode.With_regionality.l * Jkind.sort) list
               * Zero_alloc.t) list
+
+(** All element patterns of a slice pattern, in order *)
+val slice_element_patterns : slice_elements -> pattern list
 
 (** Alpha conversion of patterns *)
 val alpha_pat:

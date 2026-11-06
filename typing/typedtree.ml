@@ -276,7 +276,7 @@ and 'k pattern_desc =
   | Tpat_slice : {
       mutability: mutability;
       sort: Jkind.sort;
-      shape: slice_shape;
+      elements: slice_elements;
     } -> value pattern_desc
   | Tpat_deref : {
       id: Ident.t;
@@ -304,9 +304,23 @@ and 'k pattern_desc =
       'k general_pattern * 'k general_pattern * row_desc option ->
       'k pattern_desc
 
-and slice_shape =
-  | Tslice_empty
-  | Tslice_front of value general_pattern * value general_pattern
+and slice_elements =
+  | Tslice_closed of value general_pattern list
+  | Tslice_open of {
+      prefix: value general_pattern list;
+      rest: slice_rest_var option;
+      suffix: value general_pattern list;
+    }
+
+and slice_rest_var =
+  | Tslice_rest_var of {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.With_regionality.l;
+      type_expr: Types.type_expr;
+    }
 
 and tpat_value_argument = value general_pattern
 
@@ -1249,6 +1263,16 @@ and classify_pattern
 
 type pattern_action =
   { f : 'k . 'k general_pattern -> unit }
+let slice_element_patterns = function
+  | Tslice_closed ps -> ps
+  | Tslice_open { prefix; suffix; _ } -> prefix @ suffix
+
+let map_slice_elements f = function
+  | Tslice_closed ps -> Tslice_closed (List.map f ps)
+  | Tslice_open { prefix; rest; suffix } ->
+      Tslice_open
+        { prefix = List.map f prefix; rest; suffix = List.map f suffix }
+
 let shallow_iter_pattern_desc
   : type k . pattern_action -> k pattern_desc -> unit
   = fun f -> function
@@ -1263,8 +1287,8 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
-  | Tpat_slice { shape = Tslice_empty; _ } -> ()
-  | Tpat_slice { shape = Tslice_front (p, rest); _ } -> f.f p; f.f rest
+  | Tpat_slice { elements; _ } ->
+      List.iter f.f (slice_element_patterns elements)
   | Tpat_addr (_, _, p) | Tpat_alias_deref { pattern = p; _ } | Tpat_lazy p ->
       f.f p
   | Tpat_any
@@ -1303,9 +1327,8 @@ let shallow_map_pattern_desc
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_addr (mut, arg_sort, p1) -> Tpat_addr (mut, arg_sort, f.f p1)
-  | Tpat_slice ({ shape = Tslice_empty; _ } as s) -> Tpat_slice s
-  | Tpat_slice ({ shape = Tslice_front (p, rest); _ } as s) ->
-      Tpat_slice { s with shape = Tslice_front (f.f p, f.f rest) }
+  | Tpat_slice s ->
+      Tpat_slice { s with elements = map_slice_elements f.f s.elements }
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_alias_deref d -> Tpat_alias_deref { d with pattern = f.f d.pattern }
   | Tpat_variant (x1, Some p1, x2) ->
@@ -1379,6 +1402,15 @@ let rec iter_bound_idents
                        _ } ->
       iter_bound_idents f p;
       f (id, s, ty, sort, uid)
+  | Tpat_slice { elements = Tslice_closed ps; _ } ->
+      List.iter (iter_bound_idents f) ps
+  | Tpat_slice { elements = Tslice_open { prefix; rest; suffix }; _ } ->
+      List.iter (iter_bound_idents f) prefix;
+      Option.iter
+        (fun (Tslice_rest_var { id; name = s; uid; sort; type_expr = ty; _ }) ->
+           f (id, s, ty, sort, uid))
+        rest;
+      List.iter (iter_bound_idents f) suffix
   | Tpat_or(p1, _, _) ->
       (* Invariant : both arguments bind the same variables *)
       iter_bound_idents f p1
@@ -1415,8 +1447,9 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
     type k . 'sort full_bound_ident_action -> k general_pattern -> _ =
     fun f pat ->
       match pat.pat_desc with
-      (* [Tpat_var], [Tpat_fun_layout], [Tpat_alias], [Tpat_deref] and
-         [Tpat_alias_deref] are the only cases that directly bind an ident *)
+      (* [Tpat_var], [Tpat_fun_layout], [Tpat_alias], [Tpat_deref],
+         [Tpat_alias_deref] and [Tpat_slice] are the only cases that directly
+         bind an ident *)
       | Tpat_var { id; name = s; uid; sort; mode } ->
           f id s pat.pat_type uid mode (of_sort sort)
       | Tpat_fun_layout { id; name = s; uid; sort; mode; _ } ->
@@ -1449,9 +1482,15 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
-      | Tpat_slice { shape = Tslice_empty; _ } -> ()
-      | Tpat_slice { shape = Tslice_front (p, rest); _ } ->
-        loop f p; loop f rest
+      | Tpat_slice { elements = Tslice_closed ps; _ } -> List.iter (loop f) ps
+      | Tpat_slice { elements = Tslice_open { prefix; rest; suffix }; _ } ->
+        List.iter (loop f) prefix;
+        Option.iter
+          (fun (Tslice_rest_var { id; name = s; uid; sort; mode;
+                                  type_expr = ty }) ->
+             f id s ty uid mode (of_sort sort))
+          rest;
+        List.iter (loop f) suffix
       | Tpat_addr (_, _, p) | Tpat_lazy p
       | Tpat_exception p -> loop f p
       | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
@@ -1581,6 +1620,19 @@ let rec alpha_pat
       with
       | Not_found -> new_p
       end
+  | Tpat_slice ({ elements; _ } as s) ->
+      let elements =
+        match map_slice_elements (alpha_pat env) elements with
+        | Tslice_open ({ rest = Some (Tslice_rest_var r); _ } as o) ->
+            let rest =
+              try Some (Tslice_rest_var { r with id = alpha_var env r.id })
+              with Not_found -> None
+            in
+            Tslice_open { o with rest }
+        | (Tslice_open { rest = None; _ } | Tslice_closed _) as elements ->
+            elements
+      in
+      {p with pat_desc = Tpat_slice { s with elements }}
   | d ->
      let pat_desc =
        shallow_map_pattern_desc { f = fun p -> alpha_pat env p } d in

@@ -269,7 +269,6 @@ type error =
   | Effect_pattern_below_toplevel
   | Deref_pattern_bad_position
   | Deref_pattern_bad_argument
-  | Slice_pattern_suffix
   | Invalid_continuation_pattern
   | Inlined_record_escape
   | Inlined_record_expected
@@ -4638,15 +4637,12 @@ and type_pat_aux
         | Immutable -> Immutable
       in
       let modalities = Typemode.address_modalities mutability in
-      (* [rest] is [None] for a closed slice pattern *)
-      let elements, rest =
+      let has_elements =
         match selements with
-        | Pslice_closed ps -> ps, None
-        | Pslice_open { prefix; rest; suffix = [] } -> prefix, Some rest
-        | Pslice_open { suffix = sp :: _; _ } ->
-            Error.log_and_raise sp.ppat_loc !!penv Slice_pattern_suffix
+        | Pslice_closed ps -> ps <> []
+        | Pslice_open { prefix; suffix; _ } -> prefix <> [] || suffix <> []
       in
-      if elements <> [] then
+      if has_elements then
         check_project_mutability ~loc ~env:!!penv Slice_elements mutability
           pat_mode.mode;
       let is_contained_by : Mode.Hint.is_contained_by =
@@ -4664,47 +4660,31 @@ and type_pat_aux
         type_pat ~pat_mode:(simple_pat_mode elt_mode) ~deref_position tps
           Value sp ty_elt elt_sort
       in
-      (* A slice pattern is a chain of cells, one per element, ending in the
-         pattern for the rest of the slice. The inner cells match the rest of
-         the slice after an element, with the type and mode of the slice,
-         since computing it reads no memory. *)
-      let mk_pat ~loc pat_desc =
-        { pat_desc; pat_loc = loc; pat_extra = [];
-          pat_type = instance expected_ty; pat_attributes = [];
-          pat_env = !!penv;
-          pat_unique_barrier = Unique_barrier.not_computed () }
+      let type_rest_var name =
+        let type_expr = instance expected_ty in
+        let mode = cross_left !!penv expected_ty pat_mode.mode in
+        let id, uid =
+          enter_variable ~pv_kind:Slice_rest_var tps name.loc name mode
+            ~kind:(Val_reg sort) type_expr [] sort
+        in
+        Tslice_rest_var { id; name; uid; sort; mode; type_expr }
       in
-      let type_rest = function
-        | None -> mk_pat ~loc Tpat_any
-        | Some name ->
-            let mode = cross_left !!penv expected_ty pat_mode.mode in
-            let id, uid =
-              enter_variable ~pv_kind:Slice_rest_var tps name.loc name mode
-                ~kind:(Val_reg sort) (instance expected_ty) [] sort
-            in
-            mk_pat ~loc (Tpat_var { id; name; uid; sort; mode })
+      let elements =
+        match selements with
+        | Pslice_closed ps -> Tslice_closed (List.map type_element ps)
+        | Pslice_open { prefix; rest; suffix } ->
+            let prefix = List.map type_element prefix in
+            let rest = Option.map type_rest_var rest in
+            let suffix = List.map type_element suffix in
+            Tslice_open { prefix; rest; suffix }
       in
-      let rec type_cells ~loc = function
-        | [] ->
-            begin match rest with
-            | None -> mk_pat ~loc (Tpat_slice
-                        { mutability; sort = elt_sort; shape = Tslice_empty })
-            | Some rest -> type_rest rest
-            end
-        | sp :: sps ->
-            let p = type_element sp in
-            let cells_loc =
-              { loc with Location.loc_start = sp.ppat_loc.loc_end;
-                         loc_ghost = true }
-            in
-            let cells = type_cells ~loc:cells_loc sps in
-            mk_pat ~loc
-              (Tpat_slice
-                 { mutability; sort = elt_sort;
-                   shape = Tslice_front (p, cells) })
-      in
-      rvp { (type_cells ~loc elements) with
-            pat_attributes = sp.ppat_attributes }
+      rvp {
+        pat_desc = Tpat_slice { mutability; sort = elt_sort; elements };
+        pat_loc = loc; pat_extra=[];
+        pat_type = instance expected_ty;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_constraint(sp_constrained, sty, ms) ->
       (* Pretend separate = true *)
       let type_modes = Typemode.transl_mode_with_locality ms in
@@ -5326,7 +5306,7 @@ let rec check_counter_example_pat
         |> Result.is_ok);
       check_rec tp1 ty_arg
         (fun p1 -> mkp k (Tpat_addr (mutability, arg_sort, p1)))
-  | Tpat_slice { mutability; sort = original_elt_sort; shape } ->
+  | Tpat_slice { mutability; sort = original_elt_sort; elements } ->
       let mut : mutable_flag =
         match mutability with
         | Mutable _ -> Mutable
@@ -5336,15 +5316,17 @@ let rec check_counter_example_pat
       assert (
         Jkind.Sort.equate ~allow_mutation:true original_elt_sort elt_sort
         |> Result.is_ok);
-      let mk shape =
-        mkp k (Tpat_slice { mutability; sort = elt_sort; shape })
+      let check_elements = map_fold_cont (fun p -> check_rec p ty_elt) in
+      let mk elements =
+        mkp k (Tpat_slice { mutability; sort = elt_sort; elements })
       in
-      begin match shape with
-      | Tslice_empty -> mk Tslice_empty
-      | Tslice_front (p, rest) ->
-          check_rec p ty_elt (fun p ->
-            check_rec rest expected_ty (fun rest ->
-              mk (Tslice_front (p, rest))))
+      begin match elements with
+      | Tslice_closed ps ->
+          check_elements ps (fun ps -> mk (Tslice_closed ps))
+      | Tslice_open { prefix; rest; suffix } ->
+          check_elements prefix (fun prefix ->
+            check_elements suffix (fun suffix ->
+              mk (Tslice_open { prefix; rest; suffix })))
       end
   | Tpat_alias_deref { pattern = p; _ } -> check_rec ~info p expected_ty k
   | Tpat_deref _ ->
@@ -14591,10 +14573,6 @@ let report_error ~loc env =
       Location.errorf ~loc
         "@[Dereference patterns must bind a variable,@ as in %a.@]"
         Style.inline_code "deref_ x"
-  | Slice_pattern_suffix ->
-      Location.errorf ~loc
-        "@[Elements after the rest of a slice pattern are not supported \
-         yet.@]"
   | Invalid_continuation_pattern ->
       Location.errorf ~loc
         "@[Invalid continuation pattern: only variables and _ are allowed .@]"

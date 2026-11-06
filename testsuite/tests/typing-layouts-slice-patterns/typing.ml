@@ -6,20 +6,11 @@
 (* Basic typechecking of slice patterns *)
 
 (* The rest of a slice pattern is a slice of the same type *)
-let f = function [&| x; .. as r |] -> #(x, r) | _ -> assert false
-let f_imm = function [&: x; .. as r :] -> #(x, r) | _ -> assert false
+let f = function [&| x; .. as r; y |] -> #(x, r, y) | _ -> assert false
+let f_imm = function [&: x; .. as r; y :] -> #(x, r, y) | _ -> assert false
 [%%expect{|
-val f : 'a slice -> #('a * 'a slice) = <fun>
-val f_imm : 'a slice_imm -> #('a * 'a slice_imm) = <fun>
-|}]
-
-(* Elements after the rest are not supported yet *)
-let bad = function [&| x; .. as r; y |] -> #(x, r, y) | _ -> assert false
-[%%expect{|
-Line 1, characters 35-36:
-1 | let bad = function [&| x; .. as r; y |] -> #(x, r, y) | _ -> assert false
-                                       ^
-Error: Elements after the rest of a slice pattern are not supported yet.
+val f : 'a slice -> #('a * 'a slice * 'a) = <fun>
+val f_imm : 'a slice_imm -> #('a * 'a slice_imm * 'a) = <fun>
 |}]
 
 (* [[&| ... |]] only matches mutable slices *)
@@ -34,9 +25,7 @@ Error: This pattern matches values of type "'a slice"
 
 (* The rest can be bound on both sides of an or-pattern, at different
    positions *)
-let f = function
-  | [&| 0; .. as r |] | [&| 1; 2; .. as r |] -> r
-  | _ -> assert false
+let f = function [&| 0; .. as r |] | [&| .. as r; 0 |] -> r | _ -> assert false
 [%%expect{|
 val f : int slice -> int slice = <fun>
 |}]
@@ -118,7 +107,7 @@ val ok : string slice_imm @ unique -> unit = <fun>
 
 (* The rest has the mode of the slice *)
 let ok (s : string slice @ unique) =
-  match s with [&| _; .. as r |] -> consume_slice r | _ -> ()
+  match s with [&| .. as r |] -> consume_slice r
 [%%expect{|
 val ok : string slice @ unique -> unit = <fun>
 |}]

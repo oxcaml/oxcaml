@@ -130,27 +130,29 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
-  | Tpat_slice { mutability; shape; _ } ->
+  | Tpat_slice { mutability; elements; _ } ->
       let punct = if Types.is_mutable mutability then '|' else ':' in
-      (* Flatten the chain of cells. The rest of a slice pattern is either
-         another cell, [_] or a variable. *)
-      let rec items rev_items = function
-        | Tslice_empty -> List.rev rev_items
-        | Tslice_front (v, rest) ->
-            let rev_items = `Pattern v :: rev_items in
-            match rest.pat_desc with
-            | Tpat_slice { shape; _ } -> items rev_items shape
-            | Tpat_var { id; _ } -> List.rev (`Rest (Some id) :: rev_items)
-            | _ -> List.rev (`Rest None :: rev_items)
+      let is_any p = match p.pat_desc with Tpat_any -> true | _ -> false in
+      let patterns = List.map (fun v -> `Pattern v) in
+      let items =
+        match elements with
+        | Tslice_closed vs -> patterns vs
+        | Tslice_open { prefix; rest = None; suffix }
+          when List.for_all is_any suffix ->
+            (* A suffix of wildcards can be printed as part of the prefix *)
+            patterns (prefix @ suffix) @ [`Rest None]
+        | Tslice_open { prefix; rest; suffix } ->
+            patterns prefix @ [`Rest rest] @ patterns suffix
       in
       let pretty_item ppf = function
         | `Pattern v -> pretty_val ppf v
         | `Rest None -> fprintf ppf ".."
-        | `Rest (Some id) -> fprintf ppf ".. as %s" (Ident.name id)
+        | `Rest (Some (Tslice_rest_var { id; _ })) ->
+            fprintf ppf ".. as %s" (Ident.name id)
       in
-      begin match items [] shape with
+      begin match items with
       | [] -> fprintf ppf "@[[&%c %c]@]" punct punct
-      | items ->
+      | _ ->
           fprintf ppf "@[[&%c %a %c]@]" punct
             (pretty_list pretty_item " ;") items punct
       end

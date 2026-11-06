@@ -2491,10 +2491,12 @@ let rec with_new_idents_pat pat =
   | Tpat_alias_deref { pattern = pat; id; _ } ->
     with_new_idents_values [id];
     with_new_idents_pat pat
-  | Tpat_slice { shape = Tslice_empty; _ } -> ()
-  | Tpat_slice { shape = Tslice_front (p, rest); _ } ->
-    with_new_idents_pat p;
-    with_new_idents_pat rest
+  | Tpat_slice { elements; _ } ->
+    (match elements with
+    | Tslice_open { rest = Some (Tslice_rest_var { id; _ }); _ } ->
+      with_new_idents_values [id]
+    | Tslice_open { rest = None; _ } | Tslice_closed _ -> ());
+    List.iter with_new_idents_pat (slice_element_patterns elements)
   | Tpat_addr (_, _, pat) | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
@@ -2532,10 +2534,12 @@ let rec without_idents_pat pat =
   | Tpat_alias_deref { pattern = pat; id; _ } ->
     without_idents_values [id];
     without_idents_pat pat
-  | Tpat_slice { shape = Tslice_empty; _ } -> ()
-  | Tpat_slice { shape = Tslice_front (p, rest); _ } ->
-    without_idents_pat p;
-    without_idents_pat rest
+  | Tpat_slice { elements; _ } ->
+    (match elements with
+    | Tslice_open { rest = Some (Tslice_rest_var { id; _ }); _ } ->
+      without_idents_values [id]
+    | Tslice_open { rest = None; _ } | Tslice_closed _ -> ());
+    List.iter without_idents_pat (slice_element_patterns elements)
   | Tpat_addr (_, _, pat) | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 

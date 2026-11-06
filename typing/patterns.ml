@@ -46,6 +46,104 @@ module Non_empty_row = struct
   let map_first f (p, patl) = (f p, patl)
 end
 
+module Slice = struct
+  type kind =
+    | Closed of int
+    | Open of { prefix : int; suffix : int }
+
+  type elements =
+    | Elements_closed of pattern list
+    | Elements_open of { prefix : pattern list; suffix : pattern list }
+
+  let of_typed = function
+    | Tslice_closed ps -> Elements_closed ps
+    | Tslice_open { prefix; rest = _; suffix } ->
+        Elements_open { prefix; suffix }
+
+  let to_typed = function
+    | Elements_closed ps -> Tslice_closed ps
+    | Elements_open { prefix; suffix } ->
+        Tslice_open { prefix; rest = None; suffix }
+
+  let kind = function
+    | Elements_closed ps -> Closed (List.length ps)
+    | Elements_open { prefix; suffix } ->
+        Open { prefix = List.length prefix; suffix = List.length suffix }
+
+  let patterns = function
+    | Elements_closed ps -> ps
+    | Elements_open { prefix; suffix } -> prefix @ suffix
+
+  let arity = function
+    | Closed n -> n
+    | Open { prefix; suffix } -> prefix + suffix
+
+  let of_patterns kind ps =
+    match kind with
+    | Closed _ -> Elements_closed ps
+    | Open { prefix; _ } ->
+        Elements_open
+          { prefix = List.filteri (fun i _ -> i < prefix) ps;
+            suffix = List.filteri (fun i _ -> i >= prefix) ps }
+
+  let split kinds =
+    let max_closed, max_prefix, max_suffix =
+      List.fold_left
+        (fun (c, p, s) kind ->
+           match kind with
+           | Closed n -> max c n, p, s
+           | Open { prefix; suffix } -> c, max p prefix, max s suffix)
+        (0, 0, 0) kinds
+    in
+    let max_prefix =
+      if max_closed + 1 >= max_prefix + max_suffix
+      then max_closed + 1 - max_suffix
+      else max_prefix
+    in
+    List.init (max_prefix + max_suffix) (fun n -> Closed n)
+    @ [Open { prefix = max_prefix; suffix = max_suffix }]
+
+  let covers d h =
+    match d, h with
+    | Closed n, Closed m -> n = m
+    | Open _, Closed _ -> false
+    | Closed n, Open { prefix; suffix } -> n >= prefix + suffix
+    | Open { prefix = p; suffix = s }, Open { prefix; suffix } ->
+        prefix <= p && suffix <= s
+
+  let args d h ps =
+    match h with
+    | Closed _ -> ps
+    | Open { prefix; suffix } ->
+        let missing = arity d - prefix - suffix in
+        let prefix_ps = List.filteri (fun i _ -> i < prefix) ps in
+        let suffix_ps = List.filteri (fun i _ -> i >= prefix) ps in
+        prefix_ps @ omegas missing @ suffix_ps
+
+  let common_args e1 e2 =
+    let k1 = kind e1 and k2 = kind e2 in
+    List.filter_map
+      (fun d ->
+         if covers d k1 && covers d k2
+         then Some (d, args d k1 (patterns e1), args d k2 (patterns e2))
+         else None)
+      (split [k1; k2])
+
+  let missing kinds =
+    let first_missing_below l =
+      List.init l Fun.id
+      |> List.find_opt (fun n -> not (List.mem (Closed n) kinds))
+      |> Option.map (fun n -> Closed n)
+    in
+    match List.find_opt (function Open _ -> true | Closed _ -> false) kinds with
+    | Some open_kind -> first_missing_below (arity open_kind)
+    | None ->
+        let l = 1 + List.fold_left (fun m kind -> max m (arity kind)) 0 kinds in
+        match first_missing_below l with
+        | Some _ as missing -> missing
+        | None -> Some (Open { prefix = l; suffix = 0 })
+end
+
 (* "views" on patterns are polymorphic variants
    that allow to restrict the set of pattern constructors
    statically allowed at a particular place *)
@@ -70,7 +168,7 @@ module Simple = struct
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
-    | `Slice of mutability * Jkind.sort * slice_shape
+    | `Slice of mutability * Jkind.sort * Slice.elements
     | `Lazy of pattern
   ]
 
@@ -119,6 +217,8 @@ module General = struct
         * Jkind.Sort.t
         * Mode.With_regionality.l
         * Types.type_expr
+    | `Slice_rest of
+        mutability * Jkind.sort * pattern list * slice_rest_var * pattern list
   ]
   type pattern = view pattern_data
 
@@ -154,7 +254,12 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
-    | Tpat_slice { mutability; sort; shape } -> `Slice (mutability, sort, shape)
+    | Tpat_slice
+        { mutability; sort;
+          elements = Tslice_open { prefix; rest = Some rest; suffix } } ->
+       `Slice_rest (mutability, sort, prefix, rest, suffix)
+    | Tpat_slice { mutability; sort; elements } ->
+       `Slice (mutability, sort, Slice.of_typed elements)
     | Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty } ->
        `Deref (id, str, uid, sort, mode, ty)
     | Tpat_alias_deref
@@ -191,7 +296,12 @@ module General = struct
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
-    | `Slice (mutability, sort, shape) -> Tpat_slice { mutability; sort; shape }
+    | `Slice (mutability, sort, elements) ->
+       Tpat_slice { mutability; sort; elements = Slice.to_typed elements }
+    | `Slice_rest (mutability, sort, prefix, rest, suffix) ->
+       Tpat_slice
+         { mutability; sort;
+           elements = Tslice_open { prefix; rest = Some rest; suffix } }
     | `Deref (id, str, uid, sort, mode, ty) ->
        Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty }
     | `Alias_deref (p, id, str, uid, sort, mode, ty) ->
@@ -208,6 +318,9 @@ module General = struct
         strip_vars (view p)
     | `Var _ | `Fun_layout _ | `Deref _ ->
         { p with pat_desc = `Any }
+    | `Slice_rest (mutability, sort, prefix, _, suffix) ->
+        let elements = Slice.Elements_open { prefix; suffix } in
+        { p with pat_desc = `Slice (mutability, sort, elements) }
     | #Half_simple.view as view -> { p with pat_desc = view }
 end
 
@@ -234,7 +347,8 @@ module Head : sig
           type_row : unit -> row_desc; }
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
-    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
+    | Slice of { mutability : mutability; sort : Jkind.sort;
+                 kind : Slice.kind }
     | Lazy
 
   type t = desc pattern_data
@@ -271,7 +385,8 @@ end = struct
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
-    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
+    | Slice of { mutability : mutability; sort : Jkind.sort;
+                 kind : Slice.kind }
     | Lazy
 
   type t = desc pattern_data
@@ -316,10 +431,9 @@ end = struct
           Record_unboxed_product (lbls, repr), pats
       | `Addr (mut, arg_sort, p) ->
           Addr (mut, arg_sort), [p]
-      | `Slice (mutability, sort, Tslice_empty) ->
-          Slice { mutability; sort; nonempty = false }, []
-      | `Slice (mutability, sort, Tslice_front (p, rest)) ->
-          Slice { mutability; sort; nonempty = true }, [p; rest]
+      | `Slice (mutability, sort, elements) ->
+          Slice { mutability; sort; kind = Slice.kind elements },
+          Slice.patterns elements
       | `Lazy p ->
           Lazy, [p]
     in
@@ -340,7 +454,7 @@ end = struct
       | Record_unboxed_product (l, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
       | Addr _ -> 1
-      | Slice { nonempty; _ } -> if nonempty then 2 else 0
+      | Slice { kind; _ } -> Slice.arity kind
       | Lazy -> 1
 
   let to_omega_pattern t =
@@ -349,11 +463,9 @@ end = struct
       match t.pat_desc with
       | Any -> Tpat_any
       | Addr (mut, arg_sort) -> Tpat_addr (mut, arg_sort, omega)
-      | Slice { mutability; sort; nonempty } ->
-          let shape =
-            if nonempty then Tslice_front (omega, omega) else Tslice_empty
-          in
-          Tpat_slice { mutability; sort; shape }
+      | Slice { mutability; sort; kind } ->
+          let elements = Slice.of_patterns kind (omegas (Slice.arity kind)) in
+          Tpat_slice { mutability; sort; elements = Slice.to_typed elements }
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
       | Unboxed_unit -> Tpat_unboxed_unit

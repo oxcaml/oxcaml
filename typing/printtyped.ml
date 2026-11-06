@@ -571,15 +571,24 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_addr %a\n" fmt_mutable_mode_flag mut;
       line i ppf "%a\n" fmt_sort arg_sort;
       pattern i ppf p;
-  | Tpat_slice { mutability; sort; shape } ->
+  | Tpat_slice { mutability; sort; elements } ->
       line i ppf "Tpat_slice %a\n" fmt_mutable_mode_flag mutability;
       line i ppf "%a\n" fmt_sort sort;
-      begin match shape with
-      | Tslice_empty -> line i ppf "Tslice_empty\n"
-      | Tslice_front (p, rest) ->
-          line i ppf "Tslice_front\n";
-          pattern i ppf p;
-          pattern i ppf rest
+      begin match elements with
+      | Tslice_closed l ->
+          line i ppf "Tslice_closed\n";
+          list i pattern ppf l
+      | Tslice_open { prefix; rest; suffix } ->
+          line i ppf "Tslice_open\n";
+          list i pattern ppf prefix;
+          begin match rest with
+          | None -> line i ppf "rest\n"
+          | Some (Tslice_rest_var { id; sort; mode; _ }) ->
+              line i ppf "rest \"%a\"\n" fmt_ident id;
+              line (i+1) ppf "sort %a\n" fmt_sort sort;
+              value_mode (i+1) ppf mode
+          end;
+          list i pattern ppf suffix
       end
   | Tpat_deref { id = s; sort; mode = m; _ } ->
       line i ppf "Tpat_deref \"%a\"\n" fmt_ident s;

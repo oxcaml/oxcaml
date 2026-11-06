@@ -433,22 +433,18 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
     | Tpat_addr (mut, _, p) -> Ppat_addr (mutable_ mut, sub.pat sub p)
-    | Tpat_slice { mutability; shape; _ } ->
-        (* Flatten the chain of cells. The rest of a slice pattern from the
-           type checker is either another cell, [_] or a variable. *)
-        let rec elements rev_ps : _ -> Parsetree.slice_elements = function
-          | Tslice_empty -> Pslice_closed (List.rev rev_ps)
-          | Tslice_front (p, rest) ->
-              let rev_ps = sub.pat sub p :: rev_ps in
-              let open_ rest =
-                Pslice_open { prefix = List.rev rev_ps; rest; suffix = [] }
-              in
-              match rest.pat_desc with
-              | Tpat_slice { shape; _ } -> elements rev_ps shape
-              | Tpat_var { name; _ } -> open_ (Some name)
-              | _ -> open_ None
+    | Tpat_slice { mutability; elements; _ } ->
+        let elements =
+          match elements with
+          | Tslice_closed l -> Pslice_closed (List.map (sub.pat sub) l)
+          | Tslice_open { prefix; rest; suffix } ->
+              Pslice_open
+                { prefix = List.map (sub.pat sub) prefix;
+                  rest = Option.map (fun (Tslice_rest_var { name; _ }) -> name)
+                      rest;
+                  suffix = List.map (sub.pat sub) suffix }
         in
-        Ppat_slice (mutable_ mutability, elements [] shape)
+        Ppat_slice (mutable_ mutability, elements)
     | Tpat_deref { name; _ } ->
         Ppat_deref (Pat.var ~loc:name.loc name)
     | Tpat_alias_deref { pattern = p; name; _ } ->
