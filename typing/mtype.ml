@@ -883,8 +883,12 @@ and remove_aliases_sig env args sg =
         | mty ->
             remove_aliases_mty env args pres mty
       in
+      let env =
+        Env.add_module_declaration ~check:false ~vis:priv id pres
+          {md with md_type = mty} env
+      in
       Sig_module(id, pres, {md with md_type = mty} , rs, priv) ::
-      remove_aliases_sig (Env.add_module id pres mty env) args rem
+      remove_aliases_sig env args rem
   | Sig_modtype(id, mtd, priv) :: rem ->
       Sig_modtype(id, mtd, priv) ::
       remove_aliases_sig (Env.add_modtype id mtd env) args rem
