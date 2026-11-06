@@ -843,7 +843,8 @@ let default_iterator =
       );
 
     label_declaration =
-      (fun this {pld_name; pld_type; pld_loc; pld_mutable = _; pld_modalities; pld_attributes}->
+      (fun this {pld_name; pld_type; pld_loc; pld_inherit = _; pld_mutable = _;
+                 pld_modalities; pld_attributes}->
          iter_loc this pld_name;
          this.typ this pld_type;
          this.location this pld_loc;
@@ -926,7 +927,8 @@ let default_iterator =
              this.typ this ty;
              this.modalities this modalities
          | Pjk_kind_of ty -> this.typ this ty
-         | Pjk_product ts -> List.iter (this.jkind_annotation this) ts);
+         | Pjk_product ts -> List.iter (this.jkind_annotation this) ts
+         | Pjk_inherit t -> this.jkind_annotation this t);
 
     jkind_declaration =
       (fun this { pjkind_name; pjkind_manifest; pjkind_attributes;

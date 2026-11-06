@@ -743,7 +743,7 @@ module Jkind0 : sig
         why:Jkind_intf.History.immediate_or_null_creation_reason -> 'd jkind
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
-        int ->
+        Jkind_types.Kind_operator.t list ->
         jkind_l
     end
 

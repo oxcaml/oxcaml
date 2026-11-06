@@ -24,6 +24,8 @@ module Asttypes = struct
 
   type mutable_flag (*IF_CURRENT = Asttypes.mutable_flag *) = Immutable | Mutable
 
+  type inherit_flag (*IF_CURRENT = Asttypes.inherit_flag *) = Not_inherited | Inherited
+
   type atomic_flag (*IF_CURRENT = Asttypes.atomic_flag *) = Nonatomic | Atomic
 
   type access_flag (*IF_CURRENT = Asttypes.access_flag *) =
@@ -840,6 +842,7 @@ module Parsetree = struct
   and label_declaration (*IF_CURRENT = Parsetree.label_declaration *) =
     {
       pld_name: string loc;
+      pld_inherit: inherit_flag;
       pld_mutable: mutable_flag;
       pld_modalities: modalities;
       pld_type: core_type;
@@ -852,7 +855,10 @@ module Parsetree = struct
                                is {{!Asttypes.mutable_flag.Immutable}[Immutable]},
      - [{ ...; mutable l: T; ... }]
                              when {{!label_declaration.pld_mutable}[pld_mutable]}
-                               is {{!Asttypes.mutable_flag.Mutable}[Mutable]}.
+                               is {{!Asttypes.mutable_flag.Mutable}[Mutable]},
+     - [#{ inherit l: T }]
+                             when {{!label_declaration.pld_inherit}[pld_inherit]}
+                               is {{!Asttypes.inherit_flag.Inherited}[Inherited]}.
 
      Note: [T] can be a {{!core_type_desc.Ptyp_poly}[Ptyp_poly]}.
   *)
@@ -1422,6 +1428,7 @@ module Parsetree = struct
     | Pjk_with of jkind_annotation * core_type * modalities
     | Pjk_kind_of of core_type
     | Pjk_product of jkind_annotation list
+    | Pjk_inherit of jkind_annotation
 
   and jkind_annotation (*IF_CURRENT = Parsetree.jkind_annotation *) =
     { pjka_loc : Location.t

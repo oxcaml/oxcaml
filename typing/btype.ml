@@ -2145,11 +2145,15 @@ module Jkind0 = struct
           ~annotation:(mk_annot "immediate_or_null")
           ~why:(Immediate_or_null_creation why)
 
-      let product_of_any ~why arity =
+      let product_of_any ~why operators =
         let layout =
           Jkind_types.Layout.product
-            (List.init arity (fun _ ->
-               Jkind_types.Layout.Any Jkind_types.Scannable_axes.max))
+            (List.map
+               (fun operator ->
+                 Jkind_types.Layout.apply_operator
+                   (Jkind_types.Layout.Any Jkind_types.Scannable_axes.max)
+                   operator)
+               operators)
         in
         let desc : _ jkind_desc =
           { base = Layout layout;

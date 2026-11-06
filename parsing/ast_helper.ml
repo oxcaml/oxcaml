@@ -169,6 +169,7 @@ module Typ = struct
           Pjk_with (loop_jkind jkind, loop typ, modalities)
         | Pjk_kind_of typ -> Pjk_kind_of (loop typ)
         | Pjk_product jkinds -> Pjk_product (List.map loop_jkind jkinds)
+        | Pjk_inherit jkind -> Pjk_inherit (loop_jkind jkind)
       in
       { jkind with pjka_desc }
     and loop_row_field field =
@@ -649,9 +650,11 @@ module Type = struct
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = []) name typ =
+        ?(inherit_ = Not_inherited) ?(mut = Immutable) ?(modalities = [])
+        name typ =
     {
      pld_name = name;
+     pld_inherit = inherit_;
      pld_mutable = mut;
      pld_modalities = modalities;
      pld_type = typ;

@@ -90,6 +90,8 @@ type error =
   | Too_many_constructors
   | Duplicate_label of string
   | Unboxed_atomic_label
+  | Inherit_unsupported
+  | Inherit_mutable_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -593,11 +595,25 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          Error.log_and_raise loc (Duplicate_label name);
        all_labels := String.Set.add name !all_labels)
     lbls;
-  let mk {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
-          pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
+  let inherit_allowed =
+    match record_form with
+    | Legacy -> false
+    | Unboxed_product -> List.compare_length_with lbls 1 = 0
+  in
+  let mk {pld_name=name;pld_inherit=inherit_;pld_mutable=mut;
+          pld_modalities=modalities;pld_type=arg;pld_loc=loc;
+          pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
          let is_atomic = Builtin_attributes.has_atomic attrs in
+         (match inherit_ with
+          | Not_inherited -> ()
+          | Inherited ->
+            if not inherit_allowed then
+              Error.log_and_raise loc Inherit_unsupported;
+            (match mut with
+             | Mutable -> Error.log_and_raise loc Inherit_mutable_label
+             | Immutable -> ()));
          let mut : mutability =
           let mode = Mode.With_regionality.Comonadic.legacy in
           match mut, is_atomic with
@@ -628,6 +644,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+          ld_inherit = inherit_;
           ld_mutable = mut;
           ld_modalities = modalities;
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
@@ -645,6 +662,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
              env ld.ld_loc kloc ty
          end;
          {Types.ld_id = ld.ld_id;
+          ld_inherit = ld.ld_inherit;
           ld_mutable = ld.ld_mutable;
           ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = None;
@@ -1273,7 +1291,8 @@ let transl_declaration env sdecl (id, uid) =
             Record_unboxed_product
           in
           let jkind =
-            Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
+            Jkind.Builtin.product_of_any ~why:Unboxed_record
+              (List.map Types.field_kind_operator lbls')
           in
           Ttype_record_unboxed_product lbls,
           Type_record_unboxed_product(lbls', rep, None), jkind
@@ -1473,6 +1492,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
       List.map
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
+            ld_inherit = ld.ld_inherit;
             ld_mutable = ld.ld_mutable;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
@@ -1490,7 +1510,8 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     let rep = Types.Record_unboxed_product in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
     let jkind =
-      Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
+      Jkind.Builtin.product_of_any ~why:Unboxed_record
+        (List.map Types.field_kind_operator lbls)
     in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, rep, umc)
@@ -4561,10 +4582,12 @@ let make_native_repr
   | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
     Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_present Unboxed,
-    (Sort (Product _ | Base Void | Addressable _)) ->
+    (Sort (Product _ | Base Void | Addressable (Product _ | Base Void))) ->
     Error.log_and_raise core_type.ptyp_loc
       (Bad_native_repr_attr Unboxed)
-  | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
+  | Native_repr_attr_present Unboxed,
+    (Sort ((Base sort | Addressable (Base sort)) as c)) ->
+    (* Addressability does not affect the unboxed representation *)
     (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
        upstream-compatibility, we want the code to still work when all the
        layout annotations and unboxed types get erased.
@@ -4592,6 +4615,9 @@ let make_native_repr
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
+  | Native_repr_attr_present Unboxed,
+    Sort (Addressable (Addressable _ | Univar _ | Genvar _)) ->
+    Misc.fatal_error "typedecl: unexpected Addressable in concrete type"
   | Native_repr_attr_present Unpacked,
     Sort ((Product _ | Addressable (Product _)) as sort) ->
     (* Addressability does not affect the non-boxed representation *)
@@ -5741,6 +5767,13 @@ let report_error ~loc = function
       Location.errorf "Two labels are named %a" Style.inline_code s
   | Unboxed_atomic_label ->
       Location.errorf ~loc "Unboxed record labels cannot be atomic"
+  | Inherit_unsupported ->
+      Location.errorf ~loc
+        "%a is only supported on the sole field of an unboxed record"
+        Style.inline_code "inherit"
+  | Inherit_mutable_label ->
+      Location.errorf ~loc "%a fields cannot be mutable"
+        Style.inline_code "inherit"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
