@@ -1,0 +1,25 @@
+; Syntax errors reported by a driver built with the shipped ppxlib: explained
+; by lrgrep when one of its rules matches, and as reported by the compiler's
+; parser otherwise.
+
+(executable
+ (name driver)
+ (modules driver)
+ (libraries ppxlib))
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (with-outputs-to
+    explained.actual
+    (with-accepted-exit-codes
+     1
+     (run %{dep:driver.exe} %{dep:explained.ml})))
+   (diff explained.expected explained.actual)
+   (with-outputs-to
+    unexplained.actual
+    (with-accepted-exit-codes
+     1
+     (run %{dep:driver.exe} %{dep:unexplained.ml})))
+   (diff unexplained.expected unexplained.actual))))

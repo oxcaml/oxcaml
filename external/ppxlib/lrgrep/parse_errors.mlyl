@@ -1,0 +1,339 @@
+{
+  let rec longident_to_string = function
+    | Longident.Lident n -> n
+    | Longident.Lapply ({ txt = a; _ }, { txt = b; _ }) ->
+      longident_to_string a ^ "(" ^ longident_to_string b ^ ")"
+    | Longident.Ldot ({ txt = a; _ }, { txt = n; _ }) ->
+      longident_to_string a ^ "." ^ n
+
+  (** Use this function to set the output error location. It defualts to the state of the
+  lexer at the time of failure, but if there's a specific expression that it should be
+  set at, that can be specified by calling this function with something like
+
+    error_location($startloc(e), $endloc(e)).
+
+    Note: the expression itself can't be passed here, because lrgrep handles $startloc and
+    $endloc specially outside of this header OCaml block.
+    *)
+  let error_location: (lexing_position * lexing_position) option ref = ref None
+
+  let report_currified_constructor ?outer inner (token : Parser.token) =
+    let token = match token with
+      | UNDERSCORE -> "_"
+      | LIDENT u | UIDENT u -> u
+      | LPAREN -> "..."
+      | _ -> assert false
+    in
+    let inner_msg = longident_to_string inner ^ " (..., " ^ token ^ ")" in
+    "Arguments of n-ary constructors should be put between parentheses, e.g. " ^
+    match outer with
+    | Some outer -> longident_to_string outer ^ " (" ^ inner_msg ^ ")"
+    | None -> inner_msg
+
+  let str_line pos = string_of_int pos.Lexing.pos_lnum
+  let str_col pos = string_of_int (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
+
+  let line_and_char pos = "line " ^ str_line pos ^ ", character " ^ str_col pos
+
+  let report_at_location loc = error_location := (Some loc)
+
+  let token_name = function
+  | Parser.WITH -> Some "with"
+  | Parser.WHILE -> Some "while"
+  | Parser.WHEN -> Some "when"
+  | Parser.VIRTUAL -> Some "virtual"
+  | Parser.VAL -> Some "val"
+  | Parser.TYPE -> Some "type"
+  | Parser.TRY -> Some "try"
+  | Parser.TRUE -> Some "true"
+  | Parser.TO -> Some "to"
+  | Parser.THEN -> Some "then"
+  | Parser.STRUCT -> Some "struct"
+  | Parser.SIG -> Some "sig"
+  | Parser.REC -> Some "rec"
+  | Parser.PRIVATE -> Some "private"
+  | Parser.OVERWRITE -> Some "overwrite"
+  | Parser.OR -> Some "or"
+  | Parser.OPEN -> Some "open"
+  | Parser.OF -> Some "of"
+  | Parser.OBJECT -> Some "object"
+  | Parser.NONREC -> Some "nonrec"
+  | Parser.NEW -> Some "new"
+  | Parser.MUTABLE -> Some "mutable"
+  | Parser.MODULE -> Some "module"
+  | Parser.MOD -> Some "mod"
+  | Parser.METHOD -> Some "method"
+  | Parser.MATCH -> Some "match"
+  | Parser.LOCAL -> Some "local"
+  | Parser.LET -> Some "let"
+  | Parser.LAZY -> Some "lazy"
+  | Parser.INITIALIZER -> Some "initializer"
+  | Parser.INHERIT -> Some "inherit"
+  | Parser.INCLUDE -> Some "include"
+  | Parser.IN -> Some "in"
+  | Parser.IF -> Some "if"
+  | Parser.GLOBAL -> Some "global"
+  | Parser.FUNCTOR -> Some "functor"
+  | Parser.FUNCTION -> Some "function"
+  | Parser.FUN -> Some "fun"
+  | Parser.FOR -> Some "for"
+  | Parser.FALSE -> Some "false"
+  | Parser.EXTERNAL -> Some "external"
+  | Parser.EXCLAVE -> Some "exclave"
+  | Parser.EXCEPTION -> Some "exception"
+  | Parser.END -> Some "end"
+  | Parser.ELSE -> Some "else"
+  | Parser.DOWNTO -> Some "downto"
+  | Parser.DONE -> Some "done"
+  | Parser.DO -> Some "do"
+  | Parser.CONSTRAINT -> Some "constraint"
+  | Parser.CLASS -> Some "class"
+  | Parser.BEGIN -> Some "begin"
+  | Parser.ASSERT -> Some "assert"
+  | Parser.AS -> Some "as"
+  | Parser.AND -> Some "and"
+  | _ -> None
+}
+
+rule error_message = parse error
+
+| e=fun_expr; SEMI @ ELSE
+  partial {
+    match e with
+    | {pexp_desc = Pexp_ifthenelse(_, _, None); _} -> (
+      Some ("The semicolon " ^ line_and_char $startloc(e)
+            ^ " terminates the `if ... then ...` expression. \
+            Remove it to add an else branch.")
+      )
+    | _ -> None
+  }
+| MODULE @ EQUAL
+  { "Must include a name for this module declaration" }
+| / match_case: pattern MINUSGREATER . seq_expr
+| / match_case: pattern WHEN seq_expr MINUSGREATER . seq_expr
+  { "Need to put expression after arrow in match statement" }
+
+(* | right n -> ...
+   Must come before the more general match rules below. *)
+| _ / match_case: . pattern ...; id=LIDENT
+  @ LIDENT, UIDENT, LPAREN, UNDERSCORE, INT, STRING, CHAR, FLOAT, TRUE, FALSE,
+    LBRACKET, LBRACKETBAR, LBRACE, BACKQUOTE, LAZY
+  {
+    report_at_location ($startloc(id), $endloc(id));
+    "`" ^ id ^ "' is a variable pattern and cannot be applied to arguments. \
+     Constructors must start with an uppercase letter, e.g. `"
+    ^ String.capitalize_ascii id ^ "'"
+  }
+| MATCH; _*; WITH; reversed_preceded_or_separated_nonempty_llist(BAR,match_case); BAR
+| MATCH; _*; WITH; BAR?
+  partial {
+    match token with
+    | WHEN | MINUSGREATER -> (
+      Some ("Expected pattern after `|`")
+    )
+    | _ -> None
+  }
+| MATCH; _*; WITH; reversed_preceded_or_separated_nonempty_llist(BAR,match_case); BAR; _
+  partial {
+    match token with
+    | WHEN | MINUSGREATER -> None
+    | _ -> Some ("Expected `when` or `->` after pattern")
+  }
+(* Explicitly write out what's between the MATCH and WITH because having multiple _*'s
+   in a single rule makes it very slow *)
+| MATCH; ext; list(attribute); seq_expr; WITH; BAR?; pattern; MINUSGREATER; _*; e=_ @ MINUSGREATER
+| MATCH; _*; WITH; reversed_preceded_or_separated_nonempty_llist(BAR,match_case); BAR; pattern; MINUSGREATER; _; e=_
+  partial {
+    match token with
+    | WHEN | MINUSGREATER -> (
+      report_at_location ($startloc(e), $endloc(e));
+      Some ("Need to put a pipe before pattern in a match statement")
+    )
+    | _ -> None
+  }
+
+| type_parameters; pos=UIDENT
+  {
+    report_at_location ($startloc(pos), $endloc(pos));
+    "Type names must start with a lower-case letter" }
+
+(* val x = 1 *)
+| VAL; ext; list(attribute); poly_flag; [val_ident] @ EQUAL
+  { "`val' declares the type of a value, not its definition: \
+     use `val x : <type>', or `let x = ...' to define it" }
+
+(* type t = { a : int b : int } *)
+| COLON / label_declaration: mutable_or_global_flag LIDENT COLON . ...;
+  _*; atomic_type; id=LIDENT @ COLON
+  {
+    report_at_location ($startloc(id), $endloc(id));
+    "Record fields must be separated by `;'. \
+     Perhaps a `;' is missing before `" ^ id ^ "'"
+  }
+
+(* type t = (a, b) *)
+| / atomic_type: LPAREN reversed_separated_nontrivial_llist(COMMA,one_type_parameter_of_several) RPAREN . type_longident
+  { "Expecting a type constructor after the parenthesized type arguments, \
+     e.g. `(a, b) Hashtbl.t'. To write a tuple type use `*', e.g. `a * b'" }
+| TYPE; ext; list(attribute); type_parameters; LIDENT; option(jkind_constraint); EQUAL; _*; DOT; u=UIDENT
+  {"Attempted to set a type equal to a module " ^ line_and_char $startloc(u)}
+
+| / label_declaration: mutable_or_global_flag _ . COLON ... @ EQUAL
+  { "Expecting ':' to declare the type of a record field, not '='" }
+
+(* let x = 5 ; let y = 6 let z = 7 *)
+
+| [structure_item]; semi=SEMI; [let_bindings(ext)]
+  { "Syntax error: might be due to the semicolon " ^ line_and_char $startloc(semi) }
+
+(* g match x with ...
+   A keyword expression in argument position of a function application. *)
+| [_* / fun_expr: simple_expr . reversed_nonempty_llist(labeled_simple_expr)
+   | _* / reversed_nonempty_llist(labeled_simple_expr): _ . labeled_simple_expr]
+  @ MATCH, FUN, FUNCTION, IF, TRY
+  partial {
+    Option.map (fun kw ->
+      "`" ^ kw ^ "' cannot be a function argument by itself; \
+       wrap it in parentheses, e.g. `f (" ^ kw ^ " ...)'. \
+       (If the application was meant to end here, a `;', `in' or `;;' may be missing.)"
+    ) (token_name token)
+  }
+
+(* ( f x
+     let y = ... in ... ) *)
+| (LPAREN | SEMI); e=[seq_expr] @ LET
+| MINUSGREATER; e=[seq_expr | fun_body] @ LET
+| BEGIN; ext; list(attribute); e=[seq_expr] @ LET
+  { "`let' cannot directly follow an expression here. \
+     Perhaps a `;' is missing after the expression ending at "
+    ^ line_and_char $endloc(e) }
+
+(* fun a, b -> ... *)
+| [fun_params] @ COMMA
+  { "Tuple patterns in function parameters must be parenthesized, \
+     e.g. `fun (a, b) -> ...'" }
+
+(* let (x : t @ m) = ... *)
+| poly_flag; LPAREN; pattern; COLON; tuple_type; m=[at_mode_expr] @ RPAREN
+  {
+    report_at_location ($startloc(m), $endloc(m));
+    "A mode annotation cannot appear inside the parentheses of a type annotation: \
+     write `let (x : t) @ mode = ...' or `let x : t @ mode = ...'"
+  }
+
+(* f ~default:-1 *)
+| (LABEL | OPTLABEL) @ MINUS, MINUSDOT
+  { "Negative numbers passed as labeled arguments must be parenthesized, \
+     e.g. `~label:(-1)'" }
+
+(* Needs to be checked before "Expecting 'in' to continue let-binding" case, as in some
+   situations this is a subset of the cases expressed there. *)
+| e=[simple_expr] @ COLON
+  {
+    report_at_location ($startloc(e), $endloc(e));
+   "Syntax error: might be due to a missing '~' on a labeled argument or tuple"
+  }
+
+| loc=_ / fun_expr : ... . fun_expr; [let_bindings(ext)]
+  { "Expecting 'in' after let binding(s) in an expression. \n\
+     This might be due to the unterminated expression at " ^
+     line_and_char $endloc(loc) }
+
+| item=structure_item; [let_bindings(ext)] @ IN
+  { "A 'let ... in' is not allowed immediately after a module definition or in a top level let. \n\
+    This can be solved by inserting ';;' before the previous statement or 'let () = ' after "
+     ^ line_and_char $endloc(item) }
+
+| pos=[_* / LET ... . IN ...]
+| pos=[_* / let_bindings(ext) ... . IN ...]
+| pos=[_* / let_bindings(no_ext) ... . IN ...]
+  {
+    report_at_location ($startloc(pos), $endloc(pos));
+    "Expecting `in' to continue let-binding at " ^ line_and_char $startloc(pos) }
+
+(* https://github.com/ocaml/ocaml/issues/11108
+   Report when a keyword has been typed in a context where a lowercase
+   identifier is expected. *)
+| [_* / ... _ . LIDENT ...]
+  partial {
+   Option.map (fun kw ->
+   "`" ^ kw ^ "' is a keyword and cannot appear in this context (try " ^ kw ^ "_)"
+   ) (token_name token)
+  }
+
+
+(* https://github.com/ocaml/ocaml/issues/5068 *)
+| [_*  / ... _ . UIDENT ... |  _* / ... _ . TYPE ... | _* / ... _ . REC ...]
+| MODULE; _*; REC @ LIDENT
+  { "Expecting `type' or a module name beginning with an uppercase letter"
+  }
+
+| / generic_constructor_declaration(BAR): BAR . constr_ident ...
+  {"Expected a capitalized variant tag after the |"
+  }
+
+(* https://discuss.ocaml.org/t/syntax-error-compiling-code-with-functor-module/6352 *)
+| [_* / ... . seq_expr ...] @ MODULE
+  {  "`module' keyword cannot appear in an expression, \
+       use `(module M)' to pack a first class-module \
+       or `let module M = ... in ...' to define a local module"
+  }
+
+(* https://github.com/ocaml/ocaml/issues/11445 *)
+
+| [constructor_arguments] @ MINUSGREATER
+  { "In constructor arguments, arrow types should be wrapped between parentheses"
+  }
+
+| outer=constr_longident; inner=constr_longident;
+  [_ / pattern_gen: constr_longident pattern .]
+  @ UNDERSCORE, LIDENT, UIDENT, LPAREN
+  { report_currified_constructor ~outer inner token }
+
+| constr_longident; [simple_expr]
+  @ first(simple_expr)
+  { (* Expliquer le raisonnement *)
+    (* Plusieurs niveaux d'explications ? *)
+    (* Message court identifiant la situation *)
+    (* Hint pour détailler. (Rappel de la syntaxe) *)
+    "Application of n-ary constructors cannot be currified, \
+     arguments should be wrapped between parentheses and comma separated" }
+
+| inner=constr_longident;
+  [_* / pattern_gen: constr_longident pattern .]
+  @ UNDERSCORE, LIDENT, UIDENT, LPAREN
+  { report_currified_constructor inner token }
+
+| / . atomic_type @ LBRACKETATAT
+  { "[@@ ...] attribute should be placed after a type (note that it attaches to the item, not to the type)" }
+
+| / . atomic_type @ LBRACKETAT
+  { "[@ ...] attribute should be placed after a type" }
+
+| /type_kind: EQUAL . nonempty_type_kind
+  {"Cannot set a type equal to a value"}
+
+| LPAREN; pos=TILDE; LIDENT @ COLON
+  {
+   report_at_location ($startloc(pos), $endloc(pos));
+   "For type annotations on labeled parameters, use ~(param : type) instead of (~param : type)"
+  }
+
+| EQUAL; core_type; EQUAL; LPAREN? @ LIDENT
+{ "Expecting a variant or record definition" }
+
+(* [_ . val_ident] requires something before the dot so that this only matches
+   states where an identifier is the next thing expected (e.g. after `let'), and not
+   every state whose closure could start an expression with an identifier (e.g. any
+   function application `f x <keyword>', which is usually a missing `;').
+   [simple_pattern: . val_ident] covers binders in function parameters (`fun match ->'). *)
+| [_* / ... _ . val_ident ...]
+| [_* / simple_pattern: . val_ident]
+| [_* / ... . pattern ...]
+  partial {
+    Option.map (fun kw ->
+      "'" ^ kw ^ "' is a keyword; it cannot be used as an identifier or pattern variable"
+    ) (token_name token)
+  }
+
+| _ { "Syntax error" }
