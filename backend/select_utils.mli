@@ -258,8 +258,6 @@ val make_const_vec512 : Cmm.vec512_bits -> Operation.t
 
 val make_const_symbol : Cmm.symbol -> Operation.t
 
-val make_opaque : unit -> Operation.t
-
 val insert_debug :
   environment ->
   Sub_cfg.t ->

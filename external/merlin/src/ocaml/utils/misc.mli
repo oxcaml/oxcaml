@@ -126,6 +126,9 @@ module Stdlib : sig
     (** [is_empty l] is true if and only if [l] has no elements. It is equivalent to
         [compare_length_with l 0 = 0].  *)
 
+    val count : ('a -> bool) -> 'a t -> int
+    (** [count p l] is the number of elements of [l] that satisfy [p]. *)
+
     val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
     (** The lexicographic order supported by the provided order.
         There is no constraint on the relative lengths of the lists. *)
@@ -151,6 +154,20 @@ module Stdlib : sig
       -> ('b t, 'e) Result.t
     (** [mapi_result f l] is similar to [map_option f l] but returns the first
         error result if [f] returns one. *)
+
+    val fold_left_result
+      : ('ok -> 'a -> ('ok, 'error) result) ->
+        'ok ->
+        'a t ->
+        ('ok, 'error) result
+
+    val fold_left2_result
+      : unequal_lengths:'error ->
+        ('ok -> 'a -> 'b -> ('ok, 'error) result) ->
+        'ok ->
+        'a t ->
+        'b t ->
+        ('ok, 'error) result
 
     val map2_option : ('a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t option
 

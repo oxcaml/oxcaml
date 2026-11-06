@@ -53,6 +53,8 @@ let unboxed_tuple_probability = 25
 
 let match_in_match_probability = 50
 
+let assert_false_probability = 1
+
 let nested_record_probability = 15
 
 let mutable_binding_probability = 75
@@ -81,6 +83,11 @@ let raise_notrace_probability = 50
 
 let callee_raises_probability = 50
 
+type assertion_mode =
+  | Disabled
+  | Unreachable_only
+  | May_raise
+
 module Swarm = struct
   type t =
     { floats : bool;
@@ -93,6 +100,7 @@ module Swarm = struct
       variants : bool;
       or_null : bool;
       matches : bool;
+      assertions : assertion_mode;
       record_updates : bool;
       record_representation_conversions : bool;
       mutable_bindings : bool;
@@ -121,6 +129,11 @@ module Swarm = struct
       variants = Random.State.bool random_state;
       or_null = Random.State.bool random_state;
       matches = Random.State.bool random_state;
+      assertions =
+        (match Random.State.int random_state 3 with
+        | 0 -> Disabled
+        | 1 -> Unreachable_only
+        | _ -> May_raise);
       record_updates = Random.State.bool random_state;
       record_representation_conversions = Random.State.bool random_state;
       mutable_bindings = Random.State.bool random_state;
@@ -165,6 +178,12 @@ module Swarm = struct
       "opaque_loop_bounds", t.opaque_loop_bounds;
       "exceptions", t.exceptions ]
     |> List.map (fun (name, enabled) -> Format.sprintf "  %s = %b" name enabled)
+    |> List.cons
+         (Format.sprintf "  assertions = %s"
+            (match t.assertions with
+            | Disabled -> "disabled"
+            | Unreachable_only -> "unreachable_only"
+            | May_raise -> "may_raise"))
     |> String.concat "\n"
 
   let number_types t =

@@ -12,12 +12,17 @@ else
   ocaml_subdirs_to_ignore=
 endif
 
-ifneq ($(origin BUILD_OCAMLPARAM), undefined)
-ENV_VARS := (env-vars ("OCAMLPARAM" "$(BUILD_OCAMLPARAM)"))
-else
-ENV_VARS :=
+# The libraries of external/ast-dependent-libs, which the main context can
+# build, use $ as an ordinary operator, which compilers configured with
+# --enable-syntax-quotations reject by default. Settings before any "_" in
+# OCAMLPARAM are defaults, which command-line flags override.
+main_ocamlparam = syntax-quotations=0,_
+ifneq ($(BUILD_OCAMLPARAM),)
+main_ocamlparam = syntax-quotations=0,$(BUILD_OCAMLPARAM)
 endif
 
+# Also for the libraries of external/ast-dependent-libs, as js_of_ocaml and
+# wasm_of_ocaml ship with the compiler.
 ifeq ($(main_build_profile),dev)
 main_ocamlopt_optimization_flags :=
 else
@@ -31,15 +36,35 @@ define dune_main_context
   (name main)
   (profile $(main_build_profile))
   (cms_cmt_dependency cms)
+  ; Findlib packages from outside the build are compiled by other compilers.
   (paths
     (PATH ("$(CURDIR)/_build/_bootinstall/bin" :standard))
-    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build")))
+    (OCAMLLIB ("$(CURDIR)/_build/default/stdlib/build"))
+    (OCAMLPATH ("$(CURDIR)/_build/main/no-findlib-packages"))
+    (OCAMLFIND_CONF ("/dev/null")))
   (env (_
+    ; Not the toplevel of this build, which only runs once installed.
+    (binaries (duneconf/ocaml as ocaml))
+    ; For the tests of js_of_ocaml (see jsoo-test in Makefile), as its
+    ; dune-workspace and with-effects profile set them up.
+    (js_of_ocaml
+     (compilation_mode separate)
+     (flags (:standard -w no-missing-effects-backend))
+     (link_flags (:standard -w no-missing-effects-backend))
+     (runtest_alias runtest-js))
+    (wasm_of_ocaml
+     (enabled_if %{env:WASM_OF_OCAML=false})
+     (compilation_mode separate)
+     (flags (:standard --effects cps))
+     (runtest_alias runtest-wasm))
     (bin_annot_cms true)
-    (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
+    ; The root project's profiles add -warn-error +A (see the root dune file):
+    ; this environment also applies to the libraries of
+    ; external/ast-dependent-libs.
+    (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
-    $(ENV_VARS)))))
+    (env-vars ("OCAMLPARAM" "$(main_ocamlparam)"))))))
 endef
 
 
@@ -62,9 +87,9 @@ boot-runtest: boot-compiler
 
 compiler: boot-compiler
 	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
-          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" $(compiler_jsoo_env) \
           $(dune) build --always-show-command-line $(ws_main) \
-          --only-package=ocaml @install \
+          --promote-install-files=false ocaml.install $(compiler_jsoo_targets) \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
@@ -81,7 +106,7 @@ minimize-failure: boot-minimizer boot-compiler
           ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
           ./_build/default/chamelon/chamelon.exe dune build \
           $(ws_main) \
-          --only-packages=ocaml @install \
+          ocaml.install \
           tools/regalloc/regalloc.exe \
           oxcaml/testsuite/tools/expect.exe \
           oxcaml/testsuite/tools/expectnat.exe \
@@ -129,9 +154,17 @@ duneconf/%.ws: Makefile.common-ox
 $(ocamldir)/duneconf/dirs-to-ignore.inc:
 	echo "(data_only_dirs yacc $(ocaml_subdirs_to_ignore))" > $@
 
+# The toplevel that runs build scripts in the main context, as %{ocaml} or
+# ocaml: the system one, which must not see the stdlib of this build.
+duneconf/ocaml: Makefile.common-ox
+	printf '#!/bin/sh\nexec env -u OCAMLLIB -u OCAMLPARAM "%s" "$$@"\n' \
+	  "`$(opam_exec) which ocaml`" > $@
+	chmod +x $@
+
 # Targets that should be prerequisites to any target that runs Dune
 dune_config_targets = \
   duneconf/main.ws \
+  duneconf/ocaml \
   $(ocamldir)/duneconf/dirs-to-ignore.inc \
   $(ocamldir)/duneconf/ox-extra.inc \
   dune-project
@@ -164,6 +197,7 @@ _build/_bootinstall: Makefile.config Makefile.common-ox $(dune_config_targets)
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
 	ln -sf "`$(opam_exec) which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
+	cp duneconf/ocaml _build/_bootinstall/bin/ocaml
 	for prog in ocamlopt ocamlc ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
@@ -182,7 +216,10 @@ _install: compiler
 	rm -rf _install
 	mkdir -p _install/{bin,lib/ocaml}
 	$(cpl) _build/default/runtime/ocamlrun{,d} _install/bin/
-	$(cpl) _build/install/main/bin/* _install/bin/
+# Only the executables of the ocaml package, as listed in ocaml.install: the
+# main build can also build those of js_of_ocaml (see WITH_JSOO in Makefile).
+	$(cpl) `grep -o '"_build/install/main/bin/[^"]*"' _build/main/ocaml.install \
+	  | tr -d '"'` _install/bin/
 	( cd _install/bin; for i in *.opt; do ln -s $$i $${i%.opt}; done )
 	$(cpl) -R _build/default/stdlib/build/* _install/lib/ocaml/
 	rm -f _install/lib/ocaml/{META,dune-package,dynlink.cmxa,dynlink/dynlink.cmxa}
@@ -203,10 +240,6 @@ _install: compiler
 	done
 	mkdir _install/lib/stublibs
 	cp _build/main/parser.cmly _install/lib/ocaml/compiler-libs/
-	find _build/main/ \( -name "flambda2*.cmi" \
-          -or -name "flambda2*.cmsi" -or -name "flambda2*.cms" \
-          -or -name "flambda2*.cmti" -or -name "flambda2*.cmt" \) \
-          -exec cp -f {} _install/lib/ocaml/compiler-libs \;
 
 
 # Copy _install to the final install directory (no-op if they are the same)
@@ -274,15 +307,6 @@ endif
           _runtest/testsuite/lib/
 	cp $(main_build)/testsuite/lib/.testing.objs/native/testing.cm* \
           _runtest/testsuite/lib/
-	 # replace backend-specific testsuite/tests/asmcomp with their new versions
-	rm _runtest/testsuite/tests/asmcomp/*
-	cp -a oxcaml/testsuite/tests/asmcomp/* _runtest/testsuite/tests/asmcomp/
-	 # replace backend-specific testsuite/tests/asmgen with their new versions
-	rm _runtest/testsuite/tests/asmgen/*
-	cp -a oxcaml/testsuite/tests/asmgen/* _runtest/testsuite/tests/asmgen/
-	 # add extension library tests that are not supported by the upstream compiler
-	rm _runtest/testsuite/tests/lib-extensions/*
-	cp -a oxcaml/testsuite/tests/lib-extensions/* _runtest/testsuite/tests/lib-extensions
 
 	cp $(ocamldir)/Makefile.* _runtest/
 

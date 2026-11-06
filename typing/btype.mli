@@ -607,6 +607,12 @@ module Jkind0 : sig
       (** The jkind of block indices with mode crossing. *)
       val kind_of_idx : t
 
+      (** The jkind of mutable addresses ([addr]) with mode crossing. *)
+      val kind_of_addr : t
+
+      (** The jkind of immutable addresses ([addr_imm]) with mode crossing. *)
+      val kind_of_addr_imm : t
+
       (** The jkind of unboxed 128-bit vectors with no mode crossing. *)
       val vec128 : t
 
@@ -647,7 +653,7 @@ module Jkind0 : sig
     module Sub_failure_reason : sig
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
-        | Layout_disagreement
+        | Layout_disagreement of Jkind_types.Sort.error
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end

@@ -55,10 +55,13 @@ module type S1f' =
   sig type ('a : float64) t = t_float64 t1 type s = t_float64 t1 end
 |}];;
 
-module type S1f'' = S1f with type 'a t = 'a list;;
+type ('a : value_or_null) value_list = 'a list
+
+module type S1f'' = S1f with type 'a t = 'a value_list;;
 [%%expect {|
-Line 1, characters 34-36:
-1 | module type S1f'' = S1f with type 'a t = 'a list;;
+type ('a : value_or_null) value_list = 'a list
+Line 3, characters 34-36:
+3 | module type S1f'' = S1f with type 'a t = 'a value_list;;
                                       ^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "('a0 : float64)"
@@ -255,9 +258,9 @@ and Bar3 : sig type t : immediate end
 |}];;
 
 module rec Foo3f : sig
-  type 'a t = 'a Bar3f.t * 'a list
+  type 'a t = 'a Bar3f.t * 'a value_list
 end = struct
-  type t = 'a Bar3f.t * 'a list
+  type t = 'a Bar3f.t * 'a value_list
 end
 
 and Bar3f : sig
@@ -267,14 +270,14 @@ end = struct
 end;;
 [%%expect {|
 Line 2, characters 27-29:
-2 |   type 'a t = 'a Bar3f.t * 'a list
+2 |   type 'a t = 'a Bar3f.t * 'a value_list
                                ^^
 Error: This type "('a : float64)" should be an instance of type
          "('b : value_or_null)"
        The layout of 'a is float64
          because of the annotation on 'a in the declaration of the type t.
        But the layout of 'a must be a value layout
-         because the type argument of list has layout value_or_null.
+         because of the definition of value_list at line 1, characters 0-46.
 |}];;
 
 type t3f : float64
