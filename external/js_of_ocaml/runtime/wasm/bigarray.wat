@@ -1408,7 +1408,10 @@
               (call $caml_ba_size_per_element (local.get $kind)))))
      (if (i64.ne (local.get $l) (i64.extend_i32_s (i32.wrap_i64 (local.get $l))))
         (then (call $caml_raise_out_of_memory)))
-     (return_call $ta_create (local.get $kind) (i32.wrap_i64 (local.get $l))))
+     ;; TODO: switch back to [return_call] when a new Safari release fixes the wasm-js
+     ;; tail call cross
+     (return
+        (call $ta_create (local.get $kind) (i32.wrap_i64 (local.get $l)))))
 
    (global $CAML_BA_MAX_NUM_DIMS i32 (i32.const 16))
 
@@ -3210,8 +3213,9 @@
       (local $view (ref extern))
       (local.set $ba (ref.cast (ref $bigarray) (local.get $vba)))
       (local.set $view (struct.get $bigarray $ba_view (local.get $ba)))
-      (return_call $dv_get_ui16_unaligned
-         (local.get $view) (local.get $i) (i32.const 1)))
+      (return
+         (call $dv_get_ui16_unaligned
+            (local.get $view) (local.get $i) (i32.const 1))))
 
    (func (export "caml_ba_uint8_get32")
       (param $vba (ref eq)) (param $i i32) (result i32)
@@ -3235,8 +3239,9 @@
       (local $view (ref extern))
       (local.set $ba (ref.cast (ref $bigarray) (local.get $vba)))
       (local.set $view (struct.get $bigarray $ba_view (local.get $ba)))
-      (return_call $dv_get_i32_unaligned
-         (local.get $view) (local.get $i) (i32.const 1)))
+      (return
+         (call $dv_get_i32_unaligned
+            (local.get $view) (local.get $i) (i32.const 1))))
 
    (func (export "caml_ba_uint8_get64")
       (param $vba (ref eq)) (param $i i32) (result i64)

@@ -32,10 +32,12 @@ let mtd =
 val mtd : Deriving.t = <abstr>
 |}]
 
-type t = int [@@deriving bar]
+let cd =
+  Deriving.add "cd"
+    ~sig_class_type_decl:(Deriving.Generator.make_noarg (fun ~loc ~path:_ _ -> [%sig: val y : int]))
+    ~str_class_type_decl:(Deriving.Generator.make_noarg (fun ~loc ~path:_ _ -> [%str let y = 42]))
 [%%expect{|
-Line _, characters 25-28:
-Error: Deriver foo is needed for bar, you need to add it before in the list
+val cd : Deriving.t = <abstr>
 |}]
 
 type t = int [@@deriving bar, foo]
@@ -51,21 +53,11 @@ val foo : int = 42
 val bar : int = 43
 |}]
 
-module Foo_sig : sig
+module type Foo_sig = sig
   type t [@@deriving foo]
-end = struct
-  type t
 end
 [%%expect{|
-Line _, characters 6-25:
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t end
-       is not included in
-         sig type t val foo : int end
-       The value `foo' is required but not provided
-       File "test/deriving/test.ml", line 3, characters 2-25:
-         Expected declaration
+module type Foo_sig = sig type t val foo : int end
 |}]
 
 module type X = sig end [@@deriving mtd]
@@ -82,4 +74,28 @@ end = struct
 end
 [%%expect{|
 module Y : sig module type X = sig end val y : int end
+|}]
+
+class type x = object end[@@deriving cd]
+[%%expect{|
+class type x = object  end
+val y : int = 42
+|}]
+
+
+let mbmd =
+  Deriving.add "mbmd"
+    ~sig_module_decl:(Deriving.Generator.make_noarg (fun ~loc ~path:_ _ -> [%sig: val y : int]))
+    ~str_module_binding:(Deriving.Generator.make_noarg (fun ~loc ~path:_ _ -> [%str let y = 42]))
+
+[%%expect{|
+val mbmd : Deriving.t = <abstr>
+|}]
+
+module X = struct
+  type t
+end[@@deriving mbmd]
+[%%expect{|
+module X : sig type t end
+val y : int = 42
 |}]

@@ -676,7 +676,7 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
       get_modality_doc modality
     | _ -> get_modality_doc modality)
   (* Jkinds *)
-  | Mod_bound { txt = Mode mod_bound; loc } :: _ ->
+  | Mod_bound { txt = Pmode mod_bound; loc } :: _ ->
     get_mod_bound_doc ~loc mod_bound
   | Scannable_axis_annotation { txt = annot; _ } :: _ ->
     get_scannable_axis_annotation_doc annot

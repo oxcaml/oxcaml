@@ -244,34 +244,31 @@ merlin-promote:
 # installed compiler in $(OXCAML_INSTALL) (found through PATH and OCAMLLIB).
 # That root only holds symlinks to the projects involved, which keeps the
 # compiler's own dune rules and $(OXCAML_INSTALL) out of the workspace.
-# Sources that are not checked in come from nix (see default.nix) and are
-# symlinked into external/ast-dependent-libs/deps/, which is gitignored.
+# Sources that are not checked in come from nix (see default.nix). The
+# libraries that are only there as dependencies are symlinked into the
+# oxcaml-private/ directory of the project that uses them, and are installed as
+# its private sub-libraries; ppx_derivers and sexp_type, which are shipped as
+# their own packages, and test-only dependencies are symlinked into
+# external/ast-dependent-libs/deps/. Both are gitignored.
+#
+# They can also be built by the compiler build itself, against the compiler
+# being built: `make compiler WITH_JSOO=1` builds them along with it, in its
+# main context, and jsoo-install-shipped installs from that build.
 
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
+jsoo_private_deps = external/js_of_ocaml/oxcaml-private
 
 # The build directory is the default, $(ast_dependent_libs_root)/_build: with an
 # absolute --build-dir, dune install records absolute build-directory paths for
 # library archives in the installed dune-package files.
 ws_ast_dependent_libs = --root=$(ast_dependent_libs_root) \
   --workspace=$(CURDIR)/duneconf/ast-dependent-libs.ws
-# js_of_ocaml's dune-workspace sets up its test aliases, but is only read by
-# default when js_of_ocaml is the dune root.
-ws_jsoo_test = --root=$(ast_dependent_libs_root) \
-  --workspace=$(CURDIR)/external/js_of_ocaml/dune-workspace \
-  --profile=with-effects \
-  --build-dir=$(CURDIR)/_build/jsoo-test
 
-# STDLIB_JSIR_OCAMLOPT_FLAGS: the optimisation flags the compiler's libraries
-# are built with natively, so that their corresponding JSIR builds can use the
-# same flags.
 define dune_ast_dependent_libs_context
 (lang dune 3.23)
 (context (default
-  (profile release)
-  (env (_
-    (env-vars
-      (STDLIB_JSIR_OCAMLOPT_FLAGS "$(main_ocamlopt_optimization_flags)"))))))
+  (profile release)))
 endef
 
 duneconf/ast-dependent-libs.ws: export contents = $(dune_ast_dependent_libs_context)
@@ -288,7 +285,8 @@ ast_dependent_libs_env = \
     OCAMLLIB="$(OXCAML_INSTALL)/lib/ocaml" \
     OCAMLFIND_CONF=/dev/null \
     OCAMLPARAM="_,syntax-quotations=0" \
-    DUNE_CACHE=disabled
+    DUNE_CACHE=disabled \
+    $(build_stdlib_jsir)
 
 # The .install files are not promoted, as some of the sources are read-only.
 ast_dependent_libs_dune = \
@@ -305,16 +303,8 @@ ast-dependent-libs-compiler:
 	  exit 1; }
 	@mkdir -p _build
 
-# Against the system compiler, in isolated dune roots so that ppxlib_jane's
+# Against the system compiler, in an isolated dune root so that ppxlib_jane's
 # (select ...) picks the upstream shim.
-.PHONY: ocaml-compiler-libs-build-boot
-ocaml-compiler-libs-build-boot:
-	mkdir -p _build
-	$(dune) build \
-	  --root=external/ocaml-compiler-libs \
-	  --build-dir="$(CURDIR)/_build/ocaml-compiler-libs-boot" \
-	  @install
-
 .PHONY: ppxlib-jane-build-boot
 ppxlib-jane-build-boot:
 	mkdir -p _build
@@ -324,31 +314,28 @@ ppxlib-jane-build-boot:
 	  @default
 
 .PHONY: ast-dependent-libs-build-boot
-ast-dependent-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-boot
+ast-dependent-libs-build-boot: ppxlib-jane-build-boot
 
-# Each deps/<name> names the variable holding its nix-provided source.
 $(ast_dependent_libs_deps)/ppx_derivers: src_var = PPXLIB_PPX_DERIVERS_SRC
 $(ast_dependent_libs_deps)/sexp_type: src_var = PPXLIB_SEXP_TYPE_SRC
-$(ast_dependent_libs_deps)/stdlib-shims: src_var = PPXLIB_STDLIB_SHIMS_SRC
-$(ast_dependent_libs_deps)/gen: src_var = SEDLEX_GEN_SRC
-$(ast_dependent_libs_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
-$(ast_dependent_libs_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
-$(ast_dependent_libs_deps)/menhir: src_var = JSOO_MENHIR_SRC
-$(ast_dependent_libs_deps)/yojson: src_var = JSOO_YOJSON_SRC
+$(jsoo_private_deps)/gen: src_var = SEDLEX_GEN_SRC
+$(jsoo_private_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
+$(jsoo_private_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
+$(jsoo_private_deps)/menhir: src_var = JSOO_MENHIR_SRC
+$(jsoo_private_deps)/yojson: src_var = JSOO_YOJSON_SRC
 $(ast_dependent_libs_deps)/out-channel-redirect: src_var = JSOO_OUT_CHANNEL_REDIRECT_SRC
 $(ast_dependent_libs_deps)/qcheck: src_var = JSOO_QCHECK_SRC
 
 PPXLIB_DEPS = \
   $(ast_dependent_libs_deps)/ppx_derivers \
-  $(ast_dependent_libs_deps)/sexp_type \
-  $(ast_dependent_libs_deps)/stdlib-shims
+  $(ast_dependent_libs_deps)/sexp_type
 
 JSOO_DEPS = \
-  $(ast_dependent_libs_deps)/gen \
-  $(ast_dependent_libs_deps)/sedlex \
-  $(ast_dependent_libs_deps)/cmdliner \
-  $(ast_dependent_libs_deps)/menhir \
-  $(ast_dependent_libs_deps)/yojson
+  $(jsoo_private_deps)/gen \
+  $(jsoo_private_deps)/sedlex \
+  $(jsoo_private_deps)/cmdliner \
+  $(jsoo_private_deps)/menhir \
+  $(jsoo_private_deps)/yojson
 
 JSOO_TEST_DEPS = \
   $(ast_dependent_libs_deps)/out-channel-redirect \
@@ -373,12 +360,16 @@ jsoo-build: ast-dependent-libs-compiler duneconf/ast-dependent-libs.ws \
   $(PPXLIB_DEPS) $(JSOO_DEPS)
 	$(ast_dependent_libs_dune) $(ws_ast_dependent_libs) @jsoo-libs
 
-# The packages built by the ppxlib-libs and jsoo-libs aliases.
-PPXLIB_PACKAGES = ocaml-compiler-libs ppx_derivers sexp_type stdlib-shims \
-  ppxlib_ast ppxlib ppxlib_jane
-JSOO_PACKAGES = $(PPXLIB_PACKAGES) gen sedlex cmdliner menhirLib menhirSdk \
-  yojson js_of_ocaml-compiler wasm_of_ocaml-compiler js_of_ocaml-ppx \
-  js_of_ocaml-runtime js_of_ocaml
+# The packages built by the ppxlib-libs and jsoo-libs aliases. js_of_ocaml's
+# private dependencies are installed with its packages, as sub-libraries.
+PPXLIB_PACKAGES = ppx_derivers sexp_type ppxlib_ast ppxlib ppxlib_jane
+JSOO_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-compiler \
+  wasm_of_ocaml-compiler js_of_ocaml-ppx js_of_ocaml-runtime js_of_ocaml \
+  js_of_ocaml-toplevel
+
+# Enables the rules of $(ast_dependent_libs_root)/stdlib-jsir, which other
+# builds of the compiler's workspace leave disabled (see its dune file).
+build_stdlib_jsir = OXCAML_BUILD_STDLIB_JSIR=true
 
 stdlib_jsir_install = \
   $(call ast_dependent_libs_install,--sections=lib_root stdlib-jsir)
@@ -398,26 +389,49 @@ jsoo-install: jsoo-build
 	$(call ast_dependent_libs_install,$(JSOO_PACKAGES))
 	$(stdlib_jsir_install)
 
-# What the compiler package ships: the js_of_ocaml and wasm_of_ocaml
-# executables, the libraries needed to write and preprocess js_of_ocaml
-# code, and the standard library for JSIR.
-SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler
-SHIPPED_LIB_PACKAGES = $(PPXLIB_PACKAGES) js_of_ocaml-runtime js_of_ocaml \
-  js_of_ocaml-ppx
+SHIPPED_BIN_PACKAGES = js_of_ocaml-compiler wasm_of_ocaml-compiler \
+  js_of_ocaml-toplevel
+SHIPPED_LIB_PACKAGES = $(JSOO_PACKAGES)
 SHIPPED_LIB_SECTIONS = lib,lib_root,libexec,libexec_root,stublibs
 
-.PHONY: jsoo-install-shipped
-jsoo-install-shipped: jsoo-build
-	$(call ast_dependent_libs_install,--sections=bin $(SHIPPED_BIN_PACKAGES))
-	$(call ast_dependent_libs_install,--sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES))
-	$(stdlib_jsir_install)
+ifeq ($(WITH_JSOO),1)
+compiler_jsoo_targets = @$(ast_dependent_libs_root)/jsoo-libs
+compiler_jsoo_env = $(build_stdlib_jsir)
+compiler: $(PPXLIB_DEPS) $(JSOO_DEPS)
+endif
 
+# From the compiler build (see above): the build is a no-op after
+# `make compiler WITH_JSOO=1`.
+.PHONY: jsoo-install-shipped
+jsoo-install-shipped: boot-compiler $(PPXLIB_DEPS) $(JSOO_DEPS)
+	$(build_stdlib_jsir) $(dune) build $(ws_main) \
+	  --promote-install-files=false @$(ast_dependent_libs_root)/jsoo-libs
+	$(build_stdlib_jsir) $(dune) install $(ws_main) \
+	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=bin $(SHIPPED_BIN_PACKAGES)
+	$(build_stdlib_jsir) $(dune) install $(ws_main) \
+	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=$(SHIPPED_LIB_SECTIONS) $(SHIPPED_LIB_PACKAGES)
+	$(build_stdlib_jsir) $(dune) install $(ws_main) \
+	  --prefix="$(AST_DEPENDENT_LIBS_PREFIX)" \
+	  --sections=lib_root stdlib-jsir
+
+# The tests run in the compiler build too, against the js_of_ocaml it ships
+# (the main context sets up what js_of_ocaml's dune-workspace does). The nix
+# oxcaml package runs them in its check phase. The programs the tests compile
+# with ocamlc, some of which use unix, are compiled with the local _install.
+# Their expected outputs assume that OCAMLRUNPARAM does not ask for backtraces.
+# Like `make test`, this installs the compiler: the bytecode executables of the
+# tests refer to the installed ocamlrun.
 .PHONY: jsoo-test
-jsoo-test: ast-dependent-libs-compiler \
-  $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
-	PROJECT_ROOT="$(CURDIR)/_build/jsoo-test/default/js_of_ocaml" \
+jsoo-test: install $(PPXLIB_DEPS) $(JSOO_DEPS) $(JSOO_TEST_DEPS)
+	PROJECT_ROOT="$(CURDIR)/_build/main/$(ast_dependent_libs_root)/js_of_ocaml" \
+	OCAMLC="env OCAMLLIB=$(CURDIR)/_install/lib/ocaml $(CURDIR)/_install/bin/ocamlc.opt" \
+	CAML_LD_LIBRARY_PATH="$(CURDIR)/_install/lib/ocaml/stublibs" \
 	WASM_OF_OCAML=true \
-	  $(ast_dependent_libs_dune) $(ws_jsoo_test) @jsoo-test
+	  env -u OCAMLRUNPARAM \
+	  $(dune) build $(ws_main) --promote-install-files=false \
+	  @@$(ast_dependent_libs_root)/jsoo-test
 
 ifeq ($(with_jsir),true)
 install_for_test: jsoo-install-shipped

@@ -1,11 +1,11 @@
 (env
  (_ (flags (:standard -no-principal -w -69-70))))
 
-(vendored_dirs gc-timings memtrace ocaml-compiler-libs ocaml-jit owee ppxlib
-  ppxlib_jane)
+(vendored_dirs gc-timings memtrace ocaml-jit owee)
 
-; js_of_ocaml is only built from ast-dependent-libs/.
+; Data for the sources that middle_end/flambda2/to_jsir/jsoo_imports copies.
+; js_of_ocaml itself is built through ast-dependent-libs/, which links to it.
 (data_only_dirs js_of_ocaml)
 
-; ast-dependent-libs/ is a dune root of its own (see ast-dependent-libs/dune).
-(dirs :standard \ ast-dependent-libs)
+; Built through ast-dependent-libs/, which links to them.
+(dirs :standard \ ppxlib ppxlib_jane)

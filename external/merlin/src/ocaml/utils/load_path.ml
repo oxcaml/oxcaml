@@ -67,16 +67,17 @@ module Dune_manifests_reader : sig
       val root_override : string option ref
     end
 
-    module Load_root_relative : sig
-      type t
-
-      val of_string : string -> t
-    end
-
     module Cwd_relative : sig
       type t
 
       val to_string : t -> string
+    end
+
+    module Load_root_relative : sig
+      type t
+
+      val of_string : string -> t
+      val to_cwd_relative : t -> Cwd_relative.t
     end
   end
 

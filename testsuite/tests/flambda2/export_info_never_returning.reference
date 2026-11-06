@@ -24,6 +24,6 @@ Currying functions:
 Apply functions:
 Send functions:
 Force link: no
-Static data: Export_info_never_returning//0[ ]
+Static data: (missing)
 Function summaries for static checks:
 		camlExport_info_never_returning__entry = 0x15

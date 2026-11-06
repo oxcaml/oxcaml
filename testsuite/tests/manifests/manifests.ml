@@ -5,7 +5,7 @@
 *)
 
 
-let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_to_check = []) () =
+let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(hidden_include_files = []) ?(files_to_check = []) () =
   let disable_interactive f =
     let old_interactive = !Sys.interactive in
     Fun.protect ~finally:(fun () -> Sys.interactive := old_interactive)
@@ -16,6 +16,7 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_
   let cwd = Sys.getcwd () in
   Clflags.include_manifests := include_manifests;
   Clflags.hidden_include_manifests := hidden_include_manifests;
+  Clflags.hidden_include_files := hidden_include_files;
   let manifest_files_root = Filename.concat (Sys.getcwd ()) "manifests" in
   Load_path.For_testing.set_manifest_files_root (Some manifest_files_root);
   Load_path.init ~auto_include:Load_path.no_auto_include ~visible:[] ~hidden:[];
@@ -42,6 +43,7 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_
 val run_test :
   ?include_manifests:string list ->
   ?hidden_include_manifests:string list ->
+  ?hidden_include_files:Clflags.hidden_include_file list ->
   ?files_to_check:string list -> unit -> unit = <fun>
 |}]
 
@@ -121,4 +123,60 @@ let () =
 [%%expect{|
 qux.cmi -> $PWD/manifests/04/qux (hidden)
 quux.cmi -> $PWD/manifests/04/quux (hidden)
+|}]
+
+(* Parsing of -H-file arguments *)
+let () =
+  List.iter (fun entry ->
+    match Clflags.parse_hidden_include_file ~cmx_guaranteed:false entry with
+    | Ok { visible_path; actual_path; _ } ->
+      Format.printf "%S -> %S %S@." entry visible_path actual_path
+    | Error msg -> Format.printf "%S -> Error: %s@." entry msg)
+  [ "foo/foo.cmi:00/foo";
+    "foo.cmi:00/foo:extra";
+    "foo.cmi 00/foo";
+    "foo.cmi" ]
+
+[%%expect{|
+"foo/foo.cmi:00/foo" -> "foo/foo.cmi" "00/foo"
+"foo.cmi:00/foo:extra" -> Error: Expected '<visible_path>:<actual_path>', got: foo.cmi:00/foo:extra
+"foo.cmi 00/foo" -> Error: Expected '<visible_path>:<actual_path>', got: foo.cmi 00/foo
+"foo.cmi" -> Error: Expected '<visible_path>:<actual_path>', got: foo.cmi
+|}]
+
+(* -H-file and -Hx-file *)
+let () =
+  run_test ~hidden_include_files:[
+    { Clflags.visible_path = "foo/foo.cmi"; actual_path = "00/foo"; cmx_guaranteed = false };
+    { Clflags.visible_path = "qux/qux.cmi"; actual_path = "04/qux"; cmx_guaranteed = true };
+  ] ~files_to_check:["foo.cmi"; "qux.cmi"; "baz.cmi"] ()
+
+[%%expect{|
+foo.cmi -> $PWD/manifests/00/foo (hidden)
+qux.cmi -> $PWD/manifests/04/qux (hidden)
+baz.cmi -> Not_found
+|}]
+
+(* -H-file takes precedence over -H-manifest *)
+let () =
+  run_test ~hidden_include_manifests:[
+    "03/03-manifest.txt";
+  ] ~hidden_include_files:[
+    { Clflags.visible_path = "baz.cmi"; actual_path = "04/quux"; cmx_guaranteed = false };
+  ] ~files_to_check:["baz.cmi"] ()
+
+[%%expect{|
+baz.cmi -> $PWD/manifests/04/quux (hidden)
+|}]
+
+(* The first -H-file flag takes precedence (the list is in reverse command-line
+   order) *)
+let () =
+  run_test ~hidden_include_files:[
+    { Clflags.visible_path = "baz.cmi"; actual_path = "04/quux"; cmx_guaranteed = false };
+    { Clflags.visible_path = "baz.cmi"; actual_path = "04/qux"; cmx_guaranteed = false };
+  ] ~files_to_check:["baz.cmi"] ()
+
+[%%expect{|
+baz.cmi -> $PWD/manifests/04/qux (hidden)
 |}]
