@@ -1868,6 +1868,12 @@ let class_mode =
     ~hint_comonadic:hint
     Const.legacy)
 
+(* In modules, we take classes as implicitly under a [@@ dynamic] modality. *)
+let class_modality =
+  Mode.(Modality.(
+    Const.set (Monadic Staticity)
+      (Monadic.Atom.Join_const Staticity.Dynamic) Const.id))
+
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
   Mode.With_regionality.(of_const
