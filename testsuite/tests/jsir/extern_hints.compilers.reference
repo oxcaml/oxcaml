@@ -239,32 +239,7 @@ Entry point: 0
   v235 = imm{tag=0; 0 = v236; 1 = v231}
   v237 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__Pmakeblock_82"j, v235) 
   v239 = fun(v238){1 ()} [hint:(int)->int never_inline]
-  (assign) v290 = v239
-  v291 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__string_loads_83"j, v290) 
-  v293 = fun(v292){26 ()} [hint:(int)->int never_inline]
-  (assign) v360 = v293
-  v361 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__bytes_accesses_84"j, v360) 
-  v363 = fun(v362){60 ()} [hint:(int)->int never_inline]
-  (assign) v487 = v363
-  v488 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__bigstring_accesses_85"j, v487) 
-  v490 = fun(v489){96 ()} [hint:(int)->int never_inline]
-  (assign) v518 = v490
-  v519 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__bigarray_accesses_86"j, v518) 
-  v521 = fun(v520){111 ()} [hint:(int)->int never_inline]
-  (assign) v529 = v521
-  v530 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__int64_comparisons_87"j, v529) 
-  v532 = fun(v531){124 ()} [hint:(value)->int never_inline]
-  (assign) v534 = v532
-  v535 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__generic_length_88"j, v534) 
-  v537 = fun(v536){125 ()} [hint:(int)->int never_inline]
-  (assign) v553 = v537
-  v554 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__array_lengths_89"j, v553) 
-  v556 = fun(v555){133 ()} [hint:(int)->int never_inline]
-  (assign) v564 = v556
-  v565 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__unboxed_externals_90"j, v564) 
-  v567 = CONST{0}
-  v568 = v290(v567)
-  branch 142 (v568)
+  branch 26 (v239)
 
 ==== 1 () ====
   event extern_hints.ml:88:10
@@ -485,11 +460,16 @@ Entry point: 0
 ==== 25 () ====
   return v289
 
-==== 26 () ====
-  v295 = "caml_create_bytes"(8) 
-  branch 27 (v295)
+==== 26 (v290) ====
+  v291 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__string_loads_83"j, v290) 
+  v293 = fun(v292){27 ()} [hint:(int)->int never_inline]
+  branch 61 (v293)
 
-==== 27 (v294) ====
+==== 27 () ====
+  v295 = "caml_create_bytes"(8) 
+  branch 28 (v295)
+
+==== 28 (v294) ====
   event extern_hints.ml:99:10
   event extern_hints.ml:99:33
   event extern_hints.ml:100:2
@@ -501,21 +481,21 @@ Entry point: 0
   event extern_hints.ml:100:2
   v299 = 0l <= v298
   event extern_hints.ml:100:21
-  if v299 then 29 (v298) else 28 ()
+  if v299 then 30 (v298) else 29 ()
 
-==== 28 () ====
+==== 29 () ====
   raise v5
 
-==== 29 (v296) ====
+==== 30 (v296) ====
   event extern_hints.ml:100:2
   v300 = "caml_bytes_unsafe_set"(v294, 0l, -16) 
   event extern_hints.ml:100:21
   event extern_hints.ml:101:10
   v301 = 0l <= v296
   event extern_hints.ml:101:25
-  if v301 then 32 () else 31 ()
+  if v301 then 33 () else 32 ()
 
-==== 30 () ====
+==== 31 () ====
   event extern_hints.ml:102:2
   v308 = "caml_nativeint_sub"(v296, 1l)
   event extern_hints.ml:102:22
@@ -531,12 +511,12 @@ Entry point: 0
   event extern_hints.ml:102:2
   v312 = 0l <= v311
   event extern_hints.ml:102:22
-  if v312 then 35 (v308, v309) else 34 ()
-
-==== 31 () ====
-  raise v5
+  if v312 then 36 (v308, v309) else 35 ()
 
 ==== 32 () ====
+  raise v5
+
+==== 33 () ====
   event extern_hints.ml:101:10
   v302 = "caml_bytes_unsafe_get"(v294, 0l)
   v303 = v302 << 24
@@ -547,15 +527,15 @@ Entry point: 0
   event extern_hints.ml:101:9
   v305 = v304 === -16
   event extern_hints.ml:101:32
-  if v305 then 30 () else 33 ()
-
-==== 33 () ====
-  raise v59
+  if v305 then 31 () else 34 ()
 
 ==== 34 () ====
+  raise v59
+
+==== 35 () ====
   raise v5
 
-==== 35 (v307, v306) ====
+==== 36 (v307, v306) ====
   event extern_hints.ml:102:2
   v313 = "caml_bytes_set16u"(v294, 0l, -2)  [hint:unsafe]
   event extern_hints.ml:102:22
@@ -568,18 +548,18 @@ Entry point: 0
   event extern_hints.ml:103:10
   v318 = 0l <= v317
   event extern_hints.ml:103:25
-  if v318 then 38 (v317) else 37 ()
+  if v318 then 39 (v317) else 38 ()
 
-==== 36 (v314) ====
+==== 37 (v314) ====
   event extern_hints.ml:104:10
   v321 = 0l <= v314
   event extern_hints.ml:104:26
-  if v321 then 42 () else 41 ()
+  if v321 then 43 () else 42 ()
 
-==== 37 () ====
+==== 38 () ====
   raise v5
 
-==== 38 (v315) ====
+==== 39 (v315) ====
   event extern_hints.ml:103:10
   v319 = "caml_bytes_get16u"(v294, 0l) [hint:unsafe]
   event extern_hints.ml:103:25
@@ -588,12 +568,12 @@ Entry point: 0
   event extern_hints.ml:103:9
   v320 = v319 === 65534
   event extern_hints.ml:103:35
-  if v320 then 36 (v315) else 39 ()
-
-==== 39 () ====
-  raise v66
+  if v320 then 37 (v315) else 40 ()
 
 ==== 40 () ====
+  raise v66
+
+==== 41 () ====
   event extern_hints.ml:105:2
   v328 = "caml_nativeint_sub"(v296, 3l)
   event extern_hints.ml:105:29
@@ -609,12 +589,12 @@ Entry point: 0
   event extern_hints.ml:105:2
   v332 = 0l <= v331
   event extern_hints.ml:105:29
-  if v332 then 45 (v328, v329) else 44 ()
-
-==== 41 () ====
-  raise v5
+  if v332 then 46 (v328, v329) else 45 ()
 
 ==== 42 () ====
+  raise v5
+
+==== 43 () ====
   event extern_hints.ml:104:10
   v322 = "caml_bytes_get16u"(v294, 0l) [hint:unsafe]
   v323 = v322 << 16
@@ -625,15 +605,15 @@ Entry point: 0
   event extern_hints.ml:104:9
   v325 = v324 === -2
   event extern_hints.ml:104:32
-  if v325 then 40 () else 43 ()
-
-==== 43 () ====
-  raise v73
+  if v325 then 41 () else 44 ()
 
 ==== 44 () ====
+  raise v73
+
+==== 45 () ====
   raise v5
 
-==== 45 (v327, v326) ====
+==== 46 (v327, v326) ====
   event extern_hints.ml:105:2
   v333 = "caml_bytes_set32u"(v294, 0l, 305419896l)  [hint:unsafe]
   event extern_hints.ml:105:29
@@ -646,33 +626,33 @@ Entry point: 0
   event extern_hints.ml:106:10
   v338 = 0l <= v337
   event extern_hints.ml:106:25
-  if v338 then 48 (v337) else 47 ()
+  if v338 then 49 (v337) else 48 ()
 
-==== 46 (v334) ====
+==== 47 (v334) ====
   event extern_hints.ml:107:2
   v341 = 0l <= v334
   event extern_hints.ml:107:23
-  if v341 then 51 () else 50 ()
+  if v341 then 52 () else 51 ()
 
-==== 47 () ====
+==== 48 () ====
   raise v5
 
-==== 48 (v335) ====
+==== 49 (v335) ====
   event extern_hints.ml:106:10
   v339 = "caml_bytes_get32u"(v294, 0l) [hint:unsafe]
   event extern_hints.ml:106:25
   event extern_hints.ml:106:9
   v340 = v339 === 305419896l
   event extern_hints.ml:106:40
-  if v340 then 46 (v335) else 49 ()
-
-==== 49 () ====
-  raise v80
+  if v340 then 47 (v335) else 50 ()
 
 ==== 50 () ====
-  raise v5
+  raise v80
 
 ==== 51 () ====
+  raise v5
+
+==== 52 () ====
   event extern_hints.ml:107:2
   v342 = "caml_bytes_setf32u"(v294, 0l, 1.5)  [hint:unsafe]
   event extern_hints.ml:107:23
@@ -685,9 +665,9 @@ Entry point: 0
   event extern_hints.ml:108:9
   v345 = "caml_eq_float"(v344, 1.5)
   event extern_hints.ml:108:52
-  if v345 then 52 () else 53 ()
+  if v345 then 53 () else 54 ()
 
-==== 52 () ====
+==== 53 () ====
   event extern_hints.ml:109:2
   v348 = "caml_nativeint_sub"(v296, 7l)
   event extern_hints.ml:109:37
@@ -703,15 +683,15 @@ Entry point: 0
   event extern_hints.ml:109:2
   v352 = 0l <= v351
   event extern_hints.ml:109:37
-  if v352 then 55 (v348, v349) else 54 ()
-
-==== 53 () ====
-  raise v87
+  if v352 then 56 (v348, v349) else 55 ()
 
 ==== 54 () ====
+  raise v87
+
+==== 55 () ====
   raise v5
 
-==== 55 (v347, v346) ====
+==== 56 (v347, v346) ====
   event extern_hints.ml:109:2
   v353 = "caml_bytes_set64u"(v294, 0l, 72623859790382856L)  [hint:unsafe]
   event extern_hints.ml:109:37
@@ -724,12 +704,12 @@ Entry point: 0
   event extern_hints.ml:110:10
   v356 = 0l <= v355
   event extern_hints.ml:110:25
-  if v356 then 57 () else 56 ()
-
-==== 56 () ====
-  raise v5
+  if v356 then 58 () else 57 ()
 
 ==== 57 () ====
+  raise v5
+
+==== 58 () ====
   event extern_hints.ml:110:10
   v357 = "caml_bytes_get64u"(v294, 0l) [hint:unsafe]
   event extern_hints.ml:110:25
@@ -737,23 +717,28 @@ Entry point: 0
   v358 = "caml_equal"(v357, 72623859790382856L) [hint:int64]
   event extern_hints.ml:110:48
   v359 = CONST{0}
-  if v358 then 59 () else 58 ()
-
-==== 58 () ====
-  raise v94
+  if v358 then 60 () else 59 ()
 
 ==== 59 () ====
-  return v359
+  raise v94
 
 ==== 60 () ====
+  return v359
+
+==== 61 (v360) ====
+  v361 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__bytes_accesses_84"j, v360) 
+  v363 = fun(v362){62 ()} [hint:(int)->int never_inline]
+  branch 98 (v363)
+
+==== 62 () ====
   event extern_hints.ml:114:45
   v364 = CONST{8}
   v365 = {tag=0; 0 = v364}
   event extern_hints.ml:114:52
   v367 = "caml_ba_create"(12, 0, v365) 
-  branch 61 (v367)
+  branch 63 (v367)
 
-==== 61 (v366) ====
+==== 63 (v366) ====
   event extern_hints.ml:114:22
   event extern_hints.ml:114:53
   event extern_hints.ml:115:2
@@ -765,12 +750,12 @@ Entry point: 0
   event extern_hints.ml:115:2
   v370 = 0l <= v369
   event extern_hints.ml:115:25
-  if v370 then 63 () else 62 ()
+  if v370 then 65 () else 64 ()
 
-==== 62 () ====
+==== 64 () ====
   raise v5
 
-==== 63 () ====
+==== 65 () ====
   event extern_hints.ml:115:2
   v371 = "caml_ba_set_raw_unsafe"(v366, 0l, -16)  [hint:unsafe/uint8/C]
   event extern_hints.ml:115:25
@@ -783,9 +768,9 @@ Entry point: 0
   event extern_hints.ml:116:10
   v374 = 0l <= v373
   event extern_hints.ml:116:29
-  if v374 then 66 () else 65 ()
+  if v374 then 68 () else 67 ()
 
-==== 64 () ====
+==== 66 () ====
   event extern_hints.ml:117:2
   v379 = "caml_ba_dim"(v366, 0)
   event extern_hints.ml:117:26
@@ -816,12 +801,12 @@ Entry point: 0
   event extern_hints.ml:117:2
   v388 = 0l <= v387
   event extern_hints.ml:117:26
-  if v388 then 69 () else 68 ()
+  if v388 then 71 () else 70 ()
 
-==== 65 () ====
+==== 67 () ====
   raise v5
 
-==== 66 () ====
+==== 68 () ====
   event extern_hints.ml:116:10
   v375 = "caml_ba_get_raw_unsafe"(v366, 0l) [hint:unsafe/uint8/C]
   v376 = v375 << 24
@@ -832,15 +817,15 @@ Entry point: 0
   event extern_hints.ml:116:9
   v378 = v377 === -16
   event extern_hints.ml:116:36
-  if v378 then 64 () else 67 ()
-
-==== 67 () ====
-  raise v101
-
-==== 68 () ====
-  raise v5
+  if v378 then 66 () else 69 ()
 
 ==== 69 () ====
+  raise v101
+
+==== 70 () ====
+  raise v5
+
+==== 71 () ====
   event extern_hints.ml:117:2
   v389 = "caml_ba_uint8_set16"(v366, 0l, -2) 
   event extern_hints.ml:117:26
@@ -874,9 +859,9 @@ Entry point: 0
   event extern_hints.ml:118:10
   v399 = 0l <= v398
   event extern_hints.ml:118:29
-  if v399 then 72 () else 71 ()
+  if v399 then 74 () else 73 ()
 
-==== 70 () ====
+==== 72 () ====
   event extern_hints.ml:119:10
   v402 = "caml_ba_dim"(v366, 0)
   event extern_hints.ml:119:30
@@ -907,12 +892,12 @@ Entry point: 0
   event extern_hints.ml:119:10
   v411 = 0l <= v410
   event extern_hints.ml:119:30
-  if v411 then 76 () else 75 ()
+  if v411 then 78 () else 77 ()
 
-==== 71 () ====
+==== 73 () ====
   raise v5
 
-==== 72 () ====
+==== 74 () ====
   event extern_hints.ml:118:10
   v400 = "caml_ba_uint8_get16"(v366, 0l)
   event extern_hints.ml:118:29
@@ -921,12 +906,12 @@ Entry point: 0
   event extern_hints.ml:118:9
   v401 = v400 === 65534
   event extern_hints.ml:118:39
-  if v401 then 70 () else 73 ()
+  if v401 then 72 () else 75 ()
 
-==== 73 () ====
+==== 75 () ====
   raise v108
 
-==== 74 () ====
+==== 76 () ====
   event extern_hints.ml:120:2
   v416 = "caml_ba_dim"(v366, 0)
   event extern_hints.ml:120:33
@@ -957,12 +942,12 @@ Entry point: 0
   event extern_hints.ml:120:2
   v425 = 0l <= v424
   event extern_hints.ml:120:33
-  if v425 then 79 () else 78 ()
+  if v425 then 81 () else 80 ()
 
-==== 75 () ====
+==== 77 () ====
   raise v5
 
-==== 76 () ====
+==== 78 () ====
   event extern_hints.ml:119:10
   v412 = "caml_ba_uint8_get16"(v366, 0l)
   v413 = v412 << 16
@@ -973,15 +958,15 @@ Entry point: 0
   event extern_hints.ml:119:9
   v415 = v414 === -2
   event extern_hints.ml:119:36
-  if v415 then 74 () else 77 ()
-
-==== 77 () ====
-  raise v115
-
-==== 78 () ====
-  raise v5
+  if v415 then 76 () else 79 ()
 
 ==== 79 () ====
+  raise v115
+
+==== 80 () ====
+  raise v5
+
+==== 81 () ====
   event extern_hints.ml:120:2
   v426 = "caml_ba_uint8_set32u"(v366, 0l, 305419896l)  [hint:unsafe]
   event extern_hints.ml:120:33
@@ -1015,9 +1000,9 @@ Entry point: 0
   event extern_hints.ml:121:10
   v436 = 0l <= v435
   event extern_hints.ml:121:29
-  if v436 then 82 () else 81 ()
+  if v436 then 84 () else 83 ()
 
-==== 80 () ====
+==== 82 () ====
   event extern_hints.ml:122:2
   v439 = "caml_ba_dim"(v366, 0)
   event extern_hints.ml:122:27
@@ -1048,27 +1033,27 @@ Entry point: 0
   event extern_hints.ml:122:2
   v448 = 0l <= v447
   event extern_hints.ml:122:27
-  if v448 then 85 () else 84 ()
+  if v448 then 87 () else 86 ()
 
-==== 81 () ====
+==== 83 () ====
   raise v5
 
-==== 82 () ====
+==== 84 () ====
   event extern_hints.ml:121:10
   v437 = "caml_ba_uint8_get32u"(v366, 0l) [hint:unsafe]
   event extern_hints.ml:121:29
   event extern_hints.ml:121:9
   v438 = v437 === 305419896l
   event extern_hints.ml:121:44
-  if v438 then 80 () else 83 ()
-
-==== 83 () ====
-  raise v122
-
-==== 84 () ====
-  raise v5
+  if v438 then 82 () else 85 ()
 
 ==== 85 () ====
+  raise v122
+
+==== 86 () ====
+  raise v5
+
+==== 87 () ====
   event extern_hints.ml:122:2
   v449 = "caml_ba_uint8_setf32u"(v366, 0l, 1.5)  [hint:unsafe]
   event extern_hints.ml:122:27
@@ -1102,9 +1087,9 @@ Entry point: 0
   event extern_hints.ml:123:27
   v459 = 0l <= v458
   event extern_hints.ml:123:49
-  if v459 then 88 () else 87 ()
+  if v459 then 90 () else 89 ()
 
-==== 86 () ====
+==== 88 () ====
   event extern_hints.ml:124:2
   v463 = "caml_ba_dim"(v366, 0)
   event extern_hints.ml:124:41
@@ -1135,12 +1120,12 @@ Entry point: 0
   event extern_hints.ml:124:2
   v472 = 0l <= v471
   event extern_hints.ml:124:41
-  if v472 then 91 () else 90 ()
+  if v472 then 93 () else 92 ()
 
-==== 87 () ====
+==== 89 () ====
   raise v5
 
-==== 88 () ====
+==== 90 () ====
   event extern_hints.ml:123:27
   v460 = "caml_ba_uint8_getf32u"(v366, 0l) [hint:unsafe]
   event extern_hints.ml:123:49
@@ -1150,15 +1135,15 @@ Entry point: 0
   event extern_hints.ml:123:9
   v462 = "caml_eq_float"(v461, 1.5)
   event extern_hints.ml:123:56
-  if v462 then 86 () else 89 ()
-
-==== 89 () ====
-  raise v129
-
-==== 90 () ====
-  raise v5
+  if v462 then 88 () else 91 ()
 
 ==== 91 () ====
+  raise v129
+
+==== 92 () ====
+  raise v5
+
+==== 93 () ====
   event extern_hints.ml:124:2
   v473 = "caml_ba_uint8_set64"(v366, 0l, 72623859790382856L) 
   event extern_hints.ml:124:41
@@ -1192,12 +1177,12 @@ Entry point: 0
   event extern_hints.ml:125:10
   v483 = 0l <= v482
   event extern_hints.ml:125:29
-  if v483 then 93 () else 92 ()
+  if v483 then 95 () else 94 ()
 
-==== 92 () ====
+==== 94 () ====
   raise v5
 
-==== 93 () ====
+==== 95 () ====
   event extern_hints.ml:125:10
   v484 = "caml_ba_uint8_get64"(v366, 0l)
   event extern_hints.ml:125:29
@@ -1205,23 +1190,28 @@ Entry point: 0
   v485 = "caml_equal"(v484, 72623859790382856L) [hint:int64]
   event extern_hints.ml:125:52
   v486 = CONST{0}
-  if v485 then 95 () else 94 ()
-
-==== 94 () ====
-  raise v136
-
-==== 95 () ====
-  return v486
+  if v485 then 97 () else 96 ()
 
 ==== 96 () ====
+  raise v136
+
+==== 97 () ====
+  return v486
+
+==== 98 (v487) ====
+  v488 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__bigstring_accesses_85"j, v487) 
+  v490 = fun(v489){99 ()} [hint:(int)->int never_inline]
+  branch 114 (v490)
+
+==== 99 () ====
   event extern_hints.ml:129:46
   v491 = CONST{4}
   v492 = {tag=0; 0 = v491}
   event extern_hints.ml:129:53
   v494 = "caml_ba_create"(1, 0, v492) 
-  branch 97 (v494)
+  branch 100 (v494)
 
-==== 97 (v493) ====
+==== 100 (v493) ====
   event extern_hints.ml:129:24
   event extern_hints.ml:129:54
   event extern_hints.ml:130:2
@@ -1233,12 +1223,12 @@ Entry point: 0
   event extern_hints.ml:130:2
   v497 = 2l <= v496
   event extern_hints.ml:130:25
-  if v497 then 99 () else 98 ()
+  if v497 then 102 () else 101 ()
 
-==== 98 () ====
+==== 101 () ====
   raise v5
 
-==== 99 () ====
+==== 102 () ====
   event extern_hints.ml:130:2
   v498 = "caml_ba_set_raw_unsafe"(v493, 2, 3.5)  [hint:unsafe/float64/C]
   event extern_hints.ml:130:25
@@ -1251,32 +1241,32 @@ Entry point: 0
   event extern_hints.ml:131:10
   v501 = 2l <= v500
   event extern_hints.ml:131:29
-  if v501 then 102 () else 101 ()
+  if v501 then 105 () else 104 ()
 
-==== 100 () ====
+==== 103 () ====
   event extern_hints.ml:133:54
   v504 = CONST{4}
   v505 = {tag=0; 0 = v504}
   event extern_hints.ml:133:61
   v507 = "caml_ba_create"(6, 1, v505) 
-  branch 104 (v507)
+  branch 107 (v507)
 
-==== 101 () ====
+==== 104 () ====
   raise v5
 
-==== 102 () ====
+==== 105 () ====
   event extern_hints.ml:131:10
   v502 = "caml_ba_get_raw_unsafe"(v493, 2) [hint:unsafe/float64/C]
   event extern_hints.ml:131:29
   event extern_hints.ml:131:9
   v503 = "caml_eq_float"(v502, 3.5)
   event extern_hints.ml:131:36
-  if v503 then 100 () else 103 ()
+  if v503 then 103 () else 106 ()
 
-==== 103 () ====
+==== 106 () ====
   raise v143
 
-==== 104 (v506) ====
+==== 107 (v506) ====
   event extern_hints.ml:133:32
   event extern_hints.ml:133:62
   event extern_hints.ml:134:2
@@ -1288,12 +1278,12 @@ Entry point: 0
   event extern_hints.ml:134:2
   v510 = 0l <= v509
   event extern_hints.ml:134:27
-  if v510 then 106 () else 105 ()
+  if v510 then 109 () else 108 ()
 
-==== 105 () ====
+==== 108 () ====
   raise v5
 
-==== 106 () ====
+==== 109 () ====
   event extern_hints.ml:134:2
   v511 = "caml_ba_set_raw_unsafe"(v506, 0, 42l)  [hint:unsafe/int32/Fortran]
   event extern_hints.ml:134:27
@@ -1306,12 +1296,12 @@ Entry point: 0
   event extern_hints.ml:135:10
   v514 = 0l <= v513
   event extern_hints.ml:135:31
-  if v514 then 108 () else 107 ()
+  if v514 then 111 () else 110 ()
 
-==== 107 () ====
+==== 110 () ====
   raise v5
 
-==== 108 () ====
+==== 111 () ====
   event extern_hints.ml:135:10
   v515 = "caml_ba_get_raw_unsafe"(v506, 0) [hint:unsafe/int32/Fortran]
   event extern_hints.ml:135:31
@@ -1319,15 +1309,20 @@ Entry point: 0
   v516 = v515 === 42l
   event extern_hints.ml:135:38
   v517 = CONST{0}
-  if v516 then 110 () else 109 ()
+  if v516 then 113 () else 112 ()
 
-==== 109 () ====
+==== 112 () ====
   raise v150
 
-==== 110 () ====
+==== 113 () ====
   return v517
 
-==== 111 () ====
+==== 114 (v518) ====
+  v519 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__bigarray_accesses_86"j, v518) 
+  v521 = fun(v520){115 ()} [hint:(int)->int never_inline]
+  branch 128 (v521)
+
+==== 115 () ====
   event extern_hints.ml:138:10
   event extern_hints.ml:138:19
   event extern_hints.ml:139:10
@@ -1339,9 +1334,9 @@ Entry point: 0
   event extern_hints.ml:140:9
   v522 = "caml_lessthan"(v153, v155) [hint:int64]
   event extern_hints.ml:140:16
-  if v522 then 112 () else 113 ()
+  if v522 then 116 () else 117 ()
 
-==== 112 () ====
+==== 116 () ====
   event extern_hints.ml:141:9
   event extern_hints.ml:141:17
   event extern_hints.ml:141:9
@@ -1349,12 +1344,12 @@ Entry point: 0
   event extern_hints.ml:141:9
   v523 = "caml_lessequal"(v153, v155) [hint:int64]
   event extern_hints.ml:141:17
-  if v523 then 114 () else 115 ()
+  if v523 then 118 () else 119 ()
 
-==== 113 () ====
+==== 117 () ====
   raise v161
 
-==== 114 () ====
+==== 118 () ====
   event extern_hints.ml:142:9
   event extern_hints.ml:142:16
   event extern_hints.ml:142:9
@@ -1362,12 +1357,12 @@ Entry point: 0
   event extern_hints.ml:142:9
   v524 = "caml_lessthan"(v153, v155) [hint:int64]
   event extern_hints.ml:142:16
-  if v524 then 116 () else 117 ()
+  if v524 then 120 () else 121 ()
 
-==== 115 () ====
+==== 119 () ====
   raise v168
 
-==== 116 () ====
+==== 120 () ====
   event extern_hints.ml:143:9
   event extern_hints.ml:143:17
   event extern_hints.ml:143:9
@@ -1375,12 +1370,12 @@ Entry point: 0
   event extern_hints.ml:143:9
   v525 = "caml_lessequal"(v153, v155) [hint:int64]
   event extern_hints.ml:143:17
-  if v525 then 118 () else 119 ()
+  if v525 then 122 () else 123 ()
 
-==== 117 () ====
+==== 121 () ====
   raise v175
 
-==== 118 () ====
+==== 122 () ====
   event extern_hints.ml:144:14
   event extern_hints.ml:144:21
   event extern_hints.ml:144:14
@@ -1388,12 +1383,12 @@ Entry point: 0
   event extern_hints.ml:144:14
   v526 = "caml_equal"(v153, v155) [hint:int64]
   event extern_hints.ml:144:21
-  if v526 then 121 () else 120 ()
+  if v526 then 125 () else 124 ()
 
-==== 119 () ====
+==== 123 () ====
   raise v182
 
-==== 120 () ====
+==== 124 () ====
   event extern_hints.ml:145:9
   event extern_hints.ml:145:17
   event extern_hints.ml:145:9
@@ -1402,24 +1397,34 @@ Entry point: 0
   v527 = "caml_notequal"(v153, v155) [hint:int64]
   event extern_hints.ml:145:17
   v528 = CONST{0}
-  if v527 then 123 () else 122 ()
+  if v527 then 127 () else 126 ()
 
-==== 121 () ====
+==== 125 () ====
   raise v189
 
-==== 122 () ====
+==== 126 () ====
   raise v196
 
-==== 123 () ====
+==== 127 () ====
   return v528
 
-==== 124 () ====
+==== 128 (v529) ====
+  v530 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__int64_comparisons_87"j, v529) 
+  v532 = fun(v531){129 ()} [hint:(value)->int never_inline]
+  branch 130 (v532)
+
+==== 129 () ====
   event extern_hints.ml:147:51
   v533 = v531.length [hint:generic]
   event extern_hints.ml:147:65
   return v533
 
-==== 125 () ====
+==== 130 (v534) ====
+  v535 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__generic_length_88"j, v534) 
+  v537 = fun(v536){131 ()} [hint:(int)->int never_inline]
+  branch 139 (v537)
+
+==== 131 () ====
   event extern_hints.ml:150:36
   v538 = CONST{2}
   v539 = CONST{1}
@@ -1441,132 +1446,143 @@ Entry point: 0
   event extern_hints.ml:152:9
   v546 = v545 === 2
   event extern_hints.ml:152:34
-  if v546 then 126 () else 127 ()
+  if v546 then 132 () else 133 ()
 
-==== 126 () ====
+==== 132 () ====
   event extern_hints.ml:153:10
   v547 = v544.length [hint:value]
   event extern_hints.ml:153:27
   event extern_hints.ml:153:9
   v548 = v547 === 3
   event extern_hints.ml:153:32
-  if v548 then 128 () else 129 ()
+  if v548 then 134 () else 135 ()
 
-==== 127 () ====
+==== 133 () ====
   raise v203
 
-==== 128 () ====
+==== 134 () ====
   v550 = v534(v544)
-  branch 130 (v550)
+  branch 136 (v550)
 
-==== 129 () ====
+==== 135 () ====
   raise v210
 
-==== 130 (v549) ====
+==== 136 (v549) ====
   event extern_hints.ml:154:9
   v551 = v549 === 3
   event extern_hints.ml:154:34
   v552 = CONST{0}
-  if v551 then 132 () else 131 ()
+  if v551 then 138 () else 137 ()
 
-==== 131 () ====
+==== 137 () ====
   raise v217
 
-==== 132 () ====
+==== 138 () ====
   return v552
 
-==== 133 () ====
+==== 139 (v553) ====
+  v554 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__array_lengths_89"j, v553) 
+  v556 = fun(v555){140 ()} [hint:(int)->int never_inline]
+  branch 147 (v556)
+
+==== 140 () ====
   event extern_hints.ml:157:15
   event extern_hints.ml:157:27
   event extern_hints.ml:157:10
   event extern_hints.ml:157:27
   v558 = "caml_sqrt_float"(v220) 
-  branch 135 (v558)
+  branch 142 (v558)
 
-==== 134 () ====
+==== 141 () ====
   event extern_hints.ml:158:25
   event extern_hints.ml:158:37
   event extern_hints.ml:158:10
   event extern_hints.ml:158:37
   v561 = "caml_int32_of_float"(v229) 
-  branch 137 (v561)
+  branch 144 (v561)
 
-==== 135 (v557) ====
+==== 142 (v557) ====
   event extern_hints.ml:157:9
   v559 = "caml_eq_float"(v557, 4)
   event extern_hints.ml:157:33
-  if v559 then 134 () else 136 ()
+  if v559 then 141 () else 143 ()
 
-==== 136 () ====
+==== 143 () ====
   raise v226
 
-==== 137 (v560) ====
+==== 144 (v560) ====
   event extern_hints.ml:158:9
   v562 = v560 === 3l
   event extern_hints.ml:158:43
   v563 = CONST{0}
-  if v562 then 139 () else 138 ()
+  if v562 then 146 () else 145 ()
 
-==== 138 () ====
+==== 145 () ====
   raise v235
 
-==== 139 () ====
+==== 146 () ====
   return v563
 
-==== 140 () ====
+==== 147 (v564) ====
+  v565 = "caml_register_symbol"("Extern_hints"j, "camlExtern_hints__unboxed_externals_90"j, v564) 
+  v567 = CONST{0}
+  v568 = v290(v567)
+  branch 150 (v568)
+
+==== 148 () ====
   v587 = imm{tag=0; 0 = v290; 1 = v360; 2 = v487; 3 = v518; 4 = v529; 5 = v534; 6 = v553; 7 = v564}
   v588 = "caml_register_global"(v587, "Extern_hints"j)
   stop
 
-==== 141 () ====
+==== 149 () ====
   v570 = CONST{0}
   v571 = v360(v570)
-  branch 144 (v571)
+  branch 152 (v571)
 
-==== 142 (v566) ====
-  branch 141 ()
-
-==== 143 () ====
-  v573 = CONST{0}
-  v574 = v487(v573)
-  branch 146 (v574)
-
-==== 144 (v569) ====
-  branch 143 ()
-
-==== 145 () ====
-  v576 = CONST{0}
-  v577 = v518(v576)
-  branch 148 (v577)
-
-==== 146 (v572) ====
-  branch 145 ()
-
-==== 147 () ====
-  v579 = CONST{0}
-  v580 = v529(v579)
-  branch 150 (v580)
-
-==== 148 (v575) ====
-  branch 147 ()
-
-==== 149 () ====
-  v582 = CONST{0}
-  v583 = v553(v582)
-  branch 152 (v583)
-
-==== 150 (v578) ====
+==== 150 (v566) ====
   branch 149 ()
 
 ==== 151 () ====
-  v585 = CONST{0}
-  v586 = v564(v585)
-  branch 153 (v586)
+  v573 = CONST{0}
+  v574 = v487(v573)
+  branch 154 (v574)
 
-==== 152 (v581) ====
+==== 152 (v569) ====
   branch 151 ()
 
-==== 153 (v584) ====
-  branch 140 ()
+==== 153 () ====
+  v576 = CONST{0}
+  v577 = v518(v576)
+  branch 156 (v577)
+
+==== 154 (v572) ====
+  branch 153 ()
+
+==== 155 () ====
+  v579 = CONST{0}
+  v580 = v529(v579)
+  branch 158 (v580)
+
+==== 156 (v575) ====
+  branch 155 ()
+
+==== 157 () ====
+  v582 = CONST{0}
+  v583 = v553(v582)
+  branch 160 (v583)
+
+==== 158 (v578) ====
+  branch 157 ()
+
+==== 159 () ====
+  v585 = CONST{0}
+  v586 = v564(v585)
+  branch 161 (v586)
+
+==== 160 (v581) ====
+  branch 159 ()
+
+==== 161 (v584) ====
+  branch 148 ()
 
 

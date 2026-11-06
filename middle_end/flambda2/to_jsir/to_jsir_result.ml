@@ -49,7 +49,10 @@ type t =
         (** JSOO has a similar variable which is incremented for every method
             call; we mimic this here. *)
     imported_compilation_units : Compilation_unit.Set.t;
-    global_data_var : Jsir.Var.t option
+    global_data_var : Jsir.Var.t option;
+    late_bound_vars : Jsir.Var.Set.t
+        (** Variables created ahead of their definition and since bound with
+            [To_jsir_shared.bind_vars]. *)
   }
 
 let create () =
@@ -60,7 +63,8 @@ let create () =
     invalid_switch_block = None;
     next_method_cache_id = 1;
     imported_compilation_units = Compilation_unit.Set.empty;
-    global_data_var = None
+    global_data_var = None;
+    late_bound_vars = Jsir.Var.Set.empty
   }
 
 let add_instr_exn t instr =
@@ -178,6 +182,16 @@ let import_compilation_unit t compilation_unit =
         Compilation_unit.Set.add compilation_unit t.imported_compilation_units
     }
 
+let add_late_bound_var_exn t var =
+  if Jsir.Var.Set.mem var t.late_bound_vars
+  then
+    Misc.fatal_errorf
+      "JSIR variable %a is bound twice. This usually means that a function or \
+       value slot appears in more than one set of closures, which the JSIR \
+       translation does not support."
+      Jsir.Var.print var;
+  { t with late_bound_vars = Jsir.Var.Set.add var t.late_bound_vars }
+
 let global_data_var t =
   match t.global_data_var with
   | Some var -> t, var
@@ -198,7 +212,8 @@ let to_program_exn
       invalid_switch_block = _;
       next_method_cache_id = _;
       imported_compilation_units;
-      global_data_var
+      global_data_var;
+      late_bound_vars = _
     } =
   if List.length current_blocks <> 0
   then
