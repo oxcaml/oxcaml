@@ -384,7 +384,6 @@ class Stats:
     passed: int = 0
     discarded: int = 0
     failed: int = 0
-    # Discarded cases whose generation timed out.
     generation_timeouts: int = 0
     last_completion: float | None = None
     smoothed_interval: float | None = None
