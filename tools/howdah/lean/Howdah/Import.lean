@@ -15,7 +15,7 @@ deriving instance Lean.FromJson, Lean.ToExpr for TypeExpr
 deriving instance Lean.FromJson, Lean.ToExpr for StructuredConstant
 deriving instance Lean.FromJson, Lean.ToExpr for BlockKind
 deriving instance Lean.FromJson, Lean.ToExpr for Primitive
-deriving instance Lean.FromJson, Lean.ToExpr for Lambda'
+deriving instance Lean.FromJson, Lean.ToExpr for Lambda
 deriving instance Lean.FromJson, Lean.ToExpr for RecordLabelDecl
 deriving instance Lean.FromJson, Lean.ToExpr for RecordTypeDecl
 deriving instance Lean.FromJson, Lean.ToExpr for TypeDesc
@@ -24,7 +24,7 @@ deriving instance Lean.FromJson, Lean.ToExpr for SignatureItem
 deriving instance Lean.FromJson, Lean.ToExpr for Signature
 
 instance : Lean.FromJson Value where
-  fromJson? _ := do throw s!"don't import `Value`s"
+  fromJson? _ := throw s!"don't import `Value`s"
 deriving instance Lean.ToExpr for Value
 
 deriving instance Lean.FromJson, Lean.ToExpr for JsonImport

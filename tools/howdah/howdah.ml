@@ -90,9 +90,9 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
         ("body", serialize_lambda body);
       ]
     |> tag "bind"
-  | Lprim (primitive, args, _) ->
+  | Lprim (prim, args, _) ->
     Json.Object
-      [ ("primitive", serialize_primitive primitive);
+      [ ("prim", serialize_primitive prim);
         ("args", Json.Array (List.map serialize_lambda args));
       ]
     |> tag "prim"

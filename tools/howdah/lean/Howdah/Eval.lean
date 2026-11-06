@@ -39,8 +39,8 @@ theorem PureEvalResult.map_halted {α β} {f : α → β} {x} :
 attribute [simp] dbgTrace
 
 @[simp]
-def Lambda'.substitute {V} (idToReplace : Ident) (value : V) :
-    Lambda' V → Lambda' V
+def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
+    Lambda V → Lambda V
   | .var id => if id = idToReplace then .value value else .var id
   | .const c => .const c
   | .prim p args =>
@@ -56,12 +56,12 @@ def Lambda'.substitute {V} (idToReplace : Ident) (value : V) :
     .bind id substSubstituted bodySubstituted
   | .value v => .value v
 decreasing_by
-  · decreasing_with exact Lambda'.size_lt_of_mem <| by assumption
+  · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
   · decreasing_tactic
   · decreasing_tactic
 
 @[simp]
-theorem Lambda'.size_substitute {V} (lambda : Lambda' V) idToReplace value :
+theorem Lambda.size_substitute {V} (lambda : Lambda V) idToReplace value :
     (lambda.substitute idToReplace value).size = lambda.size := by
   induction lambda with simp
   | var v => split <;> simp
@@ -95,7 +95,7 @@ def Primitive.pureEval (args : List Value) : Primitive → PureEvalResult Value
   | .makeBlock tag => BlockKind.bindValues tag args
 
 @[simp]
-def Lambda'.pureEval : Lambda → PureEvalResult Value
+def Lambda.pureEval : Expr → PureEvalResult Value
   | .var id => .unboundVariable id |> .error
   | .const c => c.pureEval
   | .prim p args => do
@@ -106,19 +106,19 @@ def Lambda'.pureEval : Lambda → PureEvalResult Value
     body.substitute id value |>.pureEval
   | .value v => .halted v
 decreasing_by
-  · decreasing_with exact Lambda'.size_lt_of_mem <| by assumption
+  · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
   · decreasing_tactic
   · decreasing_tactic
 
 @[simp]
-def Lambda'.pureEval! (lambda : Lambda) : Value :=
+def Lambda.pureEval! (lambda : Expr) : Value :=
   match lambda.pureEval with
   | .halted result => result
   | .maybeNonterminating => panic! "maybe nonterminating"
   | .error e => panic! toString e
 
 @[simp]
-def PureEval (lambda : Lambda) (value : Value) : Prop :=
+def PureEval (lambda : Expr) (value : Value) : Prop :=
   lambda.pureEval = .halted value
 
 notation:50 e " ⇓ " v => PureEval e v
