@@ -423,16 +423,8 @@ let rec make_aliases_absent ~aliased pres mty =
       pres, Mty_signature(List.map make_item sg)
   | Mty_functor(arg, res, mres, st) ->
       let _, res = make_aliases_absent ~aliased:false Mp_present res in
-<<<<<<< Merlin:jbachurski/some-functor-application-modes
-      pres, Mty_functor(arg, res, mres)
-  | Mty_ident _ | Mty_for_hole ->
-||||||| Compiler:last-imported
-      pres, Mty_functor(arg, res, mres)
-  | Mty_ident _ ->
-=======
       pres, Mty_functor(arg, res, mres, st)
-  | Mty_ident _ ->
->>>>>>> Compiler:HEAD
+  | Mty_ident _ | Mty_for_hole ->
       pres, mty
   | Mty_strengthen (mty,p,a) ->
       let aliased = aliased || Aliasability.is_aliasable a in
