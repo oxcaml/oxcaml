@@ -98,7 +98,6 @@ let hierarchy = ref (create ())
 let reset () = hierarchy := create ()
 
 let record_call_internal ?(accumulate = false) ?counter_f name f =
-  if !Clflags.profile_columns = [] then f () else
   let E prev_hierarchy = !hierarchy in
   let start_measure = Measure.create () in
   let this_measure_diff, this_table =
