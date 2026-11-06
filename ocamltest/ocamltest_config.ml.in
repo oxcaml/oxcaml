@@ -115,3 +115,5 @@ let naked_pointers = false
 let tsan = @tsan@
 
 let address_sanitizer = @address_sanitizer@
+
+let has_relative_libdir = @target_libdir_is_relative@

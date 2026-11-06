@@ -12,10 +12,29 @@
 ;*                                                                        *
 ;**************************************************************************
 
+; config.ml is assembled per dune context (see Makefile.common-ox). The
+; [default] (boot) context is built by the system compiler, which lacks the
+; %standard_library_default primitive, so it uses config.fixed_libdir.ml; the
+; OxCaml-built [main]/[runtime_stdlib] contexts use config.relocatable.ml.
 (rule
  (targets config.ml)
  (mode fallback)
- (deps config.generated.ml config.common.ml)
+ (enabled_if
+  (= %{context_name} "default"))
+ (deps config.generated.ml config.fixed_libdir.ml config.common.ml)
+ (action
+  (with-stdout-to
+   %{targets}
+   (system "cat %{deps}"))))
+
+(rule
+ (targets config.ml)
+ (mode fallback)
+ (enabled_if
+  (or
+   (= %{context_name} "main")
+   (= %{context_name} "runtime_stdlib")))
+ (deps config.generated.ml config.relocatable.ml config.common.ml)
  (action
   (with-stdout-to
    %{targets}

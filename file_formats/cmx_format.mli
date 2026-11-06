@@ -76,6 +76,7 @@ type unit_infos =
                                   (* Compile-time data of the unit's main module
                                      block, as produced by [Slambda.eval]. *)
     ui_file_sections: File_sections.t;
+    ui_need_stdlib: bool;         (* caml_standard_library_nat needed *)
   }
 
 type unit_infos_raw =
@@ -97,6 +98,7 @@ type unit_infos_raw =
     uir_external_symbols: string array;
     uir_static_data: Slambda.CU_data.raw;
     uir_sections_length: int;      (* Byte length of all sections *)
+    uir_need_stdlib: bool;         (* caml_standard_library_nat needed *)
   }
 
 (* Each .a library has a matching .cmxa file that provides the following
@@ -112,6 +114,7 @@ type lib_unit_info =
     li_quoted_cmi : Bitmap.t;   (* subset of lib_quoted_cmi *)
     li_quoted_cmx : Bitmap.t;   (* subset of lib_quoted_cmx *)
     li_external_symbols: string array;
+    li_need_stdlib: bool;       (* caml_standard_library_nat needed *)
   }
 
 type library_infos =
