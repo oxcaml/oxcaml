@@ -220,10 +220,16 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
+  | C_call
+      { needs_caml_c_call;
+        is_c_builtin;
+        effects;
+        coeffects;
+        fat_ptr_arg_starts
+      } ->
     To_cmm_extcall.translate_external_call env res ~free_vars apply
       ~callee_simple ~args ~return_arity ~return_ty dbg ~needs_caml_c_call
-      ~is_c_builtin ~effects ~coeffects
+      ~is_c_builtin ~effects ~coeffects ~fat_ptr_arg_starts
   | Method { kind; obj } ->
     C.fail_if_apply_with_probe apply;
     let callee =

@@ -25,7 +25,8 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged | Unpacked | Unsafe_unextended
+type native_repr_kind =
+  Unboxed | Untagged | Unpacked | Unsafe_unextended | Fat_ptr
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -120,7 +121,7 @@ type error =
   | Elide_void_on_non_void
   | Elide_void_in_return_position
   | All_external_arguments_elided
-  | Cannot_unbox_or_untag_type of native_repr_kind
+  | Bad_native_repr_attr of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
   | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
@@ -4325,18 +4326,22 @@ let get_native_repr_attribute attrs ~global_repr =
     Attr_helper.get_no_payload_attribute "untagged" attrs,
     Attr_helper.get_no_payload_attribute "unpacked" attrs,
     Attr_helper.get_no_payload_attribute "unsafe_unextended" attrs,
+    Attr_helper.get_no_payload_attribute "fat_ptr" attrs,
     global_repr
   with
-  | None, None, None, None, None -> Native_repr_attr_absent
-  | None, None, None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None, None, None -> Native_repr_attr_present Untagged
-  | None, None, Some _, None, None -> Native_repr_attr_present Unpacked
-  | None, None, None, Some _, None -> Native_repr_attr_present Unsafe_unextended
-  | Some { Location.loc }, _, _, _, _
-  | _, Some { Location.loc }, _, _, _
-  | _, _, Some { Location.loc }, _, _
-  | _, _, _, Some { Location.loc }, _ ->
+  | None, None, None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, None, None, Some repr -> Native_repr_attr_present repr
+  | Some _, None, None, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None, None, None -> Native_repr_attr_present Unpacked
+  | None, None, None, Some _, None, None ->
+    Native_repr_attr_present Unsafe_unextended
+  | None, None, None, None, Some _, None -> Native_repr_attr_present Fat_ptr
+  | Some { Location.loc }, _, _, _, _, _
+  | _, Some { Location.loc }, _, _, _, _
+  | _, _, Some { Location.loc }, _, _, _
+  | _, _, _, Some { Location.loc }, _, _
+  | _, _, _, _, Some { Location.loc }, _ ->
     Error.log_and_raise loc Multiple_native_repr_attributes
 
 let is_upstream_compatible_non_value_unbox env ty =
@@ -4468,6 +4473,23 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
     in
     Error.log_and_raise loc (Jkind_sort {env; kloc; typ; err})
 
+let rec strip_addressable_sort (s : Jkind_types.Sort.Const.t) =
+  match s with
+  | Addressable s -> strip_addressable_sort s
+  | (Base _ | Product _ | Univar _ | Genvar _) as s -> s
+
+(* A fat pointer: an unboxed pair of a [value] base and a [bits64] byte
+   offset. *)
+let sort_is_fat_pointer (sort : Jkind_types.Sort.Const.t) =
+  match strip_addressable_sort sort with
+  | Product [a; b] ->
+    (match strip_addressable_sort a, strip_addressable_sort b with
+     | Base Scannable, Base Bits64 -> true
+     | _, _ -> false)
+  | Base _ | Product _ | Univar _ | Genvar _
+  (* [strip_addressable_sort] never returns [Addressable _] *)
+  | Addressable _ -> false
+
 let make_native_repr
       env core_type ty ~global_repr ~is_layout_poly ~why ~is_return =
   error_if_has_deep_native_repr_attributes core_type;
@@ -4535,7 +4557,7 @@ let make_native_repr
     with
     | None ->
         Error.log_and_raise core_type.ptyp_loc
-          (Cannot_unbox_or_untag_type kind)
+          (Bad_native_repr_attr kind)
     | Some repr -> repr
     end
   | Native_repr_attr_present Unboxed, Sort (Univar _) ->
@@ -4545,7 +4567,7 @@ let make_native_repr
   | Native_repr_attr_present Unboxed,
     (Sort (Product _ | Base Void | Addressable _)) ->
     Error.log_and_raise core_type.ptyp_loc
-      (Cannot_unbox_or_untag_type Unboxed)
+      (Bad_native_repr_attr Unboxed)
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
     (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
        upstream-compatibility, we want the code to still work when all the
@@ -4586,7 +4608,7 @@ let make_native_repr
   | Native_repr_attr_present Unpacked, (Sort (Base _ | Addressable _) | Poly)
     ->
     Error.log_and_raise core_type.ptyp_loc
-      (Cannot_unbox_or_untag_type Unpacked)
+      (Bad_native_repr_attr Unpacked)
   | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
   | Native_repr_attr_present Unsafe_unextended,
@@ -4600,9 +4622,16 @@ let make_native_repr
       Bits64 | Word | Untagged_immediate | Float32 | Float64 | Vec128 | Vec256 |
       Vec512 | Mask))) ->
     Error.log_and_raise core_type.ptyp_loc
-      (Cannot_unbox_or_untag_type Unsafe_unextended)
+      (Bad_native_repr_attr Unsafe_unextended)
   | Native_repr_attr_present Unsafe_unextended, Sort (Univar _ | Genvar _) ->
     Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Fat_ptr, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
+  | Native_repr_attr_present Fat_ptr, Sort sort
+    when sort_is_fat_pointer sort ->
+    Raw_pointer
+  | Native_repr_attr_present Fat_ptr, (Sort _ | Poly) ->
+    Error.log_and_raise core_type.ptyp_loc (Bad_native_repr_attr Fat_ptr)
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -4624,7 +4653,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
     get_native_repr_attribute core_type.ptyp_attributes ~global_repr:None
   with
   | Ptyp_arrow _, Tarrow _, Native_repr_attr_present kind  ->
-      Error.log_and_raise core_type.ptyp_loc (Cannot_unbox_or_untag_type kind)
+      Error.log_and_raise core_type.ptyp_loc (Bad_native_repr_attr kind)
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
     let t1, _ = Btype.tpoly_get_poly t1 in
@@ -4650,7 +4679,8 @@ let rec parse_native_repr_attributes env core_type ty rmode
         | Same_as_ocaml_repr (Base Void) -> Elided_void
         | Same_as_ocaml_repr _ | Repr_poly | Unboxed_float _
         | Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _
-        | Unpacked_product _ | Unextended_bits8 | Unextended_bits16 ->
+        | Unpacked_product _ | Unextended_bits8 | Unextended_bits16
+        | Raw_pointer ->
           Error.log_and_raise loc Elide_void_on_non_void
     in
     let mode =
@@ -4705,14 +4735,33 @@ let check_unboxable env loc ty =
     all_unboxable_types
     ()
 
-let has_ty_var_with_layout_any env ty =
-  Ctype.exists_free_variable (fun _ jkind -> Jkind.has_layout_any env jkind) ty
+(* Unlike other similar functions, we care about [any] specifically, not just
+   unrepresentable layouts. Abstract kinds should pass this check; if they did
+   not, we would report an error with an inaccurate suggestion. *)
+let has_ty_var_containing_layout_any env ty =
+  (* Look through products but not [box], since we know how to represent
+     [any box]. Basically checks representability, just not abstract kinds. *)
+  let rec needs_to_represent_any : _ Jkind.Layout.t -> bool = function
+    | Any _ -> true
+    | Addressable l -> needs_to_represent_any l
+    | Product ls -> List.exists needs_to_represent_any ls
+    | Sort _ | Box _ -> false
+  in
+  Ctype.exists_free_variable
+    (fun _ jkind ->
+       match Jkind.extract_layout env jkind with
+       | Ok l -> needs_to_represent_any l
+       | Error _ -> false)
+    ty
 
 let unexpected_layout_any_check env prim cty ty =
   if Primitive.prim_can_contain_layout_any prim ||
      prim.prim_is_layout_poly then ()
   else
-  if has_ty_var_with_layout_any env ty then
+  (* Slightly conservative: doesn't check where these types containing [any]
+     occur, meaning we might reject an ['a : any] that only appears in
+     acceptable positions. But that seems fine. *)
+  if has_ty_var_containing_layout_any env ty then
     Error.log_and_raise cty.ctyp_loc
       (Unexpected_layout_any_in_primitive(prim.prim_name))
 
@@ -4745,7 +4794,7 @@ let unexpected_layout_any_check env prim cty ty =
       See comment in [prim_has_valid_reprs] about what it could miss.
 
    3. Built-in primitives that inspect the jkind of type parameters cannot have
-      type variables with jkind [any] anywhere within their types.
+      type variables containing jkind [any] anywhere within their types.
 
       This check is here to prevent someone from writing:
 
@@ -4756,15 +4805,14 @@ let unexpected_layout_any_check env prim cty ty =
 
       [let f x = len x]
 
-      [x] here will have type ['a array] where the jkind of ['a] is [any]. The
-      array kind function in [typeopt] will look at ['a] expecting it to be
-      representable and fail. This produces a bad error message that doesn't
-      point to the source of the mistake which is, in fact, the external
-      declaration.
+      [x] here will have type ['a array] where the jkind of ['a] is [any].
+      Specialization of the length primitive requires this be representable, and
+      will generate code based on the default, [value]. This disagrees with the
+      type of [f], which will still contain [any].
 
-      For this reason, we have [unexpected_layout_any_check].  It's here to
-      point out this type of mistake early and suggest the use of
-      [@layout_poly].
+      [unexpected_layout_any_check] rules this out by rejecting the external
+      declaration and suggesting [@layout_poly], which instead picks a sort
+      for ['a] at each use during type checking (not just during transl).
 
       An exception is raised if any of these checks fails. *)
 (* CR layouts v7.1: additionally, we do not allow externals to have unboxed
@@ -4936,7 +4984,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         Builtin_attributes.has_layout_poly valdecl.pval_attributes
       in
       if is_layout_poly &&
-         not (has_ty_var_with_layout_any env ty) then
+         not (has_ty_var_containing_layout_any env ty) then
         Error.log_and_raise valdecl.pval_type.ptyp_loc Useless_layout_poly;
       let native_repr_args, native_repr_res =
         parse_native_repr_attributes
@@ -5899,11 +5947,12 @@ let report_error ~loc = function
   | Val_in_structure ->
       Location.errorf ~loc "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-      Location.errorf ~loc "Too many %a/%a/%a/%a attributes"
+      Location.errorf ~loc "Too many %a/%a/%a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
         Style.inline_code "[@@unsafe_unextended]"
+        Style.inline_code "[@@fat_ptr]"
   | Elide_void_on_non_void ->
       Location.errorf ~loc
         "Only external arguments of layout void can be marked %a."
@@ -5915,7 +5964,7 @@ let report_error ~loc = function
   | All_external_arguments_elided ->
       Location.errorf ~loc
         "An external must have at least one non-elided argument."
-  | Cannot_unbox_or_untag_type Unboxed ->
+  | Bad_native_repr_attr Unboxed ->
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \
          Only %a, %a, %a, %a, %a, %a, vector primitives, and@ \
@@ -5926,20 +5975,26 @@ let report_error ~loc = function
         Style.inline_code "int32"
         Style.inline_code "int64"
         Style.inline_code "nativeint"
-  | Cannot_unbox_or_untag_type Untagged ->
+  | Bad_native_repr_attr Untagged ->
       Location.errorf ~loc
         "Don't know how to untag this type. Only %a, \
          and@ other immediate types can be untagged."
         Style.inline_code "int"
-  | Cannot_unbox_or_untag_type Unpacked ->
+  | Bad_native_repr_attr Unpacked ->
       Location.errorf ~loc
         "Don't know how to unpack this type.@ \
          Only types with product layouts can be marked %a."
         Style.inline_code "unpacked"
-  | Cannot_unbox_or_untag_type Unsafe_unextended ->
+  | Bad_native_repr_attr Unsafe_unextended ->
       Location.errorf ~loc
         "@[Only types with layout bits8 or bits16 can be marked %a.@]"
         Style.inline_code "unsafe_unextended"
+  | Bad_native_repr_attr Fat_ptr ->
+      Location.errorf ~loc
+        "The %a attribute may only be used on external arguments@ \
+         whose layout is %a (a fat pointer)."
+        Style.inline_code "[@fat_ptr]"
+        Style.inline_code "value_or_null & bits64"
   | Deep_unbox_or_untag_attribute kind ->
       Location.errorf ~loc
         "The attribute %a should be attached to@ \
@@ -5950,7 +6005,8 @@ let report_error ~loc = function
          | Unboxed -> "@unboxed"
          | Untagged -> "@untagged"
          | Unpacked -> "@unpacked"
-         | Unsafe_unextended -> "@unsafe_unextended")
+         | Unsafe_unextended -> "@unsafe_unextended"
+         | Fat_ptr -> "@fat_ptr")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)

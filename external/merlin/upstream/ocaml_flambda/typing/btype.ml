@@ -1761,6 +1761,35 @@ module Jkind0 = struct
           name = "bits64 mod everything"
         }
 
+      let addr_layout =
+        Layout.Const.product
+          [ base Scannable
+              { nullability = Maybe_null; separability = Maybe_separable };
+            base Bits64 Scannable_axes.max ]
+
+      (* Addresses have the same modal base kind as a record with a field of the
+         same mutability. *)
+      let kind_of_addr =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = mutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless"
+        }
+
+      let kind_of_addr_imm =
+        { jkind =
+            { base = Layout addr_layout;
+              mod_bounds = immutable_data_mod_bounds;
+              with_bounds = No_with_bounds
+            };
+          name =
+            "value_or_null & bits64 mod forkable unyielding many stateless \
+             immutable"
+        }
+
       let vec128 =
         { jkind =
             mk_jkind (base Vec128 Scannable_axes.max)
