@@ -93,40 +93,12 @@ let add_exn_handler t cont ~addr ~exn_param ~extra_args =
 
 let add_var t fvar jvar = { t with vars = Variable.Map.add fvar jvar t.vars }
 
-let symbol_to_native_strings symbol =
-  ( Symbol.compilation_unit symbol
-    |> Compilation_unit.name |> Compilation_unit.Name.to_string
-    |> Jsir.Native_string.of_string,
-    Symbol.linkage_name_as_string symbol |> Jsir.Native_string.of_string )
-
-let symbol_is_for_compilation_unit symbol =
-  let compilation_unit = Symbol.compilation_unit symbol in
-  Symbol.equal (Symbol.for_compilation_unit compilation_unit) symbol
-
-let register_symbol' ~res symbol var =
-  match symbol_is_for_compilation_unit symbol with
-  | true ->
-    (* We don't need to add this symbol to our symbol table, because we will
-       instead fetch it from jsoo's global data table (see
-       [get_symbol_for_global_data]) *)
-    res
-  | false ->
-    let compilation_unit_name, symbol_name = symbol_to_native_strings symbol in
-    To_jsir_result.add_instr_exn res
-      (Let
-         ( Jsir.Var.fresh (),
-           Prim
-             ( Extern ("caml_register_symbol", None),
-               [ Pc (NativeString compilation_unit_name);
-                 Pc (NativeString symbol_name);
-                 Pv var ] ) ))
-
 let add_symbol_without_registering t symbol jvar =
   { t with symbols = Symbol.Map.add symbol jvar t.symbols }
 
 let add_symbol t ~res symbol jvar =
   let t = add_symbol_without_registering t symbol jvar in
-  t, register_symbol' ~res symbol jvar
+  t, To_jsir_result.register_symbol res symbol jvar
 
 let add_code_id t code_id ~addr ~params ~closure ~closure_bound_with_code ~hint
     ~loc =
@@ -149,68 +121,12 @@ let get_exn_handler_exn t cont = Continuation.Map.find cont t.exn_handlers
 
 let get_var_exn t fvar = Variable.Map.find fvar t.vars
 
-let get_symbol_from_global_data ~symbol_name ~res =
-  let res, global_data = To_jsir_result.global_data_var res in
-  let symbol_name = Jsir.Native_string.of_string symbol_name in
-  let var = Jsir.Var.fresh () in
-  let expr : Jsir.expr =
-    Prim
-      ( Extern ("caml_js_get", None),
-        [Pv global_data; Pc (NativeString symbol_name)] )
-  in
-  var, To_jsir_result.add_instr_exn res (Let (var, expr))
-
-let get_predef_exception ~res symbol =
-  let symbol_name = Symbol.linkage_name_as_string symbol in
-  (* Chop off caml_exn_ *)
-  let caml_exn_ = "caml_exn_" in
-  if not (String.starts_with ~prefix:caml_exn_ symbol_name)
-  then
-    Misc.fatal_errorf
-      "Predefined exception symbol %a doesn't start with \"caml_exn_\""
-      Symbol.print symbol;
-  let symbol_name =
-    String.sub symbol_name (String.length caml_exn_)
-      (String.length symbol_name - String.length caml_exn_)
-  in
-  (* jsoo already registers these in global data *)
-  get_symbol_from_global_data ~symbol_name:("predef:" ^ symbol_name) ~res
-
-let get_external_symbol ~res symbol =
-  match Symbol.is_predefined_exception symbol with
-  | true -> get_predef_exception ~res symbol
-  | false -> (
-    match symbol_is_for_compilation_unit symbol with
-    | true ->
-      let compilation_unit = Symbol.compilation_unit symbol in
-      let res = To_jsir_result.import_compilation_unit res compilation_unit in
-      let compilation_unit_name =
-        Compilation_unit.name_as_string compilation_unit
-      in
-      get_symbol_from_global_data ~symbol_name:compilation_unit_name ~res
-    | false ->
-      (* The unit defining the symbol must be linked (and initialised) before
-         this one, so record it as an import too. *)
-      let res =
-        To_jsir_result.import_compilation_unit res
-          (Symbol.compilation_unit symbol)
-      in
-      let compilation_unit_name, symbol_name =
-        symbol_to_native_strings symbol
-      in
-      let var = Jsir.Var.fresh () in
-      let expr : Jsir.expr =
-        Prim
-          ( Extern ("caml_get_symbol", None),
-            [ Pc (NativeString compilation_unit_name);
-              Pc (NativeString symbol_name) ] )
-      in
-      var, To_jsir_result.add_instr_exn res (Let (var, expr)))
-
 let get_symbol t ~res symbol =
   match Symbol.compilation_unit symbol |> Current_unit.is_current with
   | true -> Option.map (fun v -> v, res) (Symbol.Map.find_opt symbol t.symbols)
-  | false -> Some (get_external_symbol ~res symbol)
+  | false ->
+    let res, var = To_jsir_result.external_symbol_var res symbol in
+    Some (var, res)
 
 let get_symbol_exn t ~res symbol =
   match get_symbol t ~res symbol with
@@ -220,7 +136,7 @@ let get_symbol_exn t ~res symbol =
 let register_symbol_exn t ~res symbol =
   (* Using the map directly rather than using [get_symbol], because we don't
      want to load external symbols *)
-  register_symbol' ~res symbol (Symbol.Map.find symbol t.symbols)
+  To_jsir_result.register_symbol res symbol (Symbol.Map.find symbol t.symbols)
 
 let get_code_id_exn t code_id =
   match Code_id.Map.find_opt code_id t.code_ids with
