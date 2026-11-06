@@ -123,3 +123,24 @@ type 'a t = private 'a constraint 'a = < x : int; .. >;;
 (* PR#7437 *)
 type t = [` Closed ];;
 type nonrec t = private [> t];;
+
+module T : sig
+  type +'a t = private
+    | True
+    | And of 'a t * 'a t
+    | Base of 'a
+end = struct
+  type 'a t =
+    | True
+    | And of 'a t * 'a t
+    | Base of 'a
+end;;
+
+module Raw : sig
+  type nonrec 'a t = 'a T.t
+end = struct
+  type 'a t = 'a T.t = private
+    | True
+    | And of 'a t * 'a t
+    | Base of 'a
+end;;
