@@ -77,6 +77,15 @@ val flatten : t -> [ `Contains_apply | `Ok of Ident.t * string list ]
 val scrape_extra_ty: t -> t
 (** Removes surrounding `Pext_ty` constructors from a path *)
 
+(** Paths without functor applications and extra types, such as the paths of
+    values written in the source. *)
+type unapplied =
+  | Uident of Ident.t
+  | Udot of unapplied * string
+
+val unapplied: t -> unapplied option
+val of_unapplied: unapplied -> t
+
 val name: ?paren:(string -> bool) -> t -> string
     (* [paren] tells whether a path suffix needs parentheses *)
 val head: t -> Ident.t
