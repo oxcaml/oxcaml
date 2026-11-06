@@ -87,6 +87,7 @@ let rec stub_function_body expr =
           [ { c_lhs = any_pat;
               c_cont = None;
               c_guard = None;
+              c_generalized = [];
               c_rhs = apply_dummy2
             } ]
         in

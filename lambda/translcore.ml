@@ -1969,7 +1969,8 @@ and transl_tupled_function
       Tfunction_body body ->
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case =
-          { c_lhs = pat; c_cont = None; c_guard = None; c_rhs = body }
+          { c_lhs = pat; c_cont = None; c_guard = None; c_rhs = body;
+            c_generalized = [] }
         in
         Some (case, [], fp_partial, fp_mode.mode_modes, fp_sort)
     | _ -> None
@@ -2483,7 +2484,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let rec transl = function
         [] ->
           fun body -> body
-      | {vb_pat=pat; vb_expr=expr; vb_sort=sort; vb_rec_kind=_; vb_attributes; vb_loc}
+      | {vb_pat=pat; vb_expr=expr; vb_sort=sort; vb_rec_kind=_; vb_attributes;
+         vb_loc; vb_generalized=_}
         :: rem ->
           let sort = Jkind.Sort.default_for_transl_and_get sort in
           let layout = layout_exp sort expr in
