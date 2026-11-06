@@ -349,7 +349,10 @@ async def run_configuration(
             configuration=configuration, compilation=compilation, execution=execution
         )
 
-async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes:
+# Returns None if generation timed out.
+async def generate(
+    seed: int, *, toolchain: Toolchain, work_dir: Path
+) -> bytes | None:
     work_dir.mkdir(parents=True, exist_ok=True)
     result = await run_command(
         str(toolchain.oxfuzzer),
@@ -358,13 +361,13 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes:
         output_prefix=work_dir / "generate",
     )
     stderr = result.stderr.decode(errors="replace")
+    if result.timed_out:
+        return None
     # CR-soon xclerc: This should not interrupt the fuzzing campaign,
     # it should probably be reported as a standard failure and saved to
     # investigate the generator bug.
 
     # Generation failing is a fatal error.
-    if result.timed_out:
-        raise SystemExit(f"generation timed out. seed: {seed}.\n{stderr}")
     if result.returncode != 0:
         raise SystemExit(
             f"generation exited with code {result.returncode}. seed: {seed}.\n"
@@ -381,6 +384,8 @@ class Stats:
     passed: int = 0
     discarded: int = 0
     failed: int = 0
+    # Discarded cases whose generation timed out.
+    generation_timeouts: int = 0
     last_completion: float | None = None
     smoothed_interval: float | None = None
     last_report: float | None = None
@@ -435,6 +440,10 @@ class Stats:
             print(file=sys.stderr)
         else:
             self.print_line()
+        print(
+            f"oxfuzzer: {self.generation_timeouts} generations timed out",
+            file=sys.stderr,
+        )
 
 
 def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str | None:
@@ -680,8 +689,9 @@ async def run_case(
     case_dir = run_dir / f"case-{seed}"
     try:
         program = await generate(seed, toolchain=toolchain, work_dir=case_dir)
-        program_size = len(program)
-        if program_size > MAX_PROGRAM_BYTES:
+        if program is None:
+            stats.generation_timeouts += 1
+        if program is None or len(program) > MAX_PROGRAM_BYTES:
             stats.discarded += 1
             stats.report()
             return
@@ -716,6 +726,11 @@ async def self_check(run_dir: Path, toolchain: Toolchain) -> None:
     program = await generate(
         SELF_CHECK_SEED, toolchain=toolchain, work_dir=run_dir / "self-check"
     )
+    if program is None:
+        raise SystemExit(
+            f"oxfuzzer: self-check failed: generation timed out for seed "
+            f"{SELF_CHECK_SEED}."
+        )
     slots = asyncio.Semaphore(len(toolchain.configurations))
     results = await asyncio.gather(
         *(
@@ -837,9 +852,9 @@ executables and compares their stdout and stderr.
 
 A case fails if compilation fails in any configuration, a program exits with a
 non-zero status, or the configurations disagree. A case is discarded if
-execution times out or generated source exceeds {MAX_PROGRAM_BYTES} bytes.
-Failures are saved under <output>/seed-<generator_seed>/.
-Execution timeouts and oversized sources are not saved.
+generation or execution times out or generated source exceeds
+{MAX_PROGRAM_BYTES} bytes. Failures are saved under
+<output>/seed-<generator_seed>/. Discarded cases are not saved.
 
 Exit status is 1 if any case failed, 0 otherwise.""",
         epilog="Before first use, run `make compiler` from the repository root.",
