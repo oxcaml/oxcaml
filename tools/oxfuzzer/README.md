@@ -6,16 +6,19 @@ To use you first need to build OxCaml (more in the repostitory's root README), w
 
 ```
 make compiler
-python3 oxfuzzer.py -o output_directory
+python3 oxfuzzer.py -o output_directory --iterations 100000
 ```
+
+At least one of `--iterations N` and `--timeout-minutes M` is required. If both
+are given, the run stops at whichever limit is reached first.
 
 Use `--max-failures N` (a positive integer) to stop starting new cases after N
 failing cases have been saved. Each generated case counts once, regardless of
 how many compiler configurations fail. In-flight cases are allowed to finish
 and save their results rather than being cancelled, so the final failure count
 may exceed N. Omitting this option leaves the number of failures unlimited;
-`--iterations` still limits the total number of cases. The exit status remains 1
-if any case failed.
+`--iterations` and `--timeout-minutes` still limit the run. The exit status
+remains 1 if any case failed.
 
 Use `--timeout-minutes M` to stop starting new cases after M minutes, counted
 from startup. As with `--max-failures`, in-flight cases finish, so the run may

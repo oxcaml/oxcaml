@@ -9,6 +9,7 @@ import asyncio
 import argparse
 import errno
 import hashlib
+import itertools
 import os
 from pathlib import Path
 import platform
@@ -731,7 +732,7 @@ class Limits:
     """When to stop fuzzing. Once a limit is reached no new cases are started,
     but cases in flight finish and save their results, so a run can exceed its
     time or failure limit."""
-    iterations: int
+    iterations: int | None
     max_failures: int | None
     time_limit_minutes: float | None
     start: float = field(default_factory=time.monotonic)    # A time.monotonic() value.
@@ -743,7 +744,8 @@ class Limits:
         return self.start + self.time_limit_minutes * 60
 
     def print_summary(self) -> None:
-        print(f"iterations: {self.iterations}", file=sys.stderr)
+        if self.iterations is not None:
+            print(f"iterations: {self.iterations}", file=sys.stderr)
         if self.max_failures is not None:
             print(f"max failures: {self.max_failures}", file=sys.stderr)
         if self.time_limit_minutes is not None:
@@ -771,7 +773,10 @@ async def fuzz(
     stats: Stats,
 ) -> FinishReason:
     rng = random.Random(base_seed)
-    pending = (rng.getrandbits(62) for _ in range(limits.iterations))
+    seed_indices = (
+        itertools.count() if limits.iterations is None else range(limits.iterations)
+    )
+    pending = (rng.getrandbits(62) for _ in seed_indices)
     slots = asyncio.Semaphore(jobs)
 
     finished_because = FinishReason.ITERATIONS
@@ -815,9 +820,10 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     parser.add_argument(
         "--iterations",
         type=int,
-        default=100_000,
+        default=None,
         metavar="N",
-        help="number of cases to run (default: %(default)s)",
+        help="number of cases to run (default: unlimited); at least one of "
+        "--iterations and --timeout-minutes is required",
     )
     parser.add_argument(
         "--max-failures",
@@ -859,6 +865,10 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
+    if args.iterations is None and args.timeout_minutes is None:
+        parser.error("at least one of --iterations and --timeout-minutes is required")
+    if args.iterations is not None and args.iterations < 1:
+        parser.error("--iterations must be at least 1")
     if args.max_failures is not None and args.max_failures < 1:
         parser.error("--max-failures must be at least 1")
     if args.timeout_minutes is not None and not (
