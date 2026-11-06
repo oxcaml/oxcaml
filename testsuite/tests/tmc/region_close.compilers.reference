@@ -1,0 +1,23 @@
+File "region_close.ml", line 33, characters 43-60:
+33 |             if x = 0 then List.rev xs else rev_after_zero xs
+                                                ^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed prior to the call, preventing the function from
+  running in constant stack space.
+  This happens when either the callee or an argument is at the local mode and
+  may point to a value allocated in the surrounding region. Recursive calls,
+  parameters, non-allocating projections of parameters, immediates, and
+  values at the global mode are allowed.
+
+File "region_close.ml", line 46, characters 35-55:
+46 |             if x = 0 then o#m else send_after_zero o xs
+                                        ^^^^^^^^^^^^^^^^^^^^
+Warning 222 [tmc-breaks-tailcall-region]: This call is in tail-modulo-cons
+  position in a TMC function, but it is enclosed in a local-allocation region
+  that cannot be closed prior to the call, preventing the function from
+  running in constant stack space.
+  This happens when either the callee or an argument is at the local mode and
+  may point to a value allocated in the surrounding region. Recursive calls,
+  parameters, non-allocating projections of parameters, immediates, and
+  values at the global mode are allowed.
