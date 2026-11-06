@@ -99,7 +99,7 @@ uintnat caml_max_guarded_stacks = 1024; /* Xmax_guarded_stacks */
 /* Set nonzero to enable stack idling (see the design comment below).
    Off by default while the feature is rolled out: promoted
    continuations then keep their guarded stacks. */
-uintnat caml_idle_stacks = 0; /* Xidle_stacks */
+uintnat caml_idle_stacks = 1; /* Xidle_stacks; default ON for this deploy */
 
 uintnat caml_get_init_stack_wsize (int context)
 {
