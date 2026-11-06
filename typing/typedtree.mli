@@ -1267,46 +1267,45 @@ and open_description = (Path.t * Longident.t loc) open_infos
 
 and open_declaration = module_expr open_infos
 
-and include_kind =
-  | Tincl_structure
-  | Tincl_functor of
-      { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
-      ; yielding : Mode.Yielding.l
-      ; staticity : Mode.Staticity.Const.t
-      }
-      (* S1 -> S2 *)
-      (* Since [Types.module_representation = Jkind.sort array], this could've
-         been [of { inputs : (Ident.t * module_coercion * Jkind.sort) list }],
+and 'app_mode include_functor =
+    {
+     input_coercion : (Ident.t * module_coercion) list;
+     input_repr : Types.module_representation;
+     (** Since [Types.module_representation = Jkind.sort array], this could've
+         been of [{ inputs : (Ident.t * module_coercion * Jkind.sort) list }],
          but the way [input_coercion] and [input_repr] are used makes keeping
          them separate more natural. *)
-  | Tincl_gen_functor of
-      { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
-      ; yielding : Mode.Yielding.l
-      ; staticity : Mode.Staticity.Const.t
-      }
-      (* S1 -> () -> S2 *)
-      (* In both functor cases, the [Mode.Yielding.l] is the join of the
-         yielding modes of the functor and of the enclosing structure it is
-         applied to: if it is [Unyielding], the application can never perform a
-         free effect. For includes in signatures there is no module expression
-         (and no runtime application), so the field is a conservative
-         [Yielding.max]. *)
+     generative : bool;
+     (** [S1 -> S2] if [generative] is [false], [S1 -> () -> S2] when [true] *)
+     app_mode : 'app_mode
+     (** Mode of the functor application to the enclosing structure.
+         See the comments on [include_description] and [include_declaration]. *)
+    }
 
-and 'a include_infos =
+and 'app_mode include_kind =
+  | Tincl_structure
+  | Tincl_functor of 'app_mode include_functor
+
+and ('a, 'app_mode) include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
      incl_repr: Types.module_representation;
      incl_loc: Location.t;
-     incl_kind: include_kind;
+     incl_kind: 'app_mode include_kind;
      incl_attributes: attribute list;
     }
 
-and include_description = module_type include_infos
+(** Module types do not have modes, so the application mode is not recorded. *)
+and include_description =
+  (module_type, unit) include_infos
 
-and include_declaration = module_expr include_infos
+(** The [Mode.Yielding.l] is the join of the yielding modes of the functor and
+    of the enclosing structure it is applied to: if it is [Unyielding],
+    the application can never perform a free effect.
+    [Mode.Staticity.Const.t] is [Static] for template functor instantiations. *)
+and include_declaration =
+  (module_expr, Mode.Yielding.l * Mode.Staticity.Const.t) include_infos
 
 and with_constraint =
     Twith_type of type_declaration

@@ -46,7 +46,7 @@ let count_language_extensions typing_input =
             (match str_desc with
             | Tstr_include include_declaration -> (
               match include_declaration.incl_kind with
-              | Tincl_functor _ | Tincl_gen_functor _ -> incr Include_functor
+              | Tincl_functor _ -> incr Include_functor
               | Tincl_structure -> ())
             | _ -> ());
             default_iterator.structure_item sub si);
@@ -55,7 +55,7 @@ let count_language_extensions typing_input =
             (match sig_desc with
             | Tsig_include (include_declaration, _) -> (
               match include_declaration.incl_kind with
-              | Tincl_functor _ | Tincl_gen_functor _ -> incr Include_functor
+              | Tincl_functor _ -> incr Include_functor
               | Tincl_structure -> ())
             | _ -> ());
             default_iterator.signature_item sub si);

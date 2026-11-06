@@ -932,7 +932,7 @@ let include_infos f sub incl =
   let kind =
     match incl.incl_kind with
     | Tincl_structure -> Structure
-    | Tincl_functor _ | Tincl_gen_functor _ -> Functor
+    | Tincl_functor _ -> Functor
   in
   Incl.mk ~loc ~attrs ~kind (f sub incl.incl_mod)
 

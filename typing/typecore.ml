@@ -5797,7 +5797,7 @@ and is_nonexpansive_mod mexp =
           | Tstr_include {incl_mod=m;incl_kind=k;_} ->
             begin match k with
             | Tincl_structure -> is_nonexpansive_mod m
-            | Tincl_functor _ | Tincl_gen_functor _ -> false
+            | Tincl_functor _ -> false
             end
           | Tstr_recmodule id_mod_list ->
               List.for_all (fun {mb_expr=m;_} -> is_nonexpansive_mod m)

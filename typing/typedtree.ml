@@ -857,34 +857,33 @@ and open_description = (Path.t * Longident.t loc) open_infos
 
 and open_declaration = module_expr open_infos
 
-and include_kind =
-  | Tincl_structure
-  | Tincl_functor of
-      { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
-      ; yielding : Mode.Yielding.l
-      ; staticity : Mode.Staticity.Const.t
-      }
-  | Tincl_gen_functor of
-      { input_coercion : (Ident.t * module_coercion) list
-      ; input_repr : Types.module_representation
-      ; yielding : Mode.Yielding.l
-      ; staticity : Mode.Staticity.Const.t
-      }
+and 'app_mode include_functor =
+    {
+     input_coercion : (Ident.t * module_coercion) list;
+     input_repr : Types.module_representation;
+     generative : bool;
+     app_mode : 'app_mode
+    }
 
-and 'a include_infos =
+and 'app_mode include_kind =
+  | Tincl_structure
+  | Tincl_functor of 'app_mode include_functor
+
+and ('a, 'app_mode) include_infos =
     {
      incl_mod: 'a;
      incl_type: Types.signature;
      incl_repr: Types.module_representation;
      incl_loc: Location.t;
-     incl_kind: include_kind;
+     incl_kind: 'app_mode include_kind;
      incl_attributes: attribute list;
     }
 
-and include_description = module_type include_infos
+and include_description =
+  (module_type, unit) include_infos
 
-and include_declaration = module_expr include_infos
+and include_declaration =
+  (module_expr, Mode.Yielding.l * Mode.Staticity.Const.t) include_infos
 
 and with_constraint =
     Twith_type of type_declaration
