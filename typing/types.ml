@@ -1354,7 +1354,16 @@ module Transient_expr = struct
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
-    | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+    | _ -> Misc.fatal_error "set_var_jkind called on non-Tvar"
+  let set_jkind ty jkind' =
+    match ty.desc with
+    | Tvar { name; _ } ->
+      set_desc ty (Tvar { name; jkind = jkind' })
+    | Tunivar { name; _ } ->
+      set_desc ty (Tunivar { name; jkind = jkind' })
+    | Tof_kind _ ->
+      set_desc ty (Tof_kind jkind')
+    | _ -> Misc.fatal_error "set_jkind called on non-Tvar/Tunivar/Tof_kind"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1762,6 +1771,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_jkind ty jkind =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_jkind ty jkind
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

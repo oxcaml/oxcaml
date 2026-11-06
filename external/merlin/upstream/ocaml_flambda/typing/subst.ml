@@ -651,7 +651,8 @@ let rec typexp copy_scope s ty =
     Tvar { jkind = jk } | Tunivar { jkind = jk } ->
       let desc, jkind_changed =
         let jk' = jkind copy_scope s jk in
-        if jk == jk' then desc, false else
+        if jk == jk' then desc, false
+        else if get_level ty = generic_level then
           let desc =
             match desc with
             | Tvar tv -> Tvar { tv with jkind = jk' }
@@ -659,6 +660,7 @@ let rec typexp copy_scope s ty =
             | _ -> assert false
           in
           desc, true
+        else Misc.fatal_error "Subst.typexp: weak variable copy"
       in
       if should_duplicate_vars || get_id ty < 0 || jkind_changed then
         let ty' =
