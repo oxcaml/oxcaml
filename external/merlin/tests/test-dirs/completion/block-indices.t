@@ -33,18 +33,21 @@ Completion also works when the label is incomplete.
 
   $ $MERLIN single complete-prefix -position 5:13 -prefix ab -doc n \
   > -filename test.ml < test.ml | jq -c '.value.entries[] | [.name, .desc]'
-  ["abs","int -> int"]
-  ["abs_float","float -> float"]
+  ["abd","r -> string"]
+  ["abx","r2 -> int"]
+  ["abc","r -> int"]
 
   $ $MERLIN single complete-prefix -position 6:30 -prefix ab -doc n \
   > -filename test.ml < test.ml | jq -c '.value.entries[] | [.name, .desc]'
-  ["abs","int -> int"]
-  ["abs_float","float -> float"]
+  ["abd","r -> string"]
+  ["abc","r -> int"]
 
   $ $MERLIN single complete-prefix -position 7:16 -prefix xy -doc n \
   > -filename test.ml < test.ml | jq -c '.value.entries[] | [.name, .desc]'
+  ["xyw","u -> string"]
+  ["xyz","u -> int"]
 
   $ $MERLIN single complete-prefix -position 8:35 -prefix ab -doc n \
   > -filename test.ml < test.ml | jq -c '.value.entries[] | [.name, .desc]'
-  ["abs","int -> int"]
-  ["abs_float","float -> float"]
+  ["abd","r -> string"]
+  ["abc","r -> int"]
