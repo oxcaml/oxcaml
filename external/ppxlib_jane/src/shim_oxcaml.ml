@@ -152,10 +152,11 @@ end
 module Value_binding = struct
   let extract_modes vb = vb.pvb_modes, { vb with pvb_modes = [] }
 
-  let create ~loc ~pat ~expr ~modes =
+  let create ~loc ~pat ~expr ~constraint_ ~modes =
     { pvb_is_poly = false
     ; pvb_pat = pat
     ; pvb_expr = expr
+    ; pvb_constraint = constraint_
     ; pvb_modes = modes
     ; pvb_attributes = []
     ; pvb_loc = loc
@@ -272,6 +273,7 @@ module Pattern_desc = struct
     | Ppat_or of pattern * pattern
     | Ppat_constraint of pattern * core_type option * Modes.t
     | Ppat_type of Astlib.Longident.t loc
+    | Ppat_addr of mutable_flag * pattern
     | Ppat_lazy of pattern
     | Ppat_unpack of string option loc
     | Ppat_exception of pattern
@@ -537,6 +539,7 @@ module Module_expr_desc = struct
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
     | Pmod_apply of module_expr * module_expr
+    | Pmod_apply_unit of module_expr
     | Pmod_constraint of module_expr * module_type option * Modes.t
     | Pmod_unpack of expression
     | Pmod_extension of extension

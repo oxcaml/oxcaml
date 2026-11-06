@@ -753,7 +753,10 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                ~name
         in
         let code_id =
-          Code_id.create ~name ~debug:dbg (Current_unit.get_cu_exn ())
+          (* [name] is derived from the callee's function slot rather than the
+             wrapper's own, so no slot stamp is recorded here. *)
+          Code_id.create ~name ~slot_stamp:None ~debug:dbg
+            (Current_unit.get_cu_exn ())
         in
         (* We could create better result types by combining the types for the
            first arguments with the result types from the called function.
@@ -1525,8 +1528,12 @@ let simplify_apply ~simplify_expr ~rebuild_expr dacc apply ~down_to_up =
       in
       simplify_method_call dacc apply ~callee_ty ~kind ~obj ~down_to_up
     | C_call
-        { needs_caml_c_call = _; is_c_builtin = _; effects = _; coeffects = _ }
-      ->
+        { needs_caml_c_call = _;
+          is_c_builtin = _;
+          effects = _;
+          coeffects = _;
+          fat_ptr_arg_starts = _
+        } ->
       let callee_ty =
         match callee_ty with
         | Some callee_ty -> callee_ty
