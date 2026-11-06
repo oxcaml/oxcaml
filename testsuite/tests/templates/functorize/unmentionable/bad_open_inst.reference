@@ -1,0 +1,4 @@
+File "main_open_inst.ml", line 9, characters 24-30:
+9 | let () = print_endline (Foo__A.hello (P_int.create ()))
+                            ^^^^^^
+Error: The module Foo__A cannot be referenced by name.

@@ -5,13 +5,14 @@
     pulled in transitively and bundled as [Unmentionable].  Only [Foo] can
     be named through the instance.  Naming a dep, whether by a dotted path
     ([main_dep_via_dot.ml]), after [open]ing the instance
-    ([main_open_dep.ml]), by [open]ing the dep itself
+    ([main_open_dep.ml], [main_open_inst.ml]), by [open]ing the dep itself
     ([main_open_dep_directly.ml]) or by ascribing a signature that exports
     it ([main_ascribe_dep.ml]), fails to compile. *)
 
  readonly_files = "\
    main_dep_via_dot.ml bad_dep_via_dot.reference \
    main_open_dep.ml bad_open_dep.reference \
+   main_open_inst.ml bad_open_inst.reference \
    main_open_dep_directly.ml bad_open_dep_directly.reference \
    main_ascribe_dep.ml bad_ascribe_dep.reference \
  ";
@@ -121,6 +122,19 @@
  ocamlc.byte;
 
  compiler_reference = "bad_open_dep.reference";
+ check-ocamlc.byte-output;
+
+ (* Naming a dep after [open]ing a named instance: opening a module path
+    goes through [Env.add_components] instead, which must preserve
+    visibility as well. *)
+
+ flags = "$flg_main";
+ module = "main_open_inst.ml";
+ ocamlc_byte_exit_status = "2";
+ compiler_output = "bad_open_inst.output";
+ ocamlc.byte;
+
+ compiler_reference = "bad_open_inst.reference";
  check-ocamlc.byte-output;
 
  (* [open]ing a dep directly is rejected like any other mention of it. *)
