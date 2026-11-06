@@ -39,3 +39,32 @@ so it has to be the one users' ppx_deriving builds on.
 
 sexp_type's type appears in ppxlib's interface (`Stdppx.Sexp.t`), and has to
 be the same as the one users' sexplib0 builds on.
+
+## Syntax errors explained by lrgrep
+
+When the compiler's parser rejects a source file, ppxlib parses it again with
+`lrgrep/frontend.ml` and, if one of the rules of `lrgrep/parse_errors.mlyl`
+matches, reports `Syntax Error. LRGrep analysis: <message>` instead of the
+compiler's error.
+
+[lrgrep](https://github.com/let-def/lrgrep) itself is a private dependency:
+default.nix provides its sources, and its runtime is installed as
+`ppxlib.private.lrgrep_runtime`. Its generator, and the libraries the generator
+needs (menhirSdk, pprint, cmon, grenier), are only used while building and are
+not installed.
+
+`lrgrep/` is the library `oxcaml_private_lrgrep`, installed as
+`ppxlib.private.lrgrep`:
+
+- `parse_errors.mlyl` holds the rules, written for the OxCaml grammar.
+  `parse_errors.ml` is generated from it and the grammar of the compiler it is
+  built with, `%{ocaml_where}/compiler-libs/parser.cmly`.
+- `frontend.ml` (based on upstream's `ocaml/frontend.ml`) runs the compiler's
+  own `Lexer` and `Parser` in incremental mode, and returns the message of the
+  first matching rule. Failures other than parse errors, such as lexer errors
+  and errors raised by the parser's semantic actions, return exactly
+  "Syntax error": ppxlib then reports the compiler's own error.
+
+A change to `parsing/parser.mly` can make a rule of `parse_errors.mlyl`
+invalid, which fails the build of ppxlib. Fix the rule in the same change. See
+upstream's `DEVISING-RULES.md` for the rule language.
