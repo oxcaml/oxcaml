@@ -924,11 +924,14 @@ let lower_nongen nglev mty =
     let super = type_iterators mark in
     let it_do_type_expr it ty =
       match get_desc ty with
-        Tvar { jkind } ->
+      | Tvar { jkind } | Tivar { jkind } ->
           let level = get_level ty in
           if level < generic_level && level > nglev then (
             set_level ty nglev; Jkind.update_level nglev jkind)
-      | _ ->
+      | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tconstr _ | Tmod _ | Tobject _
+      | Tfield _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tnil | Tlink _
+      | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Trepr _ | Tpackage _
+      | Tof_kind _ | Tbox _ ->
           super.it_do_type_expr it ty
     in
   let it_mode_expr m =
