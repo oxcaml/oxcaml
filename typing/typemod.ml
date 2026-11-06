@@ -3778,26 +3778,31 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
       Env.enter_signature ~scope ~mod_shape
         (extract_sig_open env md.mod_loc md.mod_type) ~mode env
     in
-    let info, visibility =
+    let info, sg =
       match toplevel with
-      | Some false | None -> Some `From_open, Hidden
-      | Some true -> None, Exported
+      | Some true ->
+          (* At the toplevel the opened items are exported, keeping their own
+             visibility so that [Unmentionable] ones stay unmentionable. *)
+          None, sg
+      | Some false | None ->
+          let visibility = Hidden in
+          let sg =
+            List.map (function
+              | Sig_value(id, vd, _) -> Sig_value(id, vd, visibility)
+              | Sig_type(id, td, rs, _) -> Sig_type(id, td, rs, visibility)
+              | Sig_typext(id, ec, et, _) -> Sig_typext(id, ec, et, visibility)
+              | Sig_module(id, mp, md, rs, _) ->
+                  Sig_module(id, mp, md, rs, visibility)
+              | Sig_modtype(id, mtd, _) -> Sig_modtype(id, mtd, visibility)
+              | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
+              | Sig_class_type(id, ctd, rs, _) ->
+                  Sig_class_type(id, ctd, rs, visibility)
+              | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
+            ) sg
+          in
+          Some `From_open, sg
     in
     Signature_group.iter (Signature_names.check_sig_item ?info names loc) sg;
-    let sg =
-      List.map (function
-        | Sig_value(id, vd, _) -> Sig_value(id, vd, visibility)
-        | Sig_type(id, td, rs, _) -> Sig_type(id, td, rs, visibility)
-        | Sig_typext(id, ec, et, _) -> Sig_typext(id, ec, et, visibility)
-        | Sig_module(id, mp, md, rs, _) ->
-            Sig_module(id, mp, md, rs, visibility)
-        | Sig_modtype(id, mtd, _) -> Sig_modtype(id, mtd, visibility)
-        | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
-        | Sig_class_type(id, ctd, rs, _) ->
-            Sig_class_type(id, ctd, rs, visibility)
-        | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
-      ) sg
-    in
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
