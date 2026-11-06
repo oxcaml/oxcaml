@@ -230,6 +230,11 @@ let mk_generate_laws_implementation f =
   " Print the laws file of the given compiled unit (.cmo or .cmx) to the\
   \n     file given by -o, or standard output"
 
+let mk_laws_rocq f =
+  "-laws-rocq", Arg.String f,
+  "<file>  Write the definitions and the law statements of the compiled\
+  \n     implementation to <file> as Rocq (experimental)"
+
 let mk_impl f =
   "-impl", Arg.String f, "<file>  Compile <file> as a .ml file"
 
@@ -1289,6 +1294,7 @@ module type Compiler_options = sig
   val _no_g : unit -> unit
   val _stop_after : string -> unit
   val _generate_laws_implementation : unit -> unit
+  val _laws_rocq : string -> unit
   val _i : unit -> unit
   val _i_variance : unit -> unit
   val _impl : string -> unit
@@ -1529,6 +1535,7 @@ struct
     mk_g_no_ocamldebug_types F._g_no_ocamldebug_types;
     mk_stop_after ~native:false F._stop_after;
     mk_generate_laws_implementation F._generate_laws_implementation;
+    mk_laws_rocq F._laws_rocq;
     mk_i F._i;
     mk_i_variance F._i_variance;
     mk_I F._I;
@@ -1812,6 +1819,7 @@ struct
     mk_probes_optimized F._probes_optimized;
     mk_no_probes_optimized F._no_probes_optimized;
     mk_generate_laws_implementation F._generate_laws_implementation;
+    mk_laws_rocq F._laws_rocq;
     mk_i F._i;
     mk_i_variance F._i_variance;
     mk_I F._I;
@@ -2483,6 +2491,7 @@ module Default = struct
     let _g = set debug
     let _no_g = clear debug
     let _generate_laws_implementation = set generate_laws
+    let _laws_rocq f = laws_rocq := Some f
     let _i = set print_types
     let _impl = Compenv.impl
     let _instantiate = set instantiate

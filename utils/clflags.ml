@@ -77,6 +77,7 @@ type visible_include =
 
 let compile_only = ref false            (* -c *)
 and generate_laws = ref false           (* -generate-laws-implementation *)
+and laws_rocq = ref (None : string option) (* -laws-rocq *)
 and output_name = ref (None : string option) (* -o *)
 and include_dirs = ref ([] : visible_include list)  (* -I, -Ix *)
 and hidden_include_dirs = ref ([] : string list) (* -H *)

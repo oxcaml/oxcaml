@@ -196,6 +196,11 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
     if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
       let typed = typecheck_impl info parsed in
       hook_typed_tree typed;
+      Option.iter (fun output ->
+          Laws_rocq.write
+            ~source_file:(Unit_info.original_source_file info.target)
+            ~unit:info.module_name typed ~output)
+        !Clflags.laws_rocq;
       if Clflags.(should_stop_after Compiler_pass.Typing) then () else begin
         backend info typed;
       end;

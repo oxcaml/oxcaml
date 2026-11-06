@@ -369,6 +369,7 @@
   ;; some of COMP
   main_args
   compmisc
+  laws_rocq
   compile_common
   laws_gen
   instantiator

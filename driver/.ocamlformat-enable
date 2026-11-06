@@ -12,3 +12,5 @@ oxcaml_args.ml
 oxcaml_args.mli
 laws_gen.ml
 laws_gen.mli
+laws_rocq.ml
+laws_rocq.mli

@@ -1,0 +1,5 @@
+File "rocq_unsupported.ml", line 16, characters 28-34:
+16 | law? double_add (n : int) : double n = n + n
+                                 ^^^^^^
+Error: The law double_add cannot be translated to Rocq:
+       it refers to double, which is not translated (the primitive %intoffloat).

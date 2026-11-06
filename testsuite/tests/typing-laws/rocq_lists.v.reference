@@ -1,0 +1,85 @@
+(** Generated from rocq_lists.ml by the OxCaml compiler (-laws-rocq);
+    do not edit. The laws are stated as [<law>_statement] and proved
+    in a separate file. *)
+From oxiris Require Import law_prelude.
+
+(** [let is_empty = function [] -> true | _ :: _ -> false] *)
+Definition is_empty : val :=
+  (λ: "param", MatchList "param" #true BAnon BAnon #false)%V.
+
+(** [let rec rev_append l1 l2 =
+      match l1 with [] -> l2 | a :: l -> rev_append l (a :: l2)] *)
+Definition rev_append : val :=
+  (rec: "rev_append" "l1" "l2" :=
+     MatchList "l1" "l2" "a" "l" ("rev_append" "l" (Cons "a" "l2")))%V.
+
+(** [let rev l = rev_append l []] *)
+Definition rev : val := (λ: "l", rev_append "l" Nil)%V.
+
+(** [let rec length = function [] -> 0 | _ :: l -> 1 + length l] *)
+Definition length : val :=
+  (rec: "length" "param" := MatchList "param" #0 BAnon "l" (#1 + "length" "l"))%V.
+
+(** [let rec map f = function [] -> [] | x :: l -> f x :: map f l] *)
+Definition map : val :=
+  (rec: "map" "f" "param" :=
+     MatchList "param" Nil "x" "l" (Cons ("f" "x") ("map" "f" "l")))%V.
+
+(** [let singleton x = [ x ]] *)
+Definition singleton : val := (λ: "x", Cons "x" Nil)%V.
+
+(** [let digits = [ 1; 2; 3 ]] *)
+Definition digits : val := (CONSV #1 (CONSV #2 (CONSV #3 NILV)))%V.
+
+(** [let length_of_digits = length digits] *)
+Definition length_of_digits : expr := (length digits)%E.
+
+(** [law? rev_rev (xs : 'a list) : rev (rev xs) = xs] *)
+Definition rev_rev_statement : Prop :=
+  ∀ (A : sem_ty) (xs : val),
+    ty_list A xs →
+    (rev (rev xs))%E =:= (xs)%E.
+
+(** [law? rev_nonempty (xs : 'a list) :
+      not (is_empty xs) ===> not (is_empty (rev xs))] *)
+Definition rev_nonempty_statement : Prop :=
+  ∀ (A : sem_ty) (xs : val),
+    ty_list A xs →
+    spec_true (Stdlib_not (is_empty xs))%E →
+    spec_true (Stdlib_not (is_empty (rev xs)))%E.
+
+(** [law? rev_stdlib (xs : 'a list) : rev xs = List.rev xs] *)
+Definition rev_stdlib_statement : Prop :=
+  ∀ (A : sem_ty) (xs : val),
+    ty_list A xs →
+    (rev xs)%E =:= (List_rev xs)%E.
+
+(** [law? length_map (f : 'a -> 'b) (xs : 'a list) :
+      length (map f xs) = length xs] *)
+Definition length_map_statement : Prop :=
+  ∀ (A : sem_ty) (B : sem_ty) (f : val) (xs : val),
+    ty_fun A B f →
+    ty_list A xs →
+    (length (map f xs))%E =:= (length xs)%E.
+
+(** [law? length_nonneg (xs : int list) : length xs >= 0 && List.length xs >= 0] *)
+Definition length_nonneg_statement : Prop :=
+  ∀ (xs : val),
+    ty_list ty_int xs →
+    (spec_true (#0 ≤ length xs)%E) ∧ (spec_true (#0 ≤ List_length xs)%E).
+
+(** [law? map_not (bs : bool list) : map not (map not bs) = bs] *)
+Definition map_not_statement : Prop :=
+  ∀ (bs : val),
+    ty_list ty_bool bs →
+    (map Stdlib_not (map Stdlib_not bs))%E =:= (bs)%E.
+
+(** The names by which other units refer to this one. *)
+Notation Rocq_lists_is_empty := is_empty (only parsing).
+Notation Rocq_lists_rev_append := rev_append (only parsing).
+Notation Rocq_lists_rev := rev (only parsing).
+Notation Rocq_lists_length := length (only parsing).
+Notation Rocq_lists_map := map (only parsing).
+Notation Rocq_lists_singleton := singleton (only parsing).
+Notation Rocq_lists_digits := digits (only parsing).
+Notation Rocq_lists_length_of_digits := length_of_digits (only parsing).
