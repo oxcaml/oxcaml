@@ -1,0 +1,83 @@
+Entry point: 0
+
+==== 0 () ====
+  v2 = fun(v1){1 ()} [hint:(int)->int never_inline]
+  branch 7 (v2)
+
+==== 1 () ====
+  event for_loop.ml:23:2
+  v3 = 0 <= v1
+  event for_loop.ml:25:6
+  v4 = CONST{0}
+  if v3 then 2 () else 3 ()
+
+==== 2 () ====
+  v5 = CONST{0}
+  v6 = CONST{0}
+  branch 4 (v6, v5)
+
+==== 3 () ====
+  return v4
+
+==== 4 (v8, v7) ====
+  event for_loop.ml:24:9
+  v9 = v7 + v8
+  event for_loop.ml:24:15
+  event for_loop.ml:23:2
+  v10 = !(v8 === v1)
+  event for_loop.ml:25:6
+  if v10 then 5 () else 6 ()
+
+==== 5 () ====
+  event for_loop.ml:23:2
+  v11 = v8 + 1
+  event for_loop.ml:25:6
+  branch 4 (v11, v9)
+
+==== 6 () ====
+  return v9
+
+==== 7 (v12) ====
+  v13 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_up_1"j, v12) 
+  v15 = fun(v14){8 ()} [hint:(int)->int never_inline]
+  branch 14 (v15)
+
+==== 8 () ====
+  event for_loop.ml:30:2
+  v16 = 0 <= v14
+  event for_loop.ml:32:6
+  v17 = CONST{0}
+  if v16 then 9 () else 10 ()
+
+==== 9 () ====
+  v18 = CONST{0}
+  branch 11 (v14, v18)
+
+==== 10 () ====
+  return v17
+
+==== 11 (v20, v19) ====
+  event for_loop.ml:31:9
+  v21 = v19 - v20
+  event for_loop.ml:31:15
+  event for_loop.ml:30:2
+  v22 = !(v20 === 0)
+  event for_loop.ml:32:6
+  if v22 then 12 () else 13 ()
+
+==== 12 () ====
+  event for_loop.ml:30:2
+  v23 = v20 - 1
+  event for_loop.ml:32:6
+  branch 11 (v23, v21)
+
+==== 13 () ====
+  return v21
+
+==== 14 (v24) ====
+  v25 = "caml_register_symbol"("For_loop"j, "camlFor_loop__sum_down_2"j, v24) 
+  v26 = imm{tag=0; 0 = v12; 1 = v24}
+  v27 = "caml_register_global"(v26, "For_loop"j)
+  stop
+
+

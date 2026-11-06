@@ -1,0 +1,12 @@
+up: iterations=3 last_is_hi=true
+up: iterations=1 last_is_hi=true
+up: iterations=2 last_is_hi=true
+up: iterations=0 last_is_hi=false
+up: iterations=0 last_is_hi=false
+up: iterations=10 last_is_hi=true
+down: iterations=3 last_is_lo=true
+down: iterations=1 last_is_lo=true
+down: iterations=2 last_is_lo=true
+down: iterations=0 last_is_lo=false
+down: iterations=0 last_is_lo=false
+down: iterations=10 last_is_lo=true
