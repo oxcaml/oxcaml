@@ -158,19 +158,59 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
    a short descriptor's address is the running address plus its delta. */
 typedef struct {
   const unsigned char *next; /* points at the next descriptor's delta byte */
+  const unsigned char *end;  /* end of the pieces; NULL if count-prefixed */
   uintnat retaddr;           /* running absolute return address */
-  intnat remaining;          /* descriptors left to yield */
+  intnat remaining;          /* descriptors left to yield, if count-prefixed */
 } frametable_iter;
 
-static void frametable_iter_start(frametable_iter *it, intnat *tbl)
+static bool has_pieces(intnat *tbl)
 {
-  it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
-  it->next = (const unsigned char *)(tbl + 1);
+  return tbl[0] == FRAMETABLE_SECTIONS_TAG;
+}
+
+enum header_field { PIECES_START, PIECES_STOP, COUNTS_START, COUNTS_STOP };
+
+/* The address that a -frametable-sections header field points to */
+static const unsigned char *header_rel(intnat *tbl, enum header_field field)
+{
+  const unsigned char *p =
+    (const unsigned char *)(tbl + 1) + field * sizeof(int32_t);
+  return p + caml_read_unaligned_int32(p);
+}
+
+static const unsigned char *pieces_start(intnat *tbl)
+{
+  return header_rel(tbl, PIECES_START);
+}
+
+static void frametable_iter_start(frametable_iter *it,
+                                  caml_frametable_list *cell)
+{
+  intnat *tbl = cell->frametable;
+  if (has_pieces(tbl)) {
+    it->remaining = 0;
+    if (cell->owns_pieces) {
+      it->next = pieces_start(tbl);
+      it->end = header_rel(tbl, PIECES_STOP);
+    } else {
+      /* Another table enters the shared pieces */
+      it->next = it->end = (const unsigned char *)tbl;
+    }
+  } else {
+    it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
+    it->next = (const unsigned char *)(tbl + 1);
+    it->end = NULL;
+  }
   it->retaddr = 0;
 }
 
+static bool frametable_iter_more(frametable_iter *it)
+{
+  return it->end != NULL ? it->next < it->end : it->remaining > 0;
+}
+
 /* Yield the next descriptor body and its absolute return address. Must
-   only be called while [it->remaining > 0]. */
+   only be called while [frametable_iter_more(it)]. */
 Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
                                               uintnat *retaddr_out)
 {
@@ -203,9 +243,45 @@ Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
 static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
-    num_descr += (intnat)caml_read_unaligned_uintnat(cur->frametable);
+    intnat *tbl = cur->frametable;
+    if (!has_pieces(tbl)) {
+      num_descr += (intnat)caml_read_unaligned_uintnat(tbl);
+    } else if (cur->owns_pieces) {
+      /* An upper bound, since the linker may have dropped pieces */
+      const intnat *count = (const intnat *)header_rel(tbl, COUNTS_START);
+      const intnat *end = (const intnat *)header_rel(tbl, COUNTS_STOP);
+      for (; count < end; count++) num_descr += *count;
+    }
   }
   return num_descr;
+}
+
+/* Is the pieces section starting at [start] owned by a table on [list]
+   before [stop]? */
+static bool pieces_owned(caml_frametable_list *list,
+                         caml_frametable_list *stop,
+                         const unsigned char *start)
+{
+  for (caml_frametable_list *cur = list; cur != stop; cur = cur->next) {
+    if (cur->owns_pieces && pieces_start(cur->frametable) == start)
+      return true;
+  }
+  return false;
+}
+
+/* Make the first table on [new_frametables] that refers to each pieces
+   section its owner, unless a table on [frametables] already owns it. */
+static void assign_pieces_owners(caml_frametable_list *frametables,
+                                 caml_frametable_list *new_frametables)
+{
+  iter_list(new_frametables, cur) {
+    if (has_pieces(cur->frametable)) {
+      const unsigned char *start = pieces_start(cur->frametable);
+      cur->owns_pieces =
+        !pieces_owned(frametables, NULL, start)
+        && !pieces_owned(new_frametables, cur, start);
+    }
+  }
 }
 
 static caml_frametable_list* frametables_list_tail(caml_frametable_list *list) {
@@ -288,7 +364,8 @@ Caml_inline void insert_entry(frame_descr_entry *descriptors, uintnat mask,
    by which time the slot's cache line has usually arrived. */
 #define FILL_PREFETCH_DISTANCE 16
 
-static void fill_hashtable(
+/* Returns the number of descriptors inserted */
+static uintnat fill_hashtable(
   caml_frame_descrs *table, caml_frametable_list *new_frametables)
 {
   frame_descr_entry *descriptors = table->descriptors;
@@ -301,8 +378,8 @@ static void fill_hashtable(
   uintnat n = 0; /* descriptors decoded so far */
   iter_list(new_frametables,cur) {
     frametable_iter it;
-    frametable_iter_start(&it, (intnat *) cur->frametable);
-    while (it.remaining > 0) {
+    frametable_iter_start(&it, cur);
+    while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *fd = frametable_iter_next(&it, &retaddr);
       uintnat hash = Hash_retaddr(retaddr, mask);
@@ -324,6 +401,16 @@ static void fill_hashtable(
     insert_entry(descriptors, mask,
                  slot->retaddr, slot->hash, slot->fd);
   }
+  return n;
+}
+
+/* The hashtable is sized from the counts, so it cannot hold more */
+static void check_count(uintnat inserted, intnat counted)
+{
+  if (inserted > (uintnat)counted)
+    caml_fatal_error("more frame descriptors (%" ARCH_INTNAT_PRINTF_FORMAT
+                     "u) than counted (%" ARCH_INTNAT_PRINTF_FORMAT "d)",
+                     inserted, counted);
 }
 
 static void remove_entry(caml_frame_descrs *table, uintnat retaddr,
@@ -363,14 +450,13 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
   caml_frametable_list *cur = table->zombies, *rem;
   while (cur != NULL) {
     frametable_iter it;
-    frametable_iter_start(&it, (intnat *) cur->frametable);
-    intnat len = it.remaining;
-    while (it.remaining > 0) {
+    frametable_iter_start(&it, cur);
+    while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *d = frametable_iter_next(&it, &retaddr);
       remove_entry(table, retaddr, d);
+      decrease++;
     }
-    decrease += len;
     rem = cur;
     cur = cur->next;
     caml_stat_free(rem);
@@ -1062,7 +1148,7 @@ static void add_descriptor_to_stats(frame_descr *d,
         p += (uintnat)(*p) + 1;
       }
       for (uint32_t i = 0; i < dec->num_debuginfo; ++i) {
-        uint32_t offset = caml_read_unaligned_uint32(p);
+        int32_t offset = caml_read_unaligned_int32(p);
         if (offset) { /* there may be invalid debuginfo slots */
           caml_debuginfo_measure((debuginfo)(p + offset));
         }
@@ -1078,21 +1164,23 @@ static void add_descriptor_to_stats(frame_descr *d,
 
 /* Record stats for all descriptors from a frametable */
 
-static void add_frametable_to_stats(intnat *frametable,
+static void add_frametable_to_stats(caml_frametable_list *cell,
                                     struct frametable_stats *stats)
 {
   ++ stats->frametables;
-  if (!stats->min_descr ||
-      ((unsigned char*)frametable < stats->min_descr)) {
-    stats->min_descr = (unsigned char*)frametable;
-  }
-  if (!stats->max_descr ||
-      ((unsigned char*)frametable > stats->max_descr)) {
-    stats->max_descr = (unsigned char*)(frametable+1);
-  }
   frametable_iter it;
-  frametable_iter_start(&it, frametable);
-  while (it.remaining > 0) {
+  frametable_iter_start(&it, cell);
+  /* Pieces are away from their header, in the pieces section */
+  unsigned char *start =
+    it.end != NULL ? (unsigned char *)it.next
+                   : (unsigned char *)cell->frametable;
+  if (!stats->min_descr || (start < stats->min_descr)) {
+    stats->min_descr = start;
+  }
+  if (!stats->max_descr || (start > stats->max_descr)) {
+    stats->max_descr = (unsigned char *)it.next;
+  }
+  while (frametable_iter_more(&it)) {
     uintnat retaddr;
     frame_descr *d = frametable_iter_next(&it, &retaddr);
     struct frame_descr_decoded dec;
@@ -1108,7 +1196,7 @@ static void report_frametables_stats(caml_frametable_list *new_frametables)
   struct frametable_stats stats;
   clear_stats(&stats);
   iter_list(new_frametables, cur) {
-    add_frametable_to_stats(cur->frametable, &stats);
+    add_frametable_to_stats(cur, &stats);
     accumulate_frametable_stats(cur->frametable, &stats);
     clear_per_frametable_stats(&stats);
   }
@@ -1121,6 +1209,7 @@ static void add_frame_descriptors(
 {
   CAMLassert(new_frametables != NULL);
 
+  assign_pieces_owners(table->frametables, new_frametables);
   caml_frametable_list *tail = frametables_list_tail(new_frametables);
   intnat increase = count_descriptors(new_frametables);
   intnat tblsize = capacity(*table);
@@ -1150,13 +1239,14 @@ static void add_frame_descriptors(
 
     table->descriptors = alloc_descriptors(tblsize);
 
-    fill_hashtable(table, new_frametables);
+    /* [new_frametables] now continues with the old tables */
+    check_count(fill_hashtable(table, new_frametables), num_descr);
     if (caml_measure_frametables) {
       report_frametables_stats(new_frametables);
     }
   } else {
     table->num_descr += increase;
-    fill_hashtable(table, new_frametables);
+    check_count(fill_hashtable(table, new_frametables), increase);
     if (caml_measure_frametables) {
       report_frametables_stats(new_frametables);
     }
@@ -1175,6 +1265,7 @@ static caml_frametable_list *cons(
 {
   caml_frametable_list *li = caml_stat_alloc(sizeof(caml_frametable_list));
   li->frametable = frametable;
+  li->owns_pieces = false;
   li->next = tl;
   return li;
 }
@@ -1196,6 +1287,7 @@ static caml_frametable_list *copy_cons(
   memcpy(frametable_copy, *frametable, size);
   *frametable = frametable_copy;
   li->frametable = frametable_copy;
+  li->owns_pieces = false;
   li->next = tl;
   return li;
 }
@@ -1267,6 +1359,19 @@ static void remove_frame_descriptors(
     for (int i = 0; i < ntables; i++) {
       if (current->frametable == frametables[i]) {
         *previous = current->next;
+        if (current->owns_pieces) {
+          /* Hand the pieces over to another table that refers to them, if
+             any, so that they stay in the hashtable. */
+          const unsigned char *start = pieces_start(current->frametable);
+          iter_list(table->frametables, other) {
+            if (has_pieces(other->frametable)
+                && pieces_start(other->frametable) == start) {
+              other->owns_pieces = true;
+              current->owns_pieces = false;
+              break;
+            }
+          }
+        }
         current->next = table->zombies;
         table->zombies = current;
         ntables--;

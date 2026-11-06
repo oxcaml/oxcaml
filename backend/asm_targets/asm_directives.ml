@@ -36,10 +36,13 @@ let emit_assembly_comments_ref = ref None
 let not_initialized () =
   Misc.fatal_error "[Asm_directives.initialize] has not been called"
 
-let current_section_is_text () =
+let current_section () =
   match !current_section_ref with
   | None -> not_initialized ()
-  | Some section -> Asm_section.section_is_text section
+  | Some section -> section
+
+let current_section_is_text () =
+  Asm_section.section_is_text (current_section ())
 
 let emit_comments () =
   let emit_assembly_comments =
@@ -1257,6 +1260,9 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   in
   let expr = Add (Sub (Label upper, This), offset_const) in
   const expr Thirty_two
+
+let between_this_and_symbol_32bit_expr upper =
+  const (Sub (Symbol upper, This)) Thirty_two
 
 let between_symbol_in_current_unit_and_label_offset0 ~upper ~lower ~offset_upper
     ~const_for_width =

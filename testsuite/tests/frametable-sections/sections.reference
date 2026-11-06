@@ -1,0 +1,10 @@
+2 105 10
+function pieces: some
+plain pieces: 0
+code_begin pieces: 1
+counts: 1
+code_begin counts: 1
+headers: 1
+hidden: 4
+object pieces: some
+unlinked object pieces: 0

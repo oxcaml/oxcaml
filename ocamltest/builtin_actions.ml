@@ -314,6 +314,14 @@ let function_sections = make
      "Target supports function sections"
      "Target does not support function sections")
 
+let frametable_sections = make
+  ~name:"frametable_sections"
+  ~description:"Pass if target supports frametable sections"
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.frametable_sections)
+     "Target supports frametable sections"
+     "Target does not support frametable sections")
+
 let frame_pointers = make
   ~name:"frame_pointers"
   ~description:"Pass if frame pointers are available"
@@ -529,6 +537,7 @@ let init () =
     arch_riscv;
     arch_s390x;
     function_sections;
+    frametable_sections;
     frame_pointers;
     no_frame_pointers;
     naked_pointers;
