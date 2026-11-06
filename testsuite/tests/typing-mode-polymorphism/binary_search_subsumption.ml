@@ -69,50 +69,47 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val linear_search_first_satisfying :
-             'a @ [< 'm] ->
-             (get:('a @ [< past('n) > 'm] ->
-                   ('b @ [> 'q | aliased] -> 'c @ [< 'p]) @ [> past('n) | past('o)]) @ [< past('o)] ->
-              lo:'b @ [< 'mm1 & 'q & many uncontended read_write] ->
-              hi:'b @ [< many uncontended read_write] ->
-              pred:('c @ [> 'p | dynamic] -> bool @ 'mm0) @ 'mm2 ->
-              'b option @ [> 'mm1 | local aliased dynamic]) @ [> close('m) | stateful]
+             'a @ [< 'o] ->
+             get:('a @ [> 'o] -> 'b @ [> 'n | aliased] -> 'c @ [< 'm]) @ 'mm1 ->
+             lo:'b @ [< 'q & 'n & many uncontended read_write] ->
+             hi:'b @ [< many uncontended read_write] ->
+             pred:('c @ [> 'm | dynamic] -> bool @ 'p) @ 'mm0 ->
+             'b option @ [> 'q | local aliased dynamic]
            val find_first_satisfying :
-             'a @ [< 'm & 'n & many] ->
-             (get:('a @ [> 'n | aliased] ->
-                   (int @ [> aliased] -> 'b @ [< 'p]) @ 'o) @ 'mm3 ->
-              length:('a @ [> 'm | aliased] -> int @ 'q) @ 'mm2 ->
-              pred:('b @ [> 'p | dynamic] -> bool @ 'mm0) @ 'mm1 ->
-              int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | stateful]
+             'a @ [< 'p & 'n & many] ->
+             get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'm]) @ 'mm2 ->
+             length:('a @ [> 'p | aliased] -> int @ 'o) @ 'mm1 ->
+             pred:('b @ [> 'm | dynamic] -> bool @ 'q) @ 'mm0 ->
+             int option @ [> local aliased dynamic]
            val find_last_satisfying :
-             'a @ [< 'm & 'n & many] ->
-             (pred:('b @ [> 'p | dynamic] -> bool @ 'o) @ 'mm1 ->
-              get:('a @ [> 'n | aliased] ->
-                   (int @ [> aliased] -> 'b @ [< 'p]) @ 'q) @ 'mm0 ->
-              length:('a @ [> 'm | aliased] ->
-                      int @ [< many uncontended read_write]) @ [< many] ->
-              int option @ [> local dynamic]) @ [> close('m) | close('n) | stateful]
+             'a @ [< 'p & 'o & many] ->
+             pred:('b @ [> 'n | dynamic] -> bool @ 'm) @ 'mm0 ->
+             get:('a @ [> 'o | aliased] -> int @ [> aliased] -> 'b @ [< 'n]) @ 'q ->
+             length:('a @ [> 'p | aliased] ->
+                     int @ [< many uncontended read_write]) @ [< many] ->
+             int option @ [> local dynamic]
            val binary_search :
-             'a @ [< 'm & 'n & many] ->
-             (length:('a @ [> 'n | aliased] ->
+             'a @ [< 'o & 'm & many] ->
+             length:('a @ [> 'm | aliased] ->
+                     int @ [< many uncontended read_write]) @ [< many > local] ->
+             get:('a @ [> 'o | aliased] -> int @ [> aliased] -> 'b @ [< 'n]) @ [< many > local] ->
+             compare:('b @ [> 'n | dynamic] ->
+                      'c @ [> 'p | aliased] ->
                       int @ [< many uncontended read_write]) @ [< many > local] ->
-              get:('a @ [> 'm | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< many > local] ->
-              compare:('b @ [> 'o | dynamic] ->
-                       'c @ [> 'p | aliased] ->
-                       int @ [< many uncontended read_write]) @ [< many > local] ->
-              'c @ [< 'p & many] -> int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | stateful]
+             'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
          end
        is not included in
          S
        Values do not match:
          val binary_search :
-           'a @ [< 'm & 'n & many] ->
-           (length:('a @ [> 'n | aliased] ->
+           'a @ [< 'o & 'm & many] ->
+           length:('a @ [> 'm | aliased] ->
+                   int @ [< many uncontended read_write]) @ [< many > local] ->
+           get:('a @ [> 'o | aliased] -> int @ [> aliased] -> 'b @ [< 'n]) @ [< many > local] ->
+           compare:('b @ [> 'n | dynamic] ->
+                    'c @ [> 'p | aliased] ->
                     int @ [< many uncontended read_write]) @ [< many > local] ->
-            get:('a @ [> 'm | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< many > local] ->
-            compare:('b @ [> 'o | dynamic] ->
-                     'c @ [> 'p | aliased] ->
-                     int @ [< many uncontended read_write]) @ [< many > local] ->
-            'c @ [< 'p & many] -> int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | stateful]
+           'c @ [< 'p & many] -> int option @ [> local aliased dynamic]
        is not included in
          val binary_search :
            't ->

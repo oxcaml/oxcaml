@@ -185,8 +185,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let close_over x = fun () -> x
 [%%expect{|
-val close_over :
-  'a @ [< 'm & global] -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)] = <fun>
+val close_over : 'a @ [< 'm & global] -> unit @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -204,9 +203,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 let close_over x = fun () -> fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'm & global] ->
-  (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)] =
-  <fun>
+  'a @ [< 'm & global] -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -244,9 +241,7 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-val foo :
-  int @ [< portable] ->
-  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> nonportable stateful] =
+val foo : int @ [< portable] -> int @ [> nonportable] -> unit @ [> dynamic] =
   <fun>
 |}, Principal{|
 val foo :

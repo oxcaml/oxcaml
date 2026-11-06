@@ -328,7 +328,7 @@ module Curry_mode : sig
   val add_arg : t -> With_locality.lr -> upper_areality:Locality.Const.t -> t
 
   (** The accumulated curry mode. *)
-  val mode : t -> With_locality.lr
+  val mode : level:int -> t -> With_locality.lr
 end
 
 val apply:

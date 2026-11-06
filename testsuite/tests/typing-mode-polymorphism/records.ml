@@ -28,31 +28,17 @@ val alloc :
 let store_local (x @ local) y = x.i <- y
 [%%expect{|
 val store_local :
-  'a myref @ [< past('m) & corrupted write > local] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) mod many forkable unyielding | local corruptible writing] =
-  <fun>
-|}, Principal{|
-val store_local :
-  'a myref @ [< past('m) & corrupted write > local] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | local corruptible writing] =
-  <fun>
+  'a myref @ [< corrupted write > local] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  unit @ 'm = <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< past('m) & global corrupted write] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) mod many forkable unyielding | corruptible writing] =
-  <fun>
-|}, Principal{|
-val store_global :
-  'a myref @ [< past('m) & global corrupted write] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | corruptible writing] =
-  <fun>
+  'a myref @ [< global corrupted write] ->
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  unit @ 'm = <fun>
 |}]
 
 let () =

@@ -78,9 +78,8 @@ end
 module type Flip =
   sig
     val flip :
-      ('a @ [< past('m) > 'q] ->
-       ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global] ->
-      'b @ [< 'p & global] -> 'a @ [< 'q] -> 'c @ [> 'o | dynamic] @@
+      ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
+      'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] @@
       stateless
   end
 |}]
@@ -95,9 +94,7 @@ module type Add = module type of struct
 end
 [%%expect{|
 module type Add =
-  sig
-    val add : int @ 'o -> (int @ 'n -> int @ [> dynamic]) @ 'm @@ stateless
-  end
+  sig val add : int @ 'n -> int @ 'm -> int @ [> dynamic] @@ stateless end
 |}, Principal{|
 module type Add =
   sig
@@ -211,15 +208,6 @@ end
 module type Store_and_call =
   sig
     val store_and_call :
-      ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('p) & past('o) & global uncontended read_write] ->
-      (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
-       ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('p) mod many forkable unyielding | nonportable stateful]) @ [> past('o) mod many forkable unyielding | nonportable stateful]
-      @@ stateless
-  end
-|}, Principal{|
-module type Store_and_call =
-  sig
-    val store_and_call :
       ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global uncontended read_write] ->
       ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
       'a @ [< 'n] -> 'b @ [> 'm | dynamic] @@ stateless
@@ -257,16 +245,6 @@ module type Unique_cell = module type of struct
   let unique_cell (c @ unique) x = c.v <- x; use_unique c
 end
 [%%expect{|
-module type Unique_cell =
-  sig
-    val use_unique : 'a @ [< unique] -> unit @ 'm @@ stateless
-    val unique_cell :
-      'a cell @ [< past('m) & global unique corrupted write] ->
-      ('a @ [< global many uncontended forkable unyielding read_write] ->
-       unit @ [> dynamic]) @ [> past('m) mod many forkable unyielding | once corruptible writing]
-      @@ stateless
-  end
-|}, Principal{|
 module type Unique_cell =
   sig
     val use_unique : 'a @ [< unique] -> unit @ 'm @@ stateless
