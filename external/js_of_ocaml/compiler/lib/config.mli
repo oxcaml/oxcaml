@@ -112,6 +112,8 @@ module Param : sig
 
   val constant_max_depth : unit -> int
 
+  val list_literal_max_length : unit -> int
+
   val merge_node_max : unit -> int
 
   val toplevel_split_size : unit -> int
