@@ -31,6 +31,7 @@ let serialize_constant : Typedtree.constant -> Json.t = function
     |> fun bytes -> Json.Array bytes
     |> tag "bytes"
     |> tag "string"
+  | Const_int i -> Json.int i |> tag "bits" |> tag "int"
   | other_constant ->
     Format.asprintf "Constant not yet supported:@ %s"
       (Printpat.pretty_const other_constant)
@@ -96,6 +97,8 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
         ("args", Json.Array (List.map serialize_lambda args));
       ]
     |> tag "prim"
+  | Lfunction f ->
+    serialize_function f |> tag "function" |> tag "function"
   | other_lambda ->
     Format.asprintf "Lambda term not yet supported:@ %a"
       Printlambda.lambda other_lambda
@@ -112,16 +115,47 @@ and serialize_primitive : Lambda.primitive -> Json.t = function
       Printlambda.primitive other_primitive
     |> fun message -> raise (Error_message message)
 
+(* Serialize an untyped [Lambda] function. *)
+and serialize_function (f : Lambda.lfunction) : Json.t =
+  match f.params with
+  | headParam :: tailParams ->
+    Json.Object
+      [ ( "headParam", serialize_ident headParam.name );
+        ( "tailParams",
+          Json.Array
+            ( List.map
+                (fun (p : Lambda.lparam) -> serialize_ident p.name)
+                tailParams ) );
+        ( "body", serialize_lambda f.body );
+      ]
+  | [] ->
+    Format.asprintf "Function with zero arguments:@ %a:@ %a"
+      Location.print_loc (Debuginfo.Scoped_location.to_location f.loc)
+      Printlambda.lfunction f
+    |> fun message -> raise (Error_message message)
+
 (* Serialize a type expression. *)
 let rec serialize_type_expr ~(loc : Warnings.loc) (ty : Types.type_expr) : Json.t =
   begin match Types.get_desc ty with
+  (* CR wsturgeon: remove the below special case *)
   | Tpoly (ty, []) -> serialize_type_expr ~loc ty
+  (* CR wsturgeon: remove the below special case *)
   | Tconstr (path, [], _) when Path.same path Predef.path_string ->
     Json.String "string"
-  | Tconstr (path, [], _) ->
-    serialize_path ~loc path |> tag "path" |> tag "constr"
+  | Tconstr (path, args, _) ->
+    Json.Object
+      [ ("path", serialize_path ~loc path);
+        ("args", Json.Array (List.map (serialize_type_expr ~loc) args));
+      ]
+    |> tag "constr"
+  | Tarrow (_, lhs, rhs, _) ->
+    Json.Object
+      [ ("lhs", serialize_type_expr ~loc lhs);
+        ("rhs", serialize_type_expr ~loc rhs);
+      ]
+    |> tag "arrow"
   | _ ->
-    Format.asprintf "Type declaration not yet supported:@ %a:@ %a"
+    Format.asprintf "Type expression not yet supported:@ %a:@ %a"
       Location.print_loc loc
       Printtyp.type_expr ty
     |> fun message -> raise (Error_message message)
@@ -144,6 +178,7 @@ let serialize_type_declaration (id : Ident.t) (decl : Types.type_declaration)
       |> fun labels -> tag "labels" (Json.Array labels)
       |> tag "record"
       |> tag "record"
+    | Type_abstract Definition -> Json.String "abstract"
     | _ ->
       Format.asprintf "Type declaration not yet supported:@ %a:@ %a"
         Location.print_loc decl.type_loc
@@ -156,8 +191,13 @@ let serialize_type_declaration (id : Ident.t) (decl : Types.type_declaration)
       ("desc", desc)
     ]
 
+(* Serialize an interface from an [.mli]/[.cmi] pair. *)
+let rec serialize_signature (signature : Types.signature) : Json.t =
+  List.map serialize_signature_item signature
+  |> fun items -> tag "items" (Json.Array items)
+
 (* Serialize a top-level item from an [.mli] file. *)
-let serialize_signature_item : Types.signature_item -> Json.t = function
+and serialize_signature_item : Types.signature_item -> Json.t = function
   | Sig_type (id, decl, _, Exported) ->
     serialize_type_declaration id decl
     |> tag "decl"
@@ -168,18 +208,29 @@ let serialize_signature_item : Types.signature_item -> Json.t = function
         ("type", serialize_type_expr ~loc:desc.val_loc desc.val_type);
       ]
     |> tag "exprDecl"
+  | Sig_module (id, _, decl, _, _) ->
+    Json.Object
+      [ ("id", serialize_ident id);
+        ("type", serialize_module_type ~loc:decl.md_loc decl.md_type);
+      ]
+    |> tag "moduleDecl"
   | other_item ->
     Format.asprintf "Signature item not yet supported:@ %a"
       Printtyp.signature [other_item]
     |> fun message -> raise (Error_message message)
 
-(* Serialize an interface from an [.mli]/[.cmi] pair. *)
-let serialize_interface (signature : Types.signature) : Json.t =
-  List.map serialize_signature_item signature
-  |> fun items -> tag "items" (Json.Array items)
+(* Serialize a top-level module type from an [.mli] file. *)
+and serialize_module_type ~(loc : Warnings.loc) :
+    Types.module_type -> Json.t = function
+  | Mty_signature s -> serialize_signature s |> tag "signature"
+  | other_module_type ->
+    Format.asprintf "Module type not yet supported:@ %a:@ %a"
+      Location.print_loc loc
+      Printtyp.modtype other_module_type
+    |> fun message -> raise (Error_message message)
 
 (* Serialize an implementation from an [.ml]/[.cmt] pair. *)
-let serialize_implementation
+let serialize_structure
     (info : Cmt_format.cmt_infos) (structure : Typedtree.structure)
     (coercion : Typedtree.module_coercion) : Json.t =
   let { code = tlambda; _ } : Lambda.program =
@@ -191,8 +242,11 @@ let serialize_implementation
     |> Printf.sprintf "Cross-module static evaluation not yet supported: %s"
     |> fun message -> raise (Error_message message)
   in
-  let _static_data, lambda =
-    Slambda.eval ~cu_static_data Fun.id tlambda
+  let _, rawlambda = Slambda.eval ~cu_static_data Fun.id tlambda in
+  let lambda =
+    Simplif.simplify_lambda rawlambda
+      ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
+      ~gdwarf_may_alter_codegen:false
   in
   serialize_lambda lambda
 
@@ -207,29 +261,22 @@ let rehydrate_envs (info : Cmt_format.cmt_infos) :
   in
   mapper.structure mapper
 
+(* Get the CRC hash of a `.cmi` file. *)
+let crc_of_cmi (cmi : Cmi_format.cmi_infos) =
+  Array.find_map
+    ( fun import ->
+        if Import_info.name import |> Compilation_unit.Name.equal cmi.cmi_name
+        then Import_info.crc import
+        else None )
+
 (* Check that the [.cmi] and [.cmt] file discuss the same source code. *)
 let check_same_compilation
     (cmi : Cmi_format.cmi_infos) (cmt : Cmt_format.cmt_infos) : unit =
-  let cmi_crc =
-    Array.find_map
-      ( fun import ->
-          if Compilation_unit.Name.equal (Import_info.name import) cmi.cmi_name
-          then Import_info.crc import
-          else None )
-      cmi.cmi_crcs
-  in
-  let digest =
-    begin match cmt.cmt_interface_digest with
-    | Some digest -> digest
-    | None ->
-      raise
-        (Error_message "`.cmt` without an inferred interface not yet supported")
-    end
-  in
-  if Some digest <> cmi_crc
-  then begin
-    raise (Error_message "`.cmi` and `.cmt` come from different compilations")
-  end
+  if crc_of_cmi cmi cmt.cmt_imports <> crc_of_cmi cmi cmi.cmi_crcs
+  then
+    raise
+      ( Error_message
+          "`.cmi` and `.cmt` were compiled from different units" )
 
 (* Handle the user's supplied (alleged) filenames, whatever those may be. *)
 let run ~(cmi_filename : string) ~(cmt_filename : string) : unit =
@@ -261,8 +308,8 @@ let run ~(cmi_filename : string) ~(cmt_filename : string) : unit =
   in
   let json_output : Json.t =
     Json.Object
-      [ ("interface", serialize_interface interface);
-        ("implementation", serialize_implementation cmt structure coercion);
+      [ ("interface", serialize_signature interface);
+        ("implementation", serialize_structure cmt structure coercion);
       ]
   in
   Format.printf "%a@." (Json.print ~mode:Pretty) json_output

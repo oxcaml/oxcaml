@@ -1,4 +1,5 @@
 inductive Constant where
+  | int (bits : BitVec 63)
   | string (bytes : List UInt8)
   deriving Repr
 
@@ -15,7 +16,8 @@ inductive Path where
   deriving Repr
 
 inductive TypeExpr where
-  | constr (path : Path)
+  | constr (path : Path) (args : List TypeExpr)
+  | arrow (lhs rhs : TypeExpr)
   | string
   deriving Repr
 
@@ -47,6 +49,12 @@ inductive Primitive : Type where
   | makeBlock (tag : Nat)
   deriving Repr
 
+structure Function (Body : Type) : Type where
+  headParam : Ident -- to prevent empty lists
+  tailParams : List Ident
+  body : Body
+  deriving Repr
+
 /-
 This should be a character-for-character copy of the compiler's [Lambda.lambda]
 to avoid misformalization via translation errors.
@@ -58,7 +66,8 @@ inductive Lambda (V : Type) : Type where
   /- Lconst -/
   | const (const : StructuredConstant)
   /- TODO: Lapply -/
-  /- TODO: Lfunction -/
+  /- Lfunction -/
+  | function (function : Function (Lambda V))
   /- Llet -/
   | bind (id : Ident) (subst : Lambda V) (body : Lambda V)
   /- TODO: Lmutlet -/
@@ -94,20 +103,13 @@ mutual
   inductive BlockContents : BlockKind → Type where
     | values (values : List Value) : BlockContents .values
     | bytes (bytes : List UInt8) : BlockContents .bytes
-    | closure (rec : Recursive) (closure : Closure) : BlockContents .closure
+    | closure (rec : Recursive) (closure : Function (Lambda Value)) : BlockContents .closure
     -- nothing for `.notYetSupported`
-    deriving Repr
-
-  structure Closure : Type where
-    self : Ident
-    headParam : Ident -- to prevent empty lists
-    tailParams : List Ident
-    body : Lambda Value
     deriving Repr
 
   inductive Recursive : Type where
     | nonrecursive
-    | recursive (mutuals : List Closure)
+    | recursive (self : Ident) (mutuals : List (Function (Lambda Value)))
     deriving Repr
 end
 
@@ -119,8 +121,14 @@ abbrev Expr := Lambda Value
 @[simp]
 def Lambda.size {V} : Lambda V → Nat
   | .var _ | .const _ | .value _ => 1
+  | .function f => f.body.size.succ
   | .bind _ subst body => subst.size + body.size |>.succ
   | .prim _ args => args.map size |>.sum |>.succ
+decreasing_by
+  · cases f with (simp; omega)
+  · decreasing_tactic
+  · decreasing_tactic
+  · decreasing_tactic
 
 instance (priority := high) {V} : SizeOf <| Lambda V where
   sizeOf := Lambda.size
@@ -153,16 +161,33 @@ inductive List.forAll {T} (P : T → Prop) : List T → Prop
   | Cons {head tail} : P head → tail.forAll P → (head :: tail).forAll P
 
 @[induction_eliminator]
+def Lambda.induct' {V} {motive : Lambda V → Prop} :=
+  let motiveList : List (Lambda V) → Prop := List.forAll motive
+  let motiveFunction : Function (Lambda V) → Prop := (motive ·.body)
+  @Lambda.rec V
+    motive
+    motiveFunction
+    motiveList
+    (mk := fun _ _ _ h => h)
+    (nil := .Nil)
+    (cons := fun _ _ => .Cons)
+
+/-
+@[induction_eliminator]
 def Lambda.induct' {V} {motive : Lambda V → Prop}
     (var : ∀ id, motive (.var id))
-    (const : ∀ c, motive (.const c))
+    (const : ∀ const, motive (.const const))
+    (function :
+      ∀ headParam tailParam body,
+      motive body →
+      motive (.function headParam tailParam body))
     (bind :
       ∀ id subst body,
       motive subst →
       motive body →
       motive (.bind id subst body))
     (prim : ∀ prim args, List.forAll motive args → motive (.prim prim args))
-    (value : ∀ v, motive (.value v))
+    (value : ∀ value, motive (.value value))
     : ∀ l, motive l
 :=
   @Lambda.rec V
@@ -170,11 +195,13 @@ def Lambda.induct' {V} {motive : Lambda V → Prop}
     (List.forAll motive)
     (var := var)
     (const := const)
+    (function := function)
     (bind := bind)
     (prim := prim)
     (value := value)
     (nil := .Nil)
     (cons := fun _ _ => .Cons)
+-/
 
 structure RecordLabelDecl where
   id : Ident
@@ -186,6 +213,7 @@ structure RecordTypeDecl where
   deriving Repr
 
 inductive TypeDesc where
+  | abstract
   | record (record : RecordTypeDecl)
   deriving Repr
 
@@ -194,10 +222,16 @@ structure TypeDecl where
   desc : TypeDesc
   deriving Repr
 
-inductive SignatureItem where
-  | typeDecl (decl : TypeDecl)
-  | exprDecl (id : Ident) (type : TypeExpr)
-  deriving Repr
+mutual
+  inductive SignatureItem where
+    | typeDecl (decl : TypeDecl)
+    | exprDecl (id : Ident) (type : TypeExpr)
+    | moduleDecl (id : Ident) (type : ModuleType)
+    deriving Repr
+
+  inductive ModuleType where
+    | signature (items : List SignatureItem)
+end
 
 structure Signature where
   items : List SignatureItem

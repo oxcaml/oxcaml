@@ -1,11 +1,9 @@
 (rule
- (targets record.cmi record.cmt)
- (deps record.ml)
+ (targets record.cmi record.cmti record.cmt)
+ (deps record.mli record.ml)
  (action
   (run
    %{exe:../../../main_native.exe}
-   -nostdlib
-   -nopervasives
    -bin-annot
    -stop-after
    typing

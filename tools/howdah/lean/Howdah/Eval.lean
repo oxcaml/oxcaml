@@ -43,8 +43,8 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
     Lambda V → Lambda V
   | .var id => if id = idToReplace then .value value else .var id
   | .const c => .const c
-  | .prim p args =>
-    .prim p <| args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
+  | .function f =>
+    .function { f with body := substitute idToReplace value f.body }
   | .bind id subst body =>
     let substSubstituted := substitute idToReplace value subst
     let bodySubstituted :=
@@ -54,22 +54,27 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
       else
         substitute idToReplace value body
     .bind id substSubstituted bodySubstituted
+  | .prim p args =>
+    .prim p <| args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
   | .value v => .value v
 decreasing_by
+  · decreasing_tactic
+  · decreasing_tactic
+  · decreasing_tactic
   · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
-  · decreasing_tactic
-  · decreasing_tactic
 
 @[simp]
 theorem Lambda.size_substitute {V} (lambda : Lambda V) idToReplace value :
     (lambda.substitute idToReplace value).size = lambda.size := by
   induction lambda with simp
   | var v => split <;> simp
+  | function f ih => exact ih
   | bind id subst body ihSubst ihBody => split <;> simp_all
   | prim _ args ih => induction ih with simp_all
 
 @[simp]
 def Constant.pureEval : Constant → Value
+  | .int bits => .immediate bits
   | .string bytes => .bytes bytes |> .block 252
 
 @[simp]
@@ -98,17 +103,18 @@ def Primitive.pureEval (args : List Value) : Primitive → PureEvalResult Value
 def Lambda.pureEval : Expr → PureEvalResult Value
   | .var id => .unboundVariable id |> .error
   | .const c => c.pureEval
-  | .prim p args => do
-    let args ← args.attach.mapM fun ⟨arg, _⟩ => arg.pureEval
-    p.pureEval args
+  | .function f => .closure .nonrecursive f |> .block 247 |> .halted
   | .bind id subst body => do
     let value : Value ← subst.pureEval
     body.substitute id value |>.pureEval
+  | .prim p args => do
+    let args ← args.attach.mapM fun ⟨arg, _⟩ => arg.pureEval
+    p.pureEval args
   | .value v => .halted v
 decreasing_by
+  · decreasing_tactic
+  · decreasing_tactic
   · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
-  · decreasing_tactic
-  · decreasing_tactic
 
 @[simp]
 def Lambda.pureEval! (lambda : Expr) : Value :=
