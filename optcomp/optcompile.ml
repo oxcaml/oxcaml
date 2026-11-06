@@ -294,8 +294,6 @@ let native unix
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
 
-    let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
-
     (* These are the dependencies of otherlibs/eval. *)
     let extra_libraries_for_eval =
       [ "unix/unix";
@@ -309,11 +307,18 @@ let native unix
     let support_files_for_eval () =
       List.map (fun lib -> lib ^ ext_flambda_lib) extra_libraries_for_eval
 
+    (* Add the directories in which the support libraries are found, so that
+       their C stubs, and the .cmi and .cmx files needed for quotes, come from
+       the same place as the libraries themselves. A library which cannot be
+       found is reported when the linker reads it. *)
     let set_load_path_for_eval () =
-      List.iter
-        (fun lib ->
-          Load_path.add_dir
-            (Visible { cmx_guaranteed = true })
-            (Misc.expand_directory Config.standard_library ("+" ^ lib)))
-        extra_load_paths_for_eval
+      support_files_for_eval ()
+      |> List.filter_map (fun file ->
+          match Load_path.find file with
+          | path -> Some (Filename.dirname path)
+          | exception Not_found -> None)
+      |> List.fold_left
+           (fun dirs dir -> if List.mem dir dirs then dirs else dirs @ [dir])
+           []
+      |> List.iter (Load_path.add_dir (Visible { cmx_guaranteed = true }))
   end) : S)
