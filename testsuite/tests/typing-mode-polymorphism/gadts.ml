@@ -13,7 +13,9 @@ let refine (type output) (w : output t) =
 [%%expect{|
 type _ t = A : bool t
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
-val refine : 'output t @ 'm -> bool -> 'output = <fun>
+val refine :
+  'output t @ 'm -> (bool -> 'output) @ [> nonportable stateful dynamic] =
+  <fun>
 |}]
 
 type _ arr = F : (int -> int) arr
@@ -40,12 +42,11 @@ let pin (w : 'x arr) (g : 'x) =
 [%%expect{|
 val pin :
   (int -> int) arr @ 'n ->
-  (int -> int) @ [< 'm mod aliased contended immutable] ->
-  (int -> int) @ [> 'm] = <fun>
+  (int -> int) @ [< 'm mod aliased contended immutable] -> int -> int = <fun>
 |}, Principal{|
 val pin :
-  (int -> int) arr @ [< global] ->
-  (int -> int) @ [< 'm] -> (int -> int) @ [> 'm] = <fun>
+  (int -> int) arr @ [< global] -> (int -> int) @ [< 'm] -> int -> int =
+  <fun>
 |}]
 
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -116,7 +117,6 @@ let unpack (P f) = f
 [%%expect{|
 type packed = P : (int -> int) -> packed
 val pack : packed = P <fun>
-val unpack :
-  packed @ [< 'm mod aliased contended immutable] -> (int -> int) @ [> 'm] =
+val unpack : packed @ [< 'm mod aliased contended immutable] -> int -> int =
   <fun>
 |}]
