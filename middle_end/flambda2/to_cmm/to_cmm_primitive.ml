@@ -1542,6 +1542,28 @@ let consider_inlining_effectful_expressions p =
   | Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _ ->
     None
 
+(* For a bitwise [or] of tagged immediates, [C.or_int] turns [(tag c1) lor (tag
+   c2)] into [tag (c1 lor c2)], and the tag is then removed by whatever consumes
+   the result (a test, an untagging). To let that happen when [c1] or [c2] has
+   been let-bound because it has other uses, we look through the variables. The
+   comparisons may then be computed twice, which the backend's CSE merges; and
+   if every use of such a variable looks through it, its binding is dropped
+   entirely. This is only done when both arguments end up as tagged comparisons,
+   since otherwise the rewrite would not fire and the variable's binding would
+   be kept for nothing. *)
+let look_through_tagged_comparisons env (binary : P.binary_primitive) x y
+    (x' : Env.expr_with_info) (y' : Env.expr_with_info) =
+  match[@ocaml.warning "-4"] binary with
+  | Int_arith (Tagged_immediate, Or) ->
+    let x'' = C.look_through_tagged_comparison env x x' in
+    let y'' = C.look_through_tagged_comparison env y y' in
+    if
+      C.is_tagged_comparison_of_simples x''.cmm
+      && C.is_tagged_comparison_of_simples y''.cmm
+    then x'', y''
+    else x', y'
+  | _ -> x', y'
+
 let prim_simple env res dbg p =
   let consider_inlining_effectful_expressions =
     consider_inlining_effectful_expressions p
@@ -1574,6 +1596,7 @@ let prim_simple env res dbg p =
   | Binary (binary, x, y) ->
     let To_cmm_env.{ env; res; expr = x' } = arg env res x in
     let To_cmm_env.{ env; res; expr = y' } = arg env res y in
+    let x', y' = look_through_tagged_comparisons env binary x y x' y' in
     let free_vars = Backend_var.Set.union x'.free_vars y'.free_vars in
     let effs = Ece.join x'.effs y'.effs in
     let expr =

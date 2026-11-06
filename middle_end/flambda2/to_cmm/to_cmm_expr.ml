@@ -73,6 +73,20 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
       (Debuginfo.to_location dbg_with_inlined)
       (Warnings.Inlining_impossible reason)
 
+(* Temporary, until Flambda has a conditional-move primitive: the conditional
+   move is a C builtin whose first argument is a tagged boolean that
+   [Cmm_builtins] turns into a condition with [test_bool], which strips the tag
+   from a comparison. *)
+let is_csel_builtin res apply =
+  match[@ocaml.warning "-4"] Apply.call_kind apply, Apply.callee apply with
+  | C_call { is_c_builtin = true; _ }, Some callee -> (
+    match Simple.must_be_symbol callee with
+    | Some (sym, _coercion) ->
+      String.starts_with ~prefix:"caml_csel_"
+        (To_cmm_result.symbol res sym).sym_name
+    | None -> false)
+  | _, _ -> false
+
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let callee_simple = Apply.callee apply in
   let args = Apply.args apply in
@@ -94,7 +108,23 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       env, res, Some callee, callee_free_vars
     | None -> env, res, None, Backend_var.Set.empty
   in
-  let args, args_free_vars, env, res, _ = C.simple_list ~dbg env res args in
+  let args, args_free_vars, env, res, _ =
+    match args with
+    | cond :: rest when is_csel_builtin res apply ->
+      (* Translated first, as [simple_list] would. See
+         [C.look_through_tagged_comparison]. *)
+      let To_cmm_env.{ env; res; expr } = C.simple ~dbg env res cond in
+      let expr = C.look_through_tagged_comparison env cond expr in
+      let rest, rest_free_vars, env, res, rest_effs =
+        C.simple_list ~dbg env res rest
+      in
+      ( expr.cmm :: rest,
+        Backend_var.Set.union expr.free_vars rest_free_vars,
+        env,
+        res,
+        Ece.join expr.effs rest_effs )
+    | [] | _ :: _ -> C.simple_list ~dbg env res args
+  in
   let free_vars = Backend_var.Set.union callee_free_vars args_free_vars in
   let pos =
     match Apply.position apply with
