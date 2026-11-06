@@ -45,14 +45,26 @@ val create : unit -> t
     worked on. *)
 val add_instr_exn : t -> Jsir.instr -> t
 
-(** Add debugging information as an [Event] if it is not [_none_]. Raises if
-    there are no blocks being worked on. [pos] controls whether we log the start
-    of the region or the end. *)
-val maybe_add_debuginfo_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
+(** The [Parse_info.t] for the start or the end of [dbg], or [None] if [dbg] has
+    no location or if [Clflags.debug] is not set. *)
+val parse_info_of_debuginfo :
+  Debuginfo.t -> pos:[`Start | `End] -> Parse_info.t option
 
-(** Wrap any result changes between [`Start] and [`End] debuginfos. Raises if
-    there are no blocks being worked on. *)
-val with_debuginfo_exn : t -> Debuginfo.t -> f:(t -> 'a * t) -> 'a * t
+(** Add an [Event] for the start or the end of [dbg], replacing an [Event]
+    immediately preceding it. Raises if there are no blocks being worked on. *)
+val add_event_exn : t -> Debuginfo.t -> pos:[`Start | `End] -> t
+
+(** Like [add_instr_exn], for an instruction that is a call. If run within
+    [with_debuginfo_exn], the instruction is surrounded by [Event]s for the
+    start and the end of the debuginfo. *)
+val add_call_exn : t -> Jsir.instr -> t
+
+(** Run [f] so that the calls it adds with [add_call_exn] are preceded by an
+    [Event] for the start of [dbg] and, if [event_after], followed by one for
+    its end. [event_after] should be [false] for a call that ends its block with
+    [Return]. *)
+val with_debuginfo_exn :
+  t -> Debuginfo.t -> event_after:bool -> f:(t -> 'a * t) -> 'a * t
 
 (** Push a new block to the stack of current blocks. *)
 val new_block : t -> params:Jsir.Var.t list -> t * Jsir.Addr.t

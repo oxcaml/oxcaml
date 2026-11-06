@@ -61,7 +61,13 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
         with
         | Deleted _ -> env, res, bindings
         | Code_id { code_id; only_full_applications = _ } ->
-          let ({ addr; params; closure = fn_var; closure_bound_with_code; hint }
+          let ({ addr;
+                 params;
+                 closure = fn_var;
+                 closure_bound_with_code;
+                 hint;
+                 loc
+               }
                 : To_jsir_env.code_id) =
             To_jsir_env.get_code_id_exn env code_id
           in
@@ -73,7 +79,7 @@ let set_of_closures ~env ~res ~bindings ~add_to_env soc =
               res
             else
               let expr : Jsir.expr =
-                Closure (params, (addr, []), (hint, None))
+                Closure (params, (addr, []), (hint, loc))
               in
               To_jsir_result.add_instr_exn res (Let (fn_var, expr))
           in

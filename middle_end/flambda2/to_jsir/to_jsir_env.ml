@@ -39,7 +39,8 @@ type code_id =
     params : Jsir.Var.t list;
     closure : Jsir.Var.t;
     closure_bound_with_code : bool;
-    hint : Optimization_hint.closure_hint option
+    hint : Optimization_hint.closure_hint option;
+    loc : Parse_info.t option
   }
 
 type t =
@@ -128,10 +129,10 @@ let add_symbol t ~res symbol jvar =
   t, register_symbol' ~res symbol jvar
 
 let add_code_id t code_id ~addr ~params ~closure ~closure_bound_with_code ~hint
-    =
+    ~loc =
   let code_ids =
     Code_id.Map.add code_id
-      { addr; params; closure; closure_bound_with_code; hint }
+      { addr; params; closure; closure_bound_with_code; hint; loc }
       t.code_ids
   in
   { t with code_ids }

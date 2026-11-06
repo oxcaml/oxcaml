@@ -130,13 +130,15 @@ type code_id =
             code itself is defined, and every [Set_of_closures] containing this
             code reuses it. Otherwise, [closure] is bound when translating a
             [Set_of_closures] containing this code. *)
-    hint : Optimization_hint.closure_hint option
+    hint : Optimization_hint.closure_hint option;
         (** The optimisation hint to attach to closures of this code. *)
+    loc : Parse_info.t option
+        (** The source location to attach to closures of this code. *)
   }
 
 (** Map a Flambda2 code ID to the address of the corresponding JSIR block, its
-    parameters, the JSIR varible corresponding to its closure, and the hint for
-    its closures. *)
+    parameters, the JSIR varible corresponding to its closure, and the hint and
+    location for its closures. *)
 val add_code_id :
   t ->
   Code_id.t ->
@@ -145,6 +147,7 @@ val add_code_id :
   closure:Jsir.Var.t ->
   closure_bound_with_code:bool ->
   hint:Optimization_hint.closure_hint option ->
+  loc:Parse_info.t option ->
   t
 
 (** Map a Flambda2 function slot to the corresponding JSIR closure variable. *)
