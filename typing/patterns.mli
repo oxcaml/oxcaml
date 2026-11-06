@@ -57,6 +57,7 @@ module Simple : sig
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
+    | `Slice of mutability * Jkind.sort * slice_shape
     | `Lazy of pattern
   ]
   type pattern = view pattern_data
@@ -135,6 +136,9 @@ module Head : sig
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
+        (** [nonempty]: whether its arguments are an element and the rest of
+            the slice, rather than none *)
     | Lazy
 
   type t = desc pattern_data

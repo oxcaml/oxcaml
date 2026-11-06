@@ -70,6 +70,7 @@ module Simple = struct
         * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Addr of mutability * Jkind.sort * pattern
+    | `Slice of mutability * Jkind.sort * slice_shape
     | `Lazy of pattern
   ]
 
@@ -153,6 +154,7 @@ module General = struct
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
     | Tpat_addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, p)
+    | Tpat_slice { mutability; sort; shape } -> `Slice (mutability, sort, shape)
     | Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty } ->
        `Deref (id, str, uid, sort, mode, ty)
     | Tpat_alias_deref
@@ -189,6 +191,7 @@ module General = struct
     | `Array (am, arg_sort, ps) -> Tpat_array (am, arg_sort, ps)
     | `Or (p, q, row_desc) -> Tpat_or (p, q, row_desc)
     | `Addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, p)
+    | `Slice (mutability, sort, shape) -> Tpat_slice { mutability; sort; shape }
     | `Deref (id, str, uid, sort, mode, ty) ->
        Tpat_deref { id; name = str; uid; sort; mode; type_expr = ty }
     | `Alias_deref (p, id, str, uid, sort, mode, ty) ->
@@ -231,6 +234,7 @@ module Head : sig
           type_row : unit -> row_desc; }
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
     | Lazy
 
   type t = desc pattern_data
@@ -267,6 +271,7 @@ end = struct
              hence the (unit -> ...) delay *)
     | Array of mutability * Jkind.sort * int
     | Addr of mutability * Jkind.sort
+    | Slice of { mutability : mutability; sort : Jkind.sort; nonempty : bool }
     | Lazy
 
   type t = desc pattern_data
@@ -311,6 +316,10 @@ end = struct
           Record_unboxed_product (lbls, repr), pats
       | `Addr (mut, arg_sort, p) ->
           Addr (mut, arg_sort), [p]
+      | `Slice (mutability, sort, Tslice_empty) ->
+          Slice { mutability; sort; nonempty = false }, []
+      | `Slice (mutability, sort, Tslice_front (p, rest)) ->
+          Slice { mutability; sort; nonempty = true }, [p; rest]
       | `Lazy p ->
           Lazy, [p]
     in
@@ -331,6 +340,7 @@ end = struct
       | Record_unboxed_product (l, _) -> List.length l
       | Variant { has_arg; _ } -> if has_arg then 1 else 0
       | Addr _ -> 1
+      | Slice { nonempty; _ } -> if nonempty then 2 else 0
       | Lazy -> 1
 
   let to_omega_pattern t =
@@ -339,6 +349,11 @@ end = struct
       match t.pat_desc with
       | Any -> Tpat_any
       | Addr (mut, arg_sort) -> Tpat_addr (mut, arg_sort, omega)
+      | Slice { mutability; sort; nonempty } ->
+          let shape =
+            if nonempty then Tslice_front (omega, omega) else Tslice_empty
+          in
+          Tpat_slice { mutability; sort; shape }
       | Lazy -> Tpat_lazy omega
       | Constant c -> Tpat_constant c
       | Unboxed_unit -> Tpat_unboxed_unit
