@@ -28,8 +28,14 @@ module type S = sig
 
   type var
 
+  module Var_id : sig
+    type t
+
+    val print : Format.formatter -> t -> unit
+  end
+
   (** Unique and stable for non-rigid variables. *)
-  val var_id : var -> int
+  val var_id : var -> Var_id.t
 
   module Name : Ordered
 

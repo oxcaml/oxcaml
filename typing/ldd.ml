@@ -25,6 +25,42 @@ module type Ordered = Ldd_intf.Ordered
 module Make (V : Ordered) = struct
   module Name = V
 
+  module Var_id : sig
+    type t
+
+    val fresh_flexible : unit -> t
+    val rigid_name : V.t -> t
+
+    val is_rigid : t -> bool
+    val compare : t -> t -> int
+    val needs_log : t -> bool
+    val print : Format.formatter -> t -> unit
+  end = struct
+    type t = int
+
+    let fresh_flexible () = With_backtracking.Stamp.fresh ()
+
+    let[@inline] stable_hash (x : V.t) : int = Hashtbl.seeded_hash 0 x
+
+    (* Rigid ids are negative and end up in .cmi files, so they must fit in an
+       OCaml int on 32-bit platforms (like jsoo). Non-rigid ids are stamps
+       (thus non-negative). *)
+    let[@inline] rigid_name (name : V.t) =
+      (* Keep the low 29 bits of [stable_hash name]. Range [0, 2^29 - 1]. *)
+      let h = stable_hash name land ((1 lsl 29) - 1) in
+      (* [-1 - h] maps the range to [-2^29, -1]. *)
+      -1 - h
+
+    let[@inline] is_rigid t = t < 0
+
+    (* Flipping the sign bit orders rigid ids above non-rigid ids. *)
+    let[@inline] compare a b = Int.compare (a lxor min_int) (b lxor min_int)
+
+    let[@inline] needs_log t = With_backtracking.Stamp.needs_log t
+
+    let print ppf t = Format.pp_print_int ppf t
+  end
+
   type node = Obj.t
   (* node ::= node_block | int (leaf) -- we use Obj magic to unbox leaves *)
 
@@ -42,7 +78,7 @@ module Make (V : Ordered) = struct
     }
 
   and var =
-    { id : int;
+    { id : Var_id.t;
           (** For a non-rigid var, a stamp (see {!With_backtracking.Stamp}), so
               that solving it is only logged if a snapshot was taken since it
               was created. Rigid vars are never solved. *)
@@ -71,7 +107,7 @@ module Make (V : Ordered) = struct
     match var.state with
     | Solved node' when node == node' -> ()
     | _ ->
-      if With_backtracking.Stamp.needs_log var.id
+      if Var_id.needs_log var.id
       then log (Solve_var (var, var.state));
       var.state <- Solved node
 
@@ -86,7 +122,7 @@ module Make (V : Ordered) = struct
     if a == b
     then 0
     else
-      let h = Int.compare a.id b.id in
+      let h = Var_id.compare a.id b.id in
       if h <> 0 then h else compare_var_full a b
 
   (* --------- node helpers --------- *)
@@ -144,38 +180,19 @@ module Make (V : Ordered) = struct
        compilation units; collisions are handled by storing a bucket and
        comparing names. *)
 
-    let rigid_tbl : (int, t list) Hashtbl.t = Hashtbl.create 97
-
-    let[@inline] stable_hash (x : V.t) : int = Hashtbl.seeded_hash 0 x
-
-    (* Keep rigid ids strictly above any non-rigid ids. We choose the top half
-       of the *positive* int range, so rigid ids stay positive and satisfy the
-       invariant used by [inline_solved_vars] to avoid descending under
-       rigids.
-
-       Non-rigid ids are [With_backtracking.Stamp]s, which every type node also
-       consumes, so the range must be large: 2^61 on 64-bit, where it cannot run
-       out in practice, and 2^29 on 32-bit. *)
-    let rigid_var_start = 1 lsl (Sys.int_size - 2)
-
-    let[@inline] rigid_id (name : V.t) : int =
-      let h = stable_hash name land (rigid_var_start - 1) in
-      (* Ensure [id > rigid_var_start] (not just [>=]), since
-         [inline_solved_vars] uses a strict inequality. *)
-      rigid_var_start lor (h lor 1)
+    let rigid_tbl : (Var_id.t, t list) Hashtbl.t = Hashtbl.create 97
 
     let make_var () =
-      let next = With_backtracking.Stamp.fresh () in
-      if next >= rigid_var_start
-      then invalid_arg "Ldd: exhausted non-rigid id range";
-      let v = { id = next; state = Unsolved; var_node = bot } in
+      let v =
+        { id = Var_id.fresh_flexible (); state = Unsolved; var_node = bot }
+      in
       (* [var_node] is the node representing the variable itself:
          ⊥ ⊔ (v ⊓ ⊤). *)
       v.var_node <- node_raw v bot top;
       v
 
     let make_rigid ~name () =
-      let id = rigid_id name in
+      let id = Var_id.rigid_name name in
       match Hashtbl.find_opt rigid_tbl id with
       | None ->
         let v = { id; state = Rigid name; var_node = bot } in
@@ -496,7 +513,7 @@ module Make (V : Ordered) = struct
   (** [assign_bot_inline ~var w] is equivalent to
       [assign_bot ~var (inline_solved_vars w)]. *)
   let rec assign_bot_inline ~(var : var) (node : node) : node =
-    if var.id > Var.rigid_var_start
+    if Var_id.is_rigid var.id
     then assign_bot ~var (inline_solved_vars node)
     else if is_leaf node
     then node
@@ -634,7 +651,7 @@ module Make (V : Ordered) = struct
       (fun v ->
         match v.state with
         | Rigid name -> V.to_string name
-        | Unsolved -> "<unsolved-var:" ^ string_of_int v.id ^ ">"
+        | Unsolved -> Format.asprintf "<unsolved-var:%a>" Var_id.print v.id
         | Solved _ ->
           failwith "solved vars should not appear after inline_solved_vars")
       node
@@ -727,7 +744,7 @@ module Make (V : Ordered) = struct
     map_rigid_rec f (inline_solved_vars node)
 
   let iter_unsolved_vars f node =
-    let visited : (int, unit) Hashtbl.t = Hashtbl.create 16 in
+    let visited : (Var_id.t, unit) Hashtbl.t = Hashtbl.create 16 in
     let rec visit node =
       if is_leaf node
       then ()
@@ -782,7 +799,7 @@ module Make (V : Ordered) = struct
         | Rigid name -> "Rigid(" ^ V.to_string name ^ ")"
         | Solved n -> "Solved(#" ^ string_of_int (get_id n) ^ ")"
       in
-      Printf.sprintf "v#%d:%s" v.id state_s
+      Format.asprintf "v#%a:%s" Var_id.print v.id state_s
     in
     let rec go indent (node : node) : unit =
       let id = get_id node in

@@ -158,10 +158,10 @@ module Solver = struct
     | Normal
     | Normal_except_vars of (Types.type_expr -> unit)
         (** Like [Normal], but calls the callback on each [Tvar] or [Tivar]
-            whose kind is computed. Entering this mode uses a fresh
-            [ty_to_kind] table, so that a kind cached in another mode cannot
-            skip the callback. Constructor coefficients are still computed in
-            [Normal] mode. *)
+            whose kind is computed. Entering this mode uses a fresh [ty_to_kind]
+            table, so that a kind cached in another mode cannot skip the
+            callback. Constructor coefficients are still computed in [Normal]
+            mode. *)
     | Round_up_except_vars of (Types.type_expr -> Ldd.node)
         (** Like [Round_up], but the kind of a non-generic type variable is
             given by the callback (capped by its jkind), so that it can stand
@@ -1839,7 +1839,7 @@ module Placeholder = struct
         belongs to, which stays true. A placeholder created in a backtracked
         snapshot becomes unreachable from any kind, so its entry is never looked
         up again. *)
-    type nonrec t = { by_ldd_var_tbl : (int, t) Hashtbl.t }
+    type nonrec t = { by_ldd_var_tbl : (Ldd.Var_id.t, t) Hashtbl.t }
 
     let create () = { by_ldd_var_tbl = Hashtbl.create 8 }
 
