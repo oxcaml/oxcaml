@@ -99,6 +99,7 @@ module Error = struct
   and functor_symptom =
     | Params of functor_params_diff
     | Result of module_type_diff
+    | Staticity
 
   and ('arg,'path) functor_param_symptom =
     | Incompatible_params of 'arg * functor_parameter
@@ -557,7 +558,7 @@ let pair_components subst sig1_comps sig2 =
 let retrieve_functor_params env mty =
   let rec retrieve_functor_params before env mty =
     match Mtype.scrape_alias env mty with
-    | Mty_functor (p, res, _) ->
+    | Mty_functor (p, res, _, _) ->
         (* the function is only used for functor parameter diff, so the return
            mode is intentionally ignored. *)
         retrieve_functor_params (p :: before) env res
@@ -734,11 +735,17 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
       | Error e -> Error (Error.Signature e)
       end
 
-  | Mty_functor (param1, res1, mres1), Mty_functor (param2, res2, mres2) ->
+  | Mty_functor (param1, res1, mres1, staticity1),
+    Mty_functor (param2, res2, mres2, staticity2) ->
       let* () =
         Includecore.check_modes env ~item:Module
           ~crossing:Ctype.mode_crossing_functor modes
         |> map_error (fun e -> Error.Mode e)
+      in
+      let* staticity =
+        if Mode.Staticity.Const.equal staticity1 staticity2
+        then Ok staticity1
+        else Error (Error.Functor Staticity)
       in
       let cc_arg, env, subst =
         let direction = Directionality.negate direction in
@@ -774,6 +781,10 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
           in
           Ok (Tcoerce_none, final_shape)
       | Ok cc_arg, Ok (cc_res, final_res_shape) ->
+          if not (staticity = Mode.Staticity.Dynamic) then
+            Misc.fatal_errorf
+              "Includemod.try_modtypes: template functor coercion at %a"
+              Location.print_loc_in_lowercase loc;
           let final_shape =
             if final_res_shape == res_shape
             then orig_shape

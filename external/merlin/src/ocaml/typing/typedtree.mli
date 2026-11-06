@@ -1021,40 +1021,19 @@ and functor_parameter =
   | Named of Ident.t option * string option loc * module_type *
              Mode.With_locality.Const.t modes
 
-
-(* Note [Staticity of functors]
-
-   There are two kinds of functors, whose machine representations are
-   constructed and consumed differently, making them incompatible:
-   1. regular functors, which take [dynamic] parameters;
-   2. template functors, which take [static] parameters.
-
-   This incompatibility must be reflected in the type system. Differentiating
-   them by the parameter's staticity alone is not sufficient, since the generic
-   mode weakening rule would allow (1) to be used as (2).
-
-   Our workaround is as follows. Upon functor definition, we equate the
-   staticity of the functor and its parameter, giving
-   [module F : (functor (M @ m) -> ...) @ m].
-
-   Upon application of [F : (functor (M @ m0) -> ...) @ m1], where [m0 <= m] and
-   [m1 >= m] due to weakening, we restore the original [m] by requiring
-   [m1 <= m0], which forces [m0 = m1 = m]. *)
-
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
-    (** The [Mode.Staticity.r] specifies which kind of functor is constructed;
-        see Note [Staticity of functors]. *)
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.Const.t
+  (** [Mode.Staticity.Const.t] is [Static] for template functors. *)
   | Tmod_apply of
       module_expr * module_expr * module_coercion * Mode.Yielding.l
-      * Mode.Staticity.r
+      * Mode.Staticity.Const.t
         (** The [Mode.Yielding.l] is the join of the yielding modes of the
             functor and its argument: if it is [Unyielding], applying the
-            functor can never perform a free effect. The [Mode.Staticity.r]
-            specifies which kind of functor is applied; see Note [Staticity of
-            functors]. *)
+            functor can never perform a free effect.
+            [Mode.Staticity.Const.t] is [Static] for template instantiations.
+            Otherwise, the application is dynamic. *)
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
@@ -1281,6 +1260,7 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.Const.t
       }
       (* S1 -> S2 *)
       (* Since [Types.module_representation = Jkind.sort array], this could've
@@ -1291,6 +1271,7 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.Const.t
       }
       (* S1 -> () -> S2 *)
       (* In both functor cases, the [Mode.Yielding.l] is the join of the

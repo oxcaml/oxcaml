@@ -2580,7 +2580,7 @@ let rec components_of_module_maker
         items_and_paths;
       inner_full_env := !env;
       Ok (Structure_comps c)
-  | Mty_functor(arg, ty_res, _) ->
+  | Mty_functor(arg, ty_res, _, _) ->
       let sub = cm_prefixing_subst in
       let scoping = Subst.Rescope (Path.scope cm_path) in
       let open Subst.Lazy in

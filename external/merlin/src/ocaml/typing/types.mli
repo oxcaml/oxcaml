@@ -1250,6 +1250,7 @@ module type Wrapped = sig
     Mty_ident of Path.t
   | Mty_signature of signature
   | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
+                   * Mode.Staticity.Const.t
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
