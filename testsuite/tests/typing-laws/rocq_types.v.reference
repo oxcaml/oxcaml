@@ -141,7 +141,8 @@ Definition Point_add : val :=
 (* twice_greeting (line 68) is not translated:
    it refers to greeting, which is not translated (constants other than integers and characters). *)
 
-(* counter (line 69) is not translated: the primitive %makemutable. *)
+(* counter (line 69) is not translated:
+   it is stateful but not a value: its effects would be repeated at each use. *)
 
 (** [law? mirror_mirror (t : 'a tree) : mirror (mirror t) = t] *)
 Definition mirror_mirror_statement : Prop :=

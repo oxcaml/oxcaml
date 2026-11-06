@@ -58,6 +58,9 @@ type expr =
   | Binop of string * expr * expr
   | Match_list of expr * expr * binder * binder * expr
   | Match_tag of expr * binder * (int * expr) list * expr
+  | While of expr * expr
+  | For of binder * Asttypes.direction_flag * expr * expr * expr
+      (** [For (i, dir, lo, hi, body)] *)
 
 let rec is_value = function
   | Const (_, is_value) -> is_value
@@ -65,7 +68,8 @@ let rec is_value = function
   | Pair (a, b) | Cons (a, b) -> is_value a && is_value b
   | Tag (_, a) | Some_ a -> is_value a
   | Var _ | Stuck | Fst _ | Snd _ | App _ | Let _ | If _ | And_also _
-  | Or_else _ | Unop _ | Binop _ | Match_list _ | Match_tag _ ->
+  | Or_else _ | Unop _ | Binop _ | Match_list _ | Match_tag _ | While _ | For _
+    ->
       false
 
 (* Semantic types: [Sty_var "A"] is a type variable and
@@ -99,13 +103,13 @@ module Print = struct
         true
     | Tag _ | Cons _ | Some_ _ | Fst _ | Snd _ | App _ | Lam _ | Rec _ | Let _
     | If _ | And_also _ | Or_else _ | Unop _ | Binop _ | Match_list _
-    | Match_tag _ ->
+    | Match_tag _ | While _ | For _ ->
         false
 
   (* The operands of operators: atoms and applications *)
   let is_operand = function
     | Tag _ | Cons _ | Some_ _ | Fst _ | Snd _ | App _ | And_also _ | Or_else _
-    | Match_list _ | Match_tag _ ->
+    | Match_list _ | Match_tag _ | While _ | For _ ->
         true
     | e -> is_atom e
 
@@ -172,6 +176,11 @@ module Print = struct
                 arms);
             arg default;
           ]
+    | While (c, body) -> call ppf "While" [ arg c; arg body ]
+    | For (i, dir, lo, hi, body) ->
+        call ppf
+          (match dir with Upto -> "For" | Downto -> "ForDown")
+          [ (fun ppf -> binder_arg ppf i); arg lo; arg hi; arg body ]
 
   and arg e ppf = parens_if (not (is_atom e)) expr ppf e
   and operand ppf e = parens_if (not (is_operand e)) expr ppf e
@@ -205,7 +214,8 @@ module Print = struct
     | Some_ a -> call ppf "SOMEV'" [ value_arg a ]
     | Lam _ | Rec _ -> expr ppf e
     | Var _ | Stuck | Fst _ | Snd _ | App _ | Let _ | If _ | And_also _
-    | Or_else _ | Unop _ | Binop _ | Match_list _ | Match_tag _ ->
+    | Or_else _ | Unop _ | Binop _ | Match_list _ | Match_tag _ | While _
+    | For _ ->
         Misc.fatal_error "Laws_rocq.Print.value: not a value"
 
   and value_arg e ppf =
@@ -246,7 +256,9 @@ end
 (* The translation *)
 
 type value_info =
-  | Translated of { rocq : string; is_value : bool }
+  | Translated of { rocq : string; is_value : bool; stateful : bool }
+      (** [stateful]: the definition allocates or uses mutable state, or refers
+          to a definition that does *)
   | Untranslated of { name : string; reason : string }
 
 type type_info = Sem of string | No_sem of { name : string; reason : string }
@@ -274,6 +286,10 @@ type state = {
   (* The other units whose files the file imports *)
   mutable requires : String.Set.t;
   mutable uses_stuck : bool;
+  (* Whether the definition being translated is stateful *)
+  mutable stateful : bool;
+  (* Whether the file has a stateful definition *)
+  mutable uses_state : bool;
   mutable counter : int;
   (* The unit-qualified names of the definitions, and their names *)
   mutable aliases : (string * string) list;
@@ -333,6 +349,21 @@ let reserved =
       "list_to_val";
       "match_arms";
       "Stuck";
+      "While";
+      "For";
+      "ForDown";
+      "Ref_make";
+      "Ref_get";
+      "Ref_set";
+      "Ref_incr";
+      "Ref_decr";
+      "Array_length";
+      "Array_get";
+      "Array_set";
+      "Array_unsafe_get";
+      "Array_unsafe_set";
+      "Array_make";
+      "Array_to_list";
     ]
 
 let fresh_name ~avoid base =
@@ -411,8 +442,10 @@ let bind env id x =
     names = String.Set.add x env.names;
   }
 
-let value_of_info ~loc = function
-  | Translated { rocq; is_value } -> Const (rocq, is_value)
+let value_of_info st ~loc = function
+  | Translated { rocq; is_value; stateful } ->
+      if stateful then st.stateful <- true;
+      Const (rocq, is_value)
   | Untranslated { name; reason } ->
       unsupported ~loc "it refers to %s, which is not translated (%s)" name
         reason
@@ -424,15 +457,18 @@ let value_ref st ~loc env (p : Path.t) =
       | Some e -> e
       | None -> (
           match Ident.Map.find_opt id st.values with
-          | Some info -> value_of_info ~loc info
+          | Some info -> value_of_info st ~loc info
           | None -> unsupported ~loc "%s is not translated" (Ident.name id)))
   | Pdot (q, s) -> (
       match resolve_module st ~loc q with
       | Local m -> (
           match Hashtbl.find_opt m.m_values s with
-          | Some info -> value_of_info ~loc info
+          | Some info -> value_of_info st ~loc info
           | None -> unsupported ~loc "%s is not translated" (Path.name p))
-      | External comps -> Const (external_name st (comps @ [ s ]), true))
+      | External comps ->
+          let name = external_name st (comps @ [ s ]) in
+          if String.starts_with ~prefix:"Array_" name then st.stateful <- true;
+          Const (name, true))
   | Papply _ | Pextra_ty _ ->
       unsupported ~loc "the path %s is not supported" (Path.name p)
 
@@ -578,7 +614,14 @@ let rec project ~pos ~n e =
 let payload = tuple
 
 let check_label ~loc (lbl : Data_types.label_description) =
-  if Types.is_mutable lbl.lbl_mut then unsupported ~loc "mutable fields"
+  if Types.is_mutable lbl.lbl_mut then
+    unsupported ~loc "mutable record fields (other than those of refs)"
+
+(* Whether [ty] is ['a ref] *)
+let is_ref tenv ty =
+  match get_desc (Ctype.expand_head tenv ty) with
+  | Tconstr (p, [ _ ], _) -> String.equal (Path.name p) "Stdlib.ref"
+  | _ -> false
 
 (* The tag of a constructor of a variant other than [bool] and [unit] *)
 type constructor_kind =
@@ -727,6 +770,25 @@ let division st op a b =
               If (Binop ("=", Var d, Int 0), stuck st, Binop (op, Var n, Var d))
             ) )
 
+(* The Rocq function that models the primitive [name] on mutable state (see
+   [theories/generated/TARGET.md] in oxiris). [arg_ty] is the type of its
+   first argument. Out-of-bounds accesses are stuck there, since exceptions
+   are not modelled. *)
+let state_primitive ~tenv ~arg_ty name =
+  match name with
+  | "%makemutable" -> Some "Ref_make"
+  | "%field0" when is_ref tenv arg_ty -> Some "Ref_get"
+  | "%setfield0" when is_ref tenv arg_ty -> Some "Ref_set"
+  | "%incr" -> Some "Ref_incr"
+  | "%decr" -> Some "Ref_decr"
+  | "%array_safe_get" -> Some "Array_get"
+  | "%array_safe_set" -> Some "Array_set"
+  | "%array_unsafe_get" -> Some "Array_unsafe_get"
+  | "%array_unsafe_set" -> Some "Array_unsafe_set"
+  | "%array_length" -> Some "Array_length"
+  | "caml_array_make" | "caml_make_vect" -> Some "Array_make"
+  | _ -> None
+
 (* The translation of the primitive [name] applied to all its arguments.
    [arg_ty] is the type of its first argument. *)
 let primitive_op st ~loc ~tenv ~arg_ty name : expr list -> expr =
@@ -800,16 +862,17 @@ let primitive_op st ~loc ~tenv ~arg_ty name : expr list -> expr =
   | "%greaterequal" ->
       ordering ();
       bin (fun a b -> Binop ("≤", b, a))
+  | "%setfield0" ->
+      unsupported ~loc "mutable record fields (other than those of refs)"
+  | "%raise" | "%reraise" | "%raise_notrace" ->
+      unsupported ~loc "raising exceptions (exceptions are not modelled)"
   | _ -> unsupported ~loc "the primitive %s" name
 
 let describe (e : expression) =
   match e.exp_desc with
   | Texp_array _ | Texp_idx _ -> "arrays"
   | Texp_list_comprehension _ | Texp_array_comprehension _ -> "comprehensions"
-  | Texp_setfield _ | Texp_atomic_loc _ | Texp_letmutable _ | Texp_mutvar _
-  | Texp_setmutvar _ ->
-      "mutable state"
-  | Texp_while _ | Texp_for _ -> "loops"
+  | Texp_atomic_loc _ -> "atomic fields"
   | Texp_try _ -> "exception handlers"
   | Texp_lazy _ -> "lazy values"
   | Texp_variant _ -> "polymorphic variants"
@@ -863,8 +926,26 @@ let rec expr st env (e : expression) =
   | Texp_tuple (es, _) -> tuple (List.map (fun (_, e, _) -> expr st env e) es)
   | Texp_construct (_, cd, _, args, _) ->
       construct ~loc cd (List.map (fun (_, e) -> expr st env e) args)
+  | Texp_record
+      {
+        fields = [| (_, _, Overridden (_, x)) |];
+        extended_expression = None;
+        _;
+      }
+    when is_ref e.exp_env e.exp_type ->
+      st.stateful <- true;
+      App (Const ("Ref_make", true), [ expr st env x ])
   | Texp_record { fields; extended_expression; _ } ->
       record st env ~loc fields extended_expression
+  | Texp_field { record; _ } when is_ref record.exp_env record.exp_type ->
+      st.stateful <- true;
+      App (Const ("Ref_get", true), [ expr st env record ])
+  | Texp_setfield { record; newval; _ }
+    when is_ref record.exp_env record.exp_type ->
+      st.stateful <- true;
+      App (Const ("Ref_set", true), [ expr st env record; expr st env newval ])
+  | Texp_setfield _ ->
+      unsupported ~loc "mutable record fields (other than those of refs)"
   | Texp_field { record; label; _ } ->
       check_label ~loc label;
       project ~pos:label.lbl_pos
@@ -876,6 +957,23 @@ let rec expr st env (e : expression) =
           expr st env a,
           match b with Some b -> expr st env b | None -> Unit )
   | Texp_sequence (a, _, b) -> Let (Anon, expr st env a, expr st env b)
+  | Texp_while { wh_cond; wh_body; _ } ->
+      While (expr st env wh_cond, expr st env wh_body)
+  | Texp_for { for_id; for_pat; for_from; for_to; for_dir; for_body; _ } ->
+      let x =
+        match for_pat.ppat_desc with
+        | Ppat_var { txt; _ } -> txt
+        | _ -> fresh st "i"
+      in
+      For
+        ( Named x,
+          for_dir,
+          expr st env for_from,
+          expr st env for_to,
+          expr st (bind env for_id x) for_body )
+  | Texp_letmutable _ | Texp_mutvar _ | Texp_setmutvar _ ->
+      unsupported ~loc "mutable variables (let mutable)"
+  | Texp_array _ -> unsupported ~loc "array literals"
   | Texp_assert (c, _) -> (
       match expr st env c with
       | Bool false -> stuck st
@@ -998,25 +1096,31 @@ and primitive st env ~loc ~fty ~tenv (prim : Primitive.description) args =
         | Tarrow (_, a, _, _) -> (a, tenv)
         | _ -> (fty, tenv))
   in
-  let op = primitive_op st ~loc ~tenv ~arg_ty prim.prim_name in
-  let n = List.length args and arity = prim.prim_arity in
-  if n > arity then
-    unsupported ~loc "the primitive %s applied to too many arguments"
-      prim.prim_name
-  else
-    let args = List.map (expr st env) args in
-    if n = arity then op args
-    else
-      let given = List.map (fun a -> (fresh st "a", a)) args in
-      let missing = List.init (arity - n) (fun _ -> fresh st "x") in
-      List.fold_right
-        (fun (x, a) body -> Let (Named x, a, body))
-        given
-        (Lam
-           ( List.map (fun x -> Named x) missing,
-             op
-               (List.map (fun (x, _) -> Var x) given
-               @ List.map (fun x -> Var x) missing) ))
+  match state_primitive ~tenv ~arg_ty prim.prim_name with
+  | Some f -> (
+      st.stateful <- true;
+      let f = Const (f, true) in
+      match args with [] -> f | args -> App (f, List.map (expr st env) args))
+  | None ->
+      let op = primitive_op st ~loc ~tenv ~arg_ty prim.prim_name in
+      let n = List.length args and arity = prim.prim_arity in
+      if n > arity then
+        unsupported ~loc "the primitive %s applied to too many arguments"
+          prim.prim_name
+      else
+        let args = List.map (expr st env) args in
+        if n = arity then op args
+        else
+          let given = List.map (fun a -> (fresh st "a", a)) args in
+          let missing = List.init (arity - n) (fun _ -> fresh st "x") in
+          List.fold_right
+            (fun (x, a) body -> Let (Named x, a, body))
+            given
+            (Lam
+               ( List.map (fun x -> Named x) missing,
+                 op
+                   (List.map (fun (x, _) -> Var x) given
+                   @ List.map (fun x -> Var x) missing) ))
 
 and record st env ~loc fields extended =
   let fields = Array.to_list fields in
@@ -1297,11 +1401,21 @@ let register_type st minfo id name info =
   Option.iter (fun m -> Hashtbl.replace m.m_types name info) minfo
 
 let definition st ~prefix ~display minfo ~loc id name body =
-  match body () with
+  st.stateful <- false;
+  match
+    let body = body () in
+    if st.stateful && not (is_value body) then
+      unsupported ~loc
+        "it is stateful but not a value: its effects would be repeated at each \
+         use";
+    body
+  with
   | body ->
       let rocq = define st (prefix ^ name) in
       let is_value = is_value body in
-      register_value st minfo id name (Translated { rocq; is_value });
+      let stateful = st.stateful in
+      if stateful then st.uses_state <- true;
+      register_value st minfo id name (Translated { rocq; is_value; stateful });
       st.aliases <- (prefix ^ name, rocq) :: st.aliases;
       emit st (fun ppf ->
           source_comment ppf loc;
@@ -1453,7 +1567,7 @@ let types st ~prefix ~display minfo ~loc ~tenv (decls : type_declaration list) =
         List.iter
           (fun (ld : Types.label_declaration) ->
             if Types.is_mutable ld.ld_mutable then
-              unsupported ~loc "mutable fields")
+              unsupported ~loc "mutable record fields")
           lds;
         [
           constructor (name ^ "_intro")
@@ -1671,6 +1785,8 @@ let write ~source_file ~unit (impl : implementation) ~output =
       used = String.Set.empty;
       requires = String.Set.empty;
       uses_stuck = false;
+      stateful = false;
+      uses_state = false;
       counter = 0;
       aliases = [];
       items = [];
@@ -1686,7 +1802,8 @@ let write ~source_file ~unit (impl : implementation) ~output =
          not edit. The laws are stated as [<law>_statement] and proved@ in a \
          separate file. *)@]@."
         (Filename.basename source_file);
-      Format.fprintf ppf "From oxiris Require Import law_prelude.@.";
+      Format.fprintf ppf "From oxiris Require Import %s.@."
+        (if st.uses_state then "law_prelude_state" else "law_prelude");
       String.Set.iter
         (fun unit ->
           Format.fprintf ppf "From oxiris.generated Require Import %s.@."

@@ -27,9 +27,16 @@
     Values are encoded as follows: integers, booleans and [()] are literals,
     tuples and records are right-nested pairs, constructor number [i] of a
     variant (in declaration order) with payload [p] is the pair [(#i, p)], and
-    functions are curried closures. The items of a module [M] are prefixed with
-    [M_], and the items of another unit [U] are [U_x] (the standard library's
-    [Stdlib.List.rev] is [List_rev]).
+    functions are curried closures. Stateful code is supported: refs are single
+    heap cells and arrays are pairs of a location and a length, manipulated by
+    the functions [Ref_get], [Array_set] etc. of the Rocq library; [while] and
+    [for] loops are the expression formers [While], [For] and [ForDown]. A
+    stateful definition that is not a value is not translated, since its effects
+    would be repeated at each use; mutable record fields (other than those of
+    refs), mutable variables and exceptions are not supported. Files with
+    stateful code import [law_prelude_state]. The items of a module [M] are
+    prefixed with [M_], and the items of another unit [U] are [U_x] (the
+    standard library's [Stdlib.List.rev] is [List_rev]).
 
     A clause [e] of a law denotes [spec_true e], i.e. [e] evaluates to [true],
     except that a clause [e1 = e2] denotes the logical equality [e1 =:= e2]. A
