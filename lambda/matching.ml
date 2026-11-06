@@ -179,6 +179,31 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
+(* CR slice-patterns: compile slice patterns. Until then, matches containing
+   them raise at runtime (see [has_slice_pattern]). A suggested design:
+
+   A slice pattern is a chain of cells (see [Typedtree.slice_shape]), so slices
+   have two constructors, like lists: the empty slice, and a non-empty slice
+   whose arguments are its first element and the rest of the slice. The rest
+   [.. as x] of a slice pattern is then an ordinary variable on the rest of
+   the slice, which needs no special treatment.
+
+   - [can_group] groups slice heads of the same mutability, and [matcher]
+     compares whether they are empty, as for [Unboxed_bool].
+   - A [divide_slice] has two cells, combined by testing whether the length
+     of the slice is zero.
+   - The arguments of a non-empty slice are its first element, read through
+     its address, and the rest of the slice, whose address and length are
+     computed from those of the slice. Slices are unboxed products, so the
+     rest is arithmetic and can be bound with [Alias]. The element is bound
+     with [StrictOpt] and [Mutable] for mutable slices, as for arrays, and its
+     address is the [deref_address] of dereference patterns on it.
+   - A slice pattern with n elements thus tests the length n + 1 times.
+     Testing it once with a switch would be an optimization.
+*)
+let fatal_slice () =
+  fatal_error "Matching: slice patterns are not compiled yet"
+
 let fatal_var_lpoly lpoly =
   let n = List.length (Types.Lpoly.get_exn lpoly) in
   Misc.fatal_errorf
@@ -365,6 +390,7 @@ end = struct
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
         | `Lazy _ )
         as view -> stop p view
+      | `Slice _ -> fatal_slice ()
     in
     aux cl
 end
@@ -420,6 +446,7 @@ end = struct
                                    closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
       | `Addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, alpha_pat env p)
+      | `Slice _ -> fatal_slice ()
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
     { p with pat_desc }
@@ -588,6 +615,7 @@ let matcher discr (p : Simple.pattern) rem =
       yesif (List.length l = List.length l')
   | Addr (mut1, _), Addr (mut2, _) -> yesif (mut1 = mut2)
   | Lazy, Lazy -> yes ()
+  | Slice _, _ | _, Slice _ -> fatal_slice ()
   | ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
     | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
     | Unboxed_bool _ | Tuple _ | Unboxed_tuple _), _ -> no ()
@@ -726,7 +754,7 @@ end = struct
           | `Var _ | `Deref _ ->
               filter_rec ((left, Patterns.omega, right) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-          | #Simple.view as view -> (
+              | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
               | exception NoMatch -> filter_rec rem
@@ -871,7 +899,7 @@ end = struct
           | `Var _ | `Deref _ ->
               filter_rec ((Patterns.omega, ps) :: rem)
           | `Fun_layout (_, _, _, _, _, lpoly, _) -> fatal_var_lpoly lpoly
-          | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
+              | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher p ps with
@@ -1578,6 +1606,7 @@ let can_group discr pat =
          to be executed even in the [_] branch. That's okay because addresses
          are always safe to read. *)
       true
+  | Slice _, _ | _, Slice _ -> fatal_slice ()
   | ( _,
       ( Any
       | Constant
@@ -4705,6 +4734,7 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test
             (divide_addr ~scopes ph)
             Context.combine
+      | Slice _ -> fatal_slice ()
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)
@@ -4772,6 +4802,33 @@ let failure_handler ~scopes loc ~failer () =
               sloc )
         ],
         sloc )
+
+(* CR slice-patterns: compile slice patterns. Until then, matches containing
+   them raise [Failure] at runtime. *)
+let has_slice_pattern (ps : pattern list) =
+  let is_slice (p : pattern) =
+    match p.pat_desc with Tpat_slice _ -> true | _ -> false
+  in
+  List.exists (exists_pattern is_slice) ps
+
+let slice_patterns_not_compiled ~scopes loc =
+  let sloc = Scoped_location.of_location ~scopes loc in
+  let slot =
+    transl_extension_path sloc (Lazy.force Env.initial) Predef.path_failure
+  in
+  Lprim
+    ( Praise Raise_regular,
+      [ Lprim
+          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
+            [ slot;
+              Lconst
+                (Const_base
+                   (Const_string
+                      ("Slice patterns are not compiled yet", loc, None)))
+            ],
+            sloc )
+      ],
+      sloc )
 
 let toplevel_handler ~scopes ~return_layout loc ~failer partial args cases
     compile_fun =
@@ -4843,7 +4900,8 @@ let rec derefs_tuple_element (p : pattern) =
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _ | Tpat_constant _
   | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _ | Tpat_construct _
   | Tpat_variant _ | Tpat_record _ | Tpat_array _ | Tpat_addr _ | Tpat_lazy _
-    ->
+  (* Positions of slice elements are not inside the tuple element *)
+  | Tpat_slice _ ->
       false
 
 (* Whether this pattern has a top-level tuple pattern with a dereference pattern
@@ -4858,6 +4916,9 @@ let rec has_tuple_element_deref (p : pattern) =
 
 let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
       repr arg pat_act_list partial =
+  if has_slice_pattern (List.map fst pat_act_list)
+  then slice_patterns_not_compiled ~scopes loc
+  else
   let args = [ root_arg arg Strict arg_sort arg_layout ] in
   let rows = map_on_rows (fun pat -> (pat, [])) pat_act_list in
   let handler =
@@ -5129,6 +5190,9 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
 let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial =
   (* The arguments of a tupled function are always values since they must be
      tuple elements *)
+  if has_slice_pattern (List.concat_map fst pats_act_list)
+  then slice_patterns_not_compiled ~scopes loc
+  else
   let args = List.map (fun (id, sort, layout) ->
     root_arg (Lvar id) Strict sort layout
   ) paraml in
@@ -5157,6 +5221,7 @@ let flatten_simple_pattern size (p : Simple.pattern) =
   | `Record _
   | `Record_unboxed_product _
   | `Addr _
+  | `Slice _
   | `Lazy _
   | `Construct _
   | `Constant _
@@ -5223,6 +5288,9 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
 
 let do_for_multiple_match ~scopes ~return_layout loc idl mode
     pat_act_list partial =
+  if has_slice_pattern (List.map fst pat_act_list)
+  then slice_patterns_not_compiled ~scopes loc
+  else
   let repr = None in
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
