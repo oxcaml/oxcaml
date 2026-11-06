@@ -1,11 +1,6 @@
 (* TEST
    include stdlib_upstream_compatible;
    ocamlopt_flags="-extension layouts_beta";
-   {
-     bytecode;
-   }{
-     native;
-   }
 *)
 
 (* Construct and pattern-match built-in [list]s at non-value kinds. *)
