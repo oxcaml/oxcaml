@@ -1,7 +1,11 @@
 File "included_any_argument_intf.mli", line 1:
-Error: This module cannot be used as an argument for parameter Unrepresentable_param,
-       because its signature contains values whose layouts are not known.
+Error: This module contains unrepresentable items, so it cannot be used as an
+       argument for parameter Unrepresentable_param.
 File "included_any_argument_intf.mli", line 6, characters 2-11:
 6 |   val x : t
       ^^^^^^^^^
-  x has an unknown layout.
+  x is not representable.
+  The layout of t is any
+    because of the definition of t at file "included_any_argument_intf.mli", line 5, characters 2-14.
+  But the layout of t must be representable
+    because it's the type of an item in an argument for a parameterized library.

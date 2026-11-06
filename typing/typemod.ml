@@ -106,8 +106,7 @@ type error =
   | Unrepresentable_include of Env.unrepresentable_item
   | Unrepresentable_open of Env.unrepresentable_item
   | Unrepresentable_argument of
-      { param : Global_module.Parameter_name.t; item : Ident.t;
-        item_desc : value_description }
+      Global_module.Parameter_name.t * Env.unrepresentable_item
 
 
 exception Error_forward of Location.error
@@ -4727,18 +4726,13 @@ let staticity_of_modalities (modalities : Typedtree.modalities) =
   then Staticity.Static
   else Staticity.Dynamic
 
-let check_argument_representable env sourcefile actual_sig arg_module_opt =
+let resolve_argument_sorts env sourcefile actual_sig arg_module_opt =
   match arg_module_opt with
-  | None -> ()
+  | None -> actual_sig
   | Some param ->
-      List.iter
-        (fun item ->
-           match sort_of_signature_item item with
-           | Fixed _ | Absent_at_runtime -> ()
-           | Unknown (item, item_desc) ->
-               Error.log_and_raise (Location.in_file sourcefile) env
-                 (Unrepresentable_argument { param; item; item_desc }))
-        actual_sig
+      resolve_value_sorts ~why:Module_argument
+        ~loc:(Location.in_file sourcefile) env actual_sig
+        ~error:(fun unrep -> Unrepresentable_argument (param, unrep))
 
 let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
       arg_module_opt =
@@ -4995,7 +4989,9 @@ let type_implementation target modulename initial_env ast =
               simple_sg
           in
           normalize_signature simple_sg;
-          check_argument_representable finalenv sourcefile simple_sg arg_type;
+          let simple_sg =
+            resolve_argument_sorts initial_env sourcefile simple_sg arg_type
+          in
           let argument_interface =
             check_argument_type_if_given initial_env sourcefile
               ~actual_staticity:Staticity.Dynamic simple_sg arg_type
@@ -5099,7 +5095,10 @@ let type_interface target modulename env ast =
     |> Option.map Global_module.Parameter_name.of_string
   in
   let actual_staticity = staticity_of_modalities sg.sig_modalities in
-  check_argument_representable sg.sig_final_env sourcefile sg.sig_type arg_type;
+  let sg =
+    { sg with
+      sig_type = resolve_argument_sorts env sourcefile sg.sig_type arg_type }
+  in
   ignore (check_argument_type_if_given env sourcefile ~actual_staticity
             sg.sig_type arg_type
           : Typedtree.argument_interface option);
@@ -5751,15 +5750,11 @@ let report_error ~loc env = function
   | Unrepresentable_open unrep ->
       Location.errorf ~loc ~sub:[unrepresentable_item_msg env unrep]
         "This module contains unrepresentable items, so it cannot be opened."
-  | Unrepresentable_argument { param; item; item_desc } ->
-    let sub =
-      Location.msg ~loc:item_desc.val_loc
-        "%a has an unknown layout." Style.inline_code (Ident.name item)
-    in
-    Location.errorf ~loc ~sub:[sub]
-      "This module cannot be used as an argument for parameter %a,@ because \
-       its signature contains values whose layouts are not known."
-      (Style.as_inline_code Global_module.Parameter_name.print) param
+  | Unrepresentable_argument (param, unrep) ->
+      Location.errorf ~loc ~sub:[unrepresentable_item_msg env unrep]
+        "This module contains unrepresentable items, so it cannot be used as \
+         an@ argument for parameter %a."
+        (Style.as_inline_code Global_module.Parameter_name.print) param
 
 let report_error env ~loc err =
   Printtyp.wrap_printing_env ~error:true env

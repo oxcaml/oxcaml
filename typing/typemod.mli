@@ -209,8 +209,7 @@ type error =
   | Unrepresentable_include of Env.unrepresentable_item
   | Unrepresentable_open of Env.unrepresentable_item
   | Unrepresentable_argument of
-      { param : Global_module.Parameter_name.t; item : Ident.t;
-        item_desc : value_description }
+      Global_module.Parameter_name.t * Env.unrepresentable_item
 
 exception Error_forward of Location.error
 exception Errors of Location.t * Typing_recovery.Error_set.t

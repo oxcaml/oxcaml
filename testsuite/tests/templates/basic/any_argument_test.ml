@@ -4,7 +4,7 @@
    unrepresentable_param.mli \
    any_argument.mli any_argument.reference \
    included_argument.ml \
-   included_argument_intf.mli included_argument_intf.reference \
+   included_argument_intf.mli \
    included_any_argument_intf.mli included_any_argument_intf.reference \
  ";
 
@@ -30,11 +30,8 @@
 
  module = "included_argument_intf.mli";
  compiler_output = "included_argument_intf.output";
- ocamlopt_byte_exit_status = "2";
+ ocamlopt_byte_exit_status = "0";
  ocamlopt.byte;
-
- compiler_reference = "included_argument_intf.reference";
- check-ocamlopt.byte-output;
 
  module = "included_any_argument_intf.mli";
  compiler_output = "included_any_argument_intf.output";
