@@ -493,6 +493,10 @@ CAMLexport void caml_main(char_os const * const * argv)
   if (fd < 0 && (proc_self_exe = caml_executable_name()) != NULL) {
     exe_name = proc_self_exe;
     fd = caml_attempt_open(&exe_name, &trail, 0);
+    /* On success, caml_attempt_open has replaced exe_name with its own copy;
+       on failure, exe_name is reassigned below. Either way proc_self_exe is
+       no longer needed. */
+    caml_stat_free(proc_self_exe);
   }
 
   if (fd < 0) {
