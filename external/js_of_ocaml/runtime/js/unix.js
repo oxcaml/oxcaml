@@ -1,5 +1,6 @@
 //Provides: caml_unix_gettimeofday
 //Alias: unix_gettimeofday
+//Alias: caml_sys_gettimeofday
 function caml_unix_gettimeofday() {
   return Date.now() / 1000;
 }

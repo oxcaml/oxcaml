@@ -162,6 +162,9 @@ CAMLextern value caml_win32_get_temp_path(void);
    resolution may be less. The starting point is unspecified. */
 CAMLextern uint64_t caml_time_counter(void);
 
+/* Returns the wall-clock time in seconds since the Unix epoch. */
+extern double caml_gettimeofday(void);
+
 extern void caml_init_os_params(void);
 
 #endif /* CAML_INTERNALS */

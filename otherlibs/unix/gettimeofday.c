@@ -16,16 +16,13 @@
 #define CAML_INTERNALS
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
-#include <caml/fail.h>
-#include "caml/unixsupport.h"
-#include <sys/types.h>
-#include <sys/time.h>
+#include <caml/sys.h>
+
+/* Legacy primitives for external declarations using caml_unix_gettimeofday */
 
 double caml_unix_gettimeofday_unboxed(value unit)
 {
-  struct timeval tp;
-  gettimeofday(&tp, NULL);
-  return ((double) tp.tv_sec + (double) tp.tv_usec / USEC_PER_SEC);
+  return caml_sys_gettimeofday_unboxed(unit);
 }
 
 CAMLprim value caml_unix_gettimeofday(value unit)
