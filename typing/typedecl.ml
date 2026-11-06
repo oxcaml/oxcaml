@@ -4582,10 +4582,12 @@ let make_native_repr
   | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
     Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_present Unboxed,
-    (Sort (Product _ | Base Void | Addressable _)) ->
+    (Sort (Product _ | Base Void | Addressable (Product _ | Base Void))) ->
     Error.log_and_raise core_type.ptyp_loc
       (Bad_native_repr_attr Unboxed)
-  | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
+  | Native_repr_attr_present Unboxed,
+    (Sort ((Base sort | Addressable (Base sort)) as c)) ->
+    (* Addressability does not affect the unboxed representation *)
     (* We allow [@unboxed] on upstream-compatible numerical sorts. To enable
        upstream-compatibility, we want the code to still work when all the
        layout annotations and unboxed types get erased.
@@ -4613,6 +4615,9 @@ let make_native_repr
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
+  | Native_repr_attr_present Unboxed,
+    Sort (Addressable (Addressable _ | Univar _ | Genvar _)) ->
+    Misc.fatal_error "typedecl: unexpected Addressable in concrete type"
   | Native_repr_attr_present Unpacked,
     Sort ((Product _ | Addressable (Product _)) as sort) ->
     (* Addressability does not affect the non-boxed representation *)
