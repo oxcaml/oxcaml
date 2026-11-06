@@ -25,6 +25,13 @@ from startup. As with `--max-failures`, in-flight cases finish, so the run may
 last longer than M minutes. When the run ends, oxfuzzer prints which limit
 stopped it.
 
+By default the compilers, stdlib, runtime and `oxfuzzer.exe` are taken from the
+`_build` directory of the repository containing `oxfuzzer.py`. Use
+`--build-dir DIR` to point at the `_build` directory of another checkout, or
+`--install-dir DIR` to use an installed compiler instead, e.g. the result of
+`make install` or `nix build .#oxcaml`. A build directory is snapshotted into the
+output directory before fuzzing, while an installation is used in place.
+
 Failures will be saved in `output_directory/seed-<seed>/` with the following structure:
 ```
 program.ml   the generated program
