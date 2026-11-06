@@ -1269,6 +1269,23 @@ CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
   return unimplemented_ext_ptr();
 }
 
+/* Advances the index of an array element by [n] elements. In bytecode, its
+   first field is the position of the element in the array. */
+CAMLprim value caml_idx_array_advance_bytecode(value idx, value n)
+{
+  CAMLparam2 (idx, n);
+  CAMLlocal1 (res);
+  mlsize_t depth = Wosize_val(idx);
+  CAMLassert (Tag_val(idx) == 0);
+  CAMLassert (depth >= 1);
+  res = caml_alloc(depth, 0);
+  Store_field(res, 0, Val_long(Long_val(Field(idx, 0)) + Long_val(n)));
+  for (mlsize_t i = 1; i < depth; i++) {
+    Store_field(res, i, Field(idx, i));
+  }
+  CAMLreturn (res);
+}
+
 /* Concatenates idx_prefix and idx_suffix */
 CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   CAMLparam2 (idx_prefix, idx_suffix);

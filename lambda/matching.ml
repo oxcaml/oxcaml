@@ -179,31 +179,6 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
-(* CR slice-patterns: compile slice patterns. Until then, matches containing
-   them raise at runtime (see [has_slice_pattern]). A suggested design:
-
-   A slice pattern is a chain of cells (see [Typedtree.slice_shape]), so slices
-   have two constructors, like lists: the empty slice, and a non-empty slice
-   whose arguments are its first element and the rest of the slice. The rest
-   [.. as x] of a slice pattern is then an ordinary variable on the rest of
-   the slice, which needs no special treatment.
-
-   - [can_group] groups slice heads of the same mutability, and [matcher]
-     compares whether they are empty, as for [Unboxed_bool].
-   - A [divide_slice] has two cells, combined by testing whether the length
-     of the slice is zero.
-   - The arguments of a non-empty slice are its first element, read through
-     its address, and the rest of the slice, whose address and length are
-     computed from those of the slice. Slices are unboxed products, so the
-     rest is arithmetic and can be bound with [Alias]. The element is bound
-     with [StrictOpt] and [Mutable] for mutable slices, as for arrays, and its
-     address is the [deref_address] of dereference patterns on it.
-   - A slice pattern with n elements thus tests the length n + 1 times.
-     Testing it once with a switch would be an optimization.
-*)
-let fatal_slice () =
-  fatal_error "Matching: slice patterns are not compiled yet"
-
 let fatal_var_lpoly lpoly =
   let n = List.length (Types.Lpoly.get_exn lpoly) in
   Misc.fatal_errorf
@@ -388,9 +363,8 @@ end = struct
               bind_address (id, uid) deref_address action )
       | ( `Constant _ | `Unboxed_unit | `Unboxed_bool _ | `Tuple _
         | `Unboxed_tuple _ | `Construct _ | `Variant _ | `Array _ | `Addr _
-        | `Lazy _ )
+        | `Slice _ | `Lazy _ )
         as view -> stop p view
-      | `Slice _ -> fatal_slice ()
     in
     aux cl
 end
@@ -446,7 +420,9 @@ end = struct
                                    closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
       | `Addr (mut, arg_sort, p) -> `Addr (mut, arg_sort, alpha_pat env p)
-      | `Slice _ -> fatal_slice ()
+      | `Slice (mut, sort, Tslice_empty) -> `Slice (mut, sort, Tslice_empty)
+      | `Slice (mut, sort, Tslice_front (p, rest)) ->
+          `Slice (mut, sort, Tslice_front (alpha_pat env p, alpha_pat env rest))
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
     { p with pat_desc }
@@ -585,7 +561,7 @@ let matcher discr (p : Simple.pattern) rem =
   let open Patterns.Head in
   match (discr.pat_desc, ph.pat_desc) with
   | Any, _ -> rem
-  | ( ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+  | ( ( Constant _ | Construct _ | Variant _ | Addr _ | Slice _ | Lazy
       | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
       | Unboxed_bool _ | Tuple _ | Unboxed_tuple _ ), Any ) ->
       omegas @ rem
@@ -615,8 +591,10 @@ let matcher discr (p : Simple.pattern) rem =
       yesif (List.length l = List.length l')
   | Addr (mut1, _), Addr (mut2, _) -> yesif (mut1 = mut2)
   | Lazy, Lazy -> yes ()
-  | Slice _, _ | _, Slice _ -> fatal_slice ()
-  | ( Constant _ | Construct _ | Variant _ | Addr _ | Lazy
+  | Slice { mutability = m1; nonempty = b1; _ },
+    Slice { mutability = m2; nonempty = b2; _ } ->
+      yesif (m1 = m2 && Bool.equal b1 b2)
+  | ( Constant _ | Construct _ | Variant _ | Addr _ | Slice _ | Lazy
     | Array _ | Record _ | Record_unboxed_product _ | Unboxed_unit
     | Unboxed_bool _ | Tuple _ | Unboxed_tuple _), _ -> no ()
 
@@ -1606,7 +1584,7 @@ let can_group discr pat =
          to be executed even in the [_] branch. That's okay because addresses
          are always safe to read. *)
       true
-  | Slice _, _ | _, Slice _ -> fatal_slice ()
+  | Slice { mutability = m1; _ }, Slice { mutability = m2; _ } -> m1 = m2
   | ( _,
       ( Any
       | Constant
@@ -1620,7 +1598,7 @@ let can_group discr pat =
           | Const_untagged_int _ | Const_unboxed_nativeint _ )
       | Construct _ | Unboxed_unit | Unboxed_bool _ | Tuple _ | Unboxed_tuple _
       | Record _ | Record_unboxed_product _ | Array _ | Variant _ | Addr _
-      | Lazy ) ) ->
+      | Slice _ | Lazy ) ) ->
       false
 
 let is_or p =
@@ -2673,6 +2651,139 @@ let divide_addr ~scopes head ctx pm =
     (get_expr_args_addr ~scopes)
     get_pat_args_addr
     head ctx pm
+
+(* Matching against a slice pattern
+
+   A slice is either empty or has a first element and a rest. A slice is an
+   address and a length: the first element is at the address, and the rest
+   starts one element later. *)
+
+let slice_layouts =
+  [ Punboxed_product address_layouts;
+    Punboxed_or_untagged_integer Unboxed_nativeint ]
+
+(* The length of a slice is a [word] *)
+let slice_length_scalar : locality_mode Scalar.Integral.t =
+  Naked (Boxable (Nativeint Any_locality_mode))
+
+let get_key_slice = function
+  | { pat_desc = Tpat_slice { shape = Tslice_empty; _ } } -> false
+  | { pat_desc = Tpat_slice { shape = Tslice_front _; _ } } -> true
+  | p -> fatal_errorf "Matching.get_key_slice: %a" pretty_pat p
+
+let get_pat_args_slice p rem =
+  match p with
+  | { pat_desc = Tpat_slice { shape = Tslice_empty; _ } } -> rem
+  | { pat_desc = Tpat_slice { shape = Tslice_front (p, rest); _ } } ->
+      p :: rest :: rem
+  | p -> fatal_errorf "Matching.get_pat_args_slice: %a" pretty_pat p
+
+(* The kind of an array with the elements of the slice type [ty], whose
+   elements are as far apart *)
+let slice_element_array_kind env loc ty =
+  match get_desc (Ctype.expand_head env ty) with
+  | Tconstr (_, [ elt_ty ], _) -> Typeopt.array_kind_of_elt env loc elt_ty
+  | _ -> fatal_error "Matching.slice_element_array_kind"
+
+(* The index of the element after the one at the index [idx] in an array of
+   kind [array_kind]. In native code, an index is an offset in bytes. In
+   bytecode, the index of an array element is a block whose first field is the
+   position of the element. *)
+let advance_array_idx array_kind idx loc =
+  if Clflags.target_is_native () then
+    let int64 : locality_mode Scalar.Integral.t =
+      Naked (Boxable (Int64 Any_locality_mode))
+    in
+    Lprim
+      ( Pscalar (Binary (Integral (int64, Add))),
+        [ idx; const_scalar int64 (array_element_size_in_bytes array_kind) ],
+        loc )
+  else
+    Lprim
+      ( Pccall
+          (simple_prim_on_values ~name:"caml_idx_array_advance_bytecode"
+             ~arity:2 ~alloc:true),
+        [ idx; Lconst (const_int 1) ],
+        loc )
+
+let get_expr_args_slice ~scopes head ({ arg; mut; _ } as slice) rem =
+  match head.pat_desc with
+  | Patterns.Head.Slice { nonempty = false; _ } -> rem
+  | Patterns.Head.Slice { mutability; sort; nonempty = true } ->
+      let loc = head_loc ~scopes head in
+      let sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = Typeopt.layout_of_sort head.pat_loc sort in
+      let mut_flag : Asttypes.mutable_flag =
+        if Types.is_mutable mutability then Mutable else Immutable
+      in
+      let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
+      let load_flag : Asttypes.mutable_flag =
+        match ubr with
+        | Must_stay_here -> Mutable
+        | May_be_pushed_down -> mut_flag
+      in
+      let field layouts i lam =
+        Lprim (Punboxed_product_field (i, layouts), [ lam ], loc)
+      in
+      let addr = field slice_layouts 0 arg in
+      let length = field slice_layouts 1 arg in
+      (* Void elements take no space, and reading them reads nothing *)
+      let is_void = match layout with Pvoid -> true | _ -> false in
+      let rest_idx =
+        let idx = field address_layouts 1 addr in
+        if is_void then idx
+        else
+          let array_kind =
+            slice_element_array_kind head.pat_env head.pat_loc head.pat_type
+          in
+          advance_array_idx array_kind idx loc
+      in
+      let rest_addr =
+        Lprim
+          ( Pmake_unboxed_product address_layouts,
+            [ field address_layouts 0 addr; rest_idx ],
+            loc )
+      in
+      let element =
+        if is_void then Lprim (Punbox_unit, [ lambda_unit ], loc)
+        else Lprim (Pget_ptr (layout, load_flag), [ addr ], loc)
+      in
+      let rest_length =
+        Lprim
+          ( Pscalar (Binary (Integral (slice_length_scalar, Sub))),
+            [ length; const_scalar slice_length_scalar 1 ],
+            loc )
+      in
+      { arg = element;
+        binding_kind =
+          add_barrier_to_let_kind ubr
+            (if Types.is_mutable mutability then StrictOpt else Alias);
+        mut = compose_mut mut mut_flag;
+        sort;
+        layout;
+        deref_address =
+          Some
+            (In_address
+               { addr; contents_layout = layout; rev_unboxed_path = []; loc })
+      }
+      :: { slice with
+           arg =
+             Lprim
+               (Pmake_unboxed_product slice_layouts, [ rest_addr; rest_length ],
+                loc);
+           binding_kind = Alias;
+           deref_address = None
+         }
+      :: rem
+  | _ -> fatal_error "Matching.get_expr_args_slice"
+
+let divide_slice ~scopes ctx pm =
+  divide
+    (get_expr_args_slice ~scopes)
+    Bool.equal
+    get_key_slice
+    get_pat_args_slice
+    ctx pm
 
 (* Matching against a tuple pattern *)
 
@@ -3841,6 +3952,32 @@ let combine_unboxed_bool value_kind loc arg partial ctx def
   in
   (lambda1, Jumps.union local_jumps total)
 
+let combine_slice value_kind loc arg partial ctx def (cells, total, _pats) =
+  let fail, local_jumps = mk_failaction_neg partial ctx def in
+  let is_empty =
+    Lprim
+      ( Pscalar
+          (Binary
+             (Icmp (Scalar.Integral.ignore_locality slice_length_scalar, Ceq))),
+        [ Lprim (Punboxed_product_field (1, slice_layouts), [ arg ], loc);
+          const_scalar slice_length_scalar 0 ],
+        loc )
+  in
+  let empty = List.assoc_opt false cells in
+  let nonempty = List.assoc_opt true cells in
+  let lambda =
+    match empty, nonempty, fail with
+    | Some empty, Some nonempty, _ ->
+        Lifthenelse (is_empty, empty, nonempty, value_kind)
+    | Some empty, None, Some fail ->
+        Lifthenelse (is_empty, empty, fail, value_kind)
+    | None, Some nonempty, Some fail ->
+        Lifthenelse (is_empty, fail, nonempty, value_kind)
+    | (Some act, None, None) | (None, Some act, None) -> act
+    | None, None, _ -> fatal_error "Matching.combine_slice"
+  in
+  (lambda, Jumps.union local_jumps total)
+
 let split_cases tag_lambda_list =
   let rec split_rec = function
     | [] -> ([], [], None)
@@ -4734,7 +4871,10 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test
             (divide_addr ~scopes ph)
             Context.combine
-      | Slice _ -> fatal_slice ()
+      | Slice _ ->
+          compile_test
+            (divide_slice ~scopes)
+            (combine_slice value_kind ploc arg arg_partial)
       | Lazy ->
           compile_no_test
             (divide_lazy ~scopes ph)
@@ -4802,33 +4942,6 @@ let failure_handler ~scopes loc ~failer () =
               sloc )
         ],
         sloc )
-
-(* CR slice-patterns: compile slice patterns. Until then, matches containing
-   them raise [Failure] at runtime. *)
-let has_slice_pattern (ps : pattern list) =
-  let is_slice (p : pattern) =
-    match p.pat_desc with Tpat_slice _ -> true | _ -> false
-  in
-  List.exists (exists_pattern is_slice) ps
-
-let slice_patterns_not_compiled ~scopes loc =
-  let sloc = Scoped_location.of_location ~scopes loc in
-  let slot =
-    transl_extension_path sloc (Lazy.force Env.initial) Predef.path_failure
-  in
-  Lprim
-    ( Praise Raise_regular,
-      [ Lprim
-          ( Pmakeblock (0, Immutable, All_value, alloc_heap),
-            [ slot;
-              Lconst
-                (Const_base
-                   (Const_string
-                      ("Slice patterns are not compiled yet", loc, None)))
-            ],
-            sloc )
-      ],
-      sloc )
 
 let toplevel_handler ~scopes ~return_layout loc ~failer partial args cases
     compile_fun =
@@ -4916,9 +5029,6 @@ let rec has_tuple_element_deref (p : pattern) =
 
 let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
       repr arg pat_act_list partial =
-  if has_slice_pattern (List.map fst pat_act_list)
-  then slice_patterns_not_compiled ~scopes loc
-  else
   let args = [ root_arg arg Strict arg_sort arg_layout ] in
   let rows = map_on_rows (fun pat -> (pat, [])) pat_act_list in
   let handler =
@@ -5190,9 +5300,6 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
 let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial =
   (* The arguments of a tupled function are always values since they must be
      tuple elements *)
-  if has_slice_pattern (List.concat_map fst pats_act_list)
-  then slice_patterns_not_compiled ~scopes loc
-  else
   let args = List.map (fun (id, sort, layout) ->
     root_arg (Lvar id) Strict sort layout
   ) paraml in
@@ -5288,9 +5395,6 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
 
 let do_for_multiple_match ~scopes ~return_layout loc idl mode
     pat_act_list partial =
-  if has_slice_pattern (List.map fst pat_act_list)
-  then slice_patterns_not_compiled ~scopes loc
-  else
   let repr = None in
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
