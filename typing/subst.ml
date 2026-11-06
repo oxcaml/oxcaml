@@ -911,6 +911,32 @@ let jkind_declaration s decl =
     jkind_attributes = attrs s decl.jkind_attributes;
   }
 
+let law_declaration' copy_scope s decl =
+  let ty = typexp copy_scope s decl.law_loc in
+  let vars = ref Ident.Map.empty in
+  let rename_var id =
+    match Ident.Map.find_opt id !vars with
+    | Some id' -> id'
+    | None ->
+        let id' = rename_ident s id in
+        vars := Ident.Map.add id id' !vars;
+        id'
+  in
+  let law_params =
+    List.map (fun (x, ty_) -> rename_var x, ty ty_) decl.law_params
+  in
+  let spec e =
+    Spec.rename_vars ~rename:rename_var e
+    |> Spec.map_paths ~value_path:(value_path s)
+  in
+  { law_params;
+    law_assumptions = List.map spec decl.law_assumptions;
+    law_conclusion = spec decl.law_conclusion;
+    law_attributes = attrs s decl.law_attributes;
+    law_uid = decl.law_uid;
+    law_loc = loc s decl.law_loc;
+  }
+
 let rec type_declaration' copy_scope s decl =
   let unsafe_mode_crossing =
     Option.map (unsafe_mode_crossing copy_scope s decl.type_loc)
@@ -1213,6 +1239,9 @@ let rename_bound_idents scoping s sg =
           (add_jkind id (Pident id') s)
           (Sig_jkind(id', jkd, vis) :: sg)
           rest
+    | Sig_law (id, ld, vis) :: rest ->
+        let id' = rename_ident s id in
+        rename_bound_idents s (Sig_law (id', ld, vis) :: sg) rest
   in
   rename_bound_idents s [] sg
 
@@ -1376,6 +1405,8 @@ and subst_lazy_signature_item' copy_scope scoping s comp =
       Sig_class_type(id, cltype_declaration' copy_scope s d, rs, vis)
   | Sig_jkind(id, d, vis) ->
       Sig_jkind(id, jkind_declaration s d, vis)
+  | Sig_law(id, d, vis) ->
+      Sig_law(id, law_declaration' copy_scope s d, vis)
 
 and modtype scoping s t =
   For_copy.with_scope (fun copy_scope ->

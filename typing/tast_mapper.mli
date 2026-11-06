@@ -41,6 +41,7 @@ type mapper =
     jkind_annotation:
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
     jkind_declaration: mapper -> jkind_declaration -> jkind_declaration;
+    law_declaration: mapper -> law_declaration -> law_declaration;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     modes: 'a. mapper -> 'a modes -> 'a modes;
@@ -60,6 +61,7 @@ type mapper =
     open_description: mapper -> open_description -> open_description;
     signature: mapper -> signature -> signature;
     signature_item: mapper -> signature_item -> signature_item;
+    spec_expression: mapper -> spec_expression -> spec_expression;
     structure: mapper -> structure -> structure;
     structure_item: mapper -> structure_item -> structure_item;
     typ: mapper -> core_type -> core_type;
