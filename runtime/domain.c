@@ -784,6 +784,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   /* [tls_state] is scanned directly in [caml_do_roots] and by the minor GC. */
   domain_state->tls_state = Atom(0) /* Empty array */;
 
+  domain_state->thread_id = caml_fresh_thread_id();
+
   // Must happen after taking the domain lock
   caml_enable_stack_caches(domain_state->stack_caches);
 
@@ -1521,6 +1523,19 @@ CAMLprim value caml_ml_domain_index(value unit)
 {
   CAMLnoalloc;
   return Val_long(domain_self->id);
+}
+
+static atomic_uintnat next_thread_id = 0;
+
+CAMLexport value caml_fresh_thread_id(void)
+{
+  return Val_long(atomic_fetch_add(&next_thread_id, 1));
+}
+
+CAMLprim value caml_ml_thread_self_id(value unit)
+{
+  CAMLnoalloc;
+  return Caml_state->thread_id;
 }
 
 /* Global barrier implementation */

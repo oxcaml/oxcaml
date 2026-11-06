@@ -522,6 +522,7 @@ type operation =
   | Cdls_get
   | Ctls_get
   | Cdomain_index
+  | Cthread_self_id
   | Cpoll
   | Cpause
 

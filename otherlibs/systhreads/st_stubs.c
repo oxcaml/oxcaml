@@ -235,9 +235,6 @@ static void thread_lock_release(void)
    NULL, or Caml_state is setup for Active_thread. */
 #define Active_thread thread_table[Caml_state->id].active_thread
 
-/* Identifier for next thread creation */
-static atomic_uintnat thread_next_id = 0;
-
 /* Forward declarations */
 static value caml_threadstatus_new (void);
 static void caml_threadstatus_terminate (value);
@@ -350,6 +347,13 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->local_roots = th->local_roots;
   Caml_state->backtrace_pos = th->backtrace_pos;
   Caml_state->backtrace_buffer = th->backtrace_buffer;
+  /* We might have gotten here from [caml_c_thread_register], which calls
+     [restore_runtime_state] *before* allocating [descr]. In that case,
+     [caml_c_thread_register] is responsible for setting [thread_id]
+  */
+  if (Is_block(th->descr)) {
+    Caml_state->thread_id = Ident(th->descr);
+  }
   caml_tls_update_cache();
   caml_modify_generational_global_root
     (&Caml_state->backtrace_last_exn, th->backtrace_last_exn);
@@ -508,7 +512,7 @@ void caml_thread_free_info(caml_thread_t th)
 
 /* Allocate a thread descriptor block. */
 
-static value caml_thread_new_descriptor(value clos)
+static value caml_thread_new_descriptor(value id, value clos)
 {
   CAMLparam1(clos);
   CAMLlocal1(mu);
@@ -516,8 +520,7 @@ static value caml_thread_new_descriptor(value clos)
   /* Create and initialize the termination semaphore */
   mu = caml_threadstatus_new();
   /* Create a descriptor for the new thread */
-  descr = caml_alloc_3(0, Val_long(atomic_fetch_add(&thread_next_id, +1)),
-                       clos, mu);
+  descr = caml_alloc_3(0, id, clos, mu);
   CAMLreturn(descr);
 }
 
@@ -655,7 +658,9 @@ static void caml_thread_domain_initialize_hook(void)
     (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
 
   new_thread->domain_id = Caml_state->id;
-  new_thread->descr = caml_thread_new_descriptor(Val_unit);
+  /* The domain's first thread keeps the id the runtime gave the domain. */
+  new_thread->descr =
+    caml_thread_new_descriptor(Caml_state->thread_id, Val_unit);
   new_thread->next = new_thread;
   new_thread->prev = new_thread;
   /* Initialize [backtrace_last_exn] as it is accessed by the GC via
@@ -881,7 +886,7 @@ CAMLprim value caml_thread_new(value clos)
   /* Allocate the descriptor before adding to the ring; if
    * [caml_thread_new_descriptor] raises then we don't want to add a
    * zombie entry. */
-  descr = caml_thread_new_descriptor(clos);
+  descr = caml_thread_new_descriptor(caml_fresh_thread_id(), clos);
 
   /* Create a thread info block */
   caml_thread_t th = thread_alloc_and_add();
@@ -932,7 +937,9 @@ CAMLexport int caml_c_thread_register(void)
   if (th == NULL) goto out_err;
   thread_init_current(th);
   /* We can now allocate the thread descriptor on the major heap */
-  th->descr = caml_thread_new_descriptor(Val_unit);  /* no closure */
+  th->descr = caml_thread_new_descriptor(caml_fresh_thread_id(),
+                                         Val_unit /* no closure */);
+  Caml_state->thread_id = Ident(th->descr);
 
   /* Acquire a tick, in case this is the only non-initial thread.
      This must happen after the thread is fully set up, since the tick

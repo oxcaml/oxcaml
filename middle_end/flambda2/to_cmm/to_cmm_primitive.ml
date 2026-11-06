@@ -1166,6 +1166,7 @@ let nullary_primitive _env res dbg prim =
   | Dls_get -> None, res, C.dls_get ~dbg
   | Tls_get -> None, res, C.tls_get ~dbg
   | Domain_index -> None, res, C.domain_index ~dbg
+  | Thread_self_id -> None, res, C.thread_self_id ~dbg
   | Poll -> None, res, C.poll ~dbg
   | Cpu_relax -> None, res, C.cpu_relax ~dbg
 

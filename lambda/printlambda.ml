@@ -955,6 +955,7 @@ let primitive ppf = function
   | Ppoll -> fprintf ppf "poll"
   | Ptls_get -> fprintf ppf "tls_get"
   | Pdomain_index -> fprintf ppf "domain_index"
+  | Pthread_self_id -> fprintf ppf "thread_self_id"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
   | Pobj_dup -> fprintf ppf "obj_dup"
@@ -1194,6 +1195,7 @@ let name_of_primitive = function
   | Ppoll -> "Ppoll"
   | Ptls_get -> "Ptls_get"
   | Pdomain_index -> "Pdomain_index"
+  | Pthread_self_id -> "Pthread_self_id"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
   | Pobj_magic _ -> "Pobj_magic"
