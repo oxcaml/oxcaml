@@ -3,6 +3,8 @@
  flambda2;
  {
    native;
+ }{
+   jsir;
  } {
    bytecode;
  }

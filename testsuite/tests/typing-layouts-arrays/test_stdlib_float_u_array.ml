@@ -6,6 +6,8 @@
  {
    native;
  }{
+   jsir;
+ }{
    bytecode;
  }{
    flags = "-extension layouts_beta";

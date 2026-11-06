@@ -64,7 +64,11 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
-    (env-vars ("OCAMLPARAM" "$(main_ocamlparam)"))))))
+    ; STDLIB_JSIR_OCAMLOPT_FLAGS: for the JSIR builds of the compiler's
+    ; libraries (see external/ast-dependent-libs/stdlib-jsir/dune).
+    (env-vars
+      ("OCAMLPARAM" "$(main_ocamlparam)")
+      ("STDLIB_JSIR_OCAMLOPT_FLAGS" "$(main_ocamlopt_optimization_flags)"))))))
 endef
 
 
@@ -391,6 +395,9 @@ ifeq ($(with_jsir),true)
 	    -I ../../stdlib" && \
 	  $$ocamlopt_jsir -c lib.ml && \
 	  $$ocamlopt_jsir -linkall -a -o testing.cmjxa testing.ml
+	cp _install/lib/ocaml/compiler-libs/*.cmjx _runtest/utils
+	cp $(main_build)/$(ast_dependent_libs_root)/stdlib-jsir/build/compiler-libs/*.cmjo \
+	  _runtest/utils
 endif
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \
