@@ -588,24 +588,31 @@ let emit_frames ~debug_strings_section ~code_begin a =
    else
      (* The unit's table is a header: a -1 tag (a count-prefixed table starts
         with a nonnegative count) and self-relative offsets to the start and end
-        of the pieces section, which the linker merges across all units linked
-        into the executable or shared object. Each run of descriptors with the
-        same link symbol goes in a piece linked to that symbol's section, so
-        that the linker drops the piece along with the code, and starts with an
-        escape, so that the pieces can be read in any order. A zero-size piece
-        linked to [code_begin] ensures the section, and hence its start and stop
-        symbols, exists. *)
-     let start_or_stop prefix =
-       Asm_targets.Asm_symbol.create_global
-         (prefix ^ Asm_section.frametable_pieces_section_name)
+        of the pieces section and of the counts section, which the linker merges
+        across all units linked into the executable or shared object. Each run
+        of descriptors with the same link symbol goes in a piece linked to that
+        symbol's section, so that the linker drops the piece along with the
+        code, and starts with an escape, so that the pieces can be read in any
+        order. The unit's count of its descriptors and a zero-size piece are
+        linked to [code_begin]; the latter ensures the pieces section, and hence
+        its start and stop symbols, exists. *)
+     let start_and_stop section_name =
+       List.map
+         (fun prefix ->
+           Asm_targets.Asm_symbol.create_global (prefix ^ section_name))
+         ["__start_"; "__stop_"]
      in
-     let start_sym = start_or_stop "__start_" in
-     let stop_sym = start_or_stop "__stop_" in
+     let syms =
+       start_and_stop Asm_section.frametable_pieces_section_name
+       @ start_and_stop Asm_section.frametable_counts_section_name
+     in
      a.efa_word (-1);
-     D.between_this_and_symbol_32bit_expr start_sym;
-     D.between_this_and_symbol_32bit_expr stop_sym;
-     D.hidden start_sym;
-     D.hidden stop_sym;
+     List.iter D.between_this_and_symbol_32bit_expr syms;
+     List.iter D.hidden syms;
+     D.switch_to_section
+       (Asm_section.Frametable_count { link_symbol = code_begin });
+     a.efa_align Arch.size_addr;
+     a.efa_word (List.length descrs);
      let switch_to_piece link_symbol =
        D.switch_to_section (Asm_section.Frametable_piece { link_symbol })
      in

@@ -12,7 +12,8 @@
 (* Check the shape of the assembly and object file emitted under
    -frametable-sections: every frame descriptor is in a caml_frametable_pieces
    section linked (SHF_LINK_ORDER) to a function's text section, and the
-   unit's frametable symbol names a header pointing to the pieces section. *)
+   unit's frametable symbol names a header pointing to the pieces section and
+   the counts section. *)
 
 exception Boom of int
 

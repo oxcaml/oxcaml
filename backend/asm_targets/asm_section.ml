@@ -58,6 +58,7 @@ type t =
   | Note_gnu_stack
   | Debuginfo_strings
   | Frametable_piece of { link_symbol : string }
+  | Frametable_count of { link_symbol : string }
   | Custom of
       { names : string list;
         flags : string option;
@@ -90,7 +91,8 @@ let is_delayed = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
-  | Note_gnu_stack | Debuginfo_strings | Frametable_piece _ ->
+  | Note_gnu_stack | Debuginfo_strings | Frametable_piece _ | Frametable_count _
+    ->
     false
   | Custom { is_delayed; _ } -> is_delayed
 
@@ -124,6 +126,8 @@ let print ppf t =
     | Debuginfo_strings -> "Debuginfo_strings"
     | Frametable_piece { link_symbol } ->
       Printf.sprintf "(Frametable_piece %s)" link_symbol
+    | Frametable_count { link_symbol } ->
+      Printf.sprintf "(Frametable_count %s)" link_symbol
     | Custom { names; _ } ->
       Printf.sprintf "(Custom %s)" (String.concat " " names)
   in
@@ -148,7 +152,7 @@ let section_is_text = function
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | DWARF _
   | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh | Note_gnu_stack
-  | Debuginfo_strings | Frametable_piece _ ->
+  | Debuginfo_strings | Frametable_piece _ | Frametable_count _ ->
     false
   | Custom { flags; _ } -> (
     (* Check if the section is executable based on flags *)
@@ -164,6 +168,8 @@ type section_details =
   }
 
 let frametable_pieces_section_name = "caml_frametable_pieces"
+
+let frametable_counts_section_name = "caml_frametable_counts"
 
 let progbits (arch : Target_system.architecture) =
   (* "@" starts a comment on ARM *)
@@ -283,15 +289,17 @@ let details t first_occurrence =
       (* "aMS" = SHF_ALLOC | SHF_MERGE | SHF_STRINGS; de-duped by linker *)
       [".rodata.str1.1"], Some "aMS", [progbits arch; "1"]
     (* 1 = characters *)
-    | ( Frametable_piece _,
+    | ( (Frametable_piece _ | Frametable_count _),
         _,
         (MacOS_like | Win32 | Win64 | MinGW_32 | MinGW_64 | Cygwin) ) ->
       Misc.fatal_error "Frametable sections are only supported on ELF targets"
+    (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the section together
+       with the section defining [link_symbol]. The names are C identifiers, so
+       the linker defines [__start_] and [__stop_] symbols for them. *)
     | Frametable_piece { link_symbol }, arch, _ ->
-      (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the piece together
-         with the section defining [link_symbol]. The name is a C identifier, so
-         the linker defines [__start_] and [__stop_] symbols for it. *)
       [frametable_pieces_section_name], Some "ao", [progbits arch; link_symbol]
+    | Frametable_count { link_symbol }, arch, _ ->
+      [frametable_counts_section_name], Some "ao", [progbits arch; link_symbol]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

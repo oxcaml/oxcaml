@@ -65,9 +65,11 @@
  * followed by the descriptors. A unit compiled with
  * -frametable-sections instead has a header:
  *
- *   intnat  tag        = FRAMETABLE_SECTIONS_TAG
- *   int32   start_rel  offset from this field to the pieces section
- *   int32   stop_rel   offset from this field to the end of the section
+ *   intnat  tag               = FRAMETABLE_SECTIONS_TAG
+ *   int32   pieces_start_rel  offset from this field to the pieces section
+ *   int32   pieces_stop_rel   offset from this field to its end
+ *   int32   counts_start_rel  offset from this field to the counts section
+ *   int32   counts_stop_rel   offset from this field to its end
  *
  * Each function's descriptors form a "piece" in a section linked to
  * the function's code (SHF_LINK_ORDER), so the linker keeps the piece
@@ -77,7 +79,9 @@
  * the linker-defined __start_ and __stop_ symbols), so the runtime
  * enters the section into the hashtable only once. The pieces are
  * byte-contiguous, with no count or padding, and each starts with an
- * escaped descriptor.
+ * escaped descriptor. The counts section, merged likewise, is an array
+ * of intnat, one per unit, each the number of descriptors in the
+ * unit's pieces; their sum bounds the number in the pieces section.
  *
  * There are three descriptor layouts: "short", "medium", and "long".
  *

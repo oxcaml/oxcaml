@@ -168,14 +168,19 @@ static bool has_pieces(intnat *tbl)
   return tbl[0] == FRAMETABLE_SECTIONS_TAG;
 }
 
-static const unsigned char *frametable_rel(const unsigned char *p)
+enum header_field { PIECES_START, PIECES_STOP, COUNTS_START, COUNTS_STOP };
+
+/* The address that a -frametable-sections header field points to */
+static const unsigned char *header_rel(intnat *tbl, enum header_field field)
 {
+  const unsigned char *p =
+    (const unsigned char *)(tbl + 1) + field * sizeof(int32_t);
   return p + caml_read_unaligned_int32(p);
 }
 
 static const unsigned char *pieces_start(intnat *tbl)
 {
-  return frametable_rel((const unsigned char *)(tbl + 1));
+  return header_rel(tbl, PIECES_START);
 }
 
 static void frametable_iter_start(frametable_iter *it,
@@ -186,8 +191,7 @@ static void frametable_iter_start(frametable_iter *it,
     it->remaining = 0;
     if (cell->owns_pieces) {
       it->next = pieces_start(tbl);
-      it->end = frametable_rel((const unsigned char *)(tbl + 1)
-                               + sizeof(int32_t));
+      it->end = header_rel(tbl, PIECES_STOP);
     } else {
       /* Another table enters the shared pieces */
       it->next = it->end = (const unsigned char *)tbl;
@@ -239,17 +243,14 @@ Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
 static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
-    frametable_iter it;
-    frametable_iter_start(&it, cur);
-    if (it.end == NULL) {
-      num_descr += it.remaining;
-    } else {
-      /* The pieces hold no count, so decode them to count them */
-      while (frametable_iter_more(&it)) {
-        uintnat retaddr;
-        frametable_iter_next(&it, &retaddr);
-        num_descr++;
-      }
+    intnat *tbl = cur->frametable;
+    if (!has_pieces(tbl)) {
+      num_descr += (intnat)caml_read_unaligned_uintnat(tbl);
+    } else if (cur->owns_pieces) {
+      /* An upper bound, since the linker may have dropped pieces */
+      const intnat *count = (const intnat *)header_rel(tbl, COUNTS_START);
+      const intnat *end = (const intnat *)header_rel(tbl, COUNTS_STOP);
+      for (; count < end; count++) num_descr += *count;
     }
   }
   return num_descr;
@@ -363,7 +364,8 @@ Caml_inline void insert_entry(frame_descr_entry *descriptors, uintnat mask,
    by which time the slot's cache line has usually arrived. */
 #define FILL_PREFETCH_DISTANCE 16
 
-static void fill_hashtable(
+/* Returns the number of descriptors inserted */
+static uintnat fill_hashtable(
   caml_frame_descrs *table, caml_frametable_list *new_frametables)
 {
   frame_descr_entry *descriptors = table->descriptors;
@@ -399,6 +401,16 @@ static void fill_hashtable(
     insert_entry(descriptors, mask,
                  slot->retaddr, slot->hash, slot->fd);
   }
+  return n;
+}
+
+/* The hashtable is sized from the counts, so it cannot hold more */
+static void check_count(uintnat inserted, intnat counted)
+{
+  if (inserted > (uintnat)counted)
+    caml_fatal_error("more frame descriptors (%" ARCH_INTNAT_PRINTF_FORMAT
+                     "u) than counted (%" ARCH_INTNAT_PRINTF_FORMAT "d)",
+                     inserted, counted);
 }
 
 static void remove_entry(caml_frame_descrs *table, uintnat retaddr,
@@ -1227,13 +1239,14 @@ static void add_frame_descriptors(
 
     table->descriptors = alloc_descriptors(tblsize);
 
-    fill_hashtable(table, new_frametables);
+    /* [new_frametables] now continues with the old tables */
+    check_count(fill_hashtable(table, new_frametables), num_descr);
     if (caml_measure_frametables) {
       report_frametables_stats(new_frametables);
     }
   } else {
     table->num_descr += increase;
-    fill_hashtable(table, new_frametables);
+    check_count(fill_hashtable(table, new_frametables), increase);
     if (caml_measure_frametables) {
       report_frametables_stats(new_frametables);
     }
