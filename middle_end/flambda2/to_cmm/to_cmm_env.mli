@@ -112,10 +112,13 @@ val create :
     of a function. *)
 val enter_function_body :
   t ->
+  params:Bound_parameters.t ->
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
   t
+
+val function_parameter_index : t -> Simple.t -> int option
 
 (** {2 Debuginfo} *)
 

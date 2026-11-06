@@ -58,6 +58,7 @@ type environment =
         *)
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t;
+    parameters : (VP.t * Cmm.machtype) list;
     phantom_lets : V.Set.t;
     all_phantom_lets :
       (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
@@ -161,11 +162,12 @@ let pop_all_traps env =
   in
   pop_all [] env.trap_stack |> List.rev
 
-let env_create ~tailrec_label =
+let env_create ~tailrec_label ~parameters =
   { vars = V.Map.empty;
     static_exceptions = Static_label.Map.empty;
     trap_stack = Uncaught;
     tailrec_label;
+    parameters;
     phantom_lets = V.Set.empty;
     all_phantom_lets = ref V.Map.empty
   }

@@ -170,10 +170,10 @@ let linearize_terminator (func : string)
     match terminator.desc with
     | Return -> [L.Lreturn], None
     | Raise kind -> [L.Lraise kind], None
-    | Tailcall_func (Indirect _) -> [L.Lcall_op Ltailcall_ind], None
-    | Tailcall_func (Direct func_symbol) ->
+    | Tailcall_func { desc = Indirect _; _ } -> [L.Lcall_op Ltailcall_ind], None
+    | Tailcall_func { desc = Direct func_symbol; _ } ->
       [L.Lcall_op (Ltailcall_imm { func = func_symbol })], None
-    | Tailcall_self { destination } ->
+    | Tailcall_self { destination; _ } ->
       ( [ L.Lcall_op
             (Ltailcall_imm { func = { sym_name = func; sym_global = Local } })
         ],
@@ -214,7 +214,7 @@ let linearize_terminator (func : string)
       Misc.fatal_error "Cannot linearize terminator: Invalid with a successor"
     | Call { op; label_after } ->
       let op : Linear.call_operation =
-        match op with
+        match op.desc with
         | Indirect _ -> Lcall_ind
         | Direct func_symbol -> Lcall_imm { func = func_symbol }
       in
@@ -240,7 +240,7 @@ let linearize_terminator (func : string)
               stack_ofs;
               stack_align
             }
-        | Probe { name; handler_code_sym; enabled_at_init } ->
+        | Probe { name; handler_code_sym; enabled_at_init; _ } ->
           Lprobe { name; handler_code_sym; enabled_at_init }
       in
       branch_or_fallthrough [L.Lcall_op op] label_after, None

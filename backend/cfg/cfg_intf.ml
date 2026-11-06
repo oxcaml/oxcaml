@@ -32,9 +32,14 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
-  type func_call_operation =
-    | Indirect of Cmm.symbol list option
+  type func_call_desc =
+    | Indirect of Cmm.callee list option
     | Direct of Cmm.symbol
+
+  type func_call_operation =
+    { desc : func_call_desc;
+      known_arguments : Cmm.Known_arguments.t
+    }
 
   type external_call_operation =
     { func_symbol : string;
@@ -52,7 +57,8 @@ module S = struct
     | Probe of
         { name : string;
           handler_code_sym : string;
-          enabled_at_init : bool
+          enabled_at_init : bool;
+          known_arguments : Cmm.Known_arguments.t
         }
 
   type bool_test =
@@ -142,7 +148,10 @@ module S = struct
     | Switch of Label.t array
     | Return
     | Raise of Lambda.raise_kind
-    | Tailcall_self of { destination : Label.t }
+    | Tailcall_self of
+        { destination : Label.t;
+          known_arguments : Cmm.Known_arguments.t;
+        }
     | Tailcall_func of func_call_operation
     | Call_no_return of external_call_operation
     (* CR mshinwell: [Call_no_return] should have "external" in the name *)

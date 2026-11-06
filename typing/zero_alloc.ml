@@ -2,7 +2,8 @@ module ZA = Zero_alloc_utils
 
 (* Support for zero_alloc *)
 type check = Builtin_attributes.zero_alloc_check =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     opt : bool;
     arity : int;
     partial : bool;
@@ -11,7 +12,8 @@ type check = Builtin_attributes.zero_alloc_check =
   }
 
 type assume = Builtin_attributes.zero_alloc_assume =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     never_returns_normally : bool;
     never_raises : bool;
     arity : int;
@@ -26,7 +28,8 @@ type const = Builtin_attributes.zero_alloc_attribute =
   | Assume of assume
 
 type desc =
-  { strict : bool;
+  { conditional : bool;
+    strict : bool;
     opt : bool;
     custom_error_msg : string option;
     partial : bool
@@ -64,10 +67,11 @@ let debug_printer ppf t =
     let print_desc ppf desc =
       match desc with
       | None -> Format.fprintf ppf "None"
-      | Some { strict; opt; custom_error_msg; partial } ->
+      | Some { conditional; strict; opt; custom_error_msg; partial } ->
         Format.fprintf ppf
-          "{ strict = %b; opt = %b; custom_error_message = %a; partial = %b}"
-          strict opt pp_custom custom_error_msg partial
+          "{ conditional = %b; strict = %b; opt = %b; custom_error_message = \
+           %a; partial = %b}"
+          conditional strict opt pp_custom custom_error_msg partial
     in
     Format.fprintf ppf "Var { arity = %d; desc = %a }" v.arity print_desc v.desc
 
@@ -94,8 +98,8 @@ let get (t : t) =
   | Var { loc; arity; desc } -> (
     match desc with
     | None -> Default_zero_alloc
-    | Some { strict; opt; custom_error_msg; partial } ->
-      Check { loc; arity; partial; strict; opt; custom_error_msg })
+    | Some { conditional; strict; opt; custom_error_msg; partial } ->
+      Check { conditional; loc; arity; partial; strict; opt; custom_error_msg })
 
 type error =
   | Less_general of { missing_entirely : bool }
@@ -167,7 +171,9 @@ let sub_const_const_exn za1 za2 =
   in
   let v1 = abstract_value za1 in
   let v2 = abstract_value za2 in
-  if not (ZA.Assume_info.Value.lessequal v1 v2)
+  if not
+      (ZA.Assume_info.Value.satisfies ~conditional:false ~strict:false
+         ~actual:v1 ~expected:v2)
   then begin
     let missing_entirely =
       match za1 with
@@ -209,12 +215,14 @@ let sub_var_const_exn v c =
   | _, (Default_zero_alloc | Ignore_assert_all | Assume _) -> assert false
   | { arity = arity1; _ }, Check { arity = arity2; _ } when arity1 <> arity2 ->
     raise (Error (Arity_mismatch (arity1, arity2)))
-  | { desc = None; _ }, Check { strict; opt; custom_error_msg; partial } ->
+  | ( { desc = None; _ },
+      Check { conditional; strict; opt; custom_error_msg; partial } ) ->
     log (None, v);
-    v.desc <- Some { strict; opt; custom_error_msg; partial }
+    v.desc <- Some { conditional; strict; opt; custom_error_msg; partial }
   | ( { desc =
           Some
-            { strict = strict1;
+            { conditional = conditional1;
+              strict = strict1;
               opt = opt1;
               custom_error_msg = msg1;
               partial = partial1
@@ -222,13 +230,15 @@ let sub_var_const_exn v c =
         _
       },
       Check
-        { strict = strict2;
+        { conditional = conditional2;
+          strict = strict2;
           opt = opt2;
           custom_error_msg = msg2;
           partial = partial2
         } ) ->
     let strict = strict1 || strict2 in
     let opt = opt1 && opt2 in
+    let conditional = conditional1 && conditional2 in
     let partial = partial1 || partial2 in
     let custom_error_msg, msg_changed =
       match msg1, msg2 with
@@ -240,10 +250,13 @@ let sub_var_const_exn v c =
         let msg = if b then msg1 else Some (String.concat "\n" [m1; m2]) in
         msg, not b
     in
-    if strict <> strict1 || opt <> opt1 || partial <> partial1 || msg_changed
-    then begin
+    let anything_changed =
+      conditional1 <> conditional2 || strict <> strict1 || opt <> opt1
+      || partial <> partial1 || msg_changed
+    in
+    if anything_changed then begin
       log (desc, v);
-      v.desc <- Some { strict; opt; custom_error_msg; partial }
+      v.desc <- Some { conditional; strict; opt; custom_error_msg; partial }
     end
 
 let sub_exn za1 za2 =
