@@ -565,75 +565,48 @@ let simple_match_args discr head args =
       | Unboxed_bool _ -> []
       end
 
-(* Consider a pattern matrix whose first column has been simplified to contain
-   only _ or a head constructor
-     | p1, r1...
-     | p2, r2...
-     | p3, r3...
-     | ...
+(* The discriminating head for a head [head] of the first column of [pss]: the
+   head that the matrix is specialized by. A record pattern might only match a
+   subset of the fields of the record, so the discriminating head for a record
+   head has the fields of all records in the column. Other heads are their own
+   discriminating head.
 
-   We build a normalized /discriminating/ pattern from a pattern [q] by folding
-   over the first column of the matrix, "refining" [q] as we go:
-
-   - when we encounter a row starting with [Tuple], [Addr] or [Lazy] then we
-   can stop and return that head, as we cannot refine any further. Indeed,
-   these constructors are alone in their signature, so they will subsume
-   whatever other head we might find, as well as the head we're threading
-   along.
-
-   - when we find a [Record] then it is a bit more involved: it is also alone
-   in its signature, however it might only be matching a subset of the
-   record fields. We use these fields to refine our accumulator and keep going
-   as another row might match on different fields.
-
-   - rows starting with a wildcard do not bring any information, so we ignore
-   them and keep going
-
-   - if we encounter anything else (i.e. any other constructor), then we just
-   stop and return our accumulator.
-*)
-let discr_pat q pss =
+   N.B. we could make the record case "simpler" by refining it using
+   [all_record_args]. In which case we wouldn't need to fold over the first
+   column for records. However it makes the witness we generate for the
+   exhaustivity warning less pretty. *)
+let discr_pat head pss =
   let open Patterns.Head in
-  let rec refine_pat acc = function
-    | [] -> acc
-    | ((head, _), _) :: rows ->
-      let append_unique lbls lbls_unique =
-        List.fold_right (fun lbl lbls_unique ->
-          if List.exists (fun l -> l.lbl_pos = lbl.lbl_pos) lbls_unique then
-            lbls_unique
-          else
-            lbl :: lbls_unique
-        ) lbls lbls_unique
-      in
-      match head.pat_desc with
-      | Any -> refine_pat acc rows
-      | Tuple _ | Unboxed_tuple _ | Addr _ | Lazy -> head
-      | Record (lbls, repr) ->
-        (* N.B. we could make this case "simpler" by refining the record case
-           using [all_record_args].
-           In which case we wouldn't need to fold over the first column for
-           records.
-           However it makes the witness we generate for the exhaustivity warning
-           less pretty. *)
-        let fields = append_unique lbls (record_arg acc) in
-        let d = { head with pat_desc = Record (fields, repr) } in
-        refine_pat d rows
-      | Record_unboxed_product (lbls, repr) ->
-        let fields = append_unique lbls (record_unboxed_product_arg acc) in
-        let d =
-          { head with pat_desc = Record_unboxed_product (fields, repr) }
-        in
-        refine_pat d rows
-      | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Variant _
-      | Array _ | Slice _ -> acc
+  let append_unique lbls lbls_unique =
+    List.fold_right (fun lbl lbls_unique ->
+      if List.exists (fun l -> l.lbl_pos = lbl.lbl_pos) lbls_unique then
+        lbls_unique
+      else
+        lbl :: lbls_unique
+    ) lbls lbls_unique
   in
-  let q, _ = deconstruct q in
-  match q.pat_desc with
-  (* short-circuiting: clearly if we have anything other than [Record] or
-     [Any] to start with, we're not going to be able refine at all. So
-     there's no point going over the matrix. *)
-  | Any | Record _ | Record_unboxed_product _ -> refine_pat q pss
-  | _ -> q
+  let fields_in_column fields fields_of_head =
+    List.fold_left
+      (fun fields ((head, _), _) -> append_unique (fields_of_head head) fields)
+      fields pss
+  in
+  match head.pat_desc with
+  | Record (lbls, repr) ->
+    let fields =
+      fields_in_column lbls (fun head ->
+        match head.pat_desc with Record (lbls, _) -> lbls | _ -> [])
+    in
+    { head with pat_desc = Record (fields, repr) }
+  | Record_unboxed_product (lbls, repr) ->
+    let fields =
+      fields_in_column lbls (fun head ->
+        match head.pat_desc with
+        | Record_unboxed_product (lbls, _) -> lbls
+        | _ -> [])
+    in
+    { head with pat_desc = Record_unboxed_product (fields, repr) }
+  | Any | Construct _ | Constant _ | Unboxed_unit | Unboxed_bool _ | Tuple _
+  | Unboxed_tuple _ | Variant _ | Array _ | Addr _ | Slice _ | Lazy -> head
 
 (*
    In case a matching value is found, set actual arguments
@@ -813,7 +786,7 @@ type 'matrix specialized_matrices = {
    See the documentation of [build_specialized_submatrix] for an explanation of
    the [extend_row] parameter.
 *)
-let build_specialized_submatrices ~extend_row discr rows =
+let build_specialized_submatrices ~extend_row rows =
   let extend_group discr p args r rs =
     let r = extend_row (simple_match_args discr p args) r in
     (discr, r :: rs)
@@ -830,7 +803,7 @@ let build_specialized_submatrices ~extend_row discr rows =
     | [] ->
       (* if no group matched this row, it has a head constructor that
          was never seen before; add a new sub-matrix for this head *)
-      [extend_group head head args r []]
+      [extend_group (discr_pat head rows) head args r []]
     | (q0,rs) as bd::env ->
       if simple_match q0 head
       then extend_group q0 head args r rs :: env
@@ -856,21 +829,7 @@ let build_specialized_submatrices ~extend_row discr rows =
               (insert_constr head args tail constr_groups) omega_tails rest
   in
 
-  let constr_groups, omega_tails =
-    let initial_constr_group =
-      let open Patterns.Head in
-      match discr.pat_desc with
-      | Record _ | Record_unboxed_product _ | Tuple _ | Unboxed_tuple _
-      | Addr _ | Lazy ->
-        (* [discr] comes from [discr_pat], and in this case subsumes any of the
-           patterns we could find on the first column of [rows]. So it is better
-           to use it for our initial environment than any of the normalized
-           pattern we might obtain from the first column. *)
-        [discr,[]]
-      | _ -> []
-    in
-    form_groups initial_constr_group [] rows
-  in
+  let constr_groups, omega_tails = form_groups [] [] rows in
 
   (* groups are accumulated in reverse order;
      we restore the order of rows in the source code *)
@@ -1420,8 +1379,7 @@ let rec satisfiable pss qs = match pss with
             false
           else begin
             let { default; constrs } =
-              let q0 = discr_pat Patterns.Simple.omega pss in
-              build_specialized_submatrices ~extend_row:(@) q0 pss in
+              build_specialized_submatrices ~extend_row:(@) pss in
             if not (full_match false constrs) then
               satisfiable default qs
             else
@@ -1440,7 +1398,7 @@ let rec satisfiable pss qs = match pss with
           if not (all_coherent (hq :: first_column pss)) then
             false
           else begin
-              let q0 = discr_pat q pss in
+              let q0 = discr_pat hq pss in
               satisfiable (build_specialized_submatrix ~extend_row:(@) q0 pss)
                 (simple_match_args q0 hq qargs @ qs)
             end
@@ -1471,12 +1429,11 @@ let rec list_satisfying_vectors pss qs =
             if not (all_coherent (first_column pss)) then
               []
             else begin
-              let q0 = discr_pat Patterns.Simple.omega pss in
               let wild default_matrix p =
                 List.map (fun qs -> p::qs)
                   (list_satisfying_vectors default_matrix qs)
               in
-              match build_specialized_submatrices ~extend_row:(@) q0 pss with
+              match build_specialized_submatrices ~extend_row:(@) pss with
               | { default; constrs = [] } ->
                   (* first column of pss is made of variables only *)
                   wild default omega
@@ -1515,7 +1472,7 @@ let rec list_satisfying_vectors pss qs =
           if not (all_coherent (hq :: first_column pss)) then
             []
           else begin
-            let q0 = discr_pat q pss in
+            let q0 = discr_pat hq pss in
             List.map (set_args (Patterns.Head.to_omega_pattern q0))
               (list_satisfying_vectors
                  (build_specialized_submatrix ~extend_row:(@) q0 pss)
@@ -1648,13 +1605,11 @@ and specialize_and_exhaust ext pss n =
        If [exhaust] has been called by [do_check_fragile], then it is possible
        we might fail to warn the user that the matching is fragile. See for
        example testsuite/tests/warnings/w04_failure.ml. *)
-    let q0 = discr_pat Patterns.Simple.omega pss in
-    match build_specialized_submatrices ~extend_row:(@) q0 pss with
+    match build_specialized_submatrices ~extend_row:(@) pss with
     | { default; constrs = [] } ->
         (* first column of pss is made of variables only *)
         let sub_witnesses = exhaust ext default (n-1) in
-        let q0 = Patterns.Head.to_omega_pattern q0 in
-        Seq.map (fun row -> q0::row) sub_witnesses
+        Seq.map (fun row -> Patterns.omega::row) sub_witnesses
     | { default; constrs } ->
         let try_non_omega (p,pss) =
           if is_absent_pat p then
@@ -1720,8 +1675,7 @@ let rec pressure_variants tdefs = function
       if not (all_coherent (first_column pss)) then
         true
       else begin
-        let q0 = discr_pat Patterns.Simple.omega pss in
-        match build_specialized_submatrices ~extend_row:(@) q0 pss with
+        match build_specialized_submatrices ~extend_row:(@) pss with
         | { default; constrs = [] } -> pressure_variants tdefs default
         | { default; constrs } ->
             let rec try_non_omega = function
@@ -1745,7 +1699,7 @@ let rec pressure_variants tdefs = function
                   try_non_omega constrs
                 else begin
                   let { constrs = partial_constrs; _ } =
-                    build_specialized_submatrices ~extend_row:(@) q0
+                    build_specialized_submatrices ~extend_row:(@)
                       (mark_partial pss)
                   in
                   try_non_omega partial_constrs
@@ -1959,7 +1913,7 @@ let rec every_satisfiables pss qs = match qs.active with
         if not (all_coherent (hq :: first_column pss)) then
           Unused
         else begin
-          let q0 = discr_pat q pss in
+          let q0 = discr_pat hq pss in
           every_satisfiables
             (build_specialized_submatrix q0 pss
               ~extend_row:(fun ps r -> { r with active = ps @ r.active }))
@@ -2720,9 +2674,8 @@ let rec matrix_stable_vars m = match m with
             let extend_row columns = function
               | Negative r -> Negative (columns @ r)
               | Positive r -> Positive { r with row = columns @ r.row } in
-            let q0 = discr_pat Patterns.Simple.omega m in
             let { default; constrs } =
-              build_specialized_submatrices ~extend_row q0 m in
+              build_specialized_submatrices ~extend_row m in
             let non_default = List.map snd constrs in
             if full_match false constrs
             then non_default
