@@ -96,6 +96,53 @@
   ocamlopt.byte;
   run;
  }{
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -gno-upstream-dwarf";
+  module = "lpoly_lib.mli";
+  ocamlopt.byte;
+  module = "lpoly_lib.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -gno-upstream-dwarf -O3";
+  module = "user1.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -gno-upstream-dwarf \
+    -Oclassic";
+  module = "user2.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -gno-upstream-dwarf";
+  module = "user3.ml";
+  ocamlopt.byte;
+  module = "comdat_dedup.ml";
+  ocamlopt.byte;
+  unset module;
+  program = "${test_build_directory}/comdat_dedup.exe";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
+  ocamlopt.byte;
+  run;
+ }{
+  function_sections;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -function-sections";
+  module = "lpoly_lib.mli";
+  ocamlopt.byte;
+  module = "lpoly_lib.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -function-sections -O3";
+  module = "user1.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -function-sections \
+    -Oclassic";
+  module = "user2.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -g -function-sections";
+  module = "user3.ml";
+  ocamlopt.byte;
+  module = "comdat_dedup.ml";
+  ocamlopt.byte;
+  unset module;
+  program = "${test_build_directory}/comdat_dedup.exe";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
+  ocamlopt.byte;
+  run;
+ }{
   arch_amd64;
   flags = "-extension layout_poly_alpha -nocwd -Ix . -internal-assembler";
   module = "lpoly_lib.mli";
@@ -185,8 +232,10 @@
    The test runs the linked program and then shells out to [nm] to inspect
    the symbol table, and to [readelf] to check that nothing outside a COMDAT
    group refers into it by section (which would dangle when a losing copy is
-   discarded, whether or not the linker notices). Any further arguments name
-   more object files to check.
+   discarded, whether or not the linker notices), and that debug information
+   never describes a copy by the shared symbol (the blocks with [-g] vary the
+   kind of DWARF and the code layout). Any further arguments name more object
+   files to check.
 
    The internal assembler does not support weak functions, so the
    [-internal-assembler] block (amd64 only) falls back to private copies of
@@ -280,8 +329,15 @@ let is_cohort_section_symbol w =
   && (String.ends_with ~suffix:"__cohort_code" w
      || String.ends_with ~suffix:"__cohort_code.jump_tables" w)
 
+(* A cohort's shared symbol, which resolves to whichever copy wins. *)
+let is_cohort_global_symbol w =
+  String.ends_with ~suffix:"__cohort_code" w
+  && not (String.starts_with ~prefix:".text." w)
+
 (* Relocations from outside any group against a section symbol of a cohort
-   group. Linkers special-case unwind and debug information, which may. *)
+   group. Linkers special-case unwind and debug information, which may. But
+   debug information must not refer to a copy by the shared symbol, or a
+   losing copy's entries would describe the winner. *)
 let bad_relocations obj =
   let in_group = group_member_offsets obj in
   let lines =
@@ -295,15 +351,17 @@ let bad_relocations obj =
             (fun name off -> name, off)
         with
         | Some (name, off) ->
-          let allowed =
-            String.equal name ".rela.eh_frame"
-            || String.starts_with ~prefix:".rela.debug_" name
-            || List.mem off in_group
+          let checking =
+            if String.equal name ".rela.eh_frame" || List.mem off in_group
+            then None
+            else if String.starts_with ~prefix:".rela.debug_" name
+            then Some (name, is_cohort_global_symbol)
+            else Some (name, is_cohort_section_symbol)
           in
-          (if allowed then None else Some name), bad
+          checking, bad
         | None -> (
           match checking with
-          | Some name when List.exists is_cohort_section_symbol (words line) ->
+          | Some (name, is_bad) when List.exists is_bad (words line) ->
             checking, (name ^ ":" ^ line) :: bad
           | Some _ | None -> checking, bad))
       (None, []) lines

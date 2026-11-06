@@ -51,6 +51,18 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
        already reasonably readable. *)
   in
   let start_sym = Asm_symbol.create_global fun_name in
+  let own_section =
+    match fundecl.fun_sym_global with Weak -> true | Global | Local -> false
+  in
+  let code_sym =
+    (* A weak function's symbol may resolve to another unit's copy, so the
+       addresses of this copy are based at its local start label instead. *)
+    if own_section
+    then
+      Asm_label.to_local_symbol
+        (Asm_label.create_label_for_local_symbol Text start_sym)
+    else start_sym
+  in
   let location_attributes =
     if Location.is_none loc
     then [DAH.create_artificial ()]
@@ -82,8 +94,8 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
       ~location_attributes
   in
   let attribute_values =
-    [ DAH.create_low_pc_from_symbol start_sym;
-      DAH.create_high_pc ~low_pc:start_sym fun_end_label;
+    [ DAH.create_low_pc_from_symbol code_sym;
+      DAH.create_high_pc ~low_pc:code_sym fun_end_label;
       (* No [DW_AT_entry_pc]: in its absence the low PC value is assumed, which
          is correct. *)
       DAH.create_stmt_list
@@ -93,13 +105,10 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let concrete_instance_proto_die =
     Proto_die.create ~parent:(Some parent) ~tag:Subprogram ~attribute_values ()
   in
-  let own_section =
-    match fundecl.fun_sym_global with Weak -> true | Global | Local -> false
-  in
   let _inlined_frame_proto_dies =
     Profile.record "dwarf_inlined_frames"
       (fun () ->
-        Dwarf_inlined_frames.dwarf state fundecl ~function_symbol:start_sym
+        Dwarf_inlined_frames.dwarf state fundecl ~function_symbol:code_sym
           ~own_section ~function_proto_die:concrete_instance_proto_die
           inlined_frame_ranges)
       ~accumulate:true ()
@@ -111,7 +120,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
-          ~function_symbol:start_sym ~own_section
+          ~function_symbol:code_sym ~own_section
           ~function_proto_die:concrete_instance_proto_die available_ranges_vars)
       ~accumulate:true ());
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we

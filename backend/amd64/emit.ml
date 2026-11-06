@@ -3006,8 +3006,14 @@ let fundecl fundecl =
     let end_label = label_to_asm_label ~section:Text l in
     D.define_label end_label;
     let start_label = L.create_label_for_local_symbol Text fundecl_sym in
-    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fundecl_sym
-      ~start_label ~end_label ~offset_past_end_label:None
+    let function_symbol =
+      (* The weak symbol may resolve to another unit's copy. *)
+      match fundecl.fun_sym_global with
+      | Weak -> L.to_local_symbol start_label
+      | Global | Local -> fundecl_sym
+    in
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol ~start_label
+      ~end_label ~offset_past_end_label:None
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();

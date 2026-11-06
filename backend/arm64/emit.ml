@@ -2295,7 +2295,13 @@ let fundecl fundecl =
   | Some fun_end_label ->
     let fun_end_label = label_to_asm_label ~section:Text fun_end_label in
     D.define_label fun_end_label;
-    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fun_sym
+    let function_symbol =
+      (* The weak symbol may resolve to another unit's copy. *)
+      match fundecl.fun_sym_global with
+      | Cmm.Weak -> L.to_local_symbol fun_start_label
+      | Global | Local -> fun_sym
+    in
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol
       ~start_label:fun_start_label ~end_label:fun_end_label
       ~offset_past_end_label:None);
   D.cfi_endproc ();

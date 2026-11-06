@@ -76,6 +76,12 @@ val create_label_for_local_symbol : Asm_section.t -> Asm_symbol.t -> t
     instruction referencing a label. *)
 val encode : t -> string
 
+(** The label as a [Local] symbol, for uses that take a symbol. The assembler
+    makes a relocation against it relative to its section, so it denotes this
+    object file's code even where a global symbol at the same address is weak
+    and may resolve to another file's. *)
+val to_local_symbol : t -> Asm_symbol.t
+
 (** To be called by the emitter at the very start of code generation.
     [new_label] should always be [Cmm.new_label]. Needed to avoid a circular
     dependency. *)
