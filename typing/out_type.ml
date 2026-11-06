@@ -158,12 +158,13 @@ module Namespace = struct
     | Module_type -> 2
     | Class -> 3
     | Class_type -> 4
-    | Extension_constructor | Value | Constructor | Label -> 5
+    | Extension_constructor | Constructor | Label -> 5
     | Unboxed_label -> 6
     | Jkind -> 7
+    | Value -> 8
      (* we do not handle those component *)
 
-  let size = 1 + id Jkind
+  let size = 1 + id Value
 
 
   let pp ppf x =
@@ -181,8 +182,9 @@ module Namespace = struct
     | Some Class -> to_lookup Env.find_class_by_name
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | Some Jkind -> to_lookup Env.find_jkind_by_name
+    | Some Value -> to_lookup Env.find_value_by_name
     | None
-    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label) ->
+    | Some(Extension_constructor|Constructor|Label|Unboxed_label) ->
          fun _ -> raise Not_found
 
   let location namespace id =
