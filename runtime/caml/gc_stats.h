@@ -36,13 +36,13 @@
 */
 
 struct heap_stats {
-  intnat pool_words;         /* words in pools in use, including pool headers and wastage */
+  intnat pool_words;         /* including pool headers and wastage */
   intnat pool_max_words;     /* maximum of pool_words over time */
-  intnat pool_live_words;    /* words in live blocks in pools, including block headers */
+  intnat pool_live_words;    /* in live pool blocks, including headers */
   intnat pool_live_blocks;   /* live blocks in pools */
-  intnat pool_frag_words;    /* overhead in pools, including pool header, wastage, and */
-                             /* per-block trailing fragments */
-  intnat large_words;        /* words in large blocks, including large block headers */
+  intnat pool_frag_words;    /* pool overhead, including header, wastage, */
+                             /* and per-block trailing fragments */
+  intnat large_words;        /* including large block headers */
   intnat large_max_words;    /* maximum of large_words over time */
   intnat large_blocks;       /* number of large blocks */
   intnat extents;            /* number of heap extents */

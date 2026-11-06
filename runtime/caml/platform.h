@@ -74,7 +74,8 @@ Caml_inline void cpu_relax(void) {
 
    For now we only have this on linux because it directly uses the linux futex
    syscalls. */
-#if defined(__linux__) && defined(__GNU_LIBRARY__) && defined(__GLIBC__) && defined(__GLIBC_MINOR__)
+#if defined(__linux__) && defined(__GNU_LIBRARY__) && \
+    defined(__GLIBC__) && defined(__GLIBC_MINOR__)
 typedef struct {
   volatile unsigned counter;
 } custom_condvar;

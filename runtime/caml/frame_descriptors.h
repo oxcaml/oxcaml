@@ -233,7 +233,8 @@ Caml_inline uint32_t frame_short_size(frame_descr *d) {
 Caml_inline uint32_t frame_data(frame_descr *d) {
   if (frame_is_short(d)) {
     /* Reconstruct an equivalent normal frame_data: size | flags. */
-    return frame_short_size(d) | (frame_short_sizeflags(d) & FRAME_DESCRIPTOR_FLAGS);
+    return frame_short_size(d) |
+      (frame_short_sizeflags(d) & FRAME_DESCRIPTOR_FLAGS);
   }
   if (frame_is_long(d)) {
     return caml_read_unaligned_uint32(d + Frame_long_data_ofs);

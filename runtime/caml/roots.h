@@ -40,7 +40,8 @@ CAMLextern void caml_do_roots (
   scanning_action f, scanning_action_flags,
   void* data, caml_domain_state* d, int do_final_val);
 
-/* duplicate typedef (from fiber.h) to resolve circular header file dependency */
+/* duplicate typedef (from fiber.h) to resolve circular header file
+   dependency */
 typedef struct dynamic_cache_s *dynamic_cache_t;
 
 CAMLextern void caml_do_local_roots(
