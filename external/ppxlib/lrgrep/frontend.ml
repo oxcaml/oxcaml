@@ -39,23 +39,19 @@ let parse_exn
     | I.Shifting (_, _, _) | I.AboutToReduce (_, _) as cp ->
       loop env tok (I.resume cp)
     | I.Accepted x -> x
+    (* [parse] turns this, as any exception, into an unexplained error. *)
     | I.Rejected -> assert false
     | I.HandlingError _ ->
-      match PE.run env with
-      | [] -> raise_error lexbuf "Syntax error (no handler for it)"
-      | matches ->
-        if false then
-          Printf.eprintf "Matches: %s\n"
-            (String.concat ", " (List.map (fun (x, _) -> string_of_int x) matches));
-        let rec loop = function
-          | [] -> raise_error lexbuf
-                    "Syntax error (partial handler did not handle the case)"
-          | m :: ms ->
-            match Parse_errors.execute_error_message m initial tok with
-            | None -> loop ms
-            | Some err -> raise_error lexbuf err
-        in
-        loop matches
+      (* "Syntax error" if no rule explains the error: ppxlib then reports
+         the compiler's own error. *)
+      let rec first_message = function
+        | [] -> raise_error lexbuf "Syntax error"
+        | m :: ms ->
+          match Parse_errors.execute_error_message m initial tok with
+          | None -> first_message ms
+          | Some err -> raise_error lexbuf err
+      in
+      first_message (PE.run env)
   in
   match f lexbuf.lex_curr_p with
   | I.InputNeeded env as cp ->
@@ -66,6 +62,7 @@ let parse_exn
     Parsing.clear_parser ();
     Docstrings.warn_bad_docstrings ();
     ast
+  (* As above, [parse] catches this. *)
   | _ -> assert false
 
 let parse
