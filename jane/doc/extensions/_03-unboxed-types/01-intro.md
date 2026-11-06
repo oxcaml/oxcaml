@@ -203,23 +203,27 @@ Each numeric type has its own library for working with it: `float_u`,
   functions, and have limited support in records and tuples (details below).
 
 * Unboxed numbers may *not* appear...
-   * ... as a field of a constructor (e.g. you cannot have `| K of int64_u` or `| K of {
-     x : nativeint_u }`)
    * ... as a field of a polymorphic variant constructor (e.g. you cannot have ``[ `K of
      float# ]``)
+   * ... as a field of an exception or extensible variant constructor (e.g. you
+     cannot have `exception E of float#`)
    * ... anywhere near the class system (no `int64_u` methods or class variables or even
      parameters in constructors)
 
 * Unboxed numbers may be stored in structures, with
-  [some restrictions](#using-unboxed-types-in-structures). Additionally, blocks
-  in which every field is a `float` or has layout `float64` are represented as
-  flat float arrays. Unboxed numbers may *not* be stored in inline or
-  `[@@unboxed]` records.
+  [some restrictions](#using-unboxed-types-in-structures), including as
+  constructor arguments (`| K of int64_u`), in inline records
+  (`| K of { x : nativeint_u }`) and in `[@@unboxed]` records
+  (`type t = { x : float# } [@@unboxed]`). Additionally, blocks in which every
+  field is a `float` or has layout `float64` are represented as flat float
+  arrays.
 
 * With a few specific exceptions (documented below), existing types all expect
   `value` arguments. Thus for basically any `t`, you cannot write `float# t` or
-  `int64_u t`.  This includes natural candidates like `float#
-  option`.
+  `int64_u t`. One exception is `option`, whose parameter may have any layout:
+  `float# option` and `Some #1.0` are fine. So optional arguments may have
+  any layout too, as in `let f ?(x : float# option) () = ...`. Passing such an
+  argument with `~x` or giving it a default requires a representable layout.
 
 * Existing ppxs expect to work with `value` types. Accordingly, using `deriving` with
   types that involve unboxed numbers will lead to inscrutable type errors, and other ppxs
@@ -295,15 +299,18 @@ Records who store boxed floats flatly (all-float and float-and-float# records),
 versions.
 
 *Limitations and future plans*:
-* Unboxed products may only be stored in blocks via records and tuples (i.e.
-  they are not supported in polymorphic variants, etc.).
+* Unboxed products may only be stored in blocks via records, tuples and variant
+  constructors (e.g. `| K of #(int * float#)`); they are not supported in
+  polymorphic variants, exceptions, etc.
   We plan to lift this restriction in the near future.
 * Unboxed record fields may not be mutable.
   We plan to allow mutating unboxed records within boxed records
   (the design will differ from boxed record mutability, as unboxed types don't have the
   same notion of identity).
-* Unboxed record fields must be representable.
-  We plan to lift this restriction in the future.
+* Unboxed record fields may have layout `any`, as in
+  `type ('a : any) t = #{ x : 'a ; n : int }`, but such a record can only be
+  used at an instance whose fields are representable (e.g. `float# t`), like
+  any other type of layout `any` (see the next section).
 * We plan to add other types with unboxed product layouts (e.g., interior pointers).
 
 # The `any` layout
@@ -437,7 +444,7 @@ let f3 : float# -> int32_u = magic;; (* error *)
 This feature is conceptually similar to `[@local_opt]` for modes and is useful for
 array access primitives.
 
-Here's the list of primitives that currently support `[@layout_poly]`:
+Primitives supporting `[@layout_poly]` include:
 
 * `%identity`
 * `%opaque`
@@ -449,7 +456,9 @@ Here's the list of primitives that currently support `[@layout_poly]`:
 * `%array_safe_set`
 * `%array_unsafe_get`
 * `%array_unsafe_set`
-* `%array_size`
+* `%array_length`
+* `%makearray_dynamic`
+* `%get_idx` and `%set_idx` (see [block indices](../block-indices))
 
 # Arrays of unboxed elements
 
@@ -472,7 +481,8 @@ Array primitives must be declared with `[@layout_poly]` to be usable with arrays
 
 ```ocaml
 module Array = struct
-  external[@layout_poly] get : ('a : any). 'a array -> int -> 'a = "%array_safe_get"
+  external[@layout_poly] get : ('a : any separable). 'a array -> int -> 'a =
+    "%array_safe_get"
 end
 
 let first_elem () = array.(0)

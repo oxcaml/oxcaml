@@ -10,6 +10,8 @@
         arith32: Allocation
      arithfloat: Allocation
         closure: Allocation
+     recclosure: Allocation
+  mutrecclosure: Allocation
     currylocal1: Allocation
     currylocal2: Allocation
     currylocal3: Allocation

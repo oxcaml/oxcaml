@@ -46,7 +46,7 @@ let alias_with_too_many_nones loc =
   H.Typ.alias ~loc (H.Typ.constr ~loc { txt = Lident "unit"; loc } []) None None
 
 let nested_pat_constraint loc =
-  let mode s = Location.mkloc (Mode s) loc in
+  let mode s = Location.mkloc (Pmode s) loc in
   H.Pat.constraint_
     (H.Pat.constraint_
        (H.Pat.mk Ppat_any)

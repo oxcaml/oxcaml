@@ -31,15 +31,15 @@
 let version = Sys.ocaml_version
 
 (* When bumping this number, be sure to also update ../typing/magic_numbers.ml *)
-let cmi_magic_number = "Caml1999I590"
+let cmi_magic_number = "Caml1999I592"
 
 let as_debug_prefix_map_flag = ""
 
-let ast_impl_magic_number = "Caml1999M590"
-let ast_intf_magic_number = "Caml1999N590"
-let cmt_magic_number = "Caml1999T590"
-let cms_magic_number = "Caml1999S590"
-let index_magic_number = "Merl2023I590"
+let ast_impl_magic_number = "Caml1999M592"
+let ast_intf_magic_number = "Caml1999N592"
+let cmt_magic_number = "Caml1999T592"
+let cms_magic_number = "Caml1999S592"
+let index_magic_number = "Merl2023I592"
 
 let interface_suffix = ref ".mli"
 

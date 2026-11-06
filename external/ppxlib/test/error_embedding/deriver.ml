@@ -11,6 +11,7 @@ let derive_a_string ~ctxt (_rec_flag, _type_declarations) =
           pvb_expr = estring ~loc "derived_string";
           pvb_attributes = [];
           pvb_loc = loc;
+          pvb_constraint = None;
         };
       ];
   ]
@@ -25,7 +26,7 @@ let impl_generator_dependent =
   Deriving.Generator.V2.make_noarg ~deps:[ deriver_for_a_string ]
     derive_a_string
 
-let dependent_deriver =
+let _dependent_deriver =
   Deriving.add "a_dependent_string" ~str_type_decl:impl_generator_dependent
 
 let () = Driver.standalone ()

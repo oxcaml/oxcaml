@@ -19,9 +19,10 @@
 # The table has four columns: the raw linker symbol followed by
 # its demangling under [--format flat1], [--format structured], and
 # [--format auto]. Cells where ocamlfilt refuses the symbol show
-# [(error)]. Compiler-generated stamps ([_NN_MM_code], [_NN_code],
-# trailing [_NN], [PmakeblockNN], [const_blockNN], [iarrNN]) are
-# masked so the reference stays stable across builds.
+# [(error)]. Compiler-generated stamps ([DNN_] items in structured
+# symbols, [_NN_MM_code], [_NN_code], trailing [_NN], [PmakeblockNN],
+# [const_blockNN], [iarrNN]) are masked so the reference stays stable
+# across builds.
 # No [pipefail]: this script runs under POSIX [sh] (dash on Linux),
 # which does not support it. An empty extraction pipeline is caught by
 # the [! -s "$SYMS"] check below instead.
@@ -87,6 +88,7 @@ done
     "${test_build_directory}/e2e_table.structured.col" \
     "${test_build_directory}/e2e_table.auto.col"
 } | sed -E \
+    -e 's/D[0-9]+_/DN_/g' \
     -e 's/_[0-9]+_[0-9]+_code/_N_M_code/g' \
     -e 's/_[0-9]+_code/_N_code/g' \
     -e "s/_[0-9]+_[0-9]+(${TAB}|$)/_N_N\\1/g" \
@@ -94,4 +96,20 @@ done
     -e 's/Pmakeblock[0-9]+/PmakeblockN/g' \
     -e 's/const_block[0-9]+/const_blockN/g' \
     -e 's/iarr[0-9]+/iarrN/g' \
-  | column -t -s "${TAB}"
+  | awk -F "${TAB}" '
+      # column -t -s TAB, in POSIX awk: left-justify each column to its
+      # widest cell, two spaces between columns, last column unpadded.
+      # (column is not in the nix build sandbox.)
+      { nf[NR] = NF
+        for (i = 1; i <= NF; i++) {
+          cell[NR, i] = $i
+          if (length($i) > w[i]) w[i] = length($i)
+        } }
+      END {
+        for (r = 1; r <= NR; r++) {
+          line = ""
+          for (i = 1; i < nf[r]; i++)
+            line = line sprintf("%-" w[i] "s  ", cell[r, i])
+          print line cell[r, nf[r]]
+        }
+      }'
