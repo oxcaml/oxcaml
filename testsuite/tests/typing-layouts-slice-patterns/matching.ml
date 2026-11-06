@@ -218,3 +218,84 @@ let () =
       Addr.set a 20;
       Printf.printf "%d %d\n" (Addr.get a) arr.(1)
   | None -> print_endline "no second element"
+
+(* Elements after the rest *)
+
+let last = function
+  | [&| |] -> "none"
+  | [&| ..; x |] -> string_of_int x
+
+let () =
+  List.iter
+    (fun a -> print_endline (last (Slice.of_array a)))
+    [ [||]; [| 1 |]; [| 1; 2; 3 |] ]
+
+let ends = function
+  | [&| x; .. as r; y |] -> Printf.sprintf "%d..%d, %d between" x y (length r)
+  | [&| x |] -> Printf.sprintf "only %d" x
+  | [&| |] -> "empty"
+
+let () =
+  List.iter
+    (fun a -> print_endline (ends (Slice.of_array a)))
+    [ [| 1; 2; 3; 4 |]; [| 1; 2 |]; [| 5 |]; [||] ]
+
+(* Prefixes and suffixes of different lengths in one match *)
+
+let mixed = function
+  | [&| 0; .. |] -> "starts with 0"
+  | [&| ..; 0 |] -> "ends with 0"
+  | [&| _; _ |] -> "two"
+  | [&| x; ..; y; z |] -> Printf.sprintf "%d %d %d" x y z
+  | _ -> "other"
+
+let () =
+  List.iter
+    (fun a -> print_endline (mixed (Slice.of_array a)))
+    [ [| 0; 1 |]; [| 1; 0 |]; [| 1; 2 |]; [| 1; 2; 3 |]; [| 4; 5; 6; 7 |];
+      [| 1 |] ]
+
+(* The rest bound before and after an element in an or-pattern *)
+
+let around_zero = function
+  | [&| 0; .. as r |] | [&| .. as r; 0 |] -> length r
+  | _ -> -1
+
+let () =
+  List.iter
+    (fun a -> Printf.printf "%d\n" (around_zero (Slice.of_array a)))
+    [ [| 0; 1; 2 |]; [| 1; 2; 3; 0 |]; [| 1; 0; 1 |] ]
+
+(* Suffixes of unboxed elements of different sizes *)
+
+let last_float = function
+  | [&| ..; x |] -> Float_u.to_float x
+  | [&| |] -> 0.
+
+let () =
+  Printf.printf "%.1f\n" (last_float (float_slice [| #1.5; #2.5; #3.5 |]))
+
+let last_two_int8 = function
+  | [&| ..; x; y |] -> Int8_u.to_int x + Int8_u.to_int y
+  | _ -> -1
+
+let () =
+  Printf.printf "%d\n" (last_two_int8 (int8_slice [| #1s; #2s; #30s; #40s |]))
+
+(* Immutable slices *)
+
+let last_imm = function
+  | [&: ..; x :] -> x
+  | [&: :] -> 0
+
+let () = Printf.printf "%d\n" (last_imm (Slice_imm.of_iarray [: 1; 2; 3 :]))
+
+(* Dereference patterns on elements after the rest *)
+
+let () =
+  let arr = [| 1; 2; 3 |] in
+  match Slice.of_array arr with
+  | [&| ..; deref_ a |] ->
+      Addr.set a 30;
+      Printf.printf "%d %d\n" (Addr.get a) arr.(2)
+  | [&| |] -> print_endline "empty"
