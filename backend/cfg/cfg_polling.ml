@@ -333,6 +333,12 @@ let instr_cfg_with_layout :
       if needs_poll
       then (
         let after = Cfg.get_block_exn cfg src in
+        let unexpected reason =
+          Misc.fatal_errorf
+            "Cfg_polling.instr_cfg_with_layout: unexpected poll on back edge \
+             from block %a to block %a: %s"
+            Label.format src Label.format dst reason
+        in
         let poll =
           { after.terminator with
             Cfg.id = next_instruction_id ();
@@ -341,12 +347,38 @@ let instr_cfg_with_layout :
             Cfg.res = [||]
           }
         in
+        (* The arguments of a call are moved into their calling-convention
+           locations at the end of the block body, immediately before the
+           terminator. Those locations are not GC roots (the physical registers
+           are typed [Int], and arguments passed in the domain state's
+           extra_params area cannot be described in a frame descriptor), so a
+           poll must not be placed between the moves and the call. For such
+           terminators, the poll is inserted in a new block on the back edge,
+           i.e. after the call. *)
+        let can_append_to_body =
+          match after.terminator.desc with
+          | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
+          | Switch _
+          | Prim { op = Probe _; _ } ->
+            true
+          | Call _ | Prim { op = External _; _ } -> false
+          | Tailcall_func _ | Return | Invalid _ ->
+            unexpected "the source block is safe"
+          | Tailcall_self _ ->
+            (* Unreachable since prologue poll covers it. Otherwise, this one
+               could also trigger the bug mentioned above. *)
+            unexpected "tailcall self"
+          | Never | Raise _ | Call_no_return _ ->
+            unexpected "the source block has no normal successor"
+        in
         (match
            ( Label.Set.cardinal
                (Cfg.successor_labels after ~normal:true ~exn:false),
              after.exn )
          with
-        | 1, None -> DLL.add_end after.body poll
+        | 1, None when can_append_to_body ->
+          DLL.add_end after.body poll;
+          Label.Tbl.replace safe_map src true
         | _ ->
           let before = Some (Cfg.get_block_exn cfg dst) in
           let instrs = DLL.of_list [poll] in

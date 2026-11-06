@@ -135,6 +135,8 @@ let builtin_attrs =
   ; "untagged"
   ; "unpacked"
   ; "unsafe_unextended"
+  ; "elide_void"
+  ; "fat_ptr"
   ; "poll"
   ; "loop"
   ; "tail_mod_cons"

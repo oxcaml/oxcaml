@@ -1,0 +1,5 @@
+File "missing_static_data.ml", line 16, characters 2-29:
+16 |   Mli_with_static_default.foo + 1
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: No compilation unit found in path for Mli_with_static_default,
+       but it is required for static evaluation.

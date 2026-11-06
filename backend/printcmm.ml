@@ -64,6 +64,9 @@ let exttype ppf = function
   | XVec128 -> fprintf ppf "vec128"
   | XVec256 -> fprintf ppf "vec256"
   | XVec512 -> fprintf ppf "vec512"
+  | XDummy_int -> fprintf ppf "dummy_int"
+  | XDummy_float -> fprintf ppf "dummy_float"
+  | XFat_pointer -> fprintf ppf "fat_pointer"
 
 let extcall_signature ppf (ty_res, ty_args) =
   (match ty_args with
@@ -287,6 +290,7 @@ let operation d = function
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"
+  | Cnot -> "not"
   | Clsl -> "<<"
   | Clsr -> ">>u"
   | Casr -> ">>s"
@@ -331,7 +335,7 @@ let operation d = function
       is_write
       (temporal_locality locality)
   | Catomic { op; size = _ } -> Printf.sprintf "atomic %s" (atomic_op op)
-  | Copaque -> "opaque"
+  | Copaque ty -> to_string "opaque %a" machtype ty
   | Cbeginregion -> "beginregion"
   | Cendregion -> "endregion"
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field

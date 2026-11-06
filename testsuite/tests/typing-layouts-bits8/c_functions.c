@@ -52,3 +52,20 @@ CAMLprim value sum_7_bytecode(value* argv, int argn) {
   result = caml_copy_int8(u1 + u2 + u3 + u4 + u5 + u6 + u7);
   CAMLreturn(result);
 }
+
+CAMLprim intnat sum_stack_args(int64_t a1, int64_t a2, int64_t a3, int64_t a4,
+                               int64_t a5, int64_t a6, int64_t a7, int64_t a8,
+                               int8_t b1, int16_t b2, int8_t b3, int8_t b4)
+{
+  return (intnat)(a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8)
+         + b1 + b2 + b3 + b4;
+}
+
+CAMLprim value sum_stack_args_bytecode(value *argv, int argn)
+{
+  int64_t s = 0;
+  int i;
+  for (i = 0; i < 8; i++) s += Int64_val(argv[i]);
+  return Val_long((intnat)s + Long_val(argv[8]) + Long_val(argv[9])
+                  + Long_val(argv[10]) + Long_val(argv[11]));
+}

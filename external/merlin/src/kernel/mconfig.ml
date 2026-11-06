@@ -479,7 +479,6 @@ let ocaml_ignored_flags =
     "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
-    "-dslambda";
     "-drawclambda";
     "-drawflambda";
     "-drawlambda";
@@ -859,6 +858,8 @@ let ocaml_ignored_parametrized_flags =
     "-dump-dir";
     "-I-manifest";
     "-H-manifest";
+    "-H-file";
+    "-Hx-file";
     (* flambda-backend specific *)
     "-extension";
     "-extension-universe";
