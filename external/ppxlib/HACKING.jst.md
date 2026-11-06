@@ -58,7 +58,8 @@ not installed.
 
 - `parse_errors.mlyl` holds the rules, written for the OxCaml grammar.
   `parse_errors.ml` is generated from it and the grammar of the compiler it is
-  built with, `%{ocaml_where}/compiler-libs/parser.cmly`.
+  built with, `%{ocaml_where}/compiler-libs/parser.cmly` (in the compiler's own
+  build, the `parser.cmly` it generates).
 - `frontend.ml` (based on upstream's `ocaml/frontend.ml`) runs the compiler's
   own `Lexer` and `Parser` in incremental mode, and returns the message of the
   first matching rule. Failures other than parse errors, such as lexer errors
