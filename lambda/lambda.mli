@@ -126,9 +126,10 @@ type region_close =
 (** Whether an application might perform a free effect (i.e. an effect
     handled in the parent stack). [Unyielding] means the applied
     function and all of its arguments were at mode [unyielding], so the
-    call can never perform a free effect. Only meaningful for bytecode
-    (it is recorded in debug events for consumers such as js_of_ocaml);
-    native backends ignore it. *)
+    call can never perform a free effect. Only meaningful for js_of_ocaml:
+    bytecode records it in debug events, and Flambda 2 carries it through
+    to JSIR (see [Apply_expr.Yielding]), whereas the native backend ignores
+    it. *)
 type yielding_kind =
   | May_yield
   | Unyielding
