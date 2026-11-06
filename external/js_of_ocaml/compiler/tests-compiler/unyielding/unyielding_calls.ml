@@ -391,3 +391,56 @@ let%expect_test "effects performed through the inner call still work" =
     1
     42
     |}]
+
+(* An unyielding call may still reperform an effect to the caller's handler.
+   Below, the inner [Effect.Deep.Safe.try_with] below is an unyielding call
+   (neither its computation nor its handler captures a yielding value), yet
+   its handler does not handle [E], which is thus reperformed to the outer
+   handler. *)
+let code_reperform =
+  {|
+    type _ Effect.t += E : unit Effect.t
+
+    let () =
+      Effect.Deep.Safe.try_with
+        (fun (_outer_h : Effect.Handler.t) () ->
+          Effect.Deep.Safe.try_with
+            (fun (inner_h : Effect.Handler.t) () -> Effect.Safe.perform inner_h E)
+            ()
+            { Effect.Deep.effc = (fun _ -> None) })
+        ()
+        { Effect.Deep.effc =
+            (fun (type a) (eff : a Effect.t) ->
+              match eff with
+              | E ->
+                  Some
+                    (fun (k : (a, unit) Effect.Deep.continuation) ->
+                      print_endline "handled";
+                      Effect.Deep.continue k ())
+              | _ -> None) };
+      print_endline "done"
+|}
+
+let normalize_node x = Str.global_replace (Str.regexp "node\\(.exe\\)?") "%{NODE}" x
+
+let%expect_test "BUG: an effect reperformed from a handler installed by an \
+                 unyielding call does not reach the outer handler" =
+  compile_and_run ~effects:`Double_translation code_reperform;
+  print_endline (normalize_node [%expect.output]);
+  [%expect {|
+    Fatal error: exception Stdlib.Effect.Unhandled(Test.E)
+
+    process exited with error code 2
+     %{NODE} test.js
+    |}]
+
+let%expect_test "reperforming works with --disable \
+                 oxcaml-use-unyielding-debuginfo-for-effect-cps" =
+  compile_and_run
+    ~effects:`Double_translation
+    ~flags:[ "--disable"; "oxcaml-use-unyielding-debuginfo-for-effect-cps" ]
+    code_reperform;
+  [%expect {|
+    handled
+    done
+    |}]
