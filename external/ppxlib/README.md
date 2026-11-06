@@ -1,11 +1,13 @@
 # Ppxlib - Meta-programming for OCaml
 
-[![ocaml-ci status][ocaml-ci-img]][ocaml-ci] [![AppVeyor status][appveyor-img]][appveyor]
+[![ocaml-ci status][ocaml-ci-img]][ocaml-ci] [![trunk-build-status][trunk-build-img]][trunk-build] [![AppVeyor status][appveyor-img]][appveyor]
 
 [ocaml-ci]: https://ci.ocamllabs.io/github/ocaml-ppx/ppxlib
 [ocaml-ci-img]: https://img.shields.io/endpoint?url=https%3A%2F%2Fci.ocamllabs.io%2Fbadge%2Focaml-ppx%2Fppxlib%2Fmain&logo=ocaml
 [appveyor]:       https://ci.appveyor.com/project/diml/ppxlib/branch/main
 [appveyor-img]:   https://ci.appveyor.com/api/projects/status/bogbsm33uvh083jx?svg=true
+[trunk-build]: https://github.com/ocaml-ppx/ppxlib/actions/workflows/trunk-build.yml
+[trunk-build-img]: https://github.com/ocaml-ppx/ppxlib/actions/workflows/trunk-build.yml/badge.svg?branch=main
 
 [Ppxlib documentation][doc]
 

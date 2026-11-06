@@ -14,8 +14,9 @@
 
 (* Check compiler location, META paths/dependencies, native archive ownership,
    Dune availability and native toplevel/JIT/eval consumers. --bundled adds Nix
-   library inventories/consumers. The wrapper supplies a disposable cwd,
-   bootstrap tools and an environment without inherited OCaml configuration. *)
+   library inventories/consumers and checks that private dependencies stay
+   wrapped. The wrapper supplies a disposable cwd, bootstrap tools and an
+   environment without inherited OCaml configuration. *)
 
 open Fl_metascanner
 
@@ -246,11 +247,48 @@ let create_dune_target name kind =
     dependency (String.concat " " (link_flags name)));
   name ^ "/main.exe"
 
+let contains_double_underscore s =
+  let rec go i =
+    i + 1 < String.length s && ((s.[i] = '_' && s.[i + 1] = '_') || go (i + 1))
+  in
+  go 0
+
+(* Libraries shipped only as private dependencies are wrapped, so that their
+   units can't clash with a user's own copy of them. *)
+let check_private_units t =
+  checking "private dependency units";
+  let patterns = read_list (data t "installed-private-units.txt") in
+  let matches unit pattern =
+    match String.ends_with ~suffix:"*" pattern with
+    | true ->
+        String.starts_with unit
+          ~prefix:(String.sub pattern 0 (String.length pattern - 1))
+    | false -> String.equal unit pattern
+  in
+  let stdlib = installed t "lib/ocaml" in
+  let rec check_dir dir =
+    Sys.readdir dir |> Array.to_list |> sorted |> List.iter (fun file ->
+      let path = Filename.concat dir file in
+      if Sys.is_directory path then (if path <> stdlib then check_dir path)
+      else if Filename.check_suffix file ".cmi" then begin
+        let unit = String.capitalize_ascii (Filename.chop_suffix file ".cmi") in
+        if not (contains_double_underscore unit) &&
+           List.exists (matches unit) patterns
+        then fail "%s: top-level unit %s belongs to a private dependency; \
+                   wrap its library" path unit
+      end)
+  in
+  check_dir (installed t "lib")
+
 let archive_less_packages =
   [ "compiler-libs"; (* Umbrella root. *)
     "stdlib"; (* Linked implicitly. *)
     "threads.posix"; (* Alias for threads. *)
     "compiler-libs.toplevel"; (* Bytecode only. *)
+    (* Bytecode only, as they need compiler-libs.toplevel. *)
+    "js_of_ocaml-toplevel";
+    "js_of_ocaml-toplevel.common";
+    "js_of_ocaml-toplevel.worker";
   ]
 
 let check_bundled_libraries t =
@@ -331,7 +369,10 @@ let main () =
   in
   if unavailable <> "" then fail "Unavailable Dune libraries:\n%s" unavailable;
   check_native_smoke_programs t;
-  if bundled then check_bundled_libraries t
+  if bundled then begin
+    check_bundled_libraries t;
+    check_private_units t
+  end
 
 let () =
   try main () with
