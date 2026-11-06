@@ -997,13 +997,9 @@ and transl_structure ~scopes loc
                 pure_module modl, transl_module ~scopes Tcoerce_none
                   rootpath modl
             | Tincl_functor { input_coercion; input_repr;
-                              yielding; staticity } ->
-                Strict, transl_include_functor ~generative:false modl
-                          input_coercion scopes loc ~input_repr
-                          ~yielding ~staticity
-            | Tincl_gen_functor { input_coercion; input_repr;
-                                  yielding; staticity } ->
-                Strict, transl_include_functor ~generative:true modl
+                              generative; app_mode } ->
+                let yielding, staticity = app_mode in
+                Strict, transl_include_functor ~generative modl
                           input_coercion scopes loc ~input_repr
                           ~yielding ~staticity
           in
@@ -1437,13 +1433,9 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor { input_coercion; input_repr;
-                          yielding; staticity } ->
-            transl_include_functor ~generative:false modl input_coercion scopes
-              loc ~input_repr ~yielding ~staticity
-        | Tincl_gen_functor { input_coercion; input_repr;
-                              yielding; staticity } ->
-            transl_include_functor ~generative:true modl input_coercion scopes
+        | Tincl_functor { input_coercion; input_repr; generative; app_mode } ->
+            let yielding, staticity = app_mode in
+            transl_include_functor ~generative modl input_coercion scopes
               loc ~input_repr ~yielding ~staticity
       in
       let mid = Ident.create_local "include" in

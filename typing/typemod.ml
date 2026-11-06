@@ -276,21 +276,9 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
         Error.log_and_raise loc env (exn tj)
 
 (* Extract the signature and the mode of a functor's return, given the signature
-   [sig_acc] and mode [md_mode] of the functor argument. [funct_mode] is the
-   mode of the functor expression itself. *)
-let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
-      ~funct_mode =
+   [sig_acc] and mode [md_mode] of the functor argument. *)
+let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
   let sig_acc = List.rev sig_acc in
-  (* Applying the functor runs its body, which can perform a free effect if the
-     functor closes over a yielding value (its own mode) or if the enclosing
-     structure it is applied to is yielding (the argument's mode). *)
-  let yielding =
-    let yielding m =
-      Yielding.disallow_right (With_regionality.proj_comonadic Yielding m)
-    in
-    Ctype.create_yielding_mode_l
-      (Yielding.join [yielding funct_mode; yielding md_mode])
-  in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),
                  mty_result, mm_result, staticity)
@@ -332,7 +320,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor { input_coercion; input_repr; yielding; staticity },
+            { input_coercion; input_repr; generative = false; app_mode = () },
             sg_result, mm_result
         | Mty_functor (Unit, mty_result, mm_result, staticity') -> begin
             assert (staticity' = Staticity.Dynamic);
@@ -340,8 +328,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
               (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-              Tincl_gen_functor { input_coercion; input_repr;
-                                  yielding; staticity },
+              { input_coercion; input_repr; generative = true; app_mode = () },
               sg_result, mm_result
             | sg ->
                 Error.log_and_raise loc env
@@ -2329,10 +2316,8 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
-        let funct_mode = With_regionality.disallow_right With_regionality.max in
-        let sg, mode, incl_kind, _staticity =
-          extract_sig_functor_open false env smty.pmty_loc mty sig_acc
-            md_mode ~funct_mode
+        let sg, mode, incl, _staticity =
+          extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -2343,7 +2328,7 @@ and transl_signature ?(interface_toplevel = false) ~md_mode env
               ~md_mode ~mode
           |> remove_modality_and_zero_alloc_variables_sg env ~zap_modality
         in
-        incl_kind, sg
+        Tincl_functor incl, sg
       | Structure ->
         Tincl_structure, extract_sig env smty.pmty_loc mty
     in
@@ -3311,6 +3296,14 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
+(** Applying a functor runs its body, which can perform a free effect if the
+    functor closes over a yielding value (its own mode) or is given a yielding
+    argument (the argument's mode). *)
+let functor_application_yielding ~funct_mode ~arg_mode =
+  let yielding m = With_regionality.proj_comonadic Yielding m in
+  Ctype.create_yielding_mode_l
+    (Yielding.join [yielding funct_mode; yielding arg_mode])
+
 let check_package_closed ~loc ~env ~typ fl =
   if List.exists (fun (_n, t) -> not (Ctype.closed_type_expr t)) fl
   then
@@ -3653,15 +3646,6 @@ and type_application loc ~strengthen ~funct_body env smod =
 
 and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     funct_body env (funct, funct_shape) app_view =
-  (* Applying a functor runs its body, which can perform a free effect if the
-     functor closes over a yielding value (its own mode) or is given a yielding
-     argument (the argument's mode). *)
-  let functor_application_yielding ~funct_mode ~arg_mode =
-    let yielding m = With_regionality.proj_comonadic Yielding m in
-    Ctype.create_yielding_mode_l
-      (Yielding.join
-         [yielding funct_mode; yielding arg_mode])
-  in
   (* CR modes: Apply currying constraints if the application is partial
      and returns a functor, similar to constraints for functions.
 
@@ -3934,14 +3918,22 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
         let funct_mode = Typedtree.mode_without_locks_exn modl.mod_mode in
-        let sg, mode, incl_kind, staticity =
+        (* We use the enclosing structure's [md_mode] as the [arg_mode], since
+           it's passed as the functor's argument. *)
+        let yielding =
+          functor_application_yielding
+            ~funct_mode
+            ~arg_mode:(With_regionality.disallow_right md_mode)
+        in
+        let sg, mode, incl, staticity =
           extract_sig_functor_open funct_body env smodl.pmod_loc
-            modl.mod_type sig_acc md_mode ~funct_mode
+            modl.mod_type sig_acc md_mode
         in
         Staticity.submode_err (loc, Functor)
           (With_regionality.proj_monadic Staticity funct_mode)
           (Staticity.of_const ~hint:Template_inst staticity);
-        incl_kind, sg, With_regionality.disallow_right mode
+        let incl = { incl with app_mode = yielding, staticity } in
+        Tincl_functor incl, sg, With_regionality.disallow_right mode
       | Structure ->
         Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
           (Typedtree.mode_without_locks_exn modl.mod_mode)
