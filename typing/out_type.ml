@@ -4125,7 +4125,8 @@ and tree_of_module ?abbrev ~vis id md rs = wrap_mutation (fun () ->
       Ctype.zap_modalities_to_floor_if_at_least Alpha md.md_modalities
   in
   (* CR-someday zqian: unmentionable items of the other kinds should be
-     bracketed as well. *)
+     bracketed as well. Also, the bracketed form is not valid syntax, so a
+     signature with unmentionable items cannot be written as source. *)
   let name =
     match vis with
     | Unmentionable -> "[" ^ Ident.name id ^ "]"
