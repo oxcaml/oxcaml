@@ -123,16 +123,14 @@ Error: Signature mismatch:
          compare:('b @ [< global many read_write > aliased stateful dynamic] ->
                   'c @ [< global many read_write > aliased stateful dynamic] ->
                   int @ [< many read_write > dynamic]) @ [< many > local] ->
-         'c @ [< global many read_write > aliased stateful dynamic] ->
-         int option @ [> local aliased dynamic]"
+         'c @ ([< global many read_write > aliased stateful dynamic] as 'p) ->
+         int option @ ([> local aliased dynamic] as 'o)"
        is not compatible with the type
          "'a ->
          length:('a -> int) @ local ->
          get:('a -> int -> 'b) @ local ->
          compare:('b -> 'c -> int) @ local -> 'c -> int option"
-       Type
-         "'c @ [< global many read_write > aliased stateful dynamic] ->
-         int option @ [> local aliased dynamic]"
-       is not compatible with type "'c -> int option"
+       Type "'c @ 'p -> int option @ 'o" is not compatible with type
+         "'c -> int option"
        The return mode was expected to be "global" but is "local"
 |}]
