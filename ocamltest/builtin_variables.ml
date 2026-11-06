@@ -54,6 +54,9 @@ let ocamltest_response = Variables.make ("ocamltest_response",
 let ocamltest_log = Variables.make ("ocamltest_log",
   "Path to log file for the current test")
 
+let ocamlrunparam = Variables.make ("ocamlrunparam",
+  "OCAMLRUNPARAM for the test program only")
+
 let output = Variables.make ("output",
   "Where the output of executing the program is saved")
 
@@ -131,6 +134,7 @@ let init () =
     make;
     ocamltest_response;
     ocamltest_log;
+    ocamlrunparam;
     output;
     program; program2;
     reason;
