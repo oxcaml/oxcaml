@@ -6,6 +6,6 @@
 
 (tests
  (names test_int8_u test_int16_u)
- (build_if %{oxcaml_supported})
- (libraries stdlib_stable stdlib_upstream_compatible)
+ (build_if %{ocaml-config:ox})
+ (libraries ocaml.stdlib_stable ocaml.stdlib_upstream_compatible)
  (modes js wasm))

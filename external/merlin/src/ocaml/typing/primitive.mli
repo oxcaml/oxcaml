@@ -49,6 +49,11 @@ type native_repr =
   | Unpacked_product of Jkind_types.Sort.Const.t
   | Unextended_bits8
   | Unextended_bits16
+  | Raw_pointer
+  (** A fat-pointer argument: an unboxed pair of a [value] base and a
+      [bits64] byte offset, passed to C as a single raw pointer
+      (base + offset).  Written [[@fat_ptr]].  Only allowed on arguments
+      of [@@noalloc] externals. *)
 (* CR mshinwell/ccasinghino: should we actually use
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
    additional unboxed_or_untagged_integer type? *)
@@ -161,7 +166,9 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
 
 (** Check if a primitive can have layout [any] anywhere within its type
     declaration. Returns [false] for built-in primitives that inspect
-    the layout of type parameters ([%array_length] for example). *)
+    the layout of type parameters ([%array_length] for example). Missing such
+    a primitive here is unsound; see [Note regarding jkind checks on external
+    declarations] in [typedecl.ml]. *)
 val prim_can_contain_layout_any : description -> bool
 
 type wrong_repr_error =
@@ -169,6 +176,7 @@ type wrong_repr_error =
   | Unpacked_product_return
   | Unextended_return
   | Small_int_arg
+  | Raw_pointer_return
   | Repr_mismatch
 
 type error =
@@ -179,6 +187,7 @@ type error =
   | No_native_primitive_with_non_value
   | Inconsistent_attributes_for_effects
   | Inconsistent_noalloc_attributes_for_effects
+  | Raw_pointer_requires_noalloc
   | Invalid_representation_polymorphic_attribute
   | Invalid_native_repr_for_primitive of
       { prim_name : string; errors : wrong_repr_error list }

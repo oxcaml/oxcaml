@@ -605,11 +605,22 @@ let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
       cl
       (alloc_mode_for_applications region ~space:Before)
       alloc_mode
-  | C_call { alloc } ->
+  | C_call { alloc; fat_ptr_arg_starts } ->
     let noalloc_kwd = if alloc then None else Some "noalloc" in
-    pp_spaced ~space ppf "ccall%a"
+    let pp_fat_ptr_arg_starts ppf starts =
+      Format.fprintf ppf "fat_ptr(%a)"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_int)
+        starts
+    in
+    pp_spaced ~space ppf "ccall%a%a"
       (pp_option ~space:Before Format.pp_print_string)
       noalloc_kwd
+      (pp_option ~space:Before pp_fat_ptr_arg_starts)
+      (match fat_ptr_arg_starts with
+      | [] -> None
+      | _ :: _ -> Some fat_ptr_arg_starts)
   | Method { kind; obj } ->
     pp_spaced ~space ppf "mcall(%a%a)" method_kind kind
       (fun ppf -> pp_spaced ~space:Before ppf "%a" simple)

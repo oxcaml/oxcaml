@@ -29,3 +29,28 @@ let parse s =
       (* should not happen, but don't put assert false
                           so as not to crash the toplevel (see Genprintval) *)
   | Some v -> v
+
+let rec to_504_plus lid =
+  let loc = Location.none in
+  match lid with
+  | Lident s -> Longident_504.Lident s
+  | Ldot (lid, s) ->
+    Longident_504.Ldot ({txt = to_504_plus lid; loc}, { txt = s; loc})
+  | Lapply (lid, lid2) ->
+    Longident_504.Lapply
+      ({txt = to_504_plus lid; loc}, {txt= to_504_plus lid2; loc})
+
+let rec from_504_plus lid =
+  match lid with
+  | Longident_504.Lident s -> Lident s
+  | Longident_504.Ldot (lid, s) -> Ldot (from_504_plus lid.txt, s.txt)
+  | Longident_504.Lapply (lid, lid2) ->
+    Lapply (from_504_plus lid.txt, from_504_plus lid2.txt)
+
+let to_compiler lid =
+  (*IF_NOT_AT_LEAST 504 lid *)
+  (*IF_AT_LEAST 504 to_504_plus lid *)
+
+let from_compiler lid =
+  (*IF_NOT_AT_LEAST 504 lid *)
+  (*IF_AT_LEAST 504 from_504_plus lid *)

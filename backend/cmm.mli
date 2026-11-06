@@ -104,6 +104,11 @@ type exttype =
   | XVec512  (**r 512-bit vector *)
   | XDummy_int  (**r uses up an int register, passes nothing *)
   | XDummy_float  (**r uses up a float register, passes nothing *)
+  | XFat_pointer
+      (**r A fat pointer, passed to C as a single raw pointer. Occupies one
+         argument slot of the C calling convention but corresponds to two Cmm
+         arguments: a [Val] base and an [Int] byte offset. The addition
+         [base + offset] is performed when the call itself is emitted. *)
 
 val is_dummy_exttype : exttype -> bool
 

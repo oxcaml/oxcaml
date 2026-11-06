@@ -1,5 +1,3 @@
-#require "base";;
-
 open Stdppx
 open Ppxlib
 

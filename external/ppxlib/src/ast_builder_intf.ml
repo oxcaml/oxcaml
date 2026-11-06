@@ -40,22 +40,61 @@ module type Additional_helpers = sig
   val esequence : (expression list -> expression) with_loc
   val ppat_tuple_opt : (pattern list -> pattern option) with_loc
   val pexp_tuple_opt : (expression list -> expression option) with_loc
+
+  val pexp_fun :
+    (arg_label -> expression option -> pattern -> expression -> expression)
+    with_loc
+  (** [pexp_fun] can be used to create function expressions. It will check if
+      the function's body is itself a function expression and if so it will
+      coalesce the arguments.
+
+      For example, if we have [pexp_fun Nolabel None (var "x") f] and [f] is
+      [fun y -> x + y] then the function expression returned will be
+      [fun x y -> x + y] and not [fun x -> y -> x + y]. However, it will be more
+      efficient to create maximum arity functions directly with
+      {! pexp_function}. *)
+
+  val pexp_function :
+    (function_param list ->
+    type_constraint option ->
+    function_body ->
+    expression)
+    with_loc
+
+  val pexp_function_cases : (Import.cases -> expression) with_loc
+  (** [pexp_function_cases] builds an expression in the shape
+      [function C1 -> E1 | ...]. *)
+
   val pconstruct : constructor_declaration -> pattern option -> pattern
   val econstruct : constructor_declaration -> expression option -> expression
-  val elist : (expression list -> expression) with_loc
-  val plist : (pattern list -> pattern) with_loc
 
-  val pexp_function : (case list -> expression) with_loc
-  val pexp_fun :
-    (arg_label -> expression option -> pattern -> expression -> expression) with_loc
+  val elist_tail : (expression list -> expression -> expression) with_loc
+  (** [elist_tail ~loc [expr1; expr2; expr3] expr_tail] produces the expression
+      [expr1::expr2::expr3::expr_tail]. *)
+
+  val elist : (expression list -> expression) with_loc
+  (** [elist ~loc [expr1; expr2; expr3]] produces the list litteral expression
+      [[expr1; expr2; expr3]]. *)
+
+  val plist_tail : (pattern list -> pattern -> pattern) with_loc
+  (** [plist_tail ~loc [pat1; pat2; pat3] pat_tail] produces the pattern
+      [pat1::pat2::pat3::pat_tail]. *)
+
+  val plist : (pattern list -> pattern) with_loc
+  (** [plist ~loc [pat1; pat2; pat3]] produces the list pattern
+      [[pat1; pat2; pat3]]. *)
+
+  val value_binding :
+    (pat:Import.pattern -> expr:Import.expression -> Import.value_binding)
+    with_loc
 
   val pstr_value_list :
     loc:Location.t ->
     Asttypes.rec_flag ->
     value_binding list ->
     structure_item list
-  (** [pstr_value_list ~loc rf vbs] = [pstr_value ~loc rf vbs] if [vbs <> \[\]],
-      [\[\]] otherwise. *)
+  (** [pstr_value_list ~loc rf vbs] = [pstr_value ~loc rf vbs] if [vbs <> []],
+      [[]] otherwise. *)
 
   val nonrec_type_declaration :
     (name:string Loc.t ->
@@ -66,8 +105,8 @@ module type Additional_helpers = sig
     manifest:core_type option ->
     type_declaration)
     with_loc
-    [@@deprecated
-      "[since 2016-10] use Nonrecursive on the P(str|sig)_type instead"]
+  [@@deprecated
+    "[since 2016-10] use Nonrecursive on the P(str|sig)_type instead"]
 
   val unapplied_type_constr_conv :
     (Longident.t Loc.t -> f:(string -> string) -> expression) with_loc
@@ -142,9 +181,6 @@ module type Additional_helpers = sig
   val ppat_tuple : (pattern list -> pattern) with_loc
   val ppat_array : (pattern list -> pattern) with_loc
 
-  val value_binding
-    : (pat:pattern -> expr:expression -> value_binding) with_loc
-
   val include_infos
     : (?attrs:attributes -> 'a -> 'a include_infos) with_loc
 
@@ -181,6 +217,26 @@ module type Additional_helpers = sig
   val pmod_constraint : (module_expr -> module_type -> module_expr) with_loc
 
   (* ----------------------------------------------------- *)
+
+  (** {2:future-asts Compat functions for future AST nodes}
+
+      Upstream ppxlib provides these functions to encode AST nodes that its own
+      AST cannot represent. The OxCaml AST represents them directly. *)
+
+  val ptyp_labeled_tuple :
+    ((string option * core_type) list -> core_type) with_loc
+  (** Returns a labeled tuple type as introduced in OCaml 5.4. *)
+
+  val pexp_labeled_tuple :
+    ((string option * expression) list -> expression) with_loc
+  (** Returns a labeled tuple expression as introduced in OCaml 5.4. *)
+
+  val ppat_labeled_tuple :
+    ((string option * pattern) list -> closed_flag -> pattern) with_loc
+  (** Returns a labeled tuple pattern as introduced in OCaml 5.4. *)
+
+  val pexp_hole : (unit -> expression) with_loc
+  (** Returns an expression hole as introduced in OCaml 5.6 *)
 end
 
 module type Located = sig
@@ -199,10 +255,7 @@ type 'a with_location = loc:Location.t -> 'a
 
 module type S = sig
   module Located : Located with type 'a with_loc := 'a without_location
-
-  include module type of Ast_builder_generated.Make (struct
-    let loc = Location.none
-  end)
+  include Ast_builder_generated.Intf_located
 
   val pexp_apply : expression -> (arg_label * expression) list -> expression
 

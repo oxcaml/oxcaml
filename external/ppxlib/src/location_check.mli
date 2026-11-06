@@ -44,7 +44,7 @@
     but [B2] has a ghost location, then [B1], [X] and [Y] are considered
     siblings.
 
-    Additionally, there is an attribute [\[@merlin.hide\]] that you can add on
+    Additionally, there is an attribute [[@merlin.hide]] that you can add on
     nodes to tell merlin (and the check) to ignore this node and all of its
     children. Some helpers for this are provided in {!Merlin_helpers}. *)
 
