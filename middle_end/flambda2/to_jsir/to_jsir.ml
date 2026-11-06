@@ -131,56 +131,8 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
     | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode) ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
-      (* Definitions within this group can reference each others' symbols
-         (potentially not in the order they were declared in), so we should
-         first add the symbols to the environment before doing any translation.
-         Crucially, we should not register any symbols at this stage, since they
-         will not yet be defined. *)
-      let symbols = Bound_static.symbols_being_defined bound_static in
-      let env =
-        Symbol.Set.fold
-          (fun symbol env ->
-            To_jsir_env.add_symbol_without_registering env symbol
-              (Jsir.Var.fresh ()))
-          symbols env
-      in
-      (* To translate closures, we require that all the code is inserted into
-         the environment before any of the actual translation happens. Code
-         usually does come before it is used in a closure, but for static lets,
-         they may be defined within the same let binding. Moreover, code may
-         reference each other's code IDs, not necessarily in the order they are
-         declared in. Hence, we run two passes: one inserting code into the
-         environment, and one doing the actual translation. *)
-      let env, res =
-        Static_const_group.match_against_bound_static consts bound_static
-          ~init:(env, res)
-          ~code:(fun (env, res) code_id code ->
-            To_jsir_static_const.prepare_code ~env ~res ~code_id code)
-          ~deleted_code:(fun (env, res) _code_id -> env, res)
-          ~set_of_closures:(fun (env, res) ~closure_symbols:_ _soc -> env, res)
-          ~block_like:(fun (env, res) _symbol _static_const -> env, res)
-      in
-      let env, res =
-        Static_const_group.match_against_bound_static consts bound_static
-          ~init:(env, res)
-          ~code:(fun (env, res) code_id code ->
-            To_jsir_static_const.code ~env ~res ~translate_body:expr ~code_id
-              code)
-          ~deleted_code:(fun (env, res) _code_id -> env, res)
-          ~set_of_closures:(fun (env, res) ~closure_symbols soc ->
-            To_jsir_set_of_closures.static_set_of_closures ~env ~res
-              ~closure_symbols soc)
-          ~block_like:(fun (env, res) symbol static_const ->
-            To_jsir_static_const.block_like ~env ~res symbol static_const)
-      in
-      (* Now that the symbols are defined, we must remember to register all the
-         symbols to the global symbol table. *)
-      let res =
-        Symbol.Set.fold
-          (fun symbol res -> To_jsir_env.register_symbol_exn env ~res symbol)
-          symbols res
-      in
-      env, res
+      To_jsir_static_const_group.translate ~env ~res ~translate_body:expr
+        bound_static consts
     | Singleton _, Rec_info _ -> env, res
     | Singleton _, (Set_of_closures _ | Static_consts _)
     | Set_of_closures _, (Simple _ | Prim _ | Static_consts _ | Rec_info _)
