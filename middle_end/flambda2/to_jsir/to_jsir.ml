@@ -364,7 +364,12 @@ and apply_expr ~env ~res e =
       apply_fn ~res ~f ~args ~exact:false ~yielding
     | None, Function { function_call = Direct code_id } ->
       let args, res = To_jsir_shared.simples ~env ~res args in
-      let ({ closure; addr = _; params = _; closure_bound_with_code = _ }
+      let ({ closure;
+             addr = _;
+             params = _;
+             closure_bound_with_code = _;
+             hint = _
+           }
             : To_jsir_env.code_id) =
         To_jsir_env.get_code_id_exn env code_id
       in
