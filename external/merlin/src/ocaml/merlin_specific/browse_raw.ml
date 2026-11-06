@@ -78,7 +78,10 @@ type node =
   | Open_declaration of open_declaration
   | Method_call of expression * meth * Location.t
   | Record_field :
-      [ `Expression of expression | `Pattern of pattern ]
+      [ `Expression of expression
+      | `Pattern of pattern
+      | `Block_access
+      | `Unboxed_access ]
       * 'rep Data_types.gen_label_description
       * 'rep Data_types.record_form
       * Longident.t Location.loc
@@ -108,6 +111,7 @@ let node_update_env env0 = function
   | Core_type { ctyp_env = env }
   | Class_type { cltyp_env = env } -> env
   | Dummy
+  | Record_field ((`Block_access | `Unboxed_access), _, _, _)
   | Case _
   | Class_structure _
   | Class_signature _
@@ -424,11 +428,13 @@ let of_method_call obj meth loc env (f : _ f0) acc =
   app (Method_call (obj, meth, loc)) env f acc
 
 let of_block_access = function
-  | Baccess_field (_, _, _) -> id_fold
+  | Baccess_field (lid_loc, lbl, _) ->
+    of_record_field `Block_access lid_loc lbl Legacy
   | Baccess_block (_, exp) -> of_expression exp
 
 let of_unboxed_access = function
-  | Uaccess_unboxed_field (_, _, _) -> id_fold
+  | Uaccess_unboxed_field (lid_loc, lbl, _) ->
+    of_record_field `Unboxed_access lid_loc lbl Unboxed_product
 
 let rec of_expression_desc loc = function
   | Texp_ident _ | Texp_constant _ | Texp_instvar _ | Texp_mutvar _
