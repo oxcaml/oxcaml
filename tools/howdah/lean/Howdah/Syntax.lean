@@ -47,6 +47,7 @@ inductive Mutability : Type where
 
 inductive Primitive : Type where
   | makeBlock (tag : Nat)
+  | field (index : Nat)
   deriving Repr
 
 structure Function (Body : Type) : Type where
@@ -65,7 +66,8 @@ inductive Lambda (V : Type) : Type where
   /- TODO: Lmutvar -/
   /- Lconst -/
   | const (const : StructuredConstant)
-  /- TODO: Lapply -/
+  /- Lapply -/
+  | apply (func : Lambda V) (args : List <| Lambda V)
   /- Lfunction -/
   | function (function : Function (Lambda V))
   /- Llet -/
@@ -122,13 +124,13 @@ abbrev Expr := Lambda Value
 def Lambda.size {V} : Lambda V → Nat
   | .var _ | .const _ | .value _ => 1
   | .function f => f.body.size.succ
+  | .apply func args => func.size + (args.map size).sum |>.succ
   | .bind _ subst body => subst.size + body.size |>.succ
   | .prim _ args => args.map size |>.sum |>.succ
 decreasing_by
-  · cases f with (simp; omega)
-  · decreasing_tactic
-  · decreasing_tactic
-  · decreasing_tactic
+  all_goals first
+    | decreasing_tactic
+    | cases f with (simp; omega)
 
 instance (priority := high) {V} : SizeOf <| Lambda V where
   sizeOf := Lambda.size
@@ -166,8 +168,8 @@ def Lambda.induct' {V} {motive : Lambda V → Prop} :=
   let motiveFunction : Function (Lambda V) → Prop := (motive ·.body)
   @Lambda.rec V
     motive
-    motiveFunction
     motiveList
+    motiveFunction
     (mk := fun _ _ _ h => h)
     (nil := .Nil)
     (cons := fun _ _ => .Cons)

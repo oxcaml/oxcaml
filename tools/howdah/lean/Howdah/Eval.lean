@@ -2,12 +2,20 @@ import Howdah.Syntax
 
 inductive PureEvalError : Type where
   | blockTagOutOfRange (tag : Nat)
+  | primFieldArguments (args : List Value)
+  | primFieldOutOfRange (index : Nat) (values : List Value)
   | unboundVariable (id : Ident)
 
 instance : ToString PureEvalError where
   toString
-    | .blockTagOutOfRange tag => s!"block tag `{tag}` out of range"
-    | .unboundVariable id => s!"unbound variable `{id}`"
+    | .blockTagOutOfRange tag =>
+      s!"block tag `{tag}` out of range"
+    | .primFieldArguments args =>
+      s!"field primitive requires a single block but received `{repr args}`"
+    | .primFieldOutOfRange index values =>
+      s!"field primitive index `{index}` out of range of `{repr values}`"
+    | .unboundVariable id =>
+      s!"unbound variable `{id}`"
 
 inductive PureEvalResult (T : Type) : Type where
   | halted (result : T)
@@ -45,6 +53,9 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
   | .const c => .const c
   | .function f =>
     .function { f with body := substitute idToReplace value f.body }
+  | .apply func args =>
+    .apply (substitute idToReplace value func) <|
+      args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
   | .bind id subst body =>
     let substSubstituted := substitute idToReplace value subst
     let bodySubstituted :=
@@ -58,10 +69,9 @@ def Lambda.substitute {V} (idToReplace : Ident) (value : V) :
     .prim p <| args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
   | .value v => .value v
 decreasing_by
-  · decreasing_tactic
-  · decreasing_tactic
-  · decreasing_tactic
-  · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
+  all_goals first
+    | decreasing_tactic
+    | decreasing_with have := Lambda.size_lt_of_mem ‹_›; omega
 
 @[simp]
 theorem Lambda.size_substitute {V} (lambda : Lambda V) idToReplace value :
@@ -69,13 +79,16 @@ theorem Lambda.size_substitute {V} (lambda : Lambda V) idToReplace value :
   induction lambda with simp
   | var v => split <;> simp
   | function f ih => exact ih
+  | apply func args ihFunc ihArgs =>
+    simp [ihFunc]
+    (induction ihArgs with simp_all)
   | bind id subst body ihSubst ihBody => split <;> simp_all
   | prim _ args ih => induction ih with simp_all
 
 @[simp]
 def Constant.pureEval : Constant → Value
   | .int bits => .immediate bits
-  | .string bytes => .bytes bytes |> .block 252
+  | .string bytes => .block 252 <| .bytes bytes
 
 @[simp]
 def BlockKind.bindValues (tag : Nat) (contents : List Value) :
@@ -90,20 +103,28 @@ def BlockKind.bindValues (tag : Nat) (contents : List Value) :
 
 @[simp]
 def StructuredConstant.pureEval : StructuredConstant → PureEvalResult Value
-  | .base c => c.pureEval |> .halted
+  | .base c => .halted c.pureEval
   | .block tag fields => do
     let values ← fields.attach.mapM fun ⟨field, _⟩ ↦ field.pureEval
     BlockKind.bindValues tag values
 
 @[simp]
 def Primitive.pureEval (args : List Value) : Primitive → PureEvalResult Value
+  | .field index =>
+    match args with
+    | [.block 0 <| .values values] =>
+      match values[index]? with
+      | .some value => .halted value
+      | .none => .error <| .primFieldOutOfRange index values
+    | _ => .error <| .primFieldArguments args
   | .makeBlock tag => BlockKind.bindValues tag args
 
 @[simp]
 def Lambda.pureEval : Expr → PureEvalResult Value
-  | .var id => .unboundVariable id |> .error
+  | .var id => .error <| .unboundVariable id
   | .const c => c.pureEval
-  | .function f => .closure .nonrecursive f |> .block 247 |> .halted
+  | .function f => .halted <| .block 247 <| .closure .nonrecursive f
+  | .apply _ _ => .maybeNonterminating
   | .bind id subst body => do
     let value : Value ← subst.pureEval
     body.substitute id value |>.pureEval
@@ -112,9 +133,9 @@ def Lambda.pureEval : Expr → PureEvalResult Value
     p.pureEval args
   | .value v => .halted v
 decreasing_by
-  · decreasing_tactic
-  · decreasing_tactic
-  · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
+  all_goals first
+    | decreasing_tactic
+    | decreasing_with have := Lambda.size_lt_of_mem ‹_›; omega
 
 @[simp]
 def Lambda.pureEval! (lambda : Expr) : Value :=

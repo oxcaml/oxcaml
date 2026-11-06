@@ -32,6 +32,7 @@ def expectedReducedRecordModule : Value :=
         body := .var ⟨"i/329"⟩,
       },
     ],
+    -- block [.immediate 42#63],
   ]
 
 example : imported.implementation ⇓ expectedReducedRecordModule := by simp

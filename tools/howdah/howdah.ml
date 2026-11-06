@@ -84,6 +84,12 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
     serialize_structured_constant constant
     |> tag "const"
     |> tag "const"
+  | Lapply { ap_func; ap_args; _ } ->
+    Json.Object
+      [ ("func", serialize_lambda ap_func);
+        ("args", Json.Array (List.map serialize_lambda ap_args));
+      ]
+    |> tag "apply"
   | Llet (Strict, _, id, _, value, body) ->
     Json.Object
       [ ("id", serialize_ident id);
@@ -110,6 +116,10 @@ and serialize_primitive : Lambda.primitive -> Json.t = function
     Json.int block_tag
     |> tag "tag"
     |> tag "makeBlock"
+  | Pfield (index, _, Reads_agree) ->
+    Json.int index
+    |> tag "index"
+    |> tag "field"
   | other_primitive ->
     Format.asprintf "Lambda primitive not yet supported:@ %a"
       Printlambda.primitive other_primitive
