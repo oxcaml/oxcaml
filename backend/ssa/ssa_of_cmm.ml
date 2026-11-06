@@ -464,7 +464,11 @@ and emit_expr_op env c ~tail op args dbg : result =
         match[@warning "-fragile-match"] op with
         | Cmm.Capply { region; returns; _ } -> (
           match (region : Lambda.region_close) with
-          | Rc_normal -> not (returns || tail)
+          | Rc_normal ->
+            (* A call that never returns gets an [Unreachable] continuation,
+               which [Ssa_tail_call] can turn into a tail call. Only allow this
+               in tail position, matching [Cfg_selectgen.emit_tail]. *)
+            not (returns || tail)
           | Rc_nontail -> true
           | Rc_close_at_apply ->
             Misc.fatal_error
