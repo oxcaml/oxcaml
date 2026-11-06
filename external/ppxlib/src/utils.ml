@@ -202,9 +202,38 @@ module Ast_io = struct
       in
       Ok { input_name; input_version; ast }
     with exn -> (
-      match Location.Error.of_exn exn with
-      | None -> raise exn
-      | Some error -> Error (Source_parse_error (error, input_version)))
+      (* Run lrgrep to report the error *)
+      let lrgrep_error =
+        match In_channel.create input_name with
+        | exception _ ->
+            (* File does not exist, so we find no improved error. *)
+            Ok ()
+        | ic ->
+            Exn.protectx ic ~finally:close_in ~f:(fun ic ->
+                let lexbuf = Lexing.from_channel ic in
+                Lexing.set_filename lexbuf input_name;
+                Skip_hash_bang.skip_hash_bang lexbuf;
+                match kind with
+                | Intf -> Oxcaml_private_lrgrep.Frontend.interface lexbuf
+                | Impl -> Oxcaml_private_lrgrep.Frontend.implementation lexbuf)
+      in
+      match lrgrep_error with
+      | Error { Oxcaml_private_lrgrep.Frontend.Syntax_error.msg; loc } ->
+          (* This check is load-bearing, and it is important to preserve the
+             error message exactly in this case. If ppxlib and lrgrep disagree
+             about this magic error, ppxlib will swallow syntax error messages
+             and just surface [Syntaxerr.Error(_)]. *)
+          if String.equal msg "Syntax error" then raise exn
+          else
+            Error
+              (Source_parse_error
+                 ( Location.Error.make ~loc ~sub:[]
+                     ("Syntax Error. LRGrep analysis: " ^ msg),
+                   input_version ))
+      | Ok () -> (
+          match Location.Error.of_exn exn with
+          | None -> raise exn
+          | Some error -> Error (Source_parse_error (error, input_version))))
 
   let magic_length = String.length Astlib.Config.ast_impl_magic_number
 

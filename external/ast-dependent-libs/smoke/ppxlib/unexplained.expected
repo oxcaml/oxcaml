@@ -1,0 +1,7 @@
+File "unexplained.ml", line 1, characters 9-21:
+1 | let () = s.[0] <- 'x'
+             ^^^^^^^^^^^^
+Error: Syntax error: strings are immutable, there is no assignment syntax for
+       them.
+Hint: Mutable sequences of bytes are available in the Bytes module.
+Hint: Did you mean to use Bytes.set?

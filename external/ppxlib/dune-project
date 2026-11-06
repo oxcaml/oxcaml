@@ -1,6 +1,7 @@
 (lang dune 3.8)
 (name ppxlib)
 (using cinaps 1.0)
+(using menhir 2.0)
 (implicit_transitive_deps false)
 (cram enable)
 (generate_opam_files true)
