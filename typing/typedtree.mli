@@ -385,6 +385,22 @@ and 'k pattern_desc =
       value pattern_desc
         (** addr_ P        (flag = Mutable)
             addr_imm_ P    (flag = Immutable) *)
+  | Tpat_slice : {
+      mutability: Types.mutability;
+      sort: Jkind.sort;
+      (** The sort of the elements *)
+      shape: slice_shape;
+    } -> value pattern_desc
+        (** [&| ... |]    (mutability = Mutable)
+            [&: ... :]    (mutability = Immutable)
+
+            A slice pattern is a chain of [Tslice_front] cells, one per
+            element, ending in the pattern for the rest of the slice:
+            - [&| P1; ...; Pn |] is front (P1, ... front (Pn, empty))
+            - [&| P1; ...; Pn; .. |] is front (P1, ... front (Pn, _))
+            - [&| P1; ...; Pn; .. as x |] is front (P1, ... front (Pn, x))
+            Without elements, [&| .. |] is just [_] and [&| .. as x |] is
+            just [x]. *)
   | Tpat_deref : {
       id: Ident.t;
       name: string loc;
@@ -432,6 +448,12 @@ and 'k pattern_desc =
             [row_desc] = [Some _] when translating [Ppat_type _],
                          [None] otherwise.
          *)
+
+and slice_shape =
+  | Tslice_empty
+      (** The empty slice *)
+  | Tslice_front of value general_pattern * value general_pattern
+      (** A non-empty slice: its first element and the rest of the slice *)
 
 and tpat_value_argument = private value general_pattern
 
@@ -905,6 +927,8 @@ and 'k block_access =
   | Baccess_tuple_element : int -> deref block_access
   | Baccess_address : Jkind.sort -> deref block_access
       (** The sort of the value at the address *)
+  | Baccess_slice_element : Jkind.sort -> deref block_access
+      (** The sort of the elements of the slice *)
 
 (* Unboxed accesses that might follow a block access. Some are only supported by
    deref patterns, not block indices. *)

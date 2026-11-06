@@ -146,6 +146,14 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
             id = create_local (mod_name ^ "_" ^ Ident.name d.id);
             name = { d.name with txt = mod_name ^ "_" ^ d.name.txt }
           }
+      | O (Tpat_slice ({ shape = Tslice_empty; _ } as s)) -> Tpat_slice s
+      | O (Tpat_slice ({ shape = Tslice_front (p, rest); _ } as s)) ->
+        Tpat_slice
+          { s with
+            shape =
+              Tslice_front
+                (replace_in_pat mod_name p, replace_in_pat mod_name rest)
+          }
       | O (Tpat_lazy pat) -> Tpat_lazy (replace_in_pat mod_name pat)
       | O (Tpat_variant (lab, Some p, t)) ->
         Tpat_variant (lab, Some (replace_in_pat mod_name p), t)

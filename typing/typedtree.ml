@@ -273,6 +273,11 @@ and 'k pattern_desc =
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
   | Tpat_addr :
       mutability * Jkind.sort * value general_pattern -> value pattern_desc
+  | Tpat_slice : {
+      mutability: mutability;
+      sort: Jkind.sort;
+      shape: slice_shape;
+    } -> value pattern_desc
   | Tpat_deref : {
       id: Ident.t;
       name: string loc;
@@ -298,6 +303,10 @@ and 'k pattern_desc =
   | Tpat_or :
       'k general_pattern * 'k general_pattern * row_desc option ->
       'k pattern_desc
+
+and slice_shape =
+  | Tslice_empty
+  | Tslice_front of value general_pattern * value general_pattern
 
 and tpat_value_argument = value general_pattern
 
@@ -493,6 +502,7 @@ and 'k block_access =
   | Baccess_block : access_flag * expression -> index block_access
   | Baccess_tuple_element : int -> deref block_access
   | Baccess_address : Jkind.sort -> deref block_access
+  | Baccess_slice_element : Jkind.sort -> deref block_access
 
 and 'k unboxed_access =
   | Uaccess_record_unboxed_product_field :
@@ -1215,6 +1225,7 @@ let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   | Tpat_record_unboxed_product _ -> Value
   | Tpat_array _ -> Value
   | Tpat_addr _ -> Value
+  | Tpat_slice _ -> Value
   | Tpat_deref _ -> Value
   | Tpat_alias_deref _ -> Value
   | Tpat_lazy _ -> Value
@@ -1252,6 +1263,8 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
+  | Tpat_slice { shape = Tslice_empty; _ } -> ()
+  | Tpat_slice { shape = Tslice_front (p, rest); _ } -> f.f p; f.f rest
   | Tpat_addr (_, _, p) | Tpat_alias_deref { pattern = p; _ } | Tpat_lazy p ->
       f.f p
   | Tpat_any
@@ -1290,6 +1303,9 @@ let shallow_map_pattern_desc
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
   | Tpat_addr (mut, arg_sort, p1) -> Tpat_addr (mut, arg_sort, f.f p1)
+  | Tpat_slice ({ shape = Tslice_empty; _ } as s) -> Tpat_slice s
+  | Tpat_slice ({ shape = Tslice_front (p, rest); _ } as s) ->
+      Tpat_slice { s with shape = Tslice_front (f.f p, f.f rest) }
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_alias_deref d -> Tpat_alias_deref { d with pattern = f.f d.pattern }
   | Tpat_variant (x1, Some p1, x2) ->
@@ -1433,6 +1449,9 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
+      | Tpat_slice { shape = Tslice_empty; _ } -> ()
+      | Tpat_slice { shape = Tslice_front (p, rest); _ } ->
+        loop f p; loop f rest
       | Tpat_addr (_, _, p) | Tpat_lazy p
       | Tpat_exception p -> loop f p
       | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->

@@ -116,6 +116,9 @@ let rec var_from_pat pat_desc acc =
   | O (Tpat_deref { id; _ }) -> id :: acc
   | O (Tpat_alias_deref { pattern; id; _ }) ->
     var_from_pat pattern.pat_desc (id :: acc)
+  | O (Tpat_slice { shape = Tslice_empty; _ }) -> acc
+  | O (Tpat_slice { shape = Tslice_front (p, rest); _ }) ->
+    var_from_pat p.pat_desc (var_from_pat rest.pat_desc acc)
   | O (Tpat_fun_layout { id; _ }) -> id :: acc
   | O
       ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
@@ -208,6 +211,11 @@ let rec rem_in_pat str pat should_remove =
     else
       let pattern = rem_in_pat str d.pattern should_remove in
       { pat with pat_desc = Tpat_alias_deref { d with pattern } }
+  | O (Tpat_slice { shape = Tslice_empty; _ }) -> pat
+  | O (Tpat_slice ({ shape = Tslice_front (p, rest); _ } as s)) ->
+    let p = rem_in_pat str p should_remove in
+    let rest = rem_in_pat str rest should_remove in
+    { pat with pat_desc = Tpat_slice { s with shape = Tslice_front (p, rest) } }
   | O (Tpat_lazy pat) ->
     { pat with pat_desc = Tpat_lazy (rem_in_pat str pat should_remove) }
   | O (Tpat_fun_layout { id; _ }) ->

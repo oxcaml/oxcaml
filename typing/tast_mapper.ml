@@ -392,6 +392,10 @@ let pat
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
                           lpoly; env_locality_mode }
     | Tpat_addr (mut, arg_sort, p) -> Tpat_addr (mut, arg_sort, sub.pat sub p)
+    | Tpat_slice ({ shape = Tslice_empty; _ } as s) -> Tpat_slice s
+    | Tpat_slice ({ shape = Tslice_front (p, rest); _ } as s) ->
+        Tpat_slice
+          { s with shape = Tslice_front (sub.pat sub p, sub.pat sub rest) }
     | Tpat_deref d -> Tpat_deref { d with name = map_loc sub d.name }
     | Tpat_alias_deref d ->
         Tpat_alias_deref

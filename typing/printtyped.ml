@@ -571,6 +571,16 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_addr %a\n" fmt_mutable_mode_flag mut;
       line i ppf "%a\n" fmt_sort arg_sort;
       pattern i ppf p;
+  | Tpat_slice { mutability; sort; shape } ->
+      line i ppf "Tpat_slice %a\n" fmt_mutable_mode_flag mutability;
+      line i ppf "%a\n" fmt_sort sort;
+      begin match shape with
+      | Tslice_empty -> line i ppf "Tslice_empty\n"
+      | Tslice_front (p, rest) ->
+          line i ppf "Tslice_front\n";
+          pattern i ppf p;
+          pattern i ppf rest
+      end
   | Tpat_deref { id = s; sort; mode = m; _ } ->
       line i ppf "Tpat_deref \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
@@ -1480,6 +1490,8 @@ and block_access : type k. _ -> _ -> k block_access -> _ = fun i ppf -> function
       line i ppf "Baccess_tuple_element %d\n" n
   | Baccess_address sort ->
       line i ppf "Baccess_address %a\n" fmt_sort sort
+  | Baccess_slice_element sort ->
+      line i ppf "Baccess_slice_element %a\n" fmt_sort sort
 
 and unboxed_access : type k. _ -> _ -> k unboxed_access -> _ =
   fun i ppf -> function
