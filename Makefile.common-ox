@@ -265,16 +265,26 @@ boot_build = _build/default
 .PHONY: runtest-upstream test install_for_test
 install_for_test: install
 ifeq ($(with_jsir),true)
-	@test -x _install/bin/js_of_ocaml || { \
-	  echo "error: with_jsir=true but _install/bin/js_of_ocaml is missing;" \
-	    "make test needs jsoo-install-shipped to install into" \
-	    "$(CURDIR)/_install (OXCAML_INSTALL and AST_DEPENDENT_LIBS_PREFIX)," \
-	    "or use make test-without-jsir" >&2; \
-	  exit 1; }
-	@test -f _install/lib/ocaml/stdlib.cmjxa || { \
-	  echo "error: with_jsir=true but _install/lib/ocaml/stdlib.cmjxa is" \
-	    "missing (the stdlib-jsir package was not installed)" >&2; \
-	  exit 1; }
+	@for program in js_of_ocaml wasm_of_ocaml; do \
+	  test -x _install/bin/$$program || { \
+	    echo "error: with_jsir=true but _install/bin/$$program is missing;" \
+	      "make test needs jsoo-install-shipped to install into" \
+	      "$(CURDIR)/_install (OXCAML_INSTALL and AST_DEPENDENT_LIBS_PREFIX)," \
+	      "or use make test-without-jsir" >&2; \
+	    exit 1; }; \
+	done
+	@for package in stdlib-jsir:cmjxa stdlib-wasm:cmwxa; do \
+	  test -f _install/lib/ocaml/stdlib.$${package#*:} || { \
+	    echo "error: with_jsir=true but _install/lib/ocaml/stdlib.$${package#*:}" \
+	      "is missing (the $${package%:*} package was not installed)" >&2; \
+	    exit 1; }; \
+	done
+	@for program in wasm-opt wasm-merge; do \
+	  command -v $$program > /dev/null || { \
+	    echo "error: with_jsir=true but $$program is not in PATH;" \
+	      "wasm_of_ocaml runs the Binaryen tools" >&2; \
+	    exit 1; }; \
+	done
 	@command -v "$${NODE:-node}" > /dev/null || { \
 	  echo "error: with_jsir=true but $${NODE:-node} is not in PATH;" \
 	    "ocamltest runs JSIR programs with \$$NODE (default: node)" >&2; \
@@ -391,13 +401,18 @@ endif
 ifeq ($(with_jsir),true)
 	cd _runtest/testsuite/lib && \
 	  export OXCAML_JS_OF_OCAML=$(CURDIR)/_install/bin/js_of_ocaml && \
-	  ocamlopt_jsir="../../ocamlopt.opt -target js_of_ocaml -nostdlib \
-	    -I ../../stdlib" && \
-	  $$ocamlopt_jsir -c lib.ml && \
-	  $$ocamlopt_jsir -linkall -a -o testing.cmjxa testing.ml
-	cp _install/lib/ocaml/compiler-libs/*.cmjx _runtest/utils
-	cp $(main_build)/$(ast_dependent_libs_root)/stdlib-jsir/build/compiler-libs/*.cmjo \
-	  _runtest/utils
+	  export OXCAML_WASM_OF_OCAML=$(CURDIR)/_install/bin/wasm_of_ocaml && \
+	  for target in js_of_ocaml:cmj wasm_of_ocaml:cmw; do \
+	    ocamlopt_jsir="../../ocamlopt.opt -target $${target%:*} -nostdlib \
+	      -I ../../stdlib" && \
+	    $$ocamlopt_jsir -c lib.ml && \
+	    $$ocamlopt_jsir -linkall -a -o testing.$${target#*:}xa testing.ml \
+	      || exit 1; \
+	  done
+	cp _install/lib/ocaml/compiler-libs/*.cmjx \
+	  _install/lib/ocaml/compiler-libs/*.cmwx _runtest/utils
+	cp $(stdlib_jsir_build)/compiler-libs/*.cmjo \
+	  $(stdlib_jsir_build)/compiler-libs/*.cmwo _runtest/utils
 endif
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \

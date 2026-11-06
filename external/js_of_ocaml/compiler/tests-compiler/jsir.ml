@@ -61,7 +61,7 @@ let () =
     caml_get_symbol: compilation unit Bar has not been initialised yet (looking up x)
     |}]
 
-(* Synthetic [.cmj] files, laid out as [ocamlopt -target js_of_ocaml] produces
+(* Synthetic JSIR files, laid out as [ocamlopt -target js_of_ocaml] produces
    them. The programs are built directly in JSIR, as that pipeline is not
    available from these tests. *)
 
@@ -71,11 +71,12 @@ let native_string s = Code.Pc (Code.NativeString (Code.Native_string.of_string s
 
 let extern name args = Code.Prim (Code.Extern (name, None), args)
 
-let cmj_body ~name ~imports body : Code.cmj_body =
+let jsir_file ?(target = Code.Js) ~name ~imports body : Code.jsir_file =
   let body = body ~fresh:Code.Var.fresh in
   let last_var = Code.Var.count () - 1 in
   let block = { Code.params = []; body; branch = Stop } in
-  { program =
+  { target
+  ; program =
       Code.Marshalable_program.of_program
         { start = 0; blocks = Code.Addr.Map.singleton 0 block; free_pc = 1 }
   ; last_var
@@ -84,19 +85,17 @@ let cmj_body ~name ~imports body : Code.cmj_body =
   ; force_link = false
   }
 
-let write_cmj file (body : Code.cmj_body) =
+let write_jsir_file file (body : Code.jsir_file) =
   let oc = open_out_bin file in
-  output_string oc (Magic_number.to_string Magic_number.current_cmj);
+  output_string oc (Magic_number.to_string Magic_number.current_jsir);
   output_value oc body;
   close_out oc
 
-let read_cmj file =
+let read_jsir_file file =
   let ic = open_in_bin file in
-  let magic = Magic_number.of_string (really_input_string ic Magic_number.size) in
-  assert (Magic_number.equal magic Magic_number.current_cmj);
-  let unit = Parse_bytecode.from_cmj ic in
-  close_in ic;
-  unit
+  Fun.protect
+    ~finally:(fun () -> close_in ic)
+    (fun () -> Parse_bytecode.from_jsir_channel ~target:Code.Js ~filename:file ic)
 
 let print_unit (unit : Parse_bytecode.jsir_unit) =
   Printf.printf "unit %s\n" unit.name;
@@ -110,7 +109,7 @@ let print_unit (unit : Parse_bytecode.jsir_unit) =
   Format.pp_print_flush Format.std_formatter ()
 
 let unit_a =
-  cmj_body ~name:"A" ~imports:[] (fun ~fresh ->
+  jsir_file ~name:"A" ~imports:[] (fun ~fresh ->
       let greeting = fresh () in
       [ Let (greeting, extern "jsir_test_greet" [ string "A" ])
       ; Let
@@ -121,7 +120,7 @@ let unit_a =
       ])
 
 let unit_b =
-  cmj_body ~name:"B" ~imports:[ "A" ] (fun ~fresh ->
+  jsir_file ~name:"B" ~imports:[ "A" ] (fun ~fresh ->
       let greeting = fresh () in
       [ Let
           ( greeting
@@ -129,11 +128,11 @@ let unit_b =
       ; Let (fresh (), extern "jsir_test_print" [ Pv greeting ])
       ])
 
-let%expect_test "Parse_bytecode.from_cmj" =
+let%expect_test "Parse_bytecode.from_jsir_channel" =
   with_temp_dir ~f:(fun () ->
-      write_cmj "a.cmj" unit_a;
+      write_jsir_file "a.cmj" unit_a;
       Code.Var.reset ();
-      let unit = read_cmj "a.cmj" in
+      let unit = read_jsir_file "a.cmj" in
       print_unit unit;
       (* Fresh variables do not collide with the variables of the unit. *)
       Printf.printf "last_var: %d\n" unit_a.last_var;
@@ -151,12 +150,13 @@ let%expect_test "Parse_bytecode.from_cmj" =
     fresh: 3
     |}]
 
-let%expect_test "Parse_bytecode.from_cmj keeps fresh variables disjoint across units" =
+let%expect_test
+    "Parse_bytecode.from_jsir_channel keeps fresh variables disjoint across units" =
   with_temp_dir ~f:(fun () ->
-      write_cmj "a.cmj" unit_a;
-      write_cmj "b.cmj" unit_b;
+      write_jsir_file "a.cmj" unit_a;
+      write_jsir_file "b.cmj" unit_b;
       Code.Var.reset ();
-      List.iter [ "a.cmj"; "b.cmj" ] ~f:(fun file -> print_unit (read_cmj file));
+      List.iter [ "a.cmj"; "b.cmj" ] ~f:(fun file -> print_unit (read_jsir_file file));
       (* Fresh variables do not collide with the variables of any unit. *)
       Printf.printf "last_var: %d, %d\n" unit_a.last_var unit_b.last_var;
       Printf.printf "fresh: %d\n" (Code.Var.idx (Code.Var.fresh ())));
@@ -202,8 +202,8 @@ function jsir_test_unused() {
 
 let setup () =
   Filetype.write_js ~name:"stubs.js" (Filetype.js_text_of_string stubs) |> ignore;
-  write_cmj "a.cmj" unit_a;
-  write_cmj "b.cmj" unit_b;
+  write_jsir_file "a.cmj" unit_a;
+  write_jsir_file "b.cmj" unit_b;
   js_of_ocaml [ "build-runtime"; "-o"; "runtime.js" ] |> print_string
 
 (* [filter] selects the lines of the program's output to print. *)
@@ -218,7 +218,7 @@ let print_unit_infos file =
   List.iter (file_lines_text file) ~f:(fun line ->
       if String.starts_with ~prefix:Unit_info.prefix line then print_endline line)
 
-let%expect_test "cmj without --include-runtime" =
+let%expect_test "JSIR file without --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
       js_of_ocaml [ "stubs.js"; "a.cmj"; "-o"; "a.js" ] |> print_string;
@@ -237,7 +237,7 @@ let%expect_test "cmj without --include-runtime" =
     TypeError: b.jsir_test_greet is not a function
     |}]
 
-let%expect_test "cmj with --include-runtime" =
+let%expect_test "JSIR file with --include-runtime" =
   with_temp_dir ~f:(fun () ->
       setup ();
       js_of_ocaml [ "--include-runtime"; "stubs.js"; "a.cmj"; "-o"; "a.js" ]
@@ -255,4 +255,32 @@ let%expect_test "cmj with --include-runtime" =
     //# unitInfo: Provides: B
     //# unitInfo: Requires: A
     hello A
+    |}]
+
+(* The error messages, without the path to the executable. *)
+let print_errors output =
+  let marker = "Error: " in
+  let len = String.length marker in
+  String.split_on_char ~sep:'\n' output
+  |> List.iter ~f:(fun line ->
+      let rec loop i =
+        if i + len <= String.length line
+        then
+          if String.equal (String.sub line ~pos:i ~len) marker
+          then print_endline (String.sub line ~pos:i ~len:(String.length line - i))
+          else loop (i + 1)
+      in
+      loop 0)
+
+let%expect_test "js_of_ocaml rejects units compiled for wasm_of_ocaml" =
+  with_temp_dir ~f:(fun () ->
+      let unit = jsir_file ~target:Code.Wasm ~name:"W" ~imports:[] (fun ~fresh:_ -> []) in
+      write_jsir_file "w.cmw" unit;
+      write_jsir_file "w.cmj" unit;
+      print_errors (js_of_ocaml ~fail:false [ "w.cmw"; "-o"; "w.js" ]);
+      print_errors (js_of_ocaml ~fail:false [ "w.cmj"; "-o"; "w.js" ]));
+  [%expect
+    {|
+    Error: w.cmw was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
+    Error: w.cmj was compiled for wasm_of_ocaml (ocamlopt -target wasm_of_ocaml) and cannot be compiled to JavaScript
     |}]

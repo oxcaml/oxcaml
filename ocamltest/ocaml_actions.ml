@@ -27,21 +27,28 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
-let no_jsir_reason = "js_of_ocaml not available"
+let no_jsir_js_reason = "js_of_ocaml not available"
 
-let no_jsir _log env =
-  (Result.skip_with_reason no_jsir_reason, env)
+let no_jsir_wasm_reason = "wasm_of_ocaml not available"
 
-let jsir_action a =
-  if Ocamltest_config.native_compiler && Ocaml_files.jsir_available then a
-  else (Actions.update a no_jsir)
+let jsir_action ~available ~reason a =
+  if Ocamltest_config.native_compiler && available then a
+  else Actions.update a (fun _log env -> (Result.skip_with_reason reason, env))
 
-(* Jsir is compiled by ocamlopt (-target js_of_ocaml), so it takes the
-   ocamlopt variables. *)
+let jsir_js_action =
+  jsir_action ~available:Ocaml_files.jsir_js_available
+    ~reason:no_jsir_js_reason
+
+let jsir_wasm_action =
+  jsir_action ~available:Ocaml_files.jsir_wasm_available
+    ~reason:no_jsir_wasm_reason
+
+(* Jsir_js and Jsir_wasm are compiled by ocamlopt (-target js_of_ocaml and
+   -target wasm_of_ocaml), so they take the ocamlopt variables. *)
 let get_backend_value_from_env env ocamlc_var ocamlopt_var backend =
   match (backend : Ocaml_backends.t) with
   | Bytecode -> Environments.safe_lookup ocamlc_var env
-  | Native | Jsir -> Environments.safe_lookup ocamlopt_var env
+  | Native | Jsir_js | Jsir_wasm -> Environments.safe_lookup ocamlopt_var env
 
 let modules env =
   Actions_helpers.words_of_variable env Ocaml_variables.modules
@@ -100,9 +107,12 @@ let default_ocaml_env = [|
 let compiler_env backend =
   match (backend : Ocaml_backends.t) with
   | Native | Bytecode -> default_ocaml_env
-  | Jsir ->
+  | Jsir_js ->
     Array.append default_ocaml_env
       [| "OXCAML_JS_OF_OCAML=" ^ Ocaml_files.js_of_ocaml |]
+  | Jsir_wasm ->
+    Array.append default_ocaml_env
+      [| "OXCAML_WASM_OF_OCAML=" ^ Ocaml_files.wasm_of_ocaml |]
 
 type module_generator = {
   description : string;
@@ -492,11 +502,17 @@ let setup_ocamlopt_opt_build_env =
       "setup-ocamlopt.opt-build-env"
       Ocaml_compilers.ocamlopt_opt)
 
-let setup_ocamlopt_jsir_build_env =
-  jsir_action
+let setup_ocamlopt_jsir_js_build_env =
+  jsir_js_action
     (mk_compiler_env_setup
-      "setup-ocamlopt.jsir-build-env"
-      Ocaml_compilers.ocamlopt_jsir)
+      "setup-ocamlopt.jsir-js-build-env"
+      Ocaml_compilers.ocamlopt_jsir_js)
+
+let setup_ocamlopt_jsir_wasm_build_env =
+  jsir_wasm_action
+    (mk_compiler_env_setup
+      "setup-ocamlopt.jsir-wasm-build-env"
+      Ocaml_compilers.ocamlopt_jsir_wasm)
 
 let setup_ocaml_build_env =
   mk_toplevel_env_setup
@@ -576,23 +592,42 @@ let ocamlopt_opt =
       ~does_something:true
       (compile Ocaml_compilers.ocamlopt_opt))
 
-let ocamlopt_jsir =
-  jsir_action
+let ocamlopt_jsir_js =
+  jsir_js_action
     (Actions.make
-      ~name:"ocamlopt.jsir"
+      ~name:"ocamlopt.jsir-js"
       ~description:
         "Compile the program to JavaScript using \
          ocamlopt.opt -target js_of_ocaml"
       ~does_something:true
-      (compile Ocaml_compilers.ocamlopt_jsir))
+      (compile Ocaml_compilers.ocamlopt_jsir_js))
+
+let ocamlopt_jsir_wasm =
+  jsir_wasm_action
+    (Actions.make
+      ~name:"ocamlopt.jsir-wasm"
+      ~description:
+        "Compile the program to WebAssembly using \
+         ocamlopt.opt -target wasm_of_ocaml"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlopt_jsir_wasm))
 
 let run_js =
-  jsir_action
+  jsir_js_action
     (Actions.make
       ~name:"run-js"
       ~description:"Run the JavaScript program with node"
       ~does_something:true
       (Actions_helpers.run_program_with ~interpreter:Ocaml_files.node))
+
+let run_wasm =
+  jsir_wasm_action
+    (Actions.make
+      ~name:"run-wasm"
+      ~description:"Run the wasm_of_ocaml program with node"
+      ~does_something:true
+      (Actions_helpers.run_program_with
+        ~interpreter:(Ocaml_files.node ^ " " ^ Ocaml_files.node_wasm_flags)))
 
 let env_with_lib_unix env =
   let libunixdir = Ocaml_directories.libunix in
@@ -934,7 +969,7 @@ let run_expect_once input_file principal log env ~backend =
     match (backend : Ocaml_backends.t) with
     | Bytecode -> Ocaml_commands.expect
     | Native -> Ocaml_commands.expectnat
-    | Jsir -> invalid_arg "run_expect_once: no JSIR toplevel"
+    | Jsir_js | Jsir_wasm -> invalid_arg "run_expect_once: no JSIR toplevel"
   in
   let commandline =
   [
@@ -1040,10 +1075,15 @@ let check_ocamlopt_opt_output =
     (make_check_compiler_output
       "check-ocamlopt.opt-output" Ocaml_compilers.ocamlopt_opt)
 
-let check_ocamlopt_jsir_output =
-  jsir_action
+let check_ocamlopt_jsir_js_output =
+  jsir_js_action
     (make_check_compiler_output
-      "check-ocamlopt.jsir-output" Ocaml_compilers.ocamlopt_jsir)
+      "check-ocamlopt.jsir-js-output" Ocaml_compilers.ocamlopt_jsir_js)
+
+let check_ocamlopt_jsir_wasm_output =
+  jsir_wasm_action
+    (make_check_compiler_output
+      "check-ocamlopt.jsir-wasm-output" Ocaml_compilers.ocamlopt_jsir_wasm)
 
 let really_compare_programs backend comparison_tool log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -1722,10 +1762,14 @@ let init () =
     setup_ocamlopt_opt_build_env;
     ocamlopt_opt;
     check_ocamlopt_opt_output;
-    setup_ocamlopt_jsir_build_env;
-    ocamlopt_jsir;
-    check_ocamlopt_jsir_output;
+    setup_ocamlopt_jsir_js_build_env;
+    ocamlopt_jsir_js;
+    check_ocamlopt_jsir_js_output;
     run_js;
+    setup_ocamlopt_jsir_wasm_build_env;
+    ocamlopt_jsir_wasm;
+    check_ocamlopt_jsir_wasm_output;
+    run_wasm;
     run_expect;
     run_expectnat;
     compare_bytecode_programs;

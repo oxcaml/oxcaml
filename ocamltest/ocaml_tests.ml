@@ -88,28 +88,84 @@ let native =
       (if Ocamltest_config.native_compiler then opt_actions else [skip])
   }
 
+let jsir_actions ~available ~reason actions =
+  if not Ocamltest_config.native_compiler then
+    [Actions_helpers.skip_with_reason "native compiler disabled"]
+  else if not available then
+    [Actions_helpers.skip_with_reason reason]
+  else actions
+
+let jsir_js_actions =
+  [
+    setup_ocamlopt_jsir_js_build_env;
+    ocamlopt_jsir_js;
+    check_ocamlopt_jsir_js_output;
+    run_js;
+    check_program_output;
+  ]
+
+let jsir_wasm_actions =
+  [
+    setup_ocamlopt_jsir_wasm_build_env;
+    ocamlopt_jsir_wasm;
+    check_ocamlopt_jsir_wasm_output;
+    run_wasm;
+    check_program_output;
+  ]
+
+let jsir_js =
+  {
+    test_name = "jsir-js";
+    test_run_by_default = false;
+    test_description =
+      "Build JavaScript program with ocamlopt -target js_of_ocaml, run it \
+       with node and check its output";
+    test_actions =
+      jsir_actions ~available:Ocaml_files.jsir_js_available
+        ~reason:Ocaml_actions.no_jsir_js_reason jsir_js_actions
+  }
+
+let jsir_wasm =
+  {
+    test_name = "jsir-wasm";
+    test_run_by_default = false;
+    test_description =
+      "Build WebAssembly program with ocamlopt -target wasm_of_ocaml, run \
+       it with node and check its output";
+    test_actions =
+      jsir_actions ~available:Ocaml_files.jsir_wasm_available
+        ~reason:Ocaml_actions.no_jsir_wasm_reason jsir_wasm_actions
+  }
+
+(* The JavaScript half runs in its own copy of the environment, so that the
+   variables it sets (program, compiler output and reference...) do not leak
+   into the wasm half. *)
+let run_jsir_js =
+  Actions.make ~name:"run-jsir-js-test"
+    ~description:"Run the jsir-js test"
+    ~does_something:true
+    (fun log env ->
+      let (result, env') = Tests.run log env jsir_js in
+      if Result.is_pass result then (result, env) else (result, env'))
+
+(* The halves whose compiler is installed; skipped when neither is. *)
 let jsir =
   let actions =
-    if not Ocamltest_config.native_compiler then
-      [Actions_helpers.skip_with_reason "native compiler disabled"]
-    else if not Ocaml_files.jsir_available then
-      [Actions_helpers.skip_with_reason Ocaml_actions.no_jsir_reason]
-    else
-      [
-        setup_ocamlopt_jsir_build_env;
-        ocamlopt_jsir;
-        check_ocamlopt_jsir_output;
-        run_js;
-        check_program_output;
-      ]
+    match Ocaml_files.jsir_js_available, Ocaml_files.jsir_wasm_available with
+    | true, true -> run_jsir_js :: jsir_wasm_actions
+    | true, false -> jsir_js_actions
+    | false, true -> jsir_wasm_actions
+    | false, false -> []
   in
   {
     test_name = "jsir";
     test_run_by_default = true;
-    test_description =
-      "Build JavaScript program with ocamlopt -target js_of_ocaml, run it \
-       with node and check its output";
-    test_actions = actions
+    test_description = "Run the jsir-js test, then the jsir-wasm test";
+    test_actions =
+      jsir_actions
+        ~available:
+          (Ocaml_files.jsir_js_available || Ocaml_files.jsir_wasm_available)
+        ~reason:"js_of_ocaml and wasm_of_ocaml not available" actions
   }
 
 let toplevel = {
@@ -238,6 +294,8 @@ let init () =
     bytecode;
     native;
     jsir;
+    jsir_js;
+    jsir_wasm;
     toplevel;
     nattoplevel;
     expect;
