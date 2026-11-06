@@ -1433,21 +1433,42 @@ type traps =
     mutable enter_traps : L.Set.t
   }
 
-let traps = { push_traps = []; pop_traps = []; enter_traps = L.Set.empty }
+let create_traps () =
+  { push_traps = []; pop_traps = []; enter_traps = L.Set.empty }
+
+let traps = create_traps ()
+
+(* The traps of code in COMDAT groups, by group, which go in notes in those
+   groups. *)
+let group_traps = ref []
 
 let reset_traps () =
   traps.push_traps <- [];
   traps.pop_traps <- [];
-  traps.enter_traps <- L.Set.empty
+  traps.enter_traps <- L.Set.empty;
+  group_traps := []
+
+let current_traps () =
+  match Emitaux.current_group () with
+  | None -> traps
+  | Some group -> (
+    match List.find_opt (fun (g, _) -> String.equal g group) !group_traps with
+    | Some (_, traps) -> traps
+    | None ->
+      let traps = create_traps () in
+      group_traps := (group, traps) :: !group_traps;
+      traps)
 
 let emit_pop_trap_label () =
   let lbl = L.create Text in
   D.define_label lbl;
+  let traps = current_traps () in
   traps.pop_traps <- lbl :: traps.pop_traps
 
 let emit_push_trap_label handler =
   let lbl = L.create Text in
   D.define_label lbl;
+  let traps = current_traps () in
   traps.push_traps <- lbl :: traps.push_traps;
   traps.enter_traps <- L.Set.add handler traps.enter_traps
 
@@ -3325,19 +3346,38 @@ let emit_trap_notes () =
     List.iter (fun l -> D.label l) list;
     D.int64 0L
   in
-  let emit_desc () =
-    D.symbol S.Predef.stapsdt_base;
-    emit_labels (L.Set.elements traps.enter_traps);
-    emit_labels traps.push_traps;
-    emit_labels traps.pop_traps
+  let emit_note traps =
+    let emit_desc () =
+      D.symbol S.Predef.stapsdt_base;
+      emit_labels (L.Set.elements traps.enter_traps);
+      emit_labels traps.push_traps;
+      emit_labels traps.pop_traps
+    in
+    Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
+      ~emit_desc
+  in
+  let has_traps traps = not (L.Set.is_empty traps.enter_traps) in
+  let group_traps =
+    List.filter (fun (_, traps) -> has_traps traps) (List.rev !group_traps)
   in
   if
     is_system_supported && !Arch.trap_notes
-    && not (L.Set.is_empty traps.enter_traps)
+    && (has_traps traps || not (Misc.Stdlib.List.is_empty group_traps))
   then (
-    D.switch_to_section Note_ocaml_eh;
-    Emitaux.emit_elf_note ~section:Note_ocaml_eh ~owner:"OCaml" ~typ:1l
-      ~emit_desc;
+    if has_traps traps
+    then (
+      D.switch_to_section Note_ocaml_eh;
+      emit_note traps);
+    (* A note in a COMDAT group is discarded along with the group, as a losing
+       copy of a weak function must be. *)
+    List.iter
+      (fun (group, traps) ->
+        D.switch_to_section_raw ~names:[".note.ocaml_eh"] ~flags:(Some "G")
+          ~args:["\"note\""; group; "comdat"]
+          ~is_delayed:false;
+        D.unsafe_set_internal_section_ref Note_ocaml_eh;
+        emit_note traps)
+      group_traps;
     (* Reuse stapsdt base section for calculating addresses after prelinking *)
     Emitaux.emit_stapsdt_base_section ();
     (* Switch back to Data section *)

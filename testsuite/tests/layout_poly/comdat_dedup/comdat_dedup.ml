@@ -1,7 +1,8 @@
 (* TEST
  frametable_sections;
  unset OCAMLPARAM;
- readonly_files = "lpoly_lib.mli lpoly_lib.ml user1.ml user2.ml user3.ml";
+ readonly_files = "lpoly_lib.mli lpoly_lib.ml user1.ml user2.ml user3.ml \
+   lpoly_probe.mli lpoly_probe.ml probe_user1.ml probe_user2.ml";
  arguments = "1";
  setup-ocamlopt.byte-build-env;
  {
@@ -22,6 +23,36 @@
   program = "${test_build_directory}/comdat_dedup.exe";
   all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
   ocamlopt.byte;
+  run;
+ }{
+  probes;
+  flags = "-extension layout_poly_alpha -nocwd -Ix .";
+  module = "lpoly_lib.mli";
+  ocamlopt.byte;
+  module = "lpoly_lib.ml";
+  ocamlopt.byte;
+  module = "user1.ml";
+  ocamlopt.byte;
+  module = "user2.ml";
+  ocamlopt.byte;
+  module = "user3.ml";
+  ocamlopt.byte;
+  module = "lpoly_probe.mli";
+  ocamlopt.byte;
+  module = "lpoly_probe.ml";
+  ocamlopt.byte;
+  module = "probe_user1.ml";
+  ocamlopt.byte;
+  module = "probe_user2.ml";
+  ocamlopt.byte;
+  module = "comdat_dedup.ml";
+  ocamlopt.byte;
+  unset module;
+  program = "${test_build_directory}/comdat_dedup.exe";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx \
+    lpoly_probe.cmx probe_user1.cmx probe_user2.cmx comdat_dedup.cmx";
+  ocamlopt.byte;
+  arguments = "1 probe_user1.o probe_user2.o";
   run;
  }{
   flags = "-extension layout_poly_alpha -nocwd -Ix . -Oclassic";
@@ -102,12 +133,16 @@
    with each losing copy of the code. The third block compiles [user1.ml] and
    [user2.ml] at different optimization levels, so that the copies differ.
    Calling both instances runs the GC through the surviving copy's frame.
-   [lpoly_select] has a jump table, which likewise refers into the code.
+   [lpoly_select] has a jump table, [lpoly_try] an exception handler listed in
+   a trap note, and [Lpoly_probe.lpoly_probe] (where probes are supported) a
+   probe site listed in a probe note, all of which likewise refer into the
+   code.
 
    The test runs the linked program and then shells out to [nm] to inspect
    the symbol table, and to [readelf] to check that nothing outside a COMDAT
    group refers into it by section (which would dangle when a losing copy is
-   discarded, whether or not the linker notices).
+   discarded, whether or not the linker notices). Any further arguments name
+   more object files to check.
 
    The internal assembler does not support weak functions, so the last block
    (amd64 only) falls back to private copies of each instance: the program's argument, the
@@ -125,12 +160,22 @@ let () =
   let #(k1, e, f) = User1.select 3 5 in
   let #(k2, g, h) = User2.select 5 6 in
   assert (k1 = 5 lxor 99 && box e = 2.0 && box f = 1.0);
-  assert (k2 = 36 && box g = 4.0 && box h = 3.0)
+  assert (k2 = 36 && box g = 4.0 && box h = 3.0);
+  let #(k1, e, f) = User1.try_ "12" in
+  let #(k2, g, h) = User2.try_ "x" in
+  assert (k1 = 12 && box e = 2.0 && box f = 1.0);
+  assert (k2 = -1 && box g = 4.0 && box h = 3.0);
+  let #(k1, e, f) = User1.local 3 in
+  let #(k2, g, h) = User2.local 6 in
+  assert (k1 = 4 && box e = 2.0 && box f = 1.0);
+  assert (k2 = 9 && box g = 4.0 && box h = 3.0)
 
 let expected_symbol_res =
   [ "camlLpoly_lib__Lpoly_lib_lpoly_pair_.*float64_float64__cohort_code$";
     "camlLpoly_lib__Lpoly_lib_lpoly_call_between_.*float64_float64__cohort_code$";
-    "camlLpoly_lib__Lpoly_lib_lpoly_select_.*float64_float64__cohort_code$" ]
+    "camlLpoly_lib__Lpoly_lib_lpoly_select_.*float64_float64__cohort_code$";
+    "camlLpoly_lib__Lpoly_lib_lpoly_try_.*float64_float64__cohort_code$";
+    "camlLpoly_lib__Lpoly_lib_lpoly_local_.*float64_float64__cohort_code$" ]
 
 let expected_copies = int_of_string Sys.argv.(1)
 
@@ -221,7 +266,8 @@ let () =
   let bad =
     List.concat_map
       (fun obj -> bad_relocations (Filename.concat dir obj))
-      ["user1.o"; "user2.o"; "user3.o"]
+      (["user1.o"; "user2.o"; "user3.o"]
+      @ Array.to_list (Array.sub Sys.argv 2 (Array.length Sys.argv - 2)))
   in
   if bad <> []
   then begin

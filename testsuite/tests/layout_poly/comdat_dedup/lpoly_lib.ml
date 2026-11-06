@@ -18,3 +18,12 @@ let[@inline never] poly_ lpoly_select n m x y =
     | _ -> m
   in
   #(k, y, x)
+
+let[@inline never] poly_ lpoly_try s x y =
+  let k = try int_of_string s with Failure _ -> -1 in
+  #(k, y, x)
+
+let[@inline never] poly_ lpoly_local n x y =
+  let r = stack_ { contents = Float.of_int n } in
+  r.contents <- (r.contents *. 1.5) +. 0.25;
+  #(Float.to_int (Sys.opaque_identity r).contents, y, x)

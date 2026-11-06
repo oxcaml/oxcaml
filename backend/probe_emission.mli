@@ -38,6 +38,9 @@ type probe = private
     probe_label : Label.t;
         (** Probe site, recorded in .note.stapsdt section for enabling and
             disabling the probes *)
+    probe_group : string option;
+        (** The COMDAT group of the probe site's code, if any, which the note
+            joins *)
     probe_insn : Linear.instruction
         (** For optimized probes, the Iprobe instruction, recorded at the probe
             site and used for emitting the notes and the wrapper code at the end

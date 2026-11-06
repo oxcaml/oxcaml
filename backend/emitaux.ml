@@ -719,6 +719,8 @@ let with_snapshot ~f =
   current_group := saved_current_group;
   result
 
+let current_group () = !current_group
+
 let get_file_num ~file_emitter file_name =
   try List.assoc file_name !file_pos_nums
   with Not_found ->

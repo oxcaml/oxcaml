@@ -64,6 +64,10 @@ val record_frame_descr :
     [-frametable-sections], which requires a [link_symbol]. *)
 val enter_code_section : ?link_symbol:string -> ?group:string -> string -> unit
 
+(** The [group] last passed to [enter_code_section]. Anything else that refers
+    to labels in the current section must join it too. *)
+val current_group : unit -> string option
+
 (* When set before [emit_frames], every frame descriptor escapes to the normal
    format instead of the short encoding. Backends set this when the short format
    cannot be emitted (currently only MASM, which lacks .uleb128). *)

@@ -41,6 +41,7 @@ type probe =
     probe_label : Label.t;
     (* Probe site, recorded in .note.stapsdt section for enabling and disabling
        the probes *)
+    probe_group : string option;
     probe_insn : Linear.instruction
         (* Iprobe instruction, recorded at probe site and used for emitting the
            notes and the wrapper code at the end of the compilation unit. *)
@@ -60,6 +61,7 @@ let add_probe ~stack_offset ~num_stack_slots ~contains_calls ~probe_name
       probe_enabled_at_init;
       probe_handler_code_sym;
       probe_label;
+      probe_group = Emitaux.current_group ();
       probe_insn
     }
   in
@@ -152,7 +154,25 @@ let emit_probe_notes0 () =
     Emitaux.emit_elf_note ~section:Stapsdt_note ~owner:"stapsdt" ~typ:3l
       ~emit_desc
   in
-  List.iter describe_one_probe !probes
+  List.iter describe_one_probe
+    (List.filter (fun p -> Option.is_none p.probe_group) !probes);
+  let grouped =
+    List.filter_map
+      (fun p -> Option.map (fun group -> group, p) p.probe_group)
+      !probes
+  in
+  (* A note in a COMDAT group is discarded along with the group, as a losing
+     copy of a weak function must be. *)
+  List.iter
+    (fun (group, p) ->
+      D.switch_to_section_raw ~names:[".note.stapsdt"] ~flags:(Some "G")
+        ~args:["\"note\""; group; "comdat"]
+        ~is_delayed:false;
+      D.unsafe_set_internal_section_ref Stapsdt_note;
+      describe_one_probe p)
+    grouped;
+  (* Sections with the "?" flag join the group of the previous section. *)
+  if not (Misc.Stdlib.List.is_empty grouped) then D.data ()
 
 let emit_dummy_probe_notes () =
   (* A semaphore may be used via [%probe_is_enabled] without a corresponding
