@@ -1,6 +1,13 @@
 # Replace sections of LLDB and GDB output
 # This primarily looks for hex addresses, process ids, filepaths and
 # other specific details of the machine the test is running on.
+# Frames below main depend on the C library; drop them (LLDB only:
+# GDB frames carry no module prefix, and macOS LLDB bottoms out in dyld).
+# Stopping the backtrace at main in lldb_test.py would subsume these two
+# rules without naming modules, but changes every reference; deferred.
+/^frame [0-9]+: (libc\.so\.6|ld-linux[^`]*)`/ { next }
+/^frame [0-9]+: meander`_start$/ { next }
+
 {
     # Replace single quoted file paths
     gsub(/'(.*)'/,"'XXXX'")
@@ -22,6 +29,7 @@
 
     # Replace architecture identifiers
     gsub("(x86_64)", "$ARCH")
+    gsub("(aarch64)", "$ARCH")
     gsub("(arm64)", "$ARCH")
     gsub("(riscv64)", "$ARCH")
 
@@ -46,6 +54,10 @@
 
     # Work around inconsistent name mangling
     gsub(/c_to_ocaml_[0-9]+/, "c_to_ocaml")
+
+    # caml_program and the startup unit's code_begin marker label the same
+    # address; which name LLDB displays varies by target.
+    gsub(/caml_startup__code_begin/, "caml_program")
 
     # Work around symbol versioning
     gsub(/__libc_start_main_impl$/, "__libc_start_mainXXXX")
