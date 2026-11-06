@@ -18,44 +18,44 @@
 *)
 
 subdirectories = "liba liba_alt libb libc";
-setup-ocamlc.byte-build-env;
+setup-ocamlopt.opt-build-env;
 
 (* Compile both versions of liba *)
 flags = "-I liba -nocwd";
 module = "liba/a.ml";
-ocamlc.byte;
+ocamlopt.opt;
 
 flags = "-I liba_alt -nocwd";
 module = "liba_alt/a.ml";
-ocamlc.byte;
+ocamlopt.opt;
 
 (* Compile libb against liba *)
 flags = "-I liba -I libb -nocwd";
 module = "libb/b.ml";
-ocamlc.byte;
+ocamlopt.opt;
 
 {
   (* Test: Basic -Ix works for transitive dependency resolution.
      -Ix liba makes A's cmi visible, so B's dependency on A is satisfied. *)
   flags = "-Ix liba -I libb -nocwd";
   module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
+  setup-ocamlopt.opt-build-env;
+  ocamlopt.opt;
 }
 {
   (* Test: -Ix works for direct module references. *)
   flags = "-Ix liba -nocwd";
   module = "libc/c2.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
+  setup-ocamlopt.opt-build-env;
+  ocamlopt.opt;
 }
 {
   (* Test: Multiple -Ix flags work together.
      Both liba and libb are provided via -Ix. *)
   flags = "-Ix liba -Ix libb -nocwd";
   module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
+  setup-ocamlopt.opt-build-env;
+  ocamlopt.opt;
 }
 
 (* Ordering of -I and -Ix determines which version of A is seen, just like
@@ -69,8 +69,8 @@ ocamlc.byte;
     flags = "-I liba -Ix liba_alt -I libb -nocwd";
   ]
   module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
+  setup-ocamlopt.opt-build-env;
+  ocamlopt.opt;
 }
 {
   not-windows;
@@ -81,12 +81,12 @@ ocamlc.byte;
     flags = "-I liba_alt -Ix liba -I libb -nocwd";
   ]
   module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
+  setup-ocamlopt.opt-build-env;
+  ocamlopt_opt_exit_status = "2";
+  ocamlopt.opt;
+  compiler_reference2 =
     "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
+  check-ocamlopt.opt-output;
 }
 
 (* Ordering among multiple -Ix flags *)
@@ -94,20 +94,20 @@ ocamlc.byte;
   (* -Ix liba before -Ix liba_alt: liba wins, compiles fine. *)
   flags = "-Ix liba -Ix liba_alt -I libb -nocwd";
   module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
+  setup-ocamlopt.opt-build-env;
+  ocamlopt.opt;
 }
 {
   (* -Ix liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
   not-windows;
   flags = "-Ix liba_alt -Ix liba -I libb -nocwd";
   module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
+  setup-ocamlopt.opt-build-env;
+  ocamlopt_opt_exit_status = "2";
+  ocamlopt.opt;
+  compiler_reference2 =
     "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
+  check-ocamlopt.opt-output;
 }
 
 *)

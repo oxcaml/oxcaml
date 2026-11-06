@@ -11,7 +11,7 @@
  ocamlc.byte;
  module = "static_mli_include_dynamic.ml";
  compiler_output = "static_mli_include_dynamic.output";
- ocamlc_byte_exit_status = "0";
+ ocamlc_byte_exit_status = "2";
  ocamlc.byte;
  compiler_reference = "static_mli_include_dynamic.reference";
  check-ocamlc.byte-output;
