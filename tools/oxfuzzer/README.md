@@ -17,6 +17,11 @@ may exceed N. Omitting this option leaves the number of failures unlimited;
 `--iterations` still limits the total number of cases. The exit status remains 1
 if any case failed.
 
+Use `--timeout-minutes M` to stop starting new cases after M minutes, counted
+from startup. As with `--max-failures`, in-flight cases finish, so the run may
+last longer than M minutes. When the run ends, oxfuzzer prints which limit
+stopped it.
+
 Failures will be saved in `output_directory/seed-<seed>/` with the following structure:
 ```
 program.ml   the generated program
