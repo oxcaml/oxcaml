@@ -116,6 +116,50 @@
   ocamlopt.byte;
   arguments = "0";
   run;
+ }{
+  arch_amd64;
+  flags = "-extension layout_poly_alpha -nocwd -Ix .";
+  module = "lpoly_lib.mli";
+  ocamlopt.byte;
+  module = "lpoly_lib.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -internal-assembler";
+  module = "user1.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix .";
+  module = "user2.ml";
+  ocamlopt.byte;
+  module = "user3.ml";
+  ocamlopt.byte;
+  module = "comdat_dedup.ml";
+  ocamlopt.byte;
+  unset module;
+  program = "${test_build_directory}/comdat_dedup.exe";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
+  ocamlopt.byte;
+  run;
+ }{
+  arch_amd64;
+  flags = "-extension layout_poly_alpha -nocwd -Ix .";
+  module = "lpoly_lib.mli";
+  ocamlopt.byte;
+  module = "lpoly_lib.ml";
+  ocamlopt.byte;
+  module = "user1.ml";
+  ocamlopt.byte;
+  module = "user2.ml";
+  ocamlopt.byte;
+  flags = "-extension layout_poly_alpha -nocwd -Ix . -internal-assembler";
+  module = "user3.ml";
+  ocamlopt.byte;
+  module = "comdat_dedup.ml";
+  ocamlopt.byte;
+  unset module;
+  flags = "-extension layout_poly_alpha -nocwd -Ix .";
+  program = "${test_build_directory}/comdat_dedup.exe";
+  all_modules = "lpoly_lib.cmx user1.cmx user2.cmx user3.cmx comdat_dedup.cmx";
+  ocamlopt.byte;
+  run;
  }
 *)
 
@@ -144,9 +188,13 @@
    discarded, whether or not the linker notices). Any further arguments name
    more object files to check.
 
-   The internal assembler does not support weak functions, so the last block
-   (amd64 only) falls back to private copies of each instance: the program's argument, the
-   expected number of copies of each cohort's shared symbol, is 0. *)
+   The internal assembler does not support weak functions, so the
+   [-internal-assembler] block (amd64 only) falls back to private copies of
+   each instance: the program's first argument, the expected number of copies
+   of each cohort's shared symbol, is 0. The last two blocks mix units with
+   and without weak functions: a unit without them must give its instances
+   private symbols that other units then use, and must itself use the shared
+   symbols of other units' instances. *)
 
 external box : float# -> float = "%box_float"
 
@@ -154,6 +202,7 @@ let () =
   let _ = Sys.opaque_identity User1.pair () in
   let _ = Sys.opaque_identity User2.pair () in
   let _ = Sys.opaque_identity User3.call_user1 () in
+  assert (Sys.opaque_identity User3.call_sole () = 11.0);
   let #(a, b) = User1.call_between () in
   let #(c, d) = User2.call_between () in
   assert (box a = 2.0 && box b = 1.0 && box c = 4.0 && box d = 3.0);

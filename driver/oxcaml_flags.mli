@@ -137,6 +137,13 @@ val internal_assembler : bool ref
 
 val verify_binary_emitter : bool ref
 
+(** Whether the target and backend can deduplicate weak functions (see
+    [Cmm.is_global]): they need ELF COMDAT groups and frametable pieces that can
+    join them (as for [-frametable-sections]), so neither the LLVM backend nor
+    the internal assembler. Without them, each unit keeps private copies of the
+    instances of layout-polymorphic functions it uses. *)
+val weak_functions_supported : unit -> bool
+
 val gc_timings : bool ref
 
 val use_cached_generic_functions : bool ref

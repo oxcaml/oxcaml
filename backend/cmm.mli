@@ -201,12 +201,6 @@ type is_global =
 
 val equal_is_global : is_global -> is_global -> bool
 
-(** Whether the target and backend can deduplicate [Weak] functions: they need
-    ELF COMDAT groups and frametable pieces that can join them (as for
-    [-frametable-sections]), so neither the LLVM backend nor the internal
-    assembler. *)
-val weak_functions_supported : unit -> bool
-
 (* Symbols are marked with whether they are local, global, or weak, at both
    definition and use sites.
 
@@ -221,7 +215,7 @@ val weak_functions_supported : unit -> bool
    definition in more than one compilation unit; the linker deduplicates them
    (via COMDAT on ELF). They are used for the code of instantiations of
    layout-polymorphic functions (see [Cohort_id]); only functions may be [Weak],
-   not data, and only when [weak_functions_supported ()].
+   not data, and only when [Oxcaml_flags.weak_functions_supported ()].
 
    (Marking symbols in this way speeds up linking, as many references can then
    be resolved early) *)

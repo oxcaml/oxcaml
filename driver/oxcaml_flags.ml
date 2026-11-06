@@ -173,6 +173,14 @@ let internal_assembler = ref false
 
 let verify_binary_emitter = ref false
 
+let weak_functions_supported () =
+  (* A weak function's frame descriptors go in a frametable piece in its group,
+     which needs what [-frametable-sections] needs (see [Optmaindriver]). *)
+  Config.frametable_sections
+  && (not !Clflags.llvm_backend)
+  && (not !internal_assembler)
+  && not !verify_binary_emitter
+
 let gc_timings = ref false
 
 let symbol_visibility_protected = ref false (* -symbol-visibility-protected*)

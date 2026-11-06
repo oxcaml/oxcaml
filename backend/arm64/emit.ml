@@ -1324,7 +1324,7 @@ let has_weak_functions = ref false
 (* Switch to a COMDAT text section for a weak function. Mirrors the amd64
    emitter; arm64 GAS uses [%progbits] instead of [@progbits]. *)
 let emit_weak_text_section_for_symbol sym_name =
-  if not (Cmm.weak_functions_supported ())
+  if not (Oxcaml_flags.weak_functions_supported ())
   then
     (* CR-someday: macOS could use [.weak_definition] plus the default
        [.subsections_via_symbols] mode. *)

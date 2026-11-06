@@ -1157,7 +1157,7 @@ let has_weak_functions = ref false
    symbol use the [comdat] key, so the linker keeps exactly one copy across all
    object files that contain this group. *)
 let emit_weak_text_section_for_symbol sym_name =
-  if not (Cmm.weak_functions_supported ())
+  if not (Oxcaml_flags.weak_functions_supported ())
   then
     (* CR-someday: macOS could use [.weak_definition]; PE-COFF has its own
        selectany COMDAT syntax. *)

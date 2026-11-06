@@ -91,14 +91,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       ~param_types:(List.map snd return_cont_params)
   in
   let r =
-    let cohort_code_names =
-      (* Without weak functions, each unit keeps its own private copy of every
-         cohort member it uses. *)
-      if Cmm.weak_functions_supported ()
-      then To_cmm_cohorts.code_names all_code
-      else Code_id.Map.empty
-    in
-    R.create ~reachable_names ~cohort_code_names
+    R.create ~reachable_names
+      ~cohort_code_names:(To_cmm_cohorts.code_names all_code)
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
   let body, body_free_vars, body_symbol_inits, res =
