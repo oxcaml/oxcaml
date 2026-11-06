@@ -42,8 +42,9 @@ val record_call :
 (** [record_call pass f] calls [f] and records its profile information.
 
     [level] (default 1) is the least value of [Clflags.profile_level] at which
-    [pass] is recorded. At lower levels, neither [pass] nor any pass recorded
-    while [f] is running is recorded. *)
+    [pass] is recorded, where level 0 records as level 1: profiling is always
+    recorded and the options only control what is displayed. At lower levels,
+    neither [pass] nor any pass recorded while [f] is running is recorded. *)
 
 val record_call_with_counters :
   ?accumulate:bool -> ?level:int -> counter_f:('a -> Counters.t) ->

@@ -101,9 +101,10 @@ let reset () = hierarchy := create ()
    least as detailed, so they are skipped too *)
 let skipping = ref false
 
+(* Level 1 is always recorded, even when nothing will be displayed *)
 let record_call_internal ?(accumulate = false) ?(level = 1) ?counter_f name f =
-  if !Clflags.profile_level = 0 || !skipping then f ()
-  else if !Clflags.profile_level < level then
+  if !skipping then f ()
+  else if Int.max 1 !Clflags.profile_level < level then
     Misc.protect_refs [R (skipping, true)] f
   else
   let E prev_hierarchy = !hierarchy in
