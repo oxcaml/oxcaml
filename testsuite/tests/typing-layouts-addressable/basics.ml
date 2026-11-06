@@ -14,15 +14,9 @@ type t : any addressable
 type t : any addressable
 |}]
 
-type t : (bits8 & bits16) addressable
+type t : (bits8 & bits16 inherit) addressable
 [%%expect{|
-Line 1, characters 26-37:
-1 | type t : (bits8 & bits16) addressable
-                              ^^^^^^^^^^^
-Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "bits8 & bits16".
-
-type t : bits8 & bits16
+type t : (bits8 & bits16 inherit) addressable
 |}]
 
 type t : bits8 addressable & bits16
