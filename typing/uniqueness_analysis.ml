@@ -2276,6 +2276,11 @@ and pattern_match_barrier pat paths : UF.t =
        forcing a lazy expression is like calling a nullary-function *)
     consume_memory_address Lazy
   | Tpat_addr _ -> borrow_memory_address ()
+  | Tpat_slice { shape = Tslice_empty; _ } ->
+    (* reading the length of a slice does not access memory because it's not
+       an allocation *)
+    no_memory_access ()
+  | Tpat_slice { shape = Tslice_front _; _ } -> borrow_memory_address ()
   | Tpat_deref _ | Tpat_alias_deref _ ->
     (* taking the address of a position does not read it *)
     no_memory_access ()
@@ -2400,6 +2405,16 @@ and pattern_match_single ?base_paths pat paths : Ienv.Extension.t * UF.t =
          borrows and yields both. See Note [Loading from addresses]. *)
       let paths = Paths.address_load mut paths in
       pattern_match_single ~base_paths arg paths
+    | Tpat_slice { shape = Tslice_empty; _ } -> Ienv.Extension.empty, UF.unused
+    | Tpat_slice { mutability; shape = Tslice_front (pat, rest); _ } ->
+      (* CR slice-patterns: this is imprecise: all elements of the slice share
+         the same path, and so in [[&: x ; y :]] we don't know that [x] and [y]
+         are different. The rest of the slice shares the path of the slice. *)
+      let base_paths = Paths.with_memory_address paths in
+      let element_paths = Paths.address_load mutability paths in
+      conjuncts_pattern_match
+        [ pattern_match_single ~base_paths pat element_paths;
+          pattern_match_single rest paths ]
     | Tpat_deref { id; _ } ->
       Ienv.Extension.singleton id (unwrap_base_paths ()), UF.unused
     | Tpat_alias_deref { pattern = pat'; id; _ } ->
