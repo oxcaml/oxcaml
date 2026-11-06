@@ -373,7 +373,7 @@ and dynamic_let_expr env vars ~num_occurrences_of_bound_vars
       (fun var ->
         (not is_phantom)
         && Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-             (Bound_var.var var) num_occurrences_of_bound_vars)
+             num_occurrences_of_bound_vars (Bound_var.var var))
       vars
   in
   let vars, body_env = map_accum_left Env.bind_bound_var env vars in
@@ -623,9 +623,10 @@ and let_cont_expr env (lc : Flambda.Let_cont_expr.t) =
         ->
         let params, env =
           map_accum_left
-            (kinded_parameter ~needed_by_phantom_let:(fun var ->
-                 Num_occurrences.By_name_mode.needed_by_phantom_let_in_map var
-                   num_occurrences_of_invariant_params))
+            (kinded_parameter
+               ~needed_by_phantom_let:
+                 (Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
+                    num_occurrences_of_invariant_params))
             env
             (Bound_parameters.to_list invariant_params)
         in
@@ -673,9 +674,10 @@ and cont_handler env cont_id (sort : Continuation.Sort.t) h =
       ->
       let params, env =
         map_accum_left
-          (kinded_parameter ~needed_by_phantom_let:(fun var ->
-               Num_occurrences.By_name_mode.needed_by_phantom_let_in_map var
-                 num_occurrences_of_params))
+          (kinded_parameter
+             ~needed_by_phantom_let:
+               (Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
+                  num_occurrences_of_params))
           env
           (Bound_parameters.to_list params)
       in

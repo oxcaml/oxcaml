@@ -372,9 +372,9 @@ let bound_parameters_aux ~f ~needed_by_phantom_let env l =
 
 let continuation_bound_parameters env l ~num_occurrences_of_params =
   bound_parameters_aux ~f:param_machtype_of_kinded_parameter
-    ~needed_by_phantom_let:(fun var ->
-      Num_occurrences.By_name_mode.needed_by_phantom_let_in_map var
-        num_occurrences_of_params)
+    ~needed_by_phantom_let:
+      (Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
+         num_occurrences_of_params)
     env l
 
 let function_bound_parameters env l ~free_names_of_body =

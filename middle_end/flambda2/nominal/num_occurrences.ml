@@ -39,7 +39,7 @@ module By_name_mode = struct
     | One | More_than_one ->
       Format.fprintf ppf "#%a(phantom #%a)" print normal print phantom
 
-  let needed_by_phantom_let var { normal = _; phantom } =
+  let needed_by_phantom_let { normal = _; phantom } var =
     match phantom with
     | Zero -> false
     | One | More_than_one -> (
@@ -47,8 +47,8 @@ module By_name_mode = struct
       | Region | Rec_info -> false
       | Value | Naked_number _ -> true)
 
-  let needed_by_phantom_let_in_map var num_occurrences =
+  let needed_by_phantom_let_in_map num_occurrences var =
     match Variable.Map.find var num_occurrences with
     | exception Not_found -> false
-    | num_occurrences -> needed_by_phantom_let var num_occurrences
+    | num_occurrences -> needed_by_phantom_let num_occurrences var
 end

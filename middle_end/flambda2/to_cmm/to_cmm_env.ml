@@ -817,7 +817,7 @@ let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
   in
   let needed_by_phantom_let =
     Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-      (Bound_var.var var) num_occurrences_of_bound_vars
+      num_occurrences_of_bound_vars (Bound_var.var var)
   in
   match inline with
   | Drop_defining_expr -> env, res
@@ -1092,7 +1092,7 @@ let add_alias env res ~var ~alias_of ~num_occurrences_of_bound_vars =
   in
   let needed_by_phantom_let =
     Num_occurrences.By_name_mode.needed_by_phantom_let_in_map
-      (Bound_var.var var) num_occurrences_of_bound_vars
+      num_occurrences_of_bound_vars (Bound_var.var var)
   in
   match Variable.Map.find alias_of env.bindings with
   | Binding ({ inline = Must_inline_once; _ } as b) -> (

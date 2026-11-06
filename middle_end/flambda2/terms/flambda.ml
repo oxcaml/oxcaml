@@ -264,20 +264,41 @@ and apply_renaming_continuation_handlers t renaming =
   Name_abstraction.apply_renaming (module Bound_parameters) t renaming
 
 and apply_renaming_continuations_handlers_t0
-    { num_occurrences_of_invariant_params; continuation_handlers } renaming =
-  let continuation_handlers =
-    Continuation.Lmap.of_list
-    @@ List.map
-         (fun (k, handler) ->
-           let k = Renaming.apply_continuation renaming k in
-           let handler = apply_renaming_continuation_handler handler renaming in
-           k, handler)
-         (Continuation.Lmap.bindings continuation_handlers)
+    ({ num_occurrences_of_invariant_params; continuation_handlers } as t)
+    renaming =
+  let continuation_handlers' =
+    if
+      Continuation.Lmap.exists
+        (fun k _ ->
+          not (Continuation.equal k (Renaming.apply_continuation renaming k)))
+        continuation_handlers
+    then
+      Continuation.Lmap.of_list
+      @@ List.map
+           (fun (k, handler) ->
+             let k = Renaming.apply_continuation renaming k in
+             let handler =
+               apply_renaming_continuation_handler handler renaming
+             in
+             k, handler)
+           (Continuation.Lmap.bindings continuation_handlers)
+    else
+      Continuation.Lmap.map_sharing
+        (fun handler -> apply_renaming_continuation_handler handler renaming)
+        continuation_handlers
   in
-  let num_occurrences_of_invariant_params =
+  let num_occurrences_of_invariant_params' =
     apply_renaming_num_occurrences num_occurrences_of_invariant_params renaming
   in
-  { num_occurrences_of_invariant_params; continuation_handlers }
+  if
+    continuation_handlers == continuation_handlers'
+    && num_occurrences_of_invariant_params
+       == num_occurrences_of_invariant_params'
+  then t
+  else
+    { num_occurrences_of_invariant_params = num_occurrences_of_invariant_params';
+      continuation_handlers = continuation_handlers'
+    }
 
 and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
   let expr = apply_renaming expr renaming in
@@ -1254,6 +1275,26 @@ module Recursive_let_cont_handlers = struct
   type t = recursive_let_cont_handlers
 
   let create ~body ~invariant_params handlers ~free_names_of_handlers =
+    (match (free_names_of_handlers : _ Or_unknown.t) with
+    | Unknown -> ()
+    | Known free_names_of_handlers ->
+      (* Unused invariant parameters are removed by the passes that create
+         recursive groups, so every invariant parameter must occur in the
+         handlers' free names. This catches callers that have already removed
+         the invariant parameters from those names, which would silently zero
+         their occurrence counts. *)
+      ListLabels.iter (Bound_parameters.to_list invariant_params)
+        ~f:(fun param ->
+          if
+            not
+              (Name_occurrences.mem_var free_names_of_handlers
+                 (Bound_parameter.var param))
+          then
+            Misc.fatal_errorf
+              "Invariant parameter %a does not occur in the free names of the \
+               handlers:@ %a"
+              Bound_parameter.print param Name_occurrences.print
+              free_names_of_handlers));
     let bound = Continuation_handlers.domain handlers in
     let num_occurrences_of_invariant_params =
       num_occurrences_of_params invariant_params
