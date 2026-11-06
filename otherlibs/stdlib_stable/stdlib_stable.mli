@@ -15,3 +15,5 @@ module Int16 = Int16
 module Int16_u = Int16_u
 module Char_u = Char_u
 module Or_null = Or_null
+module Slice = Slice
+module Slice_imm = Slice_imm
