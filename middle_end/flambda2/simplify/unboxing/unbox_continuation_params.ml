@@ -155,7 +155,7 @@ let make_decisions ~continuation_arg_types denv params params_types :
     { decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid = invalids } )
 
 let make_decisions ~continuation_arg_types denv params params_types =
-  Profile.record_call_with_counters ~accumulate:true
+  Profile.record_call_with_counters ~accumulate:true ~level:2
     ~counter_f:(fun (_, ({ decisions; _ } : Decisions.t)) ->
       let counters = Profile.Counters.create () in
       List.fold_left
