@@ -3556,6 +3556,8 @@ module Format_history = struct
     | Address_contents ->
       fprintf ppf
         "it's the type of the value at an address@ in an address pattern"
+    | Slice_element ->
+      fprintf ppf "it's the type of an element@ in a slice pattern"
     | Field_in_indexed_record ->
       fprintf ppf
         "it's the type of a field in a record type into which a@ block index \
@@ -4780,6 +4782,7 @@ module Debug_printers = struct
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"
     | Address_contents -> fprintf ppf "Address_contents"
+    | Slice_element -> fprintf ppf "Slice_element"
     | Field_in_indexed_record -> fprintf ppf "Field_in_indexed_record"
     | Structure_item -> fprintf ppf "Structure_item"
     | Signature_item -> fprintf ppf "Signature_item"

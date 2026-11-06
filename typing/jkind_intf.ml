@@ -386,6 +386,7 @@ module History = struct
     | Array_element
     | Idx_element
     | Address_contents
+    | Slice_element
     | Field_in_indexed_record
     | Structure_item
     | Signature_item

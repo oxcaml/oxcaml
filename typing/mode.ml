@@ -4791,6 +4791,7 @@ module Report = struct
       Fmt.fprintf ppf "its mutable field %a" Misc.Style.inline_code s
     | Array_elements -> Fmt.fprintf ppf "its array elements"
     | Address_contents -> Fmt.fprintf ppf "the value it points to"
+    | Slice_elements -> Fmt.fprintf ppf "its elements"
 
   let print_always_dynamic = function
     | Application -> Fmt.dprintf "function applications"
@@ -4900,6 +4901,9 @@ module Report = struct
           | Address moda ->
             Fmt.dprintf "is an address that points to%a %t" maybe_modality moda
               print_pp
+          | Slice moda ->
+            Fmt.dprintf "is a slice that contains%a %t" maybe_modality moda
+              print_pp
           | Derived_address ->
             Fmt.dprintf "has an address derived from it that is %t" print_pp
           | Constructor (s, moda) ->
@@ -4930,6 +4934,10 @@ module Report = struct
         container
     | Address moda ->
       Fmt.dprintf "is the value%a at the address at %a" maybe_modality moda
+        (Location.Doc.loc ~capitalize_first:false)
+        container
+    | Slice moda ->
+      Fmt.dprintf "is an element%a of the slice at %a" maybe_modality moda
         (Location.Doc.loc ~capitalize_first:false)
         container
     | Derived_address ->
