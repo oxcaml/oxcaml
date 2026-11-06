@@ -406,7 +406,7 @@ let compute_handler_env ?replay ?cut_after uses ~is_recursive ~env_at_fork
         (* No need to add equations, as they will be computed from the use
            environments *)
         let denv = DE.define_parameters denv ~extra:false ~params in
-        Profile.record_call ~accumulate:true "join" (fun () ->
+        Profile.record_call ~accumulate:true ~level:2 "join" (fun () ->
             join ?cut_after denv params ~consts_lifted_after_fork
               ~use_envs_with_ids ~previous_extra_params_and_args)
       else
