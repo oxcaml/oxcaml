@@ -1170,6 +1170,14 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
         ~ctx:(Context.Module name :: ctx) diff
   | Module_type_declaration diff ->
       module_type_decl ~expansion_token ~env ~before ~ctx name diff
+  | Visibility { got = Unmentionable; expected = Exported; _ } ->
+      let printer =
+        Fmt.dprintf
+          "@[<hv>%a cannot be referenced by name,@ \
+           so the interface cannot export it@]"
+          Style.inline_code (Ident.name name)
+      in
+      dwith_context ctx printer :: before
   | Visibility { got; expected; _ } ->
       let describe : Types.visibility -> string = function
         | Exported -> "exported"
@@ -1178,8 +1186,11 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
       in
       let printer =
         Fmt.dprintf
-          "@[<hv>%a is %s in the implementation,@ \
-           but the interface requires it to be %s@]"
+          "@[<v>@[<hv>%a is %s in the implementation,@ \
+           but the interface requires it to be %s@]@,\
+           @{<error>@[<hov 2>Note: this visibility mismatch should not be \
+           reported.@ If you hit this case, report it to the Jane Street \
+           compilers team.@]@}@]"
           Style.inline_code (Ident.name name) (describe got) (describe expected)
       in
       dwith_context ctx printer :: before

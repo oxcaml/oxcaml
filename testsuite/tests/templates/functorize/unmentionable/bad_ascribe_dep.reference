@@ -6,5 +6,4 @@ Error: Signature mismatch:
          Bundle_foo_lib.Intf(P_int).S
        is not included in
          sig module Foo__A : sig val hello : P_int.t -> string end end
-       Foo__A is unmentionable in the implementation,
-       but the interface requires it to be exported
+       Foo__A cannot be referenced by name, so the interface cannot export it
