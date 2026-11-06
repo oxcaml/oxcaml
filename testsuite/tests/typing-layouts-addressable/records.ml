@@ -52,6 +52,16 @@ Error: The layout of type "t" is void addressable
          because of the annotation on the declaration of the type t.
 |}]
 
+(* Already-addressable fields are unchanged *)
+type t : bits64 = #{ i : int64_u }
+type t : value = #{ s : string }
+type t : bits8 & bits16 = #{ p : #(int8# * int16#) }
+[%%expect{|
+type t = #{ i : int64_u; }
+type t = #{ s : string; }
+type t = #{ p : #(int8# * int16#); }
+|}]
+
 (* Nested singletons *)
 type t = #{ a : int8# }
 type t' : bits8 addressable = #{ t : t }
@@ -89,6 +99,12 @@ Error: This type "t" should be an instance of type "('a : bits8)"
          because of the definition of t at line 1, characters 0-23.
        But the layout of t must be a sublayout of bits8
          because of the definition of req8 at line 2, characters 0-22.
+|}]
+
+(* [@@unboxed] types do not make their contents addressable *)
+type u : bits8 = { a : int8# } [@@unboxed]
+[%%expect{|
+type u = { a : int8#; } [@@unboxed]
 |}]
 
 (* Mode crossing is unaffected *)
@@ -190,6 +206,13 @@ Error: The value "x" has type "'a t" but an expression was expected of type
          because of the annotation on the type variable 'b.
 |}]
 
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+let f (x : 'a t) = id x
+[%%expect{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+val f : 'a t -> 'a t = <fun>
+|}]
+
 external id_addressable : ('a : any addressable). 'a -> 'a = "%identity"
   [@@layout_poly]
 let f (x : 'a t) = id_addressable x
@@ -219,6 +242,11 @@ Error: The value "x" has type "t" but an expression was expected of type
          because of the definition of t at line 1, characters 0-23.
        But the layout of t must be a sublayout of bits8
          because of the annotation on the type variable 'b.
+|}]
+
+let f (x : t) : ('b : bits8) = x.#a
+[%%expect{|
+val f : t -> int8# = <fun>
 |}]
 
 let f (x : t) = id_addressable x
