@@ -241,6 +241,7 @@ let print_cmt_infos cmt =
         rk
         Shape.Uid.print u2) arr;
     Format.printf "@]";
+    Format.print_flush ()
   end;
   if !decls then begin
     printf "\nUid of decls:\n";

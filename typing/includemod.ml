@@ -667,6 +667,49 @@ and shallow_module_paths env subst p1 mty2 p2 =
     | Mty_alias _ | Mty_ident _ | Mty_signature _ | Mty_functor _
     | exception Not_found -> false
 
+(* Pairs of uids of the labels and constructors of two declarations that were
+   checked for inclusion, matched by name. *)
+module Component_uids = struct
+  let pair_by_name ~name ~f l1 l2 =
+    let m2 =
+      List.fold_left (fun m x2 -> Misc.Stdlib.String.Map.add (name x2) x2 m)
+        Misc.Stdlib.String.Map.empty l2
+    in
+    List.concat_map (fun x1 ->
+      match Misc.Stdlib.String.Map.find_opt (name x1) m2 with
+      | Some x2 -> f x1 x2
+      | None -> [])
+      l1
+
+  let labels =
+    pair_by_name
+      ~name:(fun (l : label_declaration) -> Ident.name l.ld_id)
+      ~f:(fun l1 l2 -> [l1.ld_uid, l2.ld_uid])
+
+  let constructor_arguments args1 args2 =
+    match args1, args2 with
+    | Cstr_record l1, Cstr_record l2 -> labels l1 l2
+    | (Cstr_record _ | Cstr_tuple _), _ -> []
+
+  let type_declarations decl1 decl2 =
+    match decl1.type_kind, decl2.type_kind with
+    | Type_variant (c1, _, _), Type_variant (c2, _, _) ->
+        pair_by_name
+          ~name:(fun (c : constructor_declaration) -> Ident.name c.cd_id)
+          ~f:(fun c1 c2 ->
+            (c1.cd_uid, c2.cd_uid)
+            :: constructor_arguments c1.cd_args c2.cd_args)
+          c1 c2
+    | Type_record (l1, _, _), Type_record (l2, _, _)
+    | Type_record_unboxed_product (l1, _, _),
+      Type_record_unboxed_product (l2, _, _) -> labels l1 l2
+    | ( Type_abstract _ | Type_open | Type_variant _ | Type_record _
+      | Type_record_unboxed_product _ ), _ -> []
+
+  let extension_constructors ext1 ext2 =
+    constructor_arguments ext1.ext_args ext2.ext_args
+end
+
 let rec modtypes ~core ~direction ~loc env subst ~modes mty1 mty2 shape =
   match try_modtypes ~core ~direction ~loc env subst ~modes mty1 mty2 shape with
   | Ok _ as ok -> ok
@@ -1007,7 +1050,7 @@ and signature_components :
               | _ -> true
             in
             let shape_map = Shape.Map.add_value_proj shape_map id1 orig_shape in
-            let paired_uids = (valdecl1.val_uid, valdecl2.val_uid) in
+            let paired_uids = [valdecl1.val_uid, valdecl2.val_uid] in
             id1, item, paired_uids, shape_map, present_at_runtime
         | Sig_type(id1, tydec1, _, _), Sig_type(_id2, tydec2, _, _) ->
             let item =
@@ -1018,7 +1061,11 @@ and signature_components :
             (* Right now we don't filter hidden constructors / labels from the
             shape. *)
             let shape_map = Shape.Map.add_type_proj shape_map id1 orig_shape in
-            id1, item, (tydec1.type_uid, tydec2.type_uid), shape_map, false
+            let paired_uids =
+              (tydec1.type_uid, tydec2.type_uid)
+              :: Component_uids.type_declarations tydec1 tydec2
+            in
+            id1, item, paired_uids, shape_map, false
         | Sig_typext(id1, ext1, _, _), Sig_typext(_id2, ext2, _, _) ->
             let item =
               core.extension_constructors ~loc ~direction env subst id1
@@ -1028,7 +1075,11 @@ and signature_components :
             let shape_map =
               Shape.Map.add_extcons_proj shape_map id1 orig_shape
             in
-            id1, item, (ext1.ext_uid, ext2.ext_uid), shape_map, true
+            let paired_uids =
+              (ext1.ext_uid, ext2.ext_uid)
+              :: Component_uids.extension_constructors ext1 ext2
+            in
+            id1, item, paired_uids, shape_map, true
         | Sig_module(id1, pres1, mty1, _, _), Sig_module(_, pres2, mty2, _, _)
           -> begin
               let orig_shape =
@@ -1060,7 +1111,7 @@ and signature_components :
                 | Mp_absent, Mp_present, _ -> assert false
               in
               let item = mark_error_as_unrecoverable item in
-              let paired_uids = (mty1.md_uid, mty2.md_uid) in
+              let paired_uids = [mty1.md_uid, mty2.md_uid] in
               id1, item, paired_uids, shape_map, present_at_runtime
             end
         | Sig_modtype(id1, info1, _), Sig_modtype(_id2, info2, _) ->
@@ -1071,7 +1122,7 @@ and signature_components :
               Shape.Map.add_module_type_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            id1, item, (info1.mtd_uid, info2.mtd_uid), shape_map, false
+            id1, item, [info1.mtd_uid, info2.mtd_uid], shape_map, false
         | Sig_class(id1, decl1, _, _), Sig_class(_id2, decl2, _, _) ->
             let item =
               core.class_declarations ~loc ~direction env subst id1 ~mmodes
@@ -1081,7 +1132,7 @@ and signature_components :
               Shape.Map.add_class_proj shape_map id1 orig_shape
             in
             let item = mark_error_as_unrecoverable item in
-            id1, item, (decl1.cty_uid, decl2.cty_uid), shape_map, true
+            id1, item, [decl1.cty_uid, decl2.cty_uid], shape_map, true
         | Sig_class_type(id1, info1, _, _), Sig_class_type(_id2, info2, _, _) ->
             let item =
               core.class_type_declarations ~loc ~direction env subst id1 ~mmodes
@@ -1091,7 +1142,7 @@ and signature_components :
             let shape_map =
               Shape.Map.add_class_type_proj shape_map id1 orig_shape
             in
-            id1, item, (info1.clty_uid, info2.clty_uid), shape_map, false
+            id1, item, [info1.clty_uid, info2.clty_uid], shape_map, false
         | Sig_jkind (id1, jd1, _), Sig_jkind (_id2, jd2, _) ->
            let item =
              core.jkind_declarations ~loc env ~direction subst id1 ~mmodes jd1
@@ -1099,7 +1150,7 @@ and signature_components :
            in
            let item = mark_error_as_unrecoverable item in
            let shape_map = Shape.Map.add_jkind_proj shape_map id1 orig_shape in
-           id1, item, (jd1.jkind_uid, jd2.jkind_uid), shape_map, false
+           id1, item, [jd1.jkind_uid, jd2.jkind_uid], shape_map, false
         | _ ->
             assert false
       in
@@ -1114,17 +1165,18 @@ and signature_components :
                 module-type inclusion as it would introduce duplicates. *)
                 ()
             | { Directionality.pos; _} ->
-              let paired_uids =
-                let elt1, elt2 = paired_uids in
-                match pos with
-                | Negative ->
-                    (Cmt_format.Declaration_to_declaration, elt2, elt1)
-                | Positive ->
-                    (Cmt_format.Declaration_to_declaration, elt1, elt2)
-                | Strictly_positive ->
-                    (Cmt_format. Definition_to_declaration, elt1, elt2)
-              in
-              Cmt_format.record_declaration_dependency paired_uids
+              List.iter (fun (elt1, elt2) ->
+                let paired_uids =
+                  match pos with
+                  | Negative ->
+                      (Cmt_format.Declaration_to_declaration, elt2, elt1)
+                  | Positive ->
+                      (Cmt_format.Declaration_to_declaration, elt1, elt2)
+                  | Strictly_positive ->
+                      (Cmt_format. Definition_to_declaration, elt1, elt2)
+                in
+                Cmt_format.record_declaration_dependency paired_uids)
+                paired_uids
             end;
             let runtime_coercions =
               if present_at_runtime then [pos,x] else []
