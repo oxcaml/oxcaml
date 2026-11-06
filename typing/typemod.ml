@@ -4336,7 +4336,10 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
           |> fun (cls : _ Typeclass.class_info) ->
               cls.cls_id, cls.cls_decl.cty_loc
         in
-        let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
+        let mode =
+          apply_is_contained_by ~loc_md (Class, first_id)
+            ~modalities:Types.class_modality md_mode
+        in
         With_regionality.submode_err (first_loc, Class) Types.class_mode mode;
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
