@@ -54,8 +54,11 @@
     mutable fields (including references and arrays), must not form a cycle
     between blocks. Definitions such as [let rec xs = 0 :: xs] or
     [let rec a = Some b and b = Some a] are thus rejected, whereas
-    [let rec r = { f = fun () -> r }] is accepted. See
-    [Translcore.transl_let] for the compilation scheme.
+    [let rec r = { f = fun () -> r }] is accepted. This guarantee is about
+    types: a cycle must go through a field of a function, lazy or mutable
+    type, so values of immutable types such as lists are always finite, even
+    though [lazy x] may be represented as [x] itself. See
+    [Value_rec_compiler] for the compilation scheme.
 
     Recursive class definitions follow the same principle: the let-bindings
     in the spine of a class expression are evaluated when the class is

@@ -157,8 +157,8 @@ let () = assert (Lazy.force count = 2);;
 [%%expect{|
 |}];;
 
-(* Only the lazy values bound by the [let rec] are accepted, not those
-   nested in its right-hand sides. *)
+(* Lazy values nested in blocks break cycles too, even though [lazy s] is
+   represented as [s] itself. *)
 
 type stream = Cons of int * stream Lazy.t
 let rec s = Cons (1, lazy s);;
