@@ -85,7 +85,7 @@ let preferred_successors (block : Cfg.basic_block) ~position =
        only if no other successor is available. *)
     sorted_distinct [lt; eq; gt] @ [uo]
   | Never | Switch _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Invalid _ ->
+  | Call_no_return_ext _ | Call_no_return_func _ | Invalid _ ->
     (* Either no successor, or no fallthrough at linearization ([Switch],
        [Tailcall_self]), so adjacency brings no benefit. *)
     []

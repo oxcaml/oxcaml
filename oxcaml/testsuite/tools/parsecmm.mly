@@ -226,7 +226,7 @@ expr:
   | LPAREN LET letdef sequence RPAREN { make_letdef $3 $4 }
   | LPAREN APPLY location expr exprlist machtype RPAREN
                 { Cop(Capply {
-                        result_type = $6;
+                        result_type = Some $6;
                         region = Lambda.Rc_normal;
                         callees = None
                       },

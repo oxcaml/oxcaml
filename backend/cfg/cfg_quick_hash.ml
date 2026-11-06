@@ -66,10 +66,11 @@ let terminator : Cfg.terminator -> int =
   | Raise _ -> 8
   | Tailcall_self _ -> 9
   | Tailcall_func _ -> 10
-  | Call_no_return _ -> 11
-  | Invalid _ -> 12
-  | Call _ -> 13
-  | Prim _ -> 14
+  | Call_no_return_ext _ -> 11
+  | Call_no_return_func _ -> 12
+  | Invalid _ -> 13
+  | Call _ -> 14
+  | Prim _ -> 15
 
 let rec basic_instruction_cell :
     Cfg.basic Cfg.instruction DLL.cell option -> fuel:int -> acc:int -> int =
