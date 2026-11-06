@@ -278,7 +278,7 @@ let subst_set_of_closures env set =
         subst_value_slot env var, subst_simple env simple)
     |> Value_slot.Map.of_list
   in
-  Set_of_closures.create ~value_slots decls
+  Set_of_closures.create ~value_slots ~dbg:(Set_of_closures.debuginfo set) decls
 
 let subst_rec_info_expr _env ri =
   (* Only depth variables can occur in [Rec_info_expr], and we only mess with
@@ -998,19 +998,22 @@ let call_kinds env (call_kind1 : Call_kind.t) (call_kind2 : Call_kind.t) :
         { needs_caml_c_call = needs_caml_c_call1;
           is_c_builtin = is_c_builtin1;
           effects = effects1;
-          coeffects = coeffects1
+          coeffects = coeffects1;
+          fat_ptr_arg_starts = fat_ptr_arg_starts1
         },
       C_call
         { needs_caml_c_call = needs_caml_c_call2;
           is_c_builtin = is_c_builtin2;
           effects = effects2;
-          coeffects = coeffects2
+          coeffects = coeffects2;
+          fat_ptr_arg_starts = fat_ptr_arg_starts2
         } ) ->
     if
       Bool.equal needs_caml_c_call1 needs_caml_c_call2
       && Bool.equal is_c_builtin1 is_c_builtin2
       && Effects.compare effects1 effects2 = 0
       && Coeffects.compare coeffects1 coeffects2 = 0
+      && List.equal Int.equal fat_ptr_arg_starts1 fat_ptr_arg_starts2
     then Equivalent
     else Different { approximant = call_kind1 }
   | _, _ -> Different { approximant = call_kind1 }

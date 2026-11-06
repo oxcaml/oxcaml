@@ -1020,3 +1020,58 @@ type ('a : immutable_data) t = { x : 'a option; }
 type ('a : immutable_data) t = { x : 'a; }
 type ('a : immutable_data) t = 'a list
 |}]
+
+(***************************************************)
+(* Unboxed versions of records with mutable fields *)
+
+(* Unboxed record labels can't be mutated in place, so [mutable] fields cross
+   just like immutable ones.
+
+   CR box: limit this crossing to give [box] a better kind. *)
+type t = { mutable x : int; y : int }
+[%%expect {|
+type t = { mutable x : int; y : int; }
+|}]
+
+(* Unboxed records, mutable or not, aren't blocks, so they cross locality,
+   uniqueness, and externality. *)
+let f (x : t# @ local) : t# = x
+let f (x : t# @ aliased) : t# @ unique = x
+type k : (value mod external_) & (value mod external_) = t#
+[%%expect {|
+val f : t# @ local -> t# = <fun>
+val f : t# -> t# @ unique = <fun>
+type k = t#
+|}]
+
+(* CR box: Mutable and immutable boxed records differ in contention and
+   visibility. To give [box] a better kind, the same differences should apply to
+   the unboxed versions, causing the tests below to be rejected. *)
+let f (x : t# @ contended) : t# @ uncontended = x
+[%%expect {|
+val f : t# @ contended -> t# = <fun>
+|}]
+
+let f (x : t# @ immutable) : t# @ read_write = x
+[%%expect {|
+val f : t# @ immutable -> t# = <fun>
+|}]
+
+type k : immutable_data & immutable_data = t#
+[%%expect {|
+type k = t#
+|}]
+
+type singleton = { mutable x : int }
+let f (x : singleton# @ contended) = use_uncontended x
+[%%expect {|
+type singleton = { mutable x : int; }
+val f : singleton# @ contended -> unit = <fun>
+|}]
+
+type nested_singleton = #{ inner : singleton# }
+let f (x : nested_singleton @ contended) = use_uncontended x
+[%%expect {|
+type nested_singleton = #{ inner : singleton#; }
+val f : nested_singleton @ contended -> unit = <fun>
+|}]

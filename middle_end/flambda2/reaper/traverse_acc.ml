@@ -15,44 +15,173 @@
 
 module Graph = Global_flow_graph
 module K = Flambda_kind
-
-type continuation_info =
-  { is_exn_handler : bool;
-    params : Variable.t list;
-    arity : K.With_subkind.t list
-  }
-
 module Env = Traverse_env
 
-type code_dep =
-  { code_metadata : Code_metadata.t;
-    params : Variable.t list;
-    my_closure : Variable.t;
-    return : Variable.t list; (* Dummy variable representing return value *)
-    exn : Variable.t; (* Dummy variable representing exn return value *)
-    known_arity_call_witness : Code_id_or_name.t;
-    unknown_arity_call_witnesses :
-      Code_id_or_name.t list (* One element for each (complex) parameter *)
-  }
+module Continuation_info = struct
+  type t =
+    { is_exn_handler : bool;
+      params : Variable.t list;
+      arity : K.With_subkind.t list
+    }
 
-type apply_dep =
-  { function_containing_apply_expr : Code_id.t option;
-    apply_code_id : Code_id.t;
-    apply_closure : Code_id_or_name.t option;
-    apply_call_witness : Code_id_or_name.t
-  }
+  let ids_for_export { is_exn_handler = _; params; arity = _ } =
+    Ids_for_export.create ~variables:(Variable.Set.of_list params) ()
 
-type closure_dep =
-  { let_bound_name_of_the_closure : Name.t;
-    closure_code_id : Code_id.t;
-    only_full_applications : bool
-  }
+  let apply_renaming { is_exn_handler; params; arity } renaming =
+    { is_exn_handler;
+      params = List.map (Renaming.apply_variable renaming) params;
+      arity
+    }
+end
 
-type delayed_deps =
-  { apply_deps : apply_dep list;
-    set_of_closures_deps : closure_dep list;
-    imported_symbols : Symbol.Set.t
-  }
+module Code_dep = struct
+  type t =
+    { code_metadata : Code_metadata.t;
+      params : Variable.t list;
+      my_closure : Variable.t;
+      return : Variable.t list; (* Dummy variable representing return value *)
+      exn : Variable.t; (* Dummy variable representing exn return value *)
+      known_arity_call_witness : Code_id_or_name.t;
+      unknown_arity_call_witnesses :
+        Code_id_or_name.t list (* One element for each (complex) parameter *)
+    }
+
+  let ids_for_export
+      { code_metadata;
+        params;
+        my_closure;
+        return;
+        exn;
+        known_arity_call_witness;
+        unknown_arity_call_witnesses
+      } =
+    let variables =
+      Variable.Set.of_list (List.concat [params; return; [my_closure; exn]])
+    in
+    let ids = Ids_for_export.create ~variables () in
+    let ids =
+      Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata)
+    in
+    let ids = Ids_for_export.add_code_id_or_name ids known_arity_call_witness in
+    List.fold_left Ids_for_export.add_code_id_or_name ids
+      unknown_arity_call_witnesses
+
+  let apply_renaming
+      { code_metadata;
+        params;
+        my_closure;
+        return;
+        exn;
+        known_arity_call_witness;
+        unknown_arity_call_witnesses
+      } renaming =
+    { code_metadata = Code_metadata.apply_renaming code_metadata renaming;
+      params = List.map (Renaming.apply_variable renaming) params;
+      my_closure = Renaming.apply_variable renaming my_closure;
+      return = List.map (Renaming.apply_variable renaming) return;
+      exn = Renaming.apply_variable renaming exn;
+      known_arity_call_witness =
+        Renaming.apply_code_id_or_name renaming known_arity_call_witness;
+      unknown_arity_call_witnesses =
+        List.map
+          (Renaming.apply_code_id_or_name renaming)
+          unknown_arity_call_witnesses
+    }
+end
+
+module Delayed_deps = struct
+  type apply_dep =
+    { function_containing_apply_expr : Code_id.t option;
+      apply_code_id : Code_id.t;
+      apply_closure : Code_id_or_name.t option;
+      apply_call_witness : Code_id_or_name.t
+    }
+
+  type closure_dep =
+    { let_bound_name_of_the_closure : Name.t;
+      closure_code_id : Code_id.t;
+      only_full_applications : bool
+    }
+
+  type t =
+    { apply_deps : apply_dep list;
+      set_of_closures_deps : closure_dep list;
+      imported_symbols : Symbol.Set.t
+    }
+
+  let ids_for_export { apply_deps; set_of_closures_deps; imported_symbols } =
+    let ids = Ids_for_export.create ~symbols:imported_symbols () in
+    let ids =
+      List.fold_left
+        (fun ids
+             { function_containing_apply_expr;
+               apply_code_id;
+               apply_closure;
+               apply_call_witness
+             } ->
+          let ids = Ids_for_export.add_code_id ids apply_code_id in
+          let ids = Ids_for_export.add_code_id_or_name ids apply_call_witness in
+          let ids =
+            match apply_closure with
+            | None -> ids
+            | Some apply_closure ->
+              Ids_for_export.add_code_id_or_name ids apply_closure
+          in
+          let ids =
+            match function_containing_apply_expr with
+            | None -> ids
+            | Some code_id -> Ids_for_export.add_code_id ids code_id
+          in
+          ids)
+        ids apply_deps
+    in
+    List.fold_left
+      (fun ids
+           { let_bound_name_of_the_closure;
+             closure_code_id;
+             only_full_applications = _
+           } ->
+        let ids = Ids_for_export.add_name ids let_bound_name_of_the_closure in
+        Ids_for_export.add_code_id ids closure_code_id)
+      ids set_of_closures_deps
+
+  let apply_renaming { apply_deps; set_of_closures_deps; imported_symbols }
+      renaming =
+    { apply_deps =
+        List.map
+          (fun { function_containing_apply_expr;
+                 apply_code_id;
+                 apply_closure;
+                 apply_call_witness
+               } ->
+            { function_containing_apply_expr =
+                Option.map
+                  (Renaming.apply_code_id renaming)
+                  function_containing_apply_expr;
+              apply_code_id = Renaming.apply_code_id renaming apply_code_id;
+              apply_closure =
+                Option.map
+                  (Renaming.apply_code_id_or_name renaming)
+                  apply_closure;
+              apply_call_witness =
+                Renaming.apply_code_id_or_name renaming apply_call_witness
+            })
+          apply_deps;
+      set_of_closures_deps =
+        List.map
+          (fun { let_bound_name_of_the_closure;
+                 closure_code_id;
+                 only_full_applications
+               } ->
+            { let_bound_name_of_the_closure =
+                Renaming.apply_name renaming let_bound_name_of_the_closure;
+              closure_code_id = Renaming.apply_code_id renaming closure_code_id;
+              only_full_applications
+            })
+          set_of_closures_deps;
+      imported_symbols = Renaming.apply_symbol_set renaming imported_symbols
+    }
+end
 
 module Applications = struct
   type bounds =
@@ -109,16 +238,29 @@ module Applications = struct
 
   let union a b =
     Code_id_or_name.Map.union (fun _ a b -> Some (union_bounds a b)) a b
+
+  let ids_for_export t =
+    Code_id_or_name.Map.fold
+      (fun id _bounds ids -> Ids_for_export.add_code_id_or_name ids id)
+      t Ids_for_export.empty
+
+  let apply_renaming t renaming =
+    Code_id_or_name.Map.fold
+      (fun id bounds t ->
+        Code_id_or_name.Map.add
+          (Renaming.apply_code_id_or_name renaming id)
+          bounds t)
+      t Code_id_or_name.Map.empty
 end
 
 type t =
-  { mutable code_deps : code_dep Code_id.Map.t;
-    mutable code : Rev_expr.rev_code Code_id.Map.t;
-    mutable delayed_deps : delayed_deps;
+  { mutable code_deps : Code_dep.t Code_id.Map.t;
+    mutable code : Rev_expr.Rev_code.t Code_id.Map.t;
+    mutable delayed_deps : Delayed_deps.t;
     mutable applications : Applications.t;
     deps : Graph.graph;
     mutable fixed_arity_conts : Continuation.Set.t;
-    mutable continuation_info : continuation_info Continuation.Map.t;
+    mutable continuation_info : Continuation_info.t Continuation.Map.t;
     mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
     mutable all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
@@ -241,7 +383,7 @@ let fixed_arity_continuation t k =
 let fixed_arity_continuations t = t.fixed_arity_conts
 
 let continuation_info t k ~params ~arity ~is_exn_handler =
-  let info = { is_exn_handler; params; arity } in
+  let info = Continuation_info.{ is_exn_handler; params; arity } in
   t.continuation_info <- Continuation.Map.add k info t.continuation_info
 
 let get_continuation_info t = t.continuation_info
@@ -538,11 +680,13 @@ let add_alias_for_caller graph ~caller ~from ~to_ =
       ~if_used:(Code_id_or_name.code_id code_id)
       ~from ~to_
 
-let add_closure_dep graph ~analysis_scope ~code_deps
-    { let_bound_name_of_the_closure;
-      closure_code_id = code_id;
-      only_full_applications = _
-    } =
+let add_closure_dep graph ~analysis_scope
+    ~(code_deps : Code_dep.t Code_id.Map.t)
+    Delayed_deps.
+      { let_bound_name_of_the_closure;
+        closure_code_id = code_id;
+        only_full_applications = _
+      } =
   let closure = Code_id_or_name.name let_bound_name_of_the_closure in
   (* CR ncourant: use only_full_applications; not done here to avoid conflicts
      in code that will be rewritten for unbox-fv-closures anyway. *)
@@ -580,12 +724,13 @@ let add_closure_dep graph ~analysis_scope ~code_deps
       ~from:(List.hd code_dep.unknown_arity_call_witnesses)
       Field.unknown_arity_call_witness ~base:closure
 
-let add_apply_dep graph ~analysis_scope ~code_deps
-    { function_containing_apply_expr = caller;
-      apply_code_id = code_id;
-      apply_closure = closure;
-      apply_call_witness = call
-    } =
+let add_apply_dep graph ~analysis_scope ~(code_deps : Code_dep.t Code_id.Map.t)
+    Delayed_deps.
+      { function_containing_apply_expr = caller;
+        apply_code_id = code_id;
+        apply_closure = closure;
+        apply_call_witness = call
+      } =
   match Code_id.Map.find_opt code_id code_deps with
   | Some code_dep ->
     add_alias_for_caller graph ~caller ~from:code_dep.known_arity_call_witness
@@ -617,7 +762,7 @@ let add_apply_dep graph ~analysis_scope ~code_deps
           ~from:closure))
 
 let resolve_delayed_deps graph ~analysis_scope ~code_deps
-    { apply_deps; set_of_closures_deps; imported_symbols } =
+    Delayed_deps.{ apply_deps; set_of_closures_deps; imported_symbols } =
   List.iter (add_apply_dep graph ~analysis_scope ~code_deps) apply_deps;
   List.iter
     (add_closure_dep graph ~analysis_scope ~code_deps)

@@ -957,6 +957,22 @@ let encode_instruction : type num operands.
     (* NEG: U=1, opcode=01011 *)
     Simd_helpers.encode_simd_two_reg_misc ~q ~u:1 ~size ~opcode:0b01011 ~rn ~rd
   | NOP, _ -> Nop_helpers.encode_nop ()
+  | ( ORN_shifted_register,
+      Quad
+        ( Reg ({ reg_name = GP _; _ } as rd),
+          Reg ({ reg_name = GP _; _ } as rn),
+          Reg ({ reg_name = GP _; _ } as rm),
+          Optional shift_opt ) ) ->
+    let shift, imm6 =
+      match shift_opt with
+      | None -> 0, 0
+      | Some (Shift { kind; amount }) ->
+        ( Add_sub_helpers.decode_shift_kind_int kind,
+          Add_sub_helpers.decode_shift_amount_six amount )
+    in
+    Logical_helpers.encode_logical_shifted_register ~sf:(Reg.gp_sf rd) ~opc:0b01
+      ~shift ~n:1 ~rm:(Reg.gp_encoding rm) ~imm6 ~rn:(Reg.gp_encoding rn)
+      ~rd:(Reg.gp_encoding rd)
   | ORR_immediate, Triple (Reg rd, Reg rn, Bitmask bitmask) ->
     let n, immr, imms = Operand.Bitmask.decode_n_immr_imms bitmask in
     Logical_helpers.encode_logical_immediate ~sf:1 ~opc:0b01 ~n ~immr ~imms ~rn

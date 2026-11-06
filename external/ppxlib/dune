@@ -1,7 +1,8 @@
 (env
  (_
   (binaries
-   (test/expect/expect_test.exe as expect-test))))
+   (test/expect/expect_test.exe as expect-test)
+   dev/gencopy/gencopy.exe)))
 
 (alias
  (name runtest)

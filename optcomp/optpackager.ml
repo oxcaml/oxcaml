@@ -180,7 +180,7 @@ end) : S = struct
     let ui =
       (* [static_data] is empty as we don't support packs with layout poly. *)
       Compilenv.build_unit_info ~main_module_block_format
-        ~static_data:(Slambdaeval.CU_data.empty ())
+        ~static_data:(Slambda.CU_data.empty ())
     in
     let file_sections =
       let length =

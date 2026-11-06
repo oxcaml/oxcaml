@@ -71,6 +71,7 @@ type import = private {
   imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  imp_cmi_name : Compilation_unit.Name.t;
 }
 
 val report_error: error Format_doc.format_printer
