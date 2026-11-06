@@ -127,7 +127,8 @@ let classify_node = function
   | Class_description _ -> `Type
   | Class_type_declaration _ -> `Type
   | Method_call _ -> `Expression
-  | Record_field (`Expression _, _, _, _) -> `Expression
+  | Record_field ((`Expression _ | `Block_access | `Unboxed_access), _, _, _) ->
+    `Expression
   | Record_field (`Pattern _, _, _, _) -> `Pattern
   | Module_binding_name _ -> `Module
   | Module_declaration_name _ -> `Module
@@ -721,6 +722,7 @@ let branch_complete buffer ?get_doc ?target_type ?kinds ~keywords prefix :
               match parent with
               | `Expression e -> e.Typedtree.exp_type
               | `Pattern p -> p.Typedtree.pat_type
+              | `Block_access | `Unboxed_access -> lbl.lbl_res
             in
             let decl = Ctype.extract_concrete_typedecl env ty in
             (ty, decl)
