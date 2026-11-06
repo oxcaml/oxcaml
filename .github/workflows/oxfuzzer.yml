@@ -1,0 +1,119 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+#
+# Daily differential fuzzing of main with oxfuzzer (see tools/oxfuzzer).
+#
+# The compiler under test is the flake's release `oxcaml` package. The
+# Nix workflow builds it for every commit on main and pushes it to
+# the `oxcaml` cachix cache, so this normally downloads it rather than
+# building it. This workflow only reads the cache.
+name: oxfuzzer
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+      timezone: Europe/London
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: Stop starting cases after this many minutes
+        type: number
+        default: 60
+      max_failures:
+        description: Stop starting cases after this many failures
+        type: number
+        default: 5
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  oxfuzzer:
+    name: oxfuzzer (x86_64-linux)
+    # Forks inherit the schedule; only fuzz the upstream repository.
+    if: github.repository == 'oxcaml/oxcaml'
+    runs-on: warp-ubuntu-latest-x64-16x
+    # Fuzzing takes MINUTES plus the cases in flight; the rest covers
+    # building the compiler from source when it is not in the cache.
+    timeout-minutes: 300
+    permissions:
+      contents: read
+    env:
+      # Scheduled runs have no inputs.
+      MINUTES: ${{ inputs.minutes || 60 }}
+      MAX_FAILURES: ${{ inputs.max_failures || 5 }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          # Pin to nix 2.33.0, as in nix-github-actions.yml.
+          install_url: https://releases.nixos.org/nix/nix-2.33.0/install
+
+      - name: Set up cache (read-only)
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          # Public caches are readable without credentials.
+          name: oxcaml
+
+      - name: Build the compiler
+        run: |
+          if nix build --dry-run .#oxcaml 2>&1 | grep -q 'will be built'; then
+            echo "::warning::.#oxcaml for $GITHUB_SHA is not in the cache, so it is built from source (including its testsuite)."
+          fi
+          nix build -L --out-link result .#oxcaml
+
+      - name: Run oxfuzzer
+        run: |
+          # Fail the step if oxfuzzer fails, not just if tee does.
+          set -o pipefail
+          # The compiler links with the C toolchain it was built with.
+          #
+          # The base seed is the run ID, which is new for every run but stays
+          # the same when a run is re-run, so a re-run fuzzes the same
+          # sequence of cases and can reproduce its failures.
+          nix shell --inputs-from . nixpkgs#stdenv.cc nixpkgs#python3 --command \
+            python3 tools/oxfuzzer/oxfuzzer.py \
+              --install-dir result \
+              -o _oxfuzzer \
+              --time-limit-minutes "$MINUTES" \
+              --max-failures "$MAX_FAILURES" \
+              --jobs "$(nproc)" \
+              --seed "$GITHUB_RUN_ID" \
+            2>&1 | tee oxfuzzer.log
+
+      - name: Summarize
+        if: always()
+        run: |
+          shopt -s nullglob
+          failures=(_oxfuzzer/seed-*)
+          {
+            echo "## oxfuzzer on $GITHUB_SHA"
+            echo
+            if [ -f oxfuzzer.log ]; then
+              echo '```'
+              grep -E 'passed, .* discarded, ' oxfuzzer.log | tail -n 1
+              grep -E '^oxfuzzer: ' oxfuzzer.log | tail -n 1
+              echo '```'
+            fi
+            for failure in "${failures[@]}"; do
+              echo "- \`${failure#_oxfuzzer/}\`: $(cat "$failure/reason.txt")"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload failures
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: oxfuzzer-failures-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            oxfuzzer.log
+            _oxfuzzer/seed-*
+          if-no-files-found: ignore
