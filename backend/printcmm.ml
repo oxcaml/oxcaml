@@ -342,6 +342,7 @@ let operation d = function
   | Cdls_get -> "dls_get"
   | Ctls_get -> "tls_get"
   | Cdomain_index -> "domain_index"
+  | Cthread_self_id -> "thread_self_id"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 

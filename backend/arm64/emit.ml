@@ -1977,6 +1977,8 @@ let emit_instr env i =
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_tls_state)
   | Lop Domain_index ->
     A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_id)
+  | Lop Thread_self_id ->
+    A.ins2 LDR (H.reg_x i.res.(0)) (H.domainstate_field Domain_thread_id)
   | Lop (Csel tst) -> (
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in

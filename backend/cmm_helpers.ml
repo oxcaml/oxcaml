@@ -5722,6 +5722,8 @@ let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
 let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
 
+let thread_self_id ~dbg = Cop (Cthread_self_id, [], dbg)
+
 let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag

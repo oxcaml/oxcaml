@@ -2726,6 +2726,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Dls_get -> I.mov (domain_field Domainstate.Domain_dls_state) (res i 0)
   | Lop Tls_get -> I.mov (domain_field Domainstate.Domain_tls_state) (res i 0)
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
+  | Lop Thread_self_id ->
+    I.mov (domain_field Domainstate.Domain_thread_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
   | Llabel_for_jump_target label ->
