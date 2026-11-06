@@ -1163,14 +1163,11 @@ let scrape_alias =
   ref ((fun _env _mty -> assert false) :
         t -> Subst.Lazy.module_type -> Subst.Lazy.module_type)
 
-<<<<<<< Merlin:jk/unrepresentable-sigs
 let shorten_module_path =
   (* to be filled with Printtyp.shorten_module_path *)
   ref ((fun _ _ -> assert false) :
          t -> Path.t -> Path.t)
 
-||||||| Compiler:last-imported
-=======
 let type_sort =
   (* to be filled with Ctype.type_sort *)
   ref
@@ -1181,7 +1178,6 @@ let type_sort =
         type_expr ->
         (Jkind_types.Sort.t, Jkind.Violation.t) result)
 
->>>>>>> Compiler:HEAD
 let md md_type =
   {md_type; md_modalities = Mode.Modality.undefined; md_attributes=[];
    md_loc=Location.none; md_uid = Uid.internal_not_actually_unique}
