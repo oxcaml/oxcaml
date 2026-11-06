@@ -71,6 +71,9 @@ type t =
       (** A custom section with explicit details, for target-specific sections
           not covered by the other variants. *)
 
+(** The name of [Frametable_piece] sections *)
+val frametable_pieces_section_name : string
+
 val to_string : t -> string
 
 val of_names : string list -> t option

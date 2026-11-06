@@ -2368,7 +2368,6 @@ let end_assembly () =
   emit_frames ~debug_strings_section
     ~code_begin:
       (S.encode (S.create_global (Cmm_helpers.make_symbol "code_begin")))
-    ~code_end:(S.encode code_end_sym)
     { efa_code_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:Text lbl in

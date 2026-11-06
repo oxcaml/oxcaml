@@ -1,8 +1,9 @@
 2 105 10
 function pieces: some
 plain pieces: 0
-begin marker pieces: 1
-end marker pieces: 1
-tagged headers: 1
+code_begin pieces: 1
+headers: 1
+hidden start: 1
+hidden stop: 1
 object pieces: some
 unlinked object pieces: 0

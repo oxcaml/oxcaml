@@ -163,6 +163,8 @@ type section_details =
     is_delayed : bool
   }
 
+let frametable_pieces_section_name = "caml_frametable_pieces"
+
 let progbits (arch : Target_system.architecture) =
   (* "@" starts a comment on ARM *)
   match arch with
@@ -287,9 +289,9 @@ let details t first_occurrence =
       Misc.fatal_error "Frametable sections are only supported on ELF targets"
     | Frametable_piece { link_symbol }, arch, _ ->
       (* "ao" = SHF_ALLOC | SHF_LINK_ORDER; the linker drops the piece together
-         with the section defining [link_symbol]. The name must not clash with
-         the startup file's [caml_frametable] symbol. *)
-      [".caml_frametable"], Some "ao", [progbits arch; link_symbol]
+         with the section defining [link_symbol]. The name is a C identifier, so
+         the linker defines [__start_] and [__stop_] symbols for it. *)
+      [frametable_pieces_section_name], Some "ao", [progbits arch; link_symbol]
     | Custom { names; flags; args; _ }, _, _ -> names, flags, args
   in
   let is_delayed = is_delayed t in

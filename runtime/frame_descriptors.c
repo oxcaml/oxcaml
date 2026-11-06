@@ -160,24 +160,38 @@ typedef struct {
   const unsigned char *next; /* points at the next descriptor's delta byte */
   const unsigned char *end;  /* end of the pieces; NULL if count-prefixed */
   uintnat retaddr;           /* running absolute return address */
-  intnat remaining;          /* descriptors left to yield (at most, if [end]) */
+  intnat remaining;          /* descriptors left to yield, if count-prefixed */
 } frametable_iter;
+
+static bool has_pieces(intnat *tbl)
+{
+  return tbl[0] == FRAMETABLE_SECTIONS_TAG;
+}
 
 static const unsigned char *frametable_rel(const unsigned char *p)
 {
   return p + caml_read_unaligned_int32(p);
 }
 
-static void frametable_iter_start(frametable_iter *it, intnat *tbl)
+static const unsigned char *pieces_start(intnat *tbl)
 {
-  if (tbl[0] == FRAMETABLE_SECTIONS_TAG) {
-    const unsigned char *offsets = (const unsigned char *)(tbl + 2);
-    it->remaining = tbl[1];
-    it->next = frametable_rel(offsets);
-    it->end = frametable_rel(offsets + sizeof(int32_t));
-    if (it->next > it->end)
-      caml_fatal_error("frametable pieces out of order "
-                       "(was the unit's code reordered by the linker?)");
+  return frametable_rel((const unsigned char *)(tbl + 1));
+}
+
+static void frametable_iter_start(frametable_iter *it,
+                                  caml_frametable_list *cell)
+{
+  intnat *tbl = cell->frametable;
+  if (has_pieces(tbl)) {
+    it->remaining = 0;
+    if (cell->owns_pieces) {
+      it->next = pieces_start(tbl);
+      it->end = frametable_rel((const unsigned char *)(tbl + 1)
+                               + sizeof(int32_t));
+    } else {
+      /* Another table enters the shared pieces */
+      it->next = it->end = (const unsigned char *)tbl;
+    }
   } else {
     it->remaining = (intnat)caml_read_unaligned_uintnat(tbl);
     it->next = (const unsigned char *)(tbl + 1);
@@ -198,12 +212,6 @@ Caml_inline frame_descr *frametable_iter_next(frametable_iter *it,
 {
   const unsigned char *p = it->next;
   frame_descr *d;
-  /* The count sized the hashtable, so a range holding more descriptors
-     (another unit's pieces, placed inside it by the linker) must not be
-     entered into it. */
-  if (it->remaining <= 0)
-    caml_fatal_error("frametable pieces hold more descriptors than counted "
-                     "(was the unit's code reordered by the linker?)");
   if (*p == FRAME_DELTA_ESCAPE) {
     d = (frame_descr *)p;
     it->retaddr = Retaddr_frame(d);
@@ -232,10 +240,47 @@ static intnat count_descriptors(caml_frametable_list *list) {
   intnat num_descr = 0;
   iter_list(list,cur) {
     frametable_iter it;
-    frametable_iter_start(&it, cur->frametable);
-    num_descr += it.remaining;
+    frametable_iter_start(&it, cur);
+    if (it.end == NULL) {
+      num_descr += it.remaining;
+    } else {
+      /* The pieces hold no count, so decode them to count them */
+      while (frametable_iter_more(&it)) {
+        uintnat retaddr;
+        frametable_iter_next(&it, &retaddr);
+        num_descr++;
+      }
+    }
   }
   return num_descr;
+}
+
+/* Is the pieces section starting at [start] owned by a table on [list]
+   before [stop]? */
+static bool pieces_owned(caml_frametable_list *list,
+                         caml_frametable_list *stop,
+                         const unsigned char *start)
+{
+  for (caml_frametable_list *cur = list; cur != stop; cur = cur->next) {
+    if (cur->owns_pieces && pieces_start(cur->frametable) == start)
+      return true;
+  }
+  return false;
+}
+
+/* Make the first table on [new_frametables] that refers to each pieces
+   section its owner, unless a table on [frametables] already owns it. */
+static void assign_pieces_owners(caml_frametable_list *frametables,
+                                 caml_frametable_list *new_frametables)
+{
+  iter_list(new_frametables, cur) {
+    if (has_pieces(cur->frametable)) {
+      const unsigned char *start = pieces_start(cur->frametable);
+      cur->owns_pieces =
+        !pieces_owned(frametables, NULL, start)
+        && !pieces_owned(new_frametables, cur, start);
+    }
+  }
 }
 
 static caml_frametable_list* frametables_list_tail(caml_frametable_list *list) {
@@ -331,7 +376,7 @@ static void fill_hashtable(
   uintnat n = 0; /* descriptors decoded so far */
   iter_list(new_frametables,cur) {
     frametable_iter it;
-    frametable_iter_start(&it, (intnat *) cur->frametable);
+    frametable_iter_start(&it, cur);
     while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *fd = frametable_iter_next(&it, &retaddr);
@@ -393,16 +438,13 @@ static void clean_frame_descriptors(caml_frame_descrs *table)
   caml_frametable_list *cur = table->zombies, *rem;
   while (cur != NULL) {
     frametable_iter it;
-    frametable_iter_start(&it, (intnat *) cur->frametable);
-    /* Subtract the count, as [add_frame_descriptors] added it, even if the
-       linker dropped some of a range's descriptors. */
-    intnat len = it.remaining;
+    frametable_iter_start(&it, cur);
     while (frametable_iter_more(&it)) {
       uintnat retaddr;
       frame_descr *d = frametable_iter_next(&it, &retaddr);
       remove_entry(table, retaddr, d);
+      decrease++;
     }
-    decrease += len;
     rem = cur;
     cur = cur->next;
     caml_stat_free(rem);
@@ -1110,15 +1152,16 @@ static void add_descriptor_to_stats(frame_descr *d,
 
 /* Record stats for all descriptors from a frametable */
 
-static void add_frametable_to_stats(intnat *frametable,
+static void add_frametable_to_stats(caml_frametable_list *cell,
                                     struct frametable_stats *stats)
 {
   ++ stats->frametables;
   frametable_iter it;
-  frametable_iter_start(&it, frametable);
-  /* A range's descriptors are away from its header, in the pieces */
+  frametable_iter_start(&it, cell);
+  /* Pieces are away from their header, in the pieces section */
   unsigned char *start =
-    it.end != NULL ? (unsigned char *)it.next : (unsigned char *)frametable;
+    it.end != NULL ? (unsigned char *)it.next
+                   : (unsigned char *)cell->frametable;
   if (!stats->min_descr || (start < stats->min_descr)) {
     stats->min_descr = start;
   }
@@ -1141,7 +1184,7 @@ static void report_frametables_stats(caml_frametable_list *new_frametables)
   struct frametable_stats stats;
   clear_stats(&stats);
   iter_list(new_frametables, cur) {
-    add_frametable_to_stats(cur->frametable, &stats);
+    add_frametable_to_stats(cur, &stats);
     accumulate_frametable_stats(cur->frametable, &stats);
     clear_per_frametable_stats(&stats);
   }
@@ -1154,6 +1197,7 @@ static void add_frame_descriptors(
 {
   CAMLassert(new_frametables != NULL);
 
+  assign_pieces_owners(table->frametables, new_frametables);
   caml_frametable_list *tail = frametables_list_tail(new_frametables);
   intnat increase = count_descriptors(new_frametables);
   intnat tblsize = capacity(*table);
@@ -1208,6 +1252,7 @@ static caml_frametable_list *cons(
 {
   caml_frametable_list *li = caml_stat_alloc(sizeof(caml_frametable_list));
   li->frametable = frametable;
+  li->owns_pieces = false;
   li->next = tl;
   return li;
 }
@@ -1229,6 +1274,7 @@ static caml_frametable_list *copy_cons(
   memcpy(frametable_copy, *frametable, size);
   *frametable = frametable_copy;
   li->frametable = frametable_copy;
+  li->owns_pieces = false;
   li->next = tl;
   return li;
 }
@@ -1300,6 +1346,19 @@ static void remove_frame_descriptors(
     for (int i = 0; i < ntables; i++) {
       if (current->frametable == frametables[i]) {
         *previous = current->next;
+        if (current->owns_pieces) {
+          /* Hand the pieces over to another table that refers to them, if
+             any, so that they stay in the hashtable. */
+          const unsigned char *start = pieces_start(current->frametable);
+          iter_list(table->frametables, other) {
+            if (has_pieces(other->frametable)
+                && pieces_start(other->frametable) == start) {
+              other->owns_pieces = true;
+              current->owns_pieces = false;
+              break;
+            }
+          }
+        }
         current->next = table->zombies;
         table->zombies = current;
         ntables--;

@@ -38,8 +38,7 @@
    check-program-output;
  }{
    (* The main unit's entry function is in .text.startup.caml, which linkers
-      place before the rest of the code, so its descriptors must still land
-      inside the unit's range. *)
+      place before the rest of the code, and so do its descriptors. *)
    arch_amd64;
    setup-ocamlopt.byte-build-env;
    flags = "-g";

@@ -1261,6 +1261,9 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   let expr = Add (Sub (Label upper, This), offset_const) in
   const expr Thirty_two
 
+let between_this_and_symbol_32bit_expr upper =
+  const (Sub (Symbol upper, This)) Thirty_two
+
 let between_symbol_in_current_unit_and_label_offset0 ~upper ~lower ~offset_upper
     ~const_for_width =
   (* CR mshinwell: add checks, as above: check_symbol_in_current_unit lower;
