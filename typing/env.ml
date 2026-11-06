@@ -3771,13 +3771,14 @@ let use_modtype ~use ~loc path desc =
       (Path.name path)
   end
 
-let use_class ~use ~loc path clda =
+let use_class ~errors ~use ~loc ~env path clda =
   if use then begin
     let desc = clda.clda_declaration in
     mark_class_used desc.cty_uid;
     Builtin_attributes.check_alerts loc desc.cty_attributes
       (Path.name path)
-  end
+  end;
+  check_address_representable ~errors ~loc ~env clda.clda_address
 
 let use_cltype ~use ~loc path desc =
   if use then begin
@@ -4087,9 +4088,7 @@ let lookup_ident_class ~errors ~use ~loc s env =
       let stage_locks, locks = partition_locks locks in
       check_cross_quotation ~errors ~loc_def:loc
         ~loc_use:clda.clda_declaration.cty_loc env path (Lident s) stage_locks;
-      check_address_representable
-        ~errors ~loc ~env clda.clda_address;
-      use_class ~use ~loc path clda;
+      use_class ~errors ~use ~loc ~env path clda;
       path, locks, clda.clda_declaration
   | Error _ ->
       may_lookup_error errors loc env (Unbound_class (Lident s))
@@ -4360,9 +4359,7 @@ let lookup_dot_class ~errors ~use ~loc l s env =
   match NameMap.find s.txt comps.comp_classes with
   | clda ->
       let path = Pdot(p, s.txt) in
-      check_address_representable
-        ~errors ~loc ~env clda.clda_address;
-      use_class ~use ~loc path clda;
+      use_class ~errors ~use ~loc ~env path clda;
       (path, locks, clda.clda_declaration)
   | exception Not_found ->
       may_lookup_error errors loc env (Unbound_class (Ldot(l, s)))
