@@ -440,10 +440,7 @@ type operation =
         callees : symbol list option;
             (* List of possible callees, or [None] if not known. The actual
                callee might be a re-optimized versions of one these callees. *)
-        returns : bool
-            (* [false] means the call never returns normally (it may still
-               raise); instruction selection relies on this. [true] is the
-               conservative default. *)
+        returns : bool (* [true] is the conservative default. *)
       }
   | Cextcall of
       { func : string;
