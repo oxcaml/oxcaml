@@ -7,24 +7,22 @@
  (modules driver)
  (libraries ppxlib))
 
-; Without colors: the Nix builder's TERM is xterm-256color.
+; Without colors: under dune, in the Nix builder, the driver colors its errors
+; even with a (setenv) in the action, so set OCAML_COLOR on its command line.
 
 (rule
  (alias runtest)
  (action
-  (setenv
-   TERM
-   dumb
-   (progn
-    (with-outputs-to
-     explained.actual
-     (with-accepted-exit-codes
-      1
-      (run %{dep:driver.exe} %{dep:explained.ml})))
-    (diff explained.expected explained.actual)
-    (with-outputs-to
-     unexplained.actual
-     (with-accepted-exit-codes
-      1
-      (run %{dep:driver.exe} %{dep:unexplained.ml})))
-    (diff unexplained.expected unexplained.actual)))))
+  (progn
+   (with-outputs-to
+    explained.actual
+    (with-accepted-exit-codes
+     1
+     (run env OCAML_COLOR=never ./%{dep:driver.exe} %{dep:explained.ml})))
+   (diff explained.expected explained.actual)
+   (with-outputs-to
+    unexplained.actual
+    (with-accepted-exit-codes
+     1
+     (run env OCAML_COLOR=never ./%{dep:driver.exe} %{dep:unexplained.ml})))
+   (diff unexplained.expected unexplained.actual))))
