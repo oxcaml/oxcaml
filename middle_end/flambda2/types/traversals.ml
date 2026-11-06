@@ -64,6 +64,59 @@ type discriminant =
   | Closure
   | Boxed_number of K.Boxable_number.t
 
+module Discriminant = struct
+  module T0 = struct
+    type t = discriminant
+
+    let print ppf (t : t) =
+      let open! Misc.Sexp in
+      match t with
+      | Tagged_immediate -> print ppf [fmt "Tagged_immediate"]
+      | Block tag -> print ppf [fmt "Block"; o "tag" tag Tag.print]
+      | Array -> print ppf [fmt "Array"]
+      | Closure -> print ppf [fmt "Closure"]
+      | Boxed_number kind ->
+        print ppf [fmt "Boxed_number"; a "kind" kind K.Boxable_number.print]
+
+    let equal (t1 : t) (t2 : t) =
+      match t1, t2 with
+      | Tagged_immediate, Tagged_immediate -> true
+      | Block t1, Block t2 -> Option.equal Tag.equal t1 t2
+      | Array, Array -> true
+      | Closure, Closure -> true
+      | Boxed_number k1, Boxed_number k2 -> K.Boxable_number.equal k1 k2
+      | (Tagged_immediate | Block _ | Array | Closure | Boxed_number _), _ ->
+        false
+
+    let compare (t1 : t) (t2 : t) =
+      match t1, t2 with
+      | Tagged_immediate, Tagged_immediate -> 0
+      | Block t1, Block t2 -> Option.compare Tag.compare t1 t2
+      | Array, Array -> 0
+      | Closure, Closure -> 0
+      | Boxed_number k1, Boxed_number k2 -> K.Boxable_number.compare k1 k2
+      | Tagged_immediate, (Block _ | Array | Closure | Boxed_number _) -> -1
+      | (Block _ | Array | Closure | Boxed_number _), Tagged_immediate -> 1
+      | Block _, (Array | Closure | Boxed_number _) -> -1
+      | (Array | Closure | Boxed_number _), Block _ -> 1
+      | Array, (Closure | Boxed_number _) -> -1
+      | (Closure | Boxed_number _), Array -> 1
+      | Closure, Boxed_number _ -> -1
+      | Boxed_number _, Closure -> 1
+
+    let hash (t : t) =
+      match t with
+      | Tagged_immediate -> Hashtbl.hash 0
+      | Block tag -> Hashtbl.hash (0, Option.map Tag.hash tag)
+      | Array -> Hashtbl.hash 1
+      | Closure -> Hashtbl.hash 2
+      | Boxed_number kind -> Hashtbl.hash (1, K.Boxable_number.hash kind)
+  end
+
+  include T0
+  include Container_types.Make (T0)
+end
+
 type accessor =
   | Untag_imm
   | Is_int
@@ -399,15 +452,31 @@ end = struct
 end
 
 type 'a pattern =
-  | Any
-  | Keep of (Var.t * 'a)
-  | Unbox of discriminant * 'a pattern Accessor.Map.t
+  { keep : 'a Var.Map.t;
+    unbox : 'a pattern Accessor.Map.t Discriminant.Map.t
+  }
 
-let rec print_pattern ppf = function
-  | Any -> Format.fprintf ppf "_"
-  | Keep (var, _) -> Var.print ppf var
-  | Unbox (_discriminant, accessors) ->
+let rec print_pattern ppf pattern =
+  match
+    Var.Map.bindings pattern.keep, Discriminant.Map.bindings pattern.unbox
+  with
+  | [], [] -> Format.fprintf ppf "_"
+  | [(var, _)], [] -> Var.print ppf var
+  | [], [(_discriminant, accessors)] ->
     Accessor.Map.print print_pattern ppf accessors
+  | keep, unbox ->
+    let map ppf unbox =
+      Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (fun ppf (_discriminant, accessors) ->
+          Accessor.Map.print print_pattern ppf accessors)
+        ppf unbox
+    in
+    let vars ppf vars =
+      Format.pp_print_list ~pp_sep:Format.pp_print_space
+        (fun ppf (var, _) -> Var.print ppf var)
+        ppf vars
+    in
+    Misc.Sexp.(print ppf [a "keep" keep vars; a "unbox" unbox map])
 
 module Pattern : sig
   type 'a t = 'a pattern
@@ -415,6 +484,11 @@ module Pattern : sig
   val any : 'a t
 
   val var : Var.t -> 'a -> 'a t
+
+  val union : f:(Var.t -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 
   val untag : 'a t -> 'a t
 
@@ -448,16 +522,25 @@ module Pattern : sig
 end = struct
   type 'a t = 'a pattern
 
-  let any = Any
+  let rec print print_keep ppf { keep; unbox } =
+    Misc.Sexp.print ppf
+      [ Misc.Sexp.a "keep" keep (Var.Map.print print_keep);
+        Misc.Sexp.a "unbox" unbox
+          (Discriminant.Map.print (Accessor.Map.print (print print_keep))) ]
 
-  let var var value = Keep (var, value)
+  let any = { keep = Var.Map.empty; unbox = Discriminant.Map.empty }
+
+  let var var value =
+    { keep = Var.Map.singleton var value; unbox = Discriminant.Map.empty }
 
   let unbox discriminant fields =
-    Unbox
-      ( discriminant,
-        List.fold_left
-          (Accessor.Map.disjoint_union ?eq:None ?print:None)
-          Accessor.Map.empty fields )
+    { keep = Var.Map.empty;
+      unbox =
+        Discriminant.Map.singleton discriminant
+          (List.fold_left
+             (Accessor.Map.disjoint_union ?eq:None ?print:None)
+             Accessor.Map.empty fields)
+    }
 
   type 'a block_field = 'a pattern Accessor.Map.t
 
@@ -492,23 +575,35 @@ end = struct
   let boxed_number boxable_number t =
     unbox (Boxed_number boxable_number)
       [accessor (Unbox_number boxable_number) t]
+
+  let rec union ~f t1 t2 =
+    let keep = Var.Map.union f t1.keep t2.keep in
+    let unbox =
+      Discriminant.Map.union
+        (fun _ a1 a2 ->
+          Some (Accessor.Map.union (fun _ t1 t2 -> Some (union ~f t1 t2)) a1 a2))
+        t1.unbox t2.unbox
+    in
+    { keep; unbox }
 end
 
 let rec fold_destructuring ~f destructuring env ty acc =
   let machine_width = TE.machine_width env in
-  match destructuring with
-  | Any -> acc
-  | Keep id -> f id ty acc
-  | Unbox (discriminant, accessors) ->
-    let expanded = Expand_head.expand_head env ty in
-    Accessor.Map.fold
-      (fun accessor accessor_destructuring acc ->
-        let accessor_ty =
-          destructure_expanded_head ~machine_width discriminant accessor
-            expanded
-        in
-        fold_destructuring ~f accessor_destructuring env accessor_ty acc)
-      accessors acc
+  let acc =
+    Var.Map.fold (fun id data acc -> f (id, data) ty acc) destructuring.keep acc
+  in
+  Discriminant.Map.fold
+    (fun discriminant accessors acc ->
+      let expanded = Expand_head.expand_head env ty in
+      Accessor.Map.fold
+        (fun accessor accessor_destructuring acc ->
+          let accessor_ty =
+            destructure_expanded_head ~machine_width discriminant accessor
+              expanded
+          in
+          fold_destructuring ~f accessor_destructuring env accessor_ty acc)
+        accessors acc)
+    destructuring.unbox acc
 
 type 'a function_type =
   { code_id : Code_id.t;
