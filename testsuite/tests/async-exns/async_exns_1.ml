@@ -1,5 +1,10 @@
 (* TEST
  modules = "async_exns_stubs.c";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 let () = Sys.catch_break true

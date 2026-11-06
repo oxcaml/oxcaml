@@ -2,6 +2,11 @@
  include stdlib_stable;
  include stdlib_upstream_compatible;
  flags = "-extension small_numbers";
+ {
+   bytecode;
+ }{
+   native;
+ }
 *)
 
 module Int8_u = Stdlib_stable.Int8_u
