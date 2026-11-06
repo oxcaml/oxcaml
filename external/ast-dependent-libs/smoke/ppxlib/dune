@@ -7,19 +7,24 @@
  (modules driver)
  (libraries ppxlib))
 
+; Without colors: the Nix builder's TERM is xterm-256color.
+
 (rule
  (alias runtest)
  (action
-  (progn
-   (with-outputs-to
-    explained.actual
-    (with-accepted-exit-codes
-     1
-     (run %{dep:driver.exe} %{dep:explained.ml})))
-   (diff explained.expected explained.actual)
-   (with-outputs-to
-    unexplained.actual
-    (with-accepted-exit-codes
-     1
-     (run %{dep:driver.exe} %{dep:unexplained.ml})))
-   (diff unexplained.expected unexplained.actual))))
+  (setenv
+   TERM
+   dumb
+   (progn
+    (with-outputs-to
+     explained.actual
+     (with-accepted-exit-codes
+      1
+      (run %{dep:driver.exe} %{dep:explained.ml})))
+    (diff explained.expected explained.actual)
+    (with-outputs-to
+     unexplained.actual
+     (with-accepted-exit-codes
+      1
+      (run %{dep:driver.exe} %{dep:unexplained.ml})))
+    (diff unexplained.expected unexplained.actual)))))
