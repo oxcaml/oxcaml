@@ -1,10 +1,12 @@
 import Howdah.Syntax
 
 inductive PureEvalError : Type where
+  | blockTagOutOfRange (tag : Nat)
   | unboundVariable (id : Ident)
 
 instance : ToString PureEvalError where
   toString
+    | .blockTagOutOfRange tag => s!"block tag `{tag}` out of range"
     | .unboundVariable id => s!"unbound variable `{id}`"
 
 inductive PureEvalResult (T : Type) : Type where
@@ -37,12 +39,12 @@ theorem PureEvalResult.map_halted {α β} {f : α → β} {x} :
 attribute [simp] dbgTrace
 
 @[simp]
-def Lambda.substitute (idToReplace : Ident) (value : Value) : Lambda → Lambda
+def Lambda'.substitute {V} (idToReplace : Ident) (value : V) :
+    Lambda' V → Lambda' V
   | .var id => if id = idToReplace then .value value else .var id
   | .const c => .const c
-  | .makeBlock tag fields =>
-    .makeBlock tag <|
-      fields.attach.map fun ⟨field, _⟩ ↦ field.substitute idToReplace value
+  | .prim p args =>
+    .prim p <| args.attach.map (fun ⟨arg, _⟩ ↦ arg.substitute idToReplace value)
   | .bind id subst body =>
     let substSubstituted := substitute idToReplace value subst
     let bodySubstituted :=
@@ -54,34 +56,62 @@ def Lambda.substitute (idToReplace : Ident) (value : Value) : Lambda → Lambda
     .bind id substSubstituted bodySubstituted
   | .value v => .value v
 decreasing_by
-  · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
+  · decreasing_with exact Lambda'.size_lt_of_mem <| by assumption
   · decreasing_tactic
   · decreasing_tactic
 
 @[simp]
-theorem Lambda.size_substitute (lambda : Lambda) idToReplace value :
+theorem Lambda'.size_substitute {V} (lambda : Lambda' V) idToReplace value :
     (lambda.substitute idToReplace value).size = lambda.size := by
   induction lambda with simp
   | var v => split <;> simp
   | bind id subst body ihSubst ihBody => split <;> simp_all
-  | makeBlock tag fields ih => induction ih with simp_all
+  | prim _ args ih => induction ih with simp_all
 
 @[simp]
-def Lambda.pureEval : Lambda → PureEvalResult Value
+def Constant.pureEval : Constant → Value
+  | .string bytes => .bytes bytes |> .block 252
+
+@[simp]
+def BlockKind.bindValues (tag : Nat) (contents : List Value) :
+    PureEvalResult Value := do
+  let tag8 ←
+    if lt : tag < UInt8.size
+    then .halted <| UInt8.ofNatLT tag lt
+    else .error <| .blockTagOutOfRange tag
+  match kind : BlockKind.ofTag tag8 with
+  | .values => .halted <| .block tag8 <| kind ▸ .values contents
+  | _ => .error <| .blockTagOutOfRange tag
+
+@[simp]
+def StructuredConstant.pureEval : StructuredConstant → PureEvalResult Value
+  | .base c => c.pureEval |> .halted
+  | .block tag fields => do
+    let values ← fields.attach.mapM fun ⟨field, _⟩ ↦ field.pureEval
+    BlockKind.bindValues tag values
+
+@[simp]
+def Primitive.pureEval (args : List Value) : Primitive → PureEvalResult Value
+  | .makeBlock tag => BlockKind.bindValues tag args
+
+@[simp]
+def Lambda'.pureEval : Lambda → PureEvalResult Value
   | .var id => .unboundVariable id |> .error
-  | .const c => .const c |> .halted
-  | .makeBlock tag fields =>
-    .makeBlock tag <$> fields.attach.mapM fun ⟨field, _⟩ ↦ field.pureEval
+  | .const c => c.pureEval
+  | .prim p args => do
+    let args ← args.attach.mapM fun ⟨arg, _⟩ => arg.pureEval
+    p.pureEval args
   | .bind id subst body => do
     let value : Value ← subst.pureEval
     body.substitute id value |>.pureEval
   | .value v => .halted v
 decreasing_by
-  · decreasing_with exact Lambda.size_lt_of_mem <| by assumption
+  · decreasing_with exact Lambda'.size_lt_of_mem <| by assumption
   · decreasing_tactic
   · decreasing_tactic
 
-def Lambda.pureEval! (lambda : Lambda) : Value :=
+@[simp]
+def Lambda'.pureEval! (lambda : Lambda) : Value :=
   match lambda.pureEval with
   | .halted result => result
   | .maybeNonterminating => panic! "maybe nonterminating"

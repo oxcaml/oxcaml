@@ -1,5 +1,5 @@
 inductive Constant where
-  | string (string : String)
+  | string (bytes : List UInt8)
   deriving Repr
 
 structure Ident where
@@ -19,51 +19,120 @@ inductive TypeExpr where
   | string
   deriving Repr
 
+inductive BlockKind : Type where
+  | values
+  | bytes
+  | closure
+  | unsupported -- lazy, effect continuations, etc.
+  deriving Repr
+
+@[simp]
+def BlockKind.ofTag (tag : UInt8) : BlockKind :=
+  if tag = 247 then .closure else
+  if tag < 244 then .values else
+  if tag < 251 then .unsupported else
+  .bytes
+
 inductive StructuredConstant where
   | base (const : Constant)
   | block (tag : Nat) (fields : List StructuredConstant)
   deriving Repr
 
-inductive Value where
-  | const (const : StructuredConstant)
-  | makeBlock (tag : Nat) (fields : List Value)
+inductive Mutability : Type where
+  | Mutable
+  | Immutable
   deriving Repr
+
+inductive Primitive : Type where
+  | makeBlock (tag : Nat)
+  deriving Repr
+
+/-
+This should be a character-for-character copy of upstream [Lambda.lambda]
+to avoid misformalization via translation errors.
+-/
+inductive Lambda' (V : Type) : Type where
+  /- Lvar -/
+  | var (id : Ident)
+  /- TODO: Lmutvar -/
+  /- Lconst -/
+  | const (const : StructuredConstant)
+  /- TODO: Lapply -/
+  /- TODO: Lfunction -/
+  /- Llet -/
+  | bind (id : Ident) (subst : Lambda' V) (body : Lambda' V)
+  /- TODO: Lmutlet -/
+  /- TODO: Lletrec -/
+  /- Lprim -/
+  | prim (primitive : Primitive) (args : List <| Lambda' V)
+  /- TODO: Lswitch -/
+  /- TODO: Lstringswitch -/
+  /- TODO: Lstaticraise -/
+  /- TODO: Lstaticcatch -/
+  /- TODO: Ltrywith -/
+  /- TODO: Lifthenelse -/
+  /- TODO: Lsequence -/
+  /- TODO: Lwhile -/
+  /- TODO: Lfor -/
+  /- TODO: Lassign -/
+  /- TODO: Lsend -/
+  /- TODO: Levent -/
+  /- TODO: Lifused -/
+  /- TODO: Lregion -/
+  /- TODO: Lexclave -/
+  /- A fully-reduced value (for call-by-value substitution). -/
+  | value (value : V)
+  deriving Repr
+
+mutual
+  inductive Value : Type where
+    | immediate (bits : BitVec 63)
+    | block (tag : UInt8) (contents : BlockContents <| .ofTag tag)
+    deriving Repr
+
+  inductive BlockContents : BlockKind → Type where
+    | values (values : List Value) : BlockContents .values
+    | bytes (bytes : List UInt8) : BlockContents .bytes
+    | closure (rec : Recursive) (closure : Closure) : BlockContents .closure
+    -- nothing for `.unsupported`
+    deriving Repr
+
+  structure Closure : Type where
+    self : Ident
+    headParam : Ident
+    tailParams : List Ident
+    body : Lambda' Value
+    deriving Repr
+
+  inductive Recursive : Type where
+    | nonrecursive
+    | recursive (mutuals : List Closure)
+    deriving Repr
+end
 
 instance : Inhabited Value where
-  default := .makeBlock USize.size []
+  default := .block 0 <| .values []
 
-inductive Lambda where
-  | var (id : Ident)
-  | const (const : StructuredConstant)
-  | bind (id : Ident) (subst : Lambda) (body : Lambda)
-  | makeBlock (tag : Nat) (fields : List Lambda)
-  | value (value : Value) -- For call-by-value substitution.
-  deriving Repr
-
-inductive List.forAll {T} (P : T → Prop) : List T → Prop
-  | Nil : [].forAll P
-  | Cons {head tail} : P head → tail.forAll P → (head :: tail).forAll P
-
-@[induction_eliminator]
-def Lambda.induct' {motive : Lambda → Prop} :=
-  @Lambda.rec motive (List.forAll motive)
-    (nil := .Nil) (cons := fun _ _ ↦ .Cons)
+notation "Lambda" => Lambda' Value
 
 @[simp]
-def Lambda.size : Lambda → Nat
+def Lambda'.size {V} : Lambda' V → Nat
   | .var _ | .const _ | .value _ => 1
   | .bind _ subst body => subst.size + body.size |>.succ
-  | .makeBlock _ fields => fields.map size |>.sum |>.succ
+  | .prim _ args => args.map size |>.sum |>.succ
 
-instance (priority := high) : SizeOf Lambda where
-  sizeOf := Lambda.size
-
-@[simp]
-theorem unfoldSizeOfLambda l : sizeOf l = Lambda.size l := by rfl
+instance (priority := high) {V} : SizeOf <| Lambda' V where
+  sizeOf := Lambda'.size
 
 @[simp]
-theorem Lambda.size_lt_of_mem {fields : List Lambda} {field : Lambda} :
-    field ∈ fields → field.size < (fields.map Lambda.size |>.sum |>.succ) := by
+theorem unfoldSizeOfLambda {V} (l : Lambda' V) :
+    sizeOf l = Lambda'.size l := by rfl
+
+@[simp]
+theorem Lambda'.size_lt_of_mem {V}
+    {fields : List <| Lambda' V} {field} :
+    field ∈ fields →
+    field.size < (fields.map Lambda'.size |>.sum |>.succ) := by
   intro inFields
   induction fields with
   | nil => contradiction
@@ -78,6 +147,77 @@ macro_rules
     `(tactic| exact Lambda.size_lt_of_mem (by assumption))
 -/
 
+inductive List.forAll {T} (P : T → Prop) : List T → Prop
+  | Nil : [].forAll P
+  | Cons {head tail} : P head → tail.forAll P → (head :: tail).forAll P
+
+@[induction_eliminator]
+def Lambda'.induct' {V} {motive : Lambda' V → Prop}
+    (var : ∀ id, motive (.var id))
+    (const : ∀ c, motive (.const c))
+    (bind : ∀ id s b, motive s → motive b → motive (.bind id s b))
+    (prim : ∀ p a, List.forAll motive a → motive (.prim p a))
+    (value : ∀ v, motive (.value v))
+    : ∀ l, motive l
+:=
+  let motiveListLambda : List (Lambda' V) → Prop := List.forAll motive
+  @Lambda'.rec V
+    motive
+    motiveListLambda
+    (var := var)
+    (const := const)
+    (bind := bind)
+    (prim := prim)
+    (value := value)
+    (nil := .Nil)
+    (cons := fun _ _ => .Cons)
+
+/- @[induction_eliminator]
+ - def Lambda.induct' {motive : Lambda → Prop}
+ -     (var : ∀ id, motive (.var id))
+ -     (const : ∀ c, motive (.const c))
+ -     (bind : ∀ id s b, motive s → motive b → motive (.bind id s b))
+ -     (prim : ∀ p a, List.forAll motive a → motive (.prim p a))
+ -     (value : ∀ v, motive (.value v))
+ -     : ∀ l, motive l
+ - :=
+ -   let motiveRecursive : Recursive → Prop := fun _ => True
+ -   let motiveClosure : Closure → Prop := (motive ·.body)
+ -   let motiveValue : Value → Prop := fun _ => True
+ -   let motiveBlockContents (k : BlockKind) : BlockContents k → Prop :=
+ -     fun _ => True
+ -   let motiveListLambda : List Lambda → Prop := List.forAll motive
+ -   let motiveListClosure : List Closure → Prop := List.forAll motiveClosure
+ -   let motiveListValue : List Value → Prop := List.forAll motiveValue
+ -   @Lambda.rec
+ -     motive
+ -     motiveRecursive
+ -     motiveClosure
+ -     motiveValue
+ -     motiveBlockContents
+ -     motiveListLambda
+ -     motiveListClosure
+ -     motiveListValue
+ -     (var := var)
+ -     (const := const)
+ -     (bind := bind)
+ -     (prim := prim)
+ -     (value := fun v _ => value v)
+ -     (nonrecursive := True.intro)
+ -     (recursive := fun _ _ => True.intro)
+ -     (mk := fun _ _ _ _ h => h)
+ -     (immediate := fun _ => True.intro)
+ -     (block := fun _ _ _ => True.intro)
+ -     (values := fun _ _ => True.intro)
+ -     (bytes := fun _ => True.intro)
+ -     (closure := fun _ _ _ _ => True.intro)
+ -     (nil := .Nil)
+ -     (cons := fun _ _ => .Cons)
+ -     .Nil
+ -     (fun _ _ => .Cons)
+ -     .Nil
+ -     (fun _ _ => .Cons) -/
+
 structure RecordLabelDecl where
   id : Ident
   type : TypeExpr
@@ -87,13 +227,13 @@ structure RecordTypeDecl where
   labels : List RecordLabelDecl
   deriving Repr
 
-inductive TypeDeclDesc where
+inductive TypeDesc where
   | record (record : RecordTypeDecl)
   deriving Repr
 
 structure TypeDecl where
   id : Ident
-  desc : TypeDeclDesc
+  desc : TypeDesc
   deriving Repr
 
 inductive SignatureItem where

@@ -24,7 +24,13 @@ Cmt2annot.gen_annot target_filename
 
 (* Serialize a constant expression. *)
 let serialize_constant : Typedtree.constant -> Json.t = function
-  | Const_string (s, _, _) -> Json.String s |> tag "string" |> tag "string"
+  | Const_string (s, _, _) ->
+    String.to_seq s
+    |> Seq.map (fun c -> Char.code c |> Json.int)
+    |> List.of_seq
+    |> fun bytes -> Json.Array bytes
+    |> tag "bytes"
+    |> tag "string"
   | other_constant ->
     Format.asprintf "Constant not yet supported:@ %s"
       (Printpat.pretty_const other_constant)
@@ -84,15 +90,26 @@ let rec serialize_lambda : Lambda.lambda -> Json.t = function
         ("body", serialize_lambda body);
       ]
     |> tag "bind"
-  | Lprim (Pmakeblock (block_tag, Immutable, _, Alloc_heap), fields, _) ->
+  | Lprim (primitive, args, _) ->
     Json.Object
-      [ ("tag", Json.int block_tag);
-        ("fields", Json.Array (List.map serialize_lambda fields));
+      [ ("primitive", serialize_primitive primitive);
+        ("args", Json.Array (List.map serialize_lambda args));
       ]
-    |> tag "makeBlock"
+    |> tag "prim"
   | other_lambda ->
     Format.asprintf "Lambda term not yet supported:@ %a"
       Printlambda.lambda other_lambda
+    |> fun message -> raise (Error_message message)
+
+(* Serialize a [Lambda] primitive. *)
+and serialize_primitive : Lambda.primitive -> Json.t = function
+  | Pmakeblock (block_tag, Immutable, _, Alloc_heap) ->
+    Json.int block_tag
+    |> tag "tag"
+    |> tag "makeBlock"
+  | other_primitive ->
+    Format.asprintf "Lambda primitive not yet supported:@ %a"
+      Printlambda.primitive other_primitive
     |> fun message -> raise (Error_message message)
 
 (* Serialize a type expression. *)
@@ -165,11 +182,19 @@ let serialize_interface (signature : Types.signature) : Json.t =
 let serialize_implementation
     (info : Cmt_format.cmt_infos) (structure : Typedtree.structure)
     (coercion : Typedtree.module_coercion) : Json.t =
-  let program =
+  let { code = tlambda; _ } : Lambda.program =
     Translmod.transl_implementation info.cmt_modname
       (structure, coercion, None) ~loc:Location.none
   in
-  serialize_lambda program.code
+  let cu_static_data compilation_unit =
+    Compilation_unit.full_path_as_string compilation_unit
+    |> Printf.sprintf "Cross-module static evaluation not yet supported: %s"
+    |> fun message -> raise (Error_message message)
+  in
+  let _static_data, lambda =
+    Slambda.eval ~cu_static_data Fun.id tlambda
+  in
+  serialize_lambda lambda
 
 (* Restore load-path information from the [.cmt] artifact. *)
 let rehydrate_envs (info : Cmt_format.cmt_infos) :

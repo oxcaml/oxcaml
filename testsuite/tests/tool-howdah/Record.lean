@@ -4,15 +4,17 @@ import Howdah.Eval
 @[simp]
 def imported : JsonImport := howdah% "record.json"
 
-#eval imported |> repr |> Lean.logInfo
-
-#eval imported.implementation.pureEval! |> repr |> Lean.logInfo
+#eval imported
 
 @[simp]
 def expectedReducedRecordModule : Value :=
-  .makeBlock 0
-    [ .const (.block 0 [.base (.string "hello"), .base (.string "world")])
-    , .const (.block 0 [.base (.string "formal"), .base (.string "methods")])
+  let string (s : String) : Value := .block 252 <| .bytes s.toUTF8.toList
+  let block (contents : List Value) : Value := .block 0 <| .values contents
+  block
+    [ block [string "hello", string "world"]
+    , block [string "formal", string "methods"]
     ]
 
-example : imported.implementation ⇓ expectedReducedRecordModule := by simp
+example : imported.implementation ⇓ expectedReducedRecordModule := by
+  simp
+  decide +kernel
