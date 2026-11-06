@@ -12340,15 +12340,7 @@ and type_cases
     caselist ~check_if_total
     ~type_body:begin
       fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
-<<<<<<< Merlin:record-generalized-vars
-        ~ty_infer ~contains_gadt:_ ->
-||||||| Compiler:last-imported
-        ~ty_infer ~contains_gadt:_ ->
-        let cont = Option.map (fun (id,_) -> id) cont in
-=======
         ~ty_infer ~contains_gadt:_ ~generalized ->
-        let cont = Option.map (fun (id,_) -> id) cont in
->>>>>>> Compiler:HEAD
         let guard =
           match pc_guard with
           | None -> None
