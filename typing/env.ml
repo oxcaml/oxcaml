@@ -2979,7 +2979,7 @@ and add_extension ~check ?shape ~rebind id ext env =
   store_extension ~check ~rebind id addr ext shape env
 
 and add_module_declaration_lazy
-      ~update_summary ?(arg=false) ?(vis : visibility = Exported) ?shape
+      ~update_summary ?(arg=false) ~(vis : visibility) ?shape
       ?full_env ~check id presence md
       ?(mode = Mode.With_regionality.(allow_right max)) ?(locks = []) env =
   let check =
@@ -3006,7 +3006,7 @@ let add_jkind ~check ?shape id decl env =
   let shape = shape_or_leaf decl.jkind_uid shape in
   store_jkind ~check id decl shape env
 
-let add_module_declaration ?(arg=false) ?(vis : visibility = Exported) ?shape
+let add_module_declaration ?(arg=false) ~(vis : visibility) ?shape
   ~check id presence md
   ?mode ?locks env =
   add_module_declaration_lazy ~update_summary:true ~arg ~vis ?shape ~check id
@@ -3036,11 +3036,12 @@ let add_module_lazy ~update_summary id presence mty ?mode env =
                        md_loc = Location.none;
                        md_uid = Uid.internal_not_actually_unique}
   in
-  add_module_declaration_lazy ~update_summary ~check:false id presence md ?mode
-    env
+  add_module_declaration_lazy ~update_summary ~vis:Exported ~check:false id
+    presence md ?mode env
 
 let add_module ?arg ?shape id presence mty ?mode env =
-  add_module_declaration ~check:false ?arg ?shape id presence (md mty) ?mode env
+  add_module_declaration ~check:false ?arg ~vis:Exported ?shape id presence
+    (md mty) ?mode env
 
 let add_local_constraint ~stage path info env =
   { env with
@@ -3095,8 +3096,8 @@ let enter_extension ~scope ~rebind name ext env =
 
 let enter_module_declaration ~scope ?arg ?shape s presence md ?mode ?locks env =
   let id = Ident.create_scoped ~scope s in
-  (id, add_module_declaration ?arg ?shape ~check:true id presence md ?mode
-    ?locks env)
+  (id, add_module_declaration ?arg ~vis:Exported ?shape ~check:true id presence
+    md ?mode ?locks env)
 
 let enter_modtype ~scope name mtd env =
   let id = Ident.create_scoped ~scope name in

@@ -1629,7 +1629,8 @@ and approx_sig_items env ssg=
           let newenv =
             List.fold_left
               (fun env (id, md) -> Env.add_module_declaration ~check:false
-                  id Mp_present md ~mode:(With_regionality.min) env)
+                  ~vis:Exported id Mp_present md ~mode:(With_regionality.min)
+                  env)
               env decls
           in
           map_rec
@@ -2661,7 +2662,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
       let mode = Option.map (fun m -> m.mode_modes) mode in
       Option.fold ~none:env ~some:(fun (id, shape) ->
-        Env.add_module_declaration ~check:true ~shape ~arg:true
+        Env.add_module_declaration ~check:true ~vis:Exported ~shape ~arg:true
           id Mp_present md ?mode env
       ) id_shape
     ) env curr
@@ -3318,7 +3319,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
               let id = Ident.create_scoped ~scope name in
               let shape = Shape.var md_uid id in
               let mode = with_locality_as_regionality mode in
-              let newenv = Env.add_module_declaration
+              let newenv = Env.add_module_declaration ~vis:Exported
                 ~shape ~arg:true ~check:true id Mp_present arg_md ~mode newenv
               in
               Some id, newenv, id
@@ -4122,7 +4123,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                        md_uid = uid;
                      }
                    in
-                   Env.add_module_declaration ~check:true ~shape
+                   Env.add_module_declaration ~check:true ~vis:Exported ~shape
                      id Mp_present mdecl ~mode:mode.mode_modes env
             )
             env bindings1

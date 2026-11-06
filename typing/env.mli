@@ -486,12 +486,12 @@ val add_module_lazy:
   ?mode:Mode.With_regionality.l ->
   t ->
   t
-val add_module_declaration: ?arg:bool -> ?vis:visibility -> ?shape:Shape.t ->
+val add_module_declaration: ?arg:bool -> vis:visibility -> ?shape:Shape.t ->
   check:bool ->
   Ident.t -> module_presence -> module_declaration ->
   ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
 val add_module_declaration_lazy: ?arg:bool -> update_summary:bool ->
-  ?vis:visibility ->
+  vis:visibility ->
   Ident.t -> module_presence -> Subst.Lazy.module_declaration ->
   ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
 val add_modtype: Ident.t -> modtype_declaration -> t -> t
