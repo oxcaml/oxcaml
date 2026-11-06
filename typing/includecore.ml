@@ -1859,7 +1859,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
         let imp a b = not a || b in
         let (co1,cn1) = get_upper v1 and (co2,cn2) = get_upper v2 in
         (if abstr' then (imp co1 co2 && imp cn1 cn2)
-         else if opn || Btype.is_param_Tvar ty then (co1 = co2 && cn1 = cn2)
+         else if opn || not (Btype.is_param_Tvar ty) then (co1 = co2 && cn1 = cn2)
          else true) &&
         let (p1,n1,j1) = get_lower v1 and (p2,n2,j2) = get_lower v2 in
         (* Only check the lower bound for abstract types.
