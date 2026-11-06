@@ -604,7 +604,7 @@ type tm =
 external time : unit -> (float [@unboxed]) =
   "caml_unix_time" "caml_unix_time_unboxed" [@@noalloc]
 external gettimeofday : unit -> (float [@unboxed]) =
-  "caml_unix_gettimeofday" "caml_unix_gettimeofday_unboxed" [@@noalloc]
+  "caml_sys_gettimeofday" "caml_sys_gettimeofday_unboxed" [@@noalloc]
 external gmtime : float -> tm = "caml_unix_gmtime"
 external localtime : float -> tm = "caml_unix_localtime"
 external mktime : tm -> float * tm = "caml_unix_mktime"
