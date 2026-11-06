@@ -1,0 +1,95 @@
+(** Generated from rocq_state.ml by the OxCaml compiler (-laws-rocq);
+    do not edit. The laws are stated as [<law>_statement] and proved
+    in a separate file. *)
+From oxiris Require Import law_prelude_state.
+
+(** [let rev_in_place a =
+      let i = ref 0 and j = ref (Array.length a - 1) in
+      while !i < !j do
+        let t = a.(!i) in
+        a.(!i) <- a.(!j);
+        a.(!j) <- t;
+        incr i;
+        decr j
+      done] *)
+Definition rev_in_place : val :=
+  (λ: "a",
+     let: "$l1" := Ref_make #0 in
+     let: "$l2" := Ref_make (Array_length "a" - #1) in
+     let: "i" := "$l1" in
+     let: "j" := "$l2" in
+     While (Ref_get "i" < Ref_get "j")
+       (let: "t" := Array_get "a" (Ref_get "i") in
+        Array_set "a" (Ref_get "i") (Array_get "a" (Ref_get "j")) ;;
+        Array_set "a" (Ref_get "j") "t" ;; Ref_incr "i" ;; Ref_decr "j"))%V.
+
+(** [let sum a =
+      let s = ref 0 in
+      for i = 0 to Array.length a - 1 do
+        s := !s + Array.get a i
+      done;
+      !s] *)
+Definition sum : val :=
+  (λ: "a",
+     let: "s" := Ref_make #0 in
+     For "i" #0 (Array_length "a" - #1)
+       (Ref_set "s" (Ref_get "s" + Array_get "a" "i")) ;;
+     Ref_get "s")%V.
+
+(** [let fill_down a x =
+      for i = Array.length a - 1 downto 0 do
+        Array.set a i x
+      done] *)
+Definition fill_down : val :=
+  (λ: "a" "x", ForDown "i" (Array_length "a" - #1) #0 (Array_set "a" "i" "x"))%V.
+
+(** [let make_counter () =
+      let c = { contents = 0 } in
+      fun () ->
+        c.contents <- c.contents + 1;
+        c.contents] *)
+Definition make_counter : val :=
+  (λ: "$p3",
+     let: "c" := Ref_make #0 in
+     λ: "$p4", Ref_set "c" (Ref_get "c" + #1) ;; Ref_get "c")%V.
+
+(** [let count n =
+      let c = ref 0 in
+      for _ = 1 to n do
+        incr c
+      done;
+      !c] *)
+Definition count : val :=
+  (λ: "n",
+     let: "c" := Ref_make #0 in For "$i5" #1 "n" (Ref_incr "c") ;; Ref_get "c")%V.
+
+(** [let to_list_twice a = (Array.to_list a, Array.to_list (Array.make 2 0))] *)
+Definition to_list_twice : val :=
+  (λ: "a", (Array_to_list "a", Array_to_list (Array_make #2 #0)))%V.
+
+(** [let get = Array.get] *)
+Definition get : val := (Array_get)%V.
+
+(** [let length = Array.length] *)
+Definition length : val := (Array_length)%V.
+
+(* counter (line 54) is not translated:
+   it is stateful but not a value: its effects would be repeated at each use. *)
+
+(* The type t (line 56) is not translated: mutable record fields. *)
+
+(* bump (line 58) is not translated:
+   mutable record fields (other than those of refs). *)
+
+(* fail (line 59) is not translated:
+   raising exceptions (exceptions are not modelled). *)
+
+(** The names by which other units refer to this one. *)
+Notation Rocq_state_rev_in_place := rev_in_place (only parsing).
+Notation Rocq_state_sum := sum (only parsing).
+Notation Rocq_state_fill_down := fill_down (only parsing).
+Notation Rocq_state_make_counter := make_counter (only parsing).
+Notation Rocq_state_count := count (only parsing).
+Notation Rocq_state_to_list_twice := to_list_twice (only parsing).
+Notation Rocq_state_get := get (only parsing).
+Notation Rocq_state_length := length (only parsing).
