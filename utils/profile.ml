@@ -50,18 +50,15 @@ module Measure = struct
   type t = {
     time : float;
     allocated_words : float;
-    top_heap_words : int;
     counters : Counters.t;
   }
   let create ?(counters = Counters.create ()) () =
-    let stat = Gc.quick_stat () in
+    let minor_words, promoted_words, major_words = Gc.counters () in
     {
       time = gettimeofday ();
-      allocated_words = stat.minor_words +. stat.major_words;
-      top_heap_words = stat.top_heap_words;
+      allocated_words = minor_words +. major_words -. promoted_words;
       counters = counters;
     }
-  let zero = { time = 0.; allocated_words = 0.; top_heap_words = 0; counters = Counters.create () }
   (* The baseline for the toplevel "other" row: the clock is wall time, so it
      cannot be taken to have started at zero *)
   let initial = create ()
@@ -73,14 +70,12 @@ module Measure_diff = struct
     timestamp : int;
     duration : float;
     allocated_words : float;
-    top_heap_words_increase : int;
     counters : Counters.t;
   }
   let zero () = {
     timestamp = timestamp ();
     duration = 0.;
     allocated_words = 0.;
-    top_heap_words_increase = 0;
     counters = Counters.create ();
   }
   let accumulate t (m1 : Measure.t) (m2 : Measure.t) = {
@@ -88,8 +83,6 @@ module Measure_diff = struct
     duration = t.duration +. (m2.time -. m1.time);
     allocated_words =
       t.allocated_words +. (m2.allocated_words -. m1.allocated_words);
-    top_heap_words_increase =
-      t.top_heap_words_increase + (m2.top_heap_words - m1.top_heap_words);
     counters = Counters.union t.counters m2.counters
   }
   let of_diff m1 m2 =
@@ -102,14 +95,12 @@ type hierarchy =
 
 let create () = E (Hashtbl.create 2)
 let hierarchy = ref (create ())
-let initial_measure = ref None
-let reset () = hierarchy := create (); initial_measure := None
+let reset () = hierarchy := create ()
 
 let record_call_internal ?(accumulate = false) ?counter_f name f =
   if !Clflags.profile_columns = [] then f () else
   let E prev_hierarchy = !hierarchy in
   let start_measure = Measure.create () in
-  if !initial_measure = None then initial_measure := Some start_measure;
   let this_measure_diff, this_table =
     (* We allow the recording of multiple categories by the same name, for tools
        like ocamldoc that use the compiler libs but don't care about profile
@@ -206,7 +197,7 @@ let memory_word_display =
       done;
       1024. ** float_of_int !scale, units.(!scale)
   in
-  fun ?previous v : display ->
+  fun v : display ->
     let to_string ~max ~width =
       let scale, scale_str = choose_memory_scale max in
       let width = width - String.length scale_str in
@@ -215,14 +206,6 @@ let memory_word_display =
     let worth_displaying ~max =
       let scale, _ = choose_memory_scale max in
       float_of_string (to_string_without_unit v ~width:0 scale) <> 0.
-      && match previous with
-      | None -> true
-      | Some p ->
-         (* This branch is for numbers that represent absolute quantity, rather
-            than differences. It allows us to skip displaying the same absolute
-            quantity many times in a row. *)
-         to_string_without_unit p ~width:0 scale
-         <> to_string_without_unit v ~width:0 scale
     in
     { to_string; worth_displaying }
 
@@ -244,8 +227,6 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
       timestamp = p1.timestamp;
       duration = p1.duration -. p2.duration;
       allocated_words = p1.allocated_words -. p2.allocated_words;
-      top_heap_words_increase =
-        p1.top_heap_words_increase - p2.top_heap_words_increase;
       counters = Counters.create ();
     }
   ) table;
@@ -253,69 +234,35 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
 
 type row = R of string * (float * display) list * row list
 
-let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy env =
+let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy =
   let rows =
-    rows_of_hierarchy_list
-      ~nesting:(nesting + 1) make_row hierarchy measure_diff env in
-  let values, env =
-    make_row env measure_diff ~toplevel_other:(nesting = 0 && name = "other") in
-  R (name, values, rows), env
+    rows_of_hierarchy_list ~nesting:(nesting + 1) make_row hierarchy measure_diff
+  in
+  R (name, make_row measure_diff, rows)
 
-and rows_of_hierarchy_list ~nesting make_row hierarchy total env =
+and rows_of_hierarchy_list ~nesting make_row hierarchy total =
   let list = profile_list hierarchy in
   let list =
     if list <> [] || nesting = 0
     then list @ [ "other", (compute_other_category hierarchy total, create ()) ]
     else []
   in
-  let env = ref env in
   List.map (fun (name, (measure_diff, hierarchy)) ->
-    let a, env' =
-      rows_of_hierarchy ~nesting make_row name measure_diff hierarchy !env in
-    env := env';
-    a
+    rows_of_hierarchy ~nesting make_row name measure_diff hierarchy
   ) list
 
-let rows_of_hierarchy hierarchy measure_diff initial_measure columns timings_precision =
-  (* Computing top heap size is a bit complicated: if the compiler applies a
-     list of passes n times (rather than applying pass1 n times, then pass2 n
-     times etc), we only show one row for that pass but what does "top heap
-     size at the end of that pass" even mean?
-     It seems the only sensible answer is to pretend the compiler applied pass1
-     n times, pass2 n times by accumulating all the heap size increases that
-     happened during each pass, and then compute what the heap size would have
-     been. So that's what we do.
-     There's a bit of extra complication, which is that the heap can increase in
-     between measurements. So the heap sizes can be a bit off until the "other"
-     rows account for what's missing. We special case the toplevel "other" row
-     so that any increases that happened before the start of the compilation is
-     correctly reported, as a lot of code may run before the start of the
-     compilation (eg functor applications). *)
-    let make_row prev_top_heap_words (p : Measure_diff.t) ~toplevel_other =
-      let top_heap_words =
-        prev_top_heap_words
-        + p.top_heap_words_increase
-        - if toplevel_other
-          then initial_measure.Measure.top_heap_words
-          else 0
-      in
-      let make value ~f = value, f value in
-      List.map (function
-        | `Time ->
-          make p.duration ~f:(time_display timings_precision)
-        | `Alloc ->
-          make p.allocated_words ~f:memory_word_display
-        | `Top_heap ->
-          make (float_of_int p.top_heap_words_increase) ~f:memory_word_display
-        | `Abs_top_heap ->
-          make (float_of_int top_heap_words)
-           ~f:(memory_word_display ~previous:(float_of_int prev_top_heap_words))
-        | `Counters -> counters_display p.counters
-      ) columns,
-      top_heap_words
+let rows_of_hierarchy hierarchy measure_diff columns timings_precision =
+  let make_row (p : Measure_diff.t) =
+    let make value ~f = value, f value in
+    List.map (function
+      | `Time ->
+        make p.duration ~f:(time_display timings_precision)
+      | `Alloc ->
+        make p.allocated_words ~f:memory_word_display
+      | `Counters -> counters_display p.counters
+    ) columns
   in
   rows_of_hierarchy_list ~nesting:0 make_row hierarchy measure_diff
-    initial_measure.top_heap_words
 
 let max_by_column ~n_columns rows =
   let a = Array.make n_columns 0. in
@@ -383,13 +330,8 @@ let output_columns output_rows_f columns ~timings_precision =
   match columns with
   | [] -> ()
   | _ :: _ ->
-     let initial_measure =
-       match !initial_measure with
-       | Some v -> v
-       | None -> Measure.zero
-     in
      let total = Measure_diff.of_diff Measure.initial (Measure.create ()) in
-     output_rows_f (rows_of_hierarchy !hierarchy total initial_measure columns timings_precision)
+     output_rows_f (rows_of_hierarchy !hierarchy total columns timings_precision)
 
 let print ppf =
   output_rows
@@ -403,8 +345,6 @@ let print ppf =
 let column_mapping = [
   `Time, "time";
   `Alloc, "alloc";
-  `Top_heap, "top-heap";
-  `Abs_top_heap, "absolute-top-heap";
   `Counters, "counters"
 ]
 
