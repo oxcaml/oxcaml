@@ -1314,6 +1314,10 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let domain_id_ptr = load_domainstate_addr t Domain_id in
     let domain_id = emit_ins t (I.load ~ptr:domain_id_ptr ~typ:T.i64) in
     store_into_reg t i.res.(0) domain_id
+  | Thread_self_id ->
+    let thread_id_ptr = load_domainstate_addr t Domain_thread_id in
+    let thread_id = emit_ins t (I.load ~ptr:thread_id_ptr ~typ:T.i64) in
+    store_into_reg t i.res.(0) thread_id
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload -> not_implemented_basic ~msg:"spill / reload" i
