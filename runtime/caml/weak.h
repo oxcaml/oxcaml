@@ -46,15 +46,10 @@ struct caml_ephe_info {
      may be unmarked if these ephemerons were the target of a blit operation.
      The data field is never unmarked. */
 
-  int must_sweep_ephe;
-  /* At the beginning of [Phase_sweep_ephe] the [live] list is moved to the
-     [todo] list since the ephemerons in the [live] list may contain unmarked
-     keys if the blit operation was performed in earlier phases
-     ([Phase_mark_final] or [Phase_sweep_and_mark_main]). This move is done
-     exactly once per major cycle per domain. This field keeps track of whether
-     this move has been done for the current cycle. */
-
   uintnat round;
+  /* Records the number of the round of ephemeron marking most
+   * recently completed in the current cycle. */
+
   struct {
     value* todop;
     uintnat round;
@@ -77,6 +72,7 @@ struct caml_ephe_info {
 
 #define Ephe_link(e) (*(Op_val(e) + CAML_EPHE_LINK_OFFSET))
 #define Ephe_data(e) (*(Op_val(e) + CAML_EPHE_DATA_OFFSET))
+#define Ephe_data_addr(e) (Op_atomic_val(e) + CAML_EPHE_DATA_OFFSET)
 
 value caml_ephe_await_key(value ephe, uintnat i);
 
@@ -91,6 +87,19 @@ Caml_inline value ephe_key(value ephe, uintnat i)
 
 struct caml_ephe_info* caml_alloc_ephe_info (void);
 void caml_ephe_clean(value e);
+
+// returns the last element of the ephemeron list, or 0 if it is empty
+value caml_ephe_list_tail(value li);
+
+value caml_ephe_list_cons(value e, value li);
+value caml_ephe_list_append(value front, value back);
+value caml_ephe_list_append_seg(value first, value last, value back);
+
+void caml_ephe_list_cons_inplace(value e, value *li);
+void caml_ephe_list_append_inplace(value e, value *li);
+
+value caml_ephe_list_pop(value *li);
+
 
 #endif /* CAML_INTERNALS */
 

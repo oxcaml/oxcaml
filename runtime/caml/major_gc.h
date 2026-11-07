@@ -36,6 +36,14 @@ extern gc_phase_t caml_gc_phase;
 Caml_inline int caml_marking_started(void) {
   return caml_gc_phase != Phase_sweep_main;
 }
+
+Caml_inline bool caml_ephe_marking_ongoing(void)
+{
+  return
+    caml_marking_started()
+    && caml_gc_phase != Phase_sweep_ephe;
+}
+
 extern atomic_uintnat caml_gc_mark_phase_requested;
 
 intnat caml_opportunistic_major_work_available (caml_domain_state*);
