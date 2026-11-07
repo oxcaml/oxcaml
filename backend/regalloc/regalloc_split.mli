@@ -7,7 +7,10 @@ type phi_move =
 
 type split_result =
   { stack_slots : Regalloc_stack_slots.t;
-    phi_moves : phi_move list
+    phi_moves : phi_move list;
+    rematerializations : Regalloc_rematerializations.t
+        (** the instructions inserted as rematerializations rather than reloads,
+            for the validator *)
   }
 
 (** Splits the live ranges of registers by introducing new registers at
