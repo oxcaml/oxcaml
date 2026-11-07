@@ -255,7 +255,7 @@ Line 3, characters 6-11:
 Error: This expression has type "('a : '_representable_layout_1)"
        but an expression was expected of type "t"
        The layout of t is any
-         because of the definition of a at line 1, characters 0-12.
+         because of the definition of t at line 2, characters 0-30.
        But the layout of t must be representable
          because it's the record type used in a projection.
 |}]
