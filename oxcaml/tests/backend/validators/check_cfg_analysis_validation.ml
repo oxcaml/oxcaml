@@ -20,12 +20,6 @@ let make_cfg blocks =
       fun_ret_type = Cmm.typ_int
     }
 
-let validate_liveness cfg_with_infos =
-  Misc.protect_refs
-    [R (Oxcaml_flags.cfg_liveness_validate, true)]
-    (fun () ->
-      ignore (Cfg_with_infos.liveness cfg_with_infos : Cfg_with_infos.liveness))
-
 let validate cfg_with_infos =
   Misc.protect_refs
     [ R (Oxcaml_flags.cfg_liveness_validate, true);
@@ -33,7 +27,39 @@ let validate cfg_with_infos =
     (fun () ->
       let cfg = Cfg_with_infos.cfg cfg_with_infos in
       ignore (Cfg_with_infos.liveness cfg_with_infos : Cfg_with_infos.liveness);
-      ignore (Cfg_dominators.build cfg : Cfg_dominators.t);
+      let doms = Cfg_dominators.build cfg in
+      let tree = Cfg_dominators.dominator_tree doms in
+      assert (Label.equal tree.label cfg.entry_label);
+      let visited = ref Label.Set.empty in
+      Cfg_dominators.iter_breadth_dominator_tree tree ~f:(fun label ->
+          assert (not (Label.Set.mem label !visited));
+          visited := Label.Set.add label !visited);
+      let all_blocks =
+        Cfg.fold_blocks cfg ~init:Label.Set.empty ~f:(fun label _block labels ->
+            Label.Set.add label labels)
+      in
+      assert (Label.Set.equal !visited all_blocks);
+      (* Check frontiers against their definition, using the independently
+         validated dominators rather than the frontier-building algorithm. *)
+      Cfg.iter_blocks cfg ~f:(fun label _block ->
+          let expected =
+            Cfg.fold_blocks cfg ~init:Label.Set.empty
+              ~f:(fun target block frontier ->
+                if
+                  (not
+                     (Cfg_dominators.is_strictly_dominating doms label target))
+                  && Label.Set.exists
+                       (Cfg_dominators.is_dominating doms label)
+                       block.predecessors
+                then Label.Set.add target frontier
+                else frontier)
+          in
+          let actual = Cfg_dominators.find_dominance_frontier doms label in
+          if not (Label.Set.equal actual expected)
+          then
+            failwith
+              (Format.asprintf "Frontier of %a: expected %a, got %a" Label.print
+                 label Label.Set.print expected Label.Set.print actual));
       Cfg_reachability_validate.validate_reachability cfg)
 
 let test_diamond () =
@@ -235,7 +261,17 @@ let test_tailcall_self () =
         (terminator
            ~arg:[| int.(0); int.(1) |]
            (Tailcall_self { destination = entry_label })) ]
-  |> validate_liveness
+  |> validate
+
+let test_tailcall_to_entry () =
+  let tailcall = new_label 19 in
+  make_cfg
+    [ block entry_label (terminator (Always tailcall));
+      block tailcall
+        (terminator
+           ~arg:[| int.(0); int.(1) |]
+           (Tailcall_self { destination = entry_label })) ]
+  |> validate
 
 let () =
   test_diamond ();
@@ -249,4 +285,5 @@ let () =
   test_invariant_reachable_handler ();
   test_invariant_dead_handler ();
   test_invariant_dead_cycle ();
-  test_tailcall_self ()
+  test_tailcall_self ();
+  test_tailcall_to_entry ()
