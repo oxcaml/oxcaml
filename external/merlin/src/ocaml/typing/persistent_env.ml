@@ -30,6 +30,7 @@ type error =
   | Illegal_renaming of CU.Name.t * CU.Name.t * filepath
   | Inconsistent_import of CU.Name.t * filepath * filepath
   | Need_recursive_types of CU.Name.t
+  | Need_no_crc of CU.Name.t * filepath
   | Inconsistent_package_declaration_between_imports of
       filepath * CU.t * CU.t
   | Direct_reference_from_wrong_package of
@@ -280,7 +281,8 @@ let import_crcs penv ~source crcs =
         | Some (_, known_crc) when Digest.equal known_crc crc -> ()
         | _ ->
           add_import penv name;
-          Consistbl.check crc_units name kind crc source
+          if not !Clflags.no_crc then
+            Consistbl.check crc_units name kind crc source
   in Array.iter import_crc crcs
 
 let check_consistency penv imp =
@@ -378,9 +380,11 @@ let save_import penv crc modname impl flags filename =
     (function
         | Rectypes -> ()
         | Alerts _ -> ()
+        | No_crc -> ()
         | Opaque -> register_import_as_opaque penv modname)
     flags;
-  Consistbl.check crc_units modname impl crc filename;
+  if not !Clflags.no_crc then
+    Consistbl.check crc_units modname impl crc filename;
   add_import penv modname
 
 (* Add an import to the hash table. Checks that we are allowed to access
@@ -440,6 +444,9 @@ let acknowledge_import penv ~check modname pers_sig =
             if not !Clflags.recursive_types then
               error (Need_recursive_types(modname))
         | Alerts _ -> ()
+        | No_crc ->
+            if not !Clflags.no_crc then
+              error (Need_no_crc (modname, filename))
         | Opaque -> register_import_as_opaque penv modname)
     flags;
   begin match kind, Current_unit.get_cu () with
@@ -1017,6 +1024,11 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
             Format_doc.doc_printf
               "%a uses recursive types"
               CU.Name.print_as_inline_code name
+        | Need_no_crc (name, _) ->
+            Format_doc.doc_printf
+              "%a was compiled with %a"
+              CU.Name.print_as_inline_code name
+              Style.inline_code "-no-crc"
         | Inconsistent_package_declaration_between_imports _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
@@ -1208,6 +1220,7 @@ let make_cmi penv modname kind sign alerts =
     List.concat [
       if !Clflags.recursive_types then [Cmi_format.Rectypes] else [];
       if !Clflags.opaque then [Cmi_format.Opaque] else [];
+      if !Clflags.no_crc then [Cmi_format.No_crc] else [];
       [Alerts alerts];
     ]
   in
@@ -1285,6 +1298,14 @@ let report_error_doc ppf =
          The compilation flag %a is required@]"
         CU.Name.print_as_inline_code import
         Style.inline_code "-rectypes"
+  | Need_no_crc(import, filename) ->
+      fprintf ppf
+        "@[<hov>The interface %a@ for module %a@ was compiled with %a.@ \
+         It can only be used by tools that also pass %a.@]"
+        Location.Doc.quoted_filename filename
+        CU.Name.print_as_inline_code import
+        Style.inline_code "-no-crc"
+        Style.inline_code "-no-crc"
   | Inconsistent_package_declaration_between_imports (filename, unit1, unit2) ->
       fprintf ppf
         "@[<hov>The file %s@ is imported both as %a@ and as %a.@]"

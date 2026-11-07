@@ -42,6 +42,7 @@ type error =
   | Camlheader of string * filepath
   | Link_error of Linkdeps.error
   | Needs_custom_runtime of string
+  | Needs_no_crc of filepath
 
 exception Error of error
 
@@ -174,6 +175,8 @@ let crc_interfaces = Consistbl.create ()
 let interfaces = ref ([] : CU.Name.t list)
 
 let check_consistency file_name cu =
+  if cu.cu_no_crc && not !Clflags.no_crc then
+    raise (Error (Needs_no_crc file_name));
   try
     Array.iter
       (fun import ->
@@ -935,6 +938,13 @@ let report_error_doc ppf = function
   | Needs_custom_runtime obj_name ->
       fprintf ppf "%s links with C code, so cannot be linked with -use-prims \
                    or -use-runtime unless -noautolink is specified" obj_name
+  | Needs_no_crc filename ->
+      fprintf ppf
+        "@[<hov>The file %a@ was compiled with %a.@ \
+         It can only be used by tools that also pass %a.@]"
+        Location.Doc.quoted_filename filename
+        Style.inline_code "-no-crc"
+        Style.inline_code "-no-crc"
 
 let () =
   Location.register_error_of_exn

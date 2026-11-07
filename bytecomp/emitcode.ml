@@ -464,6 +464,7 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
                                !Translmod.primitive_declarations;
       cu_required_compunits = Compilation_unit.Set.elements required_globals;
       cu_force_link = !Clflags.link_everything;
+      cu_no_crc = !Clflags.no_crc;
       cu_debug = pos_debug;
       cu_debugsize = size_debug } in
   let pos_compunit = pos_out outchan in

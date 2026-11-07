@@ -31,6 +31,7 @@ module CU = Compilation_unit
 
 type error =
   | Missing_intf_for_quote of CU.Name.t
+  | Intf_for_quote_needs_no_crc of CU.Name.t * string
   | Missing_impl_for_quote of CU.t
 (* This is currently unused as we can't ensure the cmx files are always
    available, specifically compiler-libs doesn't ship its cmx files. We should
@@ -45,7 +46,10 @@ let cmi_bundle ~quoted_cmi =
         try Load_path.find_normalized (CU.Name.to_string name ^ ".cmi")
         with Not_found -> raise (Error (Missing_intf_for_quote name))
       in
-      Cmi_format.read_cmi path)
+      let cmi = Cmi_format.read_cmi path in
+      if List.mem Cmi_format.No_crc cmi.cmi_flags && not !Clflags.no_crc
+      then raise (Error (Intf_for_quote_needs_no_crc (name, path)));
+      cmi)
     quoted_cmi
 
 (* We can't populate this during scan_file because a cmxa contains less
@@ -87,6 +91,7 @@ let cmx_bundle ~quoted_cmx =
           uir_export_info = info.ui_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
           uir_force_link = info.ui_force_link;
+          uir_no_crc = info.ui_no_crc;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;
           uir_sections_length = total_length;

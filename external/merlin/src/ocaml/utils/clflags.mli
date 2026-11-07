@@ -25,6 +25,7 @@ val all_ppx              : string list ref
 val principal            : bool ref
 val real_paths           : bool ref
 val recursive_types      : bool ref
+val no_crc               : bool ref
 val strict_sequence      : bool ref
 val applicative_functors : bool ref
 val typing_recovery      : bool ref
