@@ -357,6 +357,8 @@ module Sort = struct
 
     let for_continuation = scannable
 
+    let for_primitive = scannable
+
     (* Pre-allocated [Some]-wrappings of the base sort constants, evaluated
        once at module initialization and shared by [some] /
        [some_of_base] to avoid allocating a fresh [Some] block per

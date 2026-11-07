@@ -133,7 +133,6 @@ type error =
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
-  | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
@@ -4900,10 +4899,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
   in
   let sort =
     match Ctype.type_sort ~why ~allow_mutation:true env cty.ctyp_type with
-    | Ok sort -> sort
-    | Error err ->
-        Error.log_and_raise cty.ctyp_loc
-          (Non_representable_in_module (env, err, cty.ctyp_type))
+    | Ok sort -> Representable sort
+    | Error _ -> Unrepresentable
   in
   let ty = cty.ctyp_type in
   let v =
@@ -6056,13 +6053,6 @@ let report_error ~loc = function
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
          env) err
-  | Non_representable_in_module (env, err, ty) ->
-    let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
-    Location.errorf ~loc "The type of a module-level value must have a@ \
-                          representable layout.@ %a"
-      (Jkind.Violation.report_with_offender ~offender
-         env)
-      err
   | Invalid_jkind_in_block (typ, sort_const, lloc) ->
     let struct_desc =
       match lloc with

@@ -3870,6 +3870,9 @@ let type_sort ~why ~allow_mutation env ty =
   type_jkind_and_sort ~why ~allow_mutation env ty
   |> Result.map snd
 
+let () =
+  Env.type_sort := type_sort
+
 let check_type_jkind env ty jkind =
   constrain_type_jkind ~allow_mutation:false env ty jkind
 
