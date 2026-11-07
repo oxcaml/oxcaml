@@ -950,3 +950,23 @@ let _ =
   print_floatu "  result (-4.00)" result;
   print_t17 t18_1;
   print_t17 t18_2
+
+(* ARM64 float32 constants must use the full 8-bit biased exponent when
+   deciding whether they can be encoded as FMOV immediates. *)
+let[@inline never] check_float32_constant expected x =
+  assert (Int32.equal expected (Float32.to_bits (Float32_u.to_float32 x)))
+
+let () =
+  check_float32_constant 0x3e000000l #0x1p-3s;
+  check_float32_constant 0xbe000000l (-#0x1p-3s);
+  check_float32_constant 0x41f80000l #0x1.fp4s;
+  check_float32_constant 0xc1f80000l (-#0x1.fp4s);
+  check_float32_constant 0x3d800000l #0x1p-4s;
+  check_float32_constant 0x42000000l #0x1p5s;
+  check_float32_constant 0x3f840000l #0x1.08p0s;
+  check_float32_constant 0x1e000000l #0x1p-67s;
+  check_float32_constant 0x21800000l #0x1p-60s;
+  check_float32_constant 0x5e000000l #0x1p61s;
+  check_float32_constant 0x5e800000l #0x1p62s;
+  check_float32_constant 0x61800000l #0x1p68s;
+  check_float32_constant 0xde800000l (-#0x1p62s)
