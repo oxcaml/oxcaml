@@ -60,7 +60,7 @@ type let_binding_classification = private
 val classify_let_binding :
   Variable.t ->
   effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
-  num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
+  num_occurrences_of_bound_vars:Num_occurrences.By_name_mode.t Variable.Map.t ->
   let_binding_classification
 
 (** Classification of continuations, indicating what may be done with the

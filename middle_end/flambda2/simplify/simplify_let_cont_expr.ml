@@ -380,6 +380,10 @@ let make_rewrite_for_recursive_continuation uacc ~cont ~is_cold
   in
   uacc
 
+let remove_params params free_names =
+  ListLabels.fold_left (Bound_parameters.to_list params) ~init:free_names
+    ~f:(fun free_names param -> NO.remove_var free_names ~var:(BP.var param))
+
 let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
   (* Here both the body and the handlers have been rebuilt. We only need to
      restore the cost metrics and name occurrences accumulators, rebuild all the
@@ -487,17 +491,25 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           (fun handler -> handler.handler)
           continuation_handlers
       in
+      (* The occurrences of the invariant parameters are still present in the
+         handlers' free names at this point (see
+         [rebuild_single_recursive_handler]), as [RE.create_recursive_let_cont]
+         requires. *)
+      let free_names_of_handlers =
+        Continuation.Lmap.fold
+          (fun _ handler free_names ->
+            NO.union free_names handler.name_occurrences_of_handler)
+          continuation_handlers NO.empty
+      in
       let expr =
         RE.create_recursive_let_cont
           (UA.are_rebuilding_terms uacc)
-          ~invariant_params rec_handlers ~body
+          ~invariant_params ~free_names_of_handlers rec_handlers ~body
       in
       let name_occurrences =
-        Continuation.Lmap.fold
-          (fun _ handler name_occurrences ->
-            NO.union name_occurrences
-              (NO.increase_counts handler.name_occurrences_of_handler))
-          continuation_handlers name_occurrences_body
+        NO.union name_occurrences_body
+          (NO.increase_counts
+             (remove_params invariant_params free_names_of_handlers))
       in
       let name_occurrences =
         Continuation.Lmap.fold
@@ -625,10 +637,6 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
   in
   EB.make_new_let_bindings uacc ~body:handler
     ~bindings_outermost_first:new_phantom_param_bindings_outermost_first
-
-let remove_params params free_names =
-  ListLabels.fold_left (Bound_parameters.to_list params) ~init:free_names
-    ~f:(fun free_names param -> NO.remove_var free_names ~var:(BP.var param))
 
 let rebuild_single_non_recursive_handler ~rebuild_expr ~at_unit_toplevel
     ~is_single_inlinable_use ~original_invariant_params cont
@@ -821,9 +829,9 @@ let rebuild_single_recursive_handler ~rebuild_expr cont
           variant_params ~handler ~free_names_of_handler:free_names
           ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
       in
-      let free_names =
-        remove_params invariant_params (remove_params variant_params free_names)
-      in
+      (* The invariant parameters are removed when the whole group is rebuilt
+         (see [rebuild_let_cont]), where their occurrences are needed. *)
+      let free_names = remove_params variant_params free_names in
       let rebuilt_handler : rebuilt_handler =
         { handler = cont_handler;
           handler_expr = handler;

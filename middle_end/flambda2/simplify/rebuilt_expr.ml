@@ -291,7 +291,8 @@ let create_non_recursive_let_cont_without_free_names are_rebuilding cont handler
       ~free_names_of_body:Unknown
     |> create ~is_cold:body.is_cold
 
-let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
+let create_recursive_let_cont are_rebuilding ~invariant_params
+    ~free_names_of_handlers handlers ~body =
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
@@ -301,6 +302,7 @@ let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
         handlers
     in
     Let_cont.create_recursive ~invariant_params handlers ~body:body.expr
+      ~free_names_of_handlers:(Known free_names_of_handlers)
     |> create ~is_cold:body.is_cold
 
 let create_switch are_rebuilding ~is_cold switch =

@@ -1179,14 +1179,17 @@ module Let_cont_with_acc = struct
     acc, expr
 
   let create_recursive acc ~invariant_params handlers ~body
-      ~cost_metrics_of_handlers =
+      ~free_names_of_handlers ~cost_metrics_of_handlers =
     let acc =
       Acc.increment_metrics
         (Cost_metrics.increase_due_to_let_cont_recursive
            ~cost_metrics_of_handlers)
         acc
     in
-    let expr = Let_cont.create_recursive ~invariant_params handlers ~body in
+    let expr =
+      Let_cont.create_recursive ~invariant_params handlers ~body
+        ~free_names_of_handlers:(Known free_names_of_handlers)
+    in
     let acc =
       Continuation.Lmap.fold
         (fun cont _ acc -> Acc.remove_continuation_from_free_names cont acc)
@@ -1220,7 +1223,7 @@ module Let_cont_with_acc = struct
         acc
     in
     create_recursive acc ~invariant_params handlers ~body
-      ~cost_metrics_of_handlers
+      ~free_names_of_handlers:handlers_free_names ~cost_metrics_of_handlers
 
   let build_non_recursive acc cont ~handler_params ~handler ~body
       ~is_exn_handler ~is_cold =
