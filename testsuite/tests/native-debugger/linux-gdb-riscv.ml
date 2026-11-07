@@ -1,4 +1,7 @@
 (* TEST
+   set BUILD_PATH_PREFIX_MAP = "";
+   file = "${test_source_directory}/sanitize.awk";
+   file-exists;
    native-compiler;
    linux;
    no-tsan; (* Skip, TSan inserts extra frames into backtraces *)
@@ -13,6 +16,8 @@
    ocamlopt.byte;
    debugger_script = "${test_source_directory}/gdb-script";
    gdb;
+   stdout = "";
+   stderr = "";
    script = "sh ${test_source_directory}/sanitize.sh linux-gdb-riscv";
    script;
    check-program-output;

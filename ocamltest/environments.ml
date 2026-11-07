@@ -46,10 +46,16 @@ let expand env = function
      let simple_bindings = List.map f bindings in
      expand [] simple_bindings value
 
-let append_to_system_env environment env =
+
+let filter_exported env =
+  let is_capitalized s = String.capitalize_ascii s = s in
+  VariableMap.filter (fun v _ -> is_capitalized (Variables.exported_name v)) env
+
+let append_to_system_env ~full environment orig_env =
   (* Augment env with any bindings which are only in environment. This must be
      done here as the Windows C implementation doesn't process multiple values
      in settings.envp. *)
+  let env = if full then orig_env else filter_exported orig_env in
   let env =
     let update env binding =
       let name, value =
@@ -74,15 +80,15 @@ let append_to_system_env environment env =
   let i = ref 0 in
   let store variable value =
     let some value =
-      Variables.string_of_binding variable (expand env (Some value)) in
+      Variables.string_of_binding variable (expand orig_env (Some value)) in
     system_env.(!i) <-
       Option.fold ~none:(Variables.name_of_variable variable) ~some value;
     incr i in
   VariableMap.iter store env;
   system_env
 
-let to_system_env env =
-  append_to_system_env [||] env
+let to_system_env ~full env =
+  append_to_system_env ~full [||] env
 
 let lookup variable env =
   try Some (expand env (VariableMap.find variable env)) with Not_found -> None
