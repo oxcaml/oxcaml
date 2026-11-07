@@ -2404,7 +2404,21 @@ let prefix_idents root prefixing_sub sg =
         rem
   in
   let sg = Subst.Lazy.force_signature_once sg in
-  prefix_idents root [] prefixing_sub sg
+  let items_and_paths, prefixing_sub =
+    prefix_idents root [] prefixing_sub sg
+  in
+  (* Signatures tend to contain many value declarations, which would make
+     adding all of them to the substitution expensive. Lookup is much rarer
+     so we shift the cost to lookup time. *)
+  let values =
+    lazy
+      (List.filter_map
+         (function
+           | Sig_value (id, _, _) -> Some (id, Pdot (root, Ident.name id))
+           | _ -> None)
+         sg)
+  in
+  items_and_paths, Subst.add_lazy_values values prefixing_sub
 
 (* Compute structure descriptions *)
 

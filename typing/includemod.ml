@@ -565,8 +565,9 @@ let pair_components subst sig1_comps sig2 =
               Subst.add_modtype id2 (Path.Pident id1) subst
           | Sig_jkind _ ->
               Subst.add_jkind id2 (Path.Pident id1) subst
-          | Sig_value _ | Sig_typext _
-          | Sig_class _ | Sig_class_type _ ->
+          | Sig_value _ ->
+              Subst.add_value id2 (Path.Pident id1) subst
+          | Sig_typext _ | Sig_class _ | Sig_class_type _ ->
               subst
         in
         pair new_subst
