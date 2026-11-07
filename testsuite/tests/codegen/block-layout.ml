@@ -45,7 +45,7 @@ sum_loop:
   ret
 .L2:
   leaq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L3:
 |}]
@@ -69,7 +69,7 @@ get_mid:
 .L0:
   subq  $8, %rsp
   leaq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]

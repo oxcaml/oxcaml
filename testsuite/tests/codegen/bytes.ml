@@ -201,7 +201,7 @@ bytes_safe_get_int32:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]

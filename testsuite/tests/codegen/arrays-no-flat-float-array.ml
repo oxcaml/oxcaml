@@ -52,7 +52,7 @@ push:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -421,7 +421,7 @@ int_safe_get:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -444,7 +444,7 @@ ref_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -463,7 +463,7 @@ poly_safe_get:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -486,7 +486,7 @@ poly_safe_set:
   ret
 .L0:
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -506,7 +506,7 @@ int64_safe_get:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -525,7 +525,7 @@ float_safe_get:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -545,7 +545,7 @@ float_safe_get_plain:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -569,7 +569,7 @@ int32_safe_get:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
