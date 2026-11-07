@@ -31,6 +31,7 @@ CAMLnoret CAMLextern void caml_sys_error (value);
 CAMLnoret CAMLextern void caml_sys_io_error (value);
 
 CAMLextern double caml_sys_time_unboxed(value);
+CAMLextern double caml_sys_gettimeofday_unboxed(value);
 CAMLextern void caml_sys_init (const char_os * exe_name,
                                char_os const * const * argv);
 
