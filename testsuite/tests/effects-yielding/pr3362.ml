@@ -5,7 +5,7 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += F : string t
 
@@ -21,4 +21,4 @@ let handle comp =
 
 let () = handle (fun h () ->
   Gc.compact ();
-  print_endline (Effect.Safe.perform h F ^ (" " ^ Effect.Safe.perform h F)))
+  print_endline (Effect.Yielding.perform h F ^ (" " ^ Effect.Yielding.perform h F)))

@@ -42,7 +42,7 @@ let code_unyielding =
          type _ Effect.t += E : unit Effect.t
 
          let local_effects () =
-           Safe.try_with (fun h () -> Effect.Safe.perform h E; 1) ()
+           Yielding.try_with (fun h () -> Effect.Yielding.perform h E; 1) ()
              { effc = (fun (type a) (eff : a Effect.t) ->
                  match eff with
                  | E -> Some (fun (k : (a, _) continuation) -> continue k ())
@@ -155,10 +155,10 @@ let code_yielding =
       let open Effect.Deep in
       let module M = struct type _ Effect.t += E : unit Effect.t end in
       let counter = ref 0 in
-      Safe.try_with
+      Yielding.try_with
         (fun h () ->
           call_twice
-            (fun () -> Effect.Safe.perform h M.E; incr counter)
+            (fun () -> Effect.Yielding.perform h M.E; incr counter)
             [@nontail]) ()
         { effc = (fun (type a) (eff : a Effect.t) ->
             match eff with
@@ -213,8 +213,9 @@ let code_run =
 
     let () =
       let counter = ref 0 in
-      Safe.try_with (fun h () ->
-        call_twice (fun () -> Effect.Safe.perform h E; incr counter) [@nontail])
+      Yielding.try_with (fun h () ->
+        call_twice (fun () -> Effect.Yielding.perform h E; incr counter)
+        [@nontail])
         ()
         handler;
       print_int !counter;
@@ -273,9 +274,9 @@ let code_nested_tail =
       let saved = ref None in
       let counter = ref 0 in
       let r =
-        Safe.try_with
+        Yielding.try_with
           (fun h () ->
-            call_via_get (fun () -> Effect.Safe.perform h E; incr counter)
+            call_via_get (fun () -> Effect.Yielding.perform h E; incr counter)
             [@nontail];
             !counter)
           ()
@@ -347,9 +348,9 @@ let code_nested_tail_unyielding_outer =
     let () =
       let counter = ref 0 in
       let r =
-        Safe.try_with
+        Yielding.try_with
           (fun h () ->
-            call_via_get (fun () -> Effect.Safe.perform h E; incr counter)
+            call_via_get (fun () -> Effect.Yielding.perform h E; incr counter)
             [@nontail]) ()
           { effc = (fun (type a) (eff : a Effect.t) ->
               match eff with

@@ -5,12 +5,12 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += Foo : int -> int t
 
-let f h () = (Effect.Safe.perform h (Foo 3)) (* 3 + 1 *)
-           + (Effect.Safe.perform h (Foo 3)) (* 3 + 1 *)
+let f h () = (Effect.Yielding.perform h (Foo 3)) (* 3 + 1 *)
+           + (Effect.Yielding.perform h (Foo 3)) (* 3 + 1 *)
 
 let r =
   try_with f ()

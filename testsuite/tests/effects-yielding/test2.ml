@@ -6,13 +6,13 @@
 open Printf
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : int -> int t
 
 let f h () =
   printf "perform effect (E 0)\n%!";
-  let v = Effect.Safe.perform h (E 0) in
+  let v = Effect.Yielding.perform h (E 0) in
   printf "perform returns %d\n%!" v;
   v + 1
 

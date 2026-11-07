@@ -5,7 +5,7 @@
 
 open Stdlib__Effect
 open Stdlib__Effect.Deep
-open Stdlib__Effect.Deep.Safe
+open Stdlib__Effect.Deep.Yielding
 
 type _ t += E : unit t
 
