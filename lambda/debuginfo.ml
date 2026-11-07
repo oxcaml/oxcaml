@@ -159,8 +159,11 @@ module Scoped_location = struct
       | Cons {item = Sc_class_definition; _} -> dot ~sep:"#" scopes s
       | _ -> dot scopes s
     in
+    (* Translclass binds the method's function as [method_<name>]; the
+       mangling item matches, so the binder's name identifies the function. *)
     cons scopes Sc_method_definition str s
-      ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
+      ~assume_zero_alloc:ZA.Assume_info.none
+      (Some (Function ("method_" ^ s)))
 
   let enter_lazy ~scopes =
     cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none
@@ -215,6 +218,15 @@ module Scoped_location = struct
     | Empty -> ZA.Assume_info.none
     | Cons { assume_zero_alloc; _ } -> assume_zero_alloc
 
+  (* A function the compiler derives from the function defined by [scopes]:
+     see [Structured_mangling.marker_payload]. The string form, which names
+     functions in DWARF and assembly output, is left as it is, and so is the
+     zero_alloc assumption, which the derived function's body inherits. *)
+  let enter_compiler_generated ~scopes marker =
+    cons scopes Sc_partial_or_eta_wrapper (str scopes) ""
+      ~assume_zero_alloc:(get_assume_zero_alloc ~scopes)
+      (Some (Function (Structured_mangling.marker_payload marker)))
+
   let string_of_scopes ~include_zero_alloc = function
     | Empty -> "<unknown>"
     | Cons {str; assume_zero_alloc; _} ->
@@ -239,6 +251,14 @@ module Scoped_location = struct
     | Empty -> None
     | Cons { prev = Empty; _ } -> Some scopes
     | Cons { prev } -> outermost_scope prev
+
+  let enclosing_module_scopes scopes =
+    let rec loop = function
+      | Empty -> Empty
+      | Cons { item = Sc_module_definition; _ } as scopes -> scopes
+      | Cons { prev; _ } -> loop prev
+    in
+    loop scopes
 
   let compilation_unit scopes =
     match outermost_scope scopes with

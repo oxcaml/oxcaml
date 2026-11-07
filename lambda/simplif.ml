@@ -588,9 +588,20 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
    tail call later on. *)
 
   let mklet str kind v duid e1 e2 =
-    match e2 with
-    | Lvar w when optimize && Ident.same v w -> e1
-    | _ -> Llet (str, kind,v,duid,e1,e2)
+    match e1, e2 with
+    | Lfunction _, Lvar w when optimize && Ident.same v w ->
+        (* [let f = fun ... in f] keeps its binding: the middle end names the
+           function after the variable it is bound to (see the [Llet] of an
+           [Lfunction] in [Lambda_to_flambda]), and an anonymous function
+           would only get a generic name. The binding also lets
+           [split_default_wrapper] below, which only recognizes let-bound
+           functions, treat a function with optional arguments defined this
+           way like any other named one: its default-filling wrapper is
+           inlined at known call sites, at the cost of one more call through
+           an unknown closure. *)
+        Llet (str, kind, v, duid, e1, e2)
+    | _, Lvar w when optimize && Ident.same v w -> e1
+    | _, _ -> Llet (str, kind, v, duid, e1, e2)
   in
 
   let mkmutlet kind v duid e1 e2 =
@@ -942,10 +953,19 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
         in
         let body = Lambda.rename subst body in
         let body = if add_region then Lregion (body, return) else body in
+        (* The body is a compiler-generated variant of the function: the
+           [inner] marker names it in mangled symbols. *)
+        let inner_loc =
+          Debuginfo.Scoped_location.map_scopes
+            (fun scopes ->
+              Debuginfo.Scoped_location.enter_compiler_generated ~scopes
+                "inner")
+            loc
+        in
         let inner_fun =
           lfunction' ~kind:(Curried {nlocal=0})
             ~params:new_ids
-            ~return ~body ~attr ~loc ~mode ~ret_mode
+            ~return ~body ~attr ~loc:inner_loc ~mode ~ret_mode
         in
         (wrapper_body, { id = inner_id;
                          debug_uid = inner_id_duid;

@@ -81,9 +81,12 @@ Warning 26 [unused-var]: unused variable "r".
   (foo/4 =
      (function {nlocal = 1} param/2[L][value<int>]
        (region
-         (let (r/5 =mut "bar")
-           (function {nlocal = 1} r/6[L] : int
-             (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
+         (let
+           (r/5 =mut "bar"
+            store/1 =
+              (function {nlocal = 1} r/6[L] : int
+                (setfield_ptr(maybe-stack) 0 r/6 "foobar")))
+           store/1))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
 val foo : unit @ 'n -> string myref @ [< write] -> unit @ 'm = <fun>
@@ -99,10 +102,10 @@ let foo () =
      (function {nlocal = 1} param/3[L][value<int>]
        (let
          (r/7 = (makemutable 0 (*) "bar")
-          store/1 =
+          store/2 =
             (function {nlocal = 0} r/8 : int (setfield_ptr 0 r/8 "foobar")))
          (function {nlocal = 1} param/4[L][value<int>] : int
-           (apply store/1 r/7)))))
+           (apply store/2 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
 val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
 |}]

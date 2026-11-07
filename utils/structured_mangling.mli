@@ -111,6 +111,16 @@ and 'cu path = 'cu path_item list
 (* CR sspies: Support for object methods (they appear as regular functions) is
    still missing. *)
 
+(** A function the compiler derives from a source-level function (the body of a
+    function with optional arguments, the destination-passing version of a
+    [[@tail_mod_cons]] function, the wrapper coercing a functor to its
+    signature) is identified by a {!Function} item whose payload is a marker in
+    braces, e.g. [{inner}], which no source identifier can contain. Demanglers
+    render the payload as is: [f.{inner}]. *)
+val marker_payload : string -> string
+
+val is_marker_payload : string -> bool
+
 (** Transform a {!Compilation_unit.t} and a {!path} into a mangled name suitable
     for creating a {!LinkageName.t} *)
 val mangle_ident : Compilation_unit.t -> Compilation_unit.t path -> string
