@@ -253,6 +253,7 @@ merlin-promote:
 ast_dependent_libs_root = external/ast-dependent-libs
 ast_dependent_libs_deps = $(ast_dependent_libs_root)/deps
 jsoo_private_deps = external/js_of_ocaml/oxcaml-private
+ppxlib_private_deps = external/ppxlib/oxcaml-private
 
 # The build directory is the default, $(ast_dependent_libs_root)/_build: with an
 # absolute --build-dir, dune install records absolute build-directory paths for
@@ -313,6 +314,11 @@ ast-dependent-libs-build-boot: ppxlib-jane-build-boot
 
 $(ast_dependent_libs_deps)/ppx_derivers: src_var = PPXLIB_PPX_DERIVERS_SRC
 $(ast_dependent_libs_deps)/sexp_type: src_var = PPXLIB_SEXP_TYPE_SRC
+$(ppxlib_private_deps)/lrgrep: src_var = PPXLIB_LRGREP_SRC
+$(ppxlib_private_deps)/menhirSdk: src_var = PPXLIB_MENHIR_SDK_SRC
+$(ppxlib_private_deps)/pprint: src_var = PPXLIB_PPRINT_SRC
+$(ppxlib_private_deps)/cmon: src_var = PPXLIB_CMON_SRC
+$(ppxlib_private_deps)/grenier: src_var = PPXLIB_GRENIER_SRC
 $(jsoo_private_deps)/gen: src_var = SEDLEX_GEN_SRC
 $(jsoo_private_deps)/sedlex: src_var = JSOO_SEDLEX_SRC
 $(jsoo_private_deps)/cmdliner: src_var = JSOO_CMDLINER_SRC
@@ -323,7 +329,12 @@ $(ast_dependent_libs_deps)/qcheck: src_var = JSOO_QCHECK_SRC
 
 PPXLIB_DEPS = \
   $(ast_dependent_libs_deps)/ppx_derivers \
-  $(ast_dependent_libs_deps)/sexp_type
+  $(ast_dependent_libs_deps)/sexp_type \
+  $(ppxlib_private_deps)/lrgrep \
+  $(ppxlib_private_deps)/menhirSdk \
+  $(ppxlib_private_deps)/pprint \
+  $(ppxlib_private_deps)/cmon \
+  $(ppxlib_private_deps)/grenier
 
 JSOO_DEPS = \
   $(jsoo_private_deps)/gen \
