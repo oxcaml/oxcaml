@@ -395,7 +395,8 @@ type prelude_result =
   { cfg_with_infos : Cfg_with_infos.t;
     cfg_infos : cfg_infos;
     stack_slots : Regalloc_stack_slots.t;
-    affinity : Regalloc_affinity.t
+    affinity : Regalloc_affinity.t;
+    rematerializations : Regalloc_rematerializations.t
   }
 
 let prelude :
@@ -475,7 +476,8 @@ let prelude :
   { cfg_with_infos;
     cfg_infos;
     stack_slots;
-    affinity = Regalloc_affinity.compute cfg_with_infos phi_moves
+    affinity = Regalloc_affinity.compute cfg_with_infos phi_moves;
+    rematerializations = Regalloc_rematerializations.create ()
   }
 
 let postlude : type s.
