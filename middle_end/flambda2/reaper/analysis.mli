@@ -22,8 +22,18 @@ module Solution : sig
   val apply_renaming : [`Without_types] t -> Renaming.t -> [`Without_types] t
 end
 
-val solve :
-  'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f Solution.t
+val solve_single : 'f Traverse.Problem.t -> 'f Solution.t
+
+(** Combine the problems of the units of a whole program and solve them
+    together.
+
+    Returns, for each unit, the part of the solution that its rebuild needs: the
+    data about its own identifiers, and about the symbols and code ids of other
+    units that it mentions, and its symbols that other units mention. Querying
+    the tables about another identifier is a fatal error. *)
+val solve_whole_program :
+  (Compilation_unit.t * [`Without_types] Traverse.Problem.t) list ->
+  (Compilation_unit.t * [`Without_types] Solution.t) list
 
 val get_unboxed_fields :
   'f Solution.t -> Code_id_or_name.t -> Unboxing_analysis.unboxed option
@@ -65,6 +75,8 @@ val is_changing_calling_convention : 'f Solution.t -> Code_id.t -> bool
    solve. *)
 val find_code_metadata : 'f Solution.t -> Code_id.t -> Code_metadata.t option
 
+(** For a solution restricted to a unit, only the slots that the rebuilt unit
+    may contain are included. *)
 val slot_offsets : 'f Solution.t -> Slot_offsets.result
 
 val rewrite_kind_with_subkind :
@@ -74,3 +86,8 @@ val rewrite_kind_with_subkind :
   Flambda_kind.With_subkind.t
 
 val final_typing_env : 'f Solution.t -> ('f, typing_env) Traverse.With_types.t
+
+(** The symbols of the unit that other units of a whole-program solve mention,
+    which must remain global in the rebuilt unit. Empty for a single-unit
+    solution. *)
+val exported_symbols : 'f Solution.t -> Symbol.Set.t
