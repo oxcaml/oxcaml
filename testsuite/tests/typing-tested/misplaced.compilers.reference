@@ -1,0 +1,34 @@
+File "misplaced.ml", line 18, characters 12-28:
+18 |   type t [@@testing_required] (* rejected *)
+                 ^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the testing_required attribute cannot appear in this context
+
+File "misplaced.ml", line 19, characters 29-49:
+19 |   module type T = sig end [@@testing_not_required] (* rejected *)
+                                  ^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the testing_not_required attribute cannot appear in this context
+
+File "misplaced.ml", line 20, characters 17-33:
+20 |   exception E [@@testing_required] (* rejected *)
+                      ^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the testing_required attribute cannot appear in this context
+
+File "misplaced.ml", line 21, characters 6-30:
+21 |   [@@@covers_required_tests_of M] (* rejected *)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the covers_required_tests_of attribute cannot appear in this context
+
+File "misplaced.ml", line 25, characters 6-22:
+25 |   [@@@testing_required] (* rejected *)
+           ^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the testing_required attribute cannot appear in this context
+
+File "misplaced.ml", line 26, characters 15-35:
+26 |   let x = 1 [@@testing_not_required] (* rejected *)
+                    ^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the testing_not_required attribute cannot appear in this context
+
+File "misplaced.ml", line 27, characters 27-43:
+27 |   module N = struct end [@@testing_required] (* rejected *)
+                                ^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the testing_required attribute cannot appear in this context

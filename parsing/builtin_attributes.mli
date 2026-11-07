@@ -367,3 +367,40 @@ val get_tracing_probe_payload :
   Parsetree.payload -> (tracing_probe, unit) result
 
 val has_atomic: Parsetree.attributes -> bool
+
+(** Attributes for checking that a structure tests a module's interface.
+
+    [[@@testing_required]] and [[@@testing_not_required]] may be attached to
+    [val], [external], [module], [module rec] and [include] items of a
+    signature. The floating forms [[@@@testing_required]] and
+    [[@@@testing_not_required]] set the default for the rest of the enclosing
+    signature. A module's requirement is the default for the items inside it.
+    Either attribute may have a string payload giving the reason.
+    [[@@@covers_required_tests_of M]] in a structure checks that the structure
+    binds every value of [M] that requires testing, except in submodules of
+    [M] checked by nested structures. *)
+type testing_requirement = Testing_required | Testing_not_required
+
+(** [testing_requirement attrs] is the requirement given by [attrs], if any.
+    Does not mark the attributes as used. *)
+val testing_requirement : Parsetree.attributes -> testing_requirement option
+
+(** Like [testing_requirement], but marks the attributes as used, warning about
+    duplicates and payloads. *)
+val parse_testing_requirement :
+  Parsetree.attributes -> testing_requirement option
+
+(** Like [parse_testing_requirement], for a single (usually floating)
+    attribute. *)
+val parse_testing_requirement_attribute :
+  Parsetree.attribute -> testing_requirement option
+
+(** A synthesized [[@@testing_required]] or [[@@testing_not_required]]
+    attribute. *)
+val testing_requirement_attr : testing_requirement -> Parsetree.attribute
+
+(** [covers_required_tests_of_attribute attr] is [None] if [attr] is not
+    [[@@@covers_required_tests_of]], and otherwise the module path in its
+    payload, if it is well-formed. *)
+val covers_required_tests_of_attribute :
+  Parsetree.attribute -> Longident.t Location.loc option option
