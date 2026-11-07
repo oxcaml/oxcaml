@@ -20,7 +20,8 @@ val is_dominating : t -> Label.t -> Label.t -> bool
 
 (** [is_strictly_dominating doms x y] is [true] iff [x] is strictly dominating
     [y] according to [doms]. That is, [is_dominating doms x y = true] and [x] is
-    not equal [y]. All edges, regular and exceptional are treated the same way.*)
+    not equal [y]. All edges, regular and exceptional are treated the same way.
+*)
 val is_strictly_dominating : t -> Label.t -> Label.t -> bool
 
 (** [find_dominance_frontier doms label] returns the dominance frontier for
@@ -41,3 +42,7 @@ val dominator_tree_for_entry_point : t -> dominator_tree
     from [doms] in a breadth-first manner (iterating over a whole tree of the
     forest before moving to the next tree), applying [f] to visited nodes. *)
 val iter_breadth_dominator_forest : t -> f:(Label.t -> unit) -> unit
+
+module For_testing : sig
+  val doms : t -> Label.t Label.Tbl.t
+end
