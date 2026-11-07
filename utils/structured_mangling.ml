@@ -197,18 +197,13 @@ type 'cu path_item =
   | Function of string
   | Anonymous_function of int
   | Lazy of int
-  | Partial_function of int * int * string option
+  | Partial of 'cu path
   | Stamp of int
 
-type 'cu path = 'cu path_item list
+and 'cu path = 'cu path_item list
 
-let mangle_path_item buf path_item =
+let rec mangle_path_item ~definition_unit buf path_item =
   let tag_prefixed ~tag sym = Printf.bprintf buf "%s%a" tag encode sym in
-  let tag_prefixed_loc ~line ~col ~file_opt ~tag =
-    let file_name = Option.value ~default:"" file_opt in
-    let ts = Printf.sprintf "%s_%d_%d" file_name line col in
-    tag_prefixed ~tag ts
-  in
   (* A decimal number cannot be length-prefixed like an identifier (the two
      would run together), so it is terminated by [_] instead, which cannot start
      an item. *)
@@ -228,28 +223,45 @@ let mangle_path_item buf path_item =
   | Function sym -> tag_prefixed ~tag:tag_function sym
   | Anonymous_function n -> tag_prefixed_number ~tag:tag_anonymous_function n
   | Lazy n -> tag_prefixed_number ~tag:tag_lazy n
-  | Partial_function (line, col, file_opt) ->
-    tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
+  | Partial callee ->
+    (* The callee is only qualified by its compilation unit when that is not the
+       unit the enclosing function is defined in (see [mangle_ident]), so that
+       the item is the same in that unit and in the units into which a copy of
+       the function is specialized by inlining. The number of items lets the
+       parser know where the callee's path ends and the enclosing path
+       resumes. *)
+    let callee =
+      match callee with
+      | Compilation_unit cu :: callee
+        when Compilation_unit.equal cu definition_unit ->
+        callee
+      | callee -> callee
+    in
+    tag_prefixed_number ~tag:tag_partial_function (List.length callee);
+    mangle_path ~definition_unit buf callee
   | Stamp n -> tag_prefixed_number ~tag:tag_stamp n
 
-let mangle_path buf path = List.iter (mangle_path_item buf) path
+and mangle_path ~definition_unit buf path =
+  List.iter (mangle_path_item ~definition_unit buf) path
 
 let mangle_ident (cu : Compilation_unit.t) (path : Compilation_unit.t path) =
   (* Compare the current compilation unit with the one recorded in the [path] to
      avoid repetition in the mangled name when they are identical, and to add an
      explicit inline tag to separate the two compilation units (the one
-     currently created and the source of the code) when they differ. *)
-  let path =
-    Compilation_unit cu
-    ::
-    (match path with
-    | Compilation_unit cu' :: path' when Compilation_unit.equal cu cu' -> path'
-    | Compilation_unit _ :: _ -> Inline_marker :: path
-    | _ -> path)
+     currently created and the source of the code) when they differ. The unit
+     recorded in the path, where the function is defined, is also the one the
+     callees of partial applications are made relative to. *)
+  let definition_unit, path =
+    match path with
+    | Compilation_unit cu' :: path' when Compilation_unit.equal cu cu' ->
+      cu, Compilation_unit cu :: path'
+    | Compilation_unit cu' :: _ ->
+      cu', Compilation_unit cu :: Inline_marker :: path
+    | _ -> cu, Compilation_unit cu :: path
   in
   let b = Buffer.create 10 in
   Buffer.add_string b ocaml_prefix;
-  mangle_path b path;
+  mangle_path ~definition_unit b path;
   Buffer.contents b
 
 module Parse = struct
@@ -351,32 +363,17 @@ module Parse = struct
     match undecimal str (pos + flag_len) with
     | None -> None
     | Some (payload_len, length_len) ->
+      let payload_pos = pos + flag_len + length_len in
       let full_len = flag_len + length_len + payload_len in
-      if payload_len <= 0 || pos + full_len > String.length str
+      (* The bound is checked by subtraction: [payload_len] can be close to
+         [max_int], and adding to it would overflow. *)
+      if payload_len <= 0 || payload_len > String.length str - payload_pos
       then None
       else
-        let payload =
-          String.sub str (pos + flag_len + length_len) payload_len
-        in
+        let payload = String.sub str payload_pos payload_len in
         if is_escaped
         then Option.map (fun p -> p, full_len) (decode_split_parts payload)
         else Some (payload, full_len)
-
-  (** Inverse of {!tag_prefixed_loc}: split a decoded [file_line_col] payload
-      back into its components. Returns [None] if the payload does not have the
-      expected shape. *)
-  let parse_location loc =
-    Option.bind (String.rindex_opt loc '_') @@ fun second ->
-    Option.bind (String.rindex_from_opt loc (second - 1) '_') @@ fun first ->
-    let line_str = String.sub loc (first + 1) (second - first - 1) in
-    Option.bind (int_of_string_opt line_str) @@ fun line ->
-    let col_str =
-      String.sub loc (second + 1) (String.length loc - second - 1)
-    in
-    Option.bind (int_of_string_opt col_str) @@ fun col ->
-    let file = String.sub loc 0 first in
-    let file_opt = if file = "" then None else Some file in
-    Some (line, col, file_opt)
 
   (* Linux prefix *)
   let linux_prefix = ocaml_prefix
@@ -397,47 +394,59 @@ module Parse = struct
   let starts_with_prefix sym = Option.is_some (matched_prefix_len sym)
 
   let parse sym =
-    let parse_loc pos tag_constructor =
-      Option.bind (decode sym pos) @@ fun (decoded, l) ->
-      Option.bind (parse_location decoded) @@ fun (line, col, file_opt) ->
-      Some (tag_constructor line col file_opt, l)
-    in
-    let parse_named pos tag_constructor =
-      Option.bind (decode sym pos) @@ fun (decoded, l) ->
-      Some (tag_constructor decoded, l)
-    in
     let len = String.length sym in
     (* Inverse of [tag_prefixed_number] in [mangle_path_item]: a decimal number
        followed by its [_] terminator. *)
-    let parse_number pos tag_constructor =
+    let parse_number pos =
       Option.bind (undecimal sym pos) @@ fun (n, l) ->
       if pos + l < len && Char.equal sym.[pos + l] '_'
-      then Some (tag_constructor n, l + 1)
+      then Some (n, l + 1)
       else None
     in
-    Option.bind (matched_prefix_len sym) @@ fun start_pos ->
-    let rec loop path pos =
-      let aux parse_fun tag_constructor =
-        Option.bind (parse_fun (pos + 1) tag_constructor) @@ fun (it, l) ->
-        loop (it :: path) (pos + 1 + l)
+    (* Each of the parsers below returns what it parsed together with the
+       position following it. *)
+    let rec parse_item pos =
+      let with_payload parse_payload make_item =
+        Option.map
+          (fun (payload, l) -> make_item payload, pos + 1 + l)
+          (parse_payload (pos + 1))
       in
-      if pos < len
-      then
-        match sym.[pos] with
-        | 'U' -> aux parse_named (fun s -> Compilation_unit s)
-        | 'M' -> aux parse_named (fun s -> Module s)
-        | 'O' -> aux parse_named (fun s -> Class s)
-        | 'F' -> aux parse_named (fun s -> Function s)
-        | 'L' -> aux parse_number (fun n -> Anonymous_function n)
-        | 'S' -> aux parse_number (fun n -> Anonymous_module n)
-        | 'Z' -> aux parse_number (fun n -> Lazy n)
-        | 'P' -> aux parse_loc (fun l c f -> Partial_function (l, c, f))
-        | 'D' -> aux parse_number (fun n -> Stamp n)
-        | 'I' -> loop (Inline_marker :: path) (pos + 1)
-        | _ -> None
-      else if pos = start_pos
+      if pos >= len
       then None
-      else Some (List.rev path)
+      else
+        match sym.[pos] with
+        | 'U' -> with_payload (decode sym) (fun s -> Compilation_unit s)
+        | 'M' -> with_payload (decode sym) (fun s -> Module s)
+        | 'O' -> with_payload (decode sym) (fun s -> Class s)
+        | 'F' -> with_payload (decode sym) (fun s -> Function s)
+        | 'L' -> with_payload parse_number (fun n -> Anonymous_function n)
+        | 'S' -> with_payload parse_number (fun n -> Anonymous_module n)
+        | 'Z' -> with_payload parse_number (fun n -> Lazy n)
+        | 'D' -> with_payload parse_number (fun n -> Stamp n)
+        | 'I' -> Some (Inline_marker, pos + 1)
+        | 'P' ->
+          Option.bind (parse_number (pos + 1)) @@ fun (k, l) ->
+          Option.map
+            (fun (callee, pos) -> Partial callee, pos)
+            (parse_items k [] (pos + 1 + l))
+        | _ -> None
+    (* Exactly [k] items: the path of the callee of a partial application. *)
+    and parse_items k acc pos =
+      match k with
+      | 0 -> Some (List.rev acc, pos)
+      | _ ->
+        Option.bind (parse_item pos) @@ fun (item, pos) ->
+        parse_items (k - 1) (item :: acc) pos
     in
-    loop [] start_pos
+    (* All the items up to the end of [sym]. *)
+    let rec parse_all acc pos =
+      if pos >= len
+      then Some (List.rev acc)
+      else
+        Option.bind (parse_item pos) @@ fun (item, pos) ->
+        parse_all (item :: acc) pos
+    in
+    Option.bind (matched_prefix_len sym) @@ fun start_pos ->
+    Option.bind (parse_all [] start_pos) @@ fun path ->
+    match path with [] -> None | _ :: _ -> Some path
 end
