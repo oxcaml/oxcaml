@@ -429,17 +429,17 @@ module Sort = struct
     let is_root { contents; _ } = Option.is_none contents
 
     (* Map var ids to smaller numbers for more consistent printing. *)
-    let next_id = ref 1
+    let next_id = Local_store.s_ref 1
 
-    let names : (int, int) Hashtbl.t = Hashtbl.create 16
+    let names : (int, int) Hashtbl.t ref = Local_store.s_table Hashtbl.create 16
 
     let get_print_number id =
-      match Hashtbl.find_opt names id with
+      match Hashtbl.find_opt !names id with
       | Some n -> n
       | None ->
         let counter = !next_id in
         incr next_id;
-        Hashtbl.add names id counter;
+        Hashtbl.add !names id counter;
         counter
 
     let name { id; _ } =

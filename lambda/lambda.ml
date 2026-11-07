@@ -2068,6 +2068,9 @@ let static_label_sequence = Static_label.make_sequence ()
 let next_raise_count () =
   Static_label.get_and_incr static_label_sequence
 
+let reset_raise_count () =
+  Static_label.reset static_label_sequence
+
 (* Anticipated staticraise, for guards *)
 let staticfail = Lstaticraise (Static_label.fail,[])
 

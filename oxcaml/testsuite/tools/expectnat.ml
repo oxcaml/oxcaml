@@ -18,6 +18,41 @@ module Toplevel = struct
   let override_sys_argv = Opttoploop.override_sys_argv
   let initialize_toplevel_env = Opttoploop.initialize_toplevel_env
   let load_file = Opttoploop.load_file
+  let max_printer_depth = Opttoploop.max_printer_depth
+  let max_printer_steps = Opttoploop.max_printer_steps
+
+  let isolate_run f =
+    let result_file = Filename.temp_file "expectnat" ".run" in
+    Format.pp_print_flush Format.std_formatter ();
+    Format.pp_print_flush Format.err_formatter ();
+    flush_all ();
+    match Unix.fork () with
+    | 0 ->
+      let status =
+        match f () with
+        | result ->
+          Out_channel.with_open_bin result_file (fun oc ->
+            Marshal.to_channel oc result []);
+          0
+        | exception exn ->
+          Location.report_exception Format.err_formatter exn;
+          2
+      in
+      Format.pp_print_flush Format.std_formatter ();
+      Format.pp_print_flush Format.err_formatter ();
+      flush_all ();
+      Unix._exit status
+    | pid ->
+      let result =
+        match Unix.waitpid [] pid with
+        | _, WEXITED 0 ->
+          Some (In_channel.with_open_bin result_file Marshal.from_channel)
+        | _, (WEXITED _ | WSIGNALED _ | WSTOPPED _) -> None
+      in
+      Sys.remove result_file;
+      match result with
+      | Some result -> result
+      | None -> exit 2
   let execute_phrase = Opttoploop.execute_phrase
 end
 

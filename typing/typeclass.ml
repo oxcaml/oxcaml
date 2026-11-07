@@ -2218,7 +2218,7 @@ let type_classes define_class approx kind env cls =
   let res = List.map (check_coercions env) res in
   (res, env)
 
-let class_num = ref 0
+let class_num = Local_store.s_ref 0
 let class_declaration env virt sexpr =
   incr class_num;
   let self_scope = Ctype.get_current_level () in
