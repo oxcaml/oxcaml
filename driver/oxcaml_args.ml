@@ -168,16 +168,6 @@ let mk_cfg_stack_checks_threshold f =
     Arg.Int f,
     "<n>  Only CFGs with fewer than n blocks will be optimized" )
 
-let mk_cfg_eliminate_dead_trap_handlers f =
-  ( "-cfg-eliminate-dead-trap-handlers",
-    Arg.Unit f,
-    " Eliminate dead trap handlers" )
-
-let mk_no_cfg_eliminate_dead_trap_handlers f =
-  ( "-no-cfg-eliminate-dead-trap-handlers",
-    Arg.Unit f,
-    " Do not eliminate dead trap handlers" )
-
 let mk_cfg_eliminate_dead_code_validate f =
   ( "-cfg-eliminate-dead-code-validate",
     Arg.Unit f,
@@ -1427,8 +1417,6 @@ module type Oxcaml_options = sig
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
-  val cfg_eliminate_dead_trap_handlers : unit -> unit
-  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
   val cfg_eliminate_dead_code_validate : unit -> unit
   val no_cfg_eliminate_dead_code_validate : unit -> unit
   val cfg_dominators_validate : unit -> unit
@@ -1642,9 +1630,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
-      mk_cfg_eliminate_dead_trap_handlers F.cfg_eliminate_dead_trap_handlers;
-      mk_no_cfg_eliminate_dead_trap_handlers
-        F.no_cfg_eliminate_dead_trap_handlers;
       mk_cfg_eliminate_dead_code_validate F.cfg_eliminate_dead_code_validate;
       mk_no_cfg_eliminate_dead_code_validate
         F.no_cfg_eliminate_dead_code_validate;
@@ -2018,12 +2003,6 @@ module Oxcaml_options_impl = struct
 
   let cfg_prologue_shrink_wrap_threshold n =
     Oxcaml_flags.cfg_prologue_shrink_wrap_threshold := n
-
-  let cfg_eliminate_dead_trap_handlers =
-    set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
-
-  let no_cfg_eliminate_dead_trap_handlers =
-    clear' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
 
   let cfg_eliminate_dead_code_validate =
     set' Oxcaml_flags.cfg_eliminate_dead_code_validate
@@ -2453,7 +2432,6 @@ module Oxcaml_options_impl = struct
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
-    cfg_eliminate_dead_trap_handlers ();
     cfg_value_propagation_flow ();
     use_ssa ()
 end
@@ -2637,8 +2615,6 @@ module Extra_params = struct
     | "cfg-peephole-optimize" -> set' Oxcaml_flags.cfg_peephole_optimize
     | "x86-peephole-optimize" -> set' Oxcaml_flags.x86_peephole_optimize
     | "cfg-stack-checks" -> set' Oxcaml_flags.cfg_stack_checks
-    | "cfg-eliminate-dead-trap-handlers" ->
-        set' Oxcaml_flags.cfg_eliminate_dead_trap_handlers
     | "cfg-eliminate-dead-code-validate" ->
         set' Oxcaml_flags.cfg_eliminate_dead_code_validate
     | "cfg-dominators-validate" -> set' Oxcaml_flags.cfg_dominators_validate
