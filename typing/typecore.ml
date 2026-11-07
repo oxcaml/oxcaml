@@ -2159,8 +2159,8 @@ let add_module_variables env module_variables =
           md_uid = mv_uid; }
       in
       let mode = Typedtree.mode_without_locks_exn modl.mod_mode in
-      Env.add_module_declaration ~shape:md_shape ~check:true mv_id pres md
-        ~mode env
+      Env.add_module_declaration ~shape:md_shape ~vis:Exported ~check:true
+        mv_id pres md ~mode env
     end
   ) env module_variables_as_list
 

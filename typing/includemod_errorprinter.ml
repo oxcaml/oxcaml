@@ -306,6 +306,7 @@ module Is_modal = struct
     | Core s -> core_sigitem_symptom s
     | Module_type d -> module_type_symptom d.symptom
     | Module_type_declaration _ -> None
+    | Visibility _ -> None
 
   and core_sigitem_symptom = function
     | Value_descriptions d -> value_mismatch d.symptom
@@ -1169,6 +1170,30 @@ and sigitem ~expansion_token ~env ~before ~ctx (name,s) = match s with
         ~ctx:(Context.Module name :: ctx) diff
   | Module_type_declaration diff ->
       module_type_decl ~expansion_token ~env ~before ~ctx name diff
+  | Visibility { got = Unmentionable; expected = Exported; _ } ->
+      let printer =
+        Fmt.dprintf
+          "@[<hv>%a cannot be referenced by name,@ \
+           so the interface cannot export it@]"
+          Style.inline_code (Ident.name name)
+      in
+      dwith_context ctx printer :: before
+  | Visibility { got; expected; _ } ->
+      let describe : Types.visibility -> string = function
+        | Exported -> "exported"
+        | Unmentionable -> "unmentionable"
+        | Hidden -> "hidden"
+      in
+      let printer =
+        Fmt.dprintf
+          "@[<v>@[<hv>%a is %s in the implementation,@ \
+           but the interface requires it to be %s@]@,\
+           @{<error>@[<hov 2>Note: this visibility mismatch should not be \
+           reported.@ If you hit this case, report it to the Jane Street \
+           compilers team.@]@}@]"
+          Style.inline_code (Ident.name name) (describe got) (describe expected)
+      in
+      dwith_context ctx printer :: before
 and module_type_decl ~expansion_token ~env ~before ~ctx id diff =
   let next =
     dwith_context_and_elision ctx (module_type_declarations id diff) in

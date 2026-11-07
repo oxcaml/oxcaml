@@ -1669,7 +1669,8 @@ and approx_sig_items env ssg=
           let newenv =
             List.fold_left
               (fun env (id, md) -> Env.add_module_declaration ~check:false
-                  id Mp_present md ~mode:(With_regionality.min) env)
+                  ~vis:Exported id Mp_present md ~mode:(With_regionality.min)
+                  env)
               env decls
           in
           map_rec
@@ -2710,7 +2711,7 @@ and transl_recmodule_modtypes env ~sig_modalities ~md_mode sdecls =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
       let mode = Option.map (fun m -> m.mode_modes) mode in
       Option.fold ~none:env ~some:(fun (id, shape) ->
-        Env.add_module_declaration ~check:true ~shape ~arg:true
+        Env.add_module_declaration ~check:true ~vis:Exported ~shape ~arg:true
           id Mp_present md ?mode env
       ) id_shape
     ) env curr
@@ -3403,7 +3404,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
               let id = Ident.create_scoped ~scope name in
               let shape = Shape.var md_uid id in
               let mode = with_locality_as_regionality mode in
-              let newenv = Env.add_module_declaration
+              let newenv = Env.add_module_declaration ~vis:Exported
                 ~shape ~arg:true ~check:true id Mp_present arg_md ~mode newenv
               in
               Some id, newenv, id
@@ -3874,26 +3875,31 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
       Env.enter_signature ~scope ~mod_shape
         (extract_sig_open env md.mod_loc md.mod_type) ~mode env
     in
-    let info, visibility =
+    let info, sg =
       match toplevel with
-      | Some false | None -> Some `From_open, Hidden
-      | Some true -> None, Exported
+      | Some true ->
+          (* At the toplevel the opened items are exported, keeping their own
+             visibility so that [Unmentionable] ones stay unmentionable. *)
+          None, sg
+      | Some false | None ->
+          let visibility = Hidden in
+          let sg =
+            List.map (function
+              | Sig_value(id, vd, _) -> Sig_value(id, vd, visibility)
+              | Sig_type(id, td, rs, _) -> Sig_type(id, td, rs, visibility)
+              | Sig_typext(id, ec, et, _) -> Sig_typext(id, ec, et, visibility)
+              | Sig_module(id, mp, md, rs, _) ->
+                  Sig_module(id, mp, md, rs, visibility)
+              | Sig_modtype(id, mtd, _) -> Sig_modtype(id, mtd, visibility)
+              | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
+              | Sig_class_type(id, ctd, rs, _) ->
+                  Sig_class_type(id, ctd, rs, visibility)
+              | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
+            ) sg
+          in
+          Some `From_open, sg
     in
     Signature_group.iter (Signature_names.check_sig_item ?info names loc) sg;
-    let sg =
-      List.map (function
-        | Sig_value(id, vd, _) -> Sig_value(id, vd, visibility)
-        | Sig_type(id, td, rs, _) -> Sig_type(id, td, rs, visibility)
-        | Sig_typext(id, ec, et, _) -> Sig_typext(id, ec, et, visibility)
-        | Sig_module(id, mp, md, rs, _) ->
-            Sig_module(id, mp, md, rs, visibility)
-        | Sig_modtype(id, mtd, _) -> Sig_modtype(id, mtd, visibility)
-        | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
-        | Sig_class_type(id, ctd, rs, _) ->
-            Sig_class_type(id, ctd, rs, visibility)
-        | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
-      ) sg
-    in
     let open_descr = {
       open_expr = md;
       open_bound_items = sg;
@@ -4221,7 +4227,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
                        md_uid = uid;
                      }
                    in
-                   Env.add_module_declaration ~check:true ~shape
+                   Env.add_module_declaration ~check:true ~vis:Exported ~shape
                      id Mp_present mdecl ~mode:mode.mode_modes env
             )
             env bindings1
@@ -5080,9 +5086,9 @@ let functorize_signature ~params ~modules : Types.signature =
   in
   let body =
     List.map
-      (fun (id, sign) ->
+      (fun (id, visibility, sign) ->
         Sig_module
-          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported))
+          (id, Mp_present, make_md (Mty_signature sign), Trec_not, visibility))
       modules
   in
   let intf_id = Ident.create_local "Intf" in

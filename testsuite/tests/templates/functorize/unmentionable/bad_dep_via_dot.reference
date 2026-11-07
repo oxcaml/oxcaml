@@ -1,0 +1,4 @@
+File "main_dep_via_dot.ml", line 7, characters 24-34:
+7 | let () = print_endline (Inst.Foo__.A.hello (P_int.create ()))
+                            ^^^^^^^^^^
+Error: The module Inst.Foo__ cannot be referenced by name.
