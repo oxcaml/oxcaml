@@ -391,11 +391,18 @@ let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
                 critical_edges)
           successor_labels critical_edges)
 
+type prelude_result =
+  { cfg_with_infos : Cfg_with_infos.t;
+    cfg_infos : cfg_infos;
+    stack_slots : Regalloc_stack_slots.t;
+    affinity : Regalloc_affinity.t
+  }
+
 let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
     Cfg_with_infos.t ->
-    cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t =
+    prelude_result =
  fun (module Utils) ~on_fatal_callback cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
@@ -465,7 +472,11 @@ let prelude :
       collect_cfg_infos cfg_with_layout, stack_slots, phi_moves
     else cfg_infos, Regalloc_stack_slots.make (), []
   in
-  cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos phi_moves
+  { cfg_with_infos;
+    cfg_infos;
+    stack_slots;
+    affinity = Regalloc_affinity.compute cfg_with_infos phi_moves
+  }
 
 let postlude : type s.
     (module State with type t = s) ->
