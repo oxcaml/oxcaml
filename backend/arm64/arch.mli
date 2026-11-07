@@ -20,6 +20,14 @@
 val macosx : bool
 val is_asan_enabled : bool ref
 val feat_cssc : bool ref
+
+(* Use a store-release (stlr/stlur) for the assignment memory-model barrier
+   instead of dmb ishld; str. *)
+val store_release : bool ref
+
+(* FEAT_LRCPC2: use store-release with an unscaled immediate offset (stlur). *)
+val lrcpc2 : bool ref
+
 val trap_notes : bool ref
 (* Machine-specific command-line options *)
 
