@@ -60,7 +60,8 @@ module type S = sig
 
   val find_equation : op_class -> numbering -> rhs -> valnum array option
 
-  val find_regs_containing : numbering -> valnum array -> Reg.t array option
+  val find_regs_containing :
+    numbering -> valnum array -> Cmm.machtype -> Reg.t array option
 
   val find_reg_containing_with_typ :
     numbering -> valnum -> Cmm.machtype_component -> Reg.t option
@@ -95,10 +96,9 @@ module Make (Op : Operation) : S with type op = Op.t = struct
      registers of different machtypes holding the same bits at one point may
      hold different bits later on. Both the store-to-load forwarding equations
      (see [Cse_generic]) and vectorized loads of the same chunk, which can
-     produce either a [Vec128] or a [Valx2], rely on this. (Instruction
-     selection may still emit a [Move] between an [Int] and a [Val] register at
-     join points, in which case [set_move] shares a value number across the two
-     machtypes; CSE does not currently guard against that.) *)
+     produce either a [Vec128] or a [Valx2], rely on this. Moves between
+     different machtypes also receive distinct value numbers (see
+     [set_move]). *)
 
   type rhs = op * valnum array * Cmm.machtype
 
@@ -150,12 +150,37 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let empty_numbering =
     { num_next = 0; num_eqs = Equations.empty; num_reg = Reg.Map.empty }
 
+  (* [Reg.Map] orders keys by stamp, then machtype. Physical aliases share a
+     stamp, so remove every view without scanning unrelated virtual
+     registers. *)
+  let remove_reg (r : Reg.t) num_reg =
+    match r.Reg.loc with
+    | Unknown | Stack _ -> Reg.Map.remove r num_reg
+    | Reg _ ->
+      let rec remove_aliases num_reg =
+        match
+          Reg.Map.find_first_opt
+            (fun r' -> Reg.Stamp.compare r'.Reg.stamp r.stamp >= 0)
+            num_reg
+        with
+        | Some (r', _) when Reg.Stamp.equal r'.Reg.stamp r.stamp ->
+          remove_aliases (Reg.Map.remove r' num_reg)
+        | Some _ | None -> num_reg
+      in
+      remove_aliases num_reg
+
+  (* Associate a value number with a register. Keep at most one typed view of
+     each physical register, since a write invalidates its other views. *)
+  let set_known_reg n r v =
+    { n with num_reg = Reg.Map.add r v (remove_reg r n.num_reg) }
+
   (** Generate a fresh value number [v] and associate it to register [r].
       Returns a pair [(n',v)] with the updated value numbering [n']. *)
 
   let fresh_valnum_reg n r =
     let v = n.num_next in
-    { n with num_next = v + 1; num_reg = Reg.Map.add r v n.num_reg }, v
+    let n = set_known_reg n r v in
+    { n with num_next = v + 1 }, v
 
   (* Same, for a set of registers [rs]. *)
 
@@ -193,14 +218,8 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let find_equation op_class n rhs =
     try Some (Equations.find op_class rhs n.num_eqs) with Not_found -> None
 
-  (* Find a register containing the given value number. *)
-
-  let find_reg_containing n v =
-    Reg.Map.fold (fun r v' res -> if v' = v then Some r else res) n.num_reg None
-
-  (* Find a register of machtype [typ] containing the given value number.
-     (Registers of different machtypes can share a value number, see
-     [set_move].) *)
+  (* Find a register containing the given value number with the required GC
+     representation. *)
 
   let find_reg_containing_with_typ n v typ =
     Reg.Map.fold
@@ -212,28 +231,23 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   (* Find a set of registers containing the given value numbers. *)
 
-  let find_regs_containing n vs =
+  let find_regs_containing n vs typs =
     match Array.length vs with
     | 0 -> Some [||]
     | 1 -> (
-      match find_reg_containing n vs.(0) with
+      match find_reg_containing_with_typ n vs.(0) typs.(0) with
       | None -> None
       | Some r -> Some [| r |])
     | l -> (
       let rs = Array.make l Reg.dummy in
       try
         for i = 0 to l - 1 do
-          match find_reg_containing n vs.(i) with
+          match find_reg_containing_with_typ n vs.(i) typs.(i) with
           | None -> raise Exit
           | Some r -> rs.(i) <- r
         done;
         Some rs
       with Exit -> None)
-
-  (* Associate the given value number to the given result register, without
-     adding new equations. *)
-
-  let set_known_reg n r v = { n with num_reg = Reg.Map.add r v n.num_reg }
 
   (* Associate the given value numbers to the given result registers, without
      adding new equations. *)
@@ -241,12 +255,14 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let set_known_regs n rs vs =
     Misc.Stdlib.Array.fold_left2 set_known_reg n rs vs
 
-  (* Record the effect of a move: no new equations, but the result reg maps to
-     the same value number as the argument reg. *)
-
+  (* A copy may change GC representation. Only copies within a machtype keep the
+     same value number; equal bits do not imply equal behavior at GC. *)
   let set_move n src dst =
-    let n1, v = valnum_reg n src in
-    { n1 with num_reg = Reg.Map.add dst v n1.num_reg }
+    if Cmm.equal_machtype_component src.Reg.typ dst.Reg.typ
+    then
+      let n1, v = valnum_reg n src in
+      set_known_reg n1 dst v
+    else fst (fresh_valnum_reg n dst)
 
   (* Record the equation [fresh valnums = rhs] and associate the given result
      registers [rs] to [fresh valnums]. *)
@@ -267,7 +283,7 @@ module Make (Op : Operation) : S with type op = Op.t = struct
      receiving unpredictable values at run-time. *)
 
   let set_unknown_regs n rs =
-    { n with num_reg = Array.fold_right ~f:Reg.Map.remove rs ~init:n.num_reg }
+    { n with num_reg = Array.fold_right ~f:remove_reg rs ~init:n.num_reg }
 
   (* Keep only the equations satisfying the given predicate. *)
 
@@ -401,10 +417,30 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Begin_region | End_region -> Op_other
     | Dls_get | Tls_get | Domain_index -> Op_load Mutable
 
-  let class_of_operation op =
-    match Target.class_of_operation op with
-    | Class op_class -> op_class
-    | Use_default -> class_of_operation0 op
+  let is_gc_sensitive (r : Reg.t) =
+    match r.typ with
+    | Val | Valx2 | Addr -> true
+    | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> false
+
+  let class_of_operation op ~arg ~res : op_class =
+    let op_class =
+      match Target.class_of_operation op with
+      | Class op_class -> op_class
+      | Use_default -> class_of_operation0 op
+    in
+    match op_class with
+    | Op_pure ->
+      (* A pure operation can still observe or produce a moving address.
+         Classify it when recording the equation, so that GC invalidates it even
+         if its original results are no longer held in registers. This also
+         prevents recomputed Addr results from recovering old numbers. As with
+         address casts, invalidation at stores is conservative. *)
+      if
+        Array.exists arg ~f:is_gc_sensitive
+        || Array.exists res ~f:is_gc_sensitive
+      then Op_load Mutable
+      else Op_pure
+    | Op_load _ | Op_store _ | Op_other -> op_class
 
   let is_cheap_operation : Operation.t -> bool = function
     | Const_int _ -> true
@@ -559,10 +595,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     match i.desc with
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
-      n
+      set_unknown_regs n (Proc.destroyed_at_basic i.desc)
     | Op (Move | Spill | Reload) ->
-      (* For moves, we associate the same value number to the result reg as to
-         the argument reg. *)
+      (* Copies share value numbers only within a machtype. *)
       let n1 = set_move n i.arg.(0) i.res.(0) in
       n1
     | Op Opaque ->
@@ -579,8 +614,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          handler, context switch), which can contain non-initializing stores.
          Hence, all equations over mutable loads must be removed. *)
       let n1 = kill_addr_regs (kill_loads n) in
-      let n2 = set_unknown_regs n1 i.res in
-      n2
+      let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
+      set_unknown_regs n2 i.res
     | Op
         (( Const_int _ | Begin_region | End_region | Dls_get | Tls_get
          | Domain_index | Const_float32 _ | Const_float _ | Const_symbol _
@@ -593,7 +628,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
          | Specific _ | Name_for_debugger _ | Pause ) as op) -> (
-      match class_of_operation op with
+      match class_of_operation op ~arg:i.arg ~res:i.res with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in
         let rhs = op, varg, Reg.typv i.res in
@@ -602,7 +637,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
         | Some vres -> (
           (* This operation was computed earlier. *)
           (* Are there registers that hold the results computed earlier? *)
-          match find_regs_containing n1 vres with
+          match find_regs_containing n1 vres (Reg.typv i.res) with
           | Some res when not (is_cheap_operation op) ->
             (* We can replace the operation with a move, provided the registers
                are stable (non-volatile). If the operation is very cheap to
