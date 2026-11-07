@@ -135,7 +135,10 @@
      (progn
       (echo "module MenhirLib = CamlinternalMenhirLib")
       (run cat %{input-file})))
-    parser)))
+    parser)
+   ((action
+     (run sed -f %{dep:boot_primitives.sed} %{input-file}))
+    profile)))
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
@@ -466,6 +469,22 @@
    (= %{context_name} "main"))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; The system compiler's runtime lacks some primitives of the OxCaml runtime
+
+(rule
+ (targets boot_primitives.sed)
+ (enabled_if
+  (= %{context_name} "default"))
+ (action
+  (write-file %{targets} "s/caml_sys_gettimeofday/caml_sys_time/g\n")))
+
+(rule
+ (targets boot_primitives.sed)
+ (enabled_if
+  (= %{context_name} "main"))
+ (action
+  (write-file %{targets} "")))
 
 ; Write empty files in an unconfigured tree
 (rule
