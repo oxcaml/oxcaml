@@ -44,6 +44,8 @@ let () =
     Some Emit.register_expect_asm_callback;
   Expectcommon.set_assembly_whole_function :=
     Some (fun b -> Emit.expect_asm_whole_function := b);
+  Expectcommon.register_ssa_callback :=
+    Some Ssa_expect.register_callback;
   Expectcommon.register_compilation_unit_callback :=
     Some Flambda2.register_compilation_unit_callback;
   Expectcommon.run

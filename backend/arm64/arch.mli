@@ -146,6 +146,14 @@ val print_specific_operation :
   (Format.formatter -> 'a -> unit) -> specific_operation ->
   Format.formatter -> 'a array -> unit
 
+(* Specific operations that compute a linear combination of their integer
+   arguments: the coefficients, one per argument in order, and the constant,
+   such that the operation computes [c1 * arg1 + ... + cn * argn + k] with
+   64-bit wraparound. [None] for every other operation. The SSA loop analyses
+   proved in Rocq trust this reading (see backend/rocq/Operation.v). *)
+
+val linear_specific_operation : specific_operation -> (int list * int) option
+
 (* Specific operations that are pure *)
 
 val operation_is_pure : specific_operation -> bool

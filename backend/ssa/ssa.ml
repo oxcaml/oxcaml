@@ -68,7 +68,9 @@ open! Int_replace_polymorphic_compare
       [Continue (Goto _)] args going to params scheduled for removal with
       [Omitted_since_unused].
     - [check_value_invariants]: every use is dominated by its definition and
-      [Omitted_since_unused] only feeds block params scheduled for removal. *)
+      [Omitted_since_unused] only feeds block params scheduled for removal; on
+      the way it fills [defining_blocks], the table from each [Op]'s id to its
+      block. *)
 
 module Block_id = Id_counter.Make ()
 module Instruction_id = Id_counter.Make ()
@@ -202,6 +204,8 @@ type 'g graph =
     keep_unused_ops : bool;
     block_id_gen : Block_id.generator;
     instruction_id_gen : Instruction_id.generator;
+    (* The block defining each [Op], by id; filled by [finish_graph]. *)
+    defining_blocks : 'g block Instruction_id.Tbl.t;
     entry : 'g block;
     mutable finished_blocks_rev : 'g block list;
     mutable blocks : 'g block list;
@@ -372,6 +376,13 @@ module Block = struct
   let immediate_dominator (block : finished t) : finished t =
     assert (block.dominator_info.depth >= 0);
     block.dominator_info.dominator
+
+  let strict_dominators (block : finished t) : finished t list =
+    let rec walk (block : finished t) acc =
+      let idom = immediate_dominator block in
+      if equal idom block then List.rev acc else walk idom (idom :: acc)
+    in
+    walk block []
 
   let dominator_depth (block : finished t) : int =
     assert (block.dominator_info.depth >= 0);
@@ -749,6 +760,10 @@ let entry (graph : 'g graph) : 'g Block.t = graph.entry
 
 let blocks (graph : finished graph) : finished Block.t list = graph.blocks
 
+let defining_blocks (graph : finished graph) :
+    (finished, finished Block.t) Instruction.Id.Tbl.t =
+  graph.defining_blocks
+
 let create_graph (function_info : Function_info.t) ~keep_unused_ops :
     under_construction graph =
   let block_id_gen = Block_id.create_generator () in
@@ -776,6 +791,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
     keep_unused_ops;
     block_id_gen;
     instruction_id_gen;
+    defining_blocks = Instruction_id.Tbl.create 64;
     entry;
     finished_blocks_rev = [];
     blocks = [];
@@ -1085,13 +1101,11 @@ let check_value_invariants (graph : finished graph)
           graph.function_info.sym_name s)
       fmt
   in
-  let defining_block : finished block Instruction_id.Tbl.t =
-    Instruction_id.Tbl.create 64
-  in
+  let defining_blocks = graph.defining_blocks in
   let check_use (user : finished block) (v : finished value) =
     match v with
     | Res (op, _) -> (
-      match Instruction_id.Tbl.find_opt defining_block op.id with
+      match Instruction_id.Tbl.find_opt defining_blocks op.id with
       | Some def_block ->
         if not (Block.dominates def_block user)
         then
@@ -1117,7 +1131,7 @@ let check_value_invariants (graph : finished graph)
   let check_instr block = function
     | Op { id; args; _ } ->
       Array.iter (check_use block) args;
-      Instruction_id.Tbl.replace defining_block id block
+      Instruction_id.Tbl.replace defining_blocks id block
     | Push_trap _ | Pop_trap _ -> ()
   in
   let check_terminator block = function

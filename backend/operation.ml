@@ -48,13 +48,15 @@ let equal_integer_comparison = Scalar.Integer_comparison.equal
 
 let invert_integer_comparison = Scalar.Integer_comparison.negate
 
+type signedness = { signed : bool }
+
 type integer_operation =
   | Iadd
   | Isub
   | Imul
-  | Imulh of { signed : bool }
-  | Idiv of { signed : bool }
-  | Imod of { signed : bool }
+  | Imulh of signedness
+  | Idiv of signedness
+  | Imod of signedness
   | Iand
   | Ior
   | Ixor
@@ -70,7 +72,7 @@ type integer_operation =
 type int128_operation =
   | Iadd128
   | Isub128
-  | Imul64 of { signed : bool }
+  | Imul64 of signedness
 
 let string_of_integer_operation = function
   | Iadd -> " + "
@@ -284,6 +286,37 @@ let invert_test = function
   | Ieventest -> Ioddtest
   | Ioddtest -> Ieventest
 
+type load =
+  { memory_chunk : Cmm.memory_chunk;
+    addressing_mode : Arch.addressing_mode;
+    mutability : mutable_flag;
+    is_atomic : bool
+  }
+
+type intop_atomic =
+  { op : Cmm.atomic_op;
+    size : Cmm.atomic_bitwidth;
+    addr : Arch.addressing_mode
+  }
+
+type probe_is_enabled =
+  { name : string;
+    enabled_at_init : bool option
+  }
+
+type name_for_debugger =
+  { ident : Ident.t;
+    which_parameter : int option;
+    provenance : Backend_var.Provenance.t option;
+    regs : Reg.t array
+  }
+
+type alloc =
+  { bytes : int;
+    dbginfo : Cmm.alloc_dbginfo;
+    mode : Cmm.Alloc_mode.t
+  }
+
 type t =
   | Move
   | Spill
@@ -297,49 +330,28 @@ type t =
   | Const_vec512 of Cmm.vec512_bits
   | Const_mask of int64
   | Stackoffset of int
-  | Load of
-      { memory_chunk : Cmm.memory_chunk;
-        addressing_mode : Arch.addressing_mode;
-        mutability : mutable_flag;
-        is_atomic : bool
-      }
+  | Load of load
   | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
   | Intop of integer_operation
   | Int128op of int128_operation
   | Intop_imm of integer_operation * int
-  | Intop_atomic of
-      { op : Cmm.atomic_op;
-        size : Cmm.atomic_bitwidth;
-        addr : Arch.addressing_mode
-      }
+  | Intop_atomic of intop_atomic
   | Floatop of float_width * float_operation
   | Csel of test
   | Reinterpret_cast of Cmm.reinterpret_cast
   | Static_cast of Cmm.static_cast
-  | Probe_is_enabled of
-      { name : string;
-        enabled_at_init : bool option
-      }
+  | Probe_is_enabled of probe_is_enabled
   | Opaque
   | Begin_region
   | End_region
   | Specific of Arch.specific_operation
-  | Name_for_debugger of
-      { ident : Ident.t;
-        which_parameter : int option;
-        provenance : Backend_var.Provenance.t option;
-        regs : Reg.t array
-      }
+  | Name_for_debugger of name_for_debugger
   | Dls_get
   | Tls_get
   | Domain_index
   | Poll
   | Pause
-  | Alloc of
-      { bytes : int;
-        dbginfo : Cmm.alloc_dbginfo;
-        mode : Cmm.Alloc_mode.t
-      }
+  | Alloc of alloc
 
 let is_pure = function
   | Move -> true

@@ -464,6 +464,18 @@ let mk_ssa_validate f =
 let mk_no_ssa_validate f =
   ("-no-ssa-validate", Arg.Unit f, " Disable SSA pipeline validation")
 
+let mk_ssa_delete_empty_loops f =
+  ( "-ssa-delete-empty-loops",
+    Arg.Unit f,
+    " Delete terminating loops whose body does no observable work in the SSA \
+     pipeline (EXPERIMENTAL)" )
+
+let mk_ssa_bounds_check_elim f =
+  ( "-ssa-bounds-check-elim",
+    Arg.Unit f,
+    " Remove array bounds checks that the dominating branches and loop \
+     counters prove redundant in the SSA pipeline (EXPERIMENTAL)" )
+
 let mk_dump_inlining_paths f =
   ( "-dump-inlining-paths",
     Arg.Unit f,
@@ -1487,6 +1499,8 @@ module type Oxcaml_options = sig
   val no_ssa_simplify : unit -> unit
   val ssa_validate : unit -> unit
   val no_ssa_validate : unit -> unit
+  val ssa_delete_empty_loops : unit -> unit
+  val ssa_bounds_check_elim : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
@@ -1706,6 +1720,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_ssa_simplify F.no_ssa_simplify;
       mk_ssa_validate F.ssa_validate;
       mk_no_ssa_validate F.no_ssa_validate;
+      mk_ssa_delete_empty_loops F.ssa_delete_empty_loops;
+      mk_ssa_bounds_check_elim F.ssa_bounds_check_elim;
       mk_internal_assembler F.internal_assembler;
       mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
@@ -2159,6 +2175,8 @@ module Oxcaml_options_impl = struct
   let no_ssa_simplify = clear' Oxcaml_flags.ssa_simplify
   let ssa_validate = set' Oxcaml_flags.ssa_validate
   let no_ssa_validate = clear' Oxcaml_flags.ssa_validate
+  let ssa_delete_empty_loops = set' Oxcaml_flags.ssa_delete_empty_loops
+  let ssa_bounds_check_elim = set' Oxcaml_flags.ssa_bounds_check_elim
   let internal_assembler = set' Oxcaml_flags.internal_assembler
   let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
@@ -2599,6 +2617,8 @@ module Extra_params = struct
     | "use-ssa" -> set' Oxcaml_flags.use_ssa
     | "ssa-simplify" -> set' Oxcaml_flags.ssa_simplify
     | "ssa-validate" -> set' Oxcaml_flags.ssa_validate
+    | "ssa-delete-empty-loops" -> set' Oxcaml_flags.ssa_delete_empty_loops
+    | "ssa-bounds-check-elim" -> set' Oxcaml_flags.ssa_bounds_check_elim
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
     | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings

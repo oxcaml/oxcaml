@@ -357,6 +357,10 @@ module Block : sig
   (** The immediate dominator of a block (the entry dominates itself). *)
   val immediate_dominator : finished t -> finished t
 
+  (** The blocks strictly dominating a block, nearest first, ending with the
+      entry (empty for the entry itself). *)
+  val strict_dominators : finished t -> finished t list
+
   (** The depth of a block in the dominator tree (the entry has depth 0). *)
   val dominator_depth : finished t -> int
 
@@ -435,6 +439,12 @@ val finish_graph : under_construction graph -> finished graph
 (** The graph's blocks in an order based on the order of calling
     [Cursor.finish_block], but where every block's dominators precede it. *)
 val blocks : finished graph -> finished Block.t list
+
+(** The table from the id of each [Op] of the graph to the block that defines
+    it, filled when the graph is finished. The SSA loop analyses proved in Rocq
+    read it as [SsaModel.op_def] (backend/ssa/rocq/SsaModel.v). *)
+val defining_blocks :
+  finished graph -> (finished, finished Block.t) Instruction.Id.Tbl.t
 
 module Export : sig
   module Instruction = Instruction
