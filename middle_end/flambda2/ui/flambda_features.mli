@@ -28,6 +28,8 @@ val classic_mode : unit -> bool
 
 val mode : unit -> any_mode
 
+val fdo_counters : unit -> bool
+
 val join_points : unit -> bool
 
 val unbox_along_intra_function_control_flow : unit -> bool

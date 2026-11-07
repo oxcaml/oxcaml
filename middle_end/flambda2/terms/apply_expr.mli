@@ -56,6 +56,7 @@ val create :
   call_kind:Call_kind.t ->
   return_mode:Alloc_mode.For_applications.t ->
   Debuginfo.t ->
+  callsite_counter:Fdo_counter.t option ->
   inlined:Inlined_attribute.t ->
   inlining_state:Inlining_state.t ->
   probe:Probe.t ->
@@ -132,3 +133,8 @@ val relative_history : t -> Inlining_history.Relative.t
 val returns : t -> bool
 
 val with_inlined_attribute : t -> Inlined_attribute.t -> t
+
+(** The FDO counter of the callsite (see [Fdo_counter]) *)
+val callsite_counter : t -> Fdo_counter.t option
+
+val with_callsite_counter : t -> Fdo_counter.t option -> t
