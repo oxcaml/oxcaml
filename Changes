@@ -31,6 +31,9 @@ OCaml 5.4.1
   (Tim McGilchrist, reported by Edwin Török, review by Edwin Török, Antonin
    Décimo and Olivier Nicole)
 
+- #15229 Bound the custom event payload by the buffer's own constant
+  (Tim McGilchrist, review by Sadiq Jaffer)
+
 OCaml 5.4.0 (9 October 2025)
 ----------------------------
 
