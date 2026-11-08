@@ -5,7 +5,7 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : unit t
 exception Done
@@ -20,7 +20,7 @@ let handle_partial () =
       | E -> Some (fun k -> assert false)
       | _ -> None }
 
-let f h () = Effect.Safe.perform h E [@nontail]
+let f h () = Effect.Yielding.perform h E [@nontail]
 
 let () =
   match_with (fun h () -> handle_partial (); f h ()) ()

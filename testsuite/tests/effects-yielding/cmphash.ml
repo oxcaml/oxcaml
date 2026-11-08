@@ -5,12 +5,12 @@
 
 open Effect
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type _ t += E : unit t
 
 let () =
-  try_with (fun h eff -> Effect.Safe.perform h eff [@nontail]) E
+  try_with (fun h eff -> Effect.Yielding.perform h eff [@nontail]) E
   { effc = fun (type a) (e : a t) ->
       match e with
       | E -> Some (fun k ->

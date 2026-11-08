@@ -4,17 +4,17 @@
 *)
 
 open Effect
-open Effect.Safe
+open Effect.Yielding
 open Effect.Deep
-open Effect.Deep.Safe
+open Effect.Deep.Yielding
 
 type 'a t += Ping : int -> int t
 
 (* [retc] (like [exnc] and [effc]) runs in the context that *encloses* the
    handler -- by the time it runs, the handler's own computation has already
    returned -- so it can only perform effects when that enclosing context is
-   itself within a handler. The plain [Safe.match_with] therefore gives [retc]
-   no [Handler.t]. To perform effects from [retc] we use
+   itself within a handler. The plain [Yielding.match_with] therefore gives
+   [retc] no [Handler.t]. To perform effects from [retc] we use
    [With_handler.match_with], passing the *outer* handler's token; the outer
    handler (which handles [Ping]) is what actually services the effect. *)
 
