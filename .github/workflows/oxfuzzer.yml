@@ -36,7 +36,7 @@ jobs:
     name: oxfuzzer (x86_64-linux)
     # Forks inherit the schedule; only fuzz the upstream repository.
     if: github.repository == 'oxcaml/oxcaml'
-    runs-on: warp-ubuntu-latest-x64-16x
+    runs-on: warp-ubuntu-latest-x64-32x
     # Fuzzing takes MINUTES plus the cases in flight; the rest covers
     # building the compiler from source when it is not in the cache.
     timeout-minutes: 300
