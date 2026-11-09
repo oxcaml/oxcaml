@@ -5,12 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <caml/mlvalues.h>
+#include "caml/mlvalues.h"
 
 #define ARR_SIZE(a)    (sizeof(a) / sizeof(*(a)))
 
 #if defined(__APPLE__)
-#define RE_FUNC_NAME "^[[:digit:]]+[[:space:]]+[[:alnum:]_\\.]+[[:space:]]+0x[[:xdigit:]]+[[:space:]]([[:alnum:]_\\.\\$]+).*$"
+#define RE_FUNC_NAME  "^[[:digit:]]+[[:space:]]+[[:alnum:]_\\.]+[[:space:]]+0x[[:xdigit:]]+[[:space:]]([[:alnum:]_\\.\\$]+).*$"
 #else
 #define RE_FUNC_NAME  "^.*\\((.+)\\+0x[[:xdigit:]]+\\) \\[0x[[:xdigit:]]+\\]$"
 #endif
@@ -23,13 +23,13 @@ typedef struct frame_info
   void*               retaddr;  /* instruction pointer / program counter */
 } frame_info;
 
+
 /*
  * A backtrace symbol looks like this on Linux:
- * ./path/to/binary(camlModule.fn_123+0xAABBCC) [0xAABBCCDDEE]
+ *   ./path/to/binary(camlModule_fn_123+0xAABBCC) [0xAABBCCDDEE]
  *
  * or this on macOS:
  * 0   c_call.opt                          0x000000010e621079 camlC_call.entry + 57
- *
  */
 static const char* backtrace_symbol(const struct frame_info* fi)
 {
@@ -43,6 +43,13 @@ static const char* backtrace_symbol(const struct frame_info* fi)
   free(symbols);
   return symbol;
 }
+
+#if defined(__linux__)
+static bool is_from_executable(const char* symbol, const char* execname)
+{
+  return strncmp(symbol, execname, strlen(execname)) == 0;
+}
+#endif
 
 static regmatch_t func_name_from_symbol(const char* symbol)
 {
@@ -107,12 +114,13 @@ static void print_symbol(const char* symbol, const regmatch_t* match)
 
 void fp_backtrace(value argv0)
 {
+#if defined(__linux__)
   const char* execname = String_val(argv0);
+#endif
+  struct frame_info* next = NULL;
   const char* symbol = NULL;
 
-  for (struct frame_info *fi = __builtin_frame_address(0), *next = NULL;
-       fi;
-       fi = next) {
+  for (struct frame_info* fi = __builtin_frame_address(0); fi; fi = next) {
     next = fi->prev;
 
     /* Detect the simplest kind of infinite loop */
@@ -124,6 +132,12 @@ void fp_backtrace(value argv0)
     symbol = backtrace_symbol(fi);
     if (!symbol)
       continue;
+
+#if defined(__linux__)
+    /* Skip entries not from the test */
+    if (!is_from_executable(symbol, execname))
+      goto skip;
+#endif
 
     /* Extract the full function name */
     regmatch_t funcname = func_name_from_symbol(symbol);
