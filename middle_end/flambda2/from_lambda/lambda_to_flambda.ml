@@ -1898,7 +1898,7 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
     Ident.create_local "toplevel_my_alloc_region"
   in
   let fdo =
-    if !Oxcaml_flags.fdo_counters
+    if Flambda_features.fdo_counters ()
     then Some (Fdo_from_lambda_env.toplevel compilation_unit)
     else None
   in
