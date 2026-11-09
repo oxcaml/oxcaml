@@ -1,0 +1,17 @@
+(rule
+  (deps (source_tree tests/))
+  (action
+    (with-stdout-to test_dirs.dune.gen
+      (run %{project_root}/ocamltest/ocamltest.native -no-ocamlsrcdir -dune -find-test-dirs tests))))
+
+(subdir gen
+  (rule
+    (alias test_dirs)
+    (action (diff test_dirs.dune ../test_dirs.dune.gen))))
+
+(include gen/test_dirs.dune)
+
+;; (rule
+;;   (target test_list.txt)
+;;   (deps (glob_files_rec rules.dune))
+;;   (action (with-stdout-to %{target} (run grep -h ";; TEST" %{deps}))))

@@ -74,3 +74,8 @@ end
 module Unix : sig
   include module type of Ocamltest_unix
 end
+
+module Sexp : sig
+  type t = A of string | S of t list
+  val pp : Format.formatter -> t -> unit
+end

@@ -439,11 +439,82 @@ let () =
     match list_tests dir with
     | [] -> failed := true
     | res ->
-       List.iter print_endline res
+       if Options.dune then begin
+         if dir <> Filename.current_dir_name then begin
+           Sys.chdir dir;
+         end;
+         let gen_file f =
+           let env, _msgs, task = test_file f in
+           match task with
+           | Actions.Static r ->
+              Format.printf ";; %s %S@." f (Result.string_of_result r)
+           | Actions.Task task ->
+              Actions_eval.print_task_dune_file ~dir env task
+         in
+         List.iter gen_file res
+       end else List.iter print_endline res
   in
   let find_test_dirs dir =
+    let print_dune (test_dir, subdirs) =
+      let open Sexp in
+      let rec invert = function
+        | s when s = "" || s = Filename.current_dir_name ->
+           Filename.current_dir_name
+        | s when Filename.dirname s = Filename.current_dir_name ->
+           Filename.parent_dir_name
+        | s ->
+           Filename.(concat (invert (dirname s)) parent_dir_name)
+      in
+      let inv = invert test_dir ^ Filename.dir_sep in
+      let test_suff =
+        match String.remove_prefix ~prefix:"tests/" test_dir with
+        | Some suff -> suff
+        | None -> failwith "Dune rule generation only supported for tests/<DIR>"
+      in
+      let run_dir = "run/" ^ test_suff in
+      let gen_dir = "gen/" ^ test_suff in
+      let cmd =
+        [A "%{project_root}/ocamltest/ocamltest.native";
+         A "-no-ocamlsrcdir";
+         A "-dune";
+         A "-list-tests";
+         A (inv ^ test_dir)]
+      in
+      let rules =
+        S [A "subdir"; A gen_dir;
+           S [A "rule";
+              S [A "target"; A "rules.dune"];
+              S [A "enabled_if"; S [A "<>"; A "%{context_name}"; A "main"]];
+              S [A "deps"; S [A "source_tree"; A (inv ^ test_dir)]];
+              S [A "action";
+                 S [A "with-stdout-to"; A "%{target}";
+                    S (A "run" :: cmd)]]];
+           S [A "rule";
+              S [A "target"; A "rules.dune"];
+              S [A "enabled_if"; S [A "="; A "%{context_name}"; A "main"]];
+              S [A "action"; S [A "write-file"; A "%{target}"; A ""]]]]
+      in
+      let subdir_copies =
+        subdirs |> List.map (fun dir ->
+          let inv = invert dir ^ Filename.dir_sep in
+          let dirname =
+            Option.get (String.remove_prefix ~prefix:(test_dir ^ "/") dir) in
+          S [A "subdir"; A dirname;
+             S [A "copy_files"; S [A "only_sources"; A "true"];
+                 S [A "files"; A (inv ^ test_dir ^ "/" ^ dirname ^ "/*")]]])
+      in
+      let run =
+        S ([A "subdir"; A run_dir;
+            S [A "copy_files"; S [A "only_sources"; A "true"];
+               S [A "files"; A (inv ^ test_dir ^ "/*")]];
+            S [A "dynamic_include"; A (inv ^ gen_dir ^ "/rules.dune")]] @
+            subdir_copies)
+      in
+      Format.printf "%a@.%a@.@." pp rules pp run
+    in
     let dirs = find_test_dirs dir in
-    List.iter (fun (d,_) -> print_endline d) dirs
+    if Options.dune then List.iter print_dune dirs
+    else List.iter (fun (d,_) -> print_endline d) dirs
   in
   let find_tests dir = List.iter print_endline (find_tests dir) in
   let doit f x = work_done := true; f x in
@@ -454,6 +525,8 @@ let () =
   let do_file f =
     if Options.translate then
       Translate.file ~style:Options.style ~compact:Options.compact f
+    else if Options.dune then
+      failwith "-dune supported only when listing tests"
     else
       let rootenv, msgs, task = test_file f in
       if Options.shell then

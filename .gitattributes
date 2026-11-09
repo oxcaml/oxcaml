@@ -54,6 +54,9 @@
 /external/merlin/upstream/ocaml_flambda/**/*.mll linguist-generated
 /external/merlin/upstream/ocaml_flambda/**/*.mly linguist-generated
 
+# Generated dune file for the testsuite
+/testsuite/gen/test_dirs.dune text eol=lf -diff linguist-generated
+
 # 'union' merge driver just unions textual content in case of conflict
 #   http://krlmlr.github.io/using-gitattributes-to-avoid-merge-conflicts/
 /.mailmap                merge=union
