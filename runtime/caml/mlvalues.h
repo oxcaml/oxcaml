@@ -239,8 +239,8 @@ uses them yet.
 
 #endif
 
-/* Interleaved-block header fields: see header_bits.h. NOT YET IN USE:
-   the reserved bits still carry the scannable-prefix encoding below.
+/* Interleaved-block header fields: see header_bits.h. Mixed blocks
+   use the inline (01) format; see the mixed-block macros below.
 
    The layout-word accessors cover the shared 58+6 word format
    intended for the extended header format, layout blocks and the mark
@@ -259,6 +259,11 @@ uses them yet.
   (((header_t)(hd) >> HEADER_SCAN_MASK_SHIFT)                           \
    & (((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1))
 
+/* Whether the block with header [hd] has a scan mask (in the header,
+   a layout word or a layout block), so that some of its words may be
+   unscannable. Rare at present; revisit the hint when it isn't. */
+#define Has_scan_mask_hd(hd) CAMLunlikely(Reserved_hd(hd) != 0)
+
 #define Layout_repeat(w) ((uintnat)(w) >> LAYOUT_WORD_REPEAT_SHIFT)
 #define Layout_scan_mask(w)                                             \
   ((uintnat)(w) & (((uintnat)1 << LAYOUT_WORD_MASK_BITS) - 1))
@@ -271,6 +276,13 @@ uses them yet.
 #define Is_mixed_block_reserved(res) (((reserved_t)(res)) > 0)
 
 /* Native code versions of mixed block macros.
+
+   A mixed block's reserved field uses the inline (01) format: the
+   16-bit scan mask (bit i = word i, 1 = unscannable) with repeat 1,
+   so words past the mask repeat its last bit. The compiler still lays
+   mixed blocks out as a scannable prefix followed by a flat suffix,
+   so every mask has the shape 0^p 1^(16-p) and the prefix decode
+   below is exact.
 
    The scannable size of a block is how many fields are values as opposed
    to flat floats/ints/etc. This is different than the (normal) size of a
@@ -290,24 +302,40 @@ uses them yet.
 */
 
 #define Scannable_wosize_val_native(val) (Scannable_wosize_hd (Hd_val (val)))
-#define Reserved_mixed_block_scannable_wosize_native(sz)  (((mlsize_t)(sz)) + 1)
-#define Mixed_block_scannable_wosize_reserved_native(res) \
-  (((reserved_t)(res)) - 1)
 
+/* The reserved field for a mixed block with [sz] scannable words then
+   a flat suffix reaching the end of the block. Must match
+   [Mixed_block_support.make_header] in cmm_helpers.ml exactly:
+   weak.c and obj.c CAMLassert equality of independently produced
+   reserved fields. */
+Caml_inline reserved_t
+Reserved_mixed_block_scannable_wosize_native(mlsize_t sz)
+{
+  uintnat mask_all = ((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1;
+  CAMLassert(sz < HEADER_SCAN_MASK_BITS);
+  return (reserved_t)
+    (((uintnat)HEADER_FORMAT_INLINE
+      << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
+     | ((uintnat)1 << (HEADER_REPEAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
+     | (mask_all & ~(((uintnat)1 << sz) - 1)));
+}
+
+/* The number of leading scannable words: the position of the first
+   set mask bit. Exact while every mask is prefix-shaped. */
 Caml_inline mlsize_t Scannable_wosize_reserved_native(reserved_t res,
                                                       mlsize_t sz) {
-  return
-    Is_mixed_block_reserved(res)
-    ? Mixed_block_scannable_wosize_reserved_native(res)
-    : sz;
+  uintnat mask;
+  mlsize_t prefix = 0;
+  if (!Is_mixed_block_reserved(res)) return sz;
+  mask = (uintnat)res & (((uintnat)1 << HEADER_SCAN_MASK_BITS) - 1);
+  if (mask == 0) return sz; /* includes the bytecode faux sentinel */
+  while (!(mask & 1)) { mask >>= 1; ++ prefix; }
+  return prefix < sz ? prefix : sz;
 }
 
 Caml_inline mlsize_t Scannable_wosize_hd_native(header_t hd) {
-  reserved_t res = Reserved_hd(hd);
-  return
-    Is_mixed_block_reserved(res)
-    ? Mixed_block_scannable_wosize_reserved_native(res)
-    : Allocated_wosize_hd(hd);
+  return Scannable_wosize_reserved_native(Reserved_hd(hd),
+                                          Allocated_wosize_hd(hd));
 }
 
 /* Bytecode versions of mixed block macros.
@@ -337,7 +365,9 @@ Caml_inline mlsize_t Scannable_wosize_reserved_byte(reserved_t res,
 #define Scannable_wosize_hd(hd)         Scannable_wosize_hd_native(hd)
 #define Scannable_wosize_val(val)       Scannable_wosize_val_native(val)
 #else
-#define Faux_mixed_block_sentinel ((reserved_t) 0xff)
+#define Faux_mixed_block_sentinel                                       \
+  ((reserved_t)HEADER_FORMAT_INLINE                                     \
+   << (HEADER_FORMAT_SHIFT - HEADER_SCAN_MASK_SHIFT))
 #define Scannable_wosize_reserved(r, s) Scannable_wosize_reserved_byte(r, s)
 #define Scannable_wosize_hd(hd)         Scannable_wosize_hd_byte(hd)
 #define Scannable_wosize_val(val)       Scannable_wosize_val_byte(val)

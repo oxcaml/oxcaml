@@ -1959,11 +1959,16 @@ let update_constructor_arguments_sorts env cd_args =
     Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.scannable |]
 
 let assert_mixed_product_support =
-  let required_reserved_header_bits = 8 in
-  (* Why 2? We'd subtract 1 if the mixed block encoding could use all 8 bits of
-     the prefix. But the all-0 prefix means "not a mixed block", so we can't use
-     the all-0 pattern, and we must subtract 2 instead. *)
-  let max_value_prefix_len = (1 lsl required_reserved_header_bits) - 2 in
+  (* These two constants duplicate Header_bits.reserved_bits and
+     Header_bits.scan_mask_bits - 1: typing can't yet depend on that
+     generated module because Merlin doesn't vendor it. The layout-word
+     header formats will lift the prefix limit and need the dependency
+     anyway; both literals should be replaced then. *)
+  let required_reserved_header_bits = 22 in
+  (* The value prefix must end within the header's 16-bit inline scan
+     mask. Larger prefixes return with the layout-word header
+     formats. *)
+  let max_value_prefix_len = 15 in
   fun loc mixed_product_kind ~value_prefix_len ->
     let required_layouts_level = Language_extension.Stable in
     if not (Language_extension.is_at_least Layouts required_layouts_level) then

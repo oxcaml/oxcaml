@@ -212,10 +212,10 @@ end = struct
 
   let required_addr_size_bits = 64
 
-  (* The legacy scannable-prefix encoding stores prefix+1 in the reserved bits,
-     with 0 meaning "not a mixed block"; typedecl.ml enforces the 254 limit of
-     its original 8-bit field. *)
-  let max_scannable_prefix = 254
+  (* The prefix must end within the header's inline scan mask; larger
+     prefixes return with the layout-word formats. typedecl.ml enforces
+     this limit with a proper error.  *)
+  let max_scannable_prefix = Header_bits.scan_mask_bits - 1
 
   let max_header =
     (1 lsl (required_addr_size_bits - required_reserved_header_bits)) - 1
@@ -249,18 +249,29 @@ end = struct
     then
       Misc.fatal_errorf "Scannable prefix too big (%d > %d)" scannable_prefix
         max_scannable_prefix;
-    (* This means we crash the compiler if someone tries to write a mixed record
-       with too many fields, but you effectively can't: you'd need something
-       like 2^46 fields. *)
     if header > max_header
     then
       Misc.fatal_errorf
         "Header too big for the mixed block encoding to be added (%nd > %nd)"
         header max_header;
+    (* The inline (01) format: 16-bit scan mask (bit i = word i,
+       1 = unscannable) with repeat 1. Must match
+       [Reserved_mixed_block_scannable_wosize_native] in mlvalues.h
+       exactly. *)
+    let mask =
+      ((1 lsl Header_bits.scan_mask_bits) - 1)
+      land lnot ((1 lsl scannable_prefix) - 1)
+    in
+    let reserved =
+      (Header_bits.format_inline
+      lsl (Header_bits.format_shift - Header_bits.scan_mask_shift))
+      lor (1 lsl (Header_bits.repeat_shift - Header_bits.scan_mask_shift))
+      lor mask
+    in
     Nativeint.add
       (Nativeint.shift_left
-         (Nativeint.of_int (scannable_prefix + 1))
-         (required_addr_size_bits - required_reserved_header_bits))
+         (Nativeint.of_int reserved)
+         Header_bits.scan_mask_shift)
       header
 end
 
