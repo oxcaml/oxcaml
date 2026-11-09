@@ -66,18 +66,18 @@ let module_level_call_binding (loc : Lambda.scoped_location) =
   | Loc_known { scopes; loc = _ } -> (
     match scopes with
     | Cons { item = Sc_module_definition; name; prev; _ } ->
-      let path =
-        Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
-          scopes
-      in
       let is_compilation_unit =
         match prev with Empty -> true | Cons _ -> false
       in
-      let anonymous = String.equal name "" || is_compilation_unit in
-      (* If a call has no binding of its own, append ".(module)" to its path.
-         This can happen, for instance, in a toplevel [include F (X)] or [module
-         _ = F (X)]. *)
-      Some (if anonymous then path ^ ".(module)" else path)
+      (* Treat calls without a binding of its own (e.g. in a toplevel [let () =
+         ...] [include F (X)] or [module _ = F (X)]) as interior positions.
+         These have no stable binders to anchor to. *)
+      if String.equal name "" || is_compilation_unit
+      then None
+      else
+        Some
+          (Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+             scopes)
     | Empty
     | Cons
         { item =
@@ -110,34 +110,99 @@ module Switch_counters = struct
       failaction : Fdo_annotation.t
     }
 
+  let empty =
+    { case = (fun _ -> Fdo_annotation.empty);
+      failaction = Fdo_annotation.empty
+    }
+
   let case t n = t.case n
 
   let failaction t = t.failaction
 end
 
-(* The arms of a [Lambda] switch are numbered by constant, then by tag, then the
-   default arm. *)
+module Lambda_switch_counters = struct
+  type t =
+    { consts : Switch_counters.t;
+      blocks : Switch_counters.t;
+      is_int : Switch_counters.t
+    }
+
+  let consts t = t.consts
+
+  let blocks t = t.blocks
+
+  let is_int t = t.is_int
+end
+
+(* The constant or the block side of a [Lambda] switch. A switch with both
+   translates to a switch per side behind the dispatch on whether the scrutinee
+   is an immediate. A side whose discriminants all go to one arm becomes a jump
+   (in [Closure_conversion.close_switch] or later), which has no counters, so
+   that arm's counters go on the dispatch instead. *)
+module Side = struct
+  type t =
+    { counters : Switch_counters.t;
+      single_arm : Fdo_annotation.t option
+          (** The counters of the only arm the side reaches, if there is one *)
+    }
+
+  let create ~cases ~num ~has_default ~counter ~failaction =
+    let counters : Switch_counters.t =
+      { case =
+          (fun n -> if List.mem_assoc n cases then counter n else failaction);
+        failaction
+      }
+    in
+    (* Whether a discriminant has no case of its own. The keys of [cases] are
+       distinct and below [num]. *)
+    let reaches_default =
+      has_default && List.compare_length_with cases num < 0
+    in
+    let single_arm =
+      match cases, reaches_default with
+      | [], true -> Some failaction
+      | [(key, _)], false -> Some (counter key)
+      | [], false | _ :: _, true | _ :: _ :: _, false -> None
+    in
+    { counters; single_arm }
+
+  let switch_counters t =
+    match t.single_arm with
+    | None -> t.counters
+    | Some _ -> Switch_counters.empty
+
+  let dispatch_counters t =
+    Option.value t.single_arm ~default:Fdo_annotation.empty
+end
+
+(* Arm 0 of a [Lambda] switch is its default arm, followed by its constants and
+   then its tags. *)
 let switch t
     ({ sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction } :
-      Lambda.lambda_switch) =
+      Lambda.lambda_switch) : Lambda_switch_counters.t =
   let index = fresh_index t in
   let counter arm =
     FC.Position.create_branch ~function_:t.function_ ~body_hash:t.body_hash
       ~index ~arm
     |> FC.of_position |> Fdo_annotation.singleton
   in
-  let failaction =
-    match sw_failaction with
-    | None -> Fdo_annotation.empty
-    | Some _ -> counter (sw_numconsts + sw_numblocks)
+  let has_default = Option.is_some sw_failaction in
+  let failaction = if has_default then counter 0 else Fdo_annotation.empty in
+  let side cases ~num ~first_arm =
+    Side.create ~cases ~num ~has_default
+      ~counter:(fun n -> counter (first_arm + n))
+      ~failaction
   in
-  let switch_counters cases ~first_arm : Switch_counters.t =
-    { case =
-        (fun n ->
-          if List.mem_assoc n cases then counter (first_arm + n) else failaction);
-      failaction
-    }
-  in
-  let consts = switch_counters sw_consts ~first_arm:0 in
-  let blocks = switch_counters sw_blocks ~first_arm:sw_numconsts in
-  ~consts, ~blocks
+  let consts = side sw_consts ~num:sw_numconsts ~first_arm:1 in
+  let blocks = side sw_blocks ~num:sw_numblocks ~first_arm:(1 + sw_numconsts) in
+  { consts = Side.switch_counters consts;
+    blocks = Side.switch_counters blocks;
+    is_int =
+      { case =
+          (function
+          | 0 -> Side.dispatch_counters blocks
+          | 1 -> Side.dispatch_counters consts
+          | _ -> Fdo_annotation.empty);
+        failaction = Fdo_annotation.empty
+      }
+  }

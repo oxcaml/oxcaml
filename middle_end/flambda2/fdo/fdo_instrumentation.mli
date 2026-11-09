@@ -34,7 +34,7 @@
     on the body (whose body hash guards it), not on how the translation compiles
     it. Calls and switches that the translation introduces (e.g. bounds checks,
     or the dispatch on whether a variant is an immediate) are not in the source
-    and get no counters. *)
+    and get no counters of their own. *)
 
 type t
 
@@ -61,10 +61,22 @@ module Switch_counters : sig
   val failaction : t -> Fdo_annotation.t
 end
 
-(** The counters of the switches a [Lambda] switch translates to: the one on the
-    constant constructors and the one on the tags of the blocks, which share one
-    index. *)
-val switch :
-  t ->
-  Lambda.lambda_switch ->
-  (consts:Switch_counters.t * blocks:Switch_counters.t)
+(** The counters of the switches a [Lambda] switch translates to. *)
+module Lambda_switch_counters : sig
+  type t
+
+  (** Constants *)
+  val consts : t -> Switch_counters.t
+
+  (** Tags of the blocks *)
+  val blocks : t -> Switch_counters.t
+
+  (** Dispatch between [blocks] and [consts] on whether the scrutinee is an
+      immediate. Normally doesn't have counters, but if [blocks] or [consts]
+      collapse into a single arm, their counters are attached here instead. *)
+  val is_int : t -> Switch_counters.t
+end
+
+(** Arm 0 of a [Lambda] switch is its default arm, followed by its constants and
+    then its tags. *)
+val switch : t -> Lambda.lambda_switch -> Lambda_switch_counters.t

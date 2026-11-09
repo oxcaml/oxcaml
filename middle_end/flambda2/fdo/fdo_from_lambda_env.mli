@@ -53,7 +53,4 @@ val call_counter : t -> Lambda.scoped_location -> Fdo_counter.t
 (** The counters of the switches a [Lambda] switch in the function [t] is for
     translates to (see [Fdo_instrumentation.switch]). *)
 val switch_counters :
-  t ->
-  Lambda.lambda_switch ->
-  (consts:Fdo_instrumentation.Switch_counters.t
-  * blocks:Fdo_instrumentation.Switch_counters.t)
+  t -> Lambda.lambda_switch -> Fdo_instrumentation.Lambda_switch_counters.t
