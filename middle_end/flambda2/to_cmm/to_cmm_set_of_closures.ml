@@ -274,7 +274,7 @@ end = struct
           in
           ( acc,
             rev_append_chunks ~for_static_sets
-              [Cmm.Word_int; Cmm.Word_int]
+              [Cmm.Word_code_pointer; Cmm.Word_int]
               chunk_acc,
             Backend_var.Set.empty,
             slot_offset + size,
@@ -303,7 +303,7 @@ end = struct
           in
           ( acc,
             rev_append_chunks ~for_static_sets
-              [Cmm.Word_int; Cmm.Word_int; Cmm.Word_int]
+              [Cmm.Word_code_pointer; Cmm.Word_int; Cmm.Word_code_pointer]
               chunk_acc,
             Backend_var.Set.empty,
             slot_offset + size,
@@ -414,7 +414,7 @@ module Dynamic = Make_layout_filler (struct
   let infix_header ~dbg ~function_slot_offset =
     C.alloc_infix_header function_slot_offset dbg
 
-  let term_of_symbol ~dbg sym = C.symbol ~dbg ~ty:Cmm.typ_int sym
+  let term_of_symbol ~dbg sym = C.symbol ~dbg ~ty:Cmm.typ_code_pointer sym
 
   let define_symbol _ = assert false
 end)

@@ -747,7 +747,7 @@ let compute_live_offset env live =
         Misc.fatal_errorf "Unexpected Valx2 type of reg %a" Printreg.reg r
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
-      | { typ = Int | Float | Float32 | Vec128; _ } -> ()
+      | { typ = Int | Code_pointer | Float | Float32 | Vec128; _ } -> ()
       | { typ = Vec256 | Vec512 | Mask; _ } ->
         Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
@@ -1341,7 +1341,7 @@ let emit_load_literal dst lbl =
   match dst.typ with
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
-  | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
+  | Val | Int | Addr | Code_pointer -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
   | Vec256 | Vec512 | Mask ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
@@ -1355,7 +1355,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
+  | ( (Int | Val | Addr | Code_pointer),
+      Reg _,
+      (Int | Val | Addr | Code_pointer),
+      Reg _ ) ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_d src) dst
@@ -1363,7 +1366,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_str_simd_and_fp env (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_q src) dst
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
+  | ( (Int | Val | Addr | Code_pointer),
+      Reg _,
+      (Int | Val | Addr | Code_pointer),
+      Stack _ ) ->
     emit_stack_str env (H.reg_x src) dst
   | Float, Stack _, Float, Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_d dst) src
@@ -1371,7 +1377,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_ldr_simd_and_fp env (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_q dst) src
-  | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
+  | ( (Int | Val | Addr | Code_pointer),
+      Stack _,
+      (Int | Val | Addr | Code_pointer),
+      Reg _ ) ->
     emit_stack_ldr env (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
     Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
@@ -1381,7 +1390,7 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Code_pointer | Valx2),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1674,7 +1683,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
-    | Word_int | Word_val ->
+    | Word_int | Word_code_pointer | Word_val ->
       if is_atomic
       then (
         assert (
@@ -1727,7 +1736,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Word_val ->
+    | Word_int | Word_code_pointer | Word_val ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
       A.ins2 STR (H.reg_x src) addressing

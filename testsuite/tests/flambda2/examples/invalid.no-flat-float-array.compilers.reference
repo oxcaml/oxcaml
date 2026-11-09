@@ -43,8 +43,8 @@
      (t1/1: val t2/1: val) : int
  (let
    param/0
-     (app{invalid.ml:28,2-13} G:"camlInvalid__check_0_3_code":int t1/1 t2/1
-       int)
+     (app{invalid.ml:28,2-13} G:"camlInvalid__check_0_3_code":code_pointer
+       t1/1 t2/1 int)
    (+ (<< (==f (load float64 (load_mut val t2/1)) 0.) 1) 1)) )
 
 (function{invalid.ml:31,8-30} camlInvalid__foo_2_5_code (param/1: int) : int
@@ -53,7 +53,7 @@
       (alloc{invalid.ml:31,17-25} 1024 L:"camlInvalid__float_3":int)
     param/2
       (app{invalid.ml:31,13-30;invalid.ml:28,2-13}
-        G:"camlInvalid__check_0_3_code":int Pmakearray/0
+        G:"camlInvalid__check_0_3_code":code_pointer Pmakearray/0
         L:"camlInvalid__empty_array_2":int int))
    (+
      (<<

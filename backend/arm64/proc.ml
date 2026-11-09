@@ -45,14 +45,15 @@ open Arch
 
 let types_are_compatible left right =
   match left.typ, right.typ with
-  | (Int | Val | Addr), (Int | Val | Addr)
+  | (Int | Val | Addr| Code_pointer), (Int | Val | Addr| Code_pointer)
   | Float, Float -> true
   | Float32, Float32 -> true
   | Vec128, Vec128 -> true
   | Valx2,Valx2 -> true
   | (Vec256 | Vec512 | Mask), _ | _, (Vec256 | Vec512 | Mask) ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr | Float | Float32 | Vec128 | Valx2), _ -> false
+  | (Int | Val | Addr | Code_pointer | Float | Float32 | Vec128 | Valx2), _ ->
+    false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -78,7 +79,7 @@ let precolored_regs =
 let phys_reg typ phys_reg =
   let index_in_class = Regs.index_in_class phys_reg in
   match (typ : Cmm.machtype_component) with
-  | Int | Addr | Val ->
+  | Int | Addr | Val | Code_pointer ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
@@ -112,7 +113,7 @@ let calling_conventions
     let ty : Cmm.machtype_component = arg.(i) in
     let registers, size =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
+      | Val | Int | Addr | Code_pointer -> int_registers, size_int
       | Float | Float32 -> float_registers, Arch.size_float
       | Vec128 -> float_registers, Arch.size_vec128
       | Vec256 | Vec512 | Mask ->
@@ -333,13 +334,14 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op (Load
           {memory_chunk=(Byte_unsigned|Byte_signed|Sixteen_unsigned|
                          Sixteen_signed|Thirtytwo_unsigned|Thirtytwo_signed|
-                         Word_int|Word_mask|Word_val|Double|
+                         Word_int|Word_code_pointer|Word_mask|Word_val|Double|
                          Onetwentyeight_unaligned|Onetwentyeight_aligned);
            _ })
   | Op (Store
           ((Byte_unsigned|Byte_signed|Sixteen_unsigned|Sixteen_signed|
-            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_mask|Word_val|
-            Double|Onetwentyeight_unaligned|Onetwentyeight_aligned),
+            Thirtytwo_unsigned|Thirtytwo_signed|Word_int|Word_code_pointer|
+            Word_mask|Word_val|Double|
+            Onetwentyeight_unaligned|Onetwentyeight_aligned),
            _, _))
     -> [||]
   | Op (Static_cast
