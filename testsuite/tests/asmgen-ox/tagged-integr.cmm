@@ -34,7 +34,7 @@
         (store float r ( *f (load float x) (load float x)))
         r))
 
-(function "integr" (f: val low: val high: val n: int)
+(function "integr" (f: code_pointer low: val high: val n: int)
   (letmut (h val "h" x val "x" s val "s" i int n)
     (store float h (/f (-f (load float high) (load float low)) (floatofint n)))
     (store float x (load float low))
@@ -52,4 +52,5 @@
 (function "test" (n: int)
   (store float "low" 0.0)
   (store float "hi" 1.0)
-  (load float (app "integr" "square" "low" "hi" n val)))
+  (load float
+    (app "integr":code_pointer "square":code_pointer "low" "hi" n val)))

@@ -75,7 +75,7 @@
                                  (intaset (addraref "board" i) j 1)
                                  (intaset (addraref "board" i1) j1 1)
                                  (intaset (addraref "board" i2) j2 2)
-                                 (if (app "solve" (+ m 1) int)
+                                 (if (app "solve":code_pointer (+ m 1) int)
                                      (raise_notrace 0)
                                    [])
                                  (intaset (addraref "board" i) j 2)
@@ -114,7 +114,7 @@
 
 (function "solitaire" ()
   (seq
-    (if (app "solve" 0 int)
-        (app "print_board" [] unit)
+    (if (app "solve":code_pointer 0 int)
+        (app "print_board":code_pointer [] unit)
       [])
     0))

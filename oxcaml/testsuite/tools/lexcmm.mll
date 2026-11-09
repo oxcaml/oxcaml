@@ -41,6 +41,7 @@ let keyword_table =
     "byte", BYTE;
     "case", CASE;
     "catch", CATCH;
+    "code_pointer", CODE_POINTER;
     "data", DATA;
     "exit", EXIT;
     "extcall", EXTCALL;
