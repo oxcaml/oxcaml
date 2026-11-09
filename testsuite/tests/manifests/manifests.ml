@@ -117,15 +117,14 @@ qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (visible)
 |}]
 
-(* You can write `file_x` in a hidden includes manifest, but it's just the same
-   as writing `file`. *)
+(* You can write `file_x` in a hidden includes manifest *)
 let () =
   run_test ~hidden_include_manifests:[
     "04/04-manifest.txt";
   ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
 
 [%%expect{|
-qux.cmi -> $PWD/manifests/04/qux (hidden)
+qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (hidden)
 |}]
 
@@ -157,7 +156,7 @@ let () =
 
 [%%expect{|
 foo.cmi -> $PWD/manifests/00/foo (hidden)
-qux.cmi -> $PWD/manifests/04/qux (hidden)
+qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
 baz.cmi -> Not_found
 |}]
 
