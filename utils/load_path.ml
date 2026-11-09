@@ -519,16 +519,17 @@ let load_one_pending_manifest ~uncap fn =
   match Queue.take_opt !pending_hidden_manifests with
   | None -> raise Not_found
   | Some manifest_path ->
-    let include_flags =
-      { visibility = Hidden; cmx_presence = Cmx_not_guaranteed }
-    in
     let found = ref None in
     Dune_manifests_reader.read_manifest
       !manifests_reader
       ~manifest_path
       ~on_manifest:(fun manifest_path ->
         Queue.add manifest_path !pending_hidden_manifests)
-      ~f:(fun ~basename ~location ~cmx_guaranteed:_ ->
+      ~f:(fun ~basename ~location ~cmx_guaranteed ->
+        let include_flags =
+          { visibility = Hidden;
+            cmx_presence = cmx_presence_of_bool cmx_guaranteed }
+        in
         let location =
           Dune_manifests_reader.Path.Cwd_relative.to_string location in
         if Option.is_none !found && basename_matches ~uncap fn basename
