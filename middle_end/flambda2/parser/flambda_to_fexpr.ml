@@ -718,7 +718,9 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let inlining_state = inlining_state (Apply_expr.inlining_state app) in
   let callsite_counter =
-    if !Oxcaml_flags.fdo_counters then Apply_expr.callsite_counter app else None
+    if Flambda_features.fdo_counters ()
+    then Apply_expr.callsite_counter app
+    else None
   in
   Apply
     { func;
