@@ -42,8 +42,8 @@ module Counters = struct
     |> Printf.sprintf "[%s]"
 end
 
-external gettimeofday : unit -> (float [@unboxed])
-  = "caml_sys_gettimeofday" "caml_sys_gettimeofday_unboxed" [@@noalloc]
+external time_include_children: bool -> float = "caml_sys_time_include_children"
+let cpu_time () = time_include_children true
 
 
 module Measure = struct
@@ -55,7 +55,7 @@ module Measure = struct
   let create ?(counters = Counters.create ()) () =
     let minor_words, promoted_words, major_words = Gc.counters () in
     {
-      time = gettimeofday ();
+      time = cpu_time ();
       allocated_words = minor_words +. major_words -. promoted_words;
       counters = counters;
     }
