@@ -54,9 +54,7 @@ val fdo_call_counter : t -> Lambda.scoped_location -> Fdo_counter.t option
 val fdo_switch_counters :
   t ->
   Lambda.lambda_switch ->
-  (consts:Fdo_instrumentation.Switch_counters.t
-  * blocks:Fdo_instrumentation.Switch_counters.t)
-  option
+  Fdo_instrumentation.Lambda_switch_counters.t option
 
 val machine_width : t -> Target_system.Machine_width.t
 
