@@ -1932,7 +1932,7 @@ let close_exact_or_unknown_apply acc env
        callsite_counter
      } :
       IR.apply) callee_approx ~replace_region : Expr_with_acc.t =
-  (if !Oxcaml_flags.fdo_counters && Flambda_features.check_invariants ()
+  (if Flambda_features.fdo_counters () && Flambda_features.check_invariants ()
    then
      match kind, callsite_counter with
      | (Function | Method _), None ->
