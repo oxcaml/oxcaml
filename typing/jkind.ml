@@ -2551,32 +2551,6 @@ module Const = struct
       | (Layout _ | Kconstr _), _ -> false)
     && Mod_bounds.equal mod_bounds mod_bounds'
 
-  let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
-      =
-    let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
-        (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds } =
-        Base_and_axes.fully_expand_aliases_const env kind
-      in
-      let layout =
-        (* CR layouts: The [Kconstr] case here is pretty sad - see internal
-           ticket 5769 *)
-        match base with
-        | Kconstr _ -> raise ~loc Abstract_kind_in_product
-        | Layout l -> l
-      in
-      ( layout :: layouts_acc,
-        Mod_bounds.join mod_bounds mod_bounds_acc,
-        With_bounds.join with_bounds with_bounds_acc )
-    in
-    let layouts, mod_bounds, with_bounds =
-      List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
-    in
-    { base = Layout (Layout.Const.product (List.rev layouts));
-      mod_bounds;
-      with_bounds
-    }
-
   let transl_kind_operator ({ txt; loc } : string Location.loc) :
       Kind_operator.t Location.loc =
     let scannable_axis axis = Kind_operator.Scannable_axis axis in
@@ -2668,13 +2642,32 @@ module Const = struct
       in
       jkind
     | Pjk_product ts ->
-      let jkinds =
-        List.map
-          (of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
-             env context)
+      let layouts, mod_bounds, with_bounds =
+        List.fold_left
+          (fun (layouts, mod_bounds_acc, with_bounds_acc)
+               (annot : Parsetree.jkind_annotation) ->
+            let { base; mod_bounds; with_bounds } =
+              of_user_written_annotation_unchecked_level ~use_abstract_jkinds
+                ~warn env context annot
+              |> Base_and_axes.fully_expand_aliases_const env
+            in
+            let layout =
+              (* CR layouts: The [Kconstr] case here is pretty sad - see
+                 internal ticket 5769 *)
+              match base with
+              | Kconstr _ -> raise ~loc Abstract_kind_in_product
+              | Layout l -> l
+            in
+            ( layout :: layouts,
+              Mod_bounds.join mod_bounds mod_bounds_acc,
+              With_bounds.join with_bounds with_bounds_acc ))
+          ([], Mod_bounds.min, No_with_bounds)
           ts
       in
-      jkind_of_product_annotations ~loc env jkinds
+      { base = Layout (Layout.Const.product (List.rev layouts));
+        mod_bounds;
+        with_bounds
+      }
     | Pjk_with (base, type_, modalities) -> (
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
